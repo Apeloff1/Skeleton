@@ -1,0 +1,70 @@
+name: Local-first engine admission regression
+
+# Source-only checks: no live model, remote backend, or device certification.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "backend/core/engine_client.py"
+      - "backend/core/engine_text.py"
+      - "backend/routes/llm_router.py"
+      - "backend/tests/test_engine_origin_admission.py"
+      - "backend/tests/test_engine_text_identity_framing.py"
+      - "backend/tests/test_llm_router_boot_admission.py"
+      - "backend/tests/test_engine_client.py"
+      - "backend/tests/test_engine_text.py"
+      - "backend/tests/test_llm_router.py"
+      - ".github/workflows/local-first-engine-source-qualification.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-first-engine-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  engine_source_admission:
+    name: Canonical engine and LLM boot admission
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Checkout exact PR head without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Confirm immutable PR checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Install canonical Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install offline test dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check --no-input
+          "pytest>=8,<9" "pytest-asyncio>=0.24,<2" "fastapi==0.161.1"
+          "pydantic-settings>=2.15.0,<3" "httpx==0.28.1"
+          "pymongo>=4,<5" "motor>=3,<4"
+          "bcrypt>=4,<5" "PyJWT>=2,<3" "email-validator>=2,<3"
+          "python-dotenv>=1,<2" "requests>=2,<3" "PyYAML>=6,<7"
+          "cryptography>=50,<51" "numpy>=2,<3"
+      - name: Compile canonical engine and newly admitted tests
+        run: |
+          python -m compileall -q backend/core/engine_client.py backend/core/engine_text.py backend/routes/llm_router.py
+          python -m compileall -q backend/tests/test_engine_origin_admission.py backend/tests/test_engine_text_identity_framing.py backend/tests/test_llm_router_boot_admission.py
+      - name: Verify engine credential confinement, identity and offline first boot
+        run: |
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin --maxfail=1 -m "not live_service" \
+            backend/tests/test_engine_origin_admission.py \
+            backend/tests/test_engine_text_identity_framing.py \
+            backend/tests/test_llm_router_boot_admission.py \
+            backend/tests/test_engine_client.py \
+            backend/tests/test_engine_text.py \
+            backend/tests/test_llm_router.py

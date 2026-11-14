@@ -57,5 +57,11 @@ def test_production_setup_route_cannot_be_spa_fallback_false_positive():
     assert 'X-Content-Type-Options "nosniff"' in location_body
 
     dockerfile = (root / "frontend/Dockerfile").read_text(encoding="utf-8")
-    assert "test -f /app/dist/setup.html || test -f /app/dist/setup/index.html" in dockerfile
+    # Docker may require non-empty artifacts (-s), which is stricter than
+    # mere existence (-f). Both forms explicitly prevent a false healthy
+    # setup route when guarded Expo export omits the setup entrypoint.
+    assert any(
+        f"test {flag} /app/dist/setup.html || test {flag} /app/dist/setup/index.html" in dockerfile
+        for flag in ("-f", "-s")
+    ), "Docker build must fail if both static setup entrypoints are missing"
     assert (root / "frontend/app/setup.tsx").is_file()
