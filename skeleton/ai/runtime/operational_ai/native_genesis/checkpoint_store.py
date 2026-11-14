@@ -2,19 +2,29 @@
 from __future__ import annotations
 from pathlib import Path
 import os
+import stat
 import hashlib
 
 from .canonical import bytes_sha, required_sha, encode
 from .errors import refuse
-from ..model.gguf.file_guard import regular_beneath
-from ..recovered_path_custody import open_private_directory
+from ..model.gguf.file_guard import open_private_artifact_root, regular_beneath
 
 
 def _open_private_root(directory: Path, *, create: bool = False) -> int:
+    if not isinstance(directory, Path) or not directory.is_absolute():
+        refuse("store-absolute-directory")
     try:
-        return open_private_directory(directory, create=create)
+        root = open_private_artifact_root(directory, create=create)
     except (OSError, ValueError):
         refuse("store-untrusted-directory")
+    metadata = os.fstat(root)
+    if not stat.S_ISDIR(metadata.st_mode) or metadata.st_mode & 0o077:
+        os.close(root)
+        refuse("store-private-only")
+    if metadata.st_uid != os.geteuid():
+        os.close(root)
+        refuse("store-owner-mismatch")
+    return root
 
 
 def _write_exclusive(root: int, leaf: str, content: bytes) -> None:

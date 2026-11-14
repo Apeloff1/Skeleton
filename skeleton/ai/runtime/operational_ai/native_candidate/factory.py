@@ -13,7 +13,6 @@ from .training_proof import inspect as inspect_training
 from .process_fence import model_training_fence
 from .strict import sha
 from .errors import deny
-from ..recovered_path_custody import require_absolute_directory
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,11 +48,10 @@ def train_native(
     *, code_sha256: str, output_directory: Path, state_directory: Path,
 ) -> FactoryResult:
     sha(code_sha256, "code")
-    try:
-        require_absolute_directory(output_directory)
-        require_absolute_directory(state_directory)
-    except ValueError:
-        deny("candidate-absolute-roots-required")
+    if type(output_directory) is not Path or not output_directory.is_absolute():
+        deny("output-root")
+    if type(state_directory) is not Path or not state_directory.is_absolute():
+        deny("state-root-required")
     with model_training_fence(state_directory, plan.expected_base_model_sha256):
         engine = CandidateTrainer(champion, plan, trainer_code_digest=code_sha256)
         result = engine.train()

@@ -84,6 +84,13 @@ class SignedEnvelope:
         _require_key(key)
         if type(scope) is not Scope or scope.key != self.scope_key:
             deny("envelope-scope")
+        require_id(self.nonce, "nonce")
+        strict_integer(self.sequence, minimum=1, maximum=2**63 - 1, field="sequence")
+        strict_integer(self.issued_ms, minimum=0, maximum=2**63 - 1, field="issued")
+        strict_integer(self.expires_ms, minimum=0, maximum=2**63 - 1, field="expires")
+        if not 0 < self.expires_ms - self.issued_ms <= MAX_TTL_MS:
+            deny("envelope-ttl")
+        require_sha256(self.payload_sha256)
         require_sha256(payload_sha256)
         if not hmac.compare_digest(self.payload_sha256, payload_sha256):
             deny("envelope-payload")

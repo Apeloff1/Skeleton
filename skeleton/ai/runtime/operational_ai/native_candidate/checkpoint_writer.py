@@ -7,18 +7,26 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import stat
 
 from .errors import deny
 from .strict import bytes_sha
 from .trainer import CandidateTrainingResult
-from ..recovered_path_custody import open_private_directory
 
 
 def _root(directory: Path) -> int:
+    from ..model.gguf.file_guard import open_private_artifact_root
+    if not isinstance(directory, Path) or not directory.is_absolute():
+        deny("candidate-root")
     try:
-        return open_private_directory(directory, create=True)
+        fd = open_private_artifact_root(directory, create=True)
     except (OSError, ValueError):
+        deny("candidate-parent-unsafe")
+    mode = os.fstat(fd)
+    if not stat.S_ISDIR(mode.st_mode) or mode.st_mode & 0o077 or mode.st_uid != os.geteuid():
+        os.close(fd)
         deny("candidate-root-private")
+    return fd
 
 
 def _write_new(fd: int, name: str, data: bytes) -> None:
