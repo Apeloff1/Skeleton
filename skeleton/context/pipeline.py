@@ -9,12 +9,16 @@ run and are already on the chain.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+import math
+from typing import Any, Dict, Mapping, Optional
 
 from skeleton.context.cockpit import Cockpit
+from skeleton.context.galaxy_profile import (
+    apply_galaxy_mechanics, attach_galaxy_profile, galaxy_profile_receipt, normalise_galaxy_profile,
+)
 from skeleton.context.dodeca import Dodecahedron
 from skeleton.context.oracle import Magic8Ball
-from skeleton.context.tensor import ContextTensor, detect_era
+from skeleton.context.tensor import AXES, ContextTensor, detect_era
 from skeleton.forge.archetypes import default_library
 from skeleton.forge.universal import Forge
 from skeleton.jeeves.core import Jeeves, SessionMode
@@ -24,6 +28,31 @@ from skeleton.pipelines.composer import PipelineComposer, Stage
 # Archetype names that ask the forge stage to compose the blueprint from the
 # vision (skeleton.forge.vision_compose) instead of stamping a preset.
 COMPOSE_ARCHETYPES = frozenset({"auto", "vision"})
+
+
+def normalise_operator_axes(raw: Optional[Mapping[str, float]]) -> Dict[str, float]:
+    """Fail closed on unknown, non-finite or out-of-range creator instruments.
+
+    A sparse mapping overrides only explicitly touched design axes; no user,
+    project or session state is stored by this validator.
+    """
+    if raw is None:
+        return {}
+    if not isinstance(raw, Mapping) or len(raw) > len(AXES):
+        raise ValueError("operator_axes must be a mapping of at most ten design axes")
+    for axis, value in raw.items():
+        if not isinstance(axis, str) or axis not in AXES:
+            raise ValueError("unknown operator axis")
+        if type(value) not in (float, int) or not math.isfinite(value) or not 0.0 <= value <= 1.0:
+            raise ValueError("operator axis values must be finite numbers between 0 and 1")
+    return {axis: float(raw[axis]) for axis in AXES if axis in raw}
+
+
+def apply_operator_axes(tensor: ContextTensor, raw: Optional[Mapping[str, float]]) -> ContextTensor:
+    """Apply sparse explicit creator edits *after* era/questionnaire resolution."""
+    for axis, value in normalise_operator_axes(raw).items():
+        tensor = tensor.with_axis(axis, value)
+    return tensor
 
 
 class GameForgeRun:
@@ -56,6 +85,8 @@ class GameForgeRun:
                 playtest: Optional[str] = None,
                 repair_mode: str = "apply",
                 operator_tensor: Optional[ContextTensor] = None,
+                operator_axes: Optional[Mapping[str, float]] = None,
+                galaxy_profile: Optional[Mapping[str, Any]] = None,
                 playable_content: bool = False) -> Dict[str, Any]:
         """Run the ten-stage pipeline.
 
@@ -74,6 +105,9 @@ class GameForgeRun:
             raise ValueError("playable archetype scenes require the Godot target")
         if repair_mode not in REPAIR_MODES:
             raise ValueError(f"repair_mode must be one of {REPAIR_MODES}, got {repair_mode!r}")
+        axis_overrides = normalise_operator_axes(operator_axes)
+        complete_galaxy_profile = normalise_galaxy_profile(galaxy_profile)
+        galaxy_receipt = galaxy_profile_receipt(complete_galaxy_profile) if complete_galaxy_profile else None
         cockpit = self.cockpit
         # Freeze operator intent before stage execution. Implicit cockpit
         # blending applies only when neither an explicit era nor questionnaire
@@ -141,6 +175,9 @@ class GameForgeRun:
                 taken.tensor if taken is not None and era == taken.era and operator_tensor is None else None
             ),
             "operator_tensor": operator_tensor,
+            "operator_axes": axis_overrides,
+            "galaxy_profile": complete_galaxy_profile,
+            "galaxy_receipt": galaxy_receipt,
             "repair": True,
             "max_rounds": 3,
             "playtest_mode": playtest_mode,
@@ -211,6 +248,18 @@ class GameForgeRun:
                            if hasattr(run.context.get("build_plan"), "to_dict")
                            else run.context.get("build_plan")),
         }
+        if axis_overrides:
+            payload["operator_axes"] = axis_overrides
+        if galaxy_receipt:
+            payload["galaxy_profile"] = {
+                **galaxy_receipt,
+                "emitted": bool(
+                    run.succeeded and
+                    "design/galaxy_studio_profile.json" in (run.context.get("files") or {})
+                ),
+            }
+            if run.context.get("galaxy_mechanics") is not None:
+                payload["galaxy_mechanics"] = run.context["galaxy_mechanics"]
         self.bus.emit("gameforge.run.finished", {
             "succeeded": run.succeeded,
             "era": payload["era"],
@@ -242,7 +291,10 @@ def _commit(ctx: Dict[str, Any], stage: str, operator: str, system: str, extra: 
 
 def _stage_ingest(ctx: Dict[str, Any]) -> Dict[str, Any]:
     vision = ctx.get("vision") or ""
-    _commit(ctx, "ingest", vision, "ingested", {"chars": len(vision)})
+    details = {"chars": len(vision)}
+    if ctx.get("galaxy_receipt"):
+        details["galaxy_profile_sha256"] = ctx["galaxy_receipt"]["sha256"]
+    _commit(ctx, "ingest", vision, "ingested", details)
     return {"ingested": True, "chars": len(vision)}
 
 
@@ -302,6 +354,7 @@ def _stage_tensor(ctx: Dict[str, Any]) -> Dict[str, Any]:
         cockpit.tensor = ctx["intake_tensor"]
     else:
         cockpit.tensor = ContextTensor.from_era(ctx["era"])
+    cockpit.tensor = apply_operator_axes(cockpit.tensor, ctx.get("operator_axes"))
     _commit(ctx, "tensor", ctx["era"], cockpit.tensor.fingerprint(), cockpit.tensor.as_dict())
     return {"tensor_fp": cockpit.tensor.fingerprint()}
 
@@ -356,6 +409,11 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
         pack, tensor=cockpit.tensor, reading=cockpit.last_oracle,
         cortex=cortex, last_walk=last_walk,
     )
+    build_plan, galaxy_mechanics = apply_galaxy_mechanics(
+        build_plan, ctx.get("galaxy_profile"),
+    )
+    if galaxy_mechanics is not None:
+        ctx["galaxy_mechanics"] = galaxy_mechanics
     ctx["build_plan"] = build_plan
     repair = bool(ctx.get("repair", True))
     max_rounds = int(ctx.get("max_rounds", 3) or 3)
@@ -441,6 +499,10 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         ctx["files"] = files
         ctx["file_count"] = len(files)
         ctx["playable_archetype"] = requested if requested in content_archetypes() else "extraction"
+    if ctx.get("galaxy_profile") is not None:
+        files = attach_galaxy_profile(files, ctx["galaxy_profile"])
+        ctx["files"] = files
+        ctx["file_count"] = len(files)
     # Validate names in both API/in-memory and disk build modes, before any
     # expensive engine checks or project publication.
     source_manifest(files)
@@ -464,12 +526,15 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
             root, files, overwrite=bool(ctx.get("overwrite")),
             meta={"era": ctx.get("era"), "dps": ctx.get("primary_dps")},
         )
-    _commit(ctx, "emit", ctx["era"], f"{len(files)} files", {
+    details = {
         "file_count": len(files),
         "root": None if not project else project["root"],
         "check": "ok",
         "playtest": None if played is None else played.get("status"),
-    })
+    }
+    if ctx.get("galaxy_receipt"):
+        details["galaxy_profile_sha256"] = ctx["galaxy_receipt"]["sha256"]
+    _commit(ctx, "emit", ctx["era"], f"{len(files)} files", details)
     return {"emitted": True, "project": project, "check_ok": True, "playtest": played}
 
 
