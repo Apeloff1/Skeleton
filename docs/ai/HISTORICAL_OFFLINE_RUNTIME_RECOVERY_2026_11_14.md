@@ -34,3 +34,13 @@ Historical tests are restored, not certified. Existing tests that assume a
 world-writable temporary parent may require explicit trusted test roots;
 do not bypass the production ancestry guard. Independent runtime and
 release evidence remains mandatory. No automatic activation.
+
+## Second recovery pass
+
+Restored 169 historical domain runbooks and specifications, one durable-jobs
+machine profile (all acceptance booleans remain false), and the missing rescue
+quest regression suite. Historical `native_candidate/STATUS.md` is restored as
+`native_candidate/source_inventory_status.md` to avoid a case-insensitive
+collision with the independent `status.md` training-domain guide. These are
+historical source records, not current runtime or release evidence. No old
+workflow or architecture metadata is substituted for the current main version.
