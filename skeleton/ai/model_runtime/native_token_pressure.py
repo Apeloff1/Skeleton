@@ -167,6 +167,8 @@ class NativeTokenPressureGuard:
         self._max_duration_ns = max_duration_ns
         self._lock = RLock()
         self._active: str | None = None
+        self._last_permit: DispatchPermit | None = None
+        self._recoverable_stop = False
         self._epoch = 0
         self._used_leases: set[str] = set()
         self._samples = 0
@@ -185,11 +187,13 @@ class NativeTokenPressureGuard:
         try:
             current = os.getpid()
         except BaseException as exc:
+            self._recoverable_stop = False
             self._stopped = True
             raise NativePressureInterrupted(
                 "native execution process identity unavailable"
             ) from exc
         if type(current) is not int or current != self._owner_pid:
+            self._recoverable_stop = False
             self._stopped = True
             raise NativePressureInterrupted(
                 "native execution process identity changed; reauthorize"
@@ -232,9 +236,11 @@ class NativeTokenPressureGuard:
             # The durable journal remains the cross-process authority; this is
             # an independent bounded in-process fence against stale callbacks.
             if permit.lease_id in self._used_leases:
+                self._recoverable_stop = False
                 self._stopped = True
                 raise NativePressureInterrupted("native pressure lease replay denied")
             if len(self._used_leases) >= MAX_USED_LEASES:
+                self._recoverable_stop = False
                 self._stopped = True
                 raise NativePressureInterrupted("native pressure lease capacity exhausted")
             try:
@@ -250,6 +256,8 @@ class NativeTokenPressureGuard:
             self._epoch += 1
             epoch = self._epoch
             self._used_leases.add(permit.lease_id)
+            self._last_permit = permit
+            self._recoverable_stop = True
             self._active = permit.lease_id
             self._samples = 0
             self._pressure = None
@@ -304,6 +312,7 @@ class NativeTokenPressureGuard:
                     self._check_deadline()
                 except NativePressureInterrupted:
                     self._active = None
+                    self._recoverable_stop = False
                     raise
             # A success without a model callback AND postflight probe, or a tripped guard
             # cannot be promoted to a reusable CPU execution permit.
@@ -311,13 +320,40 @@ class NativeTokenPressureGuard:
                 self._active is None or self._samples < 2 or self._stopped
             ):
                 self._active = None
+                self._recoverable_stop = False
                 self._stopped = True
                 raise NativePressureInterrupted(
                     "unverified pressure guard completion"
                 )
             self._active = None
-            if not success:
+            if success:
+                self._recoverable_stop = False
+            else:
                 self._stopped = True
+
+    def reauthorize_retired_lease(self, permit: DispatchPermit) -> None:
+        """Trusted recovery only, after exact journal tombstone verification.
+
+        Preserve used lease identities and invalidate old callbacks. Fresh
+        requests require normal admission and independent live sampling.
+        """
+        self._require_owner_process()
+        if not _canonical_cpu_permit(permit):
+            raise NativePressureInterrupted("canonical retired CPU permit required")
+        with self._lock:
+            if self._active is not None:
+                raise NativePressureInterrupted("cannot reauthorize active native execution")
+            if not self._stopped:
+                return
+            if (not self._recoverable_stop or self._last_permit != permit
+                    or permit.lease_id not in self._used_leases
+                    or len(self._used_leases) >= MAX_USED_LEASES):
+                raise NativePressureInterrupted("retired lease cannot reauthorize stopped guard; reopen required")
+            self._epoch += 1
+            self._start_ns = None
+            self._last_ns = None
+            self._recoverable_stop = False
+            self._stopped = False
 
     def status(self) -> NativePressureStatus:
         """Never report a live permit after its monotonic deadline expires.
