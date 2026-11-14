@@ -159,7 +159,7 @@ def test_symlink_root_rejected(tmp_path):
     target.mkdir()
     alias = tmp_path / "alias"
     alias.symlink_to(target, target_is_directory=True)
-    with pytest.raises(CanonError, match="symlink_root"):
+    with pytest.raises(CanonError, match="symlink_or_untrusted_root"):
         WorldStore(alias)
 
 

@@ -24,7 +24,10 @@ const RANGES = Object.freeze({
   'glob': { affectedFrom: '9.0.0', affectedUpTo: '14.0.1', fixed: { 14: '14.0.2' }, reviewedOutside: ['7.2.3'], severity: 'moderate', advisory: 'GHSA-3g3m-2fjr-6pw4' },
   'minimatch': { affectedFrom: '7.0.0', affectedUpTo: '11.0.0', fixed: { 11: '11.0.1' }, reviewedOutside: ['3.1.5'], severity: 'moderate', advisory: 'GHSA-g3hv-75wg-m249' },
   'http-cache-semantics': { affectedUpTo: '4.2.0', reviewedOutside: ['4.3.0'], advisory: 'GHSA-ch52-4w7c-c8xp' },
-  'node-forge': { affectedUpTo: '1.4.0', reviewedOutside: ['1.4.2'], advisory: 'GHSA-86w9-cpqp-85rv' },
+  // 1.4.3 requalified 2026-11-12 against exact upstream canonical-DER
+  // RSA source, independent structure checks and a negative signature probe.
+  // This scoped snapshot is not a blanket audit of future node-forge releases.
+  'node-forge': { affectedUpTo: '1.4.0', reviewedOutside: ['1.4.2', '1.4.3'], advisory: 'GHSA-86w9-cpqp-85rv' },
   'deepmerge': { affectedFrom: '4.2.0', affectedUpTo: '4.3.1', reviewedOutside: ['4.3.2'], severity: 'low', advisory: 'GHSA-gcqx-w48m-w2h4' },
 });
 // GHSA-vfj7-8cjw-p6xm was officially withdrawn on 2026-10-23. This status

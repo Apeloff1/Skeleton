@@ -1,16 +1,7 @@
 name: Masterplan 421 Volume Dossier Integrity
 
 on:
-  pull_request:
-    paths:
-      - 'docs/plan/volume_completion/**'
-      - 'machine/ai_master_plan.json'
-      - 'machine/ai_masterplan_parse_index.json'
-      - 'machine/ai_build_accountability.json'
-      - 'machine/ai_100_large_delivery_milestones.json'
-      - 'scripts/check_masterplan_volume_dossiers.py'
-      - 'tests/test_masterplan_volume_dossiers.py'
-      - '.github/workflows/masterplan-421-dossier-integrity.yml'
+  workflow_call:
   workflow_dispatch:
 
 permissions:
