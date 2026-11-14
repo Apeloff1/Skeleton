@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "4ddf9ea536b0592e47463984837c15166dc8d927",
+      "source_git_object_sha": "86f82e45cb1b6f23400dfc4dee731b829a050d92",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -98,7 +98,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/runtime/provider_runtime.py",
       "kind": "file",
-      "source_git_object_sha": "4ddf9ea536b0592e47463984837c15166dc8d927",
+      "source_git_object_sha": "86f82e45cb1b6f23400dfc4dee731b829a050d92",
       "role": "Existing legacy runtime import alias for the canonical credential-bearing provider runtime; a non-owning compatibility facade.",
       "work_package_refs": [
         "WP-W05",
@@ -241,7 +241,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "ed1d92c4f7cd7d59734c9d4c08a4b70290284bcc",
+      "source_git_object_sha": "779619f701ed3ec21e57c8330d7ee699b5edf768",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -309,7 +309,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "03b81d2b3f4718efb188109c165ee259107e7ed6",
+      "source_git_object_sha": "1f260feb5307752204857988fd5510e03cf93f61",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -422,7 +422,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "ce7104b6eedb972c8df30ef1887bb097c8d4ad2a",
+      "source_git_object_sha": "39355cf0e7e0914a5afa7d71039a8cefad7afae5",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -470,7 +470,7 @@
       "source": "skeleton/frontier",
       "destination": "skeleton/ai/runtime/frontier",
       "kind": "tree",
-      "source_git_object_sha": "41e62600c69806833671a00aac122bb36ee9fd44",
+      "source_git_object_sha": "42596af7e0405f134dd0892f0d4078b455af083e",
       "role": "Frontier domain runtime with canonical runtime/control-plane primitives under runtime/, progression/meta systems under progression/, ecology/lifecycle systems under ecology/, commerce/cooking/crafting/energy/equipment systems under economy/, NPC/character systems under characters/, and gameplay/voyage/world systems under game/, mirrored exactly into skeleton/ai/runtime/frontier.",
       "work_package_refs": [
         "WP-W04",
@@ -539,7 +539,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "382084558d9b30e8a7da7121a2a468698da59226",
+      "source_git_object_sha": "d8ba29ae574b829a768be0907e0e7bdf69f96c0f",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -1108,7 +1108,7 @@
       "source": "skeleton/eval",
       "destination": "skeleton/ai/evaluation",
       "kind": "tree",
-      "source_git_object_sha": "ddfe76fc6ff811705d1e404bc120d2dc4bbb79b0",
+      "source_git_object_sha": "409c6e7ac5ac5b0a0ee2aa143578fb9319d73b0a",
       "role": "evaluation and evidence support",
       "work_package_refs": [
         "WP-W00",
@@ -1293,7 +1293,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "0ea69a5070897e3f7bb6f71fdb6e8c12a318ff52",
+      "source_git_object_sha": "8cd2c2ec3737d25e74431f0f3a7bfcc1e3377ec8",
       "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
@@ -1486,7 +1486,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "c17c39ce784ae05ddae2a0efdc0b468887870fd1",
+      "source_git_object_sha": "92ca05527e2862a8961045aebae2e8112f6e0866",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1523,7 +1523,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "75e317be4c83b355084f5606e9b48dc0438caca2",
+      "source_git_object_sha": "c2f03534fa517f8cd4d58109dd4d3ee2d52dc15f",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -1712,7 +1712,7 @@
       "source": "skeleton/build",
       "destination": "skeleton/ai/build/core",
       "kind": "tree",
-      "source_git_object_sha": "6a5b9f465d8ee295492a734232d63fba923f66e9",
+      "source_git_object_sha": "7a4c6ee98b5f9f16997042afa8b1e931f6c7928a",
       "role": "Incremental build graph, resource-bounded parallel scheduling, deterministic asset invalidation, build observability, release/remote build controls, and network audit support autonomous AI work.",
       "work_package_refs": [
         "WP-W27",
@@ -2267,7 +2267,7 @@
       "source": "skeleton/quality",
       "destination": "skeleton/ai/evaluation/quality",
       "kind": "tree",
-      "source_git_object_sha": "c5c43e3142e17fb37baec29e88d02b17cbbcf409",
+      "source_git_object_sha": "0c5b2c6803008c6af077626c5987a1e108336a27",
       "role": "Replay evidence and property coverage are evaluation/qualification evidence, not an independent runtime owner.",
       "work_package_refs": [
         "WP-W18",
@@ -3411,7 +3411,7 @@
       "source": "skeleton/telemetry",
       "destination": "skeleton/ai/compat/telemetry",
       "kind": "tree",
-      "source_git_object_sha": "a650330c55e79dbe7dc13dc7c831dbca4f0ca09f",
+      "source_git_object_sha": "64b2f20e9df931233131ed5d4542b5fdb97fccd6",
       "role": "legacy telemetry/SSE facade retained for convergence into canonical observability and streaming owners",
       "work_package_refs": [
         "WP-W21",
@@ -5058,7 +5058,7 @@
       "source": "backend/gameforge/knowledge",
       "destination": "skeleton/ai/research/legacy/gameforge/knowledge",
       "kind": "tree",
-      "source_git_object_sha": "e746337edcead75de6741dc9105ad8a28314ceb2",
+      "source_git_object_sha": "f8da2d3eb4be3ea9c39990742a3870ac77c456cc",
       "role": "Legacy knowledge/free-API ingestion retained as untrusted research evidence.",
       "work_package_refs": [
         "WP-W08",
@@ -5320,7 +5320,7 @@
       "source": "skeleton/provenance",
       "destination": "skeleton/ai/runtime/provenance",
       "kind": "tree",
-      "source_git_object_sha": "881e96383c0294584b6740262390d2a8068603c3",
+      "source_git_object_sha": "589e8c10c75e700fccd5fb7ca33af9f8e1a72fd7",
       "role": "Canonical append-only provenance and event-evidence parent with independently governed Chronicle history.",
       "work_package_refs": [
         "WP-W03",
@@ -6651,10 +6651,10 @@
     ]
   },
   "provenance_refresh": {
-    "status": "current",
-    "refreshed_from_head": "4d585e7b498cb031d57c8e715171456595c05c60",
-    "refreshed_mapping_count": 1,
-    "note": "AIFT-PERSISTENCE source identity refreshed after the Bind Hold refusal and verifier tranche; baseline_git_sha remains the original migration baseline.",
+    "status": "partial",
+    "refreshed_from_head": "601217144ba504839afcd8140466af469c64eec9",
+    "refreshed_mapping_count": 16,
+    "note": "Audit refresh: 149 of 183 mapping records checked against non-truncated trees at 601217144ba504839afcd8140466af469c64eec9. Original migration baseline retained. Remaining nested sources require verification; this record does not certify source parity or runtime execution.",
     "whitespace_normalization": {
       "payload_git_sha": "178a6d4ba05854e79d7fe13fd298a6f3d4145915",
       "source_destination_pairs": 5,
