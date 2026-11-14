@@ -139,6 +139,13 @@ class OfflineAdaptiveDispatchService:
         self._guard.cancel_unstarted(request_id, tenant_id=tenant_id)
         return self.status()
 
+    def reconcile_published(
+        self, *, authorization: "RecoveryAuthorization", recovery_key: bytes,
+    ) -> OfflineDispatchStatus:
+        """Operator-approved recovery of existing authenticated sealed output."""
+        self._guard.reconcile_published(authorization=authorization, recovery_key=recovery_key)
+        return self.status()
+
     def reconcile_cancelled(
         self, *, authorization: "RecoveryAuthorization", recovery_key: bytes,
     ) -> OfflineDispatchStatus:

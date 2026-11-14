@@ -324,6 +324,12 @@ class FairStreamExecutionJournal:
                     or row[5:] != (None, None, None)
                 ):
                     raise ExecutionOutcomeUnknown("journal intent missing or stale")
+                if self._connection.execute(
+                    "SELECT 1 FROM local_fair_stream_cancelled_intents "
+                    "WHERE lease_id=? OR (session_id=? AND request_id=?) LIMIT 1",
+                    (permit.lease_id, self.session_id, permit.request_id),
+                ).fetchone() is not None:
+                    raise ExecutionOutcomeUnknown("conflicting cancellation custody")
                 changed = self._connection.execute(
                     "UPDATE local_fair_stream_execution_journal"
                     " SET state = 'committed', consumed_tokens = ?,"
@@ -338,6 +344,28 @@ class FairStreamExecutionJournal:
             except BaseException:
                 self._connection.rollback()
                 raise
+
+    def require_running_intent(self, permit: DispatchPermit) -> None:
+        """Check an exact RUNNING row before authenticating a sealed result.
+
+        commit() repeats the intent comparison inside its write transaction.
+        A missing or cancelled intent is never inferred from ciphertext.
+        """
+        if type(permit) is not DispatchPermit or permit.device_qualified:
+            raise ValueError("canonical CPU-only dispatch permit required")
+        with self._lock:
+            row = self._row(permit.lease_id)
+            if (row is None or row[:5] != (
+                self.session_id, permit.generation, permit.checkpoint_digest,
+                permit.request_id, "running",
+            ) or row[5:] != (None, None, None)):
+                raise ExecutionOutcomeUnknown("exact running intent unavailable")
+            if self._connection.execute(
+                "SELECT 1 FROM local_fair_stream_cancelled_intents "
+                "WHERE lease_id=? OR (session_id=? AND request_id=?) LIMIT 1",
+                (permit.lease_id, self.session_id, permit.request_id),
+            ).fetchone() is not None:
+                raise ExecutionOutcomeUnknown("conflicting cancellation custody")
 
     def recover_committed_receipt(
         self, permit: DispatchPermit,
@@ -358,6 +386,12 @@ class FairStreamExecutionJournal:
                 )
             ):
                 raise ExecutionOutcomeUnknown("no committed receipt to reconcile")
+            if self._connection.execute(
+                "SELECT 1 FROM local_fair_stream_cancelled_intents "
+                "WHERE lease_id=? OR (session_id=? AND request_id=?) LIMIT 1",
+                (permit.lease_id, self.session_id, permit.request_id),
+            ).fetchone() is not None:
+                raise ExecutionOutcomeUnknown("conflicting cancellation custody")
             consumed, result_digest, payload = row[5:]
             if (
                 type(consumed) is not int

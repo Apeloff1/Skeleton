@@ -362,3 +362,26 @@ def test_capacity_rejects_new_lease_without_backend_execution(vault_dir, monkeyp
         "SELECT COUNT(*) FROM local_fair_stream_sealed_results"
     ).fetchone()[0] == 1
     handle.close()
+
+def test_published_result_verification_returns_only_authenticated_metadata(vault_dir):
+    backend = Backend()
+    handle, vault = open_vault(vault_dir, backend)
+    try:
+        consumed, digest = vault.run_and_commit(permit(), state())
+        assert vault.verify_published_result(permit(), state()) == (consumed, digest)
+        assert backend.calls == 1
+        # Alter ciphertext and its unkeyed digest together. AEAD must reject.
+        from hashlib import sha256
+        ciphertext = handle.connection.execute(
+            "SELECT ciphertext FROM local_fair_stream_sealed_results"
+        ).fetchone()[0]
+        tampered = bytes([ciphertext[0] ^ 1]) + ciphertext[1:]
+        handle.connection.execute(
+            "UPDATE local_fair_stream_sealed_results SET ciphertext=?,result_digest=?",
+            (tampered, sha256(tampered).hexdigest()),
+        )
+        with pytest.raises(SealedResultUnavailable, match="authentication"):
+            vault.verify_published_result(permit(), state())
+        assert backend.calls == 1
+    finally:
+        handle.close()

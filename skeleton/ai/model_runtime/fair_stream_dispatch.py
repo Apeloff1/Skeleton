@@ -399,6 +399,70 @@ class GuardedFairStreamDispatch:
             self._uncertain = False
             return updated
 
+    def reconcile_published(
+        self, *, authorization: "RecoveryAuthorization", recovery_key: bytes,
+    ) -> dict[str, object]:
+        """Settle a sealed result left between vault commit and journal commit.
+
+        Only the exact bound vault and journal can supply evidence. The app
+        must hold exclusive custody of both stores; this path does not repair
+        external anchor divergence or authorize execution of a pending lease.
+        """
+        from .fair_stream_execution_journal import JournaledExecutionOwner
+        from .fair_stream_result_vault import SealedFairStreamResultVault
+        from .fair_stream_recovery import verify_recovery_authorization
+
+        with self._lock:
+            owner = self._owner
+            if (not self._whole_request or type(owner) is not JournaledExecutionOwner
+                    or type(owner._backend) is not SealedFairStreamResultVault
+                    or self._executing):
+                raise DispatchUncertain("sealed result reconciliation unavailable")
+            state = self._session.verify()
+            pending = state["checkpoint"]["pending"]
+            if type(pending) is not list or len(pending) != 1 or type(pending[0]) is not dict:
+                raise DispatchUncertain("exactly one pending lease required")
+            lease = pending[0]
+            permit = DispatchPermit(
+                lease_id=lease["lease_id"], request_id=lease["request_id"],
+                generation=state["generation"], checkpoint_digest=state["checkpoint_digest"],
+                tokens=lease["tokens"], bytes_reserved=lease["bytes_reserved"],
+            )
+            if self._issued and self._issued.get(permit.lease_id) != permit:
+                raise DispatchUncertain("in-memory lease differs from durable custody")
+            verify_recovery_authorization(
+                authorization, recovery_key=recovery_key, state=state,
+                lease_id=permit.lease_id, purpose="published",
+            )
+            self._executing = True
+            try:
+                with owner._lock:
+                    journal, vault = owner._journal, owner._backend
+                    if (journal.session_id != state["session_id"]
+                            or vault.session_id != journal.session_id):
+                        raise ValueError("sealed recovery session mismatch")
+                    journal.require_running_intent(permit)
+                    consumed, digest = vault.verify_published_result(permit, state)
+                    # Check the anchor again after authentication I/O.
+                    if self._session.verify() != state:
+                        raise DispatchUncertain("custody changed during sealed verification")
+                    receipt = journal.commit(
+                        permit, consumed_tokens=consumed, result_digest=digest,
+                    )
+                    updated = self._session.acknowledge(
+                        receipt, whole_request=True,
+                        expected_anchor=(state["generation"], state["digest"]),
+                    )
+                self._issued.clear()
+                self._issued_token_budget = None
+                self._uncertain = False
+                return updated
+            except BaseException as exc:
+                self._uncertain = True
+                raise DispatchUncertain("published result authentication or reconciliation failed") from exc
+            finally:
+                self._executing = False
+
     def reconcile_cancelled(
         self, *, authorization: "RecoveryAuthorization", recovery_key: bytes,
     ) -> dict[str, object]:

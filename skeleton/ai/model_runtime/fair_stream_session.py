@@ -203,12 +203,14 @@ class DurableFairStreamSession:
         )
         return permits, state
 
-    def acknowledge(self, receipt: Mapping[str, object], *, whole_request: bool | None = None) -> dict[str, object]:
+    def acknowledge(self, receipt: Mapping[str, object], *, whole_request: bool | None = None,
+                    expected_anchor: tuple[int, str] | None = None) -> dict[str, object]:
         """Only canonical execution-owner MAC receipts can retire leases."""
         if not isinstance(receipt, Mapping):
             raise ValueError("signed execution receipt required")
         self._check_policy(whole_request)
-        _, state = self._transition(action="acknowledge", receipt=receipt, whole_request=whole_request)
+        _, state = self._transition(action="acknowledge", receipt=receipt,
+                                    whole_request=whole_request, expected_anchor=expected_anchor)
         return state
 
     def pending_ids(self) -> tuple[str, ...]:

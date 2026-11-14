@@ -15,6 +15,10 @@ from typing import Mapping
 
 SCHEMA = "skeleton.ai.fair-stream-recovery-authorization.v1"
 CANCEL_SCHEMA = "skeleton.ai.fair-stream-cancellation-recovery-authorization.v1"
+PUBLISHED_SCHEMA = "skeleton.ai.fair-stream-published-result-recovery-authorization.v1"
+_PURPOSE_SCHEMAS = {
+    "committed": SCHEMA, "cancelled": CANCEL_SCHEMA, "published": PUBLISHED_SCHEMA,
+}
 MAX_GRANT_BYTES = 1024
 
 
@@ -40,7 +44,7 @@ def _body(
     *, session_id: str, generation: int, checkpoint_digest: str,
     lease_id: str, nonce: str, purpose: str = "committed",
 ) -> dict[str, object]:
-    if type(purpose) is not str or purpose not in ("committed", "cancelled"):
+    if type(purpose) is not str or purpose not in _PURPOSE_SCHEMAS:
         raise RecoveryAuthorizationDenied("invalid recovery purpose")
     _hex(session_id, 32, "session")
     _hex(checkpoint_digest, 64, "checkpoint")
@@ -49,7 +53,7 @@ def _body(
     if type(generation) is not int or not 0 <= generation < (1 << 63):
         raise RecoveryAuthorizationDenied("invalid custody generation")
     return {
-        "schema": SCHEMA if purpose == "committed" else CANCEL_SCHEMA,
+        "schema": _PURPOSE_SCHEMAS[purpose],
         "session_id": session_id,
         "generation": generation,
         "checkpoint_digest": checkpoint_digest,
@@ -123,7 +127,7 @@ def verify_recovery_authorization(
         raise RecoveryAuthorizationDenied("canonical operator approval required")
     if not isinstance(state, Mapping):
         raise RecoveryAuthorizationDenied("verified custody state required")
-    if type(purpose) is not str or purpose not in ("committed", "cancelled") or approval.purpose != purpose:
+    if type(purpose) is not str or purpose not in _PURPOSE_SCHEMAS or approval.purpose != purpose:
         raise RecoveryAuthorizationDenied("operator approval purpose mismatch")
     body = _body(
         session_id=approval.session_id, generation=approval.generation,

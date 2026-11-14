@@ -507,3 +507,77 @@ def test_expired_issued_native_permit_can_be_explicitly_cancelled_without_execut
     with pytest.raises(DispatchUncertain):
         service._guard.execute_once(permit)
     assert service.execute_next(token_budget=2)["executed"] is False
+
+@pytest.mark.parametrize("damage", ["none", "ciphertext", "missing", "intent"])
+def test_published_native_result_recovery_never_reexecutes(
+    private_files, monkeypatch, damage,
+):
+    from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchUncertain
+    from skeleton.ai.model_runtime.fair_stream_recovery import (
+        issue_recovery_authorization, RecoveryAuthorizationDenied,
+    )
+
+    install_probe(monkeypatch)
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    stage_native_cpu_prompt(
+        runtime=runtime, registry=registry, request_id="published-native",
+        tenant_id="alice", prompt="hello", max_output_tokens=2,
+    )
+    service.submit(StreamRequest("published-native", "alice", InferencePhase.PREFILL, 2, 16))
+    original_commit = journal.commit
+
+    def lost_commit(*args, **kwargs):
+        raise OSError("simulated loss between vault publication and journal commit")
+
+    monkeypatch.setattr(journal, "commit", lost_commit)
+    with pytest.raises(DispatchUncertain, match="uncertain"):
+        service.execute_next(token_budget=2)
+    monkeypatch.setattr(journal, "commit", original_commit)
+    before = session.verify()
+    lease = before["checkpoint"]["pending"][0]
+    assert registry.status()["consumed_or_revoked"] == 1
+    assert journal._connection.execute(
+        "SELECT state FROM local_fair_stream_execution_journal"
+    ).fetchone() == ("running",)
+    assert vault._connection.execute(
+        "SELECT COUNT(*) FROM local_fair_stream_sealed_results"
+    ).fetchone()[0] == 1
+
+    def approval(purpose):
+        return issue_recovery_authorization(
+            recovery_key=b"o" * 32, session_id=SESSION,
+            generation=before["generation"], checkpoint_digest=before["checkpoint_digest"],
+            lease_id=lease["lease_id"], nonce="f" * 32, purpose=purpose,
+        )
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("recovery invoked native inference")
+
+    monkeypatch.setattr(vault._backend, "generate", forbidden)
+    with pytest.raises(RecoveryAuthorizationDenied, match="purpose"):
+        service.reconcile_published(authorization=approval("committed"), recovery_key=b"o" * 32)
+    if damage == "ciphertext":
+        vault._connection.execute("UPDATE local_fair_stream_sealed_results SET nonce=zeroblob(12)")
+    elif damage == "missing":
+        vault._connection.execute("DELETE FROM local_fair_stream_sealed_results")
+    elif damage == "intent":
+        journal._connection.execute("DELETE FROM local_fair_stream_execution_journal")
+    if damage != "none":
+        with pytest.raises(DispatchUncertain, match="published result"):
+            service.reconcile_published(authorization=approval("published"), recovery_key=b"o" * 32)
+        assert session.verify() == before
+        assert service.status().execution_uncertain
+        return
+    result = service.reconcile_published(authorization=approval("published"), recovery_key=b"o" * 32)
+    assert result.pending_leases == 0 and not result.execution_uncertain
+    assert session.verify()["checkpoint"]["requests"] == []
+    assert journal._connection.execute(
+        "SELECT state FROM local_fair_stream_execution_journal"
+    ).fetchone() == ("committed",)
+    assert registry.status()["consumed_or_revoked"] == 1

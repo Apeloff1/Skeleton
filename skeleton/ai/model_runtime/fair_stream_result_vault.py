@@ -351,41 +351,64 @@ class SealedFairStreamResultVault:
             row = self._row(permit.lease_id)
             if row is None:
                 raise SealedResultUnavailable("result not committed")
-            (
-                lease_id, session_id, generation, checkpoint_digest, request_id,
-                model_digest, tokenizer_digest, tokens, bytes_reserved,
-                consumed, length, nonce, ciphertext, digest,
-            ) = row
-            if (
-                (lease_id, session_id, generation, checkpoint_digest, request_id)
-                != (permit.lease_id, self.session_id, permit.generation,
-                    permit.checkpoint_digest, permit.request_id)
-                or (model_digest, tokenizer_digest)
-                != (self.model_digest, self.tokenizer_digest)
-                or (tokens, bytes_reserved)
-                != (permit.tokens, permit.bytes_reserved)
-                or type(consumed) is not int
-                or not 0 <= consumed <= permit.tokens
-                or type(length) is not int
-                or not 0 <= length <= MAX_RESULT_BYTES
-                or type(nonce) is not bytes or len(nonce) != 12
-                or type(ciphertext) is not bytes
-                or len(ciphertext) != length + 16
-                or type(digest) is not str
-                or not hmac.compare_digest(digest, expected)
-                or not hmac.compare_digest(sha256(ciphertext).hexdigest(), expected)
-            ):
-                raise SealedResultUnavailable("result binding or digest mismatch")
-            aad = _aad(
-                permit=permit, session_id=self.session_id,
-                model_digest=self.model_digest,
-                tokenizer_digest=self.tokenizer_digest,
-                consumed_tokens=consumed, plaintext_bytes=length,
-            )
-            try:
-                plaintext = self._cipher.decrypt(nonce, ciphertext, aad)
-            except (InvalidTag, ValueError) as exc:
-                raise SealedResultUnavailable("result authentication failed") from exc
-            if len(plaintext) != length:
-                raise SealedResultUnavailable("result length mismatch")
+            _, plaintext = self._authenticate_row(permit, row, expected)
             return plaintext
+
+    def verify_published_result(self, permit: DispatchPermit, state: Mapping[str, object]) -> tuple[int, str]:
+        """Verify a durable ciphertext against the exact authenticated lease.
+
+        Trusted recovery only. Plaintext is decrypted internally to verify the
+        AEAD tag, never returned to the caller. No model execution or write.
+        """
+        self._validate_state(permit, state)
+        with self._lock:
+            self._require_open()
+            row = self._row(permit.lease_id)
+            if row is None:
+                raise SealedResultUnavailable("result not committed")
+            expected = _hex(row[-1], 64, "stored result digest")
+            consumed, plaintext = self._authenticate_row(permit, row, expected)
+            del plaintext
+            self._require_open()
+            return consumed, expected
+
+    def _authenticate_row(self, permit: DispatchPermit, row: tuple[object, ...],
+                          expected: str) -> tuple[int, bytes]:
+        (
+            lease_id, session_id, generation, checkpoint_digest, request_id,
+            model_digest, tokenizer_digest, tokens, bytes_reserved,
+            consumed, length, nonce, ciphertext, digest,
+        ) = row
+        if (
+            (lease_id, session_id, generation, checkpoint_digest, request_id)
+            != (permit.lease_id, self.session_id, permit.generation,
+                permit.checkpoint_digest, permit.request_id)
+            or (model_digest, tokenizer_digest)
+            != (self.model_digest, self.tokenizer_digest)
+            or (tokens, bytes_reserved)
+            != (permit.tokens, permit.bytes_reserved)
+            or type(consumed) is not int
+            or not 0 <= consumed <= permit.tokens
+            or type(length) is not int
+            or not 0 <= length <= MAX_RESULT_BYTES
+            or type(nonce) is not bytes or len(nonce) != 12
+            or type(ciphertext) is not bytes
+            or len(ciphertext) != length + 16
+            or type(digest) is not str
+            or not hmac.compare_digest(digest, expected)
+            or not hmac.compare_digest(sha256(ciphertext).hexdigest(), expected)
+        ):
+            raise SealedResultUnavailable("result binding or digest mismatch")
+        aad = _aad(
+            permit=permit, session_id=self.session_id,
+            model_digest=self.model_digest,
+            tokenizer_digest=self.tokenizer_digest,
+            consumed_tokens=consumed, plaintext_bytes=length,
+        )
+        try:
+            plaintext = self._cipher.decrypt(nonce, ciphertext, aad)
+        except (InvalidTag, ValueError) as exc:
+            raise SealedResultUnavailable("result authentication failed") from exc
+        if len(plaintext) != length:
+            raise SealedResultUnavailable("result length mismatch")
+        return consumed, plaintext
