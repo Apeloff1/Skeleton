@@ -1,7 +1,10 @@
 """HMAC request-envelope unit and mutation checks; no hosted provider."""
 from __future__ import annotations
 from dataclasses import replace
+import hashlib
+import hmac
 import unittest
+from skeleton.ai.runtime.operational_ai.guarded_request.contracts import canonical_bytes
 from skeleton.ai.runtime.operational_ai.guarded_request.identities import Scope
 from skeleton.ai.runtime.operational_ai.guarded_request.signed_envelope import SignedEnvelope
 from skeleton.ai.runtime.operational_ai.guarded_request.errors import GateDenied
@@ -49,6 +52,23 @@ class TestEnvelope(unittest.TestCase):
             SignedEnvelope.sign(KEY, scope=self.scope, nonce="request_2",
                                 sequence=2, payload_sha256=PAYLOAD,
                                 issued_ms=1, expires_ms=300002)
+
+    def test_authenticated_but_invalid_envelope_is_rejected(self):
+        for fields in ({"expires_ms": 300101}, {"sequence": 0}, {"nonce": "bad nonce"},
+                       {"issued_ms": -1}, {"expires_ms": True}):
+            with self.subTest(fields=fields):
+                invalid = replace(self.envelope, **fields)
+                mac = hmac.new(KEY, canonical_bytes(invalid._payload()), hashlib.sha256).hexdigest()
+                invalid = replace(invalid, mac_sha256=mac)
+                with self.assertRaises(GateDenied):
+                    invalid.verify(KEY, scope=self.scope, payload_sha256=PAYLOAD, now_ms=150)
+
+    def test_malformed_wire_fields_fail_closed(self):
+        for fields in ({"payload_sha256": 7}, {"sequence": True}, {"issued_ms": "100"}):
+            with self.subTest(fields=fields):
+                invalid = replace(self.envelope, **fields)
+                with self.assertRaises(GateDenied):
+                    invalid.verify(KEY, scope=self.scope, payload_sha256=PAYLOAD, now_ms=150)
 
     def test_manifest_schema_bound(self):
         self.assertEqual(self.envelope._payload()["schema"], "skeleton.ai.native-envelope.v1")
