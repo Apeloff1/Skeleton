@@ -48,6 +48,10 @@ Commands:
     forget       Existing organism/kernel owner
     helix        Existing organism/kernel owner
     recall       Existing organism/kernel owner
+    gameforge-conduct  GameForge 7-step conductor -> ten-stage forge -> playable Godot
+                gameforge-conduct --title T --pitch P --genre G [--pillar X]...
+                    [--era HOUSE_ERA] [--forge-era ID] [--no-playable] [--out DIR]
+                    [--overwrite] [--playtest off|auto|require] [--json]
     run         Start the skeleton runtime / GameForge vision run
                 run <vision> [--answers JSON|FILE|@FILE] [--answers-file FILE]
                     [--era ID] [--archetype NAME] [--out DIR] [--overwrite]
@@ -938,6 +942,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         from skeleton.organism.operator_cli import run_operator_cli
         return run_operator_cli(cmd, rest)
     if cmd == "run": return _cmd_gameforge_run(rest)
+    if cmd == "gameforge-conduct":
+        from skeleton.gameforge.serving import cli as conduct_cli
+        return conduct_cli(rest)
     if cmd == "scene-escort":
         from skeleton.game.gameplay.scene_escort import cli as escort_cli
         return escort_cli(rest)
