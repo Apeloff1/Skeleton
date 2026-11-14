@@ -1,19 +1,7 @@
 name: Bounded GameForge exact-run source archive qualification
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
-    paths:
-      - "backend/routes/skeleton_gameforge.py"
-      - "skeleton/testing/test_gameforge_source_archive.py"
-      - "frontend/src/skeletonForge/sourceArchive.ts"
-      - "frontend/src/skeletonForge/shareSourceArchive.ts"
-      - "frontend/src/skeletonForge/hooks.ts"
-      - "frontend/src/skeletonForge/components/**"
-      - "frontend/scripts/skeleton-forge/source-archive.test.cjs"
-      - "frontend/scripts/skeleton-forge/run-session-isolation.test.cjs"
-      - ".github/workflows/gameforge-source-archive-qualification.yml"
+  workflow_call:
   workflow_dispatch:
 
 permissions:

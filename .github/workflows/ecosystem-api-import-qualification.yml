@@ -1,14 +1,7 @@
 name: Ecosystem API Production Import Qualification
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
-    paths:
-      - "backend/routes/ecosystem_api.py"
-      - "backend/core/ecosystem_orchestrator.py"
-      - "backend/tests/test_ecosystem_import_layout_20261111.py"
-      - ".github/workflows/ecosystem-api-import-qualification.yml"
+  workflow_call:
 
 permissions:
   contents: read

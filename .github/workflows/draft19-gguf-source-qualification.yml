@@ -1,32 +1,7 @@
 name: Draft19 GGUF and source custody qualification
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/local_ai/model_loader.py"
-      - "backend/core/lazy_registry.py"
-      - "skeleton/app/offline_delivery_archive.py"
-      - "skeleton/testing/test_app_offline_delivery_archive.py"
-      - "skeleton/testing/test_app_offline_archive_schema_parity.py"
-      - "skeleton/testing/test_repo_machine_inventory_budget.py"
-      - ".machine/repository.toml"
-      - "tests/test_repo_machine_budget_20261108.py"
-      - "skeleton/testing/test_ai_next_model.py"
-      - "skeleton/testing/test_app_offline_archive_schema_parity.py"
-      - "skeleton/testing/test_repo_machine_inventory_budget.py"
-      - "skeleton/testing/test_app_offline_mixed_game_library_continuity.py"
-      - "skeleton/testing/dialogue_sessions_v1/test_companions_rescue.py"
-      - "skeleton/testing/questflows_v1/test_questflows_companions_rescue.py"
-      - "skeleton/testing/test_local_ai_model_loader_custody.py"
-      - "tests/test_local_ai_gguf_custody_v6.py"
-      - "tests/test_gguf_artifact_qualification_reconciliation.py"
-      - "machine/draft19_reconciliation.json"
-      - "scripts/check_draft19_reconciliation.py"
-      - "tests/test_draft19_reconciliation.py"
-      - "scripts/check_draft19_ci_paths.py"
-      - "tests/test_draft19_ci_paths.py"
-      - ".github/workflows/draft19-gguf-source-qualification.yml"
+  workflow_call:
 
 permissions:
   contents: read

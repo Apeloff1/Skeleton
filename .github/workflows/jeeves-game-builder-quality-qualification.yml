@@ -1,20 +1,7 @@
 name: Archived GameForge Jeeves evaluation source qualification
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
-    paths:
-      - "skeleton/eval/**"
-      - "skeleton/ai/evaluation/**"
-      - "skeleton/app/jeeves_local_lease.py"
-      - "skeleton/ai/runtime/inference/lease_custody.py"
-      - "scripts/evaluate_jeeves_game_builder_quality.py"
-      - "tests/test_game_builder_quality.py"
-      - "tests/test_game_builder_reference_pack.py"
-      - "backend/routes/skeleton_gameforge.py"
-      - "backend/tests/test_jeeves_game_quality_catalog.py"
-      - ".github/workflows/jeeves-game-builder-quality-qualification.yml"
+  workflow_call:
   workflow_dispatch:
 
 permissions:

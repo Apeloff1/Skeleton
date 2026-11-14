@@ -1,13 +1,7 @@
 name: Jeeves Bounded Canonical Evidence Qualification
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/jeeves/native_fabric/laptop_ops/contracts.py"
-      - "skeleton/ai/agents/jeeves/native_fabric/laptop_ops/contracts.py"
-      - "skeleton/testing/test_jeeves_laptop_canonical_bounds_20261111.py"
-      - ".github/workflows/jeeves-bounded-canonical-evidence.yml"
+  workflow_call:
 
 permissions:
   contents: read

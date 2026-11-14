@@ -103,6 +103,43 @@ class WorkflowTierTests(unittest.TestCase):
                 source = ROOT / ".github/workflows-archive" / name
                 (root / ".github/workflows-archive" / name).write_text(source.read_text())
             self.assertEqual(audit(root), [])
+            # All 25 source suites remain real callable jobs; reintroducing
+            # independent PR events or dropping the caller must fail closed.
+            required_sources = registry["consolidated_required_source_workflows"]
+            self.assertEqual(len(required_sources), 25)
+            source_workflow = root / ".github/workflows" / required_sources[0]
+            source_original = source_workflow.read_text()
+            source_workflow.write_text(source_original.replace(
+                "  workflow_call:", "  pull_request:", 1,
+            ))
+            self.assertTrue(any(
+                "consolidated source must be callable" in issue
+                for issue in audit(root)
+            ))
+            source_workflow.write_text(source_original)
+            readiness = root / ".github/workflows/merge-readiness.yml"
+            readiness_original = readiness.read_text()
+            required_call = "uses: ./.github/workflows/" + required_sources[0]
+            readiness.write_text(readiness_original.replace(
+                required_call, "uses: ./.github/workflows/absent-source.yml", 1,
+            ))
+            self.assertTrue(any(
+                "missing mandatory consolidated source caller" in issue
+                or "consolidated source caller is not exact-head" in issue
+                for issue in audit(root)
+            ))
+            readiness.write_text(readiness_original)
+            readiness.write_text(readiness_original.replace(
+                "needs.source_qualification_gate.result == 'success'",
+                "needs.source_qualification_gate.result != 'failure'",
+                1,
+            ))
+            self.assertTrue(any(
+                "required CI/CD lane lost fail-closed consolidated source qualification" in issue
+                for issue in audit(root)
+            ))
+            readiness.write_text(readiness_original)
+            self.assertEqual(audit(root), [])
             reusable = root / ".github/workflows" / registry["required_reusable_workflows"][0]
             reusable_original = reusable.read_text()
             reusable.write_text(reusable_original.replace("  workflow_call:", "  pull_request:"))

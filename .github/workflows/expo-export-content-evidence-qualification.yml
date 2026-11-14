@@ -1,14 +1,7 @@
 name: Expo Export Content Evidence Qualification
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
-    paths:
-      - '.github/workflows/expo-export-content-evidence-qualification.yml'
-      - 'frontend/scripts/guarded-expo-export.cjs'
-      - 'frontend/scripts/test-guarded-expo-export.cjs'
-      - 'frontend/Dockerfile'
+  workflow_call:
 
 permissions:
   contents: read

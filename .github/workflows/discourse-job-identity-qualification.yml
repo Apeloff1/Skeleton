@@ -1,19 +1,7 @@
 name: Discourse Job Identity and E2E Source Qualification
 
 on:
-  pull_request:
-    branches:
-      - main
-      - fix/ci-native-proof-preflight-20261111-r01
-    types: [opened, reopened, synchronize, ready_for_review]
-    paths:
-      - '.github/workflows/discourse-job-identity-qualification.yml'
-      - 'frontend/src/features/discourse/discourseJob.ts'
-      - 'frontend/scripts/test-discourse-async-jobs.mjs'
-      - 'tests/test_app_foundation_e2e_build_isolation.py'
-      - 'frontend/scripts/guarded-expo-export.cjs'
-      - 'frontend/scripts/test-guarded-expo-export.cjs'
-      - 'frontend/Dockerfile'
+  workflow_call:
 
 permissions:
   contents: read

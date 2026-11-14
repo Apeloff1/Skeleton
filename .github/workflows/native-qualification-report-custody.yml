@@ -1,16 +1,7 @@
 name: Native Qualification Report Custody
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
-    paths:
-      - '.github/workflows/native-qualification-report-custody.yml'
-      - 'skeleton/ai/runtime/operational_ai/deployment/qualification/paths.py'
-      - 'skeleton/ai/runtime/operational_ai/deployment/qualification/proof.py'
-      - 'skeleton/ai/runtime/operational_ai/deployment/qualification/verification.py'
-      - 'skeleton/testing/test_ai_real_model_qualification.py'
-      - 'skeleton/testing/test_ai_qualification_proof_boundaries_20261111.py'
+  workflow_call:
 
 permissions:
   contents: read
