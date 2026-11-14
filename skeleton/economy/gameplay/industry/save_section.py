@@ -88,15 +88,18 @@ def save_industry(
     sections: dict[str, Mapping[str, Any]] = dict(other_sections or {})
     if any((m := _KEY_RE.match(k)) and m.group("name") == name for k in sections):
         raise SaveError(f"other_sections already holds a {name!r} section")
-    system.require_conserved()
-    sections.update(industry_section(system, name))
-    if system.market is not None:
-        return market_save.save_market(
-            plane, slot, sequence, system.market, other_sections=sections
+    # The shared economy lock fences industry and market writers throughout
+    # conservation validation and the composite checkpoint capture.
+    with system.econ._lock:
+        system.require_conserved()
+        sections.update(industry_section(system, name))
+        if system.market is not None:
+            return market_save.save_market(
+                plane, slot, sequence, system.market, other_sections=sections
+            )
+        return save_plane.save_to_plane(
+            plane, slot, sequence, system.econ, other_sections=sections
         )
-    return save_plane.save_to_plane(
-        plane, slot, sequence, system.econ, other_sections=sections
-    )
 
 
 def load_industry(
