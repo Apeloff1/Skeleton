@@ -742,3 +742,45 @@ def test_single_nonzero_marker_is_not_valid_execution_custody(tmp_path: Path):
         with lease.hold():
             pytest.fail("invalid single-byte marker admitted execution")
     assert lease.path.read_bytes() == b"\x01"
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX open-file-description inheritance")
+def test_parent_scope_exit_does_not_unlock_live_inherited_child(tmp_path):
+    from skeleton.ai.runtime.inference.lease_custody import gguf_child_pass_fds
+
+    lease = LocalInferenceLease(tmp_path / "scope-exit.sqlite3")
+    worker = None
+    try:
+        with lease.hold():
+            worker = subprocess.Popen(
+                [sys.executable, "-c", "import time; time.sleep(30)"],
+                pass_fds=gguf_child_pass_fds(), close_fds=True,
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        assert worker.poll() is None
+        with pytest.raises(LocalInferenceLeaseBusy):
+            with LocalInferenceLease(tmp_path / "scope-exit.sqlite3").hold():
+                pytest.fail("parent scope exit unlocked a live child")
+    finally:
+        if worker is not None:
+            worker.kill()
+            worker.wait(timeout=8)
+    with lease.hold():
+        assert lease.path.read_bytes() == b"\x00"
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX ancestor mode checks")
+def test_private_leaf_below_unprotected_ancestor_refuses_lease(tmp_path):
+    shared = tmp_path / "shared"
+    shared.mkdir(mode=0o700)
+    leaf = shared / "private"
+    leaf.mkdir(mode=0o700)
+    shared.chmod(0o777)
+    try:
+        lease = LocalInferenceLease(leaf / "native.sqlite3")
+        with pytest.raises(LocalInferenceLeaseUnavailable, match="ancestor"):
+            with lease.hold():
+                pytest.fail("unsafe ancestor allowed replacement of private lock directory")
+        assert not lease.path.exists()
+    finally:
+        shared.chmod(0o700)

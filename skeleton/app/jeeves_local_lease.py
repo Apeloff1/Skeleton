@@ -51,7 +51,22 @@ class LocalInferenceLease:
         self.path = database_path.with_name(database_path.name + ".inference.lock")
         self._thread_gate = threading.Lock()
 
+    def _verify_parent_chain(self) -> None:
+        # A private leaf below a writable ancestor can be renamed and replaced.
+        if os.name != "posix":
+            return
+        try:
+            for directory in self.path.parents:
+                meta = directory.lstat()
+                if not stat.S_ISDIR(meta.st_mode) or meta.st_uid not in (0, os.getuid()):
+                    raise LocalInferenceLeaseUnavailable("unsafe inference lease ancestor")
+                if meta.st_mode & 0o022 and not meta.st_mode & stat.S_ISVTX:
+                    raise LocalInferenceLeaseUnavailable("inference lease ancestor allows unsafe writes")
+        except OSError as exc:
+            raise LocalInferenceLeaseUnavailable("inference lease ancestor unavailable") from exc
+
     def _verified_descriptor(self, *, initialize: bool) -> int:
+        self._verify_parent_chain()
         # The pathname and its lock inode must remain anchored in a directory
         # that arbitrary local users cannot replace while inference runs.
         # A root-owned sticky /tmp is acceptable; unprotected shared
@@ -190,6 +205,7 @@ class LocalInferenceLease:
             locked = True
             # A recreated sidecar must never be mistaken for the locked inode.
             # Keep validating while the kernel lock is held, before launch.
+            self._verify_parent_chain()
             observed = self.path.lstat()
             owned = os.fstat(fd)
             if (not stat.S_ISREG(observed.st_mode) or observed.st_nlink != 1
@@ -220,7 +236,11 @@ class LocalInferenceLease:
                 try:
                     if fd is not None:
                         try:
-                            if locked:
+                            # LOCK_UN on POSIX would unlock the shared open
+                            # file description even if a native child still
+                            # holds it. Close only our descriptor; the kernel
+                            # releases exclusion on the final reference.
+                            if locked and os.name != "posix":
                                 self._unlock_fd(fd)
                         finally:
                             os.close(fd)
