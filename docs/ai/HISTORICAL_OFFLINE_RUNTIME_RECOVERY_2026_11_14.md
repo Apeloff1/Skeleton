@@ -56,3 +56,18 @@ member's size and SHA-256 with the checkout and rejects missing, duplicate
 or altered records. A source configuration test is included. Neither the
 wheel nor the verifier was executed in the connector session; actual installed
 native runtime qualification remains outstanding.
+
+## Signed work-order restart custody
+
+Historical signed-work-order head `6fae74d4e147141d52625edcabfc8b8df6a07b3b`
+contained a cold-open integrity check missing from current main. Restore the
+audit before exposing either writable or read-only store instances, and close
+the database if audit fails. Extend audit to reject absent or misbound outbox
+records and invalid acknowledgement timestamps. Three historical tamper tests
+and five additional focused regressions cover valid read-only opening and
+journal/outbox corruption. An exhaustive audit over the existing one-million
+event default ceiling is required; oversized stores hold rather than silently
+bypass verification. This is local custody, not external signed-log authority.
+
+Focused command: `python -m pytest -q skeleton/testing/test_ai_work_orders_08_crash_restart.py`.
+No runtime execution or exact-head qualification is asserted by source recovery.
