@@ -4,7 +4,9 @@ const assert = require('node:assert/strict');
 const { load } = require('./harness.cjs');
 const R = load('src/features/GalaxyStudioFactory/genreRegistry.ts');
 const G = load('src/skeletonForge/galaxyGenres.ts');
-test('original 67 plus two distinct recovery specialties always render offline', () => {
+const F = load('src/features/GalaxyStudioFactory/fallbackGenres.ts');
+const C = load('src/skeletonForge/genreCatalog.ts');
+test('69 distinct historical offline choices survive recovery without duplicates', () => {
   const offline = R.mergeGalaxyGenreCatalog(null);
   assert.equal(R.GALAXY_OFFLINE_COUNT, 69);
   assert.equal(offline.length, 69);
@@ -32,4 +34,20 @@ test('unsafe unknown live records are excluded without losing offline catalog', 
   assert.ok(!items.some(x => x.id === '__proto__'));
   assert.ok(items.find(x => x.id === 'xy'));
   assert.ok(items.some(x => x.id === 'beat_em_up'));
+});
+
+test('historical metadata and ordering survive duplicate recoveries', () => {
+  const offline = R.mergeGalaxyGenreCatalog(null);
+  const original = F.FALLBACK_GENRES;
+  assert.deepEqual(offline.slice(0, original.length), original);
+  assert.equal(new Set(G.GALAXY_CHOICES.map(x => x.id)).size, 69);
+  assert.equal(C.GENRE_COUNT, 158);
+  for (const entry of offline) {
+    assert.ok(C.GENRE_CHOICES.includes(G.mappedBriefGenre(entry.id)), entry.id);
+    assert.equal(G.galaxyGenre(entry.id).name, entry.name);
+  }
+  const fallbackWithoutRecovered = original.filter(x => !R.RECOVERED_GENRES.some(y => y.id === x.id));
+  const rebuilt = R.mergeOfflineGalaxyGenres(fallbackWithoutRecovered, R.RECOVERED_GENRES);
+  assert.equal(rebuilt.length, 69);
+  assert.equal(new Set(rebuilt.map(x => x.id)).size, 69);
 });
