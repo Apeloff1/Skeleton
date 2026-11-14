@@ -17,6 +17,7 @@ from .fair_stream_queue import FairStreamScheduler, MeasuredStreamBudget, Stream
 SCHEMA = "skeleton.ai.fair-stream-custody.v1"
 RECEIPT_SCHEMA = "skeleton.ai.fair-stream-execution.v1"
 CANCELLATION_SCHEMA = "skeleton.ai.fair-stream-unstarted-cancellation.v1"
+ABANDONMENT_SCHEMA = "skeleton.ai.fair-stream-abandonment.v1"
 MAX_BYTES = 524288
 ZERO = "0" * 64
 
@@ -98,6 +99,22 @@ def sign_unstarted_cancellation(
         "lease_id": lease_id, "request_id": request_id,
     }
     return {**body, "mac": _sign(execution_key, body)}
+
+
+def sign_abandonment(
+    *, execution_key: bytes, session_id: str, generation: int,
+    checkpoint_digest: str, lease_id: str, evidence_digest: str,
+) -> dict[str, object]:
+    """Distinct retirement receipt; never a successful execution result."""
+    body = {
+        "schema": ABANDONMENT_SCHEMA,
+        "session_id": _hex(session_id, "session", 32),
+        "generation": _generation(generation),
+        "checkpoint_digest": _hex(checkpoint_digest, "checkpoint"),
+        "lease_id": _hex(lease_id, "lease"),
+        "evidence_digest": _hex(evidence_digest, "operator drainage evidence"),
+    }
+    return {**body, "mac": _sign(_key(execution_key), body)}
 
 
 class AuthenticatedFairStreamCustody:
@@ -237,6 +254,20 @@ class AuthenticatedFairStreamCustody:
                 if not hmac.compare_digest(_canonical(receipt), _canonical(expected)):
                     raise ValueError("cancellation authentication or binding failed")
                 trial.cancel_unstarted(receipt["lease_id"], receipt["request_id"], tenant_id=tenant_id)
+            elif action == "abandon":
+                fields = {"schema", "session_id", "generation", "checkpoint_digest",
+                          "lease_id", "evidence_digest", "mac"}
+                if type(receipt) is not dict or set(receipt) != fields:
+                    raise ValueError("signed abandonment receipt required")
+                expected = sign_abandonment(
+                    execution_key=self._execution_key, session_id=self.session_id,
+                    generation=self.generation,
+                    checkpoint_digest=self._scheduler.checkpoint()["digest"],
+                    lease_id=receipt["lease_id"], evidence_digest=receipt["evidence_digest"],
+                )
+                if not hmac.compare_digest(_canonical(receipt), _canonical(expected)):
+                    raise ValueError("abandonment authentication or binding failed")
+                trial.abandon_pending(receipt["lease_id"])
             elif action == "acknowledge":
                 required = {
                     "schema", "session_id", "generation", "checkpoint_digest",

@@ -226,6 +226,15 @@ class DurableFairStreamSession:
                                     whole_request=whole_request, expected_anchor=expected_anchor)
         return state
 
+    def abandon(self, receipt: Mapping[str, object], *,
+                expected_anchor: tuple[int, str] | None = None) -> dict[str, object]:
+        """Consume a distinct journal retirement receipt, never a result."""
+        if type(receipt) is not dict:
+            raise ValueError("signed abandonment receipt required")
+        _, state = self._transition(action="abandon", receipt=receipt,
+                                    expected_anchor=expected_anchor)
+        return state
+
     def pending_ids(self) -> tuple[str, ...]:
         self._require_owner_process()
         with self._lock:
