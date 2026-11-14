@@ -5,7 +5,7 @@
 import { INITIAL_STATE, buildRunRequest, questionnaireReducer, type QuestionnaireAction, type QuestionnaireState } from '../questionnaire';
 import { sparseInstrumentPayload } from '../instruments';
 import { mappedBriefGenre } from '../galaxyGenres';
-import { summarizeRun } from '../run';
+import { isLocallyCancelled, summarizeRun } from '../run';
 import type { RunPayload, RunRequest } from '../types';
 
 export const SCREENS = ['boot', 'onboarding', 'sign-in', 'dashboard', 'brief', 'build', 'account', 'settings'] as const;
@@ -476,7 +476,14 @@ export function buildGuidance(phase: BuildPhase, error: string | null, payload: 
     return {
       id: 'projects',
       label: 'All projects',
-      detail: 'The forge runs every stage in this one request. You can leave this screen; cancel here if you want it to stop.',
+      detail: 'The forge runs every stage in this one request. You can leave this screen. Cancel only stops this device from waiting; the server cannot be told to stop.',
+    };
+  }
+  if (isLocallyCancelled(phase, error)) {
+    return {
+      id: 'retry',
+      label: 'Forge it again',
+      detail: 'You stopped waiting for this build. Nothing from it was applied. Forge again when you are ready, or change the brief first.',
     };
   }
   if (phase === 'idle') {
@@ -649,12 +656,87 @@ export interface AuthClient {
   completeWebRedirect: () => Promise<unknown>;
 }
 
-export async function bootstrap(load: () => Promise<LoadResult>, auth: AuthClient): Promise<FoundationState> {
+/** Per-stage bootstrap deadlines (ms). A stage that never settles must not
+ * leave the studio on its boot spinner forever. */
+export interface BootstrapDeadlines {
+  redirect: number;
+  load: number;
+  auth: number;
+}
+
+export const BOOTSTRAP_DEADLINES: BootstrapDeadlines = Object.freeze({
+  redirect: 8000,
+  load: 10000,
+  auth: 12000,
+});
+
+export class DeadlineError extends Error {
+  constructor(readonly stage: keyof BootstrapDeadlines, readonly ms: number, message: string) {
+    super(message);
+    this.name = 'DeadlineError';
+  }
+}
+
+type TimerPort = {
+  set: (fn: () => void, ms: number) => unknown;
+  clear: (handle: unknown) => void;
+};
+
+const REAL_TIMERS: TimerPort = {
+  set: (fn, ms) => setTimeout(fn, ms),
+  clear: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+};
+
+/** Settle with `work`, or reject with a DeadlineError after `ms`. The late
+ * result of `work` is ignored (and its rejection swallowed) once expired. */
+export function withDeadline<T>(
+  work: () => Promise<T>, ms: number, stage: keyof BootstrapDeadlines,
+  message: string, timers: TimerPort = REAL_TIMERS,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let done = false;
+    const handle = timers.set(() => {
+      if (done) return;
+      done = true;
+      reject(new DeadlineError(stage, ms, message));
+    }, ms);
+    let pending: Promise<T>;
+    try { pending = Promise.resolve(work()); } catch (error) { pending = Promise.reject(error); }
+    pending.then((value) => {
+      if (done) return;
+      done = true;
+      timers.clear(handle);
+      resolve(value);
+    }, (error) => {
+      if (done) return;
+      done = true;
+      timers.clear(handle);
+      reject(error);
+    });
+  });
+}
+
+export interface BootstrapOptions {
+  deadlines?: Partial<BootstrapDeadlines>;
+  timers?: TimerPort;
+}
+
+export async function bootstrap(
+  load: () => Promise<LoadResult>, auth: AuthClient, options: BootstrapOptions = {},
+): Promise<FoundationState> {
+  const limits = { ...BOOTSTRAP_DEADLINES, ...options.deadlines };
+  const timers = options.timers ?? REAL_TIMERS;
   let state = initialFoundationState();
-  try { await auth.completeWebRedirect(); } catch { /* checkMe still decides the session */ }
+  try {
+    await withDeadline(() => auth.completeWebRedirect(), limits.redirect, 'redirect',
+      'The sign-in redirect did not finish in time.', timers);
+  } catch { /* checkMe still decides the session */ }
   let loaded: LoadResult;
   try {
-    loaded = await load();
+    // A slow device read is held exactly like a failed one: never invent an
+    // empty studio that a later save could write over the real projects.
+    loaded = await withDeadline(load, limits.load, 'load',
+      'Saved studio data did not load in time. Nothing was changed; retry to read it again.', timers);
   } catch (error) {
     loaded = {
       onboarded: false,
@@ -667,7 +749,8 @@ export async function bootstrap(load: () => Promise<LoadResult>, auth: AuthClien
   }
   state = foundationReducer(state, { type: 'hydrated', ...loaded });
   try {
-    const me = await auth.checkMe();
+    const me = await withDeadline(() => auth.checkMe(), limits.auth, 'auth',
+      'The account service did not answer in time.', timers);
     state = foundationReducer(state, { type: 'auth', view: viewFromMe(me) });
   } catch (error) {
     state = foundationReducer(state, {

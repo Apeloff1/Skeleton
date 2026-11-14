@@ -12,6 +12,7 @@ import {
   openTarget, orderedProjects, persistSnapshot, projectStatus, viewFromMe, bootstrap,
   type BuildPhase, type FoundationState, type LoadResult, type PersistSnapshot, type StepAction, type StudioProject,
 } from '../../foundation/model';
+import { createSnapshotSaver, type SnapshotSaver } from '../../foundation/persistQueue';
 import { buildRunRequest, FALLBACK_BEATS, type QuestionnaireAction } from '../../questionnaire';
 import { summarizeRun } from '../../run';
 import type { Beat, EraRow, GenerationRow, RunPayload, RunRequest } from '../../types';
@@ -121,20 +122,35 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
     return () => { cancel = true; };
   }, [initialState, ports.load, ports.auth]);
 
+  // One coalescing writer per mounted shell: at most one device write in
+  // flight, newest snapshot wins, and only the newest outcome is reported.
+  // Automatic saves and "Retry save" share it, so they cannot race.
+  const saveRef = React.useRef(ports.save);
+  saveRef.current = ports.save;
+  const saverRef = React.useRef<SnapshotSaver<PersistSnapshot> | null>(null);
+  React.useEffect(() => {
+    const saver = createSnapshotSaver<PersistSnapshot>(
+      (snap) => (saveRef.current ? saveRef.current(snap) : Promise.resolve()),
+      (outcome) => dispatch({
+        type: 'persistError',
+        error: outcome.ok ? null : message(outcome.error, 'Could not save on this device.'),
+      }),
+    );
+    saverRef.current = saver;
+    return () => {
+      saver.close();
+      if (saverRef.current === saver) saverRef.current = null;
+    };
+  }, []);
+
   const serial = JSON.stringify(persistSnapshot(state));
   const seen = React.useRef<string | null>(null);
   React.useEffect(() => {
-    if (!ports.save || !state.hydrated || state.holdSaves) return undefined;
-    if (seen.current === null) { seen.current = serial; return undefined; }
-    if (seen.current === serial) return undefined;
+    if (!ports.save || !state.hydrated || state.holdSaves) return;
+    if (seen.current === null) { seen.current = serial; return; }
+    if (seen.current === serial) return;
     seen.current = serial;
-    let cancel = false;
-    void ports.save(persistSnapshot(state)).then(() => {
-      if (!cancel) dispatch({ type: 'persistError', error: null });
-    }, (error) => {
-      if (!cancel) dispatch({ type: 'persistError', error: message(error, 'Could not save on this device.') });
-    });
-    return () => { cancel = true; };
+    saverRef.current?.enqueue(persistSnapshot(state));
   }, [serial, state.hydrated, state.holdSaves, ports.save]);
 
   React.useEffect(() => {
@@ -368,6 +384,9 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
         onCancel={visible.live && visible.phase === 'running' ? ports.run.onCancel : undefined}
         onRetry={visible.phase === 'done' || visible.phase === 'error' ? () => startForge(active, buildRunRequest(active.questionnaire)) : undefined}
         outdated={Boolean(active.lastRunOutdated && visible.phase !== 'running')}
+        live={visible.live}
+        request={visible.live ? ports.run.request ?? null
+          : active.lastRunOutdated ? null : buildRunRequest(active.questionnaire)}
         onExport={visible.live && visible.phase === 'done' && visible.payload?.source_export?.status === 'ready'
           ? ports.run.onExport : undefined}
         exportBusy={ports.run.exportBusy}
@@ -426,10 +445,8 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
             <Banner tone="bad" testID="studio-persist-error">{state.persistError}</Banner>
             <Button label="Retry save" tone="secondary" onPress={() => {
               if (!ports.save || state.holdSaves) return;
-              void ports.save(persistSnapshot(state)).then(() => dispatch({ type: 'persistError', error: null }), (error) => {
-                dispatch({ type: 'persistError', error: message(error, 'Could not save on this device.') });
-              });
-            }} testID="studio-retry-save" />
+              saverRef.current?.enqueue(persistSnapshot(state));
+            }} testID="studio-retry-save" a11yHint="Writes the current studio state to this device again" />
           </View>
         ) : null}
         {ports.legacyAvailable && canEnter(state) && !state.holdSaves ? (

@@ -4,7 +4,8 @@
  * pure reducer in ../questionnaire.
  */
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScaledText as Text, ScaledTextInput as TextInput } from './ScaledText';
 import { humanize } from '../graph';
 import { DESIGN_AXES } from '../instruments';
 import { GALAXY_CHOICES, galaxyGenre, mappedBriefGenre } from '../galaxyGenres';

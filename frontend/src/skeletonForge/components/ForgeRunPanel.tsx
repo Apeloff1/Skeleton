@@ -8,11 +8,12 @@
  * inventing per-stage progress we cannot observe.
  */
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ScaledText as Text } from './ScaledText';
 import { gridMove, readKey, rovingTabIndex, tabIndexProp, useRovingIndex, webKeyProps, type KeyEventLike } from '../a11y';
 import { featureMeta, humanize } from '../graph';
 import type { RunPhase } from '../hooks';
-import { formatElapsed, formatScore, pendingStages, playableSceneView, summarizeRun, type StageView } from '../run';
+import { formatElapsed, formatScore, isLocallyCancelled, pendingStages, playableSceneView, summarizeRun, type StageView } from '../run';
 import type { RunPayload } from '../types';
 import { Banner, Button, Card, Meter, SectionTitle, StatusPill } from './primitives';
 import { C, TONE_COLOR, TONE_GLYPH } from './theme';
@@ -65,9 +66,12 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
   }
 
   const running = phase === 'running';
+  const cancelled = isLocallyCancelled(phase, error);
   const stages = running ? pendingStages() : sum.stages;
-  const headTone = running ? 'idle' : phase === 'error' || !sum.succeeded ? 'bad' : 'ok';
-  const headLabel = running ? `Forging… ${formatElapsed(elapsed)}` : phase === 'error' ? 'Run failed' : sum.succeeded ? `Forged in ${formatElapsed(elapsed)}` : 'Run finished with failures';
+  const headTone = running ? 'idle' : cancelled ? 'warn' : phase === 'error' || !sum.succeeded ? 'bad' : 'ok';
+  const headLabel = running ? `Forging… ${formatElapsed(elapsed)}`
+    : cancelled ? `Stopped waiting after ${formatElapsed(elapsed)}`
+      : phase === 'error' ? 'Run failed' : sum.succeeded ? `Forged in ${formatElapsed(elapsed)}` : 'Run finished with failures';
 
   return (
     <View testID={testID} accessibilityState={{ busy: running }} aria-busy={running}>
@@ -77,10 +81,19 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
           <StatusPill tone={headTone} label={headLabel} testID="run-status" />
           {running && !reduceMotion ? <ActivityIndicator color={C.accent} accessibilityLabel="Forge running" /> : null}
           <View style={{ flex: 1 }} />
-          {running && onCancel ? <Button label="Cancel" tone="ghost" compact onPress={onCancel} testID="run-cancel" /> : null}
+          {running && onCancel ? (
+            <Button
+              label="Stop waiting"
+              tone="ghost"
+              compact
+              onPress={onCancel}
+              a11yHint="Stops waiting on this device. The server may still finish, and that result will not be applied."
+              testID="run-cancel"
+            />
+          ) : null}
           {!running && onRetry ? <Button label="Run again" tone="secondary" compact onPress={onRetry} testID="run-retry" /> : null}
         </View>
-        {phase === 'error' && error ? <Banner tone="bad" testID="run-error">{error}</Banner> : null}
+        {phase === 'error' && error ? <Banner tone={cancelled ? 'warn' : 'bad'} testID={cancelled ? 'run-cancelled' : 'run-error'}>{error}</Banner> : null}
         {phase === 'error' && !payload && onViewPlan ? <Button label="View plan" tone="ghost" compact onPress={onViewPlan} testID="run-view-plan" /> : null}
         <Meter
           ratio={running ? 0 : sum.completed / Math.max(1, sum.total)}
