@@ -322,3 +322,36 @@ test('presence bounds stalled heartbeats and orders leave after join', async () 
   release(); await tick();
   assert.deepEqual(posts, ['join', 'leave']);
 });
+
+
+test('client recovers from a dead transport that ignores abort and never settles', async () => {
+  const clock = fakeClock([1]); const connections = []; const got = [];
+  const transport = (_path, opts) => { connections.push(opts); return new Promise(() => {}); };
+  const c = new EventStreamClient({ channels: ['build'], transport, clock, onEvent: e => got.push(e.id) });
+  c.start();
+  connections[0].onOpen(200);
+  connections[0].onChunk(frame('1', 'build.progress', env('1')));
+  await clock.advance(45_000);
+  assert.equal(connections[0].signal.aborted, true);
+  assert.equal(c.getState().status, 'reconnecting');
+  await clock.advance(500);
+  assert.equal(connections.length, 2);
+  assert.equal(connections[1].headers['Last-Event-ID'], '1');
+  connections[0].onChunk(frame('2', 'build.progress', env('2')));
+  assert.deepEqual(got, ['1']);
+  c.stop();
+});
+
+test('lagged stream reconnects even when transport ignores cancellation', async () => {
+  const clock = fakeClock([1]); const connections = [];
+  const transport = (_path, opts) => { connections.push(opts); return new Promise(() => {}); };
+  const c = new EventStreamClient({ channels: ['build'], transport, clock, initialCursor: '99' });
+  c.start(); connections[0].onOpen(200);
+  const lag = JSON.stringify({ v: 1, ts: '2026-10-17T16:00:00.123Z', type: 'stream.lagged', payload: { dropped: 3, resume_from: '80' } });
+  connections[0].onChunk(`event: stream.lagged\ndata: ${lag}\n\n`);
+  assert.equal(connections[0].signal.aborted, true);
+  await clock.advance(0);
+  assert.equal(connections.length, 2);
+  assert.equal(connections[1].headers['Last-Event-ID'], '99');
+  c.stop();
+});
