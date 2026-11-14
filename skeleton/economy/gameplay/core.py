@@ -203,6 +203,53 @@ class GameplayEconomy(EconomySim):
             self._record_burn(item_id, qty, sink)
             return qty
 
+    def consume_items_batch(
+        self, owner: str, operations: Iterable[tuple[str, str, int]],
+    ) -> int:
+        """Validate and stage every item sink before publishing any ledger delta."""
+        with self._lock:
+            inv = self._owner(owner)
+            stacks = dict(inv.stacks)
+            bound = dict(self._bound[owner])
+            changed: dict[str, _ItemFlows] = {}
+            total = 0
+            for index, (sink, item_id, qty) in enumerate(operations):
+                if index >= 100_000:
+                    raise EconomySimError("item batch exceeds operation budget")
+                _req_id(sink, "item sink")
+                if sink in _RESERVED_ITEM_FLOWS:
+                    raise EconomySimError("reserved item sink")
+                _req_int(qty, "qty", minimum=1)
+                self._item(item_id)
+                left = stacks.get(item_id, 0) - qty
+                if left < 0:
+                    raise EconomySimError("not enough items")
+                if left:
+                    stacks[item_id] = left
+                else:
+                    stacks.pop(item_id, None)
+                if bound.get(item_id, 0) > left:
+                    if left:
+                        bound[item_id] = left
+                    else:
+                        bound.pop(item_id, None)
+                if item_id not in changed:
+                    prior = self._item_flows[item_id]
+                    changed[item_id] = _ItemFlows(
+                        minted=prior.minted, burned=prior.burned,
+                        by_source=dict(prior.by_source), by_sink=dict(prior.by_sink),
+                    )
+                flow = changed[item_id]
+                flow.burned += qty
+                flow.by_sink[sink] = flow.by_sink.get(sink, 0) + qty
+                total += qty
+            # All validation and allocations above are speculative. Existing
+            # observers use the same economy lock; publish the staged state together.
+            inv.stacks = stacks
+            self._bound[owner] = bound
+            self._item_flows.update(changed)
+            return total
+
     def move_items(self, src: str, dst: str, item_id: str, qty: int = 1) -> int:
         """Gift/transfer items between owners. Bound and untradeable items stay put."""
         _req_int(qty, "qty", minimum=1)

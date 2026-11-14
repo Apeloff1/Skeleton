@@ -22,6 +22,8 @@ DONE = "done"  # finished, output waiting for delivery (bags were full)
 DELIVERED = "delivered"
 CANCELLED = "cancelled"
 STATUSES = (QUEUED, RUNNING, DONE, DELIVERED, CANCELLED)
+MAX_JOBS = 100_000
+MAX_JOB_ID = (1 << 63) - 1
 
 
 @dataclass
@@ -128,7 +130,17 @@ class BuildQueue:
         self.jobs: dict[int, Job] = {}
         self.next_id = 1
 
+    def require_capacity(self, count: int = 1) -> None:
+        if type(count) is not int or count < 0 or len(self.jobs) + count > MAX_JOBS:
+            raise ValueError("production job history capacity exceeded")
+        if self.next_id + count > MAX_JOB_ID:
+            raise ValueError("production job identity exhausted")
+
     def add(self, job: Job) -> Job:
+        if len(self.jobs) >= MAX_JOBS:
+            raise ValueError("production job history capacity exceeded")
+        if type(job.job_id) is not int or not 1 <= job.job_id < MAX_JOB_ID:
+            raise ValueError("invalid production job identity")
         if job.job_id in self.jobs:
             raise ValueError("duplicate job identity")
         self.jobs[job.job_id] = job
@@ -136,6 +148,7 @@ class BuildQueue:
         return job
 
     def new_id(self) -> int:
+        self.require_capacity()
         jid = self.next_id
         self.next_id += 1
         return jid
@@ -241,5 +254,6 @@ __all__ = [
     "STATUSES",
     "BuildQueue",
     "Job",
+    "MAX_JOBS",
     "chain_ids",
 ]
