@@ -315,7 +315,7 @@ def test_explicit_tempo_slider_changes_actual_controller_source_for_all_modes(mo
     assert receipt["applied"]["player.speed"] > 0
     assert tuned == archetype_files(mode, tuning={"spectacle": 0.9, "tempo": 1})
     assert pristine == archetype_files(mode)
-    ok, errors = check_ok(tuned)
+    ok, errors = check_ok({**godot_files(), **tuned})
     assert ok, errors
 
 
@@ -339,7 +339,7 @@ def test_risk_scarcity_lethality_knobs_really_change_the_specific_game_logic(
     assert receipt["applied"][target] > 0
     assert receipt["mapped_axes"] == [axis]
     assert receipt["unmapped_axes"] == []
-    okay, errors = check_ok(files)
+    okay, errors = check_ok({**godot_files(), **files})
     assert okay, errors
 
 
@@ -527,7 +527,7 @@ def test_godot_static_controller_type_keeps_dynamic_custom_fields_explicit(mode)
     assert "player.autopilot_target" not in loop
     assert "player.autopilot" not in loop
     assert 'bool(player.get("autopilot"))' in loop or mode == "racing"
-    valid, issues = check_ok(emitted)
+    valid, issues = check_ok({**godot_files(), **emitted})
     assert valid, (mode, issues)
 
 
@@ -563,7 +563,7 @@ def test_progression_depth_changes_native_completion_quotas(mode, source_key, ex
         assert tuning["mapped_axes"] == ["grind"]
         assert tuning["unmapped_axes"] == []
         assert bundle == archetype_files(mode, tuning={"grind": knob})
-        valid, errors = check_ok(bundle)
+        valid, errors = check_ok({**godot_files(), **bundle})
         assert valid, (mode, knob, errors)
     assert SOURCE_PATH not in original
 
@@ -583,7 +583,7 @@ def test_mystery_axis_changes_real_native_hint_visibility(mode, flag, source_key
         assert receipt["applied"][source_key] == float(expected)
         assert receipt["mapped_axes"] == ["opacity"]
         assert receipt["unmapped_axes"] == []
-        valid, issues = check_ok(generated)
+        valid, issues = check_ok({**godot_files(), **generated})
         assert valid, (mode, knob, issues)
     assert "const SHOW_" in normal[f"scripts/archetypes/{mode}/core_loop.gd"]
 

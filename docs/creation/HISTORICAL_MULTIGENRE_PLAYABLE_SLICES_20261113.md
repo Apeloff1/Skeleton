@@ -126,3 +126,32 @@ ten-stage forge run with a valid whole-project source manifest.
 This is source identity, **not** a claim that native Godot ran successfully
 or that locally stored content cannot be edited by a user. All real
 device, native runtime, controls, security and installer gates stay separate.
+
+
+## 2026-11-14 restore onto recovered main (c7e29744)
+
+Mass recovery (#5333–#5348) landed this document, the eight-mode tests and
+the tuning/provenance modules, but `skeleton/forge/archetype_content.py`
+kept only the original three loops. The five missing loops (crafting,
+puzzle, racing, stealth, survival) are restored from #5315 into the single
+authored library, so `content_archetypes()` and
+`GET /api/skeleton/playable/archetypes` both report eight.
+
+One emit stage now serves both recovered contracts:
+
+- **Explicit selection** (`playable_archetype` and/or `playable_main_scene`):
+  one of the eight modes, cockpit tuning v1 (`data/playable_tuning.json`),
+  a launch scene or the PlayableHub launcher, and the
+  `skeleton.gameforge.playable_source.v1` receipt checked by
+  `verify_playable_source` after every writer (Galaxy profile, quest) runs.
+- **Archetype-driven slice** (no explicit selection): creator-axes
+  mechanics v3 (`operator_axes`), the PlayablePortal world gateway and the
+  `skeleton.forge.playable_mechanics.v1` receipt, unchanged.
+
+The two knob contracts are mutually exclusive per call, so a project never
+gets two scene-switch buttons or two different readings of one slider.
+The 158-genre catalog is still a design vocabulary, not eight-plus engines.
+
+Native check on the box: all eight `core_loop.gd` scenes completed headless
+on autopilot in Godot 4.7.2 (`test_core_loop_completes_in_real_godot`).
+This is not device, controls or installer qualification.
