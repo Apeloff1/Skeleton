@@ -230,3 +230,49 @@ def test_legacy_checkpoint_cannot_silently_upgrade_execution_policy(tmp_path):
             ), anchor)
     with sqlite3.connect(path) as connection:
         assert DurableFairStreamSession(store(connection), anchor).verify() == before
+
+@pytest.mark.parametrize("operation", ["verify", "pending_ids"])
+def test_anchor_change_during_store_load_quarantines_observation(monkeypatch, operation):
+    anchor = SimulatedIndependentWatermark()
+    db = store()
+    session = DurableFairStreamSession.bootstrap(db, anchor)
+    original = db.load
+
+    def moved(**kwargs):
+        owner = original(**kwargs)
+        anchor.state = (999, "f" * 64)
+        return owner
+
+    monkeypatch.setattr(db, "load", moved)
+    with pytest.raises(CustodyQuarantined):
+        getattr(session, operation)()
+    assert session.quarantined
+
+
+def test_anchor_acknowledgement_cannot_hide_corrupted_successor(monkeypatch):
+    anchor = SimulatedIndependentWatermark()
+    db = store()
+    session = DurableFairStreamSession.bootstrap(db, anchor)
+    session.submit(request())
+    original = anchor.advance
+
+    def corrupt(**kwargs):
+        original(**kwargs)
+        db._connection.execute(
+            "UPDATE local_fair_stream_custody SET payload=?", (b"{}",),
+        )
+        db._connection.commit()
+
+    monkeypatch.setattr(anchor, "advance", corrupt)
+    with pytest.raises(CustodyQuarantined, match="reconciliation"):
+        session.plan(budget())
+    assert session.quarantined
+
+
+def test_noncanonical_anchor_container_is_denied(monkeypatch):
+    anchor = SimulatedIndependentWatermark()
+    session = DurableFairStreamSession.bootstrap(store(), anchor)
+    original = anchor.read
+    monkeypatch.setattr(anchor, "read", lambda: list(original()))
+    with pytest.raises(CustodyQuarantined, match="high-watermark"):
+        session.verify()
