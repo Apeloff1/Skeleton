@@ -62,7 +62,8 @@ def _verified_live_evidence(
         return False
     if holds["cgroup_swap_spill"] == evidence["cgroup_swap_spill_allowed"]:
         return False
-    if any(holds[field] for field in _HARD_HOLDS) and (
+    if (any(holds[field] for field in _HARD_HOLDS)
+            or budget.available_for_streams == 0) and (
         not budget.thermal_hold or budget.effective_slots != 0
     ):
         return False

@@ -177,3 +177,73 @@ def test_invalid_process_identity_never_probes_or_reuses_pressure(monkeypatch):
         monkeypatch.setattr(module.os, "getpid", lambda value=value: value)
         with pytest.raises(RuntimeError, match="identity|forked"):
             sampler.sample(token_budget=128)
+
+@pytest.mark.parametrize("thermal_measured,memory_limit", [
+    (False, 8_000_000_000),
+    (True, None),
+    (False, None),
+    (True, 8_000_000_000),
+])
+def test_sampler_and_native_evidence_consumer_agree_on_unknown_sensors(
+    monkeypatch, thermal_measured, memory_limit,
+):
+    """Simulated probe readings only; the exact producer and verifier run."""
+    from skeleton.ai.model_runtime.native_token_pressure import _verified_live_evidence
+
+    configure(monkeypatch)
+    monkeypatch.setattr(module, "sys", SimpleNamespace(platform="linux"))
+    monkeypatch.setattr(module, "probe_cgroup_memory_headroom", lambda: SimpleNamespace(
+        limit_bytes=memory_limit,
+        headroom_bytes=4_000_000_000 if memory_limit is not None else None,
+        pressure_ppm=0, hard_hold=False,
+    ))
+    monkeypatch.setattr(module, "probe_cgroup_swap_headroom", lambda: SimpleNamespace(
+        limit_bytes=None, spill_allowed=False,
+    ))
+    sampler = module.LiveStreamBudgetSampler()
+    for controller, observation in (
+        (sampler._thermal, {"thermal_backpressure": False, "trip_measured": thermal_measured}),
+        (sampler._io, {"measured": True, "congested": False, "some_avg10_percent": 0.0}),
+        (sampler._cgroup, {"measured": True, "high_backpressure": False, "oom_backpressure": False}),
+        (sampler._cpu, {"measured": True, "observed_throttled_ratio": 0.0, "backpressure": False}),
+        (sampler._swap, {"measured": True, "backpressure": False}),
+        (sampler._reclaim, {"scanned_ram_fraction_per_s": 0.0, "backpressure": False}),
+    ):
+        monkeypatch.setattr(controller, "snapshot", lambda observation=observation: observation)
+    budget, evidence = sampler.sample(token_budget=4096)
+    unknown = not thermal_measured or memory_limit is None
+    assert evidence["auxiliary_telemetry_incomplete"] is unknown
+    assert budget.token_budget == (128 if unknown else 4096)
+    if unknown:
+        assert budget.stream_slots <= 1
+    assert _verified_live_evidence(budget, evidence)
+
+
+def test_zero_usable_memory_cannot_issue_stream_slots(monkeypatch):
+    from skeleton.ai.model_runtime.native_token_pressure import _verified_live_evidence
+
+    configure(monkeypatch)
+    monkeypatch.setattr(module, "probe_cgroup_memory_headroom", lambda: SimpleNamespace(
+        limit_bytes=1024 * 1024 * 1024, headroom_bytes=0,
+        pressure_ppm=1_000_000, hard_hold=True,
+    ))
+    budget, evidence = module.LiveStreamBudgetSampler().sample(token_budget=512)
+    assert budget.available_for_streams == 0
+    assert budget.thermal_hold
+    assert budget.effective_slots == budget.effective_tokens == 0
+    assert _verified_live_evidence(budget, evidence)
+
+
+def test_reserve_consumes_remaining_memory_without_authorizing_work(monkeypatch):
+    from skeleton.ai.model_runtime.native_token_pressure import _verified_live_evidence
+
+    configure(monkeypatch)
+    monkeypatch.setattr(module, "probe_local_resources", lambda _: LocalResourceSnapshot(
+        total_ram_bytes=128 * 1024 * 1024, available_ram_bytes=32 * 1024 * 1024,
+        total_disk_bytes=10_000_000_000, free_disk_bytes=5_000_000_000,
+        cpu_count=4, cpu_load_ratio=0.1,
+    ))
+    budget, evidence = module.LiveStreamBudgetSampler().sample(token_budget=128)
+    assert budget.available_for_streams == 0
+    assert budget.effective_slots == 0
+    assert _verified_live_evidence(budget, evidence)

@@ -78,6 +78,8 @@ class LiveStreamBudgetSampler:
                 available_ram = min(available_ram, cgroup_memory.headroom_bytes)
             if host.available_ram_bytes <= 0:
                 raise ValueError("no measured RAM headroom")
+            # Zero cgroup headroom is a valid measured hold, not an invitation
+            # to fall back to the larger host memory observation.
             self._thermal.observe(probe_cpu_thermal())
             thermal = self._thermal.snapshot()
             self._io.observe(probe_io_pressure())
@@ -122,6 +124,8 @@ class LiveStreamBudgetSampler:
             missing = (
                 sys.platform != "linux"
                 or cgroup_memory is None
+                or cgroup_memory.limit_bytes is None
+                or not thermal["trip_measured"]
                 or not io["measured"]
                 or not cgroup["measured"]
                 or not cpu["measured"]
@@ -133,7 +137,9 @@ class LiveStreamBudgetSampler:
                 "cgroup_high": bool(cgroup["high_backpressure"]),
                 "cgroup_oom": bool(cgroup["oom_backpressure"]),
                 "cgroup_memory": bool(cgroup_memory and cgroup_memory.hard_hold),
-                "cgroup_swap_spill": bool(cgroup_swap is None or not cgroup_swap.spill_allowed),
+                "cgroup_swap_spill": bool(
+                    cgroup_swap is None or cgroup_swap.limit_bytes is None or not cgroup_swap.spill_allowed
+                ),
                 "io": bool(io["congested"]),
                 "cpu_throttle": bool(cpu["backpressure"]),
                 "swap_churn": bool(swap["backpressure"]),
@@ -149,6 +155,7 @@ class LiveStreamBudgetSampler:
             hard_hold = (
                 holds["thermal"] or holds["cgroup_oom"]
                 or holds["cgroup_memory"] or holds["disk_reserve"]
+                or available_ram <= reserve
             )
             if hard_hold:
                 pressure = 1.0
@@ -173,7 +180,9 @@ class LiveStreamBudgetSampler:
                 "schema": "skeleton.ai.live-stream-pressure.v1",
                 "measurement": "os_probe",
                 "auxiliary_telemetry_incomplete": missing,
-                "cgroup_swap_spill_allowed": bool(cgroup_swap and cgroup_swap.spill_allowed),
+                "cgroup_swap_spill_allowed": bool(
+                    cgroup_swap and cgroup_swap.limit_bytes is not None and cgroup_swap.spill_allowed
+                ),
                 "cgroup_swap_limit_measured": bool(
                     cgroup_swap and cgroup_swap.limit_bytes is not None
                 ),
