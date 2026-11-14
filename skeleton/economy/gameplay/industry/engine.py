@@ -58,6 +58,7 @@ from skeleton.simulation.economy.sim import _req_id, _req_int
 CRAFT_SOURCE = "craft"
 CRAFT_INPUT_SINK = "craft_input"
 CRAFT_LOSS_SINK = "craft_loss"
+MAX_RETAINED_COMMANDS = 100_000
 
 
 @dataclass(frozen=True)
@@ -114,8 +115,17 @@ class IndustrySystem:
         self.research = ResearchLevels()
         self.telemetry = IndustryTelemetry(config.period_ticks)
         self.log: list[dict[str, Any]] = []
+        self.dropped_log_commands = 0
         self._tick = 0
         self._next_chain = 1
+
+    def _record_command(self, command: dict[str, Any]) -> None:
+        """Keep a bounded diagnostic suffix; authoritative state is checkpointed."""
+        if len(self.log) >= MAX_RETAINED_COMMANDS:
+            count = max(1, MAX_RETAINED_COMMANDS // 8)
+            del self.log[:count]
+            self.dropped_log_commands += count
+        self.log.append(command)
 
     # -- validation ---------------------------------------------------------
     def _validate(self) -> None:
@@ -200,7 +210,7 @@ class IndustrySystem:
         """Run every completion due by ``tick``; returns finished jobs."""
         with self.econ._lock:
             finished = self._run_until(tick)
-            self.log.append({"op": "advance", "tick": tick})
+            self._record_command({"op": "advance", "tick": tick})
             return finished
 
     def _run_until(self, tick: int) -> list[dict[str, Any]]:
@@ -228,7 +238,7 @@ class IndustrySystem:
             if lines > 10_000:
                 raise JobRejected("too many production lines")
             self.queue.lines[owner] = lines
-            self.log.append({"op": "set_lines", "owner": owner, "lines": lines})
+            self._record_command({"op": "set_lines", "owner": owner, "lines": lines})
 
     def queue_build(
         self, owner: str, blueprint_id: str, runs: int, tick: int
@@ -246,7 +256,7 @@ class IndustrySystem:
                 raise JobRejected("insufficient funds for install fee")
             job = self._new_build(owner, bp, runs, tick, (), None, fee)
             self._start_ready(tick)
-            self.log.append(
+            self._record_command(
                 {
                     "op": "build",
                     "owner": owner,
@@ -333,7 +343,7 @@ class IndustrySystem:
             self._next_chain = chain + 1
             jobs = list(staged)
             self._start_ready(tick)
-            self.log.append(
+            self._record_command(
                 {
                     "op": "chain",
                     "owner": owner,
@@ -380,7 +390,7 @@ class IndustrySystem:
                 )
             )
             self._start_ready(tick)
-            self.log.append(
+            self._record_command(
                 {
                     "op": "research",
                     "owner": owner,
@@ -404,7 +414,7 @@ class IndustrySystem:
             job.status = CANCELLED
             cancelled = [job_id] + self._cascade_cancel()
             self._start_ready(tick)
-            self.log.append(
+            self._record_command(
                 {"op": "cancel", "owner": owner, "job_id": job_id, "tick": tick}
             )
             return {"cancelled": cancelled}
@@ -504,7 +514,7 @@ class IndustrySystem:
             if not self._deliver(job, tick):
                 raise JobRejected("inventory full")
             self._start_ready(tick)
-            self.log.append(
+            self._record_command(
                 {"op": "collect", "owner": owner, "job_id": job_id, "tick": tick}
             )
             return job.output_qty
@@ -520,7 +530,7 @@ class IndustrySystem:
             qty = node.extract(self.econ, owner, tick)
             self.telemetry.bump(tick, extracted=qty)
             self._start_ready(tick)
-            self.log.append(
+            self._record_command(
                 {"op": "extract", "owner": owner, "node": node_id, "tick": tick}
             )
             return qty
@@ -535,7 +545,7 @@ class IndustrySystem:
         with self.econ._lock:
             self._run_until(tick)
             result = self.market.place(owner, "sell", item_id, qty, unit_price, tick)
-            self.log.append(
+            self._record_command(
                 {
                     "op": "list",
                     "owner": owner,
@@ -559,7 +569,7 @@ class IndustrySystem:
                 owner, "buy", item_id, qty, unit_price, tick, tif="ioc"
             )
             self._start_ready(tick)
-            self.log.append(
+            self._record_command(
                 {
                     "op": "buy",
                     "owner": owner,
