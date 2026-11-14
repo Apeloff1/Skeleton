@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from hashlib import sha256
+from itertools import islice
 import json
 import math
 from typing import Iterable, Sequence
@@ -41,6 +42,11 @@ class FrontierRuntimeError(ValueError):
 def _digest(value: object) -> str:
     return sha256(json.dumps(value, sort_keys=True, separators=(",", ":"),
                              allow_nan=False).encode()).hexdigest()
+
+
+def _bounded_number(value: object, low: float, high: float) -> bool:
+    return (not isinstance(value, bool) and isinstance(value, (int, float))
+            and low <= value <= high and math.isfinite(value))
 
 
 def _q(value: float) -> int:
@@ -101,12 +107,26 @@ class FrontierNativeRuntime:
                 "simulation_hz must divide 1e9 exactly (drift-free integer step)")
         if not isinstance(wind, WindField) or not isinstance(lod, LODPolicy):
             raise FrontierRuntimeError("wind must be WindField and lod LODPolicy")
-        ents = tuple(entities)
-        if len(ents) > MAX_ENTITIES or len({e.entity_id for e in ents}) != len(ents):
-            raise FrontierRuntimeError("entities must be unique and bounded")
-        cl = tuple(clouds)
-        if len(cl) > MAX_CLOUDS or len({c.cloud_id for c in cl}) != len(cl):
-            raise FrontierRuntimeError("clouds must be unique and bounded")
+        # Bound consumption before materialisation, including one-shot or
+        # non-terminating iterators supplied by a runtime adapter.
+        ents = tuple(islice(entities, MAX_ENTITIES + 1))
+        if (len(ents) > MAX_ENTITIES
+                or any(not isinstance(e, FrontierEntity) for e in ents)
+                or len({e.entity_id for e in ents}) != len(ents)):
+            raise FrontierRuntimeError("entities must be typed, unique and bounded")
+        cl = tuple(islice(clouds, MAX_CLOUDS + 1))
+        if (len(cl) > MAX_CLOUDS
+                or any(not isinstance(c, Cloud) for c in cl)
+                or len({c.cloud_id for c in cl}) != len(cl)):
+            raise FrontierRuntimeError("clouds must be typed, unique and bounded")
+        if (not isinstance(camera_m, (tuple, list)) or len(camera_m) != 3
+                or any(not _bounded_number(c, -1e9, 1e9) for c in camera_m)):
+            raise FrontierRuntimeError("camera_m requires three bounded coordinates")
+        if wrap_m is not None:
+            if (not isinstance(wrap_m, (tuple, list)) or len(wrap_m) != 2
+                    or any(not _bounded_number(c, 1, 1e9) for c in wrap_m)):
+                raise FrontierRuntimeError("wrap_m requires two positive bounded dimensions")
+            wrap_m = (float(wrap_m[0]), float(wrap_m[1]))
         self.fps, self.simulation_hz = fps, simulation_hz
         self.timestep = FixedTimestep(_NANO // simulation_hz, max_catchup_ticks)
         self.presentation = PresentationClock(fps)
