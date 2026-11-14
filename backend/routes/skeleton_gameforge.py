@@ -7,7 +7,7 @@ from typing import Any, Dict, Literal, Optional
 import re
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, StrictBool, field_validator
 
 _ROOT = Path(__file__).resolve().parents[2]
 if str(_ROOT) not in sys.path:
@@ -52,9 +52,9 @@ class RunRequest(BaseModel):
     blend: Optional[list] = Field(default=None, max_length=3)
     t: float = Field(default=0.5, ge=0.0, le=1.0, allow_inf_nan=False)
     generation: Optional[str] = Field(default=None, max_length=80)
-    playable_content: bool = False
+    playable_content: StrictBool = False
     playable_archetype: Optional[str] = Field(default=None, max_length=64)
-    playable_main_scene: bool = False
+    playable_main_scene: StrictBool = False
     playtest: Optional[Literal["off", "auto", "require"]] = None
     quest_content: bool = False
     quest_length: int = Field(default=3, ge=1, le=8)

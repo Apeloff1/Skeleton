@@ -7,6 +7,14 @@ on:
     paths:
       - "backend/routes/skeleton_gameforge.py"
       - "skeleton/testing/test_gameforge_source_archive.py"
+      - "skeleton/testing/test_galaxy_profile_pipeline_recovery_20261114.py"
+      - "skeleton/testing/test_recovered_native_portal_modes_20261114.py"
+      - "skeleton/testing/test_eight_native_scene_qualification.py"
+      - "skeleton/context/pipeline.py"
+      - "skeleton/context/galaxy_profile.py"
+      - "skeleton/forge/playtest.py"
+      - "skeleton/forge/playable_portal.py"
+      - "skeleton/forge/archetype_content.py"
       - "frontend/src/skeletonForge/sourceArchive.ts"
       - "frontend/src/skeletonForge/shareSourceArchive.ts"
       - "frontend/src/skeletonForge/hooks.ts"
@@ -37,6 +45,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 1
           persist-credentials: false
+      - name: Verify immutable checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - name: Supported Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
@@ -47,7 +59,14 @@ jobs:
         env:
           PYTHONPATH: ".:backend"
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: python -m pytest -q --noconftest skeleton/testing/test_gameforge_source_archive.py backend/tests/test_native_eight_scene_api.py
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_gameforge_source_archive.py
+          backend/tests/test_native_eight_scene_api.py
+          skeleton/testing/test_galaxy_profile_pipeline_recovery_20261114.py
+          skeleton/testing/test_recovered_native_portal_modes_20261114.py
+          skeleton/testing/test_eight_native_scene_qualification.py
+          skeleton/testing/test_gameforge_native_scene_convergence.py
 
   frontend_source:
     name: Offline Godot ZIP and account-bound privacy contracts
@@ -60,6 +79,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 1
           persist-credentials: false
+      - name: Verify immutable checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - name: Activate pinned package manager
         run: |
           corepack enable
