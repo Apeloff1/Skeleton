@@ -1,30 +1,13 @@
 name: Jeeves integrated mirror and local-AI CI qualification
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "machine/ai_file_tree.json"
-      - "skeleton/jeeves/**"
-      - "skeleton/ai/agents/jeeves/**"
-      - "skeleton/ai/runtime/production_fabric/product/cli.py"
-      - "skeleton/testing/test_ai_flight_http.py"
-      - "skeleton/testing/test_ai_knowledge_plane.py"
-      - "skeleton/testing/test_ai_flight_context_admission.py"
-      - "skeleton/testing/test_ai_git_knowledge.py"
-      - "skeleton/testing/test_ai_native_daemon.py"
-      - "skeleton/testing/test_ai_native_daemon_ops.py"
-      - "skeleton/testing/test_jeeves_native_durable_cli.py"
-      - "skeleton/testing/test_offline_cognition_duplicate_filter_evidence.py"
-      - "skeleton/testing/test_world_export_verification.py"
-      - "tests/test_ci_portable_native_ai_fixtures.py"
-      - ".github/workflows/jeeves-integrated-source-qualification.yml"
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: jeeves-integrated-source-${{ github.event.pull_request.number }}
+  group: jeeves-integrated-source-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -37,6 +20,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify exact PR source checkout
+        env:
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
       - name: Install canonical Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
@@ -84,6 +72,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify exact PR source checkout
+        env:
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
       - name: Install canonical Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:

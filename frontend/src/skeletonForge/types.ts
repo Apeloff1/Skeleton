@@ -109,6 +109,16 @@ export interface RunRequest {
   archetype: string;
   target: string;
   answers: Record<string, string>;
+  /** Sparse, explicitly overridden design tensor axes (0..1). */
+  operator_axes?: Record<string, number>;
+  /** Validated complete Galaxy questionnaire transferred within this app session. */
+  galaxy_profile?: import('./galaxyHandoff').GalaxyProfile;
+  /** Explicitly request the native Godot room-entry quest subsystem. */
+  quest_content?: boolean;
+  quest_length?: number;
+  playable_content?: boolean;
+  playable_archetype?: string;
+  playable_main_scene?: boolean;
   generation?: string | null;
   include_files?: boolean;
 }
@@ -162,10 +172,46 @@ export interface RunPayload {
     verify_loop?: VerifyLoopBlock | null;
     repair?: Record<string, unknown> | null;
     composition?: ComposeResult | null;
+    playable_archetype?: string | null;
+    playable_scene?: string | null;
+    playable_launch_scene?: string | null;
+    playable_launcher?: string | null;
   };
   jeeves?: { next?: { text?: string; action?: string; priority?: number } | null; briefing?: string } | null;
   sim?: { passed?: boolean; primary_dps?: number } | null;
   build_plan?: BuildPlanPayload | null;
+  operator_axes?: Record<string, number>;
+  galaxy_profile?: { sha256?: string; matrices?: number; source?: string; artifact?: string };
+  playable_prototype?: {
+    schema?: string;
+    mode?: string;
+    scene?: string;
+    launch_scene?: string | null;
+    launcher?: string | null;
+    source_files?: Record<string, string>;
+    source_sha256?: string;
+    tuning?: {
+      schema: string; mode: string; axes: Record<string, number>;
+      applied: Record<string, number>; mapped_axes: string[]; unmapped_axes: string[];
+    };
+    sealed?: boolean;
+  };
+  native_quest?: {
+    schema?: string;
+    source_world_sha256?: string;
+    quest_sha256?: string;
+    steps?: number;
+    quest?: string;
+    runtime?: string;
+    replay_verified?: boolean;
+    sealed?: boolean;
+  };
+  galaxy_mechanics?: {
+    schema?: string; source_sha256?: string; active_matrix_dials?: number;
+    supported_inputs?: string[]; unmapped_matrix_dials?: number;
+    room_votes?: Record<string, number>;
+    applied?: { target: string; value: boolean | string; changed: boolean; source: string[] }[];
+  };
   ledger?: { height?: number; head?: string; valid?: boolean } | null;
   file_names?: string[];
   [k: string]: unknown;
