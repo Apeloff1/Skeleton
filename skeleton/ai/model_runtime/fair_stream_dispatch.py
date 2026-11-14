@@ -82,6 +82,9 @@ class GuardedFairStreamDispatch:
         self._storage_path = storage_path
         self._lock = RLock()
         self._issued: dict[str, DispatchPermit] = {}
+        self._issued_budget: int | None = None
+        self._issued_observation: DispatchObservation | None = None
+        self._whole_request = getattr(owner, "whole_request", False) is True
         self._uncertain = False
 
     @property
@@ -140,12 +143,36 @@ class GuardedFairStreamDispatch:
             budget, observation = self._sample(token_budget)
             if observation.effective_slots == 0 or observation.effective_tokens == 0:
                 raise DispatchDeferred("resource pressure prohibits dispatch")
-            permits, _ = self._session.plan(budget)
+            permits, _ = self._session.plan(budget, whole_request=self._whole_request)
             if len(permits) > 1:
                 self._uncertain = True
                 raise DispatchUncertain("non-atomic multi-lease plan forbidden")
             self._issued = {permit.lease_id: permit for permit in permits}
+            self._issued_budget = token_budget if permits else None
+            self._issued_observation = observation if permits else None
             return permits, observation
+
+    def resume_or_plan_live(self, *, token_budget: int) -> tuple[tuple[DispatchPermit, ...], DispatchObservation]:
+        """Resume only an in-process permit whose backend has not been invoked.
+
+        A deferred pressure probe leaves the permit outstanding. A restart,
+        backend exception or failed receipt acknowledgement never grants replay.
+        """
+        if type(token_budget) is not int or not 1 <= token_budget <= MAX_TOKENS:
+            raise ValueError("bounded positive token budget required")
+        with self._lock:
+            if self._uncertain:
+                raise DispatchUncertain("execution outcome requires reconciliation")
+            if self._issued:
+                if len(self._issued) != 1 or self._issued_observation is None:
+                    raise DispatchUncertain("invalid issued lease inventory")
+                permit = next(iter(self._issued.values()))
+                if token_budget < permit.tokens:
+                    raise DispatchDeferred("requested budget cannot cover pending permit")
+                self._validate_pending(permit)
+                self._issued_budget = token_budget
+                return (permit,), self._issued_observation
+            return self.plan_live(token_budget=token_budget)
 
     def _validate_pending(self, permit: DispatchPermit) -> dict[str, object]:
         # Dataclass equality is insufficient: bool == 1, and an attacker who
@@ -242,6 +269,8 @@ class GuardedFairStreamDispatch:
                     "committed receipt unavailable or custody reconciliation failed"
                 ) from exc
             self._issued.clear()
+            self._issued_budget = None
+            self._issued_observation = None
             self._uncertain = False
             return updated
 
@@ -255,7 +284,10 @@ class GuardedFairStreamDispatch:
             if self._uncertain:
                 raise DispatchUncertain("execution outcome requires reconciliation")
             state = self._validate_pending(permit)
-            budget, observation = self._sample(permit.tokens)
+            # Re-probe the raw requested budget, not the already derated lease.
+            if self._issued_budget is None:
+                raise DispatchUncertain("missing issued pressure budget")
+            budget, observation = self._sample(self._issued_budget)
             if (
                 observation.effective_slots < 1
                 or observation.effective_tokens < permit.tokens
@@ -293,4 +325,6 @@ class GuardedFairStreamDispatch:
                     "execution receipt not durably reconciled"
                 ) from exc
             del self._issued[permit.lease_id]
+            self._issued_budget = None
+            self._issued_observation = None
             return updated

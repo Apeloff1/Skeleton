@@ -16,6 +16,7 @@ from .fair_stream_queue import FairStreamScheduler, MeasuredStreamBudget, Stream
 
 SCHEMA = "skeleton.ai.fair-stream-custody.v1"
 RECEIPT_SCHEMA = "skeleton.ai.fair-stream-execution.v1"
+TERMINAL_RECEIPT_SCHEMA = "skeleton.ai.fair-stream-execution.v2"
 MAX_BYTES = 524288
 ZERO = "0" * 64
 
@@ -58,7 +59,7 @@ def _sign(key: bytes, body: object) -> str:
 def sign_execution_result(
     *, execution_key: bytes, session_id: str, generation: int,
     checkpoint_digest: str, lease_id: str, consumed_tokens: int,
-    result_digest: str,
+    result_digest: str, terminal: bool = False,
 ) -> dict[str, object]:
     """Trusted execution owner calls this AFTER durable result commit."""
     _key(execution_key)
@@ -70,12 +71,16 @@ def sign_execution_result(
         _hex(value, label)
     if type(consumed_tokens) is not int or not 0 <= consumed_tokens <= (1 << 24):
         raise ValueError("invalid consumed tokens")
+    if type(terminal) is not bool:
+        raise ValueError("explicit terminal result flag required")
     body: dict[str, object] = {
-        "schema": RECEIPT_SCHEMA, "session_id": session_id,
+        "schema": TERMINAL_RECEIPT_SCHEMA if terminal else RECEIPT_SCHEMA, "session_id": session_id,
         "generation": _generation(generation),
         "checkpoint_digest": checkpoint_digest, "lease_id": lease_id,
         "consumed_tokens": consumed_tokens, "result_digest": result_digest,
     }
+    if terminal:
+        body["terminal"] = True
     return {**body, "mac": _sign(execution_key, body)}
 
 
@@ -170,6 +175,7 @@ class AuthenticatedFairStreamCustody:
         request_id: str | None = None,
         budget: MeasuredStreamBudget | None = None,
         receipt: Mapping[str, object] | None = None,
+        whole_request: bool = False,
     ) -> tuple[object | None, dict[str, object]]:
         with self._lock:
             if _generation(expected_generation) != self.generation:
@@ -190,16 +196,21 @@ class AuthenticatedFairStreamCustody:
             elif action == "plan":
                 if not isinstance(budget, MeasuredStreamBudget):
                     raise ValueError("typed measured budget required")
-                plan = trial.plan(budget)
+                plan = trial.plan(budget, whole_request=whole_request)
             elif action == "acknowledge":
                 required = {
                     "schema", "session_id", "generation", "checkpoint_digest",
                     "lease_id", "consumed_tokens", "result_digest", "mac",
                 }
-                if not isinstance(receipt, Mapping) or set(receipt) != required:
+                if not isinstance(receipt, Mapping):
                     raise ValueError("signed execution receipt required")
+                terminal = receipt.get("schema") == TERMINAL_RECEIPT_SCHEMA
+                if terminal:
+                    required.add("terminal")
+                if set(receipt) != required or (terminal and receipt["terminal"] is not True):
+                    raise ValueError("invalid execution receipt shape")
                 body = {k: receipt[k] for k in required if k != "mac"}
-                if body["schema"] != RECEIPT_SCHEMA or not hmac.compare_digest(
+                if body["schema"] not in (RECEIPT_SCHEMA, TERMINAL_RECEIPT_SCHEMA) or not hmac.compare_digest(
                     _hex(receipt["mac"], "receipt MAC"),
                     _sign(self._execution_key, body),
                 ):
@@ -212,7 +223,7 @@ class AuthenticatedFairStreamCustody:
                     raise ValueError("stale or unbound execution receipt")
                 _hex(receipt["result_digest"], "result digest")
                 trial.acknowledge(
-                    receipt["lease_id"], consumed_tokens=receipt["consumed_tokens"],
+                    receipt["lease_id"], consumed_tokens=receipt["consumed_tokens"], terminal=terminal,
                 )
             else:
                 raise ValueError("unsupported custody transition")

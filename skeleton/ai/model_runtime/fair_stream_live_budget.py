@@ -122,6 +122,7 @@ class LiveStreamBudgetSampler:
             missing = (
                 sys.platform != "linux"
                 or cgroup_memory is None
+                or not thermal["trip_measured"]
                 or not io["measured"]
                 or not cgroup["measured"]
                 or not cpu["measured"]

@@ -12,7 +12,7 @@ from threading import RLock
 from time import monotonic_ns
 
 from .fair_stream_live_budget import LiveStreamBudgetSampler
-from .fair_stream_queue import MeasuredStreamBudget
+from .fair_stream_queue import MAX_TOKENS, MeasuredStreamBudget
 from .fair_stream_session import DispatchPermit
 
 MAX_PROBES_PER_LEASE = 4096
@@ -261,7 +261,10 @@ class NativeTokenPressureGuard:
                 self._samples += 1
                 try:
                     budget, evidence = self._sampler.sample(
-                        token_budget=permit.tokens, storage_path=self._storage_path,
+                        # The permit was already pressure-derated. Probe a
+                        # bounded headroom budget rather than derating it twice.
+                        token_budget=(128 if permit.tokens <= 128 else min(MAX_TOKENS, permit.tokens * 20)),
+                        storage_path=self._storage_path,
                     )
                 except BaseException as exc:
                     self._stopped = True

@@ -210,7 +210,9 @@ class FairStreamScheduler:
             ),
         )
 
-    def plan(self, budget: MeasuredStreamBudget) -> FairStreamPlan:
+    def plan(self, budget: MeasuredStreamBudget, *, whole_request: bool = False) -> FairStreamPlan:
+        if type(whole_request) is not bool:
+            raise ValueError("explicit whole-request planning mode required")
         if not isinstance(budget, MeasuredStreamBudget):
             raise ValueError("MeasuredStreamBudget required")
         with self._lock:
@@ -238,6 +240,8 @@ class FairStreamScheduler:
                         item for item in self._requests.values()
                         if item.tenant_id == tenant and item.request_id not in selected
                         and item.bytes_per_token <= ram_left
+                        and (not whole_request or (item.remaining_tokens <= token_left
+                            and item.remaining_tokens * item.bytes_per_token <= ram_left))
                     ]
                     if not candidates:
                         continue
@@ -249,13 +253,18 @@ class FairStreamScheduler:
                             item.request_id,
                         ),
                     )
-                    canonical = IterationScheduler(
-                        token_budget=min(token_left, self.quantum),
-                        prefill_quantum=self.quantum,
-                    ).plan((IterationWork(
-                        request.request_id, request.phase, request.remaining_tokens,
-                    ),))
-                    tokens = min(canonical.slices[0].tokens, ram_left // request.bytes_per_token)
+                    if whole_request:
+                        # One-use native grants cannot resume KV state. Admit the
+                        # entire bounded request or defer it without consuming it.
+                        tokens = request.remaining_tokens
+                    else:
+                        canonical = IterationScheduler(
+                            token_budget=min(token_left, self.quantum),
+                            prefill_quantum=self.quantum,
+                        ).plan((IterationWork(
+                            request.request_id, request.phase, request.remaining_tokens,
+                        ),))
+                        tokens = min(canonical.slices[0].tokens, ram_left // request.bytes_per_token)
                     if tokens <= 0:
                         continue
                     reserved = tokens * request.bytes_per_token
@@ -303,7 +312,9 @@ class FairStreamScheduler:
                 checkpoint_digest, _digest(body),
             )
 
-    def acknowledge(self, lease_id: str, *, consumed_tokens: int) -> None:
+    def acknowledge(self, lease_id: str, *, consumed_tokens: int, terminal: bool = False) -> None:
+        if type(terminal) is not bool:
+            raise ValueError("explicit terminal receipt required")
         _identifier("lease_id", lease_id, maximum=64)
         with self._lock:
             lease = self._pending.get(lease_id)
@@ -313,7 +324,9 @@ class FairStreamScheduler:
             request = self._requests.get(lease.request_id)
             if request is None or request.remaining_tokens < consumed_tokens:
                 raise ValueError("stream state diverged from lease")
-            remaining = request.remaining_tokens - consumed_tokens
+            if terminal and lease.tokens != request.remaining_tokens:
+                raise ValueError("terminal receipt must bind a whole-request lease")
+            remaining = 0 if terminal else request.remaining_tokens - consumed_tokens
             if remaining:
                 self._requests[request.request_id] = StreamRequest(
                     request.request_id, request.tenant_id, request.phase,

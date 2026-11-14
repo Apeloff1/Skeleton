@@ -72,7 +72,7 @@ def bind_native_cpu_result_owner(
         tokenizer_digest=backend.tokenizer_digest,
         result_key=result_key, backend=backend,
     )
-    return JournaledExecutionOwner(journal, vault), vault
+    return JournaledExecutionOwner(journal, vault, whole_request=True), vault
 
 
 def stage_native_cpu_prompt(

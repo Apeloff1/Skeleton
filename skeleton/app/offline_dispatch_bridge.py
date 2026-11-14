@@ -147,7 +147,7 @@ class OfflineAdaptiveDispatchService:
         inference response. The owner controls model execution, quota and
         durable result publication; only signed receipts retire pending leases.
         """
-        permits, observation = self._guard.plan_live(token_budget=token_budget)
+        permits, observation = self._guard.resume_or_plan_live(token_budget=token_budget)
         if not permits:
             return {
                 "schema": "skeleton.app.offline-dispatch-result.v1",

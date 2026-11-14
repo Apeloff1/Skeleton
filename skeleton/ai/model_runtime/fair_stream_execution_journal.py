@@ -189,7 +189,7 @@ class FairStreamExecutionJournal:
 
     def commit(
         self, permit: DispatchPermit, *,
-        consumed_tokens: int, result_digest: str,
+        consumed_tokens: int, result_digest: str, terminal: bool = False,
     ) -> dict[str, object]:
         """Commit signed receipt only after backend durable result publication."""
         if type(permit) is not DispatchPermit:
@@ -205,7 +205,7 @@ class FairStreamExecutionJournal:
             generation=permit.generation,
             checkpoint_digest=permit.checkpoint_digest,
             lease_id=permit.lease_id, consumed_tokens=consumed_tokens,
-            result_digest=result_digest,
+            result_digest=result_digest, terminal=terminal,
         )
         payload = _receipt_bytes(receipt)
         with self._lock:
@@ -264,16 +264,18 @@ class FairStreamExecutionJournal:
             ):
                 raise ExecutionOutcomeUnknown("invalid stored execution receipt")
             _hex(result_digest, 64, "result digest")
-            expected = sign_execution_result(
-                execution_key=self._key, session_id=self.session_id,
-                generation=permit.generation,
-                checkpoint_digest=permit.checkpoint_digest,
-                lease_id=permit.lease_id, consumed_tokens=consumed,
-                result_digest=result_digest,
-            )
-            if not hmac.compare_digest(_receipt_bytes(expected), payload):
-                raise ExecutionOutcomeUnknown("stored execution receipt authentication failed")
-            return expected
+            # Reconstruct both exact signed formats; never trust a decoded flag.
+            for terminal in (False, True):
+                expected = sign_execution_result(
+                    execution_key=self._key, session_id=self.session_id,
+                    generation=permit.generation,
+                    checkpoint_digest=permit.checkpoint_digest,
+                    lease_id=permit.lease_id, consumed_tokens=consumed,
+                    result_digest=result_digest, terminal=terminal,
+                )
+                if hmac.compare_digest(_receipt_bytes(expected), payload):
+                    return expected
+            raise ExecutionOutcomeUnknown("stored execution receipt authentication failed")
 
 
 class JournaledExecutionOwner:
@@ -281,12 +283,15 @@ class JournaledExecutionOwner:
 
     def __init__(
         self, journal: FairStreamExecutionJournal,
-        backend: DurableResultBackend,
+        backend: DurableResultBackend, *, whole_request: bool = False,
     ) -> None:
         if not isinstance(journal, FairStreamExecutionJournal):
             raise ValueError("canonical execution journal required")
         if not callable(getattr(backend, "run_and_commit", None)):
             raise ValueError("trusted durable result backend required")
+        if type(whole_request) is not bool:
+            raise ValueError("explicit whole-request owner mode required")
+        self.whole_request = whole_request
         self._journal = journal
         self._backend = backend
         self._lock = RLock()
@@ -315,11 +320,17 @@ class JournaledExecutionOwner:
             or pending[0].get("bytes_reserved") != permit.bytes_reserved
         ):
             raise ExecutionOutcomeUnknown("pending lease differs from execution permit")
+        if self.whole_request:
+            requests = checkpoint.get("requests")
+            matching = [r for r in requests if isinstance(r, Mapping) and r.get("request_id") == permit.request_id] if type(requests) is list else []
+            if (len(matching) != 1 or type(matching[0].get("remaining_tokens")) is not int
+                    or matching[0]["remaining_tokens"] != permit.tokens):
+                raise ExecutionOutcomeUnknown("whole-request owner refuses partial lease")
         with self._lock:
             self._journal.begin(permit)
             # Any backend error leaves RUNNING intent durable. No automatic
             # retry, even if the backend committed before its response failed.
             consumed, digest = self._backend.run_and_commit(permit, state)
             return self._journal.commit(
-                permit, consumed_tokens=consumed, result_digest=digest,
+                permit, consumed_tokens=consumed, result_digest=digest, terminal=self.whole_request,
             )
