@@ -16,6 +16,8 @@ from .fair_stream_custody import (
     AuthenticatedFairStreamCustody, MAX_BYTES,
 )
 
+from .fair_stream_queue import FairStreamScheduler
+
 SCHEMA = "skeleton.ai.fair-stream-sqlite-cas.v1"
 MAX_GENERATION = (1 << 63) - 1
 _TABLE = "local_fair_stream_custody"
@@ -90,6 +92,7 @@ class DurableFairStreamStore:
     def __init__(
         self, connection: sqlite3.Connection, *,
         custody_key: bytes, execution_key: bytes, session_id: str,
+        whole_request: bool = False,
     ) -> None:
         if not isinstance(connection, sqlite3.Connection):
             raise ValueError("trusted SQLite connection required")
@@ -97,10 +100,14 @@ class DurableFairStreamStore:
             raise ValueError("connection must have no active transaction")
         if type(custody_key) is not bytes or type(execution_key) is not bytes:
             raise ValueError("typed custody keys required")
+        if type(whole_request) is not bool:
+            raise ValueError("explicit whole-request policy required")
+        self._whole_request = whole_request
         # Reuse the canonical key and identity validation.
         self._empty = AuthenticatedFairStreamCustody(
             custody_key=custody_key, execution_key=execution_key,
             session_id=session_id,
+            scheduler=FairStreamScheduler(whole_request=whole_request),
         )
         self._connection = connection
         self._custody_key = custody_key
@@ -116,6 +123,10 @@ class DurableFairStreamStore:
             "payload BLOB NOT NULL"
             ") WITHOUT ROWID"
         )
+
+    @property
+    def whole_request(self) -> bool:
+        return self._whole_request
 
     def _begin(self) -> None:
         if self._connection.in_transaction:
@@ -156,6 +167,8 @@ class DurableFairStreamStore:
         )
         if owner.session_id != self.session_id:
             raise ValueError("durable custody session mismatch")
+        if owner.whole_request != self._whole_request:
+            raise ValueError("durable execution policy mismatch")
         return owner
 
     def initialize(self) -> dict[str, object]:

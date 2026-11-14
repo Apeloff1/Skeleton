@@ -169,3 +169,63 @@ def test_rollback_of_sqlite_cannot_be_reconciled_with_external_anchor(tmp_path):
     conn.commit()
     with pytest.raises(CustodyQuarantined, match="diverges"):
         DurableFairStreamSession(store(conn), anchor)
+
+def test_whole_request_policy_authenticated_across_restart_and_early_eos(tmp_path):
+    path = tmp_path / "whole-policy.sqlite3"
+    anchor = SimulatedIndependentWatermark()
+
+    def open_store(connection, whole_request):
+        return DurableFairStreamStore(
+            connection, custody_key=C, execution_key=E,
+            session_id=SESSION, whole_request=whole_request,
+        )
+
+    with sqlite3.connect(path) as connection:
+        session = DurableFairStreamSession.bootstrap(open_store(connection, True), anchor)
+        session.submit(StreamRequest("native", "tenant", InferencePhase.PREFILL, 4, 4))
+        prior = session.verify()
+        assert prior["checkpoint"]["execution_policy"] == "native-whole-request-v1"
+        with pytest.raises(ValueError, match="execution policy"):
+            session.plan(budget(), whole_request=False)
+        assert session.verify() == prior
+        permits, state = session.plan(budget())
+        assert len(permits) == 1 and permits[0].tokens == 4
+        permit = permits[0]
+    with sqlite3.connect(path) as connection:
+        with pytest.raises(CustodyQuarantined):
+            DurableFairStreamSession(open_store(connection, False), anchor)
+    with sqlite3.connect(path) as connection:
+        restored = DurableFairStreamSession(open_store(connection, True), anchor)
+        assert restored.verify() == state
+        receipt = sign_execution_result(
+            execution_key=E, session_id=SESSION, generation=permit.generation,
+            checkpoint_digest=permit.checkpoint_digest, lease_id=permit.lease_id,
+            consumed_tokens=1, result_digest="f" * 64,
+        )
+        with pytest.raises(ValueError, match="execution policy"):
+            restored.acknowledge(receipt, whole_request=False)
+        assert restored.verify() == state
+        done = restored.acknowledge(receipt)
+        assert done["checkpoint"]["requests"] == []
+        assert done["checkpoint"]["pending"] == []
+
+
+def test_legacy_checkpoint_cannot_silently_upgrade_execution_policy(tmp_path):
+    path = tmp_path / "legacy-policy.sqlite3"
+    anchor = SimulatedIndependentWatermark()
+    with sqlite3.connect(path) as connection:
+        original = DurableFairStreamSession.bootstrap(store(connection), anchor)
+        before = original.verify()
+        assert before["checkpoint"]["schema"].endswith(".v1")
+        assert "execution_policy" not in before["checkpoint"]
+        with pytest.raises(ValueError, match="execution policy"):
+            original.plan(budget(), whole_request=True)
+        assert original.verify() == before
+    with sqlite3.connect(path) as connection:
+        with pytest.raises(CustodyQuarantined):
+            DurableFairStreamSession(DurableFairStreamStore(
+                connection, custody_key=C, execution_key=E, session_id=SESSION,
+                whole_request=True,
+            ), anchor)
+    with sqlite3.connect(path) as connection:
+        assert DurableFairStreamSession(store(connection), anchor).verify() == before

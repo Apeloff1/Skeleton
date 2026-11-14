@@ -68,12 +68,12 @@ class OfflineAdaptiveDispatchService:
         cls, *, connection: sqlite3.Connection, custody_key: bytes,
         execution_key: bytes, session_id: str,
         watermark: TrustedHighWatermark, owner: DurableExecutionOwner,
-        storage_path: str, bootstrap: bool = False,
+        storage_path: str, bootstrap: bool = False, whole_request: bool = False,
     ) -> "OfflineAdaptiveDispatchService":
         """Never silently reset a previous session on a restart."""
         store = DurableFairStreamStore(
             connection, custody_key=custody_key, execution_key=execution_key,
-            session_id=session_id,
+            session_id=session_id, whole_request=whole_request,
         )
         if type(bootstrap) is not bool:
             raise ValueError("explicit bootstrap boolean required")
@@ -81,7 +81,7 @@ class OfflineAdaptiveDispatchService:
             DurableFairStreamSession.bootstrap(store, watermark)
             if bootstrap else DurableFairStreamSession(store, watermark)
         )
-        return cls(session, owner, storage_path=storage_path)
+        return cls(session, owner, storage_path=storage_path, whole_request=whole_request)
 
     @classmethod
     def from_private_database(
@@ -89,7 +89,7 @@ class OfflineAdaptiveDispatchService:
         custody_key: bytes, execution_key: bytes, session_id: str,
         watermark: TrustedHighWatermark, owner: DurableExecutionOwner,
         storage_path: str, bootstrap: bool = False,
-        max_database_bytes: int = 64 << 20,
+        max_database_bytes: int = 64 << 20, whole_request: bool = False,
     ) -> tuple["OfflineAdaptiveDispatchService", PrivateSQLiteHandle]:
         """App bootstrap with a private POSIX DB; caller retains handle custody.
 
@@ -104,7 +104,7 @@ class OfflineAdaptiveDispatchService:
                 connection=handle.connection,
                 custody_key=custody_key, execution_key=execution_key,
                 session_id=session_id, watermark=watermark, owner=owner,
-                storage_path=storage_path, bootstrap=bootstrap,
+                storage_path=storage_path, bootstrap=bootstrap, whole_request=whole_request,
             )
         except BaseException:
             handle.close()

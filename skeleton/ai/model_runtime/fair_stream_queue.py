@@ -17,6 +17,8 @@ from .iteration_scheduler import InferencePhase, IterationScheduler, IterationWo
 
 
 SCHEMA = "skeleton.ai.fair-stream-checkpoint.v1"
+WHOLE_REQUEST_SCHEMA = "skeleton.ai.fair-stream-checkpoint.v2"
+WHOLE_REQUEST_POLICY = "native-whole-request-v1"
 PLAN_SCHEMA = "skeleton.ai.fair-stream-plan.v1"
 MAX_REQUESTS = 4096
 MAX_STREAMS = 64
@@ -150,7 +152,11 @@ class FairStreamScheduler:
     after a crash, restore cannot accidentally execute it twice.
     """
 
-    def __init__(self, *, max_requests: int = MAX_REQUESTS, quantum: int = 128) -> None:
+    def __init__(self, *, max_requests: int = MAX_REQUESTS, quantum: int = 128,
+                 whole_request: bool = False) -> None:
+        if type(whole_request) is not bool:
+            raise ValueError("explicit whole-request policy required")
+        self._whole_request = whole_request
         self.max_requests = _integer("max_requests", max_requests, minimum=1, maximum=MAX_REQUESTS)
         self.quantum = _integer("quantum", quantum, minimum=1, maximum=8192)
         self._requests: dict[str, StreamRequest] = {}
@@ -160,6 +166,15 @@ class FairStreamScheduler:
         self._round = 0
         self._cursor = 0
         self._lock = RLock()
+
+    @property
+    def whole_request(self) -> bool:
+        return self._whole_request
+
+    def _require_policy(self, supplied: bool | None) -> bool:
+        if supplied is not None and (type(supplied) is not bool or supplied != self._whole_request):
+            raise ValueError("execution policy differs from checkpoint")
+        return self._whole_request
 
     @property
     def pending_ids(self) -> tuple[str, ...]:
@@ -174,6 +189,8 @@ class FairStreamScheduler:
     def submit(self, request: StreamRequest) -> None:
         if not isinstance(request, StreamRequest):
             raise ValueError("StreamRequest required")
+        if self._whole_request and request.remaining_tokens > 8192:
+            raise ValueError("whole-request token ceiling exceeded")
         with self._lock:
             if request.request_id in self._requests:
                 raise ValueError("duplicate stream request")
@@ -210,9 +227,10 @@ class FairStreamScheduler:
             ),
         )
 
-    def plan(self, budget: MeasuredStreamBudget, *, whole_request: bool = False) -> FairStreamPlan:
-        if not isinstance(budget, MeasuredStreamBudget) or type(whole_request) is not bool:
-            raise ValueError("MeasuredStreamBudget and explicit planning policy required")
+    def plan(self, budget: MeasuredStreamBudget, *, whole_request: bool | None = None) -> FairStreamPlan:
+        if not isinstance(budget, MeasuredStreamBudget):
+            raise ValueError("MeasuredStreamBudget required")
+        whole_request = self._require_policy(whole_request)
         with self._lock:
             if self._pending:
                 raise ValueError("pending leases require execution reconciliation")
@@ -310,9 +328,8 @@ class FairStreamScheduler:
             )
 
     def acknowledge(self, lease_id: str, *, consumed_tokens: int,
-                    whole_request: bool = False) -> None:
-        if type(whole_request) is not bool:
-            raise ValueError("explicit completion policy required")
+                    whole_request: bool | None = None) -> None:
+        whole_request = self._require_policy(whole_request)
         _identifier("lease_id", lease_id, maximum=64)
         with self._lock:
             lease = self._pending.get(lease_id)
@@ -356,7 +373,7 @@ class FairStreamScheduler:
     def checkpoint(self) -> dict[str, object]:
         with self._lock:
             body: dict[str, object] = {
-                "schema": SCHEMA,
+                "schema": WHOLE_REQUEST_SCHEMA if self._whole_request else SCHEMA,
                 "max_requests": self.max_requests,
                 "quantum": self.quantum,
                 "round": self._round,
@@ -378,6 +395,8 @@ class FairStreamScheduler:
                     self._lease_dict(lease) for _, lease in sorted(self._pending.items())
                 ],
             }
+            if self._whole_request:
+                body["execution_policy"] = WHOLE_REQUEST_POLICY
             return {**body, "digest": _digest(body)}
 
     @classmethod
@@ -386,10 +405,18 @@ class FairStreamScheduler:
             "schema", "max_requests", "quantum", "round", "cursor",
             "requests", "pending", "digest",
         }
-        if not isinstance(checkpoint, Mapping) or set(checkpoint) != fields:
+        if not isinstance(checkpoint, Mapping):
             raise ValueError("invalid stream checkpoint shape")
-        if checkpoint["schema"] != SCHEMA:
+        schema = checkpoint.get("schema")
+        whole_request = schema == WHOLE_REQUEST_SCHEMA
+        if schema not in (SCHEMA, WHOLE_REQUEST_SCHEMA):
             raise ValueError("unsupported stream checkpoint schema")
+        if whole_request:
+            fields.add("execution_policy")
+        if set(checkpoint) != fields:
+            raise ValueError("invalid stream checkpoint shape")
+        if whole_request and checkpoint["execution_policy"] != WHOLE_REQUEST_POLICY:
+            raise ValueError("unsupported stream execution policy")
         digest = checkpoint["digest"]
         if type(digest) is not str or len(digest) != 64:
             raise ValueError("invalid stream checkpoint digest")
@@ -403,6 +430,7 @@ class FairStreamScheduler:
         restored = cls(
             max_requests=_integer("max_requests", checkpoint["max_requests"], minimum=1, maximum=MAX_REQUESTS),
             quantum=_integer("quantum", checkpoint["quantum"], minimum=1, maximum=8192),
+            whole_request=whole_request,
         )
         restored._round = _integer("round", checkpoint["round"])
         restored._cursor = _integer("cursor", checkpoint["cursor"], maximum=MAX_REQUESTS)
@@ -430,6 +458,9 @@ class FairStreamScheduler:
             restored._served[request.request_id] = _integer(
                 "served_tokens", item["served_tokens"], maximum=MAX_TOKENS
             )
+            if whole_request and (restored._served[request.request_id] != 0
+                                  or request.remaining_tokens > 8192):
+                raise ValueError("invalid whole-request checkpoint work")
             restored._wait[request.request_id] = _integer(
                 "wait_rounds", item["wait_rounds"], maximum=MAX_WAIT_ROUNDS
             )
@@ -450,6 +481,8 @@ class FairStreamScheduler:
             except (TypeError, ValueError) as exc:
                 raise ValueError("invalid checkpoint lease phase") from exc
             tokens = _integer("tokens", item["tokens"], minimum=1, maximum=request.remaining_tokens)
+            if whole_request and tokens != request.remaining_tokens:
+                raise ValueError("whole-request checkpoint contains a partial lease")
             reserved = _integer("bytes_reserved", item["bytes_reserved"], minimum=1)
             round_number = _integer("round_number", item["round_number"])
             if (round_number >= restored._round or phase != request.phase

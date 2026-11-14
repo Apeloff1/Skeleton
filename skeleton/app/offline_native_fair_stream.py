@@ -108,6 +108,8 @@ def bind_native_cpu_dispatch_service(
     if type(session) is not DurableFairStreamSession:
         raise ValueError("canonical authenticated dispatch session required")
     state = session.verify()
+    if not session.whole_request:
+        raise ValueError("native CPU dispatch requires an authenticated whole-request session")
     if state.get("session_id") != registry.session_id:
         raise ValueError("app session and native prompt registry mismatch")
     owner, vault = bind_native_cpu_result_owner(

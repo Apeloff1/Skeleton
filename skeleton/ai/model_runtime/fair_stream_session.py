@@ -81,6 +81,16 @@ class DurableFairStreamSession:
         return cls(store, watermark)
 
     @property
+    def whole_request(self) -> bool:
+        return self._store.whole_request
+
+    def _check_policy(self, whole_request: bool | None) -> None:
+        if whole_request is not None and (
+            type(whole_request) is not bool or whole_request != self.whole_request
+        ):
+            raise ValueError("execution policy differs from authenticated session")
+
+    @property
     def quarantined(self) -> bool:
         return self._quarantined
 
@@ -150,15 +160,14 @@ class DurableFairStreamSession:
         return state
 
     def plan(
-        self, budget: MeasuredStreamBudget, *, whole_request: bool = False,
+        self, budget: MeasuredStreamBudget, *, whole_request: bool | None = None,
     ) -> tuple[tuple[DispatchPermit, ...], dict[str, object]]:
         """Require a fresh trusted OS probe; never dispatch simulated inputs."""
         if not isinstance(budget, MeasuredStreamBudget):
             raise ValueError("canonical measured stream budget required")
         if budget.measurement != "os_probe":
             raise ValueError("trusted live OS measurement required for dispatch")
-        if type(whole_request) is not bool:
-            raise ValueError("explicit planning policy required")
+        self._check_policy(whole_request)
         plan, state = self._transition(action="plan", budget=budget, whole_request=whole_request)
         if plan is None:
             raise CustodyQuarantined("canonical planner produced no plan")
@@ -173,12 +182,11 @@ class DurableFairStreamSession:
         )
         return permits, state
 
-    def acknowledge(self, receipt: Mapping[str, object], *, whole_request: bool = False) -> dict[str, object]:
+    def acknowledge(self, receipt: Mapping[str, object], *, whole_request: bool | None = None) -> dict[str, object]:
         """Only canonical execution-owner MAC receipts can retire leases."""
         if not isinstance(receipt, Mapping):
             raise ValueError("signed execution receipt required")
-        if type(whole_request) is not bool:
-            raise ValueError("explicit completion policy required")
+        self._check_policy(whole_request)
         _, state = self._transition(action="acknowledge", receipt=receipt, whole_request=whole_request)
         return state
 

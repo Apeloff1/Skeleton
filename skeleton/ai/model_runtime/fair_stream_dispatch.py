@@ -75,6 +75,8 @@ class GuardedFairStreamDispatch:
             raise ValueError("explicit whole-request policy required")
         if not isinstance(session, DurableFairStreamSession):
             raise ValueError("durable authenticated session required")
+        if session.whole_request != whole_request:
+            raise ValueError("dispatch policy differs from authenticated session")
         # Only the canonical sampler can supply the dispatch observation.
         # The application must treat this Python process as trusted code.
         if type(sampler) is not LiveStreamBudgetSampler:

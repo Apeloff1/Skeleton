@@ -104,7 +104,7 @@ def build(private_files):
     )
     store = DurableFairStreamStore(
         sqlite3.connect(":memory:"), custody_key=CUSTODY_KEY,
-        execution_key=EXECUTION_KEY, session_id=SESSION,
+        execution_key=EXECUTION_KEY, session_id=SESSION, whole_request=True,
     )
     session = DurableFairStreamSession.bootstrap(store, SimulatedCAS())
     return runtime, registry, journal, session, result_handle

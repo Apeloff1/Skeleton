@@ -284,3 +284,21 @@ def test_cli_round_trip_stdout_without_payload_leak(monkeypatch, capsys) -> None
     assert output["plan"]["leases"][0]["request_id"] == "a"
     assert "world-builder" in json.dumps(output)
     assert "prompt" not in json.dumps(output)
+
+def test_whole_request_checkpoint_distinguishes_policy_and_rejects_partial_grants():
+    queue = FairStreamScheduler(quantum=1, whole_request=True)
+    queue.submit(request("native", tokens=4))
+    assert queue.plan(budget(tokens=3, slots=1)).leases == ()
+    assert queue.plan(budget(tokens=4, slots=1, available=258, reserve=256)).leases == ()
+    with pytest.raises(ValueError, match="execution policy"):
+        queue.plan(budget(tokens=4), whole_request=False)
+    lease, = queue.plan(budget(tokens=4, slots=1)).leases
+    assert lease.tokens == 4
+    checkpoint = queue.checkpoint()
+    restored = FairStreamScheduler.restore(checkpoint)
+    assert restored.whole_request
+    assert restored.checkpoint() == checkpoint
+    with pytest.raises(ValueError, match="execution policy"):
+        restored.acknowledge(lease.lease_id, consumed_tokens=0, whole_request=False)
+    restored.acknowledge(lease.lease_id, consumed_tokens=0)
+    assert restored.request_ids == ()

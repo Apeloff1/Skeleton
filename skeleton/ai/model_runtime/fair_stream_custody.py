@@ -103,6 +103,10 @@ class AuthenticatedFairStreamCustody:
         self._lock = RLock()
 
     @property
+    def whole_request(self) -> bool:
+        return self._scheduler.whole_request
+
+    @property
     def pending_ids(self) -> tuple[str, ...]:
         with self._lock:
             return self._scheduler.pending_ids
@@ -170,10 +174,13 @@ class AuthenticatedFairStreamCustody:
         request_id: str | None = None,
         budget: MeasuredStreamBudget | None = None,
         receipt: Mapping[str, object] | None = None,
-        whole_request: bool = False,
+        whole_request: bool | None = None,
     ) -> tuple[object | None, dict[str, object]]:
-        if type(whole_request) is not bool or (whole_request and action not in {"plan", "acknowledge"}):
-            raise ValueError("invalid whole-request transition policy")
+        if whole_request is not None and (
+            type(whole_request) is not bool or action not in {"plan", "acknowledge"}
+            or whole_request != self.whole_request
+        ):
+            raise ValueError("execution policy differs from checkpoint")
         with self._lock:
             if _generation(expected_generation) != self.generation:
                 raise ValueError("stale custody generation")
