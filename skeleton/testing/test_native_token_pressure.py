@@ -436,3 +436,23 @@ def test_revalidation_scope_cannot_be_reused_for_another_permit():
             with bound_revalidation_budget(P, 12):
                 pass
     assert revalidation_budget(P) == P.tokens
+
+def test_exact_retired_lease_can_reauthorize_without_replaying_old_callback(monkeypatch):
+    probe(monkeypatch, [budget(), budget(), budget()])
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    old = guard.start(P)
+    old()
+    guard.finish(success=False)
+    with pytest.raises(NativePressureInterrupted, match="retired lease"):
+        guard.reauthorize_retired_lease(replace(P, request_id="different"))
+    guard.reauthorize_retired_lease(P)
+    assert not guard.status().stopped
+    next_permit = replace(P, lease_id="f" * 64, request_id="different", generation=2)
+    current = guard.start(next_permit)
+    with pytest.raises(NativePressureInterrupted, match="no longer active"):
+        old()
+    current()
+    current()
+    guard.finish(success=True)
+    with pytest.raises(NativePressureInterrupted, match="replay"):
+        guard.start(P)
