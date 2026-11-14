@@ -25,6 +25,8 @@ import sqlite3
 import stat
 import threading
 import zipfile
+import unicodedata
+import re
 from pathlib import PurePosixPath
 
 from skeleton.ai.model_runtime.offline_chat import OfflineChatStore, _identifier
@@ -400,14 +402,65 @@ def _object(raw: bytes) -> dict[str, Any]:
     return value
 
 
+_ARCHIVE_METADATA = frozenset({"FORGE_MANIFEST.json", "JEEVES_BUILD.json"})
+_WINDOWS_DEVICES = frozenset(
+    {"con", "prn", "aux", "nul", "conin$", "conout$"}
+    | {f"{prefix}{digit}" for prefix in ("com", "lpt") for digit in "123456789¹²³"}
+)
+
+
 def _safe_name(name: object) -> str:
-    if (not isinstance(name, str) or not 1 <= len(name.encode("utf-8")) <= 240
-            or "\\" in name or ":" in name or PurePosixPath(name).is_absolute()
-            or any(ord(ch) < 32 for ch in name)
+    if type(name) is not str or not name or len(name) > 240:
+        raise ValueError("invalid source archive member")
+    try:
+        encoded = name.encode("utf-8", errors="strict")
+    except UnicodeError as exc:
+        raise ValueError("invalid source archive member") from exc
+    if (len(encoded) > 240 or unicodedata.normalize("NFC", name) != name
+            or PurePosixPath(name).is_absolute()
+            or any(ch in '\\\\:<>|"*?' or unicodedata.category(ch).startswith("C") for ch in name)
             or any(part in {"", ".", ".."} or part.rstrip(" .") != part
+                   or part.split(".", 1)[0].rstrip(" ").casefold() in _WINDOWS_DEVICES
                    for part in name.split("/"))):
         raise ValueError("invalid source archive member")
     return name
+
+
+def _archive_names(names: list, *, source_only: bool) -> set[str]:
+    """Validate the complete portable namespace before any member is read."""
+    seen: set[str] = set()
+    directories: dict[str, str] = {}
+    metadata = {name.casefold() for name in _ARCHIVE_METADATA}
+    for value in names:
+        name = _safe_name(value)
+        alias = name.casefold()
+        if alias in seen or alias in directories or (source_only and alias in metadata):
+            raise ValueError("ambiguous or reserved source archive member")
+        parts = name.split("/")
+        for index in range(1, len(parts)):
+            prefix = "/".join(parts[:index])
+            key = prefix.casefold()
+            if key in seen or key in metadata or (key in directories and directories[key] != prefix):
+                raise ValueError("ambiguous source archive directory")
+            directories[key] = prefix
+        seen.add(alias)
+    return seen
+
+
+def _source_index(manifest: Mapping[str, Any]) -> tuple[list[str], dict[str, str]]:
+    names, hashes = manifest.get("files"), manifest.get("sha256")
+    if (not isinstance(names, list) or not 1 <= len(names) <= MAX_FILES - 2
+            or not isinstance(hashes, dict)
+            or type(manifest.get("count")) is not int or manifest["count"] != len(names)):
+        raise ValueError("invalid canonical source manifest")
+    _archive_names(names, source_only=True)
+    if ("project.godot" not in names or set(names) != set(hashes)
+            or any(type(value) is not str or re.fullmatch(r"[0-9a-f]{64}", value) is None
+                   for value in hashes.values())
+            or type(manifest.get("source_sha256")) is not str
+            or re.fullmatch(r"[0-9a-f]{64}", manifest["source_sha256"]) is None):
+        raise ValueError("invalid canonical source manifest")
+    return names, hashes
 
 
 def _read_regular(path: Path, maximum: int, *, private: bool = False) -> bytes:
@@ -421,7 +474,12 @@ def _read_regular(path: Path, maximum: int, *, private: bool = False) -> bytes:
                  | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0))
     with os.fdopen(fd, "rb") as stream:
         opened = os.fstat(stream.fileno())
-        if (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
+        if ((opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino)
+                or not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 1
+                or (opened.st_size, opened.st_mtime_ns, opened.st_ctime_ns)
+                   != (before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+                or (os.name == "posix" and (opened.st_uid != os.getuid()
+                    or (private and opened.st_mode & 0o077)))):
             raise ValueError("local artifact changed")
         raw = stream.read(maximum + 1)
         after = os.fstat(stream.fileno())
@@ -429,7 +487,12 @@ def _read_regular(path: Path, maximum: int, *, private: bool = False) -> bytes:
     if (len(raw) > maximum or len(raw) != before.st_size
             or (after.st_size, after.st_mtime_ns, after.st_ctime_ns)
                != (before.st_size, before.st_mtime_ns, before.st_ctime_ns)
-            or (current.st_dev, current.st_ino) != (before.st_dev, before.st_ino)):
+            or after.st_nlink != 1 or current.st_nlink != 1
+            or not stat.S_ISREG(current.st_mode)
+            or (current.st_dev, current.st_ino, current.st_size, current.st_mtime_ns, current.st_ctime_ns)
+               != (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+            or (os.name == "posix" and (after.st_uid != os.getuid() or current.st_uid != os.getuid()
+                or (private and ((after.st_mode | current.st_mode) & 0o077))))):
         raise ValueError("local artifact changed")
     return raw
 
@@ -830,11 +893,11 @@ class LocalGameBuilder:
     def _package(self, project: Path, result: dict[str, Any]) -> tuple[bytes, int]:
         from skeleton.forge.source_manifest import source_manifest
         manifest_path = project / "FORGE_MANIFEST.json"
-        manifest = _object(_read_regular(manifest_path, MAX_RECORD_BYTES))
-        names, hashes = manifest.get("files"), manifest.get("sha256")
-        if (not isinstance(names, list) or not 1 <= len(names) <= MAX_FILES - 2
-                or not isinstance(hashes, dict) or set(names) != set(hashes) or len(names) != len(set(names))):
-            raise ValueError("invalid canonical source manifest")
+        if project.resolve() != project or not project.is_dir():
+            raise ValueError("unsafe source project directory")
+        original_manifest = _read_regular(manifest_path, MAX_RECORD_BYTES)
+        manifest = _object(original_manifest)
+        names, hashes = _source_index(manifest)
         files: dict[str, str] = {}
         total = 0
         for name in names:
@@ -850,9 +913,11 @@ class LocalGameBuilder:
         if source_manifest(files)["sha256"] != manifest.get("source_sha256"):
             raise ValueError("canonical source manifest digest mismatch")
         manifest["root"] = "project"
-        manifest_path.write_bytes(_encoded(manifest))
+        sanitized_manifest = _encoded(manifest)
+        if _read_regular(manifest_path, MAX_RECORD_BYTES) != original_manifest:
+            raise ValueError("source manifest changed during packaging")
         bodies = {name: text.encode("utf-8") for name, text in files.items()}
-        bodies["FORGE_MANIFEST.json"] = _encoded(manifest)
+        bodies["FORGE_MANIFEST.json"] = sanitized_manifest
         bodies["JEEVES_BUILD.json"] = _encoded(result)
         if sum(map(len, bodies.values())) > MAX_SOURCE_BYTES:
             raise ValueError("source archive exceeds expanded byte budget")
@@ -866,6 +931,20 @@ class LocalGameBuilder:
         payload = stream.getvalue()
         if not 1 <= len(payload) <= MAX_ARCHIVE_BYTES:
             raise ValueError("source archive exceeds compressed byte budget")
+        # Replace the private manifest atomically instead of following a path
+        # that could have been swapped to an existing external file.
+        fd, staged_name = tempfile.mkstemp(prefix=".forge-manifest-", dir=project)
+        staged = Path(staged_name)
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(sanitized_manifest)
+                handle.flush()
+                os.fsync(handle.fileno())
+            if _read_regular(manifest_path, MAX_RECORD_BYTES) != original_manifest:
+                raise ValueError("source manifest changed during packaging")
+            os.replace(staged, manifest_path)
+        finally:
+            staged.unlink(missing_ok=True)
         return payload, len(bodies)
 
     def _verify(self, row: Mapping[str, Any]) -> bytes:
@@ -897,22 +976,24 @@ class LocalGameBuilder:
             if (not 1 <= len(members) <= MAX_FILES or len(members) != row["file_count"]
                     or sum(member.file_size for member in members) > MAX_SOURCE_BYTES):
                 raise ValueError("invalid archive bounds")
-            seen = set()
+            names = [member.filename for member in members]
+            _archive_names(names, source_only=False)
+            if not {"project.godot", *_ARCHIVE_METADATA}.issubset(names):
+                raise ValueError("incomplete source archive")
             content: dict[str, bytes] = {}
             for member in members:
-                name = _safe_name(member.filename)
+                name = member.filename
                 mode = member.external_attr >> 16
-                if (name.casefold() in seen or member.is_dir() or stat.S_IFMT(mode) not in {0, stat.S_IFREG}
+                if (member.orig_filename != name or member.is_dir()
+                        or stat.S_IFMT(mode) not in {0, stat.S_IFREG}
                         or member.flag_bits & 1 or member.compress_type not in {zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED}):
                     raise ValueError("invalid archive entry")
-                seen.add(name.casefold())
                 content[name] = archive.read(member)
                 if len(content[name]) != member.file_size:
                     raise ValueError("archive content length mismatch")
-            if "project.godot" not in seen or "forge_manifest.json" not in seen or "jeeves_build.json" not in seen:
-                raise ValueError("incomplete source archive")
             from skeleton.forge.source_manifest import source_manifest
             manifest = _object(content["FORGE_MANIFEST.json"])
+            _source_index(manifest)
             sources = {name: body.decode("utf-8", errors="strict") for name, body in content.items()
                        if name not in {"FORGE_MANIFEST.json", "JEEVES_BUILD.json"}}
             source = source_manifest(sources)
