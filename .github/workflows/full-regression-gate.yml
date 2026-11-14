@@ -112,6 +112,7 @@ jobs:
       - name: Reconciliation native execution and cancellation custody
         run: >-
           python -m pytest -q --tb=short
+          skeleton/testing/test_native_admission_lifecycle.py
           skeleton/testing/test_native_whole_request_custody.py
           skeleton/testing/test_native_fair_stream_backend.py
           skeleton/testing/test_native_token_pressure.py

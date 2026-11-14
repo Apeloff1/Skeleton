@@ -418,3 +418,56 @@ def test_interrupted_native_execution_preserves_running_journal_without_result(p
     assert service.status().execution_uncertain
     with pytest.raises(DispatchUncertain):
         service.execute_next(token_budget=2)
+
+
+def test_missing_queued_grant_is_rejected_before_lease_or_journal(private_files, monkeypatch):
+    from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchDeferred
+    from skeleton.app.offline_native_fair_stream import cancel_authenticated_native_cpu_prompt
+
+    install_probe(monkeypatch)
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    req = StreamRequest("lost-grant", "alice", InferencePhase.PREFILL, 2, 16)
+    service.submit(req)
+    before = session.verify()
+    with pytest.raises(DispatchDeferred, match="prompt authorization"):
+        service.execute_next(token_budget=2)
+    assert session.verify() == before
+    assert not service.status().execution_uncertain
+    assert journal._connection.execute(
+        "SELECT COUNT(*) FROM local_fair_stream_execution_journal"
+    ).fetchone()[0] == 0
+    cancel_authenticated_native_cpu_prompt(
+        service=service, authenticated_tenant_id="alice", request_id=req.request_id,
+    )
+    assert service.execute_next(token_budget=2)["state"] == "idle"
+
+
+def test_known_result_capacity_denial_precedes_plaintext_staging(private_files, monkeypatch):
+    from skeleton.ai.model_runtime import fair_stream_result_vault
+    from skeleton.app.offline_native_fair_stream import submit_authenticated_native_cpu_prompt
+
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    monkeypatch.setattr(fair_stream_result_vault, "MAX_CIPHERTEXT_BYTES", 1)
+    before = session.verify()
+    with pytest.raises(fair_stream_result_vault.SealedResultUnavailable, match="admission capacity"):
+        submit_authenticated_native_cpu_prompt(
+            service=service, vault=vault, runtime=runtime, registry=registry,
+            authenticated_tenant_id="alice",
+            request=StreamRequest("no-room", "alice", InferencePhase.PREFILL, 2, 16),
+            prompt="hello", max_output_tokens=2,
+        )
+    assert session.verify() == before
+    assert registry.status()["staged"] == 0
+    assert registry.status()["consumed_or_revoked"] == 0

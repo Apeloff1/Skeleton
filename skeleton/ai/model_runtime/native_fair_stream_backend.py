@@ -278,6 +278,30 @@ class NativePromptRegistry:
                 del self._staged_at[request_id]
             self._used.add(request_id)
 
+    def assert_queued_grants(self, rows: list[dict[str, object]]) -> None:
+        """Check every queued identity before issuing a durable lease.
+
+        Expired or restart-lost plaintext is never reconstructed or passed
+        to the execution journal as a valid new inference attempt.
+        """
+        _require_owner_process(self._owner_pid)
+        if type(rows) is not list or len(rows) > 4096:
+            raise NativeFairStreamDenied("invalid queued prompt inventory")
+        with self._lock:
+            self._expire_locked(self._clock_locked())
+            for row in rows:
+                if type(row) is not dict:
+                    raise NativeFairStreamDenied("invalid queued prompt")
+                request = _id(row.get("request_id"), "request")
+                tenant = _id(row.get("tenant_id"), "tenant")
+                tokens = row.get("remaining_tokens")
+                pinned = self._staged.get(request)
+                if (pinned is None or pinned.tenant_id != tenant
+                        or type(tokens) is not int or not 1 <= tokens <= pinned.max_output_tokens):
+                    raise NativeFairStreamDenied(
+                        "queued prompt authorization unavailable; cancel affected request before planning"
+                    )
+
     def revoke_staged(self, request_id: str) -> None:
         """Revoke an existing grant, without burning an unknown identity."""
         _require_owner_process(self._owner_pid)

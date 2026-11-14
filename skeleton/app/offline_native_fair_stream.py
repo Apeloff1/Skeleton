@@ -118,6 +118,7 @@ def bind_native_cpu_dispatch_service(
     service = OfflineAdaptiveDispatchService(
         session, owner, sampler=sampler, storage_path=storage_path,
         revoke_queued_prompt=registry.revoke_staged,
+        validate_queued_prompts=registry.assert_queued_grants,
     )
     return service, vault
 

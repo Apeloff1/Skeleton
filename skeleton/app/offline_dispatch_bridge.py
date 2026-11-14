@@ -50,6 +50,7 @@ class OfflineAdaptiveDispatchService:
         *, storage_path: str,
         sampler: LiveStreamBudgetSampler | None = None,
         revoke_queued_prompt: Callable[[str], None] | None = None,
+        validate_queued_prompts: Callable[[list[dict[str, object]]], None] | None = None,
     ) -> None:
         if not isinstance(session, DurableFairStreamSession):
             raise ValueError("canonical durable session required")
@@ -57,6 +58,7 @@ class OfflineAdaptiveDispatchService:
         self._guard = GuardedFairStreamDispatch(
             session, sampler if sampler is not None else LiveStreamBudgetSampler(),
             owner, storage_path=storage_path, revoke_queued_prompt=revoke_queued_prompt,
+            validate_queued_prompts=validate_queued_prompts,
         )
 
     @classmethod

@@ -66,6 +66,7 @@ class GuardedFairStreamDispatch:
         owner: DurableExecutionOwner,
         *, storage_path: str,
         revoke_queued_prompt: Callable[[str], None] | None = None,
+        validate_queued_prompts: Callable[[list[dict[str, object]]], None] | None = None,
     ) -> None:
         if not isinstance(session, DurableFairStreamSession):
             raise ValueError("durable authenticated session required")
@@ -84,6 +85,9 @@ class GuardedFairStreamDispatch:
         if revoke_queued_prompt is not None and not callable(revoke_queued_prompt):
             raise ValueError('queued prompt revoke hook must be callable')
         self._revoke_queued_prompt = revoke_queued_prompt
+        if validate_queued_prompts is not None and not callable(validate_queued_prompts):
+            raise ValueError("queued prompt validation hook must be callable")
+        self._validate_queued_prompts = validate_queued_prompts
         self._lock = RLock()
         self._issued: dict[str, DispatchPermit] = {}
         self._issued_budget: int | None = None
@@ -170,6 +174,12 @@ class GuardedFairStreamDispatch:
             budget, observation = self._sample(token_budget)
             if observation.effective_slots == 0 or observation.effective_tokens == 0:
                 raise DispatchDeferred("resource pressure prohibits dispatch")
+            if self._validate_queued_prompts is not None:
+                state = self._session.verify()
+                try:
+                    self._validate_queued_prompts(state["checkpoint"]["requests"])
+                except (RuntimeError, ValueError) as exc:
+                    raise DispatchDeferred("queued prompt authorization unavailable") from exc
             permits, _ = self._session.plan(budget, whole_request=self._whole_request)
             if len(permits) > 1:
                 self._uncertain = True
