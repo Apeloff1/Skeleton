@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "csv_row_10",
+  "domain": "csv_row",
+  "ordinal": 10,
+  "arguments": {
+    "index": 10,
+    "a": 170,
+    "b": 12,
+    "word": "marble",
+    "city": "Halden"
+  },
+  "prompt": "Task 10: Return a CSV row with city then integer count: Halden and 170.",
+  "expected": "Halden,170",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

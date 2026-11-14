@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "set_intersection_08",
+  "domain": "set_intersection",
+  "ordinal": 8,
+  "arguments": {
+    "index": 8,
+    "a": 156,
+    "b": 10,
+    "word": "harbor",
+    "city": "Bergen"
+  },
+  "prompt": "Task 8: Find sorted intersection of sets harbor,green,a8 and green,a8,z8.",
+  "expected": "a8,green",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

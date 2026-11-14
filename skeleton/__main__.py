@@ -5,6 +5,7 @@ Usage:
 
 Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
+    deploy      Validated self-host profiles, diagnostics, package/units and guarded boot
     ready       Organism readiness, optional --fix/--walk and bounded -n
     product     Live operator product and policy card
     health      Live organism health card (nonzero when degraded)
@@ -927,6 +928,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "app":
         from skeleton.app.cli import run_app_cli
         return run_app_cli(rest)
+    if cmd == "deploy":
+        from skeleton.deployment.cli import run_deploy_cli
+        return run_deploy_cli(rest)
     if cmd in ("ready", "product", "health", "next"):
         from skeleton.organism.operator_cli import run_operator_cli
         return run_operator_cli(cmd, rest)

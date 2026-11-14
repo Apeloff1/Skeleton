@@ -1,0 +1,27 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "completion-27",
+  "domain": "completion",
+  "phase": "native-job-execution",
+  "category": "adversarial-denial",
+  "threat": "Verify native model/tokenizer/request identity, token budget and durable terminal receipt 27",
+  "trust_boundary": "Durable claim, authoritative native inference and terminal state must remain source-bound",
+  "input": {
+    "variant": 26,
+    "text": "Real service fixture receipt.",
+    "model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tokenizer_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "request_id": "job_1",
+    "generated_tokens": 8,
+    "output_sha": null,
+    "now_ms": -1,
+    "repeat": false
+  },
+  "expected_allow": false,
+  "acceptance": "Execute actual JobStore claim/heartbeat/finish/cancel/failure/sweep methods under fresh test SQLite",
+  "no_hosted_fallback": true,
+  "never_blindly_retry_ambiguous_inference": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

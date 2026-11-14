@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: frontier-native-smoke-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: frontier-native-smoke-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   godot4-native-smoke:
@@ -70,7 +70,7 @@ jobs:
             ${{ runner.temp }}/forge-native.xml
             ${{ runner.temp }}/forge-native.log
           retention-days: 7
-          if-no-files-found: ignore
+          if-no-files-found: error
       - name: Play and independently replay the original sky-island expedition on real Godot
         shell: bash
         env:

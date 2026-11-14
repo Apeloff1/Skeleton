@@ -94,28 +94,35 @@ _MAX_PACKAGE_FILES = 1024
 _MAX_PACKAGE_FILE_BYTES = 8 * 1024 * 1024
 _MAX_PACKAGE_RAW_BYTES = 64 * 1024 * 1024
 _MAX_ZIP_OUTPUT_BYTES = 96 * 1024 * 1024
-# Canonical aliases used by the bounded source-asset and publication contract.
+# Single source of truth for byte budgets shared by zip and APK packaging.
+# These explicit names also allow security tests to lower allocation budgets.
 _MAX_ASSET_BYTES = _MAX_PACKAGE_FILE_BYTES
 _MAX_SOURCE_BYTES = _MAX_PACKAGE_RAW_BYTES
-_WINDOWS_DEVICE_NAMES = frozenset(
-    {"CON", "PRN", "AUX", "NUL"}
-    | {f"COM{i}" for i in range(1, 10)}
-    | {f"LPT{i}" for i in range(1, 10)}
-)
 
-def _bounded_asset_bytes(content: object) -> bytes:
-    """Validate one exact literal asset before allocating its encoded bytes."""
-    if type(content) is str:
-        if len(content) > _MAX_ASSET_BYTES:
+_WINDOWS_RESERVED_MEMBERS = frozenset({
+    "CON", "PRN", "AUX", "NUL",
+    *(f"COM{i}" for i in range(1, 10)),
+    *(f"LPT{i}" for i in range(1, 10)),
+})
+
+
+def _bounded_asset_bytes(value: object) -> bytes:
+    """Reject unsupported source objects and enforce UTF-8 byte bounds."""
+    limit = min(_MAX_ASSET_BYTES, _MAX_PACKAGE_FILE_BYTES)
+    if type(value) is str:
+        if len(value) > limit:
             raise ValueError("package member exceeds byte budget")
-        payload = content.encode("utf-8")
-    elif type(content) in (bytes, bytearray, memoryview):
-        if len(content) > _MAX_ASSET_BYTES:
+        try:
+            payload = value.encode("utf-8")
+        except UnicodeError as exc:
+            raise ValueError("package member is not valid UTF-8") from exc
+    elif type(value) in (bytes, bytearray, memoryview):
+        if len(value) > limit:
             raise ValueError("package member exceeds byte budget")
-        payload = bytes(content)
+        payload = bytes(value)
     else:
         raise ValueError("package member content must be text or bytes")
-    if len(payload) > _MAX_ASSET_BYTES:
+    if len(payload) > limit:
         raise ValueError("package member exceeds byte budget")
     return payload
 
@@ -135,14 +142,16 @@ def _sanitize_path(p: str) -> str:
         raise ValueError("package member is absolute or contains controls")
     parts = normalized.split("/")
     if len(parts) > 16 or any(
-        not segment or segment in {".", ".."} or ":" in segment
-        or segment[-1] in (".", " ")
-        or segment.partition(".")[0].upper() in _WINDOWS_DEVICE_NAMES
+        not segment
+        or segment in {".", ".."}
+        or ":" in segment
+        or segment[-1] in {" ", "."}
+        or segment.split(".", 1)[0].upper() in _WINDOWS_RESERVED_MEMBERS
         for segment in parts
     ):
         raise ValueError("package member has unsafe path components")
-    if normalized == "manifest.json":
-        raise ValueError("package member cannot replace canonical manifest")
+    if normalized.casefold() == "manifest.json":
+        raise ValueError("package member cannot override reserved manifest")
     return "/".join(parts)
 
 
@@ -201,14 +210,15 @@ def _build_files_iter(build: dict):
                 raise ValueError("package source entry is invalid")
             path, content = entry.get("path", ""), entry.get("content", "")
         relative = _sanitize_path(path)
-        if relative == "manifest.json":
-            raise ValueError("package member cannot override reserved manifest")
-        if relative in seen:
-            continue
-        seen.add(relative)
+        # Reject case-folded aliases that collide on common installed-device
+        # filesystems instead of silently dropping a source asset.
+        canonical_name = relative.casefold()
+        if canonical_name in seen:
+            raise ValueError("duplicate package member name")
+        seen.add(canonical_name)
         payload = _bounded_asset_bytes(content)
-        if total + len(payload) > _MAX_SOURCE_BYTES:
-            raise ValueError("package total source byte budget exceeded")
+        if total + len(payload) > min(_MAX_SOURCE_BYTES, _MAX_PACKAGE_RAW_BYTES):
+            raise ValueError("package total payload byte budget exceeded")
         total += len(payload)
         yield relative, payload
 
@@ -981,9 +991,9 @@ def _build_apk_private_stage(build: dict, private_path: Path) -> dict:
 
 
 
-def _build_apk_staged(build: dict, private_path: Path) -> dict:
-    """Private build extension point: publication always verifies staged bytes."""
-    return _build_apk_private_stage(build, private_path)
+def _build_apk_staged(build: dict, output: Path) -> dict:
+    """Build only in a private staging path; never publish intermediate APKs."""
+    return _build_apk_private_stage(build, output)
 
 
 def build_apk(build: dict) -> dict:
@@ -1007,32 +1017,38 @@ def build_apk(build: dict) -> dict:
     with tempfile.TemporaryDirectory(prefix="galaxy-apk-stage-") as stage:
         stage_path = Path(stage) / "payload.apk"
         metadata = _build_apk_staged(build, stage_path)
+        if type(metadata) is not dict:
+            raise VaultPathError("staged APK metadata is invalid")
         if metadata.get("disabled"):
             return metadata
         if metadata.get("kind") != "apk" or metadata.get("path") != str(stage_path):
-            raise VaultPathError("staged APK identity differs")
-        expected_size = metadata["size_bytes"]
-        # A stage adapter may return only the size. Independently derive the
-        # digest from the completed private file before a public rename.
+            raise VaultPathError("staged APK is not bound to the private output")
+        # Independently measure staged bytes. A source toolchain may omit its
+        # digest; when supplied, its digest must exactly match measured bytes.
+        measured = hashlib.sha256()
+        measured_size = 0
+        with anchored_directory(Path(stage)) as stage_directory:
+            with read_regular(
+                stage_directory, "payload.apk", max_bytes=_MAX_ZIP_OUTPUT_BYTES,
+            ) as staged:
+                while chunk := staged.read(1024 * 1024):
+                    measured_size += len(chunk)
+                    if measured_size > _MAX_ZIP_OUTPUT_BYTES:
+                        raise VaultPathError("staged APK exceeds publication byte budget")
+                    measured.update(chunk)
+        expected_size = metadata.get("size_bytes")
         expected_digest = metadata.get("sha256")
-        if expected_digest is None:
-            with anchored_directory(Path(stage)) as stage_directory:
-                digest = hashlib.sha256()
-                with read_regular(
-                    stage_directory, "payload.apk", max_bytes=_MAX_ZIP_OUTPUT_BYTES,
-                ) as source:
-                    while True:
-                        block = source.read(1024 * 1024)
-                        if not block:
-                            break
-                        digest.update(block)
-                expected_digest = digest.hexdigest()
         if (
-            not isinstance(expected_size, int)
-            or expected_size > _MAX_ZIP_OUTPUT_BYTES
-            or expected_size < 0
+            type(expected_size) is not int or expected_size != measured_size
+            or (expected_digest is not None and expected_digest != measured.hexdigest())
         ):
-            raise VaultPathError("staged APK exceeds publication byte budget")
+            raise VaultPathError("staged APK size or SHA-256 differs")
+        expected_digest = measured.hexdigest()
+        metadata = {
+            **metadata,
+            "artifact_id": metadata.get("artifact_id") or f"apk_{build_id}",
+            "sha256": expected_digest,
+        }
 
         def _copy_verified(destination):
             digest = hashlib.sha256()
@@ -1061,10 +1077,8 @@ def build_apk(build: dict) -> dict:
             )
         return {
             **metadata,
-            "artifact_id": metadata.get("artifact_id", f"apk_{build_id}"),
             "path": str(published_path),
             "size_bytes": size,
-            "sha256": expected_digest,
         }
 
 

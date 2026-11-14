@@ -25,6 +25,13 @@ include = ["skeleton*"]
 "skeleton.native" = ["asm/*.S", "asm/*.md", "asm/*.h"]
 "skeleton.app" = ["manifest.json"]
 "skeleton.game.gameplay" = ["fixtures/*.json"]
+# Recovered offline model corpora: explicit wheel data, never model weights.
+"skeleton.ai.runtime.operational_ai.durable_jobs" = ["README.md","scenarios/*/*.json"]
+"skeleton.ai.runtime.operational_ai.guarded_request" = ["README.md","scenarios/*/*.json"]
+"skeleton.ai.runtime.operational_ai.native_candidate" = ["README.md","examples/v1/*/*.json","vectors/*/*.json"]
+"skeleton.ai.runtime.operational_ai.native_genesis" = ["vectors/v1/*/*.json"]
+"skeleton.ai.runtime.operational_ai.native_qualification" = ["README.md","cases/v1/*/*.json"]
+"skeleton.ai.runtime.operational_ai.native_supervised" = ["challenges/v1/*/*.json"]
 
 [build-system]
 requires = ["setuptools==84.2.1", "wheel==0.48.0"]

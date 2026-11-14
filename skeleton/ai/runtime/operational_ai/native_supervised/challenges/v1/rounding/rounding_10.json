@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "rounding_10",
+  "domain": "rounding",
+  "ordinal": 10,
+  "arguments": {
+    "index": 10,
+    "a": 170,
+    "b": 12,
+    "word": "marble",
+    "city": "Halden"
+  },
+  "prompt": "Task 10: Round 170 down to the nearest multiple of 10.",
+  "expected": "170",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

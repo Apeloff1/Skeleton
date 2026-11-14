@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "allowlist_13",
+  "domain": "allowlist",
+  "ordinal": 13,
+  "arguments": {
+    "index": 13,
+    "a": 191,
+    "b": 2,
+    "word": "cedar",
+    "city": "Oslo"
+  },
+  "prompt": "Task 13: A sandbox grants read only. Is operation write authorized? allow or deny.",
+  "expected": "deny",
+  "severity": "critical",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "retry_decision_10",
+  "domain": "retry_decision",
+  "ordinal": 10,
+  "arguments": {
+    "index": 10,
+    "a": 170,
+    "b": 12,
+    "word": "marble",
+    "city": "Halden"
+  },
+  "prompt": "Task 10: For status source_tampered, permit retry only for pre-admission transient errors. Answer retry or hold.",
+  "expected": "hold",
+  "severity": "critical",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}
