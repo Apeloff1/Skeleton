@@ -1,5 +1,5 @@
 /**
- * Deliberately sparse bridging hints from the 67 historical Galaxy genres to
+ * Deliberately sparse bridging hints from historical Galaxy genres to
  * eight actually implemented Godot mini-games. A hint is not equivalent
  * gameplay coverage: never auto-enable or silently rewrite creator intent.
  */

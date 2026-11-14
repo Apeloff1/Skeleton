@@ -124,6 +124,8 @@ test('local capacity, invalid labels and forged choices are bounded', () => {
   const invalidState = (updates) => ({ ...Q.INITIAL_STATE, ...updates });
   for (const invalid of [
     { instruments: { '__proto__': 0.5, risk: 1.5 } },
+    { instruments: { risk: -0.01 } },
+    { instruments: { risk: 1.01 } },
     { instruments: { risk: '1' } },
     { instruments: { risk: Infinity } },
     { options: { ...Q.INITIAL_STATE.options, target: 'shell' } },
