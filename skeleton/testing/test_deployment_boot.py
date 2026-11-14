@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import secrets
+
 import os
 import socket
 import stat
@@ -23,7 +25,8 @@ from skeleton.deployment.boot import (
 from skeleton.deployment.envfile import load_env_file
 from skeleton.deployment.profile import get_profile
 
-TOKEN = "Zq8vT2mX9rL4wB7nK1pD6sF3hJ0cY5gA"
+# Ephemeral test-only identity; never persist a credential in repository source.
+TOKEN = secrets.token_urlsafe(48)
 
 
 def free_port() -> int:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import secrets
+
 import os
 from collections import namedtuple
 
@@ -19,7 +21,8 @@ from skeleton.deployment.validation import (
     validate_profile,
 )
 
-TOKEN = "Zq8vT2mX9rL4wB7nK1pD6sF3hJ0cY5gA"  # 32 chars, diverse
+# Ephemeral test-only identity; never persist a credential in repository source.
+TOKEN = secrets.token_urlsafe(48)
 
 
 def codes(profile: SelfHostProfile, **kwargs) -> list[str]:

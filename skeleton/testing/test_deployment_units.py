@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import secrets
+
 import pytest
 
 from skeleton.deployment.profile import get_profile
@@ -14,7 +16,8 @@ from skeleton.deployment.units import (
     shell_command,
 )
 
-TOKEN = "Zq8vT2mX9rL4wB7nK1pD6sF3hJ0cY5gA"
+# Ephemeral test-only identity; never persist a credential in repository source.
+TOKEN = secrets.token_urlsafe(48)
 
 
 def unit_lines(text: str) -> list[str]:

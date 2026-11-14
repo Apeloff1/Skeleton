@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import secrets
+
 import io
 import json
 import os
@@ -19,7 +21,8 @@ from skeleton.deployment.cli import build_parser, run_deploy_cli
 from skeleton.deployment.envfile import load_env_file
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-TOKEN = "Zq8vT2mX9rL4wB7nK1pD6sF3hJ0cY5gA"
+# Ephemeral test-only identity; never persist a credential in repository source.
+TOKEN = secrets.token_urlsafe(48)
 
 
 def run(argv, environ=None, **kwargs):
