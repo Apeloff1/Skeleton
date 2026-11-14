@@ -1,6 +1,4 @@
 """Adversarial coverage for path preflight and exact-host URL admission."""
-from pathlib import Path
-
 import pytest
 
 from backend.core.path_hardening import (
@@ -55,6 +53,7 @@ def test_join_rejects_symlink_even_if_target_is_inside_root(tmp_path):
     "https://evil-example.com", "https://example.com.evil.net", "https://sub.example.com",
     "https://user@example.com", "https://example.com:0", "https://example.com:65536",
     "https://example.com:", "https://example.com.", "https://example.com\\@evil.test",
+    "https://[::1]junk:8080", "https://example.com:0443",
     "https://exa%6dple.com", " https://example.com", "https://example.com/\n",
 ])
 def test_url_rejects_ambiguous_or_unadmitted_authorities(url):

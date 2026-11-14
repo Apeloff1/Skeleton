@@ -62,7 +62,8 @@ def safe_join(root: Path, *parts: str) -> Path:
     if not parts:
         raise ValueError("at least one path component is required")
     try:
-        if root.is_symlink():
+        root_junction = getattr(root, "is_junction", None)
+        if root.is_symlink() or (root_junction is not None and root_junction()):
             raise ValueError("symbolic-link root is not allowed")
         root = root.resolve(strict=True)
         if not root.is_dir():
@@ -114,9 +115,12 @@ def validate_url_host(url: str, allowed: set[str] | None = None) -> str:
         parsed = urlsplit(url)
         host = _normalize_host(parsed.hostname or "")
         port = parsed.port
+        authority = f"[{host}]" if ":" in host else host
+        if port is not None:
+            authority += f":{port}"
         if (
             parsed.scheme not in {"https", "http"}
-            or not parsed.netloc
+            or parsed.netloc.lower() != authority
             or parsed.username is not None
             or parsed.password is not None
             or "%" in parsed.netloc
