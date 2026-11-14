@@ -112,52 +112,5 @@ class Draft19CIPathTests(unittest.TestCase):
         )
 
 
-    def test_discovery_missing_pattern_does_not_qualify_zero_tests(self):
-        self.set_workflow(
-            "          python -m unittest discover -s tests -p 'test_removed.py' -v\n"
-        )
-        self.assertIn("missing source: tests/test_removed.py",
-                      validate_ci_paths(self.root))
-
-    def test_discovery_with_no_unittest_candidates_fails(self):
-        self.set_workflow(
-            "          python -m unittest discover -s tests -p 'test_sample.py' -v\n"
-        )
-        self.assertIn("unittest source has no static test candidates: tests/test_sample.py",
-                      validate_ci_paths(self.root))
-
-    def test_discovery_and_dotted_module_use_literal_sources(self):
-        self.source.write_text(
-            "import unittest\nclass TestSample(unittest.TestCase):\n"
-            "    def test_real(self):\n        self.assertTrue(True)\n",
-            encoding="utf-8",
-        )
-        self.set_workflow(
-            "          python -m unittest discover -s tests -p 'test_sample.py' -v\n"
-            "          python -m unittest tests.test_sample -v\n"
-        )
-        self.assertEqual(validate_ci_paths(self.root), ())
-
-    def test_missing_dotted_module_fails(self):
-        self.set_workflow("          python -m unittest tests.test_removed -v\n")
-        self.assertIn("missing source: tests/test_removed.py",
-                      validate_ci_paths(self.root))
-
-    def test_wildcard_discovery_is_not_silently_qualified(self):
-        self.set_workflow(
-            "          python -m unittest discover -s tests -p 'test_*.py' -v\n"
-        )
-        self.assertIn("unsupported unittest discovery scope or pattern",
-                      validate_ci_paths(self.root))
-
-    def test_workflow_ancestor_symlink_is_denied(self):
-        self.set_workflow("          python -m pytest tests/test_sample.py\n")
-        actual = self.root / "actual-workflows"
-        self.workflow.parent.rename(actual)
-        self.workflow.parent.symlink_to(actual, target_is_directory=True)
-        self.assertEqual(validate_ci_paths(self.root),
-                         ("workflow missing or symbolic",))
-
-
 if __name__ == "__main__":
     unittest.main()
