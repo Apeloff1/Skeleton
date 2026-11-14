@@ -228,3 +228,30 @@ def test_live_handle_rejects_directory_permission_drift(private_dir):
             handle.assert_current()
         private_dir.chmod(0o700)
         handle.assert_current()
+
+
+def test_private_handle_allows_empty_memory_temp_catalog_only(private_dir):
+    with open_private_sqlite(private_dir, create=True) as handle:
+        conn = handle.connection
+        conn.execute("SELECT name FROM temp.sqlite_master").fetchall()
+        handle.assert_current()
+        conn.execute("CREATE TEMP TABLE shadow(value TEXT)")
+        with pytest.raises(PrivateSQLiteUnavailable, match="temporary objects"):
+            handle.assert_current()
+        conn.execute("DROP TABLE temp.shadow")
+        handle.assert_current()
+        conn.execute("ATTACH DATABASE ':memory:' AS extra")
+        with pytest.raises(PrivateSQLiteUnavailable, match="attachment"):
+            handle.assert_current()
+        conn.execute("DETACH DATABASE extra")
+        handle.assert_current()
+
+
+def test_private_handle_rejects_file_backed_temp_policy(private_dir):
+    with open_private_sqlite(private_dir, create=True) as handle:
+        conn = handle.connection
+        conn.execute("PRAGMA temp_store=FILE")
+        with pytest.raises(PrivateSQLiteUnavailable, match="temporary storage policy"):
+            handle.assert_current()
+        conn.execute("PRAGMA temp_store=MEMORY")
+        handle.assert_current()

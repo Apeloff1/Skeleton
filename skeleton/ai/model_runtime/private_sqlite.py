@@ -7,7 +7,7 @@ protect against a malicious same-UID process, or certify storage encryption.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 from pathlib import Path
 import re
@@ -89,6 +89,11 @@ class PrivateSQLiteHandle:
     _filename: str
     _max_database_bytes: int
     _closed: bool = False
+    _owner_pid: int = field(default_factory=os.getpid, init=False, repr=False)
+
+    def require_owner_process(self) -> None:
+        if os.getpid() != self._owner_pid:
+            raise PrivateSQLiteUnavailable("inherited SQLite connection requires a fresh authorized open")
 
     def assert_current(self) -> None:
         """Revalidate the exact opened inode before sensitive operations.
@@ -98,6 +103,7 @@ class PrivateSQLiteHandle:
         It does not defend against a malicious same-UID process racing
         between checks; app-account isolation is still mandatory.
         """
+        self.require_owner_process()
         if self._closed:
             raise PrivateSQLiteUnavailable("private SQLite handle closed")
         try:
@@ -118,10 +124,22 @@ class PrivateSQLiteHandle:
             ):
                 raise PrivateSQLiteUnavailable("SQLite path inode replaced")
             databases = self.connection.execute("PRAGMA database_list").fetchall()
-            if (len(databases) != 1 or databases[0][1] != "main"
-                    or not databases[0][2]):
+            # SQLite may materialize an empty TEMP schema merely by reading
+            # its catalog. It is not an external attachment. Refuse every
+            # actual temporary object, on-disk TEMP store or foreign database.
+            by_name = {row[1]: row[2] for row in databases}
+            if (len(by_name) != len(databases) or not by_name.get("main")
+                    or set(by_name) - {"main", "temp"}):
                 raise PrivateSQLiteUnavailable("unexpected SQLite attachment")
-            actual = os.stat(databases[0][2], follow_symlinks=False)
+            if self.connection.execute("PRAGMA temp_store").fetchone()[0] != 2:
+                raise PrivateSQLiteUnavailable("SQLite temporary storage policy changed")
+            if "temp" in by_name and (
+                by_name["temp"] != "" or self.connection.execute(
+                    "SELECT 1 FROM temp.sqlite_master LIMIT 1"
+                ).fetchone() is not None
+            ):
+                raise PrivateSQLiteUnavailable("unexpected SQLite temporary objects")
+            actual = os.stat(by_name["main"], follow_symlinks=False)
             if (actual.st_dev, actual.st_ino) != (
                 fd_info.st_dev, fd_info.st_ino,
             ):
@@ -131,10 +149,18 @@ class PrivateSQLiteHandle:
             if (type(page_size) is not int or type(pages) is not int
                     or pages * page_size > self._max_database_bytes):
                 raise PrivateSQLiteUnavailable("SQLite page budget exceeded")
+            cap = self.connection.execute("PRAGMA max_page_count").fetchone()[0]
+            mode = self.connection.execute("PRAGMA journal_mode").fetchone()[0]
+            sync = self.connection.execute("PRAGMA synchronous").fetchone()[0]
+            trusted = self.connection.execute("PRAGMA trusted_schema").fetchone()[0]
+            if (type(cap) is not int or cap * page_size > self._max_database_bytes
+                    or mode != "delete" or sync != 2 or trusted != 0):
+                raise PrivateSQLiteUnavailable("SQLite durability or page policy changed")
         except (OSError, sqlite3.Error) as exc:
             raise PrivateSQLiteUnavailable("private SQLite custody unavailable") from exc
 
     def close(self) -> None:
+        self.require_owner_process()
         if self._closed:
             return
         self._closed = True
@@ -147,6 +173,7 @@ class PrivateSQLiteHandle:
                 os.close(self._directory_fd)
 
     def __enter__(self) -> "PrivateSQLiteHandle":
+        self.require_owner_process()
         if self._closed:
             raise PrivateSQLiteUnavailable("private SQLite handle already closed")
         return self
@@ -161,6 +188,7 @@ def open_private_sqlite(
     filename: str = "fair-stream.db",
     create: bool = False,
     max_database_bytes: int = 64 << 20,
+    check_same_thread: bool = True,
 ) -> PrivateSQLiteHandle:
     """Open one owned database without implicit restart creation.
 
@@ -177,8 +205,8 @@ def open_private_sqlite(
     _require_platform()
     if type(filename) is not str or _SAFE_NAME.fullmatch(filename) is None:
         raise ValueError("bounded simple .db filename required")
-    if type(create) is not bool:
-        raise ValueError("explicit create boolean required")
+    if type(create) is not bool or type(check_same_thread) is not bool:
+        raise ValueError("explicit create and thread-affinity booleans required")
     if (
         type(max_database_bytes) is not int
         or not MIN_DATABASE_BYTES <= max_database_bytes <= MAX_DATABASE_BYTES
@@ -205,7 +233,7 @@ def open_private_sqlite(
         uri = "file:" + quote(path, safe="/") + "?mode=rw"
         connection = sqlite3.connect(
             uri, uri=True, timeout=1.0, isolation_level=None,
-            check_same_thread=True,
+            check_same_thread=check_same_thread,
         )
         after = os.stat(filename, dir_fd=dir_fd, follow_symlinks=False)
         opened = os.fstat(file_fd)
