@@ -187,6 +187,7 @@ def submit_authenticated_native_cpu_prompt(
         raise ValueError("native app ownership binding mismatch")
     # Serialize staging and durable admission against local planning/cancel.
     guard = service._guard
+    guard._require_owner_process()
     if not guard._lock.acquire(blocking=False):
         from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchDeferred
         raise DispatchDeferred("active dispatch prevents native admission")

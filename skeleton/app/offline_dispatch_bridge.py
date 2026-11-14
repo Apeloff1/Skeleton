@@ -6,13 +6,15 @@ vault, untrusted SQLite path, simulated sensor or execution receipt.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
+from threading import Lock
 import sqlite3
 import os
 from typing import Callable
 
 from skeleton.ai.model_runtime.fair_stream_dispatch import (
-    DispatchUncertain, DurableExecutionOwner,
+    DispatchDeferred, DispatchUncertain, DurableExecutionOwner,
     GuardedFairStreamDispatch,
 )
 from skeleton.ai.model_runtime.fair_stream_live_budget import LiveStreamBudgetSampler
@@ -55,6 +57,7 @@ class OfflineAdaptiveDispatchService:
         if not isinstance(session, DurableFairStreamSession):
             raise ValueError("canonical durable session required")
         self._session = session
+        self._operation_lock = Lock()
         self._guard = GuardedFairStreamDispatch(
             session, sampler if sampler is not None else LiveStreamBudgetSampler(),
             owner, storage_path=storage_path, revoke_queued_prompt=revoke_queued_prompt,
@@ -110,8 +113,28 @@ class OfflineAdaptiveDispatchService:
             raise
         return service, handle
 
+    @contextmanager
+    def _operation(self):
+        # Check before either lock: a fork may inherit a lock held by a
+        # thread that no longer exists. No caller waits behind model I/O.
+        self._session._require_owner_process()
+        if not self._operation_lock.acquire(blocking=False):
+            raise DispatchDeferred("another app dispatch operation is active")
+        try:
+            if not self._guard._lock.acquire(blocking=False):
+                raise DispatchDeferred("another guard dispatch operation is active")
+            try:
+                yield
+            finally:
+                self._guard._lock.release()
+        finally:
+            self._operation_lock.release()
+
     def status(self) -> OfflineDispatchStatus:
-        state = self._session.verify()
+        with self._operation():
+            return self._status_from_state(self._session.verify())
+
+    def _status_from_state(self, state: dict[str, object]) -> OfflineDispatchStatus:
         pending = state["checkpoint"]["pending"]
         return OfflineDispatchStatus(
             schema="skeleton.app.offline-dispatch-status.v1",
@@ -122,12 +145,12 @@ class OfflineAdaptiveDispatchService:
         )
 
     def submit(self, request: StreamRequest) -> OfflineDispatchStatus:
-        self._guard.submit(request)
-        return self.status()
+        with self._operation():
+            return self._status_from_state(self._guard.submit(request))
 
     def cancel(self, request_id: str, *, tenant_id: str | None = None) -> OfflineDispatchStatus:
-        self._guard.cancel(request_id, tenant_id=tenant_id)
-        return self.status()
+        with self._operation():
+            return self._status_from_state(self._guard.cancel(request_id, tenant_id=tenant_id))
 
     def reconcile_committed(
         self, *, journal: "FairStreamExecutionJournal",
@@ -140,16 +163,17 @@ class OfflineAdaptiveDispatchService:
         exclusive canonical execution-journal handle. No model execution
         occurs during reconciliation, and no keys enter public status.
         """
-        self._guard.reconcile_committed(
-            journal=journal, authorization=authorization,
-            recovery_key=recovery_key,
-        )
-        return self.status()
+        with self._operation():
+            state = self._guard.reconcile_committed(
+                journal=journal, authorization=authorization, recovery_key=recovery_key,
+            )
+            return self._status_from_state(state)
 
     def abandon_uncertain(self, *, authorization: object, recovery_key: bytes) -> OfflineDispatchStatus:
         """Trusted operator-only recovery, not a public user cancellation route."""
-        self._guard.abandon_uncertain(authorization=authorization, recovery_key=recovery_key)
-        return self.status()
+        with self._operation():
+            state = self._guard.abandon_uncertain(authorization=authorization, recovery_key=recovery_key)
+            return self._status_from_state(state)
 
     def execute_next(self, *, token_budget: int) -> dict[str, object]:
         """Plan and execute ONE source-bound slice; no backend on a hold.
@@ -158,6 +182,10 @@ class OfflineAdaptiveDispatchService:
         inference response. The owner controls model execution, quota and
         durable result publication; only signed receipts retire pending leases.
         """
+        with self._operation():
+            return self._execute_next_locked(token_budget=token_budget)
+
+    def _execute_next_locked(self, *, token_budget: int) -> dict[str, object]:
         permits, observation = self._guard.resume_or_plan_live(token_budget=token_budget)
         if not permits:
             return {
@@ -173,6 +201,9 @@ class OfflineAdaptiveDispatchService:
         if len(permits) != 1:
             raise DispatchUncertain("single-flight execution contract violated")
         state = self._guard.execute_once(permits[0])
+        observation = self._guard._last_execution_observation
+        if observation is None:
+            raise DispatchUncertain("acknowledged execution observation unavailable")
         return {
             "schema": "skeleton.app.offline-dispatch-result.v1",
             "state": "durably_acknowledged",

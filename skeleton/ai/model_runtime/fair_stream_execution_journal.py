@@ -479,6 +479,7 @@ class JournaledExecutionOwner:
             if (len(matching) != 1 or type(matching[0].get("remaining_tokens")) is not int
                     or matching[0]["remaining_tokens"] != permit.tokens):
                 raise ExecutionOutcomeUnknown("whole-request owner refuses partial lease")
+        self._journal._require_owner_process()
         with self._lock:
             self._journal.begin(permit)
             # Any backend error leaves RUNNING intent durable. No automatic

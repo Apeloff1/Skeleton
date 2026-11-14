@@ -208,3 +208,48 @@ def test_session_rejects_inherited_process_before_watermark_read(monkeypatch):
         with pytest.raises(CustodyQuarantined, match="inherited"):
             app.status()
     assert app.status().generation == 0
+
+
+def test_simultaneous_app_execute_and_status_are_deferred_before_sqlite(monkeypatch):
+    from threading import Thread
+
+    install_probe(monkeypatch)
+    outcomes = []
+
+    class ContendedOwner(SimulatedDurableOwner):
+        def execute_and_commit(self, permit, state):
+            def contender():
+                for operation in (lambda: app.execute_next(token_budget=32), app.status):
+                    try:
+                        operation()
+                    except DispatchDeferred:
+                        outcomes.append("deferred")
+                    except BaseException as exc:
+                        outcomes.append(type(exc).__name__)
+            worker = Thread(target=contender, daemon=True)
+            worker.start()
+            worker.join(timeout=2)
+            assert not worker.is_alive()
+            return super().execute_and_commit(permit, state)
+
+    owner = ContendedOwner()
+    app = make(owner=owner)
+    app.submit(request())
+    assert app.execute_next(token_budget=32)["executed"]
+    assert outcomes == ["deferred", "deferred"]
+    assert owner.calls == 1
+    assert app.status().pending_leases == 0
+
+
+def test_execution_reports_fresh_probe_not_original_plan(monkeypatch):
+    samples = iter((0, 250000))
+    def sample(self, *, token_budget, storage_path):
+        return MeasuredStreamBudget(4096, 1024, 64, 1, next(samples), False, "os_probe"), {
+            "measurement": "os_probe", "gpu_device_qualified": False,
+            "physical_memory_reserved": False, "auxiliary_telemetry_incomplete": True,
+        }
+    monkeypatch.setattr(LiveStreamBudgetSampler, "sample", sample)
+    app = make()
+    app.submit(request())
+    result = app.execute_next(token_budget=64)
+    assert result["observation"]["pressure_ppm"] == 250000

@@ -275,3 +275,46 @@ def test_boolean_alias_cannot_reuse_one_token_dispatch_permit(monkeypatch):
             guard.execute_once(forged)
     assert owner.calls == 0
     assert not guard.uncertain
+
+
+def test_reentrant_execute_during_backend_never_invokes_second_owner(monkeypatch):
+    install_probe(monkeypatch, [budget(), budget()])
+
+    class ReentrantOwner(SimulatedCommittedOwner):
+        def execute_and_commit(self, permit, state):
+            with pytest.raises(DispatchDeferred, match="reentrant"):
+                guard.execute_once(permit)
+            with pytest.raises(DispatchDeferred, match="reentrant"):
+                guard.resume_or_plan_live(token_budget=40)
+            return super().execute_and_commit(permit, state)
+
+    owner = ReentrantOwner()
+    guard = make(owner)
+    guard.submit(request())
+    permits, _ = guard.plan_live(token_budget=40)
+    guard.execute_once(permits[0])
+    assert owner.calls == 1
+    assert not guard.uncertain
+
+
+def test_inherited_guard_rejects_before_acquiring_lock(monkeypatch):
+    import os
+    from skeleton.ai.model_runtime.fair_stream_session import CustodyQuarantined
+
+    guard = make()
+    class ForbiddenLock:
+        def __enter__(self):
+            pytest.fail("inherited lock was acquired")
+        def acquire(self, *args, **kwargs):
+            pytest.fail("inherited lock was acquired")
+    monkeypatch.setattr(guard, "_lock", ForbiddenLock())
+    pid = os.getpid()
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "getpid", lambda: pid + 1)
+        for operation in (lambda: guard.submit(request()),
+                          lambda: guard.plan_live(token_budget=40),
+                          lambda: guard.resume_or_plan_live(token_budget=40),
+                          lambda: guard.cancel("r1"),
+                          lambda: guard.execute_once(None)):
+            with pytest.raises(CustodyQuarantined, match="inherited"):
+                operation()

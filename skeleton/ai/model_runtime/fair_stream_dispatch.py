@@ -7,6 +7,7 @@ may have executed is never automatically retried after an exception.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from threading import RLock
 from typing import Callable, Mapping, Protocol
@@ -94,12 +95,31 @@ class GuardedFairStreamDispatch:
         self._issued_observation: DispatchObservation | None = None
         self._whole_request = getattr(owner, "whole_request", False) is True
         self._uncertain = False
+        self._attempting = False
+        self._last_execution_observation: DispatchObservation | None = None
+
+    def _require_owner_process(self) -> None:
+        self._session._require_owner_process()
+
+    @contextmanager
+    def _execution_attempt(self):
+        self._require_owner_process()
+        with self._lock:
+            if self._attempting:
+                raise DispatchDeferred("reentrant execution is forbidden")
+            self._attempting = True
+            self._last_execution_observation = None
+            try:
+                yield
+            finally:
+                self._attempting = False
 
     @property
     def uncertain(self) -> bool:
         return self._uncertain
 
     def submit(self, request: StreamRequest) -> dict[str, object]:
+        self._require_owner_process()
         with self._lock:
             if self._issued or self._uncertain:
                 raise DispatchUncertain("pending dispatch must be reconciled")
@@ -111,6 +131,7 @@ class GuardedFairStreamDispatch:
             raise ValueError("invalid queued request identity")
         if tenant_id is not None and (type(tenant_id) is not str or not tenant_id):
             raise ValueError("invalid authenticated tenant")
+        self._require_owner_process()
         if not self._lock.acquire(blocking=False):
             raise DispatchDeferred("active dispatch prevents queued cancellation")
         try:
@@ -168,7 +189,10 @@ class GuardedFairStreamDispatch:
     def plan_live(
         self, *, token_budget: int,
     ) -> tuple[tuple[DispatchPermit, ...], DispatchObservation]:
+        self._require_owner_process()
         with self._lock:
+            if self._attempting:
+                raise DispatchDeferred("reentrant planning is forbidden")
             if self._uncertain or self._issued or self._session.pending_ids():
                 raise DispatchUncertain("pending execution requires durable reconciliation")
             budget, observation = self._sample(token_budget)
@@ -197,7 +221,10 @@ class GuardedFairStreamDispatch:
         """
         if type(token_budget) is not int or not 1 <= token_budget <= MAX_TOKENS:
             raise ValueError("bounded positive token budget required")
+        self._require_owner_process()
         with self._lock:
+            if self._attempting:
+                raise DispatchDeferred("reentrant execution is forbidden")
             if self._uncertain:
                 raise DispatchUncertain("execution outcome requires reconciliation")
             if self._issued:
@@ -266,7 +293,10 @@ class GuardedFairStreamDispatch:
 
         if type(journal) is not FairStreamExecutionJournal:
             raise ValueError("canonical committed execution journal required")
+        self._require_owner_process()
         with self._lock:
+            if self._attempting:
+                raise DispatchDeferred("active execution prevents reconciliation")
             state = self._session.verify()
             checkpoint = state.get("checkpoint")
             pending = checkpoint.get("pending") if isinstance(checkpoint, Mapping) else None
@@ -335,7 +365,10 @@ class GuardedFairStreamDispatch:
         from .fair_stream_result_vault import SealedFairStreamResultVault
         from .fair_stream_recovery import verify_abandonment_authorization
 
+        self._require_owner_process()
         with self._lock:
+            if self._attempting:
+                raise DispatchDeferred("active execution prevents abandonment")
             owner = self._owner
             if (type(owner) is not JournaledExecutionOwner or not owner.whole_request
                     or type(owner._backend) is not SealedFairStreamResultVault
@@ -387,7 +420,7 @@ class GuardedFairStreamDispatch:
         If the backend raises, a result may already have been committed. The
         permit remains pending and this adapter refuses automatic retry.
         """
-        with self._lock:
+        with self._execution_attempt():
             if self._uncertain:
                 raise DispatchUncertain("execution outcome requires reconciliation")
             state = self._validate_pending(permit)
@@ -434,4 +467,5 @@ class GuardedFairStreamDispatch:
             del self._issued[permit.lease_id]
             self._issued_budget = None
             self._issued_observation = None
+            self._last_execution_observation = observation
             return updated
