@@ -20,6 +20,7 @@ interface Entry {
   inflight: Promise<unknown> | null;
   listeners: Set<Listener>;
   generation: number;
+  invalidation: number;
 }
 
 export function serializeKey(key: QueryKey): string {
@@ -43,7 +44,7 @@ export class QueryCache {
   private entry(id: string): Entry {
     let e = this.entries.get(id);
     if (!e) {
-      e = { state: IDLE, inflight: null, listeners: new Set(), generation: 0 };
+      e = { state: IDLE, inflight: null, listeners: new Set(), generation: 0, invalidation: 0 };
       this.entries.set(id, e);
       this.evict();
     }
@@ -65,6 +66,11 @@ export class QueryCache {
 
   get<T>(key: QueryKey): QueryState<T> {
     return (this.entries.get(serializeKey(key))?.state ?? IDLE) as QueryState<T>;
+  }
+
+  /** Changes only on explicit invalidation/clear, not ordinary fetch completion. */
+  getInvalidation(key: QueryKey): number {
+    return this.entries.get(serializeKey(key))?.invalidation ?? 0;
   }
 
   isStale(key: QueryKey, staleTimeMs: number): boolean {
@@ -115,17 +121,30 @@ export class QueryCache {
   /** Mark matching entries stale (prefix match on serialized string keys or array heads). */
   invalidate(prefix?: QueryKey) {
     const p = prefix === undefined ? null : serializeKey(prefix);
-    const arrayPrefix = p && p.startsWith('[') ? p.slice(0, -1) : null;
+    const arrayPrefix = Array.isArray(prefix) && p !== null ? p.slice(0, -1) : null;
     for (const [id, e] of this.entries) {
-      if (p && !(id === p || id.startsWith(p) || (arrayPrefix && id.startsWith(arrayPrefix)))) continue;
+      // Array prefixes are segment-aware: ['games', 1] must not match ['games', 10].
+      if (p !== null && !(id === p || (arrayPrefix !== null
+        ? (arrayPrefix === '[' ? id.startsWith('[') : id.startsWith(arrayPrefix + ','))
+        : id.startsWith(p)))) continue;
       e.generation += 1;
+      e.invalidation += 1;
       e.inflight = null;
-      if (e.state.status === 'success') this.set(e, { ...e.state, updatedAt: 0 });
+      // An invalidated request no longer owns the fetching state. Always notify
+      // mounted readers, including initial loading/error and repeated resets.
+      this.set(e, e.state.data === undefined
+        ? { ...IDLE }
+        : { ...e.state, updatedAt: 0, fetching: false });
     }
   }
 
   clear() {
-    for (const e of this.entries.values()) { e.generation += 1; e.inflight = null; this.set(e, IDLE); }
+    for (const e of this.entries.values()) {
+      e.generation += 1;
+      e.invalidation += 1;
+      e.inflight = null;
+      this.set(e, { ...IDLE });
+    }
   }
 
   size(): number { return this.entries.size; }
