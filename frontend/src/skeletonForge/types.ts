@@ -111,6 +111,9 @@ export interface RunRequest {
   answers: Record<string, string>;
   generation?: string | null;
   include_files?: boolean;
+  /** Optional native room-entry quest attached to the generated Godot project. */
+  quest_content?: boolean;
+  quest_length?: number;
 }
 
 export interface StageRow {
@@ -168,6 +171,16 @@ export interface RunPayload {
   build_plan?: BuildPlanPayload | null;
   ledger?: { height?: number; head?: string; valid?: boolean } | null;
   file_names?: string[];
+  native_quest?: {
+    schema?: string;
+    source_world_sha256?: string;
+    quest_sha256?: string;
+    steps?: number;
+    quest?: string;
+    runtime?: string;
+    replay_verified?: boolean;
+    sealed?: boolean;
+  };
   [k: string]: unknown;
 }
 
