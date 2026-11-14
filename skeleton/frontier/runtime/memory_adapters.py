@@ -14,6 +14,7 @@ memory primitive: callers still program against ``MemoryContract`` through
 from __future__ import annotations
 
 import asyncio
+import heapq
 import json
 import math
 import sqlite3
@@ -170,6 +171,10 @@ class CollectionMemoryAdapter:
         if not normalized:
             raise ValueError("memory id must not be empty")
         await asyncio.to_thread(self.collection.delete, ids=[normalized])
+
+
+MAX_DATABASE_ROWS = 500_000
+MAX_DATABASE_LOGICAL_BYTES = 512 * 1024 * 1024
 
 
 class SQLiteCollection:
@@ -347,6 +352,17 @@ class SQLiteCollection:
         if count > self.capacity or size > self.max_namespace_bytes:
             raise OverflowError("memory namespace capacity exceeded")
 
+    def _assert_database_budget(self) -> None:
+        # Logical row bytes; not a physical SQLite/WAL disk reservation.
+        count, size = self._connection.execute(
+            """SELECT COUNT(*), COALESCE(SUM(
+                length(CAST(namespace AS BLOB)) + length(CAST(item_id AS BLOB)) +
+                length(CAST(document AS BLOB)) + length(CAST(metadata_json AS BLOB))
+            ), 0) FROM frontier_memory_items"""
+        ).fetchone()
+        if count > MAX_DATABASE_ROWS or size > MAX_DATABASE_LOGICAL_BYTES:
+            raise OverflowError("memory database capacity exceeded")
+
     def _rows(self) -> list[sqlite3.Row]:
         with self._lock:
             result: list[sqlite3.Row] = []
@@ -428,6 +444,7 @@ class SQLiteCollection:
                 rows,
             )
             self._assert_namespace_budget()
+            self._assert_database_budget()
 
     def query(
         self,
@@ -447,6 +464,7 @@ class SQLiteCollection:
         normalized_where = normalize_memory_filters(where)
         query = str(query_texts[0]) if query_texts else ""
         ranked: list[tuple[float, int, str, str, Mapping[str, Any]]] = []
+        n_results = min(n_results, self.capacity)
         for row in self._rows():
             seq, item_id, document, metadata = self._decoded_row(row)
             if not self._matches(metadata, normalized_where):
@@ -454,10 +472,13 @@ class SQLiteCollection:
             score = lexical_relevance(document, query)
             if query.strip() and score <= 0.0:
                 continue
-            ranked.append((score, seq, item_id, document, metadata))
+            candidate = (score, seq, item_id, document, metadata)
+            if len(ranked) < n_results:
+                heapq.heappush(ranked, candidate)
+            elif candidate[:2] > ranked[0][:2]:
+                heapq.heapreplace(ranked, candidate)
 
-        ranked.sort(key=lambda candidate: (candidate[0], candidate[1]), reverse=True)
-        selected = ranked[:n_results]
+        selected = sorted(ranked, key=lambda candidate: (candidate[0], candidate[1]), reverse=True)
         return {
             "documents": [[candidate[3] for candidate in selected]],
             "metadatas": [[candidate[4] for candidate in selected]],

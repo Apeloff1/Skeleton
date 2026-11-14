@@ -16,12 +16,11 @@ Frame format::
 
 from __future__ import annotations
 
-import json
 import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Awaitable, Callable, Iterator, List, Optional, Union
 
-from .envelope import CONTROL_TYPES, ControlEvent, EnvelopeError, RealtimeEvent, ts_to_ms
+from .envelope import CONTROL_TYPES, ControlEvent, EnvelopeError, RealtimeEvent, strict_frame_json, ts_to_ms
 
 DEFAULT_RETRY_MS = 2000
 MAX_SSE_LINE_CHARS = 524_288
@@ -149,7 +148,7 @@ def sse_message_to_frame(msg: SSEMessage) -> Optional[Frame]:
     if not msg.data:
         return None
     if msg.event in CONTROL_TYPES:
-        return ControlEvent.from_dict(json.loads(msg.data))
+        return ControlEvent.from_dict(strict_frame_json(msg.data))
     event = RealtimeEvent.from_json(msg.data)
     if msg.id is not None and msg.id.split("-", 1)[0] != event.id:
         raise EnvelopeError("SSE id line does not match envelope id")

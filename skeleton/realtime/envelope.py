@@ -169,6 +169,28 @@ def _json_strict(body: Any, **kwargs: Any) -> str:
         raise EnvelopeError(f"payload is not JSON-native: {exc}") from None
 
 
+def strict_frame_json(text: str) -> Any:
+    """Decode bounded wire objects without ambiguous keys or non-finite numbers."""
+    if type(text) is not str or len(text) > 524_288:
+        raise EnvelopeError("frame JSON exceeds decoder budget")
+
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise EnvelopeError("duplicate frame JSON key")
+            result[key] = value
+        return result
+
+    def reject_constant(_value):
+        raise EnvelopeError("non-finite frame JSON constant")
+
+    try:
+        return json.loads(text, object_pairs_hook=unique, parse_constant=reject_constant)
+    except (ValueError, TypeError, RecursionError, OverflowError) as exc:
+        raise EnvelopeError("invalid frame JSON") from exc
+
+
 def _payload_size(payload: Mapping[str, Any]) -> int:
     return len(_json_strict(payload, separators=(",", ":")).encode("utf-8"))
 
@@ -191,8 +213,8 @@ class RealtimeEvent:
     v: int = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
-        if self.v != SCHEMA_VERSION:
-            raise EnvelopeError(f"unsupported schema version {self.v!r}")
+        if type(self.v) is not int or self.v != SCHEMA_VERSION:
+            raise EnvelopeError("unsupported schema version")
         if not isinstance(self.id, str) or not _ID_RE.match(self.id) or int(self.id) < 1:
             raise EnvelopeError("id must be a positive decimal string")
         parse_ts(self.ts)
@@ -257,11 +279,7 @@ class RealtimeEvent:
 
     @classmethod
     def from_json(cls, text: str) -> "RealtimeEvent":
-        try:
-            raw = json.loads(text)
-        except (TypeError, ValueError) as exc:
-            raise EnvelopeError("envelope is not valid JSON") from exc
-        return cls.from_dict(raw)
+        return cls.from_dict(strict_frame_json(text))
 
 
 @dataclass(frozen=True)
@@ -274,13 +292,18 @@ class ControlEvent:
     v: int = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        if type(self.v) is not int or self.v != SCHEMA_VERSION:
+            raise EnvelopeError("unsupported control schema version")
+        parse_ts(self.ts)
         if self.type not in CONTROL_TYPES:
             raise EnvelopeError(f"control type must be one of {CONTROL_TYPES}")
         if not isinstance(self.payload, dict):
             raise EnvelopeError("control payload must be an object")
+        if _payload_size(self.payload) > MAX_PAYLOAD_BYTES:
+            raise EnvelopeError("control payload exceeds byte budget")
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"v": self.v, "ts": self.ts, "type": self.type, "payload": self.payload}
+        return {"v": self.v, "ts": self.ts, "type": self.type, "payload": deepcopy(self.payload)}
 
     def to_json(self) -> str:
         return _dumps(self.to_dict())

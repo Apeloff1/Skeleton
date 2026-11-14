@@ -63,6 +63,7 @@ from typing import Any, Callable, Deque, Dict, Iterable, List, Mapping, Optional
 from .envelope import (
     CHANNEL_PRESENCE,
     CHANNELS,
+    MAX_PAYLOAD_BYTES,
     STREAM_LAGGED,
     STREAM_REAUTH,
     STREAM_RESET,
@@ -668,16 +669,31 @@ class RealtimeHub:
                         status=422,
                         code="presence_scope_full",
                     )
+            candidate = PresenceMember(
+                client_id, principal, scope,
+                existing.joined_at if existing is not None else ts_from_ms(now),
+                now, clean_meta if existing is None or meta else existing.meta,
+            )
+            # A complete snapshot must fit a v1 envelope, including observers
+            # explicitly authorized to see all scopes.
+            members = [m.to_dict() for k, m in self._presence.items() if k != key]
+            members.append(candidate.to_dict())
+            size = len(json.dumps(
+                {"members": members, "count": len(members)},
+                separators=(",", ":"), allow_nan=False,
+            ).encode("utf-8"))
+            if size > MAX_PAYLOAD_BYTES:
+                raise RealtimeLimitError(
+                    "presence snapshot byte capacity exhausted", status=429,
+                    code="presence_snapshot_capacity",
+                )
+            self._presence[key] = candidate
             if existing is not None:
-                existing.last_seen_ms = now
-                if meta:
-                    existing.meta = clean_meta
-                return existing
-            member = PresenceMember(client_id, principal, scope, ts_from_ms(now), now, clean_meta)
-            self._presence[key] = member
+                return deepcopy(candidate)
+            member = candidate
         if announce:
             self.publish(CHANNEL_PRESENCE, "presence.joined", member.to_dict(), owner=principal, scope=scope)
-        return member
+        return deepcopy(member)
 
     def _leave(self, client_id: str, principal: str, scope: str, *, reason: str) -> bool:
         with self._lock:

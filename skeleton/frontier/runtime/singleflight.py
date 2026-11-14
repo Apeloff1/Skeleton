@@ -41,11 +41,15 @@ class SingleFlight:
         max_inflight: int = 72,
         max_waiters: int = 128,
         clock: Callable[[], float] = time.monotonic,
+        shutdown_timeout: float = 10.0,
     ) -> None:
         self.capacity = positive_int("capacity", capacity)
         self.ttl = positive_seconds("ttl", ttl)
         self.max_inflight = positive_int("max_inflight", max_inflight)
         self.max_waiters = positive_int("max_waiters", max_waiters)
+        self.shutdown_timeout = positive_seconds("shutdown_timeout", shutdown_timeout)
+        if self.shutdown_timeout > 300:
+            raise ValueError("shutdown timeout exceeds hard bound")
         if self.capacity > 65536 or self.max_inflight > 4096 or self.max_waiters > 4096 or self.ttl > 86400:
             raise ValueError("singleflight configuration exceeds hard bounds")
         if not callable(clock):
@@ -169,4 +173,7 @@ class SingleFlight:
         for task in tasks:
             task.cancel()
         if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+            # Keep admission closed even when a worker suppresses cancellation.
+            _, pending = await asyncio.wait(tasks, timeout=self.shutdown_timeout)
+            if pending:
+                raise TimeoutError("singleflight workers did not stop before shutdown deadline")
