@@ -703,3 +703,42 @@ def test_real_media_advisory_is_non_inferential_during_lease_then_scoped_native_
     finally:
         second.close()
         first.close()
+
+
+def test_inspection_does_not_initialize_existing_empty_marker(tmp_path: Path):
+    lease = LocalInferenceLease(tmp_path / "empty.sqlite3")
+    lease.path.touch(mode=0o600)
+    lease.path.chmod(0o600)
+    assert lease.inspect()["state"] == "unavailable"
+    assert lease.path.read_bytes() == b""
+    with lease.hold():
+        assert lease.path.read_bytes() == b"\x00"
+
+
+def test_inspection_cannot_recreate_marker_removed_after_initial_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+):
+    lease = LocalInferenceLease(tmp_path / "race.sqlite3")
+    with lease.hold():
+        pass
+    original = lease._verified_descriptor
+
+    def removed_before_open(*, initialize: bool):
+        assert initialize is False
+        lease.path.unlink()
+        return original(initialize=initialize)
+
+    monkeypatch.setattr(lease, "_verified_descriptor", removed_before_open)
+    assert lease.inspect()["state"] == "unavailable"
+    assert not lease.path.exists()
+
+
+def test_single_nonzero_marker_is_not_valid_execution_custody(tmp_path: Path):
+    lease = LocalInferenceLease(tmp_path / "wrong-byte.sqlite3")
+    lease.path.write_bytes(b"\x01")
+    lease.path.chmod(0o600)
+    assert lease.inspect()["state"] == "unavailable"
+    with pytest.raises(LocalInferenceLeaseUnavailable, match="marker format"):
+        with lease.hold():
+            pytest.fail("invalid single-byte marker admitted execution")
+    assert lease.path.read_bytes() == b"\x01"
