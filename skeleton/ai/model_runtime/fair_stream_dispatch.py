@@ -89,21 +89,42 @@ class GuardedFairStreamDispatch:
         self._issued: dict[str, DispatchPermit] = {}
         self._issued_token_budget: int | None = None
         self._uncertain = False
+        self._executing = False
 
     @property
     def uncertain(self) -> bool:
-        return self._uncertain
+        with self._lock:
+            return self._uncertain
+
+    def status_snapshot(self) -> tuple[int, int, bool, bool]:
+        """One verified generation; restarted pending work is uncertain.
+
+        A known in-process deferred permit is distinct from a persisted
+        lease whose execution outcome cannot be established by this owner.
+        """
+        with self._lock:
+            state = self._session.verify()
+            pending = state["checkpoint"]["pending"]
+            if type(pending) is not list:
+                raise DispatchUncertain("invalid pending checkpoint")
+            known = (len(pending) == len(self._issued) == 1
+                     and type(pending[0]) is dict
+                     and pending[0].get("lease_id") in self._issued)
+            return (state["generation"], len(pending), self._session.quarantined,
+                    self._uncertain or self._executing or bool(pending and not known))
+
+    def _require_no_pending(self) -> None:
+        if self._executing or self._issued or self._uncertain or self._session.pending_ids():
+            raise DispatchUncertain("pending dispatch must be reconciled")
 
     def submit(self, request: StreamRequest) -> dict[str, object]:
         with self._lock:
-            if self._issued or self._uncertain:
-                raise DispatchUncertain("pending dispatch must be reconciled")
+            self._require_no_pending()
             return self._session.submit(request)
 
     def cancel(self, request_id: str) -> dict[str, object]:
         with self._lock:
-            if self._issued or self._uncertain:
-                raise DispatchUncertain("pending dispatch must be reconciled")
+            self._require_no_pending()
             return self._session.cancel(request_id)
 
     def _sample(self, token_budget: int) -> tuple[MeasuredStreamBudget, DispatchObservation]:
@@ -142,7 +163,7 @@ class GuardedFairStreamDispatch:
         self, *, token_budget: int,
     ) -> tuple[tuple[DispatchPermit, ...], DispatchObservation]:
         with self._lock:
-            if self._uncertain or self._issued or self._session.pending_ids():
+            if self._executing or self._uncertain or self._issued or self._session.pending_ids():
                 raise DispatchUncertain("pending execution requires durable reconciliation")
             budget, observation = self._sample(token_budget)
             if observation.effective_slots == 0 or observation.effective_tokens == 0:
@@ -156,6 +177,34 @@ class GuardedFairStreamDispatch:
             # while this process owns the issued permit.
             self._issued_token_budget = token_budget if permits else None
             return permits, observation
+
+    def dispatch_next(self, *, token_budget: int) -> tuple[DispatchPermit | None, dict[str, object] | None, DispatchObservation]:
+        """Plan once or explicitly resume a known, not-yet-started permit.
+
+        Fresh observation is returned from the actual execution preflight,
+        not the potentially stale initial plan. No permit is reconstructed
+        from persistent pending state. The lock covers planning and dispatch
+        together, including receipt acknowledgement.
+        """
+        if type(token_budget) is not int or not 1 <= token_budget <= MAX_TOKENS:
+            raise ValueError("bounded positive token budget required")
+        with self._lock:
+            if self._uncertain or self._executing:
+                raise DispatchUncertain("execution outcome requires reconciliation")
+            if self._issued:
+                if len(self._issued) != 1:
+                    self._uncertain = True
+                    raise DispatchUncertain("non-atomic multi-lease plan forbidden")
+                if token_budget != self._issued_token_budget:
+                    raise DispatchDeferred("resume requires the original planning token budget")
+                permit = next(iter(self._issued.values()))
+            else:
+                permits, observation = self.plan_live(token_budget=token_budget)
+                if not permits:
+                    return None, None, observation
+                permit = permits[0]
+            state, observation = self._execute_once_observed(permit)
+            return permit, state, observation
 
     def _validate_pending(self, permit: DispatchPermit) -> dict[str, object]:
         # Dataclass equality is insufficient: bool == 1, and an attacker who
@@ -213,6 +262,8 @@ class GuardedFairStreamDispatch:
         if type(journal) is not FairStreamExecutionJournal:
             raise ValueError("canonical committed execution journal required")
         with self._lock:
+            if self._executing:
+                raise DispatchUncertain("execution owner is still active")
             state = self._session.verify()
             checkpoint = state.get("checkpoint")
             pending = checkpoint.get("pending") if isinstance(checkpoint, Mapping) else None
@@ -262,8 +313,12 @@ class GuardedFairStreamDispatch:
         If the backend raises, a result may already have been committed. The
         permit remains pending and this adapter refuses automatic retry.
         """
+        state, _ = self._execute_once_observed(permit)
+        return state
+
+    def _execute_once_observed(self, permit: DispatchPermit) -> tuple[dict[str, object], DispatchObservation]:
         with self._lock:
-            if self._uncertain:
+            if self._uncertain or self._executing:
                 raise DispatchUncertain("execution outcome requires reconciliation")
             state = self._validate_pending(permit)
             ceiling = self._issued_token_budget
@@ -293,22 +348,26 @@ class GuardedFairStreamDispatch:
                 raise DispatchUncertain(
                     "durable lease changed during resource probe; reconciliation required"
                 ) from exc
+            self._executing = True
             try:
-                with bound_revalidation_budget(permit, ceiling):
-                    receipt = self._owner.execute_and_commit(permit, refreshed)
-            except BaseException as exc:
-                self._uncertain = True
-                raise DispatchUncertain(
-                    "backend outcome uncertain; do not re-execute pending lease"
-                ) from exc
-            # Never accept an unsigned result or manufacture a completion.
-            try:
-                updated = self._session.acknowledge(receipt)
-            except BaseException as exc:
-                self._uncertain = True
-                raise DispatchUncertain(
-                    "execution receipt not durably reconciled"
-                ) from exc
-            del self._issued[permit.lease_id]
-            self._issued_token_budget = None
-            return updated
+                try:
+                    with bound_revalidation_budget(permit, ceiling):
+                        receipt = self._owner.execute_and_commit(permit, refreshed)
+                except BaseException as exc:
+                    self._uncertain = True
+                    raise DispatchUncertain(
+                        "backend outcome uncertain; do not re-execute pending lease"
+                    ) from exc
+                # Never accept an unsigned result or manufacture a completion.
+                try:
+                    updated = self._session.acknowledge(receipt)
+                except BaseException as exc:
+                    self._uncertain = True
+                    raise DispatchUncertain(
+                        "execution receipt not durably reconciled"
+                    ) from exc
+                del self._issued[permit.lease_id]
+                self._issued_token_budget = None
+                return updated, observation
+            finally:
+                self._executing = False

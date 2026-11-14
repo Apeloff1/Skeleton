@@ -153,8 +153,13 @@ def test_pending_restart_is_not_auto_reexecuted(monkeypatch, tmp_path):
         connection=sqlite3.connect(path), anchor=anchor, bootstrap=False,
     )
     assert recovered.status().pending_leases == 1
+    assert recovered.status().execution_uncertain is True
     with pytest.raises(DispatchUncertain, match="pending"):
         recovered.execute_next(token_budget=32)
+    with pytest.raises(DispatchUncertain, match="pending"):
+        recovered.submit(StreamRequest("second", "tenant", InferencePhase.PREFILL, 4, 4))
+    with pytest.raises(DispatchUncertain, match="pending"):
+        recovered.cancel("request")
 
 
 def test_status_excludes_keys_and_raw_checkpoint(monkeypatch):
@@ -166,3 +171,90 @@ def test_status_excludes_keys_and_raw_checkpoint(monkeypatch):
         "quarantined", "execution_uncertain",
     }
     assert not status.quarantined
+
+def test_bridge_resumes_same_unstarted_permit_after_pressure_deferral(monkeypatch):
+    owner = SimulatedDurableOwner()
+    app = make(owner=owner)
+    install_probe(monkeypatch)
+    sample = LiveStreamBudgetSampler.sample
+    readings = iter((0, 980_000, 0))
+    calls = []
+
+    def observed(self, *, token_budget, storage_path):
+        calls.append(token_budget)
+        _, evidence = sample(self, token_budget=token_budget, storage_path=storage_path)
+        return MeasuredStreamBudget(4096, 1024, token_budget, 1, next(readings), False, "os_probe"), evidence
+
+    monkeypatch.setattr(LiveStreamBudgetSampler, "sample", observed)
+    app.submit(request())
+    with pytest.raises(DispatchDeferred, match="fresh pressure"):
+        app.execute_next(token_budget=32)
+    pending = app.status()
+    assert pending.generation == 2 and pending.pending_leases == 1
+    assert not pending.execution_uncertain and owner.calls == 0
+    issued = next(iter(app._guard._issued.values()))
+    with pytest.raises(DispatchDeferred, match="original planning"):
+        app.execute_next(token_budget=64)
+    assert calls == [32, 32]
+    result = app.execute_next(token_budget=32)
+    assert result["generation"] == 3
+    assert result["lease_id"] == issued.lease_id
+    assert owner.calls == 1 and calls == [32, 32, 32]
+    assert app.status().pending_leases == 0
+
+
+def test_bridge_reports_execution_preflight_observation_not_initial_plan(monkeypatch):
+    install_probe(monkeypatch)
+    sample = LiveStreamBudgetSampler.sample
+    readings = iter((250_000, 100_000))
+
+    def observed(self, *, token_budget, storage_path):
+        _, evidence = sample(self, token_budget=token_budget, storage_path=storage_path)
+        return MeasuredStreamBudget(4096, 1024, token_budget, 1, next(readings), False, "os_probe"), evidence
+
+    monkeypatch.setattr(LiveStreamBudgetSampler, "sample", observed)
+    app = make()
+    app.submit(request())
+    result = app.execute_next(token_budget=32)
+    assert result["executed"] is True
+    assert result["observation"]["pressure_ppm"] == 100_000
+
+
+def test_bridge_never_resumes_owner_after_uncertain_execution(monkeypatch):
+    install_probe(monkeypatch)
+
+    class FailingOwner(SimulatedDurableOwner):
+        def execute_and_commit(self, permit, state):
+            self.calls += 1
+            raise OSError("unknown outcome")
+
+    owner = FailingOwner()
+    app = make(owner=owner)
+    app.submit(request())
+    with pytest.raises(DispatchUncertain, match="do not re-execute"):
+        app.execute_next(token_budget=32)
+    assert app.status().execution_uncertain
+    with pytest.raises(DispatchUncertain, match="reconciliation"):
+        app.execute_next(token_budget=32)
+    assert owner.calls == 1
+
+
+def test_owner_reentrant_dispatch_cannot_execute_again(monkeypatch):
+    install_probe(monkeypatch)
+    owner = SimulatedDurableOwner()
+    app = make(owner=owner)
+    original = owner.execute_and_commit
+
+    def execute(permit, state):
+        assert app.status().execution_uncertain
+        with pytest.raises(DispatchUncertain, match="reconciliation"):
+            app.execute_next(token_budget=32)
+        with pytest.raises(DispatchUncertain, match="reconciliation"):
+            app._guard.execute_once(permit)
+        return original(permit, state)
+
+    monkeypatch.setattr(owner, "execute_and_commit", execute)
+    app.submit(request())
+    assert app.execute_next(token_budget=32)["executed"]
+    assert owner.calls == 1
+    assert not app.status().execution_uncertain

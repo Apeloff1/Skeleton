@@ -111,13 +111,13 @@ class OfflineAdaptiveDispatchService:
         return service, handle
 
     def status(self) -> OfflineDispatchStatus:
-        state = self._session.verify()
+        generation, pending, quarantined, uncertain = self._guard.status_snapshot()
         return OfflineDispatchStatus(
             schema="skeleton.app.offline-dispatch-status.v1",
-            generation=state["generation"],
-            pending_leases=len(self._session.pending_ids()),
-            quarantined=self._session.quarantined,
-            execution_uncertain=self._guard.uncertain,
+            generation=generation,
+            pending_leases=pending,
+            quarantined=quarantined,
+            execution_uncertain=uncertain,
         )
 
     def submit(self, request: StreamRequest) -> OfflineDispatchStatus:
@@ -152,8 +152,8 @@ class OfflineAdaptiveDispatchService:
         inference response. The owner controls model execution, quota and
         durable result publication; only signed receipts retire pending leases.
         """
-        permits, observation = self._guard.plan_live(token_budget=token_budget)
-        if not permits:
+        permit, state, observation = self._guard.dispatch_next(token_budget=token_budget)
+        if permit is None:
             return {
                 "schema": "skeleton.app.offline-dispatch-result.v1",
                 "state": "idle",
@@ -164,9 +164,8 @@ class OfflineAdaptiveDispatchService:
                     "auxiliary_telemetry_incomplete": observation.auxiliary_telemetry_incomplete,
                 },
             }
-        if len(permits) != 1:
+        if state is None:
             raise DispatchUncertain("single-flight execution contract violated")
-        state = self._guard.execute_once(permits[0])
         return {
             "schema": "skeleton.app.offline-dispatch-result.v1",
             "state": "durably_acknowledged",
@@ -174,7 +173,7 @@ class OfflineAdaptiveDispatchService:
             "gpu_device_qualified": False,
             "generation": state["generation"],
             "checkpoint_digest": state["checkpoint_digest"],
-            "lease_id": permits[0].lease_id,
+            "lease_id": permit.lease_id,
             "observation": {
                 "pressure_ppm": observation.pressure_ppm,
                 "auxiliary_telemetry_incomplete": observation.auxiliary_telemetry_incomplete,
