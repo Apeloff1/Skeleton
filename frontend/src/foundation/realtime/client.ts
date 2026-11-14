@@ -75,6 +75,7 @@ export class EventStreamClient {
 
   stop() {
     this.stopped = true;
+    this.immediate = false;
     this.generation += 1;
     this.clearTimers();
     this.abort?.abort();
@@ -98,7 +99,9 @@ export class EventStreamClient {
       this.watchdog = null;
       if (gen !== this.generation || this.stopped) return;
       if (isStreamDead(this.state.lastActivityAt, this.clock.now())) {
-        this.abort?.abort(); // dead stream: the transport resolves 'aborted' → reconnect
+        // Abort is advisory: some transports never settle after cancellation.
+        // Retire ownership and schedule recovery without waiting for their promise.
+        this.onEnd(gen, { kind: 'aborted' });
       } else {
         this.armWatchdog(gen);
       }
@@ -111,27 +114,33 @@ export class EventStreamClient {
     const abort = new AbortController();
     this.abort = abort;
     const parser = new SseParser();
-    const cursor = this.state.cursor;
-    const path = buildStreamPath({ channels: this.opts.channels, jobId: this.opts.jobId, cursor, useCursorParam: this.opts.useCursorParam });
-    const headers = { ...(this.opts.headers?.() ?? {}), ...(this.opts.useCursorParam ? {} : resumeHeaders(cursor)) };
+    const current = () => gen === this.generation && !this.stopped && !abort.signal.aborted;
     this.set({ ...this.state, status: this.state.attempt > 0 ? 'reconnecting' : 'connecting', lastActivityAt: this.clock.now() });
+    if (!current()) return;
     this.armWatchdog(gen);
 
-    this.opts.transport(path, {
+    try {
+      const cursor = this.state.cursor;
+      const path = buildStreamPath({ channels: this.opts.channels, jobId: this.opts.jobId, cursor, useCursorParam: this.opts.useCursorParam });
+      const headers = { ...(this.opts.headers?.() ?? {}), ...(this.opts.useCursorParam ? {} : resumeHeaders(cursor)) };
+      if (!current()) return;
+      this.opts.transport(path, {
       headers,
       signal: abort.signal,
       onOpen: () => {
-        if (gen !== this.generation) return;
+        if (!current()) return;
         const now = this.clock.now();
         this.set({ ...this.state, status: 'open', connectedAt: now, lastActivityAt: now });
       },
       onChunk: text => {
-        if (gen !== this.generation) return;
+        if (!current()) return;
         let reconnectNow = false;
         for (const item of parser.feed(text)) {
+          if (!current()) break;
           const { state, effects } = applyItem(this.state, item, this.clock.now());
           this.set(state);
           for (const e of effects) {
+            if (!current()) break;
             try {
               if (e.kind === 'deliver') this.opts.onEvent?.(e.envelope);
               else if (e.kind === 'reset') this.opts.onReset?.();
@@ -144,19 +153,29 @@ export class EventStreamClient {
           if (reconnectNow) break;
         }
         // stream.lagged: reconnect at once from the last delivered id (or resume_from).
-        if (reconnectNow && gen === this.generation && !this.stopped) {
+        if (reconnectNow && current()) {
           this.immediate = true;
-          this.abort?.abort();
+          this.onEnd(gen, { kind: 'aborted' });
         }
       },
-    }).then(end => this.onEnd(gen, end), () => this.onEnd(gen, { kind: 'error', error: 'transport_threw' }));
+      }).then(end => this.onEnd(gen, end), () => this.onEnd(gen, { kind: 'error', error: 'transport_threw' }));
+    } catch {
+      this.onEnd(gen, { kind: 'error', error: 'transport_threw' });
+    }
   }
 
   private onEnd(gen: number, end: StreamEnd) {
     if (gen !== this.generation || this.stopped) return;
+    // Fence callbacks even during the retry delay, before a new connection starts.
+    const retiredGeneration = ++this.generation;
+    const retiredAbort = this.abort;
+    this.abort = null;
     if (this.watchdog !== null) { this.clock.clearTimeout(this.watchdog); this.watchdog = null; }
     const immediate = this.immediate;
     this.immediate = false;
+    retiredAbort?.abort();
+    // An abort listener may synchronously stop/restart this client.
+    if (this.stopped || this.generation !== retiredGeneration) return;
     if (end.kind === 'http' && (this.opts.fatalStatuses ?? [401, 403]).includes(end.status)) {
       this.stopped = true;
       this.set({ ...this.state, status: 'closed', connectedAt: null });
@@ -165,7 +184,12 @@ export class EventStreamClient {
     const now = this.clock.now();
     const attempt = immediate ? this.state.attempt : nextAttempt(this.state.attempt, this.state.connectedAt, now);
     const delay = immediate ? 0 : backoffDelay(attempt - 1, () => this.clock.random(), this.state.retryFloorMs);
+    const retryGeneration = this.generation;
     this.set({ ...this.state, status: 'reconnecting', attempt, connectedAt: null });
-    this.retryTimer = this.clock.setTimeout(() => { this.retryTimer = null; this.connect(); }, delay);
+    if (this.stopped || retryGeneration !== this.generation) return;
+    this.retryTimer = this.clock.setTimeout(() => {
+      this.retryTimer = null;
+      if (retryGeneration === this.generation && !this.stopped) this.connect();
+    }, delay);
   }
 }

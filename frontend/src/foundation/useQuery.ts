@@ -29,14 +29,14 @@ export function useQuery<T>(key: QueryKey, fetcher: () => Promise<T>, opts: UseQ
   const subscribe = useCallback((cb: () => void) => cache.subscribe(id, cb), [cache, id]);
   const getSnapshot = useCallback(() => cache.get<T>(id), [cache, id]);
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  const idle = state.status === 'idle';
+  const invalidation = cache.getInvalidation(id);
 
   useEffect(() => {
     if (!enabled) return;
     cache.fetch(id, () => fetcherRef.current(), { staleTimeMs }).catch(() => {});
-    // A session change clears cached projections. Mounted readers must load
-    // again for the current account without waiting for a navigation/remount.
-  }, [cache, id, enabled, staleTimeMs, idle]);
+    // Explicit reset/clear revisions trigger a replacement fetch, including
+    // repeated resets while loading. Normal completion never retriggers this effect.
+  }, [cache, id, enabled, staleTimeMs, invalidation]);
 
   const refetch = useCallback(
     () => cache.fetch(id, () => fetcherRef.current(), { force: true }).catch(() => undefined),

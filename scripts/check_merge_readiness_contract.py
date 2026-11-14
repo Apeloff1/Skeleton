@@ -18,6 +18,7 @@ REQUIRED_NEEDS = (
     "integration_smoke",
     "quality_security",
     "pr_automation",
+    "source_qualification_gate",
     "ci",
 )
 PR_AUTOMATION_TESTS = (
@@ -204,6 +205,40 @@ def main() -> int:
         "quality gates must explicitly load pytest-asyncio while plugin autoload is disabled",
         failures,
     )
+
+    require(
+        '"requests==2.32.5"' in quality_security,
+        "security origin-guard source tests require pinned requests dependency",
+        failures,
+    )
+
+    # Backend's tests/__init__.py and repository-root tests/__init__.py are
+    # intentionally independent packages. Importing both under one pytest
+    # invocation causes collection failures that mask real security results.
+    security_step = re.search(
+        r"(?ms)^      - name: Verify tenant-bound binary custody, vault streaming and bounded SSRF\n"
+        r"(?P<body>.*?)(?=^      - name: |\Z)",
+        quality_security,
+    )
+    require(security_step is not None, "bounded security regression step missing", failures)
+    if security_step is not None:
+        backend_tests, separator, root_tests = security_step.group("body").partition("\n          cd ..\n")
+        require(
+            bool(separator)
+            and "python -m pytest --noconftest -q" in root_tests
+            and "../tests/" not in backend_tests
+            and all(
+                name in root_tests
+                for name in (
+                    "tests/test_full_security_alert_inventory_20261111.py",
+                    "tests/test_codeql_lineage_contract_20261111.py",
+                    "tests/test_codeql_all_151_source_contracts_20261111.py",
+                    "tests/test_codeql_stack_trace_custody_20261111.py",
+                )
+            ),
+            "root CodeQL/security regressions must run separately without namespace collisions",
+            failures,
+        )
 
     pr_automation = job_block(text, "pr_automation")
     require(bool(pr_automation), "PR automation validation job missing", failures)

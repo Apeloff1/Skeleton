@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "device_07",
+  "category": "device",
+  "overrides": {
+    "device": "cuda"
+  },
+  "expected": "denied",
+  "reason": "Reject unsafe model device without automatic downgrade or privilege escalation"
+}

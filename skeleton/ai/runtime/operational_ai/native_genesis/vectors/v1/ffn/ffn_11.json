@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "ffn_11",
+  "category": "ffn",
+  "overrides": {
+    "ffn_kind": null
+  },
+  "expected": "denied",
+  "reason": "Refuse malformed or unapproved ffn configuration without fallback"
+}

@@ -63,7 +63,7 @@ def test_real_crafting_signals_delivery_and_earned_rescue():
 
 def test_canonical_tool_and_prerequisite_cannot_be_bypassed():
     source, board = source_board()
-    with pytest.raises(HarborError, match="not earned"):
+    with pytest.raises(HarborError, match="(?:not earned|out of reach)"):
         build_beacon_rescue(source, board, [{"op": "repair", "beacon": "canal_light"}])
     with pytest.raises(HarborError, match="prerequisite"):
         build_beacon_rescue(

@@ -22,4 +22,83 @@ class RestartCases(QueueCase):
         self.assertEqual(self.store.inspect(self.order)["output_sha"],result["output_sha256"])
         self.assertEqual(self.store.audit()["jobs"],1)
 
+    def test_tampered_job_state_refused_on_cold_reopen(self):
+        self.store.submit(self.order)
+        with self.store.db.transaction() as conn:
+            conn.execute("UPDATE jobs SET status='committed' WHERE job_id=?",
+                         (self.order.job_id,))
+        self.store.close()
+        from skeleton.ai.runtime.operational_ai.work_orders import WorkOrderStore
+        with self.assertRaises(WorkOrderError):
+            WorkOrderStore(self.state_dir)
+
+    def test_tampered_event_payload_refused_on_cold_reopen(self):
+        self.store.submit(self.order)
+        with self.store.db.transaction() as conn:
+            conn.execute("UPDATE events SET body=? WHERE sequence=1",
+                         (b'{"forged":true}',))
+        self.store.close()
+        from skeleton.ai.runtime.operational_ai.work_orders import WorkOrderStore
+        with self.assertRaises(WorkOrderError):
+            WorkOrderStore(self.state_dir)
+
+    def test_tampered_quota_refused_on_cold_reopen(self):
+        self.store.submit(self.order)
+        lease=self.store.claim(self.order,expected_revision=1,reservation_tokens=128)
+        self.assertEqual(lease["revision"],2)
+        with self.store.db.transaction() as conn:
+            conn.execute("UPDATE budgets SET reserved=reserved-1 WHERE tenant='local'")
+        self.store.close()
+        from skeleton.ai.runtime.operational_ai.work_orders import WorkOrderStore
+        with self.assertRaises(WorkOrderError):
+            WorkOrderStore(self.state_dir)
+
+    def test_read_only_reopen_valid_state(self):
+        self.store.submit(self.order)
+        self.store.close()
+        from skeleton.ai.runtime.operational_ai.work_orders import WorkOrderStore
+        with WorkOrderStore(self.state_dir,readonly=True) as observer:
+            self.assertEqual(observer.inspect(self.order)["status"],"queued")
+            self.assertEqual(observer.audit()["jobs"],1)
+
+    def test_read_only_reopen_refuses_tampered_journal(self):
+        self.store.submit(self.order)
+        with self.store.db.transaction() as conn:
+            conn.execute("UPDATE events SET body=? WHERE sequence=1",
+                         (b'{"forged":true}',))
+        self.store.close()
+        from skeleton.ai.runtime.operational_ai.work_orders import WorkOrderStore
+        with self.assertRaises(WorkOrderError):
+            WorkOrderStore(self.state_dir,readonly=True)
+
+    def test_missing_outbox_refused_on_cold_reopen(self):
+        self.store.submit(self.order)
+        with self.store.db.transaction() as conn:
+            conn.execute("DELETE FROM outbox")
+        self.store.close()
+        from skeleton.ai.runtime.operational_ai.work_orders import WorkOrderStore
+        with self.assertRaises(WorkOrderError):
+            WorkOrderStore(self.state_dir)
+
+    def test_outbox_job_mismatch_refused_on_cold_reopen(self):
+        self.store.submit(self.order)
+        other=self.other_order(job_id="second",request_id="second")
+        self.store.submit(other)
+        with self.store.db.transaction() as conn:
+            conn.execute("UPDATE outbox SET job_id=? WHERE job_id=?",
+                         (other.job_id,self.order.job_id))
+        self.store.close()
+        from skeleton.ai.runtime.operational_ai.work_orders import WorkOrderStore
+        with self.assertRaises(WorkOrderError):
+            WorkOrderStore(self.state_dir)
+
+    def test_invalid_outbox_ack_refused_on_cold_reopen(self):
+        self.store.submit(self.order)
+        with self.store.db.transaction() as conn:
+            conn.execute("UPDATE outbox SET acknowledged=1")
+        self.store.close()
+        from skeleton.ai.runtime.operational_ai.work_orders import WorkOrderStore
+        with self.assertRaises(WorkOrderError):
+            WorkOrderStore(self.state_dir)
+
 if __name__=="__main__":unittest.main()
