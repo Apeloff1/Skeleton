@@ -16,6 +16,7 @@ from .fair_stream_queue import FairStreamScheduler, MeasuredStreamBudget, Stream
 
 SCHEMA = "skeleton.ai.fair-stream-custody.v1"
 RECEIPT_SCHEMA = "skeleton.ai.fair-stream-execution.v1"
+CANCELLATION_SCHEMA = "skeleton.ai.fair-stream-unstarted-cancellation.v1"
 MAX_BYTES = 524288
 ZERO = "0" * 64
 
@@ -75,6 +76,26 @@ def sign_execution_result(
         "generation": _generation(generation),
         "checkpoint_digest": checkpoint_digest, "lease_id": lease_id,
         "consumed_tokens": consumed_tokens, "result_digest": result_digest,
+    }
+    return {**body, "mac": _sign(execution_key, body)}
+
+
+def sign_unstarted_cancellation(
+    *, execution_key: bytes, session_id: str, generation: int,
+    checkpoint_digest: str, lease_id: str, request_id: str,
+) -> dict[str, object]:
+    """Distinct from a result receipt: journal has fenced execution permanently."""
+    _key(execution_key)
+    _hex(session_id, "session", 32)
+    _hex(checkpoint_digest, "checkpoint")
+    _hex(lease_id, "lease")
+    if (type(request_id) is not str or not request_id
+            or len(request_id.encode("utf-8")) > 128):
+        raise ValueError("bounded request identity required")
+    body = {
+        "schema": CANCELLATION_SCHEMA, "session_id": session_id,
+        "generation": _generation(generation), "checkpoint_digest": checkpoint_digest,
+        "lease_id": lease_id, "request_id": request_id,
     }
     return {**body, "mac": _sign(execution_key, body)}
 
@@ -202,6 +223,20 @@ class AuthenticatedFairStreamCustody:
                 if not isinstance(budget, MeasuredStreamBudget):
                     raise ValueError("typed measured budget required")
                 plan = trial.plan(budget, whole_request=whole_request)
+            elif action == "cancel_unstarted":
+                fields = {"schema", "session_id", "generation", "checkpoint_digest",
+                          "lease_id", "request_id", "mac"}
+                if not self.whole_request or type(receipt) is not dict or set(receipt) != fields:
+                    raise ValueError("signed native cancellation required")
+                expected = sign_unstarted_cancellation(
+                    execution_key=self._execution_key, session_id=self.session_id,
+                    generation=self.generation,
+                    checkpoint_digest=self._scheduler.checkpoint()["digest"],
+                    lease_id=receipt["lease_id"], request_id=receipt["request_id"],
+                )
+                if not hmac.compare_digest(_canonical(receipt), _canonical(expected)):
+                    raise ValueError("cancellation authentication or binding failed")
+                trial.cancel_unstarted(receipt["lease_id"], receipt["request_id"], tenant_id=tenant_id)
             elif action == "acknowledge":
                 required = {
                     "schema", "session_id", "generation", "checkpoint_digest",

@@ -13,7 +13,7 @@ import sqlite3
 from threading import RLock
 from typing import Mapping, Protocol
 
-from .fair_stream_custody import sign_execution_result
+from .fair_stream_custody import sign_execution_result, sign_unstarted_cancellation
 from .fair_stream_session import DispatchPermit
 from .private_sqlite import PrivateSQLiteHandle
 
@@ -117,6 +117,22 @@ class FairStreamExecutionJournal:
             )) != ("session_id", "request_id")
         ):
             raise ValueError("untrusted journal request replay index")
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS local_fair_stream_cancelled_intents ("
+            "session_id TEXT NOT NULL, request_id TEXT NOT NULL,"
+            "lease_id TEXT NOT NULL UNIQUE, receipt BLOB NOT NULL,"
+            "PRIMARY KEY(session_id,request_id)) WITHOUT ROWID"
+        )
+        columns = tuple(row[1] for row in connection.execute(
+            "PRAGMA table_info(local_fair_stream_cancelled_intents)"
+        ))
+        if columns != ("session_id", "request_id", "lease_id", "receipt"):
+            raise ValueError("untrusted cancellation ledger schema")
+        if connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='trigger' AND "
+            "tbl_name IN ('local_fair_stream_cancelled_intents','local_fair_stream_execution_journal') LIMIT 1"
+        ).fetchone() is not None:
+            raise ValueError("untrusted execution custody trigger")
 
     def bind_private_handle(self, handle: PrivateSQLiteHandle) -> None:
         """Bind the exact owned journal inode for all later read/write operations."""
@@ -154,11 +170,55 @@ class FairStreamExecutionJournal:
             raise ValueError("bounded request identity required")
         with self._lock:
             self._assert_private()
-            return self._connection.execute(
-                "SELECT 1 FROM local_fair_stream_execution_journal"
-                " WHERE session_id=? AND request_id=? LIMIT 1",
-                (self.session_id, request_id),
-            ).fetchone() is not None
+            return self._request_fenced(request_id)
+
+    def _request_fenced(self, request_id: str) -> bool:
+        return self._connection.execute(
+            "SELECT 1 FROM local_fair_stream_execution_journal"
+            " WHERE session_id=? AND request_id=? UNION ALL "
+            "SELECT 1 FROM local_fair_stream_cancelled_intents "
+            "WHERE session_id=? AND request_id=? LIMIT 1",
+            (self.session_id, request_id, self.session_id, request_id),
+        ).fetchone() is not None
+
+    def _capacity(self) -> None:
+        count = self._connection.execute(
+            "SELECT (SELECT COUNT(*) FROM local_fair_stream_execution_journal) + "
+            "(SELECT COUNT(*) FROM local_fair_stream_cancelled_intents)"
+        ).fetchone()[0]
+        if count >= MAX_JOURNAL_ROWS:
+            raise ExecutionOutcomeUnknown("execution journal capacity exhausted")
+
+    def fence_unstarted(self, permit: DispatchPermit) -> dict[str, object]:
+        """Permanently deny begin() for an exact unstarted lease and request.
+
+        The trusted dispatcher must prove it still owns an unstarted permit.
+        A competing begin() wins or loses the same SQLite write transaction.
+        This produces no execution result and cannot retire RUNNING intent.
+        """
+        if type(permit) is not DispatchPermit or permit.device_qualified:
+            raise ValueError("canonical CPU-only dispatch permit required")
+        receipt = sign_unstarted_cancellation(
+            execution_key=self._key, session_id=self.session_id,
+            generation=permit.generation, checkpoint_digest=permit.checkpoint_digest,
+            lease_id=permit.lease_id, request_id=permit.request_id,
+        )
+        with self._lock:
+            self._begin()
+            try:
+                if self._row(permit.lease_id) is not None or self._request_fenced(permit.request_id):
+                    raise ExecutionOutcomeUnknown("request already executed, reserved or cancelled")
+                self._capacity()
+                self._connection.execute(
+                    "INSERT INTO local_fair_stream_cancelled_intents "
+                    "(session_id,request_id,lease_id,receipt) VALUES (?,?,?,?)",
+                    (self.session_id, permit.request_id, permit.lease_id, _receipt_bytes(receipt)),
+                )
+                self._connection.commit()
+                return receipt
+            except BaseException:
+                self._connection.rollback()
+                raise
 
     def begin(self, permit: DispatchPermit) -> None:
         """Persist intent before any backend call; reject ALL prior lease IDs."""
@@ -177,17 +237,12 @@ class FairStreamExecutionJournal:
             try:
                 if self._row(permit.lease_id) is not None:
                     raise ExecutionOutcomeUnknown("lease already executed or reserved")
-                if self._connection.execute(
-                    "SELECT 1 FROM local_fair_stream_execution_journal"
-                    " WHERE session_id=? AND request_id=? LIMIT 1",
-                    (self.session_id, permit.request_id),
+                if self._request_fenced(permit.request_id) or self._connection.execute(
+                    "SELECT 1 FROM local_fair_stream_cancelled_intents WHERE lease_id=? LIMIT 1",
+                    (permit.lease_id,),
                 ).fetchone() is not None:
-                    raise ExecutionOutcomeUnknown("request already executed or reserved")
-                count = self._connection.execute(
-                    "SELECT COUNT(*) FROM local_fair_stream_execution_journal"
-                ).fetchone()[0]
-                if count >= MAX_JOURNAL_ROWS:
-                    raise ExecutionOutcomeUnknown("execution journal capacity exhausted")
+                    raise ExecutionOutcomeUnknown("request already executed, reserved or cancelled")
+                self._capacity()
                 self._connection.execute(
                     "INSERT INTO local_fair_stream_execution_journal"
                     " (lease_id, session_id, generation, checkpoint_digest,"

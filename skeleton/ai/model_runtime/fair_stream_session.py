@@ -168,6 +168,16 @@ class DurableFairStreamSession:
                                     tenant_id=tenant_id, expected_anchor=expected_anchor)
         return state
 
+    def cancel_unstarted(self, receipt: Mapping[str, object], *, tenant_id: str,
+                         expected_anchor: tuple[int, str]) -> dict[str, object]:
+        if not self.whole_request or type(receipt) is not dict:
+            raise ValueError("authenticated native cancellation required")
+        _, state = self._transition(
+            action="cancel_unstarted", receipt=receipt, tenant_id=tenant_id,
+            expected_anchor=expected_anchor,
+        )
+        return state
+
     def plan(
         self, budget: MeasuredStreamBudget, *, whole_request: bool | None = None,
         expected_anchor: tuple[int, str] | None = None,

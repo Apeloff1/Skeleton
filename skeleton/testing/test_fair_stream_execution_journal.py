@@ -230,3 +230,31 @@ def test_preexisting_wrong_schema_rejected():
     )
     with pytest.raises(ValueError, match="schema"):
         journal(connection)
+
+def test_unstarted_cancellation_fences_request_permanently_without_result(tmp_path):
+    from dataclasses import replace
+
+    path = tmp_path / "cancelled-intent.db"
+    conn = sqlite3.connect(path)
+    first = journal(conn)
+    receipt = first.fence_unstarted(permit())
+    assert receipt["schema"].endswith("unstarted-cancellation.v1")
+    assert "result_digest" not in receipt and "consumed_tokens" not in receipt
+    conn.close()
+    second = journal(sqlite3.connect(path))
+    assert second.request_exists(permit().request_id)
+    for p in (permit(), replace(permit(), lease_id="f" * 64)):
+        with pytest.raises(ExecutionOutcomeUnknown, match="already"):
+            second.begin(p)
+    with pytest.raises(ExecutionOutcomeUnknown, match="no committed"):
+        second.recover_committed_receipt(permit())
+
+
+def test_unstarted_cancellation_refuses_existing_execution_intent():
+    j = journal()
+    j.begin(permit())
+    with pytest.raises(ExecutionOutcomeUnknown, match="already"):
+        j.fence_unstarted(permit())
+    assert j._connection.execute(
+        "SELECT COUNT(*) FROM local_fair_stream_cancelled_intents"
+    ).fetchone()[0] == 0

@@ -463,3 +463,47 @@ def test_native_durable_request_binds_process_keyed_grant_not_plaintext(private_
     ).fetchone()[0] == 0
     service.cancel("bound-native", tenant_id="alice")
     assert registry.budget_status()["staged_bytes"] == 0
+
+def test_expired_issued_native_permit_can_be_explicitly_cancelled_without_execution(
+    private_files, monkeypatch,
+):
+    from skeleton.ai.model_runtime import native_fair_stream_backend as native_module
+    from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchDeferred, DispatchUncertain
+
+    install_probe(monkeypatch)
+    now = [100]
+    monkeypatch.setattr(native_module, "monotonic_ns", lambda: now[0])
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    stage_native_cpu_prompt(
+        runtime=runtime, registry=registry, request_id="issued-expired",
+        tenant_id="alice", prompt="hello", max_output_tokens=2,
+    )
+    service.submit(StreamRequest("issued-expired", "alice", InferencePhase.PREFILL, 2, 16))
+    permits, _ = service._guard.plan_live(token_budget=2)
+    permit, = permits
+    now[0] += registry._max_stage_age_ns
+    with pytest.raises(DispatchDeferred, match="pending prompt authorization"):
+        service.execute_next(token_budget=2)
+    before = session.verify()
+    with pytest.raises(ValueError, match="tenant"):
+        service.cancel_unstarted("issued-expired", tenant_id="bob")
+    assert session.verify() == before
+    status = service.cancel_unstarted("issued-expired", tenant_id="alice")
+    assert status.pending_leases == 0 and not status.execution_uncertain
+    assert not session.verify()["checkpoint"]["requests"]
+    assert journal.request_exists("issued-expired")
+    assert journal._connection.execute(
+        "SELECT COUNT(*) FROM local_fair_stream_execution_journal"
+    ).fetchone()[0] == 0
+    assert vault._connection.execute(
+        "SELECT COUNT(*) FROM local_fair_stream_sealed_results"
+    ).fetchone()[0] == 0
+    with pytest.raises(DispatchUncertain):
+        service._guard.execute_once(permit)
+    assert service.execute_next(token_budget=2)["executed"] is False

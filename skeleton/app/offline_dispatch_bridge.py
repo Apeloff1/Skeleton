@@ -134,6 +134,11 @@ class OfflineAdaptiveDispatchService:
         self._guard.cancel(request_id, tenant_id=tenant_id)
         return self.status()
 
+    def cancel_unstarted(self, request_id: str, *, tenant_id: str) -> OfflineDispatchStatus:
+        """Explicit tenant cancellation of a current-process unstarted permit."""
+        self._guard.cancel_unstarted(request_id, tenant_id=tenant_id)
+        return self.status()
+
     def reconcile_committed(
         self, *, journal: "FairStreamExecutionJournal",
         authorization: "RecoveryAuthorization", recovery_key: bytes,

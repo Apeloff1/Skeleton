@@ -174,6 +174,41 @@ class GuardedFairStreamDispatch:
                 self._cancel_cleanup(request_id)
             return changed
 
+    def cancel_unstarted(self, request_id: str, *, tenant_id: str) -> dict[str, object]:
+        """Cancel only a locally issued permit that has not entered execution."""
+        from .fair_stream_execution_journal import JournaledExecutionOwner
+
+        if type(tenant_id) is not str or not tenant_id or type(request_id) is not str:
+            raise ValueError("authenticated tenant and request required")
+        with self._lock:
+            if (not self._whole_request or type(self._owner) is not JournaledExecutionOwner
+                    or self._uncertain or self._executing or len(self._issued) != 1):
+                raise DispatchUncertain("no known unstarted native permit; reconciliation required")
+            permit = next(iter(self._issued.values()))
+            state = self._validate_pending(permit)
+            if (permit.request_id != request_id
+                    or state["checkpoint"]["pending"][0]["tenant_id"] != tenant_id):
+                raise ValueError("tenant does not own pending request")
+            self._executing = True
+            try:
+                receipt = self._owner._journal.fence_unstarted(permit)
+                changed = self._session.cancel_unstarted(
+                    receipt, tenant_id=tenant_id,
+                    expected_anchor=(state["generation"], state["digest"]),
+                )
+                self._issued.clear()
+                self._issued_token_budget = None
+                if self._cancel_cleanup is not None:
+                    self._cancel_cleanup(request_id)
+                return changed
+            except BaseException as exc:
+                # The fence may have committed even if the anchor did not.
+                # Never resume inference or manufacture a completion receipt.
+                self._uncertain = True
+                raise DispatchUncertain("unstarted cancellation requires reconciliation") from exc
+            finally:
+                self._executing = False
+
     def _sample(self, token_budget: int) -> tuple[MeasuredStreamBudget, DispatchObservation]:
         if type(token_budget) is not int or not 1 <= token_budget <= MAX_TOKENS:
             raise ValueError("bounded positive token budget required")

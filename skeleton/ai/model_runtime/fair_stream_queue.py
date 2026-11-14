@@ -224,6 +224,25 @@ class FairStreamScheduler:
             del self._served[request_id]
             del self._wait[request_id]
 
+    def cancel_unstarted(self, lease_id: str, request_id: str, *, tenant_id: str) -> None:
+        """Only custody may invoke this with a verified journal cancellation."""
+        _identifier("lease_id", lease_id, maximum=64)
+        _identifier("request_id", request_id, maximum=128)
+        _identifier("tenant_id", tenant_id, maximum=128)
+        with self._lock:
+            lease = self._pending.get(lease_id)
+            request = self._requests.get(request_id)
+            if (not self._whole_request or len(self._pending) != 1
+                    or lease is None or request is None
+                    or lease.request_id != request_id or request.tenant_id != tenant_id
+                    or lease.tenant_id != tenant_id or lease.tokens != request.remaining_tokens
+                    or self._served[request_id] != 0):
+                raise ValueError("unstarted cancellation does not bind native lease")
+            del self._pending[lease_id]
+            del self._requests[request_id]
+            del self._served[request_id]
+            del self._wait[request_id]
+
     def _best_for_tenant(self, tenant: str, selected: set[str]) -> StreamRequest | None:
         candidates = [
             item for item in self._requests.values()
