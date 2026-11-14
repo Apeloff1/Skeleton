@@ -146,14 +146,16 @@ async def test_temporary_vault_fallback_is_not_reported_ready(vaults, monkeypatc
 
 
 @pytest.mark.asyncio
-async def test_deep_vault_degraded_response_serializes_path_object(vaults, monkeypatch):
+async def test_deep_vault_degraded_response_hides_path_object(vaults, monkeypatch):
     monkeypatch.setattr(galaxy_studio, "VAULT_DIR", vaults[0])
     monkeypatch.setattr(build_vault, "BUILDS_VAULT_FALLBACK", True)
     transport = httpx.ASGITransport(app=server.app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/api/health/vault")
     assert response.status_code == 503
-    assert response.json()["checks"]["galaxy_vault"]["path"] == str(vaults[0])
+    assert response.json()["checks"]["galaxy_vault"]["ok"] is True
+    assert "path" not in response.json()["checks"]["galaxy_vault"]
+    assert str(vaults[0]) not in response.text
 
 
 @pytest.mark.asyncio

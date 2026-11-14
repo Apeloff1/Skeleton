@@ -7,7 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 import pytest
 
@@ -86,7 +86,7 @@ def bridge(project_boundary, monkeypatch):
             try:
                 return await asyncio.to_thread(playable._llm_in_thread, "private context", playable._GAME_SYS_FAST, ["hint"])
             except playable.PlayableModelFailure as exc:
-                raise HTTPException(503, exc.public()) from exc
+                raise exc.http_error() from exc
         app.include_router(router)
     with TestClient(app) as client:
         yield client, headers, database, engine, commands, route_contexts
