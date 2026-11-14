@@ -120,7 +120,7 @@ class WorkflowTierTests(unittest.TestCase):
             # A called workflow can be dispatched without a PR number.
             # It must never collapse all runs into one cancellation group.
             source_workflow.write_text(source_original.replace(
-                "github.event.pull_request.number || github.sha",
+                "github.event.pull_request.number || github.ref",
                 "github.event.pull_request.number", 1,
             ))
             self.assertTrue(any(

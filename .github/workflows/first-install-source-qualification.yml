@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: first-install-source-${{ github.event.pull_request.number || github.sha }}
+  group: first-install-source-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
