@@ -289,13 +289,15 @@ class SQLiteCollection:
     def _normalized_ids(ids: Sequence[str] | None) -> set[str] | None:
         if ids is None:
             return None
+        if isinstance(ids, (str, bytes)) or len(ids) > 100_000:
+            raise ValueError("memory identifier inventory exceeds budget")
         normalized: set[str] = set()
         for item_id in ids:
             if not isinstance(item_id, str):
                 raise TypeError("memory id must be a string")
             value = item_id.strip()
-            if not value:
-                raise ValueError("memory id must not be empty")
+            if not value or len(value) > 256 or value != item_id:
+                raise ValueError("invalid normalized memory id")
             normalized.add(value)
         return normalized
 
@@ -390,12 +392,16 @@ class SQLiteCollection:
             raise OverflowError("memory batch exceeds capacity")
         rows: list[tuple[str, str, str, str]] = []
         batch_bytes = 0
+        seen_ids: set[str] = set()
         for document, metadata, item_id in zip(documents, metadatas, ids):
             if not isinstance(item_id, str):
                 raise TypeError("memory id must be a string")
             normalized_id = item_id.strip()
-            if not normalized_id:
-                raise ValueError("memory id must not be empty")
+            if not normalized_id or len(normalized_id) > 256 or normalized_id != item_id:
+                raise ValueError("invalid normalized memory id")
+            if normalized_id in seen_ids:
+                raise ValueError("duplicate memory id in batch")
+            seen_ids.add(normalized_id)
             if not isinstance(document, str):
                 raise TypeError("memory document must be a string")
             if not isinstance(metadata, Mapping):

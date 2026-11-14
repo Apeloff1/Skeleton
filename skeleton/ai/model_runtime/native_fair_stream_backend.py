@@ -261,6 +261,9 @@ class NativePromptRegistry:
             self._expire_locked(self._clock_locked())
             _id(request_id, "request")
             pinned = self._staged.get(request_id)
+            if (pinned is None and request_id not in self._used
+                    and len(self._staged) + len(self._used) >= MAX_STAGED_PROMPTS):
+                raise NativeFairStreamDenied("prompt revocation capacity exhausted")
             if pinned is not None:
                 self._budget.release(pinned.tenant_id, len(pinned.prompt.encode("utf-8")))
                 del self._staged[request_id]

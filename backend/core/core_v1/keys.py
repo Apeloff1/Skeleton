@@ -91,6 +91,8 @@ def parse_keyring(spec: str) -> dict[str, bytes]:
             raise KeyProviderError("keyring entries must look like '<key_id>:<base64 key>'")
         kid, b64 = part.split(":", 1)
         kid, b64 = kid.strip(), b64.strip()
+        if not KEY_ID_RE.fullmatch(kid):
+            raise KeyProviderError("invalid key id")
         try:
             key = base64.b64decode(b64 + "=" * (-len(b64) % 4), altchars=b"-_", validate=True)
         except (binascii.Error, ValueError):
