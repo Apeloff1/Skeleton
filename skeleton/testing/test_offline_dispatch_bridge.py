@@ -153,6 +153,7 @@ def test_pending_restart_is_not_auto_reexecuted(monkeypatch, tmp_path):
         connection=sqlite3.connect(path), anchor=anchor, bootstrap=False,
     )
     assert recovered.status().pending_leases == 1
+    assert recovered.status().execution_uncertain
     with pytest.raises(DispatchUncertain, match="pending"):
         recovered.execute_next(token_budget=32)
 
@@ -166,3 +167,44 @@ def test_status_excludes_keys_and_raw_checkpoint(monkeypatch):
         "quarantined", "execution_uncertain",
     }
     assert not status.quarantined
+
+
+def test_private_session_revalidates_inode_and_quarantines_before_dispatch(tmp_path):
+    import os
+    from skeleton.ai.model_runtime.fair_stream_session import CustodyQuarantined
+
+    if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
+        pytest.skip("private POSIX SQLite handles required")
+    directory = tmp_path / "private"
+    directory.mkdir(mode=0o700)
+    directory.chmod(0o700)
+    anchor = ExternalAnchor()
+    owner = SimulatedDurableOwner()
+    app, handle = OfflineAdaptiveDispatchService.from_private_database(
+        directory=directory, custody_key=C, execution_key=E, session_id=SESSION,
+        watermark=anchor, owner=owner, storage_path=".", bootstrap=True,
+    )
+    with handle:
+        app.submit(request())
+        prior = anchor.read()
+        path = directory / "fair-stream.db"
+        path.rename(directory / "displaced.db")
+        path.touch(mode=0o600)
+        with pytest.raises(CustodyQuarantined):
+            app.execute_next(token_budget=32)
+        assert anchor.read() == prior
+        assert owner.calls == 0
+        assert app._session.quarantined
+
+
+def test_session_rejects_inherited_process_before_watermark_read(monkeypatch):
+    import os
+    from skeleton.ai.model_runtime.fair_stream_session import CustodyQuarantined
+
+    app = make()
+    pid = os.getpid()
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "getpid", lambda: pid + 1)
+        with pytest.raises(CustodyQuarantined, match="inherited"):
+            app.status()
+    assert app.status().generation == 0

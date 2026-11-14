@@ -7,6 +7,7 @@ SQLite connection, real OS probes, and an execution owner.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from threading import RLock
 from typing import Mapping, Protocol
 
@@ -63,6 +64,7 @@ class DurableFairStreamSession:
         )):
             raise ValueError("trusted high-watermark CAS required")
         self._store = store
+        self._owner_pid = os.getpid()
         self._watermark = watermark
         self._lock = RLock()
         self._quarantined = False
@@ -84,6 +86,10 @@ class DurableFairStreamSession:
     def quarantined(self) -> bool:
         return self._quarantined
 
+    def _require_owner_process(self) -> None:
+        if os.getpid() != self._owner_pid:
+            raise CustodyQuarantined("inherited session requires reopening")
+
     def _trusted(self) -> tuple[int, str]:
         if self._quarantined:
             raise CustodyQuarantined("session quarantined; explicit recovery required")
@@ -101,6 +107,7 @@ class DurableFairStreamSession:
             raise CustodyQuarantined("trusted high-watermark unavailable") from exc
 
     def verify(self) -> dict[str, object]:
+        self._require_owner_process()
         with self._lock:
             generation, digest = self._trusted()
             try:
@@ -117,6 +124,7 @@ class DurableFairStreamSession:
     def _transition(
         self, *, action: str, **kwargs: object,
     ) -> tuple[object | None, dict[str, object]]:
+        self._require_owner_process()
         with self._lock:
             generation, digest = self._trusted()
             try:
@@ -181,6 +189,7 @@ class DurableFairStreamSession:
         return state
 
     def pending_ids(self) -> tuple[str, ...]:
+        self._require_owner_process()
         with self._lock:
             generation, digest = self._trusted()
             try:

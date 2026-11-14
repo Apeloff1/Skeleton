@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import os
 import sqlite3
 from threading import RLock
 from typing import Mapping
@@ -15,6 +16,8 @@ from typing import Mapping
 from .fair_stream_custody import (
     AuthenticatedFairStreamCustody, MAX_BYTES,
 )
+
+from .private_sqlite import PrivateSQLiteHandle, PrivateSQLiteUnavailable
 
 SCHEMA = "skeleton.ai.fair-stream-sqlite-cas.v1"
 MAX_GENERATION = (1 << 63) - 1
@@ -90,6 +93,7 @@ class DurableFairStreamStore:
     def __init__(
         self, connection: sqlite3.Connection, *,
         custody_key: bytes, execution_key: bytes, session_id: str,
+        private_handle: PrivateSQLiteHandle | None = None,
     ) -> None:
         if not isinstance(connection, sqlite3.Connection):
             raise ValueError("trusted SQLite connection required")
@@ -102,6 +106,12 @@ class DurableFairStreamStore:
             custody_key=custody_key, execution_key=execution_key,
             session_id=session_id,
         )
+        if private_handle is not None:
+            if type(private_handle) is not PrivateSQLiteHandle or private_handle.connection is not connection:
+                raise ValueError("exact private custody handle required")
+            private_handle.assert_current()
+        self._private_handle = private_handle
+        self._owner_pid = os.getpid()
         self._connection = connection
         self._custody_key = custody_key
         self._execution_key = execution_key
@@ -117,12 +127,23 @@ class DurableFairStreamStore:
             ") WITHOUT ROWID"
         )
 
+    def _require_owner_process(self) -> None:
+        if os.getpid() != self._owner_pid:
+            raise PrivateSQLiteUnavailable("inherited stream custody requires reopening")
+
+    def _assert_private(self) -> None:
+        self._require_owner_process()
+        if self._private_handle is not None:
+            self._private_handle.assert_current()
+
     def _begin(self) -> None:
+        self._assert_private()
         if self._connection.in_transaction:
             raise ValueError("shared or active SQLite transaction forbidden")
         self._connection.execute("BEGIN IMMEDIATE")
 
     def _read(self) -> tuple[int, str, bytes] | None:
+        self._assert_private()
         row = self._connection.execute(
             "SELECT generation, digest, payload FROM " + _TABLE +
             " WHERE session_id = ?", (self.session_id,),
@@ -160,6 +181,7 @@ class DurableFairStreamStore:
 
     def initialize(self) -> dict[str, object]:
         """Initialize exactly once; never overwrite a preexisting session."""
+        self._require_owner_process()
         with self._lock:
             envelope = self._empty.export()
             payload = _encode(envelope)
@@ -173,6 +195,7 @@ class DurableFairStreamStore:
                     " VALUES (?, ?, ?, ?)",
                     (self.session_id, 0, envelope["digest"], payload),
                 )
+                self._assert_private()
                 self._connection.commit()
                 return envelope
             except BaseException:
@@ -185,7 +208,10 @@ class DurableFairStreamStore:
         """Read only with an independent high-watermark; no silent fallback."""
         generation = _generation(expected_generation)
         digest = _digest(expected_digest, "trusted high-watermark")
+        self._require_owner_process()
         with self._lock:
+            if self._connection.in_transaction:
+                raise ValueError("shared or active SQLite transaction forbidden")
             row = self._read()
             if row is None:
                 raise ValueError("durable custody session missing")
@@ -206,6 +232,7 @@ class DurableFairStreamStore:
         """
         generation = _generation(expected_generation)
         digest = _digest(expected_digest, "trusted high-watermark")
+        self._require_owner_process()
         with self._lock:
             self._begin()
             try:
@@ -230,6 +257,7 @@ class DurableFairStreamStore:
                 ).rowcount
                 if changed != 1:
                     raise ValueError("durable custody CAS rejected")
+                self._assert_private()
                 self._connection.commit()
                 return plan, envelope
             except BaseException:

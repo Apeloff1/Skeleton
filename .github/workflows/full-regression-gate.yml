@@ -119,6 +119,7 @@ jobs:
           skeleton/testing/test_fair_stream_dispatch.py
           skeleton/testing/test_fair_stream_execution_journal.py
           skeleton/testing/test_fair_stream_recovery.py
+          skeleton/testing/test_offline_dispatch_bridge.py
           skeleton/testing/test_offline_native_fair_stream.py
       - name: Reconciliation industry restoration and mutation custody
         run: python -m pytest -q --tb=short skeleton/economy/gameplay/industry/tests

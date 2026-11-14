@@ -110,6 +110,19 @@ def bind_native_cpu_dispatch_service(
     state = session.verify()
     if state.get("session_id") != registry.session_id:
         raise ValueError("app session and native prompt registry mismatch")
+    if type(result_handle) is not PrivateSQLiteHandle or type(journal_handle) is not PrivateSQLiteHandle:
+        raise ValueError("canonical native database handles required")
+    store = session._store
+    if store._connection is result_handle.connection or store._connection is journal_handle.connection:
+        raise ValueError("session, journal and result must use distinct connections")
+    if store._private_handle is not None:
+        store._private_handle.assert_current()
+        identity = os.fstat(store._private_handle._file_fd)
+        for handle in (result_handle, journal_handle):
+            handle.assert_current()
+            other = os.fstat(handle._file_fd)
+            if (identity.st_dev, identity.st_ino) == (other.st_dev, other.st_ino):
+                raise ValueError("session, journal and result must use distinct inodes")
     owner, vault = bind_native_cpu_result_owner(
         runtime=runtime, registry=registry, result_handle=result_handle,
         journal_handle=journal_handle, journal=journal, result_key=result_key,

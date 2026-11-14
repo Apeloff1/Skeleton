@@ -67,14 +67,15 @@ class OfflineAdaptiveDispatchService:
         execution_key: bytes, session_id: str,
         watermark: TrustedHighWatermark, owner: DurableExecutionOwner,
         storage_path: str, bootstrap: bool = False,
+        private_handle: PrivateSQLiteHandle | None = None,
     ) -> "OfflineAdaptiveDispatchService":
         """Never silently reset a previous session on a restart."""
-        store = DurableFairStreamStore(
-            connection, custody_key=custody_key, execution_key=execution_key,
-            session_id=session_id,
-        )
         if type(bootstrap) is not bool:
             raise ValueError("explicit bootstrap boolean required")
+        store = DurableFairStreamStore(
+            connection, custody_key=custody_key, execution_key=execution_key,
+            session_id=session_id, private_handle=private_handle,
+        )
         session = (
             DurableFairStreamSession.bootstrap(store, watermark)
             if bootstrap else DurableFairStreamSession(store, watermark)
@@ -102,7 +103,7 @@ class OfflineAdaptiveDispatchService:
                 connection=handle.connection,
                 custody_key=custody_key, execution_key=execution_key,
                 session_id=session_id, watermark=watermark, owner=owner,
-                storage_path=storage_path, bootstrap=bootstrap,
+                storage_path=storage_path, bootstrap=bootstrap, private_handle=handle,
             )
         except BaseException:
             handle.close()
@@ -111,12 +112,13 @@ class OfflineAdaptiveDispatchService:
 
     def status(self) -> OfflineDispatchStatus:
         state = self._session.verify()
+        pending = state["checkpoint"]["pending"]
         return OfflineDispatchStatus(
             schema="skeleton.app.offline-dispatch-status.v1",
             generation=state["generation"],
-            pending_leases=len(self._session.pending_ids()),
+            pending_leases=len(pending),
             quarantined=self._session.quarantined,
-            execution_uncertain=self._guard.uncertain,
+            execution_uncertain=self._guard.uncertain or bool(pending and not self._guard._issued),
         )
 
     def submit(self, request: StreamRequest) -> OfflineDispatchStatus:
