@@ -24,6 +24,27 @@ module.exports = ({ config }) => {
     base?.extra?.EXPO_SKELETON_URL ||
     '';
 
+  // A built APK/AAB cannot reach a host server through the phone's localhost.
+  // Reject a disconnected native release before it is distributed.
+  const installedBuild = ['preview', 'apk', 'production'].includes(process.env.EAS_BUILD_PROFILE || '');
+  if (installedBuild) {
+    let endpoint;
+    try { endpoint = new URL(backendUrl); } catch { /* validated below */ }
+    const hostname = endpoint?.hostname?.toLowerCase() || '';
+    const loopback = hostname === 'localhost' || hostname === '0.0.0.0'
+      || hostname === '[::1]' || /^127\./.test(hostname) || hostname === '10.0.2.2';
+    if (!endpoint || endpoint.protocol !== 'https:' || !hostname || loopback
+      || endpoint.username || endpoint.password || endpoint.search || endpoint.hash
+      || (endpoint.pathname !== '/' && endpoint.pathname !== '')) {
+      throw new Error(
+        'Installed Skeleton builds require EXPO_PUBLIC_BACKEND_URL pointing at '
+        + 'the HTTPS origin of the real application API. localhost and missing '
+        + 'URLs cannot serve chat on a phone. Configure the EAS build environment '
+        + 'before compiling; never embed a model provider API key.',
+      );
+    }
+  }
+
   return {
     ...base,
     ...fromContext,

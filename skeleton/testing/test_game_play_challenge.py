@@ -60,6 +60,9 @@ def test_losing_and_disqualified_runs_never_enter_winning_rank():
     winner = _winning_session(capsule)
     strict = default_challenge_policy()
     strict["max_frames"] = max(1, winner["frame_count"] - 1)
+    # Other constraints must stay inside the strict policy budget.
+    strict["max_jump_frames"] = min(strict["max_jump_frames"], strict["max_frames"])
+    strict["max_left_frames"] = min(strict["max_left_frames"], strict["max_frames"])
     if winner["frame_count"] > 1:
         disqualified = pack_play_score(capsule, winner, strict)
         assert not disqualified["result"]["eligible"]
