@@ -363,3 +363,68 @@ def test_inherited_execution_owner_refuses_before_lock(monkeypatch):
         with pytest.raises(ExecutionOutcomeUnknown, match="inherited"):
             j.request_exists("request-1")
     assert backend.calls == 0
+
+@pytest.mark.parametrize("overrides", [
+    {"device_qualified": 0}, {"device_qualified": True},
+    {"generation": True}, {"generation": -1}, {"generation": 1 << 63},
+    {"tokens": True}, {"tokens": 0}, {"tokens": (1 << 24) + 1},
+    {"bytes_reserved": True}, {"bytes_reserved": 0},
+    {"bytes_reserved": 1 << 63}, {"request_id": "invalid\x00identity"},
+    {"request_id": "\ud800"}, {"request_id": "x" * 129},
+    {"lease_id": "X" * 64}, {"checkpoint_digest": "short"},
+])
+def test_every_journal_boundary_rejects_malformed_permit(overrides):
+    from dataclasses import replace
+
+    db = journal()
+    bad = replace(permit(), **overrides)
+    operations = (
+        lambda: db.begin(bad),
+        lambda: db.commit(bad, consumed_tokens=1, result_digest="e" * 64),
+        lambda: db.fence_unstarted(bad),
+        lambda: db.recover_cancelled_receipt(bad),
+        lambda: db.require_running_intent(bad),
+        lambda: db.recover_committed_receipt(bad),
+        lambda: db.record_abandonment(bad, evidence_digest="f" * 64),
+    )
+    for operation in operations:
+        with pytest.raises(ValueError):
+            operation()
+    assert not db._connection.in_transaction
+    for table in ("local_fair_stream_execution_journal", "local_fair_stream_cancelled_intents"):
+        assert db._connection.execute("SELECT COUNT(*) FROM " + table).fetchone() == (0,)
+
+
+def test_owner_rejects_boolean_state_resource_aliases():
+    from dataclasses import replace
+
+    db = journal()
+    backend = Backend()
+    owner = JournaledExecutionOwner(db, backend)
+    p = replace(permit(), generation=1, tokens=1, bytes_reserved=1)
+    valid = state()
+    valid["generation"] = 1
+    valid["checkpoint"]["pending"][0].update(tokens=1, bytes_reserved=1)
+    for field in ("generation", "tokens", "bytes_reserved"):
+        import copy
+        bad = copy.deepcopy(valid)
+        if field == "generation":
+            bad[field] = True
+        else:
+            bad["checkpoint"]["pending"][0][field] = True
+        with pytest.raises(ExecutionOutcomeUnknown):
+            owner.execute_and_commit(p, bad)
+    assert backend.calls == 0
+    assert not db.request_exists(p.request_id)
+
+
+def test_cancellation_lease_collision_is_rejected_without_creating_second_fence():
+    from dataclasses import replace
+
+    db = journal()
+    original = permit()
+    first = db.fence_unstarted(original)
+    with pytest.raises(ExecutionOutcomeUnknown, match="already"):
+        db.fence_unstarted(replace(original, request_id="different"))
+    assert db.recover_cancelled_receipt(original) == first
+    assert not db.request_exists("different")
