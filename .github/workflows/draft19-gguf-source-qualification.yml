@@ -13,8 +13,6 @@ on:
       - ".machine/repository.toml"
       - "tests/test_repo_machine_budget_20261108.py"
       - "skeleton/testing/test_ai_next_model.py"
-      - "skeleton/testing/test_app_offline_archive_schema_parity.py"
-      - "skeleton/testing/test_repo_machine_inventory_budget.py"
       - "skeleton/testing/test_app_offline_mixed_game_library_continuity.py"
       - "skeleton/testing/dialogue_sessions_v1/**"
       - "skeleton/testing/questflows_v1/**"
@@ -32,8 +30,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: draft19-gguf-source-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: draft19-gguf-source-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   descriptor_custody_and_provenance:
@@ -45,19 +43,15 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify checkout identity
         env:
-          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
       - name: Install supported Python runtime
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.11.16"
-      - name: Admit literal Python source and pytest paths
-        run: |
-          python scripts/check_draft19_ci_paths.py
-          python -m unittest discover -s tests -p 'test_draft19_ci_paths.py' -v
       - name: Compile changed sources
         run: |
           python -m py_compile skeleton/local_ai/model_loader.py skeleton/testing/test_local_ai_model_loader_custody.py
@@ -67,9 +61,14 @@ jobs:
           python -m py_compile skeleton/testing/test_app_offline_archive_schema_parity.py skeleton/testing/test_repo_machine_inventory_budget.py
           python -m py_compile tests/test_repo_machine_budget_20261108.py
           python -m py_compile skeleton/testing/test_ai_next_model.py skeleton/testing/test_app_offline_mixed_game_library_continuity.py
+          python -m py_compile skeleton/testing/test_app_offline_archive_schema_parity.py skeleton/testing/test_repo_machine_inventory_budget.py
           python -m py_compile scripts/check_draft19_reconciliation.py tests/test_draft19_reconciliation.py
       - name: Verify complete held-source registry
         run: python scripts/check_draft19_reconciliation.py
+      - name: Admit literal Python source and unittest selections
+        run: |
+          python scripts/check_draft19_ci_paths.py
+          python -m unittest discover -s tests -p 'test_draft19_ci_paths.py' -v
       - name: Run adversarial ledger tests
         run: python -m unittest discover -s tests -p 'test_draft19_reconciliation.py' -v
       - name: Install approved local-AI import-chain test dependencies

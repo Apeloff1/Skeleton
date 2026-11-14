@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "evidence_match_03",
+  "domain": "evidence_match",
+  "ordinal": 3,
+  "arguments": {
+    "index": 3,
+    "a": 121,
+    "b": 5,
+    "word": "quartz",
+    "city": "Tromso"
+  },
+  "prompt": "Task 3: Observed digest prefix 00000079, pinned prefix 0000007a. Reply match or mismatch.",
+  "expected": "mismatch",
+  "severity": "critical",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

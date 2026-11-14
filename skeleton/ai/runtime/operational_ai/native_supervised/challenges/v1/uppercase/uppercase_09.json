@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "uppercase_09",
+  "domain": "uppercase",
+  "ordinal": 9,
+  "arguments": {
+    "index": 9,
+    "a": 163,
+    "b": 11,
+    "word": "quartz",
+    "city": "Tromso"
+  },
+  "prompt": "Task 9: Uppercase this identifier exactly: quartz_9.",
+  "expected": "QUARTZ_9",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

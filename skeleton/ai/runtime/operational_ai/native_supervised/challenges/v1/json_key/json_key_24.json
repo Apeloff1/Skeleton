@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "json_key_24",
+  "domain": "json_key",
+  "ordinal": 24,
+  "arguments": {
+    "index": 24,
+    "a": 268,
+    "b": 13,
+    "word": "atlas",
+    "city": "Molde"
+  },
+  "prompt": "Task 24: Read JSON {\"count\":268,\"kind\":\"atlas\"}. Output only the kind field.",
+  "expected": "atlas",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

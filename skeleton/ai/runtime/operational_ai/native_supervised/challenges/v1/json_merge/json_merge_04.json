@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "json_merge_04",
+  "domain": "json_merge",
+  "ordinal": 4,
+  "arguments": {
+    "index": 4,
+    "a": 128,
+    "b": 6,
+    "word": "marble",
+    "city": "Halden"
+  },
+  "prompt": "Task 4: Combine JSON objects {\"a\":128} and {\"b\":6}; compact keys a,b only.",
+  "expected": "{\"a\":128,\"b\":6}",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

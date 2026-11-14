@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "unit_words_05",
+  "domain": "unit_words",
+  "prompt": "Write 7 amperes with digits and the singular unit in square brackets.",
+  "completion": "7 [ampere]",
+  "group_id": "unit_words_05",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

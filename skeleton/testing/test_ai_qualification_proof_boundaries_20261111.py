@@ -285,17 +285,24 @@ def test_verifier_normalizes_canonicalization_failure():
 
 
 def test_native_report_ci_watches_and_compiles_receipt_verifier():
-    # A proof-verifier-only repair must always re-run the native custody gate.
-    workflow = (
-        Path(__file__).resolve().parents[2]
-        / ".github/workflows/native-qualification-report-custody.yml"
-    ).read_text(encoding="utf-8")
-    relative = "skeleton/ai/runtime/operational_ai/deployment/qualification/verification.py"
-    watch, run = workflow.split("      - name: Compile and execute actual native report regression suite", 1)
-    assert f"      - '{relative}'" in watch
-    assert relative in run
-    assert "ref: ${{ github.event.pull_request.head.sha }}" in workflow
-
+    # Verifier-only edits always execute through the required exact-head
+    # source-gate fan-in, rather than a now-removed standalone paths filter.
+    root = Path(__file__).resolve().parents[2]
+    workflow = (root / '.github/workflows/native-qualification-report-custody.yml').read_text(encoding='utf-8')
+    readiness = (root / '.github/workflows/merge-readiness.yml').read_text(encoding='utf-8')
+    relative = 'skeleton/ai/runtime/operational_ai/deployment/qualification/verification.py'
+    assert '  workflow_call:' in workflow
+    assert '  pull_request:' not in workflow
+    assert 'permissions:' in workflow and '  contents: read' in workflow
+    assert 'ref: ${{ github.event.pull_request.head.sha }}' in workflow
+    assert 'test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"' in workflow
+    run = workflow.split('      - name: Compile and execute actual native report regression suite', 1)[1]
+    assert relative in run and 'python -m pytest -q --noconftest' in run
+    assert '  source_23:' in readiness
+    assert 'uses: ./.github/workflows/native-qualification-report-custody.yml' in readiness
+    assert '      - source_23' in readiness
+    assert 'needs: source_qualification_gate' in readiness
+    assert "needs.source_qualification_gate.result == 'success'" in readiness
 
 class _HostileReceiptKey:
     """A foreign key colliding with a trusted lookup must never run equality."""

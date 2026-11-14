@@ -20,6 +20,7 @@ interface Entry {
   inflight: Promise<unknown> | null;
   listeners: Set<Listener>;
   generation: number;
+  invalidation: number;
 }
 
 export function serializeKey(key: QueryKey): string {
@@ -43,28 +44,38 @@ export class QueryCache {
   private entry(id: string): Entry {
     let e = this.entries.get(id);
     if (!e) {
-      e = { state: IDLE, inflight: null, listeners: new Set(), generation: 0 };
+      e = { state: IDLE, inflight: null, listeners: new Set(), generation: 0, invalidation: 0 };
       this.entries.set(id, e);
-      this.evict();
+      this.evict(id);
     }
     return e;
   }
 
-  private evict() {
+  // A newly admitted entry must remain addressable even if every older entry
+  // is pinned by a subscriber or an in-flight request. Capacity is a soft cap
+  // while entries are pinned; reclaim unpinned entries on later operations.
+  private evict(protectedId?: string) {
     if (this.entries.size <= this.maxEntries) return;
     for (const [id, e] of this.entries) {
       if (this.entries.size <= this.maxEntries) break;
-      if (e.listeners.size === 0 && !e.inflight) this.entries.delete(id);
+      if (id !== protectedId && e.listeners.size === 0 && !e.inflight) this.entries.delete(id);
     }
   }
 
   private set(e: Entry, next: QueryState<unknown>) {
     e.state = next;
-    e.listeners.forEach(l => { try { l(); } catch {} });
+    for (const listener of [...e.listeners]) {
+      if (e.listeners.has(listener)) { try { listener(); } catch {} }
+    }
   }
 
   get<T>(key: QueryKey): QueryState<T> {
     return (this.entries.get(serializeKey(key))?.state ?? IDLE) as QueryState<T>;
+  }
+
+  /** Changes only on explicit invalidation/clear, not ordinary fetch completion. */
+  getInvalidation(key: QueryKey): number {
+    return this.entries.get(serializeKey(key))?.invalidation ?? 0;
   }
 
   isStale(key: QueryKey, staleTimeMs: number): boolean {
@@ -76,7 +87,7 @@ export class QueryCache {
   subscribe(key: QueryKey, listener: Listener): () => void {
     const e = this.entry(serializeKey(key));
     e.listeners.add(listener);
-    return () => { e.listeners.delete(listener); };
+    return () => { e.listeners.delete(listener); this.evict(); };
   }
 
   /** Run `fetcher` unless fresh data exists; concurrent callers share one request. */
@@ -87,10 +98,9 @@ export class QueryCache {
     if (!opts.force && !this.isStale(key, opts.staleTimeMs ?? 0)) return Promise.resolve(e.state.data as T);
     const generation = e.generation;
     const prev = e.state;
-    this.set(e, { ...prev, status: prev.status === 'success' ? 'success' : 'loading', fetching: true, error: prev.status === 'success' ? null : prev.error });
-    let p: Promise<T>;
-    try { p = Promise.resolve(fetcher()); } catch (err) { p = Promise.reject(err); }
-    const run = p.then(
+    // Register ownership before notifying subscribers or invoking user code.
+    // Reentrant fetches must share this promise rather than start another one.
+    const run = Promise.resolve().then(fetcher).then(
       data => {
         if (e.generation === generation) this.set(e, { status: 'success', data, error: null, updatedAt: this.now(), fetching: false });
         return data;
@@ -100,8 +110,11 @@ export class QueryCache {
         if (e.generation === generation) this.set(e, { status: 'error', data: e.state.data, error, updatedAt: e.state.updatedAt, fetching: false });
         throw error;
       },
-    ).finally(() => { if (e.inflight === run) e.inflight = null; });
+    ).finally(() => {
+      if (e.inflight === run) { e.inflight = null; this.evict(id); }
+    });
     e.inflight = run;
+    this.set(e, { ...prev, status: prev.status === 'success' ? 'success' : 'loading', fetching: true, error: prev.status === 'success' ? null : prev.error });
     return run;
   }
 
@@ -115,17 +128,32 @@ export class QueryCache {
   /** Mark matching entries stale (prefix match on serialized string keys or array heads). */
   invalidate(prefix?: QueryKey) {
     const p = prefix === undefined ? null : serializeKey(prefix);
-    const arrayPrefix = p && p.startsWith('[') ? p.slice(0, -1) : null;
-    for (const [id, e] of this.entries) {
-      if (p && !(id === p || id.startsWith(p) || (arrayPrefix && id.startsWith(arrayPrefix)))) continue;
+    const arrayPrefix = Array.isArray(prefix) && p !== null ? p.slice(0, -1) : null;
+    for (const [id, e] of [...this.entries]) {
+      if (this.entries.get(id) !== e) continue;
+      // Array prefixes are segment-aware: ['games', 1] must not match ['games', 10].
+      if (p !== null && !(id === p || (arrayPrefix !== null
+        ? (arrayPrefix === '[' ? id.startsWith('[') : id.startsWith(arrayPrefix + ','))
+        : id.startsWith(p)))) continue;
       e.generation += 1;
+      e.invalidation += 1;
       e.inflight = null;
-      if (e.state.status === 'success') this.set(e, { ...e.state, updatedAt: 0 });
+      // An invalidated request no longer owns the fetching state. Always notify
+      // mounted readers, including initial loading/error and repeated resets.
+      this.set(e, e.state.data === undefined
+        ? { ...IDLE }
+        : { ...e.state, updatedAt: 0, fetching: false });
     }
   }
 
   clear() {
-    for (const e of this.entries.values()) { e.generation += 1; e.inflight = null; this.set(e, IDLE); }
+    for (const [id, e] of [...this.entries]) {
+      if (this.entries.get(id) !== e) continue;
+      e.generation += 1;
+      e.invalidation += 1;
+      e.inflight = null;
+      this.set(e, { ...IDLE });
+    }
   }
 
   size(): number { return this.entries.size; }

@@ -1,0 +1,76 @@
+name: Dragon research pilot source qualification
+
+on:
+  pull_request:
+    paths:
+      - "backend/core/dragon_campaign_pilot_qualification.py"
+      - "backend/core/dragon_crawler.py"
+      - "backend/tests/test_dragon_campaign_pilot_qualification.py"
+      - "backend/tests/test_dragon_atlas_bridge.py"
+      - "frontend/src/product/crawlerClient.ts"
+      - "frontend/src/features/Jeeves/CrawlerResearchAtlasPanel.tsx"
+      - ".github/workflows/dragon-pilot-source-qualification.yml"
+      - ".github/workflows/malware-gate.yml"
+      - ".github/workflows/artifact-policy.yml"
+      - "tests/test_dragon_pilot_release_gate_admission.py"
+      - "tests/test_dragon_e2e_editor_admission.py"
+      - "scripts/qualify_e2e_dragon_editor.py"
+      - "tests/e2e/app-foundation/dragon-crawler-pilot.spec.mjs"
+      - "frontend/src/features/Jeeves/dragonResearchDecisionEngine.ts"
+      - "frontend/src/features/Jeeves/DragonResearchDecisionCockpit.tsx"
+      - "frontend/scripts/test-dragon-advanced-decision.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dragon-pilot-source-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pilot_contract:
+    name: Bounded pilot contract and fail-closed source checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact source head without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify source-head identity
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Use supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Compile changed backend modules
+        run: |
+          python -m py_compile backend/core/dragon_campaign_pilot_qualification.py
+          python -m py_compile backend/core/dragon_crawler.py
+          python -m py_compile backend/tests/test_dragon_campaign_pilot_qualification.py
+          python -m py_compile backend/tests/test_dragon_atlas_bridge.py
+      - name: Execute hermetic authority and release-hold regressions
+        env:
+          PYTHONPATH: "backend:."
+        run: python -m unittest discover -s backend/tests -p 'test_dragon_campaign_pilot_qualification.py' -v
+      - name: Verify review-only malware and artifact admission remains fail closed
+        run: python -m unittest discover -s tests -p 'test_dragon_pilot_release_gate_admission.py' -v
+      - name: Verify CI-only editor token custody and least-authority role grant
+        run: python -m unittest discover -s tests -p 'test_dragon_e2e_editor_admission.py' -v
+      - name: Verify patch whitespace against fetched parent
+        run: |
+          test "$(git rev-list --count HEAD)" -ge 2
+          git diff --check HEAD^ HEAD
+      - name: Use supported Node 24 for pure journey contracts
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - name: Exercise user journey preflight and pilot receipt encoding
+        run: |
+          node --experimental-strip-types --test frontend/scripts/test-crawler-pilot-journey.mjs
+          node --experimental-strip-types --test frontend/scripts/test-dragon-advanced-decision.mjs

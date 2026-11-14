@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "identity-06",
+  "domain": "identity",
+  "phase": "admission",
+  "category": "permitted-boundary",
+  "threat": "Enforce canonical namespace identity and disallow path or case folding ambiguity: \"job_123\"",
+  "trust_boundary": "Native AI job, principal, model and bounded capacity remain authoritative",
+  "input": {
+    "variant": "job_123"
+  },
+  "expected_allow": true,
+  "expected_state": "valid",
+  "acceptance": "Execute the actual durable_jobs.case_oracle on private test SQLite and assert exact disposition",
+  "no_hosted_fallback": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

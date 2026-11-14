@@ -22,6 +22,7 @@ import sys
 import threading
 import time
 from typing import Any, Iterator
+import unicodedata
 
 from .chat_engine import NativeChatEngine
 from .chat_protocol import ChatTranscript, MAX_MESSAGES
@@ -37,6 +38,31 @@ MAX_BUNDLE_BYTES = 16 * 1024 * 1024
 MAX_EXPORTED_TURNS = 1024
 _BUNDLE_SCHEMA = "skeleton.ai.offline-chat-bundle.v1"
 _BUNDLE_SCHEMA_V2 = "skeleton.ai.offline-chat-bundle.v2"
+_BUNDLE_SCHEMA_V3 = "skeleton.ai.offline-chat-bundle.v3"
+MAX_SESSION_TITLE_CHARS = 100
+
+
+def _session_title(value: object) -> str:
+    """Bound user-visible organization text without changing model context."""
+    if not isinstance(value, str):
+        raise RuntimeContractError("conversation title must be text")
+    try:
+        oversized = len(value.encode("utf-8", errors="strict")) > 400
+    except UnicodeError:
+        raise RuntimeContractError("invalid conversation title encoding") from None
+    if (len(value) > MAX_SESSION_TITLE_CHARS or oversized
+            or any(ord(ch) < 32 or ord(ch) == 127 or ch in "\u2028\u2029" for ch in value)):
+        raise RuntimeContractError("conversation title must be a single line of at most 100 characters")
+    return value.strip()
+
+
+def _organization_fields(value: object) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != {"title", "pinned", "archived"}:
+        raise RuntimeContractError("invalid conversation organization fields")
+    title = _session_title(value["title"])
+    if title != value["title"] or any(type(value[k]) is not bool for k in ("pinned", "archived")):
+        raise RuntimeContractError("invalid conversation organization values")
+    return {"title": title, "pinned": value["pinned"], "archived": value["archived"]}
 
 
 def _stable_bytes(obj: Any) -> bytes:
@@ -216,6 +242,14 @@ class OfflineChatStore:
             self._db.execute("PRAGMA trusted_schema=OFF")
             self._db.execute("PRAGMA secure_delete=ON")
             self._db.execute("PRAGMA foreign_keys=ON")
+            # SQLite lower() folds ASCII only. Keep multilingual title/text
+            # search in this same authority without a rebuildable shadow
+            # index or a platform-specific extension dependency.
+            self._db.create_function(
+                "offline_casefold", 1,
+                lambda value: unicodedata.normalize("NFC", value).casefold()
+                if isinstance(value, str) else "", deterministic=True,
+            )
             if filename != ":memory:":
                 self._db.execute("PRAGMA journal_mode=WAL")
             self._db.execute("""CREATE TABLE IF NOT EXISTS offline_sessions (
@@ -248,6 +282,33 @@ class OfflineChatStore:
                     REFERENCES offline_turns(session_id, request_id)
                     ON DELETE CASCADE
             )""")
+            # Additive SQLite custody for native/GGUF execution receipts.
+            # Imported or historical turns without a runtime receipt are
+            # never falsely represented as newly verified native inference.
+            self._db.execute("""CREATE TABLE IF NOT EXISTS offline_turn_execution_receipts (
+                session_id TEXT NOT NULL,
+                request_id TEXT NOT NULL,
+                revision INTEGER NOT NULL CHECK (revision >= 1),
+                model_digest TEXT NOT NULL,
+                tokenizer_digest TEXT NOT NULL,
+                output_sha256 TEXT NOT NULL,
+                execution_receipt_digest TEXT NOT NULL,
+                PRIMARY KEY (session_id, request_id),
+                FOREIGN KEY (session_id, request_id)
+                    REFERENCES offline_turns(session_id, request_id)
+                    ON DELETE CASCADE
+            )""")
+            # Presentation metadata has its own CAS clock. Renaming, pinning
+            # or archiving must not rewrite transcript/turn receipt identity.
+            # A separate additive table also keeps old six-column writers
+            # compatible with databases created by a newer application.
+            self._db.execute("""CREATE TABLE IF NOT EXISTS offline_session_metadata (
+                session_id TEXT PRIMARY KEY REFERENCES offline_sessions(session_id) ON DELETE CASCADE,
+                title TEXT NOT NULL DEFAULT '',
+                pinned INTEGER NOT NULL DEFAULT 0 CHECK (pinned IN (0,1)),
+                archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0,1)),
+                metadata_revision INTEGER NOT NULL CHECK (metadata_revision >= 1)
+            )""")
             # Upgrade existing chat stores in place, including databases
             # created by early grounding prototypes. Once present, this
             # durable marker makes dropped evidence detectable on every load.
@@ -266,6 +327,14 @@ class OfflineChatStore:
                     "SELECT 1 FROM offline_turn_evidence e "
                     "WHERE e.session_id=offline_turns.session_id "
                     "AND e.request_id=offline_turns.request_id)"
+                )
+            if "runtime_receipt_required" not in columns:
+                # Old or imported turns remain explicitly unverified. New
+                # local generations cannot erase their receipt sidecar and
+                # masquerade as historical work.
+                self._db.execute(
+                    "ALTER TABLE offline_turns ADD COLUMN runtime_receipt_required "
+                    "INTEGER NOT NULL DEFAULT 0 CHECK (runtime_receipt_required IN (0,1))"
                 )
 
             if self._db.execute("PRAGMA foreign_keys").fetchone() != (1,):
@@ -362,9 +431,13 @@ class OfflineChatStore:
                     "FROM offline_sessions WHERE session_id=?", (sid,)
                 ).fetchone()
                 rows = self._db.execute(
-                    "SELECT request_id, request_digest, revision, text, output_digest, "
-                    "prompt_tokens, generated_tokens, grounded FROM offline_turns "
-                    "WHERE session_id=? ORDER BY revision", (sid,),
+                    "SELECT t.request_id, t.request_digest, t.revision, t.text, "
+                    "t.output_digest, t.prompt_tokens, t.generated_tokens, t.grounded, "
+                    "t.runtime_receipt_required, e.revision, e.model_digest, "
+                    "e.tokenizer_digest, e.output_sha256, e.execution_receipt_digest "
+                    "FROM offline_turns t LEFT JOIN offline_turn_execution_receipts e "
+                    "ON t.session_id=e.session_id AND t.request_id=e.request_id "
+                    "WHERE t.session_id=? ORDER BY t.revision", (sid,),
                 ).fetchall()
                 evidence_rows = self._db.execute(
                     "SELECT e.request_id, e.evidence_json, e.evidence_digest "
@@ -405,6 +478,38 @@ class OfflineChatStore:
                 prompt_tokens=item[5], generated_tokens=item[6],
             ))
         _validate_complete_history(transcript, turns)
+        # A missing native receipt in *any* earlier turn is a corrupted
+        # conversation even if the caller only loads the last answer. Validate
+        # the whole execution lineage under the same SQLite read snapshot.
+        for item in rows:
+            required = item[8]
+            if type(required) is not int or required not in (0, 1):
+                raise RuntimeContractError("invalid native execution custody marker")
+            if item[9] is None:
+                if required:
+                    raise RuntimeContractError("required local execution receipt is missing")
+                continue
+            if not required:
+                raise RuntimeContractError(
+                    "an unverified historical turn cannot acquire a runtime receipt"
+                )
+            # The installed HTTP path commits visible UTF-8 text SHA-256;
+            # legacy native CLI history instead uses a token-sequence digest.
+            # Only the former has a required local-execution sidecar. Never
+            # reinterpret old native replay digests as hashes of display text.
+            if sha256(item[3].encode("utf-8")).hexdigest() != item[4]:
+                raise RuntimeContractError("committed local text output digest mismatch")
+            if (
+                type(item[9]) is not int or item[9] != item[2]
+                or item[10] != model_digest or item[11] != tokenizer_digest
+                or item[12] != item[4]
+                or type(item[13]) is not str
+                or len(item[13]) != 64
+                or any(ch not in "0123456789abcdef" for ch in item[13])
+            ):
+                raise RuntimeContractError(
+                    "local execution receipt is not bound to committed model output"
+                )
         evidence_index = {item["request_id"]: item for item in turns}
         evidence_ids = {receipt_id for receipt_id, _, _ in evidence_rows}
         for item in rows:
@@ -496,9 +601,86 @@ class OfflineChatStore:
         return tuple((_identifier("session id", sid), revision)
                      for sid, revision in rows)
 
+    def _metadata(self, stored: StoredChat) -> dict[str, Any]:
+        row = self._db.execute(
+            "SELECT title, pinned, archived, metadata_revision "
+            "FROM offline_session_metadata WHERE session_id=?", (stored.session_id,),
+        ).fetchone()
+        custom_title, pinned, archived, metadata_revision = "", 0, 0, 0
+        if row is not None:
+            custom_title, pinned, archived, metadata_revision = row
+            if (_session_title(custom_title) != custom_title
+                    or type(pinned) is not int or pinned not in (0, 1)
+                    or type(archived) is not int or archived not in (0, 1)
+                    or type(metadata_revision) is not int
+                    or not 1 <= metadata_revision <= 2**63 - 1):
+                raise RuntimeContractError("invalid stored conversation organization")
+        automatic = next((m.content for m in stored.transcript.messages
+                          if m.role == "user"), "New conversation")
+        return {
+            "session_id": stored.session_id,
+            "title": custom_title or " ".join(automatic.split())[:100],
+            "custom_title": custom_title,
+            "pinned": bool(pinned), "archived": bool(archived),
+            "metadata_revision": metadata_revision,
+        }
+
+    def session_metadata(self, session_id: str, model_digest: str,
+                         tokenizer_digest: str) -> dict[str, Any]:
+        """Read model-scoped organization from the conversation authority."""
+        with self.read_snapshot():
+            return self._metadata(self.load(session_id, model_digest, tokenizer_digest))
+
+    def update_metadata(self, session_id: str, model_digest: str,
+                        tokenizer_digest: str, updates: dict[str, Any], *,
+                        expected_metadata_revision: int | None = None) -> dict[str, Any]:
+        """Atomically organize a session without changing committed history.
+
+        Archive is reversible list organization, not deletion or a generation
+        permission. An unchanged update is idempotent after its CAS check.
+        """
+        if (not isinstance(updates, dict) or not updates
+                or not set(updates) <= {"title", "pinned", "archived"}):
+            raise RuntimeContractError("invalid conversation metadata update")
+        changes = dict(updates)
+        if "title" in changes:
+            changes["title"] = _session_title(changes["title"])
+        for key in ("pinned", "archived"):
+            if key in changes and type(changes[key]) is not bool:
+                raise RuntimeContractError("conversation organization flags must be boolean")
+        if (expected_metadata_revision is not None
+                and (type(expected_metadata_revision) is not int
+                     or not 0 <= expected_metadata_revision <= 2**63 - 1)):
+            raise RuntimeContractError("invalid conversation metadata revision")
+        with self._transaction():
+            stored = self.load(session_id, model_digest, tokenizer_digest)
+            current = self._metadata(stored)
+            if (expected_metadata_revision is not None
+                    and current["metadata_revision"] != expected_metadata_revision):
+                raise RuntimeContractError("offline conversation metadata revision conflict")
+            merged = {
+                "title": current["custom_title"],
+                "pinned": current["pinned"], "archived": current["archived"],
+            }
+            if all(merged[k] == v for k, v in changes.items()):
+                return current
+            merged.update(changes)
+            if current["metadata_revision"] >= 2**63 - 1:
+                raise RuntimeContractError("offline conversation metadata revision capacity reached")
+            self._db.execute(
+                "INSERT INTO offline_session_metadata "
+                "(session_id, title, pinned, archived, metadata_revision) "
+                "VALUES (?, ?, ?, ?, ?) ON CONFLICT(session_id) DO UPDATE SET "
+                "title=excluded.title, pinned=excluded.pinned, "
+                "archived=excluded.archived, metadata_revision=excluded.metadata_revision",
+                (stored.session_id, merged["title"], int(merged["pinned"]),
+                 int(merged["archived"]), current["metadata_revision"] + 1),
+            )
+            return self._metadata(stored)
+
     def session_summaries(self, model_digest: str, tokenizer_digest: str,
                           *, query: str = "", cursor: str | None = None,
-                          limit: int = 30) -> dict[str, Any]:
+                          limit: int = 30, archived: bool = False) -> dict[str, Any]:
         """Page model-scoped conversation projections without a shadow index.
 
         The cursor is a timestamp/identity boundary, not an array offset. Each
@@ -507,47 +689,67 @@ class OfflineChatStore:
         """
         _sha256(model_digest, "model digest")
         _sha256(tokenizer_digest, "tokenizer digest")
-        if not isinstance(query, str) or len(query.encode("utf-8")) > 256:
+        if not isinstance(query, str):
             raise RuntimeContractError("conversation search exceeds 256 UTF-8 bytes")
+        try:
+            if len(query.encode("utf-8", errors="strict")) > 256:
+                raise RuntimeContractError("conversation search exceeds 256 UTF-8 bytes")
+        except UnicodeError:
+            raise RuntimeContractError("invalid conversation search encoding") from None
         if type(limit) is not int or not 1 <= limit <= 100:
             raise RuntimeContractError("invalid conversation page size")
-        predicates = ["model_digest=?", "tokenizer_digest=?"]
-        parameters: list[Any] = [model_digest, tokenizer_digest]
+        if type(archived) is not bool:
+            raise RuntimeContractError("conversation archive filter must be boolean")
+        predicates = ["s.model_digest=?", "s.tokenizer_digest=?",
+                      "COALESCE(m.archived,0)=?"]
+        parameters: list[Any] = [model_digest, tokenizer_digest, int(archived)]
         if query.strip():
             # Parameterized literal substring search: '%' and '_' are data.
-            predicates.append("instr(lower(transcript_json), lower(?)) > 0")
-            parameters.append(query.strip())
+            predicates.append("(instr(offline_casefold(s.transcript_json), offline_casefold(?)) > 0 "
+                              "OR instr(offline_casefold(COALESCE(m.title,'')), offline_casefold(?)) > 0)")
+            parameters.extend([query.strip(), query.strip()])
         if cursor is not None:
-            if not isinstance(cursor, str) or len(cursor) > 160:
+            if not isinstance(cursor, str) or len(cursor) > 162:
                 raise RuntimeContractError("invalid conversation cursor")
-            stamp, separator, sid = cursor.partition(":")
-            if not separator or not stamp.isascii() or not stamp.isdecimal() or len(stamp) > 19:
+            parts = cursor.split(":")
+            if len(parts) == 2:
+                # Legacy timestamp cursors refer to unpinned conversations.
+                pinned, (stamp, sid) = "0", parts
+            elif len(parts) == 3:
+                pinned, stamp, sid = parts
+            else:
+                raise RuntimeContractError("invalid conversation cursor")
+            if (pinned not in {"0", "1"} or not stamp.isascii()
+                    or not stamp.isdecimal() or len(stamp) > 19):
                 raise RuntimeContractError("invalid conversation cursor")
             boundary = int(stamp)
             if boundary > 2**63 - 1:
                 raise RuntimeContractError("invalid conversation cursor")
             _identifier("cursor session id", sid)
-            predicates.append("(updated_at < ? OR (updated_at = ? AND session_id > ?))")
-            parameters.extend([boundary, boundary, sid])
+            predicates.append("(COALESCE(m.pinned,0) < ? OR "
+                              "(COALESCE(m.pinned,0) = ? AND "
+                              "(s.updated_at < ? OR (s.updated_at = ? AND s.session_id > ?))))")
+            parameters.extend([int(pinned), int(pinned), boundary, boundary, sid])
         with self._lock:
             own_snapshot = not self._db.in_transaction
             if own_snapshot:
                 self._db.execute("BEGIN")
             try:
                 rows = self._db.execute(
-                    "SELECT session_id, updated_at FROM offline_sessions WHERE "
+                    "SELECT s.session_id, s.updated_at, COALESCE(m.pinned,0) "
+                    "FROM offline_sessions s LEFT JOIN offline_session_metadata m "
+                    "ON s.session_id=m.session_id WHERE "
                     + " AND ".join(predicates)
-                    + " ORDER BY updated_at DESC, session_id LIMIT ?",
+                    + " ORDER BY COALESCE(m.pinned,0) DESC, s.updated_at DESC, s.session_id LIMIT ?",
                     (*parameters, limit + 1),
                 ).fetchall()
                 summaries = []
-                for sid, stamp in rows[:limit]:
+                for sid, stamp, _ in rows[:limit]:
                     saved = self.load(sid, model_digest, tokenizer_digest)
                     dialogue = [m for m in saved.transcript.messages if m.role != "system"]
-                    title = next((m.content for m in dialogue if m.role == "user"), "New conversation")
                     summaries.append({
+                        **self._metadata(saved),
                         "session_id": sid, "revision": saved.revision,
-                        "title": " ".join(title.split())[:100],
                         "preview": (dialogue[-1].content[:240] if dialogue else ""),
                         "updated_at_ms": stamp // 1_000_000,
                     })
@@ -556,8 +758,8 @@ class OfflineChatStore:
                     self._db.execute("ROLLBACK")
         next_cursor = None
         if len(rows) > limit:
-            sid, stamp = rows[limit - 1]
-            next_cursor = f"{stamp}:{sid}"
+            sid, stamp, pinned = rows[limit - 1]
+            next_cursor = f"{pinned}:{stamp}:{sid}"
         return {"sessions": summaries, "next_cursor": next_cursor}
 
     def delete(self, session_id: str, model_digest: str,
@@ -634,6 +836,14 @@ class OfflineChatStore:
                 "WHERE e.session_id=? AND t.revision <= ?",
                 (new_id, sid, after_turn),
             )
+            # A branch keeps the human label, but starts active and unpinned.
+            # It has an independent metadata clock as well as turn history.
+            parent_metadata = self._metadata(parent)
+            if parent_metadata["custom_title"]:
+                self._db.execute(
+                    "INSERT INTO offline_session_metadata VALUES (?, ?, 0, 0, 1)",
+                    (new_id, parent_metadata["custom_title"]),
+                )
             return new_id
 
     def export_bundle(self, session_id: str, model_digest: str,
@@ -680,6 +890,16 @@ class OfflineChatStore:
                 # carries the complete immutable source snapshot per turn.
                 body["schema"] = _BUNDLE_SCHEMA_V2
                 body["evidence"] = grounding
+            metadata = self._metadata(stored)
+            if metadata["custom_title"] or metadata["pinned"] or metadata["archived"]:
+                # Keep legacy v1/v2 byte/schema semantics intact. Explicit v3
+                # is used only when organization must travel in the backup.
+                body["schema"] = _BUNDLE_SCHEMA_V3
+                body["evidence"] = grounding
+                body["metadata"] = {
+                    "title": metadata["custom_title"],
+                    "pinned": metadata["pinned"], "archived": metadata["archived"],
+                }
             body_bytes = _stable_bytes(body)
             bundle = _stable_bytes({
                 "body": body,
@@ -717,7 +937,10 @@ class OfflineChatStore:
         ) or (
             body.get("schema") == _BUNDLE_SCHEMA_V2
             and set(body) != common_fields | {"evidence"}
-        ) or body.get("schema") not in {_BUNDLE_SCHEMA, _BUNDLE_SCHEMA_V2}:
+        ) or (
+            body.get("schema") == _BUNDLE_SCHEMA_V3
+            and set(body) != common_fields | {"evidence", "metadata"}
+        ) or body.get("schema") not in {_BUNDLE_SCHEMA, _BUNDLE_SCHEMA_V2, _BUNDLE_SCHEMA_V3}:
             raise RuntimeContractError("unsupported conversation bundle schema")
         if not hmac.compare_digest(
             _sha256(envelope["sha256"], "bundle digest"),
@@ -727,6 +950,8 @@ class OfflineChatStore:
         if (body["model_digest"] != model_digest
                 or body["tokenizer_digest"] != tokenizer_digest):
             raise RuntimeContractError("bundle model/tokenizer identity mismatch")
+        organization = (_organization_fields(body["metadata"])
+                        if body["schema"] == _BUNDLE_SCHEMA_V3 else None)
         messages = body["messages"]
         if not isinstance(messages, list):
             raise RuntimeContractError("conversation bundle messages must be a list")
@@ -773,7 +998,7 @@ class OfflineChatStore:
                 turn["generated_tokens"],
             ))
         _validate_complete_history(transcript, turns)
-        evidence = (body["evidence"] if body["schema"] == _BUNDLE_SCHEMA_V2
+        evidence = (body["evidence"] if body["schema"] in {_BUNDLE_SCHEMA_V2, _BUNDLE_SCHEMA_V3}
                     else [None] * len(turns))
         if not isinstance(evidence, list) or len(evidence) != len(turns):
             raise RuntimeContractError("grounding backup evidence count mismatch")
@@ -812,6 +1037,14 @@ class OfflineChatStore:
                 "INSERT INTO offline_turn_evidence VALUES (?, ?, ?, ?)",
                 [(new_id, *row) for row in checked_evidence],
             )
+            if organization is not None:
+                # New identity gets a fresh metadata CAS clock, never the
+                # source tab's revision (which could authorize stale edits).
+                self._db.execute(
+                    "INSERT INTO offline_session_metadata VALUES (?, ?, ?, ?, 1)",
+                    (new_id, organization["title"], int(organization["pinned"]),
+                     int(organization["archived"])),
+                )
         return new_id
 
     @staticmethod
@@ -857,6 +1090,58 @@ class OfflineChatStore:
             evidence = self.turn_evidence(saved.session_id, model_digest, tokenizer_digest)
             return receipt, evidence[receipt.revision - 1]
 
+    def local_execution_receipt(
+        self, session_id: str, request_id: str,
+        model_digest: str, tokenizer_digest: str,
+    ) -> dict[str, Any] | None:
+        """Read an exact locally produced execution digest after restart.
+
+        This is a model/runtime-bound receipt, not a hardware enclave
+        attestation or an externally signed model-quality guarantee. No
+        fabricated receipt is returned for imported or historical turns.
+        """
+        sid = _identifier("session id", session_id)
+        rid = _identifier("request id", request_id)
+        _sha256(model_digest, "model digest")
+        _sha256(tokenizer_digest, "tokenizer digest")
+        with self.read_snapshot():
+            self.load(sid, model_digest, tokenizer_digest)
+            row = self._db.execute(
+                "SELECT e.revision, e.model_digest, e.tokenizer_digest, "
+                "e.output_sha256, e.execution_receipt_digest, "
+                "t.revision, t.output_digest, t.text, t.runtime_receipt_required "
+                "FROM offline_turns t LEFT JOIN offline_turn_execution_receipts e "
+                "ON e.session_id=t.session_id AND e.request_id=t.request_id "
+                "WHERE t.session_id=? AND t.request_id=?",
+                (sid, rid),
+            ).fetchone()
+            if row is None:
+                return None
+            required = row[8]
+            if row[0] is None:
+                if required != 0:
+                    raise RuntimeContractError("required local execution receipt is missing")
+                return None
+            if required != 1:
+                raise RuntimeContractError("an unverified historical turn cannot acquire a runtime receipt")
+            revision, saved_model, saved_tokenizer, output, receipt, committed_revision, committed_output, text, _ = row
+            if (type(revision) is not int or revision != committed_revision
+                    or saved_model != model_digest or saved_tokenizer != tokenizer_digest
+                    or type(text) is not str
+                    or sha256(text.encode("utf-8")).hexdigest() != committed_output
+                    or output != committed_output
+                    or type(receipt) is not str
+                    or len(receipt) != 64
+                    or any(ch not in "0123456789abcdef" for ch in receipt)):
+                raise RuntimeContractError("local execution receipt is not bound to committed model output")
+            return {
+                "schema": "skeleton.ai.local-runtime-receipt.v1",
+                "model_digest": model_digest, "tokenizer_digest": tokenizer_digest,
+                "revision": revision, "output_sha256": output,
+                "execution_receipt_digest": receipt,
+                "authority": "local-runtime-custody-not-independent-attestation",
+            }
+
     @staticmethod
     def ensure_can_append(session: StoredChat) -> None:
         """Preflight full-history room before spending CPU on a model turn.
@@ -876,7 +1161,8 @@ class OfflineChatStore:
                request_digest: str, transcript: ChatTranscript, text: str,
                output_digest: str, prompt_tokens: int,
                generated_tokens: int,
-               evidence_manifest: dict[str, Any] | None = None) -> OfflineTurnReceipt:
+               evidence_manifest: dict[str, Any] | None = None,
+               execution_receipt_digest: str | None = None) -> OfflineTurnReceipt:
         rid = _identifier("request id", request_id)
         if (not isinstance(transcript, ChatTranscript) or not isinstance(text, str)
                 or not text.strip()):
@@ -896,10 +1182,20 @@ class OfflineChatStore:
         encoded = transcript.to_json()
         if len(encoded.encode("utf-8")) > MAX_TRANSCRIPT_BYTES:
             raise RuntimeContractError("completed conversation exceeds persisted budget")
-        if not isinstance(output_digest, str) or len(output_digest) != 64:
+        if (not isinstance(output_digest, str)
+                or len(output_digest) != 64
+                or any(char not in "0123456789abcdef" for char in output_digest)
+                or (execution_receipt_digest is not None
+                    and sha256(text.encode("utf-8")).hexdigest() != output_digest)):
+            # HTTP Jeeves runtime receipts bind *text* SHA-256. The legacy
+            # local native ChatEngine stores its replay token-sequence digest
+            # instead. Keep old native stores loadable, while forbidding an
+            # inconsistent modern runtime receipt before any SQLite CAS.
             raise RuntimeContractError("invalid native generation output digest")
         if any(type(n) is not int or n < 0 for n in (prompt_tokens, generated_tokens)):
             raise RuntimeContractError("invalid native generation token count")
+        if execution_receipt_digest is not None:
+            _sha256(execution_receipt_digest, "native execution receipt")
         stored_evidence = None
         if evidence_manifest is not None:
             from skeleton.app.offline_grounding import validate_evidence
@@ -929,17 +1225,26 @@ class OfflineChatStore:
             self._db.execute(
                 "INSERT INTO offline_turns "
                 "(session_id, request_id, request_digest, revision, text, "
-                "output_digest, prompt_tokens, generated_tokens, grounded) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "output_digest, prompt_tokens, generated_tokens, grounded, runtime_receipt_required) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (session.session_id, rid, request_digest, session.revision + 1,
                  text, output_digest, prompt_tokens, generated_tokens,
-                 int(stored_evidence is not None)),
+                 int(stored_evidence is not None), int(execution_receipt_digest is not None)),
             )
             if stored_evidence is not None:
                 self._db.execute(
                     "INSERT INTO offline_turn_evidence VALUES (?, ?, ?, ?)",
                     (session.session_id, rid, stored_evidence.decode("utf-8"),
                      sha256(stored_evidence).hexdigest()),
+                )
+            if execution_receipt_digest is not None:
+                self._db.execute(
+                    "INSERT INTO offline_turn_execution_receipts "
+                    "(session_id, request_id, revision, model_digest, tokenizer_digest, "
+                    "output_sha256, execution_receipt_digest) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (session.session_id, rid, session.revision + 1,
+                     session.model_digest, session.tokenizer_digest, output_digest,
+                     execution_receipt_digest),
                 )
             return OfflineTurnReceipt(session.session_id, rid, session.revision + 1,
                                       text, output_digest, prompt_tokens,
@@ -1013,7 +1318,12 @@ class OfflineChatProduct:
             request_digest=request_digest,
             transcript=full_transcript,
             text=generation.text,
-            output_digest=generation.output_digest,
+            # The generation digest describes native decoder material and is
+            # not necessarily SHA-256 of the visible assistant text. SQLite
+            # receipt custody is defined over the saved UTF-8 text bytes.
+            # Never weaken the store's whole-history integrity check to fit
+            # an unrelated engine-level digest.
+            output_digest=sha256(generation.text.encode("utf-8")).hexdigest(),
             prompt_tokens=result.prompt_tokens,
             generated_tokens=len(generation.generated_ids),
         )
