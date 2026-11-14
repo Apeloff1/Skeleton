@@ -9,12 +9,13 @@ run and are already on the chain.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+import math
+from typing import Any, Dict, Mapping, Optional
 
 from skeleton.context.cockpit import Cockpit
 from skeleton.context.dodeca import Dodecahedron
 from skeleton.context.oracle import Magic8Ball
-from skeleton.context.tensor import ContextTensor, detect_era
+from skeleton.context.tensor import AXES, ContextTensor, detect_era
 from skeleton.forge.archetypes import default_library
 from skeleton.forge.universal import Forge
 from skeleton.jeeves.core import Jeeves, SessionMode
@@ -24,6 +25,31 @@ from skeleton.pipelines.composer import PipelineComposer, Stage
 # Archetype names that ask the forge stage to compose the blueprint from the
 # vision (skeleton.forge.vision_compose) instead of stamping a preset.
 COMPOSE_ARCHETYPES = frozenset({"auto", "vision"})
+
+
+def normalise_operator_axes(raw: Optional[Mapping[str, float]]) -> Dict[str, float]:
+    """Fail closed on unknown, non-finite or out-of-range creator instruments.
+
+    A sparse mapping overrides only explicitly touched design axes; no user,
+    project or session state is stored by this validator.
+    """
+    if raw is None:
+        return {}
+    if not isinstance(raw, Mapping) or len(raw) > len(AXES):
+        raise ValueError("operator_axes must be a mapping of at most ten design axes")
+    for axis, value in raw.items():
+        if not isinstance(axis, str) or axis not in AXES:
+            raise ValueError("unknown operator axis")
+        if type(value) not in (float, int) or not math.isfinite(value) or not 0.0 <= value <= 1.0:
+            raise ValueError("operator axis values must be finite numbers between 0 and 1")
+    return {axis: float(raw[axis]) for axis in AXES if axis in raw}
+
+
+def apply_operator_axes(tensor: ContextTensor, raw: Optional[Mapping[str, float]]) -> ContextTensor:
+    """Apply sparse explicit creator edits *after* era/questionnaire resolution."""
+    for axis, value in normalise_operator_axes(raw).items():
+        tensor = tensor.with_axis(axis, value)
+    return tensor
 
 
 class GameForgeRun:
@@ -56,7 +82,10 @@ class GameForgeRun:
                 playtest: Optional[str] = None,
                 repair_mode: str = "apply",
                 operator_tensor: Optional[ContextTensor] = None,
-                playable_content: bool = False) -> Dict[str, Any]:
+                operator_axes: Optional[Mapping[str, float]] = None,
+                playable_content: bool = False,
+                quest_content: bool = False,
+                quest_length: int = 3) -> Dict[str, Any]:
         """Run the ten-stage pipeline.
 
         ``playtest``: ``None``/"off" (default, static checks only), "auto"
@@ -68,12 +97,21 @@ class GameForgeRun:
         from skeleton.forge.playtest import normalise_mode
         from skeleton.forge.repair import REPAIR_MODES
         playtest_mode = normalise_mode(playtest)
+        if playtest_mode != "off" and target != "godot":
+            raise ValueError("headless Godot playtest requires the Godot target")
         if type(playable_content) is not bool:
             raise ValueError("playable_content must be an explicit boolean opt-in")
         if playable_content and target != "godot":
             raise ValueError("playable archetype scenes require the Godot target")
+        if type(quest_content) is not bool:
+            raise ValueError("quest_content must be an explicit boolean")
+        if quest_content and target != "godot":
+            raise ValueError("native quests require Godot target")
+        if type(quest_length) is not int or not 1 <= quest_length <= 8:
+            raise ValueError("quest_length must be an integer between 1 and 8")
         if repair_mode not in REPAIR_MODES:
             raise ValueError(f"repair_mode must be one of {REPAIR_MODES}, got {repair_mode!r}")
+        axis_overrides = normalise_operator_axes(operator_axes)
         cockpit = self.cockpit
         # Freeze operator intent before stage execution. Implicit cockpit
         # blending applies only when neither an explicit era nor questionnaire
@@ -141,11 +179,14 @@ class GameForgeRun:
                 taken.tensor if taken is not None and era == taken.era and operator_tensor is None else None
             ),
             "operator_tensor": operator_tensor,
+            "operator_axes": axis_overrides,
             "repair": True,
             "max_rounds": 3,
             "playtest_mode": playtest_mode,
             "repair_mode": repair_mode,
             "playable_content": playable_content,
+            "quest_content": quest_content,
+            "quest_length": quest_length,
         }
         stages = [
             Stage("ingest", _stage_ingest),
@@ -211,6 +252,22 @@ class GameForgeRun:
                            if hasattr(run.context.get("build_plan"), "to_dict")
                            else run.context.get("build_plan")),
         }
+        if playable_content and run.context.get("playable_mechanics_receipt") is not None:
+            payload["playable_mechanics"] = run.context["playable_mechanics_receipt"]
+        if playable_content and run.context.get("playable_portal_receipt") is not None:
+            payload["playable_portal"] = {
+                **run.context["playable_portal_receipt"],
+                "sealed": bool(run.succeeded and emitted_manifest is not None),
+            }
+        if playable_content and run.context.get("playable_scene_playtest") is not None:
+            payload["playable_scene_playtest"] = run.context["playable_scene_playtest"]
+        if axis_overrides:
+            payload["operator_axes"] = axis_overrides
+        if quest_content and run.context.get("native_quest_receipt") is not None:
+            payload["native_quest"] = {
+                **run.context["native_quest_receipt"],
+                "sealed": bool(run.succeeded and emitted_manifest is not None),
+            }
         self.bus.emit("gameforge.run.finished", {
             "succeeded": run.succeeded,
             "era": payload["era"],
@@ -302,6 +359,7 @@ def _stage_tensor(ctx: Dict[str, Any]) -> Dict[str, Any]:
         cockpit.tensor = ctx["intake_tensor"]
     else:
         cockpit.tensor = ContextTensor.from_era(ctx["era"])
+    cockpit.tensor = apply_operator_axes(cockpit.tensor, ctx.get("operator_axes"))
     _commit(ctx, "tensor", ctx["era"], cockpit.tensor.fingerprint(), cockpit.tensor.as_dict())
     return {"tensor_fp": cockpit.tensor.fingerprint()}
 
@@ -435,12 +493,65 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
     files = ctx.get("files") or {}
     if ctx.get("playable_content"):
-        from skeleton.forge.archetype_content import content_archetypes, attach_archetype_content
+        from skeleton.forge.archetype_content import (
+            content_archetypes, attach_archetype_content, verify_archetype_content,
+        )
         requested = ctx.get("archetype") or "extraction"
-        files = attach_archetype_content(files, requested)
+        axes = ctx.get("operator_axes") or {}
+        files = attach_archetype_content(files, requested, operator_axes=axes)
+        archetype_name = requested if requested in content_archetypes() else "extraction"
+        # Source-admitted in-game launcher: without it the playable sidecar
+        # only exists as a hidden file in the Godot editor and cannot be
+        # reached from the shipped world's main scene.
+        from skeleton.forge.playable_portal import (
+            attach_playable_portal, verify_playable_portal,
+        )
+        files, portal_receipt = attach_playable_portal(files, archetype_name)
+        if not verify_playable_portal(files, archetype_name):
+            raise RuntimeError("playable world-to-prototype portal source verification failed")
         ctx["files"] = files
         ctx["file_count"] = len(files)
-        ctx["playable_archetype"] = requested if requested in content_archetypes() else "extraction"
+        ctx["playable_archetype"] = archetype_name
+        ctx["playable_portal_receipt"] = portal_receipt
+        ctx["playable_mechanics_receipt"] = {
+            "schema": "skeleton.forge.playable_mechanics.v1",
+            "archetype": archetype_name,
+            "applied_axes": {
+                name: value for name, value in axes.items()
+                if name in {
+                    "tempo",
+                    "agency",
+                    *({"risk", "scarcity"} if archetype_name == "extraction" else set()),
+                    *({"lethality", "grind"} if archetype_name == "combat_loop" else set()),
+                    *({"risk", "grind"} if archetype_name == "pipeline" else set()),
+                }
+            },
+            "source_verified": verify_archetype_content(
+                files, archetype_name, operator_axes=axes,
+            ),
+        }
+    if ctx.get("quest_content"):
+        from skeleton.ai.game_builder.godot_quest_bridge import attach_native_quest
+        files, receipt = attach_native_quest(
+            files, length=ctx.get("quest_length", 3),
+        )
+        ctx["files"] = files
+        ctx["file_count"] = len(files)
+        ctx["native_quest_receipt"] = receipt
+    # Verify *after both* feature writers run. Source-attested add-ons
+    # cannot receive a pass based only on their pre-composition versions.
+    if ctx.get("playable_content"):
+        from skeleton.forge.playable_portal import verify_playable_portal
+        from skeleton.forge.archetype_content import verify_archetype_content
+        active = str(ctx.get("playable_archetype") or "extraction")
+        if not verify_playable_portal(files, active):
+            raise RuntimeError("final in-game playable portal verification failed")
+        if not verify_archetype_content(files, active, operator_axes=ctx.get("operator_axes")):
+            raise RuntimeError("final native playable mechanics verification failed")
+    if ctx.get("quest_content"):
+        from skeleton.ai.game_builder.godot_quest_bridge import verify_native_quest
+        if not verify_native_quest(files):
+            raise RuntimeError("final native room quest verification failed")
     # Validate names in both API/in-memory and disk build modes, before any
     # expensive engine checks or project publication.
     source_manifest(files)
@@ -456,6 +567,19 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         if mode == "require" and not played.get("passed"):
             detail = "; ".join(played.get("errors") or []) or played.get("reason") or played.get("status")
             raise RuntimeError(f"playtest {played.get('status')}: {detail}"[:600])
+    # Independently boot the selected playable archetype scene. A successful
+    # default-world boot does not prove its separate win/lose loop completes.
+    # In strict mode the scene must complete before project publication.
+    scene_played = None
+    if ctx.get("playable_content") and mode != "off":
+        from skeleton.forge.playtest import playtest_archetype_scene
+        scene_played = playtest_archetype_scene(
+            files, str(ctx.get("playable_archetype") or "extraction"),
+        )
+        ctx["playable_scene_playtest"] = scene_played
+        if mode == "require" and not scene_played.get("passed"):
+            detail = "; ".join(scene_played.get("errors") or []) or scene_played.get("reason") or scene_played.get("status")
+            raise RuntimeError(f"playable scene {scene_played.get('status')}: {detail}"[:600])
     project = None
     root = ctx.get("project_root")
     if root:
@@ -464,13 +588,21 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
             root, files, overwrite=bool(ctx.get("overwrite")),
             meta={"era": ctx.get("era"), "dps": ctx.get("primary_dps")},
         )
-    _commit(ctx, "emit", ctx["era"], f"{len(files)} files", {
+    details = {
         "file_count": len(files),
         "root": None if not project else project["root"],
         "check": "ok",
         "playtest": None if played is None else played.get("status"),
-    })
-    return {"emitted": True, "project": project, "check_ok": True, "playtest": played}
+    }
+    if ctx.get("playable_portal_receipt"):
+        details["playable_portal_sha256"] = ctx["playable_portal_receipt"]["source_sha256"]
+    if scene_played is not None:
+        details["playable_scene_playtest"] = scene_played.get("status")
+    if ctx.get("native_quest_receipt"):
+        details["native_quest_sha256"] = ctx["native_quest_receipt"]["quest_sha256"]
+    _commit(ctx, "emit", ctx["era"], f"{len(files)} files", details)
+    return {"emitted": True, "project": project, "check_ok": True, "playtest": played,
+            "playable_scene_playtest": scene_played}
 
 
 def _publish_build_evidence(root, documents: Dict[str, str]) -> None:
