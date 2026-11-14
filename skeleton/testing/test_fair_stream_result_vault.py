@@ -353,7 +353,7 @@ def test_capacity_rejects_new_lease_without_backend_execution(vault_dir, monkeyp
     backend = Backend()
     handle, vault = open_vault(vault_dir, backend)
     vault.run_and_commit(permit(), state())
-    second = permit("f" * 64)
+    second = DispatchPermit("f" * 64, "request-capacity", 2, CHECKPOINT, 16, 4096)
     with pytest.raises(SealedResultUnavailable, match="capacity"):
         vault.run_and_commit(second, state(second))
     # Known capacity exhaustion is denied before the backend executes.
