@@ -44,23 +44,31 @@ def _require(condition: bool, explanation: str) -> None:
 
 
 def _launch(exe: Path, args: list[str], cwd: Path, *, timeout: int) -> dict[str, Any]:
+    version_probe = args == ["--version"]
     try:
         process = subprocess.run(
             [str(exe), "--headless", *args],
             cwd=str(cwd),
             env={**os.environ, "GODOT_SILENCE_ROOT_WARNING": "1"},
             capture_output=True,
-            text=True,
-            errors="replace",
+            text=not version_probe,
+            errors=None if version_probe else "replace",
             check=False,
             timeout=timeout,
         )
-        output = (process.stdout or "") + "\n" + (process.stderr or "")
+        def as_text(value: bytes | str | None) -> str:
+            if isinstance(value, bytes):
+                return value.decode("utf-8", "replace")
+            return value or ""
+        stdout = as_text(process.stdout)
+        stderr = as_text(process.stderr)
+        output = stdout + "\n" + stderr
         return {
             "exit": process.returncode,
             "timeout": False,
             "errors": scan_log(output)[:12],
             "output": output[-6000:],
+            **({"version_stdout": stdout[:402], "version_stderr": stderr[:402]} if version_probe else {}),
         }
     except subprocess.TimeoutExpired as error:
         data = error.stdout or b""
@@ -166,7 +174,10 @@ def verify_engine_archive(
 
 def parse_godot_major_four(text: str) -> str:
     """Admit a real Godot 4 CLI version string, never Godot 3 or shell noise."""
-    candidate = text.strip()
+    if not isinstance(text, str) or len(text) > 402:
+        raise ValueError("Godot CLI reported an invalid version string")
+    # Permit the one record terminator emitted by a CLI, not arbitrary whitespace.
+    candidate = text.removesuffix("\r\n") if text.endswith("\r\n") else text.removesuffix("\n")
     if len(candidate) > 400 or "\n" in candidate or "\r" in candidate:
         raise ValueError("Godot CLI reported an invalid version string")
     if not re.fullmatch(r"4\.\d+(?:\.\d+)?(?:\.(?:stable|rc|beta|alpha|dev))?\.[A-Za-z0-9.\-]+", candidate):
@@ -253,7 +264,9 @@ def main() -> int:
     probe = _launch(exe, ["--version"], exe.parent, timeout=15)
     _require(probe["exit"] == 0 and not probe["timeout"] and not probe["errors"],
              "Godot 4 executable version probe failed")
-    engine_version = parse_godot_major_four(probe["output"].strip())
+    _require(probe.get("version_stderr") == "" and isinstance(probe.get("version_stdout"), str),
+             "Godot version probe did not return an uncontaminated stdout record")
+    engine_version = parse_godot_major_four(probe["version_stdout"])
     expected_names = ("combat_loop", "extraction", "pipeline")
     _require(content_archetypes() == expected_names,
              "native suite must be reviewed when archetype inventory changes")

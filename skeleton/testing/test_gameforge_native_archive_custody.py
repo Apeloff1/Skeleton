@@ -88,6 +88,9 @@ def test_symlink_archive_entries_fail_closed(tmp_path):
 @pytest.mark.parametrize("invalid", [
     "3.5.stable.official.aaaa", "4.3", "Godot 4.3", "", "4.3.stable.official.x\nSCRIPT ERROR",
     "4.3.stable.official.x\r", "5.0.stable.official.abc",
+    " 4.3.stable.official.x", "4.3.stable.official.x ",
+    "4.3.stable.official.x\n\n", "4.3.stable.official.x\x00",
+    "4.3.stable.official.x\r\nnoise",
 ])
 def test_only_explicit_single_line_godot_four_versions_are_admitted(invalid):
     from scripts.qualify_gameforge_godot_native import parse_godot_major_four
@@ -103,6 +106,8 @@ def test_only_explicit_single_line_godot_four_versions_are_admitted(invalid):
 def test_actual_godot_four_version_shapes(valid):
     from scripts.qualify_gameforge_godot_native import parse_godot_major_four
     assert parse_godot_major_four(valid) == valid
+    assert parse_godot_major_four(valid + "\n") == valid
+    assert parse_godot_major_four(valid + "\r\n") == valid
 
 
 def test_noncanonical_zip_alias_is_not_accepted_as_official_distribution(tmp_path):
