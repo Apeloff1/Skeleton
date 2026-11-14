@@ -353,6 +353,7 @@ function patchNodeForgeNestedDigestAlgorithm() {
   // Both still require our nested DigestAlgorithm arity check; the upstream
   // canonical-DER verification alone does not replace this source guard.
   // Never silently trust a version bump as proof of this security fix.
+
   // Keep the allowlist exact and fail closed on future/unreviewed versions.
   if (!new Set(['1.4.0', '1.4.2', '1.4.3']).has(version)) {
     throw new Error(`[patch-node-modules] node-forge ${version} requires security patch review`);

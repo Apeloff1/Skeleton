@@ -3459,8 +3459,24 @@ class ProviderRegistry:
         guarded_components: Any | None = None,
         require_guarded_local: bool | None = None,
     ) -> ProviderRegistry:
+        # Jeeves primary chat is a pinned, local, TEXT-generation model.
+        # Reject a hosted active provider before constructing any SDK/client.
+        from skeleton.ai.jeeves_local_policy import (
+            JeevesLocalPolicyError, is_local_only, require_local_configuration,
+        )
+        try:
+            jeeves_local_only = is_local_only()
+            if jeeves_local_only:
+                require_local_configuration(require_source=False)
+        except JeevesLocalPolicyError as exc:
+            raise ProviderUnavailableError("Jeeves local-only provider configuration is invalid") from exc
         active = os.getenv("AI_PROVIDER", "openai").strip().lower() or "openai"
         raw_guard = os.getenv("AI_LOCAL_GUARD_REQUIRED", "").strip().lower()
+        if jeeves_local_only and (raw_guard in {"0", "false"} or require_guarded_local is False):
+            raise _LocalGuardUnavailable(
+                "Jeeves local-only mode cannot disable the protected inference guard",
+                readiness_code="local_guard_configuration_invalid",
+            )
         if raw_guard not in {"", "0", "false", "1", "true"}:
             raise _LocalGuardUnavailable(
                 "invalid AI_LOCAL_GUARD_REQUIRED policy", readiness_code="local_guard_configuration_invalid"
@@ -3553,6 +3569,14 @@ class ProviderRegistry:
                     )
                 except (LocalModelCatalogError, ProviderPolicyError, OSError, TypeError, ValueError) as exc:
                     raise ProviderUnavailableError("local provider catalog failed activation") from exc
+                if jeeves_local_only and (
+                    len(activation.adapters) != 1
+                    or activation.adapters[0].model != "jeeves"
+                    or activation.verification_adapter is not None
+                ):
+                    raise ProviderUnavailableError(
+                        "Jeeves local-only mode requires one exact jeeves model, no verifier or secondary model"
+                    )
                 configured = {id(adapter): guarded(adapter) for adapter in activation.adapters}
                 return cls(
                     tuple(configured.values()),
@@ -3581,6 +3605,8 @@ class ProviderRegistry:
                     )
                 except (LocalModelDeploymentError, ProviderPolicyError, OSError, TypeError, ValueError) as exc:
                     raise ProviderUnavailableError("local provider deployment failed activation") from exc
+                if jeeves_local_only and adapter.model != "jeeves":
+                    raise ProviderUnavailableError("The pinned deployment model identity is not jeeves")
                 return cls([guarded(adapter)], active="local")
             try:
                 from skeleton.ai.runtime.inference import (
@@ -3609,6 +3635,8 @@ class ProviderRegistry:
                     )
             except (LocalModelArtifactError, ProviderPolicyError, TypeError, ValueError) as exc:
                 raise ProviderUnavailableError("local provider model artifact failed activation") from exc
+            if jeeves_local_only and local_adapter.model != "jeeves":
+                raise ProviderUnavailableError("The pinned local artifact model identity is not jeeves")
             return cls(
                 [guarded(local_adapter)],
                 active="local",
