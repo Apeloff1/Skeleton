@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "min_frequency_11",
+  "category": "min_frequency",
+  "overrides": {
+    "minimum_document_frequency": "1"
+  },
+  "expected": "denied",
+  "reason": "Reject unbounded or invalid min_frequency configuration before allocation"
+}

@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "json_repair_21",
+  "domain": "json_repair",
+  "prompt": "Return valid compact JSON with string code code_120 and integer count 154.",
+  "completion": "{\"code\":\"code_120\",\"count\":154}",
+  "group_id": "json_repair_21",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

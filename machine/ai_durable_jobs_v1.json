@@ -1,0 +1,69 @@
+{
+  "schema": "skeleton.ai.durable-jobs.profile.v1",
+  "owner": "operational-ai-local-native",
+  "authoritative_model": "skeleton.ai.model_runtime.NativeLLMRuntime",
+  "authoritative_chat": "skeleton.ai.model_runtime.offline_chat.OfflineChatStore",
+  "jobs_package": "skeleton.ai.runtime.operational_ai.durable_jobs",
+  "build_order": [
+    "canonical contracts and principal identity",
+    "versioned SQLite job schema and transactional audit chain",
+    "source-bound durable enqueue with idempotency",
+    "bounded tenant fairness, lease and heartbeats",
+    "original NativeChatEngine/OfflineAIService inference bridge",
+    "durable terminal receipts and ambiguity holds",
+    "operator verified explicit recovery",
+    "audit-backed read-model and health",
+    "clean-device local checkout and CLI qualification",
+    "independent exact-head security CI"
+  ],
+  "guardrails": {
+    "no_hosted_fallback": true,
+    "no_model_created_effects": true,
+    "no_automatic_retry_after_ambiguous_inference": true,
+    "no_generated_tool_authority": true,
+    "queue_depth_limit": 4096,
+    "per_tenant_depth_limit": 128,
+    "worker_lease_ms_max": 300000,
+    "request_deadline_ms_max": 3600000,
+    "context_source": "native tokenizer + pinned model",
+    "private_sqlite": true,
+    "symlink_refusal": true,
+    "operator_proof_on_recovery": true
+  },
+  "acceptance": {
+    "domains": 21,
+    "cases_per_domain": 32,
+    "total_cases": 672,
+    "local_unit_command": "python -m unittest discover -s skeleton/testing -p 'test_durable_jobs*.py' -v",
+    "policy_command": "python -m skeleton.ai.runtime.operational_ai.durable_jobs.cli",
+    "source_compile": "python -m compileall -q skeleton/ai/runtime/operational_ai/durable_jobs",
+    "tests_executed": false,
+    "real_native_checkpoint_tested": false,
+    "installed_1p9gb_package": false,
+    "clean_machine_tested": false,
+    "ready_to_merge": false,
+    "ready_to_release": false
+  },
+  "external_artifact_policy": {
+    "max_file_bytes": 100000000,
+    "max_pr_bytes": 2000000000,
+    "padded_weights_forbidden": true
+  },
+  "dependencies": [
+    "PR #4649 native core",
+    "existing verified local checkpoint",
+    "operator-provided private state root"
+  ],
+  "required_workflows": [
+    "Merge Readiness",
+    "Backend Quality",
+    "App Foundation E2E",
+    "Workflow Input Security",
+    "Sealed Context Guard",
+    "Artifact Policy",
+    "Malware Gate",
+    "Repository Hygiene",
+    "Secret Scanning",
+    "Dependency Review"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "rounding_23",
+  "domain": "rounding",
+  "ordinal": 23,
+  "arguments": {
+    "index": 23,
+    "a": 261,
+    "b": 12,
+    "word": "lumen",
+    "city": "Trondheim"
+  },
+  "prompt": "Task 23: Round 264 down to the nearest multiple of 10.",
+  "expected": "260",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

@@ -35,6 +35,7 @@ from skeleton.skills.tool_contract import (
 )
 
 from .kv_placement import observe_native_kv_placement
+from .lease_custody import gguf_child_pass_fds
 from .local import (
     LocalInferenceCancelled,
     LocalInferenceEngine,
@@ -1762,6 +1763,15 @@ class LlamaCppModel:
                         shell=False,
                         start_new_session=(os.name != "nt"),
                         close_fds=True,
+                        # The sole nonsecret FD passed to the POSIX child is
+                        # the already-held kernel inference lease, if one was
+                        # bound by an authenticated local HTTP workspace.
+                        # An orphaned model process must retain that SAME
+                        # flock after an abrupt Python parent death, blocking
+                        # a replacement server from launching a second GGUF.
+                        # Windows must use its own job-object containment;
+                        # POSIX pass_fds is never supplied on Windows.
+                        **({"pass_fds": gguf_child_pass_fds()} if os.name == "posix" else {}),
                         creationflags=(getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0),
                     )
                 except BaseException:
