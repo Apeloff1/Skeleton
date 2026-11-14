@@ -1,20 +1,13 @@
 name: Performance Profiler Literal Target Qualification
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
-    paths:
-      - '.github/workflows/perf-profiler-literal-target-qualification.yml'
-      - 'skeleton/perf_profiler/cli.py'
-      - 'skeleton/perf_profiler/frames.py'
-      - 'tests/perf_profiler/**'
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: perf-profiler-literal-${{ github.event.pull_request.number }}
+  group: perf-profiler-literal-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
