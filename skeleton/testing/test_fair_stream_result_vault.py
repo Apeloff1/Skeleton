@@ -385,3 +385,81 @@ def test_published_result_verification_returns_only_authenticated_metadata(vault
         assert backend.calls == 1
     finally:
         handle.close()
+
+
+@pytest.mark.parametrize("temporary", [False, True])
+def test_late_result_trigger_denies_before_backend(vault_dir, temporary):
+    backend = Backend()
+    handle, vault = open_vault(vault_dir, backend)
+    try:
+        trigger = "CREATE TEMP TRIGGER" if temporary else "CREATE TRIGGER"
+        handle.connection.execute(
+            trigger + " erase_result AFTER INSERT ON local_fair_stream_sealed_results "
+            "BEGIN DELETE FROM local_fair_stream_sealed_results WHERE lease_id=NEW.lease_id; END"
+        )
+        with pytest.raises(SealedResultUnavailable, match="schema"):
+            vault.run_and_commit(permit(), state())
+        assert backend.calls == 0
+        assert handle.connection.execute(
+            "SELECT COUNT(*) FROM main.local_fair_stream_sealed_results"
+        ).fetchone()[0] == 0
+    finally:
+        handle.close()
+
+
+def test_late_result_replay_index_replacement_denies_read_and_execution(vault_dir):
+    backend = Backend()
+    handle, vault = open_vault(vault_dir, backend)
+    try:
+        _, digest = vault.run_and_commit(permit(), state())
+        handle.connection.execute("DROP INDEX local_fair_stream_result_request_identity")
+        handle.connection.execute(
+            "CREATE INDEX local_fair_stream_result_request_identity "
+            "ON local_fair_stream_sealed_results(session_id, request_id)"
+        )
+        with pytest.raises(SealedResultUnavailable, match="schema"):
+            vault.read_committed(permit(), expected_result_digest=digest)
+        other = DispatchPermit("f" * 64, "request-2", 3, CHECKPOINT, 16, 4096)
+        with pytest.raises(SealedResultUnavailable, match="schema"):
+            vault.run_and_commit(other, state(other))
+        assert backend.calls == 1
+    finally:
+        handle.close()
+
+
+def test_inherited_result_vault_refuses_before_lock(vault_dir, monkeypatch):
+    handle, vault = open_vault(vault_dir)
+    try:
+        class ForbiddenLock:
+            def __enter__(self):
+                pytest.fail("inherited vault reached process-local lock")
+        monkeypatch.setattr(vault, "_lock", ForbiddenLock())
+        pid = os.getpid()
+        with monkeypatch.context() as patch:
+            patch.setattr(os, "getpid", lambda: pid + 1)
+            with pytest.raises(SealedResultUnavailable, match="custody"):
+                vault.run_and_commit(permit(), state())
+            with pytest.raises(SealedResultUnavailable, match="custody"):
+                vault.read_committed(permit(), expected_result_digest="f" * 64)
+            with pytest.raises(SealedResultUnavailable, match="custody"):
+                vault.assert_request_admissible("request-2")
+    finally:
+        handle.close()
+
+
+def test_admission_reserves_worst_case_queued_capacity(vault_dir, monkeypatch):
+    import skeleton.ai.model_runtime.fair_stream_result_vault as module
+    backend = Backend()
+    handle, vault = open_vault(vault_dir, backend)
+    try:
+        monkeypatch.setattr(module, "MAX_RESULT_ROWS", 2)
+        vault.assert_request_admissible("request-1", queued_count=1)
+        with pytest.raises(SealedResultUnavailable, match="capacity"):
+            vault.assert_request_admissible("request-1", queued_count=2)
+        assert backend.calls == 0
+        _, digest = vault.run_and_commit(permit(), state())
+        assert vault.read_committed(permit(), expected_result_digest=digest) == backend.payload
+        with pytest.raises(SealedResultUnavailable, match="already published"):
+            vault.assert_request_admissible("request-1")
+    finally:
+        handle.close()

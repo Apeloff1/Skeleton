@@ -22,6 +22,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from .fair_stream_session import DispatchPermit
 from .private_sqlite import PrivateSQLiteHandle, PrivateSQLiteUnavailable
+from .sqlite_custody_schema import CustodySchemaError, assert_custody_schema
 
 SCHEMA = "skeleton.ai.fair-stream-result-vault.v1"
 MAX_RESULT_BYTES = 1 << 20
@@ -118,6 +119,7 @@ class SealedFairStreamResultVault:
     ) -> None:
         if type(handle) is not PrivateSQLiteHandle or handle._closed:
             raise ValueError("live canonical private SQLite handle required")
+        handle.assert_current()
         self.session_id = _hex(session_id, 32, "session")
         self.model_digest = _hex(model_digest, 64, "model")
         self.tokenizer_digest = _hex(tokenizer_digest, 64, "tokenizer")
@@ -184,6 +186,24 @@ class SealedFairStreamResultVault:
         ).fetchone()[0]:
             raise SealedResultUnavailable("untrusted result table trigger")
 
+        self._assert_schema()
+
+    def _assert_schema(self) -> None:
+        try:
+            assert_custody_schema(
+                self._connection, table=_TABLE, columns=_COLUMNS,
+                primary_key="lease_id", replay_index=_REQUEST_INDEX,
+                replay_columns=("session_id", "request_id"),
+            )
+        except CustodySchemaError as exc:
+            raise SealedResultUnavailable("result database schema changed") from exc
+
+    def _require_owner(self) -> None:
+        try:
+            self._handle.require_owner_process()
+        except PrivateSQLiteUnavailable as exc:
+            raise SealedResultUnavailable("result database custody changed") from exc
+
     def _require_open(self) -> None:
         try:
             self._handle.assert_current()
@@ -191,6 +211,7 @@ class SealedFairStreamResultVault:
             raise SealedResultUnavailable("result database custody changed") from exc
         if self._connection.in_transaction:
             raise SealedResultUnavailable("shared SQLite transaction forbidden")
+        self._assert_schema()
 
     def _row(self, lease_id: str) -> tuple[object, ...] | None:
         return self._connection.execute(
@@ -265,6 +286,7 @@ class SealedFairStreamResultVault:
         leave the execution journal in RUNNING. No replay is authorized.
         """
         self._validate_state(permit, state)
+        self._require_owner()
         with self._lock:
             self._require_open()
             if self._row(permit.lease_id) is not None:
@@ -305,6 +327,7 @@ class SealedFairStreamResultVault:
             self._require_open()
             self._connection.execute("BEGIN IMMEDIATE")
             try:
+                self._assert_schema()
                 if self._row(permit.lease_id) is not None:
                     raise SealedResultUnavailable("result lease already published")
                 if self._request_seen(permit.request_id):
@@ -330,6 +353,15 @@ class SealedFairStreamResultVault:
                         len(plaintext), nonce, ciphertext, digest,
                     ),
                 )
+                self._handle.assert_current()
+                self._assert_schema()
+                if self._row(permit.lease_id) != (
+                    permit.lease_id, self.session_id, permit.generation,
+                    permit.checkpoint_digest, permit.request_id,
+                    self.model_digest, self.tokenizer_digest, permit.tokens,
+                    permit.bytes_reserved, consumed, len(plaintext), nonce, ciphertext, digest,
+                ):
+                    raise SealedResultUnavailable("result publication readback mismatch")
                 self._connection.commit()
             except BaseException:
                 self._connection.rollback()
@@ -352,16 +384,10 @@ class SealedFairStreamResultVault:
             or not 0 <= expected_consumed_tokens <= permit.tokens
         ):
             raise ValueError("invalid signed consumed token count")
-        with self._lock:
-            self._require_open()
-            row = self._row(permit.lease_id)
-            if row is None:
-                raise SealedResultUnavailable("result not committed")
-            consumed, plaintext = self._authenticate_row(permit, row, expected)
-            if expected_consumed_tokens is not None and consumed != expected_consumed_tokens:
-                raise SealedResultUnavailable("signed consumed token count mismatch")
-            self._require_open()
-            return plaintext
+        consumed, _, plaintext = self._read_verified(permit, expected=expected)
+        if expected_consumed_tokens is not None and consumed != expected_consumed_tokens:
+            raise SealedResultUnavailable("signed consumed token count mismatch")
+        return plaintext
 
     def verify_published_result(self, permit: DispatchPermit, state: Mapping[str, object]) -> tuple[int, str]:
         """Verify a durable ciphertext against the exact authenticated lease.
@@ -370,16 +396,49 @@ class SealedFairStreamResultVault:
         AEAD tag, never returned to the caller. No model execution or write.
         """
         self._validate_state(permit, state)
+        consumed, digest, _ = self._read_verified(permit, expected=None)
+        return consumed, digest
+
+    def _read_verified(self, permit: DispatchPermit, *, expected: str | None) -> tuple[int, str, bytes]:
+        self._require_owner()
         with self._lock:
             self._require_open()
-            row = self._row(permit.lease_id)
-            if row is None:
-                raise SealedResultUnavailable("result not committed")
-            expected = _hex(row[-1], 64, "stored result digest")
-            consumed, plaintext = self._authenticate_row(permit, row, expected)
-            del plaintext
+            self._connection.execute("BEGIN")
+            try:
+                self._assert_schema()
+                row = self._row(permit.lease_id)
+                if row is None:
+                    raise SealedResultUnavailable("result not committed")
+                digest = _hex(row[-1], 64, "stored result digest")
+                consumed, plaintext = self._authenticate_row(permit, row, expected or digest)
+                self._handle.assert_current()
+                return consumed, digest, plaintext
+            finally:
+                self._connection.rollback()
+
+    def assert_request_admissible(self, request_id: str, *, queued_count: int = 0) -> None:
+        """Conservative local preflight, not a cross-process reservation."""
+        if type(request_id) is not str or not 1 <= len(request_id.encode("utf-8")) <= 128:
+            raise ValueError("bounded request identity required")
+        if type(queued_count) is not int or not 0 <= queued_count <= MAX_RESULT_ROWS:
+            raise ValueError("invalid queued result count")
+        self._require_owner()
+        with self._lock:
             self._require_open()
-            return consumed, expected
+            self._connection.execute("BEGIN")
+            try:
+                self._assert_schema()
+                if self._request_seen(request_id):
+                    raise SealedResultUnavailable("result request already published")
+                rows, total = self._connection.execute(
+                    "SELECT COUNT(*), COALESCE(SUM(LENGTH(ciphertext)), 0) FROM " + _TABLE
+                ).fetchone()
+                if (rows + queued_count >= MAX_RESULT_ROWS
+                        or total + (queued_count + 1) * (MAX_RESULT_BYTES + 16) > MAX_CIPHERTEXT_BYTES):
+                    raise SealedResultUnavailable("result vault admission capacity exhausted")
+                self._handle.assert_current()
+            finally:
+                self._connection.rollback()
 
     def _authenticate_row(self, permit: DispatchPermit, row: tuple[object, ...],
                           expected: str) -> tuple[int, bytes]:
