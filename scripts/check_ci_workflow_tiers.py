@@ -120,7 +120,7 @@ def audit(root: Path = ROOT) -> list[str]:
             # selected commit. The platform-owned dispatch SHA is bound to
             # the guarded main ref, checkout and independent concurrency.
             if ("inputs.candidate_sha" in source or
-                    re.search(r"(?m)^    inputs\\s*:", source)):
+                    re.search(r"(?m)^    inputs\s*:", source)):
                 failures.append(f"{name}: manual candidate inputs are forbidden")
             for invariant in (
                 "if: github.repository == 'Apeloff1/Skeleton' && github.ref == 'refs/heads/main'",
