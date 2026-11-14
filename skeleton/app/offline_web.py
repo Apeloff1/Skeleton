@@ -179,6 +179,7 @@ HTML = r"""<!doctype html>
       <div id="indicator" class="indicator">LOCKED</div>
       <details class="model-tools"><summary>Model tools</summary><div>
       <div id="lease-indicator" class="indicator" role="status">Execution lock unknown</div>
+      <div id="queue-indicator" class="indicator" role="status">Queue not connected</div>
       <button id="health-refresh" class="small" disabled>Check model</button>
       <button id="selftest-start" class="small" disabled>Run genuine local inference self-test</button>
       </div></details>
@@ -707,6 +708,34 @@ JAVASCRIPT = r"""'use strict';
   const terminal = turn => !!turn && ['complete', 'failed', 'cancelled'].includes(turn.state);
   const unresolved = () => !!state.turn && !terminal(state.turn);
   const status = value => { get('status').textContent = value; };
+  function queueAdmissionPossible(health, session) {
+    return !!session && health?.inference_lease?.state === 'busy' &&
+      !!health.active_turn && health.active_turn.session_id !== session &&
+      Number.isInteger(health.max_queued_turns) && health.max_queued_turns > 0 &&
+      Number.isInteger(health.queued_turn_count) && health.queued_turn_count >= 0 &&
+      health.queued_turn_count < health.max_queued_turns;
+  }
+  function updateQueueIndicator(health) {
+    const cap = health?.max_queued_turns;
+    const count = health?.queued_turn_count;
+    get('queue-indicator').textContent = Number.isInteger(cap) && cap > 0 &&
+      Number.isInteger(count) && count >= 0 && count <= cap
+      ? 'LOCAL • ' + count + '/' + cap + ' WAITING · ONE EXECUTOR'
+      : 'LOCAL • QUEUE DISABLED OR UNKNOWN';
+  }
+  async function recoverSessionTurn(id) {
+    if (state.turn || !state.connected) return;
+    const epoch = state.epoch;
+    const {turn} = await api('GET', '/v1/sessions/' + encodeURIComponent(id) + '/pending-turn');
+    if (epoch !== state.epoch || !state.connected || state.session !== id || state.turn || !turn) return;
+    if (turn.session_id !== id || typeof turn.request_id !== 'string' ||
+        !['queued', 'running', 'cancelling'].includes(turn.state)) return;
+    state.turn = turn; state.pending = null;
+    state.pollStarted = performance.now(); state.pollErrors = 0;
+    schedulePoll(100);
+    status(turn.state === 'queued' ? 'Reconnected to a waiting local request.' :
+      'Reconnected to a local generation already in progress.');
+  }
   async function refreshHealth() {
     if (!state.connected || !state.token) return;
     const epoch = state.epoch;
@@ -715,6 +744,7 @@ JAVASCRIPT = r"""'use strict';
       const observed = await api('GET', '/v1/status');
       if (epoch !== state.epoch || !state.connected) return;
       state.health = observed;
+      updateQueueIndicator(observed);
       const ownership = observed.inference_lease?.state;
       get('lease-indicator').textContent =
         ownership === 'busy' ? 'LOCAL • ANOTHER EXECUTOR IS ACTIVE' :
@@ -838,7 +868,8 @@ JAVASCRIPT = r"""'use strict';
       get(id).disabled = locked || state.busy || !state.session;
     });
     ['prompt', 'budget', 'grounded'].forEach(id => {get(id).disabled = locked || working;});
-    get('send').disabled = locked || working || foreignLease || !state.session || state.health?.ready !== true;
+    const mayQueue = queueAdmissionPossible(state.health, state.session);
+    get('send').disabled = locked || working || (foreignLease && !mayQueue) || !state.session || state.health?.ready !== true;
     const scopeBlocked = get('grounded').checked && state.knowledgeScopeMode === 'selected' &&
       (state.selectedKnowledgeIds.size === 0 ||
         [...state.selectedKnowledgeIds].some(id => !state.availableKnowledgeIds.has(id)));
@@ -919,6 +950,7 @@ JAVASCRIPT = r"""'use strict';
     state.resourceTimer = null;
     get('resource-monitor').textContent = 'Connect to inspect your device.';
     get('lease-indicator').textContent = 'Execution lock unknown';
+    get('queue-indicator').textContent = 'Queue not connected';
     get('resource-plan-result').textContent = 'No workload planned.';
     get('longform-status').textContent = 'No staged source.';
     get('longform-work-status').textContent = 'No active work cursor.';
@@ -1198,7 +1230,12 @@ JAVASCRIPT = r"""'use strict';
     get('context-report').classList.remove('warning');
     get('context-report').textContent = 'Conversation changed. Check the full local model context budget before the next turn.';
     clearGroundingPreview();
-    showMessages(); await loadSessions(); updateControls();
+    showMessages(); await loadSessions();
+    if (!state.turn && state.health?.max_queued_turns > 0) {
+      try {await recoverSessionTurn(id);}
+      catch {status('Pending request status unavailable. Refresh the conversation before submitting again.');}
+    }
+    updateControls();
   }
   function schedulePoll(delay = 1200) {
     stopPolling();
@@ -1544,7 +1581,9 @@ JAVASCRIPT = r"""'use strict';
     const {session_id, ...body} = request;
     try {
       state.turn = await api('POST', '/v1/sessions/' + session_id + '/turns', {...body, retry});
-      status('Local request admitted. You can cancel while the model runs.');
+      status(state.turn.state === 'queued' ?
+        'Local request is waiting for the single executor. You can cancel before it runs.' :
+        'Local request admitted. You can cancel while the model runs.');
       // Poll even an immediately replayed result through the same finalization UI.
       void pollTurn();
     } catch (error) {
@@ -1718,6 +1757,7 @@ JAVASCRIPT = r"""'use strict';
     try {state.health = await api('GET', '/v1/status');}
     catch (error) {state.token = ''; throw error;}
     state.connected = true; get('secret').value = '';
+    updateQueueIndicator(state.health);
     get('lease-indicator').textContent =
       state.health.inference_lease?.state === 'busy' ? 'LOCAL • ANOTHER EXECUTOR IS ACTIVE' :
       state.health.inference_lease?.state === 'unavailable' ? 'LOCAL • EXECUTION LOCK UNSAFE' :
@@ -1735,7 +1775,7 @@ JAVASCRIPT = r"""'use strict';
       void refreshResources();
       void refreshHealth();
     }, 10000);
-    if (state.health.active_turn) {
+    if (state.health.active_turn && !(state.health.max_queued_turns > 0)) {
       const activeTurn = state.health.active_turn;
       await selectSession(activeTurn.session_id);
       state.turn = activeTurn; state.pollStarted = performance.now(); schedulePoll(100);
@@ -1744,7 +1784,9 @@ JAVASCRIPT = r"""'use strict';
       status('Connected to the local host, but model inference is unavailable (' +
         (state.health.model_readiness_code || 'unknown') +
         '). Saved conversations remain accessible; no hosted fallback.');
-    } else status('Connected locally. Choose a conversation or create a new one.');
+    } else status(state.health.max_queued_turns > 0 ?
+      'Connected locally. Select a conversation to recover its waiting or active request.' :
+      'Connected locally. Choose a conversation or create a new one.');
     if (state.workspace === 'forge') {
       try {await refreshForge();} catch {get('forge-availability').textContent = 'Local builder readiness could not be read. Refresh builds to retry.';}
     }

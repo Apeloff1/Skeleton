@@ -101,6 +101,7 @@ jobs:
           tests/test_build_jeeves_game.py
           tests/test_offline_game_builder.py
           tests/test_offline_game_builder_integration.py
+          tests/test_jeeves_local_lease.py
       - name: Focused recovered Frontier runtime and source custody regressions
         run: |
           set -euo pipefail

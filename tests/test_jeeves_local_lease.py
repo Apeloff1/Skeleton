@@ -463,7 +463,10 @@ def test_local_desktop_prototype_exposes_real_kernel_lock_and_fail_closed_send()
     assert 'id="lease-indicator"' in HTML
     assert "observed.inference_lease?.state" in JAVASCRIPT
     assert "const foreignLease = ['busy', 'unavailable'].includes" in JAVASCRIPT
-    assert "get('send').disabled = locked || working || foreignLease" in JAVASCRIPT
+    assert "get('send').disabled = locked || working || (foreignLease && !mayQueue)" in JAVASCRIPT
+    assert "health?.inference_lease?.state === 'busy'" in JAVASCRIPT
+    assert "health.active_turn.session_id !== session" in JAVASCRIPT
+    assert "/pending-turn" in JAVASCRIPT
     assert "get('selftest-start').disabled = locked || working || foreignLease" in JAVASCRIPT
     assert "get('lease-indicator').textContent = 'Execution lock unknown'" in JAVASCRIPT
     assert "LOCAL • ANOTHER EXECUTOR IS ACTIVE" in JAVASCRIPT
@@ -857,6 +860,13 @@ def test_opt_in_queue_serializes_distinct_sessions_and_cancels_before_execution(
         assert entered.wait(5)
         assert app.submit_turn(second, request("second"))[1]["state"] == "queued"
         assert app.submit_turn(third, request("third"))[1]["state"] == "queued"
+        _, observation = app.dispatch("GET", f"/v1/sessions/{second}/pending-turn")
+        assert observation["turn"]["request_id"] == "second"
+        assert observation["turn"]["state"] == "queued"
+        assert set(observation["turn"]) == {
+            "session_id", "request_id", "state", "cancel_requested", "created_at", "terminal",
+        }
+        assert app.dispatch("GET", "/v1/status")[1]["queued_turn_count"] == 2
         assert app.submit_turn(second, request("second"))[0] == 202
         with pytest.raises(OfflineHTTPError) as same:
             app.submit_turn(second, request("duplicate-session"))
@@ -869,6 +879,7 @@ def test_opt_in_queue_serializes_distinct_sessions_and_cancels_before_execution(
         assert deleting.value.status == 409
         cancelled = app.turn_status(second, "second", cancel=True)
         assert cancelled["state"] == "cancelled" and cancelled["finished_at"] is not None
+        assert app.dispatch("GET", f"/v1/sessions/{second}/pending-turn")[1] == {"turn": None}
         assert app.submit_turn(fourth, request("fourth"))[1]["state"] == "queued"
         release.set()
         for sid, rid in [(first, "first"), (third, "third"), (fourth, "fourth")]:
@@ -878,4 +889,56 @@ def test_opt_in_queue_serializes_distinct_sessions_and_cancels_before_execution(
         assert not app._pending_turns
     finally:
         release.set()
+        app.close()
+
+def test_queued_real_native_turns_commit_and_replay_separately(tmp_path, monkeypatch):
+    """Actual tiny native model, controlled admission timing; no trained GGUF claim."""
+    import threading
+
+    model = native_model()
+    app = OfflineHTTPApplication(
+        model, tmp_path / "native-queue.sqlite3", token="q" * 64, max_queued_turns=1,
+    )
+    entered = threading.Event()
+    allow_first = threading.Event()
+    original = app._perform_turn
+    calls = []
+
+    def controlled(sid, request, *, turn=None):
+        calls.append((sid, request["request_id"]))
+        if request["request_id"] == "first-native":
+            entered.set()
+            assert allow_first.wait(10)
+        return original(sid, request, turn=turn)
+
+    monkeypatch.setattr(app, "_perform_turn", controlled)
+    try:
+        first, second = [app.dispatch("POST", "/v1/sessions", {})[1]["session_id"] for _ in range(2)]
+        inputs = [
+            (first, {"message": "hello world", "request_id": "first-native", "max_output_tokens": 2}),
+            (second, {"message": "local answer", "request_id": "second-native", "max_output_tokens": 2}),
+        ]
+        assert app.submit_turn(*inputs[0])[0] == 202
+        assert entered.wait(5)
+        assert app.submit_turn(*inputs[1])[1]["state"] == "queued"
+        allow_first.set()
+        for sid, request in inputs:
+            rid = request["request_id"]
+            deadline = time.monotonic() + 30
+            while True:
+                observed = app.turn_status(sid, rid)
+                if observed["terminal"]:
+                    break
+                assert time.monotonic() < deadline, "native queue did not settle"
+                time.sleep(0.02)
+            assert observed["state"] == "complete", observed["error"]
+            assert observed["result"]["local_execution_receipt"]["model_digest"] == model.model_digest
+            assert app._session(sid).revision == 1
+            status, replay = app.submit_turn(sid, request)
+            assert status == 200
+            assert replay["result"]["output_digest"] == observed["result"]["output_digest"]
+            assert app.dispatch("GET", f"/v1/sessions/{sid}/pending-turn")[1] == {"turn": None}
+        assert calls == [(sid, request["request_id"]) for sid, request in inputs]
+    finally:
+        allow_first.set()
         app.close()

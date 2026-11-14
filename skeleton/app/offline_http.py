@@ -324,15 +324,26 @@ class OfflineHTTPApplication:
         retry = request.pop("retry", False)
         if type(retry) is not bool:
             raise OfflineHTTPError(400, "retry must be a boolean")
-        rid, digest = self._turn_identity(request, self.default_output_tokens)
-        # Detach the only mutable admitted field from the caller before queueing.
-        if "document_ids" in request:
+        # Detach source scope before computing identity; pin the exact default
+        # so delayed execution cannot acquire a different request fingerprint.
+        if type(request.get("document_ids")) is list:
             request["document_ids"] = list(request["document_ids"])
+        default_budget = self.default_output_tokens
+        request.setdefault("max_output_tokens", default_budget)
+        rid, digest = self._turn_identity(request, default_budget)
         with self._store.read_snapshot():
             self._session(session_id)
             # Reject an already-owned ID with changed inputs before admission.
             committed = self._store.replay(session_id, rid, digest)
         if committed is not None:
+            # A live worker may have committed SQLite but not yet released its
+            # lease or published terminal state. Do not impersonate its settlement.
+            with self._turn_lock:
+                live = self._turns.get((session_id, rid))
+                if live is not None and live.state not in TERMINAL_TURN_STATES:
+                    if live.request_digest != digest:
+                        raise OfflineHTTPError(409, "request ID belongs to different turn content")
+                    return 202, live.public()
             # A process restart, another active worker, or a missing model
             # must never turn a committed retry into new inference.
             observed = self._read_committed_turn(
@@ -351,6 +362,9 @@ class OfflineHTTPApplication:
                     raise OfflineHTTPError(409, "request ID belongs to different turn content")
                 if not retry or existing.state not in {"failed", "cancelled"}:
                     return (200 if existing.state in TERMINAL_TURN_STATES else 202), existing.public()
+            # Deletion and new admission share this lock. The first snapshot
+            # alone is insufficient when another tab deletes the session.
+            self._session(session_id)
             # Recheck before allocating a worker so a replaced/unreadable
             # GGUF cannot be offered as a healthy new request. A completed
             # idempotent turn remains readable even when the model is gone.
@@ -1062,6 +1076,24 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(404, "unknown local API route")
         sid = _identifier("session id", components[3])
         tail = components[4] if len(components) == 5 else None
+        if tail == "pending-turn" and method == "GET":
+            # Authenticated session-scoped observation only. No queued prompt,
+            # document IDs, output, lease token or raw exception is returned.
+            with self._turn_lock:
+                self._session(sid)
+                pending = next((
+                    ticket for ticket in self._turns.values()
+                    if ticket.session_id == sid
+                    and ticket.state not in TERMINAL_TURN_STATES
+                ), None)
+                return 200, {"turn": None if pending is None else {
+                    "session_id": pending.session_id,
+                    "request_id": pending.request_id,
+                    "state": pending.state,
+                    "cancel_requested": pending.cancel_requested,
+                    "created_at": pending.created_at,
+                    "terminal": False,
+                }}
         if tail is None:
             if method == "GET":
                 with self._store.read_snapshot():
