@@ -784,3 +784,35 @@ def test_private_leaf_below_unprotected_ancestor_refuses_lease(tmp_path):
         assert not lease.path.exists()
     finally:
         shared.chmod(0o700)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX inherited descriptor custody")
+def test_copied_context_is_revoked_after_lease_exit(tmp_path):
+    from contextvars import copy_context
+    from skeleton.ai.runtime.inference.lease_custody import gguf_child_pass_fds
+
+    with LocalInferenceLease(tmp_path / "revoked.sqlite3").hold():
+        captured = copy_context()
+        assert captured.run(gguf_child_pass_fds)
+    with pytest.raises(RuntimeError, match="revoked"):
+        captured.run(gguf_child_pass_fds)
+    assert gguf_child_pass_fds() == ()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX inherited descriptor custody")
+def test_descriptor_replacement_is_not_admitted_as_the_original_lease(tmp_path):
+    from skeleton.ai.runtime.inference.lease_custody import (
+        enter_local_lease, leave_local_lease, gguf_child_fd_scope,
+    )
+    first = os.open(tmp_path / "first", os.O_RDWR | os.O_CREAT, 0o600)
+    second = os.open(tmp_path / "second", os.O_RDWR | os.O_CREAT, 0o600)
+    token = enter_local_lease(first)
+    try:
+        os.dup2(second, first)
+        with pytest.raises(RuntimeError, match="identity changed"):
+            with gguf_child_fd_scope():
+                pytest.fail("recycled descriptor admitted")
+    finally:
+        leave_local_lease(token)
+        os.close(first)
+        os.close(second)
