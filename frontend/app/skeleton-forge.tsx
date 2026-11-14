@@ -5,16 +5,21 @@
  */
 import React from 'react';
 import { SafeAreaView, StyleSheet } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import ForgeCockpitScreen from '../src/skeletonForge/components/ForgeCockpitScreen';
 import { parseTabParam } from '../src/skeletonForge/cockpitScreen';
 import { C } from '../src/skeletonForge/components/theme';
 
 export default function SkeletonForgeRoute() {
-  const params = useLocalSearchParams<{ tab?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; handoff?: string }>();
+  const router = useRouter();
   return (
     <SafeAreaView style={st.root}>
-      <ForgeCockpitScreen initialTab={parseTabParam(params.tab)} />
+      <ForgeCockpitScreen
+        initialTab={parseTabParam(params.tab)}
+        galaxyHandoffId={typeof params.handoff === 'string' ? params.handoff : null}
+        onOpenGalaxyStudio={() => router.push('/galaxy' as any)}
+      />
     </SafeAreaView>
   );
 }
