@@ -9,8 +9,14 @@ four acquisitions per rolling 60 seconds are permitted, counting unfinished
 reservations. A same-head active reservation cannot be duplicated, even by the
 same lane. Tokens are random, bound to lane, actor, head and expiry, and can be
 consumed only once. Clock regression, corruption and missing ledgers fail closed
-for an existing instance. A new instance may bootstrap a deliberately new
-database; the operator must provision and preserve its path.
+for an existing instance. Each instance freezes its absolute path and pins the
+observed file identity; missing, relinked or replaced ledgers are rejected.
+Clock samples outside the supported civil-time range are rejected before any
+arithmetic or SQL mutation. A new instance may bootstrap a deliberately new
+database; the operator must provision and preserve its path. The path checks
+are not descriptor-bound SQLite custody and do not protect against a malicious
+same-UID writer, inode reuse, modification in place, or a false wall clock.
+Use a trusted directory and an independently trusted host clock.
 
 The historical JSON ledger is not silently migrated or reused. Existing JSON
 files must be retained for audit and deliberately replaced by a new SQLite
