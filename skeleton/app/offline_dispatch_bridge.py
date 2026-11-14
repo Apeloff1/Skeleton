@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from skeleton.ai.model_runtime.fair_stream_execution_journal import FairStreamExecutionJournal
-    from skeleton.ai.model_runtime.fair_stream_recovery import RecoveryAuthorization
+    from skeleton.ai.model_runtime.fair_stream_recovery import AbandonmentAuthorization, RecoveryAuthorization
 
 from skeleton.ai.model_runtime.fair_stream_dispatch import (
     DispatchUncertain, DurableExecutionOwner,
@@ -156,6 +156,13 @@ class OfflineAdaptiveDispatchService:
     ) -> OfflineDispatchStatus:
         """Explicitly settle a durable cancellation using a separate operator grant."""
         self._guard.reconcile_cancelled(authorization=authorization, recovery_key=recovery_key)
+        return self.status()
+
+    def abandon_uncertain(
+        self, *, authorization: "AbandonmentAuthorization", recovery_key: bytes,
+    ) -> OfflineDispatchStatus:
+        """Operator-only no-output retirement; never initiate inference."""
+        self._guard.abandon_uncertain(authorization=authorization, recovery_key=recovery_key)
         return self.status()
 
     def reconcile_committed(
