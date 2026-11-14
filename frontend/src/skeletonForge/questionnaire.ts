@@ -10,6 +10,7 @@
 import type { Beat, RunRequest } from './types';
 import { isDesignAxis, normaliseAxisEdit, sparseInstrumentPayload } from './instruments';
 import { mappedBriefGenre, specializedVision } from './galaxyGenres';
+import { galaxyPrefill, type GalaxyProfile } from './galaxyHandoff';
 
 export const STEPS = ['vision', 'brief', 'beats', 'options', 'review'] as const;
 export type Step = typeof STEPS[number];
@@ -77,6 +78,8 @@ export interface QuestionnaireState {
   instruments: Record<string, number>;
   /** Historical Galaxy Studio genre specialization (mapped to a canonical vote). */
   galaxyGenre?: string | null;
+  /** All 14 matrices, narrative, extras, classic sliders, style and production inputs. */
+  galaxyProfile?: GalaxyProfile | null;
   options: ForgeOptions;
 }
 
@@ -87,6 +90,8 @@ export type QuestionnaireAction =
   | { type: 'setAxis'; axis: string; value: number | null }
   | { type: 'resetAxes' }
   | { type: 'setGalaxyGenre'; genre: string | null }
+  | { type: 'importGalaxy'; profile: GalaxyProfile }
+  | { type: 'clearGalaxyProfile' }
   | { type: 'setOption'; key: keyof ForgeOptions; value: string | null }
   | { type: 'next' }
   | { type: 'back' }
@@ -100,6 +105,7 @@ export const INITIAL_STATE: QuestionnaireState = {
   beats: {},
   instruments: {},
   galaxyGenre: null,
+  galaxyProfile: null,
   options: { archetype: 'auto', target: 'godot', era: null, generation: null },
 };
 
@@ -141,7 +147,8 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
       return { ...state, vision: String(action.vision ?? '').slice(0, VISION_MAX + 200) };
     case 'setBrief':
       return { ...state, brief: toggle(state.brief, action.facet, action.value),
-        galaxyGenre: action.facet === 'genre' ? null : state.galaxyGenre };
+        galaxyGenre: action.facet === 'genre' ? null : state.galaxyGenre,
+        galaxyProfile: action.facet === 'genre' ? null : state.galaxyProfile };
     case 'setBeat':
       return { ...state, beats: toggle(state.beats, action.beat, action.value) };
     case 'setAxis': {
@@ -157,16 +164,27 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
     }
     case 'resetAxes':
       return { ...state, instruments: {} };
+    case 'importGalaxy': {
+      const imported = galaxyPrefill(action.profile);
+      return {
+        ...state, vision: imported.vision, step: 'options',
+        brief: { ...state.brief, ...(imported.mappedGenre ? { genre: imported.mappedGenre } : {}) },
+        galaxyGenre: imported.genre, galaxyProfile: imported.profile,
+        instruments: { ...state.instruments, ...imported.axes },
+      };
+    }
+    case 'clearGalaxyProfile':
+      return { ...state, galaxyProfile: null };
     case 'setGalaxyGenre': {
       const mapped = mappedBriefGenre(action.genre);
       if (action.genre && !mapped) return state;
       const brief = { ...state.brief };
       if (!action.genre || action.genre === state.galaxyGenre) {
         if (state.galaxyGenre && brief.genre === mappedBriefGenre(state.galaxyGenre)) delete brief.genre;
-        return { ...state, brief, galaxyGenre: null };
+        return { ...state, brief, galaxyGenre: null, galaxyProfile: null };
       }
       brief.genre = mapped!;
-      return { ...state, brief, galaxyGenre: action.genre };
+      return { ...state, brief, galaxyGenre: action.genre, galaxyProfile: null };
     }
     case 'setOption': {
       const value = action.value === '' ? null : action.value;
@@ -231,7 +249,7 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   for (const [k, v] of Object.entries(state.brief)) answers[k] = v;
   for (const [k, v] of Object.entries(state.beats)) answers[k] = v;
   const request: RunRequest = {
-    vision: specializedVision(state.vision, state.galaxyGenre, VISION_MAX),
+    vision: state.galaxyProfile ? state.vision.trim().slice(0, VISION_MAX) : specializedVision(state.vision, state.galaxyGenre, VISION_MAX),
     era: state.options.era,
     archetype: state.options.archetype || 'auto',
     target: state.options.target || 'godot',
@@ -240,6 +258,7 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   };
   const instrumentAxes = sparseInstrumentPayload(state.instruments);
   if (Object.keys(instrumentAxes).length) request.operator_axes = instrumentAxes;
+  if (state.galaxyProfile) request.galaxy_profile = state.galaxyProfile;
   return request;
 }
 

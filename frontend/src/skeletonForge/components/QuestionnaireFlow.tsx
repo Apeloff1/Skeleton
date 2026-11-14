@@ -273,6 +273,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
           testID="q-design-instruments-toggle"
         />
       </View>
+      {state.galaxyProfile ? <Text style={st.help} testID="q-galaxy-profile-attached">The complete Galaxy questionnaire is attached to your next Forge run and will be included in the emitted project source.</Text> : null}
       {instrumentsOpen ? (
         <DesignInstruments
           axes={state.instruments || {}}
@@ -308,6 +309,7 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
       <Row k="Archetype" v={arch?.label ?? req.archetype} />
       <Row k="Output" v={TARGETS.find((t) => t.id === req.target)?.label ?? req.target} />
       {state.galaxyGenre ? <Row k="Specialized genre" v={(galaxyGenre(state.galaxyGenre)?.name ?? state.galaxyGenre) + " → " + (mappedBriefGenre(state.galaxyGenre) ?? "unknown")} /> : null}
+      {state.galaxyProfile ? <Row k="Galaxy questionnaire" v="Full 14 matrices, narrative phases, extended sliders, nine style selectors and production data attached to this run" /> : null}
       {req.operator_axes ? <Row k="Design tuning" v={DESIGN_AXES.filter((axis) => req.operator_axes?.[axis.id] !== undefined).map((axis) => axis.label + ": " + Math.round((req.operator_axes?.[axis.id] ?? 0) * 100) + "%").join(" · ")} /> : null}
       <Row k="Era" v={req.era ? humanize(req.era) : 'decided by the forge'} />
       {req.generation ? <Row k="Hardware" v={humanize(req.generation)} /> : null}
@@ -317,6 +319,7 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
           Your design beat overrides the brief answer for: {shadowed.join(', ')}.
         </Banner>
       ) : null}
+      {state.galaxyProfile ? <Button label="Detach transferred Galaxy profile" tone="ghost" compact onPress={() => dispatch({ type: 'clearGalaxyProfile' })} testID="q-detach-galaxy-profile" /> : null}
       <Button label="Start over" tone="ghost" compact onPress={() => dispatch({ type: 'reset' })} testID="q-reset" />
       {onViewPlan ? <Button label="View build plan" tone="secondary" compact onPress={onViewPlan} a11yHint="Opens the plan from the last forge" testID="q-view-plan" /> : null}
     </Card>

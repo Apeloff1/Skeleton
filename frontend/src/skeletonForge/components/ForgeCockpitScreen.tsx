@@ -11,16 +11,34 @@ import { cockpitScreenReducer, composeSummaryOf, consoleFailures, initialScreenS
 import { useCockpitConsole } from '../consoleHooks';
 import { useForgeCatalog, useForgeRun, useLiveCompose, useNow } from '../hooks';
 import type { RunRequest } from '../types';
+import { consumeGalaxyHandoff } from '../galaxyHandoff';
 import ForgeCockpitView from './ForgeCockpitView';
 
 export interface ForgeCockpitScreenProps {
   initialTab?: CockpitTab | null;
   onOpenGalaxyStudio?: () => void;
+  galaxyHandoffId?: string | null;
 }
 
-export default function ForgeCockpitScreen({ initialTab = null, onOpenGalaxyStudio }: ForgeCockpitScreenProps) {
+export default function ForgeCockpitScreen({ initialTab = null, onOpenGalaxyStudio, galaxyHandoffId }: ForgeCockpitScreenProps) {
   const [screen, dispatchScreen] = React.useReducer(cockpitScreenReducer, initialTab, initialScreenState);
   const [q, dispatchQ] = React.useReducer(questionnaireReducer, INITIAL_STATE);
+  const [handoffNotice, setHandoffNotice] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (!galaxyHandoffId) return;
+    const profile = consumeGalaxyHandoff(galaxyHandoffId);
+    if (!profile) {
+      setHandoffNotice('Galaxy transfer expired or was already consumed. Return to Galaxy Studio to send the questionnaire again.');
+      return;
+    }
+    try {
+      dispatchQ({ type: 'importGalaxy', profile });
+      dispatchScreen({ type: 'tab', tab: 'build' });
+      setHandoffNotice('Full Galaxy Studio design imported. Review the creator instruments before generating.');
+    } catch {
+      setHandoffNotice('Galaxy questionnaire could not be validated. No design was imported.');
+    }
+  }, [galaxyHandoffId]);
   const catalog = useForgeCatalog();
   const compose = useLiveCompose(q.vision);
   const run = useForgeRun();
@@ -59,7 +77,7 @@ export default function ForgeCockpitScreen({ initialTab = null, onOpenGalaxyStud
       onTab={(tab) => dispatchScreen({ type: 'tab', tab })}
       badges={badges}
       reduceMotion={reduceMotion}
-      notice={!catalog.loading && !catalog.beatsLive ? 'Offline beats in use — the backend catalog is unreachable.' : null}
+      notice={handoffNotice || (!catalog.loading && !catalog.beatsLive ? 'Offline beats in use — the backend catalog is unreachable.' : null)}
       questionnaire={{
         state: q,
         dispatch: dispatchQ,
