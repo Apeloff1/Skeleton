@@ -21,7 +21,8 @@ import threading
 from typing import Iterator
 
 from skeleton.ai.runtime.inference.lease_custody import (
-    enter_local_lease, leave_local_lease,
+    WINDOWS_DIRTY_RECORD_BYTES, enter_local_lease, leave_local_lease,
+    windows_recovery_candidate, recover_windows_dirty_record,
 )
 
 
@@ -110,10 +111,10 @@ class LocalInferenceLease:
                 raise LocalInferenceLeaseUnavailable("inference lease identity changed during admission")
             # Windows locks an exact byte range; establish its byte without
             # truncation. No user information or host secrets enter this file.
-            if metadata.st_size == 0 and initialize:
-                os.write(fd, bytes((0,)))
-                os.fsync(fd)
-            elif metadata.st_size != 1:
+            # Initialization occurs only after locking. A stale pre-lock
+            # observation of an empty file must never overwrite a live fence.
+            max_size = WINDOWS_DIRTY_RECORD_BYTES if os.name == "nt" else 1
+            if not 0 <= metadata.st_size <= max_size:
                 raise LocalInferenceLeaseUnavailable("inference lease marker format is invalid")
             return fd
         except OSError as exc:
@@ -192,8 +193,31 @@ class LocalInferenceLease:
         with self._hold(initialize=True):
             yield
 
+    def prepare_windows_crash_recovery(self, *, prepare_legacy: bool = False) -> dict[str, str]:
+        """Operator-only inspection; optional legacy challenge creation is not recovery."""
+        if os.name != "nt" or type(prepare_legacy) is not bool:
+            raise LocalInferenceLeaseUnavailable("explicit Windows operator recovery required")
+        with self._hold(initialize=False, recovery=True) as fd:
+            return windows_recovery_candidate(fd, prepare_legacy=prepare_legacy)
+
+    def recover_windows_crash_marker(
+        self, *, approval: dict[str, object], operator_key: bytes,
+    ) -> None:
+        """Trusted maintenance caller; key comes from independent operator config.
+
+        The operator must verify the previous job and all workers have stopped
+        before authorizing this exact launch. Never expose as an unauthenticated
+        endpoint or substitute mere lock availability for that review.
+        """
+        if os.name != "nt":
+            raise LocalInferenceLeaseUnavailable("Windows operator recovery required")
+        with self._hold(initialize=False, recovery=True) as fd:
+            recover_windows_dirty_record(fd, approval=approval, operator_key=operator_key)
+
     @contextmanager
-    def _hold(self, *, initialize: bool) -> Iterator[None]:
+    def _hold(self, *, initialize: bool, recovery: bool = False) -> Iterator[int]:
+        if recovery and (initialize or os.name != "nt"):
+            raise LocalInferenceLeaseUnavailable("invalid recovery lock mode")
         if not self._thread_gate.acquire(blocking=False):
             raise LocalInferenceLeaseBusy("local inference is already running in this service")
         fd: int | None = None
@@ -216,18 +240,31 @@ class LocalInferenceLease:
             # Validate the exact marker under the OS lock. Reading before the
             # byte-range lock on Windows can misclassify contention as corruption.
             try:
+                if owned.st_size == 0 and initialize:
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    if os.write(fd, bytes((0,))) != 1:
+                        raise OSError("inference lease initialization incomplete")
+                    os.fsync(fd)
                 os.lseek(fd, 0, os.SEEK_SET)
-                marker = os.read(fd, 2)
+                marker = os.read(fd, WINDOWS_DIRTY_RECORD_BYTES + 1 if os.name == "nt" else 2)
             except OSError as exc:
                 raise LocalInferenceLeaseUnavailable("inference lease marker cannot be read") from exc
-            if marker != bytes((0,)):
+            dirty = os.name == "nt" and marker.startswith(bytes((1,))) and len(marker) <= WINDOWS_DIRTY_RECORD_BYTES
+            if recovery:
+                if not dirty:
+                    raise LocalInferenceLeaseUnavailable("no dirty Windows native marker")
+            elif dirty:
+                raise LocalInferenceLeaseUnavailable("Windows native job drainage requires operator reconciliation")
+            elif marker != bytes((0,)):
                 raise LocalInferenceLeaseUnavailable("inference lease marker format is invalid")
             # Propagate this particular locked file description through
             # asyncio.to_thread into a pinned llama.cpp child on POSIX. If
             # Python dies, the child retains exclusion until it exits.
+            # Windows native launch instead persists a dirty byte until
+            # the bound Job Object has verified zero active members.
             if initialize:
                 context_token = enter_local_lease(fd)
-            yield
+            yield fd
         finally:
             try:
                 if context_token is not None:
