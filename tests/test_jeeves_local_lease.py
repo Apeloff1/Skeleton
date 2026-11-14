@@ -976,6 +976,12 @@ def test_durable_queue_metadata_survives_restart_and_refuses_changed_retry(tmp_p
         with pytest.raises(OfflineHTTPError) as occupied:
             peer.submit_turn(b, {**body, "retry": True})
         assert occupied.value.status == 409
+        with pytest.raises(OfflineHTTPError) as different_id:
+            peer.submit_turn(b, {**body, "request_id": "peer-other-id"})
+        assert different_id.value.status == 409
+        with pytest.raises(OfflineHTTPError) as sync_peer:
+            peer.dispatch("POST", f"/v1/sessions/{b}/turn", {**body, "request_id": "peer-sync"})
+        assert sync_peer.value.status == 409
         with pytest.raises(OfflineHTTPError) as delete:
             peer.dispatch("DELETE", f"/v1/sessions/{b}")
         assert delete.value.status == 409
@@ -1059,3 +1065,77 @@ def test_local_browser_recovery_requires_explicit_same_identity_retry():
     assert "if (recoveryId !== null) retry = true" in JAVASCRIPT
     assert "await submit(false, rid)" in JAVASCRIPT
     assert "No request was replayed" in JAVASCRIPT
+
+def test_queue_admission_fences_revision_and_attempt_without_backend(tmp_path):
+    from skeleton.app.offline_turn_admission import AdmissionRejected, DurableTurnAdmissions, QueueAdmissionOwner
+
+    model = native_model()
+    database = tmp_path / "queue-revision.sqlite3"
+    app = OfflineHTTPApplication(model, database, token="q" * 64)
+    owner = QueueAdmissionOwner(database)
+    try:
+        sid = app.dispatch("POST", "/v1/sessions", {})[1]["session_id"]
+        body = {"message": "hello", "request_id": "revision-pinned", "max_output_tokens": 2}
+        rid, digest = app._turn_identity(body, app.default_output_tokens)
+        ledger = DurableTurnAdmissions(app._store, app.model_digest, app.tokenizer_digest)
+        assert ledger.claim(owner, sid, rid, digest, retry=False) == 1
+        ledger.verify_execution(owner, sid, rid, digest, 1)
+        with pytest.raises(AdmissionRejected):
+            ledger.verify_execution(owner, sid, rid, digest, 2)
+        with pytest.raises(AdmissionRejected):
+            ledger.claim(owner, sid, rid, digest, retry=True)
+        with pytest.raises(AdmissionRejected):
+            ledger.claim(owner, sid, "different", digest, retry=False)
+        with pytest.raises(AdmissionRejected):
+            ledger.finish(owner, sid, rid, digest, 1, "settled")
+        # Deliberately simulate a changed observation at the SQL authority.
+        # No fabricated transcript or model result is asserted as valid.
+        with app._store._transaction():
+            app._store._db.execute("UPDATE offline_sessions SET revision=1 WHERE session_id=?", (sid,))
+        with pytest.raises(AdmissionRejected, match="revision changed"):
+            ledger.verify_execution(owner, sid, rid, digest, 1)
+        ledger.finish(owner, sid, rid, digest, 1, "failed")
+        with pytest.raises(AdmissionRejected, match="conversation changed"):
+            ledger.claim(owner, sid, rid, digest, retry=True)
+        with app._store._transaction():
+            app._store._db.execute("UPDATE offline_sessions SET revision=0 WHERE session_id=?", (sid,))
+        assert ledger.claim(owner, sid, rid, digest, retry=True) == 2
+        with pytest.raises(AdmissionRejected):
+            ledger.finish(owner, sid, rid, digest, 1, "failed")
+        ledger.verify_execution(owner, sid, rid, digest, 2)
+        ledger.finish(owner, sid, rid, digest, 2, "cancelled")
+    finally:
+        owner.close()
+        app.close()
+
+
+def test_committed_queue_metadata_reclaims_only_receipted_identity(tmp_path, monkeypatch):
+    import skeleton.app.offline_turn_admission as admission
+
+    model = native_model()
+    app = OfflineHTTPApplication(
+        model, tmp_path / "queue-reclaim.sqlite3", token="q" * 64, max_queued_turns=1,
+    )
+    monkeypatch.setattr(admission, "MAX_SESSION_ADMISSIONS", 1)
+    try:
+        sid = app.dispatch("POST", "/v1/sessions", {})[1]["session_id"]
+        bodies = [
+            {"message": "hello world", "request_id": "first-reclaim", "max_output_tokens": 2},
+            {"message": "local answer", "request_id": "second-reclaim", "max_output_tokens": 2},
+        ]
+        for body in bodies:
+            assert app.submit_turn(sid, body)[0] == 202
+            deadline = time.monotonic() + 30
+            while True:
+                ticket = app.turn_status(sid, body["request_id"])
+                if ticket["terminal"]:
+                    break
+                assert time.monotonic() < deadline
+                time.sleep(0.02)
+            assert ticket["state"] == "complete", ticket["error"]
+        assert app._session(sid).revision == 2
+        assert app._admissions.lookup(sid, bodies[0]["request_id"]) is None
+        assert app.submit_turn(sid, bodies[0])[0] == 200
+        assert app._session(sid).revision == 2
+    finally:
+        app.close()

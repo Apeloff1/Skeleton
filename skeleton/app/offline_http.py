@@ -723,11 +723,18 @@ class OfflineHTTPApplication:
                     self._session(session_id)
                     # Recheck async ownership under the actual inference lease;
                     # an earlier HTTP preflight is not an execution grant.
-                    if turn is None or turn.admission_attempt is None:
-                        try:
+                    try:
+                        if turn is None or turn.admission_attempt is None:
                             self._admissions.assert_unowned(session_id, rid)
-                        except AdmissionRejected as exc:
-                            raise OfflineHTTPError(exc.status, str(exc)) from None
+                        else:
+                            if self._queue_owner is None:
+                                raise AdmissionRejected(503, "local queue ownership unavailable")
+                            self._admissions.verify_execution(
+                                self._queue_owner, session_id, rid, digest,
+                                turn.admission_attempt,
+                            )
+                    except AdmissionRejected as exc:
+                        raise OfflineHTTPError(exc.status, str(exc)) from None
                     chat = DurableOfflineAISession(
                         self.backend, database=self.database, session_id=session_id
                     )
