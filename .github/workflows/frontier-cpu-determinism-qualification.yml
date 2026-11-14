@@ -1,7 +1,13 @@
 name: Frontier CPU deterministic presentation qualification
 
 on:
-  workflow_call:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/game/frontier/**"
+      - "tests/game_frontier_native/**"
+      - ".github/workflows/frontier-cpu-determinism-qualification.yml"
   workflow_dispatch:
 
 permissions:
