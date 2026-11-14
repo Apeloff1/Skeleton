@@ -31,3 +31,20 @@ A startup clock fault before the guard registers the lease requires fresh
 authorized composition. Process-identity violations, replay attempts and
 exhausted lifetime capacity likewise require fresh composition. The exact
 retired lease can reauthorize an inactive, recoverably stopped guard only.
+
+## Provisioning the independent recovery authority
+
+Trusted startup must supply `operator_recovery_key` to the dispatch service
+(or `bind_native_cpu_dispatch_service`) from the independently managed
+operator secret. Reopening requires re-provisioning the same authorized key.
+Omitting it disables all committed, published, cancelled and abandonment
+recovery operations; it does not disable ordinary fresh inference. A
+request-selected key cannot establish its own trust root. The dispatcher
+pins a domain-separated key commitment in memory and checks it before
+verifying a scoped approval or using its journal recovery path.
+
+Never reuse the custody key, receipt signing key or result encryption key
+as the operator key. Native composition checks the session and journal agree
+on the receipt signer and rejects role reuse before binding result custody.
+These source checks do not provision secrets, establish independent process
+quiescence, qualify a device, or replace external operator authentication.
