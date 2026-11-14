@@ -124,10 +124,22 @@ class PrivateSQLiteHandle:
             ):
                 raise PrivateSQLiteUnavailable("SQLite path inode replaced")
             databases = self.connection.execute("PRAGMA database_list").fetchall()
-            if (len(databases) != 1 or databases[0][1] != "main"
-                    or not databases[0][2]):
+            # SQLite may materialize an empty TEMP schema merely by reading
+            # its catalog. It is not an external attachment. Refuse every
+            # actual temporary object, on-disk TEMP store or foreign database.
+            by_name = {row[1]: row[2] for row in databases}
+            if (len(by_name) != len(databases) or not by_name.get("main")
+                    or set(by_name) - {"main", "temp"}):
                 raise PrivateSQLiteUnavailable("unexpected SQLite attachment")
-            actual = os.stat(databases[0][2], follow_symlinks=False)
+            if self.connection.execute("PRAGMA temp_store").fetchone()[0] != 2:
+                raise PrivateSQLiteUnavailable("SQLite temporary storage policy changed")
+            if "temp" in by_name and (
+                by_name["temp"] != "" or self.connection.execute(
+                    "SELECT 1 FROM temp.sqlite_master LIMIT 1"
+                ).fetchone() is not None
+            ):
+                raise PrivateSQLiteUnavailable("unexpected SQLite temporary objects")
+            actual = os.stat(by_name["main"], follow_symlinks=False)
             if (actual.st_dev, actual.st_ino) != (
                 fd_info.st_dev, fd_info.st_ino,
             ):

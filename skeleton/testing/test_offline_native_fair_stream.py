@@ -535,3 +535,64 @@ def test_native_recovery_after_vault_commit_before_journal_commit(private_files,
         assert session.verify()["checkpoint"]["requests"] == []
         with pytest.raises(DispatchUncertain):
             service.reconcile_committed(journal=journal, authorization=approval, recovery_key=key)
+
+
+def test_abandoned_native_failure_unblocks_next_authorized_request(private_files, monkeypatch):
+    from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchUncertain
+    from skeleton.ai.model_runtime.fair_stream_execution_journal import ExecutionOutcomeUnknown
+    from skeleton.ai.model_runtime.fair_stream_recovery import issue_abandonment_authorization
+    from skeleton.app.offline_native_fair_stream import submit_authenticated_native_cpu_prompt
+
+    install_probe(monkeypatch)
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+
+    def submit(request_id):
+        return submit_authenticated_native_cpu_prompt(
+            service=service, vault=vault, runtime=runtime, registry=registry,
+            authenticated_tenant_id="alice",
+            request=StreamRequest(request_id, "alice", InferencePhase.PREFILL, 2, 16),
+            prompt="hello", max_output_tokens=2,
+        )
+
+    submit("failed-native")
+    submit("next-native")
+    def failure(*args, **kwargs):
+        raise RuntimeError("simulated model interruption before durable publication")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(NativeLLMRuntime, "generate_sequence", failure)
+        with pytest.raises(DispatchUncertain):
+            service.execute_next(token_budget=2)
+    state = session.verify()
+    lease = state["checkpoint"]["pending"][0]
+    assert lease["request_id"] == "failed-native"
+    key = b"k" * 32
+    approval = issue_abandonment_authorization(
+        recovery_key=key, session_id=SESSION, generation=state["generation"],
+        checkpoint_digest=state["checkpoint_digest"], lease_id=lease["lease_id"],
+        nonce="a" * 32, evidence_digest="b" * 64,
+    )
+    status = service.abandon_uncertain(authorization=approval, recovery_key=key)
+    assert not status.execution_uncertain and status.pending_leases == 0
+    assert journal._connection.execute(
+        "SELECT state, result_digest, receipt FROM local_fair_stream_execution_journal "
+        "WHERE request_id='failed-native'"
+    ).fetchone()[:2] == ("running", None)
+    assert vault._connection.execute(
+        "SELECT COUNT(*) FROM local_fair_stream_sealed_results"
+    ).fetchone()[0] == 0
+    with pytest.raises(ExecutionOutcomeUnknown, match="already executed"):
+        submit("failed-native")
+    result = service.execute_next(token_budget=2)
+    assert result["executed"] is True
+    assert result["state"] == "durably_acknowledged"
+    assert session.verify()["checkpoint"]["requests"] == []
+    assert vault._connection.execute(
+        "SELECT request_id FROM local_fair_stream_sealed_results"
+    ).fetchall() == [("next-native",)]

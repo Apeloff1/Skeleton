@@ -61,3 +61,12 @@ def test_grant_trigger_cannot_erase_consumed_nonce(setup):
     with pytest.raises(ResultReadDenied, match="schema"):
         setup["reader"].read_once(read_permit(), operator_grant=grant(setup))
     assert connection.execute("SELECT COUNT(*) FROM local_fair_stream_result_read_grants").fetchone()[0] == 0
+
+
+def test_schema_guard_does_not_materialize_unused_temp_database():
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE ledger(id TEXT PRIMARY KEY NOT NULL, value TEXT) WITHOUT ROWID")
+    before = conn.execute("PRAGMA database_list").fetchall()
+    assert_custody_schema(conn, table="ledger", columns=("id", "value"), primary_key="id")
+    assert conn.execute("PRAGMA database_list").fetchall() == before
+    conn.close()

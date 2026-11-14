@@ -39,18 +39,25 @@ def assert_custody_schema(
     ).fetchall()
     if len(rows) != 1 or rows[0][0] != "table":
         raise CustodySchemaError("canonical custody table missing")
-    if connection.execute(
-        "SELECT 1 FROM temp.sqlite_master WHERE name=? COLLATE NOCASE LIMIT 1",
-        (table,),
-    ).fetchone() is not None:
-        raise CustodySchemaError("temporary custody table shadow")
-    for schema in ("main", "temp"):
+    # Do not materialize TEMP merely to inspect it. SQLite identifies a
+    # materialized temp schema in database_list even when it is empty.
+    schemas = {row[1] for row in connection.execute("PRAGMA database_list")}
+    if "temp" in schemas:
         if connection.execute(
-            "SELECT 1 FROM " + schema + ".sqlite_master"
-            " WHERE type='trigger' AND tbl_name=? COLLATE NOCASE LIMIT 1",
+            "SELECT 1 FROM temp.sqlite_master WHERE name=? COLLATE NOCASE LIMIT 1",
             (table,),
         ).fetchone() is not None:
+            raise CustodySchemaError("temporary custody table shadow")
+        if connection.execute(
+            "SELECT 1 FROM temp.sqlite_master WHERE type='trigger' "
+            "AND tbl_name=? COLLATE NOCASE LIMIT 1", (table,),
+        ).fetchone() is not None:
             raise CustodySchemaError("untrusted custody table trigger")
+    if connection.execute(
+        "SELECT 1 FROM main.sqlite_master WHERE type='trigger' "
+        "AND tbl_name=? COLLATE NOCASE LIMIT 1", (table,),
+    ).fetchone() is not None:
+        raise CustodySchemaError("untrusted custody table trigger")
     info = connection.execute("PRAGMA main.table_xinfo(" + table + ")").fetchall()
     if (
         tuple(row[1] for row in info) != columns
