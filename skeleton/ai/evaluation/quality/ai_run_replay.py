@@ -16,6 +16,8 @@ from skeleton.quality.replay_evidence import ReplayTape
 
 SCHEMA_ID = "quality.ai_run_replay.v1"
 _PERF_KEYS = ("frame_ms", "alloc_bytes", "load_ms")
+_MAX_EVENTS = 10_000
+_RUN_FIELDS = frozenset({"schema", "run_id", "seed", "tick_ms", "events", "perf", "budgets", "digest"})
 
 
 class AiRunReplayError(ValueError):
@@ -23,15 +25,20 @@ class AiRunReplayError(ValueError):
 
 
 def _digest(value: Any) -> str:
-    return hashlib.sha256(
-        json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode()
-    ).hexdigest()
+    try:
+        encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+    except (TypeError, ValueError, OverflowError, RecursionError) as exc:
+        raise AiRunReplayError("run is not canonically serializable") from exc
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _non_negative(value: object, name: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise AiRunReplayError(f"{name} must be a number")
-    number = float(value)
+    try:
+        number = float(value)
+    except OverflowError as exc:
+        raise AiRunReplayError(f"{name} is outside the numeric range") from exc
     if not math.isfinite(number) or number < 0:
         raise AiRunReplayError(f"{name} must be finite and non-negative")
     return number
@@ -50,6 +57,8 @@ class PerfBudgets:
     def from_mapping(cls, payload: Mapping[str, Any] | None) -> "PerfBudgets":
         if payload is None:
             return cls()
+        if not isinstance(payload, Mapping) or any(not isinstance(k, str) for k in payload):
+            raise AiRunReplayError("performance fields must be an object with string keys")
         unknown = set(payload) - set(_PERF_KEYS)
         if unknown:
             raise AiRunReplayError(f"unknown perf budget keys: {sorted(unknown)}")
@@ -69,13 +78,15 @@ class PerfObservation:
     def from_mapping(cls, payload: Mapping[str, Any] | None) -> "PerfObservation":
         if payload is None:
             return cls()
+        if not isinstance(payload, Mapping) or any(not isinstance(k, str) for k in payload):
+            raise AiRunReplayError("performance fields must be an object with string keys")
         unknown = set(payload) - set(_PERF_KEYS)
         if unknown:
             raise AiRunReplayError(f"unknown perf observation keys: {sorted(unknown)}")
         out: dict[str, tuple[float, ...]] = {}
         for key in _PERF_KEYS:
             values = payload.get(key, ())
-            if not isinstance(values, (list, tuple)):
+            if not isinstance(values, (list, tuple)) or len(values) > _MAX_EVENTS:
                 raise AiRunReplayError(f"{key} must be a list")
             out[key] = tuple(_non_negative(v, key) for v in values)
         return cls(**out)
@@ -113,10 +124,12 @@ class AiRunRecorder:
     load_ms: list[float] = field(default_factory=list)
 
     def record(self, kind: str, payload: Mapping[str, Any]) -> Any:
-        if not kind:
+        if not isinstance(kind, str) or not kind:
             raise AiRunReplayError("event kind required")
+        if "t_ms" in payload or len(self.tape.events) >= _MAX_EVENTS:
+            raise AiRunReplayError("reserved timestamp or event bound exceeded")
         self.clock.advance()
-        return self.tape.append(kind, {"t_ms": round(self.clock.now_ms(), 3), **dict(payload)})
+        return self.tape.append(kind, {**dict(payload), "t_ms": round(self.clock.now_ms(), 3)})
 
     def observe(self, *, frame_ms: float | None = None, alloc_bytes: float | None = None, load_ms: float | None = None) -> None:
         if frame_ms is not None:
@@ -145,16 +158,41 @@ class AiRunRecorder:
 def load_ai_run(document: Mapping[str, Any]) -> tuple[Any, PerfObservation, PerfBudgets]:
     if not isinstance(document, Mapping):
         raise AiRunReplayError("ai run must be an object")
-    if document.get("schema") != SCHEMA_ID:
-        raise AiRunReplayError("unsupported ai run schema")
+    if document.get("schema") != SCHEMA_ID or set(document) != _RUN_FIELDS:
+        raise AiRunReplayError("unsupported or incomplete ai run schema")
+    run_id, seed, tick = document["run_id"], document["seed"], document["tick_ms"]
+    if not isinstance(run_id, str) or not 1 <= len(run_id) <= 128:
+        raise AiRunReplayError("invalid run identity")
+    if type(seed) is not int or not 0 <= seed <= 2**32 - 1:
+        raise AiRunReplayError("invalid run seed")
+    tick = _non_negative(tick, "tick_ms")
+    events = document["events"]
+    if not isinstance(events, list) or not 1 <= len(events) <= _MAX_EVENTS:
+        raise AiRunReplayError("missing or unbounded replay events")
+    if not isinstance(document["perf"], Mapping) or not isinstance(document["budgets"], Mapping):
+        raise AiRunReplayError("performance evidence must be an object")
     body = {k: v for k, v in document.items() if k != "digest"}
-    if document.get("digest") != _digest(body):
+    if document["digest"] != _digest(body):
         raise AiRunReplayError("ai run digest mismatch")
     try:
-        tape = ReplayTape.from_events(document.get("events") or [])
-    except (ValueError, KeyError, TypeError) as exc:
-        raise AiRunReplayError(f"corrupt replay tape: {exc}") from exc
-    return tape, PerfObservation.from_mapping(document.get("perf")), PerfBudgets.from_mapping(document.get("budgets"))
+        clock = DeterministicClock(tick)
+        for index, event in enumerate(events):
+            if not isinstance(event, dict) or set(event) != {"sequence", "kind", "payload", "digest"}:
+                raise AiRunReplayError("invalid replay event shape")
+            if (type(event["sequence"]) is not int or event["sequence"] != index
+                    or not isinstance(event["kind"], str) or not event["kind"]
+                    or not isinstance(event["payload"], dict) or not isinstance(event["digest"], str)):
+                raise AiRunReplayError("invalid replay event identity")
+            clock.advance()
+            timestamp = _non_negative(event["payload"].get("t_ms"), "t_ms")
+            if timestamp != round(clock.now_ms(), 3):
+                raise AiRunReplayError("replay timestamp disagrees with deterministic clock")
+        tape = ReplayTape.from_events(events)
+    except AiRunReplayError:
+        raise
+    except (ValueError, KeyError, TypeError, OverflowError, RecursionError) as exc:
+        raise AiRunReplayError("corrupt replay tape") from exc
+    return tape, PerfObservation.from_mapping(document["perf"]), PerfBudgets.from_mapping(document["budgets"])
 
 
 def replay_ai_run(
@@ -168,6 +206,8 @@ def replay_ai_run(
         return {"schema": SCHEMA_ID, "verdict": "CORRUPT", "passed": False, "reasons": [str(exc)],
                 "divergence": None, "perf": None}
     reasons: list[str] = []
+    if any(baseline[key] != candidate[key] for key in ("run_id", "seed", "tick_ms")):
+        reasons.append("replay metadata mismatch")
     divergence = base_tape.divergence(cand_tape)
     if divergence is not None:
         reasons.append("ai run diverged")
