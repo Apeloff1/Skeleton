@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: native-report-custody-${{ github.event.pull_request.number }}
+  group: native-report-custody-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 jobs:

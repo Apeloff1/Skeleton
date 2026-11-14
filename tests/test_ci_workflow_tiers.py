@@ -117,6 +117,17 @@ class WorkflowTierTests(unittest.TestCase):
                 for issue in audit(root)
             ))
             source_workflow.write_text(source_original)
+            # A called workflow can be dispatched without a PR number.
+            # It must never collapse all runs into one cancellation group.
+            source_workflow.write_text(source_original.replace(
+                "github.event.pull_request.number || github.sha",
+                "github.event.pull_request.number", 1,
+            ))
+            self.assertTrue(any(
+                "consolidated source concurrency needs an immutable fallback" in issue
+                for issue in audit(root)
+            ))
+            source_workflow.write_text(source_original)
             readiness = root / ".github/workflows/merge-readiness.yml"
             readiness_original = readiness.read_text()
             required_call = "uses: ./.github/workflows/" + required_sources[0]
