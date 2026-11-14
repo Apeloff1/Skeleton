@@ -47,6 +47,12 @@ class OfflineNativeChatTests(unittest.TestCase):
         sid = self.product.create(system="Be precise.")
         first = self.product.turn(sid, "hello", self.config, request_id="turn-one")
         self.assertEqual(first.revision, 1)
+        # The storage receipt hashes the actual assistant text, not the
+        # internal native decoder/token trace digest.
+        from hashlib import sha256
+        self.assertEqual(
+            first.output_digest, sha256(first.text.encode("utf-8")).hexdigest()
+        )
         self.assertFalse(first.replayed)
         self.assertEqual(first.generated_tokens, 2)
         self.assertEqual(first.session_id, sid)

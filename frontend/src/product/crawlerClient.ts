@@ -3,6 +3,7 @@ import { API_BASE } from '../utils/apiBase';
 import api, { type ApiResult } from '../utils/apiClient';
 import { authHeaders, getAuthToken } from '../auth/gameforgeAuth';
 import { ChatClientError, chatApiError } from './chatErrors';
+import { canonicalPilotReceipt, pilotReceiptBody } from './crawlerPilotReceipt';
 
 export type CrawlerReadiness = { available: boolean; configured: boolean; code: string; message: string; action?: string | null; network_reachability_verified?: boolean; limits: Record<string, number>; capabilities: Record<string, boolean> };
 export type CrawlUsage = { requests: number; bytes: number; documents: number; failures: number; reserved_bytes?: number };
@@ -281,6 +282,20 @@ export type CrawlAtlasReviewTask = {
   source_id: string | null; priority: number; predecessors: string[];
   current_status: 'pending_human_review'; automatically_approvable: false;
 };
+export type CrawlPilotQualification = {
+  schema_version: 'skeleton.dragon.campaign_pilot_qualification.v1';
+  atlas_digest: string; snapshot_digest: string; source_policy_digest: string;
+  run_sequence: number; pilot_status: 'ready_for_human_review' | 'held_for_repair';
+  pilot_check_count: number;
+  checks: { code: string; status: 'qualified' | 'held'; next_action: string | null }[];
+  blocked_checks: string[]; operator_actions: string[];
+  external_release_checks: { code: string; status: 'not_qualified' }[];
+  source_only: true; read_only: true; human_review_required: true;
+  network_used: false; model_invoked: false; source_text_included: false;
+  training_authorized: false; publication_authorized: false; release_authorized: false;
+  release_status: 'held_until_independent_exact_head_and_device_evidence';
+  recheck_mongo_authority_before_any_followup: true; qualification_digest: string;
+};
 export type CrawlAtlasReport = {
   schema_version: 'skeleton.dragon.campaign_atlas_dashboard.v1';
   session_id: string; run_id: string; run_sequence: number;
@@ -530,6 +545,7 @@ export type CrawlAtlasReport = {
     }[];
     alerts: string[]; advisory_priority: number; decision: 'human_review_hold';
   };
+  pilot_qualification?: CrawlPilotQualification;
   read_only: true; network_executed: false;
   publication_granted: false; training_permission: false; review_required: true;
 };
@@ -584,6 +600,41 @@ function safeAtlasRequest(request: CrawlAtlasRequest): void {
       || request.review_budget_minutes < 1)) {
     throw new ChatClientError('Choose a finite human-review time budget.', { kind: 'validation', retryable: false });
   }
+}
+function checkedPilotQualification(value: CrawlPilotQualification, atlas: CrawlAtlasReport): boolean {
+  if (!value || value.schema_version !== 'skeleton.dragon.campaign_pilot_qualification.v1'
+    || value.atlas_digest !== atlas.atlas_digest
+    || value.snapshot_digest !== atlas.snapshot_digest
+    || value.source_policy_digest !== atlas.source_policy.digest
+    || value.run_sequence !== atlas.run_sequence
+    || !HASH.test(value.qualification_digest)
+    || value.pilot_check_count !== 10
+    || !Array.isArray(value.checks) || value.checks.length !== 10
+    || !Array.isArray(value.blocked_checks) || value.blocked_checks.length > 10
+    || !Array.isArray(value.operator_actions) || value.operator_actions.length > 10
+    || !Array.isArray(value.external_release_checks) || value.external_release_checks.length !== 10
+    || !value.external_release_checks.every(item =>
+      item && /^[a-z0-9_]{3,90}$/.test(item.code) && item.status === 'not_qualified')
+    || !value.checks.every(item =>
+      item && /^[a-z0-9_]{3,90}$/.test(item.code)
+      && (item.status === 'qualified' && item.next_action === null
+        || item.status === 'held' && typeof item.next_action === 'string'
+        && /^[a-z0-9_]{3,90}$/.test(item.next_action)))
+    || new Set(value.checks.map(item => item.code)).size !== 10
+    || value.blocked_checks.join('|')
+      !== value.checks.filter(item => item.status === 'held').map(item => item.code).join('|')
+    || value.operator_actions.join('|')
+      !== value.checks.filter(item => item.status === 'held').map(item => item.next_action).join('|')
+    || value.pilot_status !== (value.blocked_checks.length ? 'held_for_repair' : 'ready_for_human_review')
+    || value.source_only !== true || value.read_only !== true
+    || value.human_review_required !== true || value.network_used !== false
+    || value.model_invoked !== false || value.source_text_included !== false
+    || value.training_authorized !== false || value.publication_authorized !== false
+    || value.release_authorized !== false
+    || value.release_status !== 'held_until_independent_exact_head_and_device_evidence'
+    || value.recheck_mongo_authority_before_any_followup !== true
+    || JSON.stringify(value).length > 16000) return false;
+  return true;
 }
 function checkedAtlasReport(value: CrawlAtlasReport, sessionId: string, requestedMode: CrawlAtlasRequest['retrieval_mode']): CrawlAtlasReport {
   if (!value || value.schema_version !== 'skeleton.dragon.campaign_atlas_dashboard.v1'
@@ -849,6 +900,7 @@ function checkedAtlasReport(value: CrawlAtlasReport, sessionId: string, requeste
       || value.dispatch_recovery.uncertain_bytes_refunded !== false
       || value.scorecard?.decision !== 'human_review_hold'
       || !Array.isArray(value.scorecard.alerts) || value.scorecard.alerts.length > 256
+      || value.pilot_qualification !== undefined && !checkedPilotQualification(value.pilot_qualification, value)
       || value.read_only !== true || value.network_executed !== false
       || value.publication_granted !== false || value.training_permission !== false
       || value.review_required !== true || JSON.stringify(value).length > 512 * 1024) {
@@ -871,5 +923,22 @@ export async function getCrawlAtlas(
   if (signal?.aborted || previousToken !== getAuthToken()) {
     throw new ChatClientError('The research inspection was detached or your account changed.', { kind: 'authorization', retryable: false });
   }
-  return checkedAtlasReport(payload.report, id, request.retrieval_mode);
+  const report = checkedAtlasReport(payload.report, id, request.retrieval_mode);
+  if (report.pilot_qualification) {
+    // Both the status envelope and this exact-byte digest are source-only:
+    // neither is a substitute for the backend's authenticated Mongo re-read.
+    const receipt = report.pilot_qualification;
+    let canonical: string;
+    try { canonical = canonicalPilotReceipt(pilotReceiptBody(receipt)); }
+    catch { invalid('Pilot receipt has an invalid canonical payload.'); }
+    const observed = await digestStringAsync(CryptoDigestAlgorithm.SHA256, canonical);
+    if (signal?.aborted || previousToken !== getAuthToken()) {
+      throw new ChatClientError('The pilot receipt was detached from your session.',
+        { kind: 'authorization', retryable: false });
+    }
+    if (observed !== receipt.qualification_digest) {
+      invalid('The exact Dragon pilot qualification receipt did not verify.');
+    }
+  }
+  return report;
 }

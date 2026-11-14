@@ -44,6 +44,44 @@ def grounded_request_digest(plain_digest: str) -> str:
     )).hexdigest()
 
 
+def normalized_document_scope(value: object) -> tuple[str, ...] | None:
+    """Canonical, finite model-scoped source selection. None keeps legacy search.
+
+    The requested IDs are *not* a rights grant. OfflineKnowledgeLibrary
+    independently verifies the documents still exist in this exact model's
+    local, SHA-checked SQLite source index before searching.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, (list, tuple)) or not 1 <= len(value) <= 8:
+        raise RuntimeContractError("grounded document scope must contain 1–8 source IDs")
+    if any(type(item) is not str or
+           re.fullmatch(r"[A-Za-z0-9_-]{8,100}", item) is None
+           for item in value):
+        raise RuntimeContractError("grounded document scope has invalid source IDs")
+    if len(set(value)) != len(value):
+        raise RuntimeContractError("grounded document scope has duplicate sources")
+    return tuple(sorted(value))
+
+
+def scoped_grounded_request_digest(base_digest: str,
+                                  document_ids: tuple[str, ...] | None) -> str:
+    """Bind an explicit local document restriction into durable idempotency.
+
+    Omitted scope preserves existing historical digest/replay compatibility.
+    Incompatible document selections under one request ID are always a
+    conflict, not an excuse to return a different model context.
+    """
+    if not isinstance(base_digest, str) or re.fullmatch(r"[0-9a-f]{64}", base_digest) is None:
+        raise RuntimeContractError("invalid grounded request identity")
+    normalized = normalized_document_scope(document_ids)
+    if normalized is None:
+        return base_digest
+    payload = json.dumps(normalized, ensure_ascii=True, separators=(",", ":"))
+    return sha256(("skeleton.offline-grounded-scope.v1:" +
+                   base_digest + ":" + payload).encode("ascii")).hexdigest()
+
+
 def _citation(hit: dict[str, Any]) -> dict[str, Any]:
     allowed = {"document_id", "title", "document_sha256", "chunk_index",
                "char_start", "char_end", "passage", "score", "citation"}

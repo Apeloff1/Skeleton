@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "known_fraction_02",
+  "category": "known_fraction",
+  "overrides": {
+    "minimum_known_fraction_ppm": 100
+  },
+  "expected": "allowed",
+  "reason": "Explicit original-data known_fraction permission remains candidate-only"
+}

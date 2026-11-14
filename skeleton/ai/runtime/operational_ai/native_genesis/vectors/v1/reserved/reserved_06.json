@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "reserved_06",
+  "category": "reserved",
+  "overrides": {
+    "seed": 47
+  },
+  "expected": "allowed",
+  "reason": "Accept explicit reserved configuration with bounded candidate semantics"
+}

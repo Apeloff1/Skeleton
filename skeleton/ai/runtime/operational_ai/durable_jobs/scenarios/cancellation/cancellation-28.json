@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "cancellation-28",
+  "domain": "cancellation",
+  "phase": "native-job-execution",
+  "category": "adversarial-denial",
+  "threat": "Principal-bound cancellation is stable even after outstanding native lease and retry 28",
+  "trust_boundary": "Durable claim, authoritative native inference and terminal state must remain source-bound",
+  "input": {
+    "variant": 27,
+    "claimed": true,
+    "owner": "other",
+    "now_ms": 0,
+    "repeat": false
+  },
+  "expected_allow": false,
+  "acceptance": "Execute actual JobStore claim/heartbeat/finish/cancel/failure/sweep methods under fresh test SQLite",
+  "no_hosted_fallback": true,
+  "never_blindly_retry_ambiguous_inference": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

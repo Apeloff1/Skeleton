@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "json_key_03",
+  "domain": "json_key",
+  "ordinal": 3,
+  "arguments": {
+    "index": 3,
+    "a": 121,
+    "b": 5,
+    "word": "quartz",
+    "city": "Tromso"
+  },
+  "prompt": "Task 3: Read JSON {\"count\":121,\"kind\":\"quartz\"}. Output only the kind field.",
+  "expected": "quartz",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

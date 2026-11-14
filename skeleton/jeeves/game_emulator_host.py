@@ -2179,7 +2179,12 @@ class EmulatorEnvironment:
             raise EmulatorHostError("native_state_corrupt", "Native state binary identity differs")
         if hashlib.sha256(pixels).hexdigest() != frame["pixel_sha256"]:
             raise EmulatorHostError("native_state_corrupt", "Restored frame checksum differs")
-        if len(audio) != audio_size or hashlib.sha256(audio).hexdigest() != _sha(snapshot["audio_sha256"]):
+        if (
+            len(audio) != audio_size
+            or hashlib.sha256(audio).hexdigest() != _sha(snapshot["audio_sha256"])
+            or frame["audio_frames"] * 4 != audio_size
+            or frame["audio_sha256"] != snapshot["audio_sha256"]
+        ):
             raise EmulatorHostError("native_state_corrupt", "Restored prior audio checksum differs")
         restore_metadata = {
             "controls": controls,
@@ -2219,6 +2224,8 @@ class EmulatorEnvironment:
         # This is host telemetry history, not libretro core state. Restoring
         # it makes the NEXT native step's audio-onset/energy delta exact.
         self._audio = audio
+        # This describes the verified historical frame, not newly emitted PCM.
+        self._frame = dict(frame)
         observation = snapshot["observation"]
         if (
             not isinstance(observation, Mapping)

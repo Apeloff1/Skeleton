@@ -1,0 +1,31 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "summarization_01",
+  "domain": "summarization",
+  "severity": "high",
+  "objective": "Measure cross-language and evidence-preserving synthesis on original summarization task 1",
+  "steps": [
+    {
+      "prompt": "Summarize this source in 40 words or fewer. Preserve the project name and the launch city exactly, and never invent external facts:\nOriginal fictional project note. Project Orion launched in Oslo during 2015. Its pilot used 20 devices. The team measured temperature once a day. No public source is implied.",
+      "checks": [
+        {
+          "kind": "contains",
+          "expected": "Orion"
+        },
+        {
+          "kind": "contains",
+          "expected": "Oslo"
+        },
+        {
+          "kind": "max_words",
+          "expected": 40
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

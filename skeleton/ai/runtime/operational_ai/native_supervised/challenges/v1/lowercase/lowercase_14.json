@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "lowercase_14",
+  "domain": "lowercase",
+  "ordinal": 14,
+  "arguments": {
+    "index": 14,
+    "a": 198,
+    "b": 3,
+    "word": "harbor",
+    "city": "Bergen"
+  },
+  "prompt": "Task 14: Lowercase this identifier exactly: HARBOR_14.",
+  "expected": "harbor_14",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

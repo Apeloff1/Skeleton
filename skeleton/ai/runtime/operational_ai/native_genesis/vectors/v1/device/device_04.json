@@ -1,0 +1,11 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "device_04",
+  "category": "device",
+  "overrides": {
+    "device": "cpu",
+    "seed": 203
+  },
+  "expected": "allowed",
+  "reason": "Confirm explicit local CPU-only candidate device boundary"
+}

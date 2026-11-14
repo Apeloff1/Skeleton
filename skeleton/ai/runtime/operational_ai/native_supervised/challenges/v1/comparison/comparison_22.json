@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "comparison_22",
+  "domain": "comparison",
+  "ordinal": 22,
+  "arguments": {
+    "index": 22,
+    "a": 254,
+    "b": 11,
+    "word": "marble",
+    "city": "Halden"
+  },
+  "prompt": "Task 22: Is 254 greater than 243? Answer yes or no.",
+  "expected": "yes",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

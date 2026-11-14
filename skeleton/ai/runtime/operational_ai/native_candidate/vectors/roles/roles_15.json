@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-candidate.vector.v1",
+  "id": "roles_15",
+  "domain": "roles",
+  "objective": "Separate trainer, evaluator, rollback verifier and independent release identity 15",
+  "trust_boundary": "Training cannot invent its own independent authorization",
+  "input": {
+    "actors": [
+      "trainer_4",
+      "trainer_4",
+      "release_4",
+      "rollback_4"
+    ]
+  },
+  "expected_allow": false,
+  "expected_reason": "authority_collision_or_invalid_principal",
+  "model_qualified": false,
+  "release_certified": false
+}
