@@ -47,6 +47,7 @@ class ProtectedLocalComponents:
 def compose_protected_local_adapter(
     engine: LocalInferenceEngine, *, components: ProtectedLocalComponents,
     default_seed: int = 0, artifact_status: dict[str, object] | None = None,
+    activation_gate: Any | None = None,
 ) -> LocalModelAdapter:
     """Fail closed unless one protected engine has an attested native tokenizer.
 
@@ -77,7 +78,9 @@ def compose_protected_local_adapter(
         ),
         require_token_echo=True,
     )
-    service = CanonicalGuardedLocalService(guard, snapshots=components.snapshots)
+    service = CanonicalGuardedLocalService(
+        guard, snapshots=components.snapshots, activation_gate=activation_gate,
+    )
     return LocalModelAdapter(
         engine, default_seed=default_seed, artifact_status=artifact_status,
         guarded_service=service, require_guarded_inference=True,
