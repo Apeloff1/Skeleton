@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "whitespace_18",
+  "domain": "whitespace",
+  "ordinal": 18,
+  "arguments": {
+    "index": 18,
+    "a": 226,
+    "b": 7,
+    "word": "atlas",
+    "city": "Molde"
+  },
+  "prompt": "Task 18: Collapse repeated spaces in 'atlas   test     item18'.",
+  "expected": "atlas test item18",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

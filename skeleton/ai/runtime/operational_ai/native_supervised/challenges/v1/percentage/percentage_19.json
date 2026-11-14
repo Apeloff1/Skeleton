@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "percentage_19",
+  "domain": "percentage",
+  "ordinal": 19,
+  "arguments": {
+    "index": 19,
+    "a": 233,
+    "b": 8,
+    "word": "cedar",
+    "city": "Oslo"
+  },
+  "prompt": "Task 19: Compute 20 percent of 2330. Integer only.",
+  "expected": "466",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

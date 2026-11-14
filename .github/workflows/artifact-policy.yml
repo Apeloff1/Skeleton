@@ -20,7 +20,10 @@ permissions:
 
 jobs:
   validate:
-    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
+    # Review-only PR #5281 may gather source evidence while draft, without any
+    # merge/deployment privileges. Reject forks and every other draft PR.
+    # The full original malware/artifact checks remain mandatory.
+    if: github.event_name != 'pull_request' || ((!github.event.pull_request.draft || (github.event.pull_request.number == 5281 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/dragon-research-pilot-qualification-20261112')) && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Artifact placement and provenance
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -31,9 +34,14 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.11.16"
+      - name: Confirm checked-out exact source head
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
       - name: Compile policy gate
         run: python -m compileall -q scripts/check_artifact_policy.py scripts/artifact_reference.py tests/test_artifact_policy.py tests/test_artifact_reference.py
       - name: Run policy regressions

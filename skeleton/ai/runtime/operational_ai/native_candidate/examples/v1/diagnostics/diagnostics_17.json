@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "diagnostics_17",
+  "domain": "diagnostics",
+  "prompt": "Classify synthetic AI diagnostic 116: code budget_exceeded. Output exactly ready or blocked.",
+  "completion": "blocked",
+  "group_id": "diagnostics_17",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

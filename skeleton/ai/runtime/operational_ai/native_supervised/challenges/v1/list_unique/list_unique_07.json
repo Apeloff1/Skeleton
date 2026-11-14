@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "list_unique_07",
+  "domain": "list_unique",
+  "ordinal": 7,
+  "arguments": {
+    "index": 7,
+    "a": 149,
+    "b": 9,
+    "word": "cedar",
+    "city": "Oslo"
+  },
+  "prompt": "Task 7: Deduplicate labels preserving first appearance: cedar,cedar,cyan,cyan,item7.",
+  "expected": "cedar,cyan,item7",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

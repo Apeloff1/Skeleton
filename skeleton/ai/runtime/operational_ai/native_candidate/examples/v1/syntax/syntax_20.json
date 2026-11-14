@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "syntax_20",
+  "domain": "syntax",
+  "prompt": "Normalize this fictional identifier by replacing spaces with underscores and lowercasing: AMBER Service 20.",
+  "completion": "amber_service_20",
+  "group_id": "syntax_20",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

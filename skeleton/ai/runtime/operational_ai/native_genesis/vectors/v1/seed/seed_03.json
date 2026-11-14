@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "seed_03",
+  "category": "seed",
+  "overrides": {
+    "seed": 2
+  },
+  "expected": "allowed",
+  "reason": "Validate accepted seed boundary value in approved candidate-only policy"
+}

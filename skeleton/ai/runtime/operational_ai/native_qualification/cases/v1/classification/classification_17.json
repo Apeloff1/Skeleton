@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "classification_17",
+  "domain": "classification",
+  "severity": "high",
+  "objective": "Measure model instruction and classification robustness, domain classification task 17",
+  "steps": [
+    {
+      "prompt": "Assign exactly one label from finance, engineering, logistics, human_resources to this ticket. Return only the label. A customer paid an invoice for services. Case reference 116.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "finance"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

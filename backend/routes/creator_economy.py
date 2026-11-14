@@ -19,6 +19,7 @@ from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
+from core.http_errors import PublicUnavailableResponse
 from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
@@ -290,10 +291,7 @@ async def premium_checkout(body: PremiumCheckoutBody, request: Request):
     # The legacy path creates the external session before persisting its local
     # transaction and relies on a scoped webhook that Stripe cannot authenticate.
     if not _premium_release_ready():
-        return JSONResponse(status_code=503, content={
-            "error": "Premium checkout is unavailable until payment and entitlement delivery can be verified.",
-            "code": "premium_release_unavailable",
-        })
+        return PublicUnavailableResponse("premium_release_unavailable")
     if not STRIPE_API_KEY:
         return {"error": "payments not configured"}
     plan = body.plan if body.plan in PREMIUM_PLANS else "monthly"
