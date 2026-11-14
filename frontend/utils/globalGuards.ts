@@ -1,4 +1,3 @@
-import { API_BASE as CANONICAL_API_BASE } from './apiBase';
 /**
  * globalGuards — JS-runtime safety nets installed once at app boot.
  *
@@ -17,8 +16,8 @@ import { API_BASE as CANONICAL_API_BASE } from './apiBase';
 import { traceStep } from './bootTracer';
 import { getSessionId } from './modalLogger';
 import { crashTelemetryFields } from './safeError';
+import { postCrashReport } from './crashTelemetry';
 
-const BACKEND = CANONICAL_API_BASE;
 let _installed = false;
 const _seenHashes = new Set<string>();
 const _MAX_SEEN = 50;
@@ -36,18 +35,14 @@ function postCrash(source: string, error: any, isFatal: boolean) {
       arr.forEach(h => _seenHashes.add(h));
     }
     traceStep(`crash:${source}:${fields.message.slice(0, 80)}`).catch(() => {});
-    fetch(`${BACKEND}/api/telemetry/last-crash`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    postCrashReport({
         source,
         component:  source,
         message:    fields.message,
         stack:      fields.stack,
         info:       { fatal: isFatal },
         session_id: getSessionId(),
-      }),
-    }).catch(() => {});
+      });
   } catch { /* never let the guard itself crash */ }
 }
 

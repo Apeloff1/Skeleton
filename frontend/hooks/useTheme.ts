@@ -7,8 +7,12 @@ import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { themes, ThemeColors, ThemeType } from '../constants/themes';
 import { STORAGE_KEYS } from '../constants/config';
+import { useActiveSkin } from '../src/utils/skinStore';
 
 export const useTheme = () => {
+  // Re-render when a skin changes so the legacy mode hook does not use a
+  // stale snapshot of the canonical dark-mode palette.
+  useActiveSkin();
   const [theme, setThemeState] = useState<ThemeType>('dark');
   const [isLoading, setIsLoading] = useState(true);
 

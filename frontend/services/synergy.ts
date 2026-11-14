@@ -7,6 +7,34 @@ import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
  */
 
 const API_BASE = CANONICAL_API_BASE;
+const SESSION_API_TIMEOUT_MS = 12_000;
+
+/**
+ * Timeout spans both headers and JSON body consumption. Returning a raw
+ * Response before parsing would clear the timer too early and allow a
+ * stalled body to keep an ordered session progress queue alive indefinitely.
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+): Promise<{ ok: boolean; status: number; json: () => Promise<any> }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SESSION_API_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    if (!response.ok) {
+      return { ok: false, status: response.status, json: async () => null };
+    }
+    const declaredLength = Number(response.headers?.get?.('content-length'));
+    if (Number.isFinite(declaredLength) && declaredLength > 512 * 1024) {
+      throw new Error('Synergy response exceeds JSON budget');
+    }
+    const parsed = await response.json();
+    return { ok: true, status: response.status, json: async () => parsed };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 export interface UserContext {
   user_id: string;
@@ -85,7 +113,7 @@ class SynergyService {
     includeInsights = true
   ): Promise<UserContext> {
     try {
-      const response = await fetch(`${this.baseUrl}/context`, {
+      const response = await fetchWithTimeout(`${this.baseUrl}/context`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -124,7 +152,7 @@ class SynergyService {
     sessionType: 'reading' | 'quiz' | 'practice' = 'reading'
   ): Promise<SessionStartResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/session/start`, {
+      const response = await fetchWithTimeout(`${this.baseUrl}/session/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -163,7 +191,7 @@ class SynergyService {
     emotionalState?: string
   ): Promise<{ progress_updated: boolean; xp_earned: number; new_achievements: any[] }> {
     try {
-      const response = await fetch(`${this.baseUrl}/session/update`, {
+      const response = await fetchWithTimeout(`${this.baseUrl}/session/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -198,7 +226,7 @@ class SynergyService {
     satisfactionRating?: number
   ): Promise<{ logged: boolean; interaction_id?: string }> {
     try {
-      const res = await fetch(`${this.baseUrl}/ai/log`, {
+      const res = await fetchWithTimeout(`${this.baseUrl}/ai/log`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -227,7 +255,7 @@ class SynergyService {
    */
   async getDashboard(userId: string, timeRangeDays = 7): Promise<DashboardData> {
     try {
-      const response = await fetch(`${this.baseUrl}/dashboard`, {
+      const response = await fetchWithTimeout(`${this.baseUrl}/dashboard`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

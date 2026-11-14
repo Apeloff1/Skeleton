@@ -5,8 +5,8 @@ import { workbenchStore } from './store';
 import {
   commitChatTasks, extractChatTaskTitles,
   prepareChatTasks, undoChatTasks,
-} from './chatTaskActions';
-import type { ChatTaskPlan } from './chatTaskActions';
+} from './chatTaskAdapter';
+import type { ChatTaskPlan } from './chatTaskAdapter';
 import { Action, Editor, palette, styles } from './ui';
 
 /** Workbench tasks are only applied on explicit user confirmation. */

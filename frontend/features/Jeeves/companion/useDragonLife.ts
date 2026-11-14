@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Animated,AppState,Easing} from 'react-native';
-import type {DragonCompanionState} from './dragonCompanion';
+import type {DragonCompanionState} from './dragonCompanionState';
 import type {CompanionMotion} from './dragonPreferences';
 import {directDragon} from './dragonChoreography';
 import {DRAGON_POSES} from './dragonGesturePoses';

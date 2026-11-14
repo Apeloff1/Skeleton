@@ -13,6 +13,8 @@ import type { ConversationMessage, ConversationThread } from '../../src/product/
 import { attachmentCapabilities, CHAT_ATTACHMENT_MIMES, deleteChatAttachment, readPickedAttachment, uploadChatAttachment } from './chatFiles';
 import MessageContent from './MessageContent';
 import JeevesRuntimeStatus from './JeevesRuntimeStatus';
+import { MAX_CONTEXT } from './workspace';
+import { getJeevesRequestContext } from '../../state/settingsStore';
 import ChatTaskActions from './workbench/ChatTaskActions';
 import ChatSceneActions from './ChatSceneActions';
 import ChatStoryActions from './ChatStoryActions';
@@ -306,6 +308,13 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
 
   const send = async () => {
     if (!canSend || sending.current) return;
+    let preferenceContext: string;
+    try {
+      preferenceContext = getJeevesRequestContext('', MAX_CONTEXT);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Jeeves preferences exceed the request context bound.');
+      return; // Keep the draft and attachments intact.
+    }
     sending.current = true;
     const sendingAccount = getAuthToken();
     const text = draft.trim();
@@ -314,7 +323,10 @@ export default function ChatWorkspace({ initialThreadId }: ChatWorkspaceProps = 
     setDrafts(current => ({ ...current, [origin]: '' }));
     nearBottom.current = true; setNewBelow(false);
     try {
-      await controller.send(text, { attachmentRefs: attachments });
+      await controller.send(text, {
+        attachmentRefs: attachments,
+        ...(preferenceContext ? { context: preferenceContext } : {}),
+      });
       const next = controller.getSnapshot();
       if (next.pending?.accepted || next.status === 'idle') setFiles(current => ({ ...current, [origin]: [] }));
       else if (next.error && !next.pending?.accepted && sendingAccount === getAuthToken()) setDrafts(current => current[origin] ? current : { ...current, [origin]: text });

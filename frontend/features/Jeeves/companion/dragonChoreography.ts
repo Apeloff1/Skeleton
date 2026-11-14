@@ -5,7 +5,7 @@
  * phases (120 moments). All variation is deterministic in local UI time;
  * authoritative crawler state continues to own progress, approval and labels.
  */
-import type {CompanionPhase, DragonCompanionState} from './dragonCompanion';
+import type {CompanionPhase, DragonCompanionState} from './dragonCompanionState';
 import type {CompanionMotion} from './dragonPreferences';
 
 export type DragonGesture =

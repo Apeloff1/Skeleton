@@ -12,7 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { safeGetItem, safeSetItem } from '../utils/safeStorage';
 import { traceStep, traceStepSync } from '../utils/bootTracer';
-import { readBootCache } from '../src/boot';
+import { readLaunchAttempt, writeLaunchAttempt, MAX_LAUNCH_LAYER } from '../src/boot/recoveryPolicy';
 import {
   accessibleButtonProps,
   accessibleStatusProps,
@@ -21,9 +21,7 @@ import { useI18n } from '../src/i18n';
 
 const ATTEMPT_KEY = '@launcher/attempt:v1';
 const WELCOME_FLAG_KEY = '@codedock:welcome_seen:v1';
-const MAX_LAYER = 3;
-const LAYER_TIMEOUT_MS = 3500;
-const ATTEMPT_AGE_OUT_MS = 60 * 60 * 1000;
+const MAX_LAYER = MAX_LAUNCH_LAYER;
 
 interface BoundaryProps { onError: (e: Error) => void; children: React.ReactNode }
 class LayerBoundary extends React.Component<BoundaryProps, { errored: boolean }> {
@@ -148,13 +146,13 @@ export default function LaunchCascade() {
   const [layer, setLayer] = React.useState<number>(0);
   const [ready, setReady] = React.useState(false);
   const escalateLockRef = React.useRef(false);
-  const watchdogRef = React.useRef<any>(null);
   const tracedLayerRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     (async () => {
       try {
-        await traceStep('cascade_mounted');
+        // A stuck trace write must never prevent the recovery UI from mounting.
+        void traceStep('cascade_mounted').catch(() => {});
         let urlOverride: number | null = null;
         try {
           if (typeof window !== 'undefined' && window.location?.search) {
@@ -169,24 +167,15 @@ export default function LaunchCascade() {
         } catch {}
 
         const raw = await safeGetItem(ATTEMPT_KEY, '0', 400);
-        let persisted = Math.min(MAX_LAYER, Math.max(0, parseInt(raw || '0', 10) || 0));
-        if (persisted > 0) {
-          try {
-            const cache = await readBootCache();
-            if (cache && (Date.now() - cache.ts) < ATTEMPT_AGE_OUT_MS) {
-              await traceStep(`cascade_attempt_aged_out_from_${persisted}`);
-              await safeSetItem(ATTEMPT_KEY, '0');
-              persisted = 0;
-            }
-          } catch {}
-        }
-
+        // Expire fallbacks from the actual escalation timestamp. A recent
+        // success cache must not erase a crash recovery decision.
+        const persisted = readLaunchAttempt(raw);
         const start = urlOverride !== null ? urlOverride : persisted;
         if (urlOverride !== null) {
-          await safeSetItem(ATTEMPT_KEY, String(urlOverride));
+          await safeSetItem(ATTEMPT_KEY, writeLaunchAttempt(urlOverride));
         }
         setLayer(start);
-        await traceStep(`cascade_layer_${start}`);
+        void traceStep(`cascade_layer_${start}`).catch(() => {});
       } catch {
         setLayer(0);
       } finally {
@@ -195,52 +184,45 @@ export default function LaunchCascade() {
     })();
   }, [router]);
 
-  React.useEffect(() => {
-    if (!ready || layer === 0 || layer >= MAX_LAYER) return;
-    if (watchdogRef.current) clearTimeout(watchdogRef.current);
-    watchdogRef.current = setTimeout(() => {
-      escalate(`watchdog_layer_${layer}`);
-    }, LAYER_TIMEOUT_MS);
-    return () => {
-      if (watchdogRef.current) clearTimeout(watchdogRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layer, ready]);
+  // Static recovery layers are user-controlled. Never time out a person
+  // reading diagnostics or deciding whether to enter safe mode. Layer 0
+  // already owns a phase-0 watchdog in BootLauncher.
 
   // Keep the crash breadcrumb, but record it once per layer transition instead
   // of writing the complete trace to AsyncStorage on every React render.
   React.useEffect(() => {
     if (!ready || tracedLayerRef.current === layer) return;
+    const isHydration = tracedLayerRef.current === null;
     tracedLayerRef.current = layer;
     traceStepSync(`cascade_render_layer_${layer}`);
+    // Do not refresh the receipt's expiration on every relaunch: only an
+    // actual layer transition constitutes a new recovery attempt.
+    if (!isHydration) void safeSetItem(ATTEMPT_KEY, writeLaunchAttempt(layer)).catch(() => {});
   }, [layer, ready]);
 
   const escalate = React.useCallback((reason: string) => {
     if (escalateLockRef.current) return;
     escalateLockRef.current = true;
     setTimeout(() => { escalateLockRef.current = false; }, 200);
-    setLayer(prev => {
-      const next = Math.min(MAX_LAYER, prev + 1);
-      traceStep(`cascade_escalate_${prev}_to_${next}_${reason}`).catch(() => {});
-      safeSetItem(ATTEMPT_KEY, String(next)).catch(() => {});
-      return next;
-    });
+    traceStep(`cascade_escalate_${reason}`).catch(() => {});
+    setLayer(prev => Math.min(MAX_LAYER, prev + 1));
   }, []);
 
   const enterProduct = React.useCallback(async () => {
-    try { await safeSetItem(WELCOME_FLAG_KEY, '1'); } catch {}
-    try { await safeSetItem(ATTEMPT_KEY, '0'); } catch {}
-    await traceStep('cascade_enter_product');
+    // Storage persistence may be slow; it must not hold the navigation hostage.
+    void safeSetItem(WELCOME_FLAG_KEY, '1').catch(() => {});
+    void safeSetItem(ATTEMPT_KEY, '0').catch(() => {});
+    void traceStep('cascade_enter_product').catch(() => {});
     router.replace('/product');
   }, [router]);
 
   const goSafeMode = React.useCallback(async () => {
-    await traceStep('cascade_go_safe_mode');
+    void traceStep('cascade_go_safe_mode').catch(() => {});
     router.replace('/safe-mode');
   }, [router]);
 
   const retryFromTop = React.useCallback(async () => {
-    try { await safeSetItem(ATTEMPT_KEY, '0'); } catch {}
+    void safeSetItem(ATTEMPT_KEY, '0').catch(() => {});
     setLayer(0);
   }, []);
 

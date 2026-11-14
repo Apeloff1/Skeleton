@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { AppState, AppStateStatus, Platform } from 'react-native';
+import { AppState, type AppStateStatus, Platform } from 'react-native';
 import {
   getThermalGuard,
   ThermalGuard,
@@ -74,43 +74,60 @@ export function useThermalGuard(): ThermalGuardHook {
     return unsubscribe;
   }, [guard]);
 
-  // Battery integration — only on native (expo-battery crashes on web)
+  // Battery integration — native only; updates must preserve the last
+  // observed level AND charging state rather than inventing either value.
   useEffect(() => {
     if (Platform.OS === 'web') return;
 
-    let battSub: any = null;
-    let chargeSub: any = null;
+    let disposed = false;
+    let battSub: { remove: () => void } | null = null;
+    let chargeSub: { remove: () => void } | null = null;
+    const reading = { level: 1, charging: false };
 
     const init = async () => {
       try {
         const BatteryModule = require('expo-battery');
-        const level = await BatteryModule.getBatteryLevelAsync();
-        const state = await BatteryModule.getBatteryStateAsync();
-        const charging = state === BatteryModule.BatteryState.CHARGING || state === BatteryModule.BatteryState.FULL;
-        guard.setBattery(level, charging);
+        const [level, state] = await Promise.all([
+          BatteryModule.getBatteryLevelAsync(),
+          BatteryModule.getBatteryStateAsync(),
+        ]);
+        if (disposed) return;
+        if (Number.isFinite(level) && level >= 0 && level <= 1) reading.level = level;
+        reading.charging = state === BatteryModule.BatteryState.CHARGING ||
+          state === BatteryModule.BatteryState.FULL;
+        guard.setBattery(reading.level, reading.charging);
 
-        battSub = BatteryModule.addBatteryLevelListener(({ batteryLevel }: any) => {
-          guard.setBattery(batteryLevel, false);
+        if (disposed) return;
+        battSub = BatteryModule.addBatteryLevelListener(({ batteryLevel }: { batteryLevel: number }) => {
+          if (disposed || !Number.isFinite(batteryLevel) || batteryLevel < 0 || batteryLevel > 1) return;
+          reading.level = batteryLevel;
+          guard.setBattery(reading.level, reading.charging);
         });
-
-        chargeSub = BatteryModule.addBatteryStateListener(({ batteryState }: any) => {
-          const isCharging = batteryState === BatteryModule.BatteryState.CHARGING || batteryState === BatteryModule.BatteryState.FULL;
-          guard.setBattery(0.5, isCharging);
+        chargeSub = BatteryModule.addBatteryStateListener(({ batteryState }: { batteryState: number }) => {
+          if (disposed) return;
+          reading.charging = batteryState === BatteryModule.BatteryState.CHARGING ||
+            batteryState === BatteryModule.BatteryState.FULL;
+          guard.setBattery(reading.level, reading.charging);
         });
       } catch {
-        // Battery API not available (simulator or missing module)
+        battSub?.remove();
+        chargeSub?.remove();
+        battSub = null;
+        chargeSub = null;
       }
     };
 
-    init();
+    void init();
     return () => {
+      disposed = true;
       battSub?.remove();
       chargeSub?.remove();
     };
   }, [guard]);
 
-  // App state (foreground/background)
+  // Honor the actual initial background state, not only subsequent changes.
   useEffect(() => {
+    guard.setAppBackground(AppState.currentState !== 'active');
     const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
       guard.setAppBackground(next !== 'active');
     });

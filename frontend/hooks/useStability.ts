@@ -1,11 +1,11 @@
 /**
- * Stability Layer Hook v11.4
- * Error boundaries, crash recovery, and graceful degradation
+ * Recovery state for transient UI failures.
+ * A single recovery may run per mounted hook; repeated failures are bounded
+ * without depending on a stale React render closure.
  */
-
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Alert, Platform } from 'react-native';
-import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
+import { Alert } from 'react-native';
+import NetInfo, { type NetInfoState } from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface StabilityState {
@@ -19,6 +19,11 @@ interface StabilityState {
 
 const RECOVERY_KEY = '@codedock_recovery_state';
 const MAX_RECOVERY_ATTEMPTS = 3;
+const RECOVERY_TTL_MS = 60 * 60 * 1000;
+
+function normalizeError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
 
 export function useStability() {
   const [state, setState] = useState<StabilityState>({
@@ -29,149 +34,161 @@ export function useStability() {
     recoveryAttempts: 0,
     isRecovering: false,
   });
-
   const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recoveryAttemptsRef = useRef(0);
+  const recoveryInFlightRef = useRef(false);
+  const alertIssuedRef = useRef(false);
+  const mountedRef = useRef(true);
 
-  // Network monitoring
   useEffect(() => {
+    mountedRef.current = true;
     const unsubscribe = NetInfo.addEventListener((netState: NetInfoState) => {
+      if (!mountedRef.current) return;
       setState(prev => ({
         ...prev,
         isOnline: netState.isConnected ?? true,
         connectionType: netState.type,
       }));
     });
-
-    return () => unsubscribe();
+    return () => {
+      mountedRef.current = false;
+      unsubscribe();
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+      errorTimeoutRef.current = null;
+    };
   }, []);
 
-  // Save state for recovery
-  const saveRecoveryState = useCallback(async (data: any) => {
+  const saveRecoveryState = useCallback(async (data: unknown) => {
     try {
       await AsyncStorage.setItem(RECOVERY_KEY, JSON.stringify({
         timestamp: Date.now(),
         data,
       }));
-    } catch (e) {
-      console.warn('Failed to save recovery state:', e);
+    } catch (error) {
+      console.warn('Failed to save recovery state:', error);
     }
   }, []);
 
-  // Load recovery state
   const loadRecoveryState = useCallback(async () => {
     try {
       const saved = await AsyncStorage.getItem(RECOVERY_KEY);
       if (saved) {
-        const { timestamp, data } = JSON.parse(saved);
-        // Only use recovery data if less than 1 hour old
-        if (Date.now() - timestamp < 3600000) {
-          return data;
+        const receipt: unknown = JSON.parse(saved);
+        if (receipt && typeof receipt === 'object') {
+          const { timestamp, data } = receipt as { timestamp?: unknown; data?: unknown };
+          const now = Date.now();
+          if (typeof timestamp === 'number' && Number.isFinite(timestamp) &&
+              timestamp >= 0 && timestamp <= now && now - timestamp < RECOVERY_TTL_MS) {
+            return data ?? null;
+          }
         }
       }
-    } catch (e) {
-      console.warn('Failed to load recovery state:', e);
+    } catch (error) {
+      console.warn('Failed to load recovery state:', error);
     }
     return null;
   }, []);
 
-  // Clear recovery state
   const clearRecoveryState = useCallback(async () => {
     try {
       await AsyncStorage.removeItem(RECOVERY_KEY);
-    } catch (e) {
-      console.warn('Failed to clear recovery state:', e);
+    } catch (error) {
+      console.warn('Failed to clear recovery state:', error);
     }
   }, []);
 
-  // Handle errors gracefully
-  const handleError = useCallback((error: Error, context?: string) => {
+  const handleError = useCallback((incoming: unknown, context?: string) => {
+    const error = normalizeError(incoming);
     console.error(`[Stability] Error in ${context || 'unknown'}:`, error);
+    if (!mountedRef.current) return;
 
+    recoveryAttemptsRef.current = Math.min(MAX_RECOVERY_ATTEMPTS, recoveryAttemptsRef.current + 1);
+    const attempts = recoveryAttemptsRef.current;
     setState(prev => ({
       ...prev,
       hasError: true,
       lastError: error,
-      recoveryAttempts: prev.recoveryAttempts + 1,
+      recoveryAttempts: attempts,
     }));
 
-    // Auto-clear error after 5 seconds
-    if (errorTimeoutRef.current) {
-      clearTimeout(errorTimeoutRef.current);
-    }
+    if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
     errorTimeoutRef.current = setTimeout(() => {
-      setState(prev => ({ ...prev, hasError: false }));
+      errorTimeoutRef.current = null;
+      if (mountedRef.current) setState(prev => ({ ...prev, hasError: false }));
     }, 5000);
 
-    // Show alert for critical errors after max attempts
-    if (state.recoveryAttempts >= MAX_RECOVERY_ATTEMPTS - 1) {
+    if (attempts >= MAX_RECOVERY_ATTEMPTS && !alertIssuedRef.current) {
+      alertIssuedRef.current = true;
       Alert.alert(
         'Something went wrong',
         'The app encountered an issue. Some features may be limited.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
     }
-  }, [state.recoveryAttempts]);
+  }, []);
 
-  // Attempt recovery
   const attemptRecovery = useCallback(async (recoveryFn: () => Promise<void>) => {
-    if (state.recoveryAttempts >= MAX_RECOVERY_ATTEMPTS) {
-      console.warn('[Stability] Max recovery attempts reached');
+    if (!mountedRef.current || recoveryInFlightRef.current ||
+        recoveryAttemptsRef.current >= MAX_RECOVERY_ATTEMPTS) {
       return false;
     }
-
+    recoveryInFlightRef.current = true;
     setState(prev => ({ ...prev, isRecovering: true }));
 
     try {
       await recoveryFn();
+      if (!mountedRef.current) return false;
+      recoveryAttemptsRef.current = 0;
+      alertIssuedRef.current = false;
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+      errorTimeoutRef.current = null;
       setState(prev => ({
-        ...prev,
-        hasError: false,
-        lastError: null,
-        isRecovering: false,
+        ...prev, hasError: false, lastError: null,
+        recoveryAttempts: 0, isRecovering: false,
       }));
       return true;
-    } catch (e) {
-      setState(prev => ({
-        ...prev,
-        isRecovering: false,
-        recoveryAttempts: prev.recoveryAttempts + 1,
-      }));
+    } catch (error) {
+      if (mountedRef.current) {
+        recoveryAttemptsRef.current = Math.min(MAX_RECOVERY_ATTEMPTS, recoveryAttemptsRef.current + 1);
+        setState(prev => ({
+          ...prev, hasError: true, lastError: normalizeError(error),
+          isRecovering: false, recoveryAttempts: recoveryAttemptsRef.current,
+        }));
+      }
       return false;
+    } finally {
+      recoveryInFlightRef.current = false;
     }
-  }, [state.recoveryAttempts]);
-
-  // Reset error state
-  const resetError = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      hasError: false,
-      lastError: null,
-      recoveryAttempts: 0,
-    }));
   }, []);
 
-  // Wrap async operations for safety
+  const resetError = useCallback(() => {
+    if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+    errorTimeoutRef.current = null;
+    recoveryAttemptsRef.current = 0;
+    alertIssuedRef.current = false;
+    if (mountedRef.current) {
+      setState(prev => ({
+        ...prev, hasError: false, lastError: null,
+        recoveryAttempts: 0, isRecovering: false,
+      }));
+    }
+  }, []);
+
   const safeAsync = useCallback(async <T,>(
     operation: () => Promise<T>,
     fallback: T,
-    context?: string
+    context?: string,
   ): Promise<T> => {
     try {
       return await operation();
-    } catch (e) {
-      handleError(e as Error, context);
+    } catch (error) {
+      handleError(error, context);
       return fallback;
     }
   }, [handleError]);
 
   return {
-    ...state,
-    handleError,
-    attemptRecovery,
-    resetError,
-    safeAsync,
-    saveRecoveryState,
-    loadRecoveryState,
-    clearRecoveryState,
+    ...state, handleError, attemptRecovery, resetError, safeAsync,
+    saveRecoveryState, loadRecoveryState, clearRecoveryState,
   };
 }

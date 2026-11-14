@@ -383,19 +383,25 @@ export default function GameLearningWorkspace() {
     const handler = (event: KeyboardEvent) => { if (tab === 'editor' && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); if (dirty && !mutation.current) save(); } };
     document.addEventListener('keydown', handler); return () => document.removeEventListener('keydown', handler);
   }, [save, dirty, tab]);
-  const create = async () => {
-    if (mutation.current || !projectName.trim() || !consoleId) return;
+  const createProject = async (name: string, targetId: string, destination: Tab = 'editor') => {
+    if (mutation.current || !name.trim() || !targetId) return;
     if (dirty) { setError('Save or reload your editor changes before creating another project.'); return; }
     mutation.current = true; setBusy('Creating project'); setError(null);
     const token = getAuthToken();
     try {
-      const fingerprint = JSON.stringify({ name: projectName.trim(), consoleId });
+      const fingerprint = JSON.stringify({ name: name.trim(), consoleId: targetId });
       if (createAttempt.current?.fingerprint !== fingerprint) createAttempt.current = { fingerprint, key: learningRequestKey('create') };
-      const value = await createLearningProject(projectName.trim(), consoleId, {}, createAttempt.current.key);
+      const value = await createLearningProject(name.trim(), targetId, {}, createAttempt.current.key);
       if (token !== getAuthToken() || !mounted.current) return;
-      createAttempt.current = null; epoch.current++; setConnectionRevision(previous => previous + 1); acceptProject(value, true); setNewProject(false); setProjectName(''); setTrainSessions([]); setTab('editor');
+      createAttempt.current = null; epoch.current++; setConnectionRevision(previous => previous + 1); acceptProject(value, true); setNewProject(false); setProjectName(''); setTrainSessions([]); setTab(destination);
     } catch (caught) { if (mounted.current && token === getAuthToken()) setError(caught instanceof Error ? caught.message : 'The project could not be created.'); }
     finally { mutation.current = false; if (mounted.current) setBusy(null); }
+  };
+  const create = () => createProject(projectName, consoleId);
+  const createOriginal = () => {
+    const base = catalogue?.consoles.find(value => value.console_id === '8bit');
+    if (!base) { setError('The ordinary 8-bit base is absent from the current catalogue. Refresh studio readiness before creating an original adventure.'); return; }
+    void createProject('Original adventure', base.console_id, 'successor');
   };
   const rightsRefs = () => {
     const values = rights.split(/[\n,]/).map(value => value.trim()).filter(Boolean);
@@ -482,7 +488,7 @@ export default function GameLearningWorkspace() {
   const visibleProjects = [...projects].sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''));
   const library = <View style={[s.sidebar, compact && s.mobileSidebar]}>
     <View style={s.between}><Text style={s.title}>Projects</Text>{compact && <IconButton label="Close projects" icon="close-outline" onPress={() => setSidebar(false)} />}</View>
-    <Button label="New project" icon="add-outline" primary disabled={!!busy || !catalogue} onPress={() => { setSidebar(false); setNewProject(true); }} />
+    <Button label="New project" icon="add-outline" primary disabled={!!busy || !catalogue} onPress={() => { setSidebar(false); setNewProject(true); }} /><Button label="New original adventure" icon="sparkles-outline" disabled={!!busy || dirty || !catalogue} onPress={() => { setSidebar(false); createOriginal(); }} />
     <ScrollView style={s.sidebarList} contentContainerStyle={s.listContent} keyboardShouldPersistTaps="handled">
       {!projects.length && <Text style={s.muted}>Create a project to start editing, observing, and learning.</Text>}
       {visibleProjects.map(value => <TouchableOpacity key={value.project_id} accessibilityRole="button" accessibilityLabel={`Open ${value.name}`}
@@ -528,13 +534,14 @@ export default function GameLearningWorkspace() {
             <Text style={ready ? s.success : s.unavailable}>{ready ? 'Workspace available' : 'Unavailable'}</Text></View>
             <Text style={s.description}>{project.execution_readiness?.message || (project.files?.some(file => file.path === 'game/successor/spec.json') ? 'Your saved original world drives play, demonstrations, local learning and desktop packages.' : project.files?.some(file => file.path === 'game/editor/console.json') ? 'Play uses your saved scene, tiles, assets, controllers and sound. Native compilation uses the target’s source files and toolchain.' : profile?.readiness?.message || profile?.description || 'Refresh the catalogue for current runtime capabilities.')}</Text>
           </View>
+          {tab === 'overview' && profile?.external_emulator && <Section title="Selected console execution prerequisites" detail="Core installation and operator approval are separate from a compatible game actually loading."><Text style={profile.external_emulator.available ? s.success : s.unavailable}>{profile.external_emulator.readiness?.message || (profile.external_emulator.available ? 'Approved core is available for content admission.' : 'This target has no available approved core.')}</Text>{profile.external_emulator.core_installations?.map(core => <View key={core.core_id} style={s.source}><Text style={s.projectName}>{human(core.core_id)}</Text><Text style={s.muted}>{core.installation_present ? 'Installed' : 'Installation required'} · {core.operator_approved ? 'Operator approved' : 'Approval required'} · {core.available ? 'Available for admission' : human(core.readiness.code)}</Text><Text style={s.dim}>Accepted entrypoints: {core.content_admission.admitted_entrypoint_extensions.join(', ') || 'None declared'}</Text>{!!core.content_admission.unsupported_descriptor_extensions.length && <Text style={s.notice}>Unsupported descriptors: {core.content_admission.unsupported_descriptor_extensions.join(', ')}</Text>}</View>)}<Text style={s.dim}>Extension support is an admission rule. The isolated core still checks the actual content, required firmware and companion files. A catalogue entry does not verify commercial-game compatibility.</Text><Button label="Open content sources" icon="folder-open-outline" disabled={dirty || !!busy} onPress={() => setTab('sources')} /><Button label="Open actual build readiness" icon="hammer-outline" disabled={dirty || !!busy} onPress={() => setTab('build')} /></Section>}
           {tab === 'overview' && <GameStudioReadinessPanel key={'readiness:' + project.project_id + ':' + accountToken} project={project} jobs={allJobs} dirty={dirty} onOpenJob={id => { void perform('Opening issued job', async (current, signal) => { const job = await getLearningJob(id, { signal }); if (job.project_id !== current.project_id) throw new Error('This job belongs to another project.'); if (!signal.aborted) { acceptStudioJob(job); setObservedJob(id); setLearningPane('local'); setTab('learn'); } }); }} onOpenPlay={id => { void perform('Opening actual play', async (current, signal) => { const play = await getGamePlay(id, { signal }); if (play.project_id !== current.project_id) throw new Error('This play belongs to another project.'); if (!signal.aborted) acceptCompiledPlay(play); }); }} onOpenGoal={id => { setFocusedGoal(id || undefined); setLearningPane('assistant'); setTab('learn'); }} onCampaigns={id => { setFocusedCampaign(id); setLearningPane('campaign'); setTab('learn'); }} onBuild={() => setTab('build')} onSources={() => setTab('sources')} />}
           {tab === 'console' && <GameConsoleEditor key={project.project_id + ':' + accountToken} project={project} disabled={!!busy || sourceDirty} onSaved={acceptVisualProject} onDirtyChange={setVisualDirty} onPlay={() => setTab('observe')} onBuild={() => setTab('build')} />}
-          {tab === 'successor' && <GameSuccessorStudio key={project.project_id + ':' + accountToken} project={project} jobs={allJobs} disabled={!!busy || sourceDirty || visualDirty} onSaved={acceptVisualProject} onJob={acceptStudioJob} onDirtyChange={setWorldDirty} onPlay={() => setTab('observe')} />}
+          {tab === 'successor' && <GameSuccessorStudio key={project.project_id + ':' + accountToken} project={project} jobs={allJobs} disabled={!!busy || sourceDirty || visualDirty} onSaved={acceptVisualProject} onJob={acceptStudioJob} onDirtyChange={setWorldDirty} onPlay={() => setTab('observe')} onAssistant={() => { setLearningPane('assistant'); setTab('learn'); }} onLearn={() => { setLearningPane('campaign'); setTab('learn'); }} onNewOriginal={createOriginal} />}
           {tab === 'editor' && <>
             <Section title="Project source" detail="Changes are saved to this project’s exact server revision. They run only through the selected engine.">
               <View style={s.between}><Text style={dirty ? s.unsaved : s.success}>{dirty ? 'Unsaved changes' : 'Saved source'} · revision {editorVersion}</Text>
-                <View style={s.row}><Button label="Add file" icon="add-outline" disabled={!!busy || editorFiles.length >= 96} onPress={() => { setNewPath(''); setAddFile(true); }} />
+                <View style={s.row}><Button label="Add file" icon="add-outline" disabled={!!busy || editorFiles.length >= 128} onPress={() => { setNewPath(''); setAddFile(true); }} />
                   <Button label="Save" icon="save-outline" primary disabled={!!busy || !sourceDirty} onPress={save} /></View></View>
               {editorChanged && <View style={s.alert}><Text style={s.description}>The server revision changed. Your local edit is retained; saving it will require resolving that revision conflict.</Text>
                 <Button label="Copy current edit" icon="copy-outline" onPress={() => { void Clipboard.setStringAsync(code); }} />
@@ -617,7 +624,7 @@ export default function GameLearningWorkspace() {
           {tab === 'learn' && <>
             <View style={s.chips}>{([{ id: 'assistant', label: 'Jeeves assistant' }, { id: 'review', label: 'Measured review' }, { id: 'campaign', label: 'Self-learning campaign' }, { id: 'local', label: 'Local training & instances' }] as const).map(value => <TouchableOpacity key={value.id} accessibilityRole="tab" accessibilityState={{ selected: learningPane === value.id }} onPress={() => setLearningPane(value.id)} style={[s.tab, learningPane === value.id && s.activeTab]}><Text style={[s.tabText, learningPane === value.id && s.activeText]}>{value.label}</Text></TouchableOpacity>)}</View>
             {learningPane === 'review' && <GameStudioReviewPanel key={'review:' + project.project_id + ':' + accountToken} project={project} jobs={allJobs} disabled={dirty || !!busy} onJob={acceptStudioJob} onSaved={acceptVisualProject} />}
-            {learningPane === 'assistant' && <GameStudioAssistantPanel key={'assistant:' + project.project_id + ':' + accountToken + ':' + (focusedGoal || '')} initialGoalId={focusedGoal} onReadiness={() => setTab('overview')} project={project} disabled={dirty || !!busy} onSaved={acceptVisualProject} onJob={acceptStudioJob} onPlay={acceptCompiledPlay} />}
+            {learningPane === 'assistant' && <GameStudioAssistantPanel key={'assistant:' + project.project_id + ':' + accountToken + ':' + (focusedGoal || '')} initialGoalId={focusedGoal} onReadiness={() => setTab('overview')} onOriginalStudio={() => setTab('successor')} onNewOriginal={createOriginal} project={project} disabled={dirty || !!busy} onSaved={acceptVisualProject} onJob={acceptStudioJob} onPlay={acceptCompiledPlay} />}
             {learningPane === 'campaign' && <GameStudioLearningPanel key={project.project_id + ':' + accountToken + ':' + (focusedCampaign || '')} initialCampaignId={focusedCampaign} resourceProfile={resourceProfiles.find(value => value.profile_id === 'cpu')} project={project} jobs={allJobs} disabled={dirty || !!busy} onSaved={acceptVisualProject} onJob={acceptStudioJob} />}
             {learningPane === 'local' && <><Section title="Local learning" detail="Train a candidate from real engine observations. Measured evaluation and checkpoints stay separate from production promotion.">
               <Text style={s.label}>Learner</Text><View style={s.chips}>{(catalogue?.algorithms || []).map(value => <TouchableOpacity key={value.id} accessibilityRole="radio"

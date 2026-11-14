@@ -16,6 +16,7 @@ import ChatTaskActions from './workbench/ChatTaskActions';
 import ChatSceneActions from './ChatSceneActions';
 import ChatStoryActions from './ChatStoryActions';
 import { MAX_CONTEXT, MAX_TEXT, searchConversations } from './workspace';
+import { getJeevesRequestContext } from '../../state/settingsStore';
 import type { Artifact, Conversation, Message } from './workspace';
 import { exportTranscript, saveArtifact, saveChatExport } from './chatFiles';
 import CaptureEditor from './workbench/CaptureEditor';
@@ -202,7 +203,15 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
     if (!snapshot.ready || busy || !conversation.draft.trim()) return;
     if (!modelReady) { controller.notify('Choose a ready model or open Setup to finish the AI connection.'); return; }
     if (knowledge && !knowledgeQuery.trim()) { controller.notify('Enter a query for the explicit captured-knowledge context.'); return; }
+    let requestContext: string;
+    try {
+      requestContext = getJeevesRequestContext(conversation.context, MAX_CONTEXT);
+    } catch (error) {
+      controller.notify(error instanceof Error ? error.message : 'Jeeves preferences exceed the request context bound.');
+      return; // Keep the draft untouched until the user fixes settings.
+    }
     const pending = controller.send(undefined, {
+      context: requestContext,
       ...(selectedModel ? { provider_id: selectedModel.provider_id, model_id: selectedModel.model_id, max_output_tokens: Math.min(outputTokens, selectedModel.max_output_tokens, 16384) } : {}),
       ...(knowledge ? { crawler_context: { query: knowledgeQuery.trim(), max_documents: 4, max_characters: 16000 } } : {}),
     });
