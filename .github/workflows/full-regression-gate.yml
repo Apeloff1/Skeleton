@@ -275,9 +275,37 @@ jobs:
           scripts/test-telemetry-batch-admission.cjs
           scripts/test-wasm-origin-execution-boundary.cjs
 
+  windows-native-containment:
+    name: Windows native process containment
+    needs: head-sha
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out candidate SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert exact candidate SHA
+        shell: pwsh
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if ((git rev-parse HEAD) -ne $env:EXPECTED_SHA) { throw 'SHA mismatch' }
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11.16'
+      - name: Install focused test dependency
+        run: python -m pip install --disable-pip-version-check 'pytest>=8,<9'
+      - name: Run Windows Job Object subprocess tests
+        env:
+          PYTHONPATH: '${{ github.workspace }}'
+        run: python -m pytest -q --noconftest tests/test_windows_job_custody.py
+
   gate:
     name: Full regression gate
-    needs: [head-sha, python-regression, node-regression]
+    needs: [head-sha, python-regression, node-regression, windows-native-containment]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -287,6 +315,7 @@ jobs:
           HEAD_SHA_RESULT: ${{ needs.head-sha.result }}
           PYTHON_RESULT: ${{ needs.python-regression.result }}
           NODE_RESULT: ${{ needs.node-regression.result }}
+          WINDOWS_NATIVE_RESULT: ${{ needs.windows-native-containment.result }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -297,6 +326,7 @@ jobs:
               "head-sha": os.environ["HEAD_SHA_RESULT"],
               "python-regression": os.environ["PYTHON_RESULT"],
               "node-regression": os.environ["NODE_RESULT"],
+              "windows-native-containment": os.environ["WINDOWS_NATIVE_RESULT"],
           }
           failures = {
               name: result

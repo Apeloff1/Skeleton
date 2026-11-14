@@ -37,6 +37,7 @@ from skeleton.skills.tool_contract import (
 from .kv_placement import observe_native_kv_placement
 from .lease_custody import gguf_child_fd_scope
 from .process_group_custody import observe_worker_exit, terminate_owned_process_group
+from .windows_job_custody import spawn_windows_job, terminate_windows_job
 from .local import (
     LocalInferenceCancelled,
     LocalInferenceEngine,
@@ -1499,7 +1500,7 @@ class LlamaCppModel:
         # Keep the POSIX leader unreaped until its process group has received
         # the final termination signal. Otherwise inherited pipes can outlive
         # the leader and a recycled numeric PID must not be signalled.
-        if terminate_owned_process_group(process):
+        if terminate_windows_job(process) or terminate_owned_process_group(process):
             return
         if process.poll() is not None:
             return
@@ -1760,7 +1761,8 @@ class LlamaCppModel:
                                 "Metal lease did not provide release callback"
                             )
                     with gguf_child_fd_scope() as lease_fds:
-                        process = subprocess.Popen(
+                        launch = spawn_windows_job if os.name == "nt" else subprocess.Popen
+                        process = launch(
                             command,
                             stdin=subprocess.DEVNULL,
                             stdout=subprocess.PIPE,
@@ -1776,8 +1778,8 @@ class LlamaCppModel:
                             # An orphaned model process must retain that SAME
                             # flock after an abrupt Python parent death, blocking
                             # a replacement server from launching a second GGUF.
-                            # Windows must use its own job-object containment;
-                            # POSIX pass_fds is never supplied on Windows.
+                            # Windows uses a gated helper bound to a kill-on-close
+                            # Job Object before the actual model can start.
                             **({"pass_fds": lease_fds} if os.name == "posix" else {}),
                             creationflags=(getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0),
                         )
