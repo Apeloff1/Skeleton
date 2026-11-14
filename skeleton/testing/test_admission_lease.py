@@ -82,3 +82,57 @@ def test_missing_or_corrupt_ledger_fails_closed(tmp_path):
     path.write_text('{"leases":[],"pushes":[]}')
     with pytest.raises(RuntimeError, match="unavailable"):
         AdmissionLease(path)
+
+
+def test_replaced_valid_database_cannot_reset_existing_admission_budget(tmp_path):
+    path = tmp_path / "admission.db"
+    original = AdmissionLease(path)
+    for i in range(MAX_PUSHES_LAST_MINUTE):
+        assert original.acquire("lane", f"sha{i}", "actor")
+    replacement = tmp_path / "replacement.db"
+    fresh = AdmissionLease(replacement)
+    assert fresh.count_recent() == 0
+    replacement.replace(path)
+    with pytest.raises(RuntimeError, match="identity changed"):
+        original.acquire("lane", "another", "actor")
+
+
+def test_relative_path_is_pinned_at_initialization(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    original = AdmissionLease("admission.db")
+    assert original.acquire("A", "head", "actor")
+    other = tmp_path / "other"
+    other.mkdir()
+    monkeypatch.chdir(other)
+    assert original.count_recent() == 1
+    assert not (other / "admission.db").exists()
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), -1, 10**400, 1e300, True, "now"])
+def test_invalid_clock_fails_closed_without_overflow(tmp_path, bad):
+    now = [1000.0]
+    ledger = AdmissionLease(tmp_path / "admission.db", clock=lambda: now[0])
+    now[0] = bad
+    with pytest.raises(RuntimeError, match="invalid admission clock"):
+        ledger.acquire("A", "sha", "actor")
+    now[0] = 1001.0
+    assert ledger.count_recent() == 0
+
+
+def test_hardlinked_or_symlinked_ledger_path_is_refused(tmp_path):
+    path = tmp_path / "admission.db"
+    ledger = AdmissionLease(path)
+    alias = tmp_path / "alias.db"
+    try:
+        alias.hardlink_to(path)
+    except (OSError, NotImplementedError):
+        pytest.skip("host does not support hardlinks")
+    with pytest.raises(RuntimeError, match="private regular file"):
+        ledger.count_recent()
+    alias.unlink()
+    try:
+        alias.symlink_to(path)
+    except (OSError, NotImplementedError):
+        pytest.skip("host does not support symlinks")
+    with pytest.raises(RuntimeError, match="private regular file"):
+        AdmissionLease(alias)
