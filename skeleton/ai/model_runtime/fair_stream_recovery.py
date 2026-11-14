@@ -134,7 +134,57 @@ def verify_recovery_authorization(
         raise RecoveryAuthorizationDenied("operator approval authentication failed")
 
 
+@dataclass(frozen=True, slots=True)
+class AbandonmentAuthorization:
+    """Operator attests quiescence, not that inference never occurred."""
+    session_id: str
+    generation: int
+    checkpoint_digest: str
+    lease_id: str
+    nonce: str
+    evidence_digest: str
+    mac: str
+
+
+def _abandonment_body(approval: AbandonmentAuthorization) -> dict[str, object]:
+    body = _body(session_id=approval.session_id, generation=approval.generation,
+                 checkpoint_digest=approval.checkpoint_digest, lease_id=approval.lease_id,
+                 nonce=approval.nonce)
+    return {**body, "schema": "skeleton.ai.fair-stream-abandonment-authorization.v1",
+            "evidence_digest": _hex(approval.evidence_digest, 64, "quiescence evidence"),
+            "attestation": "prior_executor_stopped_no_result_to_recover"}
+
+
+def issue_abandonment_authorization(
+    *, recovery_key: bytes, session_id: str, generation: int,
+    checkpoint_digest: str, lease_id: str, nonce: str, evidence_digest: str,
+) -> AbandonmentAuthorization:
+    """Sign only after independent operator review and stopping old executors."""
+    unsigned = AbandonmentAuthorization(session_id, generation, checkpoint_digest,
+                                       lease_id, nonce, evidence_digest, "0" * 64)
+    mac = hmac.new(_key(recovery_key), _encoded(_abandonment_body(unsigned)), sha256).hexdigest()
+    return AbandonmentAuthorization(session_id, generation, checkpoint_digest,
+                                    lease_id, nonce, evidence_digest, mac)
+
+
+def verify_abandonment_authorization(
+    approval: AbandonmentAuthorization, *, recovery_key: bytes,
+    state: Mapping[str, object], lease_id: str,
+) -> None:
+    if type(approval) is not AbandonmentAuthorization:
+        raise RecoveryAuthorizationDenied("distinct abandonment approval required")
+    expected = hmac.new(_key(recovery_key), _encoded(_abandonment_body(approval)), sha256).hexdigest()
+    if (approval.session_id != state.get("session_id")
+            or approval.generation != state.get("generation")
+            or approval.checkpoint_digest != state.get("checkpoint_digest")
+            or approval.lease_id != lease_id
+            or not hmac.compare_digest(expected, _hex(approval.mac, 64, "approval MAC"))):
+        raise RecoveryAuthorizationDenied("abandonment approval does not authenticate current lease")
+
+
 __all__ = [
     "RecoveryAuthorization", "RecoveryAuthorizationDenied",
     "issue_recovery_authorization", "verify_recovery_authorization",
+    "AbandonmentAuthorization", "issue_abandonment_authorization",
+    "verify_abandonment_authorization",
 ]

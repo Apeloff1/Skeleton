@@ -230,6 +230,15 @@ class SealedFairStreamResultVault:
                     or total + (queued_count + 1) * (MAX_RESULT_BYTES + 16) > MAX_CIPHERTEXT_BYTES):
                 raise SealedResultUnavailable("result vault admission capacity exhausted")
 
+    def assert_no_published_result(self, permit: DispatchPermit) -> None:
+        """Deny abandonment even for corrupt output; preserve evidence for review."""
+        _identity(permit)
+        self._handle.require_owner_process()
+        with self._lock:
+            self._require_open()
+            if self._row(permit.lease_id) is not None or self._request_seen(permit.request_id):
+                raise SealedResultUnavailable("existing result requires reconciliation, not abandonment")
+
     def _request_seen(self, request_id: str) -> bool:
         return self._connection.execute(
             "SELECT 1 FROM " + _TABLE

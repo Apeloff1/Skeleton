@@ -325,6 +325,53 @@ class GuardedFairStreamDispatch:
             self._uncertain = False
             return updated
 
+    def abandon_uncertain(self, *, authorization: object, recovery_key: bytes) -> dict[str, object]:
+        """Operator-only recovery for a stopped whole-request native executor.
+
+        The distinct approval attests quiescence; it cannot prove it. Stop
+        other owners before this operation. No result is created or discarded.
+        """
+        from .fair_stream_execution_journal import JournaledExecutionOwner
+        from .fair_stream_result_vault import SealedFairStreamResultVault
+        from .fair_stream_recovery import verify_abandonment_authorization
+
+        with self._lock:
+            owner = self._owner
+            if (type(owner) is not JournaledExecutionOwner or not owner.whole_request
+                    or type(owner._backend) is not SealedFairStreamResultVault
+                    or owner._journal._private_handle is None):
+                raise DispatchUncertain("bound private native owner required for abandonment")
+            state = self._session.verify()
+            pending = state["checkpoint"]["pending"]
+            if len(pending) != 1:
+                raise DispatchUncertain("exactly one pending lease required")
+            lease = pending[0]
+            permit = DispatchPermit(lease["lease_id"], lease["request_id"], state["generation"],
+                                    state["checkpoint_digest"], lease["tokens"], lease["bytes_reserved"])
+            if self._issued and self._issued.get(permit.lease_id) != permit:
+                raise DispatchUncertain("in-memory lease differs from durable custody")
+            verify_abandonment_authorization(authorization, recovery_key=recovery_key,
+                                             state=state, lease_id=permit.lease_id)
+            try:
+                owner._backend.assert_no_published_result(permit)
+                receipt = owner._journal.record_abandonment(
+                    permit, evidence_digest=authorization.evidence_digest,
+                )
+                # A prior worker that still publishes after approval is a
+                # violated quiescence assumption; retain the lease on discovery.
+                owner._backend.assert_no_published_result(permit)
+                if self._revoke_queued_prompt is not None:
+                    self._revoke_queued_prompt(permit.request_id)
+                updated = self._session.abandon(receipt)
+            except BaseException as exc:
+                self._uncertain = True
+                raise DispatchUncertain("abandonment requires trusted reconciliation") from exc
+            self._issued.clear()
+            self._issued_budget = None
+            self._issued_observation = None
+            self._uncertain = False
+            return updated
+
     def execute_once(self, permit: DispatchPermit) -> dict[str, object]:
         """Execute at most once, with a fresh OS re-probe and signed receipt.
 

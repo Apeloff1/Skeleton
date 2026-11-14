@@ -339,6 +339,20 @@ class FairStreamScheduler:
                 del self._wait[request.request_id]
             del self._pending[lease_id]
 
+    def abandon_pending(self, lease_id: str) -> None:
+        """Retire the entire uncertain request; no tokens/result are credited."""
+        _identifier("lease_id", lease_id, maximum=64)
+        with self._lock:
+            if len(self._pending) != 1 or lease_id not in self._pending:
+                raise ValueError("exactly one pending lease required for abandonment")
+            request_id = self._pending[lease_id].request_id
+            if request_id not in self._requests:
+                raise ValueError("pending request missing")
+            del self._pending[lease_id]
+            del self._requests[request_id]
+            del self._served[request_id]
+            del self._wait[request_id]
+
     @staticmethod
     def _lease_dict(lease: StreamLease) -> dict[str, object]:
         return {

@@ -146,6 +146,11 @@ class OfflineAdaptiveDispatchService:
         )
         return self.status()
 
+    def abandon_uncertain(self, *, authorization: object, recovery_key: bytes) -> OfflineDispatchStatus:
+        """Trusted operator-only recovery, not a public user cancellation route."""
+        self._guard.abandon_uncertain(authorization=authorization, recovery_key=recovery_key)
+        return self.status()
+
     def execute_next(self, *, token_budget: int) -> dict[str, object]:
         """Plan and execute ONE source-bound slice; no backend on a hold.
 

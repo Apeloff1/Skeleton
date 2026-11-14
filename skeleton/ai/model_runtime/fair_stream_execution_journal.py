@@ -14,7 +14,7 @@ import sqlite3
 from threading import RLock
 from typing import Mapping, Protocol
 
-from .fair_stream_custody import sign_execution_result
+from .fair_stream_custody import sign_abandonment, sign_execution_result
 from .fair_stream_session import DispatchPermit
 from .private_sqlite import PrivateSQLiteHandle
 from .sqlite_custody_schema import assert_custody_schema
@@ -276,6 +276,67 @@ class FairStreamExecutionJournal:
                 ).rowcount
                 if changed != 1:
                     raise ExecutionOutcomeUnknown("journal completion CAS failed")
+                self._assert_private()
+                self._connection.commit()
+                return receipt
+            except BaseException:
+                self._connection.rollback()
+                raise
+
+    def record_abandonment(
+        self, permit: DispatchPermit, *, evidence_digest: str,
+    ) -> dict[str, object]:
+        """Keep an irrevocable request tombstone, not a COMMITTED result.
+
+        The trusted caller must authenticate a distinct operator approval and
+        independently establish quiescence and absence of published output.
+        The legacy RUNNING state remains a replay fence. A non-null receipt
+        containing the abandonment schema prevents a later result commit.
+        """
+        if type(permit) is not DispatchPermit or permit.device_qualified is not False:
+            raise ValueError("canonical CPU-only permit required")
+        if type(permit.request_id) is not str or not 1 <= len(permit.request_id.encode("utf-8")) <= 128:
+            raise ValueError("bounded request identity required")
+        receipt = sign_abandonment(
+            execution_key=self._key, session_id=self.session_id,
+            generation=permit.generation, checkpoint_digest=permit.checkpoint_digest,
+            lease_id=permit.lease_id, evidence_digest=evidence_digest,
+        )
+        payload = _receipt_bytes(receipt)
+        identity = (self.session_id, permit.generation, permit.checkpoint_digest, permit.request_id)
+        self._require_owner_process()
+        with self._lock:
+            self._begin()
+            try:
+                row = self._row(permit.lease_id)
+                if row is None:
+                    if self._connection.execute(
+                        "SELECT 1 FROM local_fair_stream_execution_journal WHERE session_id=? AND request_id=?",
+                        (self.session_id, permit.request_id),
+                    ).fetchone() is not None:
+                        raise ExecutionOutcomeUnknown("request already reserved under another lease")
+                    if self._connection.execute(
+                        "SELECT COUNT(*) FROM local_fair_stream_execution_journal"
+                    ).fetchone()[0] >= MAX_JOURNAL_ROWS:
+                        raise ExecutionOutcomeUnknown("journal abandonment capacity exhausted")
+                    self._connection.execute(
+                        "INSERT INTO local_fair_stream_execution_journal"
+                        " (lease_id, session_id, generation, checkpoint_digest, request_id, state, receipt)"
+                        " VALUES (?, ?, ?, ?, ?, 'running', ?)",
+                        (permit.lease_id, *identity, payload),
+                    )
+                elif row == (*identity, "running", None, None, None):
+                    changed = self._connection.execute(
+                        "UPDATE local_fair_stream_execution_journal SET receipt=?"
+                        " WHERE lease_id=? AND state='running' AND receipt IS NULL",
+                        (payload, permit.lease_id),
+                    ).rowcount
+                    if changed != 1:
+                        raise ExecutionOutcomeUnknown("abandonment CAS rejected")
+                elif row != (*identity, "running", None, None, payload):
+                    raise ExecutionOutcomeUnknown("existing journal completion or incompatible abandonment")
+                if self._row(permit.lease_id) != (*identity, "running", None, None, payload):
+                    raise ExecutionOutcomeUnknown("abandonment readback mismatch")
                 self._assert_private()
                 self._connection.commit()
                 return receipt

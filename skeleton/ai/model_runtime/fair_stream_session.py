@@ -204,6 +204,13 @@ class DurableFairStreamSession:
         _, state = self._transition(action="acknowledge", receipt=receipt)
         return state
 
+    def abandon(self, receipt: Mapping[str, object]) -> dict[str, object]:
+        """Consume a separately signed retirement receipt, never infer a result."""
+        if not isinstance(receipt, Mapping):
+            raise ValueError("signed abandonment receipt required")
+        _, state = self._transition(action="abandon", receipt=receipt)
+        return state
+
     def pending_ids(self) -> tuple[str, ...]:
         self._require_owner_process()
         with self._lock:
