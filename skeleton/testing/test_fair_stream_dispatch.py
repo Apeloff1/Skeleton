@@ -339,3 +339,32 @@ def test_sampler_cannot_expand_planning_ceiling(monkeypatch):
     guard.submit(request())
     with pytest.raises(DispatchDeferred, match="provenance"):
         guard.plan_live(token_budget=40)
+
+
+def test_inherited_dispatcher_denied_before_lock(monkeypatch):
+    import os
+
+    owner = SimulatedCommittedOwner()
+    guard = make(owner)
+    identity = os.getpid()
+
+    class ForbiddenLock:
+        def __enter__(self):
+            pytest.fail("inherited dispatcher attempted to acquire lock")
+
+        def __exit__(self, *_):
+            return False
+
+    monkeypatch.setattr(guard, "_lock", ForbiddenLock())
+    monkeypatch.setattr(os, "getpid", lambda: identity + 1)
+    for operation in (
+        guard.status_snapshot,
+        lambda: guard.submit(request()),
+        lambda: guard.plan_live(token_budget=40),
+        lambda: guard.dispatch_next(token_budget=40),
+        lambda: guard.cancel("request"),
+        lambda: guard.uncertain,
+    ):
+        with pytest.raises(DispatchUncertain, match="inherited"):
+            operation()
+    assert owner.calls == 0

@@ -258,3 +258,39 @@ def test_owner_reentrant_dispatch_cannot_execute_again(monkeypatch):
     assert app.execute_next(token_budget=32)["executed"]
     assert owner.calls == 1
     assert not app.status().execution_uncertain
+
+
+def test_invalid_bootstrap_rejected_before_schema_creation():
+    connection = sqlite3.connect(":memory:")
+    try:
+        with pytest.raises(ValueError, match="bootstrap boolean"):
+            OfflineAdaptiveDispatchService.from_trusted_handles(
+                connection=connection, custody_key=C, execution_key=E,
+                session_id=SESSION, watermark=ExternalAnchor(),
+                owner=SimulatedDurableOwner(), storage_path=".", bootstrap=1,
+            )
+        assert connection.execute("SELECT COUNT(*) FROM sqlite_master").fetchone() == (0,)
+    finally:
+        connection.close()
+
+
+def test_private_database_retains_exact_handle_and_denies_closed_custody(tmp_path):
+    import os
+    from skeleton.ai.model_runtime.fair_stream_session import CustodyQuarantined
+
+    if os.name != "posix":
+        pytest.skip("private POSIX SQLite unavailable")
+    directory = tmp_path / "custody"
+    directory.mkdir(mode=0o700)
+    service, handle = OfflineAdaptiveDispatchService.from_private_database(
+        directory=directory, custody_key=C, execution_key=E,
+        session_id=SESSION, watermark=ExternalAnchor(),
+        owner=SimulatedDurableOwner(), storage_path=".", bootstrap=True,
+    )
+    try:
+        assert service._session._store._private_handle is handle
+        assert service.status().generation == 0
+    finally:
+        handle.close()
+    with pytest.raises(CustodyQuarantined):
+        service.status()

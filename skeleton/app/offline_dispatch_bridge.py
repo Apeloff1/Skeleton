@@ -74,14 +74,16 @@ class OfflineAdaptiveDispatchService:
         execution_key: bytes, session_id: str,
         watermark: TrustedHighWatermark, owner: DurableExecutionOwner,
         storage_path: str, bootstrap: bool = False, whole_request: bool = False,
+        private_handle: PrivateSQLiteHandle | None = None,
     ) -> "OfflineAdaptiveDispatchService":
         """Never silently reset a previous session on a restart."""
+        if type(bootstrap) is not bool:
+            raise ValueError("explicit bootstrap boolean required")
         store = DurableFairStreamStore(
             connection, custody_key=custody_key, execution_key=execution_key,
             session_id=session_id, whole_request=whole_request,
+            private_handle=private_handle,
         )
-        if type(bootstrap) is not bool:
-            raise ValueError("explicit bootstrap boolean required")
         session = (
             DurableFairStreamSession.bootstrap(store, watermark)
             if bootstrap else DurableFairStreamSession(store, watermark)
@@ -101,6 +103,8 @@ class OfflineAdaptiveDispatchService:
         This never provisions the external monotonic anchor or execution keys.
         The caller must close the handle only after the service is quiescent.
         """
+        if type(bootstrap) is not bool:
+            raise ValueError("explicit bootstrap boolean required")
         handle = open_private_sqlite(
             directory, create=bootstrap, max_database_bytes=max_database_bytes,
         )
@@ -110,6 +114,7 @@ class OfflineAdaptiveDispatchService:
                 custody_key=custody_key, execution_key=execution_key,
                 session_id=session_id, watermark=watermark, owner=owner,
                 storage_path=storage_path, bootstrap=bootstrap, whole_request=whole_request,
+                private_handle=handle,
             )
         except BaseException:
             handle.close()

@@ -88,6 +88,7 @@ class GuardedFairStreamDispatch:
             raise ValueError("trusted durable execution owner required")
         if type(storage_path) is not str or not storage_path:
             raise ValueError("selected storage volume required")
+        session._require_owner_process()
         self._session = session
         self._sampler = sampler
         self._owner = owner
@@ -108,6 +109,7 @@ class GuardedFairStreamDispatch:
 
     @property
     def uncertain(self) -> bool:
+        self._require_owner_process()
         with self._lock:
             return self._uncertain
 
@@ -117,6 +119,7 @@ class GuardedFairStreamDispatch:
         A known in-process deferred permit is distinct from a persisted
         lease whose execution outcome cannot be established by this owner.
         """
+        self._require_owner_process()
         with self._lock:
             state = self._session.verify()
             pending = state["checkpoint"]["pending"]
@@ -128,11 +131,22 @@ class GuardedFairStreamDispatch:
             return (state["generation"], len(pending), self._session.quarantined,
                     self._uncertain or self._executing or bool(pending and not known))
 
+    def _require_owner_process(self) -> None:
+        """Never acquire a potentially inherited lock after a process fork."""
+        try:
+            self._session._require_owner_process()
+        except RuntimeError as exc:
+            raise DispatchUncertain("inherited dispatcher requires reopening") from exc
+
     def _require_no_pending(self) -> None:
+        self._require_owner_process()
         if self._executing or self._issued or self._uncertain or self._session.pending_ids():
             raise DispatchUncertain("pending dispatch must be reconciled")
 
     def submit(self, request: StreamRequest) -> dict[str, object]:
+        if type(request) is not StreamRequest:
+            raise ValueError("canonical stream request required")
+        self._require_owner_process()
         with self._lock:
             self._require_no_pending()
             anchor = None
@@ -150,6 +164,7 @@ class GuardedFairStreamDispatch:
             return self._session.submit(request, expected_anchor=anchor)
 
     def cancel(self, request_id: str, *, tenant_id: str | None = None) -> dict[str, object]:
+        self._require_owner_process()
         with self._lock:
             self._require_no_pending()
             # Authenticated native callers must supply tenant identity from
@@ -180,6 +195,7 @@ class GuardedFairStreamDispatch:
 
         if type(tenant_id) is not str or not tenant_id or type(request_id) is not str:
             raise ValueError("authenticated tenant and request required")
+        self._require_owner_process()
         with self._lock:
             if (not self._whole_request or type(self._owner) is not JournaledExecutionOwner
                     or self._uncertain or self._executing or len(self._issued) != 1):
@@ -244,6 +260,7 @@ class GuardedFairStreamDispatch:
     def plan_live(
         self, *, token_budget: int,
     ) -> tuple[tuple[DispatchPermit, ...], DispatchObservation]:
+        self._require_owner_process()
         with self._lock:
             if self._executing or self._uncertain or self._issued or self._session.pending_ids():
                 raise DispatchUncertain("pending execution requires durable reconciliation")
@@ -280,6 +297,7 @@ class GuardedFairStreamDispatch:
         """
         if type(token_budget) is not int or not 1 <= token_budget <= MAX_TOKENS:
             raise ValueError("bounded positive token budget required")
+        self._require_owner_process()
         with self._lock:
             if self._uncertain or self._executing:
                 raise DispatchUncertain("execution outcome requires reconciliation")
@@ -376,6 +394,7 @@ class GuardedFairStreamDispatch:
 
         if type(journal) is not FairStreamExecutionJournal:
             raise ValueError("canonical committed execution journal required")
+        self._require_owner_process()
         with self._lock:
             if type(self._owner) is JournaledExecutionOwner and journal is not self._owner._journal:
                 raise ValueError("recovery requires the bound execution journal")
@@ -444,6 +463,7 @@ class GuardedFairStreamDispatch:
         from .fair_stream_result_vault import SealedFairStreamResultVault
         from .fair_stream_recovery import verify_recovery_authorization
 
+        self._require_owner_process()
         with self._lock:
             owner = self._owner
             if (not self._whole_request or type(owner) is not JournaledExecutionOwner
@@ -506,6 +526,7 @@ class GuardedFairStreamDispatch:
         from .fair_stream_execution_journal import JournaledExecutionOwner
         from .fair_stream_recovery import verify_recovery_authorization
 
+        self._require_owner_process()
         with self._lock:
             if (not self._whole_request or type(self._owner) is not JournaledExecutionOwner
                     or self._executing):
@@ -555,6 +576,7 @@ class GuardedFairStreamDispatch:
         return state
 
     def _execute_once_observed(self, permit: DispatchPermit) -> tuple[dict[str, object], DispatchObservation]:
+        self._require_owner_process()
         with self._lock:
             if self._uncertain or self._executing:
                 raise DispatchUncertain("execution outcome requires reconciliation")
