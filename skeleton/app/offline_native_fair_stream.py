@@ -117,9 +117,17 @@ def bind_native_cpu_dispatch_service(
         journal_handle=journal_handle, journal=journal, result_key=result_key,
         sampler=sampler, storage_path=storage_path,
     )
+    def verify_queued_authority(snapshot: dict[str, object]) -> None:
+        requests = snapshot["checkpoint"]["requests"]
+        registry.verify_queued(requests)
+        for request in requests:
+            if journal.request_exists(request["request_id"]):
+                raise ValueError("queued identity already has execution custody")
+
     service = OfflineAdaptiveDispatchService(
         session, owner, sampler=sampler, storage_path=storage_path,
-        whole_request=True,
+        whole_request=True, queued_authority=verify_queued_authority,
+        cancel_cleanup=registry.revoke,
     )
     return service, vault
 
@@ -174,6 +182,8 @@ def submit_authenticated_native_cpu_prompt(
             or vault._backend.runtime is not runtime
             or service._session.verify().get("session_id") != registry.session_id):
         raise ValueError("native app ownership binding mismatch")
+    if owner._journal.request_exists(request.request_id):
+        raise ValueError("request already has durable execution custody")
     stage_native_cpu_prompt(
         runtime=runtime, registry=registry, request_id=request.request_id,
         tenant_id=authenticated_tenant_id, prompt=prompt,

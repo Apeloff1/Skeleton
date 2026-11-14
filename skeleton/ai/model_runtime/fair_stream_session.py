@@ -125,10 +125,13 @@ class DurableFairStreamSession:
                 ) from exc
 
     def _transition(
-        self, *, action: str, **kwargs: object,
+        self, *, action: str, expected_anchor: tuple[int, str] | None = None,
+        **kwargs: object,
     ) -> tuple[object | None, dict[str, object]]:
         with self._lock:
             generation, digest = self._trusted()
+            if expected_anchor is not None and expected_anchor != (generation, digest):
+                raise ValueError("verified queue changed before transition")
             try:
                 plan, envelope = self._store.transition(
                     expected_generation=generation, expected_digest=digest,
@@ -155,12 +158,15 @@ class DurableFairStreamSession:
         _, state = self._transition(action="submit", request=request)
         return state
 
-    def cancel(self, request_id: str) -> dict[str, object]:
-        _, state = self._transition(action="cancel", request_id=request_id)
+    def cancel(self, request_id: str, *, tenant_id: str | None = None,
+               expected_anchor: tuple[int, str] | None = None) -> dict[str, object]:
+        _, state = self._transition(action="cancel", request_id=request_id,
+                                    tenant_id=tenant_id, expected_anchor=expected_anchor)
         return state
 
     def plan(
         self, budget: MeasuredStreamBudget, *, whole_request: bool | None = None,
+        expected_anchor: tuple[int, str] | None = None,
     ) -> tuple[tuple[DispatchPermit, ...], dict[str, object]]:
         """Require a fresh trusted OS probe; never dispatch simulated inputs."""
         if not isinstance(budget, MeasuredStreamBudget):
@@ -168,7 +174,8 @@ class DurableFairStreamSession:
         if budget.measurement != "os_probe":
             raise ValueError("trusted live OS measurement required for dispatch")
         self._check_policy(whole_request)
-        plan, state = self._transition(action="plan", budget=budget, whole_request=whole_request)
+        plan, state = self._transition(action="plan", budget=budget,
+                                       whole_request=whole_request, expected_anchor=expected_anchor)
         if plan is None:
             raise CustodyQuarantined("canonical planner produced no plan")
         permits = tuple(

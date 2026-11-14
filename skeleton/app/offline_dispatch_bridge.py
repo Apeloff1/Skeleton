@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import sqlite3
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from skeleton.ai.model_runtime.fair_stream_execution_journal import FairStreamExecutionJournal
@@ -54,6 +54,8 @@ class OfflineAdaptiveDispatchService:
         *, storage_path: str,
         sampler: LiveStreamBudgetSampler | None = None,
         whole_request: bool = False,
+        queued_authority: Callable[[dict[str, object]], None] | None = None,
+        cancel_cleanup: Callable[[str], None] | None = None,
     ) -> None:
         if not isinstance(session, DurableFairStreamSession):
             raise ValueError("canonical durable session required")
@@ -61,6 +63,7 @@ class OfflineAdaptiveDispatchService:
         self._guard = GuardedFairStreamDispatch(
             session, sampler if sampler is not None else LiveStreamBudgetSampler(),
             owner, storage_path=storage_path, whole_request=whole_request,
+            queued_authority=queued_authority, cancel_cleanup=cancel_cleanup,
         )
 
     @classmethod
@@ -125,8 +128,8 @@ class OfflineAdaptiveDispatchService:
         self._guard.submit(request)
         return self.status()
 
-    def cancel(self, request_id: str) -> OfflineDispatchStatus:
-        self._guard.cancel(request_id)
+    def cancel(self, request_id: str, *, tenant_id: str | None = None) -> OfflineDispatchStatus:
+        self._guard.cancel(request_id, tenant_id=tenant_id)
         return self.status()
 
     def reconcile_committed(

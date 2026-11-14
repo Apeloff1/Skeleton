@@ -147,6 +147,19 @@ class FairStreamExecutionJournal:
             (lease_id,),
         ).fetchone()
 
+    def request_exists(self, request_id: str) -> bool:
+        """Observation only; begin() remains the atomic replay fence."""
+        if (type(request_id) is not str or not request_id
+                or len(request_id.encode("utf-8")) > 128):
+            raise ValueError("bounded request identity required")
+        with self._lock:
+            self._assert_private()
+            return self._connection.execute(
+                "SELECT 1 FROM local_fair_stream_execution_journal"
+                " WHERE session_id=? AND request_id=? LIMIT 1",
+                (self.session_id, request_id),
+            ).fetchone() is not None
+
     def begin(self, permit: DispatchPermit) -> None:
         """Persist intent before any backend call; reject ALL prior lease IDs."""
         if type(permit) is not DispatchPermit or permit.device_qualified:

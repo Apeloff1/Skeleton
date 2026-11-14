@@ -200,11 +200,15 @@ class FairStreamScheduler:
             self._served[request.request_id] = 0
             self._wait[request.request_id] = 0
 
-    def cancel(self, request_id: str) -> None:
+    def cancel(self, request_id: str, *, tenant_id: str | None = None) -> None:
         _identifier("request_id", request_id)
+        if tenant_id is not None:
+            _identifier("tenant_id", tenant_id, maximum=128)
         with self._lock:
             if request_id not in self._requests:
                 raise ValueError("unknown stream request")
+            if tenant_id is not None and self._requests[request_id].tenant_id != tenant_id:
+                raise ValueError("tenant does not own stream request")
             if any(lease.request_id == request_id for lease in self._pending.values()):
                 raise ValueError("pending execution must be reconciled before cancellation")
             del self._requests[request_id]

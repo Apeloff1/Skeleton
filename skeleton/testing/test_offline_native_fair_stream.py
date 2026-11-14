@@ -350,3 +350,66 @@ def test_native_whole_request_defers_without_consuming_prompt_then_completes(
     assert session.verify()["checkpoint"]["requests"] == []
     assert registry.status()["consumed_or_revoked"] == 1
     assert service.execute_next(token_budget=2)["executed"] is False
+
+def test_native_expired_grant_cannot_mint_lease_and_tenant_can_cancel(private_files, monkeypatch):
+    from skeleton.ai.model_runtime import native_fair_stream_backend as native_module
+    from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchDeferred
+
+    install_probe(monkeypatch)
+    now = [100]
+    monkeypatch.setattr(native_module, "monotonic_ns", lambda: now[0])
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, _ = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    stage_native_cpu_prompt(
+        runtime=runtime, registry=registry, request_id="expires",
+        tenant_id="alice", prompt="hello", max_output_tokens=2,
+    )
+    service.submit(StreamRequest("expires", "alice", InferencePhase.PREFILL, 2, 16))
+    original = session.verify()
+    now[0] += registry._max_stage_age_ns
+    with pytest.raises(DispatchDeferred, match="queued authorization"):
+        service.execute_next(token_budget=2)
+    assert session.verify() == original
+    assert registry.status()["staged"] == 0
+    assert journal._connection.execute(
+        "SELECT COUNT(*) FROM local_fair_stream_execution_journal"
+    ).fetchone()[0] == 0
+    with pytest.raises(ValueError, match="tenant"):
+        service.cancel("expires", tenant_id="bob")
+    with pytest.raises(ValueError, match="tenant"):
+        service.cancel("expires")
+    assert session.verify() == original
+    assert service.cancel("expires", tenant_id="alice").pending_leases == 0
+    assert not session.verify()["checkpoint"]["requests"]
+
+
+def test_native_cancel_releases_plaintext_and_burns_grant(private_files, monkeypatch):
+    from skeleton.ai.model_runtime.native_fair_stream_backend import NativeFairStreamDenied
+
+    install_probe(monkeypatch)
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, _ = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    stage_native_cpu_prompt(
+        runtime=runtime, registry=registry, request_id="cancelled",
+        tenant_id="alice", prompt="hello", max_output_tokens=2,
+    )
+    service.submit(StreamRequest("cancelled", "alice", InferencePhase.PREFILL, 2, 16))
+    assert registry.budget_status()["staged_bytes"] == 5
+    service.cancel("cancelled", tenant_id="alice")
+    assert registry.budget_status()["staged_bytes"] == 0
+    assert service.execute_next(token_budget=2)["executed"] is False
+    with pytest.raises(NativeFairStreamDenied, match="duplicate"):
+        stage_native_cpu_prompt(
+            runtime=runtime, registry=registry, request_id="cancelled",
+            tenant_id="alice", prompt="hello", max_output_tokens=2,
+        )

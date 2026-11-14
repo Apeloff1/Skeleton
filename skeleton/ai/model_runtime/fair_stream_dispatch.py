@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from threading import RLock
-from typing import TYPE_CHECKING, Mapping, Protocol
+from typing import TYPE_CHECKING, Callable, Mapping, Protocol
 
 if TYPE_CHECKING:
     from .fair_stream_execution_journal import FairStreamExecutionJournal
@@ -70,6 +70,8 @@ class GuardedFairStreamDispatch:
         sampler: LiveStreamBudgetSampler,
         owner: DurableExecutionOwner,
         *, storage_path: str, whole_request: bool = False,
+        queued_authority: Callable[[dict[str, object]], None] | None = None,
+        cancel_cleanup: Callable[[str], None] | None = None,
     ) -> None:
         if type(whole_request) is not bool:
             raise ValueError("explicit whole-request policy required")
@@ -90,6 +92,11 @@ class GuardedFairStreamDispatch:
         self._owner = owner
         self._storage_path = storage_path
         self._whole_request = whole_request
+        if ((queued_authority is not None and not callable(queued_authority))
+                or (cancel_cleanup is not None and not callable(cancel_cleanup))):
+            raise ValueError("trusted queue lifecycle callbacks required")
+        self._queued_authority = queued_authority
+        self._cancel_cleanup = cancel_cleanup
         self._lock = RLock()
         self._issued: dict[str, DispatchPermit] = {}
         self._issued_token_budget: int | None = None
@@ -127,10 +134,30 @@ class GuardedFairStreamDispatch:
             self._require_no_pending()
             return self._session.submit(request)
 
-    def cancel(self, request_id: str) -> dict[str, object]:
+    def cancel(self, request_id: str, *, tenant_id: str | None = None) -> dict[str, object]:
         with self._lock:
             self._require_no_pending()
-            return self._session.cancel(request_id)
+            # Authenticated native callers must supply tenant identity from
+            # their principal, never from an untrusted payload. Check before
+            # attempting a durable transition, to avoid quarantining on denial.
+            if self._cancel_cleanup is not None and tenant_id is None:
+                raise ValueError("authenticated tenant required for native cancellation")
+            if tenant_id is not None and (type(tenant_id) is not str or not tenant_id):
+                raise ValueError("authenticated tenant required")
+            state = self._session.verify()
+            if tenant_id is not None:
+                requests = state["checkpoint"]["requests"]
+                matches = [r for r in requests if r["request_id"] == request_id
+                           and r["tenant_id"] == tenant_id]
+                if len(matches) != 1:
+                    raise ValueError("tenant does not own queued request")
+            changed = self._session.cancel(
+                request_id, tenant_id=tenant_id,
+                expected_anchor=(state["generation"], state["digest"]),
+            )
+            if self._cancel_cleanup is not None:
+                self._cancel_cleanup(request_id)
+            return changed
 
     def _sample(self, token_budget: int) -> tuple[MeasuredStreamBudget, DispatchObservation]:
         if type(token_budget) is not int or not 1 <= token_budget <= MAX_TOKENS:
@@ -173,7 +200,17 @@ class GuardedFairStreamDispatch:
             budget, observation = self._sample(token_budget)
             if observation.effective_slots == 0 or observation.effective_tokens == 0:
                 raise DispatchDeferred("resource pressure prohibits dispatch")
-            permits, _ = self._session.plan(budget, whole_request=self._whole_request)
+            anchor = None
+            if self._queued_authority is not None:
+                snapshot = self._session.verify()
+                try:
+                    self._queued_authority(snapshot)
+                except (ValueError, RuntimeError, OSError) as exc:
+                    raise DispatchDeferred("queued authorization unavailable; explicit cancellation required") from exc
+                anchor = (snapshot["generation"], snapshot["digest"])
+            permits, _ = self._session.plan(
+                budget, whole_request=self._whole_request, expected_anchor=anchor,
+            )
             if len(permits) > 1:
                 self._uncertain = True
                 raise DispatchUncertain("non-atomic multi-lease plan forbidden")

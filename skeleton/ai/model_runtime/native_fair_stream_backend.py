@@ -254,6 +254,29 @@ class NativePromptRegistry:
             del self._staged_at[request_id]
             return pinned
 
+    def verify_queued(self, requests: list[dict[str, object]]) -> None:
+        """Read-only authorization check before a durable plan can mint a lease.
+
+        A lost, expired or mismatched prompt is not permission to reconstruct
+        plaintext. The owning tenant may explicitly cancel that queued item.
+        """
+        _require_owner_process(self._owner_pid)
+        if type(requests) is not list or len(requests) > MAX_STAGED_PROMPTS:
+            raise NativeFairStreamDenied("native queued prompt capacity exceeded")
+        with self._lock:
+            self._expire_locked(self._clock_locked())
+            for request in requests:
+                if type(request) is not dict:
+                    raise NativeFairStreamDenied("invalid native queued request")
+                rid = _id(request.get("request_id"), "request")
+                tenant = _id(request.get("tenant_id"), "tenant")
+                tokens = request.get("remaining_tokens")
+                pinned = self._staged.get(rid)
+                if (pinned is None or pinned.tenant_id != tenant
+                        or type(tokens) is not int
+                        or not 1 <= tokens <= pinned.max_output_tokens):
+                    raise NativeFairStreamDenied("queued prompt authorization unavailable; cancel explicitly")
+
     def revoke(self, request_id: str) -> None:
         """Burn a pending grant without authorizing an execution."""
         _require_owner_process(self._owner_pid)
@@ -261,6 +284,9 @@ class NativePromptRegistry:
             self._expire_locked(self._clock_locked())
             _id(request_id, "request")
             pinned = self._staged.get(request_id)
+            if (pinned is None and request_id not in self._used
+                    and len(self._staged) + len(self._used) >= MAX_STAGED_PROMPTS):
+                raise NativeFairStreamDenied("prompt identity capacity exhausted")
             if pinned is not None:
                 self._budget.release(pinned.tenant_id, len(pinned.prompt.encode("utf-8")))
                 del self._staged[request_id]

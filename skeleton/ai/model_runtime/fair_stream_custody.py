@@ -172,6 +172,7 @@ class AuthenticatedFairStreamCustody:
         self, *, expected_generation: int, action: str,
         request: StreamRequest | None = None,
         request_id: str | None = None,
+        tenant_id: str | None = None,
         budget: MeasuredStreamBudget | None = None,
         receipt: Mapping[str, object] | None = None,
         whole_request: bool | None = None,
@@ -196,7 +197,7 @@ class AuthenticatedFairStreamCustody:
             elif action == "cancel":
                 if type(request_id) is not str:
                     raise ValueError("request identity required")
-                trial.cancel(request_id)
+                trial.cancel(request_id, tenant_id=tenant_id)
             elif action == "plan":
                 if not isinstance(budget, MeasuredStreamBudget):
                     raise ValueError("typed measured budget required")
