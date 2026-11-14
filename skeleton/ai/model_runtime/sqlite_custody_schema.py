@@ -87,7 +87,9 @@ def assert_custody_schema(
     if not any(row[3] == "pk" and index_keys(row) == keys for row in all_indexes):
         raise CustodySchemaError("untrusted custody primary key index")
     for required in unique_keys:
-        if not any(index_keys(row) == required for row in all_indexes):
+        if (not required or any(key not in columns for key in required)
+                or any(row[3] != 1 for row in info if row[1] in required)
+                or not any(index_keys(row) == required for row in all_indexes)):
             raise CustodySchemaError("untrusted custody unique identity index")
     if replay_index is not None:
         replay_index = _identifier(replay_index)

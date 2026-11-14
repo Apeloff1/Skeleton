@@ -62,6 +62,7 @@ class DurableFairStreamSession:
             "initialize", "read", "advance",
         )):
             raise ValueError("trusted high-watermark CAS required")
+        store._require_owner_process()
         self._store = store
         self._watermark = watermark
         self._lock = RLock()
@@ -94,6 +95,9 @@ class DurableFairStreamSession:
     def quarantined(self) -> bool:
         return self._quarantined
 
+    def _require_owner_process(self) -> None:
+        self._store._require_owner_process()
+
     def _trusted(self) -> tuple[int, str]:
         if self._quarantined:
             raise CustodyQuarantined("session quarantined; explicit recovery required")
@@ -111,6 +115,7 @@ class DurableFairStreamSession:
             raise CustodyQuarantined("trusted high-watermark unavailable") from exc
 
     def verify(self) -> dict[str, object]:
+        self._require_owner_process()
         with self._lock:
             generation, digest = self._trusted()
             try:
@@ -128,6 +133,7 @@ class DurableFairStreamSession:
         self, *, action: str, expected_anchor: tuple[int, str] | None = None,
         **kwargs: object,
     ) -> tuple[object | None, dict[str, object]]:
+        self._require_owner_process()
         with self._lock:
             generation, digest = self._trusted()
             if expected_anchor is not None and expected_anchor != (generation, digest):
@@ -142,12 +148,19 @@ class DurableFairStreamSession:
                     expected_generation=generation, expected_digest=digest,
                     generation=envelope["generation"], digest=envelope["digest"],
                 )
+                confirmed = self._watermark.read()
+                if (type(confirmed) is not tuple or len(confirmed) != 2
+                        or type(confirmed[0]) is not int or type(confirmed[1]) is not str
+                        or confirmed != (envelope["generation"], envelope["digest"])):
+                    raise ValueError("independent anchor did not confirm transition")
                 return plan, envelope
-            except Exception as exc:
+            except BaseException as exc:
                 # Even when the SQLite update succeeded and the anchor failed,
                 # no further work can be admitted or dispatched from this
                 # process. A new process also detects the mismatch on verify.
                 self._quarantined = True
+                if not isinstance(exc, Exception):
+                    raise
                 raise CustodyQuarantined(
                     "fair-stream transaction requires trusted reconciliation"
                 ) from exc
@@ -214,6 +227,7 @@ class DurableFairStreamSession:
         return state
 
     def pending_ids(self) -> tuple[str, ...]:
+        self._require_owner_process()
         with self._lock:
             generation, digest = self._trusted()
             try:
