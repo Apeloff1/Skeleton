@@ -1,0 +1,81 @@
+name: Portable Truth Proofs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/core/sparse_merkle.py"
+      - "backend/core/epistemic_claim_index.py"
+      - "backend/core/epistemic_checkpoint.py"
+      - "backend/core/epistemic_transparency.py"
+      - "backend/core/transparency_log.py"
+      - "backend/core/transparency_witness.py"
+      - "backend/core/signed_transparency_witness.py"
+      - "backend/core/signed_finality_evidence.py"
+      - "backend/core/signed_portable_claim.py"
+      - "backend/core/transparency_finality.py"
+      - "backend/core/transparency_finality_proof.py"
+      - "backend/core/portable_claim_proof.py"
+      - "backend/core/claim_proof.py"
+      - "backend/core/epistemic_attestation.py"
+      - "backend/tests/test_portable_claim_proof.py"
+      - "backend/tests/test_portable_finality_proof.py"
+      - "backend/tests/test_signed_portable_claim.py"
+      - "backend/tests/test_claim_proof_attestation.py"
+      - "backend/tests/test_transparency_log.py"
+      - ".github/workflows/portable-truth-proofs.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - "backend/core/sparse_merkle.py"
+      - "backend/core/epistemic_claim_index.py"
+      - "backend/core/epistemic_checkpoint.py"
+      - "backend/core/epistemic_transparency.py"
+      - "backend/core/transparency_log.py"
+      - "backend/core/transparency_witness.py"
+      - "backend/core/signed_transparency_witness.py"
+      - "backend/core/signed_finality_evidence.py"
+      - "backend/core/signed_portable_claim.py"
+      - "backend/core/transparency_finality.py"
+      - "backend/core/transparency_finality_proof.py"
+      - "backend/core/portable_claim_proof.py"
+      - "backend/core/claim_proof.py"
+      - "backend/core/epistemic_attestation.py"
+      - "backend/tests/test_portable_claim_proof.py"
+      - "backend/tests/test_portable_finality_proof.py"
+      - "backend/tests/test_signed_portable_claim.py"
+      - "backend/tests/test_claim_proof_attestation.py"
+      - "backend/tests/test_transparency_log.py"
+      - ".github/workflows/portable-truth-proofs.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portable-truth-proofs-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable-truth-proofs:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install focused dependencies
+        run: python -m pip install "pytest>=8,<9" "cryptography>=46.0.4,<47"
+      - name: Verify membership, transparency, signed finality and freshness
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_portable_claim_proof.py
+          tests/test_portable_finality_proof.py
+          tests/test_signed_portable_claim.py
+          tests/test_claim_proof_attestation.py
+          tests/test_transparency_log.py
