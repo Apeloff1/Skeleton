@@ -27,6 +27,7 @@ from .fair_stream_result_vault import (
 )
 from .fair_stream_session import DispatchPermit
 from .private_sqlite import PrivateSQLiteHandle, PrivateSQLiteUnavailable
+from .sqlite_custody_schema import CustodySchemaError, assert_custody_schema
 
 SCHEMA = "skeleton.ai.fair-stream-result-read-grant.v1"
 MAX_GRANT_BYTES = 1024
@@ -169,6 +170,14 @@ class AuthorizedSealedResultReader:
             or grant_handle.connection is journal._connection
         ):
             raise ValueError("independent grant ledger required")
+        grant_handle.assert_current()
+        vault._handle.assert_current()
+        if journal._private_handle is not None:
+            journal._private_handle.assert_current()
+            journal_inode = os.fstat(journal._private_handle._file_fd)
+            grant_identity = os.fstat(grant_handle._file_fd)
+            if (journal_inode.st_dev, journal_inode.st_ino) == (grant_identity.st_dev, grant_identity.st_ino):
+                raise ValueError("grant ledger must use a distinct journal inode")
         result_inode = os.fstat(vault._handle._file_fd)
         grant_inode = os.fstat(grant_handle._file_fd)
         if (result_inode.st_dev, result_inode.st_ino) == (
@@ -204,6 +213,16 @@ class AuthorizedSealedResultReader:
             " AND tbl_name=?", (_TABLE,),
         ).fetchone()[0]:
             raise ResultReadDenied("untrusted grant-ledger trigger")
+        self._assert_schema()
+
+    def _assert_schema(self) -> None:
+        try:
+            assert_custody_schema(
+                self._connection, table=_TABLE,
+                columns=("nonce", "lease_id", "receipt_digest"), primary_key="nonce",
+            )
+        except CustodySchemaError as exc:
+            raise ResultReadDenied("grant ledger schema changed") from exc
 
     def read_once(
         self, permit: DispatchPermit, *,
@@ -214,6 +233,10 @@ class AuthorizedSealedResultReader:
         The caller must enforce app user authorization before invoking this
         method. A consumed grant remains consumed if decryption later fails.
         """
+        try:
+            self._handle.require_owner_process()
+        except PrivateSQLiteUnavailable as exc:
+            raise ResultReadDenied("grant ledger unavailable") from exc
         with self._lock:
             if self._connection.in_transaction:
                 raise ResultReadDenied("grant ledger unavailable")
@@ -221,6 +244,7 @@ class AuthorizedSealedResultReader:
                 self._handle.assert_current()
             except PrivateSQLiteUnavailable as exc:
                 raise ResultReadDenied("grant ledger inode custody changed") from exc
+            self._assert_schema()
             try:
                 receipt = self._journal.recover_committed_receipt(permit)
             except (ValueError, RuntimeError, sqlite3.Error) as exc:
@@ -243,6 +267,7 @@ class AuthorizedSealedResultReader:
             )
             self._connection.execute("BEGIN IMMEDIATE")
             try:
+                self._assert_schema()
                 count = self._connection.execute(
                     "SELECT COUNT(*) FROM " + _TABLE
                 ).fetchone()[0]
@@ -258,6 +283,13 @@ class AuthorizedSealedResultReader:
                     + " (nonce, lease_id, receipt_digest) VALUES (?, ?, ?)",
                     (nonce, permit.lease_id, digest),
                 )
+                self._handle.assert_current()
+                self._assert_schema()
+                row = self._connection.execute(
+                    "SELECT lease_id, receipt_digest FROM " + _TABLE + " WHERE nonce=?", (nonce,),
+                ).fetchone()
+                if row != (permit.lease_id, digest):
+                    raise ResultReadDenied("grant consumption readback mismatch")
                 self._connection.commit()
             except BaseException:
                 self._connection.rollback()

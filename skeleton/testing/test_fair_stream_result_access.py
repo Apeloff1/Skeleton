@@ -302,3 +302,46 @@ def test_valid_read_grant_cannot_release_output_with_disagreeing_signed_count(se
     with pytest.raises(ResultReadDenied, match="already consumed"):
         setup["reader"].read_once(permit(), operator_grant=g)
     assert setup["backend"].calls == 1
+
+
+@pytest.mark.parametrize("temporary", [False, True])
+def test_late_grant_trigger_cannot_erase_consumed_nonce(setup, temporary):
+    conn = setup["grant_handle"].connection
+    prefix = "CREATE TEMP TRIGGER" if temporary else "CREATE TRIGGER"
+    conn.execute(
+        prefix + " erase_nonce AFTER INSERT ON local_fair_stream_result_read_grants "
+        "BEGIN DELETE FROM local_fair_stream_result_read_grants WHERE nonce=NEW.nonce; END"
+    )
+    with pytest.raises(ResultReadDenied, match="schema"):
+        setup["reader"].read_once(permit(), operator_grant=grant(setup))
+    assert conn.execute("SELECT COUNT(*) FROM local_fair_stream_result_read_grants").fetchone()[0] == 0
+    conn.execute("DROP TRIGGER erase_nonce")
+    assert setup["reader"].read_once(permit(), operator_grant=grant(setup)) == b"secret offline generated text"
+    with pytest.raises(ResultReadDenied, match="already consumed"):
+        setup["reader"].read_once(permit(), operator_grant=grant(setup))
+
+
+def test_temporary_grant_table_shadow_denies_read(setup):
+    conn = setup["grant_handle"].connection
+    conn.execute(
+        "CREATE TEMP TABLE local_fair_stream_result_read_grants "
+        "(nonce TEXT PRIMARY KEY NOT NULL, lease_id TEXT NOT NULL, receipt_digest TEXT NOT NULL)"
+    )
+    with pytest.raises(ResultReadDenied, match="schema"):
+        setup["reader"].read_once(permit(), operator_grant=grant(setup))
+    assert conn.execute("SELECT COUNT(*) FROM main.local_fair_stream_result_read_grants").fetchone()[0] == 0
+
+
+def test_inherited_grant_reader_refuses_before_lock(setup, monkeypatch):
+    pid = os.getpid()
+
+    class ForbiddenLock:
+        def __enter__(self):
+            pytest.fail("inherited grant reader reached process-local lock")
+
+    g = grant(setup)
+    monkeypatch.setattr(setup["reader"], "_lock", ForbiddenLock())
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "getpid", lambda: pid + 1)
+        with pytest.raises(ResultReadDenied, match="unavailable"):
+            setup["reader"].read_once(permit(), operator_grant=g)

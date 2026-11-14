@@ -234,6 +234,7 @@ class DurableFairStreamStore:
         digest = _digest(expected_digest, "trusted high-watermark")
         self._require_owner_process()
         with self._lock:
+            self._assert_private()
             if self._connection.in_transaction:
                 raise ValueError("shared or active SQLite transaction forbidden")
             # Read schema and payload in a single SQLite snapshot. Otherwise
