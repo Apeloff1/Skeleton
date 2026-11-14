@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "python_trace_10",
+  "domain": "python_trace",
+  "severity": "high",
+  "objective": "Measure Python program interpretation and finite logical inference python_trace case 10",
+  "steps": [
+    {
+      "prompt": "Mentally run this Python 3 program without executing external code. Return exactly what the print call emits on one line. Program:\na = [76, 6, 82]\nprint(sum(a))",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "164"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

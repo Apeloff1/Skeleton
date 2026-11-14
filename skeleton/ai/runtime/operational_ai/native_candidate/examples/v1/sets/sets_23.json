@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "sets_23",
+  "domain": "sets",
+  "prompt": "Remove repeat labels while retaining first seen order for fictional set 32: alpha, beta, alpha, gamma, beta, delta32.",
+  "completion": "alpha, beta, gamma, delta32",
+  "group_id": "sets_23",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "sum_22",
+  "domain": "sum",
+  "ordinal": 22,
+  "arguments": {
+    "index": 22,
+    "a": 254,
+    "b": 11,
+    "word": "marble",
+    "city": "Halden"
+  },
+  "prompt": "Task 22: Add 254 and 11. Return the decimal integer only.",
+  "expected": "265",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

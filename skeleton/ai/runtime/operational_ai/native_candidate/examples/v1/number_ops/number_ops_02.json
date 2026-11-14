@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "number_ops_02",
+  "domain": "number_ops",
+  "prompt": "Compute 22 minus 4; reply with the integer only.",
+  "completion": "18",
+  "group_id": "number_ops_02",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

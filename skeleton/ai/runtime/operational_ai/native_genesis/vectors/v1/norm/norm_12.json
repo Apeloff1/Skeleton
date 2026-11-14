@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "norm_12",
+  "category": "norm",
+  "overrides": {
+    "norm": 1
+  },
+  "expected": "denied",
+  "reason": "Refuse malformed or unapproved norm configuration without fallback"
+}
