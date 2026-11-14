@@ -278,7 +278,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "c2ad7951bc3b6d2be1631f080f77b585e3cb9abf",
+      "source_git_object_sha": "03b81d2b3f4718efb188109c165ee259107e7ed6",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -1492,7 +1492,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "604551f6ce80fe74cfbf93dc073e306d9aa14fa6",
+      "source_git_object_sha": "75e317be4c83b355084f5606e9b48dc0438caca2",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -5629,7 +5629,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_ecs_adapter_tree_exactly_mirrored",
-      "source_git_object_sha": "ce7c1908fa42a17bc146b6e1b1f7356fb9af855a"
+      "source_git_object_sha": "7be6c2390acb9bb4287138957bc3e00f37ca65d6"
     },
     {
       "id": "AIFT-EXEC-SANDBOX",
