@@ -1,0 +1,57 @@
+name: Archived GameForge Jeeves evaluation source qualification
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "skeleton/eval/**"
+      - "skeleton/ai/evaluation/**"
+      - "skeleton/app/jeeves_local_lease.py"
+      - "skeleton/ai/runtime/inference/lease_custody.py"
+      - "scripts/evaluate_jeeves_game_builder_quality.py"
+      - "tests/test_game_builder_quality.py"
+      - "tests/test_game_builder_reference_pack.py"
+      - "backend/routes/skeleton_gameforge.py"
+      - "backend/tests/test_jeeves_game_quality_catalog.py"
+      - ".github/workflows/jeeves-game-builder-quality-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jeeves-game-quality-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  source_quality:
+    name: Jeeves source-only game builder quality regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Use supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install focused source testing dependencies
+        run: python -m pip install --disable-pip-version-check -e . "pytest==8.4.2"
+      - name: Compile source and verify mirrored Python inventory
+        run: |
+          python -m compileall -q skeleton/eval skeleton/ai/evaluation skeleton/app/jeeves_local_lease.py skeleton/ai/runtime/inference/lease_custody.py scripts/evaluate_jeeves_game_builder_quality.py
+          python scripts/check_ai_file_tree.py
+      - name: Run source-only evaluation and read-only catalog tests
+        env:
+          PYTHONPATH: ".:backend"
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest --import-mode=importlib
+          tests/test_game_builder_quality.py
+          tests/test_game_builder_reference_pack.py
+          backend/tests/test_jeeves_game_quality_catalog.py

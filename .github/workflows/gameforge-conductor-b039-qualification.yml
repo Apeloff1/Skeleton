@@ -1,0 +1,59 @@
+name: GameForge conductor and B039 self-repair qualification
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "skeleton/gameforge/__init__.py"
+      - "skeleton/gameforge/conductor.py"
+      - "skeleton/gameforge/eras.py"
+      - "skeleton/gameforge/errors.py"
+      - "skeleton/gameforge/manifest.py"
+      - "skeleton/gameforge/plans.py"
+      - "skeleton/gameforge/safety.py"
+      - "skeleton/gameforge/steps.py"
+      - "skeleton/gameforge/test_gameforge_conductor.py"
+      - "skeleton/gameforge/batch_b039/**"
+      - ".github/workflows/gameforge-conductor-b039-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gameforge-conductor-b039-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conductor_and_repair:
+    name: GameForge seven-step conductor and B039 repair tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout proposed exact SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Select supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install focused hermetic test runner
+        run: python -m pip install --disable-pip-version-check "pytest==8.4.2"
+      - name: Compile and prove canonical AI source inventory
+        run: |
+          python -m compileall -q skeleton/gameforge/conductor.py skeleton/gameforge/eras.py skeleton/gameforge/errors.py skeleton/gameforge/manifest.py skeleton/gameforge/plans.py skeleton/gameforge/safety.py skeleton/gameforge/steps.py skeleton/gameforge/batch_b039
+          python scripts/check_ai_file_tree.py
+      - name: Test conductor order, era contracts, manifest and legacy compatibility
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest -q --noconftest skeleton/gameforge/test_gameforge_conductor.py
+      - name: Test bounded repair and B031/B038 source identity
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest -q --noconftest skeleton/gameforge/batch_b039/test_self_repair.py skeleton/gameforge/batch_b039/test_route_adapter.py

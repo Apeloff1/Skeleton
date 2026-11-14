@@ -1,0 +1,61 @@
+name: First-install Studio ↔ GameForge source return qualification
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "frontend/src/skeletonForge/foundation/**"
+      - "frontend/src/skeletonForge/components/foundation/**"
+      - "frontend/src/skeletonForge/creatorBridge.ts"
+      - "frontend/src/skeletonForge/creatorBridgeStorage.ts"
+      - "frontend/src/skeletonForge/creatorStorageScope.ts"
+      - "frontend/scripts/skeleton-forge/foundation.model.test.cjs"
+      - "frontend/scripts/skeleton-forge/storage-scope.test.cjs"
+      - ".github/workflows/studio-origin-return-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-origin-return-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  full_studio_custody:
+    name: Studio source custody, revision CAS, eight-mode return and SSR
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact proposed revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Activate reviewed Yarn
+        run: |
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+      - name: Resolve frozen frontend dependencies without lifecycle hooks
+        working-directory: frontend
+        run: yarn install --frozen-lockfile --non-interactive --ignore-scripts --network-concurrency 4
+      - name: Enforce patched third-party code and real security assertions
+        working-directory: frontend
+        run: |
+          node scripts/patch-node-modules.js
+          node scripts/verify-no-release-npm-security.js
+      - name: Qualify all first-install and advanced creator source contracts
+        working-directory: frontend
+        run: yarn test:skeleton-forge
+      - name: Require complete application TypeScript compatibility
+        working-directory: frontend
+        run: yarn typecheck
+      - name: Require native Expo package compatibility
+        working-directory: frontend
+        run: yarn check:expo-native-compat
+      - name: Preserve exact UI source registry and AI-tree contracts
+        run: |
+          python scripts/check_product_surface_specification.py
+          python scripts/check_ai_file_tree.py

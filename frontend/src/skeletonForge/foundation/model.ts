@@ -2,7 +2,10 @@
  * Studio shell state: first-run, account gate, projects, and where Back goes.
  * Pure — screens and persistence sit on top of this reducer.
  */
-import { questionnaireReducer, type QuestionnaireAction, type QuestionnaireState } from '../questionnaire';
+import {
+  INITIAL_STATE, questionnaireReducer, reachable, type QuestionnaireAction, type QuestionnaireState,
+} from '../questionnaire';
+import { normalisePresetState } from '../designPresets';
 import { summarizeRun } from '../run';
 import type { RunPayload } from '../types';
 
@@ -115,6 +118,7 @@ export type FoundationAction =
   | { type: 'signedOut' }
   | { type: 'setPrefs'; prefs: StudioPrefs }
   | { type: 'recordRun'; projectId: string; snapshot: RunSnapshot }
+  | { type: 'importLegacy'; projects: StudioProject[] }
   | { type: 'persistError'; error: string | null };
 
 const LOADING_AUTH: AuthView = {
@@ -141,13 +145,41 @@ export function initialFoundationState(): FoundationState {
 }
 
 export function freshQuestionnaire(): QuestionnaireState {
+  // First-install projects must carry the same complete defaults as the
+  // advanced Forge cockpit. Independent nested objects prevent one draft
+  // mutating another project's arrays or authoring choices.
   return {
-    step: 'vision',
-    vision: '',
+    ...INITIAL_STATE,
     brief: {},
     beats: {},
-    options: { archetype: 'auto', target: 'godot', era: null, generation: null },
+    instruments: {},
+    quest: { ...INITIAL_STATE.quest! },
+    playable: { ...INITIAL_STATE.playable! },
+    sourceExport: { ...INITIAL_STATE.sourceExport! },
+    options: { ...INITIAL_STATE.options },
   };
+}
+
+/** Persist receipts and summaries, not multi-megabyte generated source bodies.
+ * Source ZIP can only be exported from the original account-bound live run.
+ */
+export function persistedRunPayload(payload: RunPayload | null | undefined): RunPayload | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  const { files: _sourceBodies, source_manifest: _manifest, source_export, ...summary } = payload;
+  if (source_export?.status === 'ready') {
+    return {
+      ...summary,
+      source_export: {
+        status: 'unavailable',
+        reason: 'Source ZIP is only available in the original live run. Save or share it before leaving.',
+      },
+    };
+  }
+  return { ...summary, ...(source_export ? { source_export } : {}) };
+}
+
+export function persistedRunSnapshot(snapshot: RunSnapshot): RunSnapshot {
+  return { ...snapshot, payload: persistedRunPayload(snapshot.payload) };
 }
 
 export function projectTitle(vision: string): string {
@@ -327,6 +359,16 @@ export function foundationReducer(state: FoundationState, action: FoundationActi
       return { ...state, prefs: sanitizePrefs(action.prefs) };
     case 'recordRun':
       return applyRecordRun(state, action.projectId, action.snapshot);
+    case 'importLegacy': {
+      if (!canEnter(state) || state.holdSaves) return state;
+      const existing = new Set(state.projects.map((project) => project.id));
+      const admitted = sanitizeProjects(action.projects);
+      if (admitted.corrupt) return state;
+      const fresh = admitted.projects.filter((project) => !existing.has(project.id));
+      // Original unscoped data remains read-only; never overwrite a
+      // current account's project with an ambiguous old project ID.
+      return fresh.length ? { ...state, projects: [...fresh, ...state.projects] } : state;
+    }
     case 'persistError':
       return { ...state, persistError: action.error };
     default:
@@ -338,7 +380,7 @@ export function applyRecordRun(state: FoundationState, projectId: string, snapsh
   const current = state.projects.find((project) => project.id === projectId);
   if (!current) return state;
   const updatedAt = snapshot.finishedAt != null ? new Date(snapshot.finishedAt).toISOString() : current.updatedAt;
-  return replaceProject(state, { ...current, lastRun: snapshot, updatedAt });
+  return replaceProject(state, { ...current, lastRun: persistedRunSnapshot(snapshot), updatedAt });
 }
 
 export interface PersistSnapshot {
@@ -352,7 +394,10 @@ export interface PersistSnapshot {
 export function persistSnapshot(state: FoundationState): PersistSnapshot {
   return {
     onboarded: state.onboarded,
-    projects: state.projects,
+    projects: state.projects.map((project) => ({
+      ...project,
+      lastRun: project.lastRun ? persistedRunSnapshot(project.lastRun) : null,
+    })),
     prefs: state.prefs,
     projectsCorrupt: state.projectsCorrupt,
     holdSaves: state.holdSaves,
@@ -466,23 +511,60 @@ function stringMap(raw: unknown): Record<string, string> | null {
 }
 
 function sanitizeProject(raw: unknown): StudioProject | null {
-  if (!raw || typeof raw !== 'object') return null;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const item = raw as Record<string, unknown>;
   if (typeof item.id !== 'string' || !item.id.trim()) return null;
   if (typeof item.createdAt !== 'string' || typeof item.updatedAt !== 'string') return null;
-  const q = item.questionnaire;
-  if (!q || typeof q !== 'object') return null;
-  const questionnaire = q as QuestionnaireState;
+  const source = item.questionnaire;
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return null;
+  const questionnaire = source as QuestionnaireState;
   if (!['vision', 'brief', 'beats', 'options', 'review'].includes(questionnaire.step)) return null;
   if (typeof questionnaire.vision !== 'string') return null;
-  const brief = stringMap(questionnaire.brief);
-  const beats = stringMap(questionnaire.beats);
-  if (!brief || !beats) return null;
-  const options = questionnaire.options;
-  if (!options || typeof options !== 'object') return null;
-  if (typeof options.archetype !== 'string' || typeof options.target !== 'string') return null;
-  if (!(options.era == null || typeof options.era === 'string')) return null;
-  if (!(options.generation == null || typeof options.generation === 'string')) return null;
+
+  // Legacy first-install projects did not persist newer authoring options.
+  // Fill ONLY absent fields; validate everything actually supplied by disk.
+  // The canonical saved-design parser rejects forged controls, invalid
+  // ranges, unsupported genres, malformed Galaxy profiles, and impossible
+  // quest/playable start scenes instead of silently clamping saved values.
+  let validated: QuestionnaireState;
+  try {
+    const defaults = freshQuestionnaire();
+    // Legacy playable/quest objects may omit newer controls. Fill missing
+    // members only; invalid present values still fail the canonical parser.
+    if (questionnaire.quest !== undefined &&
+        (!questionnaire.quest || typeof questionnaire.quest !== 'object' ||
+         Array.isArray(questionnaire.quest))) return null;
+    if (questionnaire.playable !== undefined &&
+        (!questionnaire.playable || typeof questionnaire.playable !== 'object' ||
+         Array.isArray(questionnaire.playable))) return null;
+    validated = normalisePresetState({
+      ...defaults,
+      ...questionnaire,
+      instruments: questionnaire.instruments ?? defaults.instruments,
+      galaxyGenre: questionnaire.galaxyGenre ?? null,
+      galaxyProfile: questionnaire.galaxyProfile ?? null,
+      quest: { ...defaults.quest, ...questionnaire.quest },
+      playable: { ...defaults.playable, ...questionnaire.playable },
+    });
+  } catch {
+    // A corrupt project holds ALL project saves; never overwrite a design
+    // whose rejected fields could not be faithfully recovered.
+    return null;
+  }
+  const playtest = questionnaire.playtest ?? 'off';
+  if (playtest !== 'off' && playtest !== 'auto' && playtest !== 'require') return null;
+  const rawExport = questionnaire.sourceExport ?? { enabled: false };
+  if (!rawExport || typeof rawExport !== 'object' || Array.isArray(rawExport) ||
+      typeof rawExport.enabled !== 'boolean') return null;
+  const candidate: QuestionnaireState = {
+    ...validated,
+    playtest,
+    sourceExport: { enabled: rawExport.enabled },
+  };
+  const normalized: QuestionnaireState = {
+    ...candidate,
+    step: reachable(candidate, questionnaire.step) ? questionnaire.step : 'vision',
+  };
   let lastRun: RunSnapshot | null = null;
   if (item.lastRun != null) {
     if (typeof item.lastRun !== 'object') return null;
@@ -496,7 +578,7 @@ function sanitizeProject(raw: unknown): StudioProject | null {
       startedAt: typeof run.startedAt === 'number' ? run.startedAt : null,
       finishedAt: typeof run.finishedAt === 'number' ? run.finishedAt : null,
       succeeded: run.succeeded,
-      payload: run.payload && typeof run.payload === 'object' ? run.payload : null,
+      payload: persistedRunPayload(run.payload),
     };
   }
   return {
@@ -504,7 +586,7 @@ function sanitizeProject(raw: unknown): StudioProject | null {
     title: typeof item.title === 'string' && item.title.trim() ? item.title : 'Untitled project',
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
-    questionnaire: { step: questionnaire.step, vision: questionnaire.vision, brief, beats, options: { ...options } },
+    questionnaire: normalized,
     lastRun,
   };
 }
@@ -521,6 +603,60 @@ export function sanitizeProjects(raw: unknown): { projects: StudioProject[]; cor
   }
   return { projects, corrupt: false };
 }
+
+/** Reconcile one edited Forge questionnaire into exactly its originating
+ * Studio project. ID and source revision must match; a concurrent edit or
+ * deleted project is never overwritten just because a bridge exists. */
+export function reconcileStudioReturn(
+  projects: readonly StudioProject[], projectId: string,
+  expectedUpdatedAt: string, questionnaire: QuestionnaireState,
+  at: string,
+): { status: 'applied' | 'conflict' | 'missing' | 'invalid'; projects: StudioProject[] } {
+  const snapshot = [...projects];
+  const index = snapshot.findIndex((p) => p.id === projectId);
+  if (index < 0) return { status: 'missing', projects: snapshot };
+  if (snapshot[index].updatedAt !== expectedUpdatedAt) {
+    return { status: 'conflict', projects: snapshot };
+  }
+  const draft = {
+    ...snapshot[index],
+    title: projectTitle(questionnaire.vision),
+    questionnaire,
+    updatedAt: at,
+  };
+  const vetted = sanitizeProjects([draft]);
+  if (vetted.corrupt || vetted.projects.length !== 1) {
+    return { status: 'invalid', projects: snapshot };
+  }
+  snapshot[index] = vetted.projects[0];
+  return { status: 'applied', projects: snapshot };
+}
+
+/** User-approved return from Forge: preserve edits as a new project if the
+ * original was changed/deleted while the cockpit was open. */
+export function recoverStudioReturnAsCopy(
+  projects: readonly StudioProject[], questionnaire: QuestionnaireState, at: string,
+): { project: StudioProject; projects: StudioProject[] } {
+  const occupied = new Set(projects.map((p) => p.id));
+  const stamp = Date.parse(at);
+  if (!Number.isFinite(stamp)) throw new Error('Invalid Studio return timestamp');
+  let id = '';
+  for (let index = 0; index < 128; index++) {
+    const proposed = 'p_return_' + Math.floor(stamp).toString(36) + '_' + index.toString(36);
+    if (!occupied.has(proposed)) { id = proposed; break; }
+  }
+  if (!id) throw new Error('No available Studio project ID for returned Forge edits');
+  const candidate: StudioProject = {
+    id, title: projectTitle(questionnaire.vision) + ' (Forge copy)',
+    createdAt: at, updatedAt: at, questionnaire, lastRun: null,
+  };
+  const checked = sanitizeProjects([candidate]);
+  if (checked.corrupt || checked.projects.length !== 1) {
+    throw new Error('Returned Forge questionnaire was invalid');
+  }
+  return { project: checked.projects[0], projects: [checked.projects[0], ...projects] };
+}
+
 
 export interface AuthClient {
   checkMe: () => Promise<AuthObservation>;

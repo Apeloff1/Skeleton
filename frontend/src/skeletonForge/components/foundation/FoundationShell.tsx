@@ -30,6 +30,12 @@ export interface ShellPorts {
   load?: () => Promise<LoadResult>;
   save?: (snap: PersistSnapshot) => Promise<void>;
   auth?: AuthPort;
+  /** A legacy global device blob is never attributed to the active account
+   * unless the user explicitly imports it. */
+  legacyAvailable?: boolean;
+  importLegacy?: () => Promise<StudioProject[]>;
+  studioReturnNotice?: string | null;
+  cockpitTransferError?: string | null;
   platform: A11yPlatformSnapshot;
   catalog: {
     beats: Beat[];
@@ -50,6 +56,9 @@ export interface ShellPorts {
     ownerId: string | null;
     onStart: (projectId: string, req: RunRequest) => void;
     onCancel: () => void;
+    onExport?: () => void;
+    exportBusy?: boolean;
+    exportError?: string | null;
   };
   now: number;
   console: {
@@ -59,7 +68,7 @@ export interface ShellPorts {
     onStatus: () => void;
   };
   onSetup: () => void;
-  onOpenCockpit: () => void;
+  onOpenCockpit: (project?: StudioProject) => void;
   onVision?: (vision: string) => void;
   newId?: () => string;
   nowIso?: () => string;
@@ -81,6 +90,23 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
   const [busy, setBusy] = React.useState(false);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [pendingForge, setPendingForge] = React.useState<RunRequest | null>(null);
+  const [legacyBusy, setLegacyBusy] = React.useState(false);
+  const [legacyError, setLegacyError] = React.useState<string | null>(null);
+  const legacyLock = React.useRef(false);
+  const importLegacy = React.useCallback(() => {
+    if (!ports.importLegacy || legacyLock.current) return;
+    legacyLock.current = true;
+    setLegacyBusy(true);
+    setLegacyError(null);
+    void ports.importLegacy().then((projects) => {
+      dispatch({ type: 'importLegacy', projects });
+    }).catch((error: unknown) => {
+      setLegacyError(message(error, 'Could not safely import legacy Studio projects.'));
+    }).finally(() => {
+      legacyLock.current = false;
+      setLegacyBusy(false);
+    });
+  }, [ports.importLegacy]);
   const seq = React.useRef(0);
   const newId = React.useCallback(() => (ports.newId ? ports.newId() : createId(Date.now(), ++seq.current)), [ports]);
   const iso = React.useCallback(() => (ports.nowIso ? ports.nowIso() : new Date().toISOString()), [ports]);
@@ -117,6 +143,7 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
   }, [state, newId, iso]);
 
   const active = state.projects.find((project) => project.id === state.activeId) ?? null;
+  const openActiveCockpit = () => ports.onOpenCockpit(active ?? undefined);
   React.useEffect(() => {
     ports.onVision?.(active?.questionnaire.vision ?? '');
   }, [active?.questionnaire.vision, ports]);
@@ -213,7 +240,7 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
   const onGuidance = (action: StepAction) => {
     if (action.id === 'edit-brief') dispatch({ type: 'openBrief' });
     else if (action.id === 'projects') dispatch({ type: 'openDashboard' });
-    else if (action.id === 'cockpit') ports.onOpenCockpit();
+    else if (action.id === 'cockpit') openActiveCockpit();
     else if (action.id === 'retry' && active) startForge(active, buildRunRequest(active.questionnaire));
   };
 
@@ -308,7 +335,7 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
         onRetryCatalog={ports.catalog.reload}
         onProjects={() => dispatch({ type: 'openDashboard' })}
         onViewBuild={() => dispatch({ type: 'openBuild' })}
-        onOpenCockpit={ports.onOpenCockpit}
+        onOpenCockpit={openActiveCockpit}
         conflict={pendingForge && other ? {
           title: other.title,
           onConfirm: () => startForge(active, pendingForge),
@@ -338,6 +365,10 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
         now={ports.now}
         onCancel={visible.live && visible.phase === 'running' ? ports.run.onCancel : undefined}
         onRetry={visible.phase === 'done' || visible.phase === 'error' ? () => startForge(active, buildRunRequest(active.questionnaire)) : undefined}
+        onExport={visible.live && visible.phase === 'done' && visible.payload?.source_export?.status === 'ready'
+          ? ports.run.onExport : undefined}
+        exportBusy={ports.run.exportBusy}
+        exportError={ports.run.exportError}
         guidance={guidance}
         onGuidance={onGuidance}
         consoleBusy={ports.console.busy}
@@ -347,7 +378,7 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
         onAskCockpit={ports.console.onStatus}
         onBrief={() => dispatch({ type: 'openBrief' })}
         onProjects={() => dispatch({ type: 'openDashboard' })}
-        onOpenCockpit={ports.onOpenCockpit}
+        onOpenCockpit={openActiveCockpit}
       />
     );
   } else if (state.screen === 'account') {
@@ -396,6 +427,31 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
                 dispatch({ type: 'persistError', error: message(error, 'Could not save on this device.') });
               });
             }} testID="studio-retry-save" />
+          </View>
+        ) : null}
+        {ports.legacyAvailable && canEnter(state) && !state.holdSaves ? (
+          <View style={st.persist} testID="studio-legacy-project-import">
+            <Banner tone="warn">
+              Earlier projects use unscoped device storage. They might belong to another account that used this device. Import them only if they are yours. The original legacy copy stays unchanged.
+            </Banner>
+            <Button
+              label="Import my legacy local projects"
+              tone="secondary"
+              busy={legacyBusy}
+              onPress={importLegacy}
+              testID="studio-import-legacy"
+            />
+            {legacyError ? <Banner tone="bad" testID="studio-legacy-error">{legacyError}</Banner> : null}
+          </View>
+        ) : null}
+        {ports.studioReturnNotice ? (
+          <View style={st.persist}>
+            <Banner tone="idle" testID="studio-return-status">{ports.studioReturnNotice}</Banner>
+          </View>
+        ) : null}
+        {ports.cockpitTransferError ? (
+          <View style={st.persist}>
+            <Banner tone="bad" testID="studio-cockpit-transfer-error">{ports.cockpitTransferError}</Banner>
           </View>
         ) : null}
         {body}
