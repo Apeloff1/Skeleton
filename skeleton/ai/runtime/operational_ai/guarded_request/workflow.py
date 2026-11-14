@@ -53,6 +53,7 @@ class GuardedDispatcher:
         self.pressure_policy = pressure_policy or PressurePolicy()
         self._lock = RLock()
         self._requests: dict[str, NativeRequest] = {}
+        self._active = 0
 
     def submit(self, request: NativeRequest, *, pressure: Pressure, now_mono_ms: int) -> str:
         if type(request) is not NativeRequest:
@@ -72,10 +73,15 @@ class GuardedDispatcher:
 
     def drain_one(self) -> Any | None:
         with self._lock:
+            # Claim a slot before polling; saturation must leave pending work
+            # untouched. The authoritative native service still owns model custody.
+            if self._active >= self.quota.parallel_requests:
+                return None
             ticket = self.queue.poll()
             if ticket is None:
                 return None
             request = self._requests[ticket.request_id]
+            self._active += 1
         try:
             response = self.service.turn(
                 session=request.scope.session,
@@ -87,8 +93,11 @@ class GuardedDispatcher:
             return response
         finally:
             with self._lock:
-                del self._requests[ticket.request_id]
-                self.queue.finish(ticket)
+                try:
+                    self.queue.finish(ticket)
+                    del self._requests[ticket.request_id]
+                finally:
+                    self._active -= 1
 
     def cancel(self, request_id: str) -> bool:
         with self._lock:
