@@ -37,9 +37,12 @@ from skeleton.app.local_ai import (
 )
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
 from skeleton.app.jeeves_inference_circuit import LocalInferenceCircuit
+from skeleton.app.jeeves_local_lease import (
+    LocalInferenceLease, LocalInferenceLeaseBusy, LocalInferenceLeaseUnavailable,
+)
 from skeleton.ai.runtime.inference.llama_cpp import LlamaCppRuntimeError
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeBackendError
-from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary
+from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary, MAX_QUERY_BYTES
 from skeleton.app.offline_resource_fabric import AdaptiveResourceFabric
 from skeleton.app.offline_longform_virtual import (
     LongformVirtualMemory, LongformMemoryError,
@@ -167,6 +170,7 @@ class OfflineHTTPApplication:
         self._lock = threading.RLock()
         self._turn_lock = threading.RLock()
         self._inference_circuit = LocalInferenceCircuit()
+        self._inference_lease = LocalInferenceLease(self.database)
         self._turns: dict[tuple[str, str], _LocalTurn] = {}
         self._active_session: str | None = None
         self._closing = False
@@ -366,6 +370,7 @@ class OfflineHTTPApplication:
                 404: "local conversation unavailable",
                 409: "local conversation conflict",
                 422: "local grounding unavailable",
+                423: "another local service owns the inference execution slot",
                 503: "local model or durable storage unavailable",
             }.get(exc.status, "local generation failed")
             with self._turn_lock:
@@ -507,6 +512,15 @@ class OfflineHTTPApplication:
             return min(32, limits.max_new_tokens, max(1, limits.max_context // 4))
         return min(512, max(1, (self.backend.config.context_size or 4096) // 4))
 
+    def _replayed_result(self, session_id: str, rid: str, digest: str) -> dict[str, Any]:
+        """Replay only a full SQLite-validated, model-scoped committed receipt."""
+        committed = self._read_committed_turn(
+            session_id, rid, expected_request_digest=digest,
+        )
+        if committed is None or not isinstance(committed.get("result"), dict):
+            raise OfflineHTTPError(409, "committed local turn changed during recovery")
+        return committed["result"]
+
     def _perform_turn(self, session_id: str,
                       request: dict[str, Any], *, turn: _LocalTurn | None = None) -> dict[str, Any]:
         _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
@@ -530,29 +544,13 @@ class OfflineHTTPApplication:
         if grounded:
             digest = grounded_request_digest(digest)
             digest = scoped_grounded_request_digest(digest, document_ids)
-        # The citation manifest, execution request and durable receipt must
-        # bind the same final strict/legacy idempotency identity.
+        # Runtime evidence and SQLite must attest the same strict policy.
         digest = _strict_context_digest(digest, strict)
         with self._lock:
             self._session(session_id)
             replay = self._store.replay(session_id, rid, digest)
             if replay is not None:
-                previous = self._store.turn_evidence(
-                    session_id, self.model_digest, self.tokenizer_digest,
-                )
-                return {
-                    "session_id": session_id, "request_id": rid,
-                    "revision": replay.revision, "text": replay.text,
-                    "output_digest": replay.output_digest,
-                    "input_tokens": replay.prompt_tokens,
-                    "output_tokens": replay.generated_tokens,
-                    "replayed": True, "model_digest": self.model_digest,
-                    "local_execution_receipt": self._store.local_execution_receipt(
-                        session_id, rid, self.model_digest, self.tokenizer_digest,
-                    ),
-                    "evidence": previous[replay.revision - 1],
-                    **_audit_pair(replay.text, previous[replay.revision - 1]),
-                }
+                return self._replayed_result(session_id, rid, digest)
             # Historical replies are read-only; newly generated turns must
             # prove the active local model still matches its admitted identity.
             self._admit_local_generation()
@@ -571,65 +569,84 @@ class OfflineHTTPApplication:
                 manifest = prepare_evidence(
                     text, digest, hits, self.model_digest, self.tokenizer_digest,
                 )
-            chat = DurableOfflineAISession(
-                self.backend, database=self.database, session_id=session_id
-            )
             try:
-                # Runtime adaptation and durability CAS are controlled by
-                # DurableOfflineAISession. A failed turn leaves no partial text.
-                async def generate():
-                    if turn is not None:
-                        with self._turn_lock:
-                            turn.loop = asyncio.get_running_loop()
-                            turn.task = asyncio.current_task()
-                            if turn.cancel_requested:
-                                raise asyncio.CancelledError()
-                    return await chat.ask(
-                        text, max_output_tokens=budget, request_id=rid,
-                        evidence_manifest=manifest,
-                        require_full_history=strict,
-                        **({"document_ids": document_ids}
-                           if document_ids is not None else {}),
+                # Acquire only for NEW generation. Already committed historical
+                # replies stay available while a peer runs its model.
+                with self._inference_lease.hold():
+                    # A peer may have finished the same idempotent request
+                    # between the initial replay lookup and lease admission.
+                    # Recover its durable result instead of generating twice.
+                    peer_replay = self._store.replay(session_id, rid, digest)
+                    if peer_replay is not None:
+                        return self._replayed_result(session_id, rid, digest)
+                    self._session(session_id)
+                    chat = DurableOfflineAISession(
+                        self.backend, database=self.database, session_id=session_id
                     )
-                try:
-                    generated_answer = asyncio.run(generate())
-                except (LlamaCppRuntimeError, NativeRuntimeBackendError,
-                        TimeoutError, OSError):
-                    # Count genuine local runtime failures, not invalid user
-                    # prompts, explicit cancellations or SQLite replay.
-                    self._inference_circuit.record_failure()
-                    raise
-                else:
-                    self._inference_circuit.record_success()
-            finally:
-                chat.close()
-            receipt = self._store.replay(session_id, rid, digest)
-            if receipt is None:
-                raise RuntimeContractError("local generation receipt was not committed")
-            execution_receipt = self._store.local_execution_receipt(
-                session_id, rid, self.model_digest, self.tokenizer_digest,
-            )
-            if (execution_receipt is None
-                    or execution_receipt["execution_receipt_digest"]
-                    != generated_answer.execution_receipt_digest
-                    or execution_receipt["output_sha256"] != receipt.output_digest):
-                raise RuntimeContractError(
-                    "local native generation receipt differs from its committed SQLite response"
-                )
-            committed_evidence = self._store.turn_evidence(
-                session_id, self.model_digest, self.tokenizer_digest,
-            )[receipt.revision - 1]
-            return {
-                "session_id": session_id, "request_id": rid,
-                "revision": receipt.revision, "text": receipt.text,
-                "output_digest": receipt.output_digest,
-                "input_tokens": receipt.prompt_tokens,
-                "output_tokens": receipt.generated_tokens,
-                "replayed": False, "model_digest": self.model_digest,
-                "local_execution_receipt": execution_receipt,
-                "evidence": committed_evidence,
-                **_audit_pair(receipt.text, committed_evidence),
-            }
+                    try:
+                        # Runtime adaptation and durability CAS are controlled by
+                        # DurableOfflineAISession. A failed turn leaves no partial text.
+                        async def generate():
+                            if turn is not None:
+                                with self._turn_lock:
+                                    turn.loop = asyncio.get_running_loop()
+                                    turn.task = asyncio.current_task()
+                                    if turn.cancel_requested:
+                                        raise asyncio.CancelledError()
+                            return await chat.ask(
+                                text, max_output_tokens=budget, request_id=rid,
+                                evidence_manifest=manifest,
+                                require_full_history=strict,
+                                **({"document_ids": document_ids}
+                                   if document_ids is not None else {}),
+                            )
+                        try:
+                            generated_answer = asyncio.run(generate())
+                        except (LlamaCppRuntimeError, NativeRuntimeBackendError,
+                                TimeoutError, OSError):
+                            # Count genuine local runtime failures, not invalid user
+                            # prompts, explicit cancellations or SQLite replay.
+                            self._inference_circuit.record_failure()
+                            raise
+                        else:
+                            self._inference_circuit.record_success()
+                    finally:
+                        chat.close()
+                    receipt = self._store.replay(session_id, rid, digest)
+                    if receipt is None:
+                        raise RuntimeContractError("local generation receipt was not committed")
+                    execution_receipt = self._store.local_execution_receipt(
+                        session_id, rid, self.model_digest, self.tokenizer_digest,
+                    )
+                    if (execution_receipt is None
+                            or execution_receipt["execution_receipt_digest"]
+                            != generated_answer.execution_receipt_digest
+                            or execution_receipt["output_sha256"] != receipt.output_digest):
+                        raise RuntimeContractError(
+                            "local native generation receipt differs from its committed SQLite response"
+                        )
+                    committed_evidence = self._store.turn_evidence(
+                        session_id, self.model_digest, self.tokenizer_digest,
+                    )[receipt.revision - 1]
+                    return {
+                        "session_id": session_id, "request_id": rid,
+                        "revision": receipt.revision, "text": receipt.text,
+                        "output_digest": receipt.output_digest,
+                        "input_tokens": receipt.prompt_tokens,
+                        "output_tokens": receipt.generated_tokens,
+                        "replayed": False, "model_digest": self.model_digest,
+                        "local_execution_receipt": execution_receipt,
+                        "evidence": committed_evidence,
+                        **_audit_pair(receipt.text, committed_evidence),
+                    }
+            except LocalInferenceLeaseBusy:
+                raise OfflineHTTPError(
+                    423, "another local service owns the inference execution slot"
+                ) from None
+            except LocalInferenceLeaseUnavailable:
+                raise OfflineHTTPError(
+                    503, "private local inference execution lock is unavailable"
+                ) from None
 
     def dispatch(self, method: str, path: str,
                  body: dict[str, Any] | None = None,
@@ -742,6 +759,10 @@ class OfflineHTTPApplication:
                     _fields(body, {"source_id"}, {"source_id"})
                     return 200, self.longform.verify(body["source_id"])
                 raise OfflineHTTPError(404, "unknown longform operation")
+            except OfflineHTTPError:
+                # Typed HTTP admission failures are already safe and must
+                # retain their status. They also inherit from ValueError.
+                raise
             except (LongformMemoryError, LocalResourcePressure,
                     sqlite3.Error, OSError, ValueError, UnicodeError) as exc:
                 raise OfflineHTTPError(
@@ -766,6 +787,7 @@ class OfflineHTTPApplication:
                 "model_readiness_code": code,
                 "readiness_is_live_inference_proof": False,
                 "inference_circuit": self._inference_circuit.status(),
+                "inference_lease": self._inference_lease.inspect(),
                 "runtime_kind": ("native" if hasattr(self.backend, "runtime")
                                  else "llama.cpp"),
                 "adaptive_metal_launch": getattr(
@@ -879,10 +901,20 @@ class OfflineHTTPApplication:
                 raise OfflineHTTPError(400, str(exc)) from exc
         if path == "/v1/knowledge/search" and method == "POST":
             _fields(body, {"query", "limit", "document_ids"}, {"query"})
+            query, limit = body["query"], body.get("limit", 6)
+            if not isinstance(query, str) or not query.strip():
+                raise OfflineHTTPError(400, "invalid local reference query")
+            try:
+                if len(query.encode("utf-8", errors="strict")) > MAX_QUERY_BYTES:
+                    raise OfflineHTTPError(400, "invalid local reference query")
+            except UnicodeError:
+                raise OfflineHTTPError(400, "invalid local reference query") from None
+            if type(limit) is not int or not 1 <= limit <= 12:
+                raise OfflineHTTPError(400, "invalid reference search limit")
             scope = _document_scope(body, True)
             try:
                 hits = self.knowledge.search(
-                    body["query"], limit=body.get("limit", 6),
+                    query, limit=limit,
                     document_ids=scope,
                 )
             except RuntimeContractError:
@@ -896,11 +928,12 @@ class OfflineHTTPApplication:
             self.knowledge.delete(document_id)
             return 200, {"deleted_document_id": document_id}
         if path == "/v1/sessions/search" and method == "POST":
-            _fields(body, {"query", "cursor", "limit"}, set())
+            _fields(body, {"query", "cursor", "limit", "archived"}, set())
             return 200, self._store.session_summaries(
                 self.model_digest, self.tokenizer_digest,
                 query=body.get("query", ""), cursor=body.get("cursor"),
                 limit=body.get("limit", 30),
+                archived=body.get("archived", False),
             )
         if path == "/v1/sessions":
             if method == "GET":
@@ -950,6 +983,9 @@ class OfflineHTTPApplication:
                     evidence = self._store.turn_evidence(
                         sid, self.model_digest, self.tokenizer_digest,
                     )
+                    metadata = self._store.session_metadata(
+                        sid, self.model_digest, self.tokenizer_digest,
+                    )
                 answers = [
                     message.content for message in stored.transcript.messages
                     if message.role == "assistant"
@@ -961,6 +997,7 @@ class OfflineHTTPApplication:
                     for answer, item in zip(answers, evidence)
                 ]
                 return 200, {
+                    **metadata,
                     "session_id": sid, "revision": stored.revision,
                     "messages": stored.transcript.to_list(),
                     "evidence": evidence,
@@ -975,6 +1012,18 @@ class OfflineHTTPApplication:
                                        self.tokenizer_digest)
                     self._turns = {key: value for key, value in self._turns.items() if key[0] != sid}
                 return 200, {"deleted_session_id": sid}
+        if tail == "metadata" and method == "POST":
+            _fields(body, {"title", "pinned", "archived", "expected_metadata_revision"}, set())
+            if "expected_metadata_revision" in body and (
+                    type(body["expected_metadata_revision"]) is not int
+                    or body["expected_metadata_revision"] < 0):
+                raise OfflineHTTPError(400, "invalid conversation metadata revision")
+            return 200, self._store.update_metadata(
+                sid, self.model_digest, self.tokenizer_digest,
+                {key: value for key, value in body.items()
+                 if key != "expected_metadata_revision"},
+                expected_metadata_revision=body.get("expected_metadata_revision"),
+            )
         if tail == "context-preview" and method == "POST":
             # Local-only read-only estimate; the actual new turn still
             # validates full-history retention and GGUF native admission.

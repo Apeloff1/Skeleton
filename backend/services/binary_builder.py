@@ -94,6 +94,30 @@ _MAX_PACKAGE_FILES = 1024
 _MAX_PACKAGE_FILE_BYTES = 8 * 1024 * 1024
 _MAX_PACKAGE_RAW_BYTES = 64 * 1024 * 1024
 _MAX_ZIP_OUTPUT_BYTES = 96 * 1024 * 1024
+# Canonical aliases used by the bounded source-asset and publication contract.
+_MAX_ASSET_BYTES = _MAX_PACKAGE_FILE_BYTES
+_MAX_SOURCE_BYTES = _MAX_PACKAGE_RAW_BYTES
+_WINDOWS_DEVICE_NAMES = frozenset(
+    {"CON", "PRN", "AUX", "NUL"}
+    | {f"COM{i}" for i in range(1, 10)}
+    | {f"LPT{i}" for i in range(1, 10)}
+)
+
+def _bounded_asset_bytes(content: object) -> bytes:
+    """Validate one exact literal asset before allocating its encoded bytes."""
+    if type(content) is str:
+        if len(content) > _MAX_ASSET_BYTES:
+            raise ValueError("package member exceeds byte budget")
+        payload = content.encode("utf-8")
+    elif type(content) in (bytes, bytearray, memoryview):
+        if len(content) > _MAX_ASSET_BYTES:
+            raise ValueError("package member exceeds byte budget")
+        payload = bytes(content)
+    else:
+        raise ValueError("package member content must be text or bytes")
+    if len(payload) > _MAX_ASSET_BYTES:
+        raise ValueError("package member exceeds byte budget")
+    return payload
 
 
 def _sanitize_path(p: str) -> str:
@@ -111,9 +135,14 @@ def _sanitize_path(p: str) -> str:
         raise ValueError("package member is absolute or contains controls")
     parts = normalized.split("/")
     if len(parts) > 16 or any(
-        not segment or segment in {".", ".."} or ":" in segment for segment in parts
+        not segment or segment in {".", ".."} or ":" in segment
+        or segment[-1] in (".", " ")
+        or segment.partition(".")[0].upper() in _WINDOWS_DEVICE_NAMES
+        for segment in parts
     ):
         raise ValueError("package member has unsafe path components")
+    if normalized == "manifest.json":
+        raise ValueError("package member cannot replace canonical manifest")
     return "/".join(parts)
 
 
@@ -177,19 +206,9 @@ def _build_files_iter(build: dict):
         if relative in seen:
             continue
         seen.add(relative)
-        if isinstance(content, str):
-            if len(content) > _MAX_PACKAGE_FILE_BYTES:
-                raise ValueError("package member exceeds byte budget")
-            payload = content.encode("utf-8", errors="replace")
-        elif isinstance(content, (bytes, bytearray, memoryview)):
-            if len(content) > _MAX_PACKAGE_FILE_BYTES:
-                raise ValueError("package member exceeds byte budget")
-            payload = bytes(content)
-        else:
-            raise ValueError("package member content must be text or bytes")
-        if (len(payload) > _MAX_PACKAGE_FILE_BYTES
-                or total + len(payload) > _MAX_PACKAGE_RAW_BYTES):
-            raise ValueError("package exceeds payload byte budget")
+        payload = _bounded_asset_bytes(content)
+        if total + len(payload) > _MAX_SOURCE_BYTES:
+            raise ValueError("package total source byte budget exceeded")
         total += len(payload)
         yield relative, payload
 
@@ -962,6 +981,11 @@ def _build_apk_private_stage(build: dict, private_path: Path) -> dict:
 
 
 
+def _build_apk_staged(build: dict, private_path: Path) -> dict:
+    """Private build extension point: publication always verifies staged bytes."""
+    return _build_apk_private_stage(build, private_path)
+
+
 def build_apk(build: dict) -> dict:
     """Publish only verified, complete APK bytes; never write the public path.
 
@@ -982,11 +1006,27 @@ def build_apk(build: dict) -> dict:
 
     with tempfile.TemporaryDirectory(prefix="galaxy-apk-stage-") as stage:
         stage_path = Path(stage) / "payload.apk"
-        metadata = _build_apk_private_stage(build, stage_path)
-        if not metadata.get("artifact_id"):
+        metadata = _build_apk_staged(build, stage_path)
+        if metadata.get("disabled"):
             return metadata
+        if metadata.get("kind") != "apk" or metadata.get("path") != str(stage_path):
+            raise VaultPathError("staged APK identity differs")
         expected_size = metadata["size_bytes"]
-        expected_digest = metadata["sha256"]
+        # A stage adapter may return only the size. Independently derive the
+        # digest from the completed private file before a public rename.
+        expected_digest = metadata.get("sha256")
+        if expected_digest is None:
+            with anchored_directory(Path(stage)) as stage_directory:
+                digest = hashlib.sha256()
+                with read_regular(
+                    stage_directory, "payload.apk", max_bytes=_MAX_ZIP_OUTPUT_BYTES,
+                ) as source:
+                    while True:
+                        block = source.read(1024 * 1024)
+                        if not block:
+                            break
+                        digest.update(block)
+                expected_digest = digest.hexdigest()
         if (
             not isinstance(expected_size, int)
             or expected_size > _MAX_ZIP_OUTPUT_BYTES
@@ -1021,8 +1061,10 @@ def build_apk(build: dict) -> dict:
             )
         return {
             **metadata,
+            "artifact_id": metadata.get("artifact_id", f"apk_{build_id}"),
             "path": str(published_path),
             "size_bytes": size,
+            "sha256": expected_digest,
         }
 
 

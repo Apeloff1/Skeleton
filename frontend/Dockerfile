@@ -14,8 +14,8 @@ COPY package.json yarn.lock* ./
 COPY vendor/deepmerge/ ./vendor/deepmerge/
 COPY index.js ./index.js
 COPY scripts/patch-node-modules.js ./scripts/patch-node-modules.js
-# patch-node-modules uses a separately reviewed, exact-source RSA pin.
-# Include it in the dependency stage before running the guarded install hook.
+COPY scripts/security/node-forge-rsa-verifier.cjs ./scripts/security/node-forge-rsa-verifier.cjs
+# Keep exact upstream RSA bytes and canonical-DER structure independently checked.
 COPY scripts/node-forge-rsa-custody.cjs ./scripts/node-forge-rsa-custody.cjs
 COPY scripts/verify-no-release-npm-security.js scripts/verify-deepmerge-security.cjs ./scripts/
 RUN --mount=type=secret,id=proxy_ca \

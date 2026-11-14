@@ -355,6 +355,10 @@ function patchNodeForgeNestedDigestAlgorithm() {
     const source = fs.readFileSync(
       path.join(ROOT, 'node_modules/node-forge/lib/rsa.js'), 'utf8');
     const proof = verifyReviewedForgeRsa(version, source);
+    const { qualifiesCanonicalRsaVerifier } = require('./security/node-forge-rsa-verifier.cjs');
+    if (!qualifiesCanonicalRsaVerifier(source)) {
+      throw new Error('[patch-node-modules] node-forge 1.4.3 canonical DER verifier changed; security review required');
+    }
     if (proof.patchRequired || proof.locallyPatched) {
       throw new Error('[patch-node-modules] reviewed upstream unexpectedly requires a local patch');
     }

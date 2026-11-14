@@ -646,3 +646,132 @@ module and runs these tests alongside native transformer and backend E2E.
 An independently supplied production GGUF, media codecs/decoding quality,
 Windows 11/WSL2, Apple Metal and physical devices remain separate
 non-waived release qualification requirements.
+
+## 2026 local execution custody: independent service-process safety
+
+The standalone authenticated Jeeves HTTP service now uses an additional
+**OS-backed, cross-process inference lease**. Each private SQLite workspace
+has one persistent `<database>.inference.lock` sidecar. Before a **new** native
+or GGUF generation, the service acquires a non-blocking exclusive operating
+system lock. It retains ownership from the pre-generation request replay
+check through model execution, SQLite commit and local receipt verification.
+This is separate from the in-process admission counter and failure circuit.
+
+- A concurrent service against the same private database receives **HTTP
+  423 Locked** (or a failed asynchronous ticket with a stable sanitized busy
+  category), **without executing a second model** and without mutating
+  the conversation. Exact previously committed requests remain readable.
+- POSIX uses a descriptor-backed `flock`; Windows uses `msvcrt`
+  non-blocking byte-range locking. A process kill closes its descriptor,
+  so it cannot leave a dead-process PID lease indefinitely blocking chat.
+  Do not delete the lock marker during normal operations: another process
+  could still hold the old inode, defeating exclusivity.
+- **POSIX native-child ownership:** when llama.cpp runs under the local
+  HTTP workspace lease, the already-held, nonsecret lock descriptor is
+  deliberately passed to its verified native child through `Popen(pass_fds)`,
+  while every other child descriptor remains closed. If the Python supervisor
+  is abruptly killed, the native child retains that *same* kernel `flock`
+  until it exits; a restarted Jeeves service therefore cannot start a second
+  GGUF executor against the still-running orphan. Native execution uses
+  `asyncio.to_thread`, so this custody follows the task context explicitly.
+  The regression suite starts a real child, kills its supervisor, checks
+  contention during the orphan's lifetime and verifies eventual recovery.
+  This is local POSIX protection, not a guarantee of child termination.
+  **Windows kill-on-close Job Object containment is still unqualified.**
+- Lockfiles must be owned private regular files with one hard link and an
+  exact one-byte, nonsensitive marker. Symbolic/hard links, unsafe POSIX
+  permissions, replacement of an inode while acquiring it, or unprotected
+  shared parent directories fail closed. The marker contains **no prompts,
+  credentials, model paths, process identifiers, or user conversation data**.
+- The lock is **single-host and local-filesystem only**. It is not a
+  distributed leader-election service or proof of correct NFS/SMB locking.
+  Run the SQLite database and lock marker together on a trusted local disk.
+  A different database may have a different local inference workload; this
+  mechanism is not a global GPU scheduler or substitute for hardware
+  resource admission.
+- The operator's real GGUF HTTP qualification now also starts a
+  **second independently authenticated localhost listener** on the same
+  database. While one listener holds the kernel lease, a new synchronous
+  turn through the other must fail HTTP 423 without changing any SQLite
+  history. It then restarts the original listener and submits the **same
+  previously denied request ID**; only this later admitted call may execute
+  the second genuine native turn. The JSON report explicitly distinguishes
+  `competing_local_service_inference_denied` and
+  `denied_peer_request_committed_after_restart`. Both listeners run in
+  one operator process; the separate subprocess-kill scenario remains
+  covered by the adversarial unit suite, not by this GGUF operator test.
+- The `tests/test_jeeves_local_lease.py` suite exercises independent
+  in-process owners, a **real child process** holding the kernel lock,
+  immediate recovery after killing that process, unsafe lockfile attacks,
+  and an actual native model committing/replaying an answer after peer
+  contention. The source CI includes these tests, but running them does
+  not certify operator GGUF, protected bootstrap, Windows installer or
+  disconnected-phone inference.
+
+This is **fail-closed execution ownership**, not an invitation to start a
+second unreviewed Jeeves model, bypass a held merge/release gate, or claim
+a remotely hosted fallback exists.
+
+
+## 12. Three-turn genuine GGUF operator acceptance with strict context (implemented)
+
+`python scripts/qualify_jeeves_live_local.py --manifest <operator-owned-local-gguf-manifest>`
+now executes **three actual native/local GGUF model turns** over independently
+authenticated localhost HTTP and persisted SQLite, rather than treating two
+replies as sufficient context-capacity evidence.
+
+1. First genuine reply with current SHA-pinned model and bound runtime receipt.
+2. Separate local service denied at the operating-system inference lease,
+   followed by owner restart, exact previous-history preflight, and second
+   genuine reply using the *same* previously denied request ID.
+3. New authenticated read-only `/context-preview` over all **four saved
+   user/assistant messages** confirms no older turn would be dropped, with
+   model digest, SQLite revision and conservative native/GGUF context limits.
+   An explicitly `require_full_history: true` third request then executes
+   real local inference, persists revision three, checks its exact UTF-8
+   answer digest, bound execution sidecar and all six transcript messages.
+   Reusing that strict request ID with bounded-recent mode must return HTTP
+   **409**, and the saved revision must remain unchanged.
+
+The JSON report adds `run_3_output_sha256`,
+`run_3_execution_receipt_sha256`,
+`strict_full_history_preview_verified`,
+`strict_full_history_real_generation_verified` and
+`strict_context_policy_idempotency_fence_verified`, and now reports
+`actual_model_turns: 3` with three separately timed token measurements.
+A tiny source-native transformer runs the same mechanics in CI but **does
+not** certify trained GGUF quality, Windows/WSL2 and Apple Metal host behavior,
+mobile inference, global GPU arbitration or release permission. The entrypoint
+with a real operator GGUF manifest remains mandatory for those hardware
+and model-specific claims. A failed strict context preflight is a **NO GO**
+result, never a reason to silently truncate history or switch provider.
+
+
+## 17. Cross-service media advisory acceptance under native inference lease
+
+The stacked prototype additionally runs
+`tests/test_jeeves_local_lease.py::test_real_media_advisory_is_non_inferential_during_lease_then_scoped_native_turn_commits`.
+
+This full-path acceptance uses **two independent Jeeves HTTP application
+owners** against the same private SQLite model workspace, a genuinely
+hashed user-selected PNG byte stream, an explicitly reviewed local caption,
+and a real source-native transformer. While one service owns the kernel
+inference lease, the other must be able to authenticate/attest and save
+**only** reviewed advisory text, and obtain a read-only SHA-bound local
+source preview, without generating. Its attempted model turn receives
+HTTP **423**, leaving the canonical transcript revision at zero.
+
+Once the native lease releases, the **same previously denied request ID**
+must perform exactly one model generation with the selected advisory
+document as its sole grounding scope and strict full-history policy.
+A second application must recover and replay the exact committed SQLite
+receipt without generating another answer. The committed evidence retains
+the reviewed advisory citation while raw image bytes and Base64 do not
+appear in stored reference text or the SQLite database.
+
+The source-native model used for this contract is only an executable
+integration fixture. Its passing status is **not** production GGUF
+qualification, a GPU performance score, a claim of image understanding,
+a media decoder acceptance test, Windows process containment, or a
+release permit. The review-only PR retains all independently required
+CI, security, target hardware and first-install holds.

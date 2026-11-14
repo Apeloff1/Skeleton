@@ -478,11 +478,37 @@ def _discover_credential_bearing_ai_surfaces(repo_root: Path) -> set[str]:
 
 def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
     """Track actual COPY custody through static named-stage inheritance."""
-    instructions = [
-        " ".join(line.strip().split())
-        for line in docker.replace("\\\n", " ").splitlines()
-        if line.strip() and not line.lstrip().startswith("#")
-    ]
+    # A Dockerfile heredoc body is opaque to the Docker instruction parser.
+    # In particular, Python 'from ... import ...' is not a new FROM stage.
+    instructions = []
+    heredoc_end = None
+    heredoc_strip_tabs = False
+    for line in docker.replace("\\\n", " ").splitlines():
+        stripped = line.strip()
+        if heredoc_end is not None:
+            terminator = line.lstrip("\t") if heredoc_strip_tabs else line
+            if terminator == heredoc_end:
+                heredoc_end = None
+            continue
+        if not stripped or stripped.startswith("#"):
+            continue
+        instruction = " ".join(stripped.split())
+        instructions.append(instruction)
+        markers = list(re.finditer(
+            r"<<-?(?:'([^']+)'|\"([^\"]+)\"|([A-Za-z_][A-Za-z_0-9]*))(?=\s|$)",
+            instruction,
+        ))
+        if "<<" in instruction and (len(markers) != 1 or instruction.count("<<") != 1):
+            # Multiple or unsupported heredocs need an explicit parser contract;
+            # no text from a later body may fabricate source-copy custody.
+            return instructions, []
+        marker = markers[0] if markers else None
+        if marker:
+            heredoc_strip_tabs = marker.group(0).startswith("<<-")
+            heredoc_end = next(value for value in marker.groups() if value)
+    if heredoc_end is not None:
+        # An unterminated source stage cannot establish materialization.
+        return instructions, []
     stages, named = [], {}
     current = None
     for index, instruction in enumerate(instructions):

@@ -122,6 +122,10 @@ function verifyNodeForgeNestedDigestAlgorithmGuard() {
     // do not waive or skip the malicious RSA signature test above.
     const { verifyReviewedForgeRsa } = require('./node-forge-rsa-custody.cjs');
     const receipt = verifyReviewedForgeRsa(version, rsaSource);
+    const { qualifiesCanonicalRsaVerifier } = require('./security/node-forge-rsa-verifier.cjs');
+    if (!qualifiesCanonicalRsaVerifier(rsaSource)) {
+      throw new Error('node-forge canonical RSA verifier is unqualified');
+    }
     if (receipt.patchRequired || receipt.locallyPatched ||
         receipt.securityDecision !== 'reviewed_upstream_canonical_der') {
       throw new Error('node-forge 1.4.3 canonical-DER source custody is not verified');
