@@ -26,6 +26,7 @@ from .native_prompt_budget import NativePromptBudget, PromptBudgetLedger
 
 MAX_PROMPT_BYTES = 64 << 10
 MAX_STAGED_PROMPTS = 256
+MAX_PROMPT_IDENTITIES = 10_000  # separate, bounded lifetime replay inventory
 MAX_ID_BYTES = 128
 MAX_PROMPT_STAGE_AGE_NS = 3_600_000_000_000
 DEFAULT_PROMPT_STAGE_AGE_NS = 300_000_000_000
@@ -236,8 +237,10 @@ class NativePromptRegistry:
             self._expire_locked(now)
             if pinned.request_id in self._used or pinned.request_id in self._staged:
                 raise NativeFairStreamDenied("duplicate or consumed request identity")
-            if len(self._staged) + len(self._used) >= MAX_STAGED_PROMPTS:
-                raise NativeFairStreamDenied("prompt admission capacity exhausted")
+            if len(self._staged) >= MAX_STAGED_PROMPTS:
+                raise NativeFairStreamDenied("concurrent prompt staging capacity exhausted")
+            if len(self._staged) + len(self._used) >= MAX_PROMPT_IDENTITIES:
+                raise NativeFairStreamDenied("prompt identity capacity exhausted")
             # Charge real UTF-8 bytes, not characters or token estimates.
             # Reservation precedes publication: a denied grant never becomes
             # visible to a concurrent claimant.
@@ -267,7 +270,7 @@ class NativePromptRegistry:
             _id(request_id, "request")
             pinned = self._staged.get(request_id)
             if (pinned is None and request_id not in self._used
-                    and len(self._staged) + len(self._used) >= MAX_STAGED_PROMPTS):
+                    and len(self._staged) + len(self._used) >= MAX_PROMPT_IDENTITIES):
                 raise NativeFairStreamDenied("prompt revocation capacity exhausted")
             if pinned is not None:
                 self._budget.release(pinned.tenant_id, len(pinned.prompt.encode("utf-8")))

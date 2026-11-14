@@ -16,7 +16,7 @@ from .fair_stream_queue import MAX_TOKENS, MeasuredStreamBudget
 from .fair_stream_session import DispatchPermit
 
 MAX_PROBES_PER_LEASE = 4096
-MAX_USED_LEASES = 4096  # bounded lifetime replay fence per guard instance
+MAX_USED_LEASES = 10_000  # bounded lifetime replay fence aligned with durable journal
 MAX_DURATION_NS = 86_400_000_000_000  # 24h ceiling, not a hard preemption guarantee
 DEFAULT_DURATION_NS = 900_000_000_000  # 15m cooperative lease quantum
 

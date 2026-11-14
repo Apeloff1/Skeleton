@@ -198,6 +198,23 @@ class SealedFairStreamResultVault:
             + " WHERE lease_id=?", (lease_id,),
         ).fetchone()
 
+    def assert_request_admissible(self, request_id: str, *, queued_count: int = 0) -> None:
+        """Conservative admission check, not a cross-process storage reservation."""
+        if type(request_id) is not str or not request_id or len(request_id.encode("utf-8")) > 128:
+            raise ValueError("bounded request identity required")
+        if type(queued_count) is not int or not 0 <= queued_count <= MAX_RESULT_ROWS:
+            raise ValueError("invalid queued result count")
+        with self._lock:
+            self._require_open()
+            if self._request_seen(request_id):
+                raise SealedResultUnavailable("result request already published")
+            rows, total = self._connection.execute(
+                "SELECT COUNT(*), COALESCE(SUM(LENGTH(ciphertext)), 0) FROM " + _TABLE
+            ).fetchone()
+            if (rows + queued_count >= MAX_RESULT_ROWS
+                    or total + (queued_count + 1) * (MAX_RESULT_BYTES + 16) > MAX_CIPHERTEXT_BYTES):
+                raise SealedResultUnavailable("result vault admission capacity exhausted")
+
     def _request_seen(self, request_id: str) -> bool:
         return self._connection.execute(
             "SELECT 1 FROM " + _TABLE

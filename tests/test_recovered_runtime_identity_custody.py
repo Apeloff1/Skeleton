@@ -5,7 +5,7 @@ import pytest
 
 from backend.core.core_v1.keys import KeyProviderError, parse_keyring
 from skeleton.ai.model_runtime.native_fair_stream_backend import (
-    MAX_STAGED_PROMPTS, NativeFairStreamDenied, NativePromptRegistry,
+    NativeFairStreamDenied, NativePromptRegistry,
 )
 from skeleton.frontier.runtime.agent_runtime import AgentRuntime
 from skeleton.frontier.runtime.memory_adapters import SQLiteCollection
@@ -70,10 +70,13 @@ def test_malformed_key_identifier_does_not_echo_input():
     assert invalid not in str(exc.value)
 
 
-def test_revocation_does_not_expand_identity_capacity():
+def test_revocation_does_not_expand_identity_capacity(monkeypatch):
+    from skeleton.ai.model_runtime import native_fair_stream_backend as native
+
+    monkeypatch.setattr(native, "MAX_PROMPT_IDENTITIES", 32)
     registry = NativePromptRegistry(session_id="session")
-    for index in range(MAX_STAGED_PROMPTS):
+    for index in range(32):
         registry.revoke(f"request-{index}")
     with pytest.raises(NativeFairStreamDenied, match="capacity"):
         registry.revoke("overflow")
-    assert registry.status()["consumed_or_revoked"] == MAX_STAGED_PROMPTS
+    assert registry.status()["consumed_or_revoked"] == 32

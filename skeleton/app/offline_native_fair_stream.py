@@ -182,8 +182,14 @@ def submit_authenticated_native_cpu_prompt(
             raise ValueError("native app ownership binding mismatch")
         if guard.uncertain or state["checkpoint"]["pending"]:
             raise ValueError("pending dispatch requires reconciliation")
-        if any(row["request_id"] == request.request_id for row in state["checkpoint"]["requests"]):
+        requests = state["checkpoint"]["requests"]
+        if any(row["request_id"] == request.request_id for row in requests):
             raise ValueError("duplicate queued request")
+        # A process-local prompt registry is not a durable replay authority.
+        # Refuse known historic identity reuse and depleted result/journal
+        # capacity before storing plaintext or reserving the scheduler slot.
+        owner._journal.assert_request_admissible(request.request_id, queued_count=len(requests))
+        vault.assert_request_admissible(request.request_id, queued_count=len(requests))
         stage_native_cpu_prompt(
             runtime=runtime, registry=registry, request_id=request.request_id,
             tenant_id=authenticated_tenant_id, prompt=prompt,
