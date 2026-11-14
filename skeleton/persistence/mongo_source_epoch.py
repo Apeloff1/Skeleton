@@ -31,6 +31,18 @@ _EPOCH_READ_DEADLINE_SECONDS = 3.0
 # A Mongo write timeout is AMBIGUOUS: never retry or clear a WRITING epoch.
 _EPOCH_MUTATION_DEADLINE_SECONDS = 6.0
 
+def _exact_bson_epoch(value: object) -> bool:
+    if type(value) is int:
+        return True
+    # BSON uses an exact Int64 wrapper for large durable counters. Do not
+    # equate arbitrary int subclasses with driver-owned scalar evidence.
+    try:
+        from bson.int64 import Int64
+    except ImportError:
+        return False
+    return type(value) is Int64
+
+
 class MongoSourceEpochError(RuntimeError):
     """Canonical source epoch is unavailable or violates write fencing."""
 
@@ -147,10 +159,10 @@ class MongoCanonicalSourceEpoch:
                 or type(doc.get("phase")) is not str
                 or doc["phase"] != "stable"
                 or doc.get("writer_token") is not None
-                or type(doc.get("epoch")) is not int or doc["epoch"] < 2
+                or not _exact_bson_epoch(doc.get("epoch")) or doc["epoch"] < 2
                 or doc["epoch"] >= (1 << 63) or doc["epoch"] % 2):
             raise MongoSourceEpochError("canonical source epoch missing, writing or quarantined")
-        return doc["epoch"]
+        return int(doc["epoch"])
 
     async def provision_migration_epoch(self, *, tenant_id: str, actor_id: str) -> None:
         """ONLY for an operator-controlled quiescent migration; never on reads."""
@@ -259,13 +271,13 @@ class MongoCanonicalSourceEpoch:
                 or result["actor_id"] != actor_id
                 or type(result.get("phase")) is not str
                 or result["phase"] != "revoked"
-                or type(result.get("epoch")) is not int
+                or not _exact_bson_epoch(result.get("epoch"))
                 or result["epoch"] != expected_epoch + 1
                 or type(result.get("revoked_reason")) is not str
                 or result["revoked_reason"] != reason_code
                 or result.get("writer_token") is not None):
             raise MongoSourceEpochError("actor revocation CAS rejected or unverified")
-        return result["epoch"]
+        return int(result["epoch"])
 
     def require_actor_writer(self, *, tenant_id: str, actor_id: str) -> None:
         """Guard lower-level mutation paths that cannot acquire own epoch."""
@@ -338,7 +350,7 @@ class MongoCanonicalSourceEpoch:
                 or type(acquired.get("writer_token")) is not str
                 or acquired.get("writer_token") != token
                 or acquired.get("phase") != "writing"
-                or type(acquired.get("epoch")) is not int
+                or not _exact_bson_epoch(acquired.get("epoch"))
                 or acquired["epoch"] < 3 or acquired["epoch"] >= (1 << 63) - 1
                 or acquired["epoch"] % 2 != 1):
             raise MongoSourceEpochError("canonical writer epoch not owned")
@@ -372,7 +384,7 @@ class MongoCanonicalSourceEpoch:
                     or type(closed.get("phase")) is not str
                     or closed.get("phase") != "stable"
                     or closed.get("writer_token") is not None
-                    or type(closed.get("epoch")) is not int
+                    or not _exact_bson_epoch(closed.get("epoch"))
                     or closed.get("epoch") != acquired["epoch"] + 1):
                 raise MongoSourceEpochError("canonical writer CAS lost; epoch quarantined")
         finally:

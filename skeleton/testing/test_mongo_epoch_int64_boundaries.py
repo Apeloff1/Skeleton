@@ -44,6 +44,27 @@ class EpochBoundaryTests(unittest.IsolatedAsyncioTestCase):
             ), value,
         )
 
+    async def test_exact_driver_int64_is_readable(self):
+        from bson.int64 import Int64
+
+        value = (1 << 40)
+        epoch = self.make_epoch(self.document(Int64(value)))
+        read = await epoch.read_epoch(
+            tenant_id="tenant", actor_id="actor", context_id="context",
+        )
+        self.assertIs(type(read), int)
+        self.assertEqual(read, value)
+
+    async def test_int_subclass_is_not_driver_evidence(self):
+        class Forged(int):
+            pass
+
+        epoch = self.make_epoch(self.document(Forged(2)))
+        with self.assertRaises(MongoSourceEpochError):
+            await epoch.read_epoch(
+                tenant_id="tenant", actor_id="actor", context_id="context",
+            )
+
     async def test_linearizable_reader_rejects_poisoned_writer(self):
         for phase, token in (("writing", "lease"), ("revoked", None),
                              ("stable", "lease")):

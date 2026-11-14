@@ -129,6 +129,21 @@ jobs:
           tests/test_frontier_memory_adapters.py
           tests/test_frontier_sqlite_namespace_custody.py
           tests/test_frontier_singleflight_recovery.py
+      - name: Recovered guarded activation, secret envelopes and isolated planning
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          compose=(skeleton/testing/test_compose_*.py)
+          epoch=(skeleton/testing/test_mongo_epoch_*.py)
+          test "${#compose[@]}" -ge 21
+          test "${#epoch[@]}" -ge 10
+          python -m pytest -q --tb=short "${compose[@]}" "${epoch[@]}" \
+            skeleton/testing/test_mongo_source_epoch.py \
+            skeleton/testing/test_mongo_tombstone_scope_fencing.py \
+            skeleton/testing/test_reviewer_custody.py \
+            skeleton/testing/test_signed_reviewer_client.py \
+            tests/backend_core/test_envelope_keys.py \
+            tests/test_prood_recovered_planning.py
       - name: Ruff on skeleton, tests, and backend
         run: python -m ruff check skeleton tests backend
       - name: Pytest on tests, skeleton/testing, and backend/tests
