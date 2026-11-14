@@ -55,6 +55,8 @@ class SingleFlight:
         self._pending: dict[str, _Flight] = {}
         self._completed: OrderedDict[str, tuple[str, Any, float]] = OrderedDict()
         self._loop = None
+        self._cache_bytes = 0
+        self._closed = False
         self.reused = 0
 
     @property
@@ -73,7 +75,7 @@ class SingleFlight:
     def _expire(self) -> None:
         now = self._now()
         for key in [key for key, (_, _, expires) in self._completed.items() if expires <= now]:
-            del self._completed[key]
+            self._cache_bytes -= len(self._completed.pop(key)[1])
 
     def stats(self) -> dict[str, int]:
         self._expire()
@@ -96,6 +98,8 @@ class SingleFlight:
         loop = asyncio.get_running_loop()
         if self._loop is not None and self._loop is not loop:
             raise RuntimeError("singleflight already has work on another event loop")
+        if self._closed:
+            raise RuntimeError("singleflight is closed")
         self._loop = loop
         self._expire()
         completed = self._completed.get(key)
@@ -142,15 +146,27 @@ class SingleFlight:
         del self._pending[key]
         try:
             encoded, cacheable = entry.task.result()
-            if not cacheable:
+            if self._closed or not cacheable:
                 return
             now = self._now()
             self._expire()
             self._completed[key] = (entry.fingerprint, encoded, now + self.ttl)
-            # Bound both count and aggregate encoded result retention.
-            while len(self._completed) > self.capacity or sum(
-                len(row[1]) for row in self._completed.values()
-            ) > 8_388_608:
-                self._completed.popitem(last=False)
+            self._cache_bytes += len(encoded)
+            while len(self._completed) > self.capacity or self._cache_bytes > 8_388_608:
+                _, row = self._completed.popitem(last=False)
+                self._cache_bytes -= len(row[1])
         except (Exception, asyncio.CancelledError):
             return
+
+    async def aclose(self) -> None:
+        """Fence new admissions and wait for cooperative task cancellation."""
+        if self._loop is not None and self._loop is not asyncio.get_running_loop():
+            raise RuntimeError("singleflight is bound to another event loop")
+        self._closed = True
+        self._completed.clear()
+        self._cache_bytes = 0
+        tasks = self.tasks
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)

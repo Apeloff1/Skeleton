@@ -119,6 +119,16 @@ jobs:
           test "${#assurance[@]}" -ge 13
           test "${#learning[@]}" -ge 11
           python -m pytest -q --tb=short "${assurance[@]}" "${learning[@]}" tests/test_frontier_recovered_support.py
+      - name: Canonical Frontier namespace and runtime custody
+        run: >-
+          python -m pytest -q --tb=short
+          tests/test_frontier_runtime_namespace_migration.py
+          tests/test_frontier_recovered_contract_identity.py
+          tests/test_frontier_runtime_identity_bounds.py
+          tests/test_frontier_runtime_memory_retrieval.py
+          tests/test_frontier_memory_adapters.py
+          tests/test_frontier_sqlite_namespace_custody.py
+          tests/test_frontier_singleflight_recovery.py
       - name: Ruff on skeleton, tests, and backend
         run: python -m ruff check skeleton tests backend
       - name: Pytest on tests, skeleton/testing, and backend/tests
