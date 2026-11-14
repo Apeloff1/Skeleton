@@ -294,3 +294,57 @@ def test_private_database_retains_exact_handle_and_denies_closed_custody(tmp_pat
         handle.close()
     with pytest.raises(CustodyQuarantined):
         service.status()
+
+def test_contended_app_operations_defer_before_any_database_access(monkeypatch):
+    from threading import Event, Thread
+
+    app = make()
+    entered, release = Event(), Event()
+
+    def holder():
+        with app._guard._lock:
+            entered.set()
+            release.wait(5)
+
+    thread = Thread(target=holder, daemon=True)
+    thread.start()
+    try:
+        assert entered.wait(5)
+
+        def forbidden(*args, **kwargs):
+            pytest.fail("contended app operation accessed custody")
+
+        monkeypatch.setattr(app._session, "verify", forbidden)
+        for operation in (
+            app.status,
+            lambda: app.submit(request()),
+            lambda: app.cancel("request", tenant_id="tenant"),
+            lambda: app.cancel_unstarted("request", tenant_id="tenant"),
+            lambda: app.execute_next(token_budget=32),
+        ):
+            with pytest.raises(DispatchDeferred, match="another app dispatch"):
+                operation()
+    finally:
+        release.set()
+        thread.join(5)
+    assert not thread.is_alive()
+
+
+def test_submit_status_uses_exact_mutation_without_second_observation(monkeypatch):
+    app = make()
+    submit = app._guard.submit
+
+    def mutate(request):
+        state = submit(request)
+
+        def forbidden(*args, **kwargs):
+            pytest.fail("status reread custody after completed submit")
+
+        monkeypatch.setattr(app._session, "verify", forbidden)
+        return state
+
+    monkeypatch.setattr(app._guard, "submit", mutate)
+    status = app.submit(request())
+    assert status.generation == 1
+    assert status.pending_leases == 0
+    assert not status.execution_uncertain
