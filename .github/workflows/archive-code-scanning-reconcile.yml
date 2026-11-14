@@ -1,0 +1,101 @@
+name: Archive Code Scanning Reconciler
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - fix/security-dashboard-root-causes-20261003
+    paths:
+      - .github/workflows/archive-code-scanning-reconcile.yml
+  schedule:
+    - cron: "23 4 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: archive-code-scanning-reconcile
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    if: github.repository == 'Apeloff1/Skeleton'
+    permissions:
+      contents: read
+      security-events: write
+      vulnerability-alerts: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Reconcile immutable archive findings
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          alerts_json="$(mktemp)"
+          dependabot_json="$(mktemp)"
+          trap 'rm -f "$alerts_json" "$dependabot_json"' EXIT
+
+          gh api --paginate --slurp             -H "Accept: application/vnd.github+json"             "/repos/${GH_REPO}/code-scanning/alerts?state=open&per_page=100"             | jq 'add // []' > "$alerts_json"
+
+          archive_count="$(jq '[.[] | select((.most_recent_instance.location.path // "") | startswith("satellites/branch-snapshots/"))] | length' "$alerts_json")"
+          canonical_count="$(jq '[.[] | select(((.most_recent_instance.location.path // "") | startswith("satellites/branch-snapshots/")) | not)] | length' "$alerts_json")"
+
+          echo "Open code-scanning alerts before reconcile: archive=${archive_count} canonical=${canonical_count}"
+
+          jq -r '
+            .[]
+            | select((.most_recent_instance.location.path // "") | startswith("satellites/branch-snapshots/"))
+            | [.number, .most_recent_instance.location.path]
+            | @tsv
+          ' "$alerts_json" | while IFS=$'\t' read -r number finding_path; do
+            if [[ ! "$number" =~ ^[0-9]+$ ]]; then
+              echo "::error::Refusing malformed alert number"
+              exit 1
+            fi
+            echo "Dismissing archival alert #${number}: ${finding_path}"
+            gh api --method PATCH               -H "Accept: application/vnd.github+json"               "/repos/${GH_REPO}/code-scanning/alerts/${number}"               -f state=dismissed               -f dismissed_reason="won't fix"               -f dismissed_comment="Immutable historical branch snapshot; non-build, non-deploy, non-dependency surface. Canonical maintained code remains scanned and must be fixed independently."               >/dev/null
+          done
+
+          gh api --paginate --slurp             -H "Accept: application/vnd.github+json"             "/repos/${GH_REPO}/code-scanning/alerts?state=open&per_page=100"             | jq 'add // []' > "$alerts_json"
+
+          remaining_archive="$(jq '[.[] | select((.most_recent_instance.location.path // "") | startswith("satellites/branch-snapshots/"))] | length' "$alerts_json")"
+          remaining_canonical="$(jq '[.[] | select(((.most_recent_instance.location.path // "") | startswith("satellites/branch-snapshots/")) | not)] | length' "$alerts_json")"
+
+          if [[ "$remaining_archive" != "0" ]]; then
+            echo "::error::Archive reconciliation incomplete: ${remaining_archive} alerts remain"
+            exit 1
+          fi
+
+          gh api --paginate --slurp             -H "Accept: application/vnd.github+json"             "/repos/${GH_REPO}/dependabot/alerts?state=open&per_page=100"             | jq 'add // []' > "$dependabot_json"
+
+          dependabot_count="$(jq 'length' "$dependabot_json")"
+
+          {
+            echo "## Security backlog reconciliation"
+            echo
+            echo "- Archived code-scanning alerts dismissed: ${archive_count}"
+            echo "- Archived code-scanning alerts remaining: ${remaining_archive}"
+            echo "- Canonical code-scanning alerts remaining: ${remaining_canonical}"
+            echo "- Open Dependabot alerts: ${dependabot_count}"
+            echo
+            echo "### Canonical code-scanning backlog"
+            jq -r '
+              .[]
+              | select(((.most_recent_instance.location.path // "") | startswith("satellites/branch-snapshots/")) | not)
+              | "- #\(.number) [\(.rule.security_severity_level // .rule.severity // "unknown")] \(.rule.id): \(.most_recent_instance.location.path // "unknown"): \(.most_recent_instance.location.start_line // 0)"
+            ' "$alerts_json"
+            echo
+            echo "### Dependabot backlog"
+            jq -r '
+              .[]
+              | "- #\(.number) [\(.security_advisory.severity // "unknown")] \(.dependency.package.name // "unknown"): \(.security_advisory.summary // "no summary") — \(.dependency.manifest_path // "unknown")"
+            ' "$dependabot_json"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "Canonical code-scanning alerts remaining: ${remaining_canonical}"
+          echo "Dependabot alerts remaining: ${dependabot_count}"
