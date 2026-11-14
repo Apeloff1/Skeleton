@@ -144,3 +144,63 @@ test('array invalidation respects complete key segments and retains last good da
   await p;
   assert.equal(c.get(key).data, 'last good');
 });
+
+
+test('capacity pressure never detaches a new subscribed or fetching entry', async () => {
+  const c = new Q.QueryCache(clock(), 1);
+  const unpin = c.subscribe('old', () => {});
+  const seen = [];
+  const unsubscribe = c.subscribe('new', () => seen.push(c.get('new').status));
+  const d = deferred();
+  const first = c.fetch('new', () => d.p);
+  const second = c.fetch('new', () => { throw new Error('duplicate'); });
+  assert.equal(first, second);
+  assert.equal(c.get('new').fetching, true);
+  d.resolve('retained');
+  assert.equal(await first, 'retained');
+  assert.equal(c.get('new').data, 'retained');
+  assert.deepEqual(seen, ['loading', 'success']);
+  unpin();
+  assert.equal(c.size(), 1);
+  unsubscribe();
+});
+
+test('reentrant loading subscriber observes a published single-flight promise', async () => {
+  const c = new Q.QueryCache(clock());
+  const d = deferred();
+  let nested;
+  let calls = 0;
+  c.subscribe('k', () => {
+    if (c.get('k').fetching && !nested) {
+      nested = c.fetch('k', () => { calls++; return d.p; });
+    }
+  });
+  const first = c.fetch('k', () => { calls++; return d.p; });
+  assert.equal(nested, first);
+  d.resolve('one');
+  assert.equal(await first, 'one');
+  assert.equal(calls, 1);
+});
+
+test('reset from loading notification cannot reacquire obsolete request ownership', async () => {
+  const c = new Q.QueryCache(clock());
+  const old = deferred();
+  const replacement = deferred();
+  let next;
+  let reset = false;
+  c.subscribe('k', () => {
+    if (c.get('k').fetching && !reset) {
+      reset = true;
+      c.invalidate('k');
+      next = c.fetch('k', () => replacement.p);
+    }
+  });
+  const first = c.fetch('k', () => old.p);
+  assert.notEqual(first, next);
+  assert.equal(c.fetch('k', () => { throw new Error('duplicate'); }), next);
+  replacement.resolve('new');
+  await next;
+  old.resolve('obsolete');
+  await first;
+  assert.equal(c.get('k').data, 'new');
+});
