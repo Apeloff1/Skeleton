@@ -1,7 +1,22 @@
 name: Galaxy-GameForge full-fidelity authoring roundtrip qualification
 
 on:
-  workflow_call:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "frontend/app/galaxy.tsx"
+      - "frontend/app/skeleton-forge.tsx"
+      - "frontend/src/skeletonForge/creatorBridge.ts"
+      - "frontend/src/skeletonForge/creatorBridgeStorage.ts"
+      - "frontend/src/skeletonForge/creatorStorageScope.ts"
+      - "frontend/src/features/GalaxyStudioFactory/galaxyDraftCodec.ts"
+      - "frontend/src/features/GalaxyStudioFactory/draftCustody.ts"
+      - "frontend/src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal.tsx"
+      - "frontend/src/skeletonForge/components/ForgeCockpitScreen.tsx"
+      - "frontend/src/skeletonForge/components/ForgeCockpitView.tsx"
+      - "frontend/scripts/skeleton-forge/**"
+      - ".github/workflows/galaxy-forge-roundtrip-qualification.yml"
   workflow_dispatch:
 
 permissions:

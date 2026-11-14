@@ -3,7 +3,7 @@
  * Pure — screens and persistence sit on top of this reducer.
  */
 import {
-  INITIAL_STATE, buildRunRequest, questionnaireReducer, reachable, type QuestionnaireAction, type QuestionnaireState,
+  INITIAL_STATE, questionnaireReducer, reachable, type QuestionnaireAction, type QuestionnaireState,
 } from '../questionnaire';
 import { normalisePresetState } from '../designPresets';
 import { summarizeRun } from '../run';
@@ -46,8 +46,6 @@ export interface StudioProject {
   updatedAt: string;
   questionnaire: QuestionnaireState;
   lastRun: RunSnapshot | null;
-  /** A retained build receipt never certifies the newly edited questionnaire. */
-  lastRunOutdated?: boolean;
 }
 
 export interface AuthView {
@@ -120,7 +118,6 @@ export type FoundationAction =
   | { type: 'signedOut' }
   | { type: 'setPrefs'; prefs: StudioPrefs }
   | { type: 'recordRun'; projectId: string; snapshot: RunSnapshot }
-  | { type: 'importLegacy'; projects: StudioProject[] }
   | { type: 'persistError'; error: string | null };
 
 const LOADING_AUTH: AuthView = {
@@ -160,42 +157,6 @@ export function freshQuestionnaire(): QuestionnaireState {
     sourceExport: { ...INITIAL_STATE.sourceExport! },
     options: { ...INITIAL_STATE.options },
   };
-}
-
-/** Disk custody holds receipts, not generated source bodies or download-ready
- * files. A saved run cannot replay a transient source ZIP as if available. */
-export function persistedRunPayload(payload: RunPayload | null | undefined): RunPayload | null {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
-  const { files: _bodies, source_manifest: _manifest, source_export, ...summary } = payload;
-  if (source_export?.status === 'ready') return {
-    ...summary,
-    source_export: {
-      status: 'unavailable',
-      reason: 'Save the original live-run source ZIP before leaving this build.',
-    },
-  };
-  return { ...summary, ...(source_export ? { source_export } : {}) };
-}
-
-export function persistedRunSnapshot(snapshot: RunSnapshot): RunSnapshot {
-  return { ...snapshot, payload: persistedRunPayload(snapshot.payload) };
-}
-
-/** Monotonic revision token: two edits in one millisecond are distinct. */
-export function nextStudioRevision(previousIso: string, requestedIso: string): string {
-  const prior = Date.parse(previousIso), requested = Date.parse(requestedIso);
-  if (!Number.isFinite(prior) || !Number.isFinite(requested)) {
-    throw new Error('Invalid Studio source revision timestamp');
-  }
-  const next = Math.max(prior + 1, requested);
-  if (!Number.isSafeInteger(next) || next > 8_640_000_000_000_000) {
-    throw new Error('Studio revision timestamp exhausted');
-  }
-  return new Date(next).toISOString();
-}
-
-export function changedBuildInputs(before: QuestionnaireState, after: QuestionnaireState): boolean {
-  return JSON.stringify(buildRunRequest(before)) !== JSON.stringify(buildRunRequest(after));
 }
 
 export function projectTitle(vision: string): string {
@@ -346,9 +307,7 @@ export function foundationReducer(state: FoundationState, action: FoundationActi
         ...current,
         questionnaire,
         title: projectTitle(questionnaire.vision),
-        lastRunOutdated: current.lastRun
-          ? Boolean(current.lastRunOutdated || changedBuildInputs(current.questionnaire, questionnaire)) : false,
-        updatedAt: nextStudioRevision(current.updatedAt, action.at),
+        updatedAt: action.at,
       });
     }
     case 'openBuild':
@@ -377,14 +336,6 @@ export function foundationReducer(state: FoundationState, action: FoundationActi
       return { ...state, prefs: sanitizePrefs(action.prefs) };
     case 'recordRun':
       return applyRecordRun(state, action.projectId, action.snapshot);
-    case 'importLegacy': {
-      if (!canEnter(state) || state.holdSaves) return state;
-      const safe = sanitizeProjects(action.projects);
-      if (safe.corrupt) return state;
-      const ids = new Set(state.projects.map(p => p.id));
-      const novel = safe.projects.filter(p => !ids.has(p.id));
-      return novel.length ? { ...state, projects: [...novel, ...state.projects] } : state;
-    }
     case 'persistError':
       return { ...state, persistError: action.error };
     default:
@@ -395,11 +346,8 @@ export function foundationReducer(state: FoundationState, action: FoundationActi
 export function applyRecordRun(state: FoundationState, projectId: string, snapshot: RunSnapshot): FoundationState {
   const current = state.projects.find((project) => project.id === projectId);
   if (!current) return state;
-  const finished = snapshot.finishedAt != null ? new Date(snapshot.finishedAt).toISOString() : current.updatedAt;
-  return replaceProject(state, {
-    ...current, lastRun: persistedRunSnapshot(snapshot), lastRunOutdated: false,
-    updatedAt: nextStudioRevision(current.updatedAt, finished),
-  });
+  const updatedAt = snapshot.finishedAt != null ? new Date(snapshot.finishedAt).toISOString() : current.updatedAt;
+  return replaceProject(state, { ...current, lastRun: snapshot, updatedAt });
 }
 
 export interface PersistSnapshot {
@@ -413,9 +361,7 @@ export interface PersistSnapshot {
 export function persistSnapshot(state: FoundationState): PersistSnapshot {
   return {
     onboarded: state.onboarded,
-    projects: state.projects.map(project => ({
-      ...project, lastRun: project.lastRun ? persistedRunSnapshot(project.lastRun) : null,
-    })),
+    projects: state.projects,
     prefs: state.prefs,
     projectsCorrupt: state.projectsCorrupt,
     holdSaves: state.holdSaves,
@@ -429,7 +375,6 @@ export function orderedProjects(projects: readonly StudioProject[]): StudioProje
 export function projectStatus(project: StudioProject, liveOwner: string | null, livePhase: BuildPhase): string {
   if (liveOwner === project.id && livePhase === 'running') return 'Forging';
   if (!project.lastRun) return 'Brief in progress';
-  if (project.lastRunOutdated) return 'Design changed — build again';
   if (project.lastRun.phase === 'error') return 'Needs attention';
   if (project.lastRun.succeeded) return 'Built';
   return 'Finished with failures';
@@ -437,7 +382,6 @@ export function projectStatus(project: StudioProject, liveOwner: string | null, 
 
 export function openTarget(project: StudioProject, liveOwner: string | null, livePhase: BuildPhase): 'brief' | 'build' {
   if (liveOwner === project.id && livePhase === 'running') return 'build';
-  if (project.lastRunOutdated) return 'brief';
   if (project.lastRun) return 'build';
   return 'brief';
 }
@@ -598,7 +542,7 @@ function sanitizeProject(raw: unknown): StudioProject | null {
       startedAt: typeof run.startedAt === 'number' ? run.startedAt : null,
       finishedAt: typeof run.finishedAt === 'number' ? run.finishedAt : null,
       succeeded: run.succeeded,
-      payload: persistedRunPayload(run.payload),
+      payload: run.payload && typeof run.payload === 'object' ? run.payload : null,
     };
   }
   return {
@@ -608,7 +552,6 @@ function sanitizeProject(raw: unknown): StudioProject | null {
     updatedAt: item.updatedAt,
     questionnaire: normalized,
     lastRun,
-    lastRunOutdated: Boolean(lastRun && item.lastRunOutdated === true),
   };
 }
 
@@ -617,11 +560,9 @@ export function sanitizeProjects(raw: unknown): { projects: StudioProject[]; cor
   if (raw == null) return { projects: [], corrupt: false };
   if (!Array.isArray(raw)) return { projects: [], corrupt: true };
   const projects: StudioProject[] = [];
-  const ids = new Set<string>();
   for (const item of raw) {
     const project = sanitizeProject(item);
-    if (!project || ids.has(project.id)) return { projects: [], corrupt: true };
-    ids.add(project.id);
+    if (!project) return { projects: [], corrupt: true };
     projects.push(project);
   }
   return { projects, corrupt: false };
@@ -666,62 +607,4 @@ export async function bootstrap(load: () => Promise<LoadResult>, auth: AuthClien
     });
   }
   return state;
-}
-
-/** Apply a Forge return only to its source project and exact revision.
- * Never overwrite a project that the Studio has edited meanwhile. */
-export function reconcileStudioReturn(
-  projects: readonly StudioProject[], id: string, expectedUpdatedAt: string,
-  questionnaire: QuestionnaireState, at: string,
-): { status: 'applied' | 'already-applied' | 'conflict' | 'missing' | 'invalid'; projects: StudioProject[] } {
-  const result = [...projects];
-  const index = result.findIndex(p => p.id === id);
-  if (index === -1) return { status: 'missing', projects: result };
-  const current = result[index];
-  const vetted = sanitizeProjects([{ ...current, questionnaire }]);
-  if (vetted.corrupt || vetted.projects.length !== 1) return { status: 'invalid', projects: result };
-  if (current.updatedAt !== expectedUpdatedAt) {
-    const before = sanitizeProjects([current]);
-    if (!before.corrupt && JSON.stringify(before.projects[0].questionnaire)
-        === JSON.stringify(vetted.projects[0].questionnaire)) {
-      return { status: 'already-applied', projects: result };
-    }
-    return { status: 'conflict', projects: result };
-  }
-  const draft = {
-    ...vetted.projects[0],
-    title: projectTitle(questionnaire.vision),
-    lastRunOutdated: current.lastRun
-      ? Boolean(current.lastRunOutdated || changedBuildInputs(current.questionnaire, questionnaire)) : false,
-    updatedAt: nextStudioRevision(current.updatedAt, at),
-  };
-  const accepted = sanitizeProjects([draft]);
-  if (accepted.corrupt || accepted.projects.length !== 1) return { status: 'invalid', projects: result };
-  result[index] = accepted.projects[0];
-  return { status: 'applied', projects: result };
-}
-
-/** Preserve returned work as a distinct copy if the source project changed
- * or was deleted. This is deliberate conflict recovery, never overwrite. */
-export function recoverStudioReturnAsCopy(
-  projects: readonly StudioProject[], questionnaire: QuestionnaireState, at: string,
-): { project: StudioProject; projects: StudioProject[] } {
-  const occupied = new Set(projects.map(p => p.id));
-  const stamp = Date.parse(at);
-  if (!Number.isFinite(stamp)) throw new Error('Invalid Studio return timestamp');
-  let id = '';
-  for (let i = 0; i < 128; i += 1) {
-    const candidate = 'p_return_' + Math.floor(stamp).toString(36) + '_' + i.toString(36);
-    if (!occupied.has(candidate)) { id = candidate; break; }
-  }
-  if (!id) throw new Error('No available Studio project ID for returning Forge edits');
-  const candidate: StudioProject = {
-    id, title: projectTitle(questionnaire.vision) + ' (Forge copy)',
-    createdAt: at, updatedAt: at, questionnaire, lastRun: null, lastRunOutdated: false,
-  };
-  const validated = sanitizeProjects([candidate]);
-  if (validated.corrupt || validated.projects.length !== 1) {
-    throw new Error('Returned Forge design was rejected by current Studio validation');
-  }
-  return { project: validated.projects[0], projects: [validated.projects[0], ...projects] };
 }
