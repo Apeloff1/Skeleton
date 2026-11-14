@@ -17,6 +17,9 @@ from skeleton.quality.replay_evidence import ReplayTape
 SCHEMA_ID = "quality.ai_run_replay.v1"
 _PERF_KEYS = ("frame_ms", "alloc_bytes", "load_ms")
 _MAX_EVENTS = 10_000
+_MAX_JSON_BYTES = 16 * 1024 * 1024
+_MAX_JSON_NODES = 250_000
+_MAX_JSON_DEPTH = 32
 _RUN_FIELDS = frozenset({"schema", "run_id", "seed", "tick_ms", "events", "perf", "budgets", "digest"})
 
 
@@ -24,12 +27,65 @@ class AiRunReplayError(ValueError):
     """Raised for malformed or tampered AI-run documents (fail closed)."""
 
 
-def _digest(value: Any) -> str:
+def _canonical_bytes(value: Any) -> bytes:
+    """Strict, bounded canonical JSON; no key coercion or arbitrary repr."""
+    remaining = _MAX_JSON_NODES
+    chars = _MAX_JSON_BYTES
+    active: set[int] = set()
+
+    def visit(item: Any, depth: int = 0) -> None:
+        nonlocal remaining, chars
+        remaining -= 1
+        if remaining < 0 or depth > _MAX_JSON_DEPTH:
+            raise AiRunReplayError("run JSON shape exceeds bounds")
+        if type(item) is str:
+            chars -= len(item)
+            if chars < 0:
+                raise AiRunReplayError("run JSON text exceeds bounds")
+        elif type(item) in (dict, list, tuple):
+            if id(item) in active or len(item) > remaining:
+                raise AiRunReplayError("cyclic or unbounded run JSON")
+            active.add(id(item))
+            try:
+                if type(item) is dict:
+                    for key, child in item.items():
+                        if type(key) is not str:
+                            raise AiRunReplayError("run JSON keys must be strings")
+                        visit(key, depth + 1)
+                        visit(child, depth + 1)
+                else:
+                    for child in item:
+                        visit(child, depth + 1)
+            finally:
+                active.remove(id(item))
+        elif item is None or type(item) is bool:
+            return
+        elif type(item) is int:
+            if item.bit_length() > 16384:
+                raise AiRunReplayError("run JSON integer exceeds bounds")
+        elif type(item) is float:
+            if not math.isfinite(item):
+                raise AiRunReplayError("run JSON number is not finite")
+        else:
+            raise AiRunReplayError("run is not canonically serializable")
+
+    visit(value)
+    result = bytearray()
     try:
-        encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+        encoder = json.JSONEncoder(sort_keys=True, separators=(",", ":"), allow_nan=False)
+        for chunk in encoder.iterencode(value):
+            if len(chunk) > _MAX_JSON_BYTES - len(result):
+                raise AiRunReplayError("run JSON byte limit exceeded")
+            result.extend(chunk.encode("ascii"))
     except (TypeError, ValueError, OverflowError, RecursionError) as exc:
+        if isinstance(exc, AiRunReplayError):
+            raise
         raise AiRunReplayError("run is not canonically serializable") from exc
-    return hashlib.sha256(encoded).hexdigest()
+    return bytes(result)
+
+
+def _digest(value: Any) -> str:
+    return hashlib.sha256(_canonical_bytes(value)).hexdigest()
 
 
 def _non_negative(value: object, name: str) -> float:
@@ -126,18 +182,26 @@ class AiRunRecorder:
     def record(self, kind: str, payload: Mapping[str, Any]) -> Any:
         if not isinstance(kind, str) or not kind:
             raise AiRunReplayError("event kind required")
-        if "t_ms" in payload or len(self.tape.events) >= _MAX_EVENTS:
+        if (not isinstance(payload, Mapping) or len(payload) > _MAX_JSON_NODES
+                or "t_ms" in payload or len(self.tape.events) >= _MAX_EVENTS):
             raise AiRunReplayError("reserved timestamp or event bound exceeded")
-        self.clock.advance()
-        return self.tape.append(kind, {**dict(payload), "t_ms": round(self.clock.now_ms(), 3)})
+        snapshot = json.loads(_canonical_bytes(dict(payload)))
+        try:
+            self.clock.advance()
+        except ValueError as exc:
+            raise AiRunReplayError("logical clock cannot advance") from exc
+        return self.tape.append(kind, {**snapshot, "t_ms": round(self.clock.now_ms(), 3)})
 
     def observe(self, *, frame_ms: float | None = None, alloc_bytes: float | None = None, load_ms: float | None = None) -> None:
-        if frame_ms is not None:
-            self.frame_ms.append(_non_negative(frame_ms, "frame_ms"))
-        if alloc_bytes is not None:
-            self.alloc_bytes.append(_non_negative(alloc_bytes, "alloc_bytes"))
-        if load_ms is not None:
-            self.load_ms.append(_non_negative(load_ms, "load_ms"))
+        staged = []
+        for key, sample in (("frame_ms", frame_ms), ("alloc_bytes", alloc_bytes), ("load_ms", load_ms)):
+            if sample is not None:
+                target = getattr(self, key)
+                if len(target) >= _MAX_EVENTS:
+                    raise AiRunReplayError("performance sample bound exceeded")
+                staged.append((target, _non_negative(sample, key)))
+        for target, sample in staged:
+            target.append(sample)
 
     def observation(self) -> PerfObservation:
         return PerfObservation(tuple(self.frame_ms), tuple(self.alloc_bytes), tuple(self.load_ms))
@@ -152,7 +216,10 @@ class AiRunRecorder:
             "perf": self.observation().to_mapping(),
             "budgets": (budgets or PerfBudgets()).to_mapping(),
         }
-        return {**body, "digest": _digest(body)}
+        document = json.loads(_canonical_bytes(body))
+        document["digest"] = _digest(document)
+        load_ai_run(document)
+        return document
 
 
 def load_ai_run(document: Mapping[str, Any]) -> tuple[Any, PerfObservation, PerfBudgets]:
@@ -172,8 +239,11 @@ def load_ai_run(document: Mapping[str, Any]) -> tuple[Any, PerfObservation, Perf
     if not isinstance(document["perf"], Mapping) or not isinstance(document["budgets"], Mapping):
         raise AiRunReplayError("performance evidence must be an object")
     body = {k: v for k, v in document.items() if k != "digest"}
-    if document["digest"] != _digest(body):
+    canonical = _canonical_bytes(body)
+    if document["digest"] != hashlib.sha256(canonical).hexdigest():
         raise AiRunReplayError("ai run digest mismatch")
+    snapshot = json.loads(canonical)
+    events = snapshot["events"]
     try:
         clock = DeterministicClock(tick)
         for index, event in enumerate(events):
@@ -192,7 +262,7 @@ def load_ai_run(document: Mapping[str, Any]) -> tuple[Any, PerfObservation, Perf
         raise
     except (ValueError, KeyError, TypeError, OverflowError, RecursionError) as exc:
         raise AiRunReplayError("corrupt replay tape") from exc
-    return tape, PerfObservation.from_mapping(document["perf"]), PerfBudgets.from_mapping(document["budgets"])
+    return tape, PerfObservation.from_mapping(snapshot["perf"]), PerfBudgets.from_mapping(snapshot["budgets"])
 
 
 def replay_ai_run(

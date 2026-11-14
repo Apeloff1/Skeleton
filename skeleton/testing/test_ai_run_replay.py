@@ -8,6 +8,7 @@ import pytest
 
 from skeleton.quality.deterministic_time import DeterministicClock
 from skeleton.quality.ai_run_replay import (
+    AiRunRecorder,
     AiRunReplayError,
     SCHEMA_ID,
     PerfBudgets,
@@ -129,3 +130,49 @@ def test_seed_change_is_not_equivalent_even_when_events_match() -> None:
 def test_caller_cannot_override_logical_timestamp() -> None:
     with pytest.raises(AiRunReplayError, match="reserved timestamp"):
         record_scripted_ai_run("run", [{"kind": "act", "t_ms": 999}])
+
+
+def test_recorded_nested_payload_and_exports_are_detached() -> None:
+    recorder = AiRunRecorder("owner")
+    original = {"nested": {"value": [1]}}
+    recorder.record("act", original)
+    original["nested"]["value"].append(2)
+    first = recorder.export()
+    assert first["events"][0]["payload"]["nested"]["value"] == [1]
+    first["events"][0]["payload"]["nested"]["value"].append(3)
+    assert recorder.export()["events"][0]["payload"]["nested"]["value"] == [1]
+
+
+@pytest.mark.parametrize("payload", [{1: "alias"}, {"x": float("nan")}, {"x": object()}])
+def test_invalid_payload_never_advances_the_recorder(payload) -> None:
+    recorder = AiRunRecorder("owner")
+    with pytest.raises(AiRunReplayError):
+        recorder.record("act", payload)
+    assert recorder.clock.now_ms() == 0.0
+    assert not recorder.tape.events
+
+
+def test_failed_observation_does_not_append_partial_samples() -> None:
+    recorder = AiRunRecorder("owner")
+    with pytest.raises(AiRunReplayError):
+        recorder.observe(frame_ms=12.0, alloc_bytes=-1)
+    assert recorder.observation() == PerfObservation()
+
+
+def test_loaded_replay_does_not_alias_input_document() -> None:
+    document = _run()
+    tape, _, _ = load_ai_run(document)
+    document["events"][0]["payload"]["npc"] = "mutated"
+    assert tape.events[0].payload["npc"] == "guard"
+    assert tape.verify()
+
+
+def test_unbounded_and_cyclic_replay_payload_rejected() -> None:
+    recorder = AiRunRecorder("owner")
+    cyclic = {}
+    cyclic["self"] = cyclic
+    with pytest.raises(AiRunReplayError):
+        recorder.record("act", cyclic)
+    with pytest.raises(AiRunReplayError):
+        recorder.record("act", {"text": "x" * (16 * 1024 * 1024 + 1)})
+    assert not recorder.tape.events
