@@ -19,3 +19,10 @@ This is not proof that the old worker stopped, an anti-rollback anchor, or an
 automatic abandonment policy. The signed evidence attests an independently
 reviewed operational condition. All previous owners must be quiescent; an
 existing encrypted output always blocks this path, even if corrupted.
+
+After authenticated retirement and journal tombstone verification, the bound
+CPU owner may release its stopped pressure guard for the exact inactive lease.
+Used lease identities remain retained, epochs invalidate old callbacks, and
+new requests still require independent live OS pressure sampling. A failed
+anchor transition continues to fence dispatch. This is not hardware recovery
+or automatic restart authorization.

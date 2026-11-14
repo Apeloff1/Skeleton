@@ -362,6 +362,15 @@ class GuardedFairStreamDispatch:
                 owner._backend.assert_no_published_result(permit)
                 if self._revoke_queued_prompt is not None:
                     self._revoke_queued_prompt(permit.request_id)
+                # Reauthorize the stopped guard only for the signed retired
+                # lease, while dispatch is still serialized. If the custody
+                # CAS fails, the pending lease continues to block all planning.
+                from .native_fair_stream_backend import NativeFairStreamBackend
+
+                native = owner._backend._backend
+                if type(native) is not NativeFairStreamBackend:
+                    raise DispatchUncertain("canonical native pressure owner required")
+                native.reauthorize_retired_lease(permit)
                 updated = self._session.abandon(receipt)
             except BaseException as exc:
                 self._uncertain = True

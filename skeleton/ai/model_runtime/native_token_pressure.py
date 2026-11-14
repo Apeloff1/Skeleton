@@ -165,6 +165,7 @@ class NativeTokenPressureGuard:
         self._max_duration_ns = max_duration_ns
         self._lock = RLock()
         self._active: str | None = None
+        self._last_permit: DispatchPermit | None = None
         self._epoch = 0
         self._used_leases: set[str] = set()
         self._samples = 0
@@ -245,6 +246,7 @@ class NativeTokenPressureGuard:
             epoch = self._epoch
             self._used_leases.add(permit.lease_id)
             self._active = permit.lease_id
+            self._last_permit = permit
             self._samples = 0
             self._pressure = None
 
@@ -314,6 +316,30 @@ class NativeTokenPressureGuard:
             self._active = None
             if not success:
                 self._stopped = True
+
+    def reauthorize_retired_lease(self, permit: DispatchPermit) -> None:
+        """Trusted recovery only, after verifying operator approval and journal tombstone.
+
+        This releases only the stop associated with the exact inactive lease.
+        It retains every used lease ID. A different permit must pass the normal
+        independent OS admission and execution callback checks.
+        """
+        self._require_owner_process()
+        if not _canonical_cpu_permit(permit):
+            raise NativePressureInterrupted("canonical retired CPU permit required")
+        with self._lock:
+            if self._active is not None:
+                raise NativePressureInterrupted("cannot reauthorize active native execution")
+            if not self._stopped:
+                return
+            if self._last_permit != permit or permit.lease_id not in self._used_leases:
+                raise NativePressureInterrupted("retired lease does not bind stopped pressure guard")
+            if len(self._used_leases) >= MAX_USED_LEASES:
+                raise NativePressureInterrupted("native pressure lease capacity exhausted")
+            self._epoch += 1
+            self._start_ns = None
+            self._last_ns = None
+            self._stopped = False
 
     def status(self) -> NativePressureStatus:
         """Never report a live permit after its monotonic deadline expires.

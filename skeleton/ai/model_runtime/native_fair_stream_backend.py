@@ -393,6 +393,16 @@ class NativeFairStreamBackend:
                 raise NativeExecutionInterrupted("authenticated native interruption requested")
             self._active_interrupt = None
 
+    def reauthorize_retired_lease(self, permit: DispatchPermit) -> None:
+        """Called only by the approved durable abandonment recovery owner."""
+        _require_owner_process(self._owner_pid)
+        with self._lock:
+            with self._interrupt_lock:
+                if self._active_interrupt is not None:
+                    raise NativeFairStreamDenied("cannot reauthorize active native execution")
+            if self._pressure_guard is not None:
+                self._pressure_guard.reauthorize_retired_lease(permit)
+
     def _pending(
         self, permit: DispatchPermit, state: Mapping[str, object],
     ) -> str:

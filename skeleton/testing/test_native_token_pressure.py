@@ -397,3 +397,33 @@ def test_unknown_sensor_large_quantum_cannot_authorize_native_cpu(monkeypatch, u
         guard.start(P)()
     assert guard.status().stopped
 
+
+
+def test_retired_lease_reauthorization_preserves_replay_fence(monkeypatch):
+    probe(monkeypatch, [budget(), budget(), budget()])
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    obsolete_callback = guard.start(P)
+    obsolete_callback()
+    guard.finish(success=False)
+    other = replace(P, lease_id="d" * 64, generation=2, request_id="next")
+    with pytest.raises(NativePressureInterrupted, match="does not bind"):
+        guard.reauthorize_retired_lease(other)
+    assert guard.status().stopped
+    guard.reauthorize_retired_lease(P)
+    assert not guard.status().stopped
+    current = guard.start(other)
+    with pytest.raises(NativePressureInterrupted, match="no longer active"):
+        obsolete_callback()
+    current()
+    current()
+    guard.finish(success=True)
+    with pytest.raises(NativePressureInterrupted, match="replay denied"):
+        guard.start(P)
+
+
+def test_reauthorization_cannot_release_active_pressure_owner():
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    guard.start(P)
+    with pytest.raises(NativePressureInterrupted, match="active native"):
+        guard.reauthorize_retired_lease(P)
+    guard.finish(success=False)
