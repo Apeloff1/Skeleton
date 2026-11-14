@@ -354,6 +354,7 @@ test('real editor browser flow preserves public viewer role and requires scoped 
 const checksum = text => createHash('sha256').update(text, 'utf8').digest('hex');
 const bundleSession = () => ({
   ...liveSession(), status: 'paused', source_count: 2,
+  consent_expires_at: '2026-12-31T00:00:00Z',
   counters: { requests: 2, documents: 2, bytes: 500, failures: 0 },
 });
 function bundleOptions(overrides = {}) {
@@ -630,4 +631,39 @@ test('authorized body with a changed policy age or timestamp is refused even wit
       },
     }), CrawlerBundleRefused);
   }
+});
+
+test('mutable campaign cache cannot rewrite the initial authority snapshot', async () => {
+  const baseline = bundleOptions();
+  let reads = 0;
+  await assert.rejects(buildCrawlerEvidenceBundle({
+    ...baseline,
+    getSession: async () => {
+      if (++reads === 2) baseline.session.counters.requests++;
+      return baseline.session;
+    },
+  }), CrawlerBundleRefused);
+});
+
+test('final campaign read follows hashing and catches an intervening consent change', async () => {
+  const baseline = bundleOptions();
+  let withdrawn = false;
+  await assert.rejects(buildCrawlerEvidenceBundle({
+    ...baseline,
+    sha256: async text => { withdrawn = true; return checksum(text); },
+    getSession: async () => ({ ...baseline.session, consent_current: !withdrawn }),
+  }), CrawlerBundleRefused);
+});
+
+test('source selection is frozen before awaiting campaign authority', async () => {
+  const baseline = bundleOptions();
+  const expected = [...baseline.sourceIds];
+  const packet = await buildCrawlerEvidenceBundle({
+    ...baseline,
+    getSession: async () => {
+      baseline.sourceIds.splice(0, baseline.sourceIds.length, 'f'.repeat(64));
+      return baseline.session;
+    },
+  });
+  assert.deepEqual(JSON.parse(packet.content).sources.map(row => row.source_id), expected);
 });

@@ -36,14 +36,34 @@ function gate(options: BundleOptions): void {
   if (options.signal?.aborted || !options.checkScope())
     refuse('The account or authorization session changed. The evidence bundle was not exported.');
 }
-function sameSession(first: CrawlSession, other: CrawlSession): boolean {
-  return first.session_id === other.session_id
-    && first.version === other.version
-    && first.consent_current === true && other.consent_current === true
-    && first.status === other.status && first.source_count === other.source_count
-    && first.counters.requests === other.counters.requests
-    && first.counters.documents === other.counters.documents
-    && first.counters.bytes === other.counters.bytes;
+// Snapshot only primitive authority fields; never retain mutable cached responses.
+function sessionCustody(value: CrawlSession) {
+  if (!value || !ID.test(value.session_id) || !Number.isSafeInteger(value.version)
+    || value.version < 1 || value.consent_current !== true
+    || typeof value.consent_expires_at !== 'string' || !Number.isFinite(Date.parse(value.consent_expires_at))
+    || typeof value.status !== 'string' || !Number.isSafeInteger(value.source_count)
+    || value.source_count < 0 || !value.counters
+    || [value.counters.requests, value.counters.documents, value.counters.bytes, value.counters.failures]
+      .some(count => !Number.isSafeInteger(count) || count < 0))
+    refuse('The source session authorization or counters are invalid.');
+  return Object.freeze({
+    id: value.session_id,
+    version: value.version,
+    expiry: value.consent_expires_at,
+    status: value.status,
+    sourceCount: value.source_count,
+    requests: value.counters.requests,
+    documents: value.counters.documents,
+    bytes: value.counters.bytes,
+    failures: value.counters.failures,
+  });
+}
+type SessionCustody = ReturnType<typeof sessionCustody>;
+function sameSession(first: SessionCustody, other: SessionCustody): boolean {
+  return first.id === other.id && first.version === other.version && first.expiry === other.expiry
+    && first.status === other.status && first.sourceCount === other.sourceCount
+    && first.requests === other.requests && first.documents === other.documents
+    && first.bytes === other.bytes && first.failures === other.failures;
 }
 
 /**
@@ -60,10 +80,12 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
     || sourceIds.length < 1 || sourceIds.length > MAX_SOURCES
     || sourceIds.some(id => typeof id !== 'string' || !SHA.test(id))
     || new Set(sourceIds).size !== sourceIds.length) refuse('Select 1–8 distinct authorized sources.');
-  const before = await options.getSession(session.session_id, signal);
-  gate(options);
-  if (!sameSession(session, before)) refuse('The source session changed. Refresh before exporting.');
+  const initial = sessionCustody(session);
+  const sessionId = initial.id;
   const selected = [...sourceIds].sort();
+  const before = sessionCustody(await options.getSession(sessionId, signal));
+  gate(options);
+  if (!sameSession(initial, before)) refuse('The source session changed. Refresh before exporting.');
   const rows: Array<Record<string, unknown>> = [];
   // Copy primitive custody fields before yielding to an export or another read.
   // A cache may return the same mutable record for both reads.
@@ -76,7 +98,7 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
   let totalBodyBytes = 0;
   for (const sourceId of selected) {
     gate(options);
-    const record = await options.getSource(session.session_id, sourceId, signal);
+    const record = await options.getSource(sessionId, sourceId, signal);
     gate(options);
     if (!record || record.source_id !== sourceId || !SHA.test(record.content_digest)
       || record.use_policy?.enabled !== true || record.freshness?.usable !== true
@@ -102,9 +124,9 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
     if (includeBodies) {
       // The authoritative export endpoint alone decides whether content
       // may leave the application; the source GET is not export permission.
-      const exported = await options.exportSource(session.session_id, sourceId, 'json', signal);
+      const exported = await options.exportSource(sessionId, sourceId, 'json', signal);
       gate(options);
-      if (exported.session_id !== session.session_id || exported.source_id !== sourceId
+      if (exported.session_id !== sessionId || exported.source_id !== sourceId
         || !SHA.test(exported.content_digest)
         || typeof exported.media_type !== 'string'
         || exported.media_type.split(';')[0].trim() !== 'application/json'
@@ -148,7 +170,7 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
     checked.set(sourceId, original);
     rows.push(row);
   }
-  const after = await options.getSession(session.session_id, signal);
+  const after = sessionCustody(await options.getSession(sessionId, signal));
   gate(options);
   if (!sameSession(before, after)) refuse('Source consent or campaign revision changed during export.');
   // Re-read each source after the bounded export, not just the campaign:
@@ -156,7 +178,7 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
   for (const sourceId of selected) {
     gate(options);
     const original = checked.get(sourceId);
-    const current = await options.getSource(session.session_id, sourceId, signal);
+    const current = await options.getSource(sessionId, sourceId, signal);
     gate(options);
     if (!original || !current || current.source_id !== sourceId
       || current.content_digest !== original.content_digest
@@ -170,15 +192,10 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
       || current.freshness.remote_freshness_verified !== false)
       refuse('A source policy, provenance or freshness status changed during export.');
   }
-  // A final campaign read fences withdrawal during those source rechecks.
-  const confirmed = await options.getSession(session.session_id, signal);
-  gate(options);
-  if (!sameSession(after, confirmed))
-    refuse('Campaign consent or revision changed during final source checks.');
   const packet = {
     schema: 'skeleton.dragon.owner_evidence_bundle.v1',
     mode: includeBodies ? 'authorized_source_bodies' : 'metadata_only',
-    session_id: session.session_id,
+    session_id: sessionId,
     session_version: before.version,
     source_count: rows.length,
     sources: rows,
@@ -195,11 +212,16 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
   const digest = await options.sha256(content);
   gate(options);
   if (!SHA.test(digest)) refuse('The evidence bundle digest is invalid.');
+  // Last network read occurs AFTER hashing as well as source rechecks.
+  const confirmed = sessionCustody(await options.getSession(sessionId, signal));
+  gate(options);
+  if (!sameSession(after, confirmed))
+    refuse('Campaign consent or revision changed during final source checks.');
   return {
     filename: 'dragon-evidence-' + (includeBodies ? 'authorized-' : 'metadata-')
-      + session.session_id.slice(0, 48) + '-v' + before.version + '.json',
+      + sessionId.slice(0, 48) + '-v' + before.version + '.json',
     media_type: 'application/json',
-    session_id: session.session_id,
+    session_id: sessionId,
     source_id: 'bundle',
     content, content_digest: digest,
   };
