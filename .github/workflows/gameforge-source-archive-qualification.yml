@@ -10,6 +10,8 @@ on:
       - "frontend/src/skeletonForge/sourceArchive.ts"
       - "frontend/src/skeletonForge/shareSourceArchive.ts"
       - "frontend/src/skeletonForge/hooks.ts"
+      - "frontend/src/skeletonForge/foundation/**"
+      - "frontend/scripts/skeleton-forge/design-presets.test.cjs"
       - "frontend/src/skeletonForge/components/**"
       - "frontend/scripts/skeleton-forge/source-archive.test.cjs"
       - "frontend/scripts/skeleton-forge/run-session-isolation.test.cjs"
