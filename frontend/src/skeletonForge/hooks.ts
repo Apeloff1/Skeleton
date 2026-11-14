@@ -6,6 +6,7 @@ import React from 'react';
 import { getAuthEpoch, subscribeAuthChanges } from '../auth/gameforgeAuth';
 import { composeVision, errorText, fetchBeats, fetchEras, fetchGenerations, runForge } from './client';
 import { FALLBACK_BEATS } from './questionnaire';
+import { RUN_CANCELLED_LOCALLY } from './run';
 import type { Beat, ComposeResult, EraRow, GenerationRow, RunPayload, RunRequest } from './types';
 
 export interface ComposeState {
@@ -169,13 +170,16 @@ export function useForgeRun() {
     }
   }, []);
 
+  /** Stop waiting on this device. The run endpoint is one synchronous
+   * request with no server-side cancel route, so the server may still
+   * finish; the request id fence guarantees that result is never applied. */
   const cancel = React.useCallback(() => {
     requestIdRef.current += 1;
     ctrlRef.current?.abort();
     ctrlRef.current = null;
     setState((p) => (p.phase === 'running'
       ? {
-        ...p, phase: 'error', payload: null, error: 'Cancelled',
+        ...p, phase: 'error', payload: null, error: RUN_CANCELLED_LOCALLY,
         finishedAt: Date.now(),
       }
       : p));
