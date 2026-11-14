@@ -42,6 +42,13 @@ _MAX_EXTERNAL_JSON_BYTES = 128 * 1024
 _MAX_API_FANOUT = 16
 _MAX_MCP_FANOUT = 32
 _MAX_PARALLEL_QUERIES = 8
+# Stable explicit admission contracts; keep the old names for legacy callers.
+_MAX_RESPONSE_BYTES = _MAX_EXTERNAL_RESPONSE_BYTES
+_MAX_MCP_QUERIES = _MAX_MCP_FANOUT
+_MAX_API_TARGETS = _MAX_API_FANOUT
+_MAX_SOURCES = 32
+_MAX_CONCURRENT_QUERIES = _MAX_PARALLEL_QUERIES
+_MAX_REQUEST_JSON_BYTES = 64 * 1024
 _FORBIDDEN_FORWARD_HEADERS = frozenset({
     "host",
     "proxy-authorization",
@@ -52,6 +59,11 @@ _FORBIDDEN_FORWARD_HEADERS = frozenset({
     "cookie",
     "set-cookie",
     "x-api-key",
+    "x-auth-token",
+    "x-real-ip",
+    "upgrade",
+    "content-length",
+    "content-type-override",
     "forwarded",
     "x-forwarded-host",
     "x-forwarded-for",
@@ -146,18 +158,25 @@ def _validate_external_url(url: str) -> None:
 
 
 def _safe_method(value: Any) -> str:
-    method = str(value or "GET").upper()
+    # Do not invoke user-defined __str__ during request admission.
+    if type(value) is not str or not 1 <= len(value) <= 10:
+        raise ValueError("external API method is invalid")
+    method = value.upper()
     if method not in _ALLOWED_HTTP_METHODS:
         raise ValueError("external API method is not allowed")
     return method
 
 
 def _safe_timeout(value: Any) -> float:
+    # Built-in numeric and bounded string values only; never call __float__ on
+    # a request-owned object or permit a megabyte-long numeric literal.
+    if type(value) not in (str, int, float) or (type(value) is str and len(value) > 32):
+        raise ValueError("external API timeout is invalid")
     try:
         timeout = float(value)
     except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError("external API timeout is invalid") from exc
-    if not math.isfinite(timeout) or timeout <= 0 or timeout > _MAX_EXTERNAL_TIMEOUT_SECONDS:
+    if not math.isfinite(timeout) or not 0 < timeout <= _MAX_EXTERNAL_TIMEOUT_SECONDS:
         raise ValueError("external API timeout is outside the allowed range")
     return timeout
 
@@ -165,21 +184,22 @@ def _safe_timeout(value: Any) -> float:
 def _safe_headers(value: Any) -> dict[str, str] | None:
     if value is None:
         return None
-    if not isinstance(value, dict) or len(value) > 24:
+    if type(value) is not dict or len(value) > 24:
         raise ValueError("external API headers exceed size limits")
     headers: dict[str, str] = {}
-    for raw_name, raw_value in value.items():
-        name = str(raw_name).strip()
-        header_value = str(raw_value)
-        if (not name or len(name) > 64 or not name.isascii()
-                or not all(ch.isalnum() or ch in "!#$%&'*+-.^_`|~" for ch in name)
-                or len(header_value) > 2048 or name.lower() in _FORBIDDEN_FORWARD_HEADERS):
+    for name, header_value in value.items():
+        if (
+            type(name) is not str or type(header_value) is not str
+            or not 1 <= len(name) <= 64
+            or not name.isascii() or not name[0].isalpha()
+            or any(not (ch.isascii() and (ch.isalnum() or ch == "-")) for ch in name)
+            or name.lower() in _FORBIDDEN_FORWARD_HEADERS
+            or len(header_value) > 1024
+            or any(not 32 <= ord(ch) <= 126 for ch in header_value)
+        ):
             raise ValueError("external API contains a forbidden forwarding header")
-        if any(ord(ch) < 32 and ch != "\t" for ch in name + header_value) or "\r" in header_value or "\n" in header_value:
-            raise ValueError("external API header contains control characters")
         headers[name] = header_value
     return headers
-
 
 def _get_mcp():
     global _mcp
@@ -219,35 +239,76 @@ def _safe_params(params: Any) -> dict[str, str] | None:
     return checked
 
 
-def _safe_payload(value: Any) -> Any:
-    if value is None:
-        return None
-    if not isinstance(value, (dict, list)):
+def _bounded_json(value: Any) -> Any:
+    """Validate ordinary JSON containers without executing arbitrary hooks.
+
+    Bound depth, fanout, string sizes and encoded UTF-8 bytes before giving a
+    caller-owned structure to the HTTP transport. No subclasses or cycles.
+    """
+    def check(item: Any, depth: int) -> None:
+        if depth > 8:
+            raise ValueError("external API JSON nesting exceeds budget")
+        if type(item) is dict:
+            if len(item) > 64:
+                raise ValueError("external API JSON object exceeds budget")
+            for key, child in item.items():
+                if type(key) is not str or len(key) > 256:
+                    raise ValueError("external API JSON key exceeds budget")
+                check(child, depth + 1)
+        elif type(item) is list:
+            if len(item) > 1024:
+                raise ValueError("external API JSON array exceeds budget")
+            for child in item:
+                check(child, depth + 1)
+        elif type(item) is str:
+            if len(item) > 8192:
+                raise ValueError("external API JSON string exceeds budget")
+        elif type(item) is float:
+            if not math.isfinite(item):
+                raise ValueError("external API JSON must be finite")
+        elif type(item) not in (int, bool, type(None)):
+            raise ValueError("external API JSON type is unsupported")
+
+    if type(value) not in (dict, list):
         raise ValueError("external API JSON request must be a container")
-    encoded = json.dumps(value, allow_nan=False, ensure_ascii=True)
-    if len(encoded) > _MAX_EXTERNAL_JSON_BYTES:
-        raise ValueError("external API JSON request exceeds limit")
+    check(value, 0)
+    try:
+        encoded = json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode("utf-8")
+    except (TypeError, ValueError, UnicodeError, RecursionError) as exc:
+        raise ValueError("external API JSON request is invalid") from exc
+    if len(encoded) > _MAX_REQUEST_JSON_BYTES:
+        raise ValueError("external API JSON request exceeds byte budget")
     return value
 
 
-async def _read_external_response(response) -> str:
-    """Read a bounded streamed response, including after HTTP decompression."""
+def _safe_payload(value: Any) -> Any:
+    return None if value is None else _bounded_json(value)
+
+
+async def _bounded_http_body(response: Any) -> str:
+    """Stream under the decompressed byte cap; reject before reading oversized declared bodies."""
     declared = response.headers.get("content-length")
     if declared is not None:
+        if type(declared) is not str or not declared.isascii() or not declared.isdecimal() or len(declared) > 12:
+            raise ValueError("external API response declared invalid byte budget")
         size = int(declared)
-        if size < 0 or size > _MAX_EXTERNAL_RESPONSE_BYTES:
-            raise ValueError("external API response exceeds byte limit")
+        if size > _MAX_RESPONSE_BYTES:
+            raise ValueError("external API response exceeds byte budget")
     chunks = bytearray()
     async for chunk in response.aiter_bytes():
-        if len(chunks) + len(chunk) > _MAX_EXTERNAL_RESPONSE_BYTES:
-            raise ValueError("external API response exceeds byte limit")
+        if type(chunk) is not bytes or len(chunks) + len(chunk) > _MAX_RESPONSE_BYTES:
+            raise ValueError("external API response exceeds byte budget")
         chunks.extend(chunk)
     return chunks.decode("utf-8", errors="replace")[:2000]
 
 
+async def _read_external_response(response: Any) -> str:
+    # Retain the maintained name for call sites predating the bounded API.
+    return await _bounded_http_body(response)
+
 async def _api_query(target: dict) -> dict:
     """Call only a pinned, allowlisted HTTPS endpoint with bounded payload."""
-    if not isinstance(target, dict):
+    if type(target) is not dict:
         return {"channel": "api", "target": "invalid", "ok": False,
                 "error": "invalid_api_target"}
     url = target.get("url", "")
@@ -258,7 +319,8 @@ async def _api_query(target: dict) -> dict:
         supplied_name
         if isinstance(supplied_name, str)
         and 1 <= len(supplied_name) <= 128
-        and all(ch.isascii() and (ch.isalnum() or ch in " ._-") for ch in supplied_name)
+        and supplied_name[0].isascii() and supplied_name[0].islower()
+        and all(ch.isascii() and (ch.islower() or ch.isdigit() or ch == "_") for ch in supplied_name)
         else "external_api"
     )
     if not _EXTERNAL_ENABLED:
@@ -302,7 +364,7 @@ async def _api_query(target: dict) -> dict:
                 return {"channel": "api", "target": name, "ok": response.is_success,
                         "status": response.status_code, "body": body}
     except Exception:  # noqa: BLE001
-        return {"channel": "api", "target": name, "ok": False, "error": "api_query_failed"}
+        return {"channel": "api", "target": "external_api", "ok": False, "error": "api_query_failed"}
 
 
 async def query_concurrent(room_id: str, mcp_queries: list[str] | None = None,
@@ -310,24 +372,30 @@ async def query_concurrent(room_id: str, mcp_queries: list[str] | None = None,
                            sources: list[str] | None = None) -> dict:
     """Fan every MCP query + external API target out CONCURRENTLY for a room.
     Returns per-channel results plus timing so callers can see the parallelism."""
-    if (not isinstance(room_id, str) or not 1 <= len(room_id) <= 128
-            or not isinstance(mcp_queries, (list, type(None)))
-            or not isinstance(api_targets, (list, type(None)))):
-        raise ValueError("invalid room API fanout arguments")
-    mcp_queries = mcp_queries or []
-    api_targets = api_targets or []
-    if len(mcp_queries) > _MAX_MCP_FANOUT or len(api_targets) > _MAX_API_FANOUT:
-        raise ValueError("room API fanout exceeds admission budget")
-    if any(not isinstance(q, str) or len(q) > 4096 for q in mcp_queries):
-        raise ValueError("room MCP query exceeds size budget")
-    if any(not isinstance(t, dict) for t in api_targets):
-        raise ValueError("room API target must be a mapping")
-    if sources is not None and (
-        not isinstance(sources, list)
-        or len(sources) > 32
-        or any(not isinstance(src, str) or len(src) > 128 for src in sources)
+    if type(room_id) is not str or not 1 <= len(room_id) <= 128:
+        raise ValueError("room API admission budget: invalid room identifier")
+    # Exact native types prevent untrusted mapping / sequence / comparison hooks.
+    if mcp_queries is None:
+        mcp_queries = []
+    if api_targets is None:
+        api_targets = []
+    if (
+        type(mcp_queries) is not list or type(api_targets) is not list
+        or len(mcp_queries) > _MAX_MCP_QUERIES
+        or len(api_targets) > _MAX_API_TARGETS
+        or len(mcp_queries) + len(api_targets) > 40
     ):
-        raise ValueError("invalid MCP source allowlist")
+        raise ValueError("room API admission budget exceeded")
+    if any(type(q) is not str or not 1 <= len(q) <= 4096 for q in mcp_queries):
+        raise ValueError("room API admission budget: invalid MCP query")
+    if any(type(target) is not dict or len(target) > 12 for target in api_targets):
+        raise ValueError("room API admission budget: invalid API target")
+    if sources is not None and (
+        type(sources) is not list
+        or len(sources) > _MAX_SOURCES
+        or any(type(src) is not str or not 1 <= len(src) <= 128 for src in sources)
+    ):
+        raise ValueError("room API admission budget: invalid sources")
     t0 = time.perf_counter()
     slots = asyncio.Semaphore(_MAX_PARALLEL_QUERIES)
 
