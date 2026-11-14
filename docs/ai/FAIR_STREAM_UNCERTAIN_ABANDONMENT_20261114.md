@@ -26,3 +26,9 @@ Used lease identities remain retained, epochs invalidate old callbacks, and
 new requests still require independent live OS pressure sampling. A failed
 anchor transition continues to fence dispatch. This is not hardware recovery
 or automatic restart authorization.
+
+A startup clock fault is now attributed to the exact attempted lease before
+any callback is issued. Its identity is burned and can be retired by the
+same operator procedure. Process-identity violations, replay attempts and
+exhausted lifetime capacity require fresh authorized composition instead of
+releasing the guard with an unrelated or previously successful lease.

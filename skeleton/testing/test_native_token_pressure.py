@@ -427,3 +427,50 @@ def test_reauthorization_cannot_release_active_pressure_owner():
     with pytest.raises(NativePressureInterrupted, match="active native"):
         guard.reauthorize_retired_lease(P)
     guard.finish(success=False)
+
+
+def test_startup_clock_failure_burns_attempt_and_allows_exact_retirement(monkeypatch):
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    with monkeypatch.context() as scoped:
+        def bad_clock():
+            raise OSError("clock unavailable")
+        scoped.setattr(pressure_module, "monotonic_ns", bad_clock)
+        with pytest.raises(NativePressureInterrupted, match="clock unavailable"):
+            guard.start(P)
+    assert guard.status().stopped
+    other = replace(P, lease_id="d" * 64, generation=2, request_id="next")
+    with pytest.raises(NativePressureInterrupted, match="does not bind"):
+        guard.reauthorize_retired_lease(other)
+    guard.reauthorize_retired_lease(P)
+    probe(monkeypatch, [budget(), budget()])
+    callback = guard.start(other)
+    callback()
+    callback()
+    guard.finish(success=True)
+    with pytest.raises(NativePressureInterrupted, match="replay"):
+        guard.start(P)
+
+
+def test_replay_stop_cannot_be_recovered_using_previous_success(monkeypatch):
+    probe(monkeypatch, [budget(), budget()])
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    callback = guard.start(P)
+    callback()
+    callback()
+    guard.finish(success=True)
+    with pytest.raises(NativePressureInterrupted, match="replay"):
+        guard.start(P)
+    with pytest.raises(NativePressureInterrupted, match="fresh authorized composition"):
+        guard.reauthorize_retired_lease(P)
+    assert guard.status().stopped
+
+
+def test_duplicate_failure_finish_does_not_stop_a_completed_guard(monkeypatch):
+    probe(monkeypatch, [budget(), budget()])
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    callback = guard.start(P)
+    callback()
+    callback()
+    guard.finish(success=True)
+    guard.finish(success=False)
+    assert not guard.status().stopped

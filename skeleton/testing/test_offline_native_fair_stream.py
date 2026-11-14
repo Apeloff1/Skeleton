@@ -537,7 +537,8 @@ def test_native_recovery_after_vault_commit_before_journal_commit(private_files,
             service.reconcile_committed(journal=journal, authorization=approval, recovery_key=key)
 
 
-def test_abandoned_native_failure_unblocks_next_authorized_request(private_files, monkeypatch):
+@pytest.mark.parametrize("failure_boundary", ["model", "pressure_clock"])
+def test_abandoned_native_failure_unblocks_next_authorized_request(private_files, monkeypatch, failure_boundary):
     from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchUncertain
     from skeleton.ai.model_runtime.fair_stream_execution_journal import ExecutionOutcomeUnknown
     from skeleton.ai.model_runtime.fair_stream_recovery import issue_abandonment_authorization
@@ -566,7 +567,11 @@ def test_abandoned_native_failure_unblocks_next_authorized_request(private_files
         raise RuntimeError("simulated model interruption before durable publication")
 
     with monkeypatch.context() as patch:
-        patch.setattr(NativeLLMRuntime, "generate_sequence", failure)
+        if failure_boundary == "model":
+            patch.setattr(NativeLLMRuntime, "generate_sequence", failure)
+        else:
+            from skeleton.ai.model_runtime import native_token_pressure
+            patch.setattr(native_token_pressure, "monotonic_ns", failure)
         with pytest.raises(DispatchUncertain):
             service.execute_next(token_budget=2)
     state = session.verify()
