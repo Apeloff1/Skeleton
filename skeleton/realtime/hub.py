@@ -50,6 +50,7 @@ Implements ADR ``docs/architecture/ADR-realtime-transport.md`` (PR #4101):
 from __future__ import annotations
 
 import asyncio
+from copy import deepcopy
 import json
 import secrets
 import threading
@@ -62,6 +63,7 @@ from typing import Any, Callable, Deque, Dict, Iterable, List, Mapping, Optional
 from .envelope import (
     CHANNEL_PRESENCE,
     CHANNELS,
+    MAX_PAYLOAD_BYTES,
     STREAM_LAGGED,
     STREAM_REAUTH,
     STREAM_RESET,
@@ -289,11 +291,11 @@ class Subscription:
         frame = self._queue.popleft()
         if isinstance(frame, RealtimeEvent):
             self._events_queued -= 1
-        return frame
+        return deepcopy(frame)
 
     def drain(self) -> List[Frame]:
         with self.hub._lock:
-            items = list(self._queue)
+            items = deepcopy(list(self._queue))
             self._queue.clear()
             self._events_queued = 0
             return items
@@ -333,7 +335,7 @@ class PresenceMember:
             "scope": self.scope,
             "joined_at": self.joined_at,
             "last_seen": ts_from_ms(self.last_seen_ms),
-            "meta": self.meta,
+            "meta": deepcopy(self.meta),
         }
 
 
@@ -359,6 +361,7 @@ class RealtimeHub:
         max_streams_per_principal: int = DEFAULT_MAX_STREAMS_PER_PRINCIPAL,
         max_stream_lifetime_s: float = DEFAULT_MAX_STREAM_LIFETIME_S,
         epoch: Optional[str] = None,
+        max_presence_members: int = 4096,
     ) -> None:
         if replay_capacity < 1 or subscriber_queue < 1:
             raise ValueError("replay_capacity and subscriber_queue must be >= 1")
@@ -369,6 +372,9 @@ class RealtimeHub:
         self.max_subscribers = int(max_subscribers)
         if presence_meta_max_bytes < 2 or presence_max_members_per_scope < 1 or max_streams_per_principal < 1:
             raise ValueError("presence/stream caps must be positive")
+        if type(max_presence_members) is not int or not 1 <= max_presence_members <= 100_000:
+            raise ValueError("invalid global presence capacity")
+        self.max_presence_members = max_presence_members
         self.presence_meta_max_bytes = int(presence_meta_max_bytes)
         self.presence_max_members_per_scope = int(presence_max_members_per_scope)
         self.presence_scope_authorizer: ScopeAuthorizer = presence_scope_authorizer or deny_all_scopes
@@ -481,7 +487,7 @@ class RealtimeHub:
         self.slo.record_published(channel)
         for dropped in lagged:
             self.slo.record_lagged(dropped)
-        return event
+        return deepcopy(event)
 
     # -- subscribe ---------------------------------------------------------
     def subscribe(
@@ -654,6 +660,8 @@ class RealtimeHub:
             if existing is not None and existing.principal != principal:
                 raise RealtimeAuthError("client_id is held by another principal")
             if existing is None:
+                if len(self._presence) >= self.max_presence_members:
+                    raise RealtimeLimitError("presence capacity exhausted", status=429, code="presence_capacity")
                 in_scope = sum(1 for m in self._presence.values() if m.scope == scope)
                 if in_scope >= self.presence_max_members_per_scope:
                     raise RealtimeLimitError(
@@ -661,16 +669,31 @@ class RealtimeHub:
                         status=422,
                         code="presence_scope_full",
                     )
+            candidate = PresenceMember(
+                client_id, principal, scope,
+                existing.joined_at if existing is not None else ts_from_ms(now),
+                now, clean_meta if existing is None or meta else existing.meta,
+            )
+            # A complete snapshot must fit a v1 envelope, including observers
+            # explicitly authorized to see all scopes.
+            members = [m.to_dict() for k, m in self._presence.items() if k != key]
+            members.append(candidate.to_dict())
+            size = len(json.dumps(
+                {"members": members, "count": len(members)},
+                separators=(",", ":"), allow_nan=False,
+            ).encode("utf-8"))
+            if size > MAX_PAYLOAD_BYTES:
+                raise RealtimeLimitError(
+                    "presence snapshot byte capacity exhausted", status=429,
+                    code="presence_snapshot_capacity",
+                )
+            self._presence[key] = candidate
             if existing is not None:
-                existing.last_seen_ms = now
-                if meta:
-                    existing.meta = clean_meta
-                return existing
-            member = PresenceMember(client_id, principal, scope, ts_from_ms(now), now, clean_meta)
-            self._presence[key] = member
+                return deepcopy(candidate)
+            member = candidate
         if announce:
             self.publish(CHANNEL_PRESENCE, "presence.joined", member.to_dict(), owner=principal, scope=scope)
-        return member
+        return deepcopy(member)
 
     def _leave(self, client_id: str, principal: str, scope: str, *, reason: str) -> bool:
         with self._lock:

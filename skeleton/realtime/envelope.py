@@ -29,6 +29,8 @@ SSE frames *without* an ``id:`` line so they never move the resume cursor.
 from __future__ import annotations
 
 import json
+import math
+from copy import deepcopy
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -108,7 +110,7 @@ def validate_identifier(value: Optional[str], field_name: str) -> Optional[str]:
     """Bounded, printable identifiers only (no free text, no secrets)."""
     if value is None:
         return None
-    if not isinstance(value, str) or not _IDENT_RE.match(value):
+    if not isinstance(value, str) or not _IDENT_RE.fullmatch(value):
         raise EnvelopeError(f"{field_name} must match {_IDENT_RE.pattern}")
     return value
 
@@ -120,7 +122,7 @@ def validate_channel(channel: object) -> str:
 
 
 def validate_type(channel: str, event_type: object) -> str:
-    if not isinstance(event_type, str) or not _TYPE_RE.match(event_type):
+    if not isinstance(event_type, str) or not _TYPE_RE.fullmatch(event_type):
         raise EnvelopeError("type must be dotted lowercase, e.g. build.progress")
     if not event_type.startswith(channel + "."):
         raise EnvelopeError(f"type {event_type!r} does not belong to channel {channel!r}")
@@ -139,7 +141,7 @@ def parse_cursor(raw: Optional[str]) -> Optional[int]:
     text = str(raw).strip()
     if not text:
         return None
-    if not _ID_RE.match(text):
+    if not _ID_RE.fullmatch(text):
         raise EnvelopeError("cursor must be an event id (decimal string)")
     return int(text)
 
@@ -155,7 +157,7 @@ def parse_resume_cursor(raw: Optional[str]) -> Tuple[Optional[int], Optional[str
         return None, None
     text = str(raw).strip()
     seq_text, sep, epoch = text.partition("-")
-    if sep and not _EPOCH_RE.match(epoch):
+    if sep and not _EPOCH_RE.fullmatch(epoch):
         raise EnvelopeError("cursor epoch must be 1-16 lowercase hex characters")
     return parse_cursor(seq_text), (epoch if sep else None)
 
@@ -166,6 +168,37 @@ def _json_strict(body: Any, **kwargs: Any) -> str:
         return json.dumps(body, allow_nan=False, **kwargs)
     except (TypeError, ValueError) as exc:
         raise EnvelopeError(f"payload is not JSON-native: {exc}") from None
+
+
+def strict_frame_json(text: str) -> Any:
+    """Decode bounded wire objects without ambiguous keys or non-finite numbers."""
+    if type(text) is not str or len(text) > 524_288:
+        raise EnvelopeError("frame JSON exceeds decoder budget")
+
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise EnvelopeError("duplicate frame JSON key")
+            result[key] = value
+        return result
+
+    def reject_constant(_value):
+        raise EnvelopeError("non-finite frame JSON constant")
+
+    def finite_float(value: str) -> float:
+        parsed = float(value)
+        if not math.isfinite(parsed):
+            raise EnvelopeError("non-finite frame JSON number")
+        return parsed
+
+    try:
+        return json.loads(
+            text, object_pairs_hook=unique, parse_constant=reject_constant,
+            parse_float=finite_float,
+        )
+    except (ValueError, TypeError, RecursionError, OverflowError) as exc:
+        raise EnvelopeError("invalid frame JSON") from exc
 
 
 def _payload_size(payload: Mapping[str, Any]) -> int:
@@ -190,9 +223,9 @@ class RealtimeEvent:
     v: int = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
-        if self.v != SCHEMA_VERSION:
-            raise EnvelopeError(f"unsupported schema version {self.v!r}")
-        if not isinstance(self.id, str) or not _ID_RE.match(self.id) or int(self.id) < 1:
+        if type(self.v) is not int or self.v != SCHEMA_VERSION:
+            raise EnvelopeError("unsupported schema version")
+        if not isinstance(self.id, str) or not _ID_RE.fullmatch(self.id) or int(self.id) < 1:
             raise EnvelopeError("id must be a positive decimal string")
         parse_ts(self.ts)
         validate_channel(self.channel)
@@ -220,7 +253,7 @@ class RealtimeEvent:
             "ts": self.ts,
             "channel": self.channel,
             "type": self.type,
-            "payload": self.payload,
+            "payload": deepcopy(self.payload),
         }
         if self.job_id is not None:
             body["job_id"] = self.job_id
@@ -256,11 +289,7 @@ class RealtimeEvent:
 
     @classmethod
     def from_json(cls, text: str) -> "RealtimeEvent":
-        try:
-            raw = json.loads(text)
-        except (TypeError, ValueError) as exc:
-            raise EnvelopeError("envelope is not valid JSON") from exc
-        return cls.from_dict(raw)
+        return cls.from_dict(strict_frame_json(text))
 
 
 @dataclass(frozen=True)
@@ -273,13 +302,18 @@ class ControlEvent:
     v: int = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        if type(self.v) is not int or self.v != SCHEMA_VERSION:
+            raise EnvelopeError("unsupported control schema version")
+        parse_ts(self.ts)
         if self.type not in CONTROL_TYPES:
             raise EnvelopeError(f"control type must be one of {CONTROL_TYPES}")
         if not isinstance(self.payload, dict):
             raise EnvelopeError("control payload must be an object")
+        if _payload_size(self.payload) > MAX_PAYLOAD_BYTES:
+            raise EnvelopeError("control payload exceeds byte budget")
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"v": self.v, "ts": self.ts, "type": self.type, "payload": self.payload}
+        return {"v": self.v, "ts": self.ts, "type": self.type, "payload": deepcopy(self.payload)}
 
     def to_json(self) -> str:
         return _dumps(self.to_dict())
