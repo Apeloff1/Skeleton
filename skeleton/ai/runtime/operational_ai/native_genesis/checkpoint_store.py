@@ -7,14 +7,14 @@ import hashlib
 
 from .canonical import bytes_sha, required_sha, encode
 from .errors import refuse
-from ..model.gguf.file_guard import open_private_artifact_root, regular_beneath
+from ..model.gguf.file_guard import open_trusted_root, regular_beneath
 
 
-def _open_private_root(directory: Path, *, create: bool = False) -> int:
-    if not isinstance(directory, Path) or not directory.is_absolute():
+def _open_private_root(directory: Path) -> int:
+    if type(directory) is not Path or not directory.is_absolute():
         refuse("store-absolute-directory")
     try:
-        root = open_private_artifact_root(directory, create=create)
+        root = open_trusted_root(directory)
     except (OSError, ValueError):
         refuse("store-untrusted-directory")
     metadata = os.fstat(root)
@@ -56,7 +56,8 @@ def publish_genesis(directory: Path, genesis, *, refuse_existing: bool = True) -
         refuse("genesis-output-budget")
     if bytes_sha(raw) != manifest.checkpoint_sha256:
         refuse("genesis-checkpoint-mismatch")
-    root = _open_private_root(directory, create=True)
+    directory.mkdir(mode=0o700, parents=False, exist_ok=True)
+    root = _open_private_root(directory)
     try:
         checkpoint_leaf = manifest.checkpoint_sha256 + ".native.json"
         manifest_leaf = manifest.checkpoint_sha256 + ".manifest.json"

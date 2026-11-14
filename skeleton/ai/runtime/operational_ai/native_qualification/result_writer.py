@@ -16,7 +16,7 @@ from .report import QualificationReport
 def save_new_private(report: QualificationReport, directory: Path, name: str) -> dict:
     if type(report) is not QualificationReport:
         deny("write-report-type")
-    if not isinstance(directory, Path) or not directory.is_absolute():
+    if type(directory) is not Path or not directory.is_absolute():
         deny("write-root")
     identity(name, "report-name")
     record = report.record()
@@ -26,9 +26,10 @@ def save_new_private(report: QualificationReport, directory: Path, name: str) ->
     data = encode(record)
     if len(data) > 8 * 1024 * 1024:
         deny("write-report-size")
-    from skeleton.ai.runtime.operational_ai.model.gguf.file_guard import open_private_artifact_root
+    directory.mkdir(mode=0o700, parents=False, exist_ok=True)
+    from skeleton.ai.runtime.operational_ai.model.gguf.file_guard import open_trusted_root
     try:
-        root_fd = open_private_artifact_root(directory, create=True)
+        root_fd = open_trusted_root(directory)
     except (OSError, ValueError) as exc:
         raise RuntimeError("unsafe report parent directory") from exc
     try:

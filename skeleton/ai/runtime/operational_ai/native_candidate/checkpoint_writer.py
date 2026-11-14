@@ -15,11 +15,11 @@ from .trainer import CandidateTrainingResult
 
 
 def _root(directory: Path) -> int:
-    from ..model.gguf.file_guard import open_private_artifact_root
-    if not isinstance(directory, Path) or not directory.is_absolute():
+    from ..model.gguf.file_guard import open_trusted_root
+    if type(directory) is not Path or not directory.is_absolute():
         deny("candidate-root")
     try:
-        fd = open_private_artifact_root(directory, create=True)
+        fd = open_trusted_root(directory)
     except (OSError, ValueError):
         deny("candidate-parent-unsafe")
     mode = os.fstat(fd)
@@ -69,6 +69,7 @@ def publish(result: CandidateTrainingResult, directory: Path) -> dict:
         deny("candidate-checkpoint-model-mismatch")
     digest = bytes_sha(raw)
     leaf = digest + ".native.json"
+    directory.mkdir(mode=0o700, parents=False, exist_ok=True)
     root_fd = _root(directory)
     try:
         # Do not silently accept a different artifact at an existing name.

@@ -10,7 +10,7 @@ import hashlib
 import stat
 
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
-from ..model.gguf.file_guard import open_private_artifact_root,regular_beneath
+from ..model.gguf.file_guard import open_trusted_root,regular_beneath
 from .canonical import encode,bytes_sha,require_sha
 from .errors import reject
 
@@ -18,10 +18,12 @@ MAX_BYTES=256000000
 
 
 def _root(directory:Path,*,create:bool)->int:
-    if not isinstance(directory, Path) or not directory.is_absolute():
+    if type(directory) is not Path or not directory.is_absolute():
         reject("store-absolute-path")
+    if create:
+        directory.mkdir(mode=0o700,parents=False,exist_ok=True)
     try:
-        fd=open_private_artifact_root(directory,create=create)
+        fd=open_trusted_root(directory)
     except (OSError,ValueError):
         reject("store-parent-custody")
     st=os.fstat(fd)
