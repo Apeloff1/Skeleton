@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Protocol, Sequence
 
+from skeleton.ai.model_runtime.private_sqlite import PrivateSQLiteHandle, open_private_sqlite
 from skeleton.frontier.runtime.memory import (
     lexical_relevance,
     normalize_memory_filters,
@@ -195,6 +196,7 @@ class SQLiteCollection:
         namespace: str = "frontier_memory",
         capacity: int = 10_000,
         max_namespace_bytes: int = 64 * 1024 * 1024,
+        _private_handle: PrivateSQLiteHandle | None = None,
     ) -> None:
         if not isinstance(namespace, str):
             raise TypeError("namespace must be a string")
@@ -213,13 +215,21 @@ class SQLiteCollection:
         self.namespace = namespace
         self.capacity = capacity
         self.max_namespace_bytes = max_namespace_bytes
-        self._connection = sqlite3.connect(
-            str(path),
-            check_same_thread=False,
-            timeout=5.0,
-        )
-        self._connection.row_factory = sqlite3.Row
+        self._private_handle = _private_handle
         self._lock = threading.RLock()
+        if _private_handle is None:
+            self._connection = sqlite3.connect(
+                str(path), check_same_thread=False, timeout=5.0,
+            )
+        else:
+            if type(_private_handle) is not PrivateSQLiteHandle or str(path) != ":memory:":
+                raise ValueError("exclusive private SQLite handle required")
+            _private_handle.assert_current()
+            self._connection = _private_handle.connection
+            # The private opener defaults to autocommit; this adapter uses
+            # explicit write transactions, including cross-thread calls.
+            self._connection.isolation_level = "DEFERRED"
+        self._connection.row_factory = sqlite3.Row
         with self._lock:
             self._connection.execute("PRAGMA foreign_keys = ON")
             self._connection.execute(
@@ -241,6 +251,36 @@ class SQLiteCollection:
                 """
             )
             self._connection.commit()
+
+    @classmethod
+    def from_private_database(
+        cls, directory: str | Path, *, create: bool = False,
+        filename: str = "frontier-memory.db",
+        max_database_bytes: int = 64 << 20,
+        namespace: str = "frontier_memory", capacity: int = 10_000,
+        max_namespace_bytes: int = 64 * 1024 * 1024,
+    ) -> "SQLiteCollection":
+        """Explicit private POSIX storage; no silent bootstrap on reopen.
+
+        This class owns the handle. Its RLock serializes every connection use
+        including CollectionMemoryAdapter's asyncio.to_thread calls. The
+        legacy path constructor is retained for compatibility, not certified
+        private storage. This does not protect against malicious same-UID races.
+        """
+        handle = open_private_sqlite(
+            directory, filename=filename, create=create,
+            max_database_bytes=max_database_bytes, check_same_thread=False,
+        )
+        try:
+            return cls(namespace=namespace, capacity=capacity,
+                       max_namespace_bytes=max_namespace_bytes, _private_handle=handle)
+        except BaseException:
+            handle.close()
+            raise
+
+    def _assert_private_custody(self) -> None:
+        if self._private_handle is not None:
+            self._private_handle.assert_current()
 
     @staticmethod
     def _metadata_json(metadata: Mapping[str, Any]) -> str:
@@ -365,6 +405,7 @@ class SQLiteCollection:
 
     def _rows(self) -> list[sqlite3.Row]:
         with self._lock:
+            self._assert_private_custody()
             result: list[sqlite3.Row] = []
             size = 0
             cursor = self._connection.execute(
@@ -431,6 +472,7 @@ class SQLiteCollection:
         # Cross-process serialization: the write and its quota check share
         # one transaction. A failed quota check rolls back every batch row.
         with self._lock, self._connection:
+            self._assert_private_custody()
             self._connection.execute("BEGIN IMMEDIATE")
             self._connection.executemany(
                 """
@@ -445,6 +487,7 @@ class SQLiteCollection:
             )
             self._assert_namespace_budget()
             self._assert_database_budget()
+            self._assert_private_custody()
 
     def query(
         self,
@@ -520,7 +563,9 @@ class SQLiteCollection:
         # Exact or full deletion is also the repair path for corrupt rows and
         # therefore deliberately does not require row deserialization.
         if where is None:
-            with self._lock:
+            with self._lock, self._connection:
+                self._assert_private_custody()
+                self._connection.execute("BEGIN IMMEDIATE")
                 if wanted is None:
                     self._connection.execute(
                         "DELETE FROM frontier_memory_items WHERE namespace = ?",
@@ -534,13 +579,14 @@ class SQLiteCollection:
                         """,
                         [(self.namespace, item_id) for item_id in wanted],
                     )
-                self._connection.commit()
+                self._assert_private_custody()
             return
 
         normalized_where = normalize_memory_filters(where)
         # Hold the database write reservation across selection and deletion.
         # A second process cannot change a matched row between these phases.
         with self._lock, self._connection:
+            self._assert_private_custody()
             self._connection.execute("BEGIN IMMEDIATE")
             targets: list[str] = []
             for row in self._rows():
@@ -560,9 +606,11 @@ class SQLiteCollection:
                     """,
                     [(self.namespace, item_id) for item_id in targets],
                 )
+            self._assert_private_custody()
 
     def count(self) -> int:
         with self._lock:
+            self._assert_private_custody()
             row = self._connection.execute(
                 """
                 SELECT COUNT(*)
@@ -575,7 +623,10 @@ class SQLiteCollection:
 
     def close(self) -> None:
         with self._lock:
-            self._connection.close()
+            if self._private_handle is not None:
+                self._private_handle.close()
+            else:
+                self._connection.close()
 
     def __enter__(self) -> "SQLiteCollection":
         return self

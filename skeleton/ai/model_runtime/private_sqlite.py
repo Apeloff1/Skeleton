@@ -161,6 +161,7 @@ def open_private_sqlite(
     filename: str = "fair-stream.db",
     create: bool = False,
     max_database_bytes: int = 64 << 20,
+    check_same_thread: bool = True,
 ) -> PrivateSQLiteHandle:
     """Open one owned database without implicit restart creation.
 
@@ -177,8 +178,8 @@ def open_private_sqlite(
     _require_platform()
     if type(filename) is not str or _SAFE_NAME.fullmatch(filename) is None:
         raise ValueError("bounded simple .db filename required")
-    if type(create) is not bool:
-        raise ValueError("explicit create boolean required")
+    if type(create) is not bool or type(check_same_thread) is not bool:
+        raise ValueError("explicit create and thread-affinity booleans required")
     if (
         type(max_database_bytes) is not int
         or not MIN_DATABASE_BYTES <= max_database_bytes <= MAX_DATABASE_BYTES
@@ -205,7 +206,7 @@ def open_private_sqlite(
         uri = "file:" + quote(path, safe="/") + "?mode=rw"
         connection = sqlite3.connect(
             uri, uri=True, timeout=1.0, isolation_level=None,
-            check_same_thread=True,
+            check_same_thread=check_same_thread,
         )
         after = os.stat(filename, dir_fd=dir_fd, follow_symlinks=False)
         opened = os.fstat(file_fd)
