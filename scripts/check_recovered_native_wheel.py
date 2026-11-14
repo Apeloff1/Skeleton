@@ -9,8 +9,9 @@ from __future__ import annotations
 import argparse
 from hashlib import sha256
 from pathlib import Path
+import stat
 import sys
-from zipfile import ZipFile
+from zipfile import BadZipFile, ZipFile
 
 ROOT = Path(__file__).resolve().parents[1]
 PREFIX = "skeleton/ai/runtime/operational_ai/"
@@ -59,6 +60,9 @@ def verify(wheel: Path) -> int:
             if name not in expected or name in found:
                 raise ValueError(f"unexpected or duplicate wheel record: {name}")
             size, digest = expected[name]
+            mode = stat.S_IFMT(entry.external_attr >> 16)
+            if mode not in (0, stat.S_IFREG):
+                raise ValueError(f"nonregular wheel record: {name}")
             if entry.is_dir() or entry.file_size != size or size > MAX_RECORD_BYTES:
                 raise ValueError(f"wheel size mismatch: {name}")
             with archive.open(entry) as member:
@@ -78,7 +82,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         count = verify(args.wheel)
-    except (OSError, ValueError, RuntimeError, EOFError) as exc:
+    except (OSError, ValueError, RuntimeError, EOFError, BadZipFile) as exc:
         print(f"native wheel inventory: FAIL: {exc}", file=sys.stderr)
         return 1
     print(f"native wheel inventory: PASS ({count} byte-verified records)")

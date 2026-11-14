@@ -36,3 +36,55 @@ def test_recovered_native_fixture_package_data(name, expected_count):
     assert len(source_members) == expected_count
     assert listed_members == source_members
     assert all(not (root / member).is_symlink() for member in source_members)
+
+
+def test_wheel_verifier_rejects_missing_duplicate_and_changed_records(tmp_path, monkeypatch):
+    from hashlib import sha256
+    from zipfile import ZipFile
+
+    from scripts import check_recovered_native_wheel as checker
+
+    member = checker.PREFIX + "durable_jobs/scenarios/admission/admission-01.json"
+    data = b'{"record":1}'
+    monkeypatch.setattr(checker, "inventory", lambda: {member: (len(data), sha256(data).hexdigest())})
+    wheel = tmp_path / "fixture.whl"
+    with ZipFile(wheel, "w") as archive:
+        archive.writestr(member, data)
+    assert checker.verify(wheel) == 1
+
+    with ZipFile(wheel, "w") as archive:
+        archive.writestr(member, b'{"record":2}')
+    with pytest.raises(ValueError, match="digest mismatch"):
+        checker.verify(wheel)
+
+    with ZipFile(wheel, "w"):
+        pass
+    with pytest.raises(ValueError, match="missing"):
+        checker.verify(wheel)
+
+    with ZipFile(wheel, "w") as archive:
+        archive.writestr(member, data)
+        with pytest.warns(UserWarning, match="Duplicate name"):
+            archive.writestr(member, data)
+    with pytest.raises(ValueError, match="duplicate"):
+        checker.verify(wheel)
+
+
+def test_wheel_verifier_rejects_nonregular_members(tmp_path, monkeypatch):
+    from hashlib import sha256
+    import stat
+    from zipfile import ZipFile, ZipInfo
+
+    from scripts import check_recovered_native_wheel as checker
+
+    member = checker.PREFIX + "durable_jobs/scenarios/admission/admission-01.json"
+    data = b'{"record":1}'
+    monkeypatch.setattr(checker, "inventory", lambda: {member: (len(data), sha256(data).hexdigest())})
+    wheel = tmp_path / "link.whl"
+    info = ZipInfo(member)
+    info.create_system = 3
+    info.external_attr = (stat.S_IFLNK | 0o777) << 16
+    with ZipFile(wheel, "w") as archive:
+        archive.writestr(info, data)
+    with pytest.raises(ValueError, match="nonregular"):
+        checker.verify(wheel)
