@@ -4166,13 +4166,14 @@
       "runtime_ready_claim": false,
       "action_mode": "informational",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "28d6bd90505597dbf8a69d4406bd142ae00f31c7dfb509a956ee738f6ed0eb28",
+      "source_sha256": "d8b8902fadf60f9dcc172cc32f7cfe3d2144814731ed99288b3f19e887aa586e",
       "interaction_count": 0,
       "backend_surfaces": [],
       "navigation_targets": [
-        "/menu"
+        "/menu",
+        "/skeleton-forge"
       ],
-      "accessibility_signal_count": 1,
+      "accessibility_signal_count": 2,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -6821,13 +6822,14 @@
       "runtime_ready_claim": false,
       "action_mode": "informational",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "c5d9672789790d30b0652ad3857dfb5515363e9d6fc465a02f45c24d3d9e481c",
+      "source_sha256": "58e46e8b852ee5f335142bf67de6f581dd7e90b325f4f0c5d218ef22d76c184e",
       "interaction_count": 0,
       "backend_surfaces": [],
       "navigation_targets": [
-        "/galaxy"
+        "/galaxy",
+        "/skeleton-studio"
       ],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 2,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",

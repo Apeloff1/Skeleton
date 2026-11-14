@@ -11,7 +11,8 @@ from typing import Any
 
 from .bundle import _artifact_read
 from .session import (SessionStore, SCHEMA as SESSION_SCHEMA, export_session as portable_export,
-                      import_session as portable_import, replay_choices, validate_session)
+                      import_session as portable_import, replay_choices, validate_session,
+                      player_view)
 from .studio_engine import StudioEngineStore
 from .world_canon import (
     CanonError, WorldStore, _id, _keys, _text, canonical, compile_html,
@@ -97,20 +98,101 @@ class LaptopFlow:
             raise CanonError("review_stale_source")
         return True
 
+    def preview_edit(self, world_id: str, expected_digest: str, operation: Any) -> dict[str, Any]:
+        """Reviewable, side-effect-free typed edit with exact source CAS.
+
+        The candidate is never approved or published by preview. A reviewer must
+        subsequently submit the identical operation against the original digest.
+        """
+        _id(world_id, "world_id")
+        fd = self.worlds._directory()
+        try:
+            self._lock(fd, world_id)
+            try:
+                current = self._world(fd, world_id)
+                if digest(current) != expected_digest:
+                    raise CanonError("stale_source")
+                candidate = edit(current, operation)
+                candidate_digest = digest(candidate)
+                if candidate_digest == expected_digest:
+                    raise CanonError("review_requires_change")
+                before = {kind: {item["id" if kind != "endings" else "scene"]: item
+                         for item in current[kind]}
+                          for kind in ("scenes", "choices", "endings")}
+                after = {kind: {item["id" if kind != "endings" else "scene"]: item
+                        for item in candidate[kind]}
+                         for kind in ("scenes", "choices", "endings")}
+                changes = {}
+                for kind in ("scenes", "choices", "endings"):
+                    changes[kind] = {
+                        "added": sorted(after[kind].keys() - before[kind].keys()),
+                        "removed": sorted(before[kind].keys() - after[kind].keys()),
+                        "modified": sorted(k for k in before[kind].keys() & after[kind].keys()
+                                           if before[kind][k] != after[kind][k]),
+                    }
+                return {
+                    "schema": "jeeves.world.review_preview.v1",
+                    "world_id": world_id,
+                    "source_digest": expected_digest,
+                    "candidate_digest": candidate_digest,
+                    "changes": changes,
+                    "proof": prove(candidate).as_dict(),
+                    "reviewed": False,
+                    "published": False,
+                }
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
+
     def review(self, world_id: str, expected_digest: str, operation: Any,
                review_note: str) -> dict[str, Any]:
+        """Publish an explicitly reviewed edit under one canonical writer lease.
+
+        Source CAS, proof, and review custody share a single lock. A concurrent
+        editor cannot slip a revision between publication and approval. If the
+        second durable write fails, the source remains unapproved (fail closed).
+        """
         _id(world_id, "world_id")
         _text(review_note, "review_note", 512)
         if len(review_note.strip()) < 8:
             raise CanonError("review_note_too_short")
-        current = self.worlds.read(world_id)
-        if digest(current) != expected_digest:
-            raise CanonError("stale_source")
-        revised = edit(current, operation)
-        if digest(revised) == expected_digest:
-            raise CanonError("review_requires_change")
-        new_digest = self.worlds.publish(revised, expected_digest=expected_digest)
-        return self.approve_current(world_id, new_digest, review_note)
+        fd = self.worlds._directory()
+        try:
+            self._lock(fd, world_id)
+            try:
+                current = self._world(fd, world_id)
+                if digest(current) != expected_digest:
+                    raise CanonError("stale_source")
+                revised = edit(current, operation)
+                new_digest = digest(revised)
+                if new_digest == expected_digest:
+                    raise CanonError("review_requires_change")
+                proof = prove(revised).as_dict()
+                review = {
+                    "schema": REVIEW_SCHEMA, "world_id": world_id,
+                    "source_digest": new_digest, "review_note": review_note,
+                }
+                # Revoke earlier approvals before changing source bytes.
+                # Otherwise an A -> B -> A retry could borrow a previously
+                # valid review if the next source/review pair is interrupted.
+                try:
+                    os.unlink(self._names(world_id)[0], dir_fd=fd)
+                except FileNotFoundError:
+                    pass
+                else:
+                    os.fsync(fd)
+                self.worlds._write(fd, world_id + ".json", canonical(revised))
+                self.worlds._write(fd, self._names(world_id)[0], canonical(review))
+                return {
+                    "world_id": world_id, "source_digest": new_digest,
+                    "review_digest": digest(review), "proof": proof,
+                    "reviewed": True,
+                }
+            finally:
+                os.unlink(world_id + ".lock", dir_fd=fd)
+        finally:
+            os.close(fd)
 
     def approve_current(self, world_id: str, expected_digest: str,
                         review_note: str) -> dict[str, Any]:
@@ -175,7 +257,14 @@ class LaptopFlow:
             if exc.code == "not_found":
                 raise CanonError("review_required") from None
             raise
-        self._validate_review(review, world)
+        try:
+            self._validate_review(review, world)
+        except CanonError as exc:
+            # A successfully written world with an interrupted review write
+            # has no approval, even if an old review remains on disk.
+            if exc.code == "review_stale_source":
+                raise CanonError("review_required") from None
+            raise
         return world, review
 
     @staticmethod
@@ -469,26 +558,21 @@ class LaptopFlow:
                     })
                 existing = None
                 if slot is not None:
-                    # The acceptance caller already owns the canonical world
-                    # lease. Re-entering LaptopFlow.inspect_session/export/
-                    # preflight_restore would invoke verify() and deadlock on
-                    # that same non-reentrant lease (lease_busy). Read through
-                    # the SessionStore using the pinned source digest instead.
-                    # Its read-only methods revalidate replay and save checks,
-                    # while the outer lease excludes concurrent world/session
-                    # writers for the entire three-step inspection.
-                    source_lease = receipt["source_digest"]
-                    view = self.sessions.inspect(
-                        world_id, slot, expected_world_digest=source_lease)
-                    exported = self.sessions.export(
-                        world_id, slot, expected_world_digest=source_lease)
-                    preview = self.sessions.preflight_import(
-                        world_id, exported, expected_world_digest=source_lease)
+                    # The canonical world lock is already held here. Never call
+                    # SessionStore.inspect/export/preflight_import, which would
+                    # reacquire the same non-reentrant writer lock and falsely
+                    # diagnose every healthy saved session as lease_busy.
+                    # The private validated slot read uses this *same* pinned fd.
+                    data = self.sessions._session(fd, world_id, slot, world)
+                    view = player_view(data, world)
+                    exported = portable_export(data, world)
+                    restored = portable_import(exported, world)
+                    preview = player_view(restored, world)
                     if preview["session_digest"] != view["session_digest"]:
                         raise CanonError("laptop_acceptance_session_mismatch")
                     existing = {
                         "slot": slot, "session_digest": view["session_digest"],
-                        "revision": preview["revision"], "restorable": preview["restorable"],
+                        "revision": preview["revision"], "restorable": True,
                     }
                 return {
                     "schema": "jeeves.world.laptop_acceptance.v1",

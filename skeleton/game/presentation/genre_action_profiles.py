@@ -59,6 +59,28 @@ GALAXY_GENRE_FAMILY: dict[str, str] = {
 QUESTIONNAIRE_GENRE_FAMILY = dict(GENRE_FAMILY)
 GENRE_FAMILY = {**GALAXY_GENRE_FAMILY, **QUESTIONNAIRE_GENRE_FAMILY}
 
+# Historical authored mappings remain authoritative. Complete the 158-label
+# GameForge *semantic input* taxonomy with safe group defaults only.
+# This is not a promise of 158 playable engines.
+from skeleton.context.genre_catalog import GENRE_GROUPS, GENRE_ERA_VOTES
+
+_GROUP_CONTROL_FAMILY = {
+    "action-shooting": "shooter", "role-playing": "rpg",
+    "strategy-tactics": "strategy", "simulation-management": "sandbox",
+    "adventure-narrative": "adventure", "platform-exploration": "adventure",
+    "puzzle-tabletop": "puzzle", "horror-suspense": "adventure",
+    "racing-sports": "racing", "creative-social": "sandbox",
+    "arcade-casual": "platformer",
+}
+for _group in GENRE_GROUPS:
+    for _genre, _era in _group["genres"]:
+        GENRE_FAMILY.setdefault(_genre, _GROUP_CONTROL_FAMILY[_group["id"]])
+
+# Distinct historical specialties repaired after the original 67-genre
+# offline catalog was sealed. Do not re-label them as finished game engines.
+RECOVERED_GALAXY_GENRE_FAMILY = {"beat_em_up": "platformer", "shoot_em_up": "shooter"}
+GENRE_FAMILY.update(RECOVERED_GALAXY_GENRE_FAMILY)
+
 FAMILIES = frozenset({"adventure", "rpg", "strategy", "sandbox", "platformer", "shooter", "puzzle", "racing"})
 
 
@@ -169,6 +191,8 @@ def genre_control_profile(genre: str) -> dict[str, object]:
         "catalogs": sorted([name for name, present in (
             ("galaxy", genre in GALAXY_GENRE_FAMILY),
             ("gameforge", genre in QUESTIONNAIRE_GENRE_FAMILY),
+            ("gameforge-extended", genre in GENRE_ERA_VOTES),
+            ("galaxy-recovered", genre in RECOVERED_GALAXY_GENRE_FAMILY),
         ) if present]),
         "actions": [
             {"id": a.action_id, "kind": a.kind, "context": a.context}

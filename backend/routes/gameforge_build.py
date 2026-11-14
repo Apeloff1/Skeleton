@@ -19,6 +19,7 @@ import time
 import zipfile
 from typing import Any, Optional
 
+from core.http_errors import PublicUnavailableError
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
@@ -77,11 +78,7 @@ def _governed_store():
     # The backend must not initialize a shadow engine/governance store. No
     # remote governed-artifact delivery interface is declared for this legacy
     # surface yet. Existing Studio source exports remain available separately.
-    raise HTTPException(503, {
-        "code": "artifact_owner_unavailable",
-        "message": "Governed GameForge export is unavailable. Use the Studio project source export.",
-        "action": "Use the existing Studio project source export until governed artifact delivery is connected.",
-    })
+    raise PublicUnavailableError("artifact_owner_unavailable")
 
 
 def _owned_gamefiles(game_name: str, user: Any) -> list[dict]:

@@ -12,7 +12,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { gridMove, readKey, rovingTabIndex, tabIndexProp, useRovingIndex, webKeyProps, type KeyEventLike } from '../a11y';
 import { featureMeta, humanize } from '../graph';
 import type { RunPhase } from '../hooks';
-import { formatElapsed, formatScore, pendingStages, summarizeRun, type StageView } from '../run';
+import { formatElapsed, formatScore, pendingStages, playableSceneView, summarizeRun, type StageView } from '../run';
 import type { RunPayload } from '../types';
 import { Banner, Button, Card, Meter, SectionTitle, StatusPill } from './primitives';
 import { C, TONE_COLOR, TONE_GLYPH } from './theme';
@@ -35,6 +35,10 @@ export interface ForgeRunPanelProps {
   now?: number;
   onCancel?: () => void;
   onRetry?: () => void;
+  /** Only for explicitly prepared, source-bound ZIPs from the exact completed run. */
+  onExport?: () => void;
+  exportBusy?: boolean;
+  exportError?: string | null;
   onViewEra?: (era: string) => void;
   /** Open the build-plan viewer. */
   onViewPlan?: () => void;
@@ -43,9 +47,10 @@ export interface ForgeRunPanelProps {
   testID?: string;
 }
 
-export default function ForgeRunPanel({ phase, payload, error, startedAt, finishedAt, now = Date.now(), onCancel, onRetry, onViewEra, onViewPlan, reduceMotion = false, testID }: ForgeRunPanelProps) {
+export default function ForgeRunPanel({ phase, payload, error, startedAt, finishedAt, now = Date.now(), onCancel, onRetry, onExport, exportBusy = false, exportError, onViewEra, onViewPlan, reduceMotion = false, testID }: ForgeRunPanelProps) {
   const elapsed = startedAt != null ? (finishedAt ?? now) - startedAt : 0;
   const sum = React.useMemo(() => summarizeRun(payload), [payload]);
+  const scene = React.useMemo(() => playableSceneView(payload), [payload]);
 
   if (phase === 'idle') {
     return (
@@ -103,8 +108,39 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
               <Fact k="Primary DPS" v={sum.primaryDps === null ? '—' : String(sum.primaryDps)} />
               <Fact k="Simulation" v={sum.simPassed === null ? '—' : sum.simPassed ? 'passed' : 'failed'} />
               <Fact k="Ledger" v={sum.ledgerValid === null ? '—' : sum.ledgerValid ? 'valid' : 'INVALID'} />
+              {payload.forge?.playable_archetype ? <Fact k="Playable mini-game" v={payload.forge.playable_archetype} /> : null}
+              {payload.playable_prototype ? <Fact k="Playable source" v={payload.playable_prototype.sealed ? 'Source sealed' : 'Not source sealed'} /> : null}
+              {payload.forge?.playable_launcher ? <Fact k="In-game launch and return" v="Original native scene switch available" /> : null}
+              {payload.native_quest?.steps ? <Fact k="Room-entry quest" v={String(payload.native_quest.steps) + ' native objectives'} /> : null}
               {sum.generation ? <Fact k="Hardware" v={humanize(sum.generation)} /> : null}
             </View>
+            {payload.source_export?.status === 'ready' && payload.succeeded === true ? (
+              <View style={{ marginTop: 12 }} testID="run-source-export">
+                <Text style={st.cardTitle}>Portable Godot source project</Text>
+                <Text style={st.small}>
+                  {payload.source_export.file_count} files · {payload.source_export.bytes} source bytes ·
+                  manifest {payload.source_export.manifest_sha256?.slice(0, 16)}
+                </Text>
+                <Text style={st.small}>
+                  A source-only ZIP that opens in Godot. This is not a compiled, signed or device-qualified game installer.
+                </Text>
+                {onExport ? (
+                  <Button
+                    label={exportBusy ? 'Preparing Godot ZIP…' : 'Save or share Godot ZIP'}
+                    onPress={onExport}
+                    busy={exportBusy}
+                    tone="secondary"
+                    testID="run-export-godot-zip"
+                  />
+                ) : null}
+              </View>
+            ) : null}
+            {payload.source_export?.status === 'unavailable' ? (
+              <Banner tone="warn" testID="run-source-export-unavailable">
+                {payload.source_export.reason || 'Godot source export could not be prepared within the safe limits.'}
+              </Banner>
+            ) : null}
+            {exportError ? <Banner tone="bad" testID="run-source-export-error">{exportError}</Banner> : null}
             {sum.composedFeatures.length ? (
               <View style={st.feats} accessibilityLabel={`Composed systems: ${sum.composedFeatures.join(', ')}${sum.composedFallback ? ' (fallback)' : ''}`}>
                 {sum.composedFeatures.map((f) => {
@@ -143,6 +179,27 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
               <Text style={st.cardTitle}>Playtest</Text>
               <StatusPill tone={sum.playtest.tone} label={sum.playtest.label} />
             </View>
+            {scene ? (
+              <View style={st.head} testID="run-native-playable-scene">
+                <Text style={st.cardTitle}>Independent playable scene</Text>
+                <StatusPill tone={scene.tone} label={scene.label} testID="run-native-playable-status" />
+              </View>
+            ) : null}
+            {payload.playable_scene_playtest?.scene ? (
+              <Text style={st.small} testID="run-native-playable-path">
+                Native source scene: {payload.playable_scene_playtest.scene}
+              </Text>
+            ) : null}
+            {payload.playable_scene_playtest?.errors?.length ? (
+              <Banner tone="warn" testID="run-native-playable-errors">
+                {payload.playable_scene_playtest.errors.slice(0, 3).join('; ')}
+              </Banner>
+            ) : null}
+            {scene?.state === 'unverified' || sum.playtest.state === 'unverified' ? (
+              <Banner tone="warn" testID="run-native-binary-unverified">
+                A successful native run from a non-admitted Godot binary does not certify release integrity.
+              </Banner>
+            ) : null}
           </Card>
 
           {sum.advice || sum.briefing ? (

@@ -25,6 +25,29 @@ const PLUGINS = [requireFromRoot.resolve('@babel/plugin-transform-modules-common
 const STUB = path.join(__dirname, 'rn-deep-stub.cjs');
 const SRC_EXT = ['.tsx', '.ts'];
 
+// Pure server-rendered contract tests must not import the live Expo API stack:
+// Node 24 refuses native Expo TypeScript beneath node_modules. A collapsed
+// questionnaire inspector never sends requests during SSR. Give only these
+// editor components a test-only, fail-on-use adapter; actual component code,
+// instrument state, and DOM rendering are still exercised by every test.
+const EDITOR_COMPONENTS = path.join(ROOT, 'src', 'skeletonForge', 'components') + path.sep;
+const noNetworkInSsr = () => {
+  throw new Error('Live API client invoked during offline GameForge SSR qualification');
+};
+const SSR_CLIENT = Object.freeze({
+  errorText: noNetworkInSsr,
+  fetchGenreControls: noNetworkInSsr,
+  previewHistoricalConductor: noNetworkInSsr,
+  fetchJeevesGameQualityCatalog: noNetworkInSsr,
+});
+const origLoad = Module._load;
+Module._load = function loadWithoutNativeExpo(request, parent, ...rest) {
+  if (request === '../client' && parent?.filename?.startsWith(EDITOR_COMPONENTS)) {
+    return SSR_CLIENT;
+  }
+  return origLoad.call(this, request, parent, ...rest);
+};
+
 // Node does not honor React Native's platform-specific .web.js resolution.
 // Keep this alias confined to the SSR component-test harness: production
 // Metro/native imports must still use the package's normal native entry.
