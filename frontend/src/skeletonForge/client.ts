@@ -3,7 +3,7 @@
  * apiClient (retries, timeouts, circuit breaker, breadcrumbs).
  */
 import api, { type ApiResult } from '../utils/apiClient';
-import type { Beat, CockpitResult, ComposeResult, EraRow, GenerationRow, RunPayload, RunRequest } from './types';
+import type { Beat, CockpitResult, ComposeResult, EraRow, GenerationRow, GenreControlProfile, RunPayload, RunRequest } from './types';
 
 export const SKELETON_API = '/api/skeleton';
 
@@ -17,6 +17,17 @@ export function fetchEras(signal?: AbortSignal): Promise<ApiResult<{ eras: EraRo
 
 export function fetchGenerations(signal?: AbortSignal): Promise<ApiResult<{ generations: GenerationRow[]; count: number }>> {
   return api.get(`${SKELETON_API}/generations`, { signal, timeoutMs: 10000, cacheKey: 'skeleton:generations', cacheTtlMs: 300000 });
+}
+
+/** Read-only semantic action profiles; requests are bounded and abortable. */
+export function fetchGenreControls(genre: string, signal?: AbortSignal): Promise<ApiResult<GenreControlProfile>> {
+  if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(genre)) {
+    return Promise.resolve({ ok: false, status: 400, error: 'Invalid creator genre' } as ApiResult<GenreControlProfile>);
+  }
+  return api.get(`${SKELETON_API}/controls/genres/${encodeURIComponent(genre)}`, {
+    signal, timeoutMs: 10000, retries: 0,
+    cacheKey: `skeleton:controls:${genre}`, cacheTtlMs: 300000,
+  });
 }
 
 export function composeVision(vision: string, signal?: AbortSignal): Promise<ApiResult<ComposeResult>> {
