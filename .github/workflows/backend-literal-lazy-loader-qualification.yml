@@ -1,20 +1,13 @@
 name: Backend Literal Lazy-Loader Inventory Qualification
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "backend/core/lazy_registry.py"
-      - "backend/core/public_exception_route.py"
-      - "backend/tests/test_storage_lazy_registry.py"
-      - ".github/workflows/backend-literal-lazy-loader-qualification.yml"
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: literal-lazy-loader-${{ github.event.pull_request.number }}
+  group: literal-lazy-loader-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

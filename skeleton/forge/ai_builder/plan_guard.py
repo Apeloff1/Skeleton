@@ -6,6 +6,7 @@ import json
 from typing import Any, Mapping
 
 from .plan_schema import FIELD_LIMITS, MUTABLE_FIELDS
+from skeleton.forge.game_design_spec import GameplayValidationError, gameplay_constraints, validate_gameplay
 
 
 def _seal(body: Mapping[str, Any]) -> dict[str, Any]:
@@ -47,4 +48,18 @@ def guard_proposal(compiled: Mapping[str, Any], proposal: Mapping[str, Any]) -> 
             violations.append("unknown:systems")
         else:
             spec["systems"] = list(systems)
+    if "gameplay" in proposal:
+        try:
+            gameplay = validate_gameplay(
+                proposal["gameplay"], genre=str(compiled.get("genre") or "top_down_shooter"),
+            )
+            locked = gameplay_constraints(str(compiled.get("brief") or ""))
+            conflicts = tuple("constraints:gameplay." + key for key, value in locked.items()
+                              if gameplay[key] != value)
+            if conflicts:
+                violations.extend(conflicts)
+            else:
+                spec["gameplay"] = gameplay
+        except GameplayValidationError as exc:
+            violations.extend(exc.violations)
     return _seal(spec), tuple(violations)

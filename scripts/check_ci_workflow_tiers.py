@@ -44,6 +44,37 @@ MANUAL_SOURCE_QUALIFICATIONS = {
 }
 
 
+# Each source lane is still required at the exact PR head; they now execute
+# through the existing protected Merge Readiness check instead of creating
+# 25 independent webhook subscriptions. Keep the registry and caller explicit.
+CONSOLIDATED_SOURCE_WORKFLOWS = (
+    "backend-literal-lazy-loader-qualification.yml",
+    "ci-surface-hold-source-qualification.yml",
+    "discourse-job-identity-qualification.yml",
+    "draft19-gguf-source-qualification.yml",
+    "ecosystem-api-import-qualification.yml",
+    "expo-export-content-evidence-qualification.yml",
+    "first-install-source-qualification.yml",
+    "frontier-cpu-determinism-qualification.yml",
+    "galaxy-forge-roundtrip-qualification.yml",
+    "gameforge-conductor-b039-qualification.yml",
+    "gameforge-eight-native-scene-qualification.yml",
+    "gameforge-source-archive-qualification.yml",
+    "harbor-patrol-cli-qualification.yml",
+    "harbor-studio-source-qualification.yml",
+    "jeeves-bounded-canonical-evidence.yml",
+    "jeeves-game-builder-quality-qualification.yml",
+    "jeeves-integrated-source-qualification.yml",
+    "jeeves-laptop-dispatcher-source-tests.yml",
+    "jeeves-native-sqlite-source-qualification.yml",
+    "mainline-failure-regression-qualification.yml",
+    "masterplan-421-dossier-integrity.yml",
+    "native-batch-operator-admission-qualification.yml",
+    "native-qualification-report-custody.yml",
+    "operational-literal-dispatch-qualification.yml",
+    "perf-profiler-literal-target-qualification.yml",
+)
+
 def events(source: str) -> set[str]:
     """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
     lines = source.splitlines()
@@ -81,11 +112,17 @@ def audit(root: Path = ROOT) -> list[str]:
     specialised = policy.get("specialized_manual_only")
     core = policy.get("core_automatic_pr")
     reusable = policy.get("required_reusable_workflows")
+    consolidated = policy.get("consolidated_required_source_workflows")
     tiers = (specialised, core, reusable)
     if (any(not isinstance(group, list) or not group for group in tiers)
             or any(not isinstance(name, str) or not name.endswith(".yml") or "/" in name
                    for group in tiers for name in group)):
         return ["CI tiers require nonempty sets of plain .yml file names"]
+    if (type(consolidated) is not list
+            or len(consolidated) != len(CONSOLIDATED_SOURCE_WORKFLOWS)
+            or tuple(consolidated) != CONSOLIDATED_SOURCE_WORKFLOWS):
+        failures.append("consolidated source registry must preserve all 25 required lanes")
+        consolidated = list(CONSOLIDATED_SOURCE_WORKFLOWS)
     scheduled = policy.get("operational_scheduled_non_pr")
     paused = policy.get("operational_paused_manual_only")
     if (type(scheduled) is not list
@@ -116,12 +153,16 @@ def audit(root: Path = ROOT) -> list[str]:
             source = (root / WORKFLOWS / name).read_text(encoding="utf-8")
             if events(source) != {"workflow_dispatch"}:
                 failures.append(f"{name}: source qualification must be manually dispatched, not automatically subscribed")
-            # Manually dispatchable source qualification is never an authority
-            # for whichever branch tip happened to be selected at runtime.
+            # A manually dispatched source suite must never run a caller-
+            # selected commit. The platform-owned dispatch SHA is bound to
+            # the guarded main ref, checkout and independent concurrency.
+            if ("inputs.candidate_sha" in source or
+                    re.search(r"(?m)^    inputs\s*:", source)):
+                failures.append(f"{name}: manual candidate inputs are forbidden")
             for invariant in (
-                "candidate_sha:",
-                "required: true",
-                'ref: ${{ inputs.candidate_sha }}',
+                "if: github.repository == 'Apeloff1/Skeleton' && github.ref == 'refs/heads/main'",
+                'ref: ${{ github.sha }}',
+                'CANDIDATE_SHA: ${{ github.sha }}',
                 '[[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]',
                 'test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"',
             ):
@@ -129,7 +170,7 @@ def audit(root: Path = ROOT) -> list[str]:
                     failures.append(f"{name}: immutable SHA admission or checkout attestation missing")
             expected_group = (
                 "group: " + name.removesuffix("-qualification.yml")
-                + "-${{ inputs.candidate_sha }}"
+                + "-${{ github.sha }}"
             )
             if (expected_group not in source or "cancel-in-progress: false" not in source):
                 failures.append(f"{name}: manual candidate concurrency must preserve independent immutable evidence")
@@ -138,13 +179,55 @@ def audit(root: Path = ROOT) -> list[str]:
         for case in cases:
             if case not in required_quality:
                 failures.append(f"{name}: required quality gate lost source test {case}")
+    # Called source checks must never silently become optional. Every PR
+    # source lane is executed by the existing Merge Readiness workflow as a
+    # same-commit, read-only reusable workflow, then required by CI/CD.
+    for position, name in enumerate(consolidated, 1):
+        job_id = f"source_{position:02d}"
+        path = root / WORKFLOWS / name
+        try:
+            child = path.read_text(encoding="utf-8")
+            child_events = events(child)
+        except (OSError, ValueError, UnicodeError) as exc:
+            failures.append(f"{name}: missing consolidated callable source workflow ({type(exc).__name__})")
+            continue
+        if "workflow_call" not in child_events or independently_triggered(child_events):
+            failures.append(f"{name}: consolidated source must be callable without standalone PR/schedule triggers")
+        if "permissions:\n  contents: read" not in child or "continue-on-error: true" in child:
+            failures.append(f"{name}: consolidated source must retain read-only fail-closed policy")
+        group = re.search(r"(?m)^  group:[ \t]*(.+)$", child)
+        if (not group or
+                ("github.event.pull_request.number" in group.group(1)
+                 and not any(fallback in group.group(1)
+                             for fallback in ("|| github.sha", "|| github.ref", "|| github.run_id")))):
+            failures.append(f"{name}: consolidated source concurrency needs an immutable fallback")
+        header = f"  {job_id}:\n"
+        blocks = readiness_source.split(header)
+        if len(blocks) != 2:
+            failures.append(f"{name}: missing mandatory consolidated source caller {job_id}")
+            continue
+        job = blocks[1].split("\n  ", 1)[0]
+        # Inspect the full body up to the following top-level job.
+        call = blocks[1].split("\n  source_", 1)[0]
+        if (f"uses: ./.github/workflows/{name}" not in call
+                or "    if: ${{ github.event_name == 'pull_request'" not in call
+                or "    permissions:\n      contents: read" not in call):
+            failures.append(f"{name}: consolidated source caller is not exact-head, read-only and required")
+        if f"      - {job_id}\n" not in readiness_source:
+            failures.append(f"{name}: consolidated source missing from fail-closed gate needs")
+    if ("  source_qualification_gate:\n" not in readiness_source
+            or "SOURCE_RESULTS: ${{ toJSON(needs) }}" not in readiness_source
+            or "needs: source_qualification_gate" not in readiness_source
+            or "needs.source_qualification_gate.result == 'success'" not in readiness_source
+            or "'source qualification gates incomplete/failed" not in readiness_source):
+        failures.append("required CI/CD lane lost fail-closed consolidated source qualification")
     if ("python -m pytest -q" not in required_quality
             or "python -m unittest discover" not in required_quality
             or "python -m compileall -q" not in required_quality
             or "continue-on-error: true" in required_quality):
         failures.append("protected source qualification steps must compile, execute and fail closed")
 
-    names = specialised + core + reusable + scheduled + paused
+    names = specialised + core + reusable + scheduled + paused + consolidated
     if len(set(names)) != len(names):
         return ["workflow cannot belong to multiple CI tiers"]
     rules = policy.get("release_rules")

@@ -1,0 +1,41 @@
+name: Frontier CPU deterministic presentation qualification
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontier-cpu-determinism-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic_frame_tiers:
+    name: Frontier deterministic 30/50/60/120 FPS CPU proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact proposed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Use supported pinned Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install isolated test runner
+        run: python -m pip install --disable-pip-version-check -e . "pytest==8.4.2" "PyYAML>=6,<7"
+      - name: Verify canonical source and compile native runtime
+        run: |
+          python scripts/check_ai_file_tree.py
+          python -m compileall -q skeleton/game/frontier tests/game_frontier_native
+      - name: Execute 30/50/60/120 FPS deterministic physics and LOD regressions
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          python -m pytest -q --noconftest tests/game_frontier_native/test_native_runtime_4167.py

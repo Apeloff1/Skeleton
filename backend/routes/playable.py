@@ -34,6 +34,7 @@ from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, ConfigDict
 from core.databases import client as _SHARED_MONGO_CLIENT
 from core.engine_text import EngineTextError, EngineTextContextError
+from core.http_errors import PublicUnavailableError
 from core.engine_client import EngineExecutionFailed, EngineAuthorizationError, EngineRequestRejectedError
 from core.model_catalog import ModelSelectionError
 from skeleton.vault.data_governance import DataGovernanceDenied
@@ -56,6 +57,9 @@ class PlayableModelFailure(RuntimeError):
         self.code, self.unconfirmed, self.request_key = code, unconfirmed, request_key
         super().__init__("Model execution could not be confirmed; retain this job." if unconfirmed
                          else "Model generation is unavailable for this project.")
+
+    def http_error(self) -> PublicUnavailableError:
+        return PublicUnavailableError(self.code, request_key=self.request_key)
 
     def public(self):
         return {"error": str(self), "error_code": self.code, "retry_same_request": self.unconfirmed,
@@ -616,7 +620,7 @@ async def generate(body: GenerateBody):
     try:
         return await _do_generate((body.brief or "").strip(), body.spec_id, body.title, body.depth, body.creator_id, body.forged_from, body.derive_mode)
     except PlayableModelFailure as exc:
-        raise HTTPException(503, exc.public()) from exc
+        raise exc.http_error() from exc
 
 
 async def _run_job(job_id: str, coro):

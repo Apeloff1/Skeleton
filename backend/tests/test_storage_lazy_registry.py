@@ -101,6 +101,25 @@ def test_public_exception_route_literal_loader_uses_reviewed_import(monkeypatch)
     assert calls == [name]
 
 
+def test_telemetry_privacy_has_one_reviewed_literal_loader_without_eager_import(monkeypatch):
+    """Private telemetry filters remain resolvable without eager import or dynamic names."""
+    name = "core.telemetry_privacy"
+    assert name in lazy_registry._LOADERS
+    assert lazy_registry.module_names().count("telemetry_privacy") == 1
+    marker = object()
+    calls = []
+
+    def recorded_import(request):
+        calls.append(request)
+        return marker
+
+    monkeypatch.setattr(lazy_registry.importlib, "import_module", recorded_import)
+    assert lazy_registry._LOADERS[name]() is marker
+    assert calls == [name]
+    with pytest.raises(ValueError, match="not registered"):
+        lazy_registry.lazy_import("core.telemetry_privacy.nonexistent")
+
+
 def test_registry_has_no_runtime_selected_python_imports():
     from pathlib import Path
     from scripts.check_dynamic_import_safety import violations

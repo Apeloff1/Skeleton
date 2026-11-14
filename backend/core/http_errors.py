@@ -124,6 +124,145 @@ def redact_client_payload(value: Any, *, depth: int = 0, max_depth: int = 4) -> 
     return "[UNSUPPORTED]"
 
 
+# This closed catalogue contains no exception text, provider output, or
+# caller-controlled messages. The HTTP boundary recognizes only these typed
+# constructors, not ordinary JSON bodies that happen to contain a known code.
+_UNAVAILABLE_MESSAGES = {
+    "marketplace_release_unavailable": "Selling and purchasing games is unavailable until gameplay and buyer access can be verified.",
+    "premium_release_unavailable": "Premium checkout is unavailable until payment and entitlement delivery can be verified.",
+}
+_WEBHOOK_UNAVAILABLE = frozenset({"payment_details_unreconciled", "webhook_unavailable"})
+_MODEL_FAILURE_CODES = frozenset({
+    "project_model_transfer_denied", "project_model_context_unavailable",
+    "project_model_execution_failed", "project_model_execution_unconfirmed",
+    "project_model_configuration_unavailable", "project_model_generation_failed",
+})
+_PUBLIC_ENGINE_KEY = re.compile(r"engine-chat:[0-9a-f]{64}\Z")
+
+
+def _unavailable_payload(code: str, request_key: str | None = None) -> dict[str, Any]:
+    if type(code) is not str:
+        return {"detail": PUBLIC_INTERNAL_ERROR}
+    if code in _UNAVAILABLE_MESSAGES:
+        return {"code": code, "error": _UNAVAILABLE_MESSAGES[code]}
+    if code in _WEBHOOK_UNAVAILABLE:
+        return {"received": False, "error": code}
+    if code == "artifact_owner_unavailable":
+        return {"detail": {
+            "code": code,
+            "message": "Governed GameForge export is unavailable. Use the Studio project source export.",
+            "action": "Use the existing Studio project source export until governed artifact delivery is connected.",
+        }}
+    if code in _MODEL_FAILURE_CODES:
+        uncertain = code == "project_model_execution_unconfirmed"
+        key = (
+            request_key
+            if uncertain and type(request_key) is str and len(request_key) == 76
+            and _PUBLIC_ENGINE_KEY.fullmatch(request_key)
+            else None
+        )
+        return {"detail": {
+            "error": ("Model execution could not be confirmed; retain this job."
+                      if uncertain else "Model generation is unavailable for this project."),
+            "error_code": code,
+            "retry_same_request": uncertain,
+            "engine_request_key": key,
+        }}
+    return {"detail": PUBLIC_INTERNAL_ERROR}
+
+
+class PublicUnavailableResponse(JSONResponse):
+    """A server-owned, closed-catalogue 503 response; no arbitrary envelope."""
+
+    def __init__(self, code: str, *, request_key: str | None = None) -> None:
+        self.public_code = code
+        self.public_request_key = request_key
+        super().__init__(status_code=503, content=_unavailable_payload(code, request_key),
+                         headers={"Cache-Control": "no-store"})
+
+    def sanitized(self) -> JSONResponse:
+        return PublicUnavailableResponse(self.public_code, request_key=self.public_request_key)
+
+
+class PublicUnavailableError(HTTPException):
+    """Typed 503 for first-party service admission; never forwards headers."""
+
+    def __init__(self, code: str, *, request_key: str | None = None) -> None:
+        self.public_code = code
+        self.public_request_key = request_key
+        super().__init__(status_code=503, detail=PUBLIC_INTERNAL_ERROR)
+
+    def sanitized(self) -> JSONResponse:
+        return PublicUnavailableResponse(self.public_code, request_key=self.public_request_key)
+
+
+_HEALTH_CHECKS = frozenset({
+    "mongo", "ai_provider", "vault_galaxy", "vault_builds", "critical_routes",
+    "uptime_ok", "feature_flags_loaded", "vault_module", "galaxy_vault",
+    "build_vault", "disk_pressure", "vault",
+})
+_HEALTH_ERRORS = frozenset({
+    "probe_failed", "probe_timeout_or_unavailable", "registry_probe_failed",
+})
+_HEALTH_NUMBERS = frozenset({"latency_ms_lt", "free_pct", "count", "zips",
+                             "builds", "uptime_seconds"})
+
+
+def _public_health_payload(observation: Any) -> dict[str, Any]:
+    """Project only known health fields; never emit paths or diagnostic text."""
+    if type(observation) is not dict:
+        return {"status": "degraded", "checks": {}}
+    status = observation.get("status")
+    body: dict[str, Any] = {
+        "status": status if type(status) is str and status in
+        {"not_ready", "starting", "degraded"} else "degraded",
+        "checks": {},
+    }
+    checks = observation.get("checks")
+    if type(checks) is dict:
+        for name in sorted(_HEALTH_CHECKS):
+            item = checks.get(name)
+            if type(item) is not dict:
+                continue
+            check: dict[str, Any] = {"ok": item.get("ok") is True}
+            error = item.get("error")
+            if type(error) is str and error in _HEALTH_ERRORS:
+                check["error"] = error
+            for key in _HEALTH_NUMBERS:
+                value = item.get(key)
+                if ((type(value) is int and 0 <= value <= 10**12)
+                        or (type(value) is float and math.isfinite(value)
+                            and 0 <= value <= 10**12)):
+                    check[key] = value
+            if type(item.get("report_available")) is bool:
+                check["report_available"] = item["report_available"]
+            body["checks"][name] = check
+    identity = observation.get("canonical_application")
+    if type(identity) is dict:
+        version = identity.get("version")
+        if (identity.get("name") == "Skeleton" and identity.get("component") == "backend"
+                and identity.get("ingress_prefix") == "/api"
+                and type(version) is str and len(version) <= 40
+                and re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?", version)):
+            body["canonical_application"] = {
+                "name": "Skeleton", "version": version,
+                "component": "backend", "ingress_prefix": "/api",
+            }
+    return body
+
+
+class PublicHealthUnavailable(JSONResponse):
+    """An explicitly typed health observation rather than a generic 5xx."""
+
+    def __init__(self, observation: Any) -> None:
+        self.public_observation = _public_health_payload(observation)
+        super().__init__(status_code=503, content=self.public_observation,
+                         headers={"Cache-Control": "no-store"})
+
+    def sanitized(self) -> JSONResponse:
+        return PublicHealthUnavailable(self.public_observation)
+
+
 def public_http_error(
     status_code: int,
     public_detail: str,
@@ -157,6 +296,8 @@ def install_public_error_handlers(app: FastAPI) -> None:
     async def public_http_exception_handler(
         request: Any, exc: StarletteHTTPException
     ) -> Any:
+        if type(exc) is PublicUnavailableError:
+            return exc.sanitized()
         if exc.status_code < 500:
             result = previous_http_handler(request, exc)
             return await result if isawaitable(result) else result

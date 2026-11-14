@@ -33,8 +33,12 @@ from .prompt_normalizer import normalize_prompt
 TASK_TYPE = "forge.plan"
 _SYSTEM = (
     "You refine a compiled game design spec. Reply with JSON only, schema "
-    f"{PLAN_SCHEMA!r}, keys title, fantasy, core_loop, systems. Do not change genre, "
-    "engine, scope or brief. systems may only reorder or drop the given systems."
+    f"{PLAN_SCHEMA!r}, keys title, fantasy, core_loop, systems, gameplay. Do not change genre, "
+    "engine, scope or brief. systems may only reorder or drop the given systems. "
+    "gameplay is optional; when supplied it has exactly these five data fields: "
+    "difficulty easy|normal|hard; theme moss|neon|ember|frost; objective_label a "
+    "single line of 1..100 characters; player_speed an integer from 120 to 360; "
+    "encounter_style swarm|patrol|ranged. Return no scripts, paths, tools or providers."
 )
 
 
@@ -99,6 +103,8 @@ class ModelPlanner:
         import json
 
         view = {k: compiled[k] for k in ("title", "genre", "fantasy", "core_loop", "scope", "systems")}
+        if "gameplay" in compiled:
+            view["gameplay"] = dict(compiled["gameplay"])
         return ModelRouteRequest(
             request_id=request_id,
             messages=(ModelMessage("system", _SYSTEM),

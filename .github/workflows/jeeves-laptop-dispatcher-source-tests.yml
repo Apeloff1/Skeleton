@@ -1,35 +1,13 @@
 name: Jeeves laptop native dispatcher source tests
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/ai/runtime/operational_ai/laptop_runtime/dispatcher.py"
-      - "skeleton/ai/runtime/operational_ai/laptop_runtime/client.py"
-      - "skeleton/ai/runtime/operational_ai/laptop_runtime/client_cli.py"
-      - "skeleton/testing/test_laptop_exact_prompt_custody.py"
-      - "skeleton/testing/test_laptop_inference_deadline_fence.py"
-      - "skeleton/testing/test_laptop_client_*.py"
-      - "skeleton/testing/test_laptop_runtime_http.py"
-      - "skeleton/ai/runtime/operational_ai/laptop_runtime/turn_bridge.py"
-      - "skeleton/ai/runtime/operational_ai/laptop_runtime/first_turn_acceptance.py"
-      - "skeleton/ai/runtime/operational_ai/laptop_runtime/cold_reopen_acceptance.py"
-      - "skeleton/ai/runtime/operational_ai/laptop_runtime/replay_probe.py"
-      - "skeleton/testing/test_laptop_replay_probe_*.py"
-      - "skeleton/testing/test_laptop_cold_reopen_*.py"
-      - "skeleton/ai/runtime/operational_ai/laptop_runtime/cli.py"
-      - "skeleton/testing/test_laptop_real_acceptance_*.py"
-      - "skeleton/testing/test_laptop_turnbridge_*.py"
-      - "skeleton/testing/test_laptop_runtime_turn_bridge.py"
-      - "skeleton/testing/test_laptop_dispatcher_*.py"
-      - "skeleton/testing/test_laptop_runtime_dispatcher.py"
-      - ".github/workflows/jeeves-laptop-dispatcher-source-tests.yml"
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: jeeves-laptop-dispatcher-${{ github.event.pull_request.number }}
+  group: jeeves-laptop-dispatcher-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

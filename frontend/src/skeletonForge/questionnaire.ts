@@ -8,6 +8,10 @@
  * answered (skeleton/context/questionnaire.intake), and the UI says so.
  */
 import type { Beat, RunRequest } from './types';
+import { GENRE_CHOICES } from './genreCatalog';
+import { isDesignAxis, normaliseAxisEdit, sparseInstrumentPayload } from './instruments';
+import { mappedBriefGenre, specializedVision } from './galaxyGenres';
+import { galaxyPrefill, type GalaxyProfile } from './galaxyHandoff';
 
 export const STEPS = ['vision', 'brief', 'beats', 'options', 'review'] as const;
 export type Step = typeof STEPS[number];
@@ -22,7 +26,7 @@ export const STEP_LABELS: Record<Step, string> = {
 
 /** Mirrors BRIEF_FACETS / the most common BRIEF_ERA_VOTES keys. */
 export const BRIEF_FACETS: readonly { id: string; prompt: string; options: string[] }[] = [
-  { id: 'genre', prompt: 'What kind of game is it?', options: ['action-adventure', 'rpg', 'shooter', 'roguelike', 'survival', 'extraction', 'soulslike', 'strategy', 'tactics', 'metroidvania', 'horror', 'stealth', 'cozy', 'arcade', 'deckbuilder', 'puzzle'] },
+  { id: 'genre', prompt: 'What kind of game is it?', options: GENRE_CHOICES },
   { id: 'theme', prompt: 'Where is it set?', options: ['sci-fi', 'fantasy', 'dark-fantasy', 'modern', 'post-apocalyptic', 'cyberpunk', 'horror', 'cozy', 'retro', 'historical', 'anime', 'noir'] },
   { id: 'perspective', prompt: 'How do we see it?', options: ['first-person', 'third-person', 'top-down', 'isometric', 'side-scrolling'] },
   { id: 'combat', prompt: 'How does it fight?', options: ['tactical', 'real-time', 'turn-based', 'melee', 'fast', 'stealth', 'card-based', 'puzzle-based', 'none'] },
@@ -66,11 +70,50 @@ export interface ForgeOptions {
   generation: string | null;
 }
 
+export const PLAYABLE_SLICES = [
+  { id: 'extraction', label: 'Extraction', hint: 'Recover three caches while managing heat and reach exit' },
+  { id: 'combat_loop', label: 'Arena Combat', hint: 'Survive and clear three escalating enemy waves' },
+  { id: 'pipeline', label: 'Factory Logistics', hint: 'Carry raw materials through refinery and delivery' },
+  { id: 'puzzle', label: 'Spatial Puzzle', hint: 'Activate switches in order to complete a room puzzle' },
+  { id: 'racing', label: 'Racing Time Trial', hint: 'Complete three laps through a checkpoint course' },
+  { id: 'survival', label: 'Scavenging Survival', hint: 'Manage hydration, collect supplies, reach shelter' },
+  { id: 'stealth', label: 'Stealth Infiltration', hint: 'Avoid guard vision, retrieve intel and escape' },
+  { id: 'crafting', label: 'Crafting Delivery', hint: 'Collect parts, use a workshop, deliver a crafted item' },
+] as const;
+
+/** Honest, implemented native effects only. All other axes stay in the
+ * canonical tensor; the source receipt identifies remaining unmapped edits.
+ */
+export const PLAYABLE_TUNING_EFFECTS: Record<string, readonly string[]> = {
+  extraction: ['Tempo → movement speed', 'Risk → heat pressure'],
+  combat_loop: ['Tempo → movement speed', 'Lethality → starting health', 'Progression depth → combat waves'],
+  pipeline: ['Tempo → movement speed', 'Progression depth → shipment quota'],
+  puzzle: ['Tempo → movement speed', 'Mystery → switch hints'],
+  racing: ['Tempo → movement speed', 'Risk → checkpoint time limit', 'Progression depth → race laps'],
+  survival: ['Tempo → movement speed', 'Scarcity → hydration drain'],
+  stealth: ['Tempo → movement speed', 'Risk → guard detection radius', 'Mystery → guard-zone visibility'],
+  crafting: ['Tempo → movement speed'],
+};
+
 export interface QuestionnaireState {
   step: Step;
   vision: string;
   brief: Record<string, string>;
   beats: Record<string, string>;
+  /** Explicit overrides only; an absent axis remains driven by the forge. */
+  instruments: Record<string, number>;
+  /** Historical Galaxy Studio genre specialization (mapped to a canonical vote). */
+  galaxyGenre?: string | null;
+  /** All 14 matrices, narrative, extras, classic sliders, style and production inputs. */
+  galaxyProfile?: GalaxyProfile | null;
+  /** Opt-in native generated-room quest. */
+  quest?: { enabled: boolean; length: number };
+  /** Native source-backed standalone mini-game, independent of blueprint archetype. */
+  playable?: { enabled: boolean; mode: string; launch: boolean };
+  /** Native execution off by default; opt-in with separate sidecar qualification. */
+  playtest?: 'off' | 'auto' | 'require';
+  /** User must explicitly opt in before any complete source bodies reach UI. */
+  sourceExport?: { enabled: boolean };
   options: ForgeOptions;
 }
 
@@ -78,6 +121,19 @@ export type QuestionnaireAction =
   | { type: 'setVision'; vision: string }
   | { type: 'setBrief'; facet: string; value: string | null }
   | { type: 'setBeat'; beat: string; value: string | null }
+  | { type: 'setAxis'; axis: string; value: number | null }
+  | { type: 'resetAxes' }
+  | { type: 'setGalaxyGenre'; genre: string | null }
+  | { type: 'importGalaxy'; profile: GalaxyProfile }
+  | { type: 'clearGalaxyProfile' }
+  | { type: 'restoreDesignPreset'; state: QuestionnaireState }
+  | { type: 'setQuestEnabled'; value: boolean }
+  | { type: 'setQuestLength'; value: number }
+  | { type: 'setPlayableEnabled'; value: boolean }
+  | { type: 'setPlayableMode'; value: string }
+  | { type: 'setPlayableMainScene'; value: boolean }
+  | { type: 'setPlaytestMode'; value: 'off' | 'auto' | 'require' }
+  | { type: 'setSourceExportEnabled'; value: boolean }
   | { type: 'setOption'; key: keyof ForgeOptions; value: string | null }
   | { type: 'next' }
   | { type: 'back' }
@@ -89,6 +145,13 @@ export const INITIAL_STATE: QuestionnaireState = {
   vision: '',
   brief: {},
   beats: {},
+  instruments: {},
+  galaxyGenre: null,
+  galaxyProfile: null,
+  quest: { enabled: false, length: 3 },
+  playable: { enabled: false, mode: 'extraction', launch: false },
+  playtest: 'off',
+  sourceExport: { enabled: false },
   options: { archetype: 'auto', target: 'godot', era: null, generation: null },
 };
 
@@ -129,9 +192,79 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
     case 'setVision':
       return { ...state, vision: String(action.vision ?? '').slice(0, VISION_MAX + 200) };
     case 'setBrief':
-      return { ...state, brief: toggle(state.brief, action.facet, action.value) };
+      return { ...state, brief: toggle(state.brief, action.facet, action.value),
+        galaxyGenre: action.facet === 'genre' ? null : state.galaxyGenre,
+        galaxyProfile: action.facet === 'genre' ? null : state.galaxyProfile };
     case 'setBeat':
       return { ...state, beats: toggle(state.beats, action.beat, action.value) };
+    case 'setAxis': {
+      if (!isDesignAxis(action.axis)) return state;
+      const instruments = { ...(state.instruments || {}) };
+      if (action.value === null) delete instruments[action.axis];
+      else {
+        const value = normaliseAxisEdit(action.value);
+        if (value === null) return state;
+        instruments[action.axis] = value;
+      }
+      return { ...state, instruments };
+    }
+    case 'resetAxes':
+      return { ...state, instruments: {} };
+    case 'importGalaxy': {
+      const imported = galaxyPrefill(action.profile);
+      return {
+        ...state, vision: imported.vision, step: 'options',
+        brief: { ...state.brief, ...(imported.mappedGenre ? { genre: imported.mappedGenre } : {}) },
+        galaxyGenre: imported.genre, galaxyProfile: imported.profile,
+        instruments: { ...state.instruments, ...imported.axes },
+      };
+    }
+    case 'clearGalaxyProfile':
+      return { ...state, galaxyProfile: null };
+    case 'setGalaxyGenre': {
+      const mapped = mappedBriefGenre(action.genre);
+      if (action.genre && !mapped) return state;
+      const brief = { ...state.brief };
+      if (!action.genre || action.genre === state.galaxyGenre) {
+        if (state.galaxyGenre && brief.genre === mappedBriefGenre(state.galaxyGenre)) delete brief.genre;
+        return { ...state, brief, galaxyGenre: null, galaxyProfile: null };
+      }
+      brief.genre = mapped!;
+      return { ...state, brief, galaxyGenre: action.genre, galaxyProfile: null };
+    }
+    case 'setQuestEnabled':
+      return {
+        ...state,
+        quest: { ...INITIAL_STATE.quest!, ...state.quest, enabled: action.value === true },
+        playable: action.value ? { ...INITIAL_STATE.playable!, ...state.playable, launch: false } : state.playable,
+      };
+    case 'setQuestLength': {
+      if (!Number.isInteger(action.value) || action.value < 1 || action.value > 8) return state;
+      return { ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, length: action.value } };
+    }
+    case 'setPlayableEnabled': {
+      const enabled = action.value === true;
+      return { ...state, playable: {
+        ...INITIAL_STATE.playable!, ...state.playable, enabled,
+        launch: enabled ? !!state.playable?.launch : false,
+      } };
+    }
+    case 'setPlayableMode': {
+      if (!PLAYABLE_SLICES.some((item) => item.id === action.value)) return state;
+      return { ...state, playable: { ...INITIAL_STATE.playable!, ...state.playable, mode: action.value } };
+    }
+    case 'setPlayableMainScene': {
+      if (action.value && (state.quest?.enabled || state.options.target !== 'godot')) return state;
+      return { ...state, playable: {
+        ...INITIAL_STATE.playable!, ...state.playable,
+        launch: action.value === true && !!state.playable?.enabled,
+      } };
+    }
+    case 'setPlaytestMode':
+      if (action.value !== 'off' && state.options.target !== 'godot') return state;
+      return { ...state, playtest: action.value };
+    case 'setSourceExportEnabled':
+      return { ...state, sourceExport: { enabled: action.value === true } };
     case 'setOption': {
       const value = action.value === '' ? null : action.value;
       if (action.key === 'archetype' || action.key === 'target') {
@@ -150,6 +283,8 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
     }
     case 'goto':
       return reachable(state, action.step) ? { ...state, step: action.step } : state;
+    case 'restoreDesignPreset':
+      return { ...action.state, step: 'options' };
     case 'reset':
       return INITIAL_STATE;
     default:
@@ -194,14 +329,37 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   // exists in both); a beat answer wins because beats are authoritative.
   for (const [k, v] of Object.entries(state.brief)) answers[k] = v;
   for (const [k, v] of Object.entries(state.beats)) answers[k] = v;
-  return {
-    vision: state.vision.trim().slice(0, VISION_MAX),
+  const request: RunRequest = {
+    vision: state.galaxyProfile ? state.vision.trim().slice(0, VISION_MAX) : specializedVision(state.vision, state.galaxyGenre, VISION_MAX),
     era: state.options.era,
     archetype: state.options.archetype || 'auto',
     target: state.options.target || 'godot',
     generation: state.options.generation,
     answers,
   };
+  const instrumentAxes = sparseInstrumentPayload(state.instruments);
+  if (Object.keys(instrumentAxes).length) request.operator_axes = instrumentAxes;
+  if (state.galaxyProfile) request.galaxy_profile = state.galaxyProfile;
+  if (request.target === 'godot' && (state.playtest === 'auto' || state.playtest === 'require')) {
+    request.playtest = state.playtest;
+  }
+  // An exact-run project export is opt-in and never causes a second forge.
+  if (request.target === 'godot' && state.sourceExport?.enabled === true) {
+    request.include_files = true;
+  }
+  if (state.playable?.enabled && request.target === 'godot') {
+    const chosen = PLAYABLE_SLICES.find((slice) => slice.id === state.playable?.mode);
+    if (chosen) {
+      request.playable_content = true;
+      request.playable_archetype = chosen.id;
+      request.playable_main_scene = !!state.playable.launch && !state.quest?.enabled;
+    }
+  }
+  if (state.quest?.enabled && request.target === 'godot') {
+    request.quest_content = true;
+    request.quest_length = Number.isInteger(state.quest.length) && state.quest.length >= 1 && state.quest.length <= 8 ? state.quest.length : 3;
+  }
+  return request;
 }
 
 /** Collisions where a beat answer shadows a brief facet of the same id. */
