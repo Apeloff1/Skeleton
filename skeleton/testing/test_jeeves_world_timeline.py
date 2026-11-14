@@ -132,3 +132,41 @@ def test_persist_revise_compile_with_stale_rejection(tmp_path):
     assert store.compile("harbor", second)["timeline_digest"] == second
     with pytest.raises(CanonError, match="stale_timeline"):
         store.compile("harbor", first)
+
+
+def test_proposal_covers_intermediate_scenes_and_keeps_exact_source_lease():
+    world, _ = source()
+    world["scenes"].append({"id": "storm", "title": "Storm",
+                            "narrative": "A storm covers the beacon."})
+    world["choices"][0]["to"] = "storm"
+    world["choices"].append({
+        "id": "restore", "from": "storm", "to": "resolution",
+        "label": "Restore light", "requires": [], "grants": [],
+    })
+    data = propose_timeline(world, actor="sora", opening_note="Lights dim.",
+                            resolution_note="Lights return.")
+    assert [event["scene"] for event in data["events"]] == ["opening", "storm", "resolution"]
+    assert [event["tick"] for event in data["events"]] == [0, 1, 2]
+    assert validate_timeline(data, world) == data
+    reordered = copy.deepcopy(world)
+    reordered["choices"].reverse()
+    other = propose_timeline(reordered, actor="sora", opening_note="Lights dim.",
+                             resolution_note="Lights return.")
+    assert other["events"] == data["events"]
+    assert other["world_digest"] != data["world_digest"]
+
+
+def test_proposal_requires_explicit_chronology_for_looping_world():
+    world, _ = source()
+    world["scenes"].append({"id": "storm", "title": "Storm",
+                            "narrative": "A storm covers the beacon."})
+    world["choices"][0]["to"] = "storm"
+    world["choices"].extend([
+        {"id": "return", "from": "storm", "to": "opening",
+         "label": "Return", "requires": [], "grants": []},
+        {"id": "restore", "from": "storm", "to": "resolution",
+         "label": "Restore light", "requires": [], "grants": []},
+    ])
+    with pytest.raises(CanonError, match="timeline_requires_authored_cycle"):
+        propose_timeline(world, actor="sora", opening_note="A storm.",
+                         resolution_note="Clear skies.")
