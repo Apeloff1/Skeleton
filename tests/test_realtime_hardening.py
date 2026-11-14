@@ -23,7 +23,7 @@ from skeleton.realtime.hub import (
 )
 from skeleton.realtime.sse import SSEParser, iter_frames, sse_body, sse_message_to_frame
 
-REDACTED_MARK = "REDACTED"
+from skeleton.observability.redaction import REDACTED as REDACTED_MARK
 
 
 def _hub(**kw):
@@ -406,13 +406,41 @@ def test_guard_fails_closed_for_encoded_secret_past_oversized_decode_budget():
         PayloadSecretGuard(mode="reject").scrub({"note": value})
 
 
-def test_guard_preserves_oversized_plain_prose_without_encoded_content():
+def test_guard_fails_closed_for_oversized_plain_prose_without_encoded_content():
     from skeleton.realtime.guard import _MAX_DECODE_CHARS
 
     value = "ordinary status prose " * 850
     assert len(value) > _MAX_DECODE_CHARS
     clean, hits = PayloadSecretGuard().scrub({"note": value})
-    assert hits == 0 and clean["note"] == value
+    assert hits >= 1 and clean["note"] == REDACTED_MARK
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub({"note": value})
+
+
+def test_guard_applies_size_budget_before_parsing_embedded_json(monkeypatch):
+    from skeleton.realtime.guard import _MAX_DECODE_CHARS
+
+    value = json.dumps({"note": "x" * _MAX_DECODE_CHARS})
+
+    def unexpected_parse(*args, **kwargs):
+        pytest.fail("oversized embedded JSON must not be parsed")
+
+    monkeypatch.setattr("skeleton.realtime.guard.json.loads", unexpected_parse)
+    clean, hits = PayloadSecretGuard().scrub({"note": value})
+    assert hits >= 1 and clean["note"] == REDACTED_MARK
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub({"note": value})
+
+
+def test_guard_fails_closed_for_embedded_json_parser_recursion(monkeypatch):
+    def recursion_limit(*args, **kwargs):
+        raise RecursionError("JSON nesting limit")
+
+    monkeypatch.setattr("skeleton.realtime.guard.json.loads", recursion_limit)
+    clean, hits = PayloadSecretGuard().scrub({"note": '{"a": []}'})
+    assert hits >= 1 and clean["note"] == REDACTED_MARK
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub({"note": '{"a": []}'})
 
 
 @pytest.mark.parametrize(
