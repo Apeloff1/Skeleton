@@ -32,10 +32,13 @@ from skeleton.ai.model_runtime.offline_chat import (
 from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig, RuntimeContractError
 from skeleton.app.local_ai import (
     DurableOfflineAISession, LocalDesktopModel, OfflineAIError,
-    _model_tokenizer_digest, load_gguf_deployment, load_native_checkpoint,
+    _model_tokenizer_digest, _strict_context_digest, load_gguf_deployment, load_native_checkpoint,
     private_desktop_database,
 )
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
+from skeleton.app.jeeves_inference_circuit import LocalInferenceCircuit
+from skeleton.ai.runtime.inference.llama_cpp import LlamaCppRuntimeError
+from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeBackendError
 from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary
 from skeleton.app.offline_resource_fabric import AdaptiveResourceFabric
 from skeleton.app.offline_longform_virtual import (
@@ -53,7 +56,7 @@ from skeleton.app.offline_reference_write import (
 )
 from skeleton.app.offline_grounding import (
     audit_answer_citations, audit_answer_faithfulness, grounded_request_digest,
-    prepare_evidence,
+    normalized_document_scope, scoped_grounded_request_digest, prepare_evidence,
 )
 
 
@@ -68,6 +71,7 @@ def _audit_pair(text: str, evidence: dict[str, Any] | None) -> dict[str, Any]:
 
 MAX_JSON_BYTES = 16 * 1024 * 1024
 MAX_CHAT_REQUEST_BYTES = 64 * 1024
+MAX_MEDIA_ADVISORY_REQUEST_BYTES = 6 * 1024 * 1024
 MAX_CONNECTIONS = 16
 MAX_TURN_TICKETS = 32
 TERMINAL_TURN_STATES = frozenset({"complete", "failed", "cancelled"})
@@ -130,6 +134,17 @@ def _budget(body: dict[str, Any], default: int) -> int:
     return value
 
 
+def _document_scope(body: dict[str, Any], grounded: bool) -> tuple[str, ...] | None:
+    if "document_ids" not in body:
+        return None
+    if type(body["document_ids"]) is not list or not grounded:
+        raise OfflineHTTPError(400, "explicit source selection requires grounded chat")
+    try:
+        return normalized_document_scope(body["document_ids"])
+    except RuntimeContractError:
+        raise OfflineHTTPError(400, "invalid bounded document selection") from None
+
+
 class OfflineHTTPApplication:
     """One locally selected model identity, one SQLite authority, bounded work."""
 
@@ -137,6 +152,12 @@ class OfflineHTTPApplication:
                  *, token: str) -> None:
         if not isinstance(token, str) or len(token) < 32:
             raise OfflineHTTPError(400, "a strong authorization token is required")
+        # The generic offline desktop still supports native model fixtures.
+        # A Jeeves-marked deployment must never accept a second local model
+        # under the same loopback chat surface.
+        from skeleton.ai.jeeves_local_policy import is_local_only, primary_model_id
+        if is_local_only() and getattr(backend, "model_id", None) != primary_model_id():
+            raise OfflineHTTPError(403, "Jeeves local-only HTTP requires the exact jeeves model")
         self.backend = backend
         self.database = Path(database)
         self.resource_fabric = AdaptiveResourceFabric(self.database)
@@ -145,6 +166,7 @@ class OfflineHTTPApplication:
         self.tokenizer_digest = _model_tokenizer_digest(backend)
         self._lock = threading.RLock()
         self._turn_lock = threading.RLock()
+        self._inference_circuit = LocalInferenceCircuit()
         self._turns: dict[tuple[str, str], _LocalTurn] = {}
         self._active_session: str | None = None
         self._closing = False
@@ -165,6 +187,46 @@ class OfflineHTTPApplication:
                 self.longform.close()
             self._store.close()
             raise
+
+    def _model_readiness(self) -> tuple[bool, str]:
+        """Observed local backend admission; a network/HTTP ping is not inference.
+
+        The model may be replaced, permissions revoked, or its native device
+        detached after the loopback server started. A successful startup can
+        therefore never be a perpetual ready=true claim. Keep all backend
+        exception text, paths and model prompt bytes out of the HTTP surface.
+        Full SHA-256 rehash and active tokenizer validation still happen at
+        the actual inference boundary, not from this cheap metadata probe.
+        """
+        if self._closing:
+            return False, "local_service_shutting_down"
+        # Sustained native/GGUF execution failures must not spin an infinite
+        # costly restart/retry loop. Historical SQLite replay is unaffected.
+        if not self._inference_circuit.status()["admit_new_inference"]:
+            return False, "local_execution_circuit_open"
+        try:
+            from skeleton.ai.jeeves_local_policy import is_local_only, primary_model_id
+            if is_local_only() and getattr(self.backend, "model_id", None) != primary_model_id():
+                return False, "local_primary_identity_changed"
+            if self.backend.model_digest != self.model_digest:
+                return False, "local_model_identity_changed"
+            if _model_tokenizer_digest(self.backend) != self.tokenizer_digest:
+                return False, "local_tokenizer_identity_changed"
+            checker = getattr(self.backend, "check_readiness", None)
+            if not callable(checker):
+                # A new model backend may not inherit a permissive default.
+                return False, "local_model_readiness_unavailable"
+            checker()
+        except Exception:
+            return False, "local_model_identity_unavailable"
+        return True, "ready"
+
+    def _admit_local_generation(self) -> None:
+        ready, code = self._model_readiness()
+        if not ready:
+            raise OfflineHTTPError(
+                503, "local inference unavailable: " + code,
+            )
 
     def close(self) -> None:
         with self._turn_lock:
@@ -197,7 +259,8 @@ class OfflineHTTPApplication:
 
     @staticmethod
     def _turn_identity(request: dict[str, Any], default_budget: int) -> tuple[str, str]:
-        _fields(request, {"message", "request_id", "max_output_tokens", "grounded"},
+        _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
+                          "require_full_history", "document_ids"},
                 {"message", "request_id"})
         message = request["message"]
         if (not isinstance(message, str) or not message.strip()
@@ -206,13 +269,20 @@ class OfflineHTTPApplication:
         grounded = request.get("grounded", False)
         if type(grounded) is not bool:
             raise OfflineHTTPError(400, "grounded must be a boolean")
+        strict = request.get("require_full_history", False)
+        if type(strict) is not bool:
+            raise OfflineHTTPError(400, "require_full_history must be a boolean")
+        document_ids = _document_scope(request, grounded)
         if grounded and len(message.strip().encode("utf-8")) > 1024:
             raise OfflineHTTPError(400, "grounded query exceeds 1024 bytes")
         rid = _identifier("request id", request["request_id"])
         digest = _digest_request(message.strip(), GenerationConfig(
             max_new_tokens=_budget(request, default_budget),
         ))
-        return rid, grounded_request_digest(digest) if grounded else digest
+        if grounded:
+            digest = grounded_request_digest(digest)
+            digest = scoped_grounded_request_digest(digest, document_ids)
+        return rid, _strict_context_digest(digest, strict)
 
     def submit_turn(self, session_id: str, body: dict[str, Any]) -> tuple[int, Any]:
         request = dict(body)
@@ -223,7 +293,16 @@ class OfflineHTTPApplication:
         with self._store.read_snapshot():
             self._session(session_id)
             # Reject an already-owned ID with changed inputs before admission.
-            self._store.replay(session_id, rid, digest)
+            committed = self._store.replay(session_id, rid, digest)
+        if committed is not None:
+            # A process restart, another active worker, or a missing model
+            # must never turn a committed retry into new inference.
+            observed = self._read_committed_turn(
+                session_id, rid, expected_request_digest=digest,
+            )
+            if observed is None:
+                raise OfflineHTTPError(409, "committed local turn changed during recovery")
+            return 200, observed
         key = (session_id, rid)
         with self._turn_lock:
             if self._closing:
@@ -234,6 +313,10 @@ class OfflineHTTPApplication:
                     raise OfflineHTTPError(409, "request ID belongs to different turn content")
                 if not retry or existing.state not in {"failed", "cancelled"}:
                     return (200 if existing.state in TERMINAL_TURN_STATES else 202), existing.public()
+            # Recheck before allocating a worker so a replaced/unreadable
+            # GGUF cannot be offered as a healthy new request. A completed
+            # idempotent turn remains readable even when the model is gone.
+            self._admit_local_generation()
             if self._active_session is not None:
                 raise OfflineHTTPError(409, "another local generation is still running")
             if existing is not None:
@@ -271,11 +354,34 @@ class OfflineHTTPApplication:
         except asyncio.CancelledError:
             with self._turn_lock:
                 turn.state = "cancelled"
-        except (OfflineHTTPError, OfflineAIError, RuntimeContractError) as exc:
+        except OfflineHTTPError as exc:
+            # OfflineHTTPError is an internal exception too: future callers
+            # may construct it with CLI stderr, a model path or prompt text.
+            # Async tickets are public to the authenticated client and must
+            # NEVER serialize exception strings, even when the status code is
+            # expected. Keep only a bounded, stable operator-facing category.
+            message = {
+                400: "local request validation failed",
+                403: "local model operation denied",
+                404: "local conversation unavailable",
+                409: "local conversation conflict",
+                422: "local grounding unavailable",
+                503: "local model or durable storage unavailable",
+            }.get(exc.status, "local generation failed")
             with self._turn_lock:
                 turn.state = "failed"
-                turn.error = str(exc)[:400]
-        except Exception:
+                turn.error = message
+        except (OfflineAIError, RuntimeContractError):
+            # Backends may include absolute model paths, CLI output or private
+            # runtime details in exceptions. Tickets are client-visible.
+            with self._turn_lock:
+                turn.state = "failed"
+                turn.error = "local model or durable conversation operation failed"
+        except BaseException:
+            # This is a dedicated worker thread. An unusual native binding can
+            # raise BaseException (e.g. SystemExit) instead of Exception. Never
+            # strand a user-visible ticket in "running" after the worker dies.
+            # The finally block still releases the single-model admission slot.
             with self._turn_lock:
                 turn.state = "failed"
                 turn.error = "local generation failed; inspect the model and retry"
@@ -286,6 +392,47 @@ class OfflineHTTPApplication:
                 turn.loop = None
                 self._active_session = None
 
+    def _read_committed_turn(
+        self, session_id: str, request_id: str, *,
+        expected_request_digest: str | None = None,
+        observed: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Read SQLite truth independently of a running model's execution lock.
+
+        The transcript, evidence and execution receipt are one read snapshot.
+        This is deliberately not a retry of local inference and cannot invent
+        a receipt for an in-flight, cancelled or uncommitted generation.
+        """
+        with self._store.read_snapshot():
+            committed = self._store.committed_turn(
+                session_id, request_id, self.model_digest, self.tokenizer_digest,
+                expected_request_digest=expected_request_digest,
+            )
+            if committed is None:
+                return None
+            receipt, evidence = committed
+            execution = self._store.local_execution_receipt(
+                session_id, request_id, self.model_digest, self.tokenizer_digest,
+            )
+        return {
+            "session_id": session_id, "request_id": request_id,
+            "state": "complete", "terminal": True, "cancel_requested": False,
+            "created_at": observed["created_at"] if observed else None,
+            "finished_at": observed["finished_at"] if observed else None,
+            "recovered_from_store": True, "error": None,
+            "result": {
+                "session_id": session_id, "request_id": request_id,
+                "revision": receipt.revision, "text": receipt.text,
+                "output_digest": receipt.output_digest,
+                "input_tokens": receipt.prompt_tokens,
+                "output_tokens": receipt.generated_tokens,
+                "replayed": True, "model_digest": self.model_digest,
+                "local_execution_receipt": execution,
+                "evidence": evidence,
+                **_audit_pair(receipt.text, evidence),
+            },
+        }
+
     def turn_status(self, session_id: str, request_id: str, *, cancel: bool = False) -> dict[str, Any]:
         self._session(session_id)
         rid = _identifier("request id", request_id)
@@ -295,39 +442,49 @@ class OfflineHTTPApplication:
                 if cancel:
                     self._request_cancel(turn)
                 observed = turn.public()
-                if turn.state not in {"failed", "cancelled"}:
-                    return observed
             else:
                 observed = None
-        # A process restart/eviction cannot erase a committed turn's status.
-        # This also recovers a peer process winning the same request ID while
-        # our own execution was settling. Uncommitted work is never invented.
-        committed = self._store.committed_turn(
-            session_id, rid, self.model_digest, self.tokenizer_digest,
-            expected_request_digest=turn.request_digest if turn is not None else None,
+        # A peer may commit the turn before our worker has finalized its
+        # in-memory ticket. Even a completed *local* ticket must revalidate
+        # its durable text and native execution sidecar before being claimed
+        # as committed, rather than trusting a stale in-memory snapshot.
+        committed = self._read_committed_turn(
+            session_id, rid,
+            expected_request_digest=turn.request_digest if turn else None,
+            observed=observed,
         )
+        if observed is not None and observed["state"] == "complete":
+            if committed is None or not isinstance(observed["result"], dict):
+                raise RuntimeContractError("completed local turn is missing its durable receipt")
+            original = observed["result"]
+            verified = committed["result"]
+            if (
+                original.get("revision") != verified["revision"]
+                or original.get("text") != verified["text"]
+                or original.get("output_digest") != verified["output_digest"]
+                or original.get("local_execution_receipt")
+                    != verified["local_execution_receipt"]
+            ):
+                raise RuntimeContractError("local ticket does not match committed runtime custody")
+            # Preserve the original execution's replayed=False marker after
+            # confirming the SQLite receipt. A read-after-restart is replayed.
+            return observed
+        if observed is not None and observed["state"] not in TERMINAL_TURN_STATES:
+            # SQLite may commit a result a few microseconds before the native
+            # worker's finally block publishes its terminal in-memory state.
+            # Do not mark the same live process's turn as a replayed terminal
+            # completion until its execution task actually settles. A fresh
+            # process without the ticket will still recover from the exact
+            # durable SQLite receipt above. This also avoids prematurely
+            # releasing the UI's cancel/pressure ownership signal.
+            return observed
         if committed is not None:
-            receipt, evidence = committed
-            return {
-                "session_id": session_id, "request_id": rid,
-                "state": "complete", "terminal": True, "cancel_requested": False,
-                "created_at": observed["created_at"] if observed else None,
-                "finished_at": observed["finished_at"] if observed else None,
-                "recovered_from_store": True, "error": None,
-                "result": {
-                    "session_id": session_id, "request_id": rid,
-                    "revision": receipt.revision, "text": receipt.text,
-                    "output_digest": receipt.output_digest,
-                    "input_tokens": receipt.prompt_tokens,
-                    "output_tokens": receipt.generated_tokens,
-                    "replayed": True, "model_digest": self.model_digest,
-                    "evidence": evidence,
-                    **_audit_pair(receipt.text, evidence),
-                },
-            }
+            return committed
         if observed is not None:
             return observed
-        raise OfflineHTTPError(404, "uncommitted turn ticket unavailable; resubmit the exact original request to recover")
+        raise OfflineHTTPError(
+            404, "uncommitted turn ticket unavailable; resubmit the exact original request to recover"
+        )
 
     def authenticate(self, authorization: str | None) -> bool:
         if not isinstance(authorization, str) or not authorization.startswith("Bearer "):
@@ -352,11 +509,16 @@ class OfflineHTTPApplication:
 
     def _perform_turn(self, session_id: str,
                       request: dict[str, Any], *, turn: _LocalTurn | None = None) -> dict[str, Any]:
-        _fields(request, {"message", "request_id", "max_output_tokens", "grounded"},
+        _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
+                          "require_full_history", "document_ids"},
                 {"message", "request_id"})
         grounded = request.get("grounded", False)
+        strict = request.get("require_full_history", False)
         if type(grounded) is not bool:
             raise OfflineHTTPError(400, "grounded must be a boolean")
+        if type(strict) is not bool:
+            raise OfflineHTTPError(400, "require_full_history must be a boolean")
+        document_ids = _document_scope(request, grounded)
         text = request["message"]
         if (not isinstance(text, str) or not text.strip()
                 or len(text.encode("utf-8", errors="strict")) > 4096):
@@ -367,6 +529,10 @@ class OfflineHTTPApplication:
         digest = _digest_request(text, GenerationConfig(max_new_tokens=budget))
         if grounded:
             digest = grounded_request_digest(digest)
+            digest = scoped_grounded_request_digest(digest, document_ids)
+        # The citation manifest, execution request and durable receipt must
+        # bind the same final strict/legacy idempotency identity.
+        digest = _strict_context_digest(digest, strict)
         with self._lock:
             self._session(session_id)
             replay = self._store.replay(session_id, rid, digest)
@@ -381,14 +547,23 @@ class OfflineHTTPApplication:
                     "input_tokens": replay.prompt_tokens,
                     "output_tokens": replay.generated_tokens,
                     "replayed": True, "model_digest": self.model_digest,
+                    "local_execution_receipt": self._store.local_execution_receipt(
+                        session_id, rid, self.model_digest, self.tokenizer_digest,
+                    ),
                     "evidence": previous[replay.revision - 1],
                     **_audit_pair(replay.text, previous[replay.revision - 1]),
                 }
+            # Historical replies are read-only; newly generated turns must
+            # prove the active local model still matches its admitted identity.
+            self._admit_local_generation()
             manifest = None
             if grounded:
                 if len(text.encode("utf-8")) > 1024:
                     raise OfflineHTTPError(400, "grounded query exceeds 1024 bytes")
-                hits = self.knowledge.search(text, limit=2)
+                try:
+                    hits = self.knowledge.search(text, limit=2, document_ids=document_ids)
+                except RuntimeContractError:
+                    raise OfflineHTTPError(422, "selected local reference unavailable") from None
                 if not hits:
                     raise OfflineHTTPError(
                         422, "no local reference passages match this question"
@@ -412,13 +587,35 @@ class OfflineHTTPApplication:
                     return await chat.ask(
                         text, max_output_tokens=budget, request_id=rid,
                         evidence_manifest=manifest,
+                        require_full_history=strict,
+                        **({"document_ids": document_ids}
+                           if document_ids is not None else {}),
                     )
-                asyncio.run(generate())
+                try:
+                    generated_answer = asyncio.run(generate())
+                except (LlamaCppRuntimeError, NativeRuntimeBackendError,
+                        TimeoutError, OSError):
+                    # Count genuine local runtime failures, not invalid user
+                    # prompts, explicit cancellations or SQLite replay.
+                    self._inference_circuit.record_failure()
+                    raise
+                else:
+                    self._inference_circuit.record_success()
             finally:
                 chat.close()
             receipt = self._store.replay(session_id, rid, digest)
             if receipt is None:
                 raise RuntimeContractError("local generation receipt was not committed")
+            execution_receipt = self._store.local_execution_receipt(
+                session_id, rid, self.model_digest, self.tokenizer_digest,
+            )
+            if (execution_receipt is None
+                    or execution_receipt["execution_receipt_digest"]
+                    != generated_answer.execution_receipt_digest
+                    or execution_receipt["output_sha256"] != receipt.output_digest):
+                raise RuntimeContractError(
+                    "local native generation receipt differs from its committed SQLite response"
+                )
             committed_evidence = self._store.turn_evidence(
                 session_id, self.model_digest, self.tokenizer_digest,
             )[receipt.revision - 1]
@@ -429,6 +626,7 @@ class OfflineHTTPApplication:
                 "input_tokens": receipt.prompt_tokens,
                 "output_tokens": receipt.generated_tokens,
                 "replayed": False, "model_digest": self.model_digest,
+                "local_execution_receipt": execution_receipt,
                 "evidence": committed_evidence,
                 **_audit_pair(receipt.text, committed_evidence),
             }
@@ -562,8 +760,12 @@ class OfflineHTTPApplication:
                               else self.backend.config.context_size or 4096)
             output_tokens = (self.backend.runtime.limits.max_new_tokens
                              if hasattr(self.backend, "runtime") else 8192)
+            ready, code = self._model_readiness()
             return 200, {
-                "local_only": True, "ready": True,
+                "local_only": True, "ready": ready,
+                "model_readiness_code": code,
+                "readiness_is_live_inference_proof": False,
+                "inference_circuit": self._inference_circuit.status(),
                 "runtime_kind": ("native" if hasattr(self.backend, "runtime")
                                  else "llama.cpp"),
                 "adaptive_metal_launch": getattr(
@@ -582,6 +784,32 @@ class OfflineHTTPApplication:
                 "message_bytes": 4096,
                 "grounded_query_bytes": 1024,
             }
+        if path == "/v1/advisory/status" and method == "GET":
+            from skeleton.app.jeeves_advisory import SCHEMA
+            return 200, {
+                "schema_version": SCHEMA, "primary_inference": "local-model-only",
+                "advisory_modalities": [
+                    "image-caption", "audio-transcript", "video-frames",
+                    "crawler-excerpt", "text-reference",
+                ],
+                "review_required": True, "raw_media_decoding": False,
+                "network_provider_dispatch": False,
+                "advisory_never_primary_model": True,
+                "explicit_grounded_turn_required": True,
+                "transient_media_bytes_verified_locally": True,
+                "raw_media_persisted": False,
+                "media_decoder_or_ocr_called": False,
+            }
+        if path == "/v1/advisory/ingest" and method == "POST":
+            from skeleton.app.jeeves_advisory import (
+                AdvisoryRejected, admit_local_advisory,
+            )
+            try:
+                item = admit_local_advisory(self.knowledge, body)
+            except AdvisoryRejected as exc:
+                raise OfflineHTTPError(403 if "requires explicit owner review" in str(exc)
+                                      else 400, str(exc)) from None
+            return (200 if item["reused"] else 201), item
         if path == "/v1/knowledge/documents":
             if method == "GET":
                 return 200, {"documents": self.knowledge.list_documents()}
@@ -650,10 +878,17 @@ class OfflineHTTPApplication:
             except (ReferenceReadRejected, ReferenceWriteRejected, LocalJobRejected) as exc:
                 raise OfflineHTTPError(400, str(exc)) from exc
         if path == "/v1/knowledge/search" and method == "POST":
-            _fields(body, {"query", "limit"}, {"query"})
-            return 200, {"hits": self.knowledge.search(
-                body["query"], limit=body.get("limit", 6)
-            )}
+            _fields(body, {"query", "limit", "document_ids"}, {"query"})
+            scope = _document_scope(body, True)
+            try:
+                hits = self.knowledge.search(
+                    body["query"], limit=body.get("limit", 6),
+                    document_ids=scope,
+                )
+            except RuntimeContractError:
+                raise OfflineHTTPError(422, "selected local reference unavailable") from None
+            return 200, {"hits": hits, **({"document_scope": list(scope)}
+                                          if scope is not None else {})}
         if path.startswith("/v1/knowledge/documents/") and method in {"GET", "DELETE"}:
             document_id = path[len("/v1/knowledge/documents/"):]
             if method == "GET":
@@ -740,7 +975,102 @@ class OfflineHTTPApplication:
                                        self.tokenizer_digest)
                     self._turns = {key: value for key, value in self._turns.items() if key[0] != sid}
                 return 200, {"deleted_session_id": sid}
+        if tail == "context-preview" and method == "POST":
+            # Local-only read-only estimate; the actual new turn still
+            # validates full-history retention and GGUF native admission.
+            _fields(body, {"message", "max_output_tokens", "grounded",
+                           "require_full_history", "document_ids"}, {"message"})
+            message = body["message"]
+            if (not isinstance(message, str) or not message.strip()
+                    or len(message.encode("utf-8")) > 4096):
+                raise OfflineHTTPError(400, "context preview requires 1–4096 UTF-8 message bytes")
+            grounded = body.get("grounded", False)
+            strict = body.get("require_full_history", True)
+            if type(grounded) is not bool or type(strict) is not bool:
+                raise OfflineHTTPError(400, "context policy must be boolean")
+            document_ids = _document_scope(body, grounded)
+            if grounded and len(message.strip().encode("utf-8")) > 1024:
+                raise OfflineHTTPError(400, "grounded preview exceeds 1024 bytes")
+            budget = _budget(body, self.default_output_tokens)
+            with self._lock:
+                self._session(sid)
+                context = None
+                manifest = None
+                if grounded:
+                    query = message.strip()
+                    try:
+                        hits = self.knowledge.search(
+                            query, limit=2, document_ids=document_ids,
+                        )
+                    except RuntimeContractError:
+                        raise OfflineHTTPError(422, "selected local reference unavailable") from None
+                    if not hits:
+                        raise OfflineHTTPError(
+                            422, "no local reference passages match this question"
+                        )
+                    digest = _strict_context_digest(
+                        scoped_grounded_request_digest(
+                            grounded_request_digest(_digest_request(
+                                query, GenerationConfig(max_new_tokens=budget)
+                            )), document_ids,
+                        ), strict,
+                    )
+                    manifest = prepare_evidence(
+                        query, digest, hits, self.model_digest, self.tokenizer_digest
+                    )
+                    context = manifest["context"]
+                session = DurableOfflineAISession(
+                    self.backend, database=self.database, session_id=sid
+                )
+                try:
+                    report = session.preview_context(
+                        message.strip(), budget, grounding_context=context
+                    )
+                    saved = session.store.load(
+                        sid, self.model_digest, self.tokenizer_digest
+                    )
+                    report["session_id"] = sid
+                    report["session_revision"] = saved.revision
+                    report["grounded"] = grounded
+                    report["document_scope"] = list(document_ids) if document_ids else None
+                    report["require_full_history"] = strict
+                    report["may_submit_under_policy"] = (
+                        report["fits_full_history"] or not strict
+                    )
+                    report["preview_is_admission_proof"] = False
+                    report["grounding_preview"] = (
+                        None if manifest is None else {
+                            "schema": "skeleton.jeeves.local-grounding-preview.v1",
+                            "context_sha256": manifest["context_sha256"],
+                            "question_sha256": manifest["question_sha256"],
+                            "source_count": len(manifest["citations"]),
+                            "citations": manifest["citations"],
+                            "source_authority": "untrusted-local-passages-only",
+                            "generation_performed": False,
+                            "is_committed_inference_evidence": False,
+                            "future_source_snapshot_guaranteed": False,
+                        }
+                    )
+                except OfflineAIError as exc:
+                    raise OfflineHTTPError(422, str(exc)) from None
+                finally:
+                    session.close()
+                return 200, report
         if tail == "turn" and method == "POST":
+            # A historical exact POST retry is a SQLite read, not an
+            # inference job. Recover it even while another turn owns the
+            # single local model, or when circuit admission is closed.
+            rid, digest = self._turn_identity(body, self.default_output_tokens)
+            with self._store.read_snapshot():
+                self._session(sid)
+                committed = self._store.replay(sid, rid, digest)
+            if committed is not None:
+                observed = self._read_committed_turn(
+                    sid, rid, expected_request_digest=digest,
+                )
+                if observed is None:
+                    raise OfflineHTTPError(409, "committed local turn changed during recovery")
+                return 200, observed["result"]
             with self._turn_lock:
                 if self._closing or self._active_session is not None:
                     raise OfflineHTTPError(409, "another local generation is still running")
@@ -841,7 +1171,8 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         if web:
             self.send_header("Content-Security-Policy",
                              "default-src 'none'; script-src 'self'; style-src 'self'; "
-                             "connect-src 'self'; base-uri 'none'; form-action 'none'; "
+                             "connect-src 'self'; img-src 'self' blob:; media-src 'self' blob:; "
+                             "base-uri 'none'; form-action 'none'; "
                              "frame-ancestors 'none'")
         else:
             self.send_header("Content-Security-Policy", "default-src 'none'")
@@ -884,6 +1215,7 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         limit = (
             MAX_JSON_BYTES if path == "/v1/sessions/import"
             else MAX_JSON_BYTES if path == "/v1/knowledge/documents"
+            else MAX_MEDIA_ADVISORY_REQUEST_BYTES if path == "/v1/advisory/ingest"
             else MAX_CHAT_REQUEST_BYTES
         )
         length = int(declared)
@@ -928,13 +1260,17 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         except OfflineHTTPError as exc:
             self._failed(exc)
         except RuntimeContractError as exc:
+            # Classify known contract failures without serializing private
+            # storage/model diagnostics to the authenticated HTTP caller.
             label = str(exc)
-            status = (404 if "unknown offline conversation" in label else
-                      409 if ("revision conflict" in label
-                              or "request id reused" in label) else 400)
-            self._json(status, {"error": label})
-        except (OfflineAIError, ValueError) as exc:
-            self._json(400, {"error": str(exc)})
+            if "unknown offline conversation" in label:
+                self._json(404, {"error": "unknown offline conversation"})
+            elif "revision conflict" in label or "request id reused" in label:
+                self._json(409, {"error": "local conversation conflict"})
+            else:
+                self._json(400, {"error": "invalid local conversation request"})
+        except (OfflineAIError, ValueError):
+            self._json(400, {"error": "local model request rejected"})
         except (OSError, sqlite3.Error):
             self._json(503, {"error": "local inference or storage is unavailable"})
         except Exception:
