@@ -8,12 +8,13 @@ may have executed is never automatically retried after an exception.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+import hmac
 from threading import RLock
 from typing import TYPE_CHECKING, Callable, Mapping, Protocol
 
 if TYPE_CHECKING:
     from .fair_stream_execution_journal import FairStreamExecutionJournal
-    from .fair_stream_recovery import RecoveryAuthorization
+    from .fair_stream_recovery import AbandonmentAuthorization, RecoveryAuthorization
 
 from .fair_stream_live_budget import LiveStreamBudgetSampler
 from .fair_stream_revalidation import bound_revalidation_budget
@@ -563,6 +564,80 @@ class GuardedFairStreamDispatch:
             except BaseException as exc:
                 self._uncertain = True
                 raise DispatchUncertain("cancelled receipt unavailable or custody reconciliation failed") from exc
+            finally:
+                self._executing = False
+
+    def abandon_uncertain(
+        self, *, authorization: "AbandonmentAuthorization", recovery_key: bytes,
+    ) -> dict[str, object]:
+        """Retire a drained, outcome-uncertain native request without output.
+
+        Operator must independently stop all other executors and establish
+        quiescence. A signed declaration is not proof of process termination.
+        Existing output (even damaged) and cancellation fences forbid retirement.
+        """
+        from .fair_stream_execution_journal import JournaledExecutionOwner
+        from .fair_stream_result_vault import SealedFairStreamResultVault
+        from .fair_stream_recovery import verify_abandonment_authorization
+        from .native_fair_stream_backend import NativeFairStreamBackend
+
+        self._require_owner_process()
+        with self._lock:
+            owner = self._owner
+            if (not self._whole_request or self._executing
+                    or type(owner) is not JournaledExecutionOwner
+                    or type(owner._backend) is not SealedFairStreamResultVault
+                    or owner._journal._private_handle is None
+                    or type(owner._backend._backend) is not NativeFairStreamBackend):
+                raise DispatchUncertain("bound private native owner required for abandonment")
+            state = self._session.verify()
+            pending = state["checkpoint"]["pending"]
+            if type(pending) is not list or len(pending) != 1 or type(pending[0]) is not dict:
+                raise DispatchUncertain("exactly one pending lease required")
+            lease = pending[0]
+            permit = DispatchPermit(
+                lease["lease_id"], lease["request_id"], state["generation"],
+                state["checkpoint_digest"], lease["tokens"], lease["bytes_reserved"],
+            )
+            if self._issued and self._issued.get(permit.lease_id) != permit:
+                raise DispatchUncertain("in-memory lease differs from durable custody")
+            if not self._uncertain and self._issued:
+                raise DispatchUncertain("known unstarted permit requires cancellation, not abandonment")
+            store = self._session._store
+            if type(recovery_key) is not bytes or any(
+                hmac.compare_digest(recovery_key, key)
+                for key in (store._custody_key, store._execution_key, owner._journal._key)
+            ):
+                raise ValueError("independent operator recovery key required")
+            verify_abandonment_authorization(
+                authorization, recovery_key=recovery_key, state=state, lease_id=permit.lease_id,
+            )
+            self._executing = True
+            try:
+                with owner._lock:
+                    journal, vault = owner._journal, owner._backend
+                    if journal.session_id != state["session_id"] or vault.session_id != journal.session_id:
+                        raise DispatchUncertain("retirement custody session mismatch")
+                    vault.assert_no_published_result(permit)
+                    receipt = journal.record_abandonment(
+                        permit, evidence_digest=authorization.evidence_digest,
+                    )
+                    vault.assert_no_published_result(permit)
+                    if self._session.verify() != state:
+                        raise DispatchUncertain("custody changed during retirement")
+                    if self._cancel_cleanup is not None:
+                        self._cancel_cleanup(permit.request_id)
+                    vault._backend.reauthorize_retired_lease(permit)
+                    updated = self._session.abandon(
+                        receipt, expected_anchor=(state["generation"], state["digest"]),
+                    )
+                self._issued.clear()
+                self._issued_token_budget = None
+                self._uncertain = False
+                return updated
+            except BaseException as exc:
+                self._uncertain = True
+                raise DispatchUncertain("abandonment requires trusted reconciliation") from exc
             finally:
                 self._executing = False
 
