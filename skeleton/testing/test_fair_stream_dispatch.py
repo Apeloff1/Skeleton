@@ -275,3 +275,67 @@ def test_boolean_alias_cannot_reuse_one_token_dispatch_permit(monkeypatch):
             guard.execute_once(forged)
     assert owner.calls == 0
     assert not guard.uncertain
+
+def test_stable_pressure_does_not_double_discount_issued_quantum(monkeypatch):
+    from skeleton.ai.model_runtime.fair_stream_revalidation import revalidation_budget
+
+    calls = []
+    owner = SimulatedCommittedOwner()
+    original = owner.execute_and_commit
+
+    def sample(self, *, token_budget, storage_path):
+        calls.append(token_budget)
+        return budget(tokens=token_budget, pressure=250_000), {
+            "measurement": "os_probe", "gpu_device_qualified": False,
+            "physical_memory_reserved": False, "auxiliary_telemetry_incomplete": True,
+        }
+
+    def execute(permit, state):
+        assert revalidation_budget(permit) == 40
+        return original(permit, state)
+
+    monkeypatch.setattr(LiveStreamBudgetSampler, "sample", sample)
+    monkeypatch.setattr(owner, "execute_and_commit", execute)
+    guard = make(owner)
+    guard.submit(request())
+    permits, observed = guard.plan_live(token_budget=40)
+    assert observed.effective_tokens == 30
+    assert permits[0].tokens == 30
+    guard.execute_once(permits[0])
+    assert calls == [40, 40]
+    assert owner.calls == 1
+    assert revalidation_budget(permits[0]) == 30
+    assert guard._issued_token_budget is None
+
+
+def test_increased_pressure_still_defers_unchanged_permit(monkeypatch):
+    readings = iter((250_000, 500_000, 250_000))
+    owner = SimulatedCommittedOwner()
+    calls = []
+
+    def sample(self, *, token_budget, storage_path):
+        calls.append(token_budget)
+        return budget(tokens=token_budget, pressure=next(readings)), {
+            "measurement": "os_probe", "gpu_device_qualified": False,
+            "physical_memory_reserved": False, "auxiliary_telemetry_incomplete": True,
+        }
+
+    monkeypatch.setattr(LiveStreamBudgetSampler, "sample", sample)
+    guard = make(owner)
+    guard.submit(request())
+    permits, _ = guard.plan_live(token_budget=40)
+    with pytest.raises(DispatchDeferred, match="fresh pressure"):
+        guard.execute_once(permits[0])
+    assert owner.calls == 0
+    assert not guard.uncertain
+    guard.execute_once(permits[0])
+    assert calls == [40, 40, 40]
+    assert owner.calls == 1
+
+
+def test_sampler_cannot_expand_planning_ceiling(monkeypatch):
+    install_probe(monkeypatch, [budget(tokens=41)])
+    guard = make()
+    guard.submit(request())
+    with pytest.raises(DispatchDeferred, match="provenance"):
+        guard.plan_live(token_budget=40)

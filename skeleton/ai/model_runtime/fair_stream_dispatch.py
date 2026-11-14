@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from .fair_stream_recovery import RecoveryAuthorization
 
 from .fair_stream_live_budget import LiveStreamBudgetSampler
+from .fair_stream_revalidation import bound_revalidation_budget
 from .fair_stream_queue import MeasuredStreamBudget, StreamRequest, MAX_TOKENS
 from .fair_stream_session import (
     DispatchPermit, DurableFairStreamSession,
@@ -86,6 +87,7 @@ class GuardedFairStreamDispatch:
         self._storage_path = storage_path
         self._lock = RLock()
         self._issued: dict[str, DispatchPermit] = {}
+        self._issued_token_budget: int | None = None
         self._uncertain = False
 
     @property
@@ -114,7 +116,8 @@ class GuardedFairStreamDispatch:
         except (OSError, ValueError, RuntimeError) as exc:
             raise DispatchDeferred("live resource measurement unavailable") from exc
         if (
-            not isinstance(budget, MeasuredStreamBudget)
+            type(budget) is not MeasuredStreamBudget
+            or budget.token_budget > token_budget
             or budget.measurement != "os_probe"
             or type(evidence) is not dict
             or evidence.get("measurement") != "os_probe"
@@ -149,6 +152,9 @@ class GuardedFairStreamDispatch:
                 self._uncertain = True
                 raise DispatchUncertain("non-atomic multi-lease plan forbidden")
             self._issued = {permit.lease_id: permit for permit in permits}
+            # Persist no new authority. Retain the pre-discount ceiling only
+            # while this process owns the issued permit.
+            self._issued_token_budget = token_budget if permits else None
             return permits, observation
 
     def _validate_pending(self, permit: DispatchPermit) -> dict[str, object]:
@@ -246,6 +252,7 @@ class GuardedFairStreamDispatch:
                     "committed receipt unavailable or custody reconciliation failed"
                 ) from exc
             self._issued.clear()
+            self._issued_token_budget = None
             self._uncertain = False
             return updated
 
@@ -259,7 +266,12 @@ class GuardedFairStreamDispatch:
             if self._uncertain:
                 raise DispatchUncertain("execution outcome requires reconciliation")
             state = self._validate_pending(permit)
-            budget, observation = self._sample(permit.tokens)
+            ceiling = self._issued_token_budget
+            if type(ceiling) is not int or not permit.tokens <= ceiling <= MAX_TOKENS:
+                self._uncertain = True
+                raise DispatchUncertain("original planning budget unavailable; reconcile")
+            # Do not discount the already-discounted lease a second time.
+            _, observation = self._sample(ceiling)
             if (
                 observation.effective_slots < 1
                 or observation.effective_tokens < permit.tokens
@@ -282,7 +294,8 @@ class GuardedFairStreamDispatch:
                     "durable lease changed during resource probe; reconciliation required"
                 ) from exc
             try:
-                receipt = self._owner.execute_and_commit(permit, refreshed)
+                with bound_revalidation_budget(permit, ceiling):
+                    receipt = self._owner.execute_and_commit(permit, refreshed)
             except BaseException as exc:
                 self._uncertain = True
                 raise DispatchUncertain(
@@ -297,4 +310,5 @@ class GuardedFairStreamDispatch:
                     "execution receipt not durably reconciled"
                 ) from exc
             del self._issued[permit.lease_id]
+            self._issued_token_budget = None
             return updated

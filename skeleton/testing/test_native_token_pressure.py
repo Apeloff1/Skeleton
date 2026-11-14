@@ -397,3 +397,42 @@ def test_unknown_sensor_large_quantum_cannot_authorize_native_cpu(monkeypatch, u
         guard.start(P)()
     assert guard.status().stopped
 
+def test_per_token_revalidation_preserves_original_ceiling_without_expanding_permit(monkeypatch):
+    from skeleton.ai.model_runtime.fair_stream_revalidation import bound_revalidation_budget
+
+    calls = []
+    readings = iter((250_000, 250_000, 750_000))
+    permit = replace(P, tokens=3)
+
+    def sample(self, *, token_budget, storage_path):
+        calls.append(token_budget)
+        return budget(tokens=token_budget, pressure=next(readings)), canonical_evidence()
+
+    monkeypatch.setattr(LiveStreamBudgetSampler, "sample", sample)
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    with bound_revalidation_budget(permit, 4):
+        interrupt = guard.start(permit)
+        interrupt()
+        interrupt()
+        with pytest.raises(NativePressureInterrupted, match="pressure hold"):
+            interrupt()
+        guard.finish(success=False)
+    assert calls == [4, 4, 4]
+    assert guard.status().stopped
+
+
+def test_revalidation_scope_cannot_be_reused_for_another_permit():
+    from skeleton.ai.model_runtime.fair_stream_revalidation import (
+        bound_revalidation_budget, revalidation_budget,
+    )
+
+    other = replace(P)
+    assert other == P and other is not P
+    with bound_revalidation_budget(P, 10):
+        assert revalidation_budget(P) == 10
+        with pytest.raises(ValueError, match="does not bind"):
+            revalidation_budget(other)
+        with pytest.raises(ValueError, match="non-nested"):
+            with bound_revalidation_budget(P, 12):
+                pass
+    assert revalidation_budget(P) == P.tokens

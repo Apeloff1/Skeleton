@@ -13,6 +13,7 @@ from time import monotonic_ns
 
 from .fair_stream_live_budget import LiveStreamBudgetSampler
 from .fair_stream_queue import MeasuredStreamBudget
+from .fair_stream_revalidation import revalidation_budget
 from .fair_stream_session import DispatchPermit
 
 MAX_PROBES_PER_LEASE = 4096
@@ -220,6 +221,10 @@ class NativeTokenPressureGuard:
         self._require_owner_process()
         if not _canonical_cpu_permit(permit):
             raise NativePressureInterrupted("CPU-only canonical typed permit required")
+        try:
+            ceiling = revalidation_budget(permit)
+        except ValueError as exc:
+            raise NativePressureInterrupted("native pressure envelope mismatch") from exc
         with self._lock:
             if self._active is not None or self._stopped:
                 raise NativePressureInterrupted("pressure guard not available")
@@ -262,7 +267,7 @@ class NativeTokenPressureGuard:
                 self._samples += 1
                 try:
                     budget, evidence = self._sampler.sample(
-                        token_budget=permit.tokens, storage_path=self._storage_path,
+                        token_budget=ceiling, storage_path=self._storage_path,
                     )
                 except BaseException as exc:
                     self._stopped = True
@@ -270,6 +275,7 @@ class NativeTokenPressureGuard:
                 # Probe latency itself consumes the lease's deadline.
                 self._check_deadline()
                 if (type(budget) is not MeasuredStreamBudget
+                        or budget.token_budget > ceiling
                         or budget.measurement != "os_probe"
                         or type(evidence) is not dict
                         or evidence.get("measurement") != "os_probe"
