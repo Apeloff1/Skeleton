@@ -18,13 +18,13 @@ function display(state, step = 'options') {
     beats: Q.FALLBACK_BEATS, dispatch: () => {}, onForge: () => {} }));
 }
 
-test('historical creator offers all eight actual native mini-games, not 67 fictional ones', () => {
+test('historical creator offers all eight actual native mini-games, not 69 fictional ones', () => {
   assert.deepEqual(Q.PLAYABLE_SLICES.map((s) => s.id), MODES);
   assert.equal(new Set(Q.PLAYABLE_SLICES.map((s) => s.id)).size, 8);
   const html = display(Q.INITIAL_STATE);
   assert.match(html, /data-testid="q-playable-slice-options"/);
   assert.match(text(html), /eight implemented prototypes/);
-  assert.match(text(html), /not mean all 67 historical genres/);
+  assert.match(text(html), /not mean all 69 catalog genres/);
 });
 
 test('default request unchanged until users explicitly opt in to playable content', () => {

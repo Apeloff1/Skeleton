@@ -96,24 +96,35 @@ export function normaliseGalaxyProfile(payload: unknown): GalaxyProfile {
   return { schema: GALAXY_PROFILE_SCHEMA, config: JSON.parse(serialized) };
 }
 
-let pending: { id: string; value: GalaxyProfile; expires: number } | null = null;
+// The route URL is a *public hint*, not proof of account ownership. The
+// originating and receiving app routes supply the same auth-epoch at both
+// boundaries; an account switch invalidates even a still-live hint.
+let pending: { id: string; value: GalaxyProfile; expires: number; ownerEpoch: number | null } | null = null;
 let sequence = 0;
 
-export function prepareGalaxyHandoff(payload: unknown, now: number = Date.now()): string {
-  if (!Number.isFinite(now)) fail('invalid clock');
+export function prepareGalaxyHandoff(
+  payload: unknown, now: number = Date.now(), ownerEpoch: number | null = null,
+): string {
+  if (!Number.isFinite(now) || !Number.isSafeInteger(now)) fail('invalid clock');
+  if (ownerEpoch !== null && (!Number.isSafeInteger(ownerEpoch) || ownerEpoch < 0)) {
+    fail('invalid owner epoch');
+  }
   const value = normaliseGalaxyProfile(payload);
   // ID is only a routing hint. It is NOT an authorization token. Data lives
   // only in JS memory, never in localStorage/AsyncStorage or a public URL.
   const id = 'g' + now.toString(36) + 'x' + (++sequence).toString(36);
-  pending = { id, value, expires: now + PROFILE_TTL_MS };
+  pending = { id, value, expires: now + PROFILE_TTL_MS, ownerEpoch };
   return id;
 }
 
-export function consumeGalaxyHandoff(id: string | null | undefined, now: number = Date.now()): GalaxyProfile | null {
+export function consumeGalaxyHandoff(
+  id: string | null | undefined, now: number = Date.now(), ownerEpoch: number | null = null,
+): GalaxyProfile | null {
   if (!id || !pending || id !== pending.id) return null;
   const captured = pending;
   pending = null;
-  if (!Number.isFinite(now) || now > captured.expires) return null;
+  if (!Number.isFinite(now) || now < 0 || now > captured.expires ||
+      ownerEpoch !== captured.ownerEpoch) return null;
   return normaliseGalaxyProfile(captured.value.config);
 }
 
