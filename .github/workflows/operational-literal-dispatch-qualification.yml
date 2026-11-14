@@ -1,24 +1,13 @@
 name: Operational AI Literal Dispatch Qualification
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
-    paths:
-      - '.github/workflows/operational-literal-dispatch-qualification.yml'
-      - 'skeleton/ai/runtime/operational_ai/agent_fabric/assurance/measurements/**'
-      - 'skeleton/ai/runtime/operational_ai/reliability_fabric/engine.py'
-      - 'skeleton/ai/runtime/operational_ai/trust_gates/engine.py'
-      - 'skeleton/perf_profiler/_stats.py'
-      - 'tests/test_operational_literal_dispatch_20261111.py'
-      - 'skeleton/ai/runtime/operational_ai/offline_cognition/core/testing.py'
-      - 'tests/test_offline_cognition_literal_dispatch_20261111.py'
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: operational-literal-dispatch-${{ github.event.pull_request.number }}
+  group: operational-literal-dispatch-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

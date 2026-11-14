@@ -1,31 +1,13 @@
 name: Mainline Failure Regression Qualification
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
-    paths:
-      - '.github/workflows/mainline-failure-regression-qualification.yml'
-      - 'skeleton/perf_profiler/**'
-      - 'tests/perf_profiler/**'
-      - 'skeleton/testing/test_delivery_packaging.py'
-      - 'skeleton/testing/test_harbor_crafting_journal_transfer.py'
-      - 'skeleton/testing/test_app_offline_archive_schema_parity.py'
-      - 'skeleton/testing/test_ecs_ai.py'
-      - 'skeleton/testing/test_ai_native_endurance.py'
-      - 'skeleton/ai/runtime/operational_ai/model/qualification/**'
-      - 'skeleton/testing/test_jeeves_native_batch.py'
-      - 'backend/core/build_vault.py'
-      - 'backend/tests/test_galaxy_file_budget.py'
-      - 'backend/core/lazy_registry.py'
-      - 'backend/core/public_exception_route.py'
-      - 'backend/tests/test_storage_lazy_registry.py'
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: mainline-regression-${{ github.event.pull_request.number }}
+  group: mainline-regression-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

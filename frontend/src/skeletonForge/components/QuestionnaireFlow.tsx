@@ -7,8 +7,12 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { humanize } from '../graph';
 import { DESIGN_AXES } from '../instruments';
+import { PLAYABLE_SLICES, PLAYABLE_TUNING_EFFECTS } from '../questionnaire';
 import { GALAXY_CHOICES, galaxyGenre, mappedBriefGenre } from '../galaxyGenres';
+import { GENRE_COUNT, GENRE_GROUPS, filterGenreChoices } from '../genreCatalog';
+import { suggestPlayableMode } from '../playableSuggestions';
 import DesignInstruments from './DesignInstruments';
+import DesignPresetPanel from './DesignPresetPanel';
 import {
   ARCHETYPES, BRIEF_FACETS, ERA_SOURCE_COPY, STEP_LABELS, STEPS, TARGETS, VISION_MAX,
   blockReason, buildRunRequest, eraSource, progress, reachable, shadowedBriefFacets, stepIndex,
@@ -145,12 +149,68 @@ function OptionGroup({ id, prompt, options, value, onPick, color = C.blue, capti
   );
 }
 
+/** Browsing defaults to the familiar 36; search reaches all registered genres. */
+function GenrePicker({ value, onPick }: { value?: string; onPick: (v: string) => void }) {
+  const [query, setQuery] = React.useState('');
+  const [family, setFamily] = React.useState('popular');
+  const matches = filterGenreChoices(query, family);
+  const shown = matches.slice(0, 80);
+  return (
+    <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="What kind of game is it?" testID="q-group-brief-genre">
+      <Text style={st.q}>What kind of game is it?</Text>
+      <Text style={st.help}>{GENRE_COUNT} selectable game genres and subgenres. Each is a creative-brief hint mapped to a design era, not a promise of a dedicated playable engine.</Text>
+      <TextInput
+        testID="q-genre-search"
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Search all genres (for example: colony, racing, puzzle)"
+        placeholderTextColor={C.dim}
+        accessibilityLabel="Search game genres"
+        autoCapitalize="none"
+        maxLength={48}
+        style={[st.input, { minHeight: TOUCH, marginBottom: 8 }]}
+      />
+      <View style={st.chips}>
+        <Chip label="Popular 36" selected={family === 'popular'} onPress={() => setFamily('popular')} testID="q-genre-family-popular" />
+        <Chip label="All" selected={family === 'all'} onPress={() => setFamily('all')} testID="q-genre-family-all" />
+        {GENRE_GROUPS.map((g) => (
+          <Chip key={g.id} label={g.label} selected={family === g.id} onPress={() => setFamily(g.id)} testID={'q-genre-family-' + g.id} />
+        ))}
+      </View>
+      {value && !shown.includes(value) ? (
+        <View style={st.chips}>
+          <Chip label={'Selected: ' + humanize(value)} selected onPress={() => onPick(value)} testID={'q-brief-genre-' + value} />
+        </View>
+      ) : null}
+      <Text style={st.help}>{shown.length} of {matches.length} matching genres shown{matches.length > shown.length ? '; refine search or choose a category' : ''}.</Text>
+      <View style={st.chips}>
+        {shown.map((genre) => (
+          <Chip
+            key={genre}
+            label={humanize(genre)}
+            selected={value === genre}
+            color={C.accent}
+            onPress={() => onPick(genre)}
+            testID={'q-brief-genre-' + genre}
+            a11yLabel={humanize(genre) + (value === genre ? ', selected' : '')}
+          />
+        ))}
+      </View>
+      {!shown.length ? <Text style={st.help}>No matching genre. Try a broader term or another category.</Text> : null}
+    </View>
+  );
+}
+
 function BriefStep({ state, dispatch }: QuestionnaireFlowProps) {
   return (
     <Card>
       <Text style={st.help}>Optional. The brief votes an era only when no design beat is answered; it always names and themes the game.</Text>
       {BRIEF_FACETS.map((f) => (
-        <OptionGroup key={f.id} id={`brief-${f.id}`} prompt={f.prompt} options={f.options} value={state.brief[f.id]} onPick={(v) => dispatch({ type: 'setBrief', facet: f.id, value: v })} color={C.accent} />
+        f.id === 'genre' ? (
+          <GenrePicker key={f.id} value={state.brief.genre} onPick={(v) => dispatch({ type: 'setBrief', facet: 'genre', value: v })} />
+        ) : (
+          <OptionGroup key={f.id} id={`brief-${f.id}`} prompt={f.prompt} options={f.options} value={state.brief[f.id]} onPick={(v) => dispatch({ type: 'setBrief', facet: f.id, value: v })} color={C.accent} />
+        )
       ))}
     </Card>
   );
@@ -176,6 +236,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
   const [galaxyOpen, setGalaxyOpen] = React.useState(false);
   const [genreSearch, setGenreSearch] = React.useState('');
   const filteredGenres = GALAXY_CHOICES.filter((g) => (g.id + ' ' + g.name + ' ' + g.desc).toLowerCase().includes(genreSearch.trim().toLowerCase()));
+  const playableHint = suggestPlayableMode(state.galaxyGenre);
   return (
     <Card>
       <View accessibilityRole="radiogroup" accessibilityLabel="Forge archetype" style={st.group}>
@@ -202,6 +263,72 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
         })}
       </View>
       <OptionGroup id="target" prompt="Output" options={TARGETS.map((t) => t.id)} value={state.options.target} onPick={(v) => dispatch({ type: 'setOption', key: 'target', value: v })} />
+      <DesignPresetPanel state={state} dispatch={dispatch} />
+
+      <View style={st.group} testID="q-playable-slice-options" accessibilityRole="radiogroup" accessibilityLabel="Playable original mini-game">
+        <Text style={st.q}>Playable genre prototypes</Text>
+        <Text style={st.help}>
+          Include an original self-contained Godot mini-game with real controls and a win/lose loop.
+          Choose from the eight implemented prototypes; this does not mean all {GALAXY_CHOICES.length} historical genres have complete gameplay.
+        </Text>
+        <View style={st.chips}>
+          <Chip label="No extra mini-game" selected={!state.playable?.enabled}
+            onPress={() => dispatch({ type: 'setPlayableEnabled', value: false })}
+            testID="q-playable-off" />
+          <Chip label="Include playable prototype" selected={!!state.playable?.enabled}
+            disabled={state.options.target !== 'godot'}
+            onPress={() => dispatch({ type: 'setPlayableEnabled', value: true })}
+            testID="q-playable-on" />
+        </View>
+        {state.playable?.enabled && state.options.target === 'godot' ? (
+          <>
+            <Text style={st.help}>Select the implemented game loop:</Text>
+            {playableHint ? (
+              <View testID="q-playable-suggestion">
+                <Text style={st.help}>
+                  Historical {playableHint.genreName}: the nearest authored mini-game is
+                  {' '}{PLAYABLE_SLICES.find((slice) => slice.id === playableHint.mode)?.label ?? playableHint.mode}.
+                  This is only a small prototype, not full specialized genre gameplay.
+                </Text>
+                <Chip label="Use this prototype" role="button"
+                  selected={state.playable?.mode === playableHint.mode}
+                  onPress={() => dispatch({ type: 'setPlayableMode', value: playableHint.mode })}
+                  testID="q-use-playable-suggestion" />
+              </View>
+            ) : null}
+
+            <View style={st.chips}>
+              {PLAYABLE_SLICES.map((slice) => (
+                <Chip key={slice.id} label={slice.label}
+                  selected={state.playable?.mode === slice.id}
+                  a11yLabel={slice.label + '. ' + slice.hint}
+                  onPress={() => dispatch({ type: 'setPlayableMode', value: slice.id })}
+                  testID={'q-playable-mode-' + slice.id} />
+              ))}
+            </View>
+            <Text style={st.help} testID="q-playable-tuning-hint">
+              Active prototype cockpit mappings: {(PLAYABLE_TUNING_EFFECTS[state.playable?.mode ?? 'extraction'] ?? []).join(' · ')}.
+              Other design sliders remain in the full GameForge tensor, but are not yet interpreted by this mini-game.
+              Open Design instruments above to edit the sliders.
+            </Text>
+            <View style={st.chips}>
+              <Chip label="Keep main world; add in-game switch button" selected={!state.playable?.launch}
+                onPress={() => dispatch({ type: 'setPlayableMainScene', value: false })}
+                testID="q-playable-extra-only" />
+              <Chip label="Launch this mini-game as main" selected={!!state.playable?.launch}
+                disabled={!!state.quest?.enabled}
+                onPress={() => dispatch({ type: 'setPlayableMainScene', value: true })}
+                testID="q-playable-launch" />
+            </View>
+            {state.quest?.enabled ? (
+              <Text style={st.help} testID="q-playable-quest-conflict">
+                The room-entry quest requires the original Godot launch scene.
+                The mini-game can still be included as a separate selectable scene.
+              </Text>
+            ) : null}
+          </>
+        ) : null}
+      </View>
 
       <View style={st.group} testID="q-native-quest-controls" accessibilityRole="radiogroup" accessibilityLabel="Native quest gameplay">
         <Text style={st.q}>Native room-entry quest gameplay</Text>
@@ -250,7 +377,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
         </View>
       ) : null}
       <View style={st.group}>
-        <Button label={galaxyOpen ? 'Hide 67-genre catalog' : 'Advanced: choose from all 67 Galaxy genres'}
+        <Button label={galaxyOpen ? `Hide ${GALAXY_CHOICES.length}-genre catalog` : `Advanced: choose from all ${GALAXY_CHOICES.length} Galaxy genres`}
           tone="secondary" compact testID="q-galaxy-genres-toggle"
           onPress={() => setGalaxyOpen((open) => !open)} />
       </View>
@@ -263,7 +390,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
           </Text>
           <TextInput testID="q-galaxy-genre-search" style={[st.input, { minHeight: TOUCH }]}
             value={genreSearch} onChangeText={setGenreSearch}
-            placeholder="Search 67 genres" accessibilityLabel="Search Galaxy genres"
+            placeholder={`Search ${GALAXY_CHOICES.length} genres`} accessibilityLabel="Search Galaxy genres"
             placeholderTextColor={C.dim} />
           <Text style={st.help}>{filteredGenres.length} matching genres. {filteredGenres.length > 24 ? 'Showing first 24; refine your search.' : ''}</Text>
           <View style={st.chips}>
@@ -335,6 +462,8 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
       <Row k="Beats" v={beatsTxt || '—'} />
       <Row k="Archetype" v={arch?.label ?? req.archetype} />
       <Row k="Output" v={TARGETS.find((t) => t.id === req.target)?.label ?? req.target} />
+      {state.playable?.enabled && !req.playable_content ? <Banner tone="warn" testID="q-playable-not-exported">Native playable mini-games require Godot output. This JSON-only export preserves your design but will not contain the mini-game scenes.</Banner> : null}
+      {req.playable_content ? <Row k="Playable mini-game" v={`${PLAYABLE_SLICES.find((slice) => slice.id === req.playable_archetype)?.label ?? req.playable_archetype} · ${req.playable_main_scene ? "startup scene" : "additional scene"}`} /> : null}
       {req.quest_content ? <Row k="Native quest" v={`${req.quest_length} room-entry objectives · source-bound HUD and save contract`} /> : null}
       {state.quest?.enabled && !req.quest_content ? <Banner tone="warn" testID="q-native-quest-not-exported">Native room quests are disabled for JSON blueprint output. Select Godot in Forge options to include one.</Banner> : null}
       {state.galaxyGenre ? <Row k="Specialized genre" v={(galaxyGenre(state.galaxyGenre)?.name ?? state.galaxyGenre) + " → " + (mappedBriefGenre(state.galaxyGenre) ?? "unknown")} /> : null}

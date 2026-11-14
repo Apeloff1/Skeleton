@@ -103,7 +103,10 @@ def test_owned_source_fails_closed_without_canonical_artifact_delivery(build_app
     client, headers, db, _, _ = build_app
     response = client.post("/api/gameforge/build/" + kind, headers=headers["owner"], json={"game_name": "Owned"})
     assert response.status_code == 503
-    assert response.json()["detail"]["code"] == "artifact_owner_unavailable"
+    assert response.json()["detail"] == "internal server error"
+    assert "no-store" in response.headers["cache-control"]
+    capability = client.get("/api/gameforge/build/toolchains", headers=headers["owner"])
+    assert capability.json()["artifact_delivery"]["code"] == "artifact_owner_unavailable"
     assert not db["gameforge_builds"].writes
 
 

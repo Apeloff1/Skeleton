@@ -36,5 +36,26 @@
   "operational_paused_manual_only": [
     "actions-housekeeping-cli.yml",
     "three-hour-actions-queue-expiry.yml"
+  ],
+  "consolidated_required_source_workflows": [
+    "backend-literal-lazy-loader-qualification.yml",
+    "ci-surface-hold-source-qualification.yml",
+    "discourse-job-identity-qualification.yml",
+    "draft19-gguf-source-qualification.yml",
+    "ecosystem-api-import-qualification.yml",
+    "expo-export-content-evidence-qualification.yml",
+    "first-install-source-qualification.yml",
+    "harbor-patrol-cli-qualification.yml",
+    "harbor-studio-source-qualification.yml",
+    "jeeves-bounded-canonical-evidence.yml",
+    "jeeves-integrated-source-qualification.yml",
+    "jeeves-laptop-dispatcher-source-tests.yml",
+    "jeeves-native-sqlite-source-qualification.yml",
+    "mainline-failure-regression-qualification.yml",
+    "masterplan-421-dossier-integrity.yml",
+    "native-batch-operator-admission-qualification.yml",
+    "native-qualification-report-custody.yml",
+    "operational-literal-dispatch-qualification.yml",
+    "perf-profiler-literal-target-qualification.yml"
   ]
 }

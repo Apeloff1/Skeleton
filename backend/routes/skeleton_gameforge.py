@@ -30,9 +30,21 @@ class RunRequest(BaseModel):
     galaxy_profile: Optional[Dict[str, Any]] = None
     quest_content: bool = False
     quest_length: int = Field(default=3, ge=1, le=8)
+    playable_content: bool = False
+    playable_archetype: Optional[str] = Field(default=None, max_length=64)
+    playable_main_scene: bool = False
     blend: Optional[list] = None
     t: float = 0.5
     generation: Optional[str] = None
+
+
+@router.get("/playable/archetypes")
+def playable_archetypes() -> Dict[str, Any]:
+    """Only return actual, source-backed Godot mini-games, not 67 false claims."""
+    from skeleton.forge.archetype_content import content_archetypes
+    names = content_archetypes()
+    return {"archetypes": list(names), "count": len(names),
+            "kind": "original_self_contained_godot_2d_mini_game"}
 
 
 @router.get("/eras")
@@ -51,6 +63,13 @@ def eras() -> Dict[str, Any]:
     return {"eras": out, "count": len(out)}
 
 
+@router.get("/genres")
+def genres() -> Dict[str, Any]:
+    """Read-only 158-genre taxonomy; a vote is not playable-engine certification."""
+    from skeleton.context.genre_catalog import genre_catalog_payload
+    return genre_catalog_payload()
+
+
 @router.get("/generations")
 def generations() -> Dict[str, Any]:
     from skeleton.forge.hardware import catalog
@@ -61,6 +80,8 @@ def generations() -> Dict[str, Any]:
 @router.post("/run")
 def run(req: RunRequest) -> Dict[str, Any]:
     from skeleton.context.pipeline import GameForgeRun
+    if not req.playable_content and (req.playable_archetype is not None or req.playable_main_scene):
+        raise HTTPException(status_code=422, detail="playable mode selection requires explicit opt-in")
     try:
         payload = GameForgeRun.live().execute(
             req.vision,
@@ -75,6 +96,8 @@ def run(req: RunRequest) -> Dict[str, Any]:
             blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
             generation=req.generation,
             **({"quest_content": True, "quest_length": req.quest_length} if req.quest_content else {}),
+            **({"playable_content": True, "playable_archetype": req.playable_archetype,
+                "playable_main_scene": req.playable_main_scene} if req.playable_content else {}),
         )
     except Exception as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

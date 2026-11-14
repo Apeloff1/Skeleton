@@ -99,6 +99,34 @@ test('reviewed outside-range versions are not described as published fixes', () 
   assert.match(result.scope, /not.*release certification/);
 });
 
+test('node-forge 1.4.3 is reviewed without automatically trusting future versions', () => {
+  for (const [version, expected] of [
+    ['1.4.0', 'unpatched_affected'],
+    ['1.4.1', 'requires_advisory_reverification'],
+    ['1.4.2', 'outside_published_range'],
+    ['1.4.3', 'outside_published_range'],
+    ['1.4.4', 'requires_advisory_reverification'],
+    ['1.5.0', 'requires_advisory_reverification'],
+  ]) {
+    const result = auditLock(fixture('3.0.3', version));
+    assert.equal(result.findings.find(x => x.name === 'node-forge').status, expected, version);
+    assert.equal(result.outstanding.includes('node-forge'),
+      !['1.4.2', '1.4.3'].includes(version), version);
+    assert.equal(result.automatic_alert_dismissal_authorized, false, version);
+  }
+  const mixed = fixture('3.0.3', '1.4.3') +
+    '\nnode-forge@^1.0.0:\n  version "1.4.0"\n';
+  assert.equal(auditLock(mixed).findings.find(x => x.name === 'node-forge').status,
+    'unpatched_affected');
+});
+
+test('actual node-forge lockfile pins the independently reviewed 1.4.3 release', () => {
+  const lock = fs.readFileSync(path.resolve(__dirname, '..', 'yarn.lock'), 'utf8');
+  const versions = parseYarnV1(lock).filter(x => x.name === 'node-forge').map(x => x.version);
+  assert.deepEqual(versions, ['1.4.3']);
+  assert.match(lock, /node-forge@\^1\.3\.3:\n  version "1\.4\.3"/);
+});
+
 test('mixed vulnerable and reviewed versions remain blocked', () => {
   const mixed = fixture('3.0.3', '1.4.2') + '\nnode-forge@^1.0.0:\n  version "1.4.0"\n';
   const result = auditLock(mixed);
