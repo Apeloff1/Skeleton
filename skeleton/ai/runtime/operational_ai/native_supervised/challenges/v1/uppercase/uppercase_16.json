@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "uppercase_16",
+  "domain": "uppercase",
+  "ordinal": 16,
+  "arguments": {
+    "index": 16,
+    "a": 212,
+    "b": 5,
+    "word": "marble",
+    "city": "Halden"
+  },
+  "prompt": "Task 16: Uppercase this identifier exactly: marble_16.",
+  "expected": "MARBLE_16",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

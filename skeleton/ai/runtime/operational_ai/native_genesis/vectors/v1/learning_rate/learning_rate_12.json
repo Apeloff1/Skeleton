@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "learning_rate_12",
+  "category": "learning_rate",
+  "overrides": {
+    "learning_rate_ppm": 0.5
+  },
+  "expected": "denied",
+  "reason": "Fail closed on malformed or over-budget learning_rate request"
+}

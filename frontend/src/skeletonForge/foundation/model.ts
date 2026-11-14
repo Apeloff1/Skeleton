@@ -2,9 +2,13 @@
  * Studio shell state: first-run, account gate, projects, and where Back goes.
  * Pure — screens and persistence sit on top of this reducer.
  */
-import { questionnaireReducer, type QuestionnaireAction, type QuestionnaireState } from '../questionnaire';
+import { INITIAL_STATE, buildRunRequest, questionnaireReducer, type QuestionnaireAction, type QuestionnaireState } from '../questionnaire';
+import { isDesignAxis } from '../instruments';
+import { GALAXY_PROFILE_SCHEMA, normaliseGalaxyProfile, type GalaxyProfile } from '../galaxyHandoff';
+import { PLAYABLE_SLICES } from '../questionnaire';
+import { mappedBriefGenre } from '../galaxyGenres';
 import { summarizeRun } from '../run';
-import type { RunPayload } from '../types';
+import type { RunPayload, RunRequest } from '../types';
 
 export const SCREENS = ['boot', 'onboarding', 'sign-in', 'dashboard', 'brief', 'build', 'account', 'settings'] as const;
 export type Screen = typeof SCREENS[number];
@@ -43,6 +47,8 @@ export interface StudioProject {
   updatedAt: string;
   questionnaire: QuestionnaireState;
   lastRun: RunSnapshot | null;
+  /** Previous successful receipt is retained, but no longer builds this brief. */
+  lastRunOutdated?: boolean;
 }
 
 export interface AuthView {
@@ -114,7 +120,8 @@ export type FoundationAction =
   | { type: 'back' }
   | { type: 'signedOut' }
   | { type: 'setPrefs'; prefs: StudioPrefs }
-  | { type: 'recordRun'; projectId: string; snapshot: RunSnapshot }
+  | { type: 'recordRun'; projectId: string; snapshot: RunSnapshot; request?: RunRequest }
+  | { type: 'importLegacy'; projects: StudioProject[] }
   | { type: 'persistError'; error: string | null };
 
 const LOADING_AUTH: AuthView = {
@@ -141,13 +148,63 @@ export function initialFoundationState(): FoundationState {
 }
 
 export function freshQuestionnaire(): QuestionnaireState {
+  // All original and recovered creator controls must begin in a complete,
+  // independent state. Do not share mutable nested maps between projects.
   return {
-    step: 'vision',
-    vision: '',
+    ...INITIAL_STATE,
     brief: {},
     beats: {},
-    options: { archetype: 'auto', target: 'godot', era: null, generation: null },
+    instruments: {},
+    options: { ...INITIAL_STATE.options },
+    quest: { ...INITIAL_STATE.quest! },
+    playable: { ...INITIAL_STATE.playable! },
+    sourceExport: { ...INITIAL_STATE.sourceExport! },
   };
+}
+
+/** Persist receipts and summaries, never the user's entire generated game. */
+export function persistedRunPayload(payload: RunPayload | null | undefined): RunPayload | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  const { files: _sourceBodies, source_manifest: _manifest, source_export, ...summary } = payload;
+  if (source_export?.status === 'ready') {
+    return {
+      ...summary,
+      source_export: {
+        status: 'unavailable',
+        reason: 'Source ZIP is only available in the original live run. Save or share it before leaving.',
+      },
+    };
+  }
+  return { ...summary, ...(source_export ? { source_export } : {}) };
+}
+
+export function persistedRunSnapshot(snapshot: RunSnapshot): RunSnapshot {
+  return {
+    ...snapshot,
+    payload: persistedRunPayload(snapshot.payload),
+  };
+}
+
+/** Stable optimistic-concurrency revision even for two edits in one millisecond.
+ * Without this, the Studio-to-Forge return bridge can mistakenly accept
+ * an ancestor's updatedAt token after two same-clock-time edits.
+ */
+export function nextStudioRevision(previousIso: string, requestedIso: string): string {
+  const prior = Date.parse(previousIso);
+  const requested = Date.parse(requestedIso);
+  if (!Number.isFinite(requested) || !Number.isFinite(prior)) {
+    throw new Error('Invalid Studio source revision timestamp');
+  }
+  const next = Math.max(requested, prior + 1);
+  if (!Number.isFinite(next) || next > 8_640_000_000_000_000) {
+    throw new Error('Studio revision timestamp exhausted');
+  }
+  return new Date(next).toISOString();
+}
+
+/** Compare emitted inputs, not the user's navigation step or screen focus. */
+export function changedBuildInputs(previous: QuestionnaireState, next: QuestionnaireState): boolean {
+  return JSON.stringify(buildRunRequest(previous)) !== JSON.stringify(buildRunRequest(next));
 }
 
 export function projectTitle(vision: string): string {
@@ -298,7 +355,10 @@ export function foundationReducer(state: FoundationState, action: FoundationActi
         ...current,
         questionnaire,
         title: projectTitle(questionnaire.vision),
-        updatedAt: action.at,
+        lastRunOutdated: current.lastRun
+          ? Boolean(current.lastRunOutdated || changedBuildInputs(current.questionnaire, questionnaire))
+          : false,
+        updatedAt: nextStudioRevision(current.updatedAt, action.at),
       });
     }
     case 'openBuild':
@@ -326,7 +386,17 @@ export function foundationReducer(state: FoundationState, action: FoundationActi
     case 'setPrefs':
       return { ...state, prefs: sanitizePrefs(action.prefs) };
     case 'recordRun':
-      return applyRecordRun(state, action.projectId, action.snapshot);
+      return applyRecordRun(state, action.projectId, action.snapshot, action.request);
+    case 'importLegacy': {
+      if (!canEnter(state) || state.holdSaves) return state;
+      const existing = new Set(state.projects.map((project) => project.id));
+      const admitted = sanitizeProjects(action.projects);
+      if (admitted.corrupt) return state;
+      const fresh = admitted.projects.filter((project) => !existing.has(project.id));
+      // Original unscoped data remains read-only; never overwrite a
+      // current account's project with an ambiguous old project ID.
+      return fresh.length ? { ...state, projects: [...fresh, ...state.projects] } : state;
+    }
     case 'persistError':
       return { ...state, persistError: action.error };
     default:
@@ -334,11 +404,25 @@ export function foundationReducer(state: FoundationState, action: FoundationActi
   }
 }
 
-export function applyRecordRun(state: FoundationState, projectId: string, snapshot: RunSnapshot): FoundationState {
+export function applyRecordRun(
+  state: FoundationState, projectId: string, snapshot: RunSnapshot,
+  request?: RunRequest,
+): FoundationState {
   const current = state.projects.find((project) => project.id === projectId);
   if (!current) return state;
-  const updatedAt = snapshot.finishedAt != null ? new Date(snapshot.finishedAt).toISOString() : current.updatedAt;
-  return replaceProject(state, { ...current, lastRun: snapshot, updatedAt });
+  const updatedAt = snapshot.finishedAt != null
+    ? nextStudioRevision(current.updatedAt, new Date(snapshot.finishedAt).toISOString())
+    : current.updatedAt;
+  // The user can edit design axes or return from the advanced cockpit while
+  // native generation is still running. Completion proves the *submitted*
+  // configuration, not a newer, unsent questionnaire. Never falsely clear
+  // the Needs rebuild flag when source input and completed run differ.
+  const differsFromFinishedRun = request !== undefined
+    && JSON.stringify(buildRunRequest(current.questionnaire)) !== JSON.stringify(request);
+  return replaceProject(state, {
+    ...current, lastRun: persistedRunSnapshot(snapshot),
+    lastRunOutdated: differsFromFinishedRun || false, updatedAt,
+  });
 }
 
 export interface PersistSnapshot {
@@ -352,7 +436,10 @@ export interface PersistSnapshot {
 export function persistSnapshot(state: FoundationState): PersistSnapshot {
   return {
     onboarded: state.onboarded,
-    projects: state.projects,
+    projects: state.projects.map((project) => ({
+      ...project,
+      lastRun: project.lastRun ? persistedRunSnapshot(project.lastRun) : null,
+    })),
     prefs: state.prefs,
     projectsCorrupt: state.projectsCorrupt,
     holdSaves: state.holdSaves,
@@ -366,6 +453,7 @@ export function orderedProjects(projects: readonly StudioProject[]): StudioProje
 export function projectStatus(project: StudioProject, liveOwner: string | null, livePhase: BuildPhase): string {
   if (liveOwner === project.id && livePhase === 'running') return 'Forging';
   if (!project.lastRun) return 'Brief in progress';
+  if (project.lastRunOutdated) return 'Needs rebuild';
   if (project.lastRun.phase === 'error') return 'Needs attention';
   if (project.lastRun.succeeded) return 'Built';
   return 'Finished with failures';
@@ -373,6 +461,7 @@ export function projectStatus(project: StudioProject, liveOwner: string | null, 
 
 export function openTarget(project: StudioProject, liveOwner: string | null, livePhase: BuildPhase): 'brief' | 'build' {
   if (liveOwner === project.id && livePhase === 'running') return 'build';
+  if (project.lastRunOutdated) return 'brief';
   if (project.lastRun) return 'build';
   return 'brief';
 }
@@ -483,6 +572,34 @@ function sanitizeProject(raw: unknown): StudioProject | null {
   if (typeof options.archetype !== 'string' || typeof options.target !== 'string') return null;
   if (!(options.era == null || typeof options.era === 'string')) return null;
   if (!(options.generation == null || typeof options.generation === 'string')) return null;
+  const saved = questionnaire;
+  let profile: GalaxyProfile | null = null;
+  if (saved.galaxyProfile !== undefined && saved.galaxyProfile !== null) {
+    try {
+      if (saved.galaxyProfile.schema !== GALAXY_PROFILE_SCHEMA) return null;
+      profile = normaliseGalaxyProfile(saved.galaxyProfile.config);
+    } catch { return null; }
+  }
+  const supplied = (key: keyof QuestionnaireState) => Object.prototype.hasOwnProperty.call(saved, key);
+  const instruments: Record<string, number> = {};
+  if (supplied('instruments')) {
+    if (!saved.instruments || typeof saved.instruments !== 'object' || Array.isArray(saved.instruments)) return null;
+    for (const [axis, value] of Object.entries(saved.instruments)) {
+      if (!isDesignAxis(axis) || typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) return null;
+      instruments[axis] = value;
+    }
+  }
+  if (saved.galaxyGenre != null && (typeof saved.galaxyGenre !== 'string' || !mappedBriefGenre(saved.galaxyGenre))) return null;
+  const quest = saved.quest === undefined ? { enabled: false, length: 3 } : saved.quest;
+  if (!quest || typeof quest.enabled !== 'boolean' || !Number.isInteger(quest.length) || quest.length < 1 || quest.length > 8) return null;
+  const playable = saved.playable === undefined ? { enabled: false } : saved.playable;
+  if (!playable || typeof playable.enabled !== 'boolean' ||
+      (playable.mode !== undefined && !PLAYABLE_SLICES.some(item => item.id === playable.mode)) ||
+      (playable.launch !== undefined && typeof playable.launch !== 'boolean') ||
+      (playable.launch && (!playable.enabled || quest.enabled))) return null;
+  if (supplied('playtest') && saved.playtest !== 'off' && saved.playtest !== 'auto' && saved.playtest !== 'require') return null;
+  if (supplied('sourceExport') && (!saved.sourceExport || typeof saved.sourceExport !== 'object' ||
+      Array.isArray(saved.sourceExport) || typeof saved.sourceExport.enabled !== 'boolean')) return null;
   let lastRun: RunSnapshot | null = null;
   if (item.lastRun != null) {
     if (typeof item.lastRun !== 'object') return null;
@@ -496,7 +613,7 @@ function sanitizeProject(raw: unknown): StudioProject | null {
       startedAt: typeof run.startedAt === 'number' ? run.startedAt : null,
       finishedAt: typeof run.finishedAt === 'number' ? run.finishedAt : null,
       succeeded: run.succeeded,
-      payload: run.payload && typeof run.payload === 'object' ? run.payload : null,
+      payload: persistedRunPayload(run.payload),
     };
   }
   return {
@@ -504,8 +621,27 @@ function sanitizeProject(raw: unknown): StudioProject | null {
     title: typeof item.title === 'string' && item.title.trim() ? item.title : 'Untitled project',
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
-    questionnaire: { step: questionnaire.step, vision: questionnaire.vision, brief, beats, options: { ...options } },
+    questionnaire: {
+      ...freshQuestionnaire(),
+      step: questionnaire.step,
+      vision: questionnaire.vision,
+      brief,
+      beats,
+      options: { ...options },
+      // Legacy saved projects may not contain newer controls. Recover the
+      // exact supported axes/options without discarding older creative beats.
+      instruments,
+      galaxyGenre: questionnaire.galaxyGenre ?? null,
+      galaxyProfile: profile,
+      quest: { ...quest },
+      playable: { enabled: playable.enabled, ...(playable.mode === undefined ? {} : { mode: playable.mode }),
+        ...(playable.launch === undefined ? {} : { launch: playable.launch }) },
+      playtest: questionnaire.playtest === 'require' || questionnaire.playtest === 'auto'
+        ? questionnaire.playtest : 'off',
+      sourceExport: { enabled: questionnaire.sourceExport?.enabled === true },
+    },
     lastRun,
+    lastRunOutdated: Boolean(lastRun && item.lastRunOutdated === true),
   };
 }
 
@@ -514,9 +650,16 @@ export function sanitizeProjects(raw: unknown): { projects: StudioProject[]; cor
   if (raw == null) return { projects: [], corrupt: false };
   if (!Array.isArray(raw)) return { projects: [], corrupt: true };
   const projects: StudioProject[] = [];
+  const ids = new Set<string>();
   for (const item of raw) {
     const project = sanitizeProject(item);
-    if (!project) return { projects: [], corrupt: true };
+    if (!project || ids.has(project.id)) {
+      // Duplicate IDs make project navigation ambiguous and may overwrite
+      // an existing account's project during an explicit legacy import.
+      // Fail the entire batch rather than silently dropping authored data.
+      return { projects: [], corrupt: true };
+    }
+    ids.add(project.id);
     projects.push(project);
   }
   return { projects, corrupt: false };
@@ -561,4 +704,78 @@ export async function bootstrap(load: () => Promise<LoadResult>, auth: AuthClien
     });
   }
   return state;
+}
+
+
+/** Reconcile one edited Forge questionnaire into exactly its originating
+ * Studio project. ID and source revision must match; a concurrent edit or
+ * deleted project is never overwritten just because a bridge exists. */
+export function reconcileStudioReturn(
+  projects: readonly StudioProject[], projectId: string,
+  expectedUpdatedAt: string, questionnaire: QuestionnaireState,
+  at: string,
+): { status: 'applied' | 'already-applied' | 'conflict' | 'missing' | 'invalid'; projects: StudioProject[] } {
+  const snapshot = [...projects];
+  const index = snapshot.findIndex((p) => p.id === projectId);
+  if (index < 0) return { status: 'missing', projects: snapshot };
+  if (snapshot[index].updatedAt !== expectedUpdatedAt) {
+    // A device write may commit successfully and then fail before the
+    // one-time handoff acknowledgement. If the exact same questionnaire is
+    // already saved, a retry must acknowledge it rather than cloning an
+    // extra game. Normalize both records before comparing authored state.
+    const incoming = sanitizeProjects([{
+      ...snapshot[index], questionnaire,
+    }]);
+    if (incoming.corrupt || incoming.projects.length !== 1) {
+      return { status: 'invalid', projects: snapshot };
+    }
+    const current = sanitizeProjects([snapshot[index]]);
+    if (!current.corrupt && current.projects.length === 1
+        && JSON.stringify(current.projects[0].questionnaire)
+          === JSON.stringify(incoming.projects[0].questionnaire)) {
+      return { status: 'already-applied', projects: snapshot };
+    }
+    return { status: 'conflict', projects: snapshot };
+  }
+  const draft = {
+    ...snapshot[index],
+    title: projectTitle(questionnaire.vision),
+    questionnaire,
+    lastRunOutdated: snapshot[index].lastRun
+      ? Boolean(snapshot[index].lastRunOutdated
+          || changedBuildInputs(snapshot[index].questionnaire, questionnaire))
+      : false,
+    updatedAt: nextStudioRevision(snapshot[index].updatedAt, at),
+  };
+  const vetted = sanitizeProjects([draft]);
+  if (vetted.corrupt || vetted.projects.length !== 1) {
+    return { status: 'invalid', projects: snapshot };
+  }
+  snapshot[index] = vetted.projects[0];
+  return { status: 'applied', projects: snapshot };
+}
+
+/** User-approved return from Forge: preserve edits as a new project if the
+ * original was changed/deleted while the cockpit was open. */
+export function recoverStudioReturnAsCopy(
+  projects: readonly StudioProject[], questionnaire: QuestionnaireState, at: string,
+): { project: StudioProject; projects: StudioProject[] } {
+  const occupied = new Set(projects.map((p) => p.id));
+  const stamp = Date.parse(at);
+  if (!Number.isFinite(stamp)) throw new Error('Invalid Studio return timestamp');
+  let id = '';
+  for (let index = 0; index < 128; index++) {
+    const proposed = 'p_return_' + Math.floor(stamp).toString(36) + '_' + index.toString(36);
+    if (!occupied.has(proposed)) { id = proposed; break; }
+  }
+  if (!id) throw new Error('No available Studio project ID for returned Forge edits');
+  const candidate: StudioProject = {
+    id, title: projectTitle(questionnaire.vision) + ' (Forge copy)',
+    createdAt: at, updatedAt: at, questionnaire, lastRun: null,
+  };
+  const checked = sanitizeProjects([candidate]);
+  if (checked.corrupt || checked.projects.length !== 1) {
+    throw new Error('Returned Forge questionnaire was invalid');
+  }
+  return { project: checked.projects[0], projects: [checked.projects[0], ...projects] };
 }

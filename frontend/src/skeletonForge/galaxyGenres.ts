@@ -1,6 +1,6 @@
 /**
- * Explicit bridge between the complete offline Galaxy Studio picker and
- * the expanded GameForge brief vocabulary. Mapping is intentional, not a
+ * Explicit bridge from the entire historical Galaxy Studio picker to
+ * the 158 recognized GameForge brief genre choices. Mapping is intentional, not a
  * claim that the condensed archetype reproduces each complete game's systems.
  */
 import { FALLBACK_GENRES } from '../features/GalaxyStudioFactory/fallbackGenres';

@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "scope_12",
+  "category": "scope",
+  "overrides": {
+    "training_scope": "offline_native_training"
+  },
+  "expected": "denied",
+  "reason": "Reject invalid scope without reinterpreting training rights"
+}

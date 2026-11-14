@@ -1,4 +1,1 @@
-"""Isolated questflows_v1 pytest package; preserves distinct module identities.
-
-Do not import other suites here: qualification is explicit and source-bound.
-"""
+"""Isolated questflow regression namespace for canonical pytest import identity."""

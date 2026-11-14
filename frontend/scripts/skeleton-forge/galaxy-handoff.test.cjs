@@ -37,8 +37,8 @@ test('Galaxy handoff exactly inventories every historical matrix', () => {
     assert.match(source, new RegExp('\\b' + field + ':\\s*[a-zA-Z]+Matrix'));
   }
   assert.match(source, /makeGalaxyBuildPayload\(selectedGenre\)/);
-  assert.match(source, /prepareGalaxyHandoff\(makeGalaxyBuildPayload\(selectedGenre\)\)/);
-  assert.match(source, /galaxy-send-full-design-to-gameforge/);
+  assert.match(source, /normaliseGalaxyProfile\(makeGalaxyBuildPayload\(selectedGenre\)\)/);
+  assert.match(source, /galaxy-continue-in-gameforge/);
 });
 
 test('single-use per-app navigation preserves exact complete authoring snapshot', () => {
@@ -105,4 +105,63 @@ test('Forge review shows authoritative full imported profile and explicit detach
   const opt = render(h(Flow, { state: { ...state, step: 'options' },
     dispatch: () => {}, beats: Q.FALLBACK_BEATS, onForge: () => {} }));
   assert.match(text(opt), /complete Galaxy questionnaire is attached/);
+});
+test('Galaxy full-profile handoff refuses account-epoch changes even with the original one-use URL', () => {
+  const ownerEpoch = 17;
+  const id = G.prepareGalaxyHandoff(payload(), 2000, ownerEpoch);
+  assert.equal(G.consumeGalaxyHandoff(id, 2001, ownerEpoch + 1), null,
+    'new account must not receive previous account draft');
+  assert.equal(G.consumeGalaxyHandoff(id, 2002, ownerEpoch), null,
+    'mismatched consumption must retire the hint');
+  const second = G.prepareGalaxyHandoff(payload({ title: 'Same owner' }), 2003, ownerEpoch);
+  assert.equal(G.consumeGalaxyHandoff(second, 2004, ownerEpoch).config.title, 'Same owner');
+  const legacyReader = G.prepareGalaxyHandoff(payload(), 2010, ownerEpoch);
+  assert.equal(G.consumeGalaxyHandoff(legacyReader, 2011), null,
+    'an unbound reader cannot bypass a bound profile');
+  const invalid = [NaN, Infinity, -1, 1.5, Number.MAX_SAFE_INTEGER + 1];
+  for (const epoch of invalid) assert.throws(() => G.prepareGalaxyHandoff(payload(), 2020, epoch));
+  const modal = fs.readFileSync(path.join(ROOT, 'src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal.tsx'), 'utf8');
+  const route = fs.readFileSync(path.join(ROOT, 'app/galaxy.tsx'), 'utf8');
+  const storage = fs.readFileSync(path.join(ROOT, 'src/skeletonForge/creatorBridgeStorage.ts'), 'utf8');
+  assert.match(modal, /normaliseGalaxyProfile\(makeGalaxyBuildPayload\(selectedGenre\)\)/);
+  assert.match(route, /storeCreatorBridge\(handoffFromGalaxy\(selection, incoming\), authEpoch\)/);
+  assert.match(storage, /getAuthEpoch\(\) !== expectedEpoch/);
+});
+
+test('long-lived Galaxy editor fences saved drafts, transfers and build submissions on auth rotation', () => {
+  const modal = fs.readFileSync(path.join(ROOT,
+    'src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal.tsx'), 'utf8');
+  assert.match(modal, /const editorEpoch = useRef\(getAuthEpoch\(\)\)/);
+  const route = fs.readFileSync(path.join(ROOT, 'app/galaxy.tsx'), 'utf8');
+  assert.match(route, /GalaxyStudioFactoryModal key=\{authEpoch\}/);
+  assert.match(modal, /const assertEditorOwner = \(\) => \{/);
+  assert.match(modal, /if \(editorEpoch\.current !== getAuthEpoch\(\)\)/);
+  for (const operation of ['persistGalaxyDraft', 'transferToForge', 'startBuild']) {
+    const idx = modal.indexOf('const ' + operation + ' = async () => {');
+    assert.ok(idx >= 0, operation + ' must remain available');
+    const next = modal.slice(idx, idx + (operation === 'transferToForge' ? 1400 : 900));
+    assert.match(next, /assertEditorOwner\(\)/, operation + ' must deny stale account state');
+  }
+});
+
+test('complete profile and explicit native mode survive a source-bound Studio return', () => {
+  const H = load('src/skeletonForge/creatorBridge.ts');
+  const F = load('src/skeletonForge/foundation/model.ts');
+  const timestamp = 1700000000000;
+  const origin = H.handoffFromStudio(Q.INITIAL_STATE, 'p_1', new Date(timestamp).toISOString(), timestamp);
+  const prior = H.handoffFromForge(Q.INITIAL_STATE, timestamp + 1, origin);
+  const full = G.normaliseGalaxyProfile(payload());
+  const accepted = H.handoffFromGalaxy({ title: 'North Star', vision: '', genreId: 'racing', profile: full }, prior, timestamp + 2);
+  let state = H.forgeStateFromHandoff(accepted, timestamp + 3);
+  state = Q.questionnaireReducer(state, { type: 'setPlayableEnabled', value: true });
+  state = Q.questionnaireReducer(state, { type: 'setPlayableMode', value: 'racing' });
+  const returned = H.handoffToStudio(state, accepted, timestamp + 4);
+  const restored = H.studioStateFromHandoff(returned, timestamp + 5);
+  assert.deepEqual(Q.buildRunRequest(restored), Q.buildRunRequest(state));
+  assert.equal(restored.galaxyProfile.config.mechanics_matrix.kickoff.count, 5);
+  const row = { id: 'p_1', title: 'North Star', createdAt: new Date(timestamp).toISOString(), updatedAt: new Date(timestamp).toISOString(), questionnaire: restored, lastRun: null };
+  assert.equal(F.sanitizeProjects([row]).corrupt, false);
+  const forged = JSON.parse(JSON.stringify(row));
+  forged.questionnaire.galaxyProfile.config.mechanics_matrix.kickoff.count = -1;
+  assert.equal(F.sanitizeProjects([forged]).corrupt, true);
 });

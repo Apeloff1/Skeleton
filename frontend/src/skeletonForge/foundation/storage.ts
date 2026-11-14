@@ -68,9 +68,34 @@ export async function loadFoundation(store: Kv): Promise<LoadResult> {
   };
 }
 
-export async function saveFoundation(store: Kv, snap: PersistSnapshot): Promise<void> {
-  if (snap.holdSaves || snap.projectsCorrupt) return;
-  await store.setItem(KEYS.onboarded, snap.onboarded ? '1' : '0');
-  await store.setItem(KEYS.projects, JSON.stringify(snap.projects));
-  await store.setItem(KEYS.prefs, JSON.stringify(snap.prefs));
+// A Studio shell can enqueue several saves while the user is adjusting
+// knobs, creating scenes or switching panels. AsyncStorage resolves writes
+// asynchronously and does NOT guarantee later calls complete last. Serial
+// saves per injected store: the newest submitted complete snapshot wins.
+const saveTails = new WeakMap<Kv, Promise<void>>();
+
+export function saveFoundation(store: Kv, snap: PersistSnapshot): Promise<void> {
+  if (snap.holdSaves || snap.projectsCorrupt) return Promise.resolve();
+  // Capture the value at call time, not after another edit to the reducer.
+  const onboarded = snap.onboarded ? '1' : '0';
+  const projects = JSON.stringify(snap.projects);
+  const prefs = JSON.stringify(snap.prefs);
+  const previous = saveTails.get(store) ?? Promise.resolve();
+  // A failed earlier save must surface to its caller but must NOT permanently
+  // poison the queue for a subsequent explicit retry.
+  const job = previous.catch(() => {}).then(async () => {
+    // The main authored project snapshot is the final publication write.
+    // If device preferences or onboarding persistence fails, no partial
+    // project revision is committed and a returning Forge handoff can retry.
+    await store.setItem(KEYS.prefs, prefs);
+    await store.setItem(KEYS.onboarded, onboarded);
+    await store.setItem(KEYS.projects, projects);
+  });
+  saveTails.set(store, job);
+  void job.then(() => {
+    if (saveTails.get(store) === job) saveTails.delete(store);
+  }, () => {
+    if (saveTails.get(store) === job) saveTails.delete(store);
+  });
+  return job;
 }

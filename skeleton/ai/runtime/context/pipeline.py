@@ -13,10 +13,11 @@ import math
 from typing import Any, Dict, Mapping, Optional
 
 from skeleton.context.cockpit import Cockpit
-from skeleton.context.galaxy_profile import (
-    apply_galaxy_mechanics, attach_galaxy_profile, galaxy_profile_receipt, normalise_galaxy_profile,
-)
 from skeleton.context.dodeca import Dodecahedron
+from skeleton.context.galaxy_profile import (
+    ARTIFACT_PATH, apply_galaxy_mechanics, attach_galaxy_profile,
+    galaxy_profile_receipt, normalise_galaxy_profile,
+)
 from skeleton.context.oracle import Magic8Ball
 from skeleton.context.tensor import AXES, ContextTensor, detect_era
 from skeleton.forge.archetypes import default_library
@@ -103,20 +104,22 @@ class GameForgeRun:
         from skeleton.forge.playtest import normalise_mode
         from skeleton.forge.repair import REPAIR_MODES
         playtest_mode = normalise_mode(playtest)
+        if playtest_mode != "off" and target != "godot":
+            raise ValueError("headless Godot playtest requires the Godot target")
         if type(playable_content) is not bool:
             raise ValueError("playable_content must be an explicit boolean opt-in")
-        if playable_content and target != "godot":
-            raise ValueError("playable archetype scenes require the Godot target")
         if type(playable_main_scene) is not bool:
             raise ValueError("playable_main_scene must be an explicit boolean")
         if not playable_content and (playable_archetype is not None or playable_main_scene):
-            raise ValueError("playable selection requires playable_content opt-in")
+            raise ValueError("playable selection requires explicit opt-in")
         if playable_archetype is not None:
             from skeleton.forge.archetype_content import content_archetypes
             if type(playable_archetype) is not str or playable_archetype not in content_archetypes():
                 raise ValueError("unsupported native playable archetype")
         if playable_main_scene and quest_content:
-            raise ValueError("standalone playable mini-game startup conflicts with room-entry quest startup")
+            raise ValueError("standalone playable startup conflicts with room quest startup")
+        if playable_content and target != "godot":
+            raise ValueError("playable archetype scenes require the Godot target")
         if type(quest_content) is not bool:
             raise ValueError("quest_content must be an explicit boolean")
         if quest_content and target != "godot":
@@ -126,8 +129,8 @@ class GameForgeRun:
         if repair_mode not in REPAIR_MODES:
             raise ValueError(f"repair_mode must be one of {REPAIR_MODES}, got {repair_mode!r}")
         axis_overrides = normalise_operator_axes(operator_axes)
-        complete_galaxy_profile = normalise_galaxy_profile(galaxy_profile)
-        galaxy_receipt = galaxy_profile_receipt(complete_galaxy_profile) if complete_galaxy_profile else None
+        full_profile = normalise_galaxy_profile(galaxy_profile)
+        profile_receipt = galaxy_profile_receipt(full_profile) if full_profile is not None else None
         cockpit = self.cockpit
         # Freeze operator intent before stage execution. Implicit cockpit
         # blending applies only when neither an explicit era nor questionnaire
@@ -196,8 +199,8 @@ class GameForgeRun:
             ),
             "operator_tensor": operator_tensor,
             "operator_axes": axis_overrides,
-            "galaxy_profile": complete_galaxy_profile,
-            "galaxy_receipt": galaxy_receipt,
+            "galaxy_profile": full_profile,
+            "galaxy_receipt": profile_receipt,
             "repair": True,
             "max_rounds": 3,
             "playtest_mode": playtest_mode,
@@ -256,9 +259,6 @@ class GameForgeRun:
                 "repair": run.context.get("repair"),
                 "composition": run.context.get("composition"),
                 "playable_archetype": run.context.get("playable_archetype"),
-                "playable_scene": run.context.get("playable_scene"),
-                "playable_launch_scene": run.context.get("playable_launch_scene"),
-                "playable_launcher": run.context.get("playable_launcher"),
             },
             "jeeves": run.context.get("jeeves_advice"),
             "cortex": run.context.get("cortex"),
@@ -275,23 +275,27 @@ class GameForgeRun:
                            if hasattr(run.context.get("build_plan"), "to_dict")
                            else run.context.get("build_plan")),
         }
-        if axis_overrides:
-            payload["operator_axes"] = axis_overrides
-        if galaxy_receipt:
+        if profile_receipt is not None:
             payload["galaxy_profile"] = {
-                **galaxy_receipt,
-                "emitted": bool(
-                    run.succeeded and
-                    "design/galaxy_studio_profile.json" in (run.context.get("files") or {})
-                ),
+                **profile_receipt,
+                "emitted": bool(run.succeeded and emitted_manifest is not None
+                                and ARTIFACT_PATH in generated),
             }
             if run.context.get("galaxy_mechanics") is not None:
                 payload["galaxy_mechanics"] = run.context["galaxy_mechanics"]
-        if playable_content and run.context.get("playable_receipt") is not None:
-            payload["playable_prototype"] = {
-                **run.context["playable_receipt"],
+        if playable_content and run.context.get("playable_mechanics_receipt") is not None:
+            payload["playable_mechanics"] = run.context["playable_mechanics_receipt"]
+        if playable_content and run.context.get("playable_tuning_receipt") is not None:
+            payload["playable_tuning"] = run.context["playable_tuning_receipt"]
+        if playable_content and run.context.get("playable_portal_receipt") is not None:
+            payload["playable_portal"] = {
+                **run.context["playable_portal_receipt"],
                 "sealed": bool(run.succeeded and emitted_manifest is not None),
             }
+        if playable_content and run.context.get("playable_scene_playtest") is not None:
+            payload["playable_scene_playtest"] = run.context["playable_scene_playtest"]
+        if axis_overrides:
+            payload["operator_axes"] = axis_overrides
         if quest_content and run.context.get("native_quest_receipt") is not None:
             payload["native_quest"] = {
                 **run.context["native_quest_receipt"],
@@ -329,7 +333,7 @@ def _commit(ctx: Dict[str, Any], stage: str, operator: str, system: str, extra: 
 def _stage_ingest(ctx: Dict[str, Any]) -> Dict[str, Any]:
     vision = ctx.get("vision") or ""
     details = {"chars": len(vision)}
-    if ctx.get("galaxy_receipt"):
+    if ctx.get("galaxy_receipt") is not None:
         details["galaxy_profile_sha256"] = ctx["galaxy_receipt"]["sha256"]
     _commit(ctx, "ingest", vision, "ingested", details)
     return {"ingested": True, "chars": len(vision)}
@@ -446,11 +450,9 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
         pack, tensor=cockpit.tensor, reading=cockpit.last_oracle,
         cortex=cortex, last_walk=last_walk,
     )
-    build_plan, galaxy_mechanics = apply_galaxy_mechanics(
-        build_plan, ctx.get("galaxy_profile"),
-    )
-    if galaxy_mechanics is not None:
-        ctx["galaxy_mechanics"] = galaxy_mechanics
+    build_plan, mechanics = apply_galaxy_mechanics(build_plan, ctx.get("galaxy_profile"))
+    if mechanics is not None:
+        ctx["galaxy_mechanics"] = mechanics
     ctx["build_plan"] = build_plan
     repair = bool(ctx.get("repair", True))
     max_rounds = int(ctx.get("max_rounds", 3) or 3)
@@ -530,82 +532,80 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
     files = ctx.get("files") or {}
     if ctx.get("playable_content"):
-        from skeleton.forge.archetype_content import content_archetypes, attach_archetype_content
+        from skeleton.forge.archetype_content import (
+            content_archetypes, attach_archetype_content, verify_archetype_content,
+        )
         requested = ctx.get("playable_archetype_selection") or ctx.get("archetype") or "extraction"
-        selected = requested if requested in content_archetypes() else "extraction"
-        files = attach_archetype_content(
-            files, selected, tuning=ctx.get("operator_axes") or None,
+        axes = ctx.get("operator_axes") or {}
+        files = attach_archetype_content(files, requested, operator_axes=axes)
+        archetype_name = requested if requested in content_archetypes() else "extraction"
+        # Source-admitted in-game launcher: without it the playable sidecar
+        # only exists as a hidden file in the Godot editor and cannot be
+        # reached from the shipped world's main scene.
+        from skeleton.forge.playable_portal import (
+            attach_playable_portal, verify_playable_portal,
+        )
+        startup = ctx.get("playable_main_scene") is True
+        files, portal_receipt = attach_playable_portal(files, archetype_name, start_in_prototype=startup)
+        if not verify_playable_portal(files, archetype_name, start_in_prototype=startup):
+            raise RuntimeError("playable world-to-prototype portal source verification failed")
+        ctx["files"] = files
+        ctx["file_count"] = len(files)
+        ctx["playable_archetype"] = archetype_name
+        ctx["playable_portal_receipt"] = portal_receipt
+        # New modes expose their actual sparse native effects; existing modes
+        # retain the established source-verified mechanics receipt.
+        from skeleton.forge.playable_tuning import SOURCE_PATH
+        import json
+        expanded_tuning = json.loads(files[SOURCE_PATH]) if SOURCE_PATH in files else None
+        if expanded_tuning is not None:
+            ctx["playable_tuning_receipt"] = expanded_tuning
+        ctx["playable_mechanics_receipt"] = {
+            "schema": "skeleton.forge.playable_mechanics.v1",
+            "archetype": archetype_name,
+            "applied_axes": {
+                name: value for name, value in axes.items()
+                if name in (set(expanded_tuning["mapped_axes"]) if expanded_tuning is not None else {
+                    "tempo",
+                    *({"agency"} if archetype_name in {"extraction", "combat_loop", "pipeline"} else set()),
+                    *({"risk", "scarcity"} if archetype_name == "extraction" else set()),
+                    *({"lethality", "grind"} if archetype_name == "combat_loop" else set()),
+                    *({"risk", "grind"} if archetype_name == "pipeline" else set()),
+                })
+            },
+            "source_verified": verify_archetype_content(
+                files, archetype_name, operator_axes=axes,
+            ),
+        }
+    if ctx.get("quest_content"):
+        from skeleton.ai.game_builder.godot_quest_bridge import attach_native_quest
+        files, receipt = attach_native_quest(
+            files, length=ctx.get("quest_length", 3),
         )
         ctx["files"] = files
         ctx["file_count"] = len(files)
-        ctx["playable_archetype"] = selected
-        playable_scene = f"res://scenes/archetypes/{selected}/main.tscn"
-        ctx["playable_scene"] = playable_scene
-        if ctx.get("playable_main_scene"):
-            existing = 'run/main_scene="res://scenes/levels/run_level.tscn"'
-            if files.get("project.godot", "").count(existing) != 1:
-                raise ValueError("canonical startup scene contract changed")
-            files["project.godot"] = files["project.godot"].replace(
-                existing, f'run/main_scene="{playable_scene}"',
-            )
-            ctx["playable_launch_scene"] = playable_scene
-        else:
-            # A source-only extra scene is unusable for normal players.
-            # Install a real in-game toggle without changing the main world.
-            from skeleton.forge.archetype_content import (
-                attach_playable_launcher, PLAYABLE_LAUNCHER_PATH,
-            )
-            files = attach_playable_launcher(files, selected)
-            ctx["files"] = files
-            ctx["file_count"] = len(files)
-            ctx["playable_launcher"] = PLAYABLE_LAUNCHER_PATH
+        ctx["native_quest_receipt"] = receipt
     if ctx.get("galaxy_profile") is not None:
         files = attach_galaxy_profile(files, ctx["galaxy_profile"])
         ctx["files"] = files
         ctx["file_count"] = len(files)
+    # Verify *after both* feature writers run. Source-attested add-ons
+    # cannot receive a pass based only on their pre-composition versions.
+    if ctx.get("playable_content"):
+        from skeleton.forge.playable_portal import verify_playable_portal
+        from skeleton.forge.archetype_content import verify_archetype_content
+        active = str(ctx.get("playable_archetype") or "extraction")
+        if not verify_playable_portal(files, active, start_in_prototype=ctx.get("playable_main_scene") is True):
+            raise RuntimeError("final in-game playable portal verification failed")
+        if not verify_archetype_content(files, active, operator_axes=ctx.get("operator_axes")):
+            raise RuntimeError("final native playable mechanics verification failed")
     if ctx.get("quest_content"):
-        from skeleton.ai.game_builder.godot_quest_bridge import attach_native_quest
-        files, receipt = attach_native_quest(files, length=ctx.get("quest_length", 3))
-        ctx["files"] = files
-        ctx["file_count"] = len(files)
-        ctx["native_quest_receipt"] = receipt
+        from skeleton.ai.game_builder.godot_quest_bridge import verify_native_quest
+        if not verify_native_quest(files):
+            raise RuntimeError("final native room quest verification failed")
     # Validate names in both API/in-memory and disk build modes, before any
     # expensive engine checks or project publication.
-    validated_manifest = source_manifest(files)
-    if ctx.get("playable_content"):
-        import hashlib
-        import json
-        selected = ctx["playable_archetype"]
-        paths = [
-            f"scenes/archetypes/{selected}/main.tscn",
-            f"scripts/archetypes/{selected}/player_controller.gd",
-            f"scripts/archetypes/{selected}/core_loop.gd",
-        ]
-        if ctx.get("playable_launcher"):
-            paths.append(ctx["playable_launcher"])
-        from skeleton.forge.playable_tuning import SOURCE_PATH as TUNING_PATH
-        if TUNING_PATH in files:
-            paths.append(TUNING_PATH)
-            ctx["playable_tuning"] = json.loads(files[TUNING_PATH])
-        source_hashes = {
-            path: validated_manifest["files"][path] for path in sorted(paths)
-        }
-        source_digest = hashlib.sha256(
-            json.dumps(source_hashes, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        ).hexdigest()
-        ctx["playable_receipt"] = {
-            "schema": "skeleton.gameforge.playable_source.v1",
-            "mode": selected,
-            "scene": ctx["playable_scene"],
-            "launch_scene": ctx.get("playable_launch_scene"),
-            "launcher": ctx.get("playable_launcher"),
-            "source_files": source_hashes,
-            "source_sha256": source_digest,
-            **({"tuning": ctx["playable_tuning"]} if ctx.get("playable_tuning") else {}),
-        }
-        from skeleton.forge.playable_provenance import verify_playable_source
-        if not verify_playable_source(files, ctx["playable_receipt"]):
-            raise ValueError("playable prototype differs from deterministic authored source")
+    source_manifest(files)
     ok, problems = check_ok(files)
     if not ok:
         raise RuntimeError("gdscript check failed: " + "; ".join(problems[:8]))
@@ -614,10 +614,36 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
     mode = ctx.get("playtest_mode") or "off"
     if mode != "off":
         from skeleton.forge.playtest import playtest
-        played = playtest(files)
+        # For standalone startup we still qualify the original world separately.
+        # Change only the temporary boot-test file map; never alter sealed output.
+        world_files = files
+        if ctx.get("playable_main_scene") is True:
+            selected = ctx["playable_archetype"]
+            current = f'run/main_scene="res://scenes/archetypes/{selected}/main.tscn"'
+            project_source = files["project.godot"]
+            if project_source.count(current) != 1:
+                raise RuntimeError("standalone startup verification failed")
+            world_files = dict(files)
+            world_files["project.godot"] = project_source.replace(
+                current, 'run/main_scene="res://scenes/levels/run_level.tscn"', 1,
+            )
+        played = playtest(world_files)
         if mode == "require" and not played.get("passed"):
             detail = "; ".join(played.get("errors") or []) or played.get("reason") or played.get("status")
             raise RuntimeError(f"playtest {played.get('status')}: {detail}"[:600])
+    # Independently boot the selected playable archetype scene. A successful
+    # default-world boot does not prove its separate win/lose loop completes.
+    # In strict mode the scene must complete before project publication.
+    scene_played = None
+    if ctx.get("playable_content") and mode != "off":
+        from skeleton.forge.playtest import playtest_archetype_scene
+        scene_played = playtest_archetype_scene(
+            files, str(ctx.get("playable_archetype") or "extraction"),
+        )
+        ctx["playable_scene_playtest"] = scene_played
+        if mode == "require" and not scene_played.get("passed"):
+            detail = "; ".join(scene_played.get("errors") or []) or scene_played.get("reason") or scene_played.get("status")
+            raise RuntimeError(f"playable scene {scene_played.get('status')}: {detail}"[:600])
     project = None
     root = ctx.get("project_root")
     if root:
@@ -632,12 +658,17 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "check": "ok",
         "playtest": None if played is None else played.get("status"),
     }
-    if ctx.get("galaxy_receipt"):
+    if ctx.get("playable_portal_receipt"):
+        details["playable_portal_sha256"] = ctx["playable_portal_receipt"]["source_sha256"]
+    if scene_played is not None:
+        details["playable_scene_playtest"] = scene_played.get("status")
+    if ctx.get("galaxy_receipt") is not None:
         details["galaxy_profile_sha256"] = ctx["galaxy_receipt"]["sha256"]
     if ctx.get("native_quest_receipt"):
         details["native_quest_sha256"] = ctx["native_quest_receipt"]["quest_sha256"]
     _commit(ctx, "emit", ctx["era"], f"{len(files)} files", details)
-    return {"emitted": True, "project": project, "check_ok": True, "playtest": played}
+    return {"emitted": True, "project": project, "check_ok": True, "playtest": played,
+            "playable_scene_playtest": scene_played}
 
 
 def _publish_build_evidence(root, documents: Dict[str, str]) -> None:

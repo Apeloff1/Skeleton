@@ -103,6 +103,63 @@ class WorkflowTierTests(unittest.TestCase):
                 source = ROOT / ".github/workflows-archive" / name
                 (root / ".github/workflows-archive" / name).write_text(source.read_text())
             self.assertEqual(audit(root), [])
+            # All 25 source suites remain real callable jobs; reintroducing
+            # independent PR events or dropping the caller must fail closed.
+            required_sources = registry["consolidated_required_source_workflows"]
+            self.assertEqual(len(required_sources), 25)
+            source_workflow = root / ".github/workflows" / required_sources[0]
+            source_original = source_workflow.read_text()
+            source_workflow.write_text(source_original.replace(
+                "  workflow_call:", "  pull_request:", 1,
+            ))
+            self.assertTrue(any(
+                "consolidated source must be callable" in issue
+                for issue in audit(root)
+            ))
+            source_workflow.write_text(source_original)
+            # A called workflow can be dispatched without a PR number.
+            # It must never collapse all runs into one cancellation group.
+            source_workflow.write_text(source_original.replace(
+                "github.event.pull_request.number || github.sha",
+                "github.event.pull_request.number", 1,
+            ))
+            self.assertTrue(any(
+                "consolidated source concurrency needs an immutable fallback" in issue
+                for issue in audit(root)
+            ))
+            source_workflow.write_text(source_original)
+            for replacement, expected in (
+                ('  workflow_call:\n  push: {branches: [main]}', 'consolidated source must be callable'),
+                ('  workflow_call:\n  "pull_request": {}', 'consolidated source must be callable'),
+                ('  workflow_call:\n  workflow_call:', 'duplicate workflow event'),
+            ):
+                with self.subTest(replacement=replacement):
+                    source_workflow.write_text(source_original.replace('  workflow_call:', replacement, 1))
+                    self.assertTrue(any(expected in item for item in audit(root)))
+            source_workflow.write_text(source_original)
+            readiness = root / ".github/workflows/merge-readiness.yml"
+            readiness_original = readiness.read_text()
+            required_call = "uses: ./.github/workflows/" + required_sources[0]
+            readiness.write_text(readiness_original.replace(
+                required_call, "uses: ./.github/workflows/absent-source.yml", 1,
+            ))
+            self.assertTrue(any(
+                "missing mandatory consolidated source caller" in issue
+                or "consolidated source caller is not exact-head" in issue
+                for issue in audit(root)
+            ))
+            readiness.write_text(readiness_original)
+            readiness.write_text(readiness_original.replace(
+                "needs.source_qualification_gate.result == 'success'",
+                "needs.source_qualification_gate.result != 'failure'",
+                1,
+            ))
+            self.assertTrue(any(
+                "required CI/CD lane lost fail-closed consolidated source qualification" in issue
+                for issue in audit(root)
+            ))
+            readiness.write_text(readiness_original)
+            self.assertEqual(audit(root), [])
             reusable = root / ".github/workflows" / registry["required_reusable_workflows"][0]
             reusable_original = reusable.read_text()
             reusable.write_text(reusable_original.replace("  workflow_call:", "  pull_request:"))
@@ -143,7 +200,7 @@ class WorkflowTierTests(unittest.TestCase):
             self.assertTrue(any("paused workflow gained automatic" in x for x in audit(root)))
             paused.write_text(before)
             self.assertEqual(audit(root), [])
-            for index in range(10):
+            for index in range(21):
                 (
                     root / ".github/workflows" / f"automatic-extra-{index}.yml"
                 ).write_text(
@@ -154,7 +211,7 @@ class WorkflowTierTests(unittest.TestCase):
             self.assertTrue(
                 any("unexpected active workflow count" in item for item in audit(root))
             )
-            for index in range(10):
+            for index in range(21):
                 (root / ".github/workflows" / f"automatic-extra-{index}.yml").unlink()
             name = registry["specialized_manual_only"][0]
             spec = root / ".github/workflows-archive" / name
@@ -196,10 +253,28 @@ class WorkflowTierTests(unittest.TestCase):
                 for issue in audit(root)
             ))
             strict.write_text(strict_original)
+            strict.write_text(strict_original.replace(
+                "  workflow_dispatch:",
+                "  workflow_dispatch:\n    inputs:\n      candidate_sha:\n        required: true",
+                1,
+            ))
+            self.assertTrue(any(
+                "manual candidate inputs are forbidden" in issue
+                for issue in audit(root)
+            ))
+            strict.write_text(strict_original)
 
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
+            for job in ("source_01", "source_13", "source_25"):
+                with self.subTest(missing_job=job):
+                    readiness.write_text(readiness_original.replace(f"      - {job}\n", "", 1))
+                    self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
             readiness.write_text(readiness_original)
+            # Duplicate JSON keys are an ambiguous policy, not last-writer wins.
+            policy_path = root / "machine/ci_workflow_tiers.json"
+            policy_original = policy_path.read_text()
+            policy_path.write_text(policy_original.rstrip()[:-1] + ', "schema": "skeleton.ci.workflow_tiers.v1"}')
+            self.assertTrue(any("duplicate registry key" in issue for issue in audit(root)))
+            policy_path.write_text(policy_original)
 
             # The required Merge Readiness lane must retain the same exact
             # source suites even though separate automatic runs are removed.

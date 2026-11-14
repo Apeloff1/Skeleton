@@ -1,29 +1,15 @@
 name: GameForge conductor and B039 self-repair qualification
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
-    paths:
-      - "skeleton/gameforge/__init__.py"
-      - "skeleton/gameforge/conductor.py"
-      - "skeleton/gameforge/eras.py"
-      - "skeleton/gameforge/errors.py"
-      - "skeleton/gameforge/manifest.py"
-      - "skeleton/gameforge/plans.py"
-      - "skeleton/gameforge/safety.py"
-      - "skeleton/gameforge/steps.py"
-      - "skeleton/gameforge/test_gameforge_conductor.py"
-      - "skeleton/gameforge/batch_b039/**"
-      - ".github/workflows/gameforge-conductor-b039-qualification.yml"
+  workflow_call:
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: gameforge-conductor-b039-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: gameforge-conductor-b039-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   conductor_and_repair:
@@ -37,6 +23,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 1
           persist-credentials: false
+      - name: Verify immutable source checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - name: Select supported Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:

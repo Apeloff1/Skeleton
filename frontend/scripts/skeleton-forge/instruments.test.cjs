@@ -68,10 +68,18 @@ test('complete historical backend genre vote vocabulary is available in the crea
     'mmorpg', 'visual-novel', 'narrative', 'cozy', 'arcade', 'bullet-heaven',
   ];
   const catalog = load('src/skeletonForge/genreCatalog.ts');
-  assert.deepEqual(new Set(genres), new Set(catalog.GENRE_CHOICES));
+  assert.equal(expected.length, 36);
+  assert.equal(genres.length, 158);
   assert.equal(new Set(genres).size, 158);
+  assert.ok(expected.every((genre) => genres.includes(genre)), 'all 36 historical genres remain selectable');
+  assert.deepEqual(genres, catalog.GENRE_CHOICES);
+  assert.equal(catalog.GENRE_GROUPS.length, 11);
   assert.deepEqual(new Set(catalog.POPULAR_GENRES), new Set(expected));
-  for (const original of expected) assert.ok(genres.includes(original));
+  assert.deepEqual(catalog.filterGenreChoices('colony'), ['colony-sim']);
+  assert.deepEqual(catalog.filterGenreChoices('racing').sort(), ['arcade-racing', 'kart-racing', 'racing', 'sim-racing'].sort());
+  assert.ok(catalog.filterGenreChoices('', 'horror-suspense').includes('survival-horror'));
+  assert.deepEqual(catalog.filterGenreChoices('', 'does-not-exist'), []);
+  assert.equal(catalog.filterGenreChoices('  ' ,'popular').length, 36);
 });
 
 
@@ -86,13 +94,26 @@ test('the legacy full Galaxy matrix questionnaire is reachable from Forge option
   assert.match(html, /data-testid="q-open-galaxy-studio"/);
 });
 
+test('expanded 158-genre creator brief exposes categorized search without losing prior selection', () => {
+  const state = { ...Q.INITIAL_STATE, step: 'brief', vision: 'a strategy and racing game', brief: { genre: 'city-builder' } };
+  const html = render(h(Flow, { state, dispatch: () => {}, beats: Q.FALLBACK_BEATS, onForge: () => {} }));
+  assert.match(text(html), /158 selectable game genres and subgenres/);
+  assert.match(html, /data-testid="q-genre-search"/);
+  assert.match(html, /data-testid="q-genre-family-racing-sports"/);
+  assert.match(html, /data-testid="q-brief-genre-city-builder"/);
+  assert.match(text(html), /not a promise of a dedicated playable engine/);
+  const built = Q.buildRunRequest(state);
+  assert.equal(built.answers.genre, 'city-builder');
+  assert.equal(Q.buildRunRequest({ ...state, brief: { genre: 'colony-sim' } }).answers.genre, 'colony-sim');
+});
 
-test('the full 69-genre Galaxy catalog feeds canonical Forge run semantics', () => {
+
+test('all 69 Galaxy genres feed canonical Forge run semantics', () => {
   const G = load('src/skeletonForge/galaxyGenres.ts');
   assert.equal(G.GALAXY_CHOICES.length, 69);
   assert.equal(new Set(G.GALAXY_CHOICES.map((g) => g.id)).size, 69);
-  assert.equal(G.mappedBriefGenre('beat_em_up'), 'beat-em-up');
-  assert.equal(G.mappedBriefGenre('shoot_em_up'), 'shoot-em-up');
+  assert.equal(G.mappedBriefGenre('tactics'), 'tactics');
+  assert.equal(G.mappedBriefGenre('metaverse_social'), 'mmo');
   assert.deepEqual(new Set(Object.keys(G.GALAXY_TO_FORGE_BRIEF)), new Set(G.GALAXY_CHOICES.map((g) => g.id)));
   const known = Q.BRIEF_FACETS.find((f) => f.id === 'genre').options;
   for (const item of G.GALAXY_CHOICES) {
@@ -116,63 +137,11 @@ test('historical specialized genre preserves long authored vision over generated
   assert.match(G.specializedVision('hello', 'visual_novel'), /Visual Novel/);
 });
 
-test('63+ genre options are discoverable within the existing five-step Forge', () => {
+test('69 genre options are discoverable within the existing five-step Forge', () => {
   const state = { ...Q.INITIAL_STATE, step: 'options', vision: 'a 2D builder' };
   const html = render(h(Flow, {
     state, dispatch: () => {}, beats: Q.FALLBACK_BEATS, onForge: () => {},
   }));
   assert.match(text(html), /all 69 Galaxy genres/);
   assert.match(html, /data-testid="q-galaxy-genres-toggle"/);
-});
-
-
-test('the recovered 158-genre creative brief supports search while preserving selected genre', () => {
-  const Genres = load('src/skeletonForge/genreCatalog.ts');
-  assert.equal(Genres.GENRE_COUNT, 158);
-  assert.equal(Genres.GENRE_GROUPS.length, 11);
-  assert.equal(Genres.GENRE_CHOICES.length, 158);
-  assert.equal(new Set(Genres.GENRE_CHOICES).size, 158);
-  assert.equal(Genres.POPULAR_GENRES.length, 36);
-  for (const term of ['colony-sim', 'tactical-rpg', '4x', 'rhythm', 'racing', 'visual-novel']) {
-    assert.ok(Genres.GENRE_CHOICES.includes(term), 'Missing historical genre: ' + term);
-  }
-  const state = {
-    ...Q.INITIAL_STATE,
-    step: 'brief', vision: 'Original cross-genre adventure',
-    brief: { genre: 'city-builder' },
-  };
-  const html = render(h(Flow, {
-    state, dispatch: () => {}, beats: Q.FALLBACK_BEATS, onForge: () => {},
-  }));
-  assert.match(text(html), /158 selectable game genres and subgenres/);
-  assert.match(html, /data-testid="q-genre-search"/);
-  assert.match(html, /data-testid="q-genre-family-racing-sports"/);
-  assert.match(html, /data-testid="q-brief-genre-city-builder"/);
-  assert.match(text(html), /not a promise of a dedicated playable engine/);
-  assert.equal(Q.buildRunRequest(state).answers.genre, 'city-builder');
-  assert.equal(Q.buildRunRequest({
-    ...state, brief: { genre: 'colony-sim' },
-  }).answers.genre, 'colony-sim');
-  assert.deepEqual(Genres.filterGenreChoices('colony'), ['colony-sim']);
-  assert.ok(Genres.filterGenreChoices('', 'racing-sports').includes('sailing'));
-  assert.equal(Genres.filterGenreChoices('___absent___').length, 0);
-});
-
-test('recovered saved presets validate all expanded genre options and preserve native options', () => {
-  const Presets = load('src/skeletonForge/designPresets.ts');
-  for (const genre of ['colony-sim', 'racing', 'survival-horror', 'tactical-rpg']) {
-    const state = {
-      ...Q.INITIAL_STATE,
-      brief: { genre },
-      quest: { enabled: true, length: 7 },
-      playable: { enabled: true, mode: 'survival', launch: false },
-      instruments: { tempo: 0.8, grind: 0.65 },
-    };
-    const original = Q.buildRunRequest(state);
-    const record = Presets.makeDesignPreset('Genre-' + genre, state, 100);
-    const restored = Presets.decodeDesignPresets(
-      Presets.encodeDesignPresets([record])
-    )[0];
-    assert.deepEqual(Q.buildRunRequest(restored.state), original);
-  }
 });

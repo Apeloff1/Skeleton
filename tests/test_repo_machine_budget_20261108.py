@@ -1,14 +1,15 @@
-"""Independent stdlib regression for repository inventory truncation and finite budgets.
+"""Independent finite-budget repository source inventory admission test.
 
-Tests the actual scanner behavior with mocked enumeration, never fabricated
-proof that the whole 100k+ source tree was scanned by these small fixtures.
+The scanner's output must not report a complete inventory when max_files
+truncates the last path, and no synthetic files can satisfy a source-release
+qualification. The test uses a finite deterministic mock of os.walk only.
 """
 from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
-import unittest
+from unittest import TestCase, main
 from unittest.mock import patch
 
 from skeleton.repo_machine.builder import RepositoryModelBuilder
@@ -18,41 +19,47 @@ from skeleton.repo_machine.config import load_machine_config
 ROOT = Path(__file__).resolve().parents[1]
 
 
-class RepositoryScanBudgetTests(unittest.TestCase):
-    def test_configured_capacity_is_finite_and_above_repository_floor(self):
-        config = load_machine_config(ROOT)
-        self.assertGreater(config.max_files, 100_000)
-        self.assertLessEqual(config.max_files, 500_000)
-        self.assertGreater(config.max_file_bytes, 0)
-        self.assertLessEqual(config.max_file_bytes, 2_000_000)
-
-    def test_at_capacity_is_not_confused_with_complete_inventory(self):
-        for cap in range(1, 6):
-            with self.subTest(cap=cap):
-                with TemporaryDirectory() as directory:
-                    root = Path(directory)
-                    names = ["a.py", "b.py", "c.py", "d.py"]
-                    config = replace(load_machine_config(ROOT), max_files=cap)
-                    machine = RepositoryModelBuilder(root, config=config)
-                    with patch("skeleton.repo_machine.builder.os.walk",
-                               return_value=iter([(str(root), [], names)])):
-                        files, truncated = machine._iter_files()
-                    self.assertEqual(len(files), min(cap, len(names)))
-                    self.assertEqual([f.name for f in files], names[:cap])
-                    self.assertIs(truncated, cap < len(names))
-
-    def test_incomplete_inventory_never_qualifies_as_complete(self):
-        with TemporaryDirectory() as directory:
-            root = Path(directory)
-            for cap in (1, 2, 3):
-                config = replace(load_machine_config(ROOT), max_files=cap)
-                machine = RepositoryModelBuilder(root, config=config)
+class RepositoryInventoryFiniteBudget(TestCase):
+    def test_file_cap_preserves_exhaustiveness_flag(self):
+        names = ["alpha.py", "beta.py", "gamma.py", "delta.py"]
+        configuration = load_machine_config(ROOT)
+        for cap, length, truncated in (
+            (1, 1, True), (2, 2, True), (3, 3, True),
+            (4, 4, False), (5, 4, False),
+        ):
+            with self.subTest(cap=cap), TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                model = RepositoryModelBuilder(root, config=replace(configuration, max_files=cap))
                 with patch("skeleton.repo_machine.builder.os.walk",
-                           return_value=iter([(str(root), [], ["a.py", "b.py", "c.py", "d.py"])])):
-                    files, truncated = machine._iter_files()
-                self.assertTrue(truncated, f"{cap} would hide at least one source")
-                self.assertLess(len(files), 4)
+                           return_value=iter([(str(root), [], names)])):
+                    rows, was_truncated = model._iter_files()
+                self.assertEqual(len(rows), length)
+                self.assertEqual(was_truncated, truncated)
+                # Production scanner sorts paths before enforcing the cap.
+                # Assert deterministic canonical order, not os.walk order.
+                self.assertEqual([file.name for file in rows], sorted(names)[:length])
+
+    def test_live_config_maxima_are_finite_and_prohibit_oversize_files(self):
+        config = load_machine_config(ROOT)
+        self.assertGreater(config.max_files, 100000)
+        self.assertLessEqual(config.max_files, 500000)
+        self.assertGreater(config.max_file_bytes, 0)
+        self.assertLessEqual(config.max_file_bytes, 2000000)
+
+
+    def test_reversed_walk_order_preserves_exact_path_cap(self):
+        configuration = load_machine_config(ROOT)
+        for cap in (1, 2, 3, 4, 5):
+            with self.subTest(cap=cap), TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                model = RepositoryModelBuilder(root, config=replace(configuration, max_files=cap))
+                names = ["delta.py", "gamma.py", "beta.py", "alpha.py"]
+                with patch("skeleton.repo_machine.builder.os.walk",
+                           return_value=iter([(str(root), [], names)])):
+                    rows, truncated = model._iter_files()
+                self.assertEqual([file.name for file in rows], sorted(names)[:cap])
+                self.assertIs(truncated, cap < len(names))
 
 
 if __name__ == "__main__":
-    unittest.main()
+    main()

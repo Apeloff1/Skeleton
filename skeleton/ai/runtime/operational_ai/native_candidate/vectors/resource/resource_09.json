@@ -1,0 +1,17 @@
+{
+  "schema": "skeleton.native-candidate.vector.v1",
+  "id": "resource_09",
+  "domain": "resource",
+  "objective": "Bound cloned-model working set, optimizer steps and admitted source inventory case 9",
+  "trust_boundary": "Finite resources cannot be escalated by model-generated text or caller coercion",
+  "input": {
+    "model_bytes": 5000000,
+    "steps": 1000,
+    "examples": 432,
+    "working_bytes": 1000000000
+  },
+  "expected_allow": true,
+  "expected_reason": "within_declared_resource_policy",
+  "model_qualified": false,
+  "release_certified": false
+}

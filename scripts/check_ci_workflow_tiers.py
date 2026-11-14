@@ -44,6 +44,9 @@ MANUAL_SOURCE_QUALIFICATIONS = {
 }
 
 
+# Each source lane is still required at the exact PR head; they now execute
+# through the existing protected Merge Readiness check instead of creating
+# 25 independent webhook subscriptions. Keep the registry and caller explicit.
 CONSOLIDATED_SOURCE_WORKFLOWS = (
     "backend-literal-lazy-loader-qualification.yml",
     "ci-surface-hold-source-qualification.yml",
@@ -52,9 +55,15 @@ CONSOLIDATED_SOURCE_WORKFLOWS = (
     "ecosystem-api-import-qualification.yml",
     "expo-export-content-evidence-qualification.yml",
     "first-install-source-qualification.yml",
+    "frontier-cpu-determinism-qualification.yml",
+    "galaxy-forge-roundtrip-qualification.yml",
+    "gameforge-conductor-b039-qualification.yml",
+    "gameforge-eight-native-scene-qualification.yml",
+    "gameforge-source-archive-qualification.yml",
     "harbor-patrol-cli-qualification.yml",
     "harbor-studio-source-qualification.yml",
     "jeeves-bounded-canonical-evidence.yml",
+    "jeeves-game-builder-quality-qualification.yml",
     "jeeves-integrated-source-qualification.yml",
     "jeeves-laptop-dispatcher-source-tests.yml",
     "jeeves-native-sqlite-source-qualification.yml",
@@ -66,21 +75,37 @@ CONSOLIDATED_SOURCE_WORKFLOWS = (
     "perf-profiler-literal-target-qualification.yml",
 )
 
-
 def events(source: str) -> set[str]:
-    """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
+    """Count inline and block triggers without expanding untrusted YAML."""
     lines = source.splitlines()
-    try:
-        start = next(i for i, line in enumerate(lines) if line == "on:")
-    except StopIteration as exc:
-        raise ValueError("workflow missing multiline 'on:' trigger") from exc
+    headers = [i for i, line in enumerate(lines)
+               if re.match(r"""^(?:on|'on'|"on")\s*:""", line)]
+    if len(headers) != 1 or lines[headers[0]] != "on:":
+        raise ValueError("workflow must have exactly one multiline 'on:' trigger")
     found: set[str] = set()
-    for line in lines[start + 1:]:
-        if line and not line[0].isspace() and not line.startswith("#"):
+    for line in lines[headers[0] + 1:]:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if not line[0].isspace():
             break
-        match = re.match(r"^  ([a-z_]+):(?:\s*(?:#.*)?)?$", line)
-        if match:
-            found.add(match.group(1))
+        if "\t" in line[:len(line) - len(line.lstrip())]:
+            raise ValueError("unsupported trigger indentation")
+        indent = len(line) - len(line.lstrip(" "))
+        if indent > 2:
+            if not found:
+                raise ValueError("nested trigger data without event")
+            continue
+        if indent != 2:
+            raise ValueError("unsupported trigger indentation")
+        match = re.fullmatch(r"""  (?:([a-z_]+)|'([a-z_]+)'|"([a-z_]+)")\s*:(.*)""", line)
+        if not match:
+            raise ValueError("unsupported trigger entry")
+        event = next(value for value in match.groups()[:3] if value is not None)
+        if event in found:
+            raise ValueError("duplicate workflow event")
+        found.add(event)
+    if not found:
+        raise ValueError("empty workflow trigger inventory")
     return found
 
 
@@ -93,10 +118,27 @@ def independently_triggered(found: set[str]) -> bool:
     return bool(found - {"workflow_dispatch", "workflow_call"})
 
 
+def _unique_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate registry key: {key}")
+        result[key] = value
+    return result
+
+
+def _job_block(workflow: str, job_id: str) -> str:
+    match = re.search(r"(?m)^  " + re.escape(job_id) + r":\s*$", workflow)
+    if match is None:
+        return ""
+    following = re.search(r"(?m)^  [A-Za-z0-9_-]+:\s*$", workflow[match.end():])
+    return workflow[match.start():match.end() + following.start()] if following else workflow[match.start():]
+
+
 def audit(root: Path = ROOT) -> list[str]:
     failures: list[str] = []
     try:
-        policy = json.loads((root / INDEX).read_text(encoding="utf-8"))
+        policy = json.loads((root / INDEX).read_text(encoding="utf-8"), object_pairs_hook=_unique_pairs)
     except (OSError, ValueError, UnicodeError) as exc:
         return [f"cannot read CI tier registry: {exc}"]
     if not isinstance(policy, dict) or policy.get("schema") != SCHEMA:
@@ -104,11 +146,17 @@ def audit(root: Path = ROOT) -> list[str]:
     specialised = policy.get("specialized_manual_only")
     core = policy.get("core_automatic_pr")
     reusable = policy.get("required_reusable_workflows")
+    consolidated = policy.get("consolidated_required_source_workflows")
     tiers = (specialised, core, reusable)
     if (any(not isinstance(group, list) or not group for group in tiers)
             or any(not isinstance(name, str) or not name.endswith(".yml") or "/" in name
                    for group in tiers for name in group)):
         return ["CI tiers require nonempty sets of plain .yml file names"]
+    if (type(consolidated) is not list
+            or len(consolidated) != len(CONSOLIDATED_SOURCE_WORKFLOWS)
+            or tuple(consolidated) != CONSOLIDATED_SOURCE_WORKFLOWS):
+        failures.append("consolidated source registry must preserve all 25 required lanes")
+        consolidated = list(CONSOLIDATED_SOURCE_WORKFLOWS)
     scheduled = policy.get("operational_scheduled_non_pr")
     paused = policy.get("operational_paused_manual_only")
     if (type(scheduled) is not list
@@ -128,21 +176,24 @@ def audit(root: Path = ROOT) -> list[str]:
             failures.append(f"{name}: required operational workflow missing")
     # Do not solve the workflow budget by dropping source custody tests:
     # these exact source qualifications are required within Merge Readiness.
+    readiness_source = ""
     try:
         readiness_source = (root / WORKFLOWS / "merge-readiness.yml").read_text(encoding="utf-8")
         required_quality = readiness_source.split("\n  quality_security:\n", 1)[1].split("\n  pr_automation:\n", 1)[0]
     except (OSError, UnicodeError, IndexError) as exc:
         failures.append(f"protected source qualification lane missing ({exc})")
         required_quality = ""
-        readiness_source = ""
     for name, cases in MANUAL_SOURCE_QUALIFICATIONS.items():
         try:
             source = (root / WORKFLOWS / name).read_text(encoding="utf-8")
             if events(source) != {"workflow_dispatch"}:
                 failures.append(f"{name}: source qualification must be manually dispatched, not automatically subscribed")
-            # Only the trusted main dispatch commit is authorized.
-            if "inputs.candidate_sha" in source or re.search(r"(?m)^    inputs\s*:", source):
-                failures.append(f"{name}: caller-controlled SHA forbidden for trusted source dispatch")
+            # A manually dispatched source suite must never run a caller-
+            # selected commit. The platform-owned dispatch SHA is bound to
+            # the guarded main ref, checkout and independent concurrency.
+            if ("inputs.candidate_sha" in source or
+                    re.search(r"(?m)^    inputs\s*:", source)):
+                failures.append(f"{name}: manual candidate inputs are forbidden")
             for invariant in (
                 "if: github.repository == 'Apeloff1/Skeleton' && github.ref == 'refs/heads/main'",
                 'ref: ${{ github.sha }}',
@@ -163,41 +214,61 @@ def audit(root: Path = ROOT) -> list[str]:
         for case in cases:
             if case not in required_quality:
                 failures.append(f"{name}: required quality gate lost source test {case}")
+    # Called source checks must never silently become optional. Every PR
+    # source lane is executed by the existing Merge Readiness workflow as a
+    # same-commit, read-only reusable workflow, then required by CI/CD.
+    for position, name in enumerate(consolidated, 1):
+        job_id = f"source_{position:02d}"
+        path = root / WORKFLOWS / name
+        try:
+            child = path.read_text(encoding="utf-8")
+            child_events = events(child)
+        except (OSError, ValueError, UnicodeError) as exc:
+            failures.append(f"{name}: missing consolidated callable source workflow ({type(exc).__name__})")
+            continue
+        if "workflow_call" not in child_events or independently_triggered(child_events):
+            failures.append(f"{name}: consolidated source must be callable without standalone PR/schedule triggers")
+        if "permissions:\n  contents: read" not in child or "continue-on-error: true" in child:
+            failures.append(f"{name}: consolidated source must retain read-only fail-closed policy")
+        group = re.search(r"(?m)^  group:[ \t]*(.+)$", child)
+        if (not group or
+                ("github.event.pull_request.number" in group.group(1)
+                 and not any(fallback in group.group(1)
+                             for fallback in ("|| github.sha", "|| github.ref", "|| github.run_id")))):
+            failures.append(f"{name}: consolidated source concurrency needs an immutable fallback")
+        call = _job_block(readiness_source, job_id)
+        if not call:
+            failures.append(f"{name}: missing mandatory consolidated source caller {job_id}")
+            continue
+        call_lines = [line for line in call.splitlines() if not line.lstrip().startswith("#")]
+        if (f"    uses: ./.github/workflows/{name}" not in call_lines
+                or "    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}" not in call_lines
+                or "    permissions:\n      contents: read" not in "\n".join(call_lines)
+                or any(re.match(r"^    (?:continue-on-error|secrets|with):", line) for line in call_lines)):
+            failures.append(f"{name}: consolidated source caller is not exact-head, read-only and required")
+    gate = _job_block(readiness_source, "source_qualification_gate")
+    ci = _job_block(readiness_source, "ci")
+    summary = _job_block(readiness_source, "readiness")
+    expected_jobs = {f"source_{i:02d}" for i in range(1, len(consolidated) + 1)}
+    actual_jobs = set(re.findall(r"(?m)^      - (source_[0-9]+)$", gate))
+    if actual_jobs != expected_jobs:
+        failures.append("required consolidated source gate dependency missing or unexpected")
+    if ("SOURCE_RESULTS: ${{ toJSON(needs) }}" not in gate
+            or 'item.get("result") != "success"' not in gate
+            or "set(observed) != expected" not in gate
+            or "'source qualification gates incomplete/failed" not in gate
+            or "needs: source_qualification_gate" not in ci
+            or "needs.source_qualification_gate.result == 'success'" not in ci
+            or "      - source_qualification_gate\n" not in summary
+            or "needs.source_qualification_gate.result" not in summary):
+        failures.append("required CI/CD lane lost fail-closed consolidated source qualification")
     if ("python -m pytest -q" not in required_quality
             or "python -m unittest discover" not in required_quality
             or "python -m compileall -q" not in required_quality
             or "continue-on-error: true" in required_quality):
         failures.append("protected source qualification steps must compile, execute and fail closed")
 
-    consolidated = policy.get("consolidated_required_source_workflows")
-    if consolidated != list(CONSOLIDATED_SOURCE_WORKFLOWS):
-        failures.append("consolidated source qualification inventory drift")
-    for i, name in enumerate(CONSOLIDATED_SOURCE_WORKFLOWS, 1):
-        try:
-            source = (root / WORKFLOWS / name).read_text(encoding="utf-8")
-            if independently_triggered(events(source)) or "workflow_call" not in events(source):
-                failures.append(f"{name}: consolidated source must be callable without independent triggers")
-            if "contents: read" not in source or "continue-on-error: true" in source:
-                failures.append(f"{name}: consolidated source must remain read-only and fail closed")
-            caller = re.search(rf"(?ms)^  source_qualification_{i}:\n(.*?)(?=^  [\w-]+:\s*$|\Z)", readiness_source)
-            if not caller or f"uses: ./.github/workflows/{name}" not in caller.group(1):
-                failures.append(f"{name}: required consolidated source caller missing")
-            if not re.search(rf"(?m)^      - source_qualification_{i}$", readiness_source):
-                failures.append(f"{name}: required consolidated source gate dependency missing")
-        except (OSError, ValueError, UnicodeError) as exc:
-            failures.append(f"{name}: cannot inspect consolidated qualification ({exc})")
-    for invariant in (
-        "source_qualification_gate:",
-        "SOURCE_RESULTS: ${{ toJSON(needs) }}",
-        'value["result"] != "success"',
-        "      - source_qualification_gate",
-        "needs.source_qualification_gate.result",
-        'results["source_qualification_gate"] = os.environ["SOURCE_QUALIFICATION_RESULT"]',
-    ):
-        if invariant not in readiness_source:
-            failures.append("required consolidated source qualification gate drift: " + invariant)
-
-    names = specialised + core + reusable + scheduled + paused + list(CONSOLIDATED_SOURCE_WORKFLOWS)
+    names = specialised + core + reusable + scheduled + paused + consolidated
     if len(set(names)) != len(names):
         return ["workflow cannot belong to multiple CI tiers"]
     rules = policy.get("release_rules")

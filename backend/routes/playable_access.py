@@ -187,7 +187,13 @@ async def project_request_access(
     mutate = request.method not in {"GET", "HEAD", "OPTIONS"}
     if mutate:
         _editor(user)
-    access_token = _current.set(_Access(dict(user), token, identity))
+    # Yield dependencies can be finalized by Starlette from a different
+    # task context during error cancellation. ContextVar.reset(token) is
+    # invalid across contexts and can raise an unhandled generator exception.
+    # Restore the previous value in whichever context performs cleanup;
+    # ordinary same-task scopes retain their exact previous request state.
+    previous_access = _current.get()
+    _current.set(_Access(dict(user), token, identity))
     try:
         response.headers["Cache-Control"] = "private, no-store"
         ids = _project_ids(dict(request.path_params)) | _project_ids(dict(request.query_params))
@@ -221,7 +227,7 @@ async def project_request_access(
         _current.set(_Access(dict(user), token, identity, tuple(sorted(ids))))
         yield
     finally:
-        _current.reset(access_token)
+        _current.set(previous_access)
 
 
 class _PrivateProjectRoute(PublicExceptionRoute):

@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
-import { API_BASE } from '../utils/apiBase';
+import { API_BASE, nativeBackendConfigurationIssue } from '../utils/apiBase';
 import api, { type ApiResult } from '../utils/apiClient';
 import { authHeaders, getAuthToken, resolveStorageTenantIdentity } from '../auth/gameforgeAuth';
 import { ChatClientError, chatApiError } from './chatErrors';
