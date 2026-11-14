@@ -139,6 +139,13 @@ class OfflineAdaptiveDispatchService:
         self._guard.cancel_unstarted(request_id, tenant_id=tenant_id)
         return self.status()
 
+    def reconcile_cancelled(
+        self, *, authorization: "RecoveryAuthorization", recovery_key: bytes,
+    ) -> OfflineDispatchStatus:
+        """Explicitly settle a durable cancellation using a separate operator grant."""
+        self._guard.reconcile_cancelled(authorization=authorization, recovery_key=recovery_key)
+        return self.status()
+
     def reconcile_committed(
         self, *, journal: "FairStreamExecutionJournal",
         authorization: "RecoveryAuthorization", recovery_key: bytes,

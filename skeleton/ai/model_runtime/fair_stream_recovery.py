@@ -14,6 +14,7 @@ import json
 from typing import Mapping
 
 SCHEMA = "skeleton.ai.fair-stream-recovery-authorization.v1"
+CANCEL_SCHEMA = "skeleton.ai.fair-stream-cancellation-recovery-authorization.v1"
 MAX_GRANT_BYTES = 1024
 
 
@@ -37,8 +38,10 @@ def _key(value: object) -> bytes:
 
 def _body(
     *, session_id: str, generation: int, checkpoint_digest: str,
-    lease_id: str, nonce: str,
+    lease_id: str, nonce: str, purpose: str = "committed",
 ) -> dict[str, object]:
+    if type(purpose) is not str or purpose not in ("committed", "cancelled"):
+        raise RecoveryAuthorizationDenied("invalid recovery purpose")
     _hex(session_id, 32, "session")
     _hex(checkpoint_digest, 64, "checkpoint")
     _hex(lease_id, 64, "lease")
@@ -46,7 +49,7 @@ def _body(
     if type(generation) is not int or not 0 <= generation < (1 << 63):
         raise RecoveryAuthorizationDenied("invalid custody generation")
     return {
-        "schema": SCHEMA,
+        "schema": SCHEMA if purpose == "committed" else CANCEL_SCHEMA,
         "session_id": session_id,
         "generation": generation,
         "checkpoint_digest": checkpoint_digest,
@@ -78,12 +81,13 @@ class RecoveryAuthorization:
     lease_id: str
     nonce: str
     mac: str
+    purpose: str = "committed"
 
     def __post_init__(self) -> None:
         _body(
             session_id=self.session_id, generation=self.generation,
             checkpoint_digest=self.checkpoint_digest,
-            lease_id=self.lease_id, nonce=self.nonce,
+            lease_id=self.lease_id, nonce=self.nonce, purpose=self.purpose,
         )
         _hex(self.mac, 64, "grant MAC")
 
@@ -91,21 +95,23 @@ class RecoveryAuthorization:
 def issue_recovery_authorization(
     *, recovery_key: bytes, session_id: str, generation: int,
     checkpoint_digest: str, lease_id: str, nonce: str,
+    purpose: str = "committed",
 ) -> RecoveryAuthorization:
     """Trusted operator-side signer; NEVER expose as an unguarded API route."""
     body = _body(
         session_id=session_id, generation=generation,
         checkpoint_digest=checkpoint_digest, lease_id=lease_id, nonce=nonce,
+        purpose=purpose,
     )
     mac = hmac.new(_key(recovery_key), _encoded(body), sha256).hexdigest()
     return RecoveryAuthorization(
-        session_id, generation, checkpoint_digest, lease_id, nonce, mac,
+        session_id, generation, checkpoint_digest, lease_id, nonce, mac, purpose,
     )
 
 
 def verify_recovery_authorization(
     approval: RecoveryAuthorization, *, recovery_key: bytes,
-    state: Mapping[str, object], lease_id: str,
+    state: Mapping[str, object], lease_id: str, purpose: str = "committed",
 ) -> None:
     """Check exact current signed custody identity before any journal read.
 
@@ -117,10 +123,12 @@ def verify_recovery_authorization(
         raise RecoveryAuthorizationDenied("canonical operator approval required")
     if not isinstance(state, Mapping):
         raise RecoveryAuthorizationDenied("verified custody state required")
+    if type(purpose) is not str or purpose not in ("committed", "cancelled") or approval.purpose != purpose:
+        raise RecoveryAuthorizationDenied("operator approval purpose mismatch")
     body = _body(
         session_id=approval.session_id, generation=approval.generation,
         checkpoint_digest=approval.checkpoint_digest,
-        lease_id=approval.lease_id, nonce=approval.nonce,
+        lease_id=approval.lease_id, nonce=approval.nonce, purpose=approval.purpose,
     )
     if (
         approval.session_id != state.get("session_id")

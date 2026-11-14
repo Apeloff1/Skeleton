@@ -126,7 +126,7 @@ def setup_pending(monkeypatch, tmp_path):
     return resumed_app, resumed_journal, backend, anchor
 
 
-def grant(app, *, key=RECOVERY_KEY, nonce="f" * 32):
+def grant(app, *, key=RECOVERY_KEY, nonce="f" * 32, purpose="committed"):
     state = app._session.verify()
     pending = state["checkpoint"]["pending"]
     assert len(pending) == 1
@@ -134,7 +134,7 @@ def grant(app, *, key=RECOVERY_KEY, nonce="f" * 32):
         recovery_key=key, session_id=state["session_id"],
         generation=state["generation"],
         checkpoint_digest=state["checkpoint_digest"],
-        lease_id=pending[0]["lease_id"], nonce=nonce,
+        lease_id=pending[0]["lease_id"], nonce=nonce, purpose=purpose,
     )
 
 
@@ -264,3 +264,99 @@ def test_closed_journal_connection_marks_execution_uncertain(monkeypatch, tmp_pa
     assert app.status().pending_leases == 1
     assert app.status().execution_uncertain
     assert backend.calls == 1
+
+def setup_cancelled_restart(monkeypatch, tmp_path, *, journal_state="cancelled"):
+    monkeypatch.setattr(LiveStreamBudgetSampler, "sample", sample)
+    anchor = Anchor()
+    backend = Backend()
+    custody_path, journal_path = tmp_path / "cancel-custody.db", tmp_path / "cancel-journal.db"
+
+    def open_app(bootstrap):
+        custody_connection = sqlite3.connect(custody_path)
+        journal_connection = sqlite3.connect(journal_path)
+        journal = FairStreamExecutionJournal(
+            journal_connection, session_id=SESSION, execution_key=EXECUTION_KEY,
+        )
+        app = OfflineAdaptiveDispatchService.from_trusted_handles(
+            connection=custody_connection, custody_key=CUSTODY_KEY,
+            execution_key=EXECUTION_KEY, session_id=SESSION, watermark=anchor,
+            owner=JournaledExecutionOwner(journal, backend), storage_path=".",
+            bootstrap=bootstrap, whole_request=True,
+        )
+        return app, journal, custody_connection, journal_connection
+
+    app, journal, custody_connection, journal_connection = open_app(True)
+    app.submit(StreamRequest(
+        "cancel-me", "tenant-1", InferencePhase.PREFILL, 12, 4,
+        authorization_digest="a" * 64,
+    ))
+    permits, _ = app._guard.plan_live(token_budget=12)
+    permit, = permits
+    if journal_state == "cancelled":
+        journal.fence_unstarted(permit)
+    elif journal_state == "running":
+        journal.begin(permit)
+    # Fault injection at the boundary: journal commit (or absence), but
+    # no scheduler cancellation acknowledgement. No backend invocation.
+    custody_connection.close()
+    journal_connection.close()
+    resumed, resumed_journal, _, _ = open_app(False)
+    return resumed, resumed_journal, backend, permit, anchor
+
+
+def test_cancelled_receipt_recovery_after_restart_requires_distinct_grant(monkeypatch, tmp_path):
+    app, journal, backend, permit, _ = setup_cancelled_restart(monkeypatch, tmp_path)
+    assert app.status().execution_uncertain
+    before = app._session.verify()
+    with pytest.raises(RecoveryAuthorizationDenied, match="purpose"):
+        app.reconcile_cancelled(authorization=grant(app), recovery_key=RECOVERY_KEY)
+    approval = grant(app, purpose="cancelled")
+    with pytest.raises(RecoveryAuthorizationDenied, match="authentication"):
+        app.reconcile_cancelled(authorization=approval, recovery_key=b"x" * 32)
+    with pytest.raises(RecoveryAuthorizationDenied, match="purpose"):
+        app.reconcile_committed(journal=journal, authorization=approval, recovery_key=RECOVERY_KEY)
+    assert app._session.verify() == before
+    done = app.reconcile_cancelled(authorization=approval, recovery_key=RECOVERY_KEY)
+    assert done.generation == before["generation"] + 1
+    assert done.pending_leases == 0 and not done.execution_uncertain
+    assert app._session.verify()["checkpoint"]["requests"] == []
+    assert backend.calls == 0
+    with pytest.raises(ExecutionOutcomeUnknown, match="already"):
+        journal.begin(permit)
+    with pytest.raises(DispatchUncertain, match="pending"):
+        app.reconcile_cancelled(authorization=approval, recovery_key=RECOVERY_KEY)
+
+
+@pytest.mark.parametrize("journal_state", ["missing", "running"])
+def test_cancellation_recovery_never_infers_absence_of_execution(monkeypatch, tmp_path, journal_state):
+    app, journal, backend, _, _ = setup_cancelled_restart(
+        monkeypatch, tmp_path, journal_state=journal_state,
+    )
+    before = app._session.verify()
+    with pytest.raises(DispatchUncertain, match="cancelled receipt"):
+        app.reconcile_cancelled(authorization=grant(app, purpose="cancelled"), recovery_key=RECOVERY_KEY)
+    assert app._session.verify() == before
+    assert app.status().execution_uncertain
+    assert backend.calls == 0
+    assert journal._connection.execute("SELECT COUNT(*) FROM local_fair_stream_cancelled_intents").fetchone()[0] == 0
+
+
+def test_tampered_cancellation_record_never_retires_pending_request(monkeypatch, tmp_path):
+    app, journal, backend, _, _ = setup_cancelled_restart(monkeypatch, tmp_path)
+    journal._connection.execute(
+        "UPDATE local_fair_stream_cancelled_intents SET receipt=?", (b'{"forged":true}',),
+    )
+    journal._connection.commit()
+    before = app._session.verify()
+    with pytest.raises(DispatchUncertain, match="cancelled receipt"):
+        app.reconcile_cancelled(authorization=grant(app, purpose="cancelled"), recovery_key=RECOVERY_KEY)
+    assert app._session.verify() == before
+    assert backend.calls == 0
+
+
+def test_relabelled_commit_grant_cannot_authorize_cancel_recovery(monkeypatch, tmp_path):
+    app, _, backend, _, _ = setup_cancelled_restart(monkeypatch, tmp_path)
+    approval = replace(grant(app), purpose="cancelled")
+    with pytest.raises(RecoveryAuthorizationDenied, match="authentication"):
+        app.reconcile_cancelled(authorization=approval, recovery_key=RECOVERY_KEY)
+    assert app.status().pending_leases == 1 and backend.calls == 0

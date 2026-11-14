@@ -243,6 +243,9 @@ def test_unstarted_cancellation_fences_request_permanently_without_result(tmp_pa
     conn.close()
     second = journal(sqlite3.connect(path))
     assert second.request_exists(permit().request_id)
+    assert second.recover_cancelled_receipt(permit()) == receipt
+    with pytest.raises(ExecutionOutcomeUnknown, match="cancellation"):
+        second.recover_cancelled_receipt(replace(permit(), generation=3))
     for p in (permit(), replace(permit(), lease_id="f" * 64)):
         with pytest.raises(ExecutionOutcomeUnknown, match="already"):
             second.begin(p)
@@ -258,3 +261,16 @@ def test_unstarted_cancellation_refuses_existing_execution_intent():
     assert j._connection.execute(
         "SELECT COUNT(*) FROM local_fair_stream_cancelled_intents"
     ).fetchone()[0] == 0
+
+def test_cancellation_reader_rejects_conflicting_execution_history():
+    j = journal()
+    p = permit()
+    j.fence_unstarted(p)
+    j._connection.execute(
+        "INSERT INTO local_fair_stream_execution_journal "
+        "(lease_id,session_id,generation,checkpoint_digest,request_id,state) VALUES (?,?,?,?,?,'running')",
+        (p.lease_id, SESSION, p.generation, p.checkpoint_digest, p.request_id),
+    )
+    j._connection.commit()
+    with pytest.raises(ExecutionOutcomeUnknown, match="conflicting"):
+        j.recover_cancelled_receipt(p)

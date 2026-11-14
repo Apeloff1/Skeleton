@@ -220,6 +220,41 @@ class FairStreamExecutionJournal:
                 self._connection.rollback()
                 raise
 
+    def recover_cancelled_receipt(self, permit: DispatchPermit) -> dict[str, object]:
+        """Read an existing exact cancellation fence, never create one on recovery."""
+        if type(permit) is not DispatchPermit or permit.device_qualified:
+            raise ValueError("canonical CPU-only dispatch permit required")
+        expected = sign_unstarted_cancellation(
+            execution_key=self._key, session_id=self.session_id,
+            generation=permit.generation, checkpoint_digest=permit.checkpoint_digest,
+            lease_id=permit.lease_id, request_id=permit.request_id,
+        )
+        with self._lock:
+            self._begin()
+            try:
+                row = self._connection.execute(
+                    "SELECT lease_id,receipt FROM local_fair_stream_cancelled_intents "
+                    "WHERE session_id=? AND request_id=?",
+                    (self.session_id, permit.request_id),
+                ).fetchone()
+                if row is None or row[0] != permit.lease_id:
+                    raise ExecutionOutcomeUnknown("no exact cancellation receipt to reconcile")
+                if (type(row[1]) is not bytes or len(row[1]) > MAX_RECEIPT_BYTES
+                        or not hmac.compare_digest(row[1], _receipt_bytes(expected))):
+                    raise ExecutionOutcomeUnknown("stored cancellation authentication failed")
+                if self._connection.execute(
+                    "SELECT 1 FROM local_fair_stream_execution_journal "
+                    "WHERE lease_id=? OR (session_id=? AND request_id=?) LIMIT 1",
+                    (permit.lease_id, self.session_id, permit.request_id),
+                ).fetchone() is not None:
+                    raise ExecutionOutcomeUnknown("conflicting execution and cancellation custody")
+                self._assert_private()
+                self._connection.commit()
+                return expected
+            except BaseException:
+                self._connection.rollback()
+                raise
+
     def begin(self, permit: DispatchPermit) -> None:
         """Persist intent before any backend call; reject ALL prior lease IDs."""
         if type(permit) is not DispatchPermit or permit.device_qualified:

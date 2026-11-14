@@ -399,6 +399,56 @@ class GuardedFairStreamDispatch:
             self._uncertain = False
             return updated
 
+    def reconcile_cancelled(
+        self, *, authorization: "RecoveryAuthorization", recovery_key: bytes,
+    ) -> dict[str, object]:
+        """Operator-only recovery of a previously journaled cancellation.
+
+        No caller-supplied journal, missing-row inference or new execution
+        permit is accepted. An anchor mismatch is not repairable here.
+        """
+        from .fair_stream_execution_journal import JournaledExecutionOwner
+        from .fair_stream_recovery import verify_recovery_authorization
+
+        with self._lock:
+            if (not self._whole_request or type(self._owner) is not JournaledExecutionOwner
+                    or self._executing):
+                raise DispatchUncertain("native cancellation reconciliation unavailable")
+            state = self._session.verify()
+            pending = state["checkpoint"]["pending"]
+            if type(pending) is not list or len(pending) != 1 or type(pending[0]) is not dict:
+                raise DispatchUncertain("exactly one pending lease required")
+            lease = pending[0]
+            permit = DispatchPermit(
+                lease_id=lease["lease_id"], request_id=lease["request_id"],
+                generation=state["generation"], checkpoint_digest=state["checkpoint_digest"],
+                tokens=lease["tokens"], bytes_reserved=lease["bytes_reserved"],
+            )
+            if self._issued and self._issued.get(permit.lease_id) != permit:
+                raise DispatchUncertain("in-memory lease differs from durable custody")
+            verify_recovery_authorization(
+                authorization, recovery_key=recovery_key, state=state,
+                lease_id=permit.lease_id, purpose="cancelled",
+            )
+            self._executing = True
+            try:
+                receipt = self._owner._journal.recover_cancelled_receipt(permit)
+                updated = self._session.cancel_unstarted(
+                    receipt, tenant_id=lease["tenant_id"],
+                    expected_anchor=(state["generation"], state["digest"]),
+                )
+                self._issued.clear()
+                self._issued_token_budget = None
+                if self._cancel_cleanup is not None:
+                    self._cancel_cleanup(permit.request_id)
+                self._uncertain = False
+                return updated
+            except BaseException as exc:
+                self._uncertain = True
+                raise DispatchUncertain("cancelled receipt unavailable or custody reconciliation failed") from exc
+            finally:
+                self._executing = False
+
     def execute_once(self, permit: DispatchPermit) -> dict[str, object]:
         """Execute at most once, with a fresh OS re-probe and signed receipt.
 
