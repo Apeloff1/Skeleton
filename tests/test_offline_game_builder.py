@@ -370,3 +370,59 @@ def test_saved_history_has_a_transactional_admission_limit(manager, monkeypatch)
         manager.submit("build_two", "A small shooter.")
     assert error.value.status == 429 and error.value.code == "local_game_history_full"
     assert len(manager.list_jobs()) == 1
+
+
+@pytest.mark.parametrize("name", [
+    "NUL.txt", "folder/COM1.gd", "folder/LPT¹", "invalid?.gd",
+    "folder/CONIN$", "folder/hidden\u200b.gd", "folder/e\u0301.gd",
+    "folder/trailing.", "folder/../outside", "a\\b", "bad\x7f",
+])
+def test_archive_names_reject_nonportable_components(name):
+    with pytest.raises(ValueError):
+        builder._safe_name(name)
+
+
+@pytest.mark.parametrize("names", [
+    ["project.godot", "jeeves_build.JSON"],
+    ["project.godot", "FORGE_MANIFEST.json/child"],
+    ["project.godot", "Assets/a.gd", "assets/b.gd"],
+    ["project.godot", "scripts", "Scripts/a.gd"],
+    ["project.godot", "scripts/a.gd", "Scripts"],
+    ["project.godot", "PROJECT.GODOT"],
+])
+def test_archive_namespace_rejects_aliases_before_member_read(names):
+    with pytest.raises(ValueError):
+        builder._archive_names(names, source_only=True)
+
+
+@pytest.mark.parametrize("damage", ["nonstring", "reserved", "count", "digest", "directory_alias"])
+def test_package_manifest_is_validated_before_source_reads(manager, tmp_path, monkeypatch, damage):
+    project = tmp_path / "preflight-project"
+    project.mkdir()
+    names = ["project.godot"]
+    hashes = {"project.godot": "a" * 64}
+    manifest = {"files": names, "sha256": hashes, "source_sha256": "b" * 64, "count": 1}
+    if damage == "nonstring":
+        names.append(["bad"])
+        manifest["count"] = 2
+    elif damage == "reserved":
+        names.append("JEEVES_BUILD.json")
+        hashes[names[-1]] = "a" * 64
+        manifest["count"] = 2
+    elif damage == "count":
+        manifest["count"] = True
+    elif damage == "digest":
+        hashes["project.godot"] = "not-a-digest"
+    else:
+        names.extend(["Dir/a", "dir/b"])
+        hashes.update({"Dir/a": "a" * 64, "dir/b": "a" * 64})
+        manifest["count"] = 3
+    manifest_path = project / "FORGE_MANIFEST.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    original_read = builder._read_regular
+    def only_manifest(path, *args, **kwargs):
+        assert path == manifest_path, "source member read before whole-index admission"
+        return original_read(path, *args, **kwargs)
+    monkeypatch.setattr(builder, "_read_regular", only_manifest)
+    with pytest.raises(ValueError):
+        manager._package(project, {})
