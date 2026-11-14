@@ -1,0 +1,26 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "capacity-31",
+  "domain": "capacity",
+  "phase": "admission",
+  "category": "adversarial-denial",
+  "threat": "Finite total and per-tenant queue depth, including schema and hostile identities 31",
+  "trust_boundary": "Native AI job, principal, model and bounded capacity remain authoritative",
+  "input": {
+    "variant": 30,
+    "tenants": [
+      "a",
+      "a",
+      "a",
+      "b"
+    ],
+    "global": 4,
+    "per_tenant": 2
+  },
+  "expected_allow": false,
+  "acceptance": "Execute the actual durable_jobs.case_oracle on private test SQLite and assert exact disposition",
+  "no_hosted_fallback": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

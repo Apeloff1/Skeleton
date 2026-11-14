@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "word_count_14",
+  "domain": "word_count",
+  "ordinal": 14,
+  "arguments": {
+    "index": 14,
+    "a": 198,
+    "b": 3,
+    "word": "harbor",
+    "city": "Bergen"
+  },
+  "prompt": "Task 14: Count whitespace-separated words in 'harbor really really stable pipeline node14'. Digits only.",
+  "expected": "6",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

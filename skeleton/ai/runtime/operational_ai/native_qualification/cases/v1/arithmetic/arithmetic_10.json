@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "arithmetic_10",
+  "domain": "arithmetic",
+  "severity": "high",
+  "objective": "Evaluate arithmetic and rational-number reliability on task 10",
+  "steps": [
+    {
+      "prompt": "Compute 14440 - 190. Return only the integer.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "14250"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

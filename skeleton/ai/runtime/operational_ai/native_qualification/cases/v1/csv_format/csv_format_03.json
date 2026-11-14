@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "csv_format_03",
+  "domain": "csv_format",
+  "severity": "high",
+  "objective": "Evaluate contract-correct machine-readable csv_format result 3",
+  "steps": [
+    {
+      "prompt": "Return exactly the CSV below represented by this structured data, including one header city,visitors and two data lines, no Markdown or commentary. Row 1: city=Oslo, visitors=13; row 2: city=Narvik, visitors=24.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "city,visitors\nOslo,13\nNarvik,24"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

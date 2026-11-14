@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "constraints_06",
+  "domain": "constraints",
+  "severity": "high",
+  "objective": "Measure model instruction and classification robustness, domain constraints task 6",
+  "steps": [
+    {
+      "prompt": "Reverse all letters of \"elm\", without changing case. Reply with only the reversed word.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "mle"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

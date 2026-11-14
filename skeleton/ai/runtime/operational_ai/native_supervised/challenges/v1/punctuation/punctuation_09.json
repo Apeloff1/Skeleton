@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "punctuation_09",
+  "domain": "punctuation",
+  "ordinal": 9,
+  "arguments": {
+    "index": 9,
+    "a": 163,
+    "b": 11,
+    "word": "quartz",
+    "city": "Tromso"
+  },
+  "prompt": "Task 9: Remove only commas from 'quartz, north, node9.'",
+  "expected": "quartz north node9.",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

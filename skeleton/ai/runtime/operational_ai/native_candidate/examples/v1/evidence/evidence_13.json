@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "evidence_13",
+  "domain": "evidence",
+  "prompt": "A fictional source synthetic_note_112 explicitly records tag blue. Extract the tag only; do not infer other fields.",
+  "completion": "blue",
+  "group_id": "evidence_13",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}
