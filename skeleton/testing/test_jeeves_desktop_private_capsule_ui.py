@@ -199,5 +199,34 @@ class SourceCapsuleDesktopUIContractTests(unittest.TestCase):
         view._buttons.assert_called()
 
 
+    def test_modal_consent_cannot_reuse_changed_scope_or_digest(self):
+        for changed in ("selection", "digest"):
+            with self.subTest(changed=changed):
+                view, _ = fake_window()
+                def confirm(*args, **kwargs):
+                    if changed == "selection":
+                        view._capsule_selected = lambda: "src/other.py"
+                    else:
+                        view.capsule_expected.get.return_value = "0" * 64
+                    return True
+                with (
+                    mock.patch.object(ui.filedialog, "askdirectory", return_value="/private"),
+                    mock.patch.object(ui.simpledialog, "askstring", return_value="new_capsule"),
+                    mock.patch.object(ui.messagebox, "askyesno", side_effect=confirm),
+                    mock.patch.object(ui, "publish_private_capsule") as publication,
+                ):
+                    ui.PortablePatchWindow._publish_capsule(view)
+                publication.assert_not_called()
+                self.assertTrue(view._queue.empty())
+
+    def test_cold_verify_rejects_invalid_seal(self):
+        view, _ = fake_window()
+        view._capsule_path = "/private/new_capsule"
+        view._capsule_receipt = {"seal_sha256": "not-a-digest"}
+        with mock.patch.object(ui, "verify_private_capsule") as verify:
+            ui.PortablePatchWindow._verify_capsule(view)
+        verify.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
