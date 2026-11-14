@@ -2,29 +2,19 @@
 from __future__ import annotations
 from pathlib import Path
 import os
-import stat
 import hashlib
 
 from .canonical import bytes_sha, required_sha, encode
 from .errors import refuse
-from ..model.gguf.file_guard import open_trusted_root, regular_beneath
+from ..model.gguf.file_guard import regular_beneath
+from ..recovered_path_custody import open_private_directory
 
 
-def _open_private_root(directory: Path) -> int:
-    if type(directory) is not Path or not directory.is_absolute():
-        refuse("store-absolute-directory")
+def _open_private_root(directory: Path, *, create: bool = False) -> int:
     try:
-        root = open_trusted_root(directory)
+        return open_private_directory(directory, create=create)
     except (OSError, ValueError):
         refuse("store-untrusted-directory")
-    metadata = os.fstat(root)
-    if not stat.S_ISDIR(metadata.st_mode) or metadata.st_mode & 0o077:
-        os.close(root)
-        refuse("store-private-only")
-    if metadata.st_uid != os.geteuid():
-        os.close(root)
-        refuse("store-owner-mismatch")
-    return root
 
 
 def _write_exclusive(root: int, leaf: str, content: bytes) -> None:
@@ -56,8 +46,7 @@ def publish_genesis(directory: Path, genesis, *, refuse_existing: bool = True) -
         refuse("genesis-output-budget")
     if bytes_sha(raw) != manifest.checkpoint_sha256:
         refuse("genesis-checkpoint-mismatch")
-    directory.mkdir(mode=0o700, parents=False, exist_ok=True)
-    root = _open_private_root(directory)
+    root = _open_private_root(directory, create=True)
     try:
         checkpoint_leaf = manifest.checkpoint_sha256 + ".native.json"
         manifest_leaf = manifest.checkpoint_sha256 + ".manifest.json"

@@ -5,7 +5,10 @@ The live serving model is still protected by immutable cloning.
 """
 from __future__ import annotations
 from contextlib import contextmanager
-import fcntl
+try:
+    import fcntl
+except ImportError:  # Native process custody is POSIX-only.
+    fcntl = None
 import os
 from pathlib import Path
 import stat
@@ -13,6 +16,7 @@ import time
 
 from .strict import sha, number
 from .errors import deny
+from ..recovered_path_custody import open_private_directory
 
 
 @contextmanager
@@ -20,16 +24,15 @@ def model_training_fence(
     state_directory: Path, model_sha256: str, *,
     deadline_ms: int = 20000,
 ):
-    from ..model.gguf.file_guard import open_trusted_root
     sha(model_sha256, "lock-model")
     number(deadline_ms, "lock-deadline", 1, 60000)
-    if type(state_directory) is not Path or not state_directory.is_absolute():
-        deny("lock-root")
-    root = open_trusted_root(state_directory)
+    if fcntl is None:
+        deny("training-lock-posix-required")
     try:
-        info = os.fstat(root)
-        if not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o077 or info.st_uid != os.geteuid():
-            deny("lock-private-root")
+        root = open_private_directory(state_directory, create=False)
+    except (OSError, ValueError):
+        deny("lock-private-root")
+    try:
         leaf = "model_training_" + model_sha256[:32] + ".lock"
         fd = os.open(leaf, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC,
                      0o600, dir_fd=root)

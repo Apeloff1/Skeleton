@@ -6,17 +6,19 @@ No parent-directory symlink or world-writable intermediary is accepted.
 from __future__ import annotations
 import os
 from pathlib import Path
-import stat
 from .canonical import encode, sha256, identity
 from .errors import deny
 from .privacy import inspect_public_fields
 from .report import QualificationReport
+from ..recovered_path_custody import require_absolute_directory, open_private_directory
 
 
 def save_new_private(report: QualificationReport, directory: Path, name: str) -> dict:
     if type(report) is not QualificationReport:
         deny("write-report-type")
-    if type(directory) is not Path or not directory.is_absolute():
+    try:
+        require_absolute_directory(directory)
+    except ValueError:
         deny("write-root")
     identity(name, "report-name")
     record = report.record()
@@ -26,16 +28,11 @@ def save_new_private(report: QualificationReport, directory: Path, name: str) ->
     data = encode(record)
     if len(data) > 8 * 1024 * 1024:
         deny("write-report-size")
-    directory.mkdir(mode=0o700, parents=False, exist_ok=True)
-    from skeleton.ai.runtime.operational_ai.model.gguf.file_guard import open_trusted_root
     try:
-        root_fd = open_trusted_root(directory)
+        root_fd = open_private_directory(directory, create=True)
     except (OSError, ValueError) as exc:
         raise RuntimeError("unsafe report parent directory") from exc
     try:
-        st = os.fstat(root_fd)
-        if not stat.S_ISDIR(st.st_mode) or st.st_mode & 0o077 or st.st_uid != os.geteuid():
-            deny("write-permission")
         leaf = name + ".json"
         fd = os.open(
             leaf, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,

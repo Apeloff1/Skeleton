@@ -7,26 +7,18 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-import stat
 
 from .errors import deny
 from .strict import bytes_sha
 from .trainer import CandidateTrainingResult
+from ..recovered_path_custody import open_private_directory
 
 
 def _root(directory: Path) -> int:
-    from ..model.gguf.file_guard import open_trusted_root
-    if type(directory) is not Path or not directory.is_absolute():
-        deny("candidate-root")
     try:
-        fd = open_trusted_root(directory)
+        return open_private_directory(directory, create=True)
     except (OSError, ValueError):
-        deny("candidate-parent-unsafe")
-    mode = os.fstat(fd)
-    if not stat.S_ISDIR(mode.st_mode) or mode.st_mode & 0o077 or mode.st_uid != os.geteuid():
-        os.close(fd)
         deny("candidate-root-private")
-    return fd
 
 
 def _write_new(fd: int, name: str, data: bytes) -> None:
@@ -69,7 +61,6 @@ def publish(result: CandidateTrainingResult, directory: Path) -> dict:
         deny("candidate-checkpoint-model-mismatch")
     digest = bytes_sha(raw)
     leaf = digest + ".native.json"
-    directory.mkdir(mode=0o700, parents=False, exist_ok=True)
     root_fd = _root(directory)
     try:
         # Do not silently accept a different artifact at an existing name.
