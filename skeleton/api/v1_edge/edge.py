@@ -23,6 +23,7 @@ from .validation import validate
 from .webhook_ingress import WebhookIngressVerifier
 
 UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
+MAX_BODY_FRAMES = 4096
 
 
 @dataclass
@@ -168,21 +169,29 @@ async def _read_body(receive, limit: int) -> bytes:
     frames = 0
     while True:
         frames += 1
-        if frames > 4096:
+        if frames > MAX_BODY_FRAMES:
             raise EdgeError(413, "EDGE.BODY_TOO_MANY_FRAMES", "request exceeded body frame budget")
         msg = await receive()
-        if msg["type"] == "http.disconnect":
+        # A non-mapping or untyped ASGI event must be a 400, never a KeyError/500.
+        if type(msg) is not dict:
+            raise EdgeError(400, "EDGE.BAD_BODY_FRAME", "invalid request frame")
+        if msg.get("type") == "http.disconnect":
             raise EdgeError(400, "EDGE.CLIENT_DISCONNECT", "client disconnected")
         if msg.get("type") != "http.request":
             raise EdgeError(400, "EDGE.BAD_BODY_FRAME", "invalid request frame")
         chunk = msg.get("body", b"")
         if type(chunk) is not bytes:
             raise EdgeError(400, "EDGE.BAD_BODY_FRAME", "invalid body frame type")
+        # more_body must be a real bool: a truthy string such as "false" would
+        # otherwise keep the read loop open on a forged continuation flag.
+        more = msg.get("more_body", False)
+        if type(more) is not bool:
+            raise EdgeError(400, "EDGE.BAD_BODY_FRAME", "invalid body frame type")
         size += len(chunk)
         if size > limit:
             raise EdgeError(413, "EDGE.BODY_TOO_LARGE", "request body too large", {"limit": limit})
         chunks.append(chunk)
-        if not msg.get("more_body"):
+        if not more:
             return b"".join(chunks)
 
 
