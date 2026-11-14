@@ -73,9 +73,11 @@ def test_schema_coverage_and_duplicates_fail_closed(tmp_path):
 def test_review_compile_verify_player_and_editor(tmp_path):
     world, store, source = setup(tmp_path)
     first = store.publish(world["id"], source, create=True)
-    # Publication resets approval and the review note; the published CAS
-    # identity, not the unreviewed proposal digest, is authoritative.
-    assert first == digest(store.inspect(world["id"])["chapters"])
+    published = store.inspect(world["id"])["chapters"]
+    # Publication explicitly replaces the old draft review note and revokes
+    # approval; the lease must bind the bytes actually persisted.
+    assert published["approved"] is False
+    assert first == digest(published)
     assert first != digest(source)
     assert_code("chapters_review_required",
                 lambda: store.compile(world["id"], first))

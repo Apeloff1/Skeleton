@@ -97,6 +97,18 @@ def _has_bounded_regex(path: str, source: str) -> bool:
     return False
 
 
+
+def test_bounded_benchmark_regex_guard_rejects_backtracking_pattern() -> None:
+    """Match literal regex word boundaries rather than Python backspace escapes."""
+    path = "backend/routes/compiler_tools.py"
+    source = _read(ROOT / path)
+    assert _has_bounded_regex(path, source)
+    assert not _has_bounded_regex(
+        path, source.replace(r're.findall(r"\bfor\b", benchmark_source)',
+                             r're.findall(r".*for.*", benchmark_source)'),
+    )
+
+
 def _has_ssrf_custody(path: str, source: str) -> bool:
     if path == "backend/gameforge/knowledge/free_apis.py":
         required = ("_catalog_request_parts", "_pin_public_origin",

@@ -6,9 +6,10 @@
  */
 import { FALLBACK_GENRES, type FallbackGenre } from './fallbackGenres';
 
-/** Two surviving historical specialties were absent from the 67 offline entries.
- * Preserve the 67 original records byte-for-byte; these are distinct
- * editorial genre labels, NOT additional executable Godot engines.
+/** Recovery records for the two historical specialties. Some source
+ * baselines already embed these in FALLBACK_GENRES; merge by identity so
+ * neither the original records nor distinct choices are duplicated.
+ * These are editorial labels, NOT additional executable Godot engines.
  */
 export const RECOVERED_GENRES: readonly FallbackGenre[] = [
   { id: 'beat_em_up', name: "Beat 'em up", icon: '🥊', color: '#E26D5A',
@@ -20,7 +21,13 @@ export const RECOVERED_GENRES: readonly FallbackGenre[] = [
     screens: 6, components: 10, logic_files: 8,
     subgenres: ['vertical_shmup', 'horizontal_shmup', 'pattern_shooter'], subgenre_count: 3 },
 ];
-export const GALAXY_OFFLINE_CHOICES: readonly FallbackGenre[] = [...FALLBACK_GENRES, ...RECOVERED_GENRES];
+// Preserve the canonical original record and stable ordering on every
+// baseline, including one that already contains both recovery specialties.
+const canonicalIds = new Set(FALLBACK_GENRES.map((row) => row.id));
+export const GALAXY_OFFLINE_CHOICES: readonly FallbackGenre[] = [
+  ...FALLBACK_GENRES,
+  ...RECOVERED_GENRES.filter((row) => !canonicalIds.has(row.id)),
+];
 export const GALAXY_OFFLINE_COUNT = GALAXY_OFFLINE_CHOICES.length;
 
 export const GALAXY_LIVE_GENRE_LIMIT = 512;

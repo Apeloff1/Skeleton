@@ -253,7 +253,10 @@ def pick_api(query: str) -> tuple[str, dict]:
     m = re.search(r"(?:synonym|synonyms|related words?)\s+(?:for|of)?\s*(.+)", q)
     if m:
         return "datamuse", {"q": m.group(1)}
-    if re.search(r"\b(?:crypto|cryptocurrency|bitcoin|ethereum|solana|dogecoin|cardano)\b", q) or "coin price" in q:
+    # An explicit research request outranks "crypto" inside "cryptography".
+    if "paper" in q or "research" in q or "arxiv" in q:
+        return "arxiv", {"q": re.sub(r"(papers?|research|about|on|arxiv)", "", q).strip() or query}
+    if any(w in q for w in ("crypto", "bitcoin", "ethereum", "coin price", "price of")):
         coin = "bitcoin"
         for c in ("bitcoin", "ethereum", "solana", "dogecoin", "cardano"):
             if c in q:
@@ -262,8 +265,6 @@ def pick_api(query: str) -> tuple[str, dict]:
     m = re.search(r"country\s+(.+)", q)
     if m:
         return "countries", {"q": m.group(1)}
-    if "paper" in q or "research" in q or "arxiv" in q:
-        return "arxiv", {"q": re.sub(r"(papers?|research|about|on|arxiv)", "", q).strip() or query}
     if "repo" in q or "github" in q or "library for" in q:
         return "github", {"q": re.sub(r"(repo|repos|github|library for)", "", q).strip() or query}
     if "book" in q:

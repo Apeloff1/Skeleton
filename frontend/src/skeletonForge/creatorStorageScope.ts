@@ -13,6 +13,11 @@ const ALLOWED_PREFIXES = new Set([
   '@skeleton_creator_bridge_v1',
   '@skeleton_galaxy_editor_draft_v1',
   '@skeleton_galaxy_profile_snapshot_v1',
+  // First-install Studio project settings and drafts are account isolated
+  // just like the original Galaxy and GameForge creator handoffs.
+  'skeleton.studio.onboarded.v1',
+  'skeleton.studio.projects.v1',
+  'skeleton.studio.prefs.v1',
 ]);
 
 export interface CreatorStorageScope {

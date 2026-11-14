@@ -92,6 +92,10 @@ def normalise_galaxy_profile(raw: Optional[Mapping[str, Any]]) -> Optional[dict[
                 raise ValueError("invalid Galaxy matrix axis value")
     if any(type(config.get(field)) is not dict for field in ("narrative_phases", "extra_params", "style_params")):
         raise ValueError("missing Galaxy narrative, extended or style controls")
+    # Extra controls are numeric sliders, not JSON boolean switches.
+    # Python bool otherwise silently acts like 0 or 1 in arithmetic.
+    if any(type(value) is bool for value in config["extra_params"].values()):
+        raise ValueError("Galaxy numeric slider cannot be boolean")
     _walk(raw, 0, [0])
     encoded = canonical_profile_bytes(raw)
     if len(encoded) > _MAX_BYTES:

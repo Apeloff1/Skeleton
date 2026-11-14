@@ -235,3 +235,94 @@ test('a thrown device read holds saves instead of inventing an empty studio', as
   assert.match(state.hydrateError, /disk locked/);
   assert.equal(state.screen, 'onboarding');
 });
+
+test('fresh first-install questionnaires independently allocate all modern Forge controls', () => {
+  const a = m.freshQuestionnaire(), b = m.freshQuestionnaire();
+  assert.deepEqual(a.instruments, {});
+  assert.deepEqual(a.playable, { enabled: false, mode: 'extraction', launch: false });
+  assert.deepEqual(a.quest, { enabled: false, length: 3 });
+  assert.notStrictEqual(a.instruments, b.instruments);
+  assert.notStrictEqual(a.playable, b.playable);
+  assert.notStrictEqual(a.options, b.options);
+});
+
+test('first-install saved projects preserve full Galaxy matrices, cockpit, eight-mode gameplay and custody', async () => {
+  const G = load('src/skeletonForge/galaxyHandoff.ts');
+  const config = {
+    title: 'Harbor of Glass', genre: 'beat_em_up',
+    game_vision: 'Original authored local-first arcade game',
+    extra_params: { crowd_density: 71 }, style_params: { visual_style: 'pixel_art' },
+    narrative_phases: { prologue: { branching: 2 } },
+  };
+  for (const field of G.MATRIX_FIELDS) config[field] = { prologue: { complexity: 67 } };
+  const q = {
+    ...m.freshQuestionnaire(),
+    step: 'review', vision: 'Original authored local-first arcade game',
+    brief: { genre: 'rpg' }, beats: { pace: 'frantic' },
+    instruments: { tempo: 0.75, risk: 0.32 },
+    galaxyGenre: 'beat_em_up', galaxyProfile: G.normaliseGalaxyProfile(config),
+    quest: { enabled: false, length: 4 },
+    playable: { enabled: true, mode: 'stealth', launch: true },
+    playtest: 'require', sourceExport: { enabled: true },
+  };
+  const store = storage.memoryKv({ [storage.KEYS.projects]: JSON.stringify([
+    project('harbor', { questionnaire: q }),
+  ]) });
+  const result = await storage.loadFoundation(store);
+  assert.equal(result.projectsCorrupt, false);
+  assert.equal(result.holdSaves, false);
+  const restored = result.projects[0].questionnaire;
+  assert.equal(restored.step, 'review');
+  assert.equal(restored.brief.genre, 'rpg');
+  assert.equal(restored.beats.pace, 'frantic');
+  assert.deepEqual({ ...restored.instruments }, { tempo: 0.75, risk: 0.32 });
+  assert.equal(restored.galaxyGenre, 'beat_em_up');
+  assert.equal(G.MATRIX_FIELDS.filter(f => restored.galaxyProfile.config[f]).length, 14);
+  assert.equal(restored.galaxyProfile.config.extra_params.crowd_density, 71);
+  assert.equal(restored.playable.mode, 'stealth');
+  assert.equal(restored.playable.launch, true);
+  assert.equal(restored.playtest, 'require');
+  assert.equal(restored.sourceExport.enabled, true);
+  const request = Q.buildRunRequest(restored);
+  assert.equal(request.playable_archetype, 'stealth');
+  assert.equal(request.playable_main_scene, true);
+  assert.equal(request.include_files, true);
+});
+
+test('older Studio files receive only missing Forge defaults without dropping authored vision', () => {
+  const legacy = project('old', { questionnaire: {
+    step: 'brief', vision: 'A careful original mystery',
+    brief: { genre: 'puzzle' }, beats: { pace: 'unhurried' },
+    options: { archetype: 'auto', target: 'godot', era: null, generation: null },
+    playable: { enabled: true },
+    quest: { enabled: false },
+  } });
+  const parsed = m.sanitizeProjects([legacy]);
+  assert.equal(parsed.corrupt, false);
+  const q = parsed.projects[0].questionnaire;
+  assert.equal(q.vision, 'A careful original mystery');
+  assert.equal(q.step, 'brief');
+  assert.deepEqual({ ...q.instruments }, {});
+  assert.deepEqual(q.playable, { enabled: true, mode: 'extraction', launch: false });
+  assert.deepEqual(q.quest, { enabled: false, length: 3 });
+  assert.equal(q.playtest, 'off');
+});
+
+test('forged saved source or unsafe scene controls hold the complete Studio project inventory', () => {
+  const G = load('src/skeletonForge/galaxyHandoff.ts');
+  const q = { ...m.freshQuestionnaire(), vision: 'An original survival puzzle' };
+  for (const mutation of [
+    { instruments: { risk: 1.5 } },
+    { playable: { enabled: true, mode: 'arbitrary_exec', launch: true } },
+    { galaxyProfile: { schema: G.GALAXY_PROFILE_SCHEMA, config: { title: 'incomplete' } } },
+    { quest: { enabled: true, length: 100 } },
+    { sourceExport: { enabled: 'true' } },
+  ]) {
+    const checked = m.sanitizeProjects([
+      project('good'),
+      project('bad', { questionnaire: { ...q, ...mutation } }),
+    ]);
+    assert.equal(checked.corrupt, true);
+    assert.deepEqual(checked.projects, []);
+  }
+});

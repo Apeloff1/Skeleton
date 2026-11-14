@@ -112,48 +112,47 @@ def propose_timeline(world: Any, *, actor: str, opening_note: str,
     _id(actor, "actor")
     _text(opening_note, "opening_note", 2048)
     _text(resolution_note, "resolution_note", 2048)
-    # A reviewed timeline must annotate *every* authored scene, not just its
-    # opening and endings. Derive one stable causal order from actual edges.
-    # Cyclic graphs cannot be placed on a single actor's strictly occupied
-    # clock without explicit authored review, and must fail closed.
-    scene_ids = {scene["id"] for scene in world["scenes"]}
-    edges: dict[str, set[str]] = {scene: set() for scene in scene_ids}
-    incoming = {scene: 0 for scene in scene_ids}
+    endings = {ending["scene"] for ending in world["endings"]}
+    scenes = {scene["id"]: scene for scene in world["scenes"]}
+    # One actor cannot occupy several scenes at the same tick. Establish a
+    # deterministic topological clock; looping chronology needs authored cues.
+    outgoing = {scene: set() for scene in scenes}
+    incoming = {scene: set() for scene in scenes}
     for edge in world["choices"]:
-        before, after = edge["from"], edge["to"]
-        if after not in edges[before]:
-            edges[before].add(after)
-            incoming[after] += 1
-    ready = sorted(scene for scene, count in incoming.items() if count == 0)
-    ordered: list[str] = []
+        origin, destination = edge["from"], edge["to"]
+        if origin != destination:
+            outgoing[origin].add(destination)
+            incoming[destination].add(origin)
+    remaining = {scene: len(parents) for scene, parents in incoming.items()}
+    order: list[str] = []
+    ready = sorted(scene for scene, count in remaining.items() if count == 0)
     while ready:
         scene = ready.pop(0)
-        ordered.append(scene)
-        for successor in sorted(edges[scene]):
-            incoming[successor] -= 1
-            if incoming[successor] == 0:
-                ready.append(successor)
-                ready.sort()
-    if len(ordered) != len(scene_ids) or ordered[0] != world["start"]:
-        raise CanonError("timeline_cycle_requires_explicit_review")
-    endings = sorted(ending["scene"] for ending in world["endings"])
-    ending_order = {scene: index for index, scene in enumerate(endings, 1)}
-    scene_notes = {scene["id"]: scene["title"] for scene in world["scenes"]}
+        order.append(scene)
+        for destination in sorted(outgoing[scene]):
+            remaining[destination] -= 1
+            if remaining[destination] == 0:
+                ready.append(destination)
+        ready.sort()
+    if len(order) != len(scenes) or not order or order[0] != world["start"]:
+        raise CanonError("timeline_requires_authored_cycle")
+    ids = {world["start"]: "setup"}
+    for i, ending in enumerate(sorted(endings), 1):
+        ids[ending] = f"resolution_{i}"
     events = []
-    for tick, scene in enumerate(ordered):
+    for tick, scene in enumerate(order):
+        eid = ids.get(scene, f"scene_{tick}")
         if scene == world["start"]:
-            event_id, kind, description = "setup", "setup", opening_note
-        elif scene in ending_order:
-            event_id = f"resolution_{ending_order[scene]}"
+            kind, description = "setup", opening_note
+        elif scene in endings:
             kind, description = "resolution", resolution_note
         else:
-            event_id = f"observation_{tick}"
-            kind, description = "observation", "Enter: " + scene_notes[scene]
+            kind, description = "observation", "Observe: " + scenes[scene]["title"]
+        # Alternative branches are not cumulative causal prerequisites.
         events.append({
-            "id": event_id, "scene": scene, "actor": actor,
+            "id": eid, "scene": scene, "actor": actor,
             "tick": tick, "kind": kind, "description": description,
-            "depends_on": [] if tick == 0 else ["setup"],
-            "requires_flags": [],
+            "depends_on": [] if tick == 0 else ["setup"], "requires_flags": [],
         })
     data = {"schema": SCHEMA, "world_id": world["id"],
             "world_digest": proof.source_digest, "events": events}

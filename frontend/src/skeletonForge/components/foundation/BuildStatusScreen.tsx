@@ -14,6 +14,7 @@ import { C } from '../theme';
 
 export function BuildStatusScreen({
   title, phase, payload, error, startedAt, finishedAt, now, onCancel, onRetry,
+  onExport, exportBusy, exportError,
   guidance, onGuidance, consoleBusy, consoleSummary, consoleOk, consoleFailures, onAskCockpit,
   onBrief, onProjects, onOpenCockpit,
 }: {
@@ -26,6 +27,9 @@ export function BuildStatusScreen({
   now: number;
   onCancel?: () => void;
   onRetry?: () => void;
+  onExport?: () => void;
+  exportBusy?: boolean;
+  exportError?: string | null;
   guidance: StepAction;
   onGuidance: (action: StepAction) => void;
   consoleBusy: boolean;
@@ -54,6 +58,9 @@ export function BuildStatusScreen({
         now={now}
         onCancel={onCancel}
         onRetry={onRetry}
+        onExport={onExport}
+        exportBusy={exportBusy}
+        exportError={exportError}
         testID="studio-run-panel"
       />
       <View testID="studio-next-step">

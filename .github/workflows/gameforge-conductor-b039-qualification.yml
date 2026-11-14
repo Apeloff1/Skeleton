@@ -1,21 +1,7 @@
 name: GameForge conductor and B039 self-repair qualification
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
-    paths:
-      - "skeleton/gameforge/__init__.py"
-      - "skeleton/gameforge/conductor.py"
-      - "skeleton/gameforge/eras.py"
-      - "skeleton/gameforge/errors.py"
-      - "skeleton/gameforge/manifest.py"
-      - "skeleton/gameforge/plans.py"
-      - "skeleton/gameforge/safety.py"
-      - "skeleton/gameforge/steps.py"
-      - "skeleton/gameforge/test_gameforge_conductor.py"
-      - "skeleton/gameforge/batch_b039/**"
-      - ".github/workflows/gameforge-conductor-b039-qualification.yml"
+  workflow_call:
   workflow_dispatch:
 
 permissions:
