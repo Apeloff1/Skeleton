@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "wall_budget_09",
+  "category": "wall_budget",
+  "overrides": {
+    "maximum_wall_ms": 36000001
+  },
+  "expected": "denied",
+  "reason": "Reject invalid wall_budget without reinterpreting training rights"
+}

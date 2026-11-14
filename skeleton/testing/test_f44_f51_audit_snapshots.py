@@ -214,7 +214,6 @@ def test_idempotency_decorator_cannot_hide_missing_completion_or_replay(monkeypa
         "skeleton.api.routes:forge_materialise",
         "skeleton.api.routes:forge_archetype",
         "skeleton.api.routes:gameforge_run",
-        "skeleton.api.routes:game_build",
         "skeleton.api.routes:gameforge_intake",
     }
     for missing in ("complete", "replay"):
@@ -252,6 +251,8 @@ def test_idempotency_decorator_cannot_hide_missing_completion_or_replay(monkeypa
             snapshot = idempotency_audit_snapshot()
         failures = snapshot["missing_remember" if missing == "complete" else "missing_replay"]
         assert expected <= set(failures)
+        # The separate durable game.build queue is not wrapped by the forge decorator.
+        assert "skeleton.api.routes:game_build" not in failures
 
 
 def test_idempotency_audit_rejects_completion_hidden_in_dead_branch(monkeypatch) -> None:
@@ -296,10 +297,10 @@ def test_idempotency_audit_rejects_completion_hidden_in_dead_branch(monkeypatch)
         "skeleton.api.routes:forge_materialise",
         "skeleton.api.routes:forge_archetype",
         "skeleton.api.routes:gameforge_run",
-        "skeleton.api.routes:game_build",
         "skeleton.api.routes:gameforge_intake",
     }
     assert expected <= set(result["missing_remember"])
+    assert "skeleton.api.routes:game_build" not in result["missing_remember"]
 
 
 def test_idempotency_audit_rejects_completion_after_return(monkeypatch) -> None:

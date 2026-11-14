@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "candidate_only_11",
+  "category": "candidate_only",
+  "overrides": {
+    "candidate_only": []
+  },
+  "expected": "denied",
+  "reason": "Reject unsafe model candidate_only without automatic downgrade or privilege escalation"
+}

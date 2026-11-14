@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "remainder_05",
+  "domain": "remainder",
+  "ordinal": 5,
+  "arguments": {
+    "index": 5,
+    "a": 135,
+    "b": 7,
+    "word": "lumen",
+    "city": "Trondheim"
+  },
+  "prompt": "Task 5: Compute the remainder when 135 is divided by 7.",
+  "expected": "2",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

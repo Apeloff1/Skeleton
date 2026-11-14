@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "minmax_11",
+  "domain": "minmax",
+  "ordinal": 11,
+  "arguments": {
+    "index": 11,
+    "a": 177,
+    "b": 13,
+    "word": "lumen",
+    "city": "Trondheim"
+  },
+  "prompt": "Task 11: Choose the smaller number from 177, 13, 190. Digits only.",
+  "expected": "13",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

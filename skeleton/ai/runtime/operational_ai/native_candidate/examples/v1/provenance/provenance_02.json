@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "provenance_02",
+  "domain": "provenance",
+  "prompt": "In a fictional provenance entry id=doc_701, original_author=author_b, revision=1, return the original_author value only.",
+  "completion": "author_b",
+  "group_id": "provenance_02",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

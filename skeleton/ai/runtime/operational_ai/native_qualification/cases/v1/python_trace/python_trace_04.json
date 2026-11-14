@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "python_trace_04",
+  "domain": "python_trace",
+  "severity": "high",
+  "objective": "Measure Python program interpretation and finite logical inference python_trace case 4",
+  "steps": [
+    {
+      "prompt": "Mentally run this Python 3 program without executing external code. Return exactly what the print call emits on one line. Program:\na = 34\nb = 6\nprint(a % b == 0)",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "False"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "json_merge_24",
+  "domain": "json_merge",
+  "ordinal": 24,
+  "arguments": {
+    "index": 24,
+    "a": 268,
+    "b": 13,
+    "word": "atlas",
+    "city": "Molde"
+  },
+  "prompt": "Task 24: Combine JSON objects {\"a\":268} and {\"b\":13}; compact keys a,b only.",
+  "expected": "{\"a\":268,\"b\":13}",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

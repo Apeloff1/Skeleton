@@ -1,0 +1,11 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "position_mode_05",
+  "category": "position_mode",
+  "overrides": {
+    "position_mode": "rope",
+    "seed": 204
+  },
+  "expected": "allowed",
+  "reason": "Confirm explicit local CPU-only candidate position_mode boundary"
+}

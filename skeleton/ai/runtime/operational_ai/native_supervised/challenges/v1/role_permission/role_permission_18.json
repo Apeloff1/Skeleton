@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "role_permission_18",
+  "domain": "role_permission",
+  "ordinal": 18,
+  "arguments": {
+    "index": 18,
+    "a": 226,
+    "b": 7,
+    "word": "atlas",
+    "city": "Molde"
+  },
+  "prompt": "Task 18: Owner=atlas, caller=atlas. Is strict same-owner access valid? yes or no.",
+  "expected": "yes",
+  "severity": "critical",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

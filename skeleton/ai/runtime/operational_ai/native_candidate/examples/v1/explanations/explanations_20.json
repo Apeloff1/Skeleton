@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "explanations_20",
+  "domain": "explanations",
+  "prompt": "Give this exact concise training definition of token for fictional glossary row 20.",
+  "completion": "A unit the model uses to process text.",
+  "group_id": "explanations_20",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

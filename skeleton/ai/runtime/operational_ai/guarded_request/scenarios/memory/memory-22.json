@@ -1,0 +1,28 @@
+{
+  "schema": "skeleton.ai.guard.case.v1",
+  "id": "memory-22",
+  "control": "memory",
+  "phase": "private-knowledge",
+  "kind": "adversarial-denial",
+  "objective": "Validate the actual AI memory control at exact adversarial boundary 22",
+  "threat": "Explicit consent, source and tenant binding, bounded retention and permission to forget, case 22",
+  "trust_boundary": "Local inference, principal, evidence and owner-private filesystem custody",
+  "input": {
+    "scope_tenant": "tenant",
+    "verify_tenant": "tenant",
+    "source_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "verify_source_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "category": "semantic",
+    "approved": true,
+    "caller_approved": true,
+    "issued_ms": 1000,
+    "expires_ms": 2000,
+    "now_ms": 2000
+  },
+  "expected_allow": false,
+  "expected_semantics": "Deny without model execution, hosted fallback or unapproved effect",
+  "evidence_rule": "Run a real policy_oracle instance and compare with the independently specified result",
+  "no_model_substitute": true,
+  "real_model_qualification": false,
+  "policy_release_qualification": false
+}

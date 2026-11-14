@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "remainder_17",
+  "domain": "remainder",
+  "ordinal": 17,
+  "arguments": {
+    "index": 17,
+    "a": 219,
+    "b": 6,
+    "word": "lumen",
+    "city": "Trondheim"
+  },
+  "prompt": "Task 17: Compute the remainder when 219 is divided by 6.",
+  "expected": "3",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}
