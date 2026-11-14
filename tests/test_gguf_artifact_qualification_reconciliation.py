@@ -72,7 +72,9 @@ class GuardedGGUFArtifactTests(unittest.TestCase):
             self.qualify(path=alias)
 
     def test_unconfigured_loader_remains_not_loaded(self):
-        loader = ModelLoader()
+        # Pass the mandatory full artifact digest so this case reaches the
+        # absent-path denial instead of failing earlier at digest validation.
+        loader = ModelLoader(expected_sha256=hashlib.sha256(self.data).hexdigest())
         with self.assertRaises(FileNotFoundError):
             loader.load("c" * 32, license_accepted=True)
         self.assertFalse(loader.loaded)
