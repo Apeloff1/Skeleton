@@ -63,13 +63,13 @@ export const TARGETS: readonly { id: string; label: string }[] = [
 
 export const PLAYABLE_SLICES = [
   { id: 'extraction', label: 'Extraction', hint: 'Recover caches and extract before heat becomes critical' },
-  { id: 'combat_loop', label: 'Arena combat', hint: 'Survive enemy waves' },
-  { id: 'pipeline', label: 'Factory logistics', hint: 'Refine and deliver shipments' },
-  { id: 'puzzle', label: 'Spatial puzzle', hint: 'Activate switches in sequence' },
-  { id: 'racing', label: 'Racing time trial', hint: 'Complete laps through checkpoints' },
-  { id: 'survival', label: 'Scavenging survival', hint: 'Manage hydration and reach shelter' },
-  { id: 'stealth', label: 'Stealth infiltration', hint: 'Retrieve intel while avoiding guards' },
-  { id: 'crafting', label: 'Crafting delivery', hint: 'Collect parts, craft and deliver' },
+  { id: 'combat_loop', label: 'Arena Combat', hint: 'Survive enemy waves' },
+  { id: 'pipeline', label: 'Factory Logistics', hint: 'Refine and deliver shipments' },
+  { id: 'puzzle', label: 'Spatial Puzzle', hint: 'Activate switches in sequence' },
+  { id: 'racing', label: 'Racing Time Trial', hint: 'Complete laps through checkpoints' },
+  { id: 'survival', label: 'Scavenging Survival', hint: 'Manage hydration and reach shelter' },
+  { id: 'stealth', label: 'Stealth Infiltration', hint: 'Retrieve intel while avoiding guards' },
+  { id: 'crafting', label: 'Crafting Delivery', hint: 'Collect parts, craft and deliver' },
 ] as const;
 
 export const PLAYABLE_TUNING_EFFECTS: Record<string, readonly string[]> = {
@@ -331,7 +331,7 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
     if (state.playable.mode && PLAYABLE_SLICES.some((item) => item.id === state.playable!.mode)) {
       request.playable_archetype = state.playable.mode;
     }
-    if (state.playable.launch && !state.quest?.enabled) request.playable_main_scene = true;
+    if (request.playable_archetype || state.playable.launch) request.playable_main_scene = state.playable.launch === true && !state.quest?.enabled;
   }
   if (state.playtest && state.playtest !== 'off' && request.target === 'godot') {
     request.playtest = state.playtest;

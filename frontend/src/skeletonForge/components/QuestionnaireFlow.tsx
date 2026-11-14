@@ -11,6 +11,7 @@ import { GALAXY_CHOICES, galaxyGenre, mappedBriefGenre } from '../galaxyGenres';
 import { GENRE_COUNT, GENRE_GROUPS, filterGenreChoices } from '../genreCatalog';
 import DesignInstruments from './DesignInstruments';
 import DesignPresetPanel from './DesignPresetPanel';
+import { suggestPlayableMode } from '../playableSuggestions';
 import {
   ARCHETYPES, BRIEF_FACETS, ERA_SOURCE_COPY, PLAYABLE_SLICES, PLAYABLE_TUNING_EFFECTS, STEP_LABELS, STEPS, TARGETS, VISION_MAX,
   blockReason, buildRunRequest, eraSource, progress, reachable, shadowedBriefFacets, stepIndex,
@@ -233,6 +234,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
   const [instrumentsOpen, setInstrumentsOpen] = React.useState(false);
   const [galaxyOpen, setGalaxyOpen] = React.useState(false);
   const [genreSearch, setGenreSearch] = React.useState('');
+  const playableHint = suggestPlayableMode(state.galaxyGenre);
   const filteredGenres = GALAXY_CHOICES.filter((g) => (g.id + ' ' + g.name + ' ' + g.desc).toLowerCase().includes(genreSearch.trim().toLowerCase()));
   return (
     <Card>
@@ -264,7 +266,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
       <OptionGroup id="target" prompt="Output" options={TARGETS.map((t) => t.id)} value={state.options.target} onPick={(v) => dispatch({ type: 'setOption', key: 'target', value: v })} />
       <View style={st.group} testID="q-playable-content-controls" accessibilityRole="radiogroup" accessibilityLabel="Playable Godot prototype scene">
         <Text style={st.q}>Playable Godot prototype scene</Text>
-        <Text style={st.help}>Opt-in: add a real controllable Godot sidecar scene with a complete win/lose loop. Extraction, Combat Loop and Pipeline have dedicated prototypes. Compose from vision uses Extraction as its fallback playable scene. The generated main world now includes an in-game button to launch this prototype and return again. All three prototypes draw visible objectives, live progress indicators and a touch/keyboard directional controller; headless Godot tests still run separately. The Tempo, Risk, Lethality, Scarcity, Agency and Progression Depth sliders now modify the underlying generated Godot movement, pressure, combat, interaction or completion goals where those mechanics apply; other sliders currently tune the design tensor and creative blueprint. Eight source-backed prototypes are selectable; actual native execution is separately qualified, not a claim of 158 gameplay engines.</Text>
+        <Text style={st.help}>Opt-in: add a real controllable Godot sidecar scene with a complete win/lose loop. Extraction, Combat Loop and Pipeline have dedicated prototypes. Compose from vision uses Extraction as its fallback playable scene. The generated main world now includes an in-game button to launch this prototype and return again. All three prototypes draw visible objectives, live progress indicators and a touch/keyboard directional controller; headless Godot tests still run separately. The Tempo, Risk, Lethality, Scarcity, Agency and Progression Depth sliders now modify the underlying generated Godot movement, pressure, combat, interaction or completion goals where those mechanics apply; other sliders currently tune the design tensor and creative blueprint. Choose from eight implemented source-backed prototypes. This does not mean all 69 catalog genres have complete gameplay; actual native execution is separately qualified.</Text>
         <View style={st.chips}>
           <Chip label="Blueprint only" selected={!state.playable?.enabled}
             onPress={() => dispatch({ type: 'setPlayableEnabled', value: false })}
@@ -399,14 +401,16 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
       {state.playable?.enabled && state.options.target === 'godot' ? (
         <View style={st.group} testID="q-playable-slice-options" accessibilityRole="radiogroup" accessibilityLabel="Native prototype mode">
           <Text style={st.q}>Select a playable prototype</Text>
+          {playableHint ? <View testID="q-playable-suggestion"><Text style={st.help}>Suggested mode is only a small prototype, not full specialized genre gameplay.</Text><Chip label="Use this prototype" selected={state.playable.mode === playableHint.mode} onPress={() => dispatch({ type: 'setPlayableMode', value: playableHint.mode })} testID="q-use-playable-suggestion" /></View> : null}
           <Chip label="Follow blueprint" selected={!state.playable.mode}
             onPress={() => dispatch({ type: 'setPlayableMode', value: 'auto' })} testID="q-playable-auto" />
           {PLAYABLE_SLICES.map(slice => <Chip key={slice.id} label={slice.label} selected={state.playable?.mode === slice.id}
             onPress={() => dispatch({ type: 'setPlayableMode', value: slice.id })} testID={'q-playable-mode-' + slice.id} />)}
-          {state.playable.mode ? <Text style={st.help} testID="q-playable-tuning-hint">{PLAYABLE_TUNING_EFFECTS[state.playable.mode]?.join(' · ')}</Text> : null}
-          <Chip label="Keep world startup" selected={!state.playable.launch} onPress={() => dispatch({ type: 'setPlayableMainScene', value: false })} testID="q-playable-extra-only" />
-          <Chip label="Start in prototype" selected={!!state.playable.launch} disabled={!!state.quest?.enabled}
+          {state.playable.mode ? <Text style={st.help} testID="q-playable-tuning-hint">{PLAYABLE_TUNING_EFFECTS[state.playable.mode]?.join(' · ')}. Other design sliders remain in the full GameForge tensor.</Text> : null}
+          <Chip label="Keep main world; add in-game switch button" selected={!state.playable.launch} onPress={() => dispatch({ type: 'setPlayableMainScene', value: false })} testID="q-playable-extra-only" />
+          <Chip label="Launch prototype as startup scene" selected={!!state.playable.launch} disabled={!!state.quest?.enabled}
             onPress={() => dispatch({ type: 'setPlayableMainScene', value: true })} testID="q-playable-launch" />
+          {state.quest?.enabled ? <Text style={st.help}>Room-entry quests require the original Godot launch scene.</Text> : null}
         </View>
       ) : null}
       {onOpenGalaxyStudio ? (
@@ -464,8 +468,8 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
       {state.sourceExport?.enabled && !req.include_files ? <Banner tone="warn">Godot ZIP preparation is disabled for JSON blueprint output.</Banner> : null}
       {req.playtest ? <Row k="Headless playtest" v={req.playtest === 'require' ? 'Required: main-world boot and playable scene completion when selected' : 'Best effort: main-world and selected playable scene; unavailable means unverified'} /> : null}
       {state.playtest && state.playtest !== 'off' && !req.playtest ? <Banner tone="warn" testID="q-playtest-not-exported">Headless Godot qualification is disabled for JSON blueprint export.</Banner> : null}
-      {req.playable_content ? <Row k="Playable scene" v={`Godot ${req.playable_archetype ?? (['extraction', 'combat_loop', 'pipeline'].includes(req.archetype) ? req.archetype : 'extraction')} prototype · controllable scene with launch/return control and a win/lose loop`} /> : null}
-      {state.playable?.enabled && !req.playable_content ? <Banner tone="warn" testID="q-playable-not-exported">Playable sidecar scenes require Godot output; JSON blueprint export omits playable scenes.</Banner> : null}
+      {req.playable_content ? <Row k="Playable scene" v={`${PLAYABLE_SLICES.find(slice => slice.id === (req.playable_archetype ?? req.archetype))?.label ?? 'Extraction'} · ${req.playable_main_scene ? 'startup scene' : 'additional scene'} · launch/return control`} /> : null}
+      {state.playable?.enabled && !req.playable_content ? <Banner tone="warn" testID="q-playable-not-exported">Native playable mini-games require Godot output; JSON blueprint export omits playable scenes.</Banner> : null}
       {req.quest_content ? <Row k="Native quest" v={`${req.quest_length} room-entry objectives · Godot quest HUD and snapshot contract`} /> : null}
       {state.quest?.enabled && !req.quest_content ? <Banner tone="warn" testID="q-native-quest-not-exported">Native room quests are disabled for JSON blueprint output. Select Godot in Forge options to include one.</Banner> : null}
       <Row k="Era" v={req.era ? humanize(req.era) : 'decided by the forge'} />
