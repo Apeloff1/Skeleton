@@ -115,8 +115,24 @@ function verifyNodeForgeNestedDigestAlgorithmGuard() {
 
   const rsaPath = require.resolve('node-forge/lib/rsa');
   const rsaSource = fs.readFileSync(rsaPath, 'utf8');
-  if (!rsaSource.includes('obj.value[0].value.length !==')) {
-    throw new Error('node-forge nested DigestAlgorithm source guard is missing');
+  const version = require('node-forge/package.json').version;
+  if (version === '1.4.3') {
+    const source = fs.readFileSync(rsaPath);
+    const sha = require('crypto').createHash('sha1')
+      .update('blob ' + source.length + '\0')
+      .update(source).digest('hex');
+    if (sha !== '65f6e8469d8a7695f4438722577230136f9dd425' ||
+        !rsaSource.includes('var _encodeDigestInfo = function(oid, digest, withParameters)') ||
+        !rsaSource.includes('d.substring(0, withParameters.length) !== withParameters') ||
+        !rsaSource.includes('d.substring(0, withoutParameters.length) !== withoutParameters')) {
+      throw new Error('node-forge 1.4.3 canonical DER guard or upstream source provenance missing');
+    }
+  } else if (new Set(['1.4.0', '1.4.2']).has(version)) {
+    if (!rsaSource.includes('obj.value[0].value.length !==')) {
+      throw new Error('node-forge nested DigestAlgorithm source guard is missing');
+    }
+  } else {
+    throw new Error('node-forge installed version requires security review');
   }
 }
 

@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "diagnostics_18",
+  "domain": "diagnostics",
+  "prompt": "Classify synthetic AI diagnostic 117: code healthy. Output exactly ready or blocked.",
+  "completion": "ready",
+  "group_id": "diagnostics_18",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "titlecase_15",
+  "domain": "titlecase",
+  "ordinal": 15,
+  "arguments": {
+    "index": 15,
+    "a": 205,
+    "b": 4,
+    "word": "quartz",
+    "city": "Tromso"
+  },
+  "prompt": "Task 15: Title-case these three words: quartz offline system.",
+  "expected": "Quartz Offline System",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

@@ -1,0 +1,56 @@
+name: Studio-Forge source-bound project return and custody qualification
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - 'frontend/src/skeletonForge/foundation/**'
+      - 'frontend/src/skeletonForge/components/foundation/**'
+      - 'frontend/src/skeletonForge/creatorBridge.ts'
+      - 'frontend/src/skeletonForge/creatorBridgeStorage.ts'
+      - 'frontend/src/skeletonForge/creatorStorageScope.ts'
+      - 'frontend/scripts/skeleton-forge/**'
+      - '.github/workflows/studio-forge-return-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-forge-return-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  source_custody:
+    name: Studio native source and one-time exact-revision return
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Set up pinned Yarn
+        run: |
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+      - name: Install fixed dependency manifest
+        working-directory: frontend
+        run: yarn install --frozen-lockfile --non-interactive --ignore-scripts --network-concurrency 4
+      - name: Enforce installed security patch postconditions
+        working-directory: frontend
+        run: |
+          node scripts/patch-node-modules.js
+          node scripts/verify-no-release-npm-security.js
+      - name: Qualify all original Studio and GameForge source contracts
+        working-directory: frontend
+        run: yarn test:skeleton-forge
+      - name: Compile complete frontend TypeScript
+        working-directory: frontend
+        run: yarn typecheck
+      - name: Verify real native dependency compatibility inventory
+        working-directory: frontend
+        run: yarn check:expo-native-compat

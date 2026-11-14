@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "provenance_select_19",
+  "domain": "provenance_select",
+  "ordinal": 19,
+  "arguments": {
+    "index": 19,
+    "a": 233,
+    "b": 8,
+    "word": "cedar",
+    "city": "Oslo"
+  },
+  "prompt": "Task 19: Source old revision 1 says cedar; new revision 2 says Oslo. Output the later revision value.",
+  "expected": "Oslo",
+  "severity": "critical",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

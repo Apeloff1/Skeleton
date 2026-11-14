@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "rounding_20",
+  "domain": "rounding",
+  "ordinal": 20,
+  "arguments": {
+    "index": 20,
+    "a": 240,
+    "b": 9,
+    "word": "harbor",
+    "city": "Bergen"
+  },
+  "prompt": "Task 20: Round 240 down to the nearest multiple of 10.",
+  "expected": "240",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}
