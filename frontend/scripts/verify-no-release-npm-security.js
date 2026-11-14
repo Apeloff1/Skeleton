@@ -115,7 +115,6 @@ function verifyNodeForgeNestedDigestAlgorithmGuard() {
 
   const rsaPath = require.resolve('node-forge/lib/rsa');
   const rsaSource = fs.readFileSync(rsaPath, 'utf8');
-
   const version = require('node-forge/package.json').version;
   if (version === '1.4.3') {
     const source = fs.readFileSync(rsaPath);
