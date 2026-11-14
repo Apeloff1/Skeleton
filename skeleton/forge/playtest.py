@@ -22,6 +22,7 @@ not against the admitted engine artefact. With no binary at all the result is
 """
 from __future__ import annotations
 
+import math
 import os
 import re
 import shutil
@@ -169,9 +170,11 @@ def playtest(files: Mapping[str, str], *, binary: Optional[str] = None,
             steps.append({"step": name, "returncode": code, "timed_out": timed_out,
                           "errors": found[:20], "log_tail": log[-2000:]})
             errors.extend(found)
+            if code != 0:
+                errors.append(f"{name}: engine exited {code}")
             if timed_out:
                 errors.append(f"{name}: timed out after {step_timeout:.0f}s")
-            if name == "import" and (timed_out or found):
+            if name == "import" and (timed_out or found or code != 0):
                 break
         boot = next((s for s in steps if s["step"] == "boot"), None)
         passed = bool(boot) and not errors and boot["returncode"] == 0
@@ -189,4 +192,111 @@ def playtest(files: Mapping[str, str], *, binary: Optional[str] = None,
             shutil.rmtree(root, ignore_errors=True)
 
 
-__all__ = ["PLAYTEST_MODES", "normalise_mode", "resolve_binary", "scan_log", "playtest"]
+def playtest_archetype_scene(
+    files: Mapping[str, str],
+    archetype: str,
+    *,
+    binary: Optional[str] = None,
+    frames: int = 6000,
+    timeout: float = 180.0,
+) -> Dict[str, Any]:
+    """Independently complete one of the eight real, source-backed Godot scenes.
+
+    The generated world's successful default-scene boot is not proof that its
+    separate native mini-game runs to completion. This is an isolated
+    import-and-play run against the exact emitted scene source. Model-generated
+    code, network downloads and permanent output paths are never admitted.
+    """
+    from skeleton.forge.archetype_content import (
+        COMPLETE_MARKER, FAILED_MARKER, content_archetypes,
+    )
+    from skeleton.forge.projector import write_project
+
+    if type(archetype) is not str or archetype not in content_archetypes():
+        raise ValueError("unknown original playable archetype")
+    if type(frames) is not int or not 1 <= frames <= 12000:
+        raise ValueError("scene frame budget must be 1..12000")
+    if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 1 <= timeout <= 300:
+        raise ValueError("scene timeout must be finite and 1..300 seconds")
+    scene = f"scenes/archetypes/{archetype}/main.tscn"
+    required = (
+        "project.godot", scene,
+        f"scripts/archetypes/{archetype}/core_loop.gd",
+        f"scripts/archetypes/{archetype}/player_controller.gd",
+    )
+    if not isinstance(files, Mapping) or any(
+        path not in files or type(files[path]) is not str for path in required
+    ):
+        raise ValueError("playable scene source is incomplete")
+
+    executable, source, verified = resolve_binary(binary)
+    receipt: Dict[str, Any] = {
+        "schema": "skeleton.gameforge.native_playable_scene.v1",
+        "scene": "res://" + scene,
+        "archetype": archetype,
+        "binary_source": source,
+        "verified": verified,
+        "frames": frames,
+        "passed": False,
+    }
+    if executable is None:
+        return {**receipt, "status": "unavailable", "reason": source, "errors": []}
+
+    root = Path(tempfile.mkdtemp(prefix="forge-native-scene-"))
+    start = time.monotonic()
+    deadline = start + float(timeout)
+    errors: List[str] = []
+    steps: List[Dict[str, Any]] = []
+    completed = False
+    try:
+        write_project(root, dict(files), overwrite=True)
+        success = f"{COMPLETE_MARKER} {archetype} "
+        failure = f"{FAILED_MARKER} {archetype} "
+        for name, command in (
+            ("import", [executable, "--headless", "--path", str(root), "--import"]),
+            ("scene", [
+                executable, "--headless", "--fixed-fps", "60",
+                "--quit-after", str(frames), "--path", str(root),
+                "res://" + scene,
+            ]),
+        ):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                errors.append("playable scene deadline exceeded")
+                break
+            code, output, timed_out = _run(command, root, remaining)
+            found = scan_log(output)
+            lines = tuple(line.strip() for line in output.splitlines())
+            success_seen = name == "scene" and any(line.startswith(success) for line in lines)
+            failure_seen = any(line.startswith(failure) for line in lines)
+            errors.extend(found[:12])
+            if code != 0:
+                errors.append(f"{name}: engine exited {code}")
+            if timed_out:
+                errors.append(f"{name}: deadline exceeded")
+            if failure_seen:
+                errors.append("native playable loop reported failure")
+            if name == "scene":
+                completed = success_seen and not failure_seen
+                if not success_seen:
+                    errors.append("native playable completion marker missing")
+            steps.append({
+                "step": name, "returncode": code, "timed_out": timed_out,
+                "errors": found[:12], "log_tail": output[-2000:],
+                "completion_marker": success_seen, "failure_marker": failure_seen,
+            })
+            if errors:
+                break
+        passed = completed and not errors and len(steps) == 2
+        return {
+            **receipt,
+            "status": "passed" if passed else "failed",
+            "passed": bool(passed), "errors": errors[:24],
+            "steps": steps,
+            "elapsed_s": round(time.monotonic() - start, 3),
+        }
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+__all__ = ["PLAYTEST_MODES", "normalise_mode", "resolve_binary", "scan_log", "playtest", "playtest_archetype_scene"]

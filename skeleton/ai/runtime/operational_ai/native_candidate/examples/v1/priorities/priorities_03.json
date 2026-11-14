@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "priorities_03",
+  "domain": "priorities",
+  "prompt": "Map fictional incident 302 with severity medium to its numeric priority rank (critical=0, high=1, medium=2, low=3).",
+  "completion": "2",
+  "group_id": "priorities_03",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

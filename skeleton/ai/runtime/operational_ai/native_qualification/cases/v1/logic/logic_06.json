@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "logic_06",
+  "domain": "logic",
+  "severity": "high",
+  "objective": "Measure Python program interpretation and finite logical inference logic case 6",
+  "steps": [
+    {
+      "prompt": "Evaluate the finite Boolean statement. Answer exactly TRUE or FALSE, no justification. Is (13 <= 16) OR (16 is odd) true?",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "TRUE"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

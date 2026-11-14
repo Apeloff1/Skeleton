@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "device_10",
+  "category": "device",
+  "overrides": {
+    "device": "torch"
+  },
+  "expected": "denied",
+  "reason": "Reject unsafe model device without automatic downgrade or privilege escalation"
+}

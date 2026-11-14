@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "product_21",
+  "domain": "product",
+  "ordinal": 21,
+  "arguments": {
+    "index": 21,
+    "a": 247,
+    "b": 10,
+    "word": "quartz",
+    "city": "Tromso"
+  },
+  "prompt": "Task 21: Multiply 247 by 10. Return the decimal integer only.",
+  "expected": "2470",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

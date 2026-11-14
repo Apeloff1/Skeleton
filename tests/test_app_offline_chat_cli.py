@@ -206,15 +206,22 @@ class HeadlessOfflineChatTests(unittest.TestCase):
             self.assertTrue(sessions)
             self.assertTrue(all(revision == 0 for _, revision in sessions))
 
-    def test_headless_reference_rejects_binary_large_and_symlink_file(self):
+    def test_headless_reference_rejects_binary_pressure_and_symlink_file(self):
         binary = self.directory / "binary.dat"
         binary.write_bytes(b"shader\x00binary")
         code, output, error = self._run("--add-reference", str(binary))
         self.assertEqual(code, 1)
-        oversized = self.directory / "oversized.txt"
-        oversized.write_bytes(b"shaders " * 12_000)
-        code, output, error = self._run("--add-reference", str(oversized))
+        selected = self.directory / "selected.txt"
+        selected.write_bytes(b"shaders " * 12_000)
+        # Admission follows observed device headroom, not the obsolete
+        # 64-KiB quota. A genuine resource denial still reaches the CLI and
+        # must leave the reference library untouched.
+        from skeleton.app.offline_resources import LocalResourcePressure
+        with patch("skeleton.app.offline_knowledge.admit_resident_document",
+                   side_effect=LocalResourcePressure("insufficient RAM headroom")):
+            code, output, error = self._run("--add-reference", str(selected))
         self.assertEqual(code, 1)
+        self.assertIn("headroom", error)
         good = self.directory / "trusted.txt"
         good.write_text("Hardware emulation pipeline.", encoding="utf-8")
         symlink = self.directory / "alias.txt"
@@ -227,6 +234,17 @@ class HeadlessOfflineChatTests(unittest.TestCase):
         code, output, errors = self._run("--list-references")
         self.assertEqual(code, 0, errors)
         self.assertEqual(json.loads(output), [])
+
+    def test_headless_reference_above_legacy_quota_uses_available_headroom(self):
+        selected = self.directory / "large-reference.txt"
+        text = "Hardware shaders and rasterizer continuity. " * 2_000
+        selected.write_text(text, encoding="utf-8")
+        self.assertGreater(len(text.encode("utf-8")), 65_536)
+        code, output, errors = self._run("--add-reference", str(selected))
+        self.assertEqual(code, 0, errors)
+        code, output, errors = self._run("--list-references")
+        self.assertEqual(code, 0, errors)
+        self.assertEqual(len(json.loads(output)), 1)
 
     def test_reference_read_rejects_path_swap_between_check_and_open(self):
         source = self.directory / "reference.md"

@@ -3,9 +3,7 @@ name: CI Surface and Merge-Hold Source Qualification
 # Read-only PR-head qualification. The privileged PR Merge Hold Gate remains
 # pull_request_target on the trusted base; this workflow never grants merges.
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_call:
   workflow_dispatch:
 
 permissions:

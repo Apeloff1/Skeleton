@@ -386,10 +386,23 @@ def test_redact_client_payload_is_bounded() -> None:
 def test_telemetry_crash_path_redacts_before_persist() -> None:
     source = TELEMETRY.read_text(encoding="utf-8")
     assert "def crash_row(" in source
-    assert "redact_client_text(report.message" in source
-    assert "redact_client_text(report.stack" in source
-    assert "redact_client_payload(report.info)" in source
+    # The privacy boundary keeps boolean diagnostic presence and allowlisted
+    # metadata only; original client text and stacks never reach storage.
+    assert "from core.telemetry_privacy import (" in source
+    assert "crash_metadata(" in source
+    assert "message=report.message" in source
+    assert "stack=report.stack" in source
+    assert "info=report.info" in source
     assert 'stack": (report.stack or "")[:8000]' not in source
+    from core.telemetry_privacy import crash_metadata
+    metadata = crash_metadata(
+        source="crash", component="ui", message=_PRIVATE,
+        stack="Traceback: " + _PRIVATE,
+        info={"password": _PRIVATE}, app_version="v1",
+    )
+    assert metadata["message_present"] is True
+    assert metadata["stack_present"] is True
+    assert _PRIVATE not in repr(metadata)
 
 
 def test_server_health_envelopes_do_not_stringify_exceptions() -> None:

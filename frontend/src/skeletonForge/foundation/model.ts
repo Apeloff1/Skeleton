@@ -3,6 +3,7 @@
  * Pure — screens and persistence sit on top of this reducer.
  */
 import { questionnaireReducer, type QuestionnaireAction, type QuestionnaireState } from '../questionnaire';
+import { normalisePresetState } from '../designPresets';
 import { summarizeRun } from '../run';
 import type { RunPayload } from '../types';
 
@@ -146,6 +147,13 @@ export function freshQuestionnaire(): QuestionnaireState {
     vision: '',
     brief: {},
     beats: {},
+    instruments: {},
+    galaxyGenre: null,
+    galaxyProfile: null,
+    quest: { enabled: false, length: 3 },
+    playable: { enabled: false, mode: 'extraction', launch: false },
+    playtest: 'off',
+    sourceExport: { enabled: false },
     options: { archetype: 'auto', target: 'godot', era: null, generation: null },
   };
 }
@@ -483,6 +491,28 @@ function sanitizeProject(raw: unknown): StudioProject | null {
   if (typeof options.archetype !== 'string' || typeof options.target !== 'string') return null;
   if (!(options.era == null || typeof options.era === 'string')) return null;
   if (!(options.generation == null || typeof options.generation === 'string')) return null;
+  // Old Studio projects predate the advanced cockpit. Default absent fields
+  // only; malformed present values must hold the file rather than erase edits.
+  const defaults = freshQuestionnaire();
+  let design: QuestionnaireState;
+  try {
+    const field = <K extends keyof QuestionnaireState>(key: K): QuestionnaireState[K] =>
+      Object.prototype.hasOwnProperty.call(questionnaire, key) ? questionnaire[key] : defaults[key];
+    design = normalisePresetState({
+      ...defaults, vision: questionnaire.vision, brief, beats,
+      options: { ...options, era: options.era ?? null, generation: options.generation ?? null },
+      instruments: field('instruments'), galaxyGenre: field('galaxyGenre'),
+      galaxyProfile: field('galaxyProfile'), quest: field('quest'), playable: field('playable'),
+    });
+    const playtest = field('playtest');
+    const sourceExport = field('sourceExport');
+    if (playtest !== 'off' && playtest !== 'auto' && playtest !== 'require') return null;
+    if (!sourceExport || typeof sourceExport !== 'object' ||
+        Array.isArray(sourceExport) || typeof sourceExport.enabled !== 'boolean') return null;
+    design = { ...design, step: questionnaire.step, playtest, sourceExport: { enabled: sourceExport.enabled } };
+  } catch {
+    return null;
+  }
   let lastRun: RunSnapshot | null = null;
   if (item.lastRun != null) {
     if (typeof item.lastRun !== 'object') return null;
@@ -504,7 +534,7 @@ function sanitizeProject(raw: unknown): StudioProject | null {
     title: typeof item.title === 'string' && item.title.trim() ? item.title : 'Untitled project',
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
-    questionnaire: { step: questionnaire.step, vision: questionnaire.vision, brief, beats, options: { ...options } },
+    questionnaire: design,
     lastRun,
   };
 }

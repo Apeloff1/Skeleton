@@ -23,22 +23,31 @@ export default function JeevesRuntimeStatus({ readiness, refresh, readinessError
   const lastObservedAt = observedAt ?? local.observedAt;
   const busy = refreshing || local.busy;
   const checks = { conversation_storage: 'Conversation history', engine: 'AI engine', models: 'Configured models', crawler: 'Captured knowledge' };
-  const availableModels = current?.models.models.filter(model => model.available && model.selectable).length ?? 0;
+  // Do not display an unrelated remote model as a healthy Jeeves endpoint.
+  const onlyLocalJeeves = current?.models.models.length === 1
+    && current.models.models[0]?.provider_id === 'local'
+    && current.models.models[0]?.model_id === 'jeeves'
+    && current.models.models[0]?.credential_free === true;
+  const jeevesReady = current?.available === true && onlyLocalJeeves === true
+    && current.models.models[0]?.active === true
+    && current.models.models[0]?.available === true
+    && current.models.models[0]?.selectable === true;
   return <View style={s.container}><View style={s.row}>
     <TouchableOpacity style={s.summary} accessibilityRole="button" accessibilityState={{ expanded }} onPress={() => setExpanded(value => !value)}>
-      <Ionicons name={current?.available ? 'checkmark-circle-outline' : 'information-circle-outline'} size={17} color={current?.available ? '#86efac' : '#c4b5fd'} />
-      <Text style={s.title}>{busy ? 'Checking AI readiness…' : current?.available ? `AI conversation ready · ${availableModels} available ${availableModels === 1 ? 'model' : 'models'}` : current ? 'AI conversation needs setup' : 'AI readiness not observed'}</Text>
+      <Ionicons name={jeevesReady ? 'checkmark-circle-outline' : 'information-circle-outline'} size={17} color={jeevesReady ? '#86efac' : '#c4b5fd'} />
+      <Text style={s.title}>{busy ? 'Checking AI readiness…' : jeevesReady ? 'Jeeves local model reports ready' : current ? 'Jeeves local model needs setup' : 'AI readiness not observed'}</Text>
       <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color="#94a3b8" />
     </TouchableOpacity>
     <TouchableOpacity style={s.button} disabled={busy} accessibilityRole="button" accessibilityLabel="Refresh AI readiness" accessibilityState={{ disabled: busy }} onPress={() => { void check().catch(() => {}); }}>
       {busy ? <ActivityIndicator size="small" color="#c4b5fd" /> : <Ionicons name="refresh-outline" size={17} color="#c4b5fd" />}
     </TouchableOpacity>
   </View>{expanded && <ScrollView style={{ maxHeight: Math.max(160, Math.min(520, height * 0.5)) }} contentContainerStyle={s.details} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-    <Text style={s.text}>{current ? chatReadinessMessage(current) : 'The app could not confirm its AI prerequisites. Open Setup to read the current service state.'}</Text>
+    <Text style={s.text}>{current && !onlyLocalJeeves ? 'Jeeves requires exactly one active local jeeves model. A hosted/advisory generator is not a permitted primary model.' : current ? chatReadinessMessage(current) : 'The app could not confirm its AI prerequisites. Open Setup to read the current service state.'}</Text>
     {!current && errorMessage && <Text accessibilityRole="alert" style={s.error}>{errorMessage}</Text>}
     {current && Object.entries(current.checks).map(([key, value]) => <Text key={key} style={s.text}>{checks[key as keyof typeof checks] || key.replaceAll('_', ' ')}: {value.available ? 'ready' : value.code.replaceAll('_', ' ')}</Text>)}
     {current && !current.checks.models.available && current.models.readiness?.message && <Text style={s.error}>{current.models.readiness.message}</Text>}
     {current && !current.checks.models.available && current.models.readiness?.action && <Text style={s.text}>{current.models.readiness.action}</Text>}
+    {current && <Text style={s.text}>Model readiness is a metadata and service check, not proof that the local GGUF generated a response. Verify a real two-turn answer and durable replay before first-install sign-off.</Text>}
     {current && <Text style={s.text}>{current.capabilities.token_deltas ? 'Live response text is available; the saved answer remains authoritative.' : 'Actual execution states are shown while the final answer is prepared.'} {current.capabilities.resume ? 'Saved turns can be resumed without starting duplicate work.' : 'Turn recovery is unavailable on this connection.'}</Text>}
     {lastObservedAt && <Text style={s.text}>Observed {new Date(lastObservedAt).toLocaleTimeString()}. Readiness is checked again when you return.</Text>}
     <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/setup' as never)} style={s.settings}><Text style={s.link}>Setup & readiness →</Text></TouchableOpacity>

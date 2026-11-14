@@ -18,6 +18,14 @@ class WorkOrderStore:
         if not callable(clock):refuse("trusted monotonic clock required")
         self.db=WorkDatabase(root,readonly=readonly)
         self._clock=clock
+        try:
+            # SQLite structural checks alone do not establish work custody.
+            # Refuse read and write admission until the persisted journal,
+            # reservation, signed-admission and outbox bindings are consistent.
+            self.audit()
+        except BaseException:
+            self.db.close()
+            raise
     def close(self):self.db.close()
     def __enter__(self):return self
     def __exit__(self,*_):self.close()
@@ -289,6 +297,18 @@ class WorkOrderStore:
             for tenant,reserved,consumed,job_res,job_spent in totals:
                 if reserved!=job_res or consumed!=job_spent:
                     refuse("tenant-wide durable quota and work orders diverged")
+            # Every event is published once to the outbox under its own job.
+            # The foreign keys alone allow an event to point to a different
+            # existing job, or its publication record to disappear.
+            mismatch=c.execute("""SELECT 1 FROM events e
+                LEFT JOIN outbox o ON o.event_sha=e.event_sha
+                WHERE o.event_sha IS NULL OR o.job_id<>e.job_id
+                   OR (o.acknowledged=0 AND o.acknowledged_ns IS NOT NULL)
+                   OR (o.acknowledged=1 AND
+                       (o.acknowledged_ns IS NULL OR o.acknowledged_ns<0))
+                LIMIT 1""").fetchone()
+            if mismatch is not None:
+                refuse("durable event/outbox custody diverged")
             # The admission nonce and job must be mutually bound to the exact
             # append-only signed-submission event, not merely present.
             from .contracts import parse,digest_id

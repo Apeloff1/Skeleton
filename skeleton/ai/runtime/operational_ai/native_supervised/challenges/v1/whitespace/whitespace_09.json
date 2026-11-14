@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "whitespace_09",
+  "domain": "whitespace",
+  "ordinal": 9,
+  "arguments": {
+    "index": 9,
+    "a": 163,
+    "b": 11,
+    "word": "quartz",
+    "city": "Tromso"
+  },
+  "prompt": "Task 9: Collapse repeated spaces in 'quartz   test     item9'.",
+  "expected": "quartz test item9",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

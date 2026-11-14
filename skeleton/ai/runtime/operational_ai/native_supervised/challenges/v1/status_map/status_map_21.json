@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "status_map_21",
+  "domain": "status_map",
+  "ordinal": 21,
+  "arguments": {
+    "index": 21,
+    "a": 247,
+    "b": 10,
+    "word": "quartz",
+    "city": "Tromso"
+  },
+  "prompt": "Task 21: Map synthetic worker status complete into pending, active, held or terminal.",
+  "expected": "terminal",
+  "severity": "critical",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

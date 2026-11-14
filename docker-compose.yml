@@ -64,6 +64,11 @@ services:
       # Runtime model selection is owned by the Skeleton engine process.
       # Local mode requires one artifact, deployment or multi-model catalog.
       # Empty paths keep AI unavailable while application services can boot.
+      # Jeeves is a local, single-primary text model. Multimodal sources are
+      # advisory context and cannot replace or fail over this inference owner.
+      - JEEVES_LOCAL_ONLY=${JEEVES_LOCAL_ONLY:-1}
+      - JEEVES_PRIMARY_MODEL_ID=${JEEVES_PRIMARY_MODEL_ID:-jeeves}
+      - AI_LOCAL_GUARD_REQUIRED=${AI_LOCAL_GUARD_REQUIRED:-1}
       - AI_PROVIDER=${AI_PROVIDER:-local}
       - AI_MODEL=${AI_MODEL:-}
       - AI_LOCAL_MODEL_PATH=${AI_LOCAL_MODEL_PATH:-}
@@ -151,6 +156,10 @@ services:
       - no_proxy=localhost,127.0.0.1,::1,skeleton,mongo,backend,chroma,${NO_PROXY:-},${no_proxy:-}
       - SKL_ENGINE_SERVICE_PRINCIPAL=${SKL_ENGINE_SERVICE_PRINCIPAL:-codedock-backend}
       - SKL_JEEVES_CANONICAL_CONVERSATIONS=${SKL_JEEVES_CANONICAL_CONVERSATIONS:-1}
+      # Match the model identity fence at the engine; chat never offers remote
+      # models even when an unrelated advisory module has external credentials.
+      - JEEVES_LOCAL_ONLY=${JEEVES_LOCAL_ONLY:-1}
+      - JEEVES_PRIMARY_MODEL_ID=${JEEVES_PRIMARY_MODEL_ID:-jeeves}
       - SKL_DRAGON_PRACTICE_DB_PATH=/app/data/dragon_practice.sqlite
       - SKL_DRAGON_KNOWLEDGE_DB_PATH=/app/data/dragon_knowledge.sqlite
       - SKL_DRAGON_RUNTIME_BOOTSTRAP=${SKL_DRAGON_RUNTIME_BOOTSTRAP:-1}

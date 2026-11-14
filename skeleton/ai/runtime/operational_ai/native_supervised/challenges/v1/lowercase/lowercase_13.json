@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "lowercase_13",
+  "domain": "lowercase",
+  "ordinal": 13,
+  "arguments": {
+    "index": 13,
+    "a": 191,
+    "b": 2,
+    "word": "cedar",
+    "city": "Oslo"
+  },
+  "prompt": "Task 13: Lowercase this identifier exactly: CEDAR_13.",
+  "expected": "cedar_13",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

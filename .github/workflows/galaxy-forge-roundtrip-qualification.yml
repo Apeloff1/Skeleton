@@ -1,0 +1,61 @@
+name: Galaxy-GameForge full-fidelity authoring roundtrip qualification
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "frontend/app/galaxy.tsx"
+      - "frontend/app/skeleton-forge.tsx"
+      - "frontend/src/skeletonForge/creatorBridge.ts"
+      - "frontend/src/skeletonForge/creatorBridgeStorage.ts"
+      - "frontend/src/skeletonForge/creatorStorageScope.ts"
+      - "frontend/src/features/GalaxyStudioFactory/galaxyDraftCodec.ts"
+      - "frontend/src/features/GalaxyStudioFactory/draftCustody.ts"
+      - "frontend/src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal.tsx"
+      - "frontend/src/skeletonForge/components/ForgeCockpitScreen.tsx"
+      - "frontend/src/skeletonForge/components/ForgeCockpitView.tsx"
+      - "frontend/scripts/skeleton-forge/**"
+      - ".github/workflows/galaxy-forge-roundtrip-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: galaxy-forge-roundtrip-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  frontend_roundtrip_source:
+    name: Original Galaxy and GameForge all-creator source qualifications
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out the exact proposed SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Activate pinned Yarn
+        run: |
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+      - name: Install dependencies from frozen manifest
+        working-directory: frontend
+        run: yarn install --frozen-lockfile --non-interactive --ignore-scripts --network-concurrency 4
+      - name: Enforce third-party security patches and immutable postconditions
+        working-directory: frontend
+        run: |
+          node scripts/patch-node-modules.js
+          node scripts/verify-no-release-npm-security.js
+      - name: Run complete offline GameForge component and authoring contracts
+        working-directory: frontend
+        run: yarn test:skeleton-forge
+      - name: Compile all frontend TypeScript contracts
+        working-directory: frontend
+        run: yarn typecheck
+      - name: Check Expo native compatibility
+        working-directory: frontend
+        run: yarn check:expo-native-compat
