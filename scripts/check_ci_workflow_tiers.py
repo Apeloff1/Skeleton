@@ -116,12 +116,16 @@ def audit(root: Path = ROOT) -> list[str]:
             source = (root / WORKFLOWS / name).read_text(encoding="utf-8")
             if events(source) != {"workflow_dispatch"}:
                 failures.append(f"{name}: source qualification must be manually dispatched, not automatically subscribed")
-            # Manually dispatchable source qualification is never an authority
-            # for whichever branch tip happened to be selected at runtime.
+            # A manually dispatched source suite must never run a caller-
+            # selected commit. The platform-owned dispatch SHA is bound to
+            # the guarded main ref, checkout and independent concurrency.
+            if ("inputs.candidate_sha" in source or
+                    re.search(r"(?m)^    inputs\\s*:", source)):
+                failures.append(f"{name}: manual candidate inputs are forbidden")
             for invariant in (
-                "candidate_sha:",
-                "required: true",
-                'ref: ${{ inputs.candidate_sha }}',
+                "if: github.repository == 'Apeloff1/Skeleton' && github.ref == 'refs/heads/main'",
+                'ref: ${{ github.sha }}',
+                'CANDIDATE_SHA: ${{ github.sha }}',
                 '[[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]',
                 'test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"',
             ):
@@ -129,7 +133,7 @@ def audit(root: Path = ROOT) -> list[str]:
                     failures.append(f"{name}: immutable SHA admission or checkout attestation missing")
             expected_group = (
                 "group: " + name.removesuffix("-qualification.yml")
-                + "-${{ inputs.candidate_sha }}"
+                + "-${{ github.sha }}"
             )
             if (expected_group not in source or "cancel-in-progress: false" not in source):
                 failures.append(f"{name}: manual candidate concurrency must preserve independent immutable evidence")

@@ -4,20 +4,15 @@ name: Strict Replay Source Qualification
 # quality_security step; avoid duplicate automatic PR/push admissions.
 # This workflow remains independently dispatchable for source qualification.
 on:
-  # Caller supplies one immutable source commit for unprivileged,
-  # read-only evidence. Dispatch and checkout are independent authorities.
+  # Manual evidence is limited to the reviewed main revision.
+  # Caller-provided candidate commits must use unprivileged PR checks.
   workflow_dispatch:
-    inputs:
-      candidate_sha:
-        description: "Exact 40-hex reviewed source commit"
-        required: true
-        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: strict-replay-source-${{ inputs.candidate_sha }}
+  group: strict-replay-source-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -29,7 +24,7 @@ jobs:
     steps:
       - name: Admit only the trusted dispatch commit
         env:
-          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          CANDIDATE_SHA: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -38,10 +33,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ inputs.candidate_sha }}
+          ref: ${{ github.sha }}
       - name: Verify exact trusted source checkout
         env:
-          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          CANDIDATE_SHA: ${{ github.sha }}
         shell: bash
         run: test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
       - name: Install pinned Python

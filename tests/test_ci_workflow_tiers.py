@@ -180,7 +180,7 @@ class WorkflowTierTests(unittest.TestCase):
             # Dispatch validation is insufficient if checkout still follows a
             # moving branch; the immutable source SHA must be checked twice.
             strict.write_text(strict_original.replace(
-                "ref: ${{ inputs.candidate_sha }}", "ref: main",
+                "ref: ${{ github.sha }}", "ref: main",
             ))
             self.assertTrue(any(
                 "immutable SHA admission or checkout attestation missing" in issue
@@ -188,11 +188,21 @@ class WorkflowTierTests(unittest.TestCase):
             ))
             strict.write_text(strict_original)
             strict.write_text(strict_original.replace(
-                "group: strict-replay-source-${{ inputs.candidate_sha }}",
                 "group: strict-replay-source-${{ github.sha }}",
+                "group: strict-replay-source-${{ inputs.candidate_sha }}",
             ))
             self.assertTrue(any(
                 "manual candidate concurrency must preserve independent immutable evidence" in issue
+                for issue in audit(root)
+            ))
+            strict.write_text(strict_original)
+            strict.write_text(strict_original.replace(
+                "  workflow_dispatch:",
+                "  workflow_dispatch:\n    inputs:\n      candidate_sha:\n        required: true",
+                1,
+            ))
+            self.assertTrue(any(
+                "manual candidate inputs are forbidden" in issue
                 for issue in audit(root)
             ))
             strict.write_text(strict_original)
