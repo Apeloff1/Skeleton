@@ -1,0 +1,44 @@
+name: Exact AI-tree source identity regression
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "machine/ai_file_tree.json"
+      - "tests/test_repository_integration.py"
+      - ".github/workflows/aift-source-identity-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aift-source-identity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact_source_identity:
+    name: AI-tree exact Git object identity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout proposed exact SHA with Git history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Use pinned supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install isolated test runner
+        run: python -m pip install --disable-pip-version-check "pytest==8.4.2"
+      - name: Verify full source tree parity
+        run: python scripts/check_ai_file_tree.py
+      - name: Verify all 28 canonical migration source objects
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONPATH: "."
+        run: python -m pytest -q --noconftest --import-mode=importlib tests/test_repository_integration.py::test_integrated_source_identities_match_the_index
