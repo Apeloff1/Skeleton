@@ -368,3 +368,50 @@ def test_inherited_dispatcher_denied_before_lock(monkeypatch):
         with pytest.raises(DispatchUncertain, match="inherited"):
             operation()
     assert owner.calls == 0
+
+def test_resource_callback_cannot_reenter_planning_or_execution(monkeypatch):
+    owner = SimulatedCommittedOwner()
+    guard = make(owner)
+    guard.submit(request())
+    active = None
+    samples = 0
+
+    def sample(self, *, token_budget, storage_path):
+        nonlocal samples
+        samples += 1
+        with pytest.raises(DispatchUncertain):
+            guard.plan_live(token_budget=40)
+        with pytest.raises(DispatchUncertain):
+            guard.dispatch_next(token_budget=40)
+        with pytest.raises(DispatchUncertain):
+            guard.submit(request("nested"))
+        if active is not None:
+            with pytest.raises(DispatchUncertain):
+                guard.execute_once(active)
+        return budget(), {
+            "measurement": "os_probe",
+            "gpu_device_qualified": False,
+            "physical_memory_reserved": False,
+            "auxiliary_telemetry_incomplete": True,
+        }
+
+    monkeypatch.setattr(LiveStreamBudgetSampler, "sample", sample)
+    permits, _ = guard.plan_live(token_budget=40)
+    active = permits[0]
+    assert not guard.uncertain
+    state = guard.execute_once(active)
+    assert samples == 2
+    assert owner.calls == 1
+    assert not state["checkpoint"]["pending"]
+    assert not guard.uncertain
+
+
+def test_probe_failure_releases_local_attempt_fence(monkeypatch):
+    guard = make()
+    guard.submit(request())
+    install_probe(monkeypatch, [OSError("probe unavailable"), budget(), budget()])
+    with pytest.raises(DispatchDeferred):
+        guard.plan_live(token_budget=40)
+    permits, _ = guard.plan_live(token_budget=40)
+    assert len(permits) == 1
+    assert not guard.execute_once(permits[0])["checkpoint"]["pending"]
