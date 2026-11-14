@@ -31,7 +31,7 @@
     "test:dragon-companion": "node scripts/test-dragon-companion.cjs && node scripts/test-dragon-living-motion.cjs && node scripts/test-dragon-progression.cjs && node scripts/test-dragon-journal-chain.cjs",
     "test:skeleton-forge": "node --test scripts/skeleton-forge/*.test.cjs",
     "test:forge-operator": "node --test scripts/forge-operator/*.test.cjs",
-    "test:app-foundation": "node --test scripts/test-app-foundation-flows.mjs scripts/test-app-health-readiness.cjs scripts/test-setup-local-guard.cjs",
+    "test:app-foundation": "node --test scripts/test-app-foundation-flows.mjs scripts/test-app-health-readiness.cjs scripts/test-setup-local-guard.cjs scripts/app-foundation/queries-i18n-contrast.test.cjs scripts/app-foundation/query-cache.test.cjs scripts/app-foundation/realtime.test.cjs scripts/app-foundation/session-gate.test.cjs scripts/app-foundation/strings-a11y-tokens.test.cjs",
     "test:app-foundation:render": "node --test scripts/app-foundation/render/*.test.cjs",
     "test:product-projection": "node --test scripts/test-product-projection.mjs",
     "test:accessibility": "node --test scripts/test-accessibility-contract.mjs",
