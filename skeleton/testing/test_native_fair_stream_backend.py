@@ -380,3 +380,32 @@ def test_partial_native_lease_rejected_before_burning_prompt():
     with pytest.raises(NativeFairStreamDenied, match="whole-request"):
         backend.generate(permit(), partial)
     assert registry.status()["staged"] == 1
+
+def test_durable_cancel_scrubs_prompt_even_when_expiration_clock_unavailable(monkeypatch):
+    from skeleton.ai.model_runtime import native_fair_stream_backend as module
+
+    runtime, registry, _ = setup()
+
+    def unavailable():
+        raise OSError("clock unavailable")
+
+    monkeypatch.setattr(module, "monotonic_ns", unavailable)
+    registry.discard_cancelled("request-1")
+    assert registry._staged == {}
+    assert registry._staged_at == {}
+    assert registry._budget.snapshot()["staged_bytes"] == 0
+    assert "request-1" in registry._used
+
+
+def test_unknown_revocations_and_cancel_cleanup_cannot_grow_identity_set(monkeypatch):
+    from skeleton.ai.model_runtime import native_fair_stream_backend as module
+
+    monkeypatch.setattr(module, "MAX_STAGED_PROMPTS", 2)
+    registry = NativePromptRegistry(session_id=SESSION)
+    registry.revoke("first")
+    registry.revoke("second")
+    with pytest.raises(NativeFairStreamDenied, match="capacity"):
+        registry.revoke("third")
+    registry.discard_cancelled("third")
+    registry.discard_cancelled("first")
+    assert registry.status()["consumed_or_revoked"] == 2

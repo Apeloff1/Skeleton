@@ -293,6 +293,25 @@ class NativePromptRegistry:
                 del self._staged_at[request_id]
             self._used.add(request_id)
 
+    def discard_cancelled(self, request_id: str) -> None:
+        """Release an explicitly cancelled grant even if the clock failed.
+
+        Invoke only after the authenticated durable cancellation commits.
+        Unknown identities need not grow the lifetime set beyond its cap:
+        admission is already exhausted until the registry is retired.
+        """
+        _require_owner_process(self._owner_pid)
+        rid = _id(request_id, "request")
+        with self._lock:
+            pinned = self._staged.get(rid)
+            if pinned is not None:
+                self._budget.release(pinned.tenant_id, len(pinned.prompt.encode("utf-8")))
+                del self._staged[rid]
+                del self._staged_at[rid]
+                self._used.add(rid)
+            elif len(self._staged) + len(self._used) < MAX_STAGED_PROMPTS:
+                self._used.add(rid)
+
     def status(self) -> dict[str, int | str]:
         _require_owner_process(self._owner_pid)
         with self._lock:

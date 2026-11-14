@@ -293,7 +293,7 @@ def test_native_owner_rejects_unrelated_journal_descriptor(private_files):
 def test_native_owner_detects_journal_path_replacement_before_execution(
     private_files, monkeypatch,
 ):
-    from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchUncertain
+    from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchDeferred
     install_probe(monkeypatch)
     runtime, registry, journal, session, result_handle = build(private_files)
     service, vault = bind_native_cpu_dispatch_service(
@@ -317,10 +317,11 @@ def test_native_owner_detects_journal_path_replacement_before_execution(
         handle._filename, handle._filename + ".moved",
         src_dir_fd=handle._directory_fd, dst_dir_fd=handle._directory_fd,
     )
-    with pytest.raises(DispatchUncertain, match="uncertain"):
+    with pytest.raises(DispatchDeferred, match="queued authorization"):
         service.execute_next(token_budget=2)
     assert registry.status()["staged"] == 1
-    assert service.status().execution_uncertain
+    assert service.status().pending_leases == 0
+    assert not service.status().execution_uncertain
 
 def test_native_whole_request_defers_without_consuming_prompt_then_completes(
     private_files, monkeypatch,
