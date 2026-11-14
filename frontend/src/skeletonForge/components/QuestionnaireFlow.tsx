@@ -13,8 +13,6 @@ import { GENRE_COUNT, GENRE_GROUPS, filterGenreChoices } from '../genreCatalog';
 import { suggestPlayableMode } from '../playableSuggestions';
 import DesignInstruments from './DesignInstruments';
 import GenreControlsPreview from './GenreControlsPreview';
-import ConductorPreviewPanel from './ConductorPreviewPanel';
-import JeevesQualityPanel from './JeevesQualityPanel';
 import DesignPresetPanel from './DesignPresetPanel';
 import {
   ARCHETYPES, BRIEF_FACETS, ERA_SOURCE_COPY, STEP_LABELS, STEPS, TARGETS, VISION_MAX,
@@ -35,8 +33,6 @@ export interface QuestionnaireFlowProps {
   onForge: (req: RunRequest) => void;
   /** Navigate to the full historical Galaxy Studio matrix/slider questionnaire. */
   onOpenGalaxyStudio?: () => void;
-  /** Explicitly restore the current account's device-local Galaxy full design. */
-  onRestoreGalaxyProfile?: () => void;
   forging?: boolean;
   /** Short compose summary shown on the review step. */
   composeSummary?: string | null;
@@ -237,7 +233,7 @@ function BeatsStep({ state, dispatch, beats, beatsLive }: QuestionnaireFlowProps
   );
 }
 
-function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalaxyStudio, onRestoreGalaxyProfile }: QuestionnaireFlowProps) {
+function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalaxyStudio }: QuestionnaireFlowProps) {
   const [instrumentsOpen, setInstrumentsOpen] = React.useState(false);
   const [galaxyOpen, setGalaxyOpen] = React.useState(false);
   const [genreSearch, setGenreSearch] = React.useState('');
@@ -270,14 +266,12 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
       </View>
       <OptionGroup id="target" prompt="Output" options={TARGETS.map((t) => t.id)} value={state.options.target} onPick={(v) => dispatch({ type: 'setOption', key: 'target', value: v })} />
       <DesignPresetPanel state={state} dispatch={dispatch} />
-      <ConductorPreviewPanel vision={state.vision} />
-      <JeevesQualityPanel />
 
       <View style={st.group} testID="q-playable-slice-options" accessibilityRole="radiogroup" accessibilityLabel="Playable original mini-game">
         <Text style={st.q}>Playable genre prototypes</Text>
         <Text style={st.help}>
           Include an original self-contained Godot mini-game with real controls and a win/lose loop.
-          Choose from the eight implemented prototypes; this does not mean all 69 catalog genres have complete gameplay.
+          Choose from the eight implemented prototypes; this does not mean all 67 historical genres have complete gameplay.
         </Text>
         <View style={st.chips}>
           <Chip label="No extra mini-game" selected={!state.playable?.enabled}
@@ -338,28 +332,6 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
         ) : null}
       </View>
 
-      <View style={st.group} testID="q-native-playtest-mode" accessibilityRole="radiogroup" accessibilityLabel="Native Godot execution verification">
-        <Text style={st.q}>Native Godot verification</Text>
-        <Text style={st.help}>
-          Optional native execution check. The selected playable mini-game is tested
-          independently of the main world. Require blocks project publication
-          if either attempted scene fails or Godot is unavailable.
-          A boot from an unverified binary remains visibly unqualified for release.
-        </Text>
-        <View style={st.chips}>
-          <Chip label="Source checks only" selected={!state.playtest || state.playtest === 'off'}
-            onPress={() => dispatch({ type: 'setPlaytestMode', value: 'off' })}
-            testID="q-native-playtest-off" />
-          <Chip label="Test if Godot available" selected={state.playtest === 'auto'}
-            disabled={state.options.target !== 'godot'}
-            onPress={() => dispatch({ type: 'setPlaytestMode', value: 'auto' })}
-            testID="q-native-playtest-auto" />
-          <Chip label="Require native scene completion" selected={state.playtest === 'require'}
-            disabled={state.options.target !== 'godot'}
-            onPress={() => dispatch({ type: 'setPlaytestMode', value: 'require' })}
-            testID="q-native-playtest-require" />
-        </View>
-      </View>
       <View style={st.group} testID="q-native-quest-controls" accessibilityRole="radiogroup" accessibilityLabel="Native quest gameplay">
         <Text style={st.q}>Native room-entry quest gameplay</Text>
         <Text style={st.help}>Optional real Godot quest runtime with room-triggered objectives, a quest HUD, and source-checked save snapshots. Does not automatically create NPC conversations or combat quests.</Text>
@@ -407,7 +379,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
         </View>
       ) : null}
       <View style={st.group}>
-        <Button label={galaxyOpen ? 'Hide 69-genre catalog' : 'Advanced: choose from all 69 Galaxy genres'}
+        <Button label={galaxyOpen ? 'Hide 67-genre catalog' : 'Advanced: choose from all 67 Galaxy genres'}
           tone="secondary" compact testID="q-galaxy-genres-toggle"
           onPress={() => setGalaxyOpen((open) => !open)} />
       </View>
@@ -420,7 +392,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
           </Text>
           <TextInput testID="q-galaxy-genre-search" style={[st.input, { minHeight: TOUCH }]}
             value={genreSearch} onChangeText={setGenreSearch}
-            placeholder="Search 69 genres" accessibilityLabel="Search Galaxy genres"
+            placeholder="Search 67 genres" accessibilityLabel="Search Galaxy genres"
             placeholderTextColor={C.dim} />
           <Text style={st.help}>{filteredGenres.length} matching genres. {filteredGenres.length > 24 ? 'Showing first 24; refine your search.' : ''}</Text>
           <View style={st.chips}>
@@ -441,14 +413,6 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
               GameForge category: {mappedBriefGenre(state.galaxyGenre)}
             </Text>
           ) : null}
-        </View>
-      ) : null}
-      {onRestoreGalaxyProfile ? (
-        <View style={st.group} testID="q-galaxy-saved-design-restore">
-          <Text style={st.q}>Saved your complete Galaxy questionnaire?</Text>
-          <Text style={st.help}>Restore an explicitly saved on-device design into this Forge draft. This replaces the Galaxy-sourced vision, genre and mapped axes but keeps your other Forge choices.</Text>
-          <Button label="Restore saved full Galaxy design" tone="secondary" compact
-            onPress={onRestoreGalaxyProfile} testID="q-galaxy-restore-saved" />
         </View>
       ) : null}
       {onOpenGalaxyStudio ? (
@@ -502,7 +466,6 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
       <Row k="Output" v={TARGETS.find((t) => t.id === req.target)?.label ?? req.target} />
       {state.playable?.enabled && !req.playable_content ? <Banner tone="warn" testID="q-playable-not-exported">Native playable mini-games require Godot output. This JSON-only export preserves your design but will not contain the mini-game scenes.</Banner> : null}
       {req.playable_content ? <Row k="Playable mini-game" v={`${PLAYABLE_SLICES.find((slice) => slice.id === req.playable_archetype)?.label ?? req.playable_archetype} · ${req.playable_main_scene ? "startup scene" : "additional scene"}`} /> : null}
-      {req.playtest ? <Row k="Native verification" v={req.playtest === 'require' ? 'Required: main-world boot plus independent mini-game scene completion' : 'Best-effort native Godot scene validation'} /> : null}
       {req.quest_content ? <Row k="Native quest" v={`${req.quest_length} room-entry objectives · source-bound HUD and save contract`} /> : null}
       {state.quest?.enabled && !req.quest_content ? <Banner tone="warn" testID="q-native-quest-not-exported">Native room quests are disabled for JSON blueprint output. Select Godot in Forge options to include one.</Banner> : null}
       {state.galaxyGenre ? <Row k="Specialized genre" v={(galaxyGenre(state.galaxyGenre)?.name ?? state.galaxyGenre) + " → " + (mappedBriefGenre(state.galaxyGenre) ?? "unknown")} /> : null}

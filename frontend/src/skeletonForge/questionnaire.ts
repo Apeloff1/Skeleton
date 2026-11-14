@@ -110,8 +110,6 @@ export interface QuestionnaireState {
   quest?: { enabled: boolean; length: number };
   /** Native source-backed standalone mini-game, independent of blueprint archetype. */
   playable?: { enabled: boolean; mode: string; launch: boolean };
-  /** Native execution off by default; opt-in with separate sidecar qualification. */
-  playtest?: 'off' | 'auto' | 'require';
   options: ForgeOptions;
 }
 
@@ -130,7 +128,6 @@ export type QuestionnaireAction =
   | { type: 'setPlayableEnabled'; value: boolean }
   | { type: 'setPlayableMode'; value: string }
   | { type: 'setPlayableMainScene'; value: boolean }
-  | { type: 'setPlaytestMode'; value: 'off' | 'auto' | 'require' }
   | { type: 'setOption'; key: keyof ForgeOptions; value: string | null }
   | { type: 'next' }
   | { type: 'back' }
@@ -147,7 +144,6 @@ export const INITIAL_STATE: QuestionnaireState = {
   galaxyProfile: null,
   quest: { enabled: false, length: 3 },
   playable: { enabled: false, mode: 'extraction', launch: false },
-  playtest: 'off',
   options: { archetype: 'auto', target: 'godot', era: null, generation: null },
 };
 
@@ -256,9 +252,6 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
         launch: action.value === true && !!state.playable?.enabled,
       } };
     }
-    case 'setPlaytestMode':
-      if (action.value !== 'off' && state.options.target !== 'godot') return state;
-      return { ...state, playtest: action.value };
     case 'setOption': {
       const value = action.value === '' ? null : action.value;
       if (action.key === 'archetype' || action.key === 'target') {
@@ -334,9 +327,6 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   const instrumentAxes = sparseInstrumentPayload(state.instruments);
   if (Object.keys(instrumentAxes).length) request.operator_axes = instrumentAxes;
   if (state.galaxyProfile) request.galaxy_profile = state.galaxyProfile;
-  if (request.target === 'godot' && (state.playtest === 'auto' || state.playtest === 'require')) {
-    request.playtest = state.playtest;
-  }
   if (state.playable?.enabled && request.target === 'godot') {
     const chosen = PLAYABLE_SLICES.find((slice) => slice.id === state.playable?.mode);
     if (chosen) {
