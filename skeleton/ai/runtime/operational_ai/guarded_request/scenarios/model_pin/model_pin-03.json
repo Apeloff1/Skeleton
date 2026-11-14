@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.ai.guard.case.v1",
+  "id": "model_pin-03",
+  "control": "model_pin",
+  "phase": "model",
+  "kind": "permitted-boundary",
+  "objective": "Verify actual offline AI gate decision at profile 03 for model_pin",
+  "threat": "Pin model and tokenizer identity to strict lowercase SHA256 identity, probe 3",
+  "trust_boundary": "Untrusted caller input must not change authenticated model, scope, authority or budget",
+  "input": {
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  },
+  "expected_allow": true,
+  "expected_semantics": "The submitted input remains inside explicitly granted limits",
+  "evidence_rule": "Execute the real policy_oracle entrypoint; unexpected exceptions fail acceptance",
+  "no_model_substitute": true,
+  "real_model_qualification": false,
+  "policy_release_qualification": false
+}

@@ -10,6 +10,11 @@ on:
       - "scripts/configure_ai_chat.py"
       - "scripts/build_jeeves_local_manifest.py"
       - "scripts/qualify_jeeves_live_local.py"
+      - "scripts/qualify_jeeves_workspace_browser.py"
+      - "tests/test_jeeves_conversation_organization.py"
+      - "tests/test_app_offline_http.py"
+      - "scripts/check_provider_bootstrap.py"
+      - "tests/test_docker_materialization_parser.py"
       - "skeleton/app/jeeves_advisory.py"
       - "skeleton/app/jeeves_media_advisory.py"
       - "tests/test_jeeves_media_advisory.py"
@@ -78,13 +83,15 @@ jobs:
         run: python -m pip install --disable-pip-version-check --no-input -e . "pytest>=8,<9" "pytest-asyncio>=1.4,<2"
       - name: Verify Jeeves primary is a local-only policy
         run: python -c "from skeleton.ai.jeeves_local_policy import MODEL_ID; assert MODEL_ID == 'jeeves'"
+      - name: Verify Docker materialization source-boundary parsing
+        run: python -m unittest discover -s tests -p 'test_docker_materialization_parser.py' -v
       - name: Compile first-install operator entrypoints
         run: python -m compileall -q scripts/ai_chat_installed_smoke.py scripts/configure_ai_chat.py scripts/configure_ai_chat_hosted.py scripts/build_jeeves_local_manifest.py scripts/install_ai_chat.py scripts/qualify_jeeves_live_local.py skeleton/ai/jeeves_local_policy.py skeleton/app/local_ai.py skeleton/app/offline_knowledge.py skeleton/app/offline_grounding.py skeleton/app/jeeves_advisory.py skeleton/app/jeeves_media_advisory.py skeleton/app/jeeves_inference_circuit.py skeleton/app/jeeves_local_lease.py skeleton/ai/runtime/inference/lease_custody.py skeleton/ai/runtime/inference/llama_cpp.py skeleton/app/offline_http.py backend/routes/ai.py
       - name: Verify local-only chat receipts, guard policy, provisioning and secret-safe legacy refusal
         env:
           PYTHONPATH: "."
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: python -m pytest -q --noconftest tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py tests/test_install_ai_chat.py tests/test_jeeves_local_policy.py tests/test_build_jeeves_local_manifest.py tests/test_jeeves_advisory.py tests/test_jeeves_media_advisory.py tests/test_jeeves_live_local_advanced.py tests/test_jeeves_context_window.py tests/test_jeeves_document_scope.py tests/test_jeeves_inference_circuit.py tests/test_jeeves_durable_integrity.py tests/test_jeeves_local_lease.py
+        run: python -m pytest -q --noconftest tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py tests/test_install_ai_chat.py tests/test_jeeves_local_policy.py tests/test_build_jeeves_local_manifest.py tests/test_jeeves_advisory.py tests/test_jeeves_media_advisory.py tests/test_jeeves_live_local_advanced.py tests/test_jeeves_context_window.py tests/test_jeeves_document_scope.py tests/test_jeeves_inference_circuit.py tests/test_jeeves_durable_integrity.py tests/test_jeeves_local_lease.py tests/test_jeeves_conversation_organization.py tests/test_app_offline_http.py
       - name: Verify authenticated backend-to-engine HTTP chat with durable local fixture
         env:
           PYTHONPATH: ".:backend"
@@ -121,3 +128,36 @@ jobs:
         run: yarn typecheck
       - name: Clarify source-only evidence
         run: echo "Native tiny-transformer inference is executed; no operator-owned production GGUF, protected bootstrap or physical-device qualification was performed."
+
+  workspace-browser:
+    name: Real Jeeves workspace browser, native execution and SQLite recovery
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact head without persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify source identity
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Set up Python 3.11
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install browser acceptance dependencies
+        run: python -m pip install --disable-pip-version-check --no-input -e '.[local-inference]' 'playwright==1.62.0'
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Exercise real desktop and mobile user journeys
+        run: python scripts/qualify_jeeves_workspace_browser.py --output '${{ runner.temp }}/jeeves-browser'
+      - name: Retain nonsecret browser evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: jeeves-workspace-browser-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/jeeves-browser/
+          retention-days: 7
+          if-no-files-found: ignore

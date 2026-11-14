@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "base_conversion_18",
+  "domain": "base_conversion",
+  "severity": "high",
+  "objective": "Evaluate exact structured model reasoning for base_conversion case 18",
+  "steps": [
+    {
+      "prompt": "Convert hexadecimal 7e5 (base sixteen) to decimal digits only.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "2021"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

@@ -26,6 +26,9 @@ from .desktop_private_overlay import (
 from .desktop_source_qualification import qualify_patch_sources
 from .desktop_source_graph import analyze_python_source_graph
 from .desktop_patch_reconcile import reconcile_reviewed_patch
+from .desktop_private_capsule import (
+    prepare_private_capsule, publish_private_capsule, verify_private_capsule,
+)
 from .desktop_project_work import (
     SCHEMA as MIXED_WORK_SCHEMA,
     MixedWorkHold, parse_mixed_work,
@@ -46,6 +49,11 @@ class PortablePatchWindow(tk.Toplevel):
         self.export_path = tk.StringVar()
         self.expected_manifest = tk.StringVar()
         self.expected_patch = tk.StringVar()
+        self.capsule_expected = tk.StringVar()
+        self._capsule_plan = None
+        self._capsule_source_selection = None
+        self._capsule_receipt = None
+        self._capsule_path = None
         self.status = tk.StringVar(
             value="No source patch reviewed. The model has no Git/file-write tools.",
         )
@@ -232,11 +240,28 @@ class PortablePatchWindow(tk.Toplevel):
             ),
         ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(5, 0))
 
+        capsule = ttk.LabelFrame(frame, text="Private selected-source capsule — no execution", padding=5)
+        capsule.grid(row=10, column=0, sticky="ew", pady=(6, 0))
+        capsule.columnconfigure(1, weight=1)
+        ttk.Label(capsule, text="Explicit original dependencies (one relative path per line)").grid(
+            row=0, column=0, columnspan=3, sticky="w")
+        self.capsule_sources = ScrolledText(capsule, height=3, wrap="none")
+        self.capsule_sources.grid(row=1, column=0, columnspan=3, sticky="ew")
+        self.capsule_sources.bind("<<Modified>>", self._capsule_edited)
+        self.review_capsule_button = ttk.Button(capsule, text="Review selected-source capsule", command=self._review_capsule)
+        self.review_capsule_button.grid(row=2, column=0, sticky="w")
+        ttk.Label(capsule, text="Third full SHA-256").grid(row=3, column=0, sticky="w")
+        ttk.Entry(capsule, textvariable=self.capsule_expected).grid(row=3, column=1, sticky="ew", padx=5)
+        self.publish_capsule_button = ttk.Button(capsule, text="Publish NEW private capsule", command=self._publish_capsule)
+        self.publish_capsule_button.grid(row=3, column=2)
+        self.verify_capsule_button = ttk.Button(capsule, text="Reverify sealed capsule", command=self._verify_capsule)
+        self.verify_capsule_button.grid(row=2, column=2, sticky="e")
+
         ttk.Label(
             frame, textvariable=self.status, wraplength=1130,
-        ).grid(row=10, column=0, sticky="ew", pady=(7, 0))
+        ).grid(row=11, column=0, sticky="ew", pady=(7, 0))
         self.progress = ttk.Progressbar(frame, mode="indeterminate")
-        self.progress.grid(row=11, column=0, sticky="ew", pady=(7, 0))
+        self.progress.grid(row=12, column=0, sticky="ew", pady=(7, 0))
         self._buttons()
 
     def _source_inputs(self):
@@ -329,6 +354,12 @@ class PortablePatchWindow(tk.Toplevel):
         self._source_graph = None
         self.expected_manifest.set("")
         self.expected_patch.set("")
+        self._capsule_plan = None
+        self._capsule_source_selection = None
+        self._capsule_receipt = None
+        self._capsule_path = None
+        if hasattr(self, "capsule_expected"):
+            self.capsule_expected.set("")
         for item in self.files.get_children():
             self.files.delete(item)
         self._preview("")
@@ -373,6 +404,156 @@ class PortablePatchWindow(tk.Toplevel):
                 and self._stage_path is not None
             ) else "disabled",
         )
+        if hasattr(self, "review_capsule_button"):
+            eligible = (
+                not self._busy and self._plan is not None
+                and self._qualification is not None and self._qualification.permits_inert_export
+                and self._source_graph is not None and self._source_graph.permits_inert_export
+            )
+            self.review_capsule_button.configure(state="normal" if eligible else "disabled")
+            self.publish_capsule_button.configure(
+                state="normal" if eligible and self._capsule_plan is not None else "disabled")
+            self.verify_capsule_button.configure(state="normal" if (
+                not self._busy and self._capsule_receipt is not None
+                and self._capsule_path is not None and self._capsule_plan is not None
+            ) else "disabled")
+
+    def _capsule_selected(self):
+        return self.capsule_sources.get("1.0", "end-1c")
+
+    def _capsule_edited(self, _event=None):
+        if not self.capsule_sources.edit_modified():
+            return
+        self.capsule_sources.edit_modified(False)
+        if self._busy:
+            return
+        self._capsule_plan = None
+        self._capsule_source_selection = None
+        self._capsule_receipt = None
+        self._capsule_path = None
+        self.capsule_expected.set("")
+        self.status.set("Dependency selection changed. Independent capsule review and approval required.")
+        self._buttons()
+
+    def _review_capsule(self):
+        plan = self._plan
+        if (self._busy or plan is None or self._qualification is None
+                or not self._qualification.permits_inert_export
+                or self._source_graph is None or not self._source_graph.permits_inert_export):
+            return
+        if self._reviewed_texts != self._source_inputs():
+            self._invalidate()
+            return
+        selection = self._capsule_selected()
+        self._capsule_plan = None
+        self._capsule_source_selection = None
+        self._capsule_receipt = None
+        self._capsule_path = None
+        self.capsule_expected.set("")
+        epoch = self._epoch
+        self._busy = True
+        self.progress.start(85)
+        self.status.set("Reading explicitly selected original sources and custody closure; no files written.")
+        self._buttons()
+
+        def work():
+            try:
+                reviewed = prepare_private_capsule(plan, selection)
+                self._queue.put(("capsule-reviewed", epoch, selection, reviewed, reviewed.public_review()))
+            except Exception as exc:
+                self._queue.put(("capsule-held", epoch, selection, type(exc).__name__))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _publish_capsule(self):
+        plan = self._capsule_plan
+        if (self._busy or plan is None or self._plan is None
+                or self._qualification is None or not self._qualification.permits_inert_export
+                or self._source_graph is None or not self._source_graph.permits_inert_export):
+            return
+        selection = self._capsule_selected()
+        inputs = self._source_inputs()
+        if (self._reviewed_texts != inputs or selection != self._capsule_source_selection
+                or plan.patch is not self._plan):
+            self._invalidate()
+            return
+        digests = (plan.patch.manifest_sha256, plan.patch.patch_sha256, plan.capsule_sha256)
+        if (self.expected_manifest.get(), self.expected_patch.get(), self.capsule_expected.get()) != digests:
+            self.status.set("Type all THREE full reviewed SHA-256 values exactly before publication.")
+            return
+        parent = filedialog.askdirectory(parent=self, title="Choose existing private folder OUTSIDE original project")
+        if not parent:
+            return
+        name = simpledialog.askstring("New private capsule", "Name a NEW folder (no existing files overwritten).", parent=self)
+        if not name:
+            return
+        if name in (".", "..") or Path(name).name != name or "/" in name or "\\" in name:
+            self.status.set("Choose a single new private folder name.")
+            return
+        destination = str(Path(parent) / name)
+        if not messagebox.askyesno(
+            "Publish private selected-source capsule?",
+            "Write explicitly reviewed original dependencies and changed sources into a NEW owner-private folder. "
+            "No execution, Git operations, checkout changes, release or complete-project certification. Continue?",
+            parent=self,
+        ):
+            return
+        # A Tk modal dialog can process edits or callbacks. Recheck the same
+        # reviewed source selection and approvals after the dialog returns.
+        if (self._busy or self._plan is not plan.patch or self._capsule_plan is not plan
+                or self._source_inputs() != inputs or self._capsule_selected() != selection
+                or (self.expected_manifest.get(), self.expected_patch.get(), self.capsule_expected.get()) != digests):
+            self.status.set("Review or approval changed during confirmation; nothing published.")
+            return
+        epoch = self._epoch
+        self._busy = True
+        self.progress.start(85)
+        self._buttons()
+        self.status.set("Revalidating sources and publishing private no-clobber capsule; seal written last.")
+
+        def work():
+            try:
+                receipt = publish_private_capsule(
+                    plan, destination,
+                    expected_capsule_sha256=digests[2],
+                    expected_manifest_sha256=digests[0],
+                    expected_patch_sha256=digests[1],
+                    approve_private_capsule=True,
+                )
+                self._queue.put(("capsule-published", epoch, destination, receipt))
+            except Exception as exc:
+                self._queue.put(("capsule-held", epoch, destination, type(exc).__name__))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _verify_capsule(self):
+        plan = self._capsule_plan
+        receipt = self._capsule_receipt
+        path = self._capsule_path
+        if self._busy or plan is None or receipt is None or not path:
+            return
+        seal = receipt.get("seal_sha256")
+        if not isinstance(seal, str) or len(seal) != 64 or any(c not in "0123456789abcdef" for c in seal):
+            self.status.set("A complete independently recorded capsule seal is required.")
+            return
+        epoch = self._epoch
+        self._busy = True
+        self.progress.start(85)
+        self._buttons()
+        self.status.set("Cold verifying sealed inert files; no model call or source execution.")
+
+        def work():
+            try:
+                result = verify_private_capsule(
+                    path, original_project_root=plan.patch.root,
+                    expected_capsule_sha256=plan.capsule_sha256,
+                    expected_seal_sha256=seal,
+                )
+                self._queue.put(("capsule-verified", epoch, path, result))
+            except Exception as exc:
+                self._queue.put(("capsule-held", epoch, path, type(exc).__name__))
+
+        threading.Thread(target=work, daemon=True).start()
 
     def _review(self):
         if self._busy:
@@ -672,6 +853,42 @@ class PortablePatchWindow(tk.Toplevel):
                         + " · MANIFEST " + plan.manifest_sha256
                         + " · PATCH " + plan.patch_sha256,
                     )
+                elif kind == "capsule-reviewed":
+                    _, _, selection, plan, report = message
+                    if (selection != self._capsule_selected()
+                            or self._reviewed_texts != self._source_inputs()
+                            or self._plan is not plan.patch):
+                        self._capsule_plan = None
+                        self._capsule_source_selection = None
+                        self.capsule_expected.set("")
+                        self.status.set("Capsule review became stale; review again before publication.")
+                        self._buttons()
+                        continue
+                    self._capsule_plan = plan
+                    self._capsule_source_selection = selection
+                    self.capsule_expected.set("")
+                    self.status.set(
+                        "REVIEW ONLY · capsule SHA " + plan.capsule_sha256
+                        + " · " + str(len(plan.originals)) + " selected originals · "
+                        + str(plan.total_bytes) + " bytes · closure "
+                        + str(report["selected_python_closure_status"])
+                        + " · unresolved imports " + str(report["unverified_external_or_unselected_imports"])
+                        + " · closure SHA " + str(report["python_closure_sha256"])
+                        + " · type third SHA and confirm separately; not a complete project."
+                    )
+                elif kind == "capsule-published":
+                    _, _, destination, receipt = message
+                    self._capsule_receipt = receipt
+                    self._capsule_path = destination
+                    self.status.set("Private inert capsule published at " + destination
+                                    + " · seal SHA " + str(receipt["seal_sha256"])
+                                    + " · no code executed; verify before separate use.")
+                elif kind == "capsule-verified":
+                    self.status.set("Cold capsule verified: " + str(message[3]["file_count"])
+                                    + " sealed files · no execution or release certification.")
+                elif kind == "capsule-held":
+                    self.status.set("Private capsule held: " + str(message[-1])
+                                    + " · inspect possible incomplete destination; no automatic retry.")
                 elif kind == "reconciled":
                     _, _, original_inputs, report = message
                     if original_inputs != self._source_inputs():

@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "percentage_21",
+  "domain": "percentage",
+  "ordinal": 21,
+  "arguments": {
+    "index": 21,
+    "a": 247,
+    "b": 10,
+    "word": "quartz",
+    "city": "Tromso"
+  },
+  "prompt": "Task 21: Compute 40 percent of 2470. Integer only.",
+  "expected": "988",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}
