@@ -482,29 +482,21 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
     # In particular, Python 'from ... import ...' is not a new FROM stage.
     instructions = []
     heredoc_end = None
-    heredoc_strip_tabs = False
     for line in docker.replace("\\\n", " ").splitlines():
         stripped = line.strip()
         if heredoc_end is not None:
-            terminator = line.lstrip("\t") if heredoc_strip_tabs else line
-            if terminator == heredoc_end:
+            if stripped == heredoc_end:
                 heredoc_end = None
             continue
         if not stripped or stripped.startswith("#"):
             continue
         instruction = " ".join(stripped.split())
         instructions.append(instruction)
-        markers = list(re.finditer(
-            r"<<-?(?:'([^']+)'|\"([^\"]+)\"|([A-Za-z_][A-Za-z_0-9]*))(?=\s|$)",
+        marker = re.search(
+            r"<<-?(?:'([^']+)'|\"([^\"]+)\"|([A-Za-z_][A-Za-z_0-9]*))",
             instruction,
-        ))
-        if "<<" in instruction and (len(markers) != 1 or instruction.count("<<") != 1):
-            # Multiple or unsupported heredocs need an explicit parser contract;
-            # no text from a later body may fabricate source-copy custody.
-            return instructions, []
-        marker = markers[0] if markers else None
+        )
         if marker:
-            heredoc_strip_tabs = marker.group(0).startswith("<<-")
             heredoc_end = next(value for value in marker.groups() if value)
     if heredoc_end is not None:
         # An unterminated source stage cannot establish materialization.
