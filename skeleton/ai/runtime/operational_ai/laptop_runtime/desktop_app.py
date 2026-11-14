@@ -17,7 +17,7 @@ import threading
 # not an import-time traceback or a network-provider fallback.
 try:
     import tkinter as tk
-    from tkinter import ttk, filedialog
+    from tkinter import ttk, filedialog, messagebox
     from tkinter.scrolledtext import ScrolledText
 except ImportError:
     tk = None
@@ -48,6 +48,7 @@ class JeevesWindow(tk.Tk if tk is not None else object):
         self._events: Queue = Queue()
         self._busy = False
         self._closing = False
+        self._native_campaign_window = None  # Single operator-visible local inference workbench.
         # Worker/telemetry results belong to one source epoch, never a later
         # reconnected SQLite conversation.
         self._epoch = 0
@@ -251,6 +252,10 @@ class JeevesWindow(tk.Tk if tk is not None else object):
             command=self._guided_source_repair,
         ).grid(row=4, column=0, columnspan=3, sticky="w", pady=(4, 0))
         ttk.Button(
+            attachment_bar, text="Advanced native coding campaign",
+            command=self._native_campaign,
+        ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        ttk.Button(
             attachment_bar, text="Clear attached files", command=self._clear_attachments,
         ).grid(row=0, column=2, padx=4)
         ttk.Checkbutton(
@@ -437,6 +442,17 @@ class JeevesWindow(tk.Tk if tk is not None else object):
         from .desktop_workspace_ui import WorkspaceWindow
         WorkspaceWindow(self, source_text=self._last_answer or "")
 
+    def _native_campaign(self):
+        # Source-campaign review has exactly one visible operator owner. A
+        # second click must not create a second independent approval surface.
+        window = self._native_campaign_window
+        if window is not None:
+            window.lift()
+            window.focus_set()
+            return
+        from .desktop_campaign_ui import NativeCampaignWindow
+        self._native_campaign_window = NativeCampaignWindow(self)
+
     def _batch_work(self):
         if self._bridge is None or not self._bridge.connected or self._busy:
             self._show(
@@ -514,6 +530,15 @@ class JeevesWindow(tk.Tk if tk is not None else object):
         self.prompt.focus_set()
 
     def _connect(self):
+        # Do not open a second real GGUF owner while the separate campaign
+        # workbench is present, even in the brief gap before worker startup.
+        if self._native_campaign_window is not None:
+            self._show(
+                "Native owner held",
+                "Close the advanced campaign workbench before connecting chat",
+                "warning",
+            )
+            return
         if self._busy or (self._bridge is not None and self._bridge.connected):
             return
         try:
@@ -938,6 +963,15 @@ class JeevesWindow(tk.Tk if tk is not None else object):
         self.after(75, self._pump)
 
     def _exit(self):
+        campaign = self._native_campaign_window
+        if campaign is not None and getattr(campaign, "_busy", False):
+            messagebox.showwarning(
+                "Original native request is still in progress",
+                "A real SQLite/model request may have committed. "
+                "Do not close the workbench mid-campaign or replay the task.",
+                parent=self,
+            )
+            return
         self._epoch += 1
         self._closing = True
         for bridge in (self._bridge, self._connecting):
