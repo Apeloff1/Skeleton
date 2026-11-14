@@ -15,7 +15,10 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from core.http_errors import PUBLIC_INTERNAL_ERROR
+from core.http_errors import (
+    PUBLIC_INTERNAL_ERROR, PublicHealthUnavailable,
+    PublicUnavailableError, PublicUnavailableResponse,
+)
 
 _logger = logging.getLogger("codedock.public_route")
 
@@ -33,6 +36,8 @@ class PublicExceptionRoute(APIRoute):
                 # return JSONResponse(500, {"error": str(exc)}). Such responses
                 # never reach an exception handler. Redact the entire 5xx
                 # envelope, including debug and cookie headers, before sending.
+                if type(response) in (PublicUnavailableResponse, PublicHealthUnavailable):
+                    return response.sanitized()
                 if response.status_code >= 500:
                     _logger.warning(
                         "returned server failure at %s (status=%s)",
@@ -49,6 +54,8 @@ class PublicExceptionRoute(APIRoute):
                 # Keep FastAPI's structured 422 validation response intact.
                 raise
             except StarletteHTTPException as exc:
+                if type(exc) is PublicUnavailableError:
+                    return exc.sanitized()
                 # A 5xx HTTPException can still contain a caught database,
                 # network, filesystem or credential-bearing exception in its
                 # detail or headers. Explicit server errors need the same

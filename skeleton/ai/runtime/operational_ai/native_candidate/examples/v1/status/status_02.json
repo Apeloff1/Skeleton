@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "status_02",
+  "domain": "status",
+  "prompt": "Map synthetic worker 51 with status running into pending, active, held or terminal.",
+  "completion": "active",
+  "group_id": "status_02",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

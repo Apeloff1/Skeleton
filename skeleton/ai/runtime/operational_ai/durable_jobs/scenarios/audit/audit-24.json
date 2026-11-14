@@ -1,0 +1,22 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "audit-24",
+  "domain": "audit",
+  "phase": "durability-and-observability",
+  "category": "adversarial-denial",
+  "threat": "Verify 14 distinct durable events; reject chain manipulation at authenticated event 9.",
+  "trust_boundary": "Operator, job owner and audit integrity cannot be delegated to native model text",
+  "input": {
+    "variant": 23,
+    "tamper": "chain",
+    "events": 14,
+    "target": 9
+  },
+  "expected_allow": false,
+  "acceptance": "Run live Store and operator-gate operation with independent expected state and denial",
+  "no_hosted_fallback": true,
+  "never_blindly_retry_ambiguous_inference": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

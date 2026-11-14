@@ -1,0 +1,16 @@
+{
+  "schema": "skeleton.native-candidate.vector.v1",
+  "id": "rights_07",
+  "domain": "rights",
+  "objective": "Verify explicitly limited original training rights and source identity, variation 7",
+  "trust_boundary": "Third-party or unapproved content cannot enter native model training",
+  "input": {
+    "changes": {
+      "item_id": "new_item"
+    }
+  },
+  "expected_allow": true,
+  "expected_reason": "source_rights_retained",
+  "model_qualified": false,
+  "release_certified": false
+}
