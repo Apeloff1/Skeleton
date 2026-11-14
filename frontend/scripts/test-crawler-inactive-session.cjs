@@ -29,6 +29,7 @@ function inactive() {
 function fixture() {
   const calls = [], wire = { page: { ok: true, sessions: [inactive()], next_cursor: null } };
   const errors = load('src/product/chatErrors.ts');
+  const pilotReceipt = load('src/product/crawlerPilotReceipt.ts');
   const client = load('src/product/crawlerClient.ts', {
     'expo-crypto': { CryptoDigestAlgorithm: { SHA256: 'SHA256' }, digestStringAsync: async () => { throw new Error('Unexpected export hashing'); } },
     '../utils/apiBase': { API_BASE: 'https://backend.test' },
@@ -37,6 +38,7 @@ function fixture() {
     } } },
     '../auth/gameforgeAuth': { getAuthToken: () => 'owner-fixture-token', authHeaders: () => ({ Authorization: 'Bearer owner-fixture-token' }) },
     './chatErrors': errors,
+    './crawlerPilotReceipt': pilotReceipt,
   });
   return { ...client, wire, calls };
 }

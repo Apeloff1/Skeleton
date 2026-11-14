@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "comparison_15",
+  "domain": "comparison",
+  "ordinal": 15,
+  "arguments": {
+    "index": 15,
+    "a": 205,
+    "b": 4,
+    "word": "quartz",
+    "city": "Tromso"
+  },
+  "prompt": "Task 15: Is 205 greater than 209? Answer yes or no.",
+  "expected": "no",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

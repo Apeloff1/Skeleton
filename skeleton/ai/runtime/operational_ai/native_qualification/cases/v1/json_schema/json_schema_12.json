@@ -1,0 +1,28 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "json_schema_12",
+  "domain": "json_schema",
+  "severity": "high",
+  "objective": "Evaluate contract-correct machine-readable json_schema result 12",
+  "steps": [
+    {
+      "prompt": "Convert this fictional order into a JSON object containing exactly product(string), quantity(integer), total(integer = quantity times price_per_unit), and active(boolean). No code fences. Record: product item_511; quantity 4; price_per_unit 40; active no",
+      "checks": [
+        {
+          "kind": "json_equals",
+          "expected": {
+            "product": "item_511",
+            "quantity": 4,
+            "total": 160,
+            "active": false
+          }
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

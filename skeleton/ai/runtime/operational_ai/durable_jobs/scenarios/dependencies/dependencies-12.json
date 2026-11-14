@@ -1,0 +1,22 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "dependencies-12",
+  "domain": "dependencies",
+  "phase": "durability-and-observability",
+  "category": "permitted-boundary",
+  "threat": "A genuinely pending parent remains a waiting dependency; do not treat it as an invalid state or completed job.",
+  "trust_boundary": "Parent work must be committed before dependent native inference starts",
+  "input": {
+    "variant": 11,
+    "parent_state": "pending",
+    "sweep": false
+  },
+  "expected_allow": true,
+  "expected_state": "waiting",
+  "acceptance": "Run live Store dependency_status and compare to waiting state",
+  "no_hosted_fallback": true,
+  "never_blindly_retry_ambiguous_inference": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

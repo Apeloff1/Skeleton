@@ -1,0 +1,22 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "heartbeat-07",
+  "domain": "heartbeat",
+  "phase": "native-job-execution",
+  "category": "permitted-boundary",
+  "threat": "Fenced cross-process worker heartbeat cannot extend stale, invalid or nonadvancing lease 7",
+  "trust_boundary": "Durable claim, authoritative native inference and terminal state must remain source-bound",
+  "input": {
+    "variant": 6,
+    "now_ms": 1000,
+    "extend_ms": 501
+  },
+  "expected_allow": true,
+  "expected_state": "extended",
+  "acceptance": "Execute actual JobStore claim/heartbeat/finish/cancel/failure/sweep methods under fresh test SQLite",
+  "no_hosted_fallback": true,
+  "never_blindly_retry_ambiguous_inference": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

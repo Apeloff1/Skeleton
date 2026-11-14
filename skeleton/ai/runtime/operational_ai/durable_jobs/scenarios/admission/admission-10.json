@@ -1,0 +1,26 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "admission-10",
+  "domain": "admission",
+  "phase": "durability-and-observability",
+  "category": "permitted-boundary",
+  "threat": "Reject stale, overload, spoofed or nonnumeric local CPU/memory/queue telemetry before native work 10",
+  "trust_boundary": "Operator, job owner and audit integrity cannot be delegated to native model text",
+  "input": {
+    "variant": 9,
+    "threshold": 0.5,
+    "memory": 0.499,
+    "cpu": 0.2,
+    "queue": 0.3,
+    "observed_ms": 1000,
+    "now_ms": 1200
+  },
+  "expected_allow": true,
+  "expected_state": "admitted",
+  "acceptance": "Run live Store and operator-gate operation with independent expected state and denial",
+  "no_hosted_fallback": true,
+  "never_blindly_retry_ambiguous_inference": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

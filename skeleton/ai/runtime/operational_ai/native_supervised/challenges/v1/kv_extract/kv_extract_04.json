@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "kv_extract_04",
+  "domain": "kv_extract",
+  "ordinal": 4,
+  "arguments": {
+    "index": 4,
+    "a": 128,
+    "b": 6,
+    "word": "marble",
+    "city": "Halden"
+  },
+  "prompt": "Task 4: From owner=marble; state=ready; epoch=4, output owner only.",
+  "expected": "marble",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "evidence_02",
+  "domain": "evidence",
+  "prompt": "A fictional source synthetic_note_101 explicitly records tag gold. Extract the tag only; do not infer other fields.",
+  "completion": "gold",
+  "group_id": "evidence_02",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

@@ -1,0 +1,11 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "norm_04",
+  "category": "norm",
+  "overrides": {
+    "norm": "rms",
+    "seed": 303
+  },
+  "expected": "allowed",
+  "reason": "Accept explicit norm configuration with bounded candidate semantics"
+}

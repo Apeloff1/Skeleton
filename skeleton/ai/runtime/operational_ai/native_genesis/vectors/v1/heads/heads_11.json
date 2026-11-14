@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "heads_11",
+  "category": "heads",
+  "overrides": {
+    "n_heads": 7
+  },
+  "expected": "denied",
+  "reason": "Reject unsafe or malformed heads boundary without allocating model"
+}
