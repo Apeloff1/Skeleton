@@ -59,9 +59,9 @@ def bind_native_cpu_result_owner(
         result_info.st_dev, result_info.st_ino,
     ):
         raise ValueError("result and execution journal must use different inodes")
-    journal.bind_private_handle(journal_handle)
     if registry.session_id != journal.session_id:
         raise ValueError("native prompt and execution journal session mismatch")
+    journal.bind_private_handle(journal_handle)
     backend = NativeFairStreamBackend(
         runtime, registry,
         pressure_guard=NativeTokenPressureGuard(sampler, storage_path=storage_path),
@@ -112,6 +112,26 @@ def bind_native_cpu_dispatch_service(
         raise ValueError("native CPU dispatch requires an authenticated whole-request session")
     if state.get("session_id") != registry.session_id:
         raise ValueError("app session and native prompt registry mismatch")
+    # Three distinct stores are required, even when the session uses a
+    # caller-owned trusted connection rather than a private file handle.
+    if (type(journal) is not FairStreamExecutionJournal
+            or type(result_handle) is not PrivateSQLiteHandle
+            or type(journal_handle) is not PrivateSQLiteHandle):
+        raise ValueError("canonical native custody components required")
+    session_store = session._store
+    if (session_store._connection is journal._connection
+            or session_store._connection is result_handle.connection
+            or session_store._connection is journal_handle.connection):
+        raise ValueError("session and execution custody must be separate connections")
+    if session_store._private_handle is not None:
+        session_store._private_handle.assert_current()
+        result_handle.assert_current()
+        journal_handle.assert_current()
+        session_info = os.fstat(session_store._private_handle._file_fd)
+        for handle in (result_handle, journal_handle):
+            info = os.fstat(handle._file_fd)
+            if (session_info.st_dev, session_info.st_ino) == (info.st_dev, info.st_ino):
+                raise ValueError("session and execution custody must use different inodes")
     owner, vault = bind_native_cpu_result_owner(
         runtime=runtime, registry=registry, result_handle=result_handle,
         journal_handle=journal_handle, journal=journal, result_key=result_key,
@@ -123,10 +143,18 @@ def bind_native_cpu_dispatch_service(
         for request in requests:
             if journal.request_exists(request["request_id"]):
                 raise ValueError("queued identity already has execution custody")
+            # Each request must have space in both ledgers, conservatively
+            # allowing a maximum-sized sealed result for every queued peer.
+            peers = len(requests) - 1
+            journal.assert_request_admissible(request["request_id"], queued_count=peers)
+            vault.assert_request_admissible(request["request_id"], queued_count=peers)
 
     def prepare_native_request(request: StreamRequest) -> StreamRequest:
         if journal.request_exists(request.request_id):
             raise ValueError("request already has durable execution custody")
+        queued_count = len(session.verify()["checkpoint"]["requests"])
+        journal.assert_request_admissible(request.request_id, queued_count=queued_count)
+        vault.assert_request_admissible(request.request_id, queued_count=queued_count)
         return registry.bind_request(request)
 
     service = OfflineAdaptiveDispatchService(
@@ -189,6 +217,7 @@ def submit_authenticated_native_cpu_prompt(
         raise ValueError("native app ownership binding mismatch")
     # Serialize staging with planning/cancellation on this trusted service.
     # A peer CAS change is still fenced by the exact anchor during submit.
+    service._guard._require_owner_process()
     with service._guard._lock:
         service._guard._require_no_pending()
         snapshot = service._session.verify()
@@ -197,6 +226,9 @@ def submit_authenticated_native_cpu_prompt(
                        for row in snapshot["checkpoint"]["requests"])
                 or owner._journal.request_exists(request.request_id)):
             raise ValueError("request already has durable admission or execution custody")
+        queued_count = len(snapshot["checkpoint"]["requests"])
+        owner._journal.assert_request_admissible(request.request_id, queued_count=queued_count)
+        vault.assert_request_admissible(request.request_id, queued_count=queued_count)
         stage_native_cpu_prompt(
             runtime=runtime, registry=registry, request_id=request.request_id,
             tenant_id=authenticated_tenant_id, prompt=prompt,

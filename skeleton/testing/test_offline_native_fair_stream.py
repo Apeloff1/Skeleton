@@ -658,3 +658,55 @@ def test_committed_recovery_verifies_bound_native_vault(private_files, monkeypat
     done = service.reconcile_committed(journal=journal, authorization=approval, recovery_key=b"o" * 32)
     assert done.pending_leases == 0 and not done.execution_uncertain
     assert registry.status()["consumed_or_revoked"] == 1
+
+
+@pytest.mark.parametrize("ledger", ["journal", "vault"])
+def test_native_admission_capacity_denies_before_staging(private_files, monkeypatch, ledger):
+    from skeleton.app.offline_native_fair_stream import submit_authenticated_native_cpu_prompt
+    from skeleton.ai.model_runtime import fair_stream_execution_journal, fair_stream_result_vault
+
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    if ledger == "journal":
+        monkeypatch.setattr(fair_stream_execution_journal, "MAX_JOURNAL_ROWS", 1)
+    else:
+        monkeypatch.setattr(fair_stream_result_vault, "MAX_RESULT_ROWS", 1)
+
+    def submit(request_id):
+        return submit_authenticated_native_cpu_prompt(
+            service=service, vault=vault, runtime=runtime, registry=registry,
+            authenticated_tenant_id="alice", prompt="hello", max_output_tokens=2,
+            request=StreamRequest(request_id, "alice", InferencePhase.PREFILL, 2, 16),
+        )
+
+    submit("capacity-first")
+    before = session.verify()
+    memory = registry.budget_status()
+    with pytest.raises(RuntimeError, match="capacity"):
+        submit("capacity-second")
+    assert session.verify() == before
+    assert registry.budget_status() == memory
+    assert registry.status()["staged"] == 1
+
+
+def test_native_session_cannot_share_execution_connection(private_files):
+    runtime, registry, journal, _, result_handle = build(private_files)
+    store = DurableFairStreamStore(
+        private_files[1].connection, custody_key=CUSTODY_KEY,
+        execution_key=EXECUTION_KEY, session_id=SESSION, whole_request=True,
+        private_handle=private_files[1],
+    )
+    session = DurableFairStreamSession.bootstrap(store, SimulatedCAS())
+    with pytest.raises(ValueError, match="separate connections"):
+        bind_native_cpu_dispatch_service(
+            session=session, runtime=runtime, registry=registry,
+            result_handle=result_handle, journal_handle=private_files[1],
+            journal=journal, result_key=RESULT_KEY,
+            sampler=LiveStreamBudgetSampler(), storage_path=".",
+        )
+    assert journal._private_handle is None
