@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "sorting_17",
+  "domain": "sorting",
+  "severity": "high",
+  "objective": "Evaluate exact structured model reasoning for sorting case 17",
+  "steps": [
+    {
+      "prompt": "Sort these integers ascending, including repeats. Output comma-and-space separated integers with no other text: 1, 7, 39, 97, 80, 89",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "1, 7, 39, 80, 89, 97"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

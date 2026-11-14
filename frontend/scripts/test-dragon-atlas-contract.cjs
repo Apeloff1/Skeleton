@@ -8,6 +8,7 @@ const NodeModule = require('node:module');
 const ts = require('typescript');
 const root = path.join(__dirname, '..');
 const clientPath = path.join(root, 'src/product/crawlerClient.ts');
+const pilotReceiptPath = path.join(root, 'src/product/crawlerPilotReceipt.ts');
 const panelPath = path.join(root, 'src/features/Jeeves/CrawlerResearchAtlasPanel.tsx');
 const workspacePath = path.join(root, 'src/features/Jeeves/CrawlerWorkspace.tsx');
 const H = 'a'.repeat(64);
@@ -69,7 +70,8 @@ function transpile(file) {
 function loadRepositorySource(file, dependencies) {
   // The only executable sources are explicitly approved, repository-owned TS
   // files. Never compile a URL, operator input, or an arbitrary runtime path.
-  if (file !== clientPath && file !== path.join(root, 'src/features/Jeeves/atlasCampaignPlan.ts')) {
+  if (file !== clientPath && file !== pilotReceiptPath &&
+      file !== path.join(root, 'src/features/Jeeves/atlasCampaignPlan.ts')) {
     throw new Error('Unexpected Dragon test source');
   }
   const loaded = new NodeModule(file, module);
@@ -97,6 +99,7 @@ function loadClient() {
     '../utils/apiClient': { default: api },
     '../auth/gameforgeAuth': { authHeaders: () => ({}), getAuthToken: () => token },
     './chatErrors': { ChatClientError, chatApiError: () => new ChatClientError('server rejected') },
+    './crawlerPilotReceipt': loadRepositorySource(pilotReceiptPath, {}),
   };
   return loadRepositorySource(clientPath, dependencies);
 }
@@ -262,6 +265,73 @@ function fixture() {
   };
 }
 function setup(report = fixture()) { token = 'operator-one'; response = { report }; posts = []; }
+
+// The fixed-size receipt has separate source-only and external-release gates;
+// the test crypto fixture intentionally returns H for the exact payload.
+function pilotFixture(report) {
+  const names = [
+    'current_policy', 'source_bound_evidence', 'human_review_queue',
+    'security_and_privacy', 'provenance_and_grounding', 'bounded_context',
+    'restart_custody', 'source_robustness', 'measured_capacity',
+    'robots_and_origin_review',
+  ];
+  const checks = names.map(code => ({ code, status: 'held',
+    next_action: 'independent_human_review' }));
+  return {
+    schema_version: 'skeleton.dragon.campaign_pilot_qualification.v1',
+    atlas_digest: report.atlas_digest, snapshot_digest: report.snapshot_digest,
+    source_policy_digest: report.source_policy.digest,
+    run_sequence: report.run_sequence,
+    pilot_status: 'held_for_repair', pilot_check_count: 10,
+    checks, blocked_checks: names,
+    operator_actions: checks.map(item => item.next_action),
+    external_release_checks: [
+      'exact_head_merge_readiness', 'backend_quality',
+      'frontend_typecheck_and_product_e2e', 'architecture_and_source_parity',
+      'workflow_input_security', 'codeql_and_secret_scanning',
+      'malware_artifact_dependency_and_hygiene',
+      'windows11_wsl2_docker_native_device',
+      'crash_recovery_rollback_and_provenance',
+      'human_source_rights_and_publication_review',
+    ].map(code => ({ code, status: 'not_qualified' })),
+    source_only: true, read_only: true, human_review_required: true,
+    network_used: false, model_invoked: false, source_text_included: false,
+    training_authorized: false, publication_authorized: false,
+    release_authorized: false,
+    release_status: 'held_until_independent_exact_head_and_device_evidence',
+    recheck_mongo_authority_before_any_followup: true,
+    qualification_digest: H,
+  };
+}
+
+test('Atlas pilot exact-byte receipt keeps external release and source rights held', async () => {
+  const report = fixture();
+  report.pilot_qualification = pilotFixture(report);
+  setup(report);
+  const response = await client.getCrawlAtlas('session-1', request());
+  assert.equal(response.pilot_qualification.pilot_status, 'held_for_repair');
+  assert.equal(response.pilot_qualification.release_authorized, false);
+  assert.equal(response.pilot_qualification.external_release_checks.length, 10);
+  assert.equal(posts.length, 1);
+});
+
+test('Atlas pilot refuses publication grants, changed head identities and forged digests', async () => {
+  for (const change of [
+    x => { x.release_authorized = true; },
+    x => { x.publication_authorized = true; },
+    x => { x.training_authorized = true; },
+    x => { x.snapshot_digest = 'b'.repeat(64); },
+    x => { x.qualification_digest = 'd'.repeat(64); },
+    x => { x.external_release_checks[0].status = 'qualified'; },
+    x => { x.blocked_checks.pop(); },
+  ]) {
+    const report = fixture();
+    report.pilot_qualification = pilotFixture(report);
+    change(report.pilot_qualification);
+    setup(report);
+    await assert.rejects(client.getCrawlAtlas('session-1', request()));
+  }
+});
 
 test('operator sitemap discovery is explicit, bounded and carried into the create request', () => {
   const source = fs.readFileSync(workspacePath, 'utf8');

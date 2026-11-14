@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "ids_13",
+  "domain": "ids",
+  "prompt": "Normalize this fictional task ID with underscores and no spaces: task 512 alpha.",
+  "completion": "task_512_alpha",
+  "group_id": "ids_13",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "workflow_12",
+  "domain": "workflow",
+  "prompt": "For fictional candidate workflow 711, current phase=hold. Name its next permitted stage only.",
+  "completion": "hold",
+  "group_id": "workflow_12",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}
