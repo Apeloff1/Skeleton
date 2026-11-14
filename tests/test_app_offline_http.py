@@ -267,7 +267,7 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
             "POST", endpoint, {**payload, "message": "world"}
         )
         self.assertEqual(status, 409)
-        self.assertIn("request id reused", conflict["error"])
+        self.assertEqual(conflict["error"], "local conversation conflict")
 
     def test_session_listing_fork_export_import_and_deletion(self) -> None:
         status, empty, _ = self._request("GET", "/v1/sessions")
@@ -670,7 +670,7 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
             "POST", endpoint, {**payload, "grounded": False},
         )
         self.assertEqual(status, 409)
-        self.assertIn("request id reused", conflict["error"])
+        self.assertEqual(conflict["error"], "local conversation conflict")
 
     def test_grounded_backup_import_and_fork_preserve_original_source_custody(self):
         _source, _doc, sid = self._grounded_fixture()
@@ -716,7 +716,7 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
             "POST", "/v1/sessions/import", forged,
         )
         self.assertEqual(st, 400)
-        self.assertIn("grounding", rejected["error"])
+        self.assertEqual(rejected["error"], "invalid local conversation request")
 
     def test_grounded_requires_matching_local_evidence_no_empty_commit(self):
         st, created, _ = self._request("POST", "/v1/sessions", {})
@@ -788,7 +788,7 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
             )
         st, denied, _ = self._request("GET", "/v1/sessions/" + sid)
         self.assertEqual(st, 400)
-        self.assertIn("grounding", denied["error"])
+        self.assertEqual(denied["error"], "invalid local conversation request")
         st, denied, _ = self._request(
             "POST", "/v1/sessions/" + sid + "/turn", {
                 "message": "Explain pixel coverage in the rasterizer",
