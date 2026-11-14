@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import os
 import sqlite3
 from threading import RLock
 from typing import Mapping
@@ -17,6 +18,8 @@ from .fair_stream_custody import (
 )
 
 from .fair_stream_queue import FairStreamScheduler
+from .private_sqlite import PrivateSQLiteHandle, PrivateSQLiteUnavailable
+from .sqlite_custody_schema import assert_custody_schema
 
 SCHEMA = "skeleton.ai.fair-stream-sqlite-cas.v1"
 MAX_GENERATION = (1 << 63) - 1
@@ -93,6 +96,7 @@ class DurableFairStreamStore:
         self, connection: sqlite3.Connection, *,
         custody_key: bytes, execution_key: bytes, session_id: str,
         whole_request: bool = False,
+        private_handle: PrivateSQLiteHandle | None = None,
     ) -> None:
         if not isinstance(connection, sqlite3.Connection):
             raise ValueError("trusted SQLite connection required")
@@ -109,6 +113,12 @@ class DurableFairStreamStore:
             session_id=session_id,
             scheduler=FairStreamScheduler(whole_request=whole_request),
         )
+        if private_handle is not None:
+            if type(private_handle) is not PrivateSQLiteHandle or private_handle.connection is not connection:
+                raise ValueError("exact private custody handle required")
+            private_handle.assert_current()
+        self._private_handle = private_handle
+        self._owner_pid = os.getpid()
         self._connection = connection
         self._custody_key = custody_key
         self._execution_key = execution_key
@@ -123,17 +133,37 @@ class DurableFairStreamStore:
             "payload BLOB NOT NULL"
             ") WITHOUT ROWID"
         )
+        self._assert_schema()
 
     @property
     def whole_request(self) -> bool:
         return self._whole_request
 
+    def _assert_schema(self) -> None:
+        assert_custody_schema(
+            self._connection, table=_TABLE,
+            columns=("session_id", "generation", "digest", "payload"),
+            primary_key="session_id",
+        )
+
+    def _require_owner_process(self) -> None:
+        if os.getpid() != self._owner_pid:
+            raise PrivateSQLiteUnavailable("inherited stream custody requires reopening")
+
+    def _assert_private(self) -> None:
+        self._require_owner_process()
+        if self._private_handle is not None:
+            self._private_handle.assert_current()
+
     def _begin(self) -> None:
+        self._assert_private()
         if self._connection.in_transaction:
             raise ValueError("shared or active SQLite transaction forbidden")
         self._connection.execute("BEGIN IMMEDIATE")
 
     def _read(self) -> tuple[int, str, bytes] | None:
+        self._assert_private()
+        self._assert_schema()
         row = self._connection.execute(
             "SELECT generation, digest, payload FROM " + _TABLE +
             " WHERE session_id = ?", (self.session_id,),
@@ -173,6 +203,7 @@ class DurableFairStreamStore:
 
     def initialize(self) -> dict[str, object]:
         """Initialize exactly once; never overwrite a preexisting session."""
+        self._require_owner_process()
         with self._lock:
             envelope = self._empty.export()
             payload = _encode(envelope)
@@ -186,6 +217,9 @@ class DurableFairStreamStore:
                     " VALUES (?, ?, ?, ?)",
                     (self.session_id, 0, envelope["digest"], payload),
                 )
+                if self._read() != (0, envelope["digest"], payload):
+                    raise ValueError("durable initialization readback mismatch")
+                self._assert_private()
                 self._connection.commit()
                 return envelope
             except BaseException:
@@ -198,13 +232,24 @@ class DurableFairStreamStore:
         """Read only with an independent high-watermark; no silent fallback."""
         generation = _generation(expected_generation)
         digest = _digest(expected_digest, "trusted high-watermark")
+        self._require_owner_process()
         with self._lock:
-            row = self._read()
-            if row is None:
-                raise ValueError("durable custody session missing")
-            return self._restore(
-                row, expected_generation=generation, expected_digest=digest,
-            )
+            if self._connection.in_transaction:
+                raise ValueError("shared or active SQLite transaction forbidden")
+            # Read schema and payload in a single SQLite snapshot. Otherwise
+            # another connection could change schema between verification and SELECT.
+            self._connection.execute("BEGIN")
+            try:
+                row = self._read()
+                if row is None:
+                    raise ValueError("durable custody session missing")
+                owner = self._restore(
+                    row, expected_generation=generation, expected_digest=digest,
+                )
+                self._assert_private()
+                return owner
+            finally:
+                self._connection.rollback()
 
     def transition(
         self, *, expected_generation: int, expected_digest: str,
@@ -219,6 +264,7 @@ class DurableFairStreamStore:
         """
         generation = _generation(expected_generation)
         digest = _digest(expected_digest, "trusted high-watermark")
+        self._require_owner_process()
         with self._lock:
             self._begin()
             try:
@@ -243,6 +289,9 @@ class DurableFairStreamStore:
                 ).rowcount
                 if changed != 1:
                     raise ValueError("durable custody CAS rejected")
+                if self._read() != (next_generation, next_digest, payload):
+                    raise ValueError("durable custody transition readback mismatch")
+                self._assert_private()
                 self._connection.commit()
                 return plan, envelope
             except BaseException:

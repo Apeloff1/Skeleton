@@ -220,3 +220,80 @@ def test_reject_active_transaction_and_key_alias():
         DurableFairStreamStore(
             conn, custody_key=C, execution_key=C, session_id=SESSION,
         )
+
+
+def test_schema_trigger_denied_before_durable_transition():
+    from skeleton.ai.model_runtime.sqlite_custody_schema import CustodySchemaError
+    conn = sqlite3.connect(":memory:")
+    store = make(conn)
+    before = store.initialize()
+    conn.execute(
+        "CREATE TRIGGER erase_scheduler AFTER UPDATE ON local_fair_stream_custody "
+        "BEGIN DELETE FROM local_fair_stream_custody; END"
+    )
+    with pytest.raises(CustodySchemaError, match="trigger"):
+        store.transition(
+            expected_generation=0, expected_digest=before["digest"],
+            action="submit", request=req(),
+        )
+    assert conn.execute("SELECT generation FROM local_fair_stream_custody").fetchone() == (0,)
+    assert not conn.in_transaction
+    conn.execute("DROP TRIGGER erase_scheduler")
+    assert store.load(expected_generation=0, expected_digest=before["digest"]).export() == before
+
+
+def test_temp_shadow_cannot_replace_authenticated_scheduler_reads():
+    from skeleton.ai.model_runtime.sqlite_custody_schema import CustodySchemaError
+    conn = sqlite3.connect(":memory:")
+    store = make(conn)
+    before = store.initialize()
+    conn.execute(
+        "CREATE TEMP TABLE LOCAL_FAIR_STREAM_CUSTODY "
+        "(session_id TEXT, generation INTEGER, digest TEXT, payload BLOB)"
+    )
+    with pytest.raises(CustodySchemaError, match="shadow"):
+        store.load(expected_generation=0, expected_digest=before["digest"])
+    assert not conn.in_transaction
+    conn.execute("DROP TABLE temp.LOCAL_FAIR_STREAM_CUSTODY")
+    assert store.load(expected_generation=0, expected_digest=before["digest"]).export() == before
+
+
+def test_inherited_store_rejected_before_lock(monkeypatch):
+    import os
+    from skeleton.ai.model_runtime.private_sqlite import PrivateSQLiteUnavailable
+    store = make()
+    before = store.initialize()
+
+    class ForbiddenLock:
+        def __enter__(self):
+            pytest.fail("inherited owner reached process-local lock")
+
+    store._lock = ForbiddenLock()
+    pid = os.getpid()
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "getpid", lambda: pid + 1)
+        with pytest.raises(PrivateSQLiteUnavailable, match="inherited"):
+            store.load(expected_generation=0, expected_digest=before["digest"])
+        with pytest.raises(PrivateSQLiteUnavailable, match="inherited"):
+            store.transition(expected_generation=0, expected_digest=before["digest"],
+                             action="submit", request=req())
+        with pytest.raises(PrivateSQLiteUnavailable, match="inherited"):
+            store.initialize()
+
+
+def test_whole_request_policy_survives_schema_guarded_reopen(tmp_path):
+    path = tmp_path / "native-policy.sqlite"
+    conn = sqlite3.connect(path)
+    store = DurableFairStreamStore(conn, custody_key=C, execution_key=E,
+                                   session_id=SESSION, whole_request=True)
+    state = store.initialize()
+    conn.close()
+    with sqlite3.connect(path) as reopened:
+        current = DurableFairStreamStore(reopened, custody_key=C, execution_key=E,
+                                         session_id=SESSION, whole_request=True)
+        assert current.whole_request
+        assert current.load(expected_generation=0, expected_digest=state["digest"]).export() == state
+        wrong = DurableFairStreamStore(reopened, custody_key=C, execution_key=E,
+                                       session_id=SESSION)
+        with pytest.raises(ValueError, match="execution policy"):
+            wrong.load(expected_generation=0, expected_digest=state["digest"])
