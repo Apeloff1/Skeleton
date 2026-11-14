@@ -1,6 +1,6 @@
 /**
- * Explicit bridge between the historical 67-genre Galaxy Studio picker and
- * the 36 recognized GameForge brief votes. Mapping is intentional, not a
+ * Explicit bridge between the complete offline Galaxy Studio picker and
+ * the expanded GameForge brief vocabulary. Mapping is intentional, not a
  * claim that the condensed archetype reproduces each complete game's systems.
  */
 import { FALLBACK_GENRES } from '../features/GalaxyStudioFactory/fallbackGenres';
@@ -30,7 +30,8 @@ export const GALAXY_TO_FORGE_BRIEF: Record<string, string> = {
   action_adventure: 'action-adventure', open_world: 'action-adventure',
   looter_shooter: 'shooter', extraction_rpg: 'extraction',
   card_game: 'card', board_game: 'puzzle', text_adventure: 'narrative',
-  roguelite_shooter: 'roguelite', twin_stick: 'shooter',
+  roguelite_shooter: 'roguelite', beat_em_up: 'beat-em-up',
+  shoot_em_up: 'shoot-em-up', twin_stick: 'shooter',
   stealth_action: 'stealth', tactics: 'tactics',
   metaverse_social: 'mmo',
 };

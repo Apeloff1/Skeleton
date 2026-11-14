@@ -18,6 +18,7 @@ REQUIRED_NEEDS = (
     "integration_smoke",
     "quality_security",
     "pr_automation",
+    "source_qualification_gate",
     "ci",
 )
 PR_AUTOMATION_TESTS = (
