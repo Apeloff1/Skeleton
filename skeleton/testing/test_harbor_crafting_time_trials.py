@@ -115,7 +115,7 @@ def test_malformed_authored_courses_fail_closed(mutation):
 
 
 @pytest.mark.parametrize("mutation", [
-    lambda r: r.update({"medal": "gold"}),
+    lambda r: r.update({"medal": "bronze"}),
     lambda r: r.update({"finish_tick": 1}),
     lambda r: r["visits"][0].update({"tick": 0}),
     lambda r: r["visits"][0].update({"event_digest": "0" * 64}),
@@ -124,7 +124,11 @@ def test_malformed_authored_courses_fail_closed(mutation):
 ])
 def test_outer_digest_resealing_cannot_forge_time_trial(mutation):
     report = time_trial_report(bundle(), course())
+    original_digest = digest(report)
     mutation(report)
+    # Each adversary must actually change a field before resealing; a no-op
+    # mutation would trivially pass verification without exercising the guard.
+    assert digest(report) != original_digest
     report["report_digest"] = digest({
         k: v for k, v in report.items() if k != "report_digest"
     })

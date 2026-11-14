@@ -179,6 +179,7 @@ def cli(argv: Sequence[str]) -> int:
     parser = argparse.ArgumentParser(prog="python -m skeleton scene-escort-play")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("demo")
+    sub.add_parser("demo-script")
     play = sub.add_parser("play")
     play.add_argument("--source-json", required=True)
     resume = sub.add_parser("resume")
@@ -191,6 +192,16 @@ def cli(argv: Sequence[str]) -> int:
     try:
         if args.command == "demo":
             result = play_escort(source=original_escort())
+        elif args.command == "demo-script":
+            from io import StringIO
+            from skeleton.game.gameplay.scene_escort import demo_actions
+            commands = "".join(
+                json.dumps(action, sort_keys=True) + "\n"
+                for action in demo_actions()
+            )
+            result = play_escort(
+                source=original_escort(), input_stream=StringIO(commands),
+            )
         else:
             opts = {
                 "expected_source_digest": args.expected_source_digest,

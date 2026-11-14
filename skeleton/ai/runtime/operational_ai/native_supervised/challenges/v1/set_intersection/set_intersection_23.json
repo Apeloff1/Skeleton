@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "set_intersection_23",
+  "domain": "set_intersection",
+  "ordinal": 23,
+  "arguments": {
+    "index": 23,
+    "a": 261,
+    "b": 12,
+    "word": "lumen",
+    "city": "Trondheim"
+  },
+  "prompt": "Task 23: Find sorted intersection of sets lumen,green,a23 and green,a23,z23.",
+  "expected": "a23,green",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

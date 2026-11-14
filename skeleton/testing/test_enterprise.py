@@ -12,7 +12,7 @@ def test_enterprise_request():
     gw = get_gateway()
     # The legacy bridge has no verified model or tokenizer. Do not fabricate
     # a successful inference response or a healthy runtime in this test.
-    with pytest.raises(RuntimeError, match="LOCAL_INFERENCE_NOT_BOUND"):
+    with pytest.raises(RuntimeError, match="cannot attest model/tokenizer/guard activation"):
         gw.request("enterprise test", "valid_cas_string_32chars_long_enough")
 
 def test_enterprise_seam_inventory():

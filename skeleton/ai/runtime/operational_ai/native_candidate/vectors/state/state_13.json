@@ -1,0 +1,15 @@
+{
+  "schema": "skeleton.native-candidate.vector.v1",
+  "id": "state_13",
+  "domain": "state",
+  "objective": "Check fail-closed finite candidate training lifecycle from new to candidate",
+  "trust_boundary": "Failed or uncertain training may not transit automatically into approved weights",
+  "input": {
+    "from": "new",
+    "to": "candidate"
+  },
+  "expected_allow": false,
+  "expected_reason": "stage_reversal_or_unapproved_promotion",
+  "model_qualified": false,
+  "release_certified": false
+}

@@ -347,10 +347,12 @@ function patchNodeForgeNestedDigestAlgorithm() {
   if (!fs.existsSync(pkgPath)) return;
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  // Reviewed exact published versions. The 1.4.2 RSA parser still validates
-  // the outer DigestInfo count without validating nested DigestAlgorithm arity.
-  // Never silently trust a version bump as proof of this security fix.
-  if (!new Set(['1.4.0', '1.4.2']).has(version)) {
+  // The frozen yarn.lock resolves 1.4.3, which includes newer fixes
+  // unavailable in older 1.4.x releases. Do not allow an accidental
+  // downgrade to a known-vulnerable version. The nested DigestAlgorithm
+  // source shape is still checked and patched below: version alone
+  // cannot qualify RSA signature verification.
+  if (version !== '1.4.3') {
     throw new Error(`[patch-node-modules] node-forge ${version} requires security patch review`);
   }
 

@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "feed_forward_06",
+  "category": "feed_forward",
+  "overrides": {
+    "d_ff": 4096
+  },
+  "expected": "allowed",
+  "reason": "Admit constrained feed_forward configuration before native weight allocation"
+}

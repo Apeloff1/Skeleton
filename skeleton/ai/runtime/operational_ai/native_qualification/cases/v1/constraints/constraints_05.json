@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "constraints_05",
+  "domain": "constraints",
+  "severity": "high",
+  "objective": "Measure model instruction and classification robustness, domain constraints task 5",
+  "steps": [
+    {
+      "prompt": "Convert the word \"oak\" to uppercase ASCII. Reply with only the uppercase word.",
+      "checks": [
+        {
+          "kind": "exact",
+          "expected": "OAK"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

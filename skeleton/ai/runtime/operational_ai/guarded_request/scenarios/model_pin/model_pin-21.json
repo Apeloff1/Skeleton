@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.ai.guard.case.v1",
+  "id": "model_pin-21",
+  "control": "model_pin",
+  "phase": "model",
+  "kind": "adversarial-denial",
+  "objective": "Verify actual offline AI gate decision at profile 21 for model_pin",
+  "threat": "Pin model and tokenizer identity to strict lowercase SHA256 identity, probe 21",
+  "trust_boundary": "Untrusted caller input must not change authenticated model, scope, authority or budget",
+  "input": {
+    "sha256": "abc"
+  },
+  "expected_allow": false,
+  "expected_semantics": "The gate refuses the attempted boundary crossing without any model invocation",
+  "evidence_rule": "Execute the real policy_oracle entrypoint; unexpected exceptions fail acceptance",
+  "no_model_substitute": true,
+  "real_model_qualification": false,
+  "policy_release_qualification": false
+}

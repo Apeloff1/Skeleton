@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "limits_03",
+  "domain": "limits",
+  "prompt": "A synthetic inference budget holds 54 tokens and consumed 17. Return the remaining integer count only.",
+  "completion": "37",
+  "group_id": "limits_03",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

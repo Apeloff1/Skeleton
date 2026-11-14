@@ -22,6 +22,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
+from core.http_errors import redact_client_payload, redact_client_text
 from core.telemetry_privacy import (
     crash_metadata,
     safe_detail,
@@ -59,11 +60,11 @@ class _BoundedTelemetryRoute(APIRoute):
                     if length < 0:
                         raise HTTPException(400, "Invalid content length")
                     if length > _MAX_TELEMETRY_BODY_BYTES:
-                        raise HTTPException(413, "Telemetry payload exceeds byte limit")
+                        raise HTTPException(413, "Telemetry request exceeds byte limit")
                 collected = bytearray()
                 async for chunk in request.stream():
                     if len(collected) + len(chunk) > _MAX_TELEMETRY_BODY_BYTES:
-                        raise HTTPException(413, "Telemetry payload exceeds byte limit")
+                        raise HTTPException(413, "Telemetry request exceeds byte limit")
                     collected.extend(chunk)
                 # Starlette's cached request-body path permits the normal
                 # FastAPI parser to read the already-admitted bytes.
@@ -203,9 +204,9 @@ def crash_row(report: CrashReport) -> dict:
         "detail": crash_metadata(
             source=report.source,
             component=report.component,
-            message=report.message,
-            stack=report.stack,
-            info=report.info,
+            message=redact_client_text(report.message),
+            stack=redact_client_text(report.stack or ""),
+            info=redact_client_payload(report.info),
             app_version=report.app_version,
         ),
     }
