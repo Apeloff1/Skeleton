@@ -87,7 +87,7 @@ def make(connection, anchor, owner, *, bootstrap):
         connection=connection, custody_key=CUSTODY_KEY,
         execution_key=EXECUTION_KEY, session_id=SESSION,
         watermark=anchor, owner=owner, storage_path=".",
-        bootstrap=bootstrap,
+        bootstrap=bootstrap, operator_recovery_key=RECOVERY_KEY,
     )
 
 
@@ -281,7 +281,7 @@ def setup_cancelled_restart(monkeypatch, tmp_path, *, journal_state="cancelled")
             connection=custody_connection, custody_key=CUSTODY_KEY,
             execution_key=EXECUTION_KEY, session_id=SESSION, watermark=anchor,
             owner=JournaledExecutionOwner(journal, backend), storage_path=".",
-            bootstrap=bootstrap, whole_request=True,
+            bootstrap=bootstrap, whole_request=True, operator_recovery_key=RECOVERY_KEY,
         )
         return app, journal, custody_connection, journal_connection
 
@@ -360,3 +360,29 @@ def test_relabelled_commit_grant_cannot_authorize_cancel_recovery(monkeypatch, t
     with pytest.raises(RecoveryAuthorizationDenied, match="authentication"):
         app.reconcile_cancelled(authorization=approval, recovery_key=RECOVERY_KEY)
     assert app.status().pending_leases == 1 and backend.calls == 0
+
+def test_caller_chosen_signing_key_cannot_authorize_its_own_recovery(monkeypatch, tmp_path):
+    app, journal, backend, _ = setup_pending(monkeypatch, tmp_path)
+    before = app._session.verify()
+    attacker = b"x" * 32
+    with pytest.raises(RecoveryAuthorizationDenied, match="authentication"):
+        app.reconcile_committed(
+            journal=journal, authorization=grant(app, key=attacker), recovery_key=attacker,
+        )
+    assert app._session.verify() == before
+    assert backend.calls == 1
+    assert app.reconcile_committed(
+        journal=journal, authorization=grant(app), recovery_key=RECOVERY_KEY,
+    ).pending_leases == 0
+
+
+def test_unconfigured_recovery_fails_closed(monkeypatch, tmp_path):
+    app, journal, backend, _ = setup_pending(monkeypatch, tmp_path)
+    unconfigured = OfflineAdaptiveDispatchService(app._session, app._guard._owner, storage_path=".")
+    before = app._session.verify()
+    with pytest.raises(RecoveryAuthorizationDenied, match="not configured"):
+        unconfigured.reconcile_committed(
+            journal=journal, authorization=grant(app), recovery_key=RECOVERY_KEY,
+        )
+    assert app._session.verify() == before
+    assert backend.calls == 1

@@ -58,6 +58,7 @@ class OfflineAdaptiveDispatchService:
         queued_authority: Callable[[dict[str, object]], None] | None = None,
         cancel_cleanup: Callable[[str], None] | None = None,
         prepare_request: Callable[[StreamRequest], StreamRequest] | None = None,
+        operator_recovery_key: bytes | None = None,
     ) -> None:
         if not isinstance(session, DurableFairStreamSession):
             raise ValueError("canonical durable session required")
@@ -66,7 +67,7 @@ class OfflineAdaptiveDispatchService:
             session, sampler if sampler is not None else LiveStreamBudgetSampler(),
             owner, storage_path=storage_path, whole_request=whole_request,
             queued_authority=queued_authority, cancel_cleanup=cancel_cleanup,
-            prepare_request=prepare_request,
+            prepare_request=prepare_request, operator_recovery_key=operator_recovery_key,
         )
 
     @classmethod
@@ -76,6 +77,7 @@ class OfflineAdaptiveDispatchService:
         watermark: TrustedHighWatermark, owner: DurableExecutionOwner,
         storage_path: str, bootstrap: bool = False, whole_request: bool = False,
         private_handle: PrivateSQLiteHandle | None = None,
+        operator_recovery_key: bytes | None = None,
     ) -> "OfflineAdaptiveDispatchService":
         """Never silently reset a previous session on a restart."""
         if type(bootstrap) is not bool:
@@ -89,7 +91,8 @@ class OfflineAdaptiveDispatchService:
             DurableFairStreamSession.bootstrap(store, watermark)
             if bootstrap else DurableFairStreamSession(store, watermark)
         )
-        return cls(session, owner, storage_path=storage_path, whole_request=whole_request)
+        return cls(session, owner, storage_path=storage_path, whole_request=whole_request,
+                   operator_recovery_key=operator_recovery_key)
 
     @classmethod
     def from_private_database(
@@ -98,6 +101,7 @@ class OfflineAdaptiveDispatchService:
         watermark: TrustedHighWatermark, owner: DurableExecutionOwner,
         storage_path: str, bootstrap: bool = False,
         max_database_bytes: int = 64 << 20, whole_request: bool = False,
+        operator_recovery_key: bytes | None = None,
     ) -> tuple["OfflineAdaptiveDispatchService", PrivateSQLiteHandle]:
         """App bootstrap with a private POSIX DB; caller retains handle custody.
 
@@ -115,7 +119,7 @@ class OfflineAdaptiveDispatchService:
                 custody_key=custody_key, execution_key=execution_key,
                 session_id=session_id, watermark=watermark, owner=owner,
                 storage_path=storage_path, bootstrap=bootstrap, whole_request=whole_request,
-                private_handle=handle,
+                private_handle=handle, operator_recovery_key=operator_recovery_key,
             )
         except BaseException:
             handle.close()

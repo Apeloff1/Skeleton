@@ -523,7 +523,7 @@ def test_published_native_result_recovery_never_reexecutes(
         session=session, runtime=runtime, registry=registry,
         result_handle=result_handle, journal_handle=private_files[1],
         journal=journal, result_key=RESULT_KEY,
-        sampler=LiveStreamBudgetSampler(), storage_path=".",
+        sampler=LiveStreamBudgetSampler(), storage_path=".", operator_recovery_key=b"o" * 32,
     )
     stage_native_cpu_prompt(
         runtime=runtime, registry=registry, request_id="published-native",
@@ -595,7 +595,7 @@ def test_committed_recovery_verifies_bound_native_vault(private_files, monkeypat
         session=session, runtime=runtime, registry=registry,
         result_handle=result_handle, journal_handle=private_files[1],
         journal=journal, result_key=RESULT_KEY,
-        sampler=LiveStreamBudgetSampler(), storage_path=".",
+        sampler=LiveStreamBudgetSampler(), storage_path=".", operator_recovery_key=b"o" * 32,
     )
     stage_native_cpu_prompt(
         runtime=runtime, registry=registry, request_id="committed-native",
@@ -725,7 +725,7 @@ def test_native_uncertain_retirement_preserves_replay_fence_and_output(private_f
         session=session, runtime=runtime, registry=registry,
         result_handle=result_handle, journal_handle=private_files[1],
         journal=journal, result_key=RESULT_KEY,
-        sampler=LiveStreamBudgetSampler(), storage_path=".",
+        sampler=LiveStreamBudgetSampler(), storage_path=".", operator_recovery_key=b"o" * 32,
     )
     stage_native_cpu_prompt(
         runtime=runtime, registry=registry, request_id="retire-native",

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 import hmac
+from hashlib import sha256
 from threading import RLock
 from typing import TYPE_CHECKING, Callable, Mapping, Protocol
 
@@ -74,6 +75,7 @@ class GuardedFairStreamDispatch:
         queued_authority: Callable[[dict[str, object]], None] | None = None,
         cancel_cleanup: Callable[[str], None] | None = None,
         prepare_request: Callable[[StreamRequest], StreamRequest] | None = None,
+        operator_recovery_key: bytes | None = None,
     ) -> None:
         if type(whole_request) is not bool:
             raise ValueError("explicit whole-request policy required")
@@ -91,6 +93,11 @@ class GuardedFairStreamDispatch:
             raise ValueError("selected storage volume required")
         session._require_owner_process()
         self._session = session
+        if operator_recovery_key is not None:
+            self._validate_recovery_key_role(operator_recovery_key)
+        self._recovery_key_commitment = (
+            None if operator_recovery_key is None else self._recovery_commitment(operator_recovery_key)
+        )
         self._sampler = sampler
         self._owner = owner
         self._storage_path = storage_path
@@ -138,6 +145,26 @@ class GuardedFairStreamDispatch:
             self._session._require_owner_process()
         except RuntimeError as exc:
             raise DispatchUncertain("inherited dispatcher requires reopening") from exc
+
+    @staticmethod
+    def _recovery_commitment(key: bytes) -> bytes:
+        return sha256(b"skeleton.ai.operator-recovery-key.v1\x00" + key).digest()
+
+    def _validate_recovery_key_role(self, key: bytes) -> None:
+        store = self._session._store
+        if (type(key) is not bytes or not 32 <= len(key) <= 128
+                or any(hmac.compare_digest(key, other)
+                       for other in (store._custody_key, store._execution_key))):
+            raise ValueError("independent operator recovery key required")
+
+    def _require_recovery_key(self, key: bytes) -> None:
+        """Request-supplied credentials cannot become their own trust root."""
+        from .fair_stream_recovery import RecoveryAuthorizationDenied
+
+        self._validate_recovery_key_role(key)
+        expected = self._recovery_key_commitment
+        if expected is None or not hmac.compare_digest(expected, self._recovery_commitment(key)):
+            raise RecoveryAuthorizationDenied("operator recovery authentication failed or not configured")
 
     def _require_no_pending(self) -> None:
         self._require_owner_process()
@@ -426,6 +453,7 @@ class GuardedFairStreamDispatch:
                 raise DispatchUncertain("invalid canonical pending lease") from exc
             if self._issued and self._issued.get(permit.lease_id) != permit:
                 raise DispatchUncertain("in-memory lease differs from durable custody")
+            self._require_recovery_key(recovery_key)
             verify_recovery_authorization(
                 authorization, recovery_key=recovery_key,
                 state=state, lease_id=permit.lease_id,
@@ -487,6 +515,7 @@ class GuardedFairStreamDispatch:
             )
             if self._issued and self._issued.get(permit.lease_id) != permit:
                 raise DispatchUncertain("in-memory lease differs from durable custody")
+            self._require_recovery_key(recovery_key)
             verify_recovery_authorization(
                 authorization, recovery_key=recovery_key, state=state,
                 lease_id=permit.lease_id, purpose="published",
@@ -548,6 +577,7 @@ class GuardedFairStreamDispatch:
             )
             if self._issued and self._issued.get(permit.lease_id) != permit:
                 raise DispatchUncertain("in-memory lease differs from durable custody")
+            self._require_recovery_key(recovery_key)
             verify_recovery_authorization(
                 authorization, recovery_key=recovery_key, state=state,
                 lease_id=permit.lease_id, purpose="cancelled",
@@ -607,11 +637,8 @@ class GuardedFairStreamDispatch:
                 raise DispatchUncertain("in-memory lease differs from durable custody")
             if not self._uncertain and self._issued:
                 raise DispatchUncertain("known unstarted permit requires cancellation, not abandonment")
-            store = self._session._store
-            if type(recovery_key) is not bytes or any(
-                hmac.compare_digest(recovery_key, key)
-                for key in (store._custody_key, store._execution_key, owner._journal._key)
-            ):
+            self._require_recovery_key(recovery_key)
+            if hmac.compare_digest(recovery_key, owner._journal._key):
                 raise ValueError("independent operator recovery key required")
             verify_abandonment_authorization(
                 authorization, recovery_key=recovery_key, state=state, lease_id=permit.lease_id,

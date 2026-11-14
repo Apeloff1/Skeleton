@@ -6,6 +6,7 @@ keys. No default secrets, GPU qualification or automatic restart replay.
 """
 from __future__ import annotations
 
+import hmac
 import os
 
 from skeleton.ai.model_runtime.fair_stream_execution_journal import (
@@ -98,6 +99,7 @@ def bind_native_cpu_dispatch_service(
     journal_handle: PrivateSQLiteHandle,
     journal: FairStreamExecutionJournal, result_key: bytes,
     sampler: LiveStreamBudgetSampler, storage_path: str,
+    operator_recovery_key: bytes | None = None,
 ) -> tuple[OfflineAdaptiveDispatchService, SealedFairStreamResultVault]:
     """End-to-end app composition without manufacturing keys or CPU telemetry.
 
@@ -119,6 +121,14 @@ def bind_native_cpu_dispatch_service(
             or type(journal_handle) is not PrivateSQLiteHandle):
         raise ValueError("canonical native custody components required")
     session_store = session._store
+    keys = (session_store._custody_key, session_store._execution_key, journal._key)
+    if type(result_key) is not bytes or any(hmac.compare_digest(result_key, key) for key in keys):
+        raise ValueError("independent result encryption key required")
+    if operator_recovery_key is not None and (
+        type(operator_recovery_key) is not bytes or not 32 <= len(operator_recovery_key) <= 128
+        or any(hmac.compare_digest(operator_recovery_key, key) for key in (*keys, result_key))
+    ):
+        raise ValueError("independent operator recovery key required")
     if (session_store._connection is journal._connection
             or session_store._connection is result_handle.connection
             or session_store._connection is journal_handle.connection):
@@ -161,6 +171,7 @@ def bind_native_cpu_dispatch_service(
         session, owner, sampler=sampler, storage_path=storage_path,
         whole_request=True, queued_authority=verify_queued_authority,
         cancel_cleanup=registry.discard_cancelled, prepare_request=prepare_native_request,
+        operator_recovery_key=operator_recovery_key,
     )
     return service, vault
 
