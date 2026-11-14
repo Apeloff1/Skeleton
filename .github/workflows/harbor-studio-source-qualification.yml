@@ -1,25 +1,13 @@
 name: Harbor CLI and Studio Archive Source Qualification
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "skeleton/game/gameplay/harbor_crafting_patrol_cli.py"
-      - "skeleton/app/offline_delivery_archive.py"
-      - "skeleton/build/delivery/packaging.py"
-      - "skeleton/ai/build/core/delivery/packaging.py"
-      - "skeleton/testing/test_harbor_crafting_patrol_guidance.py"
-      - "skeleton/testing/test_app_offline_archive_schema_parity.py"
-      - "skeleton/testing/test_delivery_packaging.py"
-      - "skeleton/testing/test_harbor_crafting_journal_transfer.py"
-      - "skeleton/testing/test_ecs_ai.py"
-      - ".github/workflows/harbor-studio-source-qualification.yml"
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: harbor-studio-source-${{ github.event.pull_request.number }}
+  group: harbor-studio-source-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 jobs:

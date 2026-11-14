@@ -2,40 +2,13 @@ name: First-install source qualification
 
 # Source-only qualification runs on drafts; no Windows, Docker, GGUF or release claim.
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - '.github/workflows/first-install-source-qualification.yml'
-      - '.env.example'
-      - 'Dockerfile'
-      - 'Dockerfile.dockerignore'
-      - 'backend/Dockerfile'
-      - 'backend/Dockerfile.dockerignore'
-      - 'docker-compose.yml'
-      - 'frontend/Dockerfile'
-      - 'frontend/.dockerignore'
-      - 'skeleton/app/**'
-      - 'skeleton/testing/test_app_assembly.py'
-      - 'skeleton/testing/test_app_installer.py'
-      - 'skeleton/testing/test_app_installer_epoch.py'
-      - 'skeleton/testing/test_app_offline_install_quarantine.py'
-      - 'skeleton/testing/test_app_offline_delivery_archive.py'
-      - 'skeleton/app/offline_delivery_archive.py'
-      - 'skeleton/testing/test_app_studio_journey.py'
-      - 'skeleton/testing/test_dual_runtime_verify.py'
-      - 'skeleton/ai/game_builder/dual_runtime_verify.py'
-      - 'skeleton/ai/game_builder/original_game_studio.py'
-      - 'skeleton/testing/test_app_install_source_contracts.py'
-      - 'skeleton/testing/test_app_compose_parity.py'
-      - 'skeleton/testing/test_windows_installer.py'
-      - 'scripts/check_app_assembly.py'
-      - 'scripts/check_app_compose_parity.py'
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: first-install-source-${{ github.event.pull_request.number }}
+  group: first-install-source-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 jobs:

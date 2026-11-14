@@ -221,7 +221,7 @@ jobs:
           python -m pip install --disable-pip-version-check
           "ruff==0.17.2" "pytest>=8,<9" "pytest-asyncio>=0.24,<2" "fastapi==0.161.1"
           "httpx>=0.28.1,<1" "pydantic-settings>=2.15.0,<3" "pymongo>=4,<5" "motor>=3,<4"
-          "bcrypt>=4,<5" "PyJWT>=2,<3" "email-validator>=2,<3" "python-dotenv>=1,<2" "cryptography>=50.0.2"
+          "bcrypt>=4,<5" "PyJWT>=2,<3" "email-validator>=2,<3" "python-dotenv>=1,<2" "cryptography>=50.0.2" "numpy>=2,<3" "PyYAML>=6,<7"
       # Required source qualifications are in the protected aggregate rather
       # than subscribing as two extra automatic workflows. Any source test
       # failure blocks Lint Type Security and therefore Merge Readiness.
@@ -272,6 +272,24 @@ jobs:
             trap 'git checkout -q -f "$ORIGINAL_SHA"' EXIT
             test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
           fi
+          export PYTHONPATH=".:backend"
+          export PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin \
+            skeleton/testing/test_gameforge_instrument_overrides.py \
+            skeleton/testing/test_galaxy_profile.py \
+            skeleton/testing/test_constraint_quest_synthesis.py \
+            skeleton/testing/test_genre_template_composition.py \
+            skeleton/testing/test_original_quest_slice.py \
+            skeleton/testing/test_quest_objective_runtime.py \
+            skeleton/testing/test_native_godot_quest.py \
+            skeleton/testing/test_multigenre_playable_slices.py \
+            skeleton/testing/test_historical_gameforge_convergence.py
+          python scripts/check_ai_file_tree.py
+          node frontend/scripts/patch-node-modules.js
+          node frontend/scripts/verify-no-release-npm-security.js
+          yarn --cwd frontend test:known-advisories
+          (cd frontend && node --test scripts/skeleton-forge/{instruments,galaxy-handoff,native-quest,historical-convergence,multigenre-playable}.test.cjs)
+          yarn --cwd frontend typecheck
           yarn --cwd frontend test:skeleton-forge
           mkdir -p "$RUNNER_TEMP/gameforge-godot"
           curl --fail --location --show-error --retry 2 \
@@ -282,11 +300,15 @@ jobs:
           GODOT_BINARY="$RUNNER_TEMP/gameforge-godot/Godot_v4.7.2-stable_linux.x86_64"
           test -f "$GODOT_BINARY"
           chmod 700 "$GODOT_BINARY"
-          # A missing native engine is a failure, not a pytest skip.
+          "$GODOT_BINARY" --version
+          export GODOT_BINARY
+          python -c 'import os; from pathlib import Path; from skeleton.forge.playtest import resolve_binary; b, _, _ = resolve_binary(); assert b and Path(b).resolve() == Path(os.environ["GODOT_BINARY"]).resolve()'
+          # A missing native engine or skipped witness is a failure.
           GODOT_BINARY="$GODOT_BINARY" PYTHONPATH=".:backend" \
-            PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+            PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -vv --noconftest --junitxml="$RUNNER_TEMP/gameforge-native.xml" \
               skeleton/testing/test_multigenre_native_godot.py \
               skeleton/testing/test_native_quest_godot_acceptance.py
+          python -c 'import sys, xml.etree.ElementTree as ET; cases = list(ET.parse(sys.argv[1]).iter("testcase")); assert len(cases) == 11 and all(not any(c.find(t) is not None for t in ("skipped", "failure", "error")) for c in cases), "Expected eight game and three quest native passing witnesses"; print("11 native Godot witnesses passed")' "$RUNNER_TEMP/gameforge-native.xml"
       - name: Verify filesystem and encrypted compliance CodeQL regressions
         working-directory: backend
         env:
@@ -497,6 +519,180 @@ jobs:
           backend/tests/test_supervisor_workflow_contract.py
           backend/tests/test_traffic_manager_workflow_contract.py
 
+  source_qualification_1:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / backend-literal-lazy-loader-qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/backend-literal-lazy-loader-qualification.yml
+
+  source_qualification_2:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / ci-surface-hold-source-qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci-surface-hold-source-qualification.yml
+
+  source_qualification_3:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / discourse-job-identity-qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/discourse-job-identity-qualification.yml
+
+  source_qualification_4:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / draft19-gguf-source-qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/draft19-gguf-source-qualification.yml
+
+  source_qualification_5:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / ecosystem-api-import-qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ecosystem-api-import-qualification.yml
+
+  source_qualification_6:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / expo-export-content-evidence-qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/expo-export-content-evidence-qualification.yml
+
+  source_qualification_7:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / first-install-source-qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/first-install-source-qualification.yml
+
+  source_qualification_8:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / harbor-patrol-cli-qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/harbor-patrol-cli-qualification.yml
+
+  source_qualification_9:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / harbor-studio-source-qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/harbor-studio-source-qualification.yml
+
+  source_qualification_10:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / jeeves-bounded-canonical-evidence
+    permissions:
+      contents: read
+    uses: ./.github/workflows/jeeves-bounded-canonical-evidence.yml
+
+  source_qualification_11:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / jeeves-integrated-source-qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/jeeves-integrated-source-qualification.yml
+
+  source_qualification_12:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / jeeves-laptop-dispatcher-source-tests
+    permissions:
+      contents: read
+    uses: ./.github/workflows/jeeves-laptop-dispatcher-source-tests.yml
+
+  source_qualification_13:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / jeeves-native-sqlite-source-qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/jeeves-native-sqlite-source-qualification.yml
+
+  source_qualification_14:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / mainline-failure-regression-qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/mainline-failure-regression-qualification.yml
+
+  source_qualification_15:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / masterplan-421-dossier-integrity
+    permissions:
+      contents: read
+    uses: ./.github/workflows/masterplan-421-dossier-integrity.yml
+
+  source_qualification_16:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / native-batch-operator-admission-qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/native-batch-operator-admission-qualification.yml
+
+  source_qualification_17:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / native-qualification-report-custody
+    permissions:
+      contents: read
+    uses: ./.github/workflows/native-qualification-report-custody.yml
+
+  source_qualification_18:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / operational-literal-dispatch-qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/operational-literal-dispatch-qualification.yml
+
+  source_qualification_19:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Source qualification / perf-profiler-literal-target-qualification
+    permissions:
+      contents: read
+    uses: ./.github/workflows/perf-profiler-literal-target-qualification.yml
+
+  source_qualification_gate:
+    name: Required Source Qualifications
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && !github.event.pull_request.draft }}
+    needs:
+      - source_qualification_1
+      - source_qualification_2
+      - source_qualification_3
+      - source_qualification_4
+      - source_qualification_5
+      - source_qualification_6
+      - source_qualification_7
+      - source_qualification_8
+      - source_qualification_9
+      - source_qualification_10
+      - source_qualification_11
+      - source_qualification_12
+      - source_qualification_13
+      - source_qualification_14
+      - source_qualification_15
+      - source_qualification_16
+      - source_qualification_17
+      - source_qualification_18
+      - source_qualification_19
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every source qualification to pass
+        env:
+          SOURCE_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          expected = {f"source_qualification_{i}" for i in range(1, 20)}
+          results = json.loads(os.environ["SOURCE_RESULTS"])
+          assert set(results) == expected, "source qualification dependency inventory drift"
+          failures = {key: value["result"] for key, value in results.items() if value["result"] != "success"}
+          if failures:
+              raise SystemExit(f"required source qualification failures: {failures}")
+          PY
+
   ci:
     # Restored CI/CD gates (#4104): Frontend, Backend Lint/Test/Import Smoke,
     # Skeleton GameForge, Java/Assembly accelerators, Jeeves, Cockpit Smoke and
@@ -552,6 +748,7 @@ jobs:
       - integration_smoke
       - quality_security
       - pr_automation
+      - source_qualification_gate
       - ci
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -564,6 +761,8 @@ jobs:
           QUALITY_RESULT: ${{ needs.quality_security.result }}
           PR_AUTOMATION_RESULT: ${{ needs.pr_automation.result }}
           CI_RESULT: ${{ needs.ci.result }}
+          SOURCE_QUALIFICATION_RESULT: ${{ needs.source_qualification_gate.result }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           python - <<'PY'
           import os
@@ -577,6 +776,8 @@ jobs:
               "pr_automation": os.environ["PR_AUTOMATION_RESULT"],
               "ci": os.environ["CI_RESULT"],
           }
+          if os.environ["EVENT_NAME"] == "pull_request":
+              results["source_qualification_gate"] = os.environ["SOURCE_QUALIFICATION_RESULT"]
           failures = {
               name: result
               for name, result in results.items()

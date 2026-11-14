@@ -1,20 +1,13 @@
 name: Harbor Patrol CLI Qualification
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
-    paths:
-      - '.github/workflows/harbor-patrol-cli-qualification.yml'
-      - 'skeleton/game/gameplay/harbor_crafting_patrol_cli.py'
-      - 'skeleton/testing/test_harbor_patrol_cli_dispatch_20261111.py'
-      - 'skeleton/testing/test_harbor_crafting_patrol_guidance.py'
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: harbor-patrol-cli-${{ github.event.pull_request.number }}
+  group: harbor-patrol-cli-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 jobs:

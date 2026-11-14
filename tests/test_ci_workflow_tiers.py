@@ -180,7 +180,7 @@ class WorkflowTierTests(unittest.TestCase):
             # Dispatch validation is insufficient if checkout still follows a
             # moving branch; the immutable source SHA must be checked twice.
             strict.write_text(strict_original.replace(
-                "ref: ${{ inputs.candidate_sha }}", "ref: main",
+                "ref: ${{ github.sha }}", "ref: main",
             ))
             self.assertTrue(any(
                 "immutable SHA admission or checkout attestation missing" in issue
@@ -188,14 +188,18 @@ class WorkflowTierTests(unittest.TestCase):
             ))
             strict.write_text(strict_original)
             strict.write_text(strict_original.replace(
-                "group: strict-replay-source-${{ inputs.candidate_sha }}",
                 "group: strict-replay-source-${{ github.sha }}",
+                "group: strict-replay-source-${{ inputs.candidate_sha }}",
             ))
             self.assertTrue(any(
                 "manual candidate concurrency must preserve independent immutable evidence" in issue
                 for issue in audit(root)
             ))
             strict.write_text(strict_original)
+
+            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
+            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
+            readiness.write_text(readiness_original)
 
             # The required Merge Readiness lane must retain the same exact
             # source suites even though separate automatic runs are removed.
