@@ -23,4 +23,5 @@ def test_recovered_loop_source_and_portal(mode):
         assert verify_playable_portal(result, mode, start_in_prototype=standalone)
         assert not verify_playable_portal(result, mode, start_in_prototype=not standalone)
         assert receipt["return_supported"]
+        assert "func _on_scene_changed() -> void:" in result[receipt["script"]]
         assert f"scenes/archetypes/{mode}/main.tscn" in result
