@@ -237,7 +237,8 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
     case 'setPlayableMode':
       if (action.value !== 'auto' && !PLAYABLE_SLICES.some((item) => item.id === action.value)) return state;
       return { ...state, playable: { enabled: false, ...state.playable,
-        mode: action.value === 'auto' ? undefined : action.value } };
+        mode: action.value === 'auto' ? undefined : action.value,
+        launch: state.playable?.launch === true } };
     case 'setPlayableMainScene':
       if (action.value && (!state.playable?.enabled || state.quest?.enabled || state.options.target !== 'godot')) return state;
       return { ...state, playable: { enabled: false, ...state.playable, launch: action.value === true } };
