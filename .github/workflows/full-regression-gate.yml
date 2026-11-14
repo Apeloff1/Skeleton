@@ -130,6 +130,46 @@ jobs:
           tests/test_frontier_memory_adapters.py
           tests/test_frontier_sqlite_namespace_custody.py
           tests/test_frontier_singleflight_recovery.py
+      - name: Reconciled industry and private Frontier memory qualification
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/reconciled-custody
+          modules=(
+            skeleton/economy/gameplay/industry/tests/test_industry_mutation_boundaries.py
+            skeleton/economy/gameplay/industry/tests/test_industry_restore_custody.py
+            tests/test_recovered_bounded_state_history.py
+            tests/test_frontier_private_memory_custody.py
+            skeleton/testing/test_private_sqlite.py
+          )
+          for module in "${modules[@]}"; do
+            test -f "$module"
+            report="artifacts/reconciled-custody/$(basename "$module" .py).xml"
+            python -m pytest -q --tb=short "$module" --junitxml="$report"
+            python - "$report" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse(sys.argv[1]).getroot()
+          cases = list(root.iter("testcase"))
+          passed = [
+              case for case in cases
+              if all(case.find(tag) is None for tag in ("skipped", "failure", "error"))
+          ]
+          if not passed:
+              raise SystemExit("Required reconciled module has no passing executed cases")
+          if any(case.find(tag) is not None for case in cases for tag in ("failure", "error")):
+              raise SystemExit("Reconciled module contains failed or errored cases")
+          print(f"Executed passing cases: {len(passed)} / {len(cases)}")
+          PY
+          done
+          python -m pytest -q --tb=short skeleton/economy/gameplay/industry/tests
+      - name: Upload reconciled custody qualification evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: reconciled-custody-junit
+          path: artifacts/reconciled-custody/*.xml
+          if-no-files-found: error
       - name: Recovered guarded activation, secret envelopes and isolated planning
         run: |
           set -euo pipefail
