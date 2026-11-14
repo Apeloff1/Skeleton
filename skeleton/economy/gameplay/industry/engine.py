@@ -656,12 +656,35 @@ class IndustrySystem:
         system.book = BlueprintBook.from_state(state["blueprints"], items=econ.items)
         for row in state["nodes"]:
             node = ExtractionNode.from_state(row)
+            if node.spec.node_id in system.nodes or node.spec.item not in econ.items:
+                raise ValueError("duplicate or unknown saved extraction node")
             system.nodes[node.spec.node_id] = node
         system.queue = BuildQueue.from_state(state["queue"])
         system.research = ResearchLevels.from_state(state["research"])
+        for owner, per in system.research.to_state().items():
+            system._owner(owner)
+            for blueprint_id, tracks in per.items():
+                bp = system.book.get(blueprint_id)
+                if any(level > bp.max_research for level in tracks.values()):
+                    raise ValueError("saved research exceeds blueprint cap")
         system.telemetry = IndustryTelemetry.from_state(state["telemetry"])
-        system._tick = int(state["tick"])
-        system._next_chain = int(state["next_chain"])
+        tick, next_chain = state["tick"], state["next_chain"]
+        if type(tick) is not int or not 0 <= tick <= (1 << 63) - 1:
+            raise ValueError("invalid saved industry tick")
+        if type(next_chain) is not int or not 1 <= next_chain <= (1 << 63) - 1:
+            raise ValueError("invalid next chain identity")
+        for job in system.queue.jobs.values():
+            system._owner(job.owner)
+            bp = system.book.get(job.blueprint_id)
+            if (job.created > tick or (job.start is not None and job.start > tick)
+                    or (job.chain_id is not None and job.chain_id >= next_chain)
+                    or job.runs > config.max_runs
+                    or (job.kind == BUILD and (job.output != bp.output
+                        or job.output_qty != bp.output_qty * job.runs))):
+                raise ValueError("saved job differs from industry authority")
+        if any(node.last_tick > tick for node in system.nodes.values()):
+            raise ValueError("saved extraction clock exceeds industry clock")
+        system._tick, system._next_chain = tick, next_chain
         return system
 
     def digest(self) -> str:

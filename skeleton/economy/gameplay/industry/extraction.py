@@ -142,13 +142,35 @@ class ExtractionNode:
 
     @classmethod
     def from_state(cls, state: Mapping[str, Any]) -> "ExtractionNode":
+        for key in ("remaining", "extracted", "last_tick"):
+            if type(state[key]) is not int or not 0 <= state[key] <= (1 << 63) - 1:
+                raise ValueError("invalid extraction counter")
+        last_tick = state["last_tick"]
+        owners, window = state["last_by_owner"], state["window"]
+        if type(owners) is not dict or len(owners) > 100_000 or any(
+            type(k) is not str or not k or type(v) is not int or not 0 <= v <= last_tick
+            for k, v in owners.items()
+        ):
+            raise ValueError("invalid extraction cooldown inventory")
+        if type(window) is not list or len(window) > 100_000 or any(
+            type(row) not in (list, tuple) or len(row) != 2
+            or type(row[0]) is not int or not 0 <= row[0] <= last_tick
+            or type(row[1]) is not int or not 1 <= row[1] <= (1 << 63) - 1
+            for row in window
+        ):
+            raise ValueError("invalid extraction window inventory")
+        spec = NodeSpec(**state["spec"])
+        if (any(a[0] > b[0] for a, b in zip(window, window[1:]))
+                or (spec.window_cap is None and window)
+                or (spec.window_cap is not None and (
+                    sum(row[1] for row in window) > spec.window_cap
+                    or any(last_tick - row[0] >= spec.window_ticks for row in window)))
+                or sum(row[1] for row in window) > state["extracted"]):
+            raise ValueError("invalid extraction window history")
         node = cls(
-            NodeSpec(**state["spec"]),
-            remaining=int(state["remaining"]),
-            extracted=int(state["extracted"]),
-            last_by_owner={k: int(v) for k, v in state["last_by_owner"].items()},
-            window=[(int(t), int(q)) for t, q in state["window"]],
-            last_tick=int(state["last_tick"]),
+            spec, remaining=state["remaining"], extracted=state["extracted"],
+            last_by_owner=dict(owners), window=[tuple(row) for row in window],
+            last_tick=last_tick,
         )
         if node.remaining + node.extracted != node.spec.reserve:
             raise IndustryError("node reserve does not balance")

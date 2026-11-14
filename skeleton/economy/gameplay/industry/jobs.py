@@ -76,9 +76,44 @@ class Job:
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "Job":
         kw = dict(data)
-        kw["deps"] = tuple(int(d) for d in kw.get("deps", ()))
-        kw["used"] = {k: int(v) for k, v in kw.get("used", {}).items()}
-        kw["lost"] = {k: int(v) for k, v in kw.get("lost", {}).items()}
+        for key in ("job_id", "runs", "created", "me", "te", "output_qty", "fee"):
+            value = kw[key]
+            minimum = 1 if key in ("job_id", "runs") else 0
+            if type(value) is not int or not minimum <= value <= (1 << 63) - 1:
+                raise ValueError("invalid saved job counter")
+        for key in ("owner", "blueprint_id"):
+            if type(kw[key]) is not str or not kw[key] or len(kw[key]) > 256:
+                raise ValueError("invalid saved job identity")
+        if kw["kind"] not in KINDS or kw["status"] not in STATUSES:
+            raise ValueError("invalid saved job kind or status")
+        if kw["kind"] == RESEARCH and kw["track"] not in ("me", "te"):
+            raise ValueError("invalid saved research track")
+        if kw["kind"] == BUILD and (kw["track"] != "" or type(kw["output"]) is not str
+                                    or not kw["output"] or kw["output_qty"] < 1):
+            raise ValueError("invalid saved build output")
+        chain = kw["chain_id"]
+        if chain is not None and (type(chain) is not int or not 1 <= chain <= (1 << 63) - 1):
+            raise ValueError("invalid saved chain identity")
+        deps = kw["deps"]
+        if type(deps) not in (tuple, list) or len(deps) > 10_000 or any(
+            type(d) is not int or not 1 <= d < kw["job_id"] for d in deps
+        ) or len(set(deps)) != len(deps):
+            raise ValueError("invalid saved job dependencies")
+        kw["deps"] = tuple(deps)
+        for key in ("used", "lost"):
+            if type(kw[key]) is not dict or any(
+                type(k) is not str or not k or type(v) is not int or not 0 <= v <= (1 << 63) - 1
+                for k, v in kw[key].items()
+            ):
+                raise ValueError("invalid saved job materials")
+            kw[key] = dict(kw[key])
+        start, end = kw["start"], kw["end"]
+        if kw["status"] in (QUEUED, CANCELLED):
+            if start is not None or end is not None:
+                raise ValueError("unstarted job has execution timestamps")
+        elif (type(start) is not int or type(end) is not int
+              or not kw["created"] <= start < end <= (1 << 63) - 1):
+            raise ValueError("invalid saved running job timestamps")
         return cls(**kw)
 
 
@@ -94,6 +129,8 @@ class BuildQueue:
         self.next_id = 1
 
     def add(self, job: Job) -> Job:
+        if job.job_id in self.jobs:
+            raise ValueError("duplicate job identity")
         self.jobs[job.job_id] = job
         self.next_id = max(self.next_id, job.job_id + 1)
         return job
@@ -160,11 +197,31 @@ class BuildQueue:
 
     @classmethod
     def from_state(cls, state: Mapping[str, Any]) -> "BuildQueue":
-        q = cls(int(state["default_lines"]))
-        q.lines = {k: int(v) for k, v in state["lines"].items()}
+        if type(state["default_lines"]) is not int or not 1 <= state["default_lines"] <= 10_000:
+            raise ValueError("invalid default production lines")
+        q = cls(state["default_lines"])
+        if type(state["lines"]) is not dict or any(
+            type(k) is not str or not k or type(v) is not int or not 1 <= v <= 10_000
+            for k, v in state["lines"].items()
+        ):
+            raise ValueError("invalid saved production lines")
+        q.lines = dict(state["lines"])
+        if type(state["jobs"]) is not list or len(state["jobs"]) > 100_000:
+            raise ValueError("saved job inventory exceeds budget")
         for row in state["jobs"]:
             q.add(Job.from_dict(row))
-        q.next_id = int(state["next_id"])
+        for job in q.jobs.values():
+            for dependency in job.deps:
+                parent = q.jobs.get(dependency)
+                if (parent is None or parent.owner != job.owner
+                        or job.chain_id is None or parent.chain_id != job.chain_id):
+                    raise ValueError("invalid saved job dependency custody")
+                if job.status in (RUNNING, DONE, DELIVERED) and parent.status != DELIVERED:
+                    raise ValueError("started job has incomplete dependency")
+        next_id = state["next_id"]
+        if type(next_id) is not int or not q.next_id <= next_id <= (1 << 63) - 1:
+            raise ValueError("invalid next job identity")
+        q.next_id = next_id
         return q
 
 
