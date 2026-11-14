@@ -3,11 +3,9 @@
 Every test drives the real ``skeleton.forge.game_builder.build_playable_game``
 executor with the Godot playtest off, so no engine binary or network is needed.
 Builds are cached per (brief, era, archetype) to keep the suite fast.
-Each test receives its own copy so mutations cannot corrupt later evidence.
 """
 from __future__ import annotations
 
-import copy
 import functools
 from typing import Any
 
@@ -29,7 +27,7 @@ def _cached(brief: str, era: str | None, archetype: str) -> dict[str, Any]:
 
 
 def build(brief: str, *, era: str | None = None, archetype: str = "auto") -> dict[str, Any]:
-    return copy.deepcopy(_cached(brief, era, archetype))
+    return _cached(brief, era, archetype)
 
 
 def golden(genre: str) -> str:

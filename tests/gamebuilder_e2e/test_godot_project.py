@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from tests.gamebuilder_e2e.conftest import build, golden
 
 REQUIRED = (

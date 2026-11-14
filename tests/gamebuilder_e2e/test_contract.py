@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from skeleton.forge.game_builder import RESULT_FIELDS, RUN_SCHEMA, STUBBED, public_payload
 from tests.gamebuilder_e2e.conftest import build, golden
 
