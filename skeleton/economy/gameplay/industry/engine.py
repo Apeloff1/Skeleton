@@ -58,6 +58,7 @@ from skeleton.simulation.economy.sim import _req_id, _req_int
 CRAFT_SOURCE = "craft"
 CRAFT_INPUT_SINK = "craft_input"
 CRAFT_LOSS_SINK = "craft_loss"
+MAX_RETAINED_COMMANDS = 100_000
 
 
 @dataclass(frozen=True)
@@ -114,8 +115,17 @@ class IndustrySystem:
         self.research = ResearchLevels()
         self.telemetry = IndustryTelemetry(config.period_ticks)
         self.log: list[dict[str, Any]] = []
+        self.dropped_log_commands = 0
         self._tick = 0
         self._next_chain = 1
+
+    def _record_command(self, command: dict[str, Any]) -> None:
+        """Keep a bounded diagnostic suffix; authoritative state is checkpointed."""
+        if len(self.log) >= MAX_RETAINED_COMMANDS:
+            count = max(1, MAX_RETAINED_COMMANDS // 8)
+            del self.log[:count]
+            self.dropped_log_commands += count
+        self.log.append(command)
 
     # -- validation ---------------------------------------------------------
     def _validate(self) -> None:
@@ -200,7 +210,7 @@ class IndustrySystem:
         """Run every completion due by ``tick``; returns finished jobs."""
         with self.econ._lock:
             finished = self._run_until(tick)
-            self.log.append({"op": "advance", "tick": tick})
+            self._record_command({"op": "advance", "tick": tick})
             return finished
 
     def _run_until(self, tick: int) -> list[dict[str, Any]]:
@@ -225,8 +235,10 @@ class IndustrySystem:
         with self.econ._lock:
             self._owner(owner)
             _req_int(lines, "lines", minimum=1)
+            if lines > 10_000:
+                raise JobRejected("too many production lines")
             self.queue.lines[owner] = lines
-            self.log.append({"op": "set_lines", "owner": owner, "lines": lines})
+            self._record_command({"op": "set_lines", "owner": owner, "lines": lines})
 
     def queue_build(
         self, owner: str, blueprint_id: str, runs: int, tick: int
@@ -238,12 +250,13 @@ class IndustrySystem:
             if runs > self.config.max_runs:
                 raise JobRejected("too many runs")
             self._run_until(tick)
+            self.queue.require_capacity()
             fee = self.install_fee(bp.blueprint_id, runs)
             if self.econ.balance(owner, self.config.currency) < fee:
                 raise JobRejected("insufficient funds for install fee")
             job = self._new_build(owner, bp, runs, tick, (), None, fee)
             self._start_ready(tick)
-            self.log.append(
+            self._record_command(
                 {
                     "op": "build",
                     "owner": owner,
@@ -265,11 +278,7 @@ class IndustrySystem:
         fee: int,
     ) -> Job:
         if fee:
-            self.econ.charge(
-                self.config.install_sink,
-                owner,
-                self.value_of(bp.output) * bp.output_qty * runs,
-            )
+            self.econ.charge_amount(self.config.install_sink, owner, fee)
             self.telemetry.bump(tick, install_fees=fee)
         return self.queue.add(
             Job(
@@ -303,18 +312,38 @@ class IndustrySystem:
                 raise JobRejected("too many runs")
             if self.econ.balance(owner, self.config.currency) < sum(fees):
                 raise JobRejected("insufficient funds for install fees")
+            self.queue.require_capacity(len(plan.steps))
             chain = self._next_chain
-            self._next_chain += 1
+            if chain >= (1 << 63) - 1:
+                raise JobRejected("production chain identity exhausted")
             job_for: dict[str, int] = {}
-            jobs = []
-            for step, fee in zip(plan.steps, fees):
+            staged = {}
+            first_id = self.queue.next_id
+            for offset, (step, fee) in enumerate(zip(plan.steps, fees)):
                 bp = self.book.get(step.blueprint_id)
                 deps = tuple(sorted(job_for[i] for i, _ in bp.inputs if i in job_for))
-                job = self._new_build(owner, bp, step.runs, tick, deps, chain, fee)
+                job = Job(
+                    job_id=first_id + offset, owner=owner, kind=BUILD,
+                    blueprint_id=bp.blueprint_id, runs=step.runs, deps=deps,
+                    chain_id=chain, created=tick, output=bp.output,
+                    output_qty=bp.output_qty * step.runs, fee=fee,
+                )
+                if job.job_id in self.queue.jobs:
+                    raise JobRejected("production job identity collision")
+                staged[job.job_id] = job
                 job_for[bp.output] = job.job_id
-                jobs.append(job.job_id)
+            # One aggregate burn retains the exact sum of per-blueprint fees,
+            # rather than committing individual fees before later steps exist.
+            total_fee = sum(fees)
+            if total_fee:
+                self.econ.charge_amount(self.config.install_sink, owner, total_fee)
+                self.telemetry.bump(tick, install_fees=total_fee)
+            self.queue.jobs.update(staged)
+            self.queue.next_id = first_id + len(staged)
+            self._next_chain = chain + 1
+            jobs = list(staged)
             self._start_ready(tick)
-            self.log.append(
+            self._record_command(
                 {
                     "op": "chain",
                     "owner": owner,
@@ -343,6 +372,7 @@ class IndustrySystem:
             pending = self.queue.pending_research(owner, blueprint_id, track)
             if current + pending >= bp.max_research:
                 raise JobRejected("research level at cap")
+            self.queue.require_capacity()
             cost = self.research_cost(owner, blueprint_id, track)
             if self.econ.balance(owner, self.config.currency) < cost:
                 raise JobRejected("insufficient funds for research")
@@ -360,7 +390,7 @@ class IndustrySystem:
                 )
             )
             self._start_ready(tick)
-            self.log.append(
+            self._record_command(
                 {
                     "op": "research",
                     "owner": owner,
@@ -374,16 +404,17 @@ class IndustrySystem:
     def cancel(self, owner: str, job_id: int, tick: int) -> dict[str, Any]:
         """Cancel a queued job (fees are sinks and stay burned). Dependents cancel too."""
         with self.econ._lock:
-            self._run_until(tick)
+            self._owner(owner)
             job = self.queue.jobs.get(job_id)
-            if job is None or job.owner != owner:
+            if type(job_id) is not int or job is None or job.owner != owner:
                 raise JobRejected("no such job")
+            self._run_until(tick)
             if job.status != QUEUED:
                 raise JobRejected("only queued jobs can be cancelled")
             job.status = CANCELLED
             cancelled = [job_id] + self._cascade_cancel()
             self._start_ready(tick)
-            self.log.append(
+            self._record_command(
                 {"op": "cancel", "owner": owner, "job_id": job_id, "tick": tick}
             )
             return {"cancelled": cancelled}
@@ -430,19 +461,20 @@ class IndustrySystem:
         if any(inv.count(i) < r["used"] + r["lost"] for i, r in mats.items()):
             return  # blocked on materials; stays queued
         consumed = lost = lost_value = 0
+        operations = []
+        ticks = bp.ticks_at(te, job.runs)
         for item_id, row in sorted(mats.items()):
-            self.econ.consume_items(CRAFT_INPUT_SINK, job.owner, item_id, row["used"])
+            operations.append((CRAFT_INPUT_SINK, item_id, row["used"]))
             consumed += row["used"]
             if row["lost"]:
-                self.econ.consume_items(
-                    CRAFT_LOSS_SINK, job.owner, item_id, row["lost"]
-                )
+                operations.append((CRAFT_LOSS_SINK, item_id, row["lost"]))
                 lost += row["lost"]
                 lost_value += row["lost"] * self.value_of(item_id)
+        self.econ.consume_items_batch(job.owner, operations)
         job.me, job.te = me, te
         job.used = {i: r["used"] for i, r in mats.items()}
         job.lost = {i: r["lost"] for i, r in mats.items() if r["lost"]}
-        self._start(job, now, bp.ticks_at(te, job.runs))
+        self._start(job, now, ticks)
         self.telemetry.bump(now, consumed=consumed, lost=lost, lost_value=lost_value)
 
     def _complete(self, job: Job) -> None:
@@ -472,14 +504,17 @@ class IndustrySystem:
     def collect(self, owner: str, job_id: int, tick: int) -> int:
         """Deliver a finished build whose output did not fit at completion."""
         with self.econ._lock:
-            self._run_until(tick)
+            self._owner(owner)
             job = self.queue.jobs.get(job_id)
-            if job is None or job.owner != owner or job.status != DONE:
+            if type(job_id) is not int or job is None or job.owner != owner:
+                raise JobRejected("nothing to collect")
+            self._run_until(tick)
+            if job.status != DONE:
                 raise JobRejected("nothing to collect")
             if not self._deliver(job, tick):
                 raise JobRejected("inventory full")
             self._start_ready(tick)
-            self.log.append(
+            self._record_command(
                 {"op": "collect", "owner": owner, "job_id": job_id, "tick": tick}
             )
             return job.output_qty
@@ -495,7 +530,7 @@ class IndustrySystem:
             qty = node.extract(self.econ, owner, tick)
             self.telemetry.bump(tick, extracted=qty)
             self._start_ready(tick)
-            self.log.append(
+            self._record_command(
                 {"op": "extract", "owner": owner, "node": node_id, "tick": tick}
             )
             return qty
@@ -510,7 +545,7 @@ class IndustrySystem:
         with self.econ._lock:
             self._run_until(tick)
             result = self.market.place(owner, "sell", item_id, qty, unit_price, tick)
-            self.log.append(
+            self._record_command(
                 {
                     "op": "list",
                     "owner": owner,
@@ -534,7 +569,7 @@ class IndustrySystem:
                 owner, "buy", item_id, qty, unit_price, tick, tif="ioc"
             )
             self._start_ready(tick)
-            self.log.append(
+            self._record_command(
                 {
                     "op": "buy",
                     "owner": owner,
@@ -656,22 +691,46 @@ class IndustrySystem:
         system.book = BlueprintBook.from_state(state["blueprints"], items=econ.items)
         for row in state["nodes"]:
             node = ExtractionNode.from_state(row)
+            if node.spec.node_id in system.nodes or node.spec.item not in econ.items:
+                raise ValueError("duplicate or unknown saved extraction node")
             system.nodes[node.spec.node_id] = node
         system.queue = BuildQueue.from_state(state["queue"])
         system.research = ResearchLevels.from_state(state["research"])
+        for owner, per in system.research.to_state().items():
+            system._owner(owner)
+            for blueprint_id, tracks in per.items():
+                bp = system.book.get(blueprint_id)
+                if any(level > bp.max_research for level in tracks.values()):
+                    raise ValueError("saved research exceeds blueprint cap")
         system.telemetry = IndustryTelemetry.from_state(state["telemetry"])
-        system._tick = int(state["tick"])
-        system._next_chain = int(state["next_chain"])
+        tick, next_chain = state["tick"], state["next_chain"]
+        if type(tick) is not int or not 0 <= tick <= (1 << 63) - 1:
+            raise ValueError("invalid saved industry tick")
+        if type(next_chain) is not int or not 1 <= next_chain <= (1 << 63) - 1:
+            raise ValueError("invalid next chain identity")
+        for job in system.queue.jobs.values():
+            system._owner(job.owner)
+            bp = system.book.get(job.blueprint_id)
+            if (job.created > tick or (job.start is not None and job.start > tick)
+                    or (job.chain_id is not None and job.chain_id >= next_chain)
+                    or job.runs > config.max_runs
+                    or (job.kind == BUILD and (job.output != bp.output
+                        or job.output_qty != bp.output_qty * job.runs))):
+                raise ValueError("saved job differs from industry authority")
+        if any(node.last_tick > tick for node in system.nodes.values()):
+            raise ValueError("saved extraction clock exceeds industry clock")
+        system._tick, system._next_chain = tick, next_chain
         return system
 
     def digest(self) -> str:
         """sha256 over economy snapshot plus industry state (replay contract)."""
-        payload = json.dumps(
-            {"econ": self.econ.snapshot(), "industry": self.to_state()},
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+        with self.econ._lock:
+            payload = json.dumps(
+                {"econ": self.econ.snapshot(), "industry": self.to_state()},
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _escrow_owner() -> str:

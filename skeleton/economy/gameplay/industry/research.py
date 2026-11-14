@@ -91,9 +91,19 @@ class ResearchLevels:
     @classmethod
     def from_state(cls, state: Mapping[str, Any]) -> "ResearchLevels":
         r = cls()
+        if not isinstance(state, Mapping):
+            raise ValueError("invalid research state")
+        for owner, per in state.items():
+            if type(owner) is not str or not owner or not isinstance(per, Mapping):
+                raise ValueError("invalid research owner")
+            for blueprint, tracks in per.items():
+                if type(blueprint) is not str or not blueprint or not isinstance(tracks, Mapping):
+                    raise ValueError("invalid research blueprint")
+                if any(k not in TRACKS or type(v) is not int or not 0 <= v <= 100_000
+                       for k, v in tracks.items()):
+                    raise ValueError("invalid saved research level")
         r._levels = {
-            o: {b: {k: int(v) for k, v in t.items()} for b, t in per.items()}
-            for o, per in state.items()
+            o: {b: dict(t) for b, t in per.items()} for o, per in state.items()
         }
         return r
 

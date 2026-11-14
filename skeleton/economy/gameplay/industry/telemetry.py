@@ -23,6 +23,8 @@ from typing import Any, Mapping
 from skeleton.economy.gameplay.industry.errors import IndustryError
 from skeleton.simulation.economy.sim import BPS, _req_int
 
+MAX_TELEMETRY_ROWS = 100_000
+
 COUNTERS = (
     "extracted",
     "crafted",
@@ -79,6 +81,8 @@ class IndustryTelemetry:
         row["money_supply"] = money_supply
         row["price_index_bps"] = -1 if price_index_bps is None else price_index_bps
         row["money_sink_bps"] = sinks * BPS // money_supply if money_supply > 0 else 0
+        if len(self.rows) >= MAX_TELEMETRY_ROWS:
+            del self.rows[:max(1, MAX_TELEMETRY_ROWS // 8)]
         self.rows.append(row)
         return dict(row)
 
@@ -92,11 +96,42 @@ class IndustryTelemetry:
 
     @classmethod
     def from_state(cls, state: Mapping[str, Any]) -> "IndustryTelemetry":
-        tel = cls(int(state["period_ticks"]))
+        period_ticks = state["period_ticks"]
+        if type(period_ticks) is not int or period_ticks < 1:
+            raise ValueError("invalid telemetry period")
+        tel = cls(period_ticks)
+
+        def row(value, closed: bool):
+            fields = {"period", *COUNTERS}
+            if closed:
+                fields.update(("money_supply", "price_index_bps", "money_sink_bps"))
+            if not isinstance(value, Mapping) or set(value) != fields:
+                raise ValueError("invalid telemetry row shape")
+            for key, count in value.items():
+                minimum = -1 if key == "price_index_bps" else 0
+                if type(count) is not int or not minimum <= count <= (1 << 127) - 1:
+                    raise ValueError("invalid telemetry counter")
+            return dict(value)
+
         cur = state.get("current")
-        tel.current = None if cur is None else {k: int(v) for k, v in cur.items()}
-        tel.rows = [{k: int(v) for k, v in r.items()} for r in state["rows"]]
-        tel.totals = {k: int(state["totals"].get(k, 0)) for k in COUNTERS}
+        tel.current = None if cur is None else row(cur, False)
+        rows = state["rows"]
+        if type(rows) is not list or len(rows) > MAX_TELEMETRY_ROWS:
+            raise ValueError("telemetry history exceeds retention budget")
+        tel.rows = [row(r, True) for r in rows]
+        if any(a["period"] >= b["period"] for a, b in zip(tel.rows, tel.rows[1:])):
+            raise ValueError("telemetry period order mismatch")
+        if tel.rows and tel.current is not None and tel.current["period"] <= tel.rows[-1]["period"]:
+            raise ValueError("telemetry open period precedes retained history")
+        totals = state["totals"]
+        if not isinstance(totals, Mapping) or set(totals) != set(COUNTERS):
+            raise ValueError("invalid lifetime telemetry totals")
+        for key in COUNTERS:
+            retained = sum(r[key] for r in tel.rows)
+            retained += tel.current[key] if tel.current is not None else 0
+            if type(totals[key]) is not int or not retained <= totals[key] <= (1 << 127) - 1:
+                raise ValueError("lifetime telemetry totals understate retained history")
+        tel.totals = dict(totals)
         return tel
 
 
