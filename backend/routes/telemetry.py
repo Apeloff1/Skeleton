@@ -59,11 +59,11 @@ class _BoundedTelemetryRoute(APIRoute):
                     if length < 0:
                         raise HTTPException(400, "Invalid content length")
                     if length > _MAX_TELEMETRY_BODY_BYTES:
-                        raise HTTPException(413, "Telemetry payload exceeds byte limit")
+                        raise HTTPException(413, "Telemetry request exceeds byte limit")
                 collected = bytearray()
                 async for chunk in request.stream():
                     if len(collected) + len(chunk) > _MAX_TELEMETRY_BODY_BYTES:
-                        raise HTTPException(413, "Telemetry payload exceeds byte limit")
+                        raise HTTPException(413, "Telemetry request exceeds byte limit")
                     collected.extend(chunk)
                 # Starlette's cached request-body path permits the normal
                 # FastAPI parser to read the already-admitted bytes.
