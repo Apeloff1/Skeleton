@@ -22,6 +22,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
+from core.http_errors import redact_client_payload, redact_client_text
 from core.telemetry_privacy import (
     crash_metadata,
     safe_detail,
@@ -203,9 +204,9 @@ def crash_row(report: CrashReport) -> dict:
         "detail": crash_metadata(
             source=report.source,
             component=report.component,
-            message=report.message,
-            stack=report.stack,
-            info=report.info,
+            message=redact_client_text(report.message),
+            stack=redact_client_text(report.stack or ""),
+            info=redact_client_payload(report.info),
             app_version=report.app_version,
         ),
     }
