@@ -1,0 +1,31 @@
+{
+  "schema": "skeleton.native-qualification.case.v1",
+  "id": "citations_07",
+  "domain": "citations",
+  "severity": "critical",
+  "objective": "Evaluate offline grounding, exact source attribution and untrusted evidence boundary 7",
+  "steps": [
+    {
+      "prompt": "Use the exact two original fictional evidence snippets below. Which source identifies the color of the Station sample? Answer in one short sentence naming the color violet, and cite the correct identifier in square brackets. Never cite the distractor.\n[source_106] The Station sample's recorded color is violet.\n[source_306] The unrelated Station shipment's weight is 11 kilograms.",
+      "checks": [
+        {
+          "kind": "contains",
+          "expected": "violet"
+        },
+        {
+          "kind": "citation_label",
+          "expected": "source_106"
+        },
+        {
+          "kind": "not_contains",
+          "expected": "[source_306]"
+        }
+      ],
+      "intermediate": false
+    }
+  ],
+  "seed": 0,
+  "temperature": 0.7,
+  "owner": "qualification",
+  "license_id": "original_fixture"
+}

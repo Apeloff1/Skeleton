@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "batch_lines_10",
+  "category": "batch_lines",
+  "overrides": {
+    "batch_lines": true
+  },
+  "expected": "denied",
+  "reason": "Fail closed on malformed or over-budget batch_lines request"
+}

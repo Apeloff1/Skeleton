@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "max_vocab_03",
+  "category": "max_vocab",
+  "overrides": {
+    "max_vocab": 128
+  },
+  "expected": "allowed",
+  "reason": "Admit constrained max_vocab configuration before native weight allocation"
+}
