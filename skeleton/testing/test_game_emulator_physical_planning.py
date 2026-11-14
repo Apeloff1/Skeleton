@@ -86,7 +86,9 @@ def fake_host():
     def exchange(command, payload, blocks=None):
         commands.append(command)
         if command == "disc_status":
-            return {"supported": False}, {}
+            # Mirror the complete fail-closed native disk status schema.
+            return {"supported": False, "interface_version": None,
+                    "image_count": 0, "image_index": None, "ejected": None}, {}
         if command == "state_info":
             return {"state_size": 4}, {}
         if command == "snapshot":
