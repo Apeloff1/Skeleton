@@ -101,6 +101,15 @@ jobs:
           tests/test_build_jeeves_game.py
           tests/test_offline_game_builder.py
           tests/test_offline_game_builder_integration.py
+      - name: Focused recovered Frontier runtime and source custody regressions
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          suites=(tests/test_gameforge_*.py)
+          test "${#suites[@]}" -ge 121
+          python -m pytest -q --tb=short "${suites[@]}" \
+            tests/test_draft19_reconciliation.py \
+            tests/test_repo_machine_budget_20261108.py
       - name: Ruff on skeleton, tests, and backend
         run: python -m ruff check skeleton tests backend
       - name: Pytest on tests, skeleton/testing, and backend/tests

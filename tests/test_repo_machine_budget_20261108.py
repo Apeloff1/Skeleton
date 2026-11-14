@@ -47,5 +47,19 @@ class RepositoryInventoryFiniteBudget(TestCase):
         self.assertLessEqual(config.max_file_bytes, 2000000)
 
 
+    def test_reversed_walk_order_preserves_exact_path_cap(self):
+        configuration = load_machine_config(ROOT)
+        for cap in (1, 2, 3, 4, 5):
+            with self.subTest(cap=cap), TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                model = RepositoryModelBuilder(root, config=replace(configuration, max_files=cap))
+                names = ["delta.py", "gamma.py", "beta.py", "alpha.py"]
+                with patch("skeleton.repo_machine.builder.os.walk",
+                           return_value=iter([(str(root), [], names)])):
+                    rows, truncated = model._iter_files()
+                self.assertEqual([file.name for file in rows], sorted(names)[:cap])
+                self.assertIs(truncated, cap < len(names))
+
+
 if __name__ == "__main__":
     main()
