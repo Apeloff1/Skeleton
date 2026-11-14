@@ -101,3 +101,39 @@ def test_rejects_duplicate_entities_and_time_reversal():
     rt.advance_to(100)
     with pytest.raises(FrontierRuntimeError):
         rt.advance_to(50)
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"camera_m": (0, 0)}, {"camera_m": (0, float("nan"), 0)},
+    {"camera_m": (0, True, 0)}, {"camera_m": (0, 0, 10**1000)},
+    {"wrap_m": (0, 1)}, {"wrap_m": (1,)}, {"wrap_m": (1, float("inf"))},
+    {"entities": [object()]}, {"clouds": [object()]},
+])
+def test_rejects_malformed_scene_admission(kwargs):
+    with pytest.raises(FrontierRuntimeError):
+        FrontierNativeRuntime(fps=60, wind=_wind(), lod=_lod(), **kwargs)
+
+
+def test_cloud_generator_admission_is_bounded():
+    from skeleton.game.frontier.native_runtime import MAX_CLOUDS
+
+    consumed = 0
+
+    def clouds():
+        nonlocal consumed
+        while consumed <= MAX_CLOUDS:
+            consumed += 1
+            yield Cloud(str(consumed), 0, 0, 100, .5)
+        raise AssertionError("runtime read beyond the admission boundary")
+
+    with pytest.raises(FrontierRuntimeError, match="bounded"):
+        FrontierNativeRuntime(fps=60, wind=_wind(), lod=_lod(), clouds=clouds())
+    assert consumed == MAX_CLOUDS + 1
+
+
+def test_scene_admission_copies_mutable_wrap_dimensions():
+    wrap = [200, 200]
+    rt = _rt(60, wrap_m=wrap)
+    wrap[0] = 0
+    assert rt.wrap == (200.0, 200.0)
+    assert rt.present_next().fps == 60
