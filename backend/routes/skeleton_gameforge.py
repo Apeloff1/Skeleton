@@ -53,6 +53,8 @@ class RunRequest(BaseModel):
     t: float = Field(default=0.5, ge=0.0, le=1.0, allow_inf_nan=False)
     generation: Optional[str] = Field(default=None, max_length=80)
     playable_content: bool = False
+    playable_archetype: Optional[str] = Field(default=None, max_length=64)
+    playable_main_scene: bool = False
     playtest: Optional[Literal["off", "auto", "require"]] = None
     quest_content: bool = False
     quest_length: int = Field(default=3, ge=1, le=8)
@@ -129,6 +131,8 @@ def run(req: RunRequest) -> Dict[str, Any]:
             status_code=400,
             detail="HTTP GameForge builds cannot write server project paths; export source ZIP instead",
         )
+    if not req.playable_content and (req.playable_archetype is not None or req.playable_main_scene):
+        raise HTTPException(status_code=422, detail="playable selection requires explicit opt-in")
     from skeleton.context.pipeline import GameForgeRun
     try:
         payload = GameForgeRun.live().execute(
@@ -144,6 +148,8 @@ def run(req: RunRequest) -> Dict[str, Any]:
             blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
             generation=req.generation,
             **({"playable_content": True} if req.playable_content else {}),
+            **({"playable_archetype": req.playable_archetype} if req.playable_archetype is not None else {}),
+            **({"playable_main_scene": True} if req.playable_main_scene else {}),
             **({"playtest": req.playtest} if req.playtest and req.playtest != "off" else {}),
             **({"quest_content": True, "quest_length": req.quest_length} if req.quest_content else {}),
         )

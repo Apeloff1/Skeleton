@@ -89,6 +89,8 @@ class GameForgeRun:
                 operator_axes: Optional[Mapping[str, float]] = None,
                 galaxy_profile: Optional[Mapping[str, Any]] = None,
                 playable_content: bool = False,
+                playable_archetype: Optional[str] = None,
+                playable_main_scene: bool = False,
                 quest_content: bool = False,
                 quest_length: int = 3) -> Dict[str, Any]:
         """Run the ten-stage pipeline.
@@ -106,6 +108,16 @@ class GameForgeRun:
             raise ValueError("headless Godot playtest requires the Godot target")
         if type(playable_content) is not bool:
             raise ValueError("playable_content must be an explicit boolean opt-in")
+        if type(playable_main_scene) is not bool:
+            raise ValueError("playable_main_scene must be an explicit boolean")
+        if not playable_content and (playable_archetype is not None or playable_main_scene):
+            raise ValueError("playable selection requires explicit opt-in")
+        if playable_archetype is not None:
+            from skeleton.forge.archetype_content import content_archetypes
+            if type(playable_archetype) is not str or playable_archetype not in content_archetypes():
+                raise ValueError("unsupported native playable archetype")
+        if playable_main_scene and quest_content:
+            raise ValueError("standalone playable startup conflicts with room quest startup")
         if playable_content and target != "godot":
             raise ValueError("playable archetype scenes require the Godot target")
         if type(quest_content) is not bool:
@@ -194,6 +206,8 @@ class GameForgeRun:
             "playtest_mode": playtest_mode,
             "repair_mode": repair_mode,
             "playable_content": playable_content,
+            "playable_archetype_selection": playable_archetype,
+            "playable_main_scene": playable_main_scene,
             "quest_content": quest_content,
             "quest_length": quest_length,
         }
@@ -271,6 +285,8 @@ class GameForgeRun:
                 payload["galaxy_mechanics"] = run.context["galaxy_mechanics"]
         if playable_content and run.context.get("playable_mechanics_receipt") is not None:
             payload["playable_mechanics"] = run.context["playable_mechanics_receipt"]
+        if playable_content and run.context.get("playable_tuning_receipt") is not None:
+            payload["playable_tuning"] = run.context["playable_tuning_receipt"]
         if playable_content and run.context.get("playable_portal_receipt") is not None:
             payload["playable_portal"] = {
                 **run.context["playable_portal_receipt"],
@@ -519,7 +535,7 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         from skeleton.forge.archetype_content import (
             content_archetypes, attach_archetype_content, verify_archetype_content,
         )
-        requested = ctx.get("archetype") or "extraction"
+        requested = ctx.get("playable_archetype_selection") or ctx.get("archetype") or "extraction"
         axes = ctx.get("operator_axes") or {}
         files = attach_archetype_content(files, requested, operator_axes=axes)
         archetype_name = requested if requested in content_archetypes() else "extraction"
@@ -529,25 +545,33 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         from skeleton.forge.playable_portal import (
             attach_playable_portal, verify_playable_portal,
         )
-        files, portal_receipt = attach_playable_portal(files, archetype_name)
-        if not verify_playable_portal(files, archetype_name):
+        startup = ctx.get("playable_main_scene") is True
+        files, portal_receipt = attach_playable_portal(files, archetype_name, start_in_prototype=startup)
+        if not verify_playable_portal(files, archetype_name, start_in_prototype=startup):
             raise RuntimeError("playable world-to-prototype portal source verification failed")
         ctx["files"] = files
         ctx["file_count"] = len(files)
         ctx["playable_archetype"] = archetype_name
         ctx["playable_portal_receipt"] = portal_receipt
+        # New modes expose their actual sparse native effects; existing modes
+        # retain the established source-verified mechanics receipt.
+        from skeleton.forge.playable_tuning import SOURCE_PATH
+        import json
+        expanded_tuning = json.loads(files[SOURCE_PATH]) if SOURCE_PATH in files else None
+        if expanded_tuning is not None:
+            ctx["playable_tuning_receipt"] = expanded_tuning
         ctx["playable_mechanics_receipt"] = {
             "schema": "skeleton.forge.playable_mechanics.v1",
             "archetype": archetype_name,
             "applied_axes": {
                 name: value for name, value in axes.items()
-                if name in {
+                if name in (set(expanded_tuning["mapped_axes"]) if expanded_tuning is not None else {
                     "tempo",
-                    "agency",
+                    *({"agency"} if archetype_name in {"extraction", "combat_loop", "pipeline"} else set()),
                     *({"risk", "scarcity"} if archetype_name == "extraction" else set()),
                     *({"lethality", "grind"} if archetype_name == "combat_loop" else set()),
                     *({"risk", "grind"} if archetype_name == "pipeline" else set()),
-                }
+                })
             },
             "source_verified": verify_archetype_content(
                 files, archetype_name, operator_axes=axes,
@@ -571,7 +595,7 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         from skeleton.forge.playable_portal import verify_playable_portal
         from skeleton.forge.archetype_content import verify_archetype_content
         active = str(ctx.get("playable_archetype") or "extraction")
-        if not verify_playable_portal(files, active):
+        if not verify_playable_portal(files, active, start_in_prototype=ctx.get("playable_main_scene") is True):
             raise RuntimeError("final in-game playable portal verification failed")
         if not verify_archetype_content(files, active, operator_axes=ctx.get("operator_axes")):
             raise RuntimeError("final native playable mechanics verification failed")
@@ -590,7 +614,20 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
     mode = ctx.get("playtest_mode") or "off"
     if mode != "off":
         from skeleton.forge.playtest import playtest
-        played = playtest(files)
+        # For standalone startup we still qualify the original world separately.
+        # Change only the temporary boot-test file map; never alter sealed output.
+        world_files = files
+        if ctx.get("playable_main_scene") is True:
+            selected = ctx["playable_archetype"]
+            current = f'run/main_scene="res://scenes/archetypes/{selected}/main.tscn"'
+            project_source = files["project.godot"]
+            if project_source.count(current) != 1:
+                raise RuntimeError("standalone startup verification failed")
+            world_files = dict(files)
+            world_files["project.godot"] = project_source.replace(
+                current, 'run/main_scene="res://scenes/levels/run_level.tscn"', 1,
+            )
+        played = playtest(world_files)
         if mode == "require" and not played.get("passed"):
             detail = "; ".join(played.get("errors") or []) or played.get("reason") or played.get("status")
             raise RuntimeError(f"playtest {played.get('status')}: {detail}"[:600])
