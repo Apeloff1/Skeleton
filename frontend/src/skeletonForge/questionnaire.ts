@@ -80,6 +80,8 @@ export interface QuestionnaireState {
   galaxyGenre?: string | null;
   /** All 14 matrices, narrative, extras, classic sliders, style and production inputs. */
   galaxyProfile?: GalaxyProfile | null;
+  /** Opt-in native generated-room quest. */
+  quest?: { enabled: boolean; length: number };
   options: ForgeOptions;
 }
 
@@ -92,6 +94,8 @@ export type QuestionnaireAction =
   | { type: 'setGalaxyGenre'; genre: string | null }
   | { type: 'importGalaxy'; profile: GalaxyProfile }
   | { type: 'clearGalaxyProfile' }
+  | { type: 'setQuestEnabled'; value: boolean }
+  | { type: 'setQuestLength'; value: number }
   | { type: 'setOption'; key: keyof ForgeOptions; value: string | null }
   | { type: 'next' }
   | { type: 'back' }
@@ -106,6 +110,7 @@ export const INITIAL_STATE: QuestionnaireState = {
   instruments: {},
   galaxyGenre: null,
   galaxyProfile: null,
+  quest: { enabled: false, length: 3 },
   options: { archetype: 'auto', target: 'godot', era: null, generation: null },
 };
 
@@ -186,6 +191,12 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
       brief.genre = mapped!;
       return { ...state, brief, galaxyGenre: action.genre, galaxyProfile: null };
     }
+    case 'setQuestEnabled':
+      return { ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, enabled: action.value === true } };
+    case 'setQuestLength': {
+      if (!Number.isInteger(action.value) || action.value < 1 || action.value > 8) return state;
+      return { ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, length: action.value } };
+    }
     case 'setOption': {
       const value = action.value === '' ? null : action.value;
       if (action.key === 'archetype' || action.key === 'target') {
@@ -259,6 +270,10 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   const instrumentAxes = sparseInstrumentPayload(state.instruments);
   if (Object.keys(instrumentAxes).length) request.operator_axes = instrumentAxes;
   if (state.galaxyProfile) request.galaxy_profile = state.galaxyProfile;
+  if (state.quest?.enabled && request.target === 'godot') {
+    request.quest_content = true;
+    request.quest_length = Number.isInteger(state.quest.length) && state.quest.length >= 1 && state.quest.length <= 8 ? state.quest.length : 3;
+  }
   return request;
 }
 

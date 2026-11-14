@@ -202,6 +202,33 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
         })}
       </View>
       <OptionGroup id="target" prompt="Output" options={TARGETS.map((t) => t.id)} value={state.options.target} onPick={(v) => dispatch({ type: 'setOption', key: 'target', value: v })} />
+
+      <View style={st.group} testID="q-native-quest-controls" accessibilityRole="radiogroup" accessibilityLabel="Native quest gameplay">
+        <Text style={st.q}>Native room-entry quest gameplay</Text>
+        <Text style={st.help}>Optional real Godot quest runtime with room-triggered objectives, a quest HUD, and source-checked save snapshots. Does not automatically create NPC conversations or combat quests.</Text>
+        <View style={st.chips}>
+          <Chip label="No quest" selected={!state.quest?.enabled} onPress={() => dispatch({ type: 'setQuestEnabled', value: false })} testID="q-native-quest-off" />
+          <Chip label="Room-entry quest" selected={!!state.quest?.enabled}
+            disabled={state.options.target !== 'godot'} color={C.green}
+            onPress={() => dispatch({ type: 'setQuestEnabled', value: true })}
+            testID="q-native-quest-on" />
+        </View>
+        {state.options.target !== 'godot' ? (
+          <Text style={st.help} testID="q-native-quest-inactive">Native quests require Godot output; JSON blueprint exports do not carry quest gameplay.</Text>
+        ) : null}
+        {state.quest?.enabled && state.options.target === 'godot' ? (
+          <View accessibilityRole="radiogroup" accessibilityLabel="Quest objective count" testID="q-native-quest-length">
+            <Text style={st.help}>Quest objective count: {state.quest.length} (1–8). Objectives target rooms in the emitted Godot world.</Text>
+            <View style={st.chips}>
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                <Chip key={n} label={String(n)} selected={state.quest?.length === n}
+                  onPress={() => dispatch({ type: 'setQuestLength', value: n })}
+                  testID={'q-native-quest-' + n} />
+              ))}
+            </View>
+          </View>
+        ) : null}
+      </View>
       <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Era override">
         <Text style={st.q}>Pin an era? <Text style={st.help}>(optional)</Text></Text>
         <View style={st.chips}>
@@ -308,6 +335,8 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
       <Row k="Beats" v={beatsTxt || '—'} />
       <Row k="Archetype" v={arch?.label ?? req.archetype} />
       <Row k="Output" v={TARGETS.find((t) => t.id === req.target)?.label ?? req.target} />
+      {req.quest_content ? <Row k="Native quest" v={`${req.quest_length} room-entry objectives · source-bound HUD and save contract`} /> : null}
+      {state.quest?.enabled && !req.quest_content ? <Banner tone="warn" testID="q-native-quest-not-exported">Native room quests are disabled for JSON blueprint output. Select Godot in Forge options to include one.</Banner> : null}
       {state.galaxyGenre ? <Row k="Specialized genre" v={(galaxyGenre(state.galaxyGenre)?.name ?? state.galaxyGenre) + " → " + (mappedBriefGenre(state.galaxyGenre) ?? "unknown")} /> : null}
       {state.galaxyProfile ? <Row k="Galaxy questionnaire" v="Full 14 matrices, narrative phases, extended sliders, nine style selectors and production data attached to this run" /> : null}
       {req.operator_axes ? <Row k="Design tuning" v={DESIGN_AXES.filter((axis) => req.operator_axes?.[axis.id] !== undefined).map((axis) => axis.label + ": " + Math.round((req.operator_axes?.[axis.id] ?? 0) * 100) + "%").join(" · ")} /> : null}
