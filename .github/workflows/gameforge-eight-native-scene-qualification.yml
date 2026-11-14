@@ -1,21 +1,7 @@
 name: GameForge eight-scene native source qualification
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
-    paths:
-      - "skeleton/forge/playtest.py"
-      - "skeleton/ai/forge/playtest.py"
-      - "skeleton/context/pipeline.py"
-      - "skeleton/ai/runtime/context/pipeline.py"
-      - "skeleton/testing/test_eight_native_scene_qualification.py"
-      - "skeleton/testing/test_gameforge_native_scene_convergence.py"
-      - "backend/routes/skeleton_gameforge.py"
-      - "backend/tests/test_native_eight_scene_api.py"
-      - "frontend/src/skeletonForge/**"
-      - "frontend/scripts/skeleton-forge/native-scene-qualification.test.cjs"
-      - ".github/workflows/gameforge-eight-native-scene-qualification.yml"
+  workflow_call:
   workflow_dispatch:
 
 permissions:
