@@ -1,0 +1,113 @@
+name: Archived GameForge Jeeves evaluation source qualification
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "frontend/src/skeletonForge/**"
+      - "frontend/src/features/GalaxyStudioFactory/**"
+      - "frontend/scripts/skeleton-forge/**"
+      - "frontend/scripts/patch-node-modules.js"
+      - "frontend/yarn.lock"
+      - "skeleton/context/**"
+      - "skeleton/forge/**"
+      - "skeleton/ecs/**"
+      - "skeleton/ai/runtime/ecs/**"
+      - "skeleton/eval/**"
+      - "skeleton/ai/evaluation/**"
+      - "skeleton/app/jeeves_local_lease.py"
+      - "skeleton/ai/runtime/inference/lease_custody.py"
+      - "scripts/evaluate_jeeves_game_builder_quality.py"
+      - "tests/test_game_builder_quality.py"
+      - "tests/test_game_builder_reference_pack.py"
+      - "backend/routes/skeleton_gameforge.py"
+      - "backend/tests/test_jeeves_game_quality_catalog.py"
+      - ".github/workflows/jeeves-game-builder-quality-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jeeves-game-quality-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  source_quality:
+    name: Jeeves source-only game builder quality regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Use supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install focused source testing dependencies
+        run: python -m pip install --disable-pip-version-check "pytest==8.4.2" "fastapi==0.161.1" "pydantic>=2.14.1,<3"
+      - name: Compile source and verify mirrored Python inventory
+        run: |
+          python -m compileall -q skeleton/eval skeleton/ai/evaluation skeleton/app/jeeves_local_lease.py skeleton/ai/runtime/inference/lease_custody.py scripts/evaluate_jeeves_game_builder_quality.py
+          python scripts/check_ai_file_tree.py
+      - name: Run source-only evaluation and read-only catalog tests
+        env:
+          PYTHONPATH: ".:backend"
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_game_builder_quality.py
+          tests/test_game_builder_reference_pack.py
+          backend/tests/test_jeeves_game_quality_catalog.py
+          skeleton/testing/test_historical_controls_full_catalog.py
+          skeleton/game/presentation/test_genre_action_profiles.py
+          skeleton/ecs/test_script_runtime.py
+          skeleton/ai/runtime/ecs/test_script_runtime.py
+
+  focused_frontend:
+    name: Exact-head Galaxy and cockpit focused frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Verify immutable revision
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Use reviewed Node runtime
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: "24"
+      - name: Install locked frontend dependencies without lifecycle scripts
+        working-directory: frontend
+        run: yarn install --frozen-lockfile --non-interactive --ignore-scripts
+      - name: Apply and verify security patches
+        working-directory: frontend
+        run: |
+          node scripts/patch-node-modules.js
+          node scripts/patch-node-modules.js
+          node scripts/verify-no-release-npm-security.js
+      - name: Run all named focused Galaxy and Jeeves frontend tests
+        working-directory: frontend
+        run: >-
+          node --test
+          scripts/skeleton-forge/genre-registry-recovery.test.cjs
+          scripts/skeleton-forge/galaxy-profile-snapshot.test.cjs
+          scripts/skeleton-forge/galaxy-profile-custody.test.cjs
+          scripts/skeleton-forge/galaxy-save-restore-controls.test.cjs
+          scripts/skeleton-forge/jeeves-quality-panel.test.cjs
+          scripts/skeleton-forge/instruments.test.cjs
+          scripts/skeleton-forge/multigenre-playable.test.cjs
+      - name: Typecheck frontend
+        working-directory: frontend
+        run: yarn typecheck

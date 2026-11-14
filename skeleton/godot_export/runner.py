@@ -195,3 +195,40 @@ class GodotRunner:
         finally:
             os.close(fd)
         return result
+
+    def play_scene(
+        self,
+        project: Path,
+        scene: str,
+        *,
+        frames: int = 120,
+        timeout: int = 90,
+    ) -> RunResult:
+        """Execute a real Godot scene for a bounded number of engine frames.
+
+        This is a native smoke boundary, not evidence of human input, gameplay
+        completion, saved state, or a standalone exported executable.
+        The caller must inspect the returned process result and engine output.
+        """
+        if not isinstance(scene, str) or not scene.startswith("res://"):
+            raise ValueError("scene must be a res:// resource path")
+        resource = scene[6:]
+        parts = resource.split("/")
+        if (
+            not resource
+            or len(resource) > 512
+            or any(part in ("", ".", "..") for part in parts)
+            or any(ord(char) < 32 or ord(char) == 127 for char in resource)
+            or "\\" in resource
+            or not resource.endswith(".tscn")
+        ):
+            raise ValueError("scene must be a canonical .tscn resource path")
+        if isinstance(frames, bool) or not isinstance(frames, int) or not 1 <= frames <= 36000:
+            raise ValueError("frames must be an integer in [1, 36000]")
+        if isinstance(timeout, bool) or not isinstance(timeout, int) or not 1 <= timeout <= 3600:
+            raise ValueError("timeout must be an integer in [1, 3600]")
+        return self.run(
+            ["--path", str(project), "--quit-after", str(frames), scene],
+            project,
+            timeout,
+        )

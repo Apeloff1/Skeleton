@@ -347,10 +347,11 @@ function patchNodeForgeNestedDigestAlgorithm() {
   if (!fs.existsSync(pkgPath)) return;
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  // Reviewed exact published versions. The 1.4.2 RSA parser still validates
-  // the outer DigestInfo count without validating nested DigestAlgorithm arity.
-  // Never silently trust a version bump as proof of this security fix.
-  if (!new Set(['1.4.0', '1.4.2']).has(version)) {
+  // 1.4.3 was reviewed at upstream commit 936b24d939dc7261ee37982576f9cf2b410084ee.
+  // It adds canonical DER comparison after the outer arity check. Retain the
+  // local nested-arity guard as defense in depth, and identify its exact RSA
+  // source before accepting either pristine or idempotently patched 1.4.3.
+  if (!new Set(['1.4.0', '1.4.2', '1.4.3']).has(version)) {
     throw new Error(`[patch-node-modules] node-forge ${version} requires security patch review`);
   }
 
@@ -363,6 +364,21 @@ function patchNodeForgeNestedDigestAlgorithm() {
     path.join(ROOT, 'node_modules/node-forge/lib/rsa.js'), 'utf8');
   const unpatchedDigestInfo = /if\(!asn1\.validate\(obj, digestInfoValidator, capture, errors\) \|\|\s*obj\.value\.length !== 2\) \{/;
   const nestedArityCheck = /obj\.value\[0\]\.value\.length !==/;
+  if (version === '1.4.3') {
+    const pristineCondition = 'if(!asn1.validate(obj, digestInfoValidator, capture, errors) ||\n            obj.value.length !== 2) {';
+    const hardenedCondition = `if(!asn1.validate(obj, digestInfoValidator, capture, errors) ||
+            obj.value.length !== 2 ||
+            obj.value[0].value.length !==
+              (('parameters' in capture) ? 2 : 1)) {`;
+    const original = rsaSource.includes(hardenedCondition)
+      ? rsaSource.replace(hardenedCondition, pristineCondition) : rsaSource;
+    const bytes = Buffer.from(original, 'utf8');
+    const blob = crypto.createHash('sha1').update('blob ' + bytes.length + '\0').update(bytes).digest('hex');
+    if (blob !== '65f6e8469d8a7695f4438722577230136f9dd425' ||
+        !original.includes('d.substring(0, withParameters.length) !== withParameters &&')) {
+      throw new Error('[patch-node-modules] node-forge 1.4.3 RSA source changed; review required');
+    }
+  }
   if (unpatchedDigestInfo.test(rsaSource) && nestedArityCheck.test(rsaSource)) {
     throw new Error('[patch-node-modules] node-forge mixed DigestInfo patch states');
   }
