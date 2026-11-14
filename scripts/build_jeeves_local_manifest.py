@@ -20,6 +20,7 @@ if str(ROOT) not in sys.path:
 from skeleton.ai.runtime.inference.deployment import (
     LocalModelDeployment,
     LocalModelDeploymentError,
+    LOCAL_MODEL_RUNTIME_PROFILES,
     create_local_model_deployment,
 )
 
@@ -35,7 +36,7 @@ def prepare_manifest(
     gpu_layers: int = 0,
 ) -> dict[str, object]:
     """Publish one create-only pin; re-read it from canonical custody."""
-    if profile not in ("raw", "llama-completion-chat", "qwen3-completion-chat"):
+    if profile not in LOCAL_MODEL_RUNTIME_PROFILES:
         raise ValueError("Jeeves requires an explicitly supported local text generation profile")
     destination = destination.expanduser().absolute()
     if destination.exists() or destination.is_symlink():
@@ -77,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--executable", type=Path, required=True, help="existing local llama.cpp CLI executable")
     parser.add_argument("--output", type=Path, required=True, help="new manifest file in an existing private model directory")
     parser.add_argument(
-        "--profile", choices=("raw", "llama-completion-chat", "qwen3-completion-chat"),
+        "--profile", choices=LOCAL_MODEL_RUNTIME_PROFILES,
         default="qwen3-completion-chat", help="verified local prompt protocol (Qwen3 by default)",
     )
     parser.add_argument("--context", type=int, default=4096)
