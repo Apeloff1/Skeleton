@@ -24,6 +24,10 @@ class RunRequest(BaseModel):
     overwrite: bool = False
     include_files: bool = False
     answers: Dict[str, str] = Field(default_factory=dict)
+    # Sparse, explicit design-instrument edits. Raw values are validated by GameForge.
+    operator_axes: Optional[Dict[str, Any]] = None
+    # Inert and bounded source profile for exact creator-to-build provenance.
+    galaxy_profile: Optional[Dict[str, Any]] = None
     blend: Optional[list] = None
     t: float = 0.5
     generation: Optional[str] = None
@@ -66,6 +70,8 @@ def run(req: RunRequest) -> Dict[str, Any]:
             project_root=req.project_root,
             overwrite=req.overwrite,
             answers=req.answers or None,
+            **({"operator_axes": req.operator_axes} if req.operator_axes is not None else {}),
+            **({"galaxy_profile": req.galaxy_profile} if req.galaxy_profile is not None else {}),
             blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
             generation=req.generation,
             **({"quest_content": True, "quest_length": req.quest_length} if req.quest_content else {}),
@@ -78,6 +84,29 @@ def run(req: RunRequest) -> Dict[str, Any]:
     if not req.include_files:
         payload.pop("files", None)
     return payload
+
+
+@router.get("/controls/genres")
+def gameforge_control_genres() -> Dict[str, Any]:
+    """Discover the native device-agnostic action profiles for creator genres."""
+    from skeleton.game.presentation.genre_action_profiles import GENRE_FAMILY, FAMILIES
+    return {
+        "schema": "skeleton.game.genre_action_catalog.v1",
+        "genres": sorted(GENRE_FAMILY),
+        "families": sorted(FAMILIES),
+        "count": len(GENRE_FAMILY),
+    }
+
+
+@router.get("/controls/genres/{genre}")
+def gameforge_control_genre(genre: str) -> Dict[str, Any]:
+    """Expose exact semantic gameplay controls without executing a game."""
+    from skeleton.game.presentation.input_actions import InputContractError
+    from skeleton.game.presentation.genre_action_profiles import genre_control_profile
+    try:
+        return genre_control_profile(genre)
+    except InputContractError as exc:
+        raise HTTPException(status_code=404, detail="unknown creator genre") from exc
 
 
 class ComposeRequest(BaseModel):
