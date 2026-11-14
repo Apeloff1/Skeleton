@@ -138,11 +138,13 @@ class DurableFairStreamSession:
                     generation=envelope["generation"], digest=envelope["digest"],
                 )
                 return plan, envelope
-            except Exception as exc:
+            except BaseException as exc:
                 # Even when the SQLite update succeeded and the anchor failed,
                 # no further work can be admitted or dispatched from this
                 # process. A new process also detects the mismatch on verify.
                 self._quarantined = True
+                if not isinstance(exc, Exception):
+                    raise
                 raise CustodyQuarantined(
                     "fair-stream transaction requires trusted reconciliation"
                 ) from exc
