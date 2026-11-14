@@ -39,6 +39,9 @@ export default function DesignPresetPanel({ state, dispatch }: Props) {
     void (async () => {
       try {
         const auth = await import('../../auth/gameforgeAuth');
+        if (!active) return;
+        await auth.initializeStoredToken();
+        if (!active) return;
         const epoch = auth.getAuthEpoch();
         unsubscribe = auth.subscribeAuthChanges(() => {
           if (!active || auth.getAuthEpoch() === epoch) return;

@@ -49,7 +49,7 @@ func _ready() -> void:
 	get_tree().scene_changed.connect(_on_scene_changed)
 	call_deferred("_refresh_button")
 
-func _on_scene_changed(_scene: Node) -> void:
+func _on_scene_changed() -> void:
 	_switching = false
 	_refresh_button()
 
