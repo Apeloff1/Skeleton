@@ -249,11 +249,24 @@ class DurableTurnAdmissions:
             raise AdmissionRejected(409, "invalid admission settlement")
         with self._store._transaction():
             sid = self._scope(sid)
-            if state == "settled" and self._store._db.execute(
-                "SELECT 1 FROM offline_turns WHERE session_id=? AND request_id=? AND request_digest=?",
-                (sid, rid, digest),
-            ).fetchone() is None:
-                raise AdmissionRejected(409, "committed reply identity missing")
+            if state == "settled":
+                committed = self._store._db.execute(
+                    "SELECT 1 FROM offline_turns t JOIN offline_turn_execution_receipts e "
+                    "ON e.session_id=t.session_id AND e.request_id=t.request_id "
+                    "AND e.revision=t.revision AND e.output_sha256=t.output_digest "
+                    "WHERE t.session_id=? AND t.request_id=? AND t.request_digest=? "
+                    "AND e.model_digest=? AND e.tokenizer_digest=?",
+                    (sid, rid, digest, self._model, self._tokenizer),
+                ).fetchone()
+                if committed is None:
+                    raise AdmissionRejected(409, "committed reply identity missing")
+                current = self._store._db.execute(
+                    "SELECT request_digest,attempt,state FROM offline_turn_admissions "
+                    "WHERE session_id=? AND request_id=?", (sid, rid),
+                ).fetchone()
+                # The canonical chat transaction may already have settled it.
+                if current == (digest, attempt, "settled"):
+                    return
             changed = self._store._db.execute(
                 "UPDATE offline_turn_admissions SET state=?,updated_at=? "
                 "WHERE session_id=? AND request_id=? AND request_digest=? "

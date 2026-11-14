@@ -752,6 +752,8 @@ class OfflineHTTPApplication:
                                 text, max_output_tokens=budget, request_id=rid,
                                 evidence_manifest=manifest,
                                 require_full_history=strict,
+                                **({"admission_attempt": turn.admission_attempt}
+                                   if turn is not None and turn.admission_attempt is not None else {}),
                                 **({"document_ids": document_ids}
                                    if document_ids is not None else {}),
                             )
@@ -1218,20 +1220,14 @@ class OfflineHTTPApplication:
                         pending_sid == sid for pending_sid, _ in self._pending_turns
                     ):
                         raise OfflineHTTPError(409, "cancel the active or queued turn before deleting")
-                    # The durable row and session delete must share one write
-                    # transaction to prevent peer admission between check/delete.
+                    # All callers, including the desktop CLI, now share the
+                    # canonical store's admission-aware deletion transaction.
                     try:
-                        with self._store._transaction():
-                            self._admissions.assert_deletable(sid)
-                            deleted = self._store._db.execute(
-                                "DELETE FROM offline_sessions WHERE session_id=? "
-                                "AND model_digest=? AND tokenizer_digest=?",
-                                (sid, self.model_digest, self.tokenizer_digest),
-                            )
-                            if deleted.rowcount != 1:
-                                raise OfflineHTTPError(404, "local conversation unavailable")
-                    except AdmissionRejected as exc:
-                        raise OfflineHTTPError(exc.status, str(exc)) from None
+                        self._store.delete(sid, self.model_digest, self.tokenizer_digest)
+                    except RuntimeContractError as exc:
+                        if str(exc) == "local queue admission is unresolved":
+                            raise OfflineHTTPError(409, str(exc)) from None
+                        raise
                     self._turns = {key: value for key, value in self._turns.items() if key[0] != sid}
                 return 200, {"deleted_session_id": sid}
         if tail == "metadata" and method == "POST":

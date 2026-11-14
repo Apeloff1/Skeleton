@@ -979,6 +979,13 @@ def test_durable_queue_metadata_survives_restart_and_refuses_changed_retry(tmp_p
         with pytest.raises(OfflineHTTPError) as different_id:
             peer.submit_turn(b, {**body, "request_id": "peer-other-id"})
         assert different_id.value.status == 409
+        from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
+        with pytest.raises(RuntimeContractError, match="local queue admission is unresolved"):
+            peer._store.delete(b, peer.model_digest, peer.tokenizer_digest)
+        saved = peer._session(b)
+        rid, digest = peer._turn_identity({**body, "request_id": "direct-peer"}, peer.default_output_tokens)
+        with pytest.raises(RuntimeContractError, match="queue custody"):
+            peer._store.verify_turn_admission(saved, rid, digest)
         with pytest.raises(OfflineHTTPError) as sync_peer:
             peer.dispatch("POST", f"/v1/sessions/{b}/turn", {**body, "request_id": "peer-sync"})
         assert sync_peer.value.status == 409
@@ -1137,5 +1144,35 @@ def test_committed_queue_metadata_reclaims_only_receipted_identity(tmp_path, mon
         assert app._admissions.lookup(sid, bodies[0]["request_id"]) is None
         assert app.submit_turn(sid, bodies[0])[0] == 200
         assert app._session(sid).revision == 2
+    finally:
+        app.close()
+
+def test_queue_receipt_and_admission_settlement_share_sqlite_commit(tmp_path, monkeypatch):
+    """Actual tiny native model; interrupt only the later metadata callback."""
+    import threading
+
+    model = native_model()
+    app = OfflineHTTPApplication(
+        model, tmp_path / "atomic-admission.sqlite3", token="q" * 64, max_queued_turns=1,
+    )
+    callback = threading.Event()
+
+    def unavailable(*args, **kwargs):
+        callback.set()
+        raise OSError("simulated later metadata write failure")
+
+    monkeypatch.setattr(app._admissions, "finish", unavailable)
+    try:
+        sid = app.dispatch("POST", "/v1/sessions", {})[1]["session_id"]
+        body = {"message": "hello world", "request_id": "atomic-receipt", "max_output_tokens": 2}
+        assert app.submit_turn(sid, body)[0] == 202
+        assert callback.wait(30)
+        ticket = app.turn_status(sid, body["request_id"])
+        assert ticket["state"] == "complete", ticket["error"]
+        assert app._session(sid).revision == 1
+        assert ticket["result"]["local_execution_receipt"]["model_digest"] == model.model_digest
+        assert app._admissions.lookup(sid, body["request_id"])["state"] == "settled"
+        assert app.submit_turn(sid, body)[0] == 200
+        assert app._session(sid).revision == 1
     finally:
         app.close()
