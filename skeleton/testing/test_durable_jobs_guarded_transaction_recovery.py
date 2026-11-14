@@ -118,3 +118,49 @@ def test_nonce_failed_rollback_quarantines_reads_and_writes():
             fence.head("scope")
         with pytest.raises(GateDenied, match="nonce-fence-unavailable"):
             fence.reserve("scope", "next", 2, DIGEST)
+
+
+def test_dispatch_parallel_quota_preserves_pending_work_and_recovers_after_failure():
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    from types import SimpleNamespace
+    from skeleton.ai.runtime.operational_ai.guarded_request.budgets import Quota
+    from skeleton.ai.runtime.operational_ai.guarded_request.pressure import Pressure
+    from skeleton.ai.runtime.operational_ai.guarded_request.workflow import GuardedDispatcher, NativeRequest
+
+    entered, release = Event(), Event()
+    calls = []
+    scope = Scope("tenant", "alice", "session", DIGEST)
+
+    def turn(**request):
+        calls.append(request["request_id"])
+        if request["request_id"] == "first":
+            entered.set()
+            if not release.wait(timeout=5):
+                raise AssertionError("test failed to release worker")
+            raise RuntimeError("local generation failure")
+        return request["request_id"]
+
+    # Isolate scheduler behavior; this is not a native model qualification.
+    service = SimpleNamespace(
+        actor=SimpleNamespace(tenant="tenant", user="alice", model_digest=DIGEST),
+        turn=turn,
+    )
+    dispatcher = GuardedDispatcher(service, quota=Quota(parallel_requests=1))
+    for request_id in ("first", "second"):
+        dispatcher.submit(NativeRequest(scope, request_id, "question"),
+                          pressure=Pressure(0, 0, 0, 10), now_mono_ms=10)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        active = pool.submit(dispatcher.drain_one)
+        try:
+            assert entered.wait(timeout=5)
+            assert pool.submit(dispatcher.drain_one).result(timeout=3) is None
+            assert dispatcher.queue.snapshot()["pending"] == 1
+            assert dispatcher.queue.snapshot()["inflight"] == 1
+        finally:
+            release.set()
+        with pytest.raises(RuntimeError, match="local generation failure"):
+            active.result(timeout=5)
+    assert dispatcher.drain_one() == "second"
+    assert dispatcher.queue.snapshot()["total"] == 0
+    assert calls == ["first", "second"]
