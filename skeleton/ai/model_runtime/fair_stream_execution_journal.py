@@ -46,6 +46,29 @@ def _hex(value: object, length: int, name: str) -> str:
     return value
 
 
+def _validate_permit(permit: DispatchPermit) -> None:
+    """Canonical CPU-only typed identity; reject Python bool/int aliases."""
+    if type(permit) is not DispatchPermit or permit.device_qualified is not False:
+        raise ValueError("canonical CPU-only dispatch permit required")
+    _hex(permit.lease_id, 64, "lease ID")
+    _hex(permit.checkpoint_digest, 64, "checkpoint digest")
+    if type(permit.generation) is not int or not 0 <= permit.generation < (1 << 63):
+        raise ValueError("invalid dispatch generation")
+    if (type(permit.request_id) is not str or not permit.request_id
+            or any(ord(char) < 32 or ord(char) == 127 for char in permit.request_id)):
+        raise ValueError("bounded request identity required")
+    try:
+        size = len(permit.request_id.encode("utf-8", errors="strict"))
+    except UnicodeEncodeError as exc:
+        raise ValueError("bounded request identity required") from exc
+    if not 1 <= size <= 128:
+        raise ValueError("bounded request identity required")
+    if (type(permit.tokens) is not int or not 1 <= permit.tokens <= (1 << 24)
+            or type(permit.bytes_reserved) is not int
+            or not 1 <= permit.bytes_reserved < (1 << 63)):
+        raise ValueError("invalid execution permit resource envelope")
+
+
 def _receipt_bytes(receipt: Mapping[str, object]) -> bytes:
     payload = json.dumps(
         receipt, sort_keys=True, separators=(",", ":"), allow_nan=False,
@@ -253,8 +276,7 @@ class FairStreamExecutionJournal:
         A competing begin() wins or loses the same SQLite write transaction.
         This produces no execution result and cannot retire RUNNING intent.
         """
-        if type(permit) is not DispatchPermit or permit.device_qualified:
-            raise ValueError("canonical CPU-only dispatch permit required")
+        _validate_permit(permit)
         receipt = sign_unstarted_cancellation(
             execution_key=self._key, session_id=self.session_id,
             generation=permit.generation, checkpoint_digest=permit.checkpoint_digest,
@@ -264,7 +286,12 @@ class FairStreamExecutionJournal:
         with self._lock:
             self._begin()
             try:
-                if self._row(permit.lease_id) is not None or self._request_fenced(permit.request_id):
+                if (self._row(permit.lease_id) is not None
+                        or self._request_fenced(permit.request_id)
+                        or self._connection.execute(
+                            "SELECT 1 FROM local_fair_stream_cancelled_intents WHERE lease_id=? LIMIT 1",
+                            (permit.lease_id,),
+                        ).fetchone() is not None):
                     raise ExecutionOutcomeUnknown("request already executed, reserved or cancelled")
                 self._capacity()
                 self._connection.execute(
@@ -288,8 +315,7 @@ class FairStreamExecutionJournal:
 
     def recover_cancelled_receipt(self, permit: DispatchPermit) -> dict[str, object]:
         """Read an existing exact cancellation fence, never create one on recovery."""
-        if type(permit) is not DispatchPermit or permit.device_qualified:
-            raise ValueError("canonical CPU-only dispatch permit required")
+        _validate_permit(permit)
         expected = sign_unstarted_cancellation(
             execution_key=self._key, session_id=self.session_id,
             generation=permit.generation, checkpoint_digest=permit.checkpoint_digest,
@@ -324,16 +350,7 @@ class FairStreamExecutionJournal:
 
     def begin(self, permit: DispatchPermit) -> None:
         """Persist intent before any backend call; reject ALL prior lease IDs."""
-        if type(permit) is not DispatchPermit or permit.device_qualified:
-            raise ValueError("canonical CPU-only dispatch permit required")
-        _hex(permit.lease_id, 64, "lease ID")
-        _hex(permit.checkpoint_digest, 64, "checkpoint digest")
-        if type(permit.generation) is not int or not 0 <= permit.generation < (1 << 63):
-            raise ValueError("invalid dispatch generation")
-        if type(permit.request_id) is not str or not permit.request_id:
-            raise ValueError("bounded request identity required")
-        if len(permit.request_id.encode("utf-8")) > 128:
-            raise ValueError("bounded request identity required")
+        _validate_permit(permit)
         self._require_owner_process()
         with self._lock:
             self._begin()
@@ -369,8 +386,7 @@ class FairStreamExecutionJournal:
         consumed_tokens: int, result_digest: str,
     ) -> dict[str, object]:
         """Commit signed receipt only after backend durable result publication."""
-        if type(permit) is not DispatchPermit:
-            raise ValueError("canonical permit required")
+        _validate_permit(permit)
         if (
             type(consumed_tokens) is not int
             or not 0 <= consumed_tokens <= permit.tokens
@@ -433,10 +449,7 @@ class FairStreamExecutionJournal:
         published output. A RUNNING row with a retirement receipt cannot be
         committed or retried. Repeating the exact approval is idempotent.
         """
-        if type(permit) is not DispatchPermit or permit.device_qualified is not False:
-            raise ValueError("canonical CPU-only permit required")
-        if type(permit.request_id) is not str or not 1 <= len(permit.request_id.encode("utf-8")) <= 128:
-            raise ValueError("bounded request identity required")
+        _validate_permit(permit)
         receipt = sign_abandonment(
             execution_key=self._key, session_id=self.session_id,
             generation=permit.generation, checkpoint_digest=permit.checkpoint_digest,
@@ -490,8 +503,7 @@ class FairStreamExecutionJournal:
         commit() repeats the intent comparison inside its write transaction.
         A missing or cancelled intent is never inferred from ciphertext.
         """
-        if type(permit) is not DispatchPermit or permit.device_qualified:
-            raise ValueError("canonical CPU-only dispatch permit required")
+        _validate_permit(permit)
         with self._read_snapshot():
             row = self._row(permit.lease_id)
             if (row is None or row[:5] != (
@@ -514,8 +526,7 @@ class FairStreamExecutionJournal:
         This never dispatches the backend. The operator must separately verify
         canonical custody generation and the independent external anchor.
         """
-        if type(permit) is not DispatchPermit:
-            raise ValueError("canonical permit required")
+        _validate_permit(permit)
         with self._read_snapshot():
             row = self._row(permit.lease_id)
             if (
@@ -570,10 +581,12 @@ class JournaledExecutionOwner:
     def execute_and_commit(
         self, permit: DispatchPermit, state: Mapping[str, object],
     ) -> Mapping[str, object]:
-        if not isinstance(state, Mapping) or type(permit) is not DispatchPermit:
+        _validate_permit(permit)
+        if not isinstance(state, Mapping):
             raise ValueError("canonical pending lease state required")
         if (
-            state.get("generation") != permit.generation
+            type(state.get("generation")) is not int
+            or state.get("generation") != permit.generation
             or state.get("checkpoint_digest") != permit.checkpoint_digest
             or state.get("session_id") != self._journal.session_id
         ):
@@ -587,7 +600,9 @@ class JournaledExecutionOwner:
             or not isinstance(pending[0], Mapping)
             or pending[0].get("lease_id") != permit.lease_id
             or pending[0].get("request_id") != permit.request_id
+            or type(pending[0].get("tokens")) is not int
             or pending[0].get("tokens") != permit.tokens
+            or type(pending[0].get("bytes_reserved")) is not int
             or pending[0].get("bytes_reserved") != permit.bytes_reserved
         ):
             raise ExecutionOutcomeUnknown("pending lease differs from execution permit")
