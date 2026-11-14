@@ -9,13 +9,16 @@ from __future__ import annotations
 
 import hmac
 import json
+import os
 import sqlite3
+from contextlib import contextmanager
 from threading import RLock
 from typing import Mapping, Protocol
 
 from .fair_stream_custody import sign_execution_result, sign_unstarted_cancellation
 from .fair_stream_session import DispatchPermit
 from .private_sqlite import PrivateSQLiteHandle
+from .sqlite_custody_schema import assert_custody_schema
 
 SCHEMA = "skeleton.ai.fair-stream-execution-journal.v1"
 MAX_JOURNAL_ROWS = 10_000
@@ -72,6 +75,7 @@ class FairStreamExecutionJournal:
         if type(execution_key) is not bytes or not 32 <= len(execution_key) <= 128:
             raise ValueError("independent execution key required")
         self._connection = connection
+        self._owner_pid = os.getpid()
         self._private_handle: PrivateSQLiteHandle | None = None
         self._key = execution_key
         self._lock = RLock()
@@ -134,8 +138,44 @@ class FairStreamExecutionJournal:
         ).fetchone() is not None:
             raise ValueError("untrusted execution custody trigger")
 
+        self._assert_schema()
+
+    def _assert_schema(self) -> None:
+        assert_custody_schema(
+            self._connection, table="local_fair_stream_execution_journal",
+            columns=("lease_id", "session_id", "generation", "checkpoint_digest",
+                     "request_id", "state", "consumed_tokens", "result_digest", "receipt"),
+            primary_key="lease_id", replay_index=_REQUEST_INDEX,
+            replay_columns=("session_id", "request_id"),
+        )
+        assert_custody_schema(
+            self._connection, table="local_fair_stream_cancelled_intents",
+            columns=("session_id", "request_id", "lease_id", "receipt"),
+            primary_key=("session_id", "request_id"), unique_keys=(("lease_id",),),
+        )
+
+    def _require_owner_process(self) -> None:
+        if self._owner_pid != os.getpid():
+            raise ExecutionOutcomeUnknown("inherited journal requires reopening")
+
+    @contextmanager
+    def _read_snapshot(self):
+        self._require_owner_process()
+        with self._lock:
+            self._assert_private()
+            if self._connection.in_transaction:
+                raise ExecutionOutcomeUnknown("journal connection has active transaction")
+            self._connection.execute("BEGIN")
+            try:
+                self._assert_schema()
+                yield
+                self._assert_private()
+            finally:
+                self._connection.rollback()
+
     def bind_private_handle(self, handle: PrivateSQLiteHandle) -> None:
         """Bind the exact owned journal inode for all later read/write operations."""
+        self._require_owner_process()
         with self._lock:
             if (type(handle) is not PrivateSQLiteHandle
                     or handle.connection is not self._connection
@@ -145,14 +185,21 @@ class FairStreamExecutionJournal:
             self._private_handle = handle
 
     def _assert_private(self) -> None:
+        self._require_owner_process()
         if self._private_handle is not None:
             self._private_handle.assert_current()
+        self._assert_schema()
 
     def _begin(self) -> None:
         self._assert_private()
         if self._connection.in_transaction:
             raise ExecutionOutcomeUnknown("journal connection has active transaction")
         self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            self._assert_schema()
+        except BaseException:
+            self._connection.rollback()
+            raise
 
     def _row(self, lease_id: str) -> tuple[object, ...] | None:
         self._assert_private()
@@ -168,9 +215,19 @@ class FairStreamExecutionJournal:
         if (type(request_id) is not str or not request_id
                 or len(request_id.encode("utf-8")) > 128):
             raise ValueError("bounded request identity required")
-        with self._lock:
-            self._assert_private()
+        with self._read_snapshot():
             return self._request_fenced(request_id)
+
+    def assert_request_admissible(self, request_id: str, *, queued_count: int = 0) -> None:
+        """Observe capacity across both execution and cancellation fences."""
+        if type(request_id) is not str or not 1 <= len(request_id.encode("utf-8")) <= 128:
+            raise ValueError("bounded request identity required")
+        if type(queued_count) is not int or not 0 <= queued_count <= MAX_JOURNAL_ROWS:
+            raise ValueError("invalid queued request count")
+        with self._read_snapshot():
+            if self._request_fenced(request_id):
+                raise ExecutionOutcomeUnknown("request already executed, reserved or cancelled")
+            self._capacity(queued_count=queued_count)
 
     def _request_fenced(self, request_id: str) -> bool:
         return self._connection.execute(
@@ -181,12 +238,12 @@ class FairStreamExecutionJournal:
             (self.session_id, request_id, self.session_id, request_id),
         ).fetchone() is not None
 
-    def _capacity(self) -> None:
+    def _capacity(self, *, queued_count: int = 0) -> None:
         count = self._connection.execute(
             "SELECT (SELECT COUNT(*) FROM local_fair_stream_execution_journal) + "
             "(SELECT COUNT(*) FROM local_fair_stream_cancelled_intents)"
         ).fetchone()[0]
-        if count >= MAX_JOURNAL_ROWS:
+        if count + queued_count >= MAX_JOURNAL_ROWS:
             raise ExecutionOutcomeUnknown("execution journal capacity exhausted")
 
     def fence_unstarted(self, permit: DispatchPermit) -> dict[str, object]:
@@ -203,6 +260,7 @@ class FairStreamExecutionJournal:
             generation=permit.generation, checkpoint_digest=permit.checkpoint_digest,
             lease_id=permit.lease_id, request_id=permit.request_id,
         )
+        self._require_owner_process()
         with self._lock:
             self._begin()
             try:
@@ -214,6 +272,14 @@ class FairStreamExecutionJournal:
                     "(session_id,request_id,lease_id,receipt) VALUES (?,?,?,?)",
                     (self.session_id, permit.request_id, permit.lease_id, _receipt_bytes(receipt)),
                 )
+                self._assert_private()
+                row = self._connection.execute(
+                    "SELECT lease_id, receipt FROM local_fair_stream_cancelled_intents "
+                    "WHERE session_id=? AND request_id=?",
+                    (self.session_id, permit.request_id),
+                ).fetchone()
+                if row != (permit.lease_id, _receipt_bytes(receipt)):
+                    raise ExecutionOutcomeUnknown("cancellation fence readback mismatch")
                 self._connection.commit()
                 return receipt
             except BaseException:
@@ -229,6 +295,7 @@ class FairStreamExecutionJournal:
             generation=permit.generation, checkpoint_digest=permit.checkpoint_digest,
             lease_id=permit.lease_id, request_id=permit.request_id,
         )
+        self._require_owner_process()
         with self._lock:
             self._begin()
             try:
@@ -267,6 +334,7 @@ class FairStreamExecutionJournal:
             raise ValueError("bounded request identity required")
         if len(permit.request_id.encode("utf-8")) > 128:
             raise ValueError("bounded request identity required")
+        self._require_owner_process()
         with self._lock:
             self._begin()
             try:
@@ -285,6 +353,12 @@ class FairStreamExecutionJournal:
                     (permit.lease_id, self.session_id, permit.generation,
                      permit.checkpoint_digest, permit.request_id),
                 )
+                if self._row(permit.lease_id) != (
+                    self.session_id, permit.generation, permit.checkpoint_digest,
+                    permit.request_id, "running", None, None, None,
+                ):
+                    raise ExecutionOutcomeUnknown("execution intent readback mismatch")
+                self._assert_private()
                 self._connection.commit()
             except BaseException:
                 self._connection.rollback()
@@ -311,6 +385,7 @@ class FairStreamExecutionJournal:
             result_digest=result_digest,
         )
         payload = _receipt_bytes(receipt)
+        self._require_owner_process()
         with self._lock:
             self._begin()
             try:
@@ -339,6 +414,12 @@ class FairStreamExecutionJournal:
                 ).rowcount
                 if changed != 1:
                     raise ExecutionOutcomeUnknown("journal completion CAS failed")
+                if self._row(permit.lease_id) != (
+                    self.session_id, permit.generation, permit.checkpoint_digest,
+                    permit.request_id, "committed", consumed_tokens, result_digest, payload,
+                ):
+                    raise ExecutionOutcomeUnknown("execution completion readback mismatch")
+                self._assert_private()
                 self._connection.commit()
                 return receipt
             except BaseException:
@@ -353,7 +434,7 @@ class FairStreamExecutionJournal:
         """
         if type(permit) is not DispatchPermit or permit.device_qualified:
             raise ValueError("canonical CPU-only dispatch permit required")
-        with self._lock:
+        with self._read_snapshot():
             row = self._row(permit.lease_id)
             if (row is None or row[:5] != (
                 self.session_id, permit.generation, permit.checkpoint_digest,
@@ -377,7 +458,7 @@ class FairStreamExecutionJournal:
         """
         if type(permit) is not DispatchPermit:
             raise ValueError("canonical permit required")
-        with self._lock:
+        with self._read_snapshot():
             row = self._row(permit.lease_id)
             if (
                 row is None or row[:5] != (
@@ -452,6 +533,7 @@ class JournaledExecutionOwner:
             or pending[0].get("bytes_reserved") != permit.bytes_reserved
         ):
             raise ExecutionOutcomeUnknown("pending lease differs from execution permit")
+        self._journal._require_owner_process()
         with self._lock:
             self._journal.begin(permit)
             # Any backend error leaves RUNNING intent durable. No automatic

@@ -274,3 +274,92 @@ def test_cancellation_reader_rejects_conflicting_execution_history():
     j._connection.commit()
     with pytest.raises(ExecutionOutcomeUnknown, match="conflicting"):
         j.recover_cancelled_receipt(p)
+
+
+@pytest.mark.parametrize("table", ["local_fair_stream_execution_journal", "local_fair_stream_cancelled_intents"])
+@pytest.mark.parametrize("temporary", [False, True])
+def test_late_trigger_cannot_erase_execution_or_cancel_fences(table, temporary):
+    from skeleton.ai.model_runtime.sqlite_custody_schema import CustodySchemaError
+    j = journal()
+    prefix = "CREATE TEMP TRIGGER" if temporary else "CREATE TRIGGER"
+    j._connection.execute(
+        prefix + " erase_identity AFTER INSERT ON " + table +
+        " BEGIN DELETE FROM " + table + "; END"
+    )
+    with pytest.raises(CustodySchemaError, match="trigger"):
+        j.begin(permit())
+    with pytest.raises(CustodySchemaError, match="trigger"):
+        j.fence_unstarted(permit())
+    assert not j._connection.in_transaction
+    assert j._connection.execute(
+        "SELECT COUNT(*) FROM local_fair_stream_execution_journal"
+    ).fetchone()[0] == 0
+    j._connection.execute("DROP TRIGGER erase_identity")
+    j.begin(permit())
+    with pytest.raises(ExecutionOutcomeUnknown, match="already"):
+        j.fence_unstarted(permit())
+
+
+def test_cancel_fence_unique_lease_constraint_required_after_open():
+    from skeleton.ai.model_runtime.sqlite_custody_schema import CustodySchemaError
+    j = journal()
+    j._connection.execute("DROP TABLE local_fair_stream_cancelled_intents")
+    j._connection.execute(
+        "CREATE TABLE local_fair_stream_cancelled_intents ("
+        "session_id TEXT NOT NULL, request_id TEXT NOT NULL, "
+        "lease_id TEXT NOT NULL, receipt BLOB NOT NULL,"
+        "PRIMARY KEY(session_id,request_id)) WITHOUT ROWID"
+    )
+    with pytest.raises(CustodySchemaError, match="unique"):
+        j.fence_unstarted(permit())
+    with pytest.raises(CustodySchemaError, match="unique"):
+        j.begin(permit())
+
+
+def test_late_replay_index_change_blocks_recovery():
+    from skeleton.ai.model_runtime.sqlite_custody_schema import CustodySchemaError
+    j = journal()
+    j.begin(permit())
+    j.commit(permit(), consumed_tokens=8, result_digest="d" * 64)
+    j._connection.execute("DROP INDEX local_fair_stream_execution_request_identity")
+    j._connection.execute(
+        "CREATE INDEX local_fair_stream_execution_request_identity "
+        "ON local_fair_stream_execution_journal(session_id, request_id)"
+    )
+    with pytest.raises(CustodySchemaError, match="replay index"):
+        j.recover_committed_receipt(permit())
+    assert not j._connection.in_transaction
+
+
+def test_admission_capacity_counts_cancellation_fences(monkeypatch):
+    import skeleton.ai.model_runtime.fair_stream_execution_journal as module
+    j = journal()
+    j.fence_unstarted(permit())
+    monkeypatch.setattr(module, "MAX_JOURNAL_ROWS", 2)
+    j.assert_request_admissible("other")
+    with pytest.raises(ExecutionOutcomeUnknown, match="capacity"):
+        j.assert_request_admissible("other", queued_count=1)
+    with pytest.raises(ExecutionOutcomeUnknown, match="cancelled"):
+        j.assert_request_admissible(permit().request_id)
+
+
+def test_inherited_execution_owner_refuses_before_lock(monkeypatch):
+    import os
+    j = journal()
+    backend = Backend()
+    owner = JournaledExecutionOwner(j, backend)
+    class ForbiddenLock:
+        def __enter__(self):
+            pytest.fail("inherited owner reached process-local lock")
+    monkeypatch.setattr(j, "_lock", ForbiddenLock())
+    monkeypatch.setattr(owner, "_lock", ForbiddenLock())
+    pid = os.getpid()
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "getpid", lambda: pid + 1)
+        with pytest.raises(ExecutionOutcomeUnknown, match="inherited"):
+            owner.execute_and_commit(permit(), state())
+        with pytest.raises(ExecutionOutcomeUnknown, match="inherited"):
+            j.fence_unstarted(permit())
+        with pytest.raises(ExecutionOutcomeUnknown, match="inherited"):
+            j.request_exists("request-1")
+    assert backend.calls == 0

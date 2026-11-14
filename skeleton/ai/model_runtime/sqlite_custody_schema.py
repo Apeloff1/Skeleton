@@ -24,8 +24,9 @@ def _identifier(value: str) -> str:
 
 def assert_custody_schema(
     connection: sqlite3.Connection, *, table: str, columns: tuple[str, ...],
-    primary_key: str, replay_index: str | None = None,
+    primary_key: str | tuple[str, ...], replay_index: str | None = None,
     replay_columns: tuple[str, ...] = (),
+    unique_keys: tuple[tuple[str, ...], ...] = (),
 ) -> None:
     """Validate the main table and reject temporary name shadowing and triggers.
 
@@ -58,14 +59,36 @@ def assert_custody_schema(
         "AND tbl_name=? COLLATE NOCASE LIMIT 1", (table,),
     ).fetchone() is not None:
         raise CustodySchemaError("untrusted custody table trigger")
+    keys = (primary_key,) if isinstance(primary_key, str) else primary_key
+    if not keys or any(_identifier(key) != key for key in keys):
+        raise CustodySchemaError("invalid custody primary key")
     info = connection.execute("PRAGMA main.table_xinfo(" + table + ")").fetchall()
     if (
         tuple(row[1] for row in info) != columns
         or any(row[6] != 0 for row in info)
-        or tuple(row[1] for row in info if row[5]) != (primary_key,)
-        or not any(row[1] == primary_key and row[3] == 1 and row[5] == 1 for row in info)
+        or tuple(row[1] for row in sorted((row for row in info if row[5]), key=lambda row: row[5])) != keys
+        or any(row[3] != 1 for row in info if row[1] in keys)
     ):
         raise CustodySchemaError("untrusted custody table shape or primary key")
+    # Inspect actual unique indexes, including implicit PRIMARY KEY and UNIQUE
+    # autoindexes. Partial, expression, descending and nonbinary indexes
+    # cannot substitute for the exact identity fences.
+    all_indexes = connection.execute("PRAGMA main.index_list(" + table + ")").fetchall()
+    def index_keys(row):
+        # SQLite-generated names are not in the internal identifier alphabet:
+        # bind the name as data to the table-valued PRAGMA instead.
+        parts = connection.execute(
+            "SELECT name, desc, coll FROM pragma_index_xinfo(?, 'main') WHERE key=1 ORDER BY seqno",
+            (row[1],),
+        ).fetchall()
+        if row[2] != 1 or row[4] != 0 or any(p[0] is None or p[1] != 0 or p[2] != "BINARY" for p in parts):
+            return ()
+        return tuple(p[0] for p in parts)
+    if not any(row[3] == "pk" and index_keys(row) == keys for row in all_indexes):
+        raise CustodySchemaError("untrusted custody primary key index")
+    for required in unique_keys:
+        if not any(index_keys(row) == required for row in all_indexes):
+            raise CustodySchemaError("untrusted custody unique identity index")
     if replay_index is not None:
         replay_index = _identifier(replay_index)
         indexes = [
