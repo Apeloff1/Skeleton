@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "list_reverse_15",
+  "domain": "list_reverse",
+  "ordinal": 15,
+  "arguments": {
+    "index": 15,
+    "a": 205,
+    "b": 4,
+    "word": "quartz",
+    "city": "Tromso"
+  },
+  "prompt": "Task 15: Reverse these three labels, comma-separated: quartz,north,node15.",
+  "expected": "node15,north,quartz",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

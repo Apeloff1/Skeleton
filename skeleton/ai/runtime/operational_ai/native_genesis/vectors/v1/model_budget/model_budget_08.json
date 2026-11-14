@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "model_budget_08",
+  "category": "model_budget",
+  "overrides": {
+    "maximum_model_bytes": 128
+  },
+  "expected": "denied",
+  "reason": "Fail closed on malformed or over-budget model_budget request"
+}

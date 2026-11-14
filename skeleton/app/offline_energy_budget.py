@@ -15,6 +15,7 @@ import platform
 import re
 import subprocess
 import sys
+import time
 from typing import Sequence
 
 from skeleton.app.offline_cpu_budget import (
@@ -252,6 +253,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--memory-per-worker-mib", type=int, default=256)
     parser.add_argument("--memory-reserve-mib", type=int, default=512)
     parser.add_argument("--interactive-reserve", type=int, default=1)
+    parser.add_argument("--hysteresis-samples", type=int, default=1,
+                        help="2-32 sequential real power samples with anti-thrash admission")
+    parser.add_argument("--hysteresis-interval-ms", type=int, default=100,
+                        help="delay between real samples (0-1000 ms)")
     args = parser.parse_args(argv)
     try:
         base = plan_cpu_workers(
@@ -261,15 +266,34 @@ def main(argv: Sequence[str] | None = None) -> int:
             memory_reserve_bytes=args.memory_reserve_mib * 1024**2,
             interactive_cpu_reserve=args.interactive_reserve,
         )
-        result = plan_energy_workers(base, probe_power())
+        if not 1 <= args.hysteresis_samples <= 32 or not 0 <= args.hysteresis_interval_ms <= 1000:
+            raise EnergyError("hysteresis sampling bounds exceeded")
+        history = []
+        if args.hysteresis_samples > 1:
+            from skeleton.app.offline_energy_hysteresis import EnergyHysteresis
+            gate = EnergyHysteresis()
+            for sample in range(args.hysteresis_samples):
+                if sample:
+                    time.sleep(args.hysteresis_interval_ms / 1000)
+                result = plan_energy_workers(base, probe_power())
+                now_ns = time.monotonic_ns()
+                decision = gate.step(result, now_ns=now_ns, sampled_ns=now_ns)
+                history.append({"admitted_workers": decision.admitted_workers,
+                                "candidate_workers": decision.candidate_workers,
+                                "reason": decision.reason, "digest": decision.digest})
+        else:
+            result = plan_energy_workers(base, probe_power())
     except (CpuBudgetError, EnergyError) as exc:
         print("energy admission rejected: " + str(exc), file=sys.stderr)
         return 2
-    print(json.dumps({"schema": SCHEMA, "allowed_workers": result.allowed_workers,
-                      "base_workers": result.base_workers, "reason": result.reason,
-                      "digest": result.digest, "power": asdict(result.observation),
-                      "policy": asdict(result.policy), "cpu_plan_digest": base.digest},
-                     sort_keys=True))
+    response = {"schema": SCHEMA, "allowed_workers": result.allowed_workers,
+                "base_workers": result.base_workers, "reason": result.reason,
+                "digest": result.digest, "power": asdict(result.observation),
+                "policy": asdict(result.policy), "cpu_plan_digest": base.digest}
+    if history:
+        response["hysteresis"] = history
+        response["allowed_workers"] = history[-1]["admitted_workers"]
+    print(json.dumps(response, sort_keys=True))
     return 0
 
 

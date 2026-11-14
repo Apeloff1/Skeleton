@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "slug_06",
+  "domain": "slug",
+  "ordinal": 6,
+  "arguments": {
+    "index": 6,
+    "a": 142,
+    "b": 8,
+    "word": "atlas",
+    "city": "Molde"
+  },
+  "prompt": "Task 6: Convert 'atlas Review 6' to a lowercase hyphenated slug.",
+  "expected": "atlas-review-6",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

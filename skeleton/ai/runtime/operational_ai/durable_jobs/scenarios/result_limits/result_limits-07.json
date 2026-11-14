@@ -1,0 +1,26 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "result_limits-07",
+  "domain": "result_limits",
+  "phase": "native-job-execution",
+  "category": "permitted-boundary",
+  "threat": "Enforce measured native reply bounds, output identity and exact model pin before durable completion 7",
+  "trust_boundary": "Durable claim, authoritative native inference and terminal state must remain source-bound",
+  "input": {
+    "variant": 6,
+    "text": "你好",
+    "generated_tokens": 8,
+    "token_limit": 512,
+    "model_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tokenizer_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "request_id": "job_1"
+  },
+  "expected_allow": true,
+  "expected_state": "valid",
+  "acceptance": "Execute actual JobStore claim/heartbeat/finish/cancel/failure/sweep methods under fresh test SQLite",
+  "no_hosted_fallback": true,
+  "never_blindly_retry_ambiguous_inference": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "list_reverse_17",
+  "domain": "list_reverse",
+  "ordinal": 17,
+  "arguments": {
+    "index": 17,
+    "a": 219,
+    "b": 6,
+    "word": "lumen",
+    "city": "Trondheim"
+  },
+  "prompt": "Task 17: Reverse these three labels, comma-separated: lumen,north,node17.",
+  "expected": "node17,north,lumen",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

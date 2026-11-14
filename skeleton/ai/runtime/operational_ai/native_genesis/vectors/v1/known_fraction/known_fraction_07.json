@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "known_fraction_07",
+  "category": "known_fraction",
+  "overrides": {
+    "minimum_known_fraction_ppm": -1
+  },
+  "expected": "denied",
+  "reason": "Reject invalid known_fraction without reinterpreting training rights"
+}

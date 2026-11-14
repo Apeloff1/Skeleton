@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "ctx_08",
+  "category": "ctx",
+  "overrides": {
+    "ctx": 0
+  },
+  "expected": "denied",
+  "reason": "Reject unsafe or malformed ctx boundary without allocating model"
+}

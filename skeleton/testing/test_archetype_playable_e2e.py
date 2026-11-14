@@ -51,6 +51,24 @@ def test_archetype_files_are_complete(name):
     assert 'Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")' in controller
     assert "func _tick(" in loop and COMPLETE_MARKER in loop and FAILED_MARKER in loop
     assert "{{" not in loop and "}}" not in loop
+    # Actual non-headless gameplay must show objectives, controls and player
+    # movement, not an invisible script declaring a completed win marker.
+    assert "func _draw() -> void:" in loop
+    assert "func _draw_objectives() -> void:" in loop
+    assert "func _hud_status() -> String:" in loop
+    assert "draw_circle(player.global_position" in loop
+    assert "queue_redraw()" in loop
+    assert "ForgeGameplayHUD" in loop and "TouchControls" in loop
+    assert "Control.PRESET_BOTTOM_LEFT" in loop
+    assert "Input.action_press(action)" in loop
+    assert "Input.action_release(action)" in loop
+    assert "_press_action.bind(action)" in loop
+    assert "_release_action.bind(action)" in loop
+    assert 'controls.mouse_filter = Control.MOUSE_FILTER_IGNORE' in loop
+    assert "TextServer.AUTOWRAP_WORD_SMART" in loop
+    assert 'DisplayServer.get_name() == "headless"' in loop
+    assert "Completed:" not in loop  # explicit outcome is uppercase
+    assert "COMPLETED: " in loop and "FAILED: " in loop
 
 
 @pytest.mark.parametrize("name", content_archetypes())
@@ -61,6 +79,10 @@ def test_pipeline_attaches_playable_slice(name):
     files = out["files"]
     assert f"scenes/archetypes/{name}/main.tscn" in files
     assert check_files(files) == []
+    from skeleton.forge.playable_portal import verify_playable_portal
+    assert verify_playable_portal(files, name)
+    assert out["playable_portal"]["return_supported"] is True
+    assert out["playable_portal"]["sealed"] is True
 
 
 def test_attach_is_additive_and_falls_back():
@@ -90,3 +112,21 @@ def test_core_loop_completes_in_real_godot(name, tmp_path):
     assert "SCRIPT ERROR" not in log, log[-2000:]
     assert f"{COMPLETE_MARKER} {name}" in log, log[-2000:]
     assert proc.returncode == 0
+
+
+
+def test_pipeline_applies_selected_creator_axes_to_actual_godot_scripts():
+    from skeleton.forge.archetype_content import verify_archetype_content
+    axes = {"tempo": 0.9, "agency": 0.8, "grind": 0.95, "intimacy": 0.7}
+    out = GameForgeRun().execute(
+        "An original ore automation game", archetype="pipeline",
+        playable_content=True, operator_axes=axes,
+    )
+    assert out["succeeded"] is True
+    assert verify_archetype_content(out["files"], "pipeline", operator_axes=axes)
+    assert out["playable_mechanics"]["source_verified"] is True
+    assert out["playable_mechanics"]["applied_axes"] == {
+        "tempo": 0.9, "agency": 0.8, "grind": 0.95,
+    }
+    assert "const QUOTA := 8" in out["files"]["scripts/archetypes/pipeline/core_loop.gd"]
+    assert "speed: float = 384.0" in out["files"]["scripts/archetypes/pipeline/player_controller.gd"]

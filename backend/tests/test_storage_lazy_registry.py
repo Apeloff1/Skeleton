@@ -101,6 +101,25 @@ def test_public_exception_route_literal_loader_uses_reviewed_import(monkeypatch)
     assert calls == [name]
 
 
+def test_telemetry_privacy_has_one_reviewed_literal_loader_without_eager_import(monkeypatch):
+    """Private telemetry filters remain resolvable without eager import or dynamic names."""
+    name = "core.telemetry_privacy"
+    assert name in lazy_registry._LOADERS
+    assert lazy_registry.module_names().count("telemetry_privacy") == 1
+    marker = object()
+    calls = []
+
+    def recorded_import(request):
+        calls.append(request)
+        return marker
+
+    monkeypatch.setattr(lazy_registry.importlib, "import_module", recorded_import)
+    assert lazy_registry._LOADERS[name]() is marker
+    assert calls == [name]
+    with pytest.raises(ValueError, match="not registered"):
+        lazy_registry.lazy_import("core.telemetry_privacy.nonexistent")
+
+
 def test_registry_has_no_runtime_selected_python_imports():
     from pathlib import Path
     from scripts.check_dynamic_import_safety import violations
@@ -176,3 +195,33 @@ def test_lazy_import_rejects_str_subclass_without_hashing():
     with pytest.raises(ValueError, match="not registered"):
         lazy_registry.lazy_import(HostileModuleName("core.public_exception_route"))
     assert set(sys.modules) == before
+
+
+
+def test_telemetry_privacy_is_reviewed_literal_loader_without_eager_import(monkeypatch):
+    """The privacy boundary is never discovered through a dynamic import path."""
+    name = "core.telemetry_privacy"
+    assert "telemetry_privacy" in lazy_registry.module_names()
+    assert name in lazy_registry._LOADERS
+    before = {key for key in sys.modules if key.startswith("core.")}
+    sentinel = object()
+    calls = []
+
+    def controlled(module_name):
+        calls.append(module_name)
+        return sentinel
+
+    monkeypatch.setattr(lazy_registry.importlib, "import_module", controlled)
+    assert lazy_registry._LOADERS[name]() is sentinel
+    assert calls == [name]
+    assert {key for key in sys.modules if key.startswith("core.")} == before
+
+
+def test_storage_wrap_includes_telemetry_privacy_without_import(storage_client):
+    """The full inventory and public wrap endpoint agree on the new module."""
+    before = set(sys.modules)
+    response = storage_client.post("/api/storage/lazy/wrap")
+    assert response.status_code == 200
+    assert response.json()["wrapped_core"] == len(lazy_registry.module_names())
+    assert "core.telemetry_privacy" in lazy_registry._LOADERS
+    assert "core.telemetry_privacy" not in set(sys.modules) - before

@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "kv_extract_02",
+  "domain": "kv_extract",
+  "ordinal": 2,
+  "arguments": {
+    "index": 2,
+    "a": 114,
+    "b": 4,
+    "word": "harbor",
+    "city": "Bergen"
+  },
+  "prompt": "Task 2: From owner=harbor; state=ready; epoch=2, output owner only.",
+  "expected": "harbor",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}
