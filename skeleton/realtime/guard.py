@@ -214,6 +214,10 @@ class PayloadSecretGuard:
 
         def scan_text(item: str, depth: int) -> str:
             nonlocal hits
+            # Bound work before stripping, parsing, or scanning untrusted text.
+            if len(item) > _MAX_DECODE_CHARS:
+                hits += 1
+                return REDACTED
             stripped = item.strip()
             if stripped[:1] in ("{", "[") and depth + 1 >= _MAX_DEPTH:
                 hits += 1
@@ -221,6 +225,9 @@ class PayloadSecretGuard:
             if stripped[:1] in ("{", "[") and depth + 1 < _MAX_DEPTH:
                 try:
                     embedded = json.loads(stripped)
+                except RecursionError:
+                    hits += 1
+                    return REDACTED
                 except ValueError:
                     embedded = None
                 if isinstance(embedded, (dict, list)):
