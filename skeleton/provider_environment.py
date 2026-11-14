@@ -35,39 +35,51 @@ MAX_ENCODED_ITEMS = 50000
 
 
 def _validate_json_shape(value: object) -> None:
-    """Bound nesting and element count *before* JSON generation begins.
+    """Bound total traversal, string size and nesting before encoding.
 
-    JSON can silently coerce non-string object keys and it can construct very
-    large intermediate strings before a post-serialization byte check. Only
-    exact JSON-compatible primitives/containers are admitted. Shared values
-    are allowed; cycles cannot pass the bounded depth traversal.
+    Walk one child at a time: a wide nested graph cannot enqueue more work
+    than the admitted budget, and shared acyclic nodes remain legal.
     """
-    pending: list[tuple[object, int]] = [(value, 0)]
-    visited = 0
-    while pending:
-        item, depth = pending.pop()
-        visited += 1
-        if visited > MAX_ENCODED_ITEMS or depth > MAX_PAYLOAD_DEPTH:
-            raise ValueError("replay JSON node/depth budget exhausted")
-        if type(item) is dict:
-            if len(item) > MAX_ENCODED_ITEMS - visited:
-                raise ValueError("replay JSON node budget exhausted")
-            for key, child in item.items():
-                if type(key) is not str or len(key) > MAX_RECORD_BYTES:
-                    raise ValueError("replay JSON requires bounded string keys")
-                pending.append((child, depth + 1))
-        elif type(item) in (tuple, list):
-            if len(item) > MAX_ENCODED_ITEMS - visited:
-                raise ValueError("replay JSON node budget exhausted")
-            pending.extend((child, depth + 1) for child in item)
+    remaining = MAX_ENCODED_ITEMS
+    remaining_chars = MAX_RECORD_BYTES
+    active: set[int] = set()
+
+    def charge_text(text: str) -> None:
+        nonlocal remaining_chars
+        remaining_chars -= len(text)
+        if remaining_chars < 0:
+            raise ValueError("replay JSON string exceeds byte budget")
+
+    def visit(item: object, depth: int) -> None:
+        nonlocal remaining
+        remaining -= 1
+        if remaining < 0:
+            raise ValueError("replay JSON item budget exhausted")
+        if depth > MAX_PAYLOAD_DEPTH:
+            raise ValueError("replay JSON depth budget exhausted")
+        if type(item) in (dict, tuple, list):
+            if id(item) in active:
+                raise ValueError("cyclic replay JSON graph")
+            if len(item) > remaining:
+                raise ValueError("replay JSON item budget exhausted")
+            active.add(id(item))
+            try:
+                if type(item) is dict:
+                    for key, child in item.items():
+                        if type(key) is not str:
+                            raise ValueError("replay JSON requires bounded string keys")
+                        charge_text(key)
+                        visit(child, depth + 1)
+                else:
+                    for child in item:
+                        visit(child, depth + 1)
+            finally:
+                active.remove(id(item))
         elif item is None or type(item) is bool:
-            continue
+            return
         elif type(item) is str:
-            if len(item) > MAX_RECORD_BYTES:
-                raise ValueError("replay JSON string exceeds byte budget")
+            charge_text(item)
         elif type(item) is int:
-            # Far more than ordinary JSON number precision, but rejects a
-            # pathological integer before expensive decimal conversion.
             if item.bit_length() > 16384:
                 raise ValueError("replay JSON integer exceeds numeric budget")
         elif type(item) is float:
@@ -75,6 +87,8 @@ def _validate_json_shape(value: object) -> None:
                 raise ValueError("replay requires finite JSON numbers")
         else:
             raise ValueError("replay requires strict canonical JSON data")
+
+    visit(value, 0)
 
 
 def _canonical(value: object) -> bytes:
@@ -173,6 +187,26 @@ class ReplayRecord:
     payload: Mapping[str, Any]
 
 
+def _index_digest(records: Iterable[ReplayRecord]) -> str:
+    """Stream the legacy ordered index hash without a second large payload."""
+    digest = hashlib.sha256()
+    digest.update(b"[")
+    for index, record in enumerate(records):
+        if index >= 100000:
+            raise ValueError("replay index item budget exhausted")
+        if (not isinstance(record, ReplayRecord)
+                or type(record.example_id) is not str
+                or not 1 <= len(record.example_id) <= 256
+                or type(record.payload_digest) is not str
+                or re.fullmatch(r"[0-9a-f]{64}", record.payload_digest) is None):
+            raise ValueError("invalid replay index descriptor")
+        if index:
+            digest.update(b",")
+        digest.update(_canonical((record.example_id, record.payload_digest)))
+    digest.update(b"]")
+    return digest.hexdigest()
+
+
 class HoldoutSplit:
     """Deterministic hash-based split; holdout ids can never enter training data."""
 
@@ -254,17 +288,7 @@ class BoundedRecordBuffer:
         )
 
     def _digest_locked(self) -> str:
-        # Preserve json.dumps(sort_keys=True, separators=(",", ":")) digest
-        # compatibility while avoiding a materialized 100k-item list and a
-        # second full deep-copy of each retained record.
-        digest = hashlib.sha256()
-        digest.update(b"[")
-        for index, record in enumerate(self._records):
-            if index:
-                digest.update(b",")
-            digest.update(_canonical((record.example_id, record.payload_digest)))
-        digest.update(b"]")
-        return digest.hexdigest()
+        return _index_digest(self._records)
 
     def records(self) -> tuple[ReplayRecord, ...]:
         with self._lock:
@@ -373,6 +397,8 @@ def replay_episode(
             raise ValueError("deterministic episode step budget exhausted")
         if not isinstance(action, Mapping):
             raise ValueError("invalid action source")
+        if len(action) > MAX_ENCODED_ITEMS:
+            raise ValueError("replay action item budget exhausted")
         safe_action = json.loads(_canonical(dict(action)))
         adapter.step(safe_action)
         states.append(_digest(dict(adapter.state)))
