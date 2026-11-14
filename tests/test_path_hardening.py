@@ -78,3 +78,36 @@ def test_audit_receipt_is_bound_to_action_and_path(tmp_path):
     assert receipt == audit_receipt(p, "read")
     assert receipt["sha256"] != audit_receipt(p, "write")["sha256"]
     assert receipt["sha256"] != audit_receipt(p.with_name("other"), "read")["sha256"]
+
+
+def test_join_rejects_unbounded_component_sequence_and_invalid_root(tmp_path):
+    with pytest.raises(ValueError):
+        safe_join(tmp_path, *(["sub"] * 65))
+    with pytest.raises(ValueError):
+        safe_join(str(tmp_path), "file")
+
+
+@pytest.mark.parametrize("allowed", [
+    "example.com", ["example.com"], {"example.com": True},
+    {f"host{i}.example.com" for i in range(1025)},
+])
+def test_url_rejects_unbounded_or_wrong_type_allowlists(allowed):
+    with pytest.raises(ValueError):
+        validate_url_host("https://example.com", allowed)
+
+
+def test_url_explicit_immutable_allowlist_and_case():
+    assert validate_url_host("https://example.com", frozenset({"EXAMPLE.COM"}))
+
+
+def test_join_rejects_outside_symlink(tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    try:
+        (root / "escape").symlink_to(outside, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("platform does not permit creating symlinks")
+    with pytest.raises(ValueError):
+        safe_join(root, "escape", "file")

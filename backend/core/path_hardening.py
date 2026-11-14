@@ -59,8 +59,8 @@ def safe_join(root: Path, *parts: str) -> Path:
 
     This is a preflight check, not race-free open/create custody.
     """
-    if not parts:
-        raise ValueError("at least one path component is required")
+    if not isinstance(root, Path) or not 1 <= len(parts) <= 64:
+        raise ValueError("invalid path root or component count")
     try:
         root_junction = getattr(root, "is_junction", None)
         if root.is_symlink() or (root_junction is not None and root_junction()):
@@ -129,6 +129,10 @@ def validate_url_host(url: str, allowed: set[str] | None = None) -> str:
             or (parsed.scheme == "http" and host not in _LOOPBACK_HTTP)
         ):
             raise ValueError("unsupported URL authority")
+        if allowed is not None and (
+            not isinstance(allowed, (set, frozenset)) or len(allowed) > 1024
+        ):
+            raise ValueError("invalid bounded hostname allowlist")
         admitted = {_normalize_host(item) for item in (_ALLOWED_HOSTS if allowed is None else allowed)}
         if host not in admitted:
             raise ValueError("URL host is not explicitly allowed")
