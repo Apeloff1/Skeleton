@@ -79,6 +79,15 @@ def test_invalid_request_never_triggers_dns_or_network(monkeypatch, payload):
     assert attempts == []
 
 
+def test_admitted_json_is_a_detached_bounded_snapshot():
+    authored = {"items": [{"feature": "enabled"}]}
+    admitted = gateway._safe_payload(authored)
+    authored["items"][0]["feature"] = "changed after admission"
+    authored["items"].append({"feature": "unreviewed"})
+    assert admitted == {"items": [{"feature": "enabled"}]}
+    assert gateway._safe_payload(None) is None
+
+
 def test_external_response_is_streamed_under_strict_byte_budget(monkeypatch):
     monkeypatch.setattr(gateway, "_MAX_EXTERNAL_RESPONSE_BYTES", 8)
 
@@ -211,6 +220,45 @@ def test_oversize_upstream_response_never_reaches_caller(monkeypatch):
 
     monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
     result = asyncio.run(gateway._api_query({"url": "https://api.example.test/"}))
+    assert result["ok"] is False
+    assert result["error"] == "api_query_failed"
+    assert "body" not in result
+
+def test_slow_drip_response_cannot_hold_a_room_forever(monkeypatch):
+    monkeypatch.setattr(gateway, "_EXTERNAL_ENABLED", True)
+    monkeypatch.setattr(gateway, "_EXTERNAL_API_HOSTS", frozenset({"api.example.test"}))
+    monkeypatch.setattr(gateway, "_resolve_public_host", lambda _: "93.184.216.34")
+
+    class StalledResponse:
+        headers = {}
+        status_code = 200
+        is_success = True
+
+        async def aiter_bytes(self):
+            yield b"partial-private-body"
+            await asyncio.Event().wait()
+
+    class FakeClient:
+        def __init__(self, **_):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_):
+            return False
+
+        @asynccontextmanager
+        async def stream(self, *_args, **_kwargs):
+            yield StalledResponse()
+
+    monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+    result = asyncio.run(asyncio.wait_for(
+        gateway._api_query({
+            "url": "https://api.example.test/knowledge", "timeout": 0.15,
+        }),
+        timeout=1.5,
+    ))
     assert result["ok"] is False
     assert result["error"] == "api_query_failed"
     assert "body" not in result

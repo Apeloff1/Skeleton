@@ -278,7 +278,9 @@ def _bounded_json(value: Any) -> Any:
         raise ValueError("external API JSON request is invalid") from exc
     if len(encoded) > _MAX_REQUEST_JSON_BYTES:
         raise ValueError("external API JSON request exceeds byte budget")
-    return value
+    # Freeze caller-owned containers before DNS awaits: mutating the original
+    # object cannot widen a validated request after the budget check.
+    return json.loads(encoded)
 
 
 def _safe_payload(value: Any) -> Any:
@@ -351,23 +353,27 @@ async def _api_query(target: dict) -> dict:
         )
         headers["Host"] = hostname
         import httpx
-        async with httpx.AsyncClient(
-            base_url=_origin_for_host(pinned_ip),
-            timeout=timeout,
-            follow_redirects=False,
-            trust_env=False,
-        ) as client:
-            async with client.stream(
-                method,
-                request_target,
-                params=params,
-                headers=headers,
-                json=payload,
-                extensions={"sni_hostname": hostname},
-            ) as response:
-                body = await _read_external_response(response)
-                return {"channel": "api", "target": name, "ok": response.is_success,
-                        "status": response.status_code, "body": body}
+        # HTTPX's timeout is per I/O phase. A slow-drip stream could otherwise
+        # keep delivering small chunks forever while staying below both
+        # per-read and overall response-byte limits. Bound the entire exchange.
+        async with asyncio.timeout(timeout):
+            async with httpx.AsyncClient(
+                base_url=_origin_for_host(pinned_ip),
+                timeout=timeout,
+                follow_redirects=False,
+                trust_env=False,
+            ) as client:
+                async with client.stream(
+                    method,
+                    request_target,
+                    params=params,
+                    headers=headers,
+                    json=payload,
+                    extensions={"sni_hostname": hostname},
+                ) as response:
+                    body = await _read_external_response(response)
+                    return {"channel": "api", "target": name, "ok": response.is_success,
+                            "status": response.status_code, "body": body}
     except Exception:  # noqa: BLE001
         return {"channel": "api", "target": "external_api", "ok": False, "error": "api_query_failed"}
 
