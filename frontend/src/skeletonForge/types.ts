@@ -81,6 +81,23 @@ export interface GenerationRow {
   [k: string]: unknown;
 }
 
+/** Read-only source-backed game-control profile, not playable-engine proof. */
+export interface GenreControlProfile {
+  schema: string;
+  genre: string;
+  family: string;
+  catalogs: string[];
+  actions: { id: string; kind: string; context?: string }[];
+  bindings: {
+    action: string;
+    control: string;
+    modifiers: string[];
+    scale: number;
+    axis: string;
+    deadzone: number;
+  }[];
+}
+
 /**
  * `BuildPlan.to_dict` from skeleton/jeeves/builder.py. Every field is
  * optional: older servers omit keys, and the plan viewer must tolerate that.
@@ -119,6 +136,8 @@ export interface RunRequest {
   playable_content?: boolean;
   playable_archetype?: string;
   playable_main_scene?: boolean;
+  /** Explicit native execution validation. "require" blocks publication on failure. */
+  playtest?: 'auto' | 'require';
   generation?: string | null;
   include_files?: boolean;
 }
@@ -182,6 +201,14 @@ export interface RunPayload {
   build_plan?: BuildPlanPayload | null;
   operator_axes?: Record<string, number>;
   galaxy_profile?: { sha256?: string; matrices?: number; source?: string; artifact?: string };
+  /** Main-world native Godot boot; execution and binary integrity are separate. */
+  playtest?: { status?: string; passed?: boolean; verified?: boolean; reason?: string; errors?: string[] } | null;
+  /** Completion of the exact independent playable scene, not merely the main world. */
+  playable_scene_playtest?: {
+    schema?: string; status?: string; passed?: boolean; verified?: boolean;
+    scene?: string; archetype?: string; binary_source?: string;
+    reason?: string; errors?: string[];
+  } | null;
   playable_prototype?: {
     schema?: string;
     mode?: string;
