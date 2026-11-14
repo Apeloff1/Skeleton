@@ -67,8 +67,11 @@ test('complete historical backend genre vote vocabulary is available in the crea
     'fighting', 'puzzle', 'deckbuilder', 'card', 'battle-royale', 'mmo',
     'mmorpg', 'visual-novel', 'narrative', 'cozy', 'arcade', 'bullet-heaven',
   ];
-  assert.deepEqual(new Set(genres), new Set(expected));
-  assert.equal(new Set(genres).size, expected.length);
+  const C = load('src/skeletonForge/genreCatalog.ts');
+  assert.equal(new Set(genres).size, 158);
+  for (const legacy of expected) assert.ok(genres.includes(legacy), 'lost legacy genre: ' + legacy);
+  assert.equal(genres.length, new Set(genres).size);
+  assert.deepEqual(new Set(genres), new Set(C.GENRE_CHOICES));
 });
 
 
