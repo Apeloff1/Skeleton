@@ -1,0 +1,59 @@
+name: P0 AI Authority Boundary
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "skeleton/shells/ai/context_provenance.py"
+      - "skeleton/ai/shell/context_provenance.py"
+      - "skeleton/shells/ai/context_policy.py"
+      - "skeleton/ai/shell/context_policy.py"
+      - "skeleton/shells/ai/observation.py"
+      - "skeleton/ai/shell/observation.py"
+      - "skeleton/shells/ai/observation_policy.py"
+      - "skeleton/ai/shell/observation_policy.py"
+      - "skeleton/testing/test_shell_ai_context_planner.py"
+      - "skeleton/testing/test_shell_ai_observation_metrics_audit.py"
+      - "skeleton/testing/test_shell_ai_approval_budget_toolguards.py"
+      - "machine/ai_file_tree.json"
+      - "machine/ai_edge_case_catalog.json"
+      - "machine/ai_edge_case_priority_queue.json"
+      - ".github/workflows/p0-ai-authority-boundary-current.yml"
+  workflow_dispatch:
+
+
+concurrency:
+  group: p0-ai-authority-boundary-current-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ai-authority:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - run: python -m pip install --disable-pip-version-check -e ".[dev]"
+      - name: Verify AI-shell mirrors
+        run: |
+          cmp skeleton/shells/ai/context_provenance.py skeleton/ai/shell/context_provenance.py
+          cmp skeleton/shells/ai/context_policy.py skeleton/ai/shell/context_policy.py
+          cmp skeleton/shells/ai/observation.py skeleton/ai/shell/observation.py
+          cmp skeleton/shells/ai/observation_policy.py skeleton/ai/shell/observation_policy.py
+      - name: Run authority boundary regressions
+        run: |
+          python -m pytest -q skeleton/testing/test_shell_ai_context_planner.py
+          python -m pytest -q skeleton/testing/test_shell_ai_observation_metrics_audit.py
+          python -m pytest -q skeleton/testing/test_shell_ai_approval_budget_toolguards.py
+      - run: python scripts/check_ai_file_tree.py
