@@ -41,6 +41,8 @@ def bind_native_cpu_result_owner(
     """
     if type(journal) is not FairStreamExecutionJournal:
         raise ValueError("canonical signed execution journal required")
+    if type(result_key) is not bytes or len(result_key) != 32 or hmac.compare_digest(result_key, journal._key):
+        raise ValueError("independent result encryption key required")
     if type(result_handle) is not PrivateSQLiteHandle or result_handle._closed:
         raise ValueError("canonical private result database required")
     if journal._connection is result_handle.connection:
@@ -105,7 +107,9 @@ def bind_native_cpu_dispatch_service(
 
     Caller owns a verified session, an independent durable CAS anchor, and
     three distinct custody roles (session, journal, encrypted result).
-    This method never bootstraps or resets durable state on restart.
+    This method never bootstraps or resets durable state on restart. Operator
+    recovery is disabled unless an independent key is provided by trusted
+    composition and re-provisioned on restart.
     """
     if type(session) is not DurableFairStreamSession:
         raise ValueError("canonical authenticated dispatch session required")
@@ -121,6 +125,8 @@ def bind_native_cpu_dispatch_service(
             or type(journal_handle) is not PrivateSQLiteHandle):
         raise ValueError("canonical native custody components required")
     session_store = session._store
+    if not hmac.compare_digest(session_store._execution_key, journal._key):
+        raise ValueError("journal execution authority differs from authenticated session")
     keys = (session_store._custody_key, session_store._execution_key, journal._key)
     if type(result_key) is not bytes or any(hmac.compare_digest(result_key, key) for key in keys):
         raise ValueError("independent result encryption key required")
