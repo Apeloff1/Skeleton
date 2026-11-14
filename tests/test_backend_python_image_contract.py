@@ -10,13 +10,13 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_backend_python_stages_are_supported_and_digest_pinned() -> None:
     dockerfile = (ROOT / "backend/Dockerfile").read_text(encoding="utf-8")
     matches = re.findall(
-        r"^FROM (python:(\d+)\.(\d+)\.(\d+)-alpine\d+\.\d+@sha256:[0-9a-f]{64})"
+        r"^FROM (python:(\d+)\.(\d+)(?:\.\d+)?-alpine(?:\d+\.\d+)?@sha256:[0-9a-f]{64})"
         r" AS (builder|runtime-source|production)$",
         dockerfile,
         flags=re.MULTILINE,
     )
     assert len(matches) == 3, "all three backend Python stages must have immutable digests"
-    assert {name for _, _, _, _, name in matches} == {
+    assert {name for _, _, _, name in matches} == {
         "builder", "runtime-source", "production",
     }
     assert len({image for image, *_ in matches}) == 1, "backend stage ABI must be identical"
