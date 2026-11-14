@@ -1,0 +1,147 @@
+extends "res://scripts/loops/loop_base.gd"
+## Arena loop — survive escalating waves from the portals; kills chain a
+## combo multiplier; credits let you continue. Clear the final wave to win.
+
+var waves: Array = []
+var wave: int = 0
+var score: int = 0
+var combo: int = 0
+var best_combo: int = 0
+var credits: int = 2
+var _queue: Array = []
+var _spawn_cd: float = 0.0
+var _intermission: float = 3.0
+var _combo_t: float = 0.0
+
+
+func _on_setup() -> void:
+	waves = Game.get_cfg("rules.waves", [])
+	credits = int(Game.get_cfg("rules.credits", 2))
+	Game.counters["wave"] = 0
+	Game.counters["waves_total"] = waves.size()
+	Game.counters["score"] = 0
+	Game.say("ARENA — survive %d waves" % waves.size())
+
+
+func _physics_process(delta: float) -> void:
+	if main == null or Game.outcome != "":
+		return
+	_combo_t -= delta
+	if _combo_t <= 0.0:
+		combo = 0
+	var p = main.player
+	for m in touching("medkit"):
+		m.collect()
+		p.heal(float(Game.get_cfg("rules.medkit_heal", 30.0)))
+		Game.bump("pickups")
+	if _queue.is_empty() and main.enemies().is_empty():
+		if wave >= waves.size():
+			Game.say("ARENA CLEARED — score %d" % score)
+			Game.finish("win")
+			return
+		_intermission -= delta
+		if _intermission <= 0.0:
+			_queue = (waves[wave] as Array).duplicate()
+			wave += 1
+			Game.counters["wave"] = wave
+			_intermission = float(Game.get_cfg("rules.intermission", 3.0))
+			Game.say("WAVE %d / %d" % [wave, waves.size()])
+			Game.log_event("wave", str(wave))
+			if wave > 1:
+				p.heal(p.max_hp * 0.25)
+	elif not _queue.is_empty():
+		_spawn_cd -= delta
+		if _spawn_cd <= 0.0:
+			_spawn_cd = float(Game.get_cfg("rules.spawn_interval", 0.7))
+			_spawn(str(_queue.pop_front()), p)
+
+
+func _spawn(tier: String, p) -> void:
+	var portals: Array = main.markers("portal")
+	if portals.is_empty():
+		return
+	var best = portals[0]
+	var best_d := -1.0
+	for i in range(3):
+		var cand = portals[Game.rng.randi_range(0, portals.size() - 1)]
+		var d: float = cand.global_position.distance_to(p.global_position)
+		if d > best_d:
+			best_d = d
+			best = cand
+	var e = main.spawn_enemy(tier, best.global_position)
+	e.alerted = true
+	main.fx.spark(best.global_position, Color.html("#c86bff"))
+
+
+func on_enemy_killed(enemy) -> void:
+	combo += 1
+	best_combo = max(best_combo, combo)
+	_combo_t = float(Game.get_cfg("rules.combo_window", 2.5))
+	score += 100 * int(enemy.reward) * combo
+	Game.counters["score"] = score
+	Game.counters["best_combo"] = best_combo
+	if combo >= 5 and combo % 5 == 0:
+		Game.say("COMBO x%d" % combo)
+	if Game.rng.randf() < float(Game.get_cfg("rules.medkit_drop", 0.12)):
+		main.spawn_marker.call_deferred("medkit", enemy.global_position)
+
+
+func on_player_died(p) -> void:
+	if credits > 0:
+		credits -= 1
+		Game.say("CONTINUE — %d credits left" % credits)
+		Game.log_event("continue", str(credits))
+		p.revive_at(main.tile_center(main.spawn_tile))
+		for e in main.enemies():
+			if e.global_position.distance_to(p.global_position) < 120.0:
+				e.velocity = (e.global_position - p.global_position).normalized() * 400.0
+		return
+	Game.say("GAME OVER — score %d" % score)
+	Game.finish("lose")
+
+
+func objective_text() -> String:
+	if wave == 0:
+		return "Get ready..."
+	return "Wave %d/%d   Enemies %d   Credits %d" % [wave, waves.size(), main.enemies().size() + _queue.size(), credits]
+
+
+func hud_lines() -> String:
+	return "SCORE %d   COMBO x%d   BEST x%d   Kills %d" % [score, combo, best_combo, int(Game.stats["kills"])]
+
+
+func smoke_extra() -> Dictionary:
+	return {"score": score, "wave": wave, "credits": credits, "best_combo": best_combo}
+
+
+func bot_think(bot) -> void:
+	var p = main.player
+	var target = bot_engage(bot, 14.0)
+	var threat = null
+	var threat_d := 130.0
+	for e in main.enemies():
+		var d: float = p.global_position.distance_to(e.global_position)
+		if d < threat_d:
+			threat_d = d
+			threat = e
+	if threat != null:
+		var away: Vector2 = (p.global_position - threat.global_position).normalized()
+		var side := away.orthogonal()
+		var dir := away
+		for cand in [away, (away + side).normalized(), (away - side).normalized(), side, -side]:
+			if not main.is_wall(p.global_position + cand * 44.0):
+				dir = cand
+				break
+		bot.move_vector = dir
+		if threat_d < 40.0:
+			bot.want_dodge = true
+		return
+	var med = null
+	if p.hp < p.max_hp * 0.6:
+		med = nearest_by_path(main.markers("medkit"), p.global_position, 20)
+	if med != null:
+		bot_go(bot, med.global_position)
+	elif p.global_position.distance_to(main.tile_center(main.spawn_tile)) > TILE * 3.0:
+		bot_go(bot, main.tile_center(main.spawn_tile))
+	elif target != null:
+		bot.move_vector = (target.global_position - p.global_position).normalized().orthogonal() * 0.6
