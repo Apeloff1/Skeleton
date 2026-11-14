@@ -26,6 +26,13 @@ class BudgetExceeded(RuntimeError):
     """Raised when an attempted step would breach a hard budget."""
 
 
+def _finite_nonnegative(name: str, value: object) -> float:
+    if (isinstance(value, bool) or not isinstance(value, (float, int))
+            or not math.isfinite(value) or value < 0):
+        raise ValueError(f"{name} must be a finite non-negative number")
+    return float(value)
+
+
 @dataclass(frozen=True)
 class Budget:
     max_mutations: int
@@ -34,12 +41,9 @@ class Budget:
 
     def __post_init__(self) -> None:
         if type(self.max_mutations) is not int or self.max_mutations < 0:
-            raise ValueError("mutation budget must be a non-negative integer")
-        if any(
-            type(n) not in (int, float) or not math.isfinite(n) or n < 0
-            for n in (self.max_seconds, self.max_cost)
-        ):
-            raise ValueError("time and cost budgets must be finite non-negative numbers")
+            raise ValueError("max_mutations must be a non-negative integer")
+        _finite_nonnegative("max_seconds", self.max_seconds)
+        _finite_nonnegative("max_cost", self.max_cost)
 
 
 @dataclass(frozen=True)
@@ -55,8 +59,9 @@ class EvalResult:
     failures: tuple[EvalFailure, ...] = ()
 
     def __post_init__(self) -> None:
-        if type(self.score) not in (int, float) or not math.isfinite(self.score):
-            raise ValueError("evaluation score must be a finite number")
+        if (isinstance(self.score, bool) or not isinstance(self.score, (int, float))
+                or not math.isfinite(self.score)):
+            raise ValueError("evaluation score must be finite")
 
     @property
     def passed(self) -> bool:
@@ -103,6 +108,9 @@ class Mutation:
     cost: float
     rationale: str = ""
 
+    def __post_init__(self) -> None:
+        _finite_nonnegative("mutation cost", self.cost)
+
 
 @dataclass(frozen=True)
 class RouteChoice:
@@ -114,6 +122,9 @@ class RouteChoice:
     provider: str
     unit_cost: float = 0.0
     receipt: RoutingReceipt | None = None
+
+    def __post_init__(self) -> None:
+        _finite_nonnegative("route unit cost", self.unit_cost)
 
     @classmethod
     def from_receipt(cls, receipt: RoutingReceipt, model: str | None = None,
@@ -176,8 +187,9 @@ class RepairLoop:
 
     def run(self, artifact: Mapping[str, object]) -> RepairOutcome:
         start = self.clock()
-        if type(start) not in (int, float) or not math.isfinite(start):
-            raise ValueError("repair clock must be finite")
+        if (isinstance(start, bool) or not isinstance(start, (int, float))
+                or not math.isfinite(start)):
+            raise ValueError("repair clock must provide finite timestamps")
         current = dict(artifact)
         result = self.evaluator(current)
         out = RepairOutcome("already_passing", current, result.score, 0, 0.0, 0.0)
@@ -187,8 +199,8 @@ class RepairLoop:
         stale = 0
         while True:
             elapsed = self.clock() - start
-            if type(elapsed) not in (int, float) or not math.isfinite(elapsed) or elapsed < 0:
-                raise ValueError("repair clock must be monotonic and finite")
+            if not math.isfinite(elapsed) or elapsed < 0:
+                raise ValueError("repair clock must advance monotonically")
             out.seconds_spent = elapsed
             if out.steps >= self.budget.max_mutations:
                 return self._stop(out, "exhausted", "mutation budget")
@@ -199,14 +211,9 @@ class RepairLoop:
             mutation = self.proposer(current, diags, route)
             if mutation is None:
                 return self._stop(out, "stalled", "proposer has no candidate")
-            if any(
-                type(c) not in (int, float) or not math.isfinite(c) or c < 0
-                for c in (mutation.cost, route.unit_cost)
-            ):
-                raise ValueError("mutation and route costs must be finite non-negative")
             cost = mutation.cost + route.unit_cost
-            if not math.isfinite(cost):
-                raise ValueError("total mutation cost is not finite")
+            if cost < 0:
+                raise ValueError("mutation cost must be non-negative")
             if out.cost_spent + cost > self.budget.max_cost:
                 return self._stop(out, "exhausted", "cost budget")
             out.steps += 1
@@ -220,7 +227,10 @@ class RepairLoop:
                 current, result, stale = candidate, new, 0
                 out.artifact, out.best_score = current, result.score
                 if result.passed:
-                    out.seconds_spent = self.clock() - start
+                    elapsed = self.clock() - start
+                    if not math.isfinite(elapsed) or elapsed < 0:
+                        raise ValueError("repair clock must advance monotonically")
+                    out.seconds_spent = elapsed
                     return self._stop(out, "repaired", "evals pass")
             else:
                 stale += 1
