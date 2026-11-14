@@ -44,3 +44,15 @@ quest regression suite. Historical `native_candidate/STATUS.md` is restored as
 collision with the independent `status.md` training-domain guide. These are
 historical source records, not current runtime or release evidence. No old
 workflow or architecture metadata is substituted for the current main version.
+
+## Installed package-data gate
+
+The six recovered packages carry 3,456 original JSON scenario, evaluation,
+training and vector records. Explicit setuptools package-data entries retain
+these records in wheels. After building a wheel using the existing pinned
+build environment, run `python scripts/check_recovered_native_wheel.py
+path/to/skeleton.whl` (as a single command). The verifier compares each
+member's size and SHA-256 with the checkout and rejects missing, duplicate
+or altered records. A source configuration test is included. Neither the
+wheel nor the verifier was executed in the connector session; actual installed
+native runtime qualification remains outstanding.
