@@ -416,6 +416,25 @@ class SealedFairStreamResultVault:
             finally:
                 self._connection.rollback()
 
+    def assert_no_published_result(self, permit: DispatchPermit) -> None:
+        """Observe exact absence, including corrupt or unauthentic ciphertext."""
+        _identity(permit)
+        self._require_owner()
+        with self._lock:
+            self._require_open()
+            self._connection.execute("BEGIN")
+            try:
+                self._assert_schema()
+                if self._connection.execute(
+                    "SELECT 1 FROM " + _TABLE
+                    + " WHERE lease_id=? OR (session_id=? AND request_id=?) LIMIT 1",
+                    (permit.lease_id, self.session_id, permit.request_id),
+                ).fetchone() is not None:
+                    raise SealedResultUnavailable("existing result requires reconciliation, not abandonment")
+                self._handle.assert_current()
+            finally:
+                self._connection.rollback()
+
     def assert_request_admissible(self, request_id: str, *, queued_count: int = 0) -> None:
         """Conservative local preflight, not a cross-process reservation."""
         if type(request_id) is not str or not 1 <= len(request_id.encode("utf-8")) <= 128:
