@@ -190,8 +190,8 @@ def submit_authenticated_native_cpu_prompt(
     authenticated_tenant_id MUST originate from the app's verified principal,
     never from a request body. This operation is not a replacement for the
     durable journal's one-use request identity or the live OS pressure guard.
-    If durable submit succeeds but status retrieval fails, the grant is
-    revoked and the request is held for explicit operator reconciliation.
+    The returned status is derived from the authenticated admission transition.
+    Any uncertain mutation burns the grant and requires reconciliation.
     """
     if (type(service) is not OfflineAdaptiveDispatchService
             or type(vault) is not SealedFairStreamResultVault
@@ -212,15 +212,15 @@ def submit_authenticated_native_cpu_prompt(
             or owner._backend is not vault
             or type(vault._backend) is not NativeFairStreamBackend
             or vault._backend.registry is not registry
-            or vault._backend.runtime is not runtime
-            or service._session.verify().get("session_id") != registry.session_id):
+            or vault._backend.runtime is not runtime):
         raise ValueError("native app ownership binding mismatch")
     # Serialize staging with planning/cancellation on this trusted service.
     # A peer CAS change is still fenced by the exact anchor during submit.
-    service._guard._require_owner_process()
-    with service._guard._lock:
+    with service._operation():
         service._guard._require_no_pending()
         snapshot = service._session.verify()
+        if snapshot.get("session_id") != registry.session_id:
+            raise ValueError("native app ownership binding mismatch")
         if (request.authorization_digest is not None
                 or any(row["request_id"] == request.request_id
                        for row in snapshot["checkpoint"]["requests"])
