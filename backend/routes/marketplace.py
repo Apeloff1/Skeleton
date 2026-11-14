@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
+from core.http_errors import PublicUnavailableResponse
 from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
@@ -48,10 +49,7 @@ MAX_PRICE = 500.0
 
 def _marketplace_release_unavailable() -> JSONResponse:
     """Do not accept money without verified gameplay and buyer delivery."""
-    return JSONResponse(status_code=503, content={
-        "error": "Selling and purchasing games is unavailable until gameplay and buyer access can be verified.",
-        "code": "marketplace_release_unavailable",
-    })
+    return PublicUnavailableResponse("marketplace_release_unavailable")
 
 
 def _marketplace_release_ready() -> bool:
@@ -389,7 +387,7 @@ async def stripe_webhook(request: Request):
     except Exception:
         # A missing secret or unavailable verifier is a server-side outage;
         # acknowledge neither the event nor the error as a bad signature.
-        return JSONResponse(status_code=503, content={"received": False, "error": "webhook_unavailable"})
+        return PublicUnavailableResponse("webhook_unavailable")
     # Completion can precede payment for delayed methods. An absent status is
     # not evidence of payment, and late unpaid events must not downgrade a paid
     # transaction. Payment-status polling remains available for existing orders.
@@ -399,7 +397,7 @@ async def stripe_webhook(request: Request):
         txn = await _db.payment_transactions.find_one({"session_id": ev.session_id}, {"_id": 0})
         if (not txn or not _marketplace_order_is_bound(txn)
                 or not paid_amount_matches(txn, getattr(ev, "amount_total", None), getattr(ev, "currency", None))):
-            return JSONResponse(status_code=503, content={"received": False, "error": "payment_details_unreconciled"})
+            return PublicUnavailableResponse("payment_details_unreconciled")
         try:
             await _db.payment_transactions.update_one(
                 {"session_id": ev.session_id, "amount": txn["amount"], "currency": txn["currency"],
@@ -409,12 +407,12 @@ async def stripe_webhook(request: Request):
         except HTTPException as exc:
             if exc.status_code != 404:
                 raise
-            return JSONResponse(status_code=503, content={"received": False, "error": "payment_details_unreconciled"})
+            return PublicUnavailableResponse("payment_details_unreconciled")
         before = txn
         txn = await _db.payment_transactions.find_one({"session_id": ev.session_id}, {"_id": 0})
         if (not txn or not _same_marketplace_order(before, txn)
                 or not paid_amount_matches(txn, getattr(ev, "amount_total", None), getattr(ev, "currency", None))):
-            return JSONResponse(status_code=503, content={"received": False, "error": "payment_details_unreconciled"})
+            return PublicUnavailableResponse("payment_details_unreconciled")
         await _finalize_purchase(txn)
     return {"received": True}
 
