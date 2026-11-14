@@ -211,16 +211,41 @@ class PayloadSecretGuard:
         reject mode whenever anything would have been redacted.
         """
         hits = 0
+        remaining_nodes = 100_000
+        remaining_text = 1_048_576
+
+        def charge_text(value: str) -> None:
+            nonlocal remaining_text
+            if len(value) > remaining_text:
+                raise RealtimeSecretError("payload inspection byte budget exceeded")
+            remaining_text -= len(value.encode("utf-8", errors="surrogatepass"))
+            if remaining_text < 0:
+                raise RealtimeSecretError("payload inspection byte budget exceeded")
+
+        def unique_pairs(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise RealtimeSecretError("ambiguous embedded JSON object")
+                result[key] = value
+            return result
+
+        def reject_constant(_value):
+            raise RealtimeSecretError("non-finite embedded JSON value")
 
         def scan_text(item: str, depth: int) -> str:
             nonlocal hits
+            charge_text(item)
             stripped = item.strip()
             if stripped[:1] in ("{", "[") and depth + 1 >= _MAX_DEPTH:
                 hits += 1
                 return REDACTED
             if stripped[:1] in ("{", "[") and depth + 1 < _MAX_DEPTH:
                 try:
-                    embedded = json.loads(stripped)
+                    embedded = json.loads(stripped, object_pairs_hook=unique_pairs, parse_constant=reject_constant)
+                except (RealtimeSecretError, RecursionError):
+                    hits += 1
+                    return REDACTED
                 except ValueError:
                     embedded = None
                 if isinstance(embedded, (dict, list)):
@@ -256,7 +281,10 @@ class PayloadSecretGuard:
             return item
 
         def visit(item: Any, depth: int) -> Any:
-            nonlocal hits
+            nonlocal hits, remaining_nodes
+            remaining_nodes -= 1
+            if remaining_nodes < 0:
+                raise RealtimeSecretError("payload inspection node budget exceeded")
             if depth >= _MAX_DEPTH:
                 # Truncation is a security decision, not a clean payload.
                 # Count it so reject mode never publishes unchecked subtrees.
@@ -288,6 +316,11 @@ class PayloadSecretGuard:
                         raise RealtimeSecretError(
                             f"payload keys must be strings, got {type(key).__name__}"
                         )
+                    before_key = hits
+                    scan_text(key, depth + 1)
+                    if hits != before_key:
+                        # Renaming keys could merge distinct fields; refuse the event.
+                        raise RealtimeSecretError("unsafe payload key")
                     if is_sensitive_key(key):
                         # Avoid invoking user-defined equality on untrusted values.
                         if child is not None and not (isinstance(child, str) and child in ("", REDACTED)):

@@ -24,6 +24,9 @@ from typing import Any, AsyncIterator, Awaitable, Callable, Iterator, List, Opti
 from .envelope import CONTROL_TYPES, ControlEvent, EnvelopeError, RealtimeEvent, ts_to_ms
 
 DEFAULT_RETRY_MS = 2000
+MAX_SSE_LINE_CHARS = 524_288
+MAX_SSE_FRAME_CHARS = 524_288
+MAX_SSE_DATA_LINES = 8192
 HEARTBEAT_COMMENT = ": hb\n\n"
 SSE_MEDIA_TYPE = "text/event-stream"
 
@@ -71,23 +74,46 @@ class SSEParser:
 
     def __init__(self) -> None:
         self._buf = ""
+        self._skip_lf = False
+        self._frame_chars = 0
         self._cur = SSEMessage()
         self.last_event_id: Optional[str] = None
         self.retry_ms: Optional[int] = None
         self.comments = 0
 
     def feed(self, chunk: str) -> Iterator[SSEMessage]:
-        self._buf += chunk.replace("\r\n", "\n").replace("\r", "\n")
-        while "\n" in self._buf:
-            line, self._buf = self._buf.split("\n", 1)
+        if not isinstance(chunk, str):
+            raise EnvelopeError("SSE chunk must be text")
+        # CR is already a delimiter; suppress a following LF across chunks.
+        if not chunk:
+            return
+        if self._skip_lf and chunk.startswith("\n"):
+            chunk = chunk[1:]
+        if not chunk:
+            self._skip_lf = False
+            return
+        self._skip_lf = chunk.endswith("\r")
+        normalized = chunk.replace("\r\n", "\n").replace("\r", "\n")
+        start = 0
+        while True:
+            end = normalized.find("\n", start)
+            stop = len(normalized) if end < 0 else end
+            if len(self._buf) + stop - start > MAX_SSE_LINE_CHARS:
+                raise EnvelopeError("SSE line exceeds parser budget")
+            self._buf += normalized[start:stop]
+            if end < 0:
+                break
+            line, self._buf = self._buf, ""
             msg = self._line(line)
             if msg is not None:
                 yield msg
+            start = end + 1
 
     def _line(self, line: str) -> Optional[SSEMessage]:
         if line == "":
             cur = self._cur
             self._cur = SSEMessage()
+            self._frame_chars = 0
             if cur.id is not None:
                 self.last_event_id = cur.id
             if not cur.data_lines:
@@ -101,12 +127,15 @@ class SSEParser:
         if value.startswith(" "):
             value = value[1:]
         if name == "data":
+            self._frame_chars += len(value) + 1
+            if self._frame_chars > MAX_SSE_FRAME_CHARS or len(self._cur.data_lines) >= MAX_SSE_DATA_LINES:
+                raise EnvelopeError("SSE event exceeds parser budget")
             self._cur.data_lines.append(value)
         elif name == "event":
             self._cur.event = value or "message"
         elif name == "id" and "\x00" not in value:
             self._cur.id = value
-        elif name == "retry" and value.isdigit():
+        elif name == "retry" and value.isascii() and value.isdigit() and len(value) <= 9:
             self.retry_ms = int(value)
         return None
 

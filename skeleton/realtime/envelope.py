@@ -29,6 +29,7 @@ SSE frames *without* an ``id:`` line so they never move the resume cursor.
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -220,7 +221,7 @@ class RealtimeEvent:
             "ts": self.ts,
             "channel": self.channel,
             "type": self.type,
-            "payload": self.payload,
+            "payload": deepcopy(self.payload),
         }
         if self.job_id is not None:
             body["job_id"] = self.job_id
