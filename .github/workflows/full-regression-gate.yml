@@ -116,6 +116,9 @@ jobs:
           skeleton/testing/test_native_whole_request_custody.py
           skeleton/testing/test_native_fair_stream_backend.py
           skeleton/testing/test_native_token_pressure.py
+          skeleton/testing/test_fair_stream_custody.py
+          skeleton/testing/test_fair_stream_sqlite.py
+          skeleton/testing/test_fair_stream_session.py
           skeleton/testing/test_fair_stream_dispatch.py
           skeleton/testing/test_fair_stream_execution_journal.py
           skeleton/testing/test_fair_stream_result_access.py

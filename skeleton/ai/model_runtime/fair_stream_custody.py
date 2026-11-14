@@ -6,6 +6,7 @@ dispatch, and the trusted execution owner must sign only durable results.
 """
 from __future__ import annotations
 
+from dataclasses import replace
 from hashlib import sha256
 import hmac
 import json
@@ -182,6 +183,10 @@ class AuthenticatedFairStreamCustody:
                 raise ValueError("stale custody generation")
             if self.generation == (1 << 63) - 1:
                 raise ValueError("custody generation exhausted")
+            # A receipt consumes exactly one generation and checkpoint. No
+            # unrelated mutation may invalidate a previously issued permit.
+            if self._scheduler.pending_ids and action != "acknowledge":
+                raise ValueError("pending leases require execution reconciliation")
             # Restore before modifying, so any invalid operation is atomic.
             trial = FairStreamScheduler.restore(self._scheduler.checkpoint())
             plan = None
@@ -196,7 +201,11 @@ class AuthenticatedFairStreamCustody:
             elif action == "plan":
                 if not isinstance(budget, MeasuredStreamBudget):
                     raise ValueError("typed measured budget required")
-                plan = trial.plan(budget, whole_request=whole_request)
+                # The authenticated protocol has a single-receipt CAS, not
+                # an atomic batch receipt. Keep the standalone planner's
+                # multi-stream API, but never issue multiple durable permits.
+                single = replace(budget, stream_slots=min(1, budget.stream_slots))
+                plan = trial.plan(single, whole_request=whole_request)
             elif action == "acknowledge":
                 required = {
                     "schema", "session_id", "generation", "checkpoint_digest",

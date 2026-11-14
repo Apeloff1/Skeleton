@@ -80,7 +80,11 @@ class DurableFairStreamSession:
         watermark.initialize(
             generation=envelope["generation"], digest=envelope["digest"],
         )
-        return cls(store, watermark)
+        session = cls(store, watermark)
+        if session.verify() != envelope:
+            session._quarantined = True
+            raise CustodyQuarantined("bootstrap state changed before confirmation")
+        return session
 
     @property
     def quarantined(self) -> bool:
@@ -106,15 +110,22 @@ class DurableFairStreamSession:
             self._quarantined = True
             raise CustodyQuarantined("trusted high-watermark unavailable") from exc
 
+    def _confirmed_state(self, generation: int, digest: str) -> dict[str, object]:
+        """Cross-check persisted state between two independent anchor observations."""
+        if self._trusted() != (generation, digest):
+            raise CustodyQuarantined("independent anchor did not confirm intended generation")
+        owner = self._store.load(expected_generation=generation, expected_digest=digest)
+        envelope = owner.export()
+        if self._trusted() != (generation, digest):
+            raise CustodyQuarantined("independent anchor changed during state verification")
+        return envelope
+
     def verify(self) -> dict[str, object]:
         self._require_owner_process()
         with self._lock:
             generation, digest = self._trusted()
             try:
-                owner = self._store.load(
-                    expected_generation=generation, expected_digest=digest,
-                )
-                return owner.export()
+                return self._confirmed_state(generation, digest)
             except Exception as exc:
                 self._quarantined = True
                 raise CustodyQuarantined(
@@ -137,7 +148,10 @@ class DurableFairStreamSession:
                     expected_generation=generation, expected_digest=digest,
                     generation=envelope["generation"], digest=envelope["digest"],
                 )
-                return plan, envelope
+                confirmed = self._confirmed_state(envelope["generation"], envelope["digest"])
+                if confirmed != envelope:
+                    raise CustodyQuarantined("persisted successor differs from committed transition")
+                return plan, confirmed
             except BaseException as exc:
                 # Even when the SQLite update succeeded and the anchor failed,
                 # no further work can be admitted or dispatched from this
@@ -195,10 +209,8 @@ class DurableFairStreamSession:
         with self._lock:
             generation, digest = self._trusted()
             try:
-                owner = self._store.load(
-                    expected_generation=generation, expected_digest=digest,
-                )
-                return owner.pending_ids
+                state = self._confirmed_state(generation, digest)
+                return tuple(sorted(row["lease_id"] for row in state["checkpoint"]["pending"]))
             except Exception as exc:
                 self._quarantined = True
                 raise CustodyQuarantined("pending lease state unverifiable") from exc

@@ -1,6 +1,7 @@
 """Simulated durable dispatch boundary tests; no GPU/device qualification."""
 from __future__ import annotations
 
+from dataclasses import replace
 import sqlite3
 
 import pytest
@@ -169,3 +170,94 @@ def test_rollback_of_sqlite_cannot_be_reconciled_with_external_anchor(tmp_path):
     conn.commit()
     with pytest.raises(CustodyQuarantined, match="diverges"):
         DurableFairStreamSession(store(conn), anchor)
+
+
+def test_multiple_requests_issue_one_durable_permit_and_next_receipt_remains_valid():
+    anchor = SimulatedIndependentWatermark()
+    session = DurableFairStreamSession.bootstrap(store(), anchor)
+    session.submit(request())
+    session.submit(replace(request(), request_id="r2", tenant_id="other"))
+    live = replace(budget(), stream_slots=8, token_budget=160)
+    completed = set()
+    for _ in range(2):
+        permits, state = session.plan(live, whole_request=True)
+        assert len(permits) == 1
+        permit = permits[0]
+        completed.add(permit.request_id)
+        receipt = sign_execution_result(
+            execution_key=E, session_id=SESSION, generation=state["generation"],
+            checkpoint_digest=state["checkpoint_digest"], lease_id=permit.lease_id,
+            consumed_tokens=permit.tokens, result_digest="f" * 64, terminal=True,
+        )
+        session.acknowledge(receipt)
+    assert completed == {"r1", "r2"}
+    assert session.verify()["checkpoint"]["requests"] == []
+
+
+@pytest.mark.parametrize("operation", ["submit", "cancel"])
+def test_pending_lease_cannot_be_invalidated_by_unrelated_transition(operation):
+    anchor = SimulatedIndependentWatermark()
+    db = store()
+    session = DurableFairStreamSession.bootstrap(db, anchor)
+    session.submit(request())
+    session.submit(replace(request(), request_id="r2"))
+    permits, state = session.plan(budget())
+    with pytest.raises(CustodyQuarantined):
+        if operation == "submit":
+            session.submit(replace(request(), request_id="r3"))
+        else:
+            deferred_id = "r2" if permits[0].request_id == "r1" else "r1"
+            session.cancel(deferred_id)
+    assert DurableFairStreamSession(db, anchor).verify() == state
+
+
+def test_unconfirmed_anchor_advance_never_returns_permit():
+    anchor = SimulatedIndependentWatermark()
+    db = store()
+    session = DurableFairStreamSession.bootstrap(db, anchor)
+    session.submit(request())
+    old = anchor.read()
+    anchor.advance = lambda **kwargs: None
+    with pytest.raises(CustodyQuarantined, match="reconciliation"):
+        session.plan(budget())
+    assert anchor.read() == old
+    assert session.quarantined
+    with pytest.raises(CustodyQuarantined):
+        DurableFairStreamSession(db, anchor)
+
+
+def test_anchor_acknowledgement_with_corrupted_sqlite_successor_is_quarantined():
+    anchor = SimulatedIndependentWatermark()
+    db = store()
+    session = DurableFairStreamSession.bootstrap(db, anchor)
+    session.submit(request())
+    advance = anchor.advance
+
+    def corrupt(**kwargs):
+        advance(**kwargs)
+        db._connection.execute("UPDATE local_fair_stream_custody SET payload=?", (b"{}",))
+        db._connection.commit()
+
+    anchor.advance = corrupt
+    with pytest.raises(CustodyQuarantined, match="reconciliation"):
+        session.plan(budget())
+    assert session.quarantined
+    assert not db._connection.in_transaction
+
+
+def test_anchor_changes_during_snapshot_read_prevent_verified_state(monkeypatch):
+    anchor = SimulatedIndependentWatermark()
+    db = store()
+    session = DurableFairStreamSession.bootstrap(db, anchor)
+    load = db.load
+
+    def racing_load(**kwargs):
+        owner = load(**kwargs)
+        anchor.state = (anchor.state[0] + 1, "f" * 64)
+        return owner
+
+    monkeypatch.setattr(db, "load", racing_load)
+    with pytest.raises(CustodyQuarantined, match="diverges"):
+        session.verify()
+    assert session.quarantined
+    assert not db._connection.in_transaction

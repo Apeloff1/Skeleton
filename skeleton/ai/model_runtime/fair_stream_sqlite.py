@@ -205,6 +205,8 @@ class DurableFairStreamStore:
                     " VALUES (?, ?, ?, ?)",
                     (self.session_id, 0, envelope["digest"], payload),
                 )
+                if self._read() != (0, envelope["digest"], payload):
+                    raise ValueError("durable initialization readback mismatch")
                 self._assert_private()
                 self._connection.commit()
                 return envelope
@@ -222,12 +224,20 @@ class DurableFairStreamStore:
         with self._lock:
             if self._connection.in_transaction:
                 raise ValueError("shared or active SQLite transaction forbidden")
-            row = self._read()
-            if row is None:
-                raise ValueError("durable custody session missing")
-            return self._restore(
-                row, expected_generation=generation, expected_digest=digest,
-            )
+            # Read schema and payload in a single SQLite snapshot. Otherwise
+            # another connection could change schema between verification and SELECT.
+            self._connection.execute("BEGIN")
+            try:
+                row = self._read()
+                if row is None:
+                    raise ValueError("durable custody session missing")
+                owner = self._restore(
+                    row, expected_generation=generation, expected_digest=digest,
+                )
+                self._assert_private()
+                return owner
+            finally:
+                self._connection.rollback()
 
     def transition(
         self, *, expected_generation: int, expected_digest: str,
@@ -267,6 +277,8 @@ class DurableFairStreamStore:
                 ).rowcount
                 if changed != 1:
                     raise ValueError("durable custody CAS rejected")
+                if self._read() != (next_generation, next_digest, payload):
+                    raise ValueError("durable custody transition readback mismatch")
                 self._assert_private()
                 self._connection.commit()
                 return plan, envelope
