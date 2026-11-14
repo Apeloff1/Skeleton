@@ -65,9 +65,9 @@ class Draft19CIPathTests(unittest.TestCase):
 
     def test_stale_workflow_change_filter_is_denied(self):
         self.set_workflow(
-            "          python -m pytest tests/test_sample.py\\n"
-            "    paths:\\n"
-            '      - "tests/missing_package/__init__.py"\\n'
+            "          python -m pytest tests/test_sample.py\n"
+            "    paths:\n"
+            '      - "tests/missing_package/__init__.py"\n'
         )
         self.assertIn(
             "missing source: tests/missing_package/__init__.py",
@@ -76,9 +76,9 @@ class Draft19CIPathTests(unittest.TestCase):
 
     def test_real_test_paths_in_change_filter_are_accepted(self):
         self.set_workflow(
-            "          python -m pytest tests/test_sample.py\\n"
-            "    paths:\\n"
-            '      - "tests/test_sample.py"\\n'
+            "          python -m pytest tests/test_sample.py\n"
+            "    paths:\n"
+            '      - "tests/test_sample.py"\n'
         )
         self.assertEqual(validate_ci_paths(self.root), ())
 
