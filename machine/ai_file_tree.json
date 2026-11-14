@@ -126,6 +126,37 @@
       ]
     },
     {
+      "id": "AIFT-PROVIDER-MODEL-READINESS",
+      "source": "skeleton/provider_model_readiness.py",
+      "destination": "skeleton/ai/runtime/provider_model_readiness.py",
+      "kind": "file",
+      "source_git_object_sha": "f063b6778170d82fb8bf07593ad442bb195c1a07",
+      "role": "Local-only model readiness admission and bounded resource envelope; canonical provider policy remains with the original runtime.",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-PROV-02",
+        "AIQ-S2-PROTO-02",
+        "AIQ-S7-E2E-01"
+      ],
+      "parity_mode": "compatibility_facade",
+      "facade_required_import": "from skeleton.provider_model_readiness import",
+      "note": "Runtime alias is non-owning; source remains canonical and class identity is preserved.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:owner-sensitive"
+      ],
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "canonical_provider_owner_retained_with_non_owning_legacy_import_alias",
+      "volume_refs": [
+        "VOL-004",
+        "VOL-007"
+      ]
+    },
+    {
       "id": "AIFT-CONTRACTS",
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
@@ -3300,7 +3331,7 @@
       "source": "skeleton/shells/ai",
       "destination": "skeleton/ai/shell",
       "kind": "tree",
-      "source_git_object_sha": "845d634bcf8319f73170c30f7e93848209ad4d50",
+      "source_git_object_sha": "5bb2ec5ed45eb5bd3643dd3469282a0314ba16bc",
       "role": "AI shell/control-plane implementation spanning governance, planning, policy, verification, durable recovery, trust, provider routing and release evidence",
       "work_package_refs": [
         "WP-W03",
