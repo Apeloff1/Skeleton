@@ -5629,7 +5629,7 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "canonical_ecs_adapter_tree_exactly_mirrored",
-      "source_git_object_sha": "ce7c1908fa42a17bc146b6e1b1f7356fb9af855a"
+      "source_git_object_sha": "5ccc97d23a308b0e1f46f26def3cec159e059c6e"
     },
     {
       "id": "AIFT-EXEC-SANDBOX",
