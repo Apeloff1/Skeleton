@@ -13,7 +13,7 @@ class ModelLoaderCustodyTests(unittest.TestCase):
 
     def test_absent_model_does_not_simulate_success(self):
         with self.assertRaises(FileNotFoundError):
-            ModelLoader().load(self.CAS, license_accepted=True)
+            ModelLoader(expected_sha256="0" * 64).load(self.CAS, license_accepted=True)
 
     def test_missing_digest_is_denied(self):
         with tempfile.TemporaryDirectory() as root:
