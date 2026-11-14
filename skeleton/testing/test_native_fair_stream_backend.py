@@ -400,7 +400,7 @@ def test_durable_cancel_scrubs_prompt_even_when_expiration_clock_unavailable(mon
 def test_unknown_revocations_and_cancel_cleanup_cannot_grow_identity_set(monkeypatch):
     from skeleton.ai.model_runtime import native_fair_stream_backend as module
 
-    monkeypatch.setattr(module, "MAX_STAGED_PROMPTS", 2)
+    monkeypatch.setattr(module, "MAX_PROMPT_IDENTITIES", 2)
     registry = NativePromptRegistry(session_id=SESSION)
     registry.revoke("first")
     registry.revoke("second")
