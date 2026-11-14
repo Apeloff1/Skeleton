@@ -265,28 +265,32 @@ class GuardedFairStreamDispatch:
         with self._lock:
             if self._executing or self._uncertain or self._issued or self._session.pending_ids():
                 raise DispatchUncertain("pending execution requires durable reconciliation")
-            budget, observation = self._sample(token_budget)
-            if observation.effective_slots == 0 or observation.effective_tokens == 0:
-                raise DispatchDeferred("resource pressure prohibits dispatch")
-            anchor = None
-            if self._queued_authority is not None:
-                snapshot = self._session.verify()
-                try:
-                    self._queued_authority(snapshot)
-                except (ValueError, RuntimeError, OSError) as exc:
-                    raise DispatchDeferred("queued authorization unavailable; explicit cancellation required") from exc
-                anchor = (snapshot["generation"], snapshot["digest"])
-            permits, _ = self._session.plan(
-                budget, whole_request=self._whole_request, expected_anchor=anchor,
-            )
-            if len(permits) > 1:
-                self._uncertain = True
-                raise DispatchUncertain("non-atomic multi-lease plan forbidden")
-            self._issued = {permit.lease_id: permit for permit in permits}
-            # Persist no new authority. Retain the pre-discount ceiling only
-            # while this process owns the issued permit.
-            self._issued_token_budget = token_budget if permits else None
-            return permits, observation
+            self._executing = True
+            try:
+                budget, observation = self._sample(token_budget)
+                if observation.effective_slots == 0 or observation.effective_tokens == 0:
+                    raise DispatchDeferred("resource pressure prohibits dispatch")
+                anchor = None
+                if self._queued_authority is not None:
+                    snapshot = self._session.verify()
+                    try:
+                        self._queued_authority(snapshot)
+                    except (ValueError, RuntimeError, OSError) as exc:
+                        raise DispatchDeferred("queued authorization unavailable; explicit cancellation required") from exc
+                    anchor = (snapshot["generation"], snapshot["digest"])
+                permits, _ = self._session.plan(
+                    budget, whole_request=self._whole_request, expected_anchor=anchor,
+                )
+                if len(permits) > 1:
+                    self._uncertain = True
+                    raise DispatchUncertain("non-atomic multi-lease plan forbidden")
+                self._issued = {permit.lease_id: permit for permit in permits}
+                # Persist no new authority. Retain the pre-discount ceiling only
+                # while this process owns the issued permit.
+                self._issued_token_budget = token_budget if permits else None
+                return permits, observation
+            finally:
+                self._executing = False
 
     def dispatch_next(self, *, token_budget: int) -> tuple[DispatchPermit | None, dict[str, object] | None, DispatchObservation]:
         """Plan once or explicitly resume a known, not-yet-started permit.
@@ -655,47 +659,47 @@ class GuardedFairStreamDispatch:
         with self._lock:
             if self._uncertain or self._executing:
                 raise DispatchUncertain("execution outcome requires reconciliation")
-            state = self._validate_pending(permit)
-            ceiling = self._issued_token_budget
-            if type(ceiling) is not int or not permit.tokens <= ceiling <= MAX_TOKENS:
-                self._uncertain = True
-                raise DispatchUncertain("original planning budget unavailable; reconcile")
-            # Do not discount the already-discounted lease a second time.
-            _, observation = self._sample(ceiling)
-            if (
-                observation.effective_slots < 1
-                or observation.effective_tokens < permit.tokens
-                or observation.ram_headroom_bytes < permit.bytes_reserved
-            ):
-                raise DispatchDeferred("fresh pressure probe denies pending lease")
-            # A live OS probe can block or yield while another process moves
-            # the independent CAS anchor. Re-read both durable authorities
-            # immediately before invoking the side-effecting native backend.
-            # The journal's one-use execution claim remains the final
-            # cross-process fence; this check narrows the sampling TOCTOU gap.
-            try:
-                refreshed = self._validate_pending(permit)
-                if (refreshed["generation"] != state["generation"]
-                        or refreshed["checkpoint_digest"] != state["checkpoint_digest"]):
-                    raise DispatchUncertain("durable lease changed during resource probe")
-            except BaseException as exc:
-                self._uncertain = True
-                raise DispatchUncertain(
-                    "durable lease changed during resource probe; reconciliation required"
-                ) from exc
-            if self._queued_authority is not None:
-                try:
-                    self._queued_authority(refreshed)
-                except (ValueError, RuntimeError, OSError) as exc:
-                    raise DispatchDeferred("pending prompt authorization unavailable; hold for reconciliation") from exc
-                # Authorization checks can themselves cross an I/O boundary.
-                try:
-                    refreshed = self._validate_pending(permit)
-                except BaseException as exc:
-                    self._uncertain = True
-                    raise DispatchUncertain("durable lease changed during grant verification") from exc
             self._executing = True
             try:
+                state = self._validate_pending(permit)
+                ceiling = self._issued_token_budget
+                if type(ceiling) is not int or not permit.tokens <= ceiling <= MAX_TOKENS:
+                    self._uncertain = True
+                    raise DispatchUncertain("original planning budget unavailable; reconcile")
+                # Do not discount the already-discounted lease a second time.
+                _, observation = self._sample(ceiling)
+                if (
+                    observation.effective_slots < 1
+                    or observation.effective_tokens < permit.tokens
+                    or observation.ram_headroom_bytes < permit.bytes_reserved
+                ):
+                    raise DispatchDeferred("fresh pressure probe denies pending lease")
+                # A live OS probe can block or yield while another process moves
+                # the independent CAS anchor. Re-read both durable authorities
+                # immediately before invoking the side-effecting native backend.
+                # The journal's one-use execution claim remains the final
+                # cross-process fence; this check narrows the sampling TOCTOU gap.
+                try:
+                    refreshed = self._validate_pending(permit)
+                    if (refreshed["generation"] != state["generation"]
+                            or refreshed["checkpoint_digest"] != state["checkpoint_digest"]):
+                        raise DispatchUncertain("durable lease changed during resource probe")
+                except BaseException as exc:
+                    self._uncertain = True
+                    raise DispatchUncertain(
+                        "durable lease changed during resource probe; reconciliation required"
+                    ) from exc
+                if self._queued_authority is not None:
+                    try:
+                        self._queued_authority(refreshed)
+                    except (ValueError, RuntimeError, OSError) as exc:
+                        raise DispatchDeferred("pending prompt authorization unavailable; hold for reconciliation") from exc
+                    # Authorization checks can themselves cross an I/O boundary.
+                    try:
+                        refreshed = self._validate_pending(permit)
+                    except BaseException as exc:
+                        self._uncertain = True
+                        raise DispatchUncertain("durable lease changed during grant verification") from exc
                 try:
                     with bound_revalidation_budget(permit, ceiling):
                         receipt = self._owner.execute_and_commit(permit, refreshed)
