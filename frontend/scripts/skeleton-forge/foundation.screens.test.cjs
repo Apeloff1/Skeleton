@@ -264,3 +264,55 @@ test('the live screen reuses the forge run and cockpit console, and auth stays o
   assert.match(auth, /\/api\/auth\/me/);
   assert.doesNotMatch(auth, /fetch\(|axios/);
 });
+
+test('first-install build status can share prepared Godot source, but never a restored expired archive', () => {
+  const ready = {
+    succeeded: true,
+    forge: { blueprint_id: 'bp-original', file_count: 12 },
+    run: { succeeded: true, stages: [] },
+    source_export: {
+      status: 'ready', file_count: 12, bytes: 4096,
+      manifest_sha256: 'a'.repeat(64),
+    },
+  };
+  function show(payload, onExport = noop) {
+    return render(h(BuildStatusScreen, {
+      title: 'An original game', phase: 'done', payload,
+      error: null, startedAt: 0, finishedAt: 15, now: 20,
+      onExport, guidance: { id: 'projects', label: 'Back to projects', detail: 'Build complete.' },
+      onGuidance: noop, consoleBusy: false, consoleSummary: null,
+      consoleOk: null, consoleFailures: 0, onAskCockpit: noop,
+      onBrief: noop, onProjects: noop, onOpenCockpit: noop,
+    }));
+  }
+  const fresh = show(ready);
+  assert.match(fresh, /data-testid="run-export-godot-zip"/);
+  assert.match(text(fresh), /source-only ZIP that opens in Godot/);
+  const expired = show({
+    ...ready,
+    source_export: {
+      status: 'unavailable',
+      reason: 'Save source ZIP from the original live run',
+    },
+  });
+  assert.doesNotMatch(expired, /data-testid="run-export-godot-zip"/);
+  assert.match(text(expired), /original live run/);
+});
+
+test('legacy local project recovery is an explicit first-install action, not automatic attribution', () => {
+  const visible = render(h(Shell, {
+    initialState: shellState(),
+    ports: ports({
+      legacyAvailable: true,
+      importLegacy: async () => [],
+    }),
+  }));
+  assert.match(visible, /data-testid="studio-legacy-project-import"/);
+  assert.match(visible, /data-testid="studio-import-legacy"/);
+  assert.match(text(visible), /might belong to another account/);
+  const hidden = render(h(Shell, {
+    initialState: shellState(),
+    ports: ports({ legacyAvailable: false }),
+  }));
+  assert.doesNotMatch(hidden, /data-testid="studio-import-legacy"/);
+});

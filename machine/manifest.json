@@ -815,6 +815,21 @@
     "runtime_status_projection": "frontend/src/features/Jeeves/JeevesRuntimeStatus.tsx mounts authenticated RuntimeOptimizationPanel: exact model controls, actual server policy field catalog, bounded tenant learner checkpoint and numeric dataset export, maintenance retry/circuit reset and worker coordination. Explicit admin mutations preserve CAS/failure/source pins and durable audit; frontend owns no provider execution or policy authority.",
     "durable_status_recovery": "expired or failed tickets may project a verified committed SQLite receipt; uncommitted work is never inferred",
     "studio_foundation_surfaces": "Existing chat/studio/crawler forms consume authenticated bounded draft-only workflow templates; RuntimeOptimizationPanel projects activated local execution limits, scoped operational predictor explanations and observed maintenance queue/handler/task blockers. Existing owner validation, grants, canonical receipts and physical-custody recovery remain authoritative.",
-    "operational_gap_continuation": "machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.operational_gap_continuation"
+    "operational_gap_continuation": "machine/ai_app_construction.json#cognitive_runtime_blueprint.adaptive_runtime_optimization.operational_gap_continuation",
+    "session_organization": {
+      "owner": "skeleton/ai/model_runtime/offline_chat.py",
+      "route": "POST /v1/sessions/{session_id}/metadata",
+      "fields": [
+        "title",
+        "pinned",
+        "archived",
+        "metadata_revision"
+      ],
+      "authority": "additive model/tokenizer-scoped SQLite metadata; transcript revisions and inference receipts remain unchanged",
+      "concurrency": "expected_metadata_revision compare-and-set; stale edits return conflict",
+      "discovery": "title and transcript search; active/archive filters; pinned-first ordering",
+      "backup": "organization metadata has a versioned backup envelope; legacy v1/v2 bundles remain importable",
+      "qualification": "implementation candidate; source and browser evidence recorded separately"
+    }
   }
 }

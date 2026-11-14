@@ -112,17 +112,47 @@ def propose_timeline(world: Any, *, actor: str, opening_note: str,
     _id(actor, "actor")
     _text(opening_note, "opening_note", 2048)
     _text(resolution_note, "resolution_note", 2048)
-    endings = sorted(ending["scene"] for ending in world["endings"])
-    events = [{
-        "id": "setup", "scene": world["start"], "actor": actor,
-        "tick": 0, "kind": "setup", "description": opening_note,
-        "depends_on": [], "requires_flags": [],
-    }]
-    for i, ending in enumerate(endings, 1):
+    endings = {ending["scene"] for ending in world["endings"]}
+    scenes = {scene["id"]: scene for scene in world["scenes"]}
+    # One actor cannot occupy several scenes at the same tick. Establish a
+    # deterministic topological clock; looping chronology needs authored cues.
+    outgoing = {scene: set() for scene in scenes}
+    incoming = {scene: set() for scene in scenes}
+    for edge in world["choices"]:
+        origin, destination = edge["from"], edge["to"]
+        if origin != destination:
+            outgoing[origin].add(destination)
+            incoming[destination].add(origin)
+    remaining = {scene: len(parents) for scene, parents in incoming.items()}
+    order: list[str] = []
+    ready = sorted(scene for scene, count in remaining.items() if count == 0)
+    while ready:
+        scene = ready.pop(0)
+        order.append(scene)
+        for destination in sorted(outgoing[scene]):
+            remaining[destination] -= 1
+            if remaining[destination] == 0:
+                ready.append(destination)
+        ready.sort()
+    if len(order) != len(scenes) or not order or order[0] != world["start"]:
+        raise CanonError("timeline_requires_authored_cycle")
+    ids = {world["start"]: "setup"}
+    for i, ending in enumerate(sorted(endings), 1):
+        ids[ending] = f"resolution_{i}"
+    events = []
+    for tick, scene in enumerate(order):
+        eid = ids.get(scene, f"scene_{tick}")
+        if scene == world["start"]:
+            kind, description = "setup", opening_note
+        elif scene in endings:
+            kind, description = "resolution", resolution_note
+        else:
+            kind, description = "observation", "Observe: " + scenes[scene]["title"]
+        # Alternative branches are not cumulative causal prerequisites.
         events.append({
-            "id": f"resolution_{i}", "scene": ending, "actor": actor,
-            "tick": i, "kind": "resolution", "description": resolution_note,
-            "depends_on": ["setup"], "requires_flags": [],
+            "id": eid, "scene": scene, "actor": actor,
+            "tick": tick, "kind": kind, "description": description,
+            "depends_on": [] if tick == 0 else ["setup"], "requires_flags": [],
         })
     data = {"schema": SCHEMA, "world_id": world["id"],
             "world_digest": proof.source_digest, "events": events}
