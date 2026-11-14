@@ -710,3 +710,71 @@ def test_native_session_cannot_share_execution_connection(private_files):
             sampler=LiveStreamBudgetSampler(), storage_path=".",
         )
     assert journal._private_handle is None
+
+@pytest.mark.parametrize("published", [False, True])
+def test_native_uncertain_retirement_preserves_replay_fence_and_output(private_files, monkeypatch, published):
+    from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchUncertain
+    from skeleton.ai.model_runtime.fair_stream_recovery import (
+        issue_abandonment_authorization, issue_recovery_authorization, RecoveryAuthorizationDenied,
+    )
+    from skeleton.ai.model_runtime.fair_stream_execution_journal import ExecutionOutcomeUnknown
+
+    install_probe(monkeypatch)
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    stage_native_cpu_prompt(
+        runtime=runtime, registry=registry, request_id="retire-native",
+        tenant_id="alice", prompt="hello", max_output_tokens=2,
+    )
+    service.submit(StreamRequest("retire-native", "alice", InferencePhase.PREFILL, 2, 16))
+
+    def fail(*args, **kwargs):
+        raise OSError("simulated interrupted owner")
+
+    with monkeypatch.context() as patch:
+        if published:
+            patch.setattr(journal, "commit", fail)
+        else:
+            patch.setattr(NativeLLMRuntime, "generate_sequence", fail)
+        with pytest.raises(DispatchUncertain, match="uncertain"):
+            service.execute_next(token_budget=2)
+
+    before = session.verify()
+    lease = before["checkpoint"]["pending"][0]
+    kwargs = dict(recovery_key=b"o" * 32, session_id=SESSION, generation=before["generation"],
+                  checkpoint_digest=before["checkpoint_digest"], lease_id=lease["lease_id"],
+                  nonce="f" * 32)
+    with pytest.raises(RecoveryAuthorizationDenied, match="distinct"):
+        service.abandon_uncertain(authorization=issue_recovery_authorization(**kwargs), recovery_key=b"o" * 32)
+    approval = issue_abandonment_authorization(**kwargs, evidence_digest="d" * 64)
+
+    if published:
+        with pytest.raises(DispatchUncertain, match="abandonment"):
+            service.abandon_uncertain(authorization=approval, recovery_key=b"o" * 32)
+        assert session.verify() == before
+        assert vault._connection.execute("SELECT COUNT(*) FROM local_fair_stream_sealed_results").fetchone() == (1,)
+        return
+
+    with pytest.raises(ValueError, match="independent"):
+        service.abandon_uncertain(authorization=approval, recovery_key=EXECUTION_KEY)
+    status = service.abandon_uncertain(authorization=approval, recovery_key=b"o" * 32)
+    assert status.pending_leases == 0 and not status.execution_uncertain
+    assert session.verify()["checkpoint"]["requests"] == []
+    assert vault._connection.execute("SELECT COUNT(*) FROM local_fair_stream_sealed_results").fetchone() == (0,)
+    assert journal.request_exists("retire-native")
+    with pytest.raises(ExecutionOutcomeUnknown):
+        journal.assert_request_admissible("retire-native")
+    with pytest.raises(DispatchUncertain, match="exactly one pending"):
+        service.abandon_uncertain(authorization=approval, recovery_key=b"o" * 32)
+
+    stage_native_cpu_prompt(
+        runtime=runtime, registry=registry, request_id="fresh-native",
+        tenant_id="alice", prompt="hello", max_output_tokens=2,
+    )
+    service.submit(StreamRequest("fresh-native", "alice", InferencePhase.PREFILL, 2, 16))
+    assert service.execute_next(token_budget=2)["executed"] is True
