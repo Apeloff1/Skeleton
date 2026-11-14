@@ -138,6 +138,16 @@ class DurableTurnAdmissions:
                 "WHERE session_id=? AND request_id=?", (sid, rid),
             ).fetchone()
             now = time.time()
+            # A peer may commit between the HTTP replay check and this
+            # write transaction. Never reserve a new attempt over that truth.
+            committed = self._store._db.execute(
+                "SELECT request_digest FROM offline_turns WHERE session_id=? AND request_id=?",
+                (sid, rid),
+            ).fetchone()
+            if committed is not None:
+                if committed[0] != digest:
+                    raise AdmissionRejected(409, "request ID belongs to different turn content")
+                raise AdmissionRejected(409, "reply already committed; read saved history")
             if row is not None:
                 previous_digest, attempt, state = row
                 if previous_digest != digest:

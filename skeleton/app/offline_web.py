@@ -227,6 +227,14 @@ HTML = r"""<!doctype html>
         <label for="context-preserve"><input id="context-preserve" type="checkbox" checked> Require entire conversation context</label>
         <label for="budget">Output tokens <input id="budget" type="number" min="1" max="8192" value="32"></label>
       </div></details>
+      <details id="admission-recovery" hidden>
+        <summary>Recover an unfinished request</summary>
+        <p class="hint">Only request identity survives a service restart. Re-enter the original message, output budget and grounding settings exactly. No automatic replay.</p>
+        <label for="admission-choice">Previously admitted request</label>
+        <select id="admission-choice" aria-describedby="admission-recovery-status"></select>
+        <p id="admission-recovery-status" class="hint" role="status">No recovery records loaded.</p>
+        <button id="admission-retry" class="secondary small" disabled>Explicitly retry selected request</button>
+      </details>
       <div class="composer-submit">
         <span class="hint keyboard-hint">Ctrl / ⌘ + Enter to send</span>
         <button id="context-preview" class="small" disabled>Preview context</button>
@@ -373,6 +381,7 @@ JAVASCRIPT = r"""'use strict';
     network: new AbortController(), resourceTimer: null, longformSourceId: null,
     longformWork: null, longformPendingRequest: null,
     longformImportPending: null,
+    recoverableAdmissions: [], admissionSession: '', admissionLoad: 0,
     workspace: 'chat', forgeGenre: 'shooter', forgeJob: null, forgeRequest: null,
     forgeJobs: [], forgeAvailability: null, forgeLimits: null,
     forgeTimer: null, forgePolling: false, forgePollStarted: 0, forgePollErrors: 0,
@@ -723,6 +732,41 @@ JAVASCRIPT = r"""'use strict';
       ? 'LOCAL • ' + count + '/' + cap + ' WAITING · ONE EXECUTOR'
       : 'LOCAL • QUEUE DISABLED OR UNKNOWN';
   }
+  function clearAdmissionRecovery() {
+    state.admissionLoad++;
+    state.admissionSession = ''; state.recoverableAdmissions = [];
+    get('admission-choice').replaceChildren();
+    get('admission-recovery').hidden = true;
+    get('admission-recovery-status').textContent = 'No recovery records loaded.';
+  }
+  async function refreshAdmissionRecovery(id) {
+    clearAdmissionRecovery();
+    if (!id || !state.connected || state.health?.durable_admission_metadata !== true) return;
+    const epoch = state.epoch;
+    const load = state.admissionLoad;
+    const observed = await api('GET', '/v1/sessions/' + encodeURIComponent(id) + '/admissions');
+    if (epoch !== state.epoch || load !== state.admissionLoad ||
+        state.session !== id || !state.connected) return;
+    if (observed?.automatic_replay !== false || !Array.isArray(observed.admissions) ||
+        observed.admissions.length > 32) throw new Error('Invalid recovery inventory.');
+    const rows = observed.admissions.filter(row =>
+      typeof row?.request_id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(row.request_id) &&
+      ['failed', 'cancelled', 'interrupted'].includes(row.state) &&
+      Number.isInteger(row.attempt) && row.attempt > 0);
+    state.admissionSession = id;
+    state.recoverableAdmissions = rows;
+    for (const row of rows) {
+      const option = document.createElement('option');
+      option.value = row.request_id;
+      option.textContent = row.request_id + ' · ' + row.state + ' · attempt ' + row.attempt;
+      get('admission-choice').append(option);
+    }
+    get('admission-recovery').hidden = rows.length === 0;
+    get('admission-recovery-status').textContent = rows.length
+      ? 'No committed reply for these identities. Exact explicit retry only.'
+      : 'No eligible unfinished requests.';
+    updateControls();
+  }
   async function recoverSessionTurn(id) {
     if (state.turn || !state.connected) return;
     const epoch = state.epoch;
@@ -924,6 +968,12 @@ JAVASCRIPT = r"""'use strict';
     get('check-turn').disabled = !state.turn || state.polling || locked;
     get('retry-turn').hidden = !state.pending || !terminal(state.turn) || state.turn.state === 'complete';
     get('retry-turn').disabled = locked || working;
+    const selectedAdmission = get('admission-choice').value;
+    get('admission-choice').disabled = locked || working;
+    get('admission-retry').disabled = locked || working ||
+      (foreignLease && !mayQueue) || state.health?.ready !== true ||
+      state.admissionSession !== state.session ||
+      !state.recoverableAdmissions.some(row => row.request_id === selectedAdmission);
     document.querySelectorAll('[data-session], [data-fork]').forEach(button => {
       button.disabled = locked || working;
     });
@@ -990,6 +1040,7 @@ JAVASCRIPT = r"""'use strict';
       writePending: null, writeRequest: '', showArchived: false,
       sessionMetadata: null, titleEditSession: '', titleEditRevision: 0});
     clearForge();
+    clearAdmissionRecovery();
     clearSessionMetadata(); showCollection();
     get('session-title-dialog').close();
     get('session-title-input').value = '';
@@ -1215,6 +1266,7 @@ JAVASCRIPT = r"""'use strict';
     const result = await api('GET', '/v1/sessions/' + id);
     if (current !== id) {
       state.turn = null; state.pending = null; stopPolling();
+      clearAdmissionRecovery();
       // Preserve the explicit source restriction across conversations.
       // Only the operator's reset control may broaden grounding.
       knowledgeScopeStatus();
@@ -1235,6 +1287,8 @@ JAVASCRIPT = r"""'use strict';
       try {await recoverSessionTurn(id);}
       catch {status('Pending request status unavailable. Refresh the conversation before submitting again.');}
     }
+    try {await refreshAdmissionRecovery(id);}
+    catch {status('Admission recovery inventory unavailable. No request was replayed.');}
     updateControls();
   }
   function schedulePoll(delay = 1200) {
@@ -1267,6 +1321,8 @@ JAVASCRIPT = r"""'use strict';
         } else {
           await completeSelfTest(ticket, epoch);
           status(ticket.error || 'Cancelled without a completed reply. Retry original turn or edit your next request.');
+          try {await refreshAdmissionRecovery(ticket.session_id);}
+          catch { /* The terminal ticket remains visible independently. */ }
         }
       } else {
         const seconds = Math.max(0, Math.floor((Date.now() - ticket.created_at * 1000) / 1000));
@@ -1537,12 +1593,18 @@ JAVASCRIPT = r"""'use strict';
   }));
   ['grounded', 'context-preserve', 'budget'].forEach(id =>
     get(id).addEventListener('change', invalidateContextPreview));
-  async function submit(retry = false) {
+  async function submit(retry = false, recoveryId = null) {
     const epoch = state.epoch;
-    if (!state.session) throw new Error('Create or select a conversation first.');
+    const session = state.session;
+    if (!session) throw new Error('Create or select a conversation first.');
     if (unresolved()) throw new Error('Resolve the current request before starting another.');
+    if (recoveryId !== null && (state.health?.durable_admission_metadata !== true ||
+        state.admissionSession !== session ||
+        !state.recoverableAdmissions.some(row => row.request_id === recoveryId))) {
+      throw new Error('Select an eligible recovery identity first.');
+    }
     let request;
-    if (retry) {
+    if (retry && recoveryId === null) {
       if (!state.pending) throw new Error('The original request is not available in this tab. Refresh saved history.');
       request = state.pending;
     } else {
@@ -1560,15 +1622,17 @@ JAVASCRIPT = r"""'use strict';
         if (preview.may_submit_under_policy !== true)
           throw new Error('Full transcript exceeds the local model window. No inference was submitted.');
       }
-      if (scopeVersion !== state.knowledgeScopeVersion ||
+      if (epoch !== state.epoch || session !== state.session ||
+          scopeVersion !== state.knowledgeScopeVersion ||
           JSON.stringify(document_ids) !== JSON.stringify(selectedGroundingScope(grounded)))
         throw new Error('Grounding selection changed during preflight. Preview again.');
       request = {session_id: state.session, message, grounded, max_output_tokens,
         require_full_history,
         ...(document_ids.length ? {document_ids} : {}),
-        request_id: crypto.randomUUID().replace(/-/g, '')};
+        request_id: recoveryId ?? crypto.randomUUID().replace(/-/g, '')};
       const original = state.pending;
-      if (original && original.session_id === request.session_id && original.message === message
+      if (recoveryId !== null) retry = true;
+      if (recoveryId === null && original && original.session_id === request.session_id && original.message === message
           && original.grounded === grounded && original.max_output_tokens === max_output_tokens
           && original.require_full_history === require_full_history
           && JSON.stringify(original.document_ids || []) === JSON.stringify(document_ids)) {
@@ -1576,6 +1640,8 @@ JAVASCRIPT = r"""'use strict';
       }
       state.pending = request;
     }
+    if (epoch !== state.epoch || request.session_id !== state.session)
+      throw new Error('Conversation changed before submission. No request was sent.');
     state.turn = {session_id: request.session_id, request_id: request.request_id, state: 'unknown'};
     state.pollStarted = performance.now(); state.pollErrors = 0; updateControls();
     const {session_id, ...body} = request;
@@ -1923,6 +1989,12 @@ JAVASCRIPT = r"""'use strict';
   }));
   get('send').addEventListener('click', () => run(() => submit(false)));
   get('retry-turn').addEventListener('click', () => run(() => submit(true)));
+  get('admission-choice').addEventListener('change', updateControls);
+  get('admission-retry').addEventListener('click', () => run(async () => {
+    const rid = get('admission-choice').value;
+    if (!window.confirm('Retry this exact unfinished request using the message and settings currently entered?')) return;
+    await submit(false, rid);
+  }));
   get('check-turn').addEventListener('click', () => {state.pollStarted = performance.now(); state.pollErrors = 0; void pollTurn();});
   get('cancel-turn').addEventListener('click', async () => {
     const current = state.turn; if (!current || terminal(current)) return;
@@ -2010,6 +2082,7 @@ JAVASCRIPT = r"""'use strict';
     if (!window.confirm('Permanently delete this conversation and its receipts? Export a backup first if needed.')) return;
     await api('DELETE', '/v1/sessions/' + state.session);
     state.drafts.delete(state.session); state.session = ''; state.revision = 0;
+    clearAdmissionRecovery();
     clearSessionMetadata();
     state.messages = []; state.evidence = []; state.audits = []; state.faithfulness = []; state.pending = null; state.turn = null;
     get('prompt').value = ''; get('revision').textContent = 'No conversation selected';

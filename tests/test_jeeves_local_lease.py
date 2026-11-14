@@ -1049,3 +1049,13 @@ def test_interrupted_admission_recovery_is_metadata_only(tmp_path):
         assert reopened.dispatch("GET", f"/v1/sessions/{sid}/admissions")[1]["admissions"][0]["state"] == "interrupted"
     finally:
         reopened.close()
+
+def test_local_browser_recovery_requires_explicit_same_identity_retry():
+    from skeleton.app.offline_web import HTML, JAVASCRIPT
+    assert 'id="admission-recovery"' in HTML
+    assert "No automatic replay." in HTML
+    assert "state.admissionSession !== session" in JAVASCRIPT
+    assert "request_id: recoveryId ?? crypto.randomUUID()" in JAVASCRIPT
+    assert "if (recoveryId !== null) retry = true" in JAVASCRIPT
+    assert "await submit(false, rid)" in JAVASCRIPT
+    assert "No request was replayed" in JAVASCRIPT

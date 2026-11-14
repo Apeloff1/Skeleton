@@ -721,6 +721,13 @@ class OfflineHTTPApplication:
                     if peer_replay is not None:
                         return self._replayed_result(session_id, rid, digest)
                     self._session(session_id)
+                    # Recheck async ownership under the actual inference lease;
+                    # an earlier HTTP preflight is not an execution grant.
+                    if turn is None or turn.admission_attempt is None:
+                        try:
+                            self._admissions.assert_unowned(session_id, rid)
+                        except AdmissionRejected as exc:
+                            raise OfflineHTTPError(exc.status, str(exc)) from None
                     chat = DurableOfflineAISession(
                         self.backend, database=self.database, session_id=session_id
                     )
