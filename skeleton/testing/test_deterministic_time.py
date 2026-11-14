@@ -64,3 +64,37 @@ def test_as_monotonic_defaults_to_frozen_deterministic_clock() -> None:
     assert as_monotonic(custom) is custom
     with pytest.raises(TypeError):
         as_monotonic(42)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("bad", [True, False, "1", 10**400])
+def test_clock_and_budget_refuse_coercive_or_overflowing_numbers(bad) -> None:
+    with pytest.raises(ValueError):
+        DeterministicClock(tick_ms=bad)
+    with pytest.raises(ValueError):
+        DeterministicClock(start_ms=bad)
+    clock = DeterministicClock()
+    with pytest.raises(ValueError):
+        clock.advance(bad)
+    assert clock.now_ms() == 0.0
+    assert not budget_within(bad, None)
+    assert not budget_within(1, bad)
+
+
+@pytest.mark.parametrize("invoke", [lambda clock: clock.advance(), lambda clock: clock()])
+def test_clock_overflow_does_not_mutate_state(invoke) -> None:
+    clock = DeterministicClock(tick_ms=1e308, start_ms=1e308)
+    before = clock.to_mapping()
+    with pytest.raises(ValueError, match="overflow"):
+        invoke(clock)
+    assert clock.to_mapping() == before
+
+
+def test_clock_rejects_precision_loss_and_non_boolean_freeze() -> None:
+    clock = DeterministicClock(tick_ms=1, start_ms=1e20)
+    with pytest.raises(ValueError, match="precision"):
+        clock.advance()
+    assert clock.now_ms() == 1e20
+    with pytest.raises(ValueError):
+        DeterministicClock(frozen="false")
+    assert not budget_within(math.inf, None)
+    assert not budget_within(-1, None)
