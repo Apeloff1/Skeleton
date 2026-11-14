@@ -240,3 +240,29 @@ def submit_authenticated_native_cpu_prompt(
             # Cleanup must not depend on a functioning expiration clock.
             registry.discard_cancelled(request.request_id)
             raise
+
+
+def interrupt_authenticated_native_cpu_prompt(
+    *, service: OfflineAdaptiveDispatchService, authenticated_tenant_id: str,
+    request_id: str,
+) -> bool:
+    """Request a cooperative stop without acquiring dispatch or database locks.
+
+    True acknowledges the matching active generation's signal, not a durable
+    cancellation. The running journal still requires explicit reconciliation.
+    The tenant must be supplied by the verified application principal.
+    """
+    if type(service) is not OfflineAdaptiveDispatchService:
+        raise ValueError("canonical native dispatch service required")
+    if type(authenticated_tenant_id) is not str or not authenticated_tenant_id:
+        raise ValueError("authenticated tenant required")
+    service._guard._require_owner_process()
+    owner = service._guard._owner
+    if type(owner) is not JournaledExecutionOwner:
+        raise ValueError("canonical native owner required")
+    vault = owner._backend
+    if type(vault) is not SealedFairStreamResultVault or type(vault._backend) is not NativeFairStreamBackend:
+        raise ValueError("canonical native backend required")
+    return vault._backend.request_interrupt(
+        tenant_id=authenticated_tenant_id, request_id=request_id,
+    )

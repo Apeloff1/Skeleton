@@ -409,3 +409,58 @@ def test_unknown_revocations_and_cancel_cleanup_cannot_grow_identity_set(monkeyp
     registry.discard_cancelled("third")
     registry.discard_cancelled("first")
     assert registry.status()["consumed_or_revoked"] == 2
+
+
+def test_active_native_interrupt_is_tenant_scoped_and_one_use(monkeypatch):
+    from threading import Event, Thread
+    from skeleton.ai.model_runtime.native_fair_stream_backend import NativeExecutionInterrupted
+
+    runtime, registry, backend = setup()
+    entered, release = Event(), Event()
+    outcomes = []
+    original = NativeLLMRuntime.generate_sequence
+
+    def paused(self, sequence, config, *, interrupt=None):
+        entered.set()
+        if not release.wait(5):
+            raise RuntimeError("test synchronization timed out")
+        interrupt()
+        return original(self, sequence, config, interrupt=interrupt)
+
+    monkeypatch.setattr(NativeLLMRuntime, "generate_sequence", paused)
+
+    def run():
+        try:
+            outcomes.append(backend.generate(permit(), state()))
+        except BaseException as exc:
+            outcomes.append(exc)
+
+    worker = Thread(target=run, daemon=True)
+    worker.start()
+    try:
+        assert entered.wait(5)
+        assert not backend.request_interrupt(tenant_id="bob", request_id="request-1")
+        assert not backend.request_interrupt(tenant_id="alice", request_id="other")
+        assert backend.request_interrupt(tenant_id="alice", request_id="request-1")
+    finally:
+        release.set()
+        worker.join(5)
+    assert not worker.is_alive()
+    assert len(outcomes) == 1 and isinstance(outcomes[0], NativeExecutionInterrupted)
+    assert registry.status()["consumed_or_revoked"] == 1
+    assert not backend.request_interrupt(tenant_id="alice", request_id="request-1")
+    with pytest.raises(NativeFairStreamDenied, match="missing authorized"):
+        backend.generate(permit(), state())
+
+
+def test_completed_native_generation_cannot_be_interrupted(monkeypatch):
+    _, _, backend = setup()
+    original = backend._seal_interrupt_scope
+
+    def seal(signal):
+        original(signal)
+        assert not backend.request_interrupt(tenant_id="alice", request_id="request-1")
+
+    monkeypatch.setattr(backend, "_seal_interrupt_scope", seal)
+    assert type(backend.generate(permit(), state())[1]) is bytes
+    assert not backend.request_interrupt(tenant_id="alice", request_id="request-1")
