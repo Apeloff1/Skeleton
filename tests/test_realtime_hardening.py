@@ -8,6 +8,7 @@ import json
 
 import pytest
 
+from skeleton.observability.redaction import REDACTED as REDACTED_MARK
 from skeleton.realtime import PayloadSecretGuard, RealtimeHub, RealtimeSecretError
 from skeleton.realtime.envelope import (
     ControlEvent,
@@ -22,9 +23,6 @@ from skeleton.realtime.hub import (
     sealed_principal_authorizer,
 )
 from skeleton.realtime.sse import SSEParser, iter_frames, sse_body, sse_message_to_frame
-
-from skeleton.observability.redaction import REDACTED as REDACTED_MARK
-
 
 def _hub(**kw):
     kw.setdefault("id_seed", 1000)
