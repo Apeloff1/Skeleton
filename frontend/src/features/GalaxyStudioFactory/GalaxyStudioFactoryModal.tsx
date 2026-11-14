@@ -45,9 +45,20 @@ import { shareResult } from '../../utils/shareResult';
 import { classifyBuildJob } from '../../product/buildJobLifecycle';
 
 import { FALLBACK_GENRES } from './fallbackGenres';
+import { mergeGalaxyGenreCatalog, recoveredGalaxyGenre } from './genreRegistry';
+import { GALAXY_TO_FORGE_BRIEF } from '../../skeletonForge/galaxyGenres';
+import type { CreatorBridgeDraft, GalaxyBridgeSelection } from '../../skeletonForge/creatorBridge';
+import { GALAXY_DRAFT_SCHEMA, saveGalaxyDraft, type GalaxyDraftSnapshot } from './draftCustody';
 const BACKEND = CANONICAL_API_BASE;
 
-interface Props { visible: boolean; onClose: () => void; }
+interface Props {
+  visible: boolean;
+  onClose: () => void;
+  initialForgeDraft?: CreatorBridgeDraft | null;
+  initialGalaxyDraft?: GalaxyDraftSnapshot | null;
+  handoffError?: string | null;
+  onSendToForge?: (selection: GalaxyBridgeSelection) => Promise<void>;
+}
 type Step = 'pick' | 'building' | 'done';
 
 const BUILD_STOP_REASONS: Record<string, string> = {
@@ -365,12 +376,16 @@ function StylePicker<T extends string>({
 }
 
 export default function GalaxyStudioFactoryModal
-({ visible, onClose }: Props) {
+({ visible, onClose, initialForgeDraft = null, initialGalaxyDraft = null, handoffError = null, onSendToForge }: Props) {
   const [step, setStep] = useState<Step>('pick');
+  const [handoffBusy, setHandoffBusy] = useState(false);
+  const handoffLock = useRef(false);
+  const [draftSaveError, setDraftSaveError] = useState<string | null>(null);
+  const [draftSaveNotice, setDraftSaveNotice] = useState<string | null>(null);
   // ★ 2026-05 SOTA UX: Quick / Advanced mode toggle.
   // Default ON (Quick) so first-time users see a focused, friendly form.
   // Turning it OFF reveals the full 100-slider depth for power users.
-  const [quickMode, setQuickMode] = useState<boolean>(true);
+  const [quickMode, setQuickMode] = useState<boolean>(initialGalaxyDraft?.quickMode ?? true);
   // Per-section collapse state for the Advanced sliders (when quickMode=false).
   const [, setCollapsedSections] = useState<Record<string, boolean>>({
     style: false,        // Style palette open by default
@@ -383,68 +398,69 @@ export default function GalaxyStudioFactoryModal
   const toggleSection = useCallback((key: string) => {
     setCollapsedSections(s => ({ ...s, [key]: !s[key] }));
   }, []);
-  // Prime with baked-in fallback so the picker ALWAYS renders 52 genres,
-  // network or not. The network fetch below overwrites on success.
+  // Prime with the complete offline fallback catalog; do not hard-code
+  // the count because historical genres can be recovered independently.
+  // Live fetch may expand the available choices.
   const [genres, setGenres] = useState<Genre[]>(FALLBACK_GENRES as any);
   const [manifest, setManifest] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   // Create
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(initialGalaxyDraft?.title ?? '');
 
   // ★ 2026-05 — Defaults set to MAX. Users adjust DOWN from here. This
   // standardises the "give me the best possible build" experience: every
   // knob ships maxed by default. Drop only what you actively don't need.
-  const [complexity, setComplexity] = useState<number>(10);
-  const [ageTarget, setAgeTarget] = useState<string>('ALL');
-  const [graphicsEra, setGraphicsEra] = useState<number>(7);
-  const [npcDensity, setNpcDensity] = useState<number>(7);
-  const [soundEra, setSoundEra] = useState<number>(7);
-  const [worldSize, setWorldSize] = useState<number>(7);
-  const [physicsRealism, setPhysicsRealism] = useState<number>(7);
-  const [aiComplexity, setAiComplexity] = useState<number>(7);
-  const [lightingEngine, setLightingEngine] = useState<number>(7);
-  const [particleEffects, setParticleEffects] = useState<number>(7);
-  const [destructionPhysics, setDestructionPhysics] = useState<number>(7);
-  const [narrativeBranching, setNarrativeBranching] = useState<number>(7);
-  const [economyComplexity, setEconomyComplexity] = useState<number>(7);
-  const [multiplayerMax, setMultiplayerMax] = useState<number>(7);
-  const [weatherSystems, setWeatherSystems] = useState<number>(7);
-  const [dayNightCycle, setDayNightCycle] = useState<number>(7);
-  const [animationFluidity, setAnimationFluidity] = useState<number>(7);
-  const [postProcessing, setPostProcessing] = useState<number>(7);
+  const [complexity, setComplexity] = useState<number>(initialGalaxyDraft?.complexity ?? 10);
+  const [ageTarget, setAgeTarget] = useState<string>(initialGalaxyDraft?.ageTarget ?? 'ALL');
+  const [graphicsEra, setGraphicsEra] = useState<number>(initialGalaxyDraft?.classic.graphicsEra ?? 7);
+  const [npcDensity, setNpcDensity] = useState<number>(initialGalaxyDraft?.classic.npcDensity ?? 7);
+  const [soundEra, setSoundEra] = useState<number>(initialGalaxyDraft?.classic.soundEra ?? 7);
+  const [worldSize, setWorldSize] = useState<number>(initialGalaxyDraft?.classic.worldSize ?? 7);
+  const [physicsRealism, setPhysicsRealism] = useState<number>(initialGalaxyDraft?.classic.physicsRealism ?? 7);
+  const [aiComplexity, setAiComplexity] = useState<number>(initialGalaxyDraft?.classic.aiComplexity ?? 7);
+  const [lightingEngine, setLightingEngine] = useState<number>(initialGalaxyDraft?.classic.lightingEngine ?? 7);
+  const [particleEffects, setParticleEffects] = useState<number>(initialGalaxyDraft?.classic.particleEffects ?? 7);
+  const [destructionPhysics, setDestructionPhysics] = useState<number>(initialGalaxyDraft?.classic.destructionPhysics ?? 7);
+  const [narrativeBranching, setNarrativeBranching] = useState<number>(initialGalaxyDraft?.classic.narrativeBranching ?? 7);
+  const [economyComplexity, setEconomyComplexity] = useState<number>(initialGalaxyDraft?.classic.economyComplexity ?? 7);
+  const [multiplayerMax, setMultiplayerMax] = useState<number>(initialGalaxyDraft?.classic.multiplayerMax ?? 7);
+  const [weatherSystems, setWeatherSystems] = useState<number>(initialGalaxyDraft?.classic.weatherSystems ?? 7);
+  const [dayNightCycle, setDayNightCycle] = useState<number>(initialGalaxyDraft?.classic.dayNightCycle ?? 7);
+  const [animationFluidity, setAnimationFluidity] = useState<number>(initialGalaxyDraft?.classic.animationFluidity ?? 7);
+  const [postProcessing, setPostProcessing] = useState<number>(initialGalaxyDraft?.classic.postProcessing ?? 7);
   // ★ 2026-02 Animation controls (new) — wire into backend _phase_animations_pack
-  const [animationStyle, setAnimationStyle] = useState<'subtle'|'smooth'|'punchy'|'cinematic'>('smooth');
-  const [cameraEffects, setCameraEffects] = useState<boolean>(true);
+  const [animationStyle, setAnimationStyle] = useState<'subtle'|'smooth'|'punchy'|'cinematic'>((initialGalaxyDraft?.styleChoices.animationStyle as any) ?? 'smooth');
+  const [cameraEffects, setCameraEffects] = useState<boolean>((initialGalaxyDraft?.styleChoices.cameraEffects as boolean | undefined) ?? true);
   // ★ 2026-02 Story & Style pack — wire into backend _phase_story_style_pack
   // These choices drive dedicated phase outputs (storyline/, visual_style/,
   // tone/, perspective/, combat/, progression/, audio/) so every slider
   // visibly modifies the file tree.
-  const [storylineStyle, setStorylineStyle] = useState<'heroic'|'tragedy'|'mystery'|'redemption'|'coming_of_age'|'comedy'|'cosmic_horror'>('heroic');
-  const [gamePace, setGamePace] = useState<'slow_burn'|'standard'|'action_packed'|'breakneck'>('standard');
-  const [difficultyCurve, setDifficultyCurve] = useState<'gentle'|'steady'|'adaptive'|'punishing'>('steady');
-  const [perspective, setPerspective] = useState<'first_person'|'third_person'|'isometric'|'top_down'|'side_scroll'|'vr'>('third_person');
-  const [combatStyle, setCombatStyle] = useState<'realtime'|'turn_based'|'action_rpg'|'rhythm'|'tactical'|'none'>('action_rpg');
-  const [visualStyle, setVisualStyle] = useState<'photoreal'|'cel_shaded'|'pixel_art'|'low_poly'|'voxel'|'hand_painted'|'anime'>('hand_painted');
-  const [gameTone, setGameTone] = useState<'heroic'|'dark'|'humorous'|'melancholic'|'epic'|'cozy'|'unsettling'>('epic');
-  const [progressionType, setProgressionType] = useState<'linear'|'open_world'|'metroidvania'|'roguelike'|'sandbox'|'hub_and_spoke'>('open_world');
-  const [audioMood, setAudioMood] = useState<'orchestral'|'synthwave'|'ambient'|'chiptune'|'rock'|'folk'|'silent'>('orchestral');
+  const [storylineStyle, setStorylineStyle] = useState<'heroic'|'tragedy'|'mystery'|'redemption'|'coming_of_age'|'comedy'|'cosmic_horror'>((initialGalaxyDraft?.styleChoices.storylineStyle as any) ?? 'heroic');
+  const [gamePace, setGamePace] = useState<'slow_burn'|'standard'|'action_packed'|'breakneck'>((initialGalaxyDraft?.styleChoices.gamePace as any) ?? 'standard');
+  const [difficultyCurve, setDifficultyCurve] = useState<'gentle'|'steady'|'adaptive'|'punishing'>((initialGalaxyDraft?.styleChoices.difficultyCurve as any) ?? 'steady');
+  const [perspective, setPerspective] = useState<'first_person'|'third_person'|'isometric'|'top_down'|'side_scroll'|'vr'>((initialGalaxyDraft?.styleChoices.perspective as any) ?? 'third_person');
+  const [combatStyle, setCombatStyle] = useState<'realtime'|'turn_based'|'action_rpg'|'rhythm'|'tactical'|'none'>((initialGalaxyDraft?.styleChoices.combatStyle as any) ?? 'action_rpg');
+  const [visualStyle, setVisualStyle] = useState<'photoreal'|'cel_shaded'|'pixel_art'|'low_poly'|'voxel'|'hand_painted'|'anime'>((initialGalaxyDraft?.styleChoices.visualStyle as any) ?? 'hand_painted');
+  const [gameTone, setGameTone] = useState<'heroic'|'dark'|'humorous'|'melancholic'|'epic'|'cozy'|'unsettling'>((initialGalaxyDraft?.styleChoices.gameTone as any) ?? 'epic');
+  const [progressionType, setProgressionType] = useState<'linear'|'open_world'|'metroidvania'|'roguelike'|'sandbox'|'hub_and_spoke'>((initialGalaxyDraft?.styleChoices.progressionType as any) ?? 'open_world');
+  const [audioMood, setAudioMood] = useState<'orchestral'|'synthwave'|'ambient'|'chiptune'|'rock'|'folk'|'silent'>((initialGalaxyDraft?.styleChoices.audioMood as any) ?? 'orchestral');
   // ★ 2026-02 Locomotion — chip slider (0-10) + style picker
-  const [locomotionDepth, setLocomotionDepth] = useState<number>(7);
-  const [locomotionStyle, setLocomotionStyle] = useState<'basic'|'tactical'|'parkour'|'als'|'gunplay'|'melee'>('als');
-  const [foliageDensity, setFoliageDensity] = useState<number>(7);
-  const [waterSimulation, setWaterSimulation] = useState<number>(7);
-  const [uiMinimalism, setUiMinimalism] = useState<number>(7);
-  const [lootVariety, setLootVariety] = useState<number>(7);
-  const [craftingDepth, setCraftingDepth] = useState<number>(7);
-  const [dialogDepth, setDialogDepth] = useState<number>(7);
-  const [stealthMechanics, setStealthMechanics] = useState<number>(7);
-  const [vehicleSimulation, setVehicleSimulation] = useState<number>(7);
-  const [biomeDiversity, setBiomeDiversity] = useState<number>(7);
-  const [factionReputation, setFactionReputation] = useState<number>(7);
-  const [skillSystem, setSkillSystem] = useState<number>(7);
-  const [goreSystem, setGoreSystem] = useState<number>(7);
-  const [moddingSupport, setModdingSupport] = useState<number>(7);
+  const [locomotionDepth, setLocomotionDepth] = useState<number>(initialGalaxyDraft?.classic.locomotionDepth ?? 7);
+  const [locomotionStyle, setLocomotionStyle] = useState<'basic'|'tactical'|'parkour'|'als'|'gunplay'|'melee'>((initialGalaxyDraft?.styleChoices.locomotionStyle as any) ?? 'als');
+  const [foliageDensity, setFoliageDensity] = useState<number>(initialGalaxyDraft?.classic.foliageDensity ?? 7);
+  const [waterSimulation, setWaterSimulation] = useState<number>(initialGalaxyDraft?.classic.waterSimulation ?? 7);
+  const [uiMinimalism, setUiMinimalism] = useState<number>(initialGalaxyDraft?.classic.uiMinimalism ?? 7);
+  const [lootVariety, setLootVariety] = useState<number>(initialGalaxyDraft?.classic.lootVariety ?? 7);
+  const [craftingDepth, setCraftingDepth] = useState<number>(initialGalaxyDraft?.classic.craftingDepth ?? 7);
+  const [dialogDepth, setDialogDepth] = useState<number>(initialGalaxyDraft?.classic.dialogDepth ?? 7);
+  const [stealthMechanics, setStealthMechanics] = useState<number>(initialGalaxyDraft?.classic.stealthMechanics ?? 7);
+  const [vehicleSimulation, setVehicleSimulation] = useState<number>(initialGalaxyDraft?.classic.vehicleSimulation ?? 7);
+  const [biomeDiversity, setBiomeDiversity] = useState<number>(initialGalaxyDraft?.classic.biomeDiversity ?? 7);
+  const [factionReputation, setFactionReputation] = useState<number>(initialGalaxyDraft?.classic.factionReputation ?? 7);
+  const [skillSystem, setSkillSystem] = useState<number>(initialGalaxyDraft?.classic.skillSystem ?? 7);
+  const [goreSystem, setGoreSystem] = useState<number>(initialGalaxyDraft?.classic.goreSystem ?? 7);
+  const [moddingSupport, setModdingSupport] = useState<number>(initialGalaxyDraft?.classic.moddingSupport ?? 7);
 
   // ═══ 2026-05-15 — EXTREME-GRANULARITY MATRICES ═══════════════════════════
   // Every questionnaire section is now expressed as a phase × axes tensor.
@@ -452,22 +468,22 @@ export default function GalaxyStudioFactoryModal
   // adds another 36 × 5 = 180. Total user-tunable dials > 1,400 across the
   // questionnaire. Each matrix is collapsed by default — Quick mode hides
   // them entirely.
-  const [narrativePhaseValues, setNarrativePhaseValues] = useState<AllPhaseValues>(() => defaultNarrativePhaseValues());
-  const [mechanicsMatrix, setMechanicsMatrix] = useState<MatrixValues>(() => defaultMatrixValues(MECHANICS_MATRIX));
-  const [worldMatrix, setWorldMatrix] = useState<MatrixValues>(() => defaultMatrixValues(WORLD_MATRIX));
-  const [artMatrix, setArtMatrix] = useState<MatrixValues>(() => defaultMatrixValues(ART_MATRIX));
-  const [audioMatrix, setAudioMatrix] = useState<MatrixValues>(() => defaultMatrixValues(AUDIO_MATRIX));
-  const [techMatrix, setTechMatrix] = useState<MatrixValues>(() => defaultMatrixValues(TECH_MATRIX));
-  const [monetisationMatrix, setMonetisationMatrix] = useState<MatrixValues>(() => defaultMatrixValues(MONETISATION_MATRIX));
-  const [qaMatrix, setQaMatrix] = useState<MatrixValues>(() => defaultMatrixValues(QA_MATRIX));
-  const [agentMatrix, setAgentMatrix] = useState<MatrixValues>(() => defaultMatrixValues(AGENT_MATRIX));
+  const [narrativePhaseValues, setNarrativePhaseValues] = useState<AllPhaseValues>(() => initialGalaxyDraft?.narrative ?? defaultNarrativePhaseValues());
+  const [mechanicsMatrix, setMechanicsMatrix] = useState<MatrixValues>(() => (initialGalaxyDraft?.matrices.mechanics ?? defaultMatrixValues(MECHANICS_MATRIX)));
+  const [worldMatrix, setWorldMatrix] = useState<MatrixValues>(() => (initialGalaxyDraft?.matrices.world ?? defaultMatrixValues(WORLD_MATRIX)));
+  const [artMatrix, setArtMatrix] = useState<MatrixValues>(() => (initialGalaxyDraft?.matrices.art ?? defaultMatrixValues(ART_MATRIX)));
+  const [audioMatrix, setAudioMatrix] = useState<MatrixValues>(() => (initialGalaxyDraft?.matrices.audio ?? defaultMatrixValues(AUDIO_MATRIX)));
+  const [techMatrix, setTechMatrix] = useState<MatrixValues>(() => (initialGalaxyDraft?.matrices.tech ?? defaultMatrixValues(TECH_MATRIX)));
+  const [monetisationMatrix, setMonetisationMatrix] = useState<MatrixValues>(() => (initialGalaxyDraft?.matrices.monetisation ?? defaultMatrixValues(MONETISATION_MATRIX)));
+  const [qaMatrix, setQaMatrix] = useState<MatrixValues>(() => (initialGalaxyDraft?.matrices.qa ?? defaultMatrixValues(QA_MATRIX)));
+  const [agentMatrix, setAgentMatrix] = useState<MatrixValues>(() => (initialGalaxyDraft?.matrices.agent ?? defaultMatrixValues(AGENT_MATRIX)));
   // ── 2026-05-15 second wave: DBs + Styles + Mutation + Flair ──
-  const [vectorDbMatrix, setVectorDbMatrix]       = useState<MatrixValues>(() => defaultMatrixValues(VECTOR_DB_MATRIX));
-  const [plagiarismMatrix, setPlagiarismMatrix]   = useState<MatrixValues>(() => defaultMatrixValues(PLAGIARISM_MATRIX));
-  const [rdbmsMatrix, setRdbmsMatrix]             = useState<MatrixValues>(() => defaultMatrixValues(RDBMS_MATRIX));
-  const [stylesMatrix, setStylesMatrix]           = useState<MatrixValues>(() => defaultMatrixValues(STYLES_MATRIX));
-  const [mutationMatrix, setMutationMatrix]       = useState<MatrixValues>(() => defaultMatrixValues(MUTATION_MATRIX));
-  const [uniqueFlairMatrix, setUniqueFlairMatrix] = useState<MatrixValues>(() => defaultMatrixValues(UNIQUE_FLAIR_MATRIX));
+  const [vectorDbMatrix, setVectorDbMatrix]       = useState<MatrixValues>(() => (initialGalaxyDraft?.matrices.vector_db ?? defaultMatrixValues(VECTOR_DB_MATRIX)));
+  const [plagiarismMatrix, setPlagiarismMatrix]   = useState<MatrixValues>(() => (initialGalaxyDraft?.matrices.plagiarism ?? defaultMatrixValues(PLAGIARISM_MATRIX)));
+  const [rdbmsMatrix, setRdbmsMatrix]             = useState<MatrixValues>(() => (initialGalaxyDraft?.matrices.rdbms ?? defaultMatrixValues(RDBMS_MATRIX)));
+  const [stylesMatrix, setStylesMatrix]           = useState<MatrixValues>(() => (initialGalaxyDraft?.matrices.styles ?? defaultMatrixValues(STYLES_MATRIX)));
+  const [mutationMatrix, setMutationMatrix]       = useState<MatrixValues>(() => (initialGalaxyDraft?.matrices.mutation ?? defaultMatrixValues(MUTATION_MATRIX)));
+  const [uniqueFlairMatrix, setUniqueFlairMatrix] = useState<MatrixValues>(() => (initialGalaxyDraft?.matrices.unique_flair ?? defaultMatrixValues(UNIQUE_FLAIR_MATRIX)));
   const [expandedMatrix, setExpandedMatrix] = useState<string | null>(null);
   const matrixSetters: Record<string, (v: MatrixValues) => void> = {
     mechanics:    setMechanicsMatrix,
@@ -505,28 +521,28 @@ export default function GalaxyStudioFactoryModal
   // 0 = sterile / minimal, 10 = explosive (max screen-shake, hit-stop, particles).
   // Backend wires this into the visual_juice agent-knowledge collection so the
   // agent picks the matching intensity tier ("subtle"|"medium"|"strong"|"explosive").
-  const [juice, setJuice] = useState<number>(7);
+  const [juice, setJuice] = useState<number>(initialGalaxyDraft?.classic.juice ?? 7);
   // ═══ v3: Game Era — tech/aesthetic tone selector ═══
-  const [selectedEraId, setSelectedEraId] = useState<string>(DEFAULT_ERA_ID);
+  const [selectedEraId, setSelectedEraId] = useState<string>(initialGalaxyDraft?.selectedEraId ?? DEFAULT_ERA_ID);
   const selectedEra = GAME_ERAS.find(e => e.id === selectedEraId) || GAME_ERAS[8];
   // ═══ v5: "Era by Age" — year slider 1985 → 2030. Anchors the build to
   // a specific year's hardware/cultural sensibility (e.g. 1995 PS1, 2015
   // live-service, 2030 neural-interface). Independent of Game Era above.
-  const [ageEraYear, setAgeEraYear] = useState<number>(2025);
+  const [ageEraYear, setAgeEraYear] = useState<number>(initialGalaxyDraft?.ageEraYear ?? 2025);
   const AGE_YEARS = Array.from({ length: 2030 - 1985 + 1 }, (_, i) => 1985 + i);
   // ═══ v6: 9 style pickers (graphic/sound/music/design/cinematic/director/
   // dimension/asset/model). Stored as flat {key: option_id} map.
-  const [styleParams, setStyleParams] = useState<Record<string, string>>(DEFAULT_STYLE_PARAMS);
+  const [styleParams, setStyleParams] = useState<Record<string, string>>(() => ({ ...DEFAULT_STYLE_PARAMS, ...initialGalaxyDraft?.styleParams }));
   const setStyleParam = useCallback((key: string, value: string) => {
     setStyleParams(prev => ({ ...prev, [key]: value }));
   }, []);
   // ═══ 2026-05-13 — Production Studio panel state (0-100 sliders + multi-select
   //     platforms/languages/monetization/save/network/art-direction/tone/narrative/
   //     perspective). Forwarded to the backend as extra_params.production.
-  const [productionState, setProductionState] = useState<ProductionState>(DEFAULT_PRODUCTION_STATE);
+  const [productionState, setProductionState] = useState<ProductionState>(() => initialGalaxyDraft?.production ? { ...DEFAULT_PRODUCTION_STATE, ...initialGalaxyDraft.production } : DEFAULT_PRODUCTION_STATE);
 
   // ═══ v2: 100 extra questionnaire sliders — stored as flat { key: value } map ═══
-  const [extraParams, setExtraParams] = useState<Record<string, number>>(DEFAULT_EXTRA_PARAMS);
+  const [extraParams, setExtraParams] = useState<Record<string, number>>(() => ({ ...DEFAULT_EXTRA_PARAMS, ...initialGalaxyDraft?.extraParams }));
   const [expandedExtraCat, setExpandedExtraCat] = useState<string | null>(null);
   const setExtraParam = useCallback((key: string, value: number) => {
     setExtraParams(prev => ({ ...prev, [key]: value }));
@@ -601,7 +617,7 @@ export default function GalaxyStudioFactoryModal
     setTitle(tpl.title);
     if (tpl.genre) {
       const match = genres.find(g => g.id === tpl.genre);
-      if (match) setSelectedGenre(match);
+      if (match) { pendingGenreRestore.current = null; setSelectedGenre(match); }
     }
     if (tpl.subgenre) setSelectedSubgenre(tpl.subgenre);
     setGameVision(tpl.gameVision);
@@ -627,13 +643,30 @@ export default function GalaxyStudioFactoryModal
     }
   }, [genres]);
 
-  const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
-  const [selectedSubgenre, setSelectedSubgenre] = useState<string | null>(null);
+  const pendingGenreRestore = useRef<string | null>(
+    initialForgeDraft?.galaxyGenre ??
+      Object.entries(GALAXY_TO_FORGE_BRIEF).find(([, vote]) => vote === initialForgeDraft?.brief.genre)?.[0] ??
+      initialGalaxyDraft?.genreId ?? null,
+  );
+  const [selectedGenre, setSelectedGenre] = useState<Genre | null>(
+    () => recoveredGalaxyGenre(FALLBACK_GENRES, pendingGenreRestore.current),
+  );
+  // A valid backend-only selected genre is rehydrated when its live row
+  // arrives. An explicit user selection/clear always wins the race.
+  useEffect(() => {
+    const id = pendingGenreRestore.current;
+    if (!id) return;
+    const matching = recoveredGalaxyGenre(genres, id);
+    if (!matching) return;
+    setSelectedGenre(current => current ?? matching);
+    pendingGenreRestore.current = null;
+  }, [genres]);
+  const [selectedSubgenre, setSelectedSubgenre] = useState<string | null>(initialGalaxyDraft?.subgenreId ?? null);
   // ═══ Multi-genre / multi-subgenre fusion support ═══
   // The primary `selectedGenre` above stays the lead; extra picks fuse in.
-  const [extraGenreIds, setExtraGenreIds] = useState<string[]>([]);
-  const [extraSubgenreIds, setExtraSubgenreIds] = useState<string[]>([]);
-  const [multiGenreMode, setMultiGenreMode] = useState<boolean>(false);
+  const [extraGenreIds, setExtraGenreIds] = useState<string[]>(initialGalaxyDraft?.extraGenreIds ?? []);
+  const [extraSubgenreIds, setExtraSubgenreIds] = useState<string[]>(initialGalaxyDraft?.extraSubgenreIds ?? []);
+  const [multiGenreMode, setMultiGenreMode] = useState<boolean>(initialGalaxyDraft?.multiGenreMode ?? false);
   const toggleExtraGenre = (id: string) => {
     if (!selectedGenre || id === selectedGenre.id) return;
     setExtraGenreIds(prev =>
@@ -652,16 +685,16 @@ export default function GalaxyStudioFactoryModal
     : 1.0;
   const [genreSearch, setGenreSearch] = useState('');
   const [expandedGenre, setExpandedGenre] = useState<string | null>(null);
-  const [gameVision, setGameVision] = useState('');
-  const [systemArch, setSystemArch] = useState('');
-  const [worldLaws, setWorldLaws] = useState('');
-  const [agentInstructions, setAgentInstructions] = useState('');
+  const [gameVision, setGameVision] = useState(initialForgeDraft?.vision || initialGalaxyDraft?.gameVision || '');
+  const [systemArch, setSystemArch] = useState(initialGalaxyDraft?.systemArch ?? '');
+  const [worldLaws, setWorldLaws] = useState(initialGalaxyDraft?.worldLaws ?? '');
+  const [agentInstructions, setAgentInstructions] = useState(initialGalaxyDraft?.agentInstructions ?? '');
   // Auto-expand the AAA Design Questionnaire on first mount so the
   // FileSizeSlider + 5 description fields are discoverable without an
   // extra tap. Users who want a clean view can still collapse it.
-  const [showDescriptions, setShowDescriptions] = useState(true);
-  const [scaleCommand, setScaleCommand] = useState('');
-  const [targetFiles, setTargetFiles] = useState<number>(MAX_TARGET_FILES);
+  const [showDescriptions, setShowDescriptions] = useState(initialGalaxyDraft?.showDescriptions ?? true);
+  const [scaleCommand, setScaleCommand] = useState(initialGalaxyDraft?.scaleCommand ?? '');
+  const [targetFiles, setTargetFiles] = useState<number>(initialGalaxyDraft?.targetFiles ?? MAX_TARGET_FILES);
 
   /** Keep scaleCommand in sync with the slider so the existing backend
    *  payload (`scale: scaleCommand`) carries the user's target file count.
@@ -796,7 +829,7 @@ export default function GalaxyStudioFactoryModal
 
   const resetState = () => {
     detachArtifactObservation();
-    setStep('pick'); setTitle(''); setSelectedGenre(null); setSelectedSubgenre(null);
+    setStep('pick'); setTitle(''); pendingGenreRestore.current = null; setSelectedGenre(null); setSelectedSubgenre(null);
     setExtraGenreIds([]); setExtraSubgenreIds([]); setMultiGenreMode(false);
     setGenreSearch(''); setExpandedGenre(null); setGameVision(''); setSystemArch('');
     setWorldLaws(''); setAgentInstructions(''); setShowDescriptions(false); setScaleCommand(''); setComplexity(10); setAgeTarget('ALL'); setGraphicsEra(7); setNpcDensity(7); setSoundEra(7); setWorldSize(7); setPhysicsRealism(7); setAiComplexity(7); setLightingEngine(7); setParticleEffects(7); setDestructionPhysics(7); setNarrativeBranching(7); setEconomyComplexity(7); setMultiplayerMax(7); setWeatherSystems(7); setDayNightCycle(7); setAnimationFluidity(7); setPostProcessing(7); setFoliageDensity(7); setWaterSimulation(7); setUiMinimalism(7); setLootVariety(7); setCraftingDepth(7); setDialogDepth(7); setStealthMechanics(7); setVehicleSimulation(7); setBiomeDiversity(7); setFactionReputation(7); setSkillSystem(7); setGoreSystem(7); setModdingSupport(7); setJuice(7); setTargetFiles(MAX_TARGET_FILES);
@@ -867,7 +900,7 @@ export default function GalaxyStudioFactoryModal
         staleMaxMs: 30 * 24 * 60 * 60_000, // serve up to 30 d stale
       });
       if (data && Array.isArray(data.genres) && data.genres.length > 0) {
-        setGenres(data.genres);
+        setGenres(mergeGalaxyGenreCatalog(data));
         return;
       }
     } catch {}
@@ -1601,6 +1634,72 @@ export default function GalaxyStudioFactoryModal
   }, []);
 
   // ═══ STEP 1: PICK GENRE ═══
+  const persistGalaxyDraft = async () => {
+      const snapshot: GalaxyDraftSnapshot = {
+        schema: GALAXY_DRAFT_SCHEMA, savedMs: Date.now(),
+        title, gameVision, systemArch, worldLaws, agentInstructions,
+        genreId: selectedGenre?.id ?? null, subgenreId: selectedSubgenre,
+        extraGenreIds, extraSubgenreIds, multiGenreMode, quickMode,
+        complexity, ageTarget, selectedEraId, ageEraYear,
+        targetFiles, scaleCommand, showDescriptions,
+        classic: { graphicsEra, npcDensity, soundEra, worldSize, physicsRealism, aiComplexity, lightingEngine, particleEffects, destructionPhysics, narrativeBranching, economyComplexity, multiplayerMax, weatherSystems, dayNightCycle, animationFluidity, postProcessing, locomotionDepth, foliageDensity, waterSimulation, uiMinimalism, lootVariety, craftingDepth, dialogDepth, stealthMechanics, vehicleSimulation, biomeDiversity, factionReputation, skillSystem, goreSystem, moddingSupport, juice },
+        styleChoices: { animationStyle, storylineStyle, gamePace, difficultyCurve, perspective, combatStyle, visualStyle, gameTone, progressionType, audioMood, locomotionStyle, cameraEffects },
+        styleParams, extraParams, production: productionState,
+        matrices: matrixValues, narrative: narrativePhaseValues,
+      };
+      await saveGalaxyDraft(snapshot);
+  };
+
+  const saveGalaxyDraftOnly = async () => {
+    if (handoffLock.current || handoffBusy || step !== 'pick') return;
+    handoffLock.current = true;
+    setHandoffBusy(true);
+    setDraftSaveError(null);
+    setDraftSaveNotice(null);
+    try {
+      await persistGalaxyDraft();
+      setDraftSaveNotice('Saved a local snapshot. Edits made after this save require another save or a normal editor close.');
+    } catch {
+      setDraftSaveError('Galaxy draft could not be saved. Your editor remains open.');
+    } finally {
+      handoffLock.current = false;
+      setHandoffBusy(false);
+    }
+  };
+
+  const transferToForge = async () => {
+    if (!onSendToForge || handoffLock.current || handoffBusy || step !== 'pick') return;
+    handoffLock.current = true;
+    setHandoffBusy(true);
+    setDraftSaveError(null);
+    try {
+      await persistGalaxyDraft();
+      await onSendToForge({ title, vision: gameVision, genreId: selectedGenre?.id ?? null });
+    } catch {
+      setDraftSaveError('Galaxy draft could not be transferred. No build was started.');
+    } finally {
+      handoffLock.current = false;
+      setHandoffBusy(false);
+    }
+  };
+
+  const persistAndClose = async () => {
+    if (handoffLock.current) return;
+    if (step !== 'pick') { onClose(); return; }
+    handoffLock.current = true;
+    setHandoffBusy(true);
+    setDraftSaveError(null);
+    try {
+      await persistGalaxyDraft();
+      onClose();
+    } catch {
+      setDraftSaveError('Your Galaxy draft could not be saved locally. Close cancelled to prevent losing changes.');
+    } finally {
+      handoffLock.current = false;
+      setHandoffBusy(false);
+    }
+  };
+
   const renderPick = () => (
     <ScrollView ref={pickScrollRef} style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
       <View style={s.pickContent}>
@@ -1835,7 +1934,7 @@ export default function GalaxyStudioFactoryModal
               <Text style={[s.selectedName, { color: selectedGenre.color }]}>{selectedGenre.name}</Text>
               {selectedSubgenre && <Text style={s.selectedSub}>{selectedSubgenre.replace(/_/g, ' ')}</Text>}
             </View>
-            <TouchableOpacity onPress={() => { setSelectedGenre(null); setSelectedSubgenre(null); setExpandedGenre(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity onPress={() => { pendingGenreRestore.current = null; setSelectedGenre(null); setSelectedSubgenre(null); setExpandedGenre(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close-outline" size={20} color={T.textMuted} />
             </TouchableOpacity>
           </View>
@@ -2529,6 +2628,43 @@ export default function GalaxyStudioFactoryModal
           </View>
         )}
 
+        {initialForgeDraft ? (
+          <View style={{ padding: 12, borderWidth: 1, borderColor: '#2563EB', borderRadius: 12, marginVertical: 10 }}>
+            <Text style={{ color: T.text, fontWeight: '700' }} testID="galaxy-imported-gameforge-draft">
+              Imported GameForge vision and compatible genre. Original Forge design knobs, beats, and quest options are preserved for return.
+            </Text>
+          </View>
+        ) : null}
+        <View style={{ padding: 12, backgroundColor: T.surfaceAlt, borderRadius: 12, marginVertical: 10 }}>
+          <TouchableOpacity
+            testID="galaxy-save-draft" accessibilityRole="button"
+            accessibilityLabel="Save the full Galaxy game design locally"
+            disabled={handoffBusy} onPress={saveGalaxyDraftOnly}
+            style={{ backgroundColor: '#166534', padding: 12, borderRadius: 9, alignItems: 'center' }}
+          >
+            <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>{handoffBusy ? 'Saving…' : 'Save Galaxy draft on device'}</Text>
+          </TouchableOpacity>
+          {draftSaveNotice ? <Text style={{ color: '#86EFAC', marginTop: 6 }} testID="galaxy-draft-saved">{draftSaveNotice}</Text> : null}
+          {!onSendToForge && draftSaveError ? <Text accessibilityRole="alert" style={{ color: '#FBBF24', marginTop: 6 }}>{draftSaveError}</Text> : null}
+        </View>
+        {onSendToForge ? (
+          <View style={{ padding: 12, backgroundColor: T.surfaceAlt, borderRadius: 12, marginVertical: 10 }}>
+            <TouchableOpacity
+              testID="galaxy-continue-in-gameforge" accessibilityRole="button"
+              accessibilityLabel="Continue this Galaxy game draft in GameForge"
+              onPress={transferToForge} disabled={handoffBusy}
+              style={{ backgroundColor: '#1D4ED8', padding: 12, borderRadius: 9, alignItems: 'center' }}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>{handoffBusy ? 'Preserving Galaxy draft…' : 'Continue this game in GameForge'}</Text>
+            </TouchableOpacity>
+            {(draftSaveError || handoffError) ? (
+              <Text style={{ color: '#FBBF24', marginTop: 6 }} testID="galaxy-handoff-error">{draftSaveError || handoffError}</Text>
+            ) : null}
+            <Text style={{ color: T.textMuted, marginTop: 6, fontSize: 11 }}>
+              Transfers the authored vision and primary genre. Prior Forge knobs, beats, and quest settings are retained. Galaxy's fourteen matrices, narrative phases, and extended sliders are preserved as a separate device-local Galaxy draft, never silently reinterpreted as ten Forge axes.
+            </Text>
+          </View>
+        ) : null}
         <YourChoicesCard
           title={title}
           genre={selectedGenre?.name ?? null}
@@ -2596,7 +2732,7 @@ export default function GalaxyStudioFactoryModal
                   // In fusion mode, tap on non-primary toggles extra-add
                   toggleExtraGenre(g.id);
                 } else {
-                  setSelectedGenre(g); setSelectedSubgenre(null); setExpandedGenre(g.id);
+                  pendingGenreRestore.current = null; setSelectedGenre(g); setSelectedSubgenre(null); setExpandedGenre(g.id);
                   // Reset extras on new primary
                   setExtraGenreIds([]); setExtraSubgenreIds([]);
                 }
@@ -3362,6 +3498,17 @@ export default function GalaxyStudioFactoryModal
             <Text style={[s.gxBridgeText, { color: '#F59E0B' }]}>Build Hub</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            style={[s.gxBridgeBtn, { backgroundColor: '#10B98122', borderColor: '#10B981' }]}
+            onPress={() => { onClose(); router.push('/skeleton-forge?tab=build' as any); }}
+            accessibilityRole="button"
+            accessibilityLabel="Open the GameForge design cockpit"
+            activeOpacity={0.7}
+            testID="galaxy-open-skeleton-forge"
+          >
+            <Ionicons name="options-outline" size={14} color="#10B981" />
+            <Text style={[s.gxBridgeText, { color: '#10B981' }]}>GameForge Cockpit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[s.gxBridgeBtn, { backgroundColor: '#2563EB22', borderColor: '#2563EB' }]}
             onPress={() => { onClose(); router.push('/playground' as any); }}
             activeOpacity={0.7}
@@ -3383,7 +3530,7 @@ export default function GalaxyStudioFactoryModal
   const getSub = () => step === 'pick' ? `${genres.length} genres • ${manifest?.total_agents?.toLocaleString() || '28,894'} agents` : step === 'building' ? `Batch ${buildStatus?.bg_current_batch || buildStatus?.current_batch || 0}/${buildStatus?.total_batches || 10} • ${(buildStatus?.completed_phases || 0)}/${buildStatus?.total_phases || 100} phases • ${(buildStatus?.file_count || 0).toLocaleString()} files` : `${files?.total_files?.toLocaleString() || 0} files • ${files?.total_lines?.toLocaleString() || 0} lines`;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { void persistAndClose(); }}>
       <View style={s.container} testID="galaxy-studio-modal-root">
         <View style={s.header}>
           <TouchableOpacity testID="galaxy-studio-close-button" onPress={() => {
@@ -3392,7 +3539,7 @@ export default function GalaxyStudioFactoryModal
             if (showVault) { setShowVault(false); return; }
             if (step === 'done') { setStep('pick'); return; }
             if (step === 'building') { onClose(); return; }
-            onClose();
+            void persistAndClose();
           }} style={s.headerBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name={step === 'pick' && !showCode && !showVault && !showMLConsole ? 'close-outline' : 'arrow-back-outline'} size={24} color={T.text} />
           </TouchableOpacity>

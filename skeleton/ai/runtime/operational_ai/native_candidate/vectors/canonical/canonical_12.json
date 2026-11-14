@@ -1,0 +1,14 @@
+{
+  "schema": "skeleton.native-candidate.vector.v1",
+  "id": "canonical_12",
+  "domain": "canonical",
+  "objective": "Executable native training intake boundary canonical case 12",
+  "trust_boundary": "Source inputs cannot bypass canonical training authority",
+  "input": {
+    "value": "{\"x\":NaN}"
+  },
+  "expected_allow": false,
+  "expected_reason": "reject_ambiguous_or_untrusted_input",
+  "model_qualified": false,
+  "release_certified": false
+}

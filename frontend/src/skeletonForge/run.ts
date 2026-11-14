@@ -158,9 +158,26 @@ export function playtestView(payload: RunPayload | null | undefined): PlaytestVi
   const p = (payload as any)?.playtest;
   if (!p || typeof p !== 'object') return { state: 'off', tone: 'idle', label: 'Headless playtest off' };
   const status = String(p.status ?? '');
-  if (status === 'passed' || p.passed === true) return { state: 'passed', tone: 'ok', label: 'Headless Godot playtest passed' };
+  if (status === 'passed' && p.passed === true) return { state: 'passed', tone: 'ok', label: 'Headless Godot playtest passed' };
   if (status === 'unavailable') return { state: 'unavailable', tone: 'warn', label: `Playtest unavailable${p.reason ? ` (${p.reason})` : ''}` };
   return { state: 'failed', tone: 'bad', label: 'Headless Godot playtest failed' };
+}
+
+/** Independent native scene completion. The main-world boot is insufficient. */
+export function playableSceneView(payload: RunPayload | null | undefined): PlaytestView | null {
+  const archetype = payload?.forge?.playable_archetype;
+  if (!archetype) return null;
+  const report = payload?.playable_scene_playtest;
+  if (!report) {
+    return { state: 'off', tone: 'idle', label: 'Playable scene not dynamically tested' };
+  }
+  if (report.status === 'passed' && report.passed === true) {
+    return { state: 'passed', tone: 'ok', label: 'Playable ' + archetype + ' scene completed in Godot' };
+  }
+  if (report.status === 'unavailable') {
+    return { state: 'unavailable', tone: 'warn', label: 'Playable scene unverified (Godot unavailable)' };
+  }
+  return { state: 'failed', tone: 'bad', label: 'Playable scene qualification failed' };
 }
 
 export function summarizeRun(payload: RunPayload | null | undefined): RunSummary {

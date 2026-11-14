@@ -144,9 +144,17 @@ def test_tamper_stale_revision_and_lock_fail_closed(tmp_path):
     source = world()
     WorldStore(tmp_path).publish(source, create=True)
     store = AtlasStore(tmp_path)
-    spec = review_atlas(crossing(source), source, "Reviewed source.")
-    store.save("voyage", spec, expected_world_digest=digest(source), create=True)
-    store.compile("voyage", expected_atlas_digest=digest(spec))
+    spec = crossing(source)
+    proposed_digest = store.save(
+        "voyage", spec, expected_world_digest=digest(source), create=True,
+    )
+    # Saving an already-approved client payload must never bypass the store's
+    # explicit review transition. Compile only the digest minted by approve().
+    approved_digest = store.approve(
+        "voyage", expected_atlas_digest=proposed_digest,
+        review_note="Reviewed source.",
+    )
+    store.compile("voyage", expected_atlas_digest=approved_digest)
     html = tmp_path / "voyage.atlas.playable.html"
     html.write_text("tampered")
     with pytest.raises(CanonError, match="atlas_playable_mismatch"):
@@ -167,9 +175,17 @@ def test_symlink_artifact_never_verified(tmp_path):
     source = world()
     WorldStore(tmp_path).publish(source, create=True)
     store = AtlasStore(tmp_path)
-    spec = review_atlas(crossing(source), source, "Reviewed source.")
-    store.save("voyage", spec, expected_world_digest=digest(source), create=True)
-    store.compile("voyage", expected_atlas_digest=digest(spec))
+    spec = crossing(source)
+    proposed_digest = store.save(
+        "voyage", spec, expected_world_digest=digest(source), create=True,
+    )
+    # Saving an already-approved client payload must never bypass the store's
+    # explicit review transition. Compile only the digest minted by approve().
+    approved_digest = store.approve(
+        "voyage", expected_atlas_digest=proposed_digest,
+        review_note="Reviewed source.",
+    )
+    store.compile("voyage", expected_atlas_digest=approved_digest)
     artifact = tmp_path / "voyage.atlas.playable.html"
     artifact.unlink()
     artifact.symlink_to(tmp_path / "voyage.json")

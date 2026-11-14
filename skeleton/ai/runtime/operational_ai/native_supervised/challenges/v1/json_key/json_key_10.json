@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "json_key_10",
+  "domain": "json_key",
+  "ordinal": 10,
+  "arguments": {
+    "index": 10,
+    "a": 170,
+    "b": 12,
+    "word": "marble",
+    "city": "Halden"
+  },
+  "prompt": "Task 10: Read JSON {\"count\":170,\"kind\":\"marble\"}. Output only the kind field.",
+  "expected": "marble",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

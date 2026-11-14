@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "slug_01",
+  "domain": "slug",
+  "ordinal": 1,
+  "arguments": {
+    "index": 1,
+    "a": 107,
+    "b": 3,
+    "word": "cedar",
+    "city": "Oslo"
+  },
+  "prompt": "Task 1: Convert 'cedar Review 1' to a lowercase hyphenated slug.",
+  "expected": "cedar-review-1",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}
