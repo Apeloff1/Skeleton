@@ -99,7 +99,9 @@ export class EventStreamClient {
       this.watchdog = null;
       if (gen !== this.generation || this.stopped) return;
       if (isStreamDead(this.state.lastActivityAt, this.clock.now())) {
-        this.abort?.abort(); // dead stream: the transport resolves 'aborted' → reconnect
+        // Abort is advisory: some transports never settle after cancellation.
+        // Retire ownership and schedule recovery without waiting for their promise.
+        this.onEnd(gen, { kind: 'aborted' });
       } else {
         this.armWatchdog(gen);
       }
@@ -153,7 +155,7 @@ export class EventStreamClient {
         // stream.lagged: reconnect at once from the last delivered id (or resume_from).
         if (reconnectNow && current()) {
           this.immediate = true;
-          this.abort?.abort();
+          this.onEnd(gen, { kind: 'aborted' });
         }
       },
       }).then(end => this.onEnd(gen, end), () => this.onEnd(gen, { kind: 'error', error: 'transport_threw' }));
@@ -165,12 +167,15 @@ export class EventStreamClient {
   private onEnd(gen: number, end: StreamEnd) {
     if (gen !== this.generation || this.stopped) return;
     // Fence callbacks even during the retry delay, before a new connection starts.
-    this.generation += 1;
-    this.abort?.abort();
+    const retiredGeneration = ++this.generation;
+    const retiredAbort = this.abort;
     this.abort = null;
     if (this.watchdog !== null) { this.clock.clearTimeout(this.watchdog); this.watchdog = null; }
     const immediate = this.immediate;
     this.immediate = false;
+    retiredAbort?.abort();
+    // An abort listener may synchronously stop/restart this client.
+    if (this.stopped || this.generation !== retiredGeneration) return;
     if (end.kind === 'http' && (this.opts.fatalStatuses ?? [401, 403]).includes(end.status)) {
       this.stopped = true;
       this.set({ ...this.state, status: 'closed', connectedAt: null });
