@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import os
 import sqlite3
 from threading import RLock
 from typing import Mapping, Protocol
@@ -16,6 +17,7 @@ from typing import Mapping, Protocol
 from .fair_stream_custody import sign_execution_result
 from .fair_stream_session import DispatchPermit
 from .private_sqlite import PrivateSQLiteHandle
+from .sqlite_custody_schema import assert_custody_schema
 
 SCHEMA = "skeleton.ai.fair-stream-execution-journal.v1"
 MAX_JOURNAL_ROWS = 10_000
@@ -72,6 +74,7 @@ class FairStreamExecutionJournal:
         if type(execution_key) is not bytes or not 32 <= len(execution_key) <= 128:
             raise ValueError("independent execution key required")
         self._connection = connection
+        self._owner_pid = os.getpid()
         self._private_handle: PrivateSQLiteHandle | None = None
         self._key = execution_key
         self._lock = RLock()
@@ -117,9 +120,24 @@ class FairStreamExecutionJournal:
             )) != ("session_id", "request_id")
         ):
             raise ValueError("untrusted journal request replay index")
+        self._assert_schema()
+
+    def _assert_schema(self) -> None:
+        assert_custody_schema(
+            self._connection, table="local_fair_stream_execution_journal",
+            columns=("lease_id", "session_id", "generation", "checkpoint_digest",
+                     "request_id", "state", "consumed_tokens", "result_digest", "receipt"),
+            primary_key="lease_id", replay_index=_REQUEST_INDEX,
+            replay_columns=("session_id", "request_id"),
+        )
+
+    def _require_owner_process(self) -> None:
+        if self._owner_pid != os.getpid():
+            raise ExecutionOutcomeUnknown("inherited journal requires reopening")
 
     def bind_private_handle(self, handle: PrivateSQLiteHandle) -> None:
         """Bind the exact owned journal inode for all later read/write operations."""
+        self._require_owner_process()
         with self._lock:
             if (type(handle) is not PrivateSQLiteHandle
                     or handle.connection is not self._connection
@@ -129,8 +147,10 @@ class FairStreamExecutionJournal:
             self._private_handle = handle
 
     def _assert_private(self) -> None:
+        self._require_owner_process()
         if self._private_handle is not None:
             self._private_handle.assert_current()
+        self._assert_schema()
 
     def _begin(self) -> None:
         self._assert_private()
@@ -153,6 +173,7 @@ class FairStreamExecutionJournal:
             raise ValueError("bounded request identity required")
         if type(queued_count) is not int or not 0 <= queued_count <= MAX_JOURNAL_ROWS:
             raise ValueError("invalid queued request count")
+        self._require_owner_process()
         with self._lock:
             self._assert_private()
             if self._connection.in_transaction:
@@ -181,6 +202,7 @@ class FairStreamExecutionJournal:
             raise ValueError("bounded request identity required")
         if len(permit.request_id.encode("utf-8")) > 128:
             raise ValueError("bounded request identity required")
+        self._require_owner_process()
         with self._lock:
             self._begin()
             try:
@@ -204,6 +226,7 @@ class FairStreamExecutionJournal:
                     (permit.lease_id, self.session_id, permit.generation,
                      permit.checkpoint_digest, permit.request_id),
                 )
+                self._assert_private()
                 self._connection.commit()
             except BaseException:
                 self._connection.rollback()
@@ -230,6 +253,7 @@ class FairStreamExecutionJournal:
             result_digest=result_digest, terminal=terminal,
         )
         payload = _receipt_bytes(receipt)
+        self._require_owner_process()
         with self._lock:
             self._begin()
             try:
@@ -252,6 +276,7 @@ class FairStreamExecutionJournal:
                 ).rowcount
                 if changed != 1:
                     raise ExecutionOutcomeUnknown("journal completion CAS failed")
+                self._assert_private()
                 self._connection.commit()
                 return receipt
             except BaseException:
@@ -276,6 +301,7 @@ class FairStreamExecutionJournal:
             raise ExecutionOutcomeUnknown("independent bound native journal and vault required")
         if type(permit) is not DispatchPermit or permit.device_qualified is not False:
             raise ValueError("canonical CPU-only permit required")
+        self._require_owner_process()
         with self._lock:
             row = self._row(permit.lease_id)
             if row is None or row[:4] != (
@@ -311,6 +337,7 @@ class FairStreamExecutionJournal:
         """
         if type(permit) is not DispatchPermit:
             raise ValueError("canonical permit required")
+        self._require_owner_process()
         with self._lock:
             row = self._row(permit.lease_id)
             if (

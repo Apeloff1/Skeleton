@@ -22,6 +22,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from .fair_stream_session import DispatchPermit
 from .private_sqlite import PrivateSQLiteHandle, PrivateSQLiteUnavailable
+from .sqlite_custody_schema import CustodySchemaError, assert_custody_schema
 
 SCHEMA = "skeleton.ai.fair-stream-result-vault.v1"
 MAX_RESULT_BYTES = 1 << 20
@@ -118,6 +119,7 @@ class SealedFairStreamResultVault:
     ) -> None:
         if type(handle) is not PrivateSQLiteHandle or handle._closed:
             raise ValueError("live canonical private SQLite handle required")
+        handle.assert_current()
         self.session_id = _hex(session_id, 32, "session")
         self.model_digest = _hex(model_digest, 64, "model")
         self.tokenizer_digest = _hex(tokenizer_digest, 64, "tokenizer")
@@ -183,6 +185,17 @@ class SealedFairStreamResultVault:
             " AND tbl_name=?", (_TABLE,),
         ).fetchone()[0]:
             raise SealedResultUnavailable("untrusted result table trigger")
+        self._assert_schema()
+
+    def _assert_schema(self) -> None:
+        try:
+            assert_custody_schema(
+                self._connection, table=_TABLE, columns=_COLUMNS,
+                primary_key="lease_id", replay_index=_REQUEST_INDEX,
+                replay_columns=("session_id", "request_id"),
+            )
+        except CustodySchemaError as exc:
+            raise SealedResultUnavailable("result database schema changed") from exc
 
     def _require_open(self) -> None:
         try:
@@ -191,6 +204,7 @@ class SealedFairStreamResultVault:
             raise SealedResultUnavailable("result database custody changed") from exc
         if self._connection.in_transaction:
             raise SealedResultUnavailable("shared SQLite transaction forbidden")
+        self._assert_schema()
 
     def _row(self, lease_id: str) -> tuple[object, ...] | None:
         return self._connection.execute(
@@ -204,6 +218,7 @@ class SealedFairStreamResultVault:
             raise ValueError("bounded request identity required")
         if type(queued_count) is not int or not 0 <= queued_count <= MAX_RESULT_ROWS:
             raise ValueError("invalid queued result count")
+        self._handle.require_owner_process()
         with self._lock:
             self._require_open()
             if self._request_seen(request_id):
@@ -282,6 +297,7 @@ class SealedFairStreamResultVault:
         leave the execution journal in RUNNING. No replay is authorized.
         """
         self._validate_state(permit, state)
+        self._handle.require_owner_process()
         with self._lock:
             self._require_open()
             if self._row(permit.lease_id) is not None:
@@ -322,6 +338,7 @@ class SealedFairStreamResultVault:
             self._require_open()
             self._connection.execute("BEGIN IMMEDIATE")
             try:
+                self._assert_schema()
                 if self._row(permit.lease_id) is not None:
                     raise SealedResultUnavailable("result lease already published")
                 if self._request_seen(permit.request_id):
@@ -347,6 +364,8 @@ class SealedFairStreamResultVault:
                         len(plaintext), nonce, ciphertext, digest,
                     ),
                 )
+                self._handle.assert_current()
+                self._assert_schema()
                 self._connection.commit()
             except BaseException:
                 self._connection.rollback()
@@ -377,6 +396,7 @@ class SealedFairStreamResultVault:
         self, permit: DispatchPermit, *, expected: str | None,
     ) -> tuple[int, str, bytes]:
         _identity(permit)
+        self._handle.require_owner_process()
         with self._lock:
             self._require_open()
             row = self._row(permit.lease_id)

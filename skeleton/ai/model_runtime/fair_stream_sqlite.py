@@ -18,6 +18,7 @@ from .fair_stream_custody import (
 )
 
 from .private_sqlite import PrivateSQLiteHandle, PrivateSQLiteUnavailable
+from .sqlite_custody_schema import assert_custody_schema
 
 SCHEMA = "skeleton.ai.fair-stream-sqlite-cas.v1"
 MAX_GENERATION = (1 << 63) - 1
@@ -126,6 +127,14 @@ class DurableFairStreamStore:
             "payload BLOB NOT NULL"
             ") WITHOUT ROWID"
         )
+        self._assert_schema()
+
+    def _assert_schema(self) -> None:
+        assert_custody_schema(
+            self._connection, table=_TABLE,
+            columns=("session_id", "generation", "digest", "payload"),
+            primary_key="session_id",
+        )
 
     def _require_owner_process(self) -> None:
         if os.getpid() != self._owner_pid:
@@ -144,6 +153,7 @@ class DurableFairStreamStore:
 
     def _read(self) -> tuple[int, str, bytes] | None:
         self._assert_private()
+        self._assert_schema()
         row = self._connection.execute(
             "SELECT generation, digest, payload FROM " + _TABLE +
             " WHERE session_id = ?", (self.session_id,),

@@ -118,6 +118,8 @@ jobs:
           skeleton/testing/test_native_token_pressure.py
           skeleton/testing/test_fair_stream_dispatch.py
           skeleton/testing/test_fair_stream_execution_journal.py
+          skeleton/testing/test_fair_stream_result_access.py
+          skeleton/testing/test_sqlite_custody_schema_guard.py
           skeleton/testing/test_fair_stream_recovery.py
           skeleton/testing/test_fair_stream_anchor_recovery.py
           skeleton/testing/test_offline_dispatch_bridge.py
