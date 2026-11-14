@@ -1,0 +1,220 @@
+{
+  "schema": "ridge.rescue.missions.v1",
+  "id": "cinder-ridge-missions",
+  "title": "Cinder Ridge: Earned Rescue Objectives",
+  "world": {
+    "schema": "ridge.rescue.world.v1",
+    "name": "Cinder Ridge - Last Signal",
+    "rows": [
+      ".........",
+      "..#......",
+      "....^....",
+      ".........",
+      ".....#...",
+      ".........",
+      "........."
+    ],
+    "start": [
+      0,
+      0
+    ],
+    "shelter": [
+      8,
+      6
+    ],
+    "civilians": [
+      {
+        "id": "mira",
+        "at": [
+          2,
+          0
+        ]
+      },
+      {
+        "id": "orin",
+        "at": [
+          6,
+          5
+        ]
+      }
+    ],
+    "raiders": [
+      {
+        "id": "scout",
+        "at": [
+          8,
+          1
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "id": "pine",
+        "kind": "wood",
+        "at": [
+          1,
+          1
+        ],
+        "count": 4
+      },
+      {
+        "id": "seam",
+        "kind": "ore",
+        "at": [
+          4,
+          0
+        ],
+        "count": 4
+      },
+      {
+        "id": "sage",
+        "kind": "herb",
+        "at": [
+          1,
+          5
+        ],
+        "count": 4
+      }
+    ],
+    "max_turns": 72
+  },
+  "nodes": [
+    {
+      "id": "mira_found",
+      "title": "Locate Mira",
+      "requires": [],
+      "condition": {
+        "kind": "rescued",
+        "value": "mira"
+      },
+      "points": 20,
+      "group": ""
+    },
+    {
+      "id": "pine_collected",
+      "title": "Recover ridge pine",
+      "requires": [],
+      "condition": {
+        "kind": "event",
+        "value": "gather:pine:"
+      },
+      "points": 10,
+      "group": ""
+    },
+    {
+      "id": "torch_crafted",
+      "title": "Build a field torch",
+      "requires": [
+        "pine_collected"
+      ],
+      "condition": {
+        "kind": "event",
+        "value": "craft:torch"
+      },
+      "points": 15,
+      "group": ""
+    },
+    {
+      "id": "scout_defeated",
+      "title": "Neutralize the ridge scout",
+      "requires": [
+        "torch_crafted"
+      ],
+      "condition": {
+        "kind": "enemy_defeated",
+        "value": "scout"
+      },
+      "points": 30,
+      "group": ""
+    },
+    {
+      "id": "orin_found",
+      "title": "Locate Orin",
+      "requires": [
+        "mira_found"
+      ],
+      "condition": {
+        "kind": "rescued",
+        "value": "orin"
+      },
+      "points": 20,
+      "group": ""
+    },
+    {
+      "id": "storm_survived",
+      "title": "Survive a storm pulse",
+      "requires": [],
+      "condition": {
+        "kind": "event",
+        "value": "storm:damage"
+      },
+      "points": 10,
+      "group": ""
+    },
+    {
+      "id": "shelter_reached",
+      "title": "Reach the evacuation shelter",
+      "requires": [
+        "orin_found"
+      ],
+      "condition": {
+        "kind": "shelter",
+        "value": true
+      },
+      "points": 20,
+      "group": ""
+    },
+    {
+      "id": "trade_completed",
+      "title": "Trade at the shelter",
+      "requires": [
+        "shelter_reached"
+      ],
+      "condition": {
+        "kind": "event",
+        "value": "trade:"
+      },
+      "points": 10,
+      "group": ""
+    },
+    {
+      "id": "beacon_lit",
+      "title": "Light the rescue beacon",
+      "requires": [
+        "shelter_reached"
+      ],
+      "condition": {
+        "kind": "beacon",
+        "value": true
+      },
+      "points": 20,
+      "group": ""
+    },
+    {
+      "id": "protect_exit",
+      "title": "Secure the protected evacuation",
+      "requires": [
+        "beacon_lit"
+      ],
+      "condition": {
+        "kind": "ending",
+        "value": "won:protect"
+      },
+      "points": 40,
+      "group": "finale"
+    },
+    {
+      "id": "salvage_exit",
+      "title": "Complete the salvage evacuation",
+      "requires": [
+        "shelter_reached"
+      ],
+      "condition": {
+        "kind": "ending",
+        "value": "won:salvage"
+      },
+      "points": 25,
+      "group": "finale"
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "schema": "ridge.rescue.challenge.v1",
+  "id": "inland-arc",
+  "title": "Inland Arc",
+  "ending": "salvage",
+  "world": {
+    "schema": "ridge.rescue.world.v1",
+    "name": "Cinder Ridge: Inland Arc",
+    "rows": [
+      ".....",
+      ".....",
+      ".###.",
+      ".....",
+      "....."
+    ],
+    "start": [
+      0,
+      0
+    ],
+    "shelter": [
+      4,
+      4
+    ],
+    "civilians": [
+      {
+        "id": "sol",
+        "at": [
+          1,
+          0
+        ]
+      }
+    ],
+    "raiders": [],
+    "resources": [],
+    "max_turns": 32
+  },
+  "actions": [
+    {
+      "verb": "rescue",
+      "target": "sol"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "evacuate",
+      "choice": "salvage"
+    }
+  ]
+}

@@ -1,0 +1,117 @@
+{
+  "schema": "ridge.rescue.challenge.v1",
+  "id": "signal-crossing",
+  "title": "Signal Crossing",
+  "ending": "protect",
+  "world": {
+    "schema": "ridge.rescue.world.v1",
+    "name": "Cinder Ridge: Signal Crossing",
+    "rows": [
+      ".....",
+      ".....",
+      ".##..",
+      ".....",
+      "....."
+    ],
+    "start": [
+      4,
+      0
+    ],
+    "shelter": [
+      0,
+      4
+    ],
+    "civilians": [
+      {
+        "id": "vero",
+        "at": [
+          3,
+          0
+        ]
+      }
+    ],
+    "raiders": [],
+    "resources": [
+      {
+        "id": "cedar",
+        "kind": "wood",
+        "at": [
+          4,
+          1
+        ],
+        "count": 1
+      },
+      {
+        "id": "copper",
+        "kind": "ore",
+        "at": [
+          3,
+          1
+        ],
+        "count": 2
+      }
+    ],
+    "max_turns": 32
+  },
+  "actions": [
+    {
+      "verb": "rescue",
+      "target": "vero"
+    },
+    {
+      "verb": "gather",
+      "target": "cedar"
+    },
+    {
+      "verb": "move",
+      "direction": "west"
+    },
+    {
+      "verb": "gather",
+      "target": "copper"
+    },
+    {
+      "verb": "gather",
+      "target": "copper"
+    },
+    {
+      "verb": "craft",
+      "item": "signal"
+    },
+    {
+      "verb": "move",
+      "direction": "west"
+    },
+    {
+      "verb": "move",
+      "direction": "west"
+    },
+    {
+      "verb": "move",
+      "direction": "west"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "signal"
+    },
+    {
+      "verb": "evacuate",
+      "choice": "protect"
+    }
+  ]
+}
