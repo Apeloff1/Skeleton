@@ -6,6 +6,7 @@ vault, untrusted SQLite path, simulated sensor or execution receipt.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 import sqlite3
 import os
@@ -16,7 +17,7 @@ if TYPE_CHECKING:
     from skeleton.ai.model_runtime.fair_stream_recovery import AbandonmentAuthorization, RecoveryAuthorization
 
 from skeleton.ai.model_runtime.fair_stream_dispatch import (
-    DispatchUncertain, DurableExecutionOwner,
+    DispatchDeferred, DispatchUncertain, DurableExecutionOwner,
     GuardedFairStreamDispatch,
 )
 from skeleton.ai.model_runtime.fair_stream_live_budget import LiveStreamBudgetSampler
@@ -121,49 +122,73 @@ class OfflineAdaptiveDispatchService:
             raise
         return service, handle
 
-    def status(self) -> OfflineDispatchStatus:
-        generation, pending, quarantined, uncertain = self._guard.status_snapshot()
+    @contextmanager
+    def _operation(self):
+        """Never wait behind native model I/O; retain the guard's lock order."""
+        self._guard._require_owner_process()
+        if not self._guard._lock.acquire(blocking=False):
+            raise DispatchDeferred("another app dispatch operation is active")
+        try:
+            yield
+        finally:
+            self._guard._lock.release()
+
+    def _status_from_state(self, state: dict[str, object]) -> OfflineDispatchStatus:
+        pending = state["checkpoint"]["pending"]
+        known = (len(pending) == len(self._guard._issued) == 1
+                 and pending[0]["lease_id"] in self._guard._issued)
         return OfflineDispatchStatus(
             schema="skeleton.app.offline-dispatch-status.v1",
-            generation=generation,
-            pending_leases=pending,
-            quarantined=quarantined,
-            execution_uncertain=uncertain,
+            generation=state["generation"],
+            pending_leases=len(pending),
+            quarantined=self._session.quarantined,
+            execution_uncertain=(self._guard._uncertain or self._guard._executing
+                                 or bool(pending and not known)),
         )
 
+    def status(self) -> OfflineDispatchStatus:
+        with self._operation():
+            return self._status_from_state(self._session.verify())
+
     def submit(self, request: StreamRequest) -> OfflineDispatchStatus:
-        self._guard.submit(request)
-        return self.status()
+        with self._operation():
+            return self._status_from_state(self._guard.submit(request))
 
     def cancel(self, request_id: str, *, tenant_id: str | None = None) -> OfflineDispatchStatus:
-        self._guard.cancel(request_id, tenant_id=tenant_id)
-        return self.status()
+        with self._operation():
+            return self._status_from_state(self._guard.cancel(request_id, tenant_id=tenant_id))
 
     def cancel_unstarted(self, request_id: str, *, tenant_id: str) -> OfflineDispatchStatus:
         """Explicit tenant cancellation of a current-process unstarted permit."""
-        self._guard.cancel_unstarted(request_id, tenant_id=tenant_id)
-        return self.status()
+        with self._operation():
+            return self._status_from_state(self._guard.cancel_unstarted(request_id, tenant_id=tenant_id))
 
     def reconcile_published(
         self, *, authorization: "RecoveryAuthorization", recovery_key: bytes,
     ) -> OfflineDispatchStatus:
         """Operator-approved recovery of existing authenticated sealed output."""
-        self._guard.reconcile_published(authorization=authorization, recovery_key=recovery_key)
-        return self.status()
+        with self._operation():
+            return self._status_from_state(self._guard.reconcile_published(
+                authorization=authorization, recovery_key=recovery_key,
+            ))
 
     def reconcile_cancelled(
         self, *, authorization: "RecoveryAuthorization", recovery_key: bytes,
     ) -> OfflineDispatchStatus:
         """Explicitly settle a durable cancellation using a separate operator grant."""
-        self._guard.reconcile_cancelled(authorization=authorization, recovery_key=recovery_key)
-        return self.status()
+        with self._operation():
+            return self._status_from_state(self._guard.reconcile_cancelled(
+                authorization=authorization, recovery_key=recovery_key,
+            ))
 
     def abandon_uncertain(
         self, *, authorization: "AbandonmentAuthorization", recovery_key: bytes,
     ) -> OfflineDispatchStatus:
         """Operator-only no-output retirement; never initiate inference."""
-        self._guard.abandon_uncertain(authorization=authorization, recovery_key=recovery_key)
-        return self.status()
+        with self._operation():
+            return self._status_from_state(self._guard.abandon_uncertain(
+                authorization=authorization, recovery_key=recovery_key,
+            ))
 
     def reconcile_committed(
         self, *, journal: "FairStreamExecutionJournal",
@@ -176,11 +201,11 @@ class OfflineAdaptiveDispatchService:
         exclusive canonical execution-journal handle. No model execution
         occurs during reconciliation, and no keys enter public status.
         """
-        self._guard.reconcile_committed(
-            journal=journal, authorization=authorization,
-            recovery_key=recovery_key,
-        )
-        return self.status()
+        with self._operation():
+            return self._status_from_state(self._guard.reconcile_committed(
+                journal=journal, authorization=authorization,
+                recovery_key=recovery_key,
+            ))
 
     def execute_next(self, *, token_budget: int) -> dict[str, object]:
         """Plan and execute ONE source-bound slice; no backend on a hold.
@@ -189,7 +214,8 @@ class OfflineAdaptiveDispatchService:
         inference response. The owner controls model execution, quota and
         durable result publication; only signed receipts retire pending leases.
         """
-        permit, state, observation = self._guard.dispatch_next(token_budget=token_budget)
+        with self._operation():
+            permit, state, observation = self._guard.dispatch_next(token_budget=token_budget)
         if permit is None:
             return {
                 "schema": "skeleton.app.offline-dispatch-result.v1",
