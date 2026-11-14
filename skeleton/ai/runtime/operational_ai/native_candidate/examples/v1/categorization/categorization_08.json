@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "categorization_08",
+  "domain": "categorization",
+  "prompt": "Route fictional record 607 about a contract to exactly one category: finance, engineering, logistics or human_resources.",
+  "completion": "human_resources",
+  "group_id": "categorization_08",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

@@ -14,6 +14,7 @@ import { C } from '../theme';
 
 export function BuildStatusScreen({
   title, phase, payload, error, startedAt, finishedAt, now, onCancel, onRetry,
+  onExport, exportBusy, exportError, outdated = false,
   guidance, onGuidance, consoleBusy, consoleSummary, consoleOk, consoleFailures, onAskCockpit,
   onBrief, onProjects, onOpenCockpit,
 }: {
@@ -26,6 +27,10 @@ export function BuildStatusScreen({
   now: number;
   onCancel?: () => void;
   onRetry?: () => void;
+  onExport?: () => void;
+  exportBusy?: boolean;
+  exportError?: string | null;
+  outdated?: boolean;
   guidance: StepAction;
   onGuidance: (action: StepAction) => void;
   consoleBusy: boolean;
@@ -40,6 +45,11 @@ export function BuildStatusScreen({
   return (
     <ScrollView contentContainerStyle={st.body} testID="studio-build" keyboardShouldPersistTaps="handled">
       <SectionTitle hint="Forge run">{title}</SectionTitle>
+      {outdated ? (
+        <Banner tone="warn" testID="studio-build-outdated">
+          This build belongs to an earlier version of the questionnaire. Your new design is saved; forge again to update the playable project. Old receipts remain for reference.
+        </Banner>
+      ) : null}
       <View style={st.row}>
         <Button label="Back to brief" tone="ghost" compact onPress={onBrief} testID="studio-back-brief" />
         <Button label="All projects" tone="ghost" compact onPress={onProjects} testID="studio-back" />
@@ -54,6 +64,9 @@ export function BuildStatusScreen({
         now={now}
         onCancel={onCancel}
         onRetry={onRetry}
+        onExport={onExport}
+        exportBusy={exportBusy}
+        exportError={exportError}
         testID="studio-run-panel"
       />
       <View testID="studio-next-step">

@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "list_sort_04",
+  "domain": "list_sort",
+  "ordinal": 4,
+  "arguments": {
+    "index": 4,
+    "a": 128,
+    "b": 6,
+    "word": "marble",
+    "city": "Halden"
+  },
+  "prompt": "Task 4: Sort ascending and join with commas, no spaces: 6,4,12,4.",
+  "expected": "4,4,6,12",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

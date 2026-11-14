@@ -3363,7 +3363,7 @@ app.add_middleware(
     exempt_prefixes=("/api/health",),
 )
 
-from core.http_errors import install_public_error_handlers as _install_public_error_handlers
+from core.http_errors import install_public_error_handlers as _install_public_error_handlers, PublicHealthUnavailable
 _install_public_error_handlers(app)
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -3483,7 +3483,7 @@ def _collect_vault_readiness():
     try:
         from routes.galaxy_studio import VAULT_DIR as vault_dir
         _probe_vault_io(vault_dir)
-        checks["vault_galaxy"] = {"ok": True, "path": str(vault_dir)}
+        checks["vault_galaxy"] = {"ok": True}
     except Exception as exc:
         logger.warning("health probe failed (vault_galaxy): %s", type(exc).__name__)
         checks["vault_galaxy"] = {"ok": False, "error": "probe_failed"}
@@ -3492,7 +3492,7 @@ def _collect_vault_readiness():
         if build_vault.BUILDS_VAULT_FALLBACK:
             raise OSError("persistent build vault unavailable")
         _probe_vault_io(str(build_vault.BUILDS_ROOT))
-        checks["vault_builds"] = {"ok": True, "path": str(build_vault.BUILDS_ROOT)}
+        checks["vault_builds"] = {"ok": True}
     except Exception as exc:
         logger.warning("health probe failed (vault_builds): %s", type(exc).__name__)
         checks["vault_builds"] = {"ok": False, "error": "probe_failed"}
@@ -3613,8 +3613,7 @@ async def health_ready():
         "canonical_application": dict(_BACKEND_HEALTH_IDENTITY),
     }
     if not overall_ok:
-        from fastapi.responses import JSONResponse
-        return JSONResponse(status_code=503, content=body)
+        return PublicHealthUnavailable(body)
     return body
 
 
@@ -3651,8 +3650,7 @@ async def health_startup():
     _probe_event("startup", "ok" if overall else "pending")
     body = {"status": "started" if overall else "starting", "uptime_seconds": round(uptime, 2), "checks": checks}
     if not overall:
-        from fastapi.responses import JSONResponse
-        return JSONResponse(status_code=503, content=body)
+        return PublicHealthUnavailable(body)
     return body
 
 
@@ -3671,7 +3669,7 @@ def _collect_vault_deep():
         _probe_vault_io(_gv)
         # also list a few entries to confirm dir is readable
         zip_count = len(os.listdir(os.path.join(_gv, "zips"))) if os.path.isdir(os.path.join(_gv, "zips")) else 0
-        out["checks"]["galaxy_vault"] = {"ok": True, "path": str(_gv), "zips": zip_count}
+        out["checks"]["galaxy_vault"] = {"ok": True, "zips": zip_count}
     except Exception as e:
         logger.warning("health probe failed (galaxy_vault): %s", type(e).__name__)
         out["checks"]["galaxy_vault"] = {"ok": False, "error": "probe_failed"}
@@ -3685,7 +3683,7 @@ def _collect_vault_deep():
         root = str(_bv.BUILDS_ROOT)
         _probe_vault_io(root)
         build_count = len([x for x in os.listdir(root) if os.path.isdir(os.path.join(root, x))])
-        out["checks"]["build_vault"] = {"ok": True, "path": root, "builds": build_count}
+        out["checks"]["build_vault"] = {"ok": True, "builds": build_count}
     except Exception as e:
         logger.warning("health probe failed (build_vault): %s", type(e).__name__)
         out["checks"]["build_vault"] = {"ok": False, "error": "probe_failed"}
@@ -3714,8 +3712,7 @@ def _collect_vault_deep():
     out["status"] = "ok" if overall else "degraded"
     _probe_event("vault", "ok" if overall else "degraded")
     if not overall:
-        from fastapi.responses import JSONResponse
-        return JSONResponse(status_code=503, content=out)
+        return PublicHealthUnavailable(out)
     return out
 
 
@@ -3723,7 +3720,7 @@ def _collect_vault_deep():
 async def health_vault():
     result = await _bounded_vault_observation("deep", _collect_vault_deep)
     if result is None:
-        return JSONResponse(status_code=503, content={
+        return PublicHealthUnavailable({
             "status": "degraded", "checks": {"vault": {"ok": False, "error": "probe_timeout_or_unavailable"}}
         })
     return result
