@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: jeeves-integrated-source-${{ github.event.pull_request.number || github.sha }}
+  group: jeeves-integrated-source-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

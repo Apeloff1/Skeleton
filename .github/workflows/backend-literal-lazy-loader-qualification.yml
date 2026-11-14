@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: literal-lazy-loader-${{ github.event.pull_request.number || github.sha }}
+  group: literal-lazy-loader-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
