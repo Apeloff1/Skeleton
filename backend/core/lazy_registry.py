@@ -111,6 +111,7 @@ _LOADERS = {
     'core.discourse_catalog': lambda: importlib.import_module('core.discourse_catalog'),
     'core.discourse_engine': lambda: importlib.import_module('core.discourse_engine'),
     'core.discovery_engine': lambda: importlib.import_module('core.discovery_engine'),
+    'core.dragon_campaign_pilot_qualification': lambda: importlib.import_module('core.dragon_campaign_pilot_qualification'),
     'core.dragon_conversation_binding': lambda: importlib.import_module('core.dragon_conversation_binding'),
     'core.dragon_crawler': lambda: importlib.import_module('core.dragon_crawler'),
     'core.dragon_delivery_routes': lambda: importlib.import_module('core.dragon_delivery_routes'),

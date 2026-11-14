@@ -17,6 +17,7 @@ import ForgeRunPanel, { type ForgeRunPanelProps } from './ForgeRunPanel';
 import PlanViewer, { type PlanViewerProps } from './PlanViewer';
 import QuestionnaireFlow, { type QuestionnaireFlowProps } from './QuestionnaireFlow';
 import { C, TONE_COLOR, TOUCH, pressFeedback } from './theme';
+import { Button } from './primitives';
 
 /** Arrow keys move between cockpit tabs and wrap. Enter/Space stay on the tab's own press. */
 export function cockpitTabMove(current: CockpitTab, event: KeyEventLike): CockpitTab | null {
@@ -32,6 +33,8 @@ export function cockpitTabMove(current: CockpitTab, event: KeyEventLike): Cockpi
 export interface ForgeCockpitViewProps {
   tab: CockpitTab;
   onTab: (tab: CockpitTab) => void;
+  /** Only visible when the original project has a verified Studio origin. */
+  onReturnToStudio?: () => void;
   badges: Record<CockpitTab, TabBadge>;
   questionnaire: QuestionnaireFlowProps;
   compose: ComposePanelProps;
@@ -41,6 +44,8 @@ export interface ForgeCockpitViewProps {
   console: CockpitConsoleProps;
   /** Optional offline/backend banner shown above every tab. */
   notice?: string | null;
+  /** Explicit save-back action only for a source-bound Studio project. */
+  onReturnToStudio?: () => void;
   /** Overrides the OS reduce-motion preference when set. */
   reduceMotion?: boolean;
   testID?: string;
@@ -103,7 +108,27 @@ export default function ForgeCockpitView(props: ForgeCockpitViewProps) {
       <View style={st.header}>
         <Text style={st.title} accessibilityRole="header">Skeleton Forge</Text>
         <Text style={st.subtitle}>{COCKPIT_TAB_HINTS[tab]}</Text>
+        {props.onReturnToStudio ? (
+          <Pressable testID="forge-return-to-studio" accessibilityRole="button"
+            accessibilityLabel="Return authored Forge design to original Studio project"
+            onPress={props.onReturnToStudio}
+            style={{ alignSelf: 'flex-start', paddingVertical: 10, paddingHorizontal: 12, minHeight: TOUCH,
+              borderRadius: 8, borderWidth: 1, borderColor: C.green, marginTop: 8 }}>
+            <Text style={{ color: C.textStrong, fontWeight: '700' }}>Return to original Studio project</Text>
+          </Pressable>
+        ) : null}
       </View>
+      {props.onReturnToStudio ? (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 8 }} testID="cockpit-return-to-studio">
+          <Button
+            label="Save edits back to Studio"
+            tone="secondary"
+            onPress={props.onReturnToStudio}
+            testID="cockpit-save-to-studio"
+            a11yHint="Save the edited questionnaire to its original Studio project, or a new copy if it changed"
+          />
+        </View>
+      ) : null}
       <CockpitTabBar tab={tab} onTab={props.onTab} badges={props.badges} reduceMotion={reduceMotion} />
       {notice ? (
         <View style={st.notice} accessibilityRole="alert" testID="cockpit-notice">

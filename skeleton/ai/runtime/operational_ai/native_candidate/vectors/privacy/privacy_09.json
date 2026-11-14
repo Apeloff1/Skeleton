@@ -1,0 +1,21 @@
+{
+  "schema": "skeleton.native-candidate.vector.v1",
+  "id": "privacy_09",
+  "domain": "privacy",
+  "objective": "Verify aggregate candidate reports exclude raw prompts and private token-bearing fields 9",
+  "trust_boundary": "Private source prompts or bearer metadata may not enter public training receipts",
+  "input": {
+    "record": {
+      "run_id": "r_8",
+      "model_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "usage": {
+        "steps": 9,
+        "read_only": true
+      }
+    }
+  },
+  "expected_allow": true,
+  "expected_reason": "source_free_public_metrics",
+  "model_qualified": false,
+  "release_certified": false
+}

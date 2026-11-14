@@ -1,0 +1,25 @@
+{
+  "schema": "skeleton.ai.jobs.case.v1",
+  "id": "cursor-01",
+  "domain": "cursor",
+  "phase": "durability-and-observability",
+  "category": "permitted-boundary",
+  "threat": "HMAC-bound owner cursor rejects expiration, tamper and scope substitution across job pagination 1",
+  "trust_boundary": "Operator, job owner and audit integrity cannot be delegated to native model text",
+  "input": {
+    "variant": 0,
+    "issued_ms": 1000,
+    "expires_ms": 2000,
+    "now_ms": 1500,
+    "tenant": "tenant",
+    "tamper": false
+  },
+  "expected_allow": true,
+  "expected_state": "verified",
+  "acceptance": "Run live Store and operator-gate operation with independent expected state and denial",
+  "no_hosted_fallback": true,
+  "never_blindly_retry_ambiguous_inference": true,
+  "no_synthetic_production_model": true,
+  "device_qualified": false,
+  "release_certified": false
+}

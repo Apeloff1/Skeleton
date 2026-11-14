@@ -3,6 +3,7 @@
  * ignore stale responses so fast typing never shows an older composition.
  */
 import React from 'react';
+import { getAuthEpoch, subscribeAuthChanges } from '../auth/gameforgeAuth';
 import { composeVision, errorText, fetchBeats, fetchEras, fetchGenerations, runForge } from './client';
 import { FALLBACK_BEATS } from './questionnaire';
 import type { Beat, ComposeResult, EraRow, GenerationRow, RunPayload, RunRequest } from './types';
@@ -92,25 +93,94 @@ export interface ForgeRunState {
   finishedAt: number | null;
 }
 
-/** Owns one in-flight forge run; `start` cancels any previous run. */
+/** One active run belongs to exactly one local authentication epoch. */
+export function currentForgeRun(
+  startedEpoch: number, activeEpoch: number,
+  requestId: number, activeRequestId: number, aborted: boolean,
+): boolean {
+  return !aborted && startedEpoch === activeEpoch && requestId === activeRequestId;
+}
+
+function emptyForgeRun(): ForgeRunState {
+  return {
+    phase: 'idle', payload: null, request: null, error: null,
+    startedAt: null, finishedAt: null,
+  };
+}
+
+/** Cancellable, account-scoped run with at-most-one accepted response. */
 export function useForgeRun() {
-  const [state, setState] = React.useState<ForgeRunState>({ phase: 'idle', payload: null, request: null, error: null, startedAt: null, finishedAt: null });
+  const [state, setState] = React.useState<ForgeRunState>(emptyForgeRun);
   const ctrlRef = React.useRef<AbortController | null>(null);
+  const requestIdRef = React.useRef(0);
+
+  const invalidate = React.useCallback(() => {
+    requestIdRef.current += 1;
+    ctrlRef.current?.abort();
+    ctrlRef.current = null;
+    // No completed source file or authored vision survives an account change.
+    setState(emptyForgeRun());
+  }, []);
+
+  React.useEffect(() => {
+    const unsubscribe = subscribeAuthChanges(invalidate);
+    return () => {
+      unsubscribe();
+      requestIdRef.current += 1;
+      ctrlRef.current?.abort();
+      ctrlRef.current = null;
+    };
+  }, [invalidate]);
+
   const start = React.useCallback(async (req: RunRequest) => {
     ctrlRef.current?.abort();
     const ctrl = new AbortController();
     ctrlRef.current = ctrl;
-    setState({ phase: 'running', payload: null, request: req, error: null, startedAt: Date.now(), finishedAt: null });
-    const r = await runForge(req, ctrl.signal);
-    if (ctrl.signal.aborted) return;
-    if (r.ok && r.data) setState((p) => ({ ...p, phase: 'done', payload: r.data, finishedAt: Date.now() }));
-    else setState((p) => ({ ...p, phase: 'error', error: errorText(r), finishedAt: Date.now() }));
+    const requestId = ++requestIdRef.current;
+    const startedEpoch = getAuthEpoch();
+    setState({
+      phase: 'running', payload: null, request: req, error: null,
+      startedAt: Date.now(), finishedAt: null,
+    });
+    try {
+      const r = await runForge(req, ctrl.signal);
+      if (!currentForgeRun(startedEpoch, getAuthEpoch(), requestId,
+        requestIdRef.current, ctrl.signal.aborted)) return;
+      if (r.ok && r.data) {
+        setState((p) => ({
+          ...p, phase: 'done', payload: r.data, finishedAt: Date.now(),
+        }));
+      } else {
+        setState((p) => ({
+          ...p, phase: 'error', payload: null, error: errorText(r),
+          finishedAt: Date.now(),
+        }));
+      }
+    } catch {
+      if (!currentForgeRun(startedEpoch, getAuthEpoch(), requestId,
+        requestIdRef.current, ctrl.signal.aborted)) return;
+      setState((p) => ({
+        ...p, phase: 'error', payload: null,
+        error: 'GameForge run could not be completed.',
+        finishedAt: Date.now(),
+      }));
+    } finally {
+      if (ctrlRef.current === ctrl) ctrlRef.current = null;
+    }
   }, []);
+
   const cancel = React.useCallback(() => {
+    requestIdRef.current += 1;
     ctrlRef.current?.abort();
-    setState((p) => (p.phase === 'running' ? { ...p, phase: 'error', error: 'Cancelled', finishedAt: Date.now() } : p));
+    ctrlRef.current = null;
+    setState((p) => (p.phase === 'running'
+      ? {
+        ...p, phase: 'error', payload: null, error: 'Cancelled',
+        finishedAt: Date.now(),
+      }
+      : p));
   }, []);
-  React.useEffect(() => () => ctrlRef.current?.abort(), []);
+
   return { ...state, start, cancel };
 }
 
