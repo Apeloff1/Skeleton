@@ -1644,7 +1644,7 @@
       "source": "skeleton/app/runtime",
       "destination": "skeleton/ai/runtime/application",
       "kind": "tree",
-      "source_git_object_sha": "1d502dad477e068307996d73bc88b7fd8e913b24",
+      "source_git_object_sha": "e56cbf7803b26a4122711def2aed6731e02ad313",
       "role": "Engine command lifecycle, capability runtime, contract audits, and admission/authorization helpers belong inside the governed AI runtime application layer; this is not the backend product API owner.",
       "work_package_refs": [
         "WP-W01",
