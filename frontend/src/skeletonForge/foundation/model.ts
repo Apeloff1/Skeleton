@@ -3,7 +3,9 @@
  * Pure — screens and persistence sit on top of this reducer.
  */
 import { INITIAL_STATE, buildRunRequest, questionnaireReducer, type QuestionnaireAction, type QuestionnaireState } from '../questionnaire';
-import { sparseInstrumentPayload } from '../instruments';
+import { isDesignAxis } from '../instruments';
+import { GALAXY_PROFILE_SCHEMA, normaliseGalaxyProfile, type GalaxyProfile } from '../galaxyHandoff';
+import { PLAYABLE_SLICES } from '../questionnaire';
 import { mappedBriefGenre } from '../galaxyGenres';
 import { summarizeRun } from '../run';
 import type { RunPayload, RunRequest } from '../types';
@@ -570,6 +572,34 @@ function sanitizeProject(raw: unknown): StudioProject | null {
   if (typeof options.archetype !== 'string' || typeof options.target !== 'string') return null;
   if (!(options.era == null || typeof options.era === 'string')) return null;
   if (!(options.generation == null || typeof options.generation === 'string')) return null;
+  const saved = questionnaire;
+  let profile: GalaxyProfile | null = null;
+  if (saved.galaxyProfile !== undefined && saved.galaxyProfile !== null) {
+    try {
+      if (saved.galaxyProfile.schema !== GALAXY_PROFILE_SCHEMA) return null;
+      profile = normaliseGalaxyProfile(saved.galaxyProfile.config);
+    } catch { return null; }
+  }
+  const supplied = (key: keyof QuestionnaireState) => Object.prototype.hasOwnProperty.call(saved, key);
+  const instruments: Record<string, number> = {};
+  if (supplied('instruments')) {
+    if (!saved.instruments || typeof saved.instruments !== 'object' || Array.isArray(saved.instruments)) return null;
+    for (const [axis, value] of Object.entries(saved.instruments)) {
+      if (!isDesignAxis(axis) || typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) return null;
+      instruments[axis] = value;
+    }
+  }
+  if (saved.galaxyGenre != null && (typeof saved.galaxyGenre !== 'string' || !mappedBriefGenre(saved.galaxyGenre))) return null;
+  const quest = saved.quest === undefined ? { enabled: false, length: 3 } : saved.quest;
+  if (!quest || typeof quest.enabled !== 'boolean' || !Number.isInteger(quest.length) || quest.length < 1 || quest.length > 8) return null;
+  const playable = saved.playable === undefined ? { enabled: false } : saved.playable;
+  if (!playable || typeof playable.enabled !== 'boolean' ||
+      (playable.mode !== undefined && !PLAYABLE_SLICES.some(item => item.id === playable.mode)) ||
+      (playable.launch !== undefined && typeof playable.launch !== 'boolean') ||
+      (playable.launch && (!playable.enabled || quest.enabled))) return null;
+  if (supplied('playtest') && saved.playtest !== 'off' && saved.playtest !== 'auto' && saved.playtest !== 'require') return null;
+  if (supplied('sourceExport') && (!saved.sourceExport || typeof saved.sourceExport !== 'object' ||
+      Array.isArray(saved.sourceExport) || typeof saved.sourceExport.enabled !== 'boolean')) return null;
   let lastRun: RunSnapshot | null = null;
   if (item.lastRun != null) {
     if (typeof item.lastRun !== 'object') return null;
@@ -600,21 +630,12 @@ function sanitizeProject(raw: unknown): StudioProject | null {
       options: { ...options },
       // Legacy saved projects may not contain newer controls. Recover the
       // exact supported axes/options without discarding older creative beats.
-      instruments: sparseInstrumentPayload(
-        questionnaire.instruments && typeof questionnaire.instruments === 'object'
-          && !Array.isArray(questionnaire.instruments)
-          ? questionnaire.instruments : {},
-      ),
-      galaxyGenre: typeof questionnaire.galaxyGenre === 'string'
-        && mappedBriefGenre(questionnaire.galaxyGenre)
-        ? questionnaire.galaxyGenre : null,
-      quest: {
-        enabled: questionnaire.quest?.enabled === true,
-        length: Number.isInteger(questionnaire.quest?.length)
-          && questionnaire.quest!.length >= 1 && questionnaire.quest!.length <= 8
-          ? questionnaire.quest!.length : 3,
-      },
-      playable: { enabled: questionnaire.playable?.enabled === true },
+      instruments,
+      galaxyGenre: questionnaire.galaxyGenre ?? null,
+      galaxyProfile: profile,
+      quest: { ...quest },
+      playable: { enabled: playable.enabled, ...(playable.mode === undefined ? {} : { mode: playable.mode }),
+        ...(playable.launch === undefined ? {} : { launch: playable.launch }) },
       playtest: questionnaire.playtest === 'require' || questionnaire.playtest === 'auto'
         ? questionnaire.playtest : 'off',
       sourceExport: { enabled: questionnaire.sourceExport?.enabled === true },

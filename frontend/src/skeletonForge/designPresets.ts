@@ -88,7 +88,7 @@ export function normalisePresetState(input: unknown): QuestionnaireState {
   }
   const instruments: Record<string, number> = Object.create(null);
   for (const [axis, value] of Object.entries(input.instruments)) {
-    if (!isDesignAxis(axis) || typeof value !== 'number') reject('unrecognised cockpit axis');
+    if (!isDesignAxis(axis) || typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) reject('invalid cockpit axis');
     const normalized = normaliseAxisEdit(value);
     if (normalized === null) reject('cockpit value must be finite and bounded');
     instruments[axis] = normalized;
@@ -101,12 +101,12 @@ export function normalisePresetState(input: unknown): QuestionnaireState {
   }
   const era = safeOption(options.era, 'era');
   const generation = safeOption(options.generation, 'generation');
-  const genre = input.galaxyGenre === null ? null : input.galaxyGenre;
+  const genre = input.galaxyGenre ?? null;
   if (genre !== null && (typeof genre !== 'string' || !galaxyGenre(genre))) {
     reject('unknown historical genre');
   }
   let profile = null;
-  if (input.galaxyProfile !== null) {
+  if (input.galaxyProfile != null) {
     if (!plain(input.galaxyProfile) || input.galaxyProfile.schema !== GALAXY_PROFILE_SCHEMA) {
       reject('invalid historical Galaxy profile');
     }
@@ -119,8 +119,8 @@ export function normalisePresetState(input: unknown): QuestionnaireState {
     reject('invalid native quest configuration');
   }
   if (!plain(playable) || typeof playable.enabled !== 'boolean'
-      || typeof playable.launch !== 'boolean'
-      || !PLAYABLE_SLICES.some((row) => row.id === playable.mode)) {
+      || (playable.launch !== undefined && typeof playable.launch !== 'boolean')
+      || (playable.mode !== undefined && !PLAYABLE_SLICES.some((row) => row.id === playable.mode))) {
     reject('invalid playable mini-game selection');
   }
   if (quest.enabled && playable.launch) reject('quest and mini-game cannot both own startup');
@@ -133,7 +133,8 @@ export function normalisePresetState(input: unknown): QuestionnaireState {
     galaxyGenre: genre as string | null,
     galaxyProfile: profile,
     quest: { enabled: quest.enabled, length: quest.length as number },
-    playable: { enabled: playable.enabled, mode: playable.mode as string, launch: playable.launch },
+    playable: { enabled: playable.enabled, ...(playable.mode === undefined ? {} : { mode: playable.mode as string }),
+      ...(playable.launch === undefined ? {} : { launch: playable.launch as boolean }) },
     options: { archetype: options.archetype as string, target: options.target as string, era, generation },
   };
 }

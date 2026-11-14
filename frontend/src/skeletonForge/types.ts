@@ -115,6 +115,9 @@ export interface RunRequest {
   include_files?: boolean;
   /** Optional playable Godot archetype sidecar scene (three verified templates). */
   playable_content?: boolean;
+  playable_archetype?: string;
+  playable_main_scene?: boolean;
+  galaxy_profile?: import('./galaxyHandoff').GalaxyProfile;
   /** Optional main-scene Godot boot, plus playable sidecar completion if present. */
   playtest?: 'auto' | 'require';
   /** Optional native room-entry quest attached to the generated Godot project. */
