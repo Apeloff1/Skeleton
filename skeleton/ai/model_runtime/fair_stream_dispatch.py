@@ -255,7 +255,7 @@ class GuardedFairStreamDispatch:
 
         This administrative in-process seam must only be exposed behind the
         application's independent operator authentication. It cannot repair
-        an uncommitted execution, an unknown result or a rolled-back anchor.
+        an execution without authenticated durable output or a rolled-back anchor.
         """
         from .fair_stream_execution_journal import (
             ExecutionOutcomeUnknown, FairStreamExecutionJournal,
@@ -295,7 +295,21 @@ class GuardedFairStreamDispatch:
             # Never call execute_and_commit, even if the journal has only a
             # RUNNING intent. The execution result must already be durable.
             try:
-                receipt = journal.recover_committed_receipt(permit)
+                from .fair_stream_execution_journal import JournaledExecutionOwner
+                from .fair_stream_result_vault import SealedFairStreamResultVault
+
+                owner = self._owner
+                if (type(owner) is JournaledExecutionOwner
+                        and type(owner._backend) is SealedFairStreamResultVault):
+                    if owner._journal is not journal or not owner.whole_request:
+                        raise ExecutionOutcomeUnknown("recovery must use the bound whole-request owner")
+                    rows = checkpoint["requests"]
+                    matching = [r for r in rows if r["request_id"] == permit.request_id]
+                    if len(matching) != 1 or matching[0]["remaining_tokens"] != permit.tokens:
+                        raise ExecutionOutcomeUnknown("partial native lease cannot be reconciled as terminal")
+                    receipt = journal.reconcile_sealed_completion(permit, vault=owner._backend)
+                else:
+                    receipt = journal.recover_committed_receipt(permit)
                 updated = self._session.acknowledge(receipt)
             except BaseException as exc:
                 # SQLite I/O errors, interruption and malformed receipts are

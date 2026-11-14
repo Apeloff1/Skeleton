@@ -361,8 +361,22 @@ class SealedFairStreamResultVault:
         The application must first verify authorization and the journal's
         authenticated completion receipt; this method alone is not an ACL.
         """
-        _identity(permit)
         expected = _hex(expected_result_digest, 64, "result receipt digest")
+        return self._read_verified(permit, expected=expected)[2]
+
+    def verify_sealed_completion(self, permit: DispatchPermit) -> tuple[int, str]:
+        """Verify durable AEAD output without returning its plaintext.
+
+        Trusted reconciliation callers must independently authenticate the
+        operator, exact pending lease and journal intent before using this.
+        """
+        consumed, digest, _ = self._read_verified(permit, expected=None)
+        return consumed, digest
+
+    def _read_verified(
+        self, permit: DispatchPermit, *, expected: str | None,
+    ) -> tuple[int, str, bytes]:
+        _identity(permit)
         with self._lock:
             self._require_open()
             row = self._row(permit.lease_id)
@@ -389,8 +403,10 @@ class SealedFairStreamResultVault:
                 or type(ciphertext) is not bytes
                 or len(ciphertext) != length + 16
                 or type(digest) is not str
-                or not hmac.compare_digest(digest, expected)
-                or not hmac.compare_digest(sha256(ciphertext).hexdigest(), expected)
+                or len(digest) != 64
+                or any(c not in "0123456789abcdef" for c in digest)
+                or (expected is not None and not hmac.compare_digest(digest, expected))
+                or not hmac.compare_digest(sha256(ciphertext).hexdigest(), digest)
             ):
                 raise SealedResultUnavailable("result binding or digest mismatch")
             aad = _aad(
@@ -405,4 +421,4 @@ class SealedFairStreamResultVault:
                 raise SealedResultUnavailable("result authentication failed") from exc
             if len(plaintext) != length:
                 raise SealedResultUnavailable("result length mismatch")
-            return plaintext
+            return consumed, digest, plaintext

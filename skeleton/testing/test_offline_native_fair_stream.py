@@ -471,3 +471,67 @@ def test_known_result_capacity_denial_precedes_plaintext_staging(private_files, 
     assert session.verify() == before
     assert registry.status()["staged"] == 0
     assert registry.status()["consumed_or_revoked"] == 0
+
+
+@pytest.mark.parametrize("tamper", [False, True])
+def test_native_recovery_after_vault_commit_before_journal_commit(private_files, monkeypatch, tamper):
+    from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchUncertain
+    from skeleton.ai.model_runtime.fair_stream_recovery import issue_recovery_authorization
+    from skeleton.app.offline_native_fair_stream import submit_authenticated_native_cpu_prompt
+
+    install_probe(monkeypatch)
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    req = StreamRequest("lost-journal-commit", "alice", InferencePhase.PREFILL, 2, 16)
+    submit_authenticated_native_cpu_prompt(
+        service=service, vault=vault, runtime=runtime, registry=registry,
+        authenticated_tenant_id="alice", request=req, prompt="hello", max_output_tokens=2,
+    )
+
+    def fail_commit(*args, **kwargs):
+        raise OSError("simulated journal commit failure")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(journal, "commit", fail_commit)
+        with pytest.raises(DispatchUncertain):
+            service.execute_next(token_budget=2)
+    assert journal._connection.execute(
+        "SELECT state FROM local_fair_stream_execution_journal"
+    ).fetchone() == ("running",)
+    before = session.verify()
+    pending = before["checkpoint"]["pending"][0]
+    key = b"z" * 32
+    approval = issue_recovery_authorization(
+        recovery_key=key, session_id=SESSION, generation=before["generation"],
+        checkpoint_digest=before["checkpoint_digest"], lease_id=pending["lease_id"],
+        nonce="f" * 32,
+    )
+    if tamper:
+        vault._connection.execute(
+            "UPDATE local_fair_stream_sealed_results SET nonce = ?", (b"x" * 12,)
+        )
+    def never_generate(*args, **kwargs):
+        pytest.fail("recovery must not invoke native inference")
+
+    monkeypatch.setattr(NativeLLMRuntime, "generate_sequence", never_generate)
+    if tamper:
+        with pytest.raises(DispatchUncertain):
+            service.reconcile_committed(journal=journal, authorization=approval, recovery_key=key)
+        assert session.verify() == before
+        assert journal._connection.execute(
+            "SELECT state FROM local_fair_stream_execution_journal"
+        ).fetchone() == ("running",)
+    else:
+        status = service.reconcile_committed(journal=journal, authorization=approval, recovery_key=key)
+        assert status.pending_leases == 0 and not status.execution_uncertain
+        assert journal._connection.execute(
+            "SELECT state FROM local_fair_stream_execution_journal"
+        ).fetchone() == ("committed",)
+        assert session.verify()["checkpoint"]["requests"] == []
+        with pytest.raises(DispatchUncertain):
+            service.reconcile_committed(journal=journal, authorization=approval, recovery_key=key)

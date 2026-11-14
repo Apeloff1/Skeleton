@@ -258,6 +258,49 @@ class FairStreamExecutionJournal:
                 self._connection.rollback()
                 raise
 
+    def reconcile_sealed_completion(
+        self, permit: DispatchPermit, *, vault: object,
+    ) -> dict[str, object]:
+        """Repair a lost journal commit only from the exact authenticated result.
+
+        This is called by an explicitly authorized, whole-request native
+        reconciliation owner. It never invokes generation or accepts a result
+        digest supplied by the operator. Both stores remain required.
+        """
+        from .fair_stream_result_vault import SealedFairStreamResultVault
+
+        if (type(vault) is not SealedFairStreamResultVault
+                or vault.session_id != self.session_id
+                or self._private_handle is None
+                or vault._connection is self._connection):
+            raise ExecutionOutcomeUnknown("independent bound native journal and vault required")
+        if type(permit) is not DispatchPermit or permit.device_qualified is not False:
+            raise ValueError("canonical CPU-only permit required")
+        with self._lock:
+            row = self._row(permit.lease_id)
+            if row is None or row[:4] != (
+                self.session_id, permit.generation,
+                permit.checkpoint_digest, permit.request_id,
+            ):
+                raise ExecutionOutcomeUnknown("no matching execution intent")
+            if row[4] == "committed":
+                receipt = self.recover_committed_receipt(permit)
+                if receipt.get("terminal") is not True:
+                    raise ExecutionOutcomeUnknown("legacy partial receipt requires separate reconciliation")
+                consumed, digest = vault.verify_sealed_completion(permit)
+                if (receipt["consumed_tokens"] != consumed
+                        or not hmac.compare_digest(receipt["result_digest"], digest)):
+                    raise ExecutionOutcomeUnknown("sealed result differs from committed receipt")
+                return receipt
+            if row[4] != "running" or row[5:] != (None, None, None):
+                raise ExecutionOutcomeUnknown("invalid running execution intent")
+            consumed, digest = vault.verify_sealed_completion(permit)
+            # The original generation may have completed and published the
+            # AES-GCM row before a crash prevented the journal COMMIT.
+            return self.commit(
+                permit, consumed_tokens=consumed, result_digest=digest, terminal=True,
+            )
+
     def recover_committed_receipt(
         self, permit: DispatchPermit,
     ) -> dict[str, object]:
