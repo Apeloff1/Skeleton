@@ -414,3 +414,52 @@ def test_native_cancel_releases_plaintext_and_burns_grant(private_files, monkeyp
             runtime=runtime, registry=registry, request_id="cancelled",
             tenant_id="alice", prompt="hello", max_output_tokens=2,
         )
+
+def test_native_durable_request_binds_process_keyed_grant_not_plaintext(private_files, monkeypatch):
+    from skeleton.ai.model_runtime.native_fair_stream_backend import NativeFairStreamDenied
+    from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchDeferred
+    from skeleton.app.offline_native_fair_stream import submit_authenticated_native_cpu_prompt
+
+    install_probe(monkeypatch)
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    request = StreamRequest("bound-native", "alice", InferencePhase.PREFILL, 2, 16)
+    submit_authenticated_native_cpu_prompt(
+        service=service, vault=vault, runtime=runtime, registry=registry,
+        authenticated_tenant_id="alice", request=request,
+        prompt="hello", max_output_tokens=2,
+    )
+    original = session.verify()
+    rows = original["checkpoint"]["requests"]
+    assert len(rows[0]["authorization_digest"]) == 64
+    assert "hello" not in str(original)
+    assert registry._binding_key.hex() not in str(original)
+    with pytest.raises(ValueError, match="durable"):
+        submit_authenticated_native_cpu_prompt(
+            service=service, vault=vault, runtime=runtime, registry=registry,
+            authenticated_tenant_id="alice", request=request,
+            prompt="world", max_output_tokens=2,
+        )
+    assert session.verify() == original
+    fresh = NativePromptRegistry(session_id=SESSION)
+    stage_native_cpu_prompt(
+        runtime=runtime, registry=fresh, request_id="bound-native",
+        tenant_id="alice", prompt="hello", max_output_tokens=2,
+    )
+    with pytest.raises(NativeFairStreamDenied, match="commitment mismatch"):
+        fresh.verify_queued(rows)
+    # Simulate a lost process key: the exact checkpoint remains unmodified.
+    monkeypatch.setattr(registry, "_binding_key", fresh._binding_key)
+    with pytest.raises(DispatchDeferred, match="queued authorization"):
+        service.execute_next(token_budget=2)
+    assert session.verify() == original
+    assert journal._connection.execute(
+        "SELECT COUNT(*) FROM local_fair_stream_execution_journal"
+    ).fetchone()[0] == 0
+    service.cancel("bound-native", tenant_id="alice")
+    assert registry.budget_status()["staged_bytes"] == 0

@@ -152,10 +152,14 @@ class DurableFairStreamSession:
                     "fair-stream transaction requires trusted reconciliation"
                 ) from exc
 
-    def submit(self, request: StreamRequest) -> dict[str, object]:
+    def submit(self, request: StreamRequest, *,
+               expected_anchor: tuple[int, str] | None = None) -> dict[str, object]:
         if not isinstance(request, StreamRequest):
             raise ValueError("canonical stream request required")
-        _, state = self._transition(action="submit", request=request)
+        if self.whole_request != (request.authorization_digest is not None):
+            raise ValueError("request authorization must match execution policy")
+        _, state = self._transition(action="submit", request=request,
+                                    expected_anchor=expected_anchor)
         return state
 
     def cancel(self, request_id: str, *, tenant_id: str | None = None,

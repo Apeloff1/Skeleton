@@ -182,9 +182,10 @@ def test_whole_request_policy_authenticated_across_restart_and_early_eos(tmp_pat
 
     with sqlite3.connect(path) as connection:
         session = DurableFairStreamSession.bootstrap(open_store(connection, True), anchor)
-        session.submit(StreamRequest("native", "tenant", InferencePhase.PREFILL, 4, 4))
+        session.submit(StreamRequest("native", "tenant", InferencePhase.PREFILL, 4, 4,
+                                     authorization_digest="f" * 64))
         prior = session.verify()
-        assert prior["checkpoint"]["execution_policy"] == "native-whole-request-v1"
+        assert prior["checkpoint"]["execution_policy"] == "native-whole-request-v2"
         with pytest.raises(ValueError, match="execution policy"):
             session.plan(budget(), whole_request=False)
         assert session.verify() == prior

@@ -17,8 +17,8 @@ from .iteration_scheduler import InferencePhase, IterationScheduler, IterationWo
 
 
 SCHEMA = "skeleton.ai.fair-stream-checkpoint.v1"
-WHOLE_REQUEST_SCHEMA = "skeleton.ai.fair-stream-checkpoint.v2"
-WHOLE_REQUEST_POLICY = "native-whole-request-v1"
+WHOLE_REQUEST_SCHEMA = "skeleton.ai.fair-stream-checkpoint.v3"
+WHOLE_REQUEST_POLICY = "native-whole-request-v2"
 PLAN_SCHEMA = "skeleton.ai.fair-stream-plan.v1"
 MAX_REQUESTS = 4096
 MAX_STREAMS = 64
@@ -59,6 +59,7 @@ class StreamRequest:
     remaining_tokens: int
     bytes_per_token: int
     priority: int = 0
+    authorization_digest: str | None = None
 
     def __post_init__(self) -> None:
         _identifier("request_id", self.request_id)
@@ -68,6 +69,12 @@ class StreamRequest:
         _integer("remaining_tokens", self.remaining_tokens, minimum=1, maximum=MAX_TOKENS)
         _integer("bytes_per_token", self.bytes_per_token, minimum=1)
         _integer("priority", self.priority, minimum=-100, maximum=100)
+        if self.authorization_digest is not None and (
+            type(self.authorization_digest) is not str
+            or len(self.authorization_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in self.authorization_digest)
+        ):
+            raise ValueError("invalid request authorization commitment")
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,6 +198,8 @@ class FairStreamScheduler:
             raise ValueError("StreamRequest required")
         if self._whole_request and request.remaining_tokens > 8192:
             raise ValueError("whole-request token ceiling exceeded")
+        if self._whole_request != (request.authorization_digest is not None):
+            raise ValueError("request authorization must match execution policy")
         with self._lock:
             if request.request_id in self._requests:
                 raise ValueError("duplicate stream request")
@@ -392,6 +401,8 @@ class FairStreamScheduler:
                         "priority": item.priority,
                         "served_tokens": self._served[item.request_id],
                         "wait_rounds": self._wait[item.request_id],
+                        **({"authorization_digest": item.authorization_digest}
+                           if self._whole_request else {}),
                     }
                     for _, item in sorted(self._requests.items())
                 ],
@@ -447,6 +458,8 @@ class FairStreamScheduler:
             "request_id", "tenant_id", "phase", "remaining_tokens",
             "bytes_per_token", "priority", "served_tokens", "wait_rounds",
         }
+        if whole_request:
+            request_fields.add("authorization_digest")
         for item in raw_requests:
             if type(item) is not dict or set(item) != request_fields:
                 raise ValueError("invalid checkpoint request")
@@ -457,6 +470,7 @@ class FairStreamScheduler:
             request = StreamRequest(
                 item["request_id"], item["tenant_id"], phase,
                 item["remaining_tokens"], item["bytes_per_token"], item["priority"],
+                item.get("authorization_digest"),
             )
             restored.submit(request)
             restored._served[request.request_id] = _integer(

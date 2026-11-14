@@ -72,6 +72,7 @@ class GuardedFairStreamDispatch:
         *, storage_path: str, whole_request: bool = False,
         queued_authority: Callable[[dict[str, object]], None] | None = None,
         cancel_cleanup: Callable[[str], None] | None = None,
+        prepare_request: Callable[[StreamRequest], StreamRequest] | None = None,
     ) -> None:
         if type(whole_request) is not bool:
             raise ValueError("explicit whole-request policy required")
@@ -93,10 +94,12 @@ class GuardedFairStreamDispatch:
         self._storage_path = storage_path
         self._whole_request = whole_request
         if ((queued_authority is not None and not callable(queued_authority))
-                or (cancel_cleanup is not None and not callable(cancel_cleanup))):
+                or (cancel_cleanup is not None and not callable(cancel_cleanup))
+                or (prepare_request is not None and not callable(prepare_request))):
             raise ValueError("trusted queue lifecycle callbacks required")
         self._queued_authority = queued_authority
         self._cancel_cleanup = cancel_cleanup
+        self._prepare_request = prepare_request
         self._lock = RLock()
         self._issued: dict[str, DispatchPermit] = {}
         self._issued_token_budget: int | None = None
@@ -132,7 +135,19 @@ class GuardedFairStreamDispatch:
     def submit(self, request: StreamRequest) -> dict[str, object]:
         with self._lock:
             self._require_no_pending()
-            return self._session.submit(request)
+            anchor = None
+            if self._prepare_request is not None:
+                snapshot = self._session.verify()
+                if any(row["request_id"] == request.request_id
+                       for row in snapshot["checkpoint"]["requests"]):
+                    raise ValueError("duplicate durable stream request")
+                prepared = self._prepare_request(request)
+                if (type(prepared) is not StreamRequest
+                        or replace(prepared, authorization_digest=request.authorization_digest) != request):
+                    raise ValueError("trusted preparation changed request identity")
+                request = prepared
+                anchor = (snapshot["generation"], snapshot["digest"])
+            return self._session.submit(request, expected_anchor=anchor)
 
     def cancel(self, request_id: str, *, tenant_id: str | None = None) -> dict[str, object]:
         with self._lock:
@@ -390,6 +405,17 @@ class GuardedFairStreamDispatch:
                 raise DispatchUncertain(
                     "durable lease changed during resource probe; reconciliation required"
                 ) from exc
+            if self._queued_authority is not None:
+                try:
+                    self._queued_authority(refreshed)
+                except (ValueError, RuntimeError, OSError) as exc:
+                    raise DispatchDeferred("pending prompt authorization unavailable; hold for reconciliation") from exc
+                # Authorization checks can themselves cross an I/O boundary.
+                try:
+                    refreshed = self._validate_pending(permit)
+                except BaseException as exc:
+                    self._uncertain = True
+                    raise DispatchUncertain("durable lease changed during grant verification") from exc
             self._executing = True
             try:
                 try:

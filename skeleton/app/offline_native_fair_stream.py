@@ -124,10 +124,15 @@ def bind_native_cpu_dispatch_service(
             if journal.request_exists(request["request_id"]):
                 raise ValueError("queued identity already has execution custody")
 
+    def prepare_native_request(request: StreamRequest) -> StreamRequest:
+        if journal.request_exists(request.request_id):
+            raise ValueError("request already has durable execution custody")
+        return registry.bind_request(request)
+
     service = OfflineAdaptiveDispatchService(
         session, owner, sampler=sampler, storage_path=storage_path,
         whole_request=True, queued_authority=verify_queued_authority,
-        cancel_cleanup=registry.discard_cancelled,
+        cancel_cleanup=registry.discard_cancelled, prepare_request=prepare_native_request,
     )
     return service, vault
 
@@ -182,17 +187,24 @@ def submit_authenticated_native_cpu_prompt(
             or vault._backend.runtime is not runtime
             or service._session.verify().get("session_id") != registry.session_id):
         raise ValueError("native app ownership binding mismatch")
-    if owner._journal.request_exists(request.request_id):
-        raise ValueError("request already has durable execution custody")
-    stage_native_cpu_prompt(
-        runtime=runtime, registry=registry, request_id=request.request_id,
-        tenant_id=authenticated_tenant_id, prompt=prompt,
-        max_output_tokens=max_output_tokens,
-    )
-    try:
-        return service.submit(request)
-    except BaseException:
-        # Never retain plaintext admission after a failed or uncertain submit.
-        # Revocation burns this process-local identity; no automatic retry.
-        registry.revoke(request.request_id)
-        raise
+    # Serialize staging with planning/cancellation on this trusted service.
+    # A peer CAS change is still fenced by the exact anchor during submit.
+    with service._guard._lock:
+        service._guard._require_no_pending()
+        snapshot = service._session.verify()
+        if (request.authorization_digest is not None
+                or any(row["request_id"] == request.request_id
+                       for row in snapshot["checkpoint"]["requests"])
+                or owner._journal.request_exists(request.request_id)):
+            raise ValueError("request already has durable admission or execution custody")
+        stage_native_cpu_prompt(
+            runtime=runtime, registry=registry, request_id=request.request_id,
+            tenant_id=authenticated_tenant_id, prompt=prompt,
+            max_output_tokens=max_output_tokens,
+        )
+        try:
+            return service.submit(request)
+        except BaseException:
+            # Cleanup must not depend on a functioning expiration clock.
+            registry.discard_cancelled(request.request_id)
+            raise

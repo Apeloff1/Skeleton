@@ -7,10 +7,11 @@ No prompt or key material is written into scheduler checkpoints or receipts.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from hashlib import sha256
 import hmac
 import os
+import secrets
 from threading import RLock
 from time import monotonic_ns
 from typing import Mapping
@@ -18,6 +19,7 @@ from typing import Mapping
 from .fair_stream_result_vault import MAX_RESULT_BYTES
 from .flgb_model_runtime import digest_json
 from .fair_stream_session import DispatchPermit
+from .fair_stream_queue import StreamRequest, WHOLE_REQUEST_SCHEMA
 from .native_llm_runtime import GenerationResult, NativeLLMRuntime
 from .runtime_contracts import GenerationConfig
 from .native_token_pressure import NativeTokenPressureGuard
@@ -182,6 +184,7 @@ class NativePromptRegistry:
                 or not 1 <= max_stage_age_ns <= MAX_PROMPT_STAGE_AGE_NS):
             raise NativeFairStreamDenied("invalid prompt staging lifetime")
         self._owner_pid = os.getpid()
+        self._binding_key = secrets.token_bytes(32)
         self._lock = RLock()
         self._staged: dict[str, PinnedNativePrompt] = {}
         self._staged_at: dict[str, int] = {}
@@ -240,7 +243,56 @@ class NativePromptRegistry:
             self._staged[pinned.request_id] = pinned
             self._staged_at[pinned.request_id] = now
 
-    def claim(self, request_id: str, tenant_id: str) -> PinnedNativePrompt:
+    def _commitment(self, pinned: PinnedNativePrompt, request: Mapping[str, object]) -> str:
+        # The process-private key is never serialized; the commitment cannot
+        # be regenerated on restart, even from the same plaintext prompt.
+        fields = {
+            "schema": "skeleton.ai.native-prompt-authorization.v1",
+            "session_id": pinned.session_id,
+            "request_id": pinned.request_id,
+            "tenant_id": pinned.tenant_id,
+            "prompt_digest": pinned.prompt_digest,
+            "model_digest": pinned.model_digest,
+            "tokenizer_digest": pinned.tokenizer_digest,
+            "max_output_tokens": pinned.max_output_tokens,
+            "remaining_tokens": request.get("remaining_tokens"),
+            "bytes_per_token": request.get("bytes_per_token"),
+            "phase": request.get("phase"),
+            "priority": request.get("priority"),
+        }
+        return hmac.new(self._binding_key, digest_json(fields).encode("ascii"), sha256).hexdigest()
+
+    def _verified_pinned(self, request: Mapping[str, object], *, bound: bool) -> PinnedNativePrompt:
+        rid = _id(request.get("request_id"), "request")
+        tenant = _id(request.get("tenant_id"), "tenant")
+        tokens = request.get("remaining_tokens")
+        pinned = self._staged.get(rid)
+        if (pinned is None or pinned.tenant_id != tenant or type(tokens) is not int
+                or not 1 <= tokens <= pinned.max_output_tokens):
+            raise NativeFairStreamDenied("queued prompt authorization unavailable; cancel explicitly")
+        if bound:
+            commitment = _digest(request.get("authorization_digest"), "request authorization")
+            if not hmac.compare_digest(commitment, self._commitment(pinned, request)):
+                raise NativeFairStreamDenied("queued prompt authorization commitment mismatch")
+        return pinned
+
+    def bind_request(self, request: StreamRequest) -> StreamRequest:
+        """Bind the exact staged grant before durable publication."""
+        _require_owner_process(self._owner_pid)
+        if type(request) is not StreamRequest or request.authorization_digest is not None:
+            raise NativeFairStreamDenied("unbound canonical request required")
+        row = {
+            "request_id": request.request_id, "tenant_id": request.tenant_id,
+            "remaining_tokens": request.remaining_tokens, "bytes_per_token": request.bytes_per_token,
+            "phase": request.phase.value, "priority": request.priority,
+        }
+        with self._lock:
+            self._expire_locked(self._clock_locked())
+            pinned = self._verified_pinned(row, bound=False)
+            return replace(request, authorization_digest=self._commitment(pinned, row))
+
+    def claim(self, request_id: str, tenant_id: str, *,
+              authorized_request: Mapping[str, object] | None = None) -> PinnedNativePrompt:
         """Consume before invoking a potentially side-effecting model."""
         _require_owner_process(self._owner_pid)
         with self._lock:
@@ -248,6 +300,9 @@ class NativePromptRegistry:
             pinned = self._staged.get(_id(request_id, "request"))
             if pinned is None or pinned.tenant_id != _id(tenant_id, "tenant"):
                 raise NativeFairStreamDenied("missing authorized prompt")
+            if authorized_request is not None:
+                if self._verified_pinned(authorized_request, bound=True) is not pinned:
+                    raise NativeFairStreamDenied("native request authorization identity mismatch")
             self._budget.release(pinned.tenant_id, len(pinned.prompt.encode("utf-8")))
             self._used.add(request_id)
             del self._staged[request_id]
@@ -268,14 +323,7 @@ class NativePromptRegistry:
             for request in requests:
                 if type(request) is not dict:
                     raise NativeFairStreamDenied("invalid native queued request")
-                rid = _id(request.get("request_id"), "request")
-                tenant = _id(request.get("tenant_id"), "tenant")
-                tokens = request.get("remaining_tokens")
-                pinned = self._staged.get(rid)
-                if (pinned is None or pinned.tenant_id != tenant
-                        or type(tokens) is not int
-                        or not 1 <= tokens <= pinned.max_output_tokens):
-                    raise NativeFairStreamDenied("queued prompt authorization unavailable; cancel explicitly")
+                self._verified_pinned(request, bound=True)
 
     def revoke(self, request_id: str) -> None:
         """Burn a pending grant without authorizing an execution."""
@@ -421,7 +469,16 @@ class NativeFairStreamBackend:
                     or not hmac.compare_digest(tokenizer, self.tokenizer_digest)):
                 raise NativeFairStreamDenied("pinned native runtime changed")
             # Claim is intentionally irreversible, even on a preflight failure.
-            pinned = self.registry.claim(permit.request_id, tenant)
+            checkpoint = state["checkpoint"]
+            authorized_request = None
+            if checkpoint.get("schema") == WHOLE_REQUEST_SCHEMA:
+                authorized_request = next(
+                    item for item in checkpoint["requests"]
+                    if item["request_id"] == permit.request_id
+                )
+            pinned = self.registry.claim(
+                permit.request_id, tenant, authorized_request=authorized_request,
+            )
             if (pinned.max_output_tokens < permit.tokens
                     or not hmac.compare_digest(pinned.model_digest, model)
                     or not hmac.compare_digest(pinned.tokenizer_digest, tokenizer)):
