@@ -48,6 +48,7 @@ jobs:
       - name: Run offline local activation, inference and physical drain acceptance
         run: >-
           python -m pytest --import-mode=importlib -q --tb=short
+          backend/tests/test_live_collection_boundary.py
           backend/tests/test_model_catalog_reconciliation.py
           skeleton/testing/test_cooperation_multidraft.py
           skeleton/testing/test_engine_admission_recovery.py
