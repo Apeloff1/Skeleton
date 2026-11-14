@@ -68,7 +68,8 @@ def _launch(exe: Path, args: list[str], cwd: Path, *, timeout: int) -> dict[str,
             "timeout": False,
             "errors": scan_log(output)[:12],
             "output": output[-6000:],
-            **({"version_stdout": stdout[:402], "version_stderr": stderr[:402]} if version_probe else {}),
+            **({"version_stdout": stdout if len(stdout) <= 402 else None,
+                "version_stderr": stderr[:402]} if version_probe else {}),
         }
     except subprocess.TimeoutExpired as error:
         data = error.stdout or b""

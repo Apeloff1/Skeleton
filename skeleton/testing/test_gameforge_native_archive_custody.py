@@ -117,3 +117,17 @@ def test_noncanonical_zip_alias_is_not_accepted_as_official_distribution(tmp_pat
     digest = _archive(dist, {"pkg//Godot_4": exe.read_bytes()})
     with pytest.raises(ValueError, match="unsafe or duplicate"):
         verify_engine_archive(exe, dist, digest)
+
+
+def test_version_probe_preserves_raw_control_and_rejects_truncated_record(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    from scripts import qualify_gameforge_godot_native as qualification
+    def launch(stdout):
+        monkeypatch.setattr(qualification.subprocess, "run", lambda *args, **kwargs:
+            SimpleNamespace(stdout=stdout, stderr=b"", returncode=0))
+        return qualification._launch(tmp_path / "godot", ["--version"], tmp_path, timeout=1)
+    record = launch(b"4.3.stable.official.x\r")
+    assert record["version_stdout"] == "4.3.stable.official.x\r"
+    with pytest.raises(ValueError):
+        qualification.parse_godot_major_four(record["version_stdout"])
+    assert launch(b"4.3.stable.official.x" + b"a" * 500)["version_stdout"] is None
