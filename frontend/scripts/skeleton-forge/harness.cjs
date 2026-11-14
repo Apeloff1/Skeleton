@@ -23,6 +23,8 @@ const PRESETS = [
 ];
 const PLUGINS = [requireFromRoot.resolve('@babel/plugin-transform-modules-commonjs')];
 const STUB = path.join(__dirname, 'rn-deep-stub.cjs');
+const EXPO_CONSTANTS = path.join(__dirname, 'expo-constants-ssr.cjs');
+const ASYNC_STORAGE = path.join(__dirname, 'async-storage-ssr.cjs');
 const SRC_EXT = ['.tsx', '.ts'];
 
 // Pure server-rendered contract tests must not import the live Expo API stack:
@@ -54,6 +56,11 @@ Module._load = function loadWithoutNativeExpo(request, parent, ...rest) {
 let svgRoot;
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function resolve(request, parent, ...rest) {
+  // Native-only Expo configuration and storage must not load Metro's
+  // TypeScript package entry in the Node SSR process. Real app source and
+  // API client still execute; device integration is qualified separately.
+  if (request === 'expo-constants') return EXPO_CONSTANTS;
+  if (request === '@react-native-async-storage/async-storage') return ASYNC_STORAGE;
   if (request === 'react-native-svg') {
     svgRoot = path.dirname(requireFromRoot.resolve('react-native-svg/package.json'));
     const webEntry = path.join(svgRoot, 'lib', 'commonjs', 'ReactNativeSVG.web.js');

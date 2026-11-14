@@ -338,50 +338,6 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
         ) : null}
       </View>
 
-      <View style={st.group} testID="q-godot-source-export" accessibilityRole="radiogroup" accessibilityLabel="Portable Godot source project">
-        <Text style={st.q}>Portable Godot source project</Text>
-        <Text style={st.help}>
-          Prepare a bounded, exact-run ZIP containing the project source and scripts,
-          available after a successful source-sealed Godot build.
-          This does not build an APK, executable, signed release or device installer.
-        </Text>
-        <View style={st.chips}>
-          <Chip label="Do not return project source" selected={!state.sourceExport?.enabled}
-            onPress={() => dispatch({ type: 'setSourceExportEnabled', value: false })}
-            testID="q-source-export-off" />
-          <Chip label="Prepare portable Godot ZIP" selected={!!state.sourceExport?.enabled}
-            disabled={state.options.target !== 'godot'}
-            onPress={() => dispatch({ type: 'setSourceExportEnabled', value: true })}
-            testID="q-source-export-on" />
-        </View>
-        {state.sourceExport?.enabled && state.options.target !== 'godot' ? (
-          <Text style={st.help} testID="q-source-export-inactive">
-            Choose Godot output to include the complete source project in this run.
-          </Text>
-        ) : null}
-      </View>
-      <View style={st.group} testID="q-native-playtest-mode" accessibilityRole="radiogroup" accessibilityLabel="Native Godot execution verification">
-        <Text style={st.q}>Native Godot verification</Text>
-        <Text style={st.help}>
-          Optional native execution check. The selected playable mini-game is tested
-          independently of the main world. Require blocks project publication
-          if either attempted scene fails or Godot is unavailable.
-          A boot from an unverified binary remains visibly unqualified for release.
-        </Text>
-        <View style={st.chips}>
-          <Chip label="Source checks only" selected={!state.playtest || state.playtest === 'off'}
-            onPress={() => dispatch({ type: 'setPlaytestMode', value: 'off' })}
-            testID="q-native-playtest-off" />
-          <Chip label="Test if Godot available" selected={state.playtest === 'auto'}
-            disabled={state.options.target !== 'godot'}
-            onPress={() => dispatch({ type: 'setPlaytestMode', value: 'auto' })}
-            testID="q-native-playtest-auto" />
-          <Chip label="Require native scene completion" selected={state.playtest === 'require'}
-            disabled={state.options.target !== 'godot'}
-            onPress={() => dispatch({ type: 'setPlaytestMode', value: 'require' })}
-            testID="q-native-playtest-require" />
-        </View>
-      </View>
       <View style={st.group} testID="q-native-quest-controls" accessibilityRole="radiogroup" accessibilityLabel="Native quest gameplay">
         <Text style={st.q}>Native room-entry quest gameplay</Text>
         <Text style={st.help}>Optional real Godot quest runtime with room-triggered objectives, a quest HUD, and source-checked save snapshots. Does not automatically create NPC conversations or combat quests.</Text>
@@ -524,8 +480,6 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
       <Row k="Output" v={TARGETS.find((t) => t.id === req.target)?.label ?? req.target} />
       {state.playable?.enabled && !req.playable_content ? <Banner tone="warn" testID="q-playable-not-exported">Native playable mini-games require Godot output. This JSON-only export preserves your design but will not contain the mini-game scenes.</Banner> : null}
       {req.playable_content ? <Row k="Playable mini-game" v={`${PLAYABLE_SLICES.find((slice) => slice.id === req.playable_archetype)?.label ?? req.playable_archetype} · ${req.playable_main_scene ? "startup scene" : "additional scene"}`} /> : null}
-      {req.include_files ? <Row k="Portable source" v="Prepare the exact emitted Godot project for a local ZIP after this run" /> : null}
-      {req.playtest ? <Row k="Native verification" v={req.playtest === 'require' ? 'Required: main-world boot plus independent mini-game scene completion' : 'Best-effort native Godot scene validation'} /> : null}
       {req.quest_content ? <Row k="Native quest" v={`${req.quest_length} room-entry objectives · source-bound HUD and save contract`} /> : null}
       {state.quest?.enabled && !req.quest_content ? <Banner tone="warn" testID="q-native-quest-not-exported">Native room quests are disabled for JSON blueprint output. Select Godot in Forge options to include one.</Banner> : null}
       {state.galaxyGenre ? <Row k="Specialized genre" v={(galaxyGenre(state.galaxyGenre)?.name ?? state.galaxyGenre) + " → " + (mappedBriefGenre(state.galaxyGenre) ?? "unknown")} /> : null}

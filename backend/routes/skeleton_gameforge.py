@@ -1,10 +1,9 @@
 """HTTP surface for the Skeleton GameForge pipeline (eras, intake, run)."""
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -14,28 +13,6 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 router = APIRouter(prefix="/api/skeleton", tags=["skeleton-gameforge"])
-
-
-_EXPORT_SEGMENT = re.compile(r"^[A-Za-z0-9_.-]{1,120}$")
-_EXPORT_DEVICES = {"con", "nul", "aux", "prn"} | {
-    f"{prefix}{index}" for prefix in ("com", "lpt") for index in range(1, 10)
-}
-
-
-def _safe_export_path(name: str) -> bool:
-    """Use the portable ZIP path contract before returning source bodies."""
-    if not isinstance(name, str) or not name or len(name) > 240:
-        return False
-    if "\\" in name or ":" in name or name.startswith("/"):
-        return False
-    parts = name.split("/")
-    return all(
-        part and part not in {".", ".."} and not part.startswith(".")
-        and part.rstrip(" .") == part
-        and _EXPORT_SEGMENT.fullmatch(part) is not None
-        and part.split(".")[0].casefold() not in _EXPORT_DEVICES
-        for part in parts
-    )
 
 
 class RunRequest(BaseModel):
@@ -56,7 +33,6 @@ class RunRequest(BaseModel):
     playable_content: bool = False
     playable_archetype: Optional[str] = Field(default=None, max_length=64)
     playable_main_scene: bool = False
-    playtest: Optional[Literal["off", "auto", "require"]] = None
     blend: Optional[list] = None
     t: float = 0.5
     generation: Optional[str] = None
@@ -122,62 +98,13 @@ def run(req: RunRequest) -> Dict[str, Any]:
             **({"quest_content": True, "quest_length": req.quest_length} if req.quest_content else {}),
             **({"playable_content": True, "playable_archetype": req.playable_archetype,
                 "playable_main_scene": req.playable_main_scene} if req.playable_content else {}),
-            **({"playtest": req.playtest} if req.playtest and req.playtest != "off" else {}),
         )
     except Exception as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     files = payload.get("files") or {}
     payload = dict(payload)
     payload["file_names"] = sorted(files)
-    if req.include_files:
-        manifest = payload.get("source_manifest")
-        ready = (
-            req.target == "godot"
-            and payload.get("succeeded") is True
-            and isinstance(files, dict)
-            and 0 < len(files) <= 256
-            and isinstance(manifest, dict)
-            and manifest.get("schema") == "skeleton.forge.source_manifest.v1"
-            and isinstance(manifest.get("sha256"), str)
-            and len(manifest["sha256"]) == 64
-            and manifest.get("file_count") == len(files)
-        )
-        source_bytes = 0
-        if ready:
-            for name, body in files.items():
-                if not _safe_export_path(name) or not isinstance(body, str):
-                    ready = False
-                    break
-                try:
-                    source_bytes += len(body.encode("utf-8"))
-                except UnicodeEncodeError:
-                    ready = False
-                    break
-                if source_bytes > 8 * 1024 * 1024:
-                    ready = False
-                    break
-        if ready:
-            # Do not trust the returned manifest on assertion alone. Recompute
-            # against the exact bodies, paths and file list for this one run.
-            from skeleton.forge.source_manifest import source_manifest
-            try:
-                ready = source_manifest(files) == manifest
-            except (ValueError, TypeError, UnicodeError):
-                ready = False
-        if ready:
-            payload["source_export"] = {
-                "status": "ready",
-                "bytes": source_bytes,
-                "file_count": len(files),
-                "manifest_sha256": manifest["sha256"],
-            }
-        else:
-            payload["source_export"] = {
-                "status": "unavailable",
-                "reason": "Godot source export unavailable (build failed, unsealed, or exceeds 256 files / 8 MiB)",
-            }
-            payload.pop("files", None)
-    else:
+    if not req.include_files:
         payload.pop("files", None)
     return payload
 
