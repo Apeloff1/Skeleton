@@ -236,6 +236,10 @@ class PayloadSecretGuard:
         def scan_text(item: str, depth: int) -> str:
             nonlocal hits
             charge_text(item)
+            # Apply the per-value budget before parsing or scanning text.
+            if len(item) > _MAX_DECODE_CHARS:
+                hits += 1
+                return REDACTED
             stripped = item.strip()
             if stripped[:1] in ("{", "[") and depth + 1 >= _MAX_DEPTH:
                 hits += 1
