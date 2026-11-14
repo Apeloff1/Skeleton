@@ -10,11 +10,19 @@ Normal cleanup terminates remaining job members and waits for the active
 member count to reach zero. Parent death closes the job handle and requests
 kernel termination. No breakaway policy is enabled.
 
+For authenticated workspace launches, the locked persistent marker is set to
+0x01 and flushed before the model gate opens. The exact launch's completion
+callback restores 0x00 only after verified zero active members and helper
+reaping. If the supervisor dies or termination evidence is unavailable, the
+marker remains dirty and a replacement service fails closed, even after the
+byte-range lock is released. Standalone children without a workspace lease
+have no cross-process workspace claim.
+
 The Windows workflow runs actual helper/descendant subprocess tests on a
 Windows-hosted runner and is required by the full regression aggregate.
 These tests do not qualify real GGUF outputs, installer integration, Windows
 11/WSL2 hardware or driver behavior. A frozen executable without a trusted
-CPython helper is denied. The supervisor's existing byte-range lock can be
-released by process death before the kernel has fully drained its job;
-cross-process simultaneous model exclusion during that interval requires
-additional platform qualification. No unsupported containment fallback.
+CPython helper is denied. Automatic recovery of a dirty marker is intentionally not implemented.
+Only a separately qualified operator recovery procedure may clear it after
+establishing that all prior native work has stopped. Never clear it merely
+because the byte-range lock is available. No unsupported containment fallback.

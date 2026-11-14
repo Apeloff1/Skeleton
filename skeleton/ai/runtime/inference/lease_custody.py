@@ -3,7 +3,8 @@
 A POSIX flock belongs to an open file description. Native children inherit
 that exact description, never an arbitrary recycled descriptor. Context
 copies share revocation state and subprocess admission is serialized against
-lease exit. Windows job-object qualification is separate.
+lease exit. A Windows durable dirty marker fences replacement supervisors until
+job drainage has been proved.
 """
 from __future__ import annotations
 
@@ -12,8 +13,8 @@ from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 import os
 import stat
-from threading import Lock
-from typing import Iterator
+from threading import RLock
+from typing import Callable, Iterator
 
 
 @dataclass
@@ -22,7 +23,8 @@ class _LeaseBinding:
     device: int
     inode: int
     active: bool = True
-    gate: Lock = field(default_factory=Lock)
+    gate: RLock = field(default_factory=RLock)
+    windows_fence: object | None = None
 
 
 _current_local_inference_lease: ContextVar[_LeaseBinding | None] = ContextVar(
@@ -68,7 +70,53 @@ def gguf_child_fd_scope() -> Iterator[tuple[int, ...]]:
     with binding.gate:
         if not binding.active:
             raise RuntimeError("local inference lease context revoked")
-        yield _verified_fds(binding) if os.name == "posix" else ()
+        verified = _verified_fds(binding)
+        yield verified if os.name == "posix" else ()
+
+
+def begin_windows_native_custody() -> Callable[[], None] | None:
+    """Persist a dirty marker *before* permitting a Windows native launch.
+
+    Only the returned completion callback may clean this particular fence.
+    Call it after verified zero job membership and helper reaping, never
+    merely because a termination request was sent. On crash, leave the
+    marker dirty; a replacement supervisor cannot assume the job has drained.
+    Standalone non-workspace callers have no cross-process workspace claim.
+    """
+    if os.name != "nt":
+        raise RuntimeError("Windows native fence is platform-specific")
+    binding = _current_local_inference_lease.get()
+    if binding is None:
+        return None
+    with binding.gate:
+        _verified_fds(binding)
+        if binding.windows_fence is not None:
+            raise RuntimeError("Windows native execution fence already active")
+        os.lseek(binding.fd, 0, os.SEEK_SET)
+        if os.read(binding.fd, 2) != b"\x00":
+            raise RuntimeError("Windows native execution marker is not clean")
+        nonce = object()
+        binding.windows_fence = nonce
+        os.lseek(binding.fd, 0, os.SEEK_SET)
+        if os.write(binding.fd, b"\x01") != 1:
+            raise RuntimeError("Windows native execution fence write incomplete")
+        os.fsync(binding.fd)
+
+    def complete() -> None:
+        with binding.gate:
+            _verified_fds(binding)
+            if binding.windows_fence is not nonce:
+                raise RuntimeError("Windows native execution fence is stale")
+            os.lseek(binding.fd, 0, os.SEEK_SET)
+            if os.read(binding.fd, 2) != b"\x01":
+                raise RuntimeError("Windows native execution fence marker changed")
+            os.lseek(binding.fd, 0, os.SEEK_SET)
+            if os.write(binding.fd, b"\x00") != 1:
+                raise RuntimeError("Windows native execution completion write incomplete")
+            os.fsync(binding.fd)
+            binding.windows_fence = None
+
+    return complete
 
 
 def gguf_child_pass_fds() -> tuple[int, ...]:
@@ -77,4 +125,7 @@ def gguf_child_pass_fds() -> tuple[int, ...]:
         return fds
 
 
-__all__ = ["enter_local_lease", "leave_local_lease", "gguf_child_pass_fds", "gguf_child_fd_scope"]
+__all__ = [
+    "enter_local_lease", "leave_local_lease", "gguf_child_pass_fds",
+    "gguf_child_fd_scope", "begin_windows_native_custody",
+]

@@ -18,6 +18,13 @@ assert spec is not None and spec.loader is not None
 custody = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(custody)
 
+LEASE_PATH = MODULE_PATH.with_name("lease_custody.py")
+lease_spec = importlib.util.spec_from_file_location("windows_lease_custody_test_target", LEASE_PATH)
+assert lease_spec is not None and lease_spec.loader is not None
+lease_custody = importlib.util.module_from_spec(lease_spec)
+sys.modules[lease_spec.name] = lease_custody
+lease_spec.loader.exec_module(lease_custody)
+
 pytestmark = pytest.mark.skipif(os.name != "nt", reason="Windows kernel Job Objects required")
 
 
@@ -34,7 +41,8 @@ def test_success_preserves_exit_and_output():
     try:
         assert process.wait(timeout=10) == 0
         assert custody.terminate_windows_job(process)
-        assert process.communicate(timeout=3) == (b"contained\r\n", b"")
+        out, error = process.communicate(timeout=3)
+        assert out.strip() == b"contained" and error == b""
     finally:
         if process.returncode is None:
             custody.terminate_windows_job(process)
@@ -111,3 +119,58 @@ def test_supervisor_death_kills_job_members(tmp_path):
             if kernel.WaitForSingleObject(handle, 0) != 0:
                 kernel.TerminateProcess(handle, 1)
             kernel.CloseHandle(handle)
+
+
+def test_workspace_marker_stays_dirty_until_job_drain(tmp_path):
+    marker = tmp_path / "native.inference.lock"
+    marker.write_bytes(bytes((0,)))
+    fd = os.open(marker, os.O_RDWR | os.O_BINARY)
+    token = lease_custody.enter_local_lease(fd)
+    process = None
+    try:
+        process = custody.spawn_windows_job(
+            [sys.executable, "-I", "-S", "-c", "import time; time.sleep(30)"],
+            begin_lease_fence=lease_custody.begin_windows_native_custody,
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            close_fds=True, shell=False,
+        )
+        assert marker.read_bytes() == bytes((1,))
+        with pytest.raises(RuntimeError, match="already active"):
+            lease_custody.begin_windows_native_custody()
+        custody.terminate_windows_job(process)
+        assert marker.read_bytes() == bytes((0,))
+        process.communicate(timeout=3)
+    finally:
+        if process is not None and getattr(process, custody._JOB_ATTR).handle:
+            custody.terminate_windows_job(process)
+        lease_custody.leave_local_lease(token)
+        os.close(fd)
+
+
+def test_workspace_fence_cannot_be_cleared_by_revoked_context(tmp_path):
+    marker = tmp_path / "native.inference.lock"
+    marker.write_bytes(bytes((0,)))
+    fd = os.open(marker, os.O_RDWR | os.O_BINARY)
+    token = lease_custody.enter_local_lease(fd)
+    finish = lease_custody.begin_windows_native_custody()
+    lease_custody.leave_local_lease(token)
+    try:
+        with pytest.raises(RuntimeError, match="revoked"):
+            finish()
+        assert marker.read_bytes() == bytes((1,))
+    finally:
+        os.close(fd)
+
+
+def test_workspace_dirty_marker_refuses_new_native_fence(tmp_path):
+    marker = tmp_path / "native.inference.lock"
+    marker.write_bytes(bytes((1,)))
+    fd = os.open(marker, os.O_RDWR | os.O_BINARY)
+    token = lease_custody.enter_local_lease(fd)
+    try:
+        with pytest.raises(RuntimeError, match="not clean"):
+            lease_custody.begin_windows_native_custody()
+        assert marker.read_bytes() == bytes((1,))
+    finally:
+        lease_custody.leave_local_lease(token)
+        os.close(fd)

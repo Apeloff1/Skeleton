@@ -35,7 +35,7 @@ from skeleton.skills.tool_contract import (
 )
 
 from .kv_placement import observe_native_kv_placement
-from .lease_custody import gguf_child_fd_scope
+from .lease_custody import begin_windows_native_custody, gguf_child_fd_scope
 from .process_group_custody import observe_worker_exit, terminate_owned_process_group
 from .windows_job_custody import spawn_windows_job, terminate_windows_job
 from .local import (
@@ -1781,6 +1781,7 @@ class LlamaCppModel:
                             # Windows uses a gated helper bound to a kill-on-close
                             # Job Object before the actual model can start.
                             **({"pass_fds": lease_fds} if os.name == "posix" else {}),
+                            **({"begin_lease_fence": begin_windows_native_custody} if os.name == "nt" else {}),
                             creationflags=(getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0),
                         )
                 except BaseException:

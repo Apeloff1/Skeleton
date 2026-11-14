@@ -14,9 +14,10 @@ from pathlib import Path
 import subprocess
 import sys
 import time
-from typing import Any
+from typing import Any, Callable
 
 _JOB_ATTR = "_skeleton_native_job"
+_FENCE_ATTR = "_skeleton_native_fence_completion"
 _JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
 _JOB_OBJECT_EXTENDED_LIMIT_INFORMATION = 9
 _JOB_OBJECT_BASIC_ACCOUNTING_INFORMATION = 1
@@ -155,7 +156,10 @@ class _WindowsJob:
             self.handle = None
 
 
-def spawn_windows_job(command: list[str], **kwargs: Any) -> subprocess.Popen[bytes]:
+def spawn_windows_job(
+    command: list[str], *, begin_lease_fence: Callable[[], Callable[[], None] | None] | None = None,
+    **kwargs: Any,
+) -> subprocess.Popen[bytes]:
     """Launch target only after verified job assignment; no uncontained fallback."""
     if os.name != "nt" or sys.implementation.name != "cpython" or getattr(sys, "frozen", False):
         raise WindowsJobUnavailable("trusted Windows CPython helper unavailable")
@@ -168,9 +172,14 @@ def spawn_windows_job(command: list[str], **kwargs: Any) -> subprocess.Popen[byt
         or not sys.executable or not Path(sys.executable).is_absolute()
     ):
         raise WindowsJobUnavailable("noncanonical native launch arguments")
+    if begin_lease_fence is not None and not callable(begin_lease_fence):
+        raise WindowsJobUnavailable("invalid workspace fence callback")
     job = _WindowsJob()
     process = None
+    finish_fence = None
     try:
+        if begin_lease_fence is not None:
+            finish_fence = begin_lease_fence()
         options = dict(kwargs)
         options["stdin"] = subprocess.PIPE
         options["creationflags"] = options.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
@@ -181,6 +190,7 @@ def spawn_windows_job(command: list[str], **kwargs: Any) -> subprocess.Popen[byt
         if process.stdin is None:
             raise WindowsJobUnavailable("private launch gate unavailable")
         setattr(process, _JOB_ATTR, job)
+        setattr(process, _FENCE_ATTR, finish_fence)
         # No GGUF command executes until assignment and membership checks succeed.
         process.stdin.write(b"\xa5")
         process.stdin.flush()
@@ -188,18 +198,25 @@ def spawn_windows_job(command: list[str], **kwargs: Any) -> subprocess.Popen[byt
         process.stdin = None
         return process
     except BaseException:
+        # Never clean the workspace marker on ambiguous termination. Drain
+        # the assigned job before closing its handle, then reap the helper.
+        # If assignment failed the unassigned helper has not received the gate.
         try:
-            # Closing the job kills assigned descendants, including if the
-            # gate was released immediately before an exception.
-            job.close()
-        finally:
+            try:
+                job.stop()
+            finally:
+                job.close()
             if process is not None:
                 if process.stdin is not None:
                     process.stdin.close()
                     process.stdin = None
                 if process.poll() is None:
-                    process.kill()  # only the gated helper if not assigned
+                    process.kill()
                 process.wait()
+            if finish_fence is not None:
+                finish_fence()
+        finally:
+            if process is not None:
                 for stream in (process.stdout, process.stderr):
                     if stream is not None:
                         stream.close()
@@ -218,4 +235,8 @@ def terminate_windows_job(process: subprocess.Popen[bytes]) -> bool:
     finally:
         job.close()  # kernel kill-on-close is also the supervisor-death fence
     process.wait()
+    finish_fence = getattr(process, _FENCE_ATTR, None)
+    if finish_fence is not None:
+        finish_fence()
+        setattr(process, _FENCE_ATTR, None)
     return True

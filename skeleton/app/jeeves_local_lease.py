@@ -220,11 +220,15 @@ class LocalInferenceLease:
                 marker = os.read(fd, 2)
             except OSError as exc:
                 raise LocalInferenceLeaseUnavailable("inference lease marker cannot be read") from exc
+            if marker == bytes((1,)) and os.name == "nt":
+                raise LocalInferenceLeaseUnavailable("Windows native job drainage requires operator reconciliation")
             if marker != bytes((0,)):
                 raise LocalInferenceLeaseUnavailable("inference lease marker format is invalid")
             # Propagate this particular locked file description through
             # asyncio.to_thread into a pinned llama.cpp child on POSIX. If
             # Python dies, the child retains exclusion until it exits.
+            # Windows native launch instead persists a dirty byte until
+            # the bound Job Object has verified zero active members.
             if initialize:
                 context_token = enter_local_lease(fd)
             yield
