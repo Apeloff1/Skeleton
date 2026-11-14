@@ -22,7 +22,16 @@ The Windows workflow runs actual helper/descendant subprocess tests on a
 Windows-hosted runner and is required by the full regression aggregate.
 These tests do not qualify real GGUF outputs, installer integration, Windows
 11/WSL2 hardware or driver behavior. A frozen executable without a trusted
-CPython helper is denied. Automatic recovery of a dirty marker is intentionally not implemented.
-Only a separately qualified operator recovery procedure may clear it after
-establishing that all prior native work has stopped. Never clear it merely
-because the byte-range lock is available. No unsupported containment fallback.
+CPython helper is denied. Each dirty marker now carries a fresh 256-bit launch identity. The operator-only
+method prepare_windows_crash_recovery reads that challenge under the workspace
+lock; explicit prepare_legacy=True can assign a challenge to an old one-byte or
+partial dirty marker without clearing it. After independently establishing that
+ALL prior native work has stopped, the operator signs the current challenge and
+reviewed evidence SHA-256 with a separately provisioned HMAC key using
+issue_windows_drain_approval. The trusted maintenance caller passes this approval
+and its independently configured key to recover_windows_crash_marker. It checks
+and clears the exact marker under exclusive lock. Approval cannot authorize a
+later launch; no inference starts during recovery. The evidence digest binds an
+operator attestation, not an OS proof. No automatic or public recovery endpoint
+is provided. Do not treat mere lock availability as proof of drainage. No
+unsupported containment fallback.

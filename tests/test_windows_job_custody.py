@@ -134,7 +134,8 @@ def test_workspace_marker_stays_dirty_until_job_drain(tmp_path):
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             close_fds=True, shell=False,
         )
-        assert marker.read_bytes() == bytes((1,))
+        dirty = marker.read_bytes()
+        assert dirty.startswith(bytes((1,))) and len(dirty) == 33
         with pytest.raises(RuntimeError, match="already active"):
             lease_custody.begin_windows_native_custody()
         custody.terminate_windows_job(process)
@@ -157,7 +158,7 @@ def test_workspace_fence_cannot_be_cleared_by_revoked_context(tmp_path):
     try:
         with pytest.raises(RuntimeError, match="revoked"):
             finish()
-        assert marker.read_bytes() == bytes((1,))
+        assert marker.read_bytes().startswith(bytes((1,))) and marker.stat().st_size == 33
     finally:
         os.close(fd)
 
@@ -174,3 +175,92 @@ def test_workspace_dirty_marker_refuses_new_native_fence(tmp_path):
     finally:
         lease_custody.leave_local_lease(token)
         os.close(fd)
+
+
+def test_operator_recovery_is_bound_to_single_launch_and_evidence(tmp_path):
+    marker = tmp_path / "native.inference.lock"
+    marker.write_bytes(bytes((0,)))
+    fd = os.open(marker, os.O_RDWR | os.O_BINARY)
+    key = b"k" * 32
+    evidence = "e" * 64
+    try:
+        token = lease_custody.enter_local_lease(fd)
+        lease_custody.begin_windows_native_custody()
+        lease_custody.leave_local_lease(token)
+        candidate = lease_custody.windows_recovery_candidate(fd)
+        approval = lease_custody.issue_windows_drain_approval(
+            candidate, drain_evidence_sha256=evidence, operator_key=key,
+        )
+        dirty = marker.read_bytes()
+        with pytest.raises(RuntimeError, match="authentication"):
+            lease_custody.recover_windows_dirty_record(fd, approval=approval, operator_key=b"x" * 32)
+        with pytest.raises(RuntimeError, match="authentication"):
+            lease_custody.recover_windows_dirty_record(
+                fd, approval={**approval, "drain_evidence_sha256": "f" * 64},
+                operator_key=key,
+            )
+        assert marker.read_bytes() == dirty
+        lease_custody.recover_windows_dirty_record(fd, approval=approval, operator_key=key)
+        assert marker.read_bytes() == bytes((0,))
+        token = lease_custody.enter_local_lease(fd)
+        finish = lease_custody.begin_windows_native_custody()
+        try:
+            with pytest.raises(RuntimeError, match="current launch"):
+                lease_custody.recover_windows_dirty_record(fd, approval=approval, operator_key=key)
+        finally:
+            finish()
+            lease_custody.leave_local_lease(token)
+    finally:
+        os.close(fd)
+
+
+def test_legacy_dirty_challenge_preparation_never_clears_marker(tmp_path):
+    marker = tmp_path / "legacy.inference.lock"
+    marker.write_bytes(bytes((1,)))
+    fd = os.open(marker, os.O_RDWR | os.O_BINARY)
+    try:
+        with pytest.raises(RuntimeError, match="explicit preparation"):
+            lease_custody.windows_recovery_candidate(fd)
+        assert marker.read_bytes() == bytes((1,))
+        candidate = lease_custody.windows_recovery_candidate(fd, prepare_legacy=True)
+        assert len(marker.read_bytes()) == 33
+        assert marker.read_bytes().startswith(bytes((1,)))
+        assert lease_custody.windows_recovery_candidate(fd, prepare_legacy=True) == candidate
+    finally:
+        os.close(fd)
+
+
+def test_windows_workspace_recovery_uses_same_exclusive_lock(tmp_path):
+    # Load exact app lock module with the already-loaded lightweight dependency,
+    # avoiding unrelated model imports on the focused Windows runner.
+    dependency = "skeleton.ai.runtime.inference.lease_custody"
+    old = sys.modules.get(dependency)
+    sys.modules[dependency] = lease_custody
+    try:
+        path = MODULE_PATH.parents[3] / "app" / "jeeves_local_lease.py"
+        app_spec = importlib.util.spec_from_file_location("windows_workspace_lease_test_target", path)
+        assert app_spec is not None and app_spec.loader is not None
+        app = importlib.util.module_from_spec(app_spec)
+        app_spec.loader.exec_module(app)
+    finally:
+        if old is None:
+            sys.modules.pop(dependency, None)
+        else:
+            sys.modules[dependency] = old
+    owner = app.LocalInferenceLease(tmp_path / "workspace.db")
+    peer = app.LocalInferenceLease(tmp_path / "workspace.db")
+    with owner.hold():
+        lease_custody.begin_windows_native_custody()
+        with pytest.raises(app.LocalInferenceLeaseBusy):
+            peer.prepare_windows_crash_recovery()
+    with pytest.raises(app.LocalInferenceLeaseUnavailable, match="reconciliation"):
+        with peer.hold():
+            pytest.fail("dirty workspace admitted a second launch")
+    candidate = peer.prepare_windows_crash_recovery()
+    key = b"z" * 32
+    approval = lease_custody.issue_windows_drain_approval(
+        candidate, drain_evidence_sha256="d" * 64, operator_key=key,
+    )
+    peer.recover_windows_crash_marker(approval=approval, operator_key=key)
+    with peer.hold():
+        pass
