@@ -97,7 +97,9 @@ def traced(
 # kernel plane
 # ---------------------------------------------------------------------------
 
-_KERNEL_RESULT_KEYS = ("kind", "runs", "dropped", "reason", "n")
+_KERNEL_RESULT_KEYS = ("runs", "dropped", "n")
+_HTTP_METHODS = frozenset({"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE", "CONNECT"})
+_TASK_STATES = frozenset({"PENDING", "ASSIGNED", "RUNNING", "COMPLETED", "FAILED", "CANCELLED", "QUEUED", "IN_PROGRESS"})
 
 
 def instrument_kernel_orchestrator(orchestrator: Any, *, telemetry: Optional[PlaneTelemetry] = None) -> Any:
@@ -114,8 +116,13 @@ def instrument_kernel_orchestrator(orchestrator: Any, *, telemetry: Optional[Pla
             result = original(*args, **kwargs)
             if isinstance(result, dict):
                 for key in _KERNEL_RESULT_KEYS:
-                    if key in result and isinstance(result[key], (str, int, float, bool)):
-                        span.set_attribute(f"kernel.{key}", result[key])
+                    value = result.get(key)
+                    if type(value) is int and 0 <= value <= 2**53 - 1:
+                        span.set_attribute(f"kernel.{key}", value)
+                if result.get("kind") == "kernel-orch":
+                    span.set_attribute("kernel.kind", "kernel-orch")
+                if result.get("reason") == "storm":
+                    span.set_attribute("kernel.reason", "storm")
                 stages = result.get("trace")
                 if isinstance(stages, list):
                     span.set_attribute("kernel.stages", len(stages))
@@ -132,15 +139,11 @@ def instrument_kernel_orchestrator(orchestrator: Any, *, telemetry: Optional[Pla
 
 
 def _task_attrs(span: Any, task: Any) -> None:
-    status = getattr(task, "status", None)
-    if status is not None:
-        span.set_attribute("agent.task_status", getattr(status, "name", str(status)))
-    task_id = getattr(task, "task_id", None)
-    if isinstance(task_id, str):
-        span.set_attribute("agent.task_id", task_id)
-    agent_id = getattr(task, "agent_id", None)
-    if isinstance(agent_id, str):
-        span.set_attribute("agent.agent_id", agent_id)
+    # Only static status categories enter retained spans. Task/agent identifiers,
+    # arbitrary descriptions and error details belong to the private task store.
+    status = getattr(getattr(task, "status", None), "name", None)
+    if type(status) is str and status in _TASK_STATES:
+        span.set_attribute("agent.task_status", status)
 
 
 def _metadata_correlation(args: tuple, kwargs: Dict[str, Any]) -> Any:
@@ -157,7 +160,7 @@ def _metadata_correlation(args: tuple, kwargs: Dict[str, Any]) -> Any:
 
 def _task_type(args: tuple, kwargs: Dict[str, Any]) -> str:
     value = kwargs.get("task_type", args[1] if len(args) >= 2 else "default")
-    return str(value)
+    return "default" if type(value) is str and value == "default" else "custom"
 
 
 def instrument_coordinator(coordinator: Any, *, telemetry: Optional[PlaneTelemetry] = None) -> Any:
@@ -263,38 +266,53 @@ class PlaneTelemetryMiddleware:
             return
 
         tel = _resolve(self.telemetry)
-        method = str(scope.get("method") or "GET").upper()
-        path = str(scope.get("path") or "/")
+        raw_method = scope.get("method")
+        method = raw_method.upper() if type(raw_method) is str and len(raw_method) <= 8 else "OTHER"
+        if method not in _HTTP_METHODS:
+            method = "OTHER"
         status_holder: Dict[str, int] = {}
 
         with ExitStack() as stack:
             existing = get_correlation_id()
-            correlation_id = existing or stack.enter_context(correlation_scope(_scope_request_id(scope)))
+            correlation_id = (existing if _REQUEST_ID_RE.fullmatch(existing) else
+                              stack.enter_context(correlation_scope(_scope_request_id(scope))))
             state = scope.get("state")
             if isinstance(state, dict):
                 state.setdefault("request_id", correlation_id)
 
             async def send_wrapper(message: Dict[str, Any]) -> None:
                 if message.get("type") == "http.response.start":
-                    status_holder["status"] = int(message.get("status") or 0)
+                    raw_status = message.get("status")
+                    status_holder["status"] = raw_status if type(raw_status) is int and 100 <= raw_status <= 599 else 500
                     if self.echo_request_id:
                         headers = list(message.get("headers") or [])
-                        if not _header_values(headers, b"x-request-id"):
-                            headers.append((b"x-request-id", correlation_id.encode("latin-1")))
-                            message = {**message, "headers": headers}
+                        # Keep the wire response and captured span on one
+                        # canonical request ID, including duplicate/invalid
+                        # downstream response headers. Never echo raw input.
+                        headers = [(k, v) for k, v in headers if k.lower() != b"x-request-id"]
+                        headers.append((b"x-request-id", correlation_id.encode("ascii")))
+                        message = {**message, "headers": headers}
                 await send(message)
 
-            with tel.span("api", "request", **{"http.method": method, "http.path": path}) as span:
+            # Do not retain raw request paths: user IDs, tokens and source
+            # names can appear in path segments even without query strings.
+            with tel.span("api", "request", **{"http.method": method}) as span:
+                raised = False
                 try:
                     await self.app(scope, receive, send_wrapper)
+                except BaseException:
+                    raised = True
+                    raise
                 finally:
                     status = status_holder.get("status", 500)
                     span.set_attribute("http.status_code", status)
                     labels = {"plane": "api", "op": "request", "status": f"{status // 100}xx"}
                     tel.registry.counter(HTTP_STATUS, labels=labels)
-                    if status >= 500 and "status" in status_holder:
+                    if status >= 500:
                         span.status = "ERROR"
-                        tel.registry.counter(ERRORS, labels={"plane": "api", "op": "request"})
+                        # The span context already counts raised exceptions.
+                        if not raised:
+                            tel.registry.counter(ERRORS, labels={"plane": "api", "op": "request"})
 
 
 def install_plane_telemetry(app: Any, *, telemetry: Optional[PlaneTelemetry] = None) -> Any:

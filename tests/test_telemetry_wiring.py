@@ -159,3 +159,45 @@ def test_compat_mirror_is_byte_identical():
             ROOT / "skeleton/ai/compat/telemetry" / name,
             shallow=False,
         )
+
+
+def test_private_paths_and_unbounded_method_values_never_enter_span():
+    tel = PlaneTelemetry()
+    mw = PlaneTelemetryMiddleware(_app, telemetry=tel)
+    secret_path = "/account/private-user/file/opaque-private-source"
+    sent, _ = _call(mw, secret_path, [(b"x-request-id", b"req-privacy")])
+    assert sent[0]["status"] == 200
+    attrs = tel.traces("req-privacy")[0]["attributes"]
+    assert attrs["http.method"] == "GET"
+    assert "http.path" not in attrs
+    assert "opaque-private-source" not in str(attrs)
+
+
+def test_exception_after_5xx_and_missing_response_count_once():
+    tel = PlaneTelemetry()
+
+    async def after_error(scope, receive, send):
+        await send({"type": "http.response.start", "status": 503, "headers": []})
+        raise RuntimeError("private upstream detail")
+
+    with pytest.raises(RuntimeError):
+        _call(PlaneTelemetryMiddleware(after_error, telemetry=tel), "/partial")
+    assert tel.summary("api", "request")["errors"] == 1.0
+
+    async def no_response(scope, receive, send):
+        return None
+
+    _call(PlaneTelemetryMiddleware(no_response, telemetry=tel), "/missing")
+    assert tel.summary("api", "request")["errors"] == 2.0
+
+
+def test_downstream_correlation_headers_are_canonical_and_unique():
+    async def conflicting(scope, receive, send):
+        await send({"type": "http.response.start", "status": 200, "headers": [
+            (b"X-Request-ID", b"unrelated"), (b"x-request-id", b"duplicate"),
+            (b"content-type", b"text/plain"),
+        ]})
+    sent, _ = _call(PlaneTelemetryMiddleware(conflicting, telemetry=PlaneTelemetry()),
+                    "/ok", [(b"x-request-id", b"canonical-id")])
+    assert [v for k, v in sent[0]["headers"] if k.lower() == b"x-request-id"] == [b"canonical-id"]
+    assert (b"content-type", b"text/plain") in sent[0]["headers"]
