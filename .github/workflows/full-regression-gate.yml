@@ -248,6 +248,7 @@ jobs:
           mkdir -p artifacts
           python -m pytest -q --tb=short --strict-markers \
             --junitxml=artifacts/native-fair-stream.junit.xml \
+            skeleton/testing/test_fair_stream_anchor_recovery.py \
             skeleton/testing/test_fair_stream_custody.py \
             skeleton/testing/test_fair_stream_dispatch.py \
             skeleton/testing/test_fair_stream_execution_journal.py \
@@ -270,6 +271,7 @@ jobs:
           from pathlib import Path
           from xml.etree import ElementTree
           expected = {
+              "test_fair_stream_anchor_recovery",
               "test_fair_stream_custody", "test_fair_stream_dispatch",
               "test_fair_stream_execution_journal", "test_fair_stream_live_budget",
               "test_fair_stream_queue", "test_fair_stream_recovery",
@@ -288,7 +290,7 @@ jobs:
           missing = expected - observed
           if missing:
               raise SystemExit("No passing executed cases: " + ", ".join(sorted(missing)))
-          print("All 16 source suites have passing executed cases; no device qualification claimed.")
+          print(f"All {len(expected)} source suites have passing executed cases; no device qualification claimed.")
           PY
       - name: Upload native source test evidence
         if: always()
