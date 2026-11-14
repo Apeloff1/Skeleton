@@ -1,10 +1,9 @@
 """HTTP surface for the Skeleton GameForge pipeline (eras, intake, run)."""
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -14,28 +13,6 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 router = APIRouter(prefix="/api/skeleton", tags=["skeleton-gameforge"])
-
-
-_EXPORT_SEGMENT = re.compile(r"^[A-Za-z0-9_.-]{1,120}$")
-_EXPORT_DEVICES = {"con", "nul", "aux", "prn"} | {
-    f"{prefix}{index}" for prefix in ("com", "lpt") for index in range(1, 10)
-}
-
-
-def _safe_export_path(name: str) -> bool:
-    """Use the portable ZIP path contract before returning source bodies."""
-    if not isinstance(name, str) or not name or len(name) > 240:
-        return False
-    if "\\" in name or ":" in name or name.startswith("/"):
-        return False
-    parts = name.split("/")
-    return all(
-        part and part not in {".", ".."} and not part.startswith(".")
-        and part.rstrip(" .") == part
-        and _EXPORT_SEGMENT.fullmatch(part) is not None
-        and part.split(".")[0].casefold() not in _EXPORT_DEVICES
-        for part in parts
-    )
 
 
 class RunRequest(BaseModel):
@@ -56,7 +33,6 @@ class RunRequest(BaseModel):
     playable_content: bool = False
     playable_archetype: Optional[str] = Field(default=None, max_length=64)
     playable_main_scene: bool = False
-    playtest: Optional[Literal["off", "auto", "require"]] = None
     blend: Optional[list] = None
     t: float = 0.5
     generation: Optional[str] = None
@@ -122,161 +98,15 @@ def run(req: RunRequest) -> Dict[str, Any]:
             **({"quest_content": True, "quest_length": req.quest_length} if req.quest_content else {}),
             **({"playable_content": True, "playable_archetype": req.playable_archetype,
                 "playable_main_scene": req.playable_main_scene} if req.playable_content else {}),
-            **({"playtest": req.playtest} if req.playtest and req.playtest != "off" else {}),
         )
     except Exception as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     files = payload.get("files") or {}
     payload = dict(payload)
     payload["file_names"] = sorted(files)
-    if req.include_files:
-        manifest = payload.get("source_manifest")
-        ready = (
-            req.target == "godot"
-            and payload.get("succeeded") is True
-            and isinstance(files, dict)
-            and 0 < len(files) <= 256
-            and isinstance(manifest, dict)
-            and manifest.get("schema") == "skeleton.forge.source_manifest.v1"
-            and isinstance(manifest.get("sha256"), str)
-            and len(manifest["sha256"]) == 64
-            and manifest.get("file_count") == len(files)
-        )
-        source_bytes = 0
-        if ready:
-            for name, body in files.items():
-                if not _safe_export_path(name) or not isinstance(body, str):
-                    ready = False
-                    break
-                try:
-                    source_bytes += len(body.encode("utf-8"))
-                except UnicodeEncodeError:
-                    ready = False
-                    break
-                if source_bytes > 8 * 1024 * 1024:
-                    ready = False
-                    break
-        if ready:
-            # Do not trust the returned manifest on assertion alone. Recompute
-            # against the exact bodies, paths and file list for this one run.
-            from skeleton.forge.source_manifest import source_manifest
-            try:
-                ready = source_manifest(files) == manifest
-            except (ValueError, TypeError, UnicodeError):
-                ready = False
-        if ready:
-            payload["source_export"] = {
-                "status": "ready",
-                "bytes": source_bytes,
-                "file_count": len(files),
-                "manifest_sha256": manifest["sha256"],
-            }
-        else:
-            payload["source_export"] = {
-                "status": "unavailable",
-                "reason": "Godot source export unavailable (build failed, unsealed, or exceeds 256 files / 8 MiB)",
-            }
-            payload.pop("files", None)
-    else:
+    if not req.include_files:
         payload.pop("files", None)
     return payload
-
-
-@router.get("/controls/genres")
-def gameforge_control_genres() -> Dict[str, Any]:
-    """Discover device-independent historical controls for creator genres."""
-    from skeleton.game.presentation.genre_action_profiles import GENRE_FAMILY, FAMILIES
-    return {
-        "schema": "skeleton.game.genre_action_catalog.v1",
-        "genres": sorted(GENRE_FAMILY),
-        "families": sorted(FAMILIES),
-        "count": len(GENRE_FAMILY),
-    }
-
-
-@router.get("/controls/genres/{genre}")
-def gameforge_control_genre(genre: str) -> Dict[str, Any]:
-    """Present semantic input controls; do not claim a dedicated native engine."""
-    from skeleton.game.presentation.input_actions import InputContractError
-    from skeleton.game.presentation.genre_action_profiles import genre_control_profile
-    try:
-        return genre_control_profile(genre)
-    except InputContractError as exc:
-        raise HTTPException(status_code=404, detail="unknown creator genre") from exc
-
-
-class HistoricalConductorPreviewRequest(BaseModel):
-    """Bounded archival seven-stage preview; does not mutate current GameForge."""
-    title: str = Field(min_length=1, max_length=120)
-    pitch: str = Field(min_length=1, max_length=4000)
-    genre: str = Field(min_length=1, max_length=48)
-    pillars: list[str] = Field(default_factory=lambda: ["gameplay"])
-    era: str = Field(default="HOUSE_ERA", max_length=32)
-    target_minutes: int = Field(default=15, ge=1, le=600)
-    target: str = Field(default="bundle", max_length=16)
-    budget_bytes: int = Field(default=1_000_000, ge=1024, le=1_000_000)
-    regions: int = Field(default=5, ge=1, le=20)
-
-
-@router.post("/conductor/preview")
-def historical_conductor_preview(req: HistoricalConductorPreviewRequest) -> Dict[str, Any]:
-    """Restored archived #807 seven-step planning; return only bounded receipts.
-
-    No file writes, project overwrites or native game readiness claims.
-    """
-    from skeleton.gameforge import ConductorConfig, GameForgeConductor
-    from skeleton.gameforge.plans import GENRES
-    from skeleton.gameforge.eras import BUILTIN_ERAS
-    if req.genre not in GENRES:
-        raise HTTPException(status_code=422, detail="unsupported historical conductor genre")
-    if req.era not in BUILTIN_ERAS:
-        raise HTTPException(status_code=422, detail="unsupported historical conductor era")
-    if req.target not in {"web", "desktop", "bundle"}:
-        raise HTTPException(status_code=422, detail="unsupported historical conductor export target")
-    if not 1 <= len(req.pillars) <= 5 or any(
-        not isinstance(pillar, str) or not 1 <= len(pillar) <= 100 for pillar in req.pillars
-    ):
-        raise HTTPException(status_code=422, detail="pillars must contain one to five short strings")
-    result = GameForgeConductor(config=ConductorConfig(
-        budget_bytes=req.budget_bytes, regions=req.regions, target=req.target
-    )).run({
-        "title": req.title, "pitch": req.pitch, "genre": req.genre,
-        "pillars": req.pillars, "target_minutes": req.target_minutes, "era": req.era,
-    })
-    if not result.ok:
-        raise HTTPException(status_code=422, detail=result.error.to_dict() if result.error else "preview rejected")
-    return {
-        **result.to_dict(),
-        "mode": "historical_7_stage_preview",
-        "artifacts": sorted(result.artifacts),
-        "artifact_count": len(result.artifacts),
-        "byte_total": sum(len(data) for data in result.artifacts.values()),
-    }
-
-
-@router.get("/jeeves/game-quality")
-def jeeves_game_quality_catalog() -> Dict[str, Any]:
-    """Discover deterministic public diagnostic coverage; never invoke a model.
-
-    Scores from this public taskset cannot certify model quality or authorize
-    project publication. Inference remains operator-controlled and local-only.
-    """
-    from skeleton.eval.game_builder_quality import (
-        TASKSET_ID, SCORER_ID, DIMENSIONS, TASKS, taskset_digest,
-    )
-    return {
-        "schema": "skeleton.jeeves.game_quality.catalog.v1",
-        "taskset_id": TASKSET_ID,
-        "scorer_id": SCORER_ID,
-        "taskset_sha256": taskset_digest(),
-        "task_count": len(TASKS),
-        "categories": sorted({task.category for task in TASKS}),
-        "dimensions": list(DIMENSIONS),
-        "evidence_kind": "public_deterministic_diagnostics",
-        "model_quality_certified": False,
-        "inference_started": False,
-        "local_gguf_required_for_run": True,
-    }
 
 
 class ComposeRequest(BaseModel):
