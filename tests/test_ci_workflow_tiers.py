@@ -120,13 +120,22 @@ class WorkflowTierTests(unittest.TestCase):
             # A called workflow can be dispatched without a PR number.
             # It must never collapse all runs into one cancellation group.
             source_workflow.write_text(source_original.replace(
-                "github.event.pull_request.number || github.ref",
+                "github.event.pull_request.number || github.sha",
                 "github.event.pull_request.number", 1,
             ))
             self.assertTrue(any(
                 "consolidated source concurrency needs an immutable fallback" in issue
                 for issue in audit(root)
             ))
+            source_workflow.write_text(source_original)
+            for replacement, expected in (
+                ('  workflow_call:\n  push: {branches: [main]}', 'consolidated source must be callable'),
+                ('  workflow_call:\n  "pull_request": {}', 'consolidated source must be callable'),
+                ('  workflow_call:\n  workflow_call:', 'duplicate workflow event'),
+            ):
+                with self.subTest(replacement=replacement):
+                    source_workflow.write_text(source_original.replace('  workflow_call:', replacement, 1))
+                    self.assertTrue(any(expected in item for item in audit(root)))
             source_workflow.write_text(source_original)
             readiness = root / ".github/workflows/merge-readiness.yml"
             readiness_original = readiness.read_text()
@@ -191,7 +200,7 @@ class WorkflowTierTests(unittest.TestCase):
             self.assertTrue(any("paused workflow gained automatic" in x for x in audit(root)))
             paused.write_text(before)
             self.assertEqual(audit(root), [])
-            for index in range(10):
+            for index in range(21):
                 (
                     root / ".github/workflows" / f"automatic-extra-{index}.yml"
                 ).write_text(
@@ -202,7 +211,7 @@ class WorkflowTierTests(unittest.TestCase):
             self.assertTrue(
                 any("unexpected active workflow count" in item for item in audit(root))
             )
-            for index in range(10):
+            for index in range(21):
                 (root / ".github/workflows" / f"automatic-extra-{index}.yml").unlink()
             name = registry["specialized_manual_only"][0]
             spec = root / ".github/workflows-archive" / name
