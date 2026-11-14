@@ -71,6 +71,7 @@ class _SSEStream:
         self._chunks: Any = None
         self._closed = False
         self.retry_ms: Optional[int] = None
+        self.last_id: Optional[str] = None
 
     async def __aiter__(self) -> AsyncIterator[StreamItem]:
         if self._chunks is None:
@@ -85,6 +86,8 @@ class _SSEStream:
                         raise RealtimeProtocolError(str(exc)) from exc
                     if frame is not None:
                         produced = True
+                        if msg.id:
+                            self.last_id = msg.id
                         yield frame
                 if self._parser.retry_ms is not None:
                     self.retry_ms = self._parser.retry_ms
@@ -282,11 +285,12 @@ class InProcessTransport:
         self.principal = principal
 
     async def open(self, *, channels: Sequence[str], job_id: Optional[str], cursor: Optional[str]) -> RealtimeStream:
-        from skeleton.realtime.envelope import parse_cursor
+        from skeleton.realtime.envelope import parse_resume_cursor
         from skeleton.realtime.hub import RealtimeAuthError as HubAuthError
 
         try:
-            sub = self.hub.subscribe(channels, principal=self.principal, cursor=parse_cursor(cursor), job_id=job_id)
+            seq, epoch = parse_resume_cursor(cursor)
+            sub = self.hub.subscribe(channels, principal=self.principal, cursor=seq, cursor_epoch=epoch, job_id=job_id)
         except HubAuthError as exc:
             raise RealtimeAuthError(str(exc)) from exc
         except RuntimeError as exc:
