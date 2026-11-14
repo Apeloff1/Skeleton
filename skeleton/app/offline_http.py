@@ -37,6 +37,9 @@ from skeleton.app.local_ai import (
 )
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
 from skeleton.app.jeeves_inference_circuit import LocalInferenceCircuit
+from skeleton.app.offline_turn_admission import (
+    AdmissionRejected, DurableTurnAdmissions, QueueAdmissionOwner,
+)
 from skeleton.app.jeeves_local_lease import (
     LocalInferenceLease, LocalInferenceLeaseBusy, LocalInferenceLeaseUnavailable,
 )
@@ -97,6 +100,7 @@ class _LocalTurn:
     loop: Any = None
     task: Any = None
     worker: Any = None
+    admission_attempt: int | None = None
 
     def public(self) -> dict[str, Any]:
         return {
@@ -183,8 +187,15 @@ class OfflineHTTPApplication:
         self._closing = False
         self._game_builder = None
         self._store = OfflineChatStore(database)
+        self._queue_owner: QueueAdmissionOwner | None = None
         self.longform = None
         try:
+            self._admissions = DurableTurnAdmissions(
+                self._store, self.model_digest, self.tokenizer_digest,
+            )
+            if max_queued_turns:
+                self._queue_owner = QueueAdmissionOwner(self.database)
+                self._admissions.recover(self._queue_owner)
             self.longform = LongformVirtualMemory(
                 self.database.with_name(self.database.name + ".longform.sqlite3")
             )
@@ -195,9 +206,13 @@ class OfflineHTTPApplication:
             self.reference_writes = LocalReferenceWrite(self.knowledge)
             self.reference_jobs = LocalReferenceJob(self.knowledge)
         except BaseException:
-            if self.longform is not None:
-                self.longform.close()
-            self._store.close()
+            try:
+                if self.longform is not None:
+                    self.longform.close()
+                self._store.close()
+            finally:
+                if self._queue_owner is not None:
+                    self._queue_owner.close()
             raise
 
     def _model_readiness(self) -> tuple[bool, str]:
@@ -259,9 +274,13 @@ class OfflineHTTPApplication:
         for worker in workers:
             if worker is not threading.current_thread():
                 worker.join()
-        if self.longform is not None:
-            self.longform.close()
-        self._store.close()
+        try:
+            if self.longform is not None:
+                self.longform.close()
+            self._store.close()
+        finally:
+            if self._queue_owner is not None:
+                self._queue_owner.close()
 
     def _local_game_builder(self):
         """Lazy application composition, never a second model or service."""
@@ -283,6 +302,7 @@ class OfflineHTTPApplication:
             del self._pending_turns[key]
             turn.state = "cancelled"
             turn.finished_at = time.time()
+            self._finish_admission(turn)
             return
         turn.state = "cancelling"
         if turn.loop is not None and turn.task is not None:
@@ -380,9 +400,12 @@ class OfflineHTTPApplication:
                     raise OfflineHTTPError(409, "another local generation is still running")
                 if len(self._pending_turns) >= self.max_queued_turns:
                     raise OfflineHTTPError(429, "local generation queue is full")
-            if existing is not None:
-                del self._turns[key]
-            while len(self._turns) >= MAX_TURN_TICKETS:
+            if self._queue_owner is None:
+                try:
+                    self._admissions.assert_unowned(session_id, rid)
+                except AdmissionRejected as exc:
+                    raise OfflineHTTPError(exc.status, str(exc)) from None
+            while len(self._turns) >= MAX_TURN_TICKETS and existing is None:
                 terminal_key = next((
                     k for k, ticket in self._turns.items()
                     if ticket.state in TERMINAL_TURN_STATES
@@ -392,6 +415,13 @@ class OfflineHTTPApplication:
                     raise OfflineHTTPError(429, "local generation ticket capacity reached")
                 del self._turns[terminal_key]
             turn = _LocalTurn(session_id, rid, digest)
+            if self._queue_owner is not None:
+                try:
+                    turn.admission_attempt = self._admissions.claim(
+                        self._queue_owner, session_id, rid, digest, retry=retry,
+                    )
+                except AdmissionRejected as exc:
+                    raise OfflineHTTPError(exc.status, str(exc)) from None
             self._turns[key] = turn
             self._pending_turns[key] = request
             self._start_next_turn_locked()
@@ -421,9 +451,25 @@ class OfflineHTTPApplication:
                 turn.error = "local generation worker unavailable"
                 turn.finished_at = time.time()
                 turn.state = "failed"
+                self._finish_admission(turn)
                 self._active_session = None
                 continue
             return
+
+    def _finish_admission(self, turn: _LocalTurn) -> None:
+        if turn.admission_attempt is None or self._queue_owner is None:
+            return
+        try:
+            self._admissions.finish(
+                self._queue_owner, turn.session_id, turn.request_id,
+                turn.request_digest, turn.admission_attempt,
+                "settled" if turn.state == "complete" else turn.state,
+            )
+        except (AdmissionRejected, sqlite3.Error, OSError):
+            # A committed chat receipt remains authoritative. A failed metadata
+            # write cannot create a receipt or permit automatic model replay.
+            if turn.state != "complete":
+                turn.error = "local admission settlement unavailable; verify saved history"
 
     def _run_turn(self, turn: _LocalTurn, request: dict[str, Any]) -> None:
         result = None
@@ -434,6 +480,10 @@ class OfflineHTTPApplication:
                 if turn.cancel_requested:
                     raise asyncio.CancelledError()
                 turn.state = "running"
+                if turn.admission_attempt is not None:
+                    if self._queue_owner is None:
+                        raise OfflineHTTPError(503, "local queue ownership unavailable")
+                    self._queue_owner.assert_owned()
             result = self._perform_turn(turn.session_id, request, turn=turn)
             # A durable commit wins a late cancellation request.
             final_state = "complete"
@@ -466,6 +516,7 @@ class OfflineHTTPApplication:
                 turn.task = None
                 turn.loop = None
                 turn.state = final_state
+                self._finish_admission(turn)
                 self._active_session = None
                 self._start_next_turn_locked()
 
@@ -559,6 +610,24 @@ class OfflineHTTPApplication:
             return committed
         if observed is not None:
             return observed
+        try:
+            admission = self._admissions.lookup(session_id, rid)
+        except AdmissionRejected as exc:
+            raise OfflineHTTPError(exc.status, str(exc)) from None
+        if admission is not None:
+            state = admission["state"]
+            if state in {"admitted", "settled"}:
+                raise OfflineHTTPError(409, "admission outcome unconfirmed; check owning service or saved history")
+            return {
+                "session_id": session_id, "request_id": rid,
+                "state": "cancelled" if state == "cancelled" else "failed",
+                "terminal": True, "cancel_requested": state == "cancelled",
+                "created_at": admission["created_at"],
+                "finished_at": admission["updated_at"],
+                "result": None, "recovered_admission": True,
+                "inference_outcome_unknown": state == "interrupted",
+                "error": "No committed reply confirmed; exact explicit retry required.",
+            }
         raise OfflineHTTPError(
             404, "uncommitted turn ticket unavailable; resubmit the exact original request to recover"
         )
@@ -900,6 +969,7 @@ class OfflineHTTPApplication:
                 "max_turn_tickets": MAX_TURN_TICKETS,
                 "max_queued_turns": self.max_queued_turns,
                 "queued_turn_count": queued_turn_count,
+                "durable_admission_metadata": self._queue_owner is not None,
                 "active_turn": active_turn,
                 "context_tokens": context_tokens,
                 "max_output_tokens": min(output_tokens, max(1, context_tokens - 1)),
@@ -1076,6 +1146,12 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(404, "unknown local API route")
         sid = _identifier("session id", components[3])
         tail = components[4] if len(components) == 5 else None
+        if tail == "admissions" and method == "GET":
+            try:
+                return 200, {"admissions": self._admissions.recovery_rows(sid),
+                             "automatic_replay": False}
+            except AdmissionRejected as exc:
+                raise OfflineHTTPError(exc.status, str(exc)) from None
         if tail == "pending-turn" and method == "GET":
             # Authenticated session-scoped observation only. No queued prompt,
             # document IDs, output, lease token or raw exception is returned.
@@ -1128,8 +1204,20 @@ class OfflineHTTPApplication:
                         pending_sid == sid for pending_sid, _ in self._pending_turns
                     ):
                         raise OfflineHTTPError(409, "cancel the active or queued turn before deleting")
-                    self._store.delete(sid, self.model_digest,
-                                       self.tokenizer_digest)
+                    # The durable row and session delete must share one write
+                    # transaction to prevent peer admission between check/delete.
+                    try:
+                        with self._store._transaction():
+                            self._admissions.assert_deletable(sid)
+                            deleted = self._store._db.execute(
+                                "DELETE FROM offline_sessions WHERE session_id=? "
+                                "AND model_digest=? AND tokenizer_digest=?",
+                                (sid, self.model_digest, self.tokenizer_digest),
+                            )
+                            if deleted.rowcount != 1:
+                                raise OfflineHTTPError(404, "local conversation unavailable")
+                    except AdmissionRejected as exc:
+                        raise OfflineHTTPError(exc.status, str(exc)) from None
                     self._turns = {key: value for key, value in self._turns.items() if key[0] != sid}
                 return 200, {"deleted_session_id": sid}
         if tail == "metadata" and method == "POST":
@@ -1243,6 +1331,10 @@ class OfflineHTTPApplication:
             with self._turn_lock:
                 if self._closing or self._active_session is not None:
                     raise OfflineHTTPError(409, "another local generation is still running")
+                try:
+                    self._admissions.assert_unowned(sid, rid)
+                except AdmissionRejected as exc:
+                    raise OfflineHTTPError(exc.status, str(exc)) from None
                 self._active_session = sid
             try:
                 return 200, self._perform_turn(sid, body)

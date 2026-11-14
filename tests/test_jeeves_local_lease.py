@@ -942,3 +942,110 @@ def test_queued_real_native_turns_commit_and_replay_separately(tmp_path, monkeyp
     finally:
         allow_first.set()
         app.close()
+
+def test_durable_queue_metadata_survives_restart_and_refuses_changed_retry(tmp_path, monkeypatch):
+    """Metadata only: no automatic inference, plaintext persistence or peer takeover."""
+    import threading
+
+    model = native_model()
+    database = tmp_path / "durable-queue.sqlite3"
+    app = OfflineHTTPApplication(model, database, token="q" * 64, max_queued_turns=2)
+    entered = threading.Event()
+    release = threading.Event()
+    peer = None
+    second = None
+    calls = []
+
+    def held_failure(sid, request, *, turn=None):
+        calls.append(request["request_id"])
+        entered.set()
+        assert release.wait(10)
+        raise OfflineHTTPError(503, "private backend detail")
+
+    monkeypatch.setattr(app, "_perform_turn", held_failure)
+    try:
+        a, b = [app.dispatch("POST", "/v1/sessions", {})[1]["session_id"] for _ in range(2)]
+        body = {"message": "private marker not stored by admission", "request_id": "recover-me",
+                "max_output_tokens": 2}
+        assert app.submit_turn(a, {**body, "request_id": "first"})[0] == 202
+        assert entered.wait(5)
+        assert app.submit_turn(b, body)[1]["state"] == "queued"
+        peer = OfflineHTTPApplication(model, database, token="p" * 64)
+        with pytest.raises(Exception, match="exclusive local queue ownership unavailable"):
+            OfflineHTTPApplication(model, database, token="r" * 64, max_queued_turns=1)
+        with pytest.raises(OfflineHTTPError) as occupied:
+            peer.submit_turn(b, {**body, "retry": True})
+        assert occupied.value.status == 409
+        with pytest.raises(OfflineHTTPError) as delete:
+            peer.dispatch("DELETE", f"/v1/sessions/{b}")
+        assert delete.value.status == 409
+        records = peer.dispatch("GET", f"/v1/sessions/{b}/admissions")[1]
+        assert records["automatic_replay"] is False
+        assert records["admissions"][0]["request_id"] == "recover-me"
+        assert records["admissions"][0]["state"] == "admitted"
+        assert "private marker" not in str(records)
+        assert "digest" not in str(records)
+        assert app.turn_status(b, "recover-me", cancel=True)["state"] == "cancelled"
+        release.set()
+        app.close()
+        app = None
+        second = OfflineHTTPApplication(model, database, token="s" * 64, max_queued_turns=1)
+        recovered = second.turn_status(b, "recover-me")
+        assert recovered["state"] == "cancelled"
+        assert recovered["recovered_admission"] is True
+        with pytest.raises(OfflineHTTPError) as changed:
+            second.submit_turn(b, {**body, "message": "different", "retry": True})
+        assert changed.value.status == 409
+        with pytest.raises(OfflineHTTPError) as implicit:
+            second.submit_turn(b, body)
+        assert implicit.value.status == 409
+        assert calls == ["first"]
+        assert second._session(b).revision == 0
+        assert second.submit_turn(b, {**body, "retry": True})[0] == 202
+        deadline = time.monotonic() + 30
+        while True:
+            observed = second.turn_status(b, "recover-me")
+            if observed["terminal"]:
+                break
+            assert time.monotonic() < deadline
+            time.sleep(0.02)
+        assert observed["state"] == "complete", observed["error"]
+        assert second.dispatch("GET", f"/v1/sessions/{b}/admissions")[1]["admissions"] == []
+    finally:
+        release.set()
+        if app is not None:
+            app.close()
+        if second is not None:
+            second.close()
+        if peer is not None:
+            peer.close()
+
+
+def test_interrupted_admission_recovery_is_metadata_only(tmp_path):
+    from skeleton.app.offline_turn_admission import DurableTurnAdmissions, QueueAdmissionOwner
+
+    model = native_model()
+    database = tmp_path / "interrupted-queue.sqlite3"
+    first = OfflineHTTPApplication(model, database, token="q" * 64)
+    try:
+        sid = first.dispatch("POST", "/v1/sessions", {})[1]["session_id"]
+        body = {"message": "hello", "request_id": "interrupted", "max_output_tokens": 2}
+        rid, digest = first._turn_identity(body, first.default_output_tokens)
+        owner = QueueAdmissionOwner(database)
+        try:
+            ledger = DurableTurnAdmissions(first._store, first.model_digest, first.tokenizer_digest)
+            assert ledger.claim(owner, sid, rid, digest, retry=False) == 1
+        finally:
+            owner.close()
+    finally:
+        first.close()
+    reopened = OfflineHTTPApplication(model, database, token="t" * 64, max_queued_turns=1)
+    try:
+        status = reopened.turn_status(sid, rid)
+        assert status["recovered_admission"] is True
+        assert status["inference_outcome_unknown"] is True
+        assert status["result"] is None
+        assert reopened._session(sid).revision == 0
+        assert reopened.dispatch("GET", f"/v1/sessions/{sid}/admissions")[1]["admissions"][0]["state"] == "interrupted"
+    finally:
+        reopened.close()
