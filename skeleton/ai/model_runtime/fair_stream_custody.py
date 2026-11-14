@@ -170,7 +170,10 @@ class AuthenticatedFairStreamCustody:
         request_id: str | None = None,
         budget: MeasuredStreamBudget | None = None,
         receipt: Mapping[str, object] | None = None,
+        whole_request: bool = False,
     ) -> tuple[object | None, dict[str, object]]:
+        if type(whole_request) is not bool or (whole_request and action not in {"plan", "acknowledge"}):
+            raise ValueError("invalid whole-request transition policy")
         with self._lock:
             if _generation(expected_generation) != self.generation:
                 raise ValueError("stale custody generation")
@@ -190,7 +193,7 @@ class AuthenticatedFairStreamCustody:
             elif action == "plan":
                 if not isinstance(budget, MeasuredStreamBudget):
                     raise ValueError("typed measured budget required")
-                plan = trial.plan(budget)
+                plan = trial.plan(budget, whole_request=whole_request)
             elif action == "acknowledge":
                 required = {
                     "schema", "session_id", "generation", "checkpoint_digest",
@@ -213,6 +216,7 @@ class AuthenticatedFairStreamCustody:
                 _hex(receipt["result_digest"], "result digest")
                 trial.acknowledge(
                     receipt["lease_id"], consumed_tokens=receipt["consumed_tokens"],
+                    whole_request=whole_request,
                 )
             else:
                 raise ValueError("unsupported custody transition")

@@ -352,6 +352,11 @@ class NativeFairStreamBackend:
             or request["tenant_id"] != lease["tenant_id"]
         ):
             raise NativeFairStreamDenied("lease and request tenant mismatch")
+        # One-use native prompts cannot resume a generic partial lease.
+        # The app must admit a whole request before burning the RAM grant.
+        if (type(request.get("remaining_tokens")) is not int
+                or request["remaining_tokens"] != permit.tokens):
+            raise NativeFairStreamDenied("native whole-request lease required")
         bytes_per_token = request.get("bytes_per_token")
         if (type(bytes_per_token) is not int or bytes_per_token <= 0
                 or type(permit.tokens) is not int or permit.tokens <= 0

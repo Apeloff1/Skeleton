@@ -45,7 +45,7 @@ def state(lease=None, *, tenant="alice"):
             }],
             "requests": [{
                 "request_id": p.request_id, "tenant_id": tenant,
-                "bytes_per_token": 16,
+                "bytes_per_token": 16, "remaining_tokens": p.tokens,
             }],
         },
     }
@@ -371,4 +371,12 @@ def test_unreadable_native_process_identity_denies_before_lock(monkeypatch):
             backend.generate(permit(), state())
         with pytest.raises(NativeFairStreamDenied, match="identity unavailable"):
             registry.claim("request-1", "alice")
+    assert registry.status()["staged"] == 1
+
+def test_partial_native_lease_rejected_before_burning_prompt():
+    _, registry, backend = setup()
+    partial = state()
+    partial["checkpoint"]["requests"][0]["remaining_tokens"] = 3
+    with pytest.raises(NativeFairStreamDenied, match="whole-request"):
+        backend.generate(permit(), partial)
     assert registry.status()["staged"] == 1

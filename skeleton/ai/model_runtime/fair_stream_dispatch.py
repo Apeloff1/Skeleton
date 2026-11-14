@@ -69,8 +69,10 @@ class GuardedFairStreamDispatch:
         self, session: DurableFairStreamSession,
         sampler: LiveStreamBudgetSampler,
         owner: DurableExecutionOwner,
-        *, storage_path: str,
+        *, storage_path: str, whole_request: bool = False,
     ) -> None:
+        if type(whole_request) is not bool:
+            raise ValueError("explicit whole-request policy required")
         if not isinstance(session, DurableFairStreamSession):
             raise ValueError("durable authenticated session required")
         # Only the canonical sampler can supply the dispatch observation.
@@ -85,6 +87,7 @@ class GuardedFairStreamDispatch:
         self._sampler = sampler
         self._owner = owner
         self._storage_path = storage_path
+        self._whole_request = whole_request
         self._lock = RLock()
         self._issued: dict[str, DispatchPermit] = {}
         self._issued_token_budget: int | None = None
@@ -168,7 +171,7 @@ class GuardedFairStreamDispatch:
             budget, observation = self._sample(token_budget)
             if observation.effective_slots == 0 or observation.effective_tokens == 0:
                 raise DispatchDeferred("resource pressure prohibits dispatch")
-            permits, _ = self._session.plan(budget)
+            permits, _ = self._session.plan(budget, whole_request=self._whole_request)
             if len(permits) > 1:
                 self._uncertain = True
                 raise DispatchUncertain("non-atomic multi-lease plan forbidden")
@@ -293,7 +296,7 @@ class GuardedFairStreamDispatch:
             # RUNNING intent. The execution result must already be durable.
             try:
                 receipt = journal.recover_committed_receipt(permit)
-                updated = self._session.acknowledge(receipt)
+                updated = self._session.acknowledge(receipt, whole_request=self._whole_request)
             except BaseException as exc:
                 # SQLite I/O errors, interruption and malformed receipts are
                 # also uncertain outcomes. Do not leave the app reporting an
@@ -360,7 +363,7 @@ class GuardedFairStreamDispatch:
                     ) from exc
                 # Never accept an unsigned result or manufacture a completion.
                 try:
-                    updated = self._session.acknowledge(receipt)
+                    updated = self._session.acknowledge(receipt, whole_request=self._whole_request)
                 except BaseException as exc:
                     self._uncertain = True
                     raise DispatchUncertain(

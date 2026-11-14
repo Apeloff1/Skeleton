@@ -117,6 +117,7 @@ def bind_native_cpu_dispatch_service(
     )
     service = OfflineAdaptiveDispatchService(
         session, owner, sampler=sampler, storage_path=storage_path,
+        whole_request=True,
     )
     return service, vault
 
@@ -159,7 +160,7 @@ def submit_authenticated_native_cpu_prompt(
             or request.tenant_id != authenticated_tenant_id):
         raise ValueError("authenticated tenant does not own stream request")
     if (type(max_output_tokens) is not int
-            or request.remaining_tokens > max_output_tokens):
+            or not 1 <= request.remaining_tokens <= min(max_output_tokens, 8192)):
         raise ValueError("native output grant cannot cover requested stream")
     # Reject an unrelated registry, runtime, vault or session BEFORE staging
     # plaintext. A caller must use the exact owner bound during app startup.

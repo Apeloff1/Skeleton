@@ -321,3 +321,32 @@ def test_native_owner_detects_journal_path_replacement_before_execution(
         service.execute_next(token_budget=2)
     assert registry.status()["staged"] == 1
     assert service.status().execution_uncertain
+
+def test_native_whole_request_defers_without_consuming_prompt_then_completes(
+    private_files, monkeypatch,
+):
+    install_probe(monkeypatch)
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    stage_native_cpu_prompt(
+        runtime=runtime, registry=registry, request_id="whole",
+        tenant_id="alice", prompt="hello", max_output_tokens=2,
+    )
+    service.submit(StreamRequest("whole", "alice", InferencePhase.PREFILL, 2, 16))
+    deferred = service.execute_next(token_budget=1)
+    assert deferred["executed"] is False
+    assert registry.status()["staged"] == 1
+    assert service.status().pending_leases == 0
+    assert journal._connection.execute(
+        "SELECT COUNT(*) FROM local_fair_stream_execution_journal"
+    ).fetchone()[0] == 0
+    result = service.execute_next(token_budget=2)
+    assert result["executed"]
+    assert session.verify()["checkpoint"]["requests"] == []
+    assert registry.status()["consumed_or_revoked"] == 1
+    assert service.execute_next(token_budget=2)["executed"] is False

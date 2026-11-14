@@ -53,13 +53,14 @@ class OfflineAdaptiveDispatchService:
         owner: DurableExecutionOwner,
         *, storage_path: str,
         sampler: LiveStreamBudgetSampler | None = None,
+        whole_request: bool = False,
     ) -> None:
         if not isinstance(session, DurableFairStreamSession):
             raise ValueError("canonical durable session required")
         self._session = session
         self._guard = GuardedFairStreamDispatch(
             session, sampler if sampler is not None else LiveStreamBudgetSampler(),
-            owner, storage_path=storage_path,
+            owner, storage_path=storage_path, whole_request=whole_request,
         )
 
     @classmethod

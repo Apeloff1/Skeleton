@@ -210,9 +210,9 @@ class FairStreamScheduler:
             ),
         )
 
-    def plan(self, budget: MeasuredStreamBudget) -> FairStreamPlan:
-        if not isinstance(budget, MeasuredStreamBudget):
-            raise ValueError("MeasuredStreamBudget required")
+    def plan(self, budget: MeasuredStreamBudget, *, whole_request: bool = False) -> FairStreamPlan:
+        if not isinstance(budget, MeasuredStreamBudget) or type(whole_request) is not bool:
+            raise ValueError("MeasuredStreamBudget and explicit planning policy required")
         with self._lock:
             if self._pending:
                 raise ValueError("pending leases require execution reconciliation")
@@ -238,6 +238,11 @@ class FairStreamScheduler:
                         item for item in self._requests.values()
                         if item.tenant_id == tenant and item.request_id not in selected
                         and item.bytes_per_token <= ram_left
+                        and (not whole_request or (
+                            self._served[item.request_id] == 0
+                            and item.remaining_tokens <= min(token_left, 8192)
+                            and item.remaining_tokens * item.bytes_per_token <= ram_left
+                        ))
                     ]
                     if not candidates:
                         continue
@@ -255,7 +260,8 @@ class FairStreamScheduler:
                     ).plan((IterationWork(
                         request.request_id, request.phase, request.remaining_tokens,
                     ),))
-                    tokens = min(canonical.slices[0].tokens, ram_left // request.bytes_per_token)
+                    tokens = (request.remaining_tokens if whole_request else
+                              min(canonical.slices[0].tokens, ram_left // request.bytes_per_token))
                     if tokens <= 0:
                         continue
                     reserved = tokens * request.bytes_per_token
@@ -303,7 +309,10 @@ class FairStreamScheduler:
                 checkpoint_digest, _digest(body),
             )
 
-    def acknowledge(self, lease_id: str, *, consumed_tokens: int) -> None:
+    def acknowledge(self, lease_id: str, *, consumed_tokens: int,
+                    whole_request: bool = False) -> None:
+        if type(whole_request) is not bool:
+            raise ValueError("explicit completion policy required")
         _identifier("lease_id", lease_id, maximum=64)
         with self._lock:
             lease = self._pending.get(lease_id)
@@ -313,7 +322,13 @@ class FairStreamScheduler:
             request = self._requests.get(lease.request_id)
             if request is None or request.remaining_tokens < consumed_tokens:
                 raise ValueError("stream state diverged from lease")
-            remaining = request.remaining_tokens - consumed_tokens
+            if whole_request and (
+                lease.tokens != request.remaining_tokens or self._served[request.request_id] != 0
+            ):
+                raise ValueError("whole-request completion requires an unsliced lease")
+            # The signed receipt retains the actual token count, including
+            # early EOS. Only a trusted whole-request owner retires the rest.
+            remaining = 0 if whole_request else request.remaining_tokens - consumed_tokens
             if remaining:
                 self._requests[request.request_id] = StreamRequest(
                     request.request_id, request.tenant_id, request.phase,
