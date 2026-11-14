@@ -65,7 +65,14 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
   if (!sameSession(session, before)) refuse('The source session changed. Refresh before exporting.');
   const selected = [...sourceIds].sort();
   const rows: Array<Record<string, unknown>> = [];
-  const checked = new Map<string, CapturedSource>();
+  // Copy primitive custody fields before yielding to an export or another read.
+  // A cache may return the same mutable record for both reads.
+  const checked = new Map<string, Readonly<{
+    content_digest: string;
+    version: number;
+    changed_at: string | null;
+    max_age_seconds: number;
+  }>>();
   let totalBodyBytes = 0;
   for (const sourceId of selected) {
     gate(options);
@@ -79,10 +86,16 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
       || record.use_policy.version < 0) {
       refuse('At least one source is not currently authorized for use or its provenance is invalid.');
     }
+    const original = Object.freeze({
+      content_digest: record.content_digest,
+      version: record.use_policy.version,
+      changed_at: record.use_policy.changed_at,
+      max_age_seconds: record.use_policy.max_age_seconds,
+    });
     const row: Record<string, unknown> = {
       source_id: sourceId,
-      captured_content_sha256: record.content_digest,
-      use_policy_version: record.use_policy.version,
+      captured_content_sha256: original.content_digest,
+      use_policy_version: original.version,
       captured_freshness: 'current',
       remote_freshness_verified: false,
     };
@@ -116,9 +129,11 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
       }
       if (!body || typeof body !== 'object' || Array.isArray(body)
         || body.source_id !== sourceId
-        || body.content_digest !== record.content_digest
+        || body.content_digest !== original.content_digest
         || body.use_policy?.enabled !== true
-        || body.use_policy?.version !== record.use_policy.version
+        || body.use_policy?.version !== original.version
+        || body.use_policy.changed_at !== original.changed_at
+        || body.use_policy.max_age_seconds !== original.max_age_seconds
         || body.freshness?.state !== 'current'
         || body.freshness?.usable !== true
         || body.freshness?.remote_freshness_verified !== false
@@ -130,7 +145,7 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
       row.authorized_export_media_type = 'application/json';
       row.authorized_export_body = exported.content;
     }
-    checked.set(sourceId, record);
+    checked.set(sourceId, original);
     rows.push(row);
   }
   const after = await options.getSession(session.session_id, signal);
@@ -147,9 +162,9 @@ export async function buildCrawlerEvidenceBundle(options: BundleOptions): Promis
       || current.content_digest !== original.content_digest
       || !SHA.test(current.content_digest)
       || current.use_policy?.enabled !== true
-      || current.use_policy.version !== original.use_policy.version
-      || current.use_policy.changed_at !== original.use_policy.changed_at
-      || current.use_policy.max_age_seconds !== original.use_policy.max_age_seconds
+      || current.use_policy.version !== original.version
+      || current.use_policy.changed_at !== original.changed_at
+      || current.use_policy.max_age_seconds !== original.max_age_seconds
       || current.freshness?.usable !== true
       || current.freshness.state !== 'current'
       || current.freshness.remote_freshness_verified !== false)

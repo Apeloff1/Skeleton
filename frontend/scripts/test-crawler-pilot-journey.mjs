@@ -600,3 +600,34 @@ test('source revalidation retains deterministic content, SHA, and non-release po
   assert.equal(packet.publication_authorized, false);
   assert.equal(packet.training_authorized, false);
 });
+
+test('a reused mutable cached source cannot rewrite the original custody snapshot', async () => {
+  const original = bundleOptions();
+  const counts = new Map();
+  await assert.rejects(buildCrawlerEvidenceBundle({
+    ...original,
+    getSource: async (sid, id) => {
+      const record = await original.getSource(sid, id);
+      const count = (counts.get(id) || 0) + 1;
+      counts.set(id, count);
+      if (count === 2) record.use_policy.version++;
+      return record;
+    },
+  }), CrawlerBundleRefused);
+});
+
+test('authorized body with a changed policy age or timestamp is refused even with a valid checksum', async () => {
+  for (const altered of [{max_age_seconds: 60}, {changed_at: '2026-11-13T00:00:00Z'}]) {
+    const original = bundleOptions();
+    await assert.rejects(buildCrawlerEvidenceBundle({
+      ...original, includeBodies: true,
+      exportSource: async (sid, id) => {
+        const result = await original.exportSource(sid, id);
+        const body = JSON.parse(result.content);
+        Object.assign(body.use_policy, altered);
+        const content = JSON.stringify(body);
+        return {...result, content, content_digest: checksum(content)};
+      },
+    }), CrawlerBundleRefused);
+  }
+});
