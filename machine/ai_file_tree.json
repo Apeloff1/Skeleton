@@ -2744,7 +2744,7 @@
       "source": "skeleton/forge/creator",
       "destination": "skeleton/ai/forge/creator",
       "kind": "tree",
-      "source_git_object_sha": "78bfd4f83ea74946ed8779493e319e253ebd0338",
+      "source_git_object_sha": "7cfc48c5d0ba128aaa99e0804138e5ea70ad8427",
       "role": "Canonical engine-neutral intent compilation, persistent design graph, typed command surface, transactional preview, semantic diff, reversible generated-state history, approval boundaries, and work leases under skeleton/forge/creator; mirrored exactly into AI Forge.",
       "work_package_refs": [
         "WP-W12",
@@ -2808,7 +2808,7 @@
       "source": "skeleton/simulation/game",
       "destination": "skeleton/ai/simulation/game",
       "kind": "tree",
-      "source_git_object_sha": "ea2f401f7501951ad534b37848b6425417a2549e",
+      "source_git_object_sha": "ef48f6e9212c536624b4b96c15cea19c347a09c1",
       "role": "Canonical game mechanics, replay, AI FSM, economy simulation, progression and tick-clock runtime under skeleton/simulation/game, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
@@ -2936,7 +2936,7 @@
       "source": "skeleton/learning/school",
       "destination": "skeleton/ai/learning/school",
       "kind": "tree",
-      "source_git_object_sha": "0089891575b363bb0e4f80cccc16dab7ed40702b",
+      "source_git_object_sha": "350002143ba77d95682f5e84dcc26e0f11071dcd",
       "role": "Curriculum, assessment, tutoring, code-intelligence, and learning-control modules deepen the existing controlled-learning owner.",
       "work_package_refs": [
         "WP-W28"
@@ -6651,10 +6651,10 @@
     ]
   },
   "provenance_refresh": {
-    "status": "partial",
+    "status": "current",
     "refreshed_from_head": "601217144ba504839afcd8140466af469c64eec9",
-    "refreshed_mapping_count": 16,
-    "note": "Audit refresh: 149 of 183 mapping records checked against non-truncated trees at 601217144ba504839afcd8140466af469c64eec9. Original migration baseline retained. Remaining nested sources require verification; this record does not certify source parity or runtime execution.",
+    "refreshed_mapping_count": 19,
+    "note": "All 183 mapping source objects compared to non-truncated immutable Git trees; original migration baseline retained. Source references validated; mirror semantics, runtime and release qualification are separate.",
     "whitespace_normalization": {
       "payload_git_sha": "178a6d4ba05854e79d7fe13fd298a6f3d4145915",
       "source_destination_pairs": 5,
