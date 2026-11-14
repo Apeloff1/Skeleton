@@ -250,6 +250,22 @@
       "import",
       "reset",
       "restore_last_healthy"
+    ],
+    "ForgeDifficulty": [
+      "easy",
+      "normal",
+      "hard"
+    ],
+    "ForgeTheme": [
+      "moss",
+      "neon",
+      "ember",
+      "frost"
+    ],
+    "ForgeEncounterStyle": [
+      "swarm",
+      "patrol",
+      "ranged"
     ]
   },
   "records": {
@@ -2964,6 +2980,39 @@
         "Current operation stop/failure and partial artifacts retain physical custody until native work settles; no successful output is inferred from elapsed time or HTTP command acknowledgement.",
         "Queued APK preparation is not remote submission. Durable submission intent and a service-acknowledged remote build ID distinguish preparation, acknowledged work and unresolved side effects.",
         "Artifact admission is the existing process-local build owner; this does not establish distributed consensus or multi-host fencing."
+      ]
+    },
+    "ForgeGameplayConfig": {
+      "schema_version": 1,
+      "owner_plane": "engine-api",
+      "fields": {
+        "difficulty": {
+          "type": "ForgeDifficulty"
+        },
+        "theme": {
+          "type": "ForgeTheme"
+        },
+        "objective_label": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 100
+        },
+        "player_speed": {
+          "type": "integer",
+          "minimum": 120,
+          "maximum": 360
+        },
+        "encounter_style": {
+          "type": "ForgeEncounterStyle"
+        }
+      },
+      "unknown_fields": "reject",
+      "embedding": "optional gameplay in skeleton.game_design_spec.v1; legacy absent values derive validated defaults",
+      "invariants": [
+        "all five fields required when gameplay is present",
+        "explicit user brief labels cannot be widened or replaced by a model proposal",
+        "no paths, code, provider, authority or tool fields",
+        "numbers are exact finite integers and booleans are never numeric values"
       ]
     }
   },
