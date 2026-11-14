@@ -2,9 +2,7 @@
  * Studio shell state: first-run, account gate, projects, and where Back goes.
  * Pure — screens and persistence sit on top of this reducer.
  */
-import {
-  INITIAL_STATE, questionnaireReducer, reachable, type QuestionnaireAction, type QuestionnaireState,
-} from '../questionnaire';
+import { questionnaireReducer, type QuestionnaireAction, type QuestionnaireState } from '../questionnaire';
 import { normalisePresetState } from '../designPresets';
 import { summarizeRun } from '../run';
 import type { RunPayload } from '../types';
@@ -144,18 +142,19 @@ export function initialFoundationState(): FoundationState {
 }
 
 export function freshQuestionnaire(): QuestionnaireState {
-  // First-install projects must carry the same complete defaults as the
-  // advanced Forge cockpit. Independent nested objects prevent one draft
-  // mutating another project's arrays or authoring choices.
   return {
-    ...INITIAL_STATE,
+    step: 'vision',
+    vision: '',
     brief: {},
     beats: {},
     instruments: {},
-    quest: { ...INITIAL_STATE.quest! },
-    playable: { ...INITIAL_STATE.playable! },
-    sourceExport: { ...INITIAL_STATE.sourceExport! },
-    options: { ...INITIAL_STATE.options },
+    galaxyGenre: null,
+    galaxyProfile: null,
+    quest: { enabled: false, length: 3 },
+    playable: { enabled: false, mode: 'extraction', launch: false },
+    playtest: 'off',
+    sourceExport: { enabled: false },
+    options: { archetype: 'auto', target: 'godot', era: null, generation: null },
   };
 }
 
@@ -475,60 +474,45 @@ function stringMap(raw: unknown): Record<string, string> | null {
 }
 
 function sanitizeProject(raw: unknown): StudioProject | null {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (!raw || typeof raw !== 'object') return null;
   const item = raw as Record<string, unknown>;
   if (typeof item.id !== 'string' || !item.id.trim()) return null;
   if (typeof item.createdAt !== 'string' || typeof item.updatedAt !== 'string') return null;
-  const source = item.questionnaire;
-  if (!source || typeof source !== 'object' || Array.isArray(source)) return null;
-  const questionnaire = source as QuestionnaireState;
+  const q = item.questionnaire;
+  if (!q || typeof q !== 'object') return null;
+  const questionnaire = q as QuestionnaireState;
   if (!['vision', 'brief', 'beats', 'options', 'review'].includes(questionnaire.step)) return null;
   if (typeof questionnaire.vision !== 'string') return null;
-
-  // Legacy first-install projects did not persist newer authoring options.
-  // Fill ONLY absent fields; validate everything actually supplied by disk.
-  // The canonical saved-design parser rejects forged controls, invalid
-  // ranges, unsupported genres, malformed Galaxy profiles, and impossible
-  // quest/playable start scenes instead of silently clamping saved values.
-  let validated: QuestionnaireState;
+  const brief = stringMap(questionnaire.brief);
+  const beats = stringMap(questionnaire.beats);
+  if (!brief || !beats) return null;
+  const options = questionnaire.options;
+  if (!options || typeof options !== 'object') return null;
+  if (typeof options.archetype !== 'string' || typeof options.target !== 'string') return null;
+  if (!(options.era == null || typeof options.era === 'string')) return null;
+  if (!(options.generation == null || typeof options.generation === 'string')) return null;
+  // Old Studio projects predate the advanced cockpit. Default absent fields
+  // only; malformed present values must hold the file rather than erase edits.
+  const defaults = freshQuestionnaire();
+  let design: QuestionnaireState;
   try {
-    const defaults = freshQuestionnaire();
-    // Legacy playable/quest objects may omit newer controls. Fill missing
-    // members only; invalid present values still fail the canonical parser.
-    if (questionnaire.quest !== undefined &&
-        (!questionnaire.quest || typeof questionnaire.quest !== 'object' ||
-         Array.isArray(questionnaire.quest))) return null;
-    if (questionnaire.playable !== undefined &&
-        (!questionnaire.playable || typeof questionnaire.playable !== 'object' ||
-         Array.isArray(questionnaire.playable))) return null;
-    validated = normalisePresetState({
-      ...defaults,
-      ...questionnaire,
-      instruments: questionnaire.instruments ?? defaults.instruments,
-      galaxyGenre: questionnaire.galaxyGenre ?? null,
-      galaxyProfile: questionnaire.galaxyProfile ?? null,
-      quest: { ...defaults.quest, ...questionnaire.quest },
-      playable: { ...defaults.playable, ...questionnaire.playable },
+    const field = <K extends keyof QuestionnaireState>(key: K): QuestionnaireState[K] =>
+      Object.prototype.hasOwnProperty.call(questionnaire, key) ? questionnaire[key] : defaults[key];
+    design = normalisePresetState({
+      ...defaults, vision: questionnaire.vision, brief, beats,
+      options: { ...options, era: options.era ?? null, generation: options.generation ?? null },
+      instruments: field('instruments'), galaxyGenre: field('galaxyGenre'),
+      galaxyProfile: field('galaxyProfile'), quest: field('quest'), playable: field('playable'),
     });
+    const playtest = field('playtest');
+    const sourceExport = field('sourceExport');
+    if (playtest !== 'off' && playtest !== 'auto' && playtest !== 'require') return null;
+    if (!sourceExport || typeof sourceExport !== 'object' ||
+        Array.isArray(sourceExport) || typeof sourceExport.enabled !== 'boolean') return null;
+    design = { ...design, step: questionnaire.step, playtest, sourceExport: { enabled: sourceExport.enabled } };
   } catch {
-    // A corrupt project holds ALL project saves; never overwrite a design
-    // whose rejected fields could not be faithfully recovered.
     return null;
   }
-  const playtest = questionnaire.playtest ?? 'off';
-  if (playtest !== 'off' && playtest !== 'auto' && playtest !== 'require') return null;
-  const rawExport = questionnaire.sourceExport ?? { enabled: false };
-  if (!rawExport || typeof rawExport !== 'object' || Array.isArray(rawExport) ||
-      typeof rawExport.enabled !== 'boolean') return null;
-  const candidate: QuestionnaireState = {
-    ...validated,
-    playtest,
-    sourceExport: { enabled: rawExport.enabled },
-  };
-  const normalized: QuestionnaireState = {
-    ...candidate,
-    step: reachable(candidate, questionnaire.step) ? questionnaire.step : 'vision',
-  };
   let lastRun: RunSnapshot | null = null;
   if (item.lastRun != null) {
     if (typeof item.lastRun !== 'object') return null;
@@ -550,7 +534,7 @@ function sanitizeProject(raw: unknown): StudioProject | null {
     title: typeof item.title === 'string' && item.title.trim() ? item.title : 'Untitled project',
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
-    questionnaire: normalized,
+    questionnaire: design,
     lastRun,
   };
 }

@@ -6,7 +6,7 @@ import React from 'react';
 import { getAuthEpoch } from '../../auth/gameforgeAuth';
 import { shareGodotSourceArchive } from '../shareSourceArchive';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
-import { buildRunRequest, INITIAL_STATE, questionnaireReducer, STEPS, stepIndex, type QuestionnaireState } from '../questionnaire';
+import { buildRunRequest, INITIAL_STATE, questionnaireReducer, STEPS, stepIndex } from '../questionnaire';
 import { baseEra } from '../eras';
 import { planStatus } from '../plan';
 import { cockpitScreenReducer, composeSummaryOf, consoleFailures, initialScreenState, tabBadges, type CockpitTab } from '../cockpitScreen';
@@ -18,21 +18,17 @@ import ForgeCockpitView from './ForgeCockpitView';
 
 export interface ForgeCockpitScreenProps {
   initialTab?: CockpitTab | null;
-  initialQuestionnaire?: QuestionnaireState | null;
-  onOpenGalaxyStudio?: (draft: QuestionnaireState) => void;
-  onReturnToStudio?: (draft: QuestionnaireState) => void;
+  onOpenGalaxyStudio?: () => void;
   galaxyHandoffId?: string | null;
 }
 
-export default function ForgeCockpitScreen({
-  initialTab = null, initialQuestionnaire = null, onOpenGalaxyStudio, onReturnToStudio, galaxyHandoffId,
-}: ForgeCockpitScreenProps) {
+export default function ForgeCockpitScreen({ initialTab = null, onOpenGalaxyStudio, galaxyHandoffId }: ForgeCockpitScreenProps) {
   const [screen, dispatchScreen] = React.useReducer(cockpitScreenReducer, initialTab, initialScreenState);
-  const [q, dispatchQ] = React.useReducer(questionnaireReducer, initialQuestionnaire ?? INITIAL_STATE);
+  const [q, dispatchQ] = React.useReducer(questionnaireReducer, INITIAL_STATE);
   const [handoffNotice, setHandoffNotice] = React.useState<string | null>(null);
   React.useEffect(() => {
     if (!galaxyHandoffId) return;
-    const profile = consumeGalaxyHandoff(galaxyHandoffId, Date.now(), getAuthEpoch());
+    const profile = consumeGalaxyHandoff(galaxyHandoffId);
     if (!profile) {
       setHandoffNotice('Galaxy transfer expired or was already consumed. Return to Galaxy Studio to send the questionnaire again.');
       return;
@@ -133,7 +129,6 @@ export default function ForgeCockpitScreen({
       testID="skeleton-forge-cockpit"
       tab={screen.tab}
       onTab={(tab) => dispatchScreen({ type: 'tab', tab })}
-      onReturnToStudio={onReturnToStudio ? () => onReturnToStudio(q) : undefined}
       badges={badges}
       reduceMotion={reduceMotion}
       notice={handoffNotice || (!catalog.loading && !catalog.beatsLive ? 'Offline beats in use — the backend catalog is unreachable.' : null)}
@@ -145,7 +140,7 @@ export default function ForgeCockpitScreen({
         eras: catalog.eras,
         generations: catalog.generations,
         onForge: startRun,
-        onOpenGalaxyStudio: onOpenGalaxyStudio ? () => onOpenGalaxyStudio(q) : undefined,
+        onOpenGalaxyStudio,
         onRestoreGalaxyProfile: restoreSavedGalaxy,
         forging: run.phase === 'running',
         composeSummary: composeSummaryOf(compose.result),
