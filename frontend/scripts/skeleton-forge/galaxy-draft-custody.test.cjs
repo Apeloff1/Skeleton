@@ -135,13 +135,13 @@ test('Galaxy studio button snapshots draft before invoking the separate Forge ha
   const route = fs.readFileSync(path.join(root, 'app/galaxy.tsx'), 'utf8');
   assert.match(modal, /await saveGalaxyDraft\(snapshot\)/);
   assert.match(modal, /matrices: matrixValues, narrative: narrativePhaseValues/);
-  assert.match(modal, /disabled=\{handoffBusy \|\| step !== 'pick'\}/);
+  assert.match(modal, /disabled=\{handoffBusy\}/);
   assert.match(modal, /onRequestClose=\{\(\) => \{ void persistAndClose\(\); \}\}/);
   assert.match(modal, /await persistGalaxyDraft\(\);/);
   assert.match(modal, /targetFiles, scaleCommand, showDescriptions/);
-  assert.match(modal, /testID="galaxy-save-editable-draft"/);
+  assert.match(modal, /testID="galaxy-save-draft"/);
   assert.match(modal, /testID="galaxy-draft-saved"/);
-  assert.match(modal, /onSendToForge\(\{/);
+  assert.match(modal, /onSendToForge\(\{ title, vision: gameVision/);
   assert.match(route, /loadGalaxyDraft\(\)/);
   assert.match(route, /initialGalaxyDraft=\{savedGalaxy\}/);
 });

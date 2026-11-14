@@ -59,23 +59,13 @@ export default function GalaxyRoute() {
 
   const continueInForge = React.useCallback(async (selection: GalaxyBridgeSelection): Promise<void> => {
     try {
-      if (getAuthEpoch() !== authEpoch || loadedAuthEpoch !== authEpoch) {
-        throw new Error('Account changed before Galaxy handoff');
-      }
       await storeCreatorBridge(handoffFromGalaxy(selection, incoming));
-      if (getAuthEpoch() !== authEpoch) throw new Error('Account changed before navigating to Forge');
-      const handoffId = typeof selection.handoffId === 'string' &&
-        /^g[a-z0-9]{1,40}x[a-z0-9]{1,20}$/.test(selection.handoffId)
-        ? selection.handoffId : null;
-      router.replace({
-        pathname: '/skeleton-forge',
-        params: { tab: 'build', ...(handoffId ? { handoff: handoffId } : {}) },
-      } as any);
+      router.replace('/skeleton-forge?tab=build' as any);
     } catch {
       setHandoffError('Could not hand off the Galaxy draft to GameForge. Nothing was built.');
       throw new Error('Galaxy to GameForge handoff failed');
     }
-  }, [router, incoming, authEpoch, loadedAuthEpoch]);
+  }, [router, incoming]);
 
   const closing = React.useRef(false);
   const close = React.useCallback(async () => {

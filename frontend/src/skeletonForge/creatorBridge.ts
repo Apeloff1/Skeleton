@@ -3,11 +3,7 @@
  * Legacy GameForge axes, quest option and answered beats are carried unmodified when
  * visiting Galaxy, and restored when returning. Galaxy matrices remain Galaxy-owned.
  */
-import { STEPS, PLAYABLE_SLICES, reachable, type QuestionnaireState } from './questionnaire';
-import {
-  GALAXY_PROFILE_SCHEMA, MAX_PROFILE_CHARS, normaliseGalaxyProfile,
-  type GalaxyProfile,
-} from './galaxyHandoff';
+import { STEPS, reachable, type QuestionnaireState } from './questionnaire';
 import { DESIGN_AXES } from './instruments';
 import { GALAXY_CHOICES, mappedBriefGenre } from './galaxyGenres';
 import { GENRE_CHOICES } from './genreCatalog';
@@ -32,9 +28,7 @@ export interface CreatorBridgeDraft {
   galaxyGenre: string | null;
   options: QuestionnaireState['options'];
   quest: { enabled: boolean; length: number };
-  playable: { enabled: boolean; mode: string; launch: boolean };
-  /** Bounded, complete authoring when the incoming Forge draft originated in Galaxy. */
-  galaxyProfile?: GalaxyProfile | null;
+  playable: { enabled: boolean };
   playtest: 'off' | 'auto' | 'require';
   sourceExport: { enabled: boolean };
 }
@@ -42,8 +36,6 @@ export interface GalaxyBridgeSelection {
   title: string;
   vision: string;
   genreId: string | null;
-  /** Opaque one-use transfer ID; no project data or bearer token in the URL. */
-  handoffId?: string | null;
 }
 
 const availableGenres = new Set(GENRE_CHOICES);
@@ -122,21 +114,6 @@ export function parseCreatorBridge(
   const rawExport = record(input.sourceExport);
   const rawPlayable = record(input.playable);
   const rawQuest = record(input.quest);
-  const hasRawGalaxyProfile = input.galaxyProfile !== null && input.galaxyProfile !== undefined;
-  let galaxyProfile: GalaxyProfile | null = null;
-  if (hasRawGalaxyProfile) {
-    const profile = record(input.galaxyProfile);
-    if (!profile || profile.schema !== GALAXY_PROFILE_SCHEMA) return null;
-    try {
-      galaxyProfile = normaliseGalaxyProfile(profile.config);
-      if (JSON.stringify(galaxyProfile).length > MAX_PROFILE_CHARS + 100) return null;
-    } catch {
-      return null;
-    }
-  }
-  const playableMode = typeof rawPlayable?.mode === 'string' &&
-    PLAYABLE_SLICES.some((choice) => choice.id === rawPlayable.mode)
-    ? rawPlayable.mode : 'extraction';
   const length = rawQuest && Number.isInteger(rawQuest.length) &&
     (rawQuest.length as number) >= 1 && (rawQuest.length as number) <= 8 ? rawQuest.length as number : 3;
   return {
@@ -145,13 +122,7 @@ export function parseCreatorBridge(
     step, vision, brief, beats, instruments, galaxyGenre: genre,
     options: { archetype, target: originalTarget, era, generation },
     quest: { enabled: rawQuest?.enabled === true, length },
-    playable: {
-      enabled: rawPlayable?.enabled === true,
-      mode: playableMode,
-      launch: rawPlayable?.launch === true && rawPlayable.enabled === true &&
-        rawQuest?.enabled !== true && originalTarget === 'godot',
-    },
-    galaxyProfile,
+    playable: { enabled: rawPlayable?.enabled === true },
     playtest,
     sourceExport: { enabled: rawExport?.enabled === true },
   };
@@ -171,8 +142,7 @@ export function handoffFromForge(
     step: state.step, vision: state.vision, brief: state.brief, beats: state.beats,
     instruments: state.instruments, galaxyGenre: state.galaxyGenre,
     options: state.options, quest: state.quest,
-    playable: state.playable, galaxyProfile: state.galaxyProfile ?? null,
-    playtest: state.playtest,
+    playable: state.playable, playtest: state.playtest,
     sourceExport: state.sourceExport,
   };
   const valid = parseCreatorBridge(raw, 'galaxy', now);
@@ -221,8 +191,7 @@ export function handoffFromGalaxy(
     step: previous?.step ?? 'brief', vision, brief, beats: previous?.beats ?? {}, instruments: previous?.instruments ?? {},
     galaxyGenre: genre, options: previous?.options ?? { archetype: 'auto', target: 'godot', era: null, generation: null },
     quest: previous?.quest ?? { enabled: false, length: 3 },
-    playable: previous?.playable ?? { enabled: false, mode: 'extraction', launch: false },
-    galaxyProfile: previous?.galaxyProfile ?? null,
+    playable: previous?.playable ?? { enabled: false },
     playtest: previous?.playtest ?? 'off',
     sourceExport: previous?.sourceExport ?? { enabled: false },
   };
@@ -238,7 +207,7 @@ export function forgeStateFromHandoff(raw: CreatorBridgeDraft, now: number = Dat
     step: draft.step, vision: draft.vision, brief: draft.brief, beats: draft.beats,
     instruments: draft.instruments, galaxyGenre: draft.galaxyGenre,
     options: draft.options, quest: draft.quest,
-    playable: draft.playable, galaxyProfile: draft.galaxyProfile ?? null,
+    playable: draft.playable,
     playtest: draft.playtest,
     sourceExport: draft.sourceExport,
   };

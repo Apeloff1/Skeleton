@@ -35,7 +35,7 @@ export interface ForgeRunPanelProps {
   now?: number;
   onCancel?: () => void;
   onRetry?: () => void;
-  /** Only for explicitly prepared, source-bound ZIPs from the exact completed run. */
+  /** Invoked only for explicitly prepared exact-run Godot source exports. */
   onExport?: () => void;
   exportBusy?: boolean;
   exportError?: string | null;
@@ -50,7 +50,7 @@ export interface ForgeRunPanelProps {
 export default function ForgeRunPanel({ phase, payload, error, startedAt, finishedAt, now = Date.now(), onCancel, onRetry, onExport, exportBusy = false, exportError, onViewEra, onViewPlan, reduceMotion = false, testID }: ForgeRunPanelProps) {
   const elapsed = startedAt != null ? (finishedAt ?? now) - startedAt : 0;
   const sum = React.useMemo(() => summarizeRun(payload), [payload]);
-  const scene = React.useMemo(() => playableSceneView(payload), [payload]);
+  const playableEvidence = React.useMemo(() => playableSceneView(payload), [payload]);
 
   if (phase === 'idle') {
     return (
@@ -108,10 +108,20 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
               <Fact k="Primary DPS" v={sum.primaryDps === null ? '—' : String(sum.primaryDps)} />
               <Fact k="Simulation" v={sum.simPassed === null ? '—' : sum.simPassed ? 'passed' : 'failed'} />
               <Fact k="Ledger" v={sum.ledgerValid === null ? '—' : sum.ledgerValid ? 'valid' : 'INVALID'} />
-              {payload.forge?.playable_archetype ? <Fact k="Playable mini-game" v={payload.forge.playable_archetype} /> : null}
-              {payload.playable_prototype ? <Fact k="Playable source" v={payload.playable_prototype.sealed ? 'Source sealed' : 'Not source sealed'} /> : null}
-              {payload.forge?.playable_launcher ? <Fact k="In-game launch and return" v="Original native scene switch available" /> : null}
-              {payload.native_quest?.steps ? <Fact k="Room-entry quest" v={String(payload.native_quest.steps) + ' native objectives'} /> : null}
+              {payload.forge?.playable_archetype ? <Fact k="Playable scene" v={payload.forge.playable_archetype} /> : null}
+              {payload.playable_mechanics ? (
+                <Fact k="Native mechanics tuning" v={payload.playable_mechanics.source_verified === true
+                  ? (Object.keys(payload.playable_mechanics.applied_axes || {}).length
+                    ? Object.entries(payload.playable_mechanics.applied_axes || {})
+                        .map(([axis, value]) => axis + ' ' + Math.round(value * 100) + '%').join(' · ')
+                    : 'Original default mechanics (no explicit slider changes)')
+                  : 'Source tuning not verified'} />
+              ) : null}
+              {payload.playable_portal ? (
+                <Fact k="In-game playable gateway" v={payload.playable_portal.sealed && payload.playable_portal.return_supported
+                  ? 'Source sealed · launch + return' : 'Not source sealed'} />
+              ) : null}
+              {payload.native_quest?.steps ? <Fact k="Native quest" v={String(payload.native_quest.steps) + ' room objectives' + (payload.native_quest.sealed ? ' · source sealed' : ' · unsealed')} /> : null}
               {sum.generation ? <Fact k="Hardware" v={humanize(sum.generation)} /> : null}
             </View>
             {payload.source_export?.status === 'ready' && payload.succeeded === true ? (
@@ -179,26 +189,34 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
               <Text style={st.cardTitle}>Playtest</Text>
               <StatusPill tone={sum.playtest.tone} label={sum.playtest.label} />
             </View>
-            {scene ? (
-              <View style={st.head} testID="run-native-playable-scene">
-                <Text style={st.cardTitle}>Independent playable scene</Text>
-                <StatusPill tone={scene.tone} label={scene.label} testID="run-native-playable-status" />
+            {payload.playtest?.status === 'passed' && payload.playtest.passed === true && payload.playtest.verified !== true ? (
+              <Banner tone="warn" testID="run-world-binary-unverified">
+                World boot passed, but the Godot binary has not been verified against admitted release provenance.
+              </Banner>
+            ) : null}
+            {payload.playable_portal && !payload.playable_portal.sealed ? (
+              <Banner tone="warn" testID="run-playable-portal-unsealed">
+                In-game playable gateway was generated but its project/source receipt is not sealed.
+              </Banner>
+            ) : null}
+            {playableEvidence ? (
+              <View testID="run-playable-scene-qualification">
+                <View style={[st.head, { marginTop: 10 }]}>
+                  <Text style={st.cardTitle}>Independent playable scene</Text>
+                  <StatusPill tone={playableEvidence.tone} label={playableEvidence.label} testID="run-playable-scene-status" />
+                </View>
+                {payload.playable_scene_playtest?.scene ? <Text style={st.small}>Source scene: {payload.playable_scene_playtest.scene}</Text> : null}
+                {payload.playable_scene_playtest?.status === 'passed' && payload.playable_scene_playtest.passed === true && payload.playable_scene_playtest.verified !== true ? (
+                  <Banner tone="warn" testID="run-playable-binary-unverified">
+                    Playable scene completed, but the Godot binary's release provenance is unverified.
+                  </Banner>
+                ) : null}
+                {payload.playable_scene_playtest?.errors?.length ? (
+                  <Text style={[st.small, { color: C.red }]} testID="run-playable-scene-errors">
+                    {payload.playable_scene_playtest.errors.slice(0, 3).join('; ')}
+                  </Text>
+                ) : null}
               </View>
-            ) : null}
-            {payload.playable_scene_playtest?.scene ? (
-              <Text style={st.small} testID="run-native-playable-path">
-                Native source scene: {payload.playable_scene_playtest.scene}
-              </Text>
-            ) : null}
-            {payload.playable_scene_playtest?.errors?.length ? (
-              <Banner tone="warn" testID="run-native-playable-errors">
-                {payload.playable_scene_playtest.errors.slice(0, 3).join('; ')}
-              </Banner>
-            ) : null}
-            {scene?.state === 'unverified' || sum.playtest.state === 'unverified' ? (
-              <Banner tone="warn" testID="run-native-binary-unverified">
-                A successful native run from a non-admitted Godot binary does not certify release integrity.
-              </Banner>
             ) : null}
           </Card>
 

@@ -7,7 +7,7 @@ const path = require('node:path');
 const { load, h, render, text } = require('./harness.cjs');
 const Archive = load('src/skeletonForge/sourceArchive.ts');
 const Q = load('src/skeletonForge/questionnaire.ts');
-const Galaxy = load('src/skeletonForge/galaxyHandoff.ts');
+const H = load('src/skeletonForge/creatorBridge.ts');
 const Panel = load('src/skeletonForge/components/ForgeRunPanel.tsx').default;
 
 const SHA = s => createHash('sha256').update(s).digest('hex');
@@ -129,15 +129,9 @@ test('source bundle preparation is opt-in and remains roundtrippable through Gal
   assert.equal(Q.buildRunRequest(Q.INITIAL_STATE).include_files, undefined);
   const enabled = Q.questionnaireReducer(Q.INITIAL_STATE, { type: 'setSourceExportEnabled', value: true });
   assert.equal(Q.buildRunRequest(enabled).include_files, true);
-  const original = {
-    title: 'Source package game', genre: 'rpg',
-    narrative_phases: { prologue: { steps: 2 } },
-    extra_params: { authored_sliders: 75 }, style_params: { palette: 'retro' },
-  };
-  for (const family of Galaxy.MATRIX_FIELDS) original[family] = { act1: { effort: 9 } };
-  const restored = Q.questionnaireReducer(enabled, {
-    type: 'importGalaxy', profile: Galaxy.normaliseGalaxyProfile(original),
-  });
+  const handoff = H.handoffFromForge(enabled, 1700000000000);
+  const returnHop = H.handoffFromGalaxy({ title: '', vision: '', genreId: null }, handoff, 1700000000001);
+  const restored = H.forgeStateFromHandoff(returnHop, 1700000000002);
   assert.equal(restored.sourceExport.enabled, true);
   assert.equal(Q.buildRunRequest(restored).include_files, true);
   const json = Q.questionnaireReducer(restored, { type: 'setOption', key: 'target', value: 'json' });

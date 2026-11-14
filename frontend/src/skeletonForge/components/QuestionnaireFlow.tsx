@@ -7,14 +7,9 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { humanize } from '../graph';
 import { DESIGN_AXES } from '../instruments';
-import { PLAYABLE_SLICES, PLAYABLE_TUNING_EFFECTS } from '../questionnaire';
 import { GALAXY_CHOICES, galaxyGenre, mappedBriefGenre } from '../galaxyGenres';
 import { GENRE_COUNT, GENRE_GROUPS, filterGenreChoices } from '../genreCatalog';
-import { suggestPlayableMode } from '../playableSuggestions';
 import DesignInstruments from './DesignInstruments';
-import GenreControlsPreview from './GenreControlsPreview';
-import ConductorPreviewPanel from './ConductorPreviewPanel';
-import DesignPresetPanel from './DesignPresetPanel';
 import {
   ARCHETYPES, BRIEF_FACETS, ERA_SOURCE_COPY, STEP_LABELS, STEPS, TARGETS, VISION_MAX,
   blockReason, buildRunRequest, eraSource, progress, reachable, shadowedBriefFacets, stepIndex,
@@ -199,7 +194,6 @@ function GenrePicker({ value, onPick }: { value?: string; onPick: (v: string) =>
         ))}
       </View>
       {!shown.length ? <Text style={st.help}>No matching genre. Try a broader term or another category.</Text> : null}
-      {value ? <GenreControlsPreview genre={value} /> : null}
     </View>
   );
 }
@@ -212,7 +206,7 @@ function BriefStep({ state, dispatch }: QuestionnaireFlowProps) {
         f.id === 'genre' ? (
           <GenrePicker key={f.id} value={state.brief.genre} onPick={(v) => dispatch({ type: 'setBrief', facet: 'genre', value: v })} />
         ) : (
-          <OptionGroup key={f.id} id={`brief-${f.id}`} prompt={f.prompt} options={f.options} value={state.brief[f.id]} onPick={(v) => dispatch({ type: 'setBrief', facet: f.id, value: v })} color={C.accent} />
+        <OptionGroup key={f.id} id={`brief-${f.id}`} prompt={f.prompt} options={f.options} value={state.brief[f.id]} onPick={(v) => dispatch({ type: 'setBrief', facet: f.id, value: v })} color={C.accent} />
         )
       ))}
     </Card>
@@ -239,7 +233,6 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
   const [galaxyOpen, setGalaxyOpen] = React.useState(false);
   const [genreSearch, setGenreSearch] = React.useState('');
   const filteredGenres = GALAXY_CHOICES.filter((g) => (g.id + ' ' + g.name + ' ' + g.desc).toLowerCase().includes(genreSearch.trim().toLowerCase()));
-  const playableHint = suggestPlayableMode(state.galaxyGenre);
   return (
     <Card>
       <View accessibilityRole="radiogroup" accessibilityLabel="Forge archetype" style={st.group}>
@@ -266,99 +259,82 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
         })}
       </View>
       <OptionGroup id="target" prompt="Output" options={TARGETS.map((t) => t.id)} value={state.options.target} onPick={(v) => dispatch({ type: 'setOption', key: 'target', value: v })} />
-      <DesignPresetPanel state={state} dispatch={dispatch} />
-      <ConductorPreviewPanel vision={state.vision} />
-
-      <View style={st.group} testID="q-playable-slice-options" accessibilityRole="radiogroup" accessibilityLabel="Playable original mini-game">
-        <Text style={st.q}>Playable genre prototypes</Text>
-        <Text style={st.help}>
-          Include an original self-contained Godot mini-game with real controls and a win/lose loop.
-          Choose from the eight implemented prototypes; this does not mean all 67 historical genres have complete gameplay.
-        </Text>
+      <View style={st.group} testID="q-playable-content-controls" accessibilityRole="radiogroup" accessibilityLabel="Playable Godot prototype scene">
+        <Text style={st.q}>Playable Godot prototype scene</Text>
+        <Text style={st.help}>Opt-in: add a real controllable Godot sidecar scene with a complete win/lose loop. Extraction, Combat Loop and Pipeline have dedicated prototypes. Compose from vision uses Extraction as its fallback playable scene. The generated main world now includes an in-game button to launch this prototype and return again. All three prototypes draw visible objectives, live progress indicators and a touch/keyboard directional controller; headless Godot tests still run separately. The Tempo, Risk, Lethality, Scarcity, Agency and Progression Depth sliders now modify the underlying generated Godot movement, pressure, combat, interaction or completion goals where those mechanics apply; other sliders currently tune the design tensor and creative blueprint. This remains three independent playable scenes, not a claim of 158 gameplay engines.</Text>
         <View style={st.chips}>
-          <Chip label="No extra mini-game" selected={!state.playable?.enabled}
+          <Chip label="Blueprint only" selected={!state.playable?.enabled}
             onPress={() => dispatch({ type: 'setPlayableEnabled', value: false })}
             testID="q-playable-off" />
-          <Chip label="Include playable prototype" selected={!!state.playable?.enabled}
-            disabled={state.options.target !== 'godot'}
+          <Chip label="Add playable scene" selected={!!state.playable?.enabled}
+            disabled={state.options.target !== 'godot'} color={C.green}
             onPress={() => dispatch({ type: 'setPlayableEnabled', value: true })}
             testID="q-playable-on" />
         </View>
-        {state.playable?.enabled && state.options.target === 'godot' ? (
-          <>
-            <Text style={st.help}>Select the implemented game loop:</Text>
-            {playableHint ? (
-              <View testID="q-playable-suggestion">
-                <Text style={st.help}>
-                  Historical {playableHint.genreName}: the nearest authored mini-game is
-                  {' '}{PLAYABLE_SLICES.find((slice) => slice.id === playableHint.mode)?.label ?? playableHint.mode}.
-                  This is only a small prototype, not full specialized genre gameplay.
-                </Text>
-                <Chip label="Use this prototype" role="button"
-                  selected={state.playable?.mode === playableHint.mode}
-                  onPress={() => dispatch({ type: 'setPlayableMode', value: playableHint.mode })}
-                  testID="q-use-playable-suggestion" />
-              </View>
-            ) : null}
-
-            <View style={st.chips}>
-              {PLAYABLE_SLICES.map((slice) => (
-                <Chip key={slice.id} label={slice.label}
-                  selected={state.playable?.mode === slice.id}
-                  a11yLabel={slice.label + '. ' + slice.hint}
-                  onPress={() => dispatch({ type: 'setPlayableMode', value: slice.id })}
-                  testID={'q-playable-mode-' + slice.id} />
-              ))}
-            </View>
-            <Text style={st.help} testID="q-playable-tuning-hint">
-              Active prototype cockpit mappings: {(PLAYABLE_TUNING_EFFECTS[state.playable?.mode ?? 'extraction'] ?? []).join(' · ')}.
-              Other design sliders remain in the full GameForge tensor, but are not yet interpreted by this mini-game.
-              Open Design instruments above to edit the sliders.
-            </Text>
-            <View style={st.chips}>
-              <Chip label="Keep main world; add in-game switch button" selected={!state.playable?.launch}
-                onPress={() => dispatch({ type: 'setPlayableMainScene', value: false })}
-                testID="q-playable-extra-only" />
-              <Chip label="Launch this mini-game as main" selected={!!state.playable?.launch}
-                disabled={!!state.quest?.enabled}
-                onPress={() => dispatch({ type: 'setPlayableMainScene', value: true })}
-                testID="q-playable-launch" />
-            </View>
-            {state.quest?.enabled ? (
-              <Text style={st.help} testID="q-playable-quest-conflict">
-                The room-entry quest requires the original Godot launch scene.
-                The mini-game can still be included as a separate selectable scene.
-              </Text>
-            ) : null}
-          </>
+        {state.options.target !== 'godot' ? (
+          <Text style={st.help} testID="q-playable-inactive">Playable Godot scenes are not generated for JSON blueprint export.</Text>
         ) : null}
       </View>
-
       <View style={st.group} testID="q-native-quest-controls" accessibilityRole="radiogroup" accessibilityLabel="Native quest gameplay">
-        <Text style={st.q}>Native room-entry quest gameplay</Text>
-        <Text style={st.help}>Optional real Godot quest runtime with room-triggered objectives, a quest HUD, and source-checked save snapshots. Does not automatically create NPC conversations or combat quests.</Text>
+        <Text style={st.q}>Native quest gameplay (original quest runtime)</Text>
+        <Text style={st.help}>Optional. Generate a real Godot room-entry quest with a visible objective HUD, room-triggered progression, and source-checked save snapshots. This does not add NPC conversations or combat quests.</Text>
         <View style={st.chips}>
-          <Chip label="No quest" selected={!state.quest?.enabled} onPress={() => dispatch({ type: 'setQuestEnabled', value: false })} testID="q-native-quest-off" />
+          <Chip label="No quest" selected={!state.quest?.enabled}
+            onPress={() => dispatch({ type: 'setQuestEnabled', value: false })}
+            testID="q-native-quest-off" />
           <Chip label="Room-entry quest" selected={!!state.quest?.enabled}
             disabled={state.options.target !== 'godot'} color={C.green}
             onPress={() => dispatch({ type: 'setQuestEnabled', value: true })}
             testID="q-native-quest-on" />
         </View>
         {state.options.target !== 'godot' ? (
-          <Text style={st.help} testID="q-native-quest-inactive">Native quests require Godot output; JSON blueprint exports do not carry quest gameplay.</Text>
+          <Text style={st.help} testID="q-native-quest-inactive">Native quests require Godot output; JSON blueprint export will not include quest gameplay.</Text>
         ) : null}
         {state.quest?.enabled && state.options.target === 'godot' ? (
-          <View accessibilityRole="radiogroup" accessibilityLabel="Quest objective count" testID="q-native-quest-length">
-            <Text style={st.help}>Quest objective count: {state.quest.length} (1–8). Objectives target rooms in the emitted Godot world.</Text>
+          <View accessibilityRole="radiogroup" accessibilityLabel="Number of quest objectives" testID="q-native-quest-length">
+            <Text style={st.help}>Quest objective count: {state.quest.length} (1–8). Each objective targets a reachable room in the emitted world.</Text>
             <View style={st.chips}>
               {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
                 <Chip key={n} label={String(n)} selected={state.quest?.length === n}
-                  onPress={() => dispatch({ type: 'setQuestLength', value: n })}
+                  color={C.blue} onPress={() => dispatch({ type: 'setQuestLength', value: n })}
                   testID={'q-native-quest-' + n} />
               ))}
             </View>
           </View>
         ) : null}
+      </View>
+      <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Portable Godot source archive" testID="q-source-export">
+        <Text style={st.q}>Export your generated Godot project</Text>
+        <Text style={st.help}>Optional: prepare the actual generated source files for a local ZIP share after forging, limited to 256 files and 8 MiB of UTF-8 source. No regeneration, cloud upload, or unverified binary release.</Text>
+        <View style={st.chips}>
+          <Chip label="No source archive" selected={!state.sourceExport?.enabled}
+            onPress={() => dispatch({ type: 'setSourceExportEnabled', value: false })}
+            testID="q-source-export-off" />
+          <Chip label="Prepare Godot ZIP" selected={!!state.sourceExport?.enabled}
+            disabled={state.options.target !== 'godot'} color={C.green}
+            onPress={() => dispatch({ type: 'setSourceExportEnabled', value: true })}
+            testID="q-source-export-on" />
+        </View>
+        {state.options.target !== 'godot' ? (
+          <Text style={st.help}>Godot ZIP preparation requires a Godot source target.</Text>
+        ) : null}
+      </View>
+      <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Godot headless qualification" testID="q-playtest-controls">
+        <Text style={st.q}>Godot headless playtest</Text>
+        <Text style={st.help}>Optional runtime check: boot the generated main world in locally installed Godot; when a playable sidecar is selected, run its complete win/lose scene separately. Best effort reports unavailable engines; Require rejects the build if an engine is missing or either scene fails. No engine is downloaded or contacted remotely.</Text>
+        <View style={st.chips}>
+          <Chip label="Off" selected={!state.playtest || state.playtest === 'off'}
+            onPress={() => dispatch({ type: 'setPlaytestMode', value: 'off' })}
+            testID="q-playtest-off" />
+          <Chip label="Best effort" selected={state.playtest === 'auto'}
+            disabled={state.options.target !== 'godot'} color={C.blue}
+            onPress={() => dispatch({ type: 'setPlaytestMode', value: 'auto' })}
+            testID="q-playtest-auto" />
+          <Chip label="Require both when present" selected={state.playtest === 'require'}
+            disabled={state.options.target !== 'godot'} color={C.green}
+            onPress={() => dispatch({ type: 'setPlaytestMode', value: 'require' })}
+            testID="q-playtest-require" />
+        </View>
       </View>
       <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Era override">
         <Text style={st.q}>Pin an era? <Text style={st.help}>(optional)</Text></Text>
@@ -381,7 +357,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
         </View>
       ) : null}
       <View style={st.group}>
-        <Button label={galaxyOpen ? 'Hide 67-genre catalog' : 'Advanced: choose from all 67 Galaxy genres'}
+        <Button label={galaxyOpen ? `Hide ${GALAXY_CHOICES.length}-genre catalog` : `Advanced: choose from all ${GALAXY_CHOICES.length} Galaxy genres`}
           tone="secondary" compact testID="q-galaxy-genres-toggle"
           onPress={() => setGalaxyOpen((open) => !open)} />
       </View>
@@ -394,7 +370,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
           </Text>
           <TextInput testID="q-galaxy-genre-search" style={[st.input, { minHeight: TOUCH }]}
             value={genreSearch} onChangeText={setGenreSearch}
-            placeholder="Search 67 genres" accessibilityLabel="Search Galaxy genres"
+            placeholder={`Search ${GALAXY_CHOICES.length} genres`} accessibilityLabel="Search Galaxy genres"
             placeholderTextColor={C.dim} />
           <Text style={st.help}>{filteredGenres.length} matching genres. {filteredGenres.length > 24 ? 'Showing first 24; refine your search.' : ''}</Text>
           <View style={st.chips}>
@@ -420,7 +396,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
       {onOpenGalaxyStudio ? (
         <View style={st.group}>
           <Text style={st.q}>Need the original full-production questionnaire?</Text>
-          <Text style={st.help}>Open Galaxy Studio for its 14 production matrices, narrative phase controls, nine style selectors and 100 extended sliders. Galaxy and this Forge run currently have separate drafts.</Text>
+          <Text style={st.help}>Open Galaxy Studio for its 14 production matrices, narrative phase controls, nine style selectors and 100 extended sliders. Galaxy matrices and Forge design knobs are preserved separately on device; compatible vision and genre choices transfer explicitly.</Text>
           <Button label="Open full Galaxy Studio questionnaire" tone="secondary" compact onPress={onOpenGalaxyStudio} testID="q-open-galaxy-studio" />
         </View>
       ) : null}
@@ -431,7 +407,6 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
           testID="q-design-instruments-toggle"
         />
       </View>
-      {state.galaxyProfile ? <Text style={st.help} testID="q-galaxy-profile-attached">The complete Galaxy questionnaire is attached to your next Forge run and will be included in the emitted project source.</Text> : null}
       {instrumentsOpen ? (
         <DesignInstruments
           axes={state.instruments || {}}
@@ -466,13 +441,16 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
       <Row k="Beats" v={beatsTxt || '—'} />
       <Row k="Archetype" v={arch?.label ?? req.archetype} />
       <Row k="Output" v={TARGETS.find((t) => t.id === req.target)?.label ?? req.target} />
-      {state.playable?.enabled && !req.playable_content ? <Banner tone="warn" testID="q-playable-not-exported">Native playable mini-games require Godot output. This JSON-only export preserves your design but will not contain the mini-game scenes.</Banner> : null}
-      {req.playable_content ? <Row k="Playable mini-game" v={`${PLAYABLE_SLICES.find((slice) => slice.id === req.playable_archetype)?.label ?? req.playable_archetype} · ${req.playable_main_scene ? "startup scene" : "additional scene"}`} /> : null}
-      {req.quest_content ? <Row k="Native quest" v={`${req.quest_length} room-entry objectives · source-bound HUD and save contract`} /> : null}
-      {state.quest?.enabled && !req.quest_content ? <Banner tone="warn" testID="q-native-quest-not-exported">Native room quests are disabled for JSON blueprint output. Select Godot in Forge options to include one.</Banner> : null}
       {state.galaxyGenre ? <Row k="Specialized genre" v={(galaxyGenre(state.galaxyGenre)?.name ?? state.galaxyGenre) + " → " + (mappedBriefGenre(state.galaxyGenre) ?? "unknown")} /> : null}
-      {state.galaxyProfile ? <Row k="Galaxy questionnaire" v="Full 14 matrices, narrative phases, extended sliders, nine style selectors and production data attached to this run" /> : null}
       {req.operator_axes ? <Row k="Design tuning" v={DESIGN_AXES.filter((axis) => req.operator_axes?.[axis.id] !== undefined).map((axis) => axis.label + ": " + Math.round((req.operator_axes?.[axis.id] ?? 0) * 100) + "%").join(" · ")} /> : null}
+      {req.include_files ? <Row k="Portable source" v="Prepare bounded Godot ZIP from the exact build" /> : null}
+      {state.sourceExport?.enabled && !req.include_files ? <Banner tone="warn">Godot ZIP preparation is disabled for JSON blueprint output.</Banner> : null}
+      {req.playtest ? <Row k="Headless playtest" v={req.playtest === 'require' ? 'Required: main-world boot and playable scene completion when selected' : 'Best effort: main-world and selected playable scene; unavailable means unverified'} /> : null}
+      {state.playtest && state.playtest !== 'off' && !req.playtest ? <Banner tone="warn" testID="q-playtest-not-exported">Headless Godot qualification is disabled for JSON blueprint export.</Banner> : null}
+      {req.playable_content ? <Row k="Playable scene" v={`Godot ${['extraction', 'combat_loop', 'pipeline'].includes(req.archetype) ? req.archetype : 'extraction'} prototype · controllable scene with launch/return control and a win/lose loop`} /> : null}
+      {state.playable?.enabled && !req.playable_content ? <Banner tone="warn" testID="q-playable-not-exported">Playable sidecar scenes require Godot output; JSON blueprint export omits playable scenes.</Banner> : null}
+      {req.quest_content ? <Row k="Native quest" v={`${req.quest_length} room-entry objectives · Godot quest HUD and snapshot contract`} /> : null}
+      {state.quest?.enabled && !req.quest_content ? <Banner tone="warn" testID="q-native-quest-not-exported">Native room quests are disabled for JSON blueprint output. Select Godot in Forge options to include one.</Banner> : null}
       <Row k="Era" v={req.era ? humanize(req.era) : 'decided by the forge'} />
       {req.generation ? <Row k="Hardware" v={humanize(req.generation)} /> : null}
       <Banner tone="idle">{ERA_SOURCE_COPY[eraSource(state)]}</Banner>
@@ -481,7 +459,6 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
           Your design beat overrides the brief answer for: {shadowed.join(', ')}.
         </Banner>
       ) : null}
-      {state.galaxyProfile ? <Button label="Detach transferred Galaxy profile" tone="ghost" compact onPress={() => dispatch({ type: 'clearGalaxyProfile' })} testID="q-detach-galaxy-profile" /> : null}
       <Button label="Start over" tone="ghost" compact onPress={() => dispatch({ type: 'reset' })} testID="q-reset" />
       {onViewPlan ? <Button label="View build plan" tone="secondary" compact onPress={onViewPlan} a11yHint="Opens the plan from the last forge" testID="q-view-plan" /> : null}
     </Card>

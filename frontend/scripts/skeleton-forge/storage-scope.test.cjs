@@ -175,9 +175,36 @@ test('first-install Studio project keys are isolated across accounts without sto
   assert.equal(kv.size, 2);
   bearer = 'alice-offline-bearer';
   epoch++;
-  assert.equal(await alice.getItem('skeleton.studio.projects.v1'), '[{"title":"Alice original design"}]');
+  // Even returning to the same token does not revive an old session's
+  // adapter: it is bound to an exact authentication epoch.
+  await assert.rejects(alice.getItem('skeleton.studio.projects.v1'), /Account changed/);
+  const aliceAgain = studioStorage.asyncStorageKv();
+  assert.equal(await aliceAgain.getItem('skeleton.studio.projects.v1'), '[{"title":"Alice original design"}]');
   await assert.rejects(alice.getItem('unrecognized-project-file'), /Unexpected/);
   await assert.rejects(alice.setItem('unrecognized-project-file', 'private'), /Unexpected/);
+});
+
+test('all keys in one project snapshot use one immutable account identity', async () => {
+  const alice = studioStorage.asyncStorageKv();
+  await alice.setItem('skeleton.studio.onboarded.v1', '1');
+  rotateOnWrite = true;
+  await assert.rejects(
+    alice.setItem('skeleton.studio.prefs.v1', '{"textSize":"large"}'),
+    /Account changed/,
+  );
+  assert.equal(bearer, 'bob-offline-bearer');
+  await assert.rejects(
+    alice.setItem('skeleton.studio.projects.v1', '[{"title":"Private Alice project"}]'),
+    /Account changed/,
+  );
+  const bob = studioStorage.asyncStorageKv();
+  for (const key of ['skeleton.studio.onboarded.v1', 'skeleton.studio.projects.v1', 'skeleton.studio.prefs.v1']) {
+    assert.equal(await bob.getItem(key), null, key + ' cannot receive the prior account snapshot');
+  }
+  bearer = 'alice-offline-bearer'; epoch++;
+  const aliceAgain = studioStorage.asyncStorageKv();
+  assert.equal(await aliceAgain.getItem('skeleton.studio.onboarded.v1'), '1');
+  assert.match(await aliceAgain.getItem('skeleton.studio.prefs.v1'), /large/);
 });
 
 test('legacy unscoped projects are only read by an explicit migration adapter', async () => {
@@ -199,10 +226,12 @@ test('account rotation while writing Studio projects rejects publication to the 
     /Account changed during Studio project write/,
   );
   assert.equal(bearer, 'bob-offline-bearer');
-  assert.equal(await store.getItem('skeleton.studio.projects.v1'), null);
+  await assert.rejects(store.getItem('skeleton.studio.projects.v1'), /Account changed/);
+  assert.equal(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), null);
   bearer = 'alice-offline-bearer';
   epoch++;
-  assert.match(await store.getItem('skeleton.studio.projects.v1'), /Alice only/);
+  await assert.rejects(store.getItem('skeleton.studio.projects.v1'), /Account changed/);
+  assert.match(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), /Alice only/);
 });
 
 test('first-install Studio unmounts old local projects when the signed-in account changes', () => {
@@ -232,4 +261,87 @@ test('explicit Studio return is one-time, direction-checked and isolated across 
   assert.equal(restored.studioProjectId, 'p_recovered');
   assert.equal(restored.studioProjectUpdatedAt, '2026-11-13T16:00:00.000Z');
   assert.equal(await bridgeStorage.consumeCreatorBridge('studio'), null);
+});
+test('an initial Studio scope lookup error can be retried, but an acquired account scope cannot change', async () => {
+  const adapter = studioStorage.asyncStorageKv();
+  bearer = 'alice-offline-bearer';
+  epoch = 1;
+  const before = await scope.creatorStorageScope('skeleton.studio.projects.v1');
+  assert.ok(before.stillCurrent());
+  await adapter.setItem('skeleton.studio.projects.v1', '[{"title":"original"}]');
+  bearer = 'bob-offline-bearer'; epoch++;
+  await assert.rejects(adapter.getItem('skeleton.studio.projects.v1'), /Account changed/);
+  bearer = 'alice-offline-bearer'; epoch++;
+  await assert.rejects(adapter.getItem('skeleton.studio.projects.v1'), /Account changed/);
+  const fresh = studioStorage.asyncStorageKv();
+  assert.match(await fresh.getItem('skeleton.studio.projects.v1'), /original/);
+});
+
+
+test('Studio commits a returning Forge draft exactly once before the handoff is removed', async () => {
+  const source = H.handoffFromStudio(
+    Q.INITIAL_STATE, 'project-original', '2026-11-13T16:00:00.000Z',
+  );
+  await bridgeStorage.storeCreatorBridge(H.handoffToStudio(Q.INITIAL_STATE, source));
+  const received = await bridgeStorage.withCreatorBridge('studio', async (draft) => {
+    assert.equal(draft.studioProjectId, 'project-original');
+    assert.equal(kv.size, 1, 'return must still exist until the receiving save commits');
+    await studioStorage.asyncStorageKv().setItem('skeleton.studio.projects.v1',
+      JSON.stringify([{ id: 'project-original', title: 'Committed only after validation' }]));
+    return draft.studioProjectId;
+  });
+  assert.equal(received, 'project-original');
+  assert.equal(await bridgeStorage.consumeCreatorBridge('studio'), null);
+  assert.equal(kv.size, 1, 'only the receiving Studio project remains');
+  assert.equal(await bridgeStorage.withCreatorBridge('studio', async () => {
+    throw new Error('same handoff claimed twice');
+  }), null);
+});
+
+test('Studio handoff commit failure leaves private authored changes retriable', async () => {
+  const source = H.handoffFromStudio(
+    Q.INITIAL_STATE, 'project-retry', '2026-11-13T16:00:00.000Z',
+  );
+  await bridgeStorage.storeCreatorBridge(H.handoffToStudio(Q.INITIAL_STATE, source));
+  await assert.rejects(
+    bridgeStorage.withCreatorBridge('studio', async () => {
+      throw new Error('device is temporarily full');
+    }), /device is temporarily full/,
+  );
+  assert.equal(kv.size, 1, 'unfinished return cannot consume the draft');
+  const retried = await bridgeStorage.withCreatorBridge('studio', async (draft) => draft.studioProjectId);
+  assert.equal(retried, 'project-retry');
+  assert.equal(kv.size, 0);
+});
+
+test('auth change mid-return cannot reissue the prior account draft to a new account', async () => {
+  const source = H.handoffFromStudio(
+    Q.INITIAL_STATE, 'alice-private-return', '2026-11-13T16:00:00.000Z',
+  );
+  await bridgeStorage.storeCreatorBridge(H.handoffToStudio(Q.INITIAL_STATE, source));
+  rotateOnWrite = true;
+  await assert.rejects(
+    bridgeStorage.withCreatorBridge('studio', async () => {
+      await studioStorage.asyncStorageKv().setItem(
+        'skeleton.studio.projects.v1', '[{"id":"alice-private-return"}]',
+      );
+    }), /Account changed/,
+  );
+  assert.equal(bearer, 'bob-offline-bearer');
+  assert.equal(await bridgeStorage.consumeCreatorBridge('studio'), null);
+  assert.equal(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), null);
+  assert.equal(kv.size, 2, 'Alice handoff and partial Alice project are under Alice keys only');
+  bearer = 'alice-offline-bearer'; epoch++;
+  const restored = await bridgeStorage.withCreatorBridge('studio', async (draft) => draft);
+  assert.equal(restored.studioProjectId, 'alice-private-return');
+  assert.equal(kv.size, 1);
+});
+
+test('first-install return no longer consumes a draft before saving it', () => {
+  const src = fs.readFileSync(
+    path.resolve(__dirname, '../../src/skeletonForge/components/foundation/FoundationScreen.tsx'), 'utf8',
+  );
+  assert.match(src, /withCreatorBridge\('studio', async \(returned\)/);
+  assert.doesNotMatch(src, /storeCreatorBridge\(returned\)/);
+  assert.doesNotMatch(src, /await consumeCreatorBridge\('studio'\)/);
 });

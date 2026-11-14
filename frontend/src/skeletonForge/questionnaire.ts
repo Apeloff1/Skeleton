@@ -11,7 +11,6 @@ import type { Beat, RunRequest } from './types';
 import { GENRE_CHOICES } from './genreCatalog';
 import { isDesignAxis, normaliseAxisEdit, sparseInstrumentPayload } from './instruments';
 import { mappedBriefGenre, specializedVision } from './galaxyGenres';
-import { galaxyPrefill, type GalaxyProfile } from './galaxyHandoff';
 
 export const STEPS = ['vision', 'brief', 'beats', 'options', 'review'] as const;
 export type Step = typeof STEPS[number];
@@ -70,31 +69,6 @@ export interface ForgeOptions {
   generation: string | null;
 }
 
-export const PLAYABLE_SLICES = [
-  { id: 'extraction', label: 'Extraction', hint: 'Recover three caches while managing heat and reach exit' },
-  { id: 'combat_loop', label: 'Arena Combat', hint: 'Survive and clear three escalating enemy waves' },
-  { id: 'pipeline', label: 'Factory Logistics', hint: 'Carry raw materials through refinery and delivery' },
-  { id: 'puzzle', label: 'Spatial Puzzle', hint: 'Activate switches in order to complete a room puzzle' },
-  { id: 'racing', label: 'Racing Time Trial', hint: 'Complete three laps through a checkpoint course' },
-  { id: 'survival', label: 'Scavenging Survival', hint: 'Manage hydration, collect supplies, reach shelter' },
-  { id: 'stealth', label: 'Stealth Infiltration', hint: 'Avoid guard vision, retrieve intel and escape' },
-  { id: 'crafting', label: 'Crafting Delivery', hint: 'Collect parts, use a workshop, deliver a crafted item' },
-] as const;
-
-/** Honest, implemented native effects only. All other axes stay in the
- * canonical tensor; the source receipt identifies remaining unmapped edits.
- */
-export const PLAYABLE_TUNING_EFFECTS: Record<string, readonly string[]> = {
-  extraction: ['Tempo → movement speed', 'Risk → heat pressure'],
-  combat_loop: ['Tempo → movement speed', 'Lethality → starting health', 'Progression depth → combat waves'],
-  pipeline: ['Tempo → movement speed', 'Progression depth → shipment quota'],
-  puzzle: ['Tempo → movement speed', 'Mystery → switch hints'],
-  racing: ['Tempo → movement speed', 'Risk → checkpoint time limit', 'Progression depth → race laps'],
-  survival: ['Tempo → movement speed', 'Scarcity → hydration drain'],
-  stealth: ['Tempo → movement speed', 'Risk → guard detection radius', 'Mystery → guard-zone visibility'],
-  crafting: ['Tempo → movement speed'],
-};
-
 export interface QuestionnaireState {
   step: Step;
   vision: string;
@@ -104,13 +78,14 @@ export interface QuestionnaireState {
   instruments: Record<string, number>;
   /** Historical Galaxy Studio genre specialization (mapped to a canonical vote). */
   galaxyGenre?: string | null;
-  /** All 14 matrices, narrative, extras, classic sliders, style and production inputs. */
-  galaxyProfile?: GalaxyProfile | null;
-  /** Opt-in native generated-room quest. */
-  quest?: { enabled: boolean; length: number };
-  /** Native source-backed standalone mini-game, independent of blueprint archetype. */
-  playable?: { enabled: boolean; mode: string; launch: boolean };
   options: ForgeOptions;
+  /** Explicit opt-in native Godot room-entry quest prototype. */
+  quest?: { enabled: boolean; length: number };
+  /** Opt in to three existing executable Godot archetype sidecar scenes. */
+  playable?: { enabled: boolean };
+  /** Optional Godot headless boot qualification. */
+  playtest?: 'off' | 'auto' | 'require';
+  sourceExport?: { enabled: boolean };
 }
 
 export type QuestionnaireAction =
@@ -120,15 +95,12 @@ export type QuestionnaireAction =
   | { type: 'setAxis'; axis: string; value: number | null }
   | { type: 'resetAxes' }
   | { type: 'setGalaxyGenre'; genre: string | null }
-  | { type: 'importGalaxy'; profile: GalaxyProfile }
-  | { type: 'clearGalaxyProfile' }
-  | { type: 'restoreDesignPreset'; state: QuestionnaireState }
+  | { type: 'setOption'; key: keyof ForgeOptions; value: string | null }
+  | { type: 'setSourceExportEnabled'; value: boolean }
+  | { type: 'setPlayableEnabled'; value: boolean }
+  | { type: 'setPlaytestMode'; value: 'off' | 'auto' | 'require' }
   | { type: 'setQuestEnabled'; value: boolean }
   | { type: 'setQuestLength'; value: number }
-  | { type: 'setPlayableEnabled'; value: boolean }
-  | { type: 'setPlayableMode'; value: string }
-  | { type: 'setPlayableMainScene'; value: boolean }
-  | { type: 'setOption'; key: keyof ForgeOptions; value: string | null }
   | { type: 'next' }
   | { type: 'back' }
   | { type: 'goto'; step: Step }
@@ -141,10 +113,11 @@ export const INITIAL_STATE: QuestionnaireState = {
   beats: {},
   instruments: {},
   galaxyGenre: null,
-  galaxyProfile: null,
-  quest: { enabled: false, length: 3 },
-  playable: { enabled: false, mode: 'extraction', launch: false },
   options: { archetype: 'auto', target: 'godot', era: null, generation: null },
+  quest: { enabled: false, length: 3 },
+  playable: { enabled: false },
+  playtest: 'off',
+  sourceExport: { enabled: false },
 };
 
 function toggle(map: Record<string, string>, key: string, value: string | null): Record<string, string> {
@@ -185,8 +158,7 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
       return { ...state, vision: String(action.vision ?? '').slice(0, VISION_MAX + 200) };
     case 'setBrief':
       return { ...state, brief: toggle(state.brief, action.facet, action.value),
-        galaxyGenre: action.facet === 'genre' ? null : state.galaxyGenre,
-        galaxyProfile: action.facet === 'genre' ? null : state.galaxyProfile };
+        galaxyGenre: action.facet === 'genre' ? null : state.galaxyGenre };
     case 'setBeat':
       return { ...state, beats: toggle(state.beats, action.beat, action.value) };
     case 'setAxis': {
@@ -202,55 +174,28 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
     }
     case 'resetAxes':
       return { ...state, instruments: {} };
-    case 'importGalaxy': {
-      const imported = galaxyPrefill(action.profile);
-      return {
-        ...state, vision: imported.vision, step: 'options',
-        brief: { ...state.brief, ...(imported.mappedGenre ? { genre: imported.mappedGenre } : {}) },
-        galaxyGenre: imported.genre, galaxyProfile: imported.profile,
-        instruments: { ...state.instruments, ...imported.axes },
-      };
-    }
-    case 'clearGalaxyProfile':
-      return { ...state, galaxyProfile: null };
     case 'setGalaxyGenre': {
       const mapped = mappedBriefGenre(action.genre);
       if (action.genre && !mapped) return state;
       const brief = { ...state.brief };
       if (!action.genre || action.genre === state.galaxyGenre) {
         if (state.galaxyGenre && brief.genre === mappedBriefGenre(state.galaxyGenre)) delete brief.genre;
-        return { ...state, brief, galaxyGenre: null, galaxyProfile: null };
+        return { ...state, brief, galaxyGenre: null };
       }
       brief.genre = mapped!;
-      return { ...state, brief, galaxyGenre: action.genre, galaxyProfile: null };
+      return { ...state, brief, galaxyGenre: action.genre };
     }
+    case 'setSourceExportEnabled':
+      return { ...state, sourceExport: { enabled: action.value === true } };
+    case 'setPlayableEnabled':
+      return { ...state, playable: { enabled: action.value === true } };
+    case 'setPlaytestMode':
+      return { ...state, playtest: ['off', 'auto', 'require'].includes(action.value) ? action.value : 'off' };
     case 'setQuestEnabled':
-      return {
-        ...state,
-        quest: { ...INITIAL_STATE.quest!, ...state.quest, enabled: action.value === true },
-        playable: action.value ? { ...INITIAL_STATE.playable!, ...state.playable, launch: false } : state.playable,
-      };
+      return { ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, enabled: action.value === true } };
     case 'setQuestLength': {
       if (!Number.isInteger(action.value) || action.value < 1 || action.value > 8) return state;
       return { ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, length: action.value } };
-    }
-    case 'setPlayableEnabled': {
-      const enabled = action.value === true;
-      return { ...state, playable: {
-        ...INITIAL_STATE.playable!, ...state.playable, enabled,
-        launch: enabled ? !!state.playable?.launch : false,
-      } };
-    }
-    case 'setPlayableMode': {
-      if (!PLAYABLE_SLICES.some((item) => item.id === action.value)) return state;
-      return { ...state, playable: { ...INITIAL_STATE.playable!, ...state.playable, mode: action.value } };
-    }
-    case 'setPlayableMainScene': {
-      if (action.value && (state.quest?.enabled || state.options.target !== 'godot')) return state;
-      return { ...state, playable: {
-        ...INITIAL_STATE.playable!, ...state.playable,
-        launch: action.value === true && !!state.playable?.enabled,
-      } };
     }
     case 'setOption': {
       const value = action.value === '' ? null : action.value;
@@ -270,8 +215,6 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
     }
     case 'goto':
       return reachable(state, action.step) ? { ...state, step: action.step } : state;
-    case 'restoreDesignPreset':
-      return { ...action.state, step: 'options' };
     case 'reset':
       return INITIAL_STATE;
     default:
@@ -317,7 +260,7 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   for (const [k, v] of Object.entries(state.brief)) answers[k] = v;
   for (const [k, v] of Object.entries(state.beats)) answers[k] = v;
   const request: RunRequest = {
-    vision: state.galaxyProfile ? state.vision.trim().slice(0, VISION_MAX) : specializedVision(state.vision, state.galaxyGenre, VISION_MAX),
+    vision: specializedVision(state.vision, state.galaxyGenre, VISION_MAX),
     era: state.options.era,
     archetype: state.options.archetype || 'auto',
     target: state.options.target || 'godot',
@@ -326,18 +269,24 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   };
   const instrumentAxes = sparseInstrumentPayload(state.instruments);
   if (Object.keys(instrumentAxes).length) request.operator_axes = instrumentAxes;
-  if (state.galaxyProfile) request.galaxy_profile = state.galaxyProfile;
+  // Never change legacy request bytes for callers that did not opt in.
+  // The native sidecar is an independently executable Godot scene;
+  // JSON blueprint export cannot embed it.
   if (state.playable?.enabled && request.target === 'godot') {
-    const chosen = PLAYABLE_SLICES.find((slice) => slice.id === state.playable?.mode);
-    if (chosen) {
-      request.playable_content = true;
-      request.playable_archetype = chosen.id;
-      request.playable_main_scene = !!state.playable.launch && !state.quest?.enabled;
-    }
+    request.playable_content = true;
   }
+  if (state.playtest && state.playtest !== 'off' && request.target === 'godot') {
+    request.playtest = state.playtest;
+  }
+  // Prepare source from this exact run only; download must never silently
+  // start a new, potentially different build.
+  if (state.sourceExport?.enabled && request.target === 'godot') {
+    request.include_files = true;
+  }
+  // Room quests are separate from the playable archetype sidecar scene.
   if (state.quest?.enabled && request.target === 'godot') {
     request.quest_content = true;
-    request.quest_length = Number.isInteger(state.quest.length) && state.quest.length >= 1 && state.quest.length <= 8 ? state.quest.length : 3;
+    request.quest_length = Math.max(1, Math.min(8, state.quest.length));
   }
   return request;
 }

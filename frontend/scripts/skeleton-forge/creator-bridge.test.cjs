@@ -8,16 +8,16 @@ const { load } = require('./harness.cjs');
 const Q = load('src/skeletonForge/questionnaire.ts');
 const H = load('src/skeletonForge/creatorBridge.ts');
 const Galaxy = load('src/skeletonForge/galaxyGenres.ts');
-const { GALAXY_OFFLINE_CHOICES } = load('src/features/GalaxyStudioFactory/genreRegistry.ts');
+const { FALLBACK_GENRES } = load('src/features/GalaxyStudioFactory/fallbackGenres.ts');
 const { GENRE_CHOICES } = load('src/skeletonForge/genreCatalog.ts');
 
 function make(...actions) {
   return actions.reduce(Q.questionnaireReducer, Q.INITIAL_STATE);
 }
 
-test('all distinct historical Galaxy fallback genres map into 158-choice GameForge', () => {
+test('all 69 historical Galaxy fallback genres have a valid 158-choice GameForge counterpart', () => {
   const tokens = new Set(GENRE_CHOICES);
-  const ids = GALAXY_OFFLINE_CHOICES.map(x => x.id);
+  const ids = FALLBACK_GENRES.map(x => x.id);
   assert.equal(ids.length, 69);
   assert.equal(new Set(ids).size, 69);
   assert.equal(Galaxy.GALAXY_CHOICES.length, 69);
@@ -240,8 +240,8 @@ test('Galaxy and Forge routes only hand off after explicit user action', () => {
   assert.match(forgeRoute, /storeCreatorBridge\(handoffFromForge\(draft, Date\.now\(\), incoming\)\)/);
   assert.match(forgeRoute, /onOpenGalaxyStudio=\{openGalaxy\}/);
   assert.match(galaxyRoute, /storeCreatorBridge\(handoffFromGalaxy\(selection, incoming\)\)/);
-  assert.match(galaxyModal, /testID="galaxy-send-full-design-to-gameforge"/);
-  assert.match(galaxyModal, /onPress=\{sendToGameForge\}/);
+  assert.match(galaxyModal, /testID="galaxy-continue-in-gameforge"/);
+  assert.match(galaxyModal, /onPress=\{transferToForge\}/);
   assert.match(galaxyModal, /await saveGalaxyDraft\(snapshot\)/);
   assert.match(galaxyModal, /GALAXY_DRAFT_SCHEMA/);
   assert.match(galaxyRoute, /await storeCreatorBridge\(handoffFromGalaxy\(selection, incoming\)\)/);
@@ -250,9 +250,9 @@ test('Galaxy and Forge routes only hand off after explicit user action', () => {
   assert.match(galaxyRoute, /if \(incoming\) \{/);
   assert.match(galaxyRoute, /const previous = handoffFromGalaxy\(/);
   assert.match(galaxyRoute, /await storeCreatorBridge\(previous\)/);
-  assert.match(galaxyRoute, /router\.replace\(\{/);
+  assert.match(galaxyRoute, /router\.replace\('\/skeleton-forge\?tab=build'/);
 
-  assert.match(galaxyModal, /await onSendToForge\(\{/);
+  assert.match(galaxyModal, /await onSendToForge\(\{ title, vision: gameVision/);
   assert.match(galaxyModal, /handoffLock\.current = true/);
   assert.doesNotMatch(forgeRoute, /onOpenGalaxyStudio=\{\(\) => router\.push/);
 });
