@@ -9,6 +9,19 @@ from skeleton.persistence.mongo_source_epoch import (
 )
 
 
+def _matches(document, query):
+    for key, expected in query.items():
+        actual = document.get(key)
+        if type(expected) is dict:
+            if set(expected) != {"$gte", "$lt"} or type(actual) is not int:
+                return False
+            if not expected["$gte"] <= actual < expected["$lt"]:
+                return False
+        elif actual != expected:
+            return False
+    return True
+
+
 class FakeMajorityCollection:
     def __init__(self):
         self.doc = {
@@ -20,7 +33,7 @@ class FakeMajorityCollection:
         self.error = None
 
     async def find_one(self, filter, *, max_time_ms):
-        if any(self.doc.get(key) != value for key, value in filter.items()):
+        if not _matches(self.doc, filter):
             return None
         return dict(self.doc)
 
@@ -28,7 +41,7 @@ class FakeMajorityCollection:
         self.calls += 1
         if self.error is not None:
             raise self.error
-        if any(self.doc.get(key) != value for key, value in filter.items()):
+        if not _matches(self.doc, filter):
             return None
         self.doc = dict(self.doc)
         for key, value in update.get("$inc", {}).items():

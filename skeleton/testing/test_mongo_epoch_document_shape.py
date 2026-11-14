@@ -25,6 +25,11 @@ class _Reader:
 class MongoEpochDocumentShapeTests(unittest.IsolatedAsyncioTestCase):
     async def _read(self, document):
         witness = object.__new__(MongoCanonicalSourceEpoch)
+        if type(document) is dict:
+            document = {
+                "_id": MongoCanonicalSourceEpoch._key("tenant", "actor"),
+                "tenant_id": "tenant", "actor_id": "actor", **document,
+            }
         witness._reader = _Reader(document)
         return await witness.read_epoch(
             tenant_id="tenant", actor_id="actor", context_id="context",
