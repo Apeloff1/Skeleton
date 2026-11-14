@@ -14,6 +14,10 @@ from typing import Any, Dict, Mapping, Optional
 
 from skeleton.context.cockpit import Cockpit
 from skeleton.context.dodeca import Dodecahedron
+from skeleton.context.galaxy_profile import (
+    ARTIFACT_PATH, apply_galaxy_mechanics, attach_galaxy_profile,
+    galaxy_profile_receipt, normalise_galaxy_profile,
+)
 from skeleton.context.oracle import Magic8Ball
 from skeleton.context.tensor import AXES, ContextTensor, detect_era
 from skeleton.forge.archetypes import default_library
@@ -83,6 +87,7 @@ class GameForgeRun:
                 repair_mode: str = "apply",
                 operator_tensor: Optional[ContextTensor] = None,
                 operator_axes: Optional[Mapping[str, float]] = None,
+                galaxy_profile: Optional[Mapping[str, Any]] = None,
                 playable_content: bool = False,
                 quest_content: bool = False,
                 quest_length: int = 3) -> Dict[str, Any]:
@@ -112,6 +117,8 @@ class GameForgeRun:
         if repair_mode not in REPAIR_MODES:
             raise ValueError(f"repair_mode must be one of {REPAIR_MODES}, got {repair_mode!r}")
         axis_overrides = normalise_operator_axes(operator_axes)
+        full_profile = normalise_galaxy_profile(galaxy_profile)
+        profile_receipt = galaxy_profile_receipt(full_profile) if full_profile is not None else None
         cockpit = self.cockpit
         # Freeze operator intent before stage execution. Implicit cockpit
         # blending applies only when neither an explicit era nor questionnaire
@@ -180,6 +187,8 @@ class GameForgeRun:
             ),
             "operator_tensor": operator_tensor,
             "operator_axes": axis_overrides,
+            "galaxy_profile": full_profile,
+            "galaxy_receipt": profile_receipt,
             "repair": True,
             "max_rounds": 3,
             "playtest_mode": playtest_mode,
@@ -252,6 +261,14 @@ class GameForgeRun:
                            if hasattr(run.context.get("build_plan"), "to_dict")
                            else run.context.get("build_plan")),
         }
+        if profile_receipt is not None:
+            payload["galaxy_profile"] = {
+                **profile_receipt,
+                "emitted": bool(run.succeeded and emitted_manifest is not None
+                                and ARTIFACT_PATH in generated),
+            }
+            if run.context.get("galaxy_mechanics") is not None:
+                payload["galaxy_mechanics"] = run.context["galaxy_mechanics"]
         if playable_content and run.context.get("playable_mechanics_receipt") is not None:
             payload["playable_mechanics"] = run.context["playable_mechanics_receipt"]
         if playable_content and run.context.get("playable_portal_receipt") is not None:
@@ -299,7 +316,10 @@ def _commit(ctx: Dict[str, Any], stage: str, operator: str, system: str, extra: 
 
 def _stage_ingest(ctx: Dict[str, Any]) -> Dict[str, Any]:
     vision = ctx.get("vision") or ""
-    _commit(ctx, "ingest", vision, "ingested", {"chars": len(vision)})
+    details = {"chars": len(vision)}
+    if ctx.get("galaxy_receipt") is not None:
+        details["galaxy_profile_sha256"] = ctx["galaxy_receipt"]["sha256"]
+    _commit(ctx, "ingest", vision, "ingested", details)
     return {"ingested": True, "chars": len(vision)}
 
 
@@ -414,6 +434,9 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
         pack, tensor=cockpit.tensor, reading=cockpit.last_oracle,
         cortex=cortex, last_walk=last_walk,
     )
+    build_plan, mechanics = apply_galaxy_mechanics(build_plan, ctx.get("galaxy_profile"))
+    if mechanics is not None:
+        ctx["galaxy_mechanics"] = mechanics
     ctx["build_plan"] = build_plan
     repair = bool(ctx.get("repair", True))
     max_rounds = int(ctx.get("max_rounds", 3) or 3)
@@ -538,6 +561,10 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         ctx["files"] = files
         ctx["file_count"] = len(files)
         ctx["native_quest_receipt"] = receipt
+    if ctx.get("galaxy_profile") is not None:
+        files = attach_galaxy_profile(files, ctx["galaxy_profile"])
+        ctx["files"] = files
+        ctx["file_count"] = len(files)
     # Verify *after both* feature writers run. Source-attested add-ons
     # cannot receive a pass based only on their pre-composition versions.
     if ctx.get("playable_content"):
@@ -598,6 +625,8 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         details["playable_portal_sha256"] = ctx["playable_portal_receipt"]["source_sha256"]
     if scene_played is not None:
         details["playable_scene_playtest"] = scene_played.get("status")
+    if ctx.get("galaxy_receipt") is not None:
+        details["galaxy_profile_sha256"] = ctx["galaxy_receipt"]["sha256"]
     if ctx.get("native_quest_receipt"):
         details["native_quest_sha256"] = ctx["native_quest_receipt"]["quest_sha256"]
     _commit(ctx, "emit", ctx["era"], f"{len(files)} files", details)
