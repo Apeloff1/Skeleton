@@ -171,7 +171,10 @@ def playtest(files: Mapping[str, str], *, binary: Optional[str] = None,
             errors.extend(found)
             if timed_out:
                 errors.append(f"{name}: timed out after {step_timeout:.0f}s")
-            if name == "import" and (timed_out or found):
+            elif name == "import" and code != 0:
+                # A failed import is a failed boot, never a silent pass-through.
+                errors.append(f"import: engine exited {code}")
+            if name == "import" and (timed_out or found or code != 0):
                 break
         boot = next((s for s in steps if s["step"] == "boot"), None)
         passed = bool(boot) and not errors and boot["returncode"] == 0
