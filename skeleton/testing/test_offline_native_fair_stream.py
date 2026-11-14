@@ -778,3 +778,22 @@ def test_native_uncertain_retirement_preserves_replay_fence_and_output(private_f
     )
     service.submit(StreamRequest("fresh-native", "alice", InferencePhase.PREFILL, 2, 16))
     assert service.execute_next(token_budget=2)["executed"] is True
+
+@pytest.mark.parametrize("role", ["journal", "result", "recovery"])
+def test_native_composition_rejects_cross_role_or_wrong_keys(private_files, role):
+    runtime, registry, journal, session, result_handle = build(private_files)
+    if role == "journal":
+        journal._key = b"x" * 32
+    result_key = CUSTODY_KEY if role == "result" else RESULT_KEY
+    recovery_key = RESULT_KEY if role == "recovery" else b"o" * 32
+    before = session.verify()
+    with pytest.raises(ValueError, match="authority differs|independent"):
+        bind_native_cpu_dispatch_service(
+            session=session, runtime=runtime, registry=registry,
+            result_handle=result_handle, journal_handle=private_files[1],
+            journal=journal, result_key=result_key, operator_recovery_key=recovery_key,
+            sampler=LiveStreamBudgetSampler(), storage_path=".",
+        )
+    assert session.verify() == before
+    assert journal._private_handle is None
+    assert registry.status()["staged"] == 0
