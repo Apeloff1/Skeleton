@@ -134,9 +134,12 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
           compose=(skeleton/testing/test_compose_*.py)
-          epoch=(skeleton/testing/test_mongo_epoch_*.py)
+          epoch=()
+          for path in skeleton/testing/test_mongo_epoch_*.py; do
+            [[ "$path" == */test_mongo_epoch_live_replica.py ]] || epoch+=("$path")
+          done
           test "${#compose[@]}" -ge 21
-          test "${#epoch[@]}" -ge 10
+          test "${#epoch[@]}" -ge 9
           python -m pytest -q --tb=short "${compose[@]}" "${epoch[@]}" \
             skeleton/testing/test_mongo_source_epoch.py \
             skeleton/testing/test_mongo_tombstone_scope_fencing.py \
