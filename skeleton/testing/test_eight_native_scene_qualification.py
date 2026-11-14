@@ -139,3 +139,34 @@ def test_unverified_engine_can_finish_gameplay_but_is_not_source_attested(monkey
     result = native.playtest_archetype_scene(_files("crafting"), "crafting")
     assert result["passed"] is True
     assert result["verified"] is False
+
+@pytest.mark.parametrize("transcript", [
+    "ARCHETYPE_LOOP_COMPLETE puzzle_extra objective",
+    "ARCHETYPE_LOOP_COMPLETE puzzle first\nARCHETYPE_LOOP_COMPLETE puzzle duplicate",
+    "ARCHETYPE_LOOP_COMPLETE puzzle done\nARCHETYPE_LOOP_FAILED racing unrelated",
+    "ARCHETYPE_LOOP_COMPLETE puzzle done\nSCRIPT ERROR: audio driver initialization failed",
+])
+def test_native_marker_and_log_boundary_fails_closed(transcript, monkeypatch):
+    _admit(monkeypatch)
+    monkeypatch.setattr(native, "_run", lambda cmd, root, timeout:
+                        (0, "import ok" if "--import" in cmd else transcript, False))
+    assert native.playtest_archetype_scene(_files("puzzle"), "puzzle")["passed"] is False
+
+
+def test_import_completion_marker_does_not_qualify_scene(monkeypatch):
+    _admit(monkeypatch)
+    monkeypatch.setattr(native, "_run", lambda cmd, root, timeout:
+                        (0, "ARCHETYPE_LOOP_COMPLETE puzzle done", False))
+    result = native.playtest_archetype_scene(_files("puzzle"), "puzzle")
+    assert result["passed"] is False
+    assert len(result["steps"]) == 1
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"frames": True}, {"frames": 12001}, {"timeout": float("inf")},
+    {"timeout": True}, {"deadline": float("nan")},
+])
+def test_main_world_budget_validation_precedes_engine_launch(kwargs, monkeypatch):
+    monkeypatch.setattr(native, "resolve_binary", lambda *args: pytest.fail("unexpected binary resolve"))
+    with pytest.raises(ValueError):
+        native.playtest(_files("extraction"), **kwargs)

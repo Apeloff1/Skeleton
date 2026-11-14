@@ -5,17 +5,19 @@ import {
   type GalaxyDraftSnapshot,
 } from './galaxyDraftCodec';
 import { creatorStorageScope } from '../../skeletonForge/creatorStorageScope';
+import { getAuthEpoch } from '../../auth/gameforgeAuth';
 
 export { GALAXY_DRAFT_SCHEMA, type GalaxyDraftSnapshot } from './galaxyDraftCodec';
 const KEY = '@skeleton_galaxy_editor_draft_v1';
 
-export async function saveGalaxyDraft(raw: GalaxyDraftSnapshot): Promise<void> {
+export async function saveGalaxyDraft(raw: GalaxyDraftSnapshot, expectedEpoch: number = getAuthEpoch()): Promise<void> {
   const clean = normalizeGalaxyDraft(raw);
   if (!clean) throw new Error('Invalid Galaxy studio draft');
   const data = JSON.stringify(clean);
   if (data.length > GALAXY_DRAFT_MAX_BYTES) throw new Error('Galaxy editor draft exceeds local storage policy');
+  if (getAuthEpoch() !== expectedEpoch) throw new Error('Stale Galaxy editor');
   const scope = await creatorStorageScope(KEY);
-  if (!scope.stillCurrent()) throw new Error('Account changed before saving Galaxy draft');
+  if (!scope.stillCurrent() || getAuthEpoch() !== expectedEpoch) throw new Error('Account changed before saving Galaxy draft');
   await AsyncStorage.setItem(scope.key, data);
   if (!scope.stillCurrent()) {
     await AsyncStorage.removeItem(scope.key);

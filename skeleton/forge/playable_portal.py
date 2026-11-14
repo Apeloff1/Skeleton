@@ -100,11 +100,13 @@ def _script(archetype: str) -> str:
 
 
 def attach_playable_portal(
-    files: Mapping[str, str], archetype: str,
+    files: Mapping[str, str], archetype: str, *, start_in_prototype: bool = False,
 ) -> tuple[dict[str, str], dict[str, Any]]:
     """Attach one persistent in-game scene switcher; preserve caller files."""
     if not isinstance(files, Mapping):
         raise PlayablePortalError("Godot file map is required")
+    if type(start_in_prototype) is not bool:
+        raise PlayablePortalError("startup selection requires explicit boolean")
     script = _script(archetype)
     scene = f"scenes/archetypes/{archetype}/main.tscn"
     project = files.get("project.godot")
@@ -120,7 +122,13 @@ def attach_playable_portal(
     ):
         raise PlayablePortalError("playable portal project or scene contract is invalid")
     out = dict(files)
-    out["project.godot"] = project.replace(INPUT_ENTRY, INPUT_ENTRY + AUTOLOAD_ENTRY)
+    settings = project.replace(INPUT_ENTRY, INPUT_ENTRY + AUTOLOAD_ENTRY)
+    if start_in_prototype:
+        original = f'run/main_scene="{WORLD_SCENE}"'
+        if settings.count(original) != 1:
+            raise PlayablePortalError("ambiguous Godot startup scene")
+        settings = settings.replace(original, f'run/main_scene="res://{scene}"', 1)
+    out["project.godot"] = settings
     out[SCRIPT_PATH] = script
     return out, {
         "schema": SCHEMA,
@@ -130,21 +138,27 @@ def attach_playable_portal(
         "world": "scenes/levels/run_level.tscn",
         "source_sha256": hashlib.sha256(script.encode("utf-8")).hexdigest(),
         "return_supported": True,
+        **({"launch_scene": f"res://{scene}"} if start_in_prototype else {}),
         "headless_inert": True,
     }
 
 
-def verify_playable_portal(files: Mapping[str, str], archetype: str) -> bool:
+def verify_playable_portal(
+    files: Mapping[str, str], archetype: str, *, start_in_prototype: bool = False,
+) -> bool:
     """Verify exact generated gateway, both scenes and the autoload binding."""
     try:
         scene = f"scenes/archetypes/{archetype}/main.tscn"
         project = files["project.godot"]
+        expected_scene = f"res://{scene}" if start_in_prototype else WORLD_SCENE
         return (
+            type(start_in_prototype) is bool and
             type(project) is str
             and project.count(INPUT_ENTRY) == 1
             and project.count(AUTOLOAD_ENTRY) == 1
             and project.count("PlayablePortal=") == 1
-            and f'run/main_scene="{WORLD_SCENE}"' in project
+            and project.count(f'run/main_scene="{expected_scene}"') == 1
+            and project.count("run/main_scene=") == 1
             and scene in files
             and "scripts/autoloads/input_bind.gd" in files
             and "scenes/levels/run_level.tscn" in files

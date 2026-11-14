@@ -59,13 +59,15 @@ export default function GalaxyRoute() {
 
   const continueInForge = React.useCallback(async (selection: GalaxyBridgeSelection): Promise<void> => {
     try {
-      await storeCreatorBridge(handoffFromGalaxy(selection, incoming));
+      if (getAuthEpoch() !== authEpoch || loadedAuthEpoch !== authEpoch) throw new Error('Stale Galaxy editor');
+      await storeCreatorBridge(handoffFromGalaxy(selection, incoming), authEpoch);
+      if (getAuthEpoch() !== authEpoch) throw new Error('Account changed before navigation');
       router.replace('/skeleton-forge?tab=build' as any);
     } catch {
       setHandoffError('Could not hand off the Galaxy draft to GameForge. Nothing was built.');
       throw new Error('Galaxy to GameForge handoff failed');
     }
-  }, [router, incoming]);
+  }, [router, incoming, authEpoch, loadedAuthEpoch]);
 
   const closing = React.useRef(false);
   const close = React.useCallback(async () => {
@@ -85,7 +87,7 @@ export default function GalaxyRoute() {
           { title: '', vision: '', genreId: null },
           incoming,
         );
-        await storeCreatorBridge(previous);
+        await storeCreatorBridge(previous, authEpoch);
         if (getAuthEpoch() !== authEpoch) {
           throw new Error('Creator account changed before navigation.');
         }
@@ -107,7 +109,7 @@ export default function GalaxyRoute() {
     <View style={styles.root} testID="galaxy-studio-route">
       {handoffError ? <Text accessibilityRole="alert" style={{ color: '#FBBF24' }}>{handoffError}</Text> : null}
       {ready && loadedAuthEpoch === authEpoch ? (
-        <LazyMount><GalaxyStudioFactoryModal visible={true} onClose={close}
+        <LazyMount><GalaxyStudioFactoryModal key={authEpoch} visible={true} onClose={close}
           initialForgeDraft={incoming} initialGalaxyDraft={savedGalaxy}
           handoffError={handoffError} onSendToForge={continueInForge} /></LazyMount>
       ) : null}
