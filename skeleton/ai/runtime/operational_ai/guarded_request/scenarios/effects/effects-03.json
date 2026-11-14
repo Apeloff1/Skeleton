@@ -1,0 +1,22 @@
+{
+  "schema": "skeleton.ai.guard.case.v1",
+  "id": "effects-03",
+  "control": "effects",
+  "phase": "durable-effects",
+  "kind": "permitted-boundary",
+  "objective": "Verify executable offline AI effects gate at profile 03",
+  "threat": "Protect durable external-effect prepare/commit and forbid conflicting replay, scenario 3",
+  "trust_boundary": "Untrusted incoming operations may never exceed authenticated offline AI authority",
+  "input": {
+    "args_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "next_args_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "committed": true,
+    "contradict": false
+  },
+  "expected_allow": true,
+  "expected_semantics": "Accept the bounded request without creating unauthorized side effects",
+  "evidence_rule": "Call actual policy_oracle and compare with separately declared expected decision",
+  "no_model_substitute": true,
+  "real_model_qualification": false,
+  "policy_release_qualification": false
+}

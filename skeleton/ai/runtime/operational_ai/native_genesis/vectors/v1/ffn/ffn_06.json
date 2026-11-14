@@ -1,0 +1,11 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "ffn_06",
+  "category": "ffn",
+  "overrides": {
+    "ffn_kind": "swiglu",
+    "seed": 305
+  },
+  "expected": "allowed",
+  "reason": "Accept explicit ffn configuration with bounded candidate semantics"
+}

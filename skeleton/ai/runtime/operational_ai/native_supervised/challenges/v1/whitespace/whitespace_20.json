@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.native-supervised.challenge.v1",
+  "id": "whitespace_20",
+  "domain": "whitespace",
+  "ordinal": 20,
+  "arguments": {
+    "index": 20,
+    "a": 240,
+    "b": 9,
+    "word": "harbor",
+    "city": "Bergen"
+  },
+  "prompt": "Task 20: Collapse repeated spaces in 'harbor   test     item20'.",
+  "expected": "harbor test item20",
+  "severity": "medium",
+  "license_id": "skeleton_original",
+  "purpose": "offline_native_sft_evaluation",
+  "provenance": "original_synthetic_authored"
+}

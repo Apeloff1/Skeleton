@@ -1,0 +1,12 @@
+{
+  "schema": "skeleton.native-candidate.example.v1",
+  "id": "routing_15",
+  "domain": "routing",
+  "prompt": "Route synthetic message 214 tagged lane=south, target=archive. Return only the selected target label.",
+  "completion": "archive",
+  "group_id": "routing_15",
+  "rights_status": "allowed",
+  "license_id": "skeleton_original",
+  "training_scope": "offline_native_candidate_training",
+  "provenance": "original_synthetic_authored"
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "skeleton.native-genesis.policy-vector.v1",
+  "id": "min_frequency_03",
+  "category": "min_frequency",
+  "overrides": {
+    "minimum_document_frequency": 3
+  },
+  "expected": "allowed",
+  "reason": "Admit constrained min_frequency configuration before native weight allocation"
+}

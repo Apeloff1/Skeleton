@@ -1,0 +1,19 @@
+{
+  "schema": "skeleton.ai.guard.case.v1",
+  "id": "identity-23",
+  "control": "identity",
+  "phase": "authority",
+  "kind": "permitted-boundary",
+  "objective": "Verify actual offline AI gate decision at profile 23 for identity",
+  "threat": "Prevent invalid identity syntax, scope ambiguity or user-controlled path injection at boundary 23",
+  "trust_boundary": "Untrusted caller input must not change authenticated model, scope, authority or budget",
+  "input": {
+    "value": "a--b"
+  },
+  "expected_allow": true,
+  "expected_semantics": "The submitted input remains inside explicitly granted limits",
+  "evidence_rule": "Execute the real policy_oracle entrypoint; unexpected exceptions fail acceptance",
+  "no_model_substitute": true,
+  "real_model_qualification": false,
+  "policy_release_qualification": false
+}
