@@ -156,8 +156,10 @@ def _digest_beneath(
 
 MAX_MANIFEST_BYTES = 8 * 1024 * 1024
 
+MAX_SOURCE_DIRS = 100_000
 MAX_SOURCE_ENTRIES = 2 * MAX_SOURCE_FILES
 MAX_SOURCE_DEPTH = 64
+MAX_SOURCE_PATH_BYTES = 64 * 1024 * 1024
 
 
 def _open_tree_directory(root_fd: int, relative: tuple[str, ...]) -> int:
@@ -200,15 +202,19 @@ def tree_digest(root: Path) -> str:
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     root_fd = os.open("/", flags)
     try:
-        for component in absolute.parts[1:]:
-            next_fd = os.open(component, flags, dir_fd=root_fd)
-            os.close(root_fd)
-            root_fd = next_fd
+        try:
+            for component in absolute.parts[1:]:
+                next_fd = os.open(component, flags, dir_fd=root_fd)
+                os.close(root_fd)
+                root_fd = next_fd
+        except OSError as exc:
+            raise ValueError("source root unavailable or unsafe") from exc
         initial = os.fstat(root_fd)
-        pending: list[tuple[str, ...]] = [()]
         observed: list[tuple[tuple[str, ...], tuple[int, ...]]] = []
         source_digests: list[tuple[str, str]] = []
-        seen = count = total = 0
+        files_seen: list[tuple[tuple[str, ...], tuple[int, ...]]] = []
+        seen = count = total = path_bytes = 0
+        directories = 1
 
         def directory_identity(info: os.stat_result) -> tuple[int, ...]:
             return (
@@ -216,47 +222,86 @@ def tree_digest(root: Path) -> str:
                 info.st_mtime_ns, info.st_ctime_ns,
             )
 
+        def file_identity(info: os.stat_result) -> tuple[int, ...]:
+            return (info.st_dev, info.st_ino, info.st_mode, info.st_nlink,
+                    info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+
+        pending = [((), directory_identity(initial))]
         while pending:
-            relative_dir = pending.pop()
+            relative_dir, expected = pending.pop()
             try:
                 dfd = _open_tree_directory(root_fd, relative_dir)
             except OSError as exc:
                 raise ValueError("source directory changed during scan") from exc
             try:
-                observed.append((relative_dir, directory_identity(os.fstat(dfd))))
+                fingerprint = directory_identity(os.fstat(dfd))
+                if fingerprint != expected:
+                    raise ValueError("source directory replaced or changed before scan")
+                observed.append((relative_dir, fingerprint))
                 with os.scandir(dfd) as entries:
                     for item in entries:
                         name = item.name
-                        if name in IGNORED_DIRS:
-                            continue
-                        # Ignore no path aliases. Names from a dirfd are single
-                        # names, not attacker-supplied relative path expressions.
-                        if not name or name in (".", "..") or "/" in name:
-                            raise ValueError("noncanonical source tree entry")
+                        # Charge even ignored entries before examining type.
                         seen += 1
                         if seen > MAX_SOURCE_ENTRIES:
                             raise ValueError("source tree entry budget exceeded")
                         rel = relative_dir + (name,)
-                        if item.is_symlink():
-                            raise ValueError("symlink or linked project source cannot be certified")
-                        if item.is_dir(follow_symlinks=False):
+                        rel_path = "/".join(rel)
+                        _relative(rel_path)
+                        try:
+                            path_bytes += len(rel_path.encode("utf-8"))
+                        except UnicodeError as exc:
+                            raise ValueError("unsafe source path encoding") from exc
+                        if path_bytes > MAX_SOURCE_PATH_BYTES:
+                            raise ValueError("source path byte budget exceeded")
+                        info = item.stat(follow_symlinks=False)
+                        if stat.S_ISLNK(info.st_mode):
+                            raise ValueError("unsafe symlink or linked project source cannot be certified")
+                        if stat.S_ISDIR(info.st_mode):
+                            if name in IGNORED_DIRS:
+                                continue
+                            directories += 1
+                            if directories > MAX_SOURCE_DIRS:
+                                raise ValueError("source directory budget exceeded")
                             if len(rel) > MAX_SOURCE_DEPTH:
                                 raise ValueError("source directory depth exceeded")
-                            pending.append(rel)
+                            pending.append((rel, directory_identity(info)))
                             continue
-                        if not item.is_file(follow_symlinks=False):
-                            raise ValueError("special project source cannot be certified")
+                        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                            raise ValueError("unsafe special project source cannot be certified")
                         count += 1
                         if count > MAX_SOURCE_FILES:
                             raise ValueError("source file budget exceeded")
-                        rel_path = "/".join(rel)
-                        digest, size = _digest_beneath(root, rel_path)
+                        remaining = MAX_SOURCE_BYTES - total
+                        if info.st_size > remaining:
+                            raise ValueError("source size budget exceeded")
+                        digest, size = _digest_beneath(
+                            root, rel_path, max_bytes=max(1, min(MAX_ARTIFACT_BYTES, remaining)),
+                        )
+                        current = os.stat(name, dir_fd=dfd, follow_symlinks=False)
+                        if file_identity(current) != file_identity(info) or size != info.st_size:
+                            raise ValueError("source file changed after inventory")
                         total += size
                         if total > MAX_SOURCE_BYTES:
                             raise ValueError("source size budget exceeded")
+                        files_seen.append((rel, file_identity(info)))
                         source_digests.append((rel_path, digest))
             finally:
                 os.close(dfd)
+
+        # In-place writes need not change the directory listing timestamps.
+        # Recheck every hashed file's metadata through the still-open root.
+        for relative_file, fingerprint in files_seen:
+            try:
+                parent_fd = _open_tree_directory(root_fd, relative_file[:-1])
+                try:
+                    current = os.stat(relative_file[-1], dir_fd=parent_fd, follow_symlinks=False)
+                    if file_identity(current) != fingerprint:
+                        raise ValueError("source file changed after hashing")
+                finally:
+                    os.close(parent_fd)
+            except OSError as exc:
+                raise ValueError("source file custody lost after hashing") from exc
 
         # Verify that previously scanned directories (including empty ones)
         # still have the same identities and listing generations. Otherwise
