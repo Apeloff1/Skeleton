@@ -25,16 +25,17 @@ _DISCOVERY_CPU=threading.BoundedSemaphore(2)
 
 async def _bounded_discovery_cpu(operation,*args):
     from core.dragon_crawler import CrawlerError
-    if not _DISCOVERY_CPU.acquire(blocking=False):
+    gate=_DISCOVERY_CPU
+    if not gate.acquire(blocking=False):
         raise CrawlerError("crawler_vault_busy","Historical chamber parsing is at local capacity. Retry after the active scan completes.",429)
     try:
         future=asyncio.get_running_loop().run_in_executor(None,operation,*args)
     except BaseException:
-        _DISCOVERY_CPU.release()
+        gate.release()
         raise
 
     def finished(result):
-        _DISCOVERY_CPU.release()
+        gate.release()
         # Observe any late exception even if the client detached.
         if not result.cancelled():
             result.exception()
@@ -46,7 +47,8 @@ async def _bounded_discovery_cpu(operation,*args):
 class DragonVaultMixin:
     def _vault_primary(self,scope,row):
         from core.dragon_crawler import _now,_utc,_plain,_digest,_core
-        if row["status"] not in TERMINAL or row.get("worker_token") is not None or row.get("lease_until") is not None:
+        if (row["status"] not in TERMINAL or row.get("worker_token") is not None
+                or row.get("lease_until") is not None or row.get("last_worker_exit_confirmed") is False):
             raise ValueError("vault requires quiescent terminal checkpoint")
         now=_now().timestamp()
         if _utc(row["consent_expires_at"]).timestamp()>now:
@@ -64,6 +66,8 @@ class DragonVaultMixin:
                 or _digest(_plain(row["request"]))!=row["request_digest"]
                 or abs(_utc(row["consent_expires_at"]).timestamp()-binding["consent"]["expires_at"])>=.002):
             raise ValueError("vault checkpoint scope mismatch")
+        if snapshot.get("pending_dispatch") is not None or set(self._source_policies(row))-set(snapshot["sources"]):
+            raise ValueError("terminal source or pending-dispatch custody mismatch")
         _,run_type=_core()
         try:
             run_type.from_snapshot(snapshot)
@@ -107,7 +111,7 @@ class DragonVaultMixin:
             receipt=await self._admit(scope,identifier,{"treasury_vault":marker})
             changed=await self.sessions.update_one({"_id":identifier,**scope,"version":row["version"],
                 "status":{"$in":sorted(TERMINAL)},"treasury_vault":{"$exists":False},
-                "worker_token":None,"lease_until":None,
+                "worker_token":None,"lease_until":None,"last_worker_exit_confirmed":{"$ne":False},
                 "$expr":{"$lte":["$consent_expires_at","$$NOW"]}},
                 {"$set":{"treasury_vault":marker,"storage_receipt":receipt},"$inc":{"version":1}})
             if not changed.modified_count:
@@ -489,6 +493,16 @@ class DragonVaultMixin:
             raise CrawlerError("crawler_not_found","Retired expedition not found.",404)
         unavailable=CrawlerError("crawler_vault_restore_held","Exact original custody cannot be restored safely.",409)
         previous=row.get("treasury_vault_restore")
+        if previous is not None:
+            from skeleton.ai.webcrawler.dragon_treasury_vault import hash_identity
+            if (not isinstance(previous,dict)
+                    or set(previous)!={"operation","request_digest","snapshot_digest","published_version","repaired_at"}
+                    or not all(hash_identity(previous.get(key)) for key in ("operation","request_digest","snapshot_digest"))
+                    or type(previous.get("published_version")) is not int
+                    or not 1<=previous["published_version"]<=row["version"]
+                    or not isinstance(previous["repaired_at"],str)
+                    or not 1<=len(previous["repaired_at"])<=64):
+                raise unavailable
         replay=isinstance(previous,dict) and previous.get("operation")==operation
         if replay and previous.get("request_digest")!=digest:
             raise CrawlerError("crawler_idempotency_conflict","Restore key names a different command.",409)
@@ -539,3 +553,59 @@ class DragonVaultMixin:
                 "version":current["version"],"outcome":outcome,"snapshot_digest":marker["snapshot_digest"],
                 "ancestor_rollback":False,"capture_consent_extended":False,"historical_grant_extended":False,
                 "network_executed":False,"model_context_permission":False}
+
+
+    def _inspect_vault_redundancy(self,scope,row):
+        from core.dragon_crawler import _plain
+        marker=validate_marker(_plain(row["treasury_vault"]))
+        witness=_plain(row["checkpoint_identity"])
+        if marker["state"]!="vaulted" or witness["snapshot_digest"]!=marker["snapshot_digest"]:
+            raise ValueError("vault witness mismatch")
+        primary="held"
+        replica="unavailable"
+        try:
+            self._vault_primary(scope,row)
+        except (ValueError,TypeError,KeyError,RecursionError,CheckpointReplicaError):
+            pass
+        else:
+            primary="exact"
+        if witness.get("replica_available") is True:
+            try:
+                candidate=decode_exact_replica(row.get("checkpoint_replica"),witness)
+                self._vault_primary(scope,{**row,"snapshot":candidate})
+            except (ValueError,TypeError,KeyError,RecursionError,CheckpointReplicaError):
+                replica="held"
+            else:
+                replica="exact"
+        return primary,replica,marker["snapshot_digest"]
+
+    async def treasury_vault_redundancy(self,scope,identifier):
+        """Verify actual current copies, rather than trusting the availability flag."""
+        from core.dragon_crawler import CrawlerError,_now
+        if not identity(identifier):
+            raise CrawlerError("crawler_identifier_invalid","Invalid retired expedition identifier.")
+        query={"_id":identifier,**scope,"status":{"$in":sorted(TERMINAL)},"treasury_vault.state":"vaulted"}
+        row=await self.sessions.find_one(query,max_time_ms=2000)
+        if row is None:
+            raise CrawlerError("crawler_not_found","Retired expedition not found.",404)
+        try:
+            primary,replica,digest=await _bounded_discovery_cpu(self._inspect_vault_redundancy,scope,row)
+        except CrawlerError as exc:
+            if exc.code=="crawler_vault_busy":
+                raise
+            primary,replica,digest="held","held",None
+        except (ValueError,TypeError,KeyError,RecursionError,CheckpointReplicaError):
+            primary,replica,digest="held","held",None
+        final=await self.sessions.find_one({**query,"version":row["version"]},
+                {"_id":1,"version":1,"checkpoint_identity":1,"treasury_vault":1},max_time_ms=2000)
+        if (final is None or final.get("checkpoint_identity")!=row.get("checkpoint_identity")
+                or final.get("treasury_vault")!=row.get("treasury_vault")):
+            raise CrawlerError("crawler_conflict","Retained record changed during verification.",409)
+        state=("redundant" if primary==replica=="exact" else
+               "primary_only" if primary=="exact" else
+               "repairable_primary" if replica=="exact" else "held")
+        return {"ok":True,"schema":"skeleton.dragon.vault-redundancy.v1","session_id":identifier,
+                "version":row["version"],"as_of_unix":_now().timestamp(),"state":state,
+                "primary":primary,"replica":replica,"snapshot_digest":digest,
+                "independent_backup":False,"read_only":True,"source_text_returned":False,
+                "historical_grant_extended":False,"network_executed":False}

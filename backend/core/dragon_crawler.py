@@ -400,6 +400,8 @@ class DragonCrawlerApplication(DragonVaultMixin):
                                       "completed", "budget_exhausted", "failed"}
             or row.get("worker_token") is not None
             or row.get("lease_until") is not None
+            or row.get("last_worker_exit_confirmed") is False
+            or row.get("treasury_vault") is not None
             or type(row.get("version")) is not int
             or row.get("consent_expires_at") is None
             or _utc(row["consent_expires_at"]) <= _now()
@@ -431,6 +433,7 @@ class DragonCrawlerApplication(DragonVaultMixin):
             {"_id": row["_id"], **scope, "version": row["version"],
              "worker_epoch": row["worker_epoch"], "status": row["status"],
              "worker_token": None, "lease_until": None,
+             "last_worker_exit_confirmed":{"$ne":False},"treasury_vault":{"$exists":False},
              "checkpoint_identity": identity,
              "consent_expires_at": row["consent_expires_at"],
              "$expr": {"$gt": ["$consent_expires_at", "$$NOW"]}},

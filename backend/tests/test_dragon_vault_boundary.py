@@ -471,6 +471,36 @@ class VaultRestoreTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(error.exception.code,"crawler_conflict")
         self.assertEqual(row["snapshot"],{"damaged":True})
 
+    async def test_redundancy_reports_exact_and_repairable_bytes_without_writes(self):
+        for damaged,expected in ((True,"repairable_primary"),(False,"redundant")):
+            app,row,original,now,command=self.harness(damaged=damaged)
+            with patch("core.dragon_crawler._now",return_value=now):
+                result=await app.treasury_vault_redundancy(SCOPE,row["_id"])
+            self.assertEqual(result["state"],expected)
+            self.assertEqual(result["snapshot_digest"],original["snapshot_digest"])
+            self.assertFalse(result["source_text_returned"])
+            self.assertFalse(result["independent_backup"])
+            app._admit.assert_not_awaited()
+            app.sessions.update_one.assert_not_awaited()
+
+    async def test_corrupt_replica_with_intact_primary_is_primary_only(self):
+        app,row,original,now,command=self.harness(damaged=False)
+        row["checkpoint_replica"]="invalid"
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.treasury_vault_redundancy(SCOPE,row["_id"])
+        self.assertEqual(result["state"],"primary_only")
+        self.assertEqual(result["replica"],"held")
+
+    async def test_malformed_restore_receipt_cannot_be_replayed(self):
+        app,row,original,now,command=self.harness()
+        row["treasury_vault_restore"]={"operation":"a"*64}
+        with patch("core.dragon_crawler._now",return_value=now),patch(
+                "core.dragon_crawler.authenticated_scope",return_value=SCOPE):
+            with self.assertRaises(CrawlerError) as error:
+                await app.restore_treasury_vault(SCOPE,row["_id"],command,principal={"role":"editor"})
+        self.assertEqual(error.exception.code,"crawler_vault_restore_held")
+        app._admit.assert_not_awaited()
+
     async def test_viewer_cannot_restore(self):
         app,row,original,now,command=self.harness()
         with patch("core.dragon_crawler.authenticated_scope",return_value=SCOPE):

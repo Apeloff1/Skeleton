@@ -603,6 +603,26 @@ export async function getDragonVault(cursor?:string,signal?:AbortSignal):Promise
     ||p.next_cursor!==null&&(p.sessions.length!==32||p.next_cursor!==p.sessions[p.sessions.length-1].session_id))invalid('Invalid vault catalogue custody.');
   return p;
 }
+export type DragonVaultRedundancy = {
+  schema:'skeleton.dragon.vault-redundancy.v1';session_id:string;version:number;as_of_unix:number;
+  state:'redundant'|'primary_only'|'repairable_primary'|'held';primary:'exact'|'held';
+  replica:'exact'|'held'|'unavailable';snapshot_digest:string|null;independent_backup:false;
+  read_only:true;source_text_returned:false;historical_grant_extended:false;network_executed:false;
+};
+export async function getDragonVaultRedundancy(id:string,signal?:AbortSignal):Promise<DragonVaultRedundancy>{
+  const p=await read(api.get<DragonVaultRedundancy>(ROOT+'/sessions/'+identifier(id)+'/vault-redundancy',options(signal)),
+    getAuthToken(),'Historical copy verification unavailable.');
+  if(!p||p.schema!=='skeleton.dragon.vault-redundancy.v1'||p.session_id!==id||!integer(p.version)||p.version<1
+    ||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0||!['exact','held'].includes(p.primary)
+    ||!['exact','held','unavailable'].includes(p.replica)
+    ||p.state!==(p.primary==='exact'?(p.replica==='exact'?'redundant':'primary_only'):
+                    p.replica==='exact'?'repairable_primary':'held')
+    ||p.snapshot_digest!==null&&!HASH.test(p.snapshot_digest)||p.state!=='held'&&p.snapshot_digest===null
+    ||p.independent_backup!==false||p.read_only!==true||p.source_text_returned!==false
+    ||p.historical_grant_extended!==false||p.network_executed!==false)
+    invalid('Invalid historical redundancy receipt.');
+  return p;
+}
 export type DragonVaultRestore = {
   schema:'skeleton.dragon.vault-restore.v1';session_id:string;version:number;outcome:'restored'|'already_intact';
   snapshot_digest:string;ancestor_rollback:false;capture_consent_extended:false;historical_grant_extended:false;

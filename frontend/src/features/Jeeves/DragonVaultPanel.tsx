@@ -1,8 +1,8 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,AppState,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {getAuthToken} from '../../auth/gameforgeAuth';
-import {getDragonVault,getDragonVaultQuota,discoverDragonVault,retireDragonSession,restoreDragonVaultPrimary,getCrawl,crawlRequestKey,configureDragonArchive,
- configureLegacyTreasuryArchive,eraseCrawl,type DragonVaultCatalog,type DragonVaultQuota,type DragonVaultDiscovery,type DragonVaultEntry,type CrawlSession} from '../../product/crawlerClient';
+import {getDragonVault,getDragonVaultQuota,discoverDragonVault,retireDragonSession,restoreDragonVaultPrimary,getDragonVaultRedundancy,getCrawl,crawlRequestKey,configureDragonArchive,
+ configureLegacyTreasuryArchive,eraseCrawl,type DragonVaultCatalog,type DragonVaultQuota,type DragonVaultDiscovery,type DragonVaultRedundancy,type DragonVaultEntry,type CrawlSession} from '../../product/crawlerClient';
 import s,{colors} from './CrawlerWorkspace.styles';
 import {scanArchiveChambers,bestHistoryWindow,type ChamberScan,SCAN_DEADLINE_MS} from './dragonVaultScan';
 
@@ -18,6 +18,7 @@ const stamp=(n:number)=>new Date(n*1000).toLocaleString();
 export default function DragonVaultPanel({revision,session,canWrite,disabled,onWindow,onSession,onChanged}:Props){
  const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[catalog,setCatalog]=useState<DragonVaultCatalog|null>(null);
  const [quota,setQuota]=useState<DragonVaultQuota|null>(null);
+ const [redundancy,setRedundancy]=useState<DragonVaultRedundancy|null>(null);
  const [discoveryQuery,setDiscoveryQuery]=useState('');
  const [discovery,setDiscovery]=useState<DragonVaultDiscovery|null>(null);
  const [discoveryBusy,setDiscoveryBusy]=useState(false);
@@ -41,7 +42,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   setDiscovery(null);setArchiveScan(null);setScanProgress(null);setDiscoveryBusy(false);
  },[]);
  const reset=useCallback(()=>{
-  invalidate();clearDiscovery();setDiscoveryQuery('');setCatalog(null);setQuota(null);setSelected([]);setHistory([]);setCursor(undefined);setBusy(false);
+  invalidate();clearDiscovery();setDiscoveryQuery('');setCatalog(null);setQuota(null);setRedundancy(null);setSelected([]);setHistory([]);setCursor(undefined);setBusy(false);
   setRetention(false);setManaged(null);setRights(false);setEraseText('');operation.current=null;setNotice('');setError('');
  },[invalidate,clearDiscovery]);
  useEffect(()=>{reset();return()=>{invalidate();clearDiscovery();};},[revision,reset,invalidate,clearDiscovery]);
@@ -54,7 +55,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
 
  async function load(next?:string){
   invalidate();const attempt=epoch.current,token=getAuthToken(),ctrl=new AbortController();
-  owner.current=token;pending.current=ctrl;setBusy(true);setCatalog(null);setQuota(null);setError('');
+  owner.current=token;pending.current=ctrl;setBusy(true);setCatalog(null);setQuota(null);setRedundancy(null);setError('');
   try{
    const [result,health]=await Promise.allSettled([getDragonVault(next,ctrl.signal),getDragonVaultQuota(ctrl.signal)]);
    if(!valid(ctrl,attempt,token))return;
@@ -63,7 +64,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
    const page=result.value;
    if(!valid(ctrl,attempt,token))return;
    setCatalog(page);setCursor(next);setManaged(null);setRights(false);setEraseText('');setRetention(false);
-   timer.current=setTimeout(()=>{if(epoch.current===attempt){setCatalog(null);setQuota(null);setSelected([]);setManaged(null);setRights(false);setEraseText('');}},60000);
+   timer.current=setTimeout(()=>{if(epoch.current===attempt){setCatalog(null);setQuota(null);setRedundancy(null);setSelected([]);setManaged(null);setRights(false);setEraseText('');}},60000);
   }catch(e){if(valid(ctrl,attempt,token))setError(e instanceof Error?e.message:'Vault catalogue unavailable.');}
   finally{if(epoch.current===attempt){pending.current=null;setBusy(false);}}
  }
@@ -110,13 +111,25 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   try{const ids=bestHistoryWindow(archiveScan,performance.now());if(ids.length)onWindow(ids,discoveryQuery);}
   catch(e){clearDiscovery();setError(e instanceof Error?e.message:'Archive ranking expired.');}
  }
+ async function verifyCopies(row:DragonVaultEntry){
+  if(busy||disabled||owner.current!==getAuthToken())return;
+  const ctrl=new AbortController(),token=getAuthToken(),attempt=epoch.current;
+  pending.current=ctrl;setBusy(true);setRedundancy(null);setError('');
+  try{
+   const result=await getDragonVaultRedundancy(row.session_id,ctrl.signal);
+   if(!valid(ctrl,attempt,token))return;
+   if(result.version!==row.version){setError('Retained record changed; refresh the catalogue.');setCatalog(null);return;}
+   setRedundancy(result);
+  }catch(e){if(valid(ctrl,attempt,token))setError(e instanceof Error?e.message:'Historical copy verification unavailable.');}
+  finally{if(epoch.current===attempt){pending.current=null;setBusy(false);}}
+ }
  async function mutate(action:'retire'|'restore'|'grant'|'revoke'|'erase',id:string,version:number,legacy=false){
   if(busy||disabled||owner.current!==getAuthToken()||action!=='revoke'&&!canWrite)return;
   if((action==='retire'||action==='restore')&&!retention||action==='grant'&&!rights||action==='erase'&&eraseText!=='ERASE')return;
   const n=action==='grant'?Number(days):30;
   if(!Number.isInteger(n)||n<1||n>30){setError('Historical-use duration must be 1–30 days.');return;}
   clearDiscovery();invalidate();const token=getAuthToken(),attempt=epoch.current,ctrl=new AbortController();pending.current=ctrl;
-  setBusy(true);setError('');setNotice('');setCatalog(null);setQuota(null);
+  setBusy(true);setError('');setNotice('');setCatalog(null);setQuota(null);setRedundancy(null);
   const identity=[action,id,version,n].join(':');
   if(operation.current?.identity!==identity)operation.current={identity,key:crawlRequestKey('vault-'+action)};
   const command={expected_version:version,idempotency_key:operation.current.key};
@@ -222,7 +235,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
       {row.vault&&<Text style={s.small}>Accepted {stamp(row.vault.accepted_at)} · {row.legacy_runtime?'older-runtime witness':'current-runtime witness'}</Text>}
       {row.archive_expires_at!==null&&<Text style={s.small}>Recorded archive grant expires {stamp(row.archive_expires_at)}. Individual source permission is checked at read time.</Text>}
       <Button label={selected.includes(row.session_id)?'Remove from selected history':'Select for historical window'} disabled={busy||disabled||row.integrity_held||row.vault?.state!=='vaulted'||selected.length>=32&&!selected.includes(row.session_id)} action={()=>toggle(row)}/>
-      <Button label="Manage retained record" disabled={busy||disabled} action={()=>{setManaged(managed===row.session_id?null:row.session_id);setRetention(false);setRights(false);setEraseText('');}}/>
+      <Button label="Manage retained record" disabled={busy||disabled} action={()=>{setManaged(managed===row.session_id?null:row.session_id);setRedundancy(null);setRetention(false);setRights(false);setEraseText('');}}/>
       {managed===row.session_id&&<>
        {!row.integrity_held&&row.vault&&!row.vault.active_slot_released&&canWrite&&<>
         <View style={s.row}><Switch value={retention} onValueChange={setRetention} accessibilityLabel="Confirm pending retirement retry"/><Text style={[s.small,s.grow]}>Confirm the same cold-custody intent.</Text></View>
@@ -233,6 +246,13 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
          <View style={s.row}><Switch value={rights} onValueChange={setRights} accessibilityLabel="Authorize historical source use"/><Text style={[s.small,s.grow]}>I hold rights for this separate historical-use period.</Text></View>
          <Button label="Authorize historical use" disabled={busy||disabled||!rights} action={()=>void mutate('grant',row.session_id,row.version,!!row.legacy_runtime)}/></>}
         <Button label="Revoke historical use" disabled={busy||disabled} action={()=>void mutate('revoke',row.session_id,row.version,!!row.legacy_runtime)}/>
+       </>}
+       {row.vault?.state==='vaulted'&&<>
+        <Button label="Verify both retained copies" disabled={busy||disabled} action={()=>void verifyCopies(row)}/>
+        {redundancy?.session_id===row.session_id&&redundancy.version===row.version&&<View style={s.check}>
+         <Text style={s.label}>{redundancy.state==='redundant'?'Both copies match the witness':redundancy.state==='primary_only'?'Primary intact; duplicate unavailable or held':redundancy.state==='repairable_primary'?'Exact duplicate can restore original primary':'Both copies held'}</Text>
+         <Text style={s.small}>Primary {redundancy.primary} · replica {redundancy.replica}. Same-row redundancy, not an independent backup.</Text>
+        </View>}
        </>}
        {canWrite&&row.vault?.state==='vaulted'&&<>
         <Text style={s.small}>Check the original primary and repair only from its exact existing witnessed replica. This cannot restore an older revision or renew permission.</Text>

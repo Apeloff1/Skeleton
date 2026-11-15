@@ -38,7 +38,7 @@ function client(initial){
   });
   return {requests,read:modules.getDragonTreasury,readVault:modules.getDragonVault,
     quota:modules.getDragonVaultQuota,discover:modules.discoverDragonVault,
-    retire:modules.retireDragonSession,restore:modules.restoreDragonVaultPrimary,set:value=>{payload=value;}};
+    retire:modules.retireDragonSession,restore:modules.restoreDragonVaultPrimary,redundancy:modules.getDragonVaultRedundancy,set:value=>{payload=value;}};
 }
 
 async function main(){
@@ -145,6 +145,13 @@ async function main(){
     {model_context_permission:true},{version:1},{snapshot_digest:'wrong'}]){
     vc.set({...repair,...patch});await assert.rejects(vc.restore('vaulted-fixture',command),e=>e.kind==='protocol');
   }
-  console.log('Treasury and cold custody: canonical wire parity, validated archive windows, quota health, discovery and exact primary restore receipts.');
+  const redundancy={schema:'skeleton.dragon.vault-redundancy.v1',session_id:'vaulted-fixture',version:2,as_of_unix:1800000000,
+    state:'repairable_primary',primary:'held',replica:'exact',snapshot_digest:'a'.repeat(64),independent_backup:false,
+    read_only:true,source_text_returned:false,historical_grant_extended:false,network_executed:false};
+  vc.set(redundancy);assert.deepEqual(await vc.redundancy('vaulted-fixture'),redundancy);
+  for(const patch of [{state:'redundant'},{independent_backup:true},{source_text_returned:true},{snapshot_digest:null}]){
+    vc.set({...redundancy,...patch});await assert.rejects(vc.redundancy('vaulted-fixture'),e=>e.kind==='protocol');
+  }
+  console.log('Treasury and cold custody: canonical wire parity, archive windows, quota, discovery, exact primary restore and redundancy verification.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
