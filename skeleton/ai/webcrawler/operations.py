@@ -34,7 +34,7 @@ from .structured_discovery import (
 )
 from .frontier_scheduler import choose_frontier
 from .adaptive_navigation import access_denied_hold, origin_health, restorative_wait
-from .frontier_circuit import evaluate_frontier_candidate
+from .frontier_circuit import evaluate_frontier_candidate, navigation_hazard
 from .host_backpressure import consent_bounded_retry_after, origin_throttle
 from .source_instruction_guard import (
     incident_receipt, incident_summary, inspect_extracted, inspect_response,
@@ -645,7 +645,8 @@ class CrawlRun:
 
     def _admit(self, url):
         normalized = _url(url)
-        if normalized != url or not self.policy.admits(normalized):
+        if (normalized != url or not self.policy.admits(normalized)
+                or navigation_hazard(normalized) is not None):
             raise CrawlOperationError("URL is outside admitted source scope")
         return normalized
 
@@ -1039,6 +1040,15 @@ class CrawlRun:
                 )
                 if len(chain) >= 5 or destination == fetch_url or destination in chain:
                     raise CrawlOperationError("redirect chain rejected")
+                if not needs_robots:
+                    # A redirect is a fresh untrusted discovery, not a right to
+                    # bypass exact deduplication or structural family traps.
+                    circuit = evaluate_frontier_candidate(
+                        destination, seen=state["seen"],
+                        frontier=[entry["url"] for entry in state["frontier"] if entry is not item],
+                    )
+                    if not circuit.allowed:
+                        raise CrawlOperationError("redirect frontier circuit rejected")
             except (ValueError, UnicodeError):
                 self._finish_item(item)
                 return self._event(
