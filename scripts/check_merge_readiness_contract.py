@@ -207,7 +207,7 @@ def main() -> int:
     )
 
     require(
-        '"requests==2.32.5"' in quality_security,
+        '"requests==2.34.2"' in quality_security,
         "security origin-guard source tests require pinned requests dependency",
         failures,
     )
