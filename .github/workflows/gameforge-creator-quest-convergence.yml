@@ -187,7 +187,7 @@ jobs:
           GODOT_ARCHIVE_SHA256: 6bcc59dfd1d670e918c77eae06e82b9dc5699de13d353dc3a4b3b6b307b6dc06
         run: |
           set -euo pipefail
-          python scripts/qualify_prood_native_maze.py \
+          python -m scripts.qualify_prood_native_maze \
             --godot "$RUNNER_TEMP/gameforge-godot-native" \
             --archive "$RUNNER_TEMP/Godot_v4.6-stable_linux.x86_64.zip" \
             --archive-sha256 "$GODOT_ARCHIVE_SHA256"

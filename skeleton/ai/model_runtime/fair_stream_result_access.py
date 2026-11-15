@@ -233,14 +233,13 @@ class AuthorizedSealedResultReader:
         The caller must enforce app user authorization before invoking this
         method. A consumed grant remains consumed if decryption later fails.
         """
-        self._handle.require_owner_process()
         with self._lock:
-            if self._connection.in_transaction:
-                raise ResultReadDenied("grant ledger unavailable")
             try:
                 self._handle.assert_current()
-            except PrivateSQLiteUnavailable as exc:
-                raise ResultReadDenied("grant ledger inode custody changed") from exc
+                if self._connection.in_transaction:
+                    raise ResultReadDenied("grant ledger unavailable")
+            except (PrivateSQLiteUnavailable, sqlite3.Error) as exc:
+                raise ResultReadDenied("grant ledger unavailable: inode custody changed") from exc
             self._assert_schema()
             try:
                 receipt = self._journal.recover_committed_receipt(permit)
