@@ -1,4 +1,4 @@
-"""Bounded outbox contract for durable handoff without a persistence dependency."""
+"""Bounded process-local outbox hints; use DurableOutbox for durable handoff."""
 
 from __future__ import annotations
 

@@ -28,6 +28,7 @@ _MAX_BATCH = 1024
 _MAX_DEPS = 1024
 _STATES = frozenset({"pending", "claimed", "succeeded", "failed", "cancelled", "uncertain"})
 _TERMINAL = frozenset({"succeeded", "failed", "cancelled", "uncertain"})
+_RECOVERY_DOMAIN = b"frontier.work.recovery.v1\0"
 _TABLE = "frontier_work_orders_v1"
 _FIELDS = ("scope", "work_id", "kind", "body", "dependencies", "state",
            "owner", "token_digest", "receipt", "mac")
@@ -100,6 +101,43 @@ class WorkClaim:
         return f"WorkClaim(scope={self.scope!r}, work_id={self.work_id!r}, owner={self.owner!r})"
 
 
+@dataclass(frozen=True, slots=True)
+class RecoveryChallenge:
+    scope: str
+    work_id: str
+    owner: str
+    record_mac: str
+
+
+@dataclass(frozen=True, slots=True)
+class RecoveryAuthorization:
+    challenge: RecoveryChallenge
+    state: str
+    receipt_digest: str
+    signature: str
+
+
+def _recovery_payload(challenge: RecoveryChallenge, state: str, receipt: str) -> bytes:
+    if type(challenge) is not RecoveryChallenge:
+        raise ValueError("canonical recovery challenge required")
+    if state not in {"succeeded", "failed", "uncertain"}:
+        raise ValueError("recovery cannot requeue execution")
+    return _RECOVERY_DOMAIN + _encode([
+        _text(challenge.scope), _hex(challenge.work_id), _text(challenge.owner),
+        _hex(challenge.record_mac), state, _hex(receipt),
+    ])
+
+
+def sign_recovery(challenge: RecoveryChallenge, *, state: str,
+                  receipt_digest: str, recovery_key: bytes) -> RecoveryAuthorization:
+    """Operator-only helper: call after independent evidence and quiescence review."""
+    if type(recovery_key) is not bytes or len(recovery_key) != 32:
+        raise ValueError("independent 256-bit recovery key required")
+    payload = _recovery_payload(challenge, state, receipt_digest)
+    return RecoveryAuthorization(challenge, state, receipt_digest,
+                                 hmac.new(recovery_key, payload, sha256).hexdigest())
+
+
 class DurableWorkJournal:
     """Source-neutral, bounded transaction owner; admission is explicit.
 
@@ -110,7 +148,8 @@ class DurableWorkJournal:
 
     def __init__(self, connection: sqlite3.Connection, *, scope: str,
                  custody_key: bytes, max_rows: int = 4096,
-                 max_bytes: int = 64 << 20):
+                 max_bytes: int = 64 << 20,
+                 recovery_key: bytes | None = None):
         if not isinstance(connection, sqlite3.Connection) or connection.in_transaction:
             raise ValueError("exclusive idle SQLite connection required")
         if type(custody_key) is not bytes or len(custody_key) != 32:
@@ -121,7 +160,11 @@ class DurableWorkJournal:
             raise ValueError("invalid work byte budget")
         self._db = connection
         self._scope = _text(scope)
+        if recovery_key is not None and (type(recovery_key) is not bytes
+                or len(recovery_key) != 32 or hmac.compare_digest(recovery_key, custody_key)):
+            raise ValueError("recovery must use a separate 256-bit key")
         self._key = custody_key
+        self._recovery_key = recovery_key
         self._max_rows = max_rows
         self._max_bytes = max_bytes
         self._pid = os.getpid()
@@ -346,6 +389,58 @@ class DurableWorkJournal:
                 if (state is None or row[5] == state) and len(result) < limit:
                     result.append(self._status(row))
             return tuple(result)
+
+    def ready(self, *, kind: str | None = None, limit: int = 64) -> tuple[WorkStatus, ...]:
+        """Return authenticated dependency-ready candidates, not actual admission permits."""
+        if kind is not None:
+            _text(kind)
+        if type(limit) is not int or not 1 <= limit <= 1024:
+            raise ValueError("invalid ready-work limit")
+        # list_status verifies every row and releases its snapshot before
+        # claim; claim always rereads prerequisites transactionally.
+        rows = self.list_status(limit=_MAX_ROWS)
+        by_id = {row.work_id: row for row in rows}
+        ready = []
+        for row in rows:
+            if row.state != "pending" or (kind is not None and row.kind != kind):
+                continue
+            if any(dep not in by_id for dep in row.dependencies):
+                raise WorkIntegrityError("authenticated work has missing dependency")
+            if all(by_id[dep].state == "succeeded" for dep in row.dependencies):
+                ready.append(row)
+                if len(ready) == limit:
+                    break
+        return tuple(ready)
+
+    def recovery_challenge(self, work_id: str) -> RecoveryChallenge:
+        """Expose only the authenticated record identity for external reconciliation."""
+        with self._tx():
+            row = self._require(work_id)
+            if row[5] != "claimed":
+                raise WorkConflict("only a claimed order requires reconciliation")
+            return RecoveryChallenge(self._scope, row[1], row[6], row[-1])
+
+    def reconcile_claimed(self, authorization: RecoveryAuthorization) -> WorkStatus:
+        """Resolve a lost claim using independent operator proof; never replay."""
+        if self._recovery_key is None:
+            raise WorkConflict("independent recovery authority not configured")
+        if type(authorization) is not RecoveryAuthorization:
+            raise TypeError("canonical recovery authorization required")
+        challenge = authorization.challenge
+        payload = _recovery_payload(challenge, authorization.state, authorization.receipt_digest)
+        expected = hmac.new(self._recovery_key, payload, sha256).hexdigest()
+        if not hmac.compare_digest(_hex(authorization.signature), expected):
+            raise WorkConflict("invalid independent recovery proof")
+        if challenge.scope != self._scope:
+            raise WorkConflict("foreign recovery scope")
+        with self._tx():
+            prior = self._require(challenge.work_id)
+            if (prior[5] != "claimed" or prior[6] != challenge.owner
+                    or not hmac.compare_digest(prior[-1], challenge.record_mac)):
+                raise WorkConflict("stale recovery challenge")
+            result = self._replace(prior, state=authorization.state, owner=prior[6],
+                                   token_digest=prior[7], receipt=authorization.receipt_digest)
+            return self._status(result)
 
     def _replace(self, prior: tuple, *, state: str, owner: str,
                  token_digest: str, receipt: str) -> tuple:

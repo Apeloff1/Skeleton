@@ -6,7 +6,7 @@ from threading import Lock
 
 class DeadLetterQueue:
     def __init__(self, capacity: int = 256):
-        if not isinstance(capacity, int) or isinstance(capacity, bool) or capacity <= 0:
+        if type(capacity) is not int or not 1 <= capacity <= 65_536:
             raise ValueError("capacity must be a positive integer")
         self._q = deque()
         self._cap = capacity
