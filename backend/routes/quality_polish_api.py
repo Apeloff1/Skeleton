@@ -177,7 +177,10 @@ async def polish_game_stage(
     }
     updated = await _db.game_kb.find_one_and_update(
         {
-            "game_id": pid, f"artifacts.{key}": {"$eq": original},
+            "game_id": pid,
+            # Expression equality compares the whole field rather than matching
+            # a value found inside an array; literal prevents operator interpretation.
+            "$expr": {"$eq": [f"$artifacts.{key}", {"$literal": original}]},
             "deleted": {"$ne": True}, "revoked": {"$ne": True},
             "rights_revoked": {"$ne": True},
             "state": {"$nin": ["deleted", "revoked", "archived", "withdrawn"]},
