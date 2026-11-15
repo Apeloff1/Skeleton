@@ -64,6 +64,9 @@ class OmegaFabric:
         self._saved = 0
         self._restore_status = "not_attempted"
         self._write_status = "not_attempted"
+        self._growth_queue: asyncio.Queue = asyncio.Queue(maxsize=256)
+        self._growth_task: asyncio.Task | None = None
+        self._growth_telemetry_failures = 0
 
     # ── durable state helpers (A1) ────────────────────────────
     def _persist_enabled(self) -> bool:
@@ -210,6 +213,14 @@ class OmegaFabric:
 
     async def close(self):
         async with self._lifecycle_lock:
+            telemetry, self._growth_task = self._growth_task, None
+            if telemetry is not None:
+                telemetry.cancel()
+                await asyncio.gather(telemetry, return_exceptions=True)
+            while not self._growth_queue.empty():
+                self._growth_queue.get_nowait()
+                self._growth_queue.task_done()
+                self._growth_telemetry_failures += 1
             task, self._flush_task = self._flush_task, None
             if task is not None:
                 task.cancel()
@@ -278,6 +289,33 @@ class OmegaFabric:
         async with self._lifecycle_lock:
             return await self.agents[agent_id].drain(queue, limit)
 
+    async def _drain_growth_telemetry(self):
+        from gameforge.prood import event_bus
+        while not self._growth_queue.empty():
+            item = self._growth_queue.get_nowait()
+            try:
+                result = await asyncio.wait_for(event_bus.publish("iq.grow", item), timeout=5)
+                if result.get("persistence") == "unavailable":
+                    self._growth_telemetry_failures += 1
+            except asyncio.CancelledError:
+                self._growth_telemetry_failures += 1
+                raise
+            except Exception:
+                self._growth_telemetry_failures += 1
+            finally:
+                self._growth_queue.task_done()
+
+    def _enqueue_growth(self, event: str, agent_id: str):
+        try:
+            self._growth_queue.put_nowait({"event": event, "agent": agent_id,
+                                           "iq": self.system_iq,
+                                           "basis": "heuristic_emission_counter"})
+        except asyncio.QueueFull:
+            self._growth_telemetry_failures += 1
+            return
+        if self._growth_task is None or self._growth_task.done():
+            self._growth_task = asyncio.create_task(self._drain_growth_telemetry())
+
     def _grow(self, event: str, agent_id: str):
         self.total_emissions += 1
         self.system_iq = min(_IQ_MAX, self.system_iq + 1.0)
@@ -286,6 +324,7 @@ class OmegaFabric:
         if len(self.growth_log) > 500:
             self.growth_log = self.growth_log[-500:]
         self.mark_dirty()
+        self._enqueue_growth(event, agent_id)
 
     def _lafs_remember(self, author: str, content: str, topic: str):
         """Best-effort: persist emission into the LAFS knowledge ledger AND fold
@@ -393,6 +432,8 @@ class OmegaFabric:
             "agent_map": self.agent_map.snapshot("agent-map") if self._started else None,
             "agents": self.list_agents(),
             "recent_growth": self.growth_log[-15:],
+            "growth_telemetry": {"pending": self._growth_queue.qsize(),
+                                 "failures": self._growth_telemetry_failures},
             "topology": "jeeves(mastermap) → agent-map(map) → agents(sub-conductors)",
         }
 
