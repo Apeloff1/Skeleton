@@ -10,6 +10,9 @@ on:
       - 'tests/test_ai_webcrawler_dragon_treasury.py'
       - 'tests/test_ai_webcrawler_dragon_archive_grant.py'
       - 'scripts/benchmark_dragon_revisit.py'
+      - 'frontend/src/features/Jeeves/**'
+      - 'frontend/src/product/crawlerClient.ts'
+      - 'frontend/scripts/test-dragon-hoarder-motion.cjs'
       - '.github/workflows/dragon-hoarder-qualification.yml'
   workflow_dispatch:
 
@@ -77,3 +80,24 @@ jobs:
         run: |
           python -m py_compile backend/core/dragon_crawler.py backend/routes/dragon_academy.py
           python -m unittest discover -s backend/tests -p 'test_dragon_treasury_boundary.py' -v
+  hoarder_motion:
+    name: Level-based physical animation and cozy repertoire
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify checkout identity
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: "24"
+      - name: Install the existing TypeScript compiler version into an isolated test directory
+        run: npm install --prefix "$RUNNER_TEMP/dragon-ts" --no-save --ignore-scripts --no-audit --no-fund typescript@5.9.3
+      - name: Verify all completed 60-level motion profiles and 10 phases
+        run: NODE_PATH="$RUNNER_TEMP/dragon-ts/node_modules" node frontend/scripts/test-dragon-hoarder-motion.cjs
