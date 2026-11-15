@@ -52,7 +52,7 @@ test('the device sharing path always clears temporary private ZIP data', () => {
   const src = fs.readFileSync(
     path.resolve(__dirname, '../../src/skeletonForge/shareSourceArchive.ts'), 'utf8',
   );
-  assert.match(src, /finally \{\s*try \{ if \(file\.exists\) file\.delete\(\); \}/);
+  assert.match(src, /finally \{\s*try \{ if \(created && file\.exists\) file\.delete\(\); \}/);
   assert.match(src, /owner|stillCurrent/);
   assert.match(src, /Godot source file checksum mismatch/);
   assert.match(src, /Godot source manifest checksum mismatch/);
