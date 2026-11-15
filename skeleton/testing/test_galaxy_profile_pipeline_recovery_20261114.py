@@ -56,3 +56,40 @@ def test_absent_profile_does_not_create_implicit_authoring_artifact():
     assert result["succeeded"]
     assert ARTIFACT_PATH not in result["files"]
     assert "galaxy_profile" not in result
+
+
+def test_profile_rejects_aggregate_escaped_budget_and_invalid_unicode():
+    full = profile()
+    full["config"]["large"] = ["界" * 12_000] * 10
+    with pytest.raises(ValueError, match="600KB"):
+        normalise_galaxy_profile(full)
+    full = profile()
+    full["config"]["bad"] = "\ud800"
+    with pytest.raises(ValueError, match="Unicode"):
+        normalise_galaxy_profile(full)
+
+
+def test_profile_rejects_shared_wide_graph_before_semantic_validation():
+    full = profile()
+    full["config"]["wide"] = [[0] * 4096] * 7
+    with pytest.raises(ValueError, match="complexity"):
+        normalise_galaxy_profile(full)
+
+
+def test_profile_artifact_rejects_case_insensitive_path_collision():
+    from skeleton.context.galaxy_profile import attach_galaxy_profile
+    with pytest.raises(ValueError, match="collision"):
+        attach_galaxy_profile({ARTIFACT_PATH.upper(): "existing"}, profile())
+
+
+def test_profile_preserves_extra_nested_controls_and_canonical_digest():
+    full = profile()
+    full["config"]["extra_params"].update({
+        "production": {"physics": 5},
+        "platforms": ["linux", "windows"],
+        "languages": ["norwegian"],
+    })
+    detached = normalise_galaxy_profile(full)
+    original = canonical_profile_bytes(detached)
+    full["config"]["extra_params"]["production"]["physics"] = 99
+    assert canonical_profile_bytes(detached) == original
