@@ -5,6 +5,7 @@ import {crawlRequestKey} from '../../product/crawlerClient';
 import {getSourceTaxonomy,searchSourceLibrary,searchGames,sourcePage,releaseTimeline,enqueueReleaseImport,importStatus,dispatchGameCapture,type GameIdentity,type GameSource,type ReleaseEvent,type TimelineCursor,type ImportReceipt,type ImportState,type CaptureReceipt,type TaxonomyEntry,type GlobalSource} from '../../product/dragonGameCorpusClient';
 import s,{colors as C} from './CrawlerWorkspace.styles';
 import DragonSourceViewer from './DragonSourceViewer';
+import DragonDatasetExplorer from './DragonDatasetExplorer';
 
 const field={color:C.text,backgroundColor:C.bg,borderWidth:1,borderColor:C.edge,borderRadius:9,padding:10};
 function Button({label,disabled,press}:{label:string;disabled?:boolean;press:()=>void}){
@@ -91,6 +92,7 @@ export default function DragonGameCorpusPanel({visible,canWrite}:{visible:boolea
    {game&&<><Text style={s.label}>Sources for {game.first_title}</Text><Button label="Refresh filtered sources" disabled={!enabled} press={()=>choose(game)}/></>}
    {sources.map(x=><View key={x.source_id} style={s.check}><Text selectable style={s.small}>{x.url}</Text><Text style={s.small}>{human(x.family||"source")} · {human(x.kind)} · {x.view_mode||"text"} · {x.language} · {human(x.latest_observation.stage)} · {x.latest_observation.version||'version not supplied'}</Text><Text style={s.small}>Observed {day(x.last_observed)} · review due {day(x.next_review)}</Text><Button label="Open source viewer" disabled={!enabled} press={()=>setViewer(x)}/><Button label="Select exact source observation" disabled={!enabled||!canWrite} press={()=>{setSelected(x);setConsent(false);setCapture(null);}}/></View>)}
    <Button label="Next source page" disabled={!enabled||!game||!sourceCursor} press={()=>{if(game&&sourceCursor)choose(game,sourceCursor)}}/>
+   {game&&<DragonDatasetExplorer key={game.game_id} game={game.game_id} visible={visible&&open} disabled={busy}/>}
    {game&&viewer&&<View style={s.check}><Button label="Close source viewer" disabled={busy} press={()=>setViewer(null)}/><DragonSourceViewer key={game.game_id+":"+viewer.source_id} game={game.game_id} source={viewer} visible={visible&&open} disabled={busy} canWrite={canWrite}/></View>}
    {selected&&canWrite&&<View style={s.check}><Text selectable style={s.small}>{selected.url}</Text>
     <View style={s.row}><Switch disabled={!enabled} value={consent} onValueChange={setConsent} accessibilityLabel="Explicit capture and source rights consent"/><Text style={s.small}>I authorize capture and acknowledge source rights for this exact URL.</Text></View>
