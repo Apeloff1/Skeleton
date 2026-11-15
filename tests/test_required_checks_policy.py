@@ -454,7 +454,7 @@ def test_main_end_to_end_with_fake_api(capsys) -> None:
         {
             "repos/o/r/pulls/7": _pull(),
             f"repos/o/r/commits/{SHA}/check-runs": {
-                "total_count": 6,
+                "total_count": len(_all_green()),
                 "check_runs": _all_green(),
             },
             "repos/o/r/branches/main/protection": status.ApiError(
@@ -513,3 +513,63 @@ def test_reusable_lane_rolls_up_child_jobs() -> None:
     red = [*green, _run("CI/CD / Backend Test", "failure", run_id=3)]
     assert status.classify_run("CI/CD", red, 15368).state == "failure"
     assert status.classify_run("CI/CD", [], 15368).state == "missing"
+
+
+@pytest.mark.parametrize("name", ["Merge Readiness", "Required source qualification", "Unit"])
+def test_prefixed_impostor_cannot_satisfy_standalone_check(name) -> None:
+    impostor = _run(name + " / unrelated", "success")
+    assert status.classify_run(name, [impostor], 15368).state == "missing"
+
+
+def test_reusable_rollup_checks_direct_and_child_evidence_together() -> None:
+    parent = _run("CI/CD", "success", run_id=1)
+    failing = _run("CI/CD / Backend Test", "failure", run_id=2)
+    assert status.classify_run("CI/CD", iter([parent, failing]), 15368).state == "failure"
+    skipped = _run("CI/CD / Frontend", "skipped", run_id=3)
+    assert status.classify_run("CI/CD", iter([skipped]), 15368).state == "failure"
+    pending = _run("CI/CD / Frontend", "skipped", "queued", run_id=4)
+    assert status.classify_run("CI/CD", [pending], 15368).state == "pending"
+
+
+def test_foreign_head_cannot_satisfy_required_check() -> None:
+    runs = _all_green()
+    runs[0]["head_sha"] = "b" * 40
+    assert status.evaluate(POLICY, SHA, runs, _pull())["verdict"] == "PENDING"
+
+
+@pytest.mark.parametrize("defect", ["truncated", "duplicate", "total_drift", "foreign_head", "budget"])
+def test_incomplete_check_run_inventory_fails_closed(defect) -> None:
+    first = [_run("check-" + str(index), "success", run_id=index + 1) for index in range(100)]
+    second = [_run("last", "failure", run_id=101)]
+    total = 101
+    pages = [{"total_count": total, "check_runs": first},
+             {"total_count": total, "check_runs": second}]
+    budget = 2
+    if defect == "truncated":
+        pages[1]["check_runs"] = []
+    elif defect == "duplicate":
+        second[0]["id"] = 1
+    elif defect == "total_drift":
+        pages[1]["total_count"] = 102
+    elif defect == "foreign_head":
+        second[0]["head_sha"] = "b" * 40
+    else:
+        budget = 1
+    responses = iter(pages)
+    def api(path):
+        assert "filter=all" in path
+        return next(responses)
+    with pytest.raises(status.ApiError):
+        status.fetch_check_runs(api, "o/r", SHA, max_pages=budget)
+
+
+def test_pr_head_is_reread_after_collecting_checks() -> None:
+    pulls = iter([_pull(), _pull(head={"sha": "b" * 40, "ref": "feat/x"})])
+    def api(path):
+        if "/pulls/" in path:
+            return next(pulls)
+        runs = _all_green()
+        return {"total_count": len(runs), "check_runs": runs}
+    report = status.collect(POLICY, "o/r", pr=7, api_get=api, include_protection=False)
+    assert report["verdict"] == "NOT_READY"
+    assert any("historical" in item for item in report["blockers"])

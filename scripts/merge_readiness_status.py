@@ -117,24 +117,21 @@ def classify_run(
 ) -> CheckState:
     """Classify the newest check run for ``name`` (optionally from one GitHub App)."""
 
-    matching = [
-        run
-        for run in runs
-        if run.get("name") == name
-        and (app_id is None or (run.get("app") or {}).get("id") == app_id)
+    admitted = [
+        run for run in runs
+        if app_id is None or (type((run.get("app") or {}).get("id")) is int
+                             and (run.get("app") or {}).get("id") == app_id)
     ]
-    reusable_children = False
-    if not matching:
-        reusable_children = True
-        # A lane that calls a reusable workflow (e.g. ``CI/CD`` -> ci.yml, #4104)
-        # publishes no run of its own, only ``"<lane> / <job>"`` children.
-        prefix = f"{name} / "
-        matching = [
-            run
-            for run in runs
-            if str(run.get("name") or "").startswith(prefix)
-            and (app_id is None or (run.get("app") or {}).get("id") == app_id)
-        ]
+    direct = [run for run in admitted if run.get("name") == name]
+    # Only the explicitly reusable CI/CD lane supports child aggregation.
+    # A prefixed impostor may never satisfy a standalone required check.
+    reusable_children = name == "CI/CD"
+    children = [
+        run for run in admitted
+        if reusable_children and isinstance(run.get("name"), str)
+        and run["name"].startswith(f"{name} / ") and run["name"][len(name) + 3:].strip()
+    ]
+    matching = direct + children
     if not matching:
         return CheckState(name, "missing", "no check run for this head SHA")
     # Take the newest attempt per check suite (and child job), then let the
@@ -146,14 +143,21 @@ def classify_run(
             per_suite[suite]
         ):
             per_suite[suite] = run
+    latest_runs = list(per_suite.values())
     states = [
-        _classify_one(name, run)
-        if not reusable_children or run.get("conclusion") != "skipped"
-        # Change-scoped reusable children skip when a PR does not touch their
-        # inputs; GitHub reports the calling lane as success in that case.
-        else CheckState(name, "success", "skipped (out of change scope)", run.get("html_url"))
-        for run in per_suite.values()
+        # Only completed CI/CD *children* may be change-scoped skips.
+        # A skipped direct parent (or pending child) is never proof.
+        CheckState(name, "success", "skipped (out of change scope)", run.get("html_url"))
+        if (reusable_children and run.get("name") != name
+            and run.get("status") == "completed" and run.get("conclusion") == "skipped")
+        else _classify_one(name, run)
+        for run in latest_runs
     ]
+    if reusable_children and not any(
+        run.get("status") == "completed" and run.get("conclusion") == "success"
+        for run in latest_runs
+    ) and all(item.state == "success" for item in states):
+        return CheckState(name, "failure", "all reusable children skipped; no successful check")
     return max(states, key=lambda item: _SEVERITY[item.state])
 
 
@@ -232,6 +236,9 @@ def evaluate(
 ) -> dict[str, Any]:
     """Pure verdict function: no I/O, deterministic ordering."""
 
+    # The commit-scoped endpoint may return malformed or foreign records.
+    # Explicitly different heads are never eligible even for pure callers.
+    check_runs = [run for run in check_runs if run.get("head_sha", sha) == sha]
     required = [
         classify_run(item["context"], check_runs, item["app_id"])
         for item in policy["required_status_checks"]
@@ -302,17 +309,36 @@ def evaluate(
 def fetch_check_runs(
     api_get: ApiGet, repo: str, sha: str, max_pages: int = 30
 ) -> list[dict[str, Any]]:
+    if type(max_pages) is not int or not 1 <= max_pages <= 100:
+        raise ValueError("invalid check-run page budget")
     runs: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    expected_total: int | None = None
     for page in range(1, max_pages + 1):
-        body = api_get(
-            f"repos/{repo}/commits/{sha}/check-runs?per_page=100&page={page}"
-        )
-        batch = (body or {}).get("check_runs") or []
-        runs.extend(batch)
-        total = int((body or {}).get("total_count") or 0)
-        if len(batch) < 100 or len(runs) >= total:
-            break
-    return runs
+        # GitHub defaults to filter=latest; that can hide unrelated suites
+        # with the same check name. Request the full inventory.
+        path = f"repos/{repo}/commits/{sha}/check-runs?filter=all&per_page=100&page={page}"
+        body = api_get(path)
+        if not isinstance(body, dict):
+            raise ApiError(path, None, "invalid check-run response")
+        batch, total = body.get("check_runs"), body.get("total_count")
+        if (type(total) is not int or total < 0
+                or not isinstance(batch, list) or len(batch) > 100
+                or (expected_total is not None and total != expected_total)):
+            raise ApiError(path, None, "inconsistent check-run inventory")
+        expected_total = total
+        for run in batch:
+            if (not isinstance(run, dict) or type(run.get("id")) is not int
+                    or run["id"] <= 0 or run["id"] in seen
+                    or run.get("head_sha", sha) != sha):
+                raise ApiError(path, None, "duplicate, invalid or foreign check-run identity")
+            seen.add(run["id"])
+            runs.append(run)
+        if len(runs) == total:
+            return runs
+        if len(runs) > total or len(batch) < 100:
+            raise ApiError(path, None, "incomplete or inconsistent check-run inventory")
+    raise ApiError("check-runs", None, "check-run page budget exhausted; evidence incomplete")
 
 
 def fetch_protection(
@@ -357,6 +383,13 @@ def collect(
         )
     runs = fetch_check_runs(api_get, repo, sha)
     protection = fetch_protection(api_get, repo, policy) if include_protection else None
+    # Re-read PR identity after collecting asynchronous evidence; a moved
+    # head cannot inherit a READY verdict from the earlier query.
+    if pr is not None:
+        latest_pull = api_get(f"repos/{repo}/pulls/{pr}")
+        if not isinstance(latest_pull, dict):
+            raise ApiError("resolve head", None, "invalid final pull request response")
+        pull = latest_pull
     report = evaluate(policy, sha, runs, pull, protection)
     report["repo"] = repo
     return report
