@@ -18,11 +18,12 @@ from core.dragon_game_corpus import GameCorpus, CatalogueHeld, digest
 from core.dragon_hoarder_bulk import owner_key
 from core.dragon_release_discovery import parse_manifest,parse_steam_catalogue,parse_release_feed
 
-MAX_PENDING=100000
+MAX_PENDING=2_000_000
 MAX_ROWS_PER_IMPORT=4000
 MAX_ATTEMPTS=5
 LEASE_SECONDS=90
 SCHEMA="""
+CREATE TABLE IF NOT EXISTS release_queue_counts(owner TEXT PRIMARY KEY,total INTEGER NOT NULL CHECK(total>=0)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS release_imports(
  owner TEXT NOT NULL, id TEXT NOT NULL, input_digest TEXT NOT NULL,
  created_at INTEGER NOT NULL, total INTEGER NOT NULL,
@@ -87,7 +88,11 @@ class ReleaseQueue:
                     return {"batch_id":batch,"total":prior["total"],"replayed":True,"network_executed":False}
                 # Bound total retained jobs, not just pending rows. Compact
                 # completed jobs only after an explicit retention design.
-                count=db.execute("SELECT COUNT(*) FROM release_jobs WHERE owner=?",(owner,)).fetchone()[0]
+                counted=db.execute("SELECT total FROM release_queue_counts WHERE owner=?",(owner,)).fetchone()
+                if counted is None:
+                    count=db.execute("SELECT COUNT(*) FROM release_jobs WHERE owner=?",(owner,)).fetchone()[0]
+                    db.execute("INSERT INTO release_queue_counts VALUES(?,?)",(owner,count))
+                else:count=counted["total"]
                 if count+len(items)>MAX_PENDING:
                     raise CatalogueHeld("release queue storage cap")
                 db.execute("INSERT INTO release_imports VALUES(?,?,?,?,?)",(owner,batch,input_digest,now,len(items)))
@@ -95,6 +100,7 @@ class ReleaseQueue:
                     VALUES(?,?,?,?,?,'queued',?)""",
                     [(owner,digest([batch,k]),batch,json.dumps(scope,sort_keys=True),
                       json.dumps(p,ensure_ascii=False,sort_keys=True),now) for k,p in items.items()])
+                db.execute("UPDATE release_queue_counts SET total=total+? WHERE owner=?",(len(items),owner))
                 db.execute("COMMIT")
             except BaseException:
                 if db.in_transaction: db.execute("ROLLBACK")
