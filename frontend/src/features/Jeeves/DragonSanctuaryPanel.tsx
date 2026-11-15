@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getAuthToken } from '../../auth/gameforgeAuth';
 import { getDragonSanctuary, type DragonSanctuary } from '../../product/crawlerClient';
@@ -8,7 +8,7 @@ const FORMS = ['Hatchling', 'Scout', 'Scholar', 'Pathfinder', 'Archivist'];
 const HABITATS: Record<string, string> = { web:'Web forest', document:'Archive vault',
   structured:'Data crystals', media:'Media caverns', text:'Scribe library', artifact:'Artifact forge' };
 
-export default function DragonSanctuaryPanel({ revision }: { revision: number }) {
+export default function DragonSanctuaryPanel({ revision }: { revision: string }) {
   const [value, setValue] = useState<DragonSanctuary | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -19,13 +19,13 @@ export default function DragonSanctuaryPanel({ revision }: { revision: number })
   const token = useRef(getAuthToken());
   const generation = useRef(0);
 
-  function invalidate() {
+  const invalidate = useCallback(() => {
     generation.current++;
     pending.current?.abort();
     pending.current = null;
     if (expiryTimer.current !== null) clearTimeout(expiryTimer.current);
     expiryTimer.current = null;
-  }
+  }, []);
   useEffect(() => {
     if (observedRevision.current !== revision) {
       observedRevision.current = revision;
@@ -33,7 +33,7 @@ export default function DragonSanctuaryPanel({ revision }: { revision: number })
       setValue(null); setBusy(false); setExpired(true); setError('');
     }
     return () => invalidate();
-  }, [revision]);
+  }, [revision, invalidate]);
 
   async function observe() {
     invalidate();
@@ -62,7 +62,7 @@ export default function DragonSanctuaryPanel({ revision }: { revision: number })
     }
   }
 
-  const visible = value && token.current === getAuthToken() ? value : null;
+  const visible = value && observedRevision.current === revision && token.current === getAuthToken() ? value : null;
   return <View style={s.card}>
     <Text style={s.eyebrow}>DRAGON SANCTUARY · SHARED COLLECTION</Text>
     <Text style={s.heading}>Discoveries across expeditions</Text>
