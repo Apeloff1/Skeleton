@@ -18,13 +18,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from core.dragon_hoarder_bulk import owner_key
 
-KINDS = {
-    "official_wiki": 86400, "community_wiki": 86400, "storefront": 21600,
-    "release_feed": 3600, "patch_notes": 3600, "developer_blog": 21600,
-    "manual": 604800, "mod_catalogue": 86400, "technical_reference": 604800,
-    "accessibility": 604800, "preservation": 604800, "esports": 21600,
-    "community_guide": 86400, "engine_docs": 604800, "localization": 86400,
-}
+from core.dragon_game_taxonomy import KINDS, cadence, priority, public_taxonomy
 STAGES = {"announced", "early_access", "released", "updated", "delisted", "unknown"}
 KEY = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,127}\Z")
 DIGEST = re.compile(r"[a-f0-9]{64}\Z")
@@ -201,9 +195,7 @@ class GameCorpus:
                     count = db.execute("SELECT COUNT(*) FROM sources WHERE owner=? AND game=?",(owner,gid)).fetchone()[0]
                     if count >= MAX_SOURCES:
                         raise CatalogueHeld("per-game source quota reached")
-                next_review = now + KINDS[kind]
-                if stage in {"announced","early_access","updated"}:
-                    next_review = now + min(21600,KINDS[kind])
+                next_review = now + cadence(kind,stage)
                 db.execute("""INSERT INTO sources VALUES(?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(owner,game,id) DO UPDATE SET last_observed=excluded.last_observed,
                     next_review=excluded.next_review,latest_event=excluded.latest_event""",(owner,gid,sid,url,kind,language,now,next_review,event_key))
