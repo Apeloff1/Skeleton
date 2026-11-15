@@ -303,3 +303,71 @@ def test_whole_request_checkpoint_distinguishes_policy_and_rejects_partial_grant
         restored.acknowledge(lease.lease_id, consumed_tokens=0, whole_request=False)
     restored.acknowledge(lease.lease_id, consumed_tokens=0)
     assert restored.request_ids == ()
+
+def _rehash_checkpoint(state):
+    body = {key: value for key, value in state.items() if key != "digest"}
+    state["digest"] = hashlib.sha256(json.dumps(
+        body, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False,
+    ).encode("utf-8")).hexdigest()
+    return state
+
+
+def test_restored_round_overflow_fails_before_queue_mutation():
+    from skeleton.ai.model_runtime.fair_stream_queue import MAX_BYTES
+
+    queue = FairStreamScheduler()
+    queue.submit(request("r"))
+    state = queue.checkpoint()
+    state["round"] = MAX_BYTES
+    restored = FairStreamScheduler.restore(_rehash_checkpoint(state))
+    before = restored.checkpoint()
+    with pytest.raises(ValueError, match="round counter exhausted"):
+        restored.plan(budget())
+    assert restored.checkpoint() == before
+
+
+def test_restored_token_history_cannot_exceed_original_limit():
+    from skeleton.ai.model_runtime.fair_stream_queue import MAX_TOKENS
+
+    queue = FairStreamScheduler()
+    queue.submit(request("r", tokens=MAX_TOKENS))
+    state = queue.checkpoint()
+    state["requests"][0]["served_tokens"] = 1
+    with pytest.raises(ValueError, match="token history"):
+        FairStreamScheduler.restore(_rehash_checkpoint(state))
+
+
+@pytest.mark.parametrize("damage", ["historical_round", "wait_age"])
+def test_pending_lease_must_belong_to_latest_planning_round(damage):
+    queue = FairStreamScheduler()
+    queue.submit(request("r"))
+    queue.plan(budget())
+    state = queue.checkpoint()
+    if damage == "historical_round":
+        state["round"] += 1
+    else:
+        state["requests"][0]["wait_rounds"] = 1
+    with pytest.raises(ValueError, match="lease does not bind"):
+        FairStreamScheduler.restore(_rehash_checkpoint(state))
+
+
+def test_large_tenant_inventory_remains_insertion_order_independent():
+    from dataclasses import replace
+
+    requests = [
+        replace(request(f"r-{i:04d}", f"tenant-{i % 137:03d}",
+                        tokens=(i % 13) + 1, priority=(i % 21) - 10),
+                authorization_digest="a" * 64)
+        for i in range(384)
+    ]
+    queues = [FairStreamScheduler(whole_request=True) for _ in range(2)]
+    for queue, items in zip(queues, (requests, reversed(requests))):
+        for item in items:
+            queue.submit(item)
+    for _ in range(8):
+        plans = [queue.plan(budget(tokens=96, slots=16, available=8192)) for queue in queues]
+        assert plans[0] == plans[1]
+        for queue, plan in zip(queues, plans):
+            for lease in plan.leases:
+                queue.acknowledge(lease.lease_id, consumed_tokens=lease.tokens)
+    assert queues[0].checkpoint() == queues[1].checkpoint()

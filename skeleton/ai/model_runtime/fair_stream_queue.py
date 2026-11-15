@@ -104,7 +104,7 @@ class MeasuredStreamBudget:
             raise ValueError("reserved RAM exceeds available RAM")
         if type(self.thermal_hold) is not bool:
             raise ValueError("thermal_hold must be boolean")
-        if self.measurement not in {"os_probe", "operator", "simulated"}:
+        if type(self.measurement) is not str or self.measurement not in {"os_probe", "operator", "simulated"}:
             raise ValueError("unsupported measurement provenance")
 
     @property
@@ -194,7 +194,7 @@ class FairStreamScheduler:
             return tuple(sorted(self._requests))
 
     def submit(self, request: StreamRequest) -> None:
-        if not isinstance(request, StreamRequest):
+        if type(request) is not StreamRequest:
             raise ValueError("StreamRequest required")
         if self._whole_request and request.remaining_tokens > 8192:
             raise ValueError("whole-request token ceiling exceeded")
@@ -275,16 +275,23 @@ class FairStreamScheduler:
         )
 
     def plan(self, budget: MeasuredStreamBudget, *, whole_request: bool | None = None) -> FairStreamPlan:
-        if not isinstance(budget, MeasuredStreamBudget):
+        if type(budget) is not MeasuredStreamBudget:
             raise ValueError("MeasuredStreamBudget required")
         whole_request = self._require_policy(whole_request)
         with self._lock:
             if self._pending:
                 raise ValueError("pending leases require execution reconciliation")
+            if self._round >= MAX_BYTES:
+                raise ValueError("stream round counter exhausted; explicit migration required")
             token_left = budget.effective_tokens
             ram_left = budget.available_for_streams
             slots = budget.effective_slots
-            tenants = sorted({item.tenant_id for item in self._requests.values()})
+            # Group once rather than scan the entire queue for every tenant.
+            # Preserve the existing deterministic tenant rotation and priority.
+            by_tenant: dict[str, list[StreamRequest]] = {}
+            for item in self._requests.values():
+                by_tenant.setdefault(item.tenant_id, []).append(item)
+            tenants = sorted(by_tenant)
             leases: list[StreamLease] = []
             selected: set[str] = set()
             if tenants:
@@ -300,8 +307,8 @@ class FairStreamScheduler:
                     if slots <= 0 or token_left <= 0 or ram_left <= 0:
                         break
                     candidates = [
-                        item for item in self._requests.values()
-                        if item.tenant_id == tenant and item.request_id not in selected
+                        item for item in by_tenant[tenant]
+                        if item.request_id not in selected
                         and item.bytes_per_token <= ram_left
                         and (not whole_request or (
                             self._served[item.request_id] == 0
@@ -319,14 +326,16 @@ class FairStreamScheduler:
                             item.request_id,
                         ),
                     )
-                    canonical = IterationScheduler(
-                        token_budget=min(token_left, self.quantum),
-                        prefill_quantum=self.quantum,
-                    ).plan((IterationWork(
-                        request.request_id, request.phase, request.remaining_tokens,
-                    ),))
-                    tokens = (request.remaining_tokens if whole_request else
-                              min(canonical.slices[0].tokens, ram_left // request.bytes_per_token))
+                    if whole_request:
+                        tokens = request.remaining_tokens
+                    else:
+                        canonical = IterationScheduler(
+                            token_budget=min(token_left, self.quantum),
+                            prefill_quantum=self.quantum,
+                        ).plan((IterationWork(
+                            request.request_id, request.phase, request.remaining_tokens,
+                        ),))
+                        tokens = min(canonical.slices[0].tokens, ram_left // request.bytes_per_token)
                     if tokens <= 0:
                         continue
                     reserved = tokens * request.bytes_per_token
@@ -510,6 +519,8 @@ class FairStreamScheduler:
             restored._served[request.request_id] = _integer(
                 "served_tokens", item["served_tokens"], maximum=MAX_TOKENS
             )
+            if restored._served[request.request_id] + request.remaining_tokens > MAX_TOKENS:
+                raise ValueError("checkpoint request token history exceeds original ceiling")
             if whole_request and (restored._served[request.request_id] != 0
                                   or request.remaining_tokens > 8192):
                 raise ValueError("invalid whole-request checkpoint work")
@@ -537,7 +548,8 @@ class FairStreamScheduler:
                 raise ValueError("whole-request checkpoint contains a partial lease")
             reserved = _integer("bytes_reserved", item["bytes_reserved"], minimum=1)
             round_number = _integer("round_number", item["round_number"])
-            if (round_number >= restored._round or phase != request.phase
+            if (round_number != restored._round - 1 or phase != request.phase
+                    or restored._wait[request_id] != 0
                     or item["tenant_id"] != request.tenant_id
                     or reserved != tokens * request.bytes_per_token):
                 raise ValueError("checkpoint lease does not bind request")
