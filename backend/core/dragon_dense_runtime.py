@@ -85,7 +85,7 @@ class DragonDenseArchiveMixin:
             totals["indexed" if changed.modified_count else "superseded"]+=1
         return totals
 
-    async def dense_archive_candidates(self,scope,query,*,session_ids=None):
+    async def dense_archive_candidates(self,scope,query,*,session_ids=None,game_id=None):
         from core.dragon_crawler import CrawlerError,_now
         if not local.configured():
             return []
@@ -94,7 +94,9 @@ class DragonDenseArchiveMixin:
         predicate={**scope,"status":{"$in":sorted(TERMINAL)},"deep_archive.released":True,
                    "deep_dense_route.model_identity":q["model_identity"],
                    "deep_dense_route.expires_at":{"$gt":now},"deep_dense_route.tokens":{"$in":q["tokens"]}}
-        if session_ids is not None:
+        if game_id is not None:
+            predicate["$or"]=[{"game_route.game_id":game_id},{"_id":{"$in":session_ids or []}}]
+        elif session_ids is not None:
             predicate["_id"]={"$in":session_ids}
         rows=await self.sessions.find(predicate).sort("_id",ASCENDING).limit(16).max_time_ms(2000).to_list(16)
         def rerank():
