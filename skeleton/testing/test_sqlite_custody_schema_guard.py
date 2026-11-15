@@ -70,3 +70,31 @@ def test_schema_guard_does_not_materialize_unused_temp_database():
     assert_custody_schema(conn, table="ledger", columns=("id", "value"), primary_key="id")
     assert conn.execute("PRAGMA database_list").fetchall() == before
     conn.close()
+
+def test_schema_guard_refuses_attached_databases():
+    with sqlite3.connect(":memory:") as conn:
+        conn.execute("CREATE TABLE ledger(id TEXT PRIMARY KEY NOT NULL, value TEXT) WITHOUT ROWID")
+        conn.execute("ATTACH DATABASE ':memory:' AS foreign_db")
+        with pytest.raises(CustodySchemaError, match="attached"):
+            assert_custody_schema(conn, table="ledger", columns=("id", "value"), primary_key="id")
+
+
+def test_schema_guard_refuses_cascading_external_identity_dependency():
+    with sqlite3.connect(":memory:") as conn:
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.execute("CREATE TABLE parent(id TEXT PRIMARY KEY)")
+        conn.execute(
+            "CREATE TABLE ledger(id TEXT PRIMARY KEY NOT NULL, value TEXT,"
+            " FOREIGN KEY(id) REFERENCES parent(id) ON DELETE CASCADE) WITHOUT ROWID"
+        )
+        with pytest.raises(CustodySchemaError, match="foreign key"):
+            assert_custody_schema(conn, table="ledger", columns=("id", "value"), primary_key="id")
+
+
+def test_schema_guard_refuses_nullable_replay_identity():
+    with sqlite3.connect(":memory:") as conn:
+        conn.execute("CREATE TABLE ledger(id TEXT PRIMARY KEY NOT NULL, request TEXT) WITHOUT ROWID")
+        conn.execute("CREATE UNIQUE INDEX replay ON ledger(request)")
+        with pytest.raises(CustodySchemaError, match="nullable"):
+            assert_custody_schema(conn, table="ledger", columns=("id", "request"),
+                                  primary_key="id", replay_index="replay", replay_columns=("request",))

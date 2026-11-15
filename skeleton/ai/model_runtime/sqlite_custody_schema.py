@@ -43,6 +43,8 @@ def assert_custody_schema(
     # Do not materialize TEMP merely to inspect it. SQLite identifies a
     # materialized temp schema in database_list even when it is empty.
     schemas = {row[1] for row in connection.execute("PRAGMA database_list")}
+    if schemas - {"main", "temp"}:
+        raise CustodySchemaError("unexpected attached custody database")
     if "temp" in schemas:
         if connection.execute(
             "SELECT 1 FROM temp.sqlite_master WHERE name=? COLLATE NOCASE LIMIT 1",
@@ -59,6 +61,10 @@ def assert_custody_schema(
         "AND tbl_name=? COLLATE NOCASE LIMIT 1", (table,),
     ).fetchone() is not None:
         raise CustodySchemaError("untrusted custody table trigger")
+    # An identity ledger is an independent authority, not a relational
+    # dependent whose rows may disappear on a foreign-table cascade.
+    if connection.execute("PRAGMA main.foreign_key_list(" + table + ")").fetchone() is not None:
+        raise CustodySchemaError("untrusted custody foreign key dependency")
     keys = (primary_key,) if isinstance(primary_key, str) else primary_key
     if not keys or any(_identifier(key) != key for key in keys):
         raise CustodySchemaError("invalid custody primary key")
@@ -93,6 +99,9 @@ def assert_custody_schema(
             raise CustodySchemaError("untrusted custody unique identity index")
     if replay_index is not None:
         replay_index = _identifier(replay_index)
+        if (not replay_columns or any(key not in columns for key in replay_columns)
+                or any(row[3] != 1 for row in info if row[1] in replay_columns)):
+            raise CustodySchemaError("untrusted nullable custody replay identity")
         indexes = [
             row for row in connection.execute("PRAGMA main.index_list(" + table + ")")
             if row[1] == replay_index
