@@ -10,6 +10,9 @@ import math
 from pathlib import Path
 import sys
 import threading
+import re
+
+from .offline_kernel_counters import MAX_KERNEL_COUNTER, read_kernel_ascii, uint_counter
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,17 +24,19 @@ class IOPressure:
     full_total_us: int
 
     def __post_init__(self) -> None:
-        if self.scope not in {"cgroup", "host"}:
+        if type(self.scope) is not str or self.scope not in {"cgroup", "host"}:
             raise ValueError("unknown IO pressure scope")
         for key in ("some_avg10", "full_avg10"):
             value = getattr(self, key)
-            if (isinstance(value, bool) or not isinstance(value, (float, int))
-                    or not math.isfinite(value) or not 0 <= value <= 100):
+            if (type(value) not in (float, int)
+                    or not 0 <= value <= 100 or not math.isfinite(value)):
                 raise ValueError("invalid IO stall percentage")
         for key in ("some_total_us", "full_total_us"):
             value = getattr(self, key)
-            if type(value) is not int or value < 0:
+            if type(value) is not int or not 0 <= value <= MAX_KERNEL_COUNTER:
                 raise ValueError("invalid IO stall counter")
+        if self.full_avg10 > self.some_avg10 or self.full_total_us > self.some_total_us:
+            raise ValueError("full IO stall exceeds some stall")
 
 
 def _parse_psi(raw: str, scope: str) -> IOPressure | None:
@@ -45,14 +50,20 @@ def _parse_psi(raw: str, scope: str) -> IOPressure | None:
             if len(fields) != len(parts) - 1:
                 return None
             lines[parts[0]] = fields
-        if not {"some", "full"} <= lines.keys():
+        if set(lines) != {"some", "full"}:
             return None
+        for fields in lines.values():
+            if not {"avg10", "total"} <= fields.keys():
+                return None
+            for key in ("avg10", "avg60", "avg300"):
+                if key in fields and re.fullmatch(r"(?:0|[1-9][0-9]{0,2})(?:\.[0-9]{1,6})?", fields[key]) is None:
+                    return None
         return IOPressure(
             scope=scope,
             some_avg10=float(lines["some"]["avg10"]),
             full_avg10=float(lines["full"]["avg10"]),
-            some_total_us=int(lines["some"]["total"]),
-            full_total_us=int(lines["full"]["total"]),
+            some_total_us=uint_counter(lines["some"]["total"]),
+            full_total_us=uint_counter(lines["full"]["total"]),
         )
     except (KeyError, ValueError, TypeError, OverflowError):
         return None
@@ -70,12 +81,10 @@ def probe_io_pressure(
         (Path(host_path), "host"),
     ):
         try:
-            raw = path.read_text(encoding="ascii")
+            raw = read_kernel_ascii(path, maximum=4096)
         except FileNotFoundError:
             continue
-        except (OSError, UnicodeError):
-            return None
-        if len(raw) > 4096:
+        except (OSError, UnicodeError, ValueError):
             return None
         return _parse_psi(raw, scope)
     return None
@@ -92,9 +101,10 @@ class IOPressureController:
         self._transitions = 0
 
     def observe(self, sample: IOPressure | None) -> None:
-        if sample is not None and not isinstance(sample, IOPressure):
+        if sample is not None and type(sample) is not IOPressure:
             raise TypeError("typed IO pressure required")
         with self._lock:
+            previous = self._sample
             self._sample = sample
             self._observations += 1
             if sample is None:
@@ -102,7 +112,10 @@ class IOPressureController:
             before = self._congested
             if sample.some_avg10 >= 15 or sample.full_avg10 >= 5:
                 self._congested = True
-            elif sample.some_avg10 <= 8 and sample.full_avg10 <= 2:
+            elif (sample.some_avg10 <= 8 and sample.full_avg10 <= 2
+                    and previous is not None and previous.scope == sample.scope
+                    and sample.some_total_us >= previous.some_total_us
+                    and sample.full_total_us >= previous.full_total_us):
                 self._congested = False
             if self._congested != before:
                 self._transitions += 1
