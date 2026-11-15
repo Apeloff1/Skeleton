@@ -408,3 +408,18 @@ def test_cleanup_failure_does_not_consume_cancel_recovery_approval(monkeypatch, 
     assert status.pending_leases == 0 and not status.execution_uncertain
     assert attempts == [permit.request_id, permit.request_id]
     assert backend.calls == 0
+
+@pytest.mark.parametrize("generation", [True, 1.0, "1", -1])
+def test_recovery_verifiers_refuse_untyped_generation_aliases(generation):
+    from skeleton.ai.model_runtime.fair_stream_recovery import (
+        issue_abandonment_authorization, verify_abandonment_authorization,
+    )
+    scope = dict(recovery_key=RECOVERY_KEY, session_id=SESSION, generation=1,
+                 checkpoint_digest="b" * 64, lease_id="c" * 64, nonce="d" * 32)
+    snapshot = dict(session_id=SESSION, generation=generation, checkpoint_digest="b" * 64)
+    normal = issue_recovery_authorization(**scope)
+    abandonment = issue_abandonment_authorization(**scope, evidence_digest="e" * 64)
+    for verifier, approval in ((verify_recovery_authorization, normal),
+                               (verify_abandonment_authorization, abandonment)):
+        with pytest.raises(RecoveryAuthorizationDenied, match="generation"):
+            verifier(approval, recovery_key=RECOVERY_KEY, state=snapshot, lease_id="c" * 64)

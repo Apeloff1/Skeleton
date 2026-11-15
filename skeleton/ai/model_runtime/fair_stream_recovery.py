@@ -68,7 +68,7 @@ def _encoded(body: Mapping[str, object]) -> bytes:
             body, sort_keys=True, separators=(",", ":"),
             allow_nan=False, ensure_ascii=True,
         ).encode("ascii")
-    except (ValueError, TypeError, OverflowError) as exc:
+    except (ValueError, TypeError, OverflowError, RecursionError) as exc:
         raise RecoveryAuthorizationDenied("invalid recovery grant encoding") from exc
     if len(encoded) > MAX_GRANT_BYTES:
         raise RecoveryAuthorizationDenied("recovery grant exceeds byte budget")
@@ -125,8 +125,14 @@ def verify_recovery_authorization(
     """
     if type(approval) is not RecoveryAuthorization:
         raise RecoveryAuthorizationDenied("canonical operator approval required")
-    if not isinstance(state, Mapping):
+    if type(state) is not dict:
         raise RecoveryAuthorizationDenied("verified custody state required")
+    _hex(state.get("session_id"), 32, "state session")
+    _hex(state.get("checkpoint_digest"), 64, "state checkpoint")
+    _hex(lease_id, 64, "current lease")
+    generation = state.get("generation")
+    if type(generation) is not int or not 0 <= generation < (1 << 63):
+        raise RecoveryAuthorizationDenied("invalid verified custody generation")
     if type(purpose) is not str or purpose not in _PURPOSE_SCHEMAS or approval.purpose != purpose:
         raise RecoveryAuthorizationDenied("operator approval purpose mismatch")
     body = _body(
@@ -142,7 +148,7 @@ def verify_recovery_authorization(
     ):
         raise RecoveryAuthorizationDenied("operator approval does not bind current lease")
     expected = hmac.new(_key(recovery_key), _encoded(body), sha256).hexdigest()
-    if not hmac.compare_digest(expected, approval.mac):
+    if not hmac.compare_digest(expected, _hex(approval.mac, 64, "approval MAC")):
         raise RecoveryAuthorizationDenied("operator approval authentication failed")
 
 
@@ -185,8 +191,14 @@ def verify_abandonment_authorization(
 ) -> None:
     if type(approval) is not AbandonmentAuthorization:
         raise RecoveryAuthorizationDenied("distinct abandonment approval required")
-    if not isinstance(state, Mapping):
+    if type(state) is not dict:
         raise RecoveryAuthorizationDenied("verified custody state required")
+    _hex(state.get("session_id"), 32, "state session")
+    _hex(state.get("checkpoint_digest"), 64, "state checkpoint")
+    _hex(lease_id, 64, "current lease")
+    generation = state.get("generation")
+    if type(generation) is not int or not 0 <= generation < (1 << 63):
+        raise RecoveryAuthorizationDenied("invalid verified custody generation")
     expected = hmac.new(_key(recovery_key), _encoded(_abandonment_body(approval)), sha256).hexdigest()
     if (approval.session_id != state.get("session_id")
             or approval.generation != state.get("generation")

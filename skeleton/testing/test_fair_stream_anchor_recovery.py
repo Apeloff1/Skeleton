@@ -233,3 +233,65 @@ def test_composed_forward_authority_rejects_self_signed_candidate():
     assert anchor.read() == prior
     grant = issue_forward_approval(candidate, nonce="b" * 32, signing_key=operator)
     assert authority.recover(grant).verify()["digest"] == candidate.next_digest
+
+@pytest.mark.parametrize("release_at", [1, 2])
+def test_candidate_rejects_reservation_release_from_anchor_read(monkeypatch, release_at):
+    db, anchor, _ = failed_transition()
+    original = anchor.read
+    calls = 0
+
+    def read():
+        nonlocal calls
+        calls += 1
+        if calls == release_at:
+            db._connection.commit()
+        return original()
+
+    monkeypatch.setattr(anchor, "read", read)
+    with pytest.raises(AnchorRecoveryDenied, match="writer reservation"):
+        inspect_forward_candidate(db, anchor)
+    assert not db._connection.in_transaction
+
+
+def test_final_anchor_read_cannot_release_writer_reservation(monkeypatch):
+    db, anchor, _ = failed_transition()
+    approval, key = approved(db, anchor)
+    original = anchor.read
+    confirmed = 0
+
+    def read():
+        nonlocal confirmed
+        current = original()
+        if current[0] == approval.candidate.next_generation:
+            confirmed += 1
+            if confirmed == 2:
+                db._connection.commit()
+        return current
+
+    monkeypatch.setattr(anchor, "read", read)
+    with pytest.raises(AnchorRecoveryDenied, match="writer reservation"):
+        recover_forward_anchor(db, anchor, approval=approval, operator_public_key=key)
+    assert not db._connection.in_transaction
+    assert original() == (approval.candidate.next_generation, approval.candidate.next_digest)
+
+
+def test_final_anchor_read_cannot_mutate_approved_payload(monkeypatch):
+    db, anchor, _ = failed_transition()
+    approval, key = approved(db, anchor)
+    original = anchor.read
+    confirmed = 0
+
+    def read():
+        nonlocal confirmed
+        current = original()
+        if current[0] == approval.candidate.next_generation:
+            confirmed += 1
+            if confirmed == 2:
+                db._connection.execute("UPDATE local_fair_stream_custody SET payload=?", (b"{}",))
+        return current
+
+    monkeypatch.setattr(anchor, "read", read)
+    with pytest.raises(AnchorRecoveryDenied, match="final readback"):
+        recover_forward_anchor(db, anchor, approval=approval, operator_public_key=key)
+    assert not db._connection.in_transaction
+    assert DurableFairStreamSession(db, anchor).verify()["digest"] == approval.candidate.next_digest

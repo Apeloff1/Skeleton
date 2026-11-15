@@ -117,6 +117,9 @@ def _candidate_locked(
     store: DurableFairStreamStore, watermark: TrustedHighWatermark,
 ) -> ForwardCandidate:
     prior_generation, prior_digest = _anchor(watermark)
+    if not store._connection.in_transaction:
+        raise AnchorRecoveryDenied("anchor callback released custody writer reservation")
+    changes = store._connection.total_changes
     row = store._read()
     if row is None or row[0] != prior_generation + 1:
         raise AnchorRecoveryDenied("only a one-generation forward gap can be repaired")
@@ -130,9 +133,11 @@ def _candidate_locked(
         raise AnchorRecoveryDenied("candidate lost its writer reservation")
     if _anchor(watermark) != (prior_generation, prior_digest):
         raise AnchorRecoveryDenied("independent anchor changed during candidate inspection")
+    if not store._connection.in_transaction:
+        raise AnchorRecoveryDenied("anchor callback released custody writer reservation")
     store._assert_private()
     store._assert_schema()
-    if store._read() != row:
+    if store._read() != row or store._connection.total_changes != changes:
         raise AnchorRecoveryDenied("stored candidate changed during inspection")
     checkpoint = state["checkpoint"]
     return ForwardCandidate(
@@ -183,6 +188,9 @@ def recover_forward_anchor(
             approved_row = store._read()
             if approved_row is None or approved_row[:2] != (candidate.next_generation, candidate.next_digest):
                 raise AnchorRecoveryDenied("approved successor unavailable")
+            if not store._connection.in_transaction:
+                raise AnchorRecoveryDenied("candidate lost its writer reservation")
+            changes = store._connection.total_changes
             watermark.advance(
                 expected_generation=candidate.prior_generation,
                 expected_digest=candidate.prior_digest,
@@ -199,6 +207,11 @@ def recover_forward_anchor(
                 raise AnchorRecoveryDenied("approved successor changed during anchor advancement")
             if _anchor(watermark) != (candidate.next_generation, candidate.next_digest):
                 raise AnchorRecoveryDenied("independent anchor changed during readback")
+            if not store._connection.in_transaction:
+                raise AnchorRecoveryDenied("anchor callback released custody writer reservation")
+            store._assert_private()
+            if store._read() != approved_row or store._connection.total_changes != changes:
+                raise AnchorRecoveryDenied("approved successor changed during final readback")
         finally:
             # This transaction performs no SQL writes. Release the writer
             # reservation even when the CAS outcome is uncertain.
@@ -222,6 +235,11 @@ class ForwardAnchorRecoveryAuthority:
         store._require_owner_process()
         if type(operator_public_key) is not bytes or len(operator_public_key) != 32:
             raise AnchorRecoveryDenied("pinned Ed25519 operator public key required")
+        if any(hmac.compare_digest(operator_public_key, key)
+               for key in (store._custody_key, store._execution_key)):
+            raise AnchorRecoveryDenied("independent operator verification key required")
+        if not all(callable(getattr(watermark, name, None)) for name in ("read", "advance", "initialize")):
+            raise AnchorRecoveryDenied("independent anchor adapter required")
         self._store = store
         self._watermark = watermark
         self._verifier = Ed25519PublicKey.from_public_bytes(operator_public_key)
