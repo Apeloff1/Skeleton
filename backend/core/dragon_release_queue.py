@@ -40,6 +40,12 @@ CREATE TABLE IF NOT EXISTS release_jobs(
 CREATE INDEX IF NOT EXISTS release_jobs_ready ON release_jobs(state,due,owner,id);
 CREATE INDEX IF NOT EXISTS release_jobs_lease ON release_jobs(state,lease_until,owner,id);
 CREATE INDEX IF NOT EXISTS release_jobs_batch ON release_jobs(owner,batch,state,id);
+CREATE TABLE IF NOT EXISTS lead_release_outbox(
+ owner TEXT NOT NULL,id TEXT NOT NULL,created_at INTEGER NOT NULL,
+ state TEXT NOT NULL CHECK(state IN ('queued','done','held')),
+ PRIMARY KEY(owner,id),FOREIGN KEY(owner,id) REFERENCES release_jobs(owner,id)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS lead_release_pending ON lead_release_outbox(state,created_at,owner,id);
 """
 
 
@@ -152,9 +158,21 @@ class ReleaseQueue:
         state="done" if reason is None else "held" if permanent or row["attempts"]>=MAX_ATTEMPTS else "queued"
         due=now+min(3600,30*(2**row["attempts"])) if state=="queued" else now
         with self._db() as db:
-            change=db.execute("""UPDATE release_jobs SET state=?,due=?,claim=NULL,lease_until=0,reason=?
-                WHERE owner=? AND id=? AND state='leased' AND claim=? AND lease_until>?""",
-                (state,due,reason,row["owner"],row["id"],row["claim"],now))
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                change=db.execute("""UPDATE release_jobs SET state=?,due=?,claim=NULL,lease_until=0,reason=?
+                    WHERE owner=? AND id=? AND state='leased' AND claim=? AND lease_until>?""",
+                    (state,due,reason,row["owner"],row["id"],row["claim"],now))
+                if state=="done" and change.rowcount:
+                    # The lead frontier consumes metadata after the canonical
+                    # catalogue transaction; no work is lost on a crash
+                    # between job settlement and secondary graph indexing.
+                    db.execute("INSERT OR IGNORE INTO lead_release_outbox VALUES(?,?,?,'queued')",
+                        (row["owner"],row["id"],now))
+                db.execute("COMMIT")
+            except BaseException:
+                if db.in_transaction:db.execute("ROLLBACK")
+                raise
         return state if change.rowcount else "superseded"
 
     def pulse(self,*,limit=8):
