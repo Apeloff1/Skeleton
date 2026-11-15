@@ -24,7 +24,12 @@ import time
 from urllib.parse import urlsplit
 from typing import Any
 
-from gameforge.egress_admission import DNS_RESOLVER, HTTP_ADMISSION, is_public_egress_address
+from gameforge.egress_admission import (
+    DNS_RESOLVER,
+    HTTP_ADMISSION,
+    is_public_egress_address,
+    require_identity_encoding,
+)
 
 _EXTERNAL_ENABLED = os.getenv("GAMEFORGE_ENABLE_EXTERNAL_APIS", "0") == "1"
 _EXTERNAL_API_HOSTS = frozenset(
@@ -53,6 +58,7 @@ _MAX_CONCURRENT_QUERIES = _MAX_PARALLEL_QUERIES
 _MAX_REQUEST_JSON_BYTES = 64 * 1024
 _FORBIDDEN_FORWARD_HEADERS = frozenset({
     "host",
+    "accept-encoding",
     "proxy-authorization",
     "proxy-connection",
     "connection",
@@ -290,10 +296,11 @@ def _safe_payload(value: Any) -> Any:
 
 
 async def _bounded_http_body(response: Any) -> str:
-    """Stream under the decompressed byte cap; reject before reading oversized declared bodies."""
+    """Stream identity payloads under the byte cap; reject oversized headers first."""
     # Either legacy or current configuration may tighten the response cap.
     # Use the stricter cap; never let an alias silently disable admission.
     byte_ceiling = min(_MAX_EXTERNAL_RESPONSE_BYTES, _MAX_RESPONSE_BYTES)
+    require_identity_encoding(response.headers)
     declared = response.headers.get("content-length")
     if declared is not None:
         if type(declared) is not str or not declared.isascii() or not declared.isdecimal() or len(declared) > 12:
@@ -351,6 +358,7 @@ async def _api_query(target: dict) -> dict:
                 raise ValueError("external API host is missing")
             pinned_ip = await DNS_RESOLVER.run(_resolve_public_host, hostname, timeout=5.0)
             headers["Host"] = hostname
+            headers["Accept-Encoding"] = "identity"
             import httpx
             # HTTPX's timeout is per I/O phase. A slow-drip stream could otherwise
             # keep delivering small chunks forever while staying below both
