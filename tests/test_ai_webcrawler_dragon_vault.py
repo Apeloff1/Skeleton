@@ -194,10 +194,11 @@ class FiniteCareContractTests(unittest.TestCase):
     def test_finite_budget_expiry_and_witness(self):
         from skeleton.ai.webcrawler.dragon_vault_care import issue_care,consume_care,public_care
         grant=issue_care(operation="a"*64,request_digest="b"*64,snapshot_digest="c"*64,
-                         now=NOW,days=7,budget=2)
+                         principal_email="owner@example.test",now=NOW,days=7,budget=2)
         first=consume_care(grant,now=NOW+1,version=7,witness="c"*64,side="primary")
         second=consume_care(first,now=NOW+2,version=8,witness="c"*64,side="replica")
         self.assertEqual(second["used"],2)
+        self.assertNotIn("principal_email",public_care(first,now=NOW+1,version=8,witness="c"*64))
         self.assertFalse(public_care(second,now=NOW+2,version=9,witness="c"*64)["active"])
         for item,stamp,witness in ((second,NOW+3,"c"*64),(grant,NOW+7*DAY,"c"*64),
                                   (grant,NOW+1,"d"*64),({**grant,"enabled":False},NOW+1,"c"*64)):
@@ -207,8 +208,8 @@ class FiniteCareContractTests(unittest.TestCase):
     def test_malformed_care_receipt_cannot_authorize(self):
         from skeleton.ai.webcrawler.dragon_vault_care import issue_care,validate_care
         grant=issue_care(operation="a"*64,request_digest="b"*64,snapshot_digest="c"*64,
-                         now=NOW,days=1,budget=1)
-        for patch in ({"budget":4},{"expires_at":NOW+8*DAY},{"used":1},{"network_authorized":True},
+                         principal_email="owner@example.test",now=NOW,days=1,budget=1)
+        for patch in ({"budget":4},{"principal_email":" INVALID "},{"expires_at":NOW+8*DAY},{"used":1},{"network_authorized":True},
                       {"enabled":1},{"issued_at":float("nan")}):
             with self.assertRaises(ValueError):
                 validate_care({**grant,**patch})

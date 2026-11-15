@@ -631,8 +631,10 @@ class VaultCareTests(unittest.IsolatedAsyncioTestCase):
     def harness(self,damaged=True,enabled=True):
         from skeleton.ai.webcrawler.dragon_vault_care import issue_care
         app,row,now=VaultScrubTests().harness(damaged=damaged)
+        app._grant_principal=AsyncMock()
         row["treasury_vault_care"]=issue_care(operation="a"*64,request_digest="b"*64,
-            snapshot_digest=row["treasury_vault"]["snapshot_digest"],now=now.timestamp()-10,days=7,budget=2,enabled=enabled)
+            snapshot_digest=row["treasury_vault"]["snapshot_digest"],principal_email="owner@example.test",
+            now=now.timestamp()-10,days=7,budget=2,enabled=enabled)
         if not damaged:
             row["checkpoint_replica"]="bad"
         return app,row,now
@@ -661,6 +663,26 @@ class VaultCareTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["auto_primary_repaired"],0)
         self.assertNotIn("snapshot",app.sessions.update_one.await_args.args[1]["$set"])
 
+    async def test_disabled_or_downgraded_account_cannot_repair(self):
+        app,row,now=self.harness()
+        app._grant_principal=AsyncMock(side_effect=CrawlerError("crawler_grant_revoked","revoked",403))
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.scrub_treasury_vault()
+        self.assertEqual(result["auto_primary_repaired"],0)
+        self.assertEqual(result["repairable_primary"],1)
+        self.assertNotIn("snapshot",app.sessions.update_one.await_args.args[1]["$set"])
+        app._grant_principal.assert_awaited_once()
+
+    async def test_live_principal_rechecked_after_admission(self):
+        app,row,now=self.harness()
+        app._grant_principal=AsyncMock(side_effect=[None,CrawlerError("crawler_grant_revoked","revoked",403)])
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.scrub_treasury_vault()
+        self.assertEqual(result["auto_primary_repaired"],0)
+        self.assertEqual(result["repairable_primary"],1)
+        self.assertNotIn("snapshot",app.sessions.update_one.await_args.args[1]["$set"])
+        self.assertEqual(app._grant_principal.await_count,2)
+
     async def test_revocation_or_concurrent_version_wins_publication(self):
         app,row,now=self.harness()
         app.sessions.update_one.side_effect=[Mock(modified_count=1),Mock(modified_count=0)]
@@ -676,12 +698,12 @@ class VaultCareTests(unittest.IsolatedAsyncioTestCase):
         with patch("core.dragon_crawler._now",return_value=now),patch(
                 "core.dragon_crawler.authenticated_scope",return_value=SCOPE):
             with self.assertRaises(CrawlerError):
-                await app.configure_vault_care(SCOPE,row["_id"],body,principal={"role":"viewer"})
-            receipt=await app.configure_vault_care(SCOPE,row["_id"],body,principal={"role":"editor"})
+                await app.configure_vault_care(SCOPE,row["_id"],body,principal={"role":"viewer","email":"owner@example.test"})
+            receipt=await app.configure_vault_care(SCOPE,row["_id"],body,principal={"role":"editor","email":"owner@example.test"})
             self.assertTrue(receipt["care"]["active"])
             with patch.object(app,"_inspect_vault_redundancy") as inspect:
                 revoked=await app.configure_vault_care(SCOPE,row["_id"],{**body,"enabled":False,
-                    "idempotency_key":"withdraw-care","retention_acknowledged":False},principal={"role":"viewer"})
+                    "idempotency_key":"withdraw-care","retention_acknowledged":False},principal={"role":"viewer","email":"owner@example.test"})
                 inspect.assert_not_called()
         self.assertFalse(revoked["care"]["active"])
         self.assertFalse(revoked["care"]["network_authorized"])
@@ -699,7 +721,8 @@ class VaultHealthTests(unittest.IsolatedAsyncioTestCase):
         def observation(state,primary,replica,age):
             return {"schema":"skeleton.dragon.vault-scrub.v1","version":7,"snapshot_digest":digest,
                     "checked_at":now.timestamp()-age,"state":state,"primary":primary,"replica":replica}
-        grant=issue_care(operation="a"*64,request_digest="b"*64,snapshot_digest=digest,now=now.timestamp()-1,days=7,budget=2)
+        grant=issue_care(operation="a"*64,request_digest="b"*64,snapshot_digest=digest,
+                         principal_email="owner@example.test",now=now.timestamp()-1,days=7,budget=2)
         rows=[
             {"_id":"a",**base,"treasury_vault_scrub":observation("redundant","exact","exact",1),
              "treasury_vault_care":grant,"treasury_vault_scrub_due":now.timestamp()+3600},

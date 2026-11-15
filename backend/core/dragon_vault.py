@@ -898,7 +898,8 @@ class DragonVaultMixin:
                 raise CrawlerError("crawler_vault_care_held","At least one exact original copy must qualify.",409) from exc
         now=_now().timestamp()
         grant=issue_care(operation=operation,request_digest=request_digest,snapshot_digest=witness,
-                        now=now,days=body["days"],budget=body["repairs"],enabled=body["enabled"])
+                        principal_email=principal["email"].strip().lower(),now=now,
+                        days=body["days"],budget=body["repairs"],enabled=body["enabled"])
         fence={**query,"version":row["version"],"treasury_vault":row["treasury_vault"],
                "treasury_vault_care":prior if "treasury_vault_care" in row else {"$exists":False}}
         fields={"treasury_vault_care":grant,"treasury_vault_scrub_due":now}
@@ -906,7 +907,9 @@ class DragonVaultMixin:
             fence.update({"checkpoint_identity":row["checkpoint_identity"],"worker_token":None,
                 "lease_until":None,"last_worker_exit_confirmed":{"$ne":False},
                 "$expr":{"$lte":["$consent_expires_at","$$NOW"]}})
+            await self._grant_principal(scope,grant)
             fields["storage_receipt"]=await self._admit(scope,identifier,{"treasury_vault_care":grant})
+            await self._grant_principal(scope,grant)
         # Withdrawal must remain available during storage-attester outages.
         # The small disabled receipt replaces the prior bounded grant.
         changed=await self.sessions.update_one(fence,{"$set":fields,"$inc":{"version":1}})
@@ -918,7 +921,7 @@ class DragonVaultMixin:
 
     async def _apply_vault_care(self,scope,row,fence,state,replica,digest,claim_until):
         """Consume grant and repair in one row CAS; never impersonate owner."""
-        from core.dragon_crawler import _now
+        from core.dragon_crawler import CrawlerError,_now
         from skeleton.ai.webcrawler.dragon_vault_care import consume_care
         grant=row.get("treasury_vault_care")
         public=self._public_care(row,_now().timestamp(),digest)
@@ -931,6 +934,12 @@ class DragonVaultMixin:
         else:
             return None
         try:
+            await self._grant_principal(scope,grant)
+        except CrawlerError as exc:
+            if exc.code=="crawler_grant_revoked":
+                return None
+            raise
+        try:
             replacement=await _bounded_discovery_cpu(prepare,scope,row)
             if replacement is None:
                 return None
@@ -942,6 +951,12 @@ class DragonVaultMixin:
             return None
         payload={field:replacement,"treasury_vault_care":consumed}
         receipt=await self._admit(scope,row["_id"],payload)
+        try:
+            await self._grant_principal(scope,grant)
+        except CrawlerError as exc:
+            if exc.code=="crawler_grant_revoked":
+                return None
+            raise
         clock={"$divide":[{"$toLong":"$$NOW"},1000]}
         fenced={**fence,"treasury_vault_care":grant,"worker_token":None,"lease_until":None,
                 "last_worker_exit_confirmed":{"$ne":False},

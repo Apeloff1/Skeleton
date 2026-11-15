@@ -11,9 +11,11 @@ DAY=86400
 
 def validate_care(value):
     if (not isinstance(value,dict) or set(value)!={"schema","operation","request_digest","snapshot_digest",
-            "issued_at","expires_at","enabled","budget","used","last_repair"}
+            "issued_at","expires_at","enabled","budget","used","last_repair","principal_email"}
             or value["schema"]!=SCHEMA
             or not all(hash_identity(value[k]) for k in ("operation","request_digest","snapshot_digest"))
+            or not isinstance(value["principal_email"],str) or not 3<=len(value["principal_email"])<=200
+            or value["principal_email"]!=value["principal_email"].strip().lower()
             or not finite(value["issued_at"]) or not finite(value["expires_at"])
             or not 0<value["expires_at"]-value["issued_at"]<=MAX_DAYS*DAY
             or type(value["enabled"]) is not bool
@@ -32,12 +34,12 @@ def validate_care(value):
     return value
 
 
-def issue_care(*,operation,request_digest,snapshot_digest,now,days,budget,enabled=True):
+def issue_care(*,operation,request_digest,snapshot_digest,principal_email,now,days,budget,enabled=True):
     if type(days) is not int or not 1<=days<=MAX_DAYS:
         raise ValueError("care duration out of range")
     return validate_care({"schema":SCHEMA,"operation":operation,"request_digest":request_digest,
         "snapshot_digest":snapshot_digest,"issued_at":now,"expires_at":now+days*DAY,
-        "enabled":enabled,"budget":budget,"used":0,"last_repair":None})
+        "enabled":enabled,"budget":budget,"used":0,"last_repair":None,"principal_email":principal_email})
 
 
 def public_care(value,*,now,version,witness):
