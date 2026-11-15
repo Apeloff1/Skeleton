@@ -36,6 +36,8 @@ from .structured_discovery import (
 )
 from .frontier_scheduler import choose_frontier
 from .adaptive_navigation import access_denied_hold, origin_health, restorative_wait
+from .acquisition_feedback import (host_economics, portfolio_summary, quantize_latency,
+                                   settled_observation, validate_measurements)
 from .frontier_circuit import evaluate_frontier_candidate, navigation_hazard
 from .host_backpressure import consent_bounded_retry_after, origin_throttle
 from .source_instruction_guard import (
@@ -105,6 +107,7 @@ def implementation_digest():
                 "document_formats.py",
                 "frontier_scheduler.py",
                 "adaptive_navigation.py",
+                "acquisition_feedback.py",
                 "frontier_coverage.py",
                 "frontier_antichain.py",
                 "federated_activity.py",
@@ -358,6 +361,7 @@ class CrawlRun:
             "events": [],
             "instruction_incidents": [],
             "source_aliases": [],
+            "acquisition_measurements": [],
             "stop_reason": None,
             "pending_dispatch": None,
         }
@@ -422,6 +426,7 @@ class CrawlRun:
             "events",
             "instruction_incidents",
             "source_aliases",
+            "acquisition_measurements",
             "stop_reason",
             "pending_dispatch",
         }:
@@ -520,6 +525,11 @@ class CrawlRun:
                 )
             ):
                 raise CrawlOperationError("pending dispatch is not bound to reserved work")
+        try:
+            validate_measurements(state["acquisition_measurements"], usage=usage, pending=pending,
+                                  sequence=state["sequence"], hosts=request.allowed_hosts)
+        except (ValueError, TypeError, KeyError) as exc:
+            raise CrawlOperationError("acquisition measurement custody invalid") from exc
         if len(set(state["seen"])) != len(state["seen"]):
             raise CrawlOperationError("duplicate visited URL")
         for url in state["seen"]:
@@ -736,6 +746,8 @@ class CrawlRun:
             "source_count": len(state["sources"]),
             "instruction_security": incident_summary(state["instruction_incidents"]),
             "duplicate_evidence": alias_summary(state["source_aliases"]),
+            "acquisition_economics": portfolio_summary(state["acquisition_measurements"],
+                self.request.allowed_hosts, floor=self.request.min_host_delay_seconds),
             "adaptive_origin_health": {
                 host: asdict(origin_health(state["events"], host))
                 for host in self.request.allowed_hosts
@@ -956,12 +968,17 @@ class CrawlRun:
             self._authority(self._authorize, self._cancelled)
         except Exception as exc:
             raise _CheckpointInterrupted("crawl dispatch authority rejected") from exc
+        # Measure only the transport call, not storage or parsing latency.
+        started_mono = time.monotonic()
+        self._last_transport = {"url": url, "status": None, "latency_bucket": None,
+                                "charged_bytes": 0, "uncertain_bytes": limit}
         timeout = getattr(self.fetcher, "timeout_seconds", None)
         if timeout is not None:
             self.fetcher.timeout_seconds = min(timeout, max(0.01, self._slice_deadline - time.monotonic()))
         try:
             response = self.fetcher.fetch_once(url, user_agent=self.policy.user_agent, max_bytes=limit)
         finally:
+            self._last_transport["latency_bucket"] = quantize_latency(max(0., time.monotonic() - started_mono))
             if timeout is not None:
                 self.fetcher.timeout_seconds = timeout
         if (
@@ -986,10 +1003,31 @@ class CrawlRun:
             raise CrawlOperationError("transport compression receipt violates byte admission")
         _number(response.fetched_at, started - 300, time.time() + 300, "response timestamp")
         # Charge the larger encoded/decoded entity within the same reservation.
-        self._state["usage"]["bytes"] += max(len(response.body), wire_bytes)
+        charged = max(len(response.body), wire_bytes)
+        self._state["usage"]["bytes"] += charged
+        self._last_transport.update(status=response.status, charged_bytes=charged, uncertain_bytes=0)
         self._state["usage"]["reserved_bytes"] -= limit
         self._state["pending_dispatch"] = None
         return response
+
+    def _settle_feedback(self, event, *, pending=None):
+        state = self._state
+        observation = getattr(self, "_last_transport", None)
+        if pending is not None:
+            observation = {"url": pending["url"], "status": None, "latency_bucket": None,
+                           "charged_bytes": 0, "uncertain_bytes": pending["limit"]}
+        if observation is None:
+            return
+        row = settled_observation(request=state["usage"]["requests"],
+            kind=event["kind"], event_sequence=event["sequence"], **observation)
+        state["acquisition_measurements"].append(row)
+        # Latency feedback is an additional hold, never an override of REP,
+        # server cooldown, existing host readiness or operator consent.
+        economy = host_economics(state["acquisition_measurements"], row["host"],
+                                 floor=self.request.min_host_delay_seconds)
+        state["host_ready"][row["host"]] = max(state["host_ready"].get(row["host"], 0),
+            min(state["binding"]["consent"]["expires_at"], event["at"] + economy.conservative_delay))
+        self._last_transport = None
 
     def _step(self, now):
         state = self._state
@@ -997,6 +1035,7 @@ class CrawlRun:
             state["frontier"], sources=state["sources"],
             host_ready=state["host_ready"], query=self.request.query,
             now=now, strategy=self.request.frontier_strategy, events=state["events"],
+            measurements=state["acquisition_measurements"], robots=state["robots"],
         )
         if item is None:
             return None
@@ -1476,6 +1515,7 @@ class CrawlRun:
             self._authority(authorize, cancelled)
             before = copy.deepcopy(self._state)
             self._rollback_state = before
+            self._last_transport = None
             try:
                 self._state["state"] = "running"
                 usage = self._state["usage"]
@@ -1523,6 +1563,7 @@ class CrawlRun:
                     if not self._state["frontier"]:
                         self._state["state"] = "completed"
                         self._state["stop_reason"] = "frontier_drained"
+                self._settle_feedback(event, pending=pending)
                 self._persist(event)
                 events.append(event)
             except BaseException:
