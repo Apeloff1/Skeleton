@@ -604,3 +604,74 @@ def test_guard_does_not_compare_secret_field_value_with_custom_equality():
     assert hits == 1 and cleaned["accessToken"] == REDACTED_MARK
     with pytest.raises(RealtimeSecretError):
         PayloadSecretGuard(mode="reject").scrub({"accessToken": DangerousEquality()})
+
+
+@pytest.mark.parametrize("mode", ["redact", "reject"])
+def test_guard_refuses_credential_material_in_mapping_keys(mode):
+    with pytest.raises(RealtimeSecretError, match="unsafe payload key"):
+        PayloadSecretGuard(mode=mode).scrub({_FAKE_GH: "ordinary"})
+
+
+@pytest.mark.parametrize("mode", ["redact", "reject"])
+def test_guard_refuses_encoded_credential_mapping_keys(mode):
+    encoded = base64.b64encode(_FAKE_GH.encode()).decode()
+    with pytest.raises(RealtimeSecretError, match="unsafe payload key"):
+        PayloadSecretGuard(mode=mode).scrub({encoded: "ordinary"})
+
+
+@pytest.mark.parametrize("value", ['{"note":1,"note":2}', '{"metric":NaN}', '{"metric":Infinity}'])
+def test_guard_fails_closed_on_ambiguous_embedded_json(value):
+    cleaned, hits = PayloadSecretGuard().scrub({"note": value})
+    assert hits >= 1 and cleaned["note"] == REDACTED_MARK
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub({"note": value})
+
+
+def test_guard_aggregate_text_budget_is_fail_closed():
+    payload = {"values": ["ordinary bounded prose " * 600] * 90}
+    with pytest.raises(RealtimeSecretError, match="byte budget"):
+        PayloadSecretGuard().scrub(payload)
+
+
+def test_guard_aggregate_node_budget_is_fail_closed():
+    with pytest.raises(RealtimeSecretError, match="node budget"):
+        PayloadSecretGuard().scrub({"values": [None] * 100_001})
+
+
+def test_guard_bounds_numeric_conversion_before_inspection():
+    huge = 1 << 20000
+    cleaned, hits = PayloadSecretGuard().scrub({"metric": huge})
+    assert hits == 1 and cleaned["metric"] == REDACTED_MARK
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub({"metric": huge})
+
+
+@pytest.mark.parametrize("value", ['{"metric":1e999}', '{"metric":' + '9' * 310 + '}'])
+def test_guard_redacts_invalid_embedded_numeric_document_before_reemission(value):
+    cleaned, hits = PayloadSecretGuard().scrub({"note": value})
+    assert hits >= 1 and cleaned["note"] == REDACTED_MARK
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub({"note": value})
+
+
+def test_guard_does_not_invoke_custom_json_container_or_scalar_behavior():
+    class HostileDict(dict):
+        def items(self):
+            raise AssertionError("untrusted mapping behavior")
+
+    class HostileList(list):
+        def __iter__(self):
+            raise AssertionError("untrusted sequence behavior")
+
+    class HostileText(str):
+        def __eq__(self, other):
+            raise AssertionError("untrusted scalar equality")
+
+        def encode(self, *args, **kwargs):
+            raise AssertionError("untrusted encoding behavior")
+
+    for value in (HostileDict(), HostileList(), HostileText("harmless")):
+        with pytest.raises(RealtimeSecretError):
+            PayloadSecretGuard().scrub({"value": value})
+    cleaned, hits = PayloadSecretGuard().scrub({"accessToken": HostileText("opaque")})
+    assert hits == 1 and cleaned["accessToken"] == REDACTED_MARK
