@@ -445,11 +445,12 @@ def register_knowledge_routes(router):
         from core.dragon_media_archive import MediaArchive
         from core.dragon_hoarder_copy import _io
         from core.dragon_hoarder_bulk import StorageHeld
+        from core.dragon_game_corpus import CatalogueHeld
         if op not in {"begin","append","seal","list","metadata","part","revoke"}:
             raise HTTPException(422,detail={"code":"dragon_media_operation"})
         try:
             return await _io(lambda:getattr(MediaArchive(),op)(owner,*args,**kwargs))
-        except StorageHeld as exc:
+        except (StorageHeld,CatalogueHeld) as exc:
             raise HTTPException(409,detail={"code":"dragon_media_storage_held"}) from exc
         except LookupError as exc:
             raise HTTPException(404,detail={"code":"dragon_media_unavailable"}) from exc
