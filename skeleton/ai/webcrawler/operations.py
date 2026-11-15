@@ -35,6 +35,7 @@ from .structured_discovery import (
     extract_robots_sitemaps,
 )
 from .frontier_scheduler import choose_frontier
+from .dragon_companion import build_companion, companion_style
 from .adaptive_navigation import access_denied_hold, origin_health, restorative_wait
 from .acquisition_feedback import (host_economics, portfolio_summary, quantize_latency,
                                    settled_observation, validate_measurements)
@@ -110,6 +111,7 @@ def implementation_digest():
                 "adaptive_navigation.py",
                 "acquisition_feedback.py",
                 "information_portfolio.py",
+                "dragon_companion.py",
                 "frontier_coverage.py",
                 "frontier_antichain.py",
                 "federated_activity.py",
@@ -309,7 +311,8 @@ class CrawlRequest:
         if type(self.discover_mementos) is not bool:
             raise CrawlOperationError("Memento discovery requires an explicit boolean")
         if type(self.frontier_strategy) is not str or self.frontier_strategy not in (
-            "fifo", "balanced", "coverage",
+            "fifo", "balanced", "coverage", "companion", "companion_curiosity",
+            "companion_scholar", "companion_guardian",
         ):
             raise CrawlOperationError("unknown bounded crawl frontier strategy")
 
@@ -598,6 +601,14 @@ class CrawlRun:
             _text(source.get("title"), 4000, "source title", empty=True)
             _number(source.get("fetched_at"), 0, 1e12, "source timestamp")
             provenance = source["provenance"]
+            if "capture_sequence" in provenance:
+                capture_seq = provenance["capture_sequence"]
+                if type(capture_seq) is not int or not any(
+                    m["event_sequence"] == capture_seq and m["kind"] == "captured"
+                    and m["host"] == urlsplit(source["fetched_url"]).hostname
+                    for m in state["acquisition_measurements"]
+                ):
+                    raise CrawlOperationError("companion source capture sequence mismatch")
             if "structural_projection" in provenance and (
                 source["content_type"] not in {"text/html", "application/xhtml+xml"}
                 or not validate_structural_receipt(provenance["structural_projection"])
@@ -754,6 +765,7 @@ class CrawlRun:
             "source_count": len(state["sources"]),
             "instruction_security": incident_summary(state["instruction_incidents"]),
             "duplicate_evidence": alias_summary(state["source_aliases"]),
+            "companion": self._companion(now, due=bool(ready and min(ready) <= now)).projection,
             "acquisition_economics": portfolio_summary(state["acquisition_measurements"],
                 self.request.allowed_hosts, floor=self.request.min_host_delay_seconds),
             "adaptive_origin_health": {
@@ -774,6 +786,14 @@ class CrawlRun:
             ],
             "snapshot_digest": self.snapshot()["snapshot_digest"],
         }
+
+    def _companion(self, now, *, due=True):
+        state = self._state
+        return build_companion(sources=state["sources"], measurements=state["acquisition_measurements"],
+            query=self.request.query, usage=state["usage"], limits=self.request.as_dict(),
+            state=state["state"], frontier_count=len(state["frontier"]),
+            consent_current=now < state["binding"]["consent"]["expires_at"], due=due,
+            incidents=len(state["instruction_incidents"]), style=companion_style(self.request.frontier_strategy))
 
     def sources(self):
         return [copy.deepcopy(row) for row in self._state["sources"].values()]
@@ -1045,6 +1065,7 @@ class CrawlRun:
             now=now, strategy=self.request.frontier_strategy, events=state["events"],
             measurements=state["acquisition_measurements"], robots=state["robots"],
             remaining_requests=self.request.max_requests - state["usage"]["requests"],
+            companion=(self._companion(now) if self.request.frontier_strategy.startswith("companion") else None),
         )
         if item is None:
             return None
@@ -1477,6 +1498,7 @@ class CrawlRun:
             "consent_id": state["binding"]["consent"]["consent_id"],
             "transport_mode": getattr(self.fetcher, "transport_mode", "caller_supplied_transport"),
             "source_status": "unreviewed_external_capture",
+            "capture_sequence": state["sequence"] + 1,
             "training_permission": False,
             "raw_bytes_retained": False,
             "requested_url": item["original_url"],
