@@ -13,6 +13,7 @@ import CrawlerSourceLibrary, { type CrawlPassageSelection } from './CrawlerSourc
 import CrawlerResearchAtlasPanel from './CrawlerResearchAtlasPanel';
 import CrawlerInstructionSecurityPanel from './CrawlerInstructionSecurityPanel';
 import DragonCompanionPanel from './DragonCompanionPanel';
+import DragonSanctuaryPanel from './DragonSanctuaryPanel';
 import DragonKnowledgePanel from './DragonKnowledgePanel';
 import { saveCrawlerExport } from '../../product/crawlerExport';
 
@@ -204,6 +205,7 @@ function CrawlerContent() {
     <View style={s.row} accessibilityRole="tablist"><TouchableOpacity accessibilityRole="tab" accessibilityState={{ selected: pane === 'capture' }} onPress={() => choosePane('capture')} style={s.button}><Text style={s.buttonText}>Capture operations</Text></TouchableOpacity><TouchableOpacity accessibilityRole="tab" accessibilityState={{ selected: pane === 'review' }} onPress={() => choosePane('review')} style={s.button}><Text style={s.buttonText}>Review & practice{reviewDraft ? ' · selected passage' : ''}</Text></TouchableOpacity></View>
     <View style={pane === 'capture' ? undefined : { display: 'none' }}>
     <View style={[s.twoColumns, width < 900 && { flexDirection: 'column' }]}><View style={[s.column, s.card, { flexBasis: 280, maxWidth: width > 900 ? 360 : undefined }]}><View style={s.row}><Text style={[s.heading, s.grow]}>Your crawls</Text><Button title="New" disabled={!canWrite || !!busy || running} onPress={() => { setCreating(true); setError(''); }} /></View>
+      <DragonSanctuaryPanel key={'sanctuary:' + token.current} revision={sessions.map(row => row.session_id + ':' + row.version).join('|')} />
       {!sessions.length && <Text style={s.small}>No captured sessions loaded. Create one after readiness and permissions are confirmed.</Text>}
       {sessions.map(row => <TouchableOpacity key={row.session_id} accessibilityRole="button" accessibilityState={{ selected: active?.session_id === row.session_id }} style={[s.check, active?.session_id === row.session_id && { backgroundColor: '#251f38', padding: 12, borderRadius: 8 }]} onPress={() => open(row)}><Text style={s.label}>{row.title}</Text><Text style={s.small}>{label(row.status)} · {row.counters.documents} captures · {row.counters.requests} requests</Text></TouchableOpacity>)}
       {nextCursor && <Button title="Load more crawls" onPress={() => void perform(async signal => { const page = await listCrawls(nextCursor, signal); if (!signal.aborted) { setSessions(rows => [...rows, ...page.sessions.filter(row => !rows.some(old => old.session_id === row.session_id))].slice(0, 128)); setNextCursor(page.next_cursor); } })} />}
