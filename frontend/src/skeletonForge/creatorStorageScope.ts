@@ -13,6 +13,7 @@ const ALLOWED_PREFIXES = new Set([
   '@skeleton_creator_bridge_v1',
   '@skeleton_gameforge_design_presets_v1',
   '@skeleton_galaxy_editor_draft_v1',
+  '@skeleton_galaxy_profile_snapshot_v1',
   // First-install project state is now protected by the same offline
   // account-epoch custody as the advanced creator workspaces.
   'skeleton.studio.onboarded.v1',

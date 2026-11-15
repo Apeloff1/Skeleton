@@ -11,6 +11,9 @@ import { GALAXY_CHOICES, galaxyGenre, mappedBriefGenre } from '../galaxyGenres';
 import { GENRE_COUNT, GENRE_GROUPS, filterGenreChoices } from '../genreCatalog';
 import DesignInstruments from './DesignInstruments';
 import DesignPresetPanel from './DesignPresetPanel';
+import GenreControlsPreview from './GenreControlsPreview';
+import ConductorPreviewPanel from './ConductorPreviewPanel';
+import JeevesQualityPanel from './JeevesQualityPanel';
 import { suggestPlayableMode } from '../playableSuggestions';
 import {
   ARCHETYPES, BRIEF_FACETS, ERA_SOURCE_COPY, PLAYABLE_SLICES, PLAYABLE_TUNING_EFFECTS, STEP_LABELS, STEPS, TARGETS, VISION_MAX,
@@ -31,6 +34,9 @@ export interface QuestionnaireFlowProps {
   onForge: (req: RunRequest) => void;
   /** Navigate to the full historical Galaxy Studio matrix/slider questionnaire. */
   onOpenGalaxyStudio?: () => void;
+  onRestoreGalaxyProfile?: () => void;
+  galaxyRestoreBusy?: boolean;
+  galaxyRestoreNotice?: string | null;
   forging?: boolean;
   /** Short compose summary shown on the review step. */
   composeSummary?: string | null;
@@ -196,6 +202,7 @@ function GenrePicker({ value, onPick }: { value?: string; onPick: (v: string) =>
         ))}
       </View>
       {!shown.length ? <Text style={st.help}>No matching genre. Try a broader term or another category.</Text> : null}
+      {value ? <GenreControlsPreview genre={value} /> : null}
     </View>
   );
 }
@@ -230,7 +237,7 @@ function BeatsStep({ state, dispatch, beats, beatsLive }: QuestionnaireFlowProps
   );
 }
 
-function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalaxyStudio }: QuestionnaireFlowProps) {
+function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalaxyStudio, onRestoreGalaxyProfile, galaxyRestoreBusy, galaxyRestoreNotice }: QuestionnaireFlowProps) {
   const [instrumentsOpen, setInstrumentsOpen] = React.useState(false);
   const [galaxyOpen, setGalaxyOpen] = React.useState(false);
   const [genreSearch, setGenreSearch] = React.useState('');
@@ -239,6 +246,8 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
   return (
     <Card>
       <DesignPresetPanel state={state} dispatch={dispatch} />
+      <ConductorPreviewPanel vision={state.vision} />
+      <JeevesQualityPanel />
       {state.galaxyProfile ? <Banner tone="idle">The complete Galaxy questionnaire is attached to this build.</Banner> : null}
       <View accessibilityRole="radiogroup" accessibilityLabel="Forge archetype" style={st.group}>
         <Text style={st.q}>How should the blueprint be built?</Text>
@@ -411,6 +420,15 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
           <Chip label="Launch prototype as startup scene" selected={!!state.playable.launch} disabled={!!state.quest?.enabled}
             onPress={() => dispatch({ type: 'setPlayableMainScene', value: true })} testID="q-playable-launch" />
           {state.quest?.enabled ? <Text style={st.help}>Room-entry quests require the original Godot launch scene.</Text> : null}
+        </View>
+      ) : null}
+      {onRestoreGalaxyProfile ? (
+        <View style={st.group} testID="q-galaxy-saved-design-restore">
+          <Text style={st.q}>Restore saved full Galaxy design</Text>
+          <Text style={st.help}>Explicitly import your account's saved vision, genre and complete matrices. Existing Forge choices and explicitly edited axes are retained.</Text>
+          <Button label="Restore saved full Galaxy design" tone="secondary" compact
+            onPress={onRestoreGalaxyProfile} disabled={galaxyRestoreBusy} testID="q-galaxy-restore-saved" />
+          {galaxyRestoreNotice ? <Text accessibilityLiveRegion="polite" style={st.help}>{galaxyRestoreNotice}</Text> : null}
         </View>
       ) : null}
       {onOpenGalaxyStudio ? (
