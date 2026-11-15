@@ -130,9 +130,10 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
     <Text style={s.small}>Hoarder unlock requires discovery ≥800, sufficient authorized historic transitions and at least two current families. Permission changes may change the collection view, not pet health.</Text>
     <Text style={s.label}>Current indexed {visible.current_indexed} · Historic indexed {visible.historic_indexed} · Metadata only {visible.metadata_only}</Text>
     <Text style={s.small}>{visible.families} families · {visible.revisions} versions · {visible.rollbacks} rollbacks · {visible.blocked_current} current families unavailable · {visible.alias_held_families} alias conflicts</Text>
+    {visible.invalid_materialized_segments>0&&<Text style={s.small}>An invalid derived index segment was ignored and recompiled from permitted text.</Text>}
     {(visible.candidate_limit_reached||visible.excluded_sessions>0)&&<Text style={s.small}>Bounded or unqualified corpus: this observation cannot establish complete archive coverage.</Text>}
     <Text style={s.heading}>Revision families and revisit recommendations</Text>
-    <Text style={s.small}>{visible.parsed_unique_payloads} distinct retained payloads reparsed · {visible.verified_historic_transitions} distinct verified version transitions · {visible.revisit_plan.length} prioritized suggestions, interleaved across origins.</Text>
+    <Text style={s.small}>{visible.parsed_unique_payloads} distinct retained payload projections · {visible.materialized_payload_hits} reused from durable index · {visible.verified_historic_transitions} distinct verified version transitions · {visible.revisit_plan.length} prioritized suggestions, interleaved across origins.</Text>
     {visible.family_rows.map(f=><View key={f.family_id} style={s.check}>
      <Text style={s.label}>{short(f.family_id)} · {f.revision_count} versions{f.simultaneous_conflict?' · conflicting observations':''}{f.alias_conflict?' · newer ambiguous alias':''}</Text>
      <Text style={s.small}>{f.current_indexed?'Current indexed':'Current unavailable'} · last seen {stamp(f.last_seen)}</Text>
