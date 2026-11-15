@@ -20,6 +20,7 @@ from urllib.parse import unquote, urlsplit
 from .frontier_coverage import build_coverage_index, score_indexed_candidate
 from .adaptive_navigation import adaptive_priority, origin_health
 from .information_portfolio import build_information_portfolio, marginal_yield
+from .dragon_companion import CompanionProfile, companion_priority
 
 
 _TOKEN = re.compile(r"[a-z0-9]{2,64}")
@@ -49,10 +50,13 @@ def _lexical_terms(text: str) -> frozenset[str]:
 def choose_frontier(
     frontier: list[dict], *, sources: dict, host_ready: dict,
     query: str, now: float, strategy: str = "fifo", events=None,
-    measurements=None, robots=None, remaining_requests=None,
+    measurements=None, robots=None, remaining_requests=None, companion=None,
 ) -> tuple[dict | None, FrontierDecision | None]:
-    if strategy not in ("fifo", "balanced", "coverage"):
+    if strategy not in ("fifo", "balanced", "coverage", "companion", "companion_curiosity",
+                        "companion_scholar", "companion_guardian"):
         raise ValueError("unknown bounded frontier scheduling algorithm")
+    if strategy.startswith("companion") and not isinstance(companion, CompanionProfile):
+        raise ValueError("companion strategy requires canonical evidence profile")
     if (not isinstance(frontier, list) or len(frontier) > _MAX_ROWS
             or not isinstance(sources, dict)
             or not isinstance(host_ready, dict)
@@ -136,6 +140,8 @@ def choose_frontier(
                 if candidate[2] not in health_by_host:
                     health_by_host[candidate[2]] = origin_health(events, candidate[2])
                 score = adaptive_priority(score, health_by_host[candidate[2]], coverage_cost=False)
+            if strategy.startswith("companion"):
+                score = companion_priority(row, profile=companion, base=score, query=query)
             ranked.append((score, due, ordinal, candidate))
         _coverage, _due, _ordinal, selected = min(
             ranked, key=lambda x: (
