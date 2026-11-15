@@ -196,7 +196,8 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
                    alias_blockers: list[dict] | None = None,
                    materialized: dict[tuple[str,str],ParsedVersion] | None = None,
                    cursor: str | None = None, observed_before: float | None = None,
-                   left: str | None = None, right: str | None = None) -> dict:
+                   left: str | None = None, right: str | None = None,
+                   catalogue_scope:tuple[str,...]|None=None) -> dict:
     if (not isinstance(observations,list) or len(observations)>MAX_OBSERVATIONS
             or type(as_of) not in (int,float) or not math.isfinite(as_of)
             or mode not in _MODES or not isinstance(query,str) or len(query.encode())>1024
@@ -210,6 +211,13 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
             or type(candidate_limit_reached) is not bool
             or type(excluded_sessions) is not int or not 0<=excluded_sessions<=MAX_SESSIONS):
         raise ValueError("invalid treasury query envelope")
+    if catalogue_scope is not None:
+        from .dragon_treasury_vault import selected_ids
+        if (not isinstance(catalogue_scope,tuple) or tuple(selected_ids(list(catalogue_scope)))!=catalogue_scope
+                or mode=="current_only" or not candidate_limit_reached
+                or any(row.session_id not in catalogue_scope or (row.text is not None and not row.archive_only)
+                       for row in observations)):
+            raise ValueError("invalid history-only catalogue window")
     aliases = alias_blockers if alias_blockers is not None else []
     if not isinstance(aliases,list) or len(aliases)>4096:
         raise ValueError("archive alias blocker capacity exceeded")
@@ -481,7 +489,8 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
         complete=all(exact[(v["session_id"],v["source_id"])].complete_text for v in (before,after))
         chosen={"current":after,"previous":before,"delta":_delta(parse_rows[left],parse_rows[right],complete=complete)}
     scope_digest=_digest({"partition":partition_digest,"mode":mode,"family":family,"query":query,
-                         "observed_before":observed_before,"left":left,"right":right})
+                         "observed_before":observed_before,"left":left,"right":right,
+                         "catalogue_scope":catalogue_scope})
     offset=0
     if cursor is not None:
         bound,raw_offset=cursor.split(":",1)

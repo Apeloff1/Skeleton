@@ -544,11 +544,15 @@ class DragonAtlasRegression(unittest.TestCase):
         )
 
     def test_same_sequence_different_state_is_equivocation(self):
-        previous = self.empty
-        current = self.with_sources(
-            ("https://example.com/archive", research_text()),
+        previous = self.with_sources(
+            ("https://example.com/archive", research_text("earlier")),
         )
-        with self.assertRaises(ValueError):
+        current = self.with_sources(
+            ("https://example.com/archive", research_text("different")),
+        )
+        self.assertEqual(previous["sequence"],current["sequence"])
+        self.assertNotEqual(previous["snapshot_digest"],current["snapshot_digest"])
+        with self.assertRaisesRegex(ValueError,"equivocated same-sequence"):
             analyze_snapshot_drift(
                 self.mandate, previous, current,
                 now=self.now+2, authorized=True,

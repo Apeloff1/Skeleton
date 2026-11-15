@@ -2677,6 +2677,10 @@ class CrawlerTreasuryWatchRequest(CrawlerWriteRequest):
     archive_rights_acknowledged: bool = Field(strict=True)
 
 
+class CrawlerVaultRetireRequest(CrawlerWriteRequest):
+    retention_acknowledged: bool = Field(strict=True)
+
+
 class CrawlerArchiveGrantRequest(CrawlerWriteRequest):
     enabled: bool = Field(strict=True)
     days: int = Field(default=30, ge=1, le=30, strict=True)
@@ -2825,6 +2829,26 @@ async def crawler_legacy_archive(
     ))
 
 
+@router.get("/crawler/companion/vault")
+async def crawler_treasury_vault(
+    cursor: str|None = Query(default=None,pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    limit: int = Query(default=16,ge=1,le=32),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    return await _crawler_result(crawler_application.treasury_vault_catalog(scope,cursor=cursor,limit=limit))
+
+
+@router.post("/crawler/sessions/{session_id}/retire-to-vault")
+async def crawler_retire_to_vault(
+    body: CrawlerVaultRetireRequest,
+    session_id: str = URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    return await _crawler_result(crawler_application.retire_treasury_session(
+        scope,session_id,body.model_dump(),principal=user))
+
+
 @router.get("/crawler/companion/treasury")
 async def crawler_companion_treasury(
     mode: str = Query(default="current_only", pattern=r"^(current_only|historic_only|all_revisions|timeline|compare|at_time)$"),
@@ -2834,12 +2858,14 @@ async def crawler_companion_treasury(
     observed_before: float | None = Query(default=None,ge=0),
     left: str | None = Query(default=None,pattern=r"^[a-f0-9]{64}$"),
     right: str | None = Query(default=None,pattern=r"^[a-f0-9]{64}$"),
+    vault_sessions: str|None = Query(default=None,min_length=1,max_length=4127),
     scope: dict = Depends(_crawler_scope),
 ) -> dict:
     """Read-only current/history reparse; every source remains policy-bound."""
     return await _crawler_result(crawler_application.companion_treasury(
         scope, mode=mode, query=query, family=family,cursor=cursor,
         observed_before=observed_before,left=left,right=right,
+        vault_sessions=vault_sessions.split(",") if vault_sessions is not None else None,
     ))
 
 

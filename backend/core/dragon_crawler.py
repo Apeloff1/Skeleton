@@ -22,6 +22,7 @@ from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from core.databases import core_db
 from core.dragon_resource_governor import ResourceGovernor
+from core.dragon_vault import DragonVaultMixin
 from core.dragon_checkpoint_replica import (
     CheckpointReplicaError, checkpoint_fields, decode_exact_replica, verify_primary,
 )
@@ -116,7 +117,7 @@ def _safe_error(exc: BaseException) -> str:
     return "crawler_slice_interrupted"
 
 
-class DragonCrawlerApplication:
+class DragonCrawlerApplication(DragonVaultMixin):
     def __init__(self, database=core_db):
         self.database = database
         self.sessions = database["dragon_crawler_sessions"]
@@ -146,6 +147,10 @@ class DragonCrawlerApplication:
             await self.sessions.create_index([("treasury_index.expires_at",ASCENDING)])
             await self.sessions.create_index([("treasury_repair_due",ASCENDING),
                                               ("archive_grant.expires_at",ASCENDING)])
+            await self.sessions.create_index([("tenant_id",ASCENDING),("owner_id",ASCENDING),
+                ("treasury_vault.state",ASCENDING),("updated_at",DESCENDING),("_id",DESCENDING)])
+            await self.sessions.create_index([("treasury_vault.active_slot_released",ASCENDING),
+                ("treasury_vault.retry_at",ASCENDING)])
             self._indexes_ready = True
 
     async def readiness(self) -> dict[str, Any]:
@@ -574,6 +579,9 @@ class DragonCrawlerApplication:
             except (ValueError,TypeError,KeyError):
                 status["treasury_watch"]=None
         status["watch_managed"]=row.get("treasury_watch_parent") is not None
+        if row.get("treasury_vault") is not None:
+            from skeleton.ai.webcrawler.dragon_treasury_vault import public_marker
+            status["treasury_vault"]=public_marker(_plain(row["treasury_vault"]))
         witness = row.get("checkpoint_identity") or {}
         repair = row.get("checkpoint_repair") or {}
         status["checkpoint_recovery"] = {
@@ -1525,7 +1533,7 @@ class DragonCrawlerApplication:
         return {"ok": True, "report": metadata}
 
     async def list(self, scope: dict[str, str], *, cursor: str | None = None, limit: int = 16) -> dict:
-        query = {**scope, "status": {"$ne": "deleted"}}
+        query = {**scope, "status": {"$ne": "deleted"},"treasury_vault.state":{"$ne":"vaulted"}}
         if cursor:
             query["_id"] = {"$lt": cursor}
         rows = (
@@ -1575,6 +1583,8 @@ class DragonCrawlerApplication:
         now=_now().timestamp()
         grant=None
         if body["enabled"]:
+            if row.get("treasury_vault") is not None:
+                raise CrawlerError("crawler_watch_vaulted","Retired expeditions cannot authorize new watches; prepare a fresh crawl.",409)
             if row["status"] not in {"completed","budget_exhausted"} or row.get("treasury_watch_parent"):
                 raise CrawlerError("crawler_watch_parent","Watch requires an independent finished expedition.",409)
             if row.get("treasury_watch") and row["treasury_watch"].get("enabled") and row["treasury_watch"].get("expires_at",0)>now:
@@ -2209,7 +2219,7 @@ class DragonCrawlerApplication:
     async def companion_treasury(self, scope: dict[str, str], *, mode: str,
                                  query: str = "", family: str | None = None, cursor: str | None = None,
                                  observed_before: float | None = None, left: str | None = None,
-                                 right: str | None = None) -> dict:
+                                 right: str | None = None, vault_sessions:list[str]|None=None) -> dict:
         """Read and reparse only qualified retained text; preserve metadata-only lineage.
 
         Older, expired source rows are not opened as text. Their verified
@@ -2224,12 +2234,25 @@ class DragonCrawlerApplication:
         at = _now()
         when = at.timestamp()
         _, run_type = _core()
-        metadata = await (
-            self.sessions.find({**scope, "status": {"$ne": "deleted"}}, {"_id": 1, "version": 1})
-            .sort([("updated_at", DESCENDING), ("_id", DESCENDING)])
-            .limit(MAX_SESSIONS + 1).max_time_ms(2000).to_list(MAX_SESSIONS + 1)
-        )
-        capped = len(metadata) > MAX_SESSIONS
+        from skeleton.ai.webcrawler.dragon_treasury_vault import selected_ids,validate_marker
+        catalogue={**scope,"status":{"$ne":"deleted"}}
+        selection=None
+        if vault_sessions is not None:
+            try:
+                selection=selected_ids(vault_sessions)
+            except ValueError as exc:
+                raise CrawlerError("crawler_vault_bounds","Select 1–32 distinct retired expeditions.") from exc
+            if mode not in {"historic_only","all_revisions","timeline","compare","at_time"}:
+                raise CrawlerError("crawler_vault_history_only","A selected vault window is history-only.")
+            catalogue.update({"_id":{"$in":list(selection)},"treasury_vault.state":"vaulted"})
+        sort=[("treasury_vault.state",ASCENDING),("updated_at",DESCENDING),("_id",DESCENDING)]
+        async def catalogue_page():
+            return await self.sessions.find(catalogue,{"_id":1,"version":1}).sort(sort).limit(
+                MAX_SESSIONS+1).max_time_ms(2000).to_list(MAX_SESSIONS+1)
+        metadata=await catalogue_page()
+        if selection is not None and {item["_id"] for item in metadata}!=set(selection):
+            raise CrawlerError("crawler_vault_changed","Selected vault expedition unavailable.",409)
+        capped=selection is not None or len(metadata)>MAX_SESSIONS
         excluded = 0
         fence = []
         observations = []
@@ -2250,7 +2273,7 @@ class DragonCrawlerApplication:
                 {"_id": 1, "tenant_id": 1, "owner_id": 1, "status": 1, "version": 1,
                  "consent_expires_at": 1, "request": 1, "request_digest": 1, "consent": 1,
                  "snapshot": 1, "checkpoint_identity": 1, "source_use_policies": 1,
-                 "archive_grant": 1, "treasury_index": 1,"legacy_archive_receipt":1}, max_time_ms=2000,
+                 "archive_grant": 1, "treasury_index": 1,"legacy_archive_receipt":1,"treasury_vault":1}, max_time_ms=2000,
             )
             if row is None:
                 raise CrawlerError("crawler_treasury_changed", "Treasury changed during reparse.", 409)
@@ -2278,6 +2301,13 @@ class DragonCrawlerApplication:
                         or binding["request_digest"] != row["request_digest"]
                         or _digest(_plain(row["request"])) != row["request_digest"]):
                     raise ValueError("treasury owner or grant mismatch")
+                marker=validate_marker(_plain(row["treasury_vault"])) if row.get("treasury_vault") is not None else None
+                vaulted=marker is not None and marker["state"]=="vaulted"
+                if vaulted and (marker["snapshot_digest"]!=snapshot["snapshot_digest"]
+                                or _utc(row["consent_expires_at"])>at):
+                    raise ValueError("retired capture witness or consent mismatch")
+                if selection is not None and not vaulted:
+                    raise ValueError("selected record is not retired")
                 policies = self._source_policies(row)
                 if set(policies) - set(snapshot["sources"]):
                     raise ValueError("orphaned source policy")
@@ -2320,7 +2350,7 @@ class DragonCrawlerApplication:
                     policy = policies.get(source["source_id"], {"enabled": True,
                                           "max_age_seconds": MAX_SOURCE_AGE_SECONDS})
                     fresh = None
-                    if (not legacy and row["status"] != "cancelled" and policy["enabled"]
+                    if (not legacy and not vaulted and row["status"] != "cancelled" and policy["enabled"]
                             and _utc(row["consent_expires_at"]) > at
                             and stamp + policy["max_age_seconds"] > when):
                         fresh = self._capture_freshness(row, source)
@@ -2347,7 +2377,7 @@ class DragonCrawlerApplication:
                         "sensitive": (str(identifier) + ":" + source["source_id"])
                                      if freshness.get("sensitive_vary") or freshness.get("private") else None,
                     })
-                    refresh_allowed = (not legacy and row["status"] != "cancelled" and policy["enabled"]
+                    refresh_allowed = (not legacy and not vaulted and selection is None and row["status"] != "cancelled" and policy["enabled"]
                                        and not freshness.get("private") and not freshness.get("sensitive_vary")
                                        and not freshness.get("no_store"))
                     # Stale source text remains unavailable. A fresh grant
@@ -2405,7 +2435,8 @@ class DragonCrawlerApplication:
             result = await asyncio.to_thread(build_treasury,observations, as_of=when, growth=growth, mode=mode, query=query,
                                     family=family, candidate_limit_reached=capped, excluded_sessions=excluded,
                                     alias_blockers=alias_blockers,materialized=materialized,cursor=cursor,
-                                    observed_before=observed_before,left=left,right=right)
+                                    observed_before=observed_before,left=left,right=right,catalogue_scope=selection)
+            result["vault_window"]=list(selection) if selection is not None else None
             result["invalid_materialized_segments"]=invalid_segments
             result["legacy_history_sessions"]=legacy_sessions
             result["index_health"]=index_health
@@ -2427,9 +2458,7 @@ class DragonCrawlerApplication:
                 raise CrawlerError("crawler_treasury_changed", "Treasury changed during reparse.", 409)
         # A newly inserted session (or a source removed from the owner set)
         # also invalidates the read, even if all selected versions survived.
-        final_metadata=await (self.sessions.find({**scope,"status":{"$ne":"deleted"}},{"_id":1,"version":1})
-            .sort([("updated_at",DESCENDING),("_id",DESCENDING)])
-            .limit(MAX_SESSIONS+1).max_time_ms(2000).to_list(MAX_SESSIONS+1))
+        final_metadata=await catalogue_page()
         if [(item["_id"],item["version"]) for item in final_metadata]!=[(item["_id"],item["version"]) for item in metadata]:
             raise CrawlerError("crawler_treasury_changed","Owner catalogue changed during reparse.",409)
         expiry = result["earliest_source_expiry"]
@@ -3661,7 +3690,7 @@ class DragonCrawlerApplication:
             # Tombstone publication may have succeeded before quota release
             # lost its response. Exact replay must finish that idempotent step.
             await self.limits.update_one(
-                {"_id": _digest(scope), **scope}, {"$pull": {"session_ids": identifier}}
+                {"_id": _digest(scope), **scope}, {"$pull": {"session_ids": identifier,"vault_ids":identifier}}
             )
             return {
                 "ok": True,
@@ -3705,6 +3734,7 @@ class DragonCrawlerApplication:
                     "legacy_archive_receipt": "",
                     "treasury_watch": "",
                     "treasury_watch_parent": "",
+                    "treasury_vault": "",
                 },
             },
         )
@@ -3712,7 +3742,8 @@ class DragonCrawlerApplication:
             raise CrawlerError("crawler_conflict", "Crawler changed before source erasure.", 409)
         # A live worker's physical lease is deliberately retained until its
         # actual thread drains; status='deleted' fences its final publication.
-        await self.limits.update_one({"_id": _digest(scope), **scope}, {"$pull": {"session_ids": identifier}})
+        await self.limits.update_one({"_id": _digest(scope), **scope},
+            {"$pull": {"session_ids": identifier,"vault_ids":identifier}})
         return {
             "ok": True,
             "session_id": identifier,
@@ -4552,6 +4583,7 @@ async def recover_crawler_runs(*, limit: int = 16) -> dict:
         ("treasury_watches",crawler_application.recover_treasury_watches),
         ("treasury_expired_segments",crawler_application.purge_expired_treasury_segments),
         ("treasury_segment_repair",crawler_application.repair_treasury_segments),
+        ("treasury_retirements",crawler_application.recover_treasury_retirements),
     ):
         try:
             result[name]=await operation()
