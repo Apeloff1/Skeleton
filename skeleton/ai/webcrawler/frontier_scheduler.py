@@ -17,7 +17,7 @@ import math
 import re
 from urllib.parse import unquote, urlsplit
 
-from .frontier_coverage import measure_frontier_coverage
+from .frontier_coverage import build_coverage_index, score_indexed_candidate
 from .adaptive_navigation import adaptive_priority, origin_health
 
 
@@ -112,10 +112,11 @@ def choose_frontier(
         )
     else:
         ranked = []
+        index = build_coverage_index(sources=sources, query=query)
         for candidate in eligible:
             ordinal, row, host, overlap, _score, due = candidate
-            scorecard = measure_frontier_coverage(
-                row["url"], sources=sources, query=query,
+            scorecard = score_indexed_candidate(
+                row["url"], index=index,
                 depth=row["depth"], attempts=row["attempts"],
             )
             score = scorecard.score
