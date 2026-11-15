@@ -88,6 +88,22 @@ class HoarderCopyRequest(Request):
     retention_acknowledged: StrictBool
 
 
+class SourceViewPin(Request):
+    session: str = Field(min_length=36,max_length=36)
+    capture_source: str = Field(pattern=r"^[a-f0-9]{64}$")
+    offset: int = Field(ge=0,le=24000,strict=True)
+    length: int = Field(ge=1,le=4000,strict=True)
+    session_version: int = Field(ge=1,strict=True)
+    snapshot_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    preserved_text_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    history_only: StrictBool
+
+
+class SourceComparisonRequest(Request):
+    left: SourceViewPin
+    right: SourceViewPin
+
+
 def register_knowledge_routes(router):
     def scope(user):
         try:
@@ -247,8 +263,11 @@ def register_knowledge_routes(router):
     @router.get("/knowledge/game-corpus/{game_id}/sources")
     async def game_sources(game_id: str, after: str | None = Query(None, max_length=64),
                            limit: int = Query(64, ge=1, le=100),
+                           kind: str | None = Query(None,max_length=32),
+                           family: str | None = Query(None,max_length=32),
+                           language: str | None = Query(None,max_length=32),
                            user: dict = Depends(get_current_user)):
-        return await corpus_call(scope(user), "sources", game_id, after=after, limit=limit)
+        return await corpus_call(scope(user), "sources", game_id, after=after, limit=limit,kind=kind,family=family,language=language)
 
     @router.get("/knowledge/game-corpus/{game_id}/history")
     async def game_history(game_id: str, stamp: int | None = Query(None, ge=0),
@@ -328,3 +347,31 @@ def register_knowledge_routes(router):
         owner=editor(user)
         return await corpus_runtime_call(runtime.crawler_application.stage_bulk_copy(
             owner,session_id,body.model_dump(),principal=user))
+
+
+    @router.get("/knowledge/game-corpus/{game_id}/sources/{source_id}/captures")
+    async def source_captures(game_id:str,source_id:str,stamp:int|None=Query(None,ge=0),
+                              session:str|None=Query(None,max_length=36),limit:int=Query(32,ge=1,le=100),
+                              user:dict=Depends(get_current_user)):
+        from core.dragon_source_library import source_capture_page
+        if (stamp is None)!=(session is None):
+            raise HTTPException(422,detail={"code":"dragon_source_cursor_invalid"})
+        return await corpus_runtime_call(source_capture_page(scope(user),game_id,source_id,
+                    before=(stamp,session) if stamp is not None else None,limit=limit))
+
+    @router.get("/knowledge/game-corpus/{game_id}/sources/{source_id}/captures/{session}/documents")
+    async def source_documents(game_id:str,source_id:str,session:str,after:str|None=Query(None,max_length=64),
+                               limit:int=Query(8,ge=1,le=8),user:dict=Depends(get_current_user)):
+        from core.dragon_source_library import capture_documents
+        return await corpus_runtime_call(capture_documents(scope(user),game_id,source_id,session,after=after,limit=limit))
+
+    @router.post("/knowledge/game-corpus/{game_id}/sources/{source_id}/view")
+    async def source_view(game_id:str,source_id:str,body:SourceViewPin,user:dict=Depends(get_current_user)):
+        from core.dragon_source_library import read_document
+        return await corpus_runtime_call(read_document(scope(user),game_id,source_id,**body.model_dump()))
+
+    @router.post("/knowledge/game-corpus/{game_id}/sources/{source_id}/compare")
+    async def source_compare(game_id:str,source_id:str,body:SourceComparisonRequest,user:dict=Depends(get_current_user)):
+        from core.dragon_source_library import compare_documents
+        return await corpus_runtime_call(compare_documents(scope(user),game_id,source_id,
+                    body.left.model_dump(),body.right.model_dump()))
