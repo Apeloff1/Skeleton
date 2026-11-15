@@ -152,3 +152,18 @@ test('expired handoffs and changed account during storage are fail-closed', asyn
   assert.equal(await bridgeStorage.consumeCreatorBridge('galaxy'), null);
   storage.setItem = prev;
 });
+
+
+test('same genre and explicit close retain full source; changed genre never mislabels it', () => {
+  const initial = H.handoffFromForge(setup(), 1700000000000);
+  const again = H.handoffFromGalaxy({title:'Future Harbor',vision:'',genreId:'beat_em_up'}, initial, 1700000000001);
+  assert.deepEqual(again.galaxyProfile, initial.galaxyProfile);
+  const close = H.handoffFromGalaxy({title:'',vision:'',genreId:null}, initial, 1700000000001);
+  assert.deepEqual(close.galaxyProfile, initial.galaxyProfile);
+  const changed = H.handoffFromGalaxy({title:'Other',vision:'Other world',genreId:'puzzle'}, initial, 1700000000001);
+  assert.equal(changed.galaxyProfile, null);
+  assert.equal(changed.galaxyGenre, 'puzzle');
+  assert.equal(changed.brief.genre, 'puzzle');
+  assert.throws(() => H.handoffFromGalaxy({title:'Other',vision:'',genreId:'puzzle',profile:fullProfile()}, initial, 1700000000001),
+    /genre does not match/);
+});

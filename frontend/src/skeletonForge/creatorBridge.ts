@@ -199,6 +199,12 @@ export function handoffFromGalaxy(
   }
   const transferred = selection.profile ? galaxyPrefill(selection.profile) : null;
   if (transferred && transferred.profile.config.genre !== selectedId) throw new Error('Galaxy profile genre does not match transfer selection');
+  // A same-genre selection without a replacement profile is not an
+  // instruction to delete the fourteen authored matrices. A changed genre
+  // must not retain an incompatible full profile under a new genre label.
+  const retainedProfile = previous?.galaxyProfile &&
+    (!selectedId || previous.galaxyProfile.config.genre === selectedId)
+    ? previous.galaxyProfile : null;
   const vision = transferred?.vision || cleanText(selection.vision, 4000).trim() ||
     cleanText(selection.title, 160).trim() || previous?.vision || '';
   const raw = {
@@ -206,7 +212,7 @@ export function handoffFromGalaxy(
     studioProjectId: previous?.studioProjectId ?? null,
     studioProjectUpdatedAt: previous?.studioProjectUpdatedAt ?? null,
     step: transferred ? 'options' : previous?.step ?? 'brief', vision, brief, beats: previous?.beats ?? {}, instruments: { ...transferred?.axes, ...previous?.instruments },
-    galaxyGenre: genre, galaxyProfile: transferred?.profile ?? (selectedId ? null : previous?.galaxyProfile ?? null), options: previous?.options ?? { archetype: 'auto', target: 'godot', era: null, generation: null },
+    galaxyGenre: genre, galaxyProfile: transferred?.profile ?? retainedProfile, options: previous?.options ?? { archetype: 'auto', target: 'godot', era: null, generation: null },
     quest: previous?.quest ?? { enabled: false, length: 3 },
     playable: previous?.playable ?? { enabled: false },
     playtest: previous?.playtest ?? 'off',
