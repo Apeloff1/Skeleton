@@ -250,3 +250,59 @@ def test_galaxy_economy_tunes_racing_boost_regeneration():
     player = archetype_files("racing", operator_axes=axes)["scripts/archetypes/racing/player_controller.gd"]
     assert "const BOOST_RECHARGE := 5.00" in player
     assert receipt["mapped_matrix_dials"] == 1
+
+
+@pytest.mark.parametrize("depth,count", [(0.0, 2), (0.25, 3), (0.5, 4), (0.75, 5), (1.0, 6)])
+def test_extraction_cache_goal_matches_actual_collectibles_and_finite_coolant(depth, count):
+    import re
+    files = archetype_files("extraction", operator_axes={"grind": depth, "risk": 1.0, "scarcity": 1.0})
+    loop = files["scripts/archetypes/extraction/core_loop.gd"]
+    points = re.search(r"var loot: Array\[Vector2\] = \[(.*?)\]", loop).group(1)
+    assert points.count("Vector2(") == count
+    assert f"const CACHE_GOAL := {count}" in loop
+    assert "const HEAT_LIMIT := 70.00" in loop
+    assert "const HEAT_PER_SECOND := 10.00" in loop
+    assert "CARGO_HEAT * float(carried) / float(CACHE_GOAL)" in loop
+    assert "var coolant: int = 2" in loop
+    assert "if coolant <= 0 or heat < COOLANT_RESTORE:" in loop
+    assert "coolant -= 1" in loop and "heat - COOLANT_RESTORE" in loop
+    assert "carried == CACHE_GOAL:" in loop
+    assert "100.0 * heat / HEAT_LIMIT" in loop
+
+
+@pytest.mark.parametrize("scarcity,capacity", [(0.0, 3), (0.5, 2), (1.0, 1)])
+@pytest.mark.parametrize("depth,quota", [(0.0, 2), (0.5, 5), (1.0, 8)])
+def test_factory_cargo_capacity_and_finite_stock_are_bound_to_quota(scarcity, capacity, depth, quota):
+    files = archetype_files("pipeline", operator_axes={"scarcity": scarcity, "grind": depth})
+    loop = files["scripts/archetypes/pipeline/core_loop.gd"]
+    assert f"const CARGO_CAPACITY := {capacity}" in loop
+    assert f"const QUOTA := {quota}" in loop
+    assert "var source_stock: int = QUOTA" in loop
+    assert "raw_cargo + refined_cargo <= CARGO_CAPACITY" in loop
+    assert "source_stock + raw_cargo + refined_cargo + shipped == QUOTA" in loop
+    assert "raw_cargo = mini(CARGO_CAPACITY, source_stock)" in loop
+    assert "source_stock -= raw_cargo" in loop
+    assert "refine_timer = REFINE_SECONDS_PER_UNIT * float(raw_cargo)" in loop
+    assert "refined_cargo = raw_cargo" in loop and "raw_cargo = 0" in loop
+    assert "shipped += refined_cargo" in loop and "refined_cargo = 0" in loop
+    assert "if shipped == QUOTA and source_stock == 0 and raw_cargo == 0 and refined_cargo == 0:" in loop
+    assert 'Input.is_action_just_pressed("ui_accept")' in loop
+    assert 'elif autopilot or Input.is_action_pressed("ui_accept"):' in loop
+
+
+@pytest.mark.parametrize("mode,matrix,phase,dial,control", [
+    ("extraction", "world_matrix", "dungeon", "secrets", "grind"),
+    ("pipeline", "mechanics_matrix", "economy", "intricacy", "scarcity"),
+])
+def test_galaxy_extraction_and_factory_resource_controls(mode, matrix, phase, dial, control):
+    from skeleton.context.galaxy_profile import MATRIX_FIELDS, SCHEMA, compile_galaxy_playable_axes
+    config = {field: {} for field in MATRIX_FIELDS}
+    config.update(title="Resource operation", genre=mode, narrative_phases={}, extra_params={}, style_params={})
+    config[matrix][phase] = {dial: 1000}
+    axes, receipt = compile_galaxy_playable_axes({"schema": SCHEMA, "config": config}, mode, {})
+    assert axes == {control: 1.0}
+    assert receipt["mapped_matrix_dials"] == 1
+    # Factory's default capacity already equals the high-scarcity boundary.
+    expected = "const CACHE_GOAL := 6" if mode == "extraction" else "const CARGO_CAPACITY := 1"
+    loop = archetype_files(mode, operator_axes=axes)[f"scripts/archetypes/{mode}/core_loop.gd"]
+    assert expected in loop

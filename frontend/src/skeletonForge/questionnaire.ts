@@ -73,9 +73,9 @@ export const PLAYABLE_SLICES = [
 ] as const;
 
 export const PLAYABLE_TUNING_EFFECTS: Record<string, readonly string[]> = {
-  extraction: ['Tempo: movement', 'Risk: heat', 'Scarcity: heat budget', 'Agency: pickup range'],
+  extraction: ['Tempo: movement', 'Risk: heat', 'Scarcity: heat budget', 'Agency: pickup range', 'Progression depth: cache count'],
   combat_loop: ['Tempo: movement', 'Lethality: contact damage', 'Agency: attack range', 'Progression depth: waves'],
-  pipeline: ['Tempo: movement', 'Risk: frame budget', 'Agency: interaction range', 'Progression depth: deliveries'],
+  pipeline: ['Tempo: movement', 'Risk: frame budget', 'Agency: interaction range', 'Progression depth: deliveries', 'Scarcity: cargo capacity'],
   puzzle: ['Tempo: movement', 'Mystery: switch hints', 'Agency: switch range', 'Progression depth: switches'],
   racing: ['Tempo: top speed', 'Risk: time limit', 'Progression depth: laps', 'Agency: checkpoint range', 'Scarcity: boost recharge'],
   survival: ['Tempo: movement', 'Scarcity: hydration', 'Risk: exposure drain', 'Agency: pickup range', 'Progression depth: supplies'],

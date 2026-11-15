@@ -575,9 +575,9 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
                 if name in (set(expanded_tuning["mapped_axes"]) if expanded_tuning is not None else {
                     "tempo",
                     *({"agency"} if archetype_name in {"extraction", "combat_loop", "pipeline"} else set()),
-                    *({"risk", "scarcity"} if archetype_name == "extraction" else set()),
+                    *({"risk", "scarcity", "grind"} if archetype_name == "extraction" else set()),
                     *({"lethality", "grind"} if archetype_name == "combat_loop" else set()),
-                    *({"risk", "grind"} if archetype_name == "pipeline" else set()),
+                    *({"risk", "grind", "scarcity"} if archetype_name == "pipeline" else set()),
                 })
             },
             "source_verified": verify_archetype_content(

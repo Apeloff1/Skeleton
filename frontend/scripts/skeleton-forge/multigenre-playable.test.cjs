@@ -162,31 +162,31 @@ test('creator explains exact authored cockpit effects for every supported mini-g
     assert.match(text(html), /Other design sliders remain in the full GameForge tensor/);
   }
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.racing, [
-    'Tempo: movement', 'Risk: time limit',
-    'Progression depth: laps',
+    'Tempo: top speed', 'Risk: time limit', 'Progression depth: laps', 'Agency: checkpoint range', 'Scarcity: boost recharge',
   ]);
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.survival, [
-    'Tempo: movement', 'Scarcity: hydration',
+    'Tempo: movement', 'Scarcity: hydration', 'Risk: exposure drain', 'Agency: pickup range', 'Progression depth: supplies',
   ]);
 });
 
 
-test('creator discloses progression and mystery effects only where implemented', () => {
+test('creator discloses only implemented native effects for all eight scenarios', () => {
+  assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.extraction, [
+    'Tempo: movement', 'Risk: heat', 'Scarcity: heat budget', 'Agency: pickup range', 'Progression depth: cache count',
+  ]);
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.puzzle, [
-    'Tempo: movement', 'Mystery: switch hints',
+    'Tempo: movement', 'Mystery: switch hints', 'Agency: switch range', 'Progression depth: switches',
   ]);
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.stealth, [
-    'Tempo: movement', 'Risk: guard radius',
-    'Mystery: guard visibility',
+    'Tempo: movement', 'Risk: guard radius', 'Lethality: detection pressure', 'Mystery: guard visibility', 'Agency: interaction range', 'Progression depth: intel',
   ]);
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.pipeline, [
-    'Tempo: movement', 'Risk: frame budget', 'Agency: interaction range', 'Progression depth: deliveries',
+    'Tempo: movement', 'Risk: frame budget', 'Agency: interaction range', 'Progression depth: deliveries', 'Scarcity: cargo capacity',
   ]);
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.combat_loop, [
-    'Tempo: movement', 'Lethality: contact damage',
-    'Progression depth: waves',
+    'Tempo: movement', 'Lethality: contact damage', 'Agency: attack range', 'Progression depth: waves',
   ]);
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.crafting, [
-    'Tempo: movement',
+    'Tempo: movement', 'Progression depth: materials', 'Agency: work range', 'Risk: assembly duration',
   ]);
 });

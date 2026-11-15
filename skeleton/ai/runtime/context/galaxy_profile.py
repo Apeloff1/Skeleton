@@ -241,6 +241,7 @@ _M = "mechanics_matrix"
 _W = "world_matrix"
 _PLAYABLE_RULES = {
     "extraction": {
+        "grind": ((_W, "dungeon", "secrets"), (_W, "ruin", "secrets"), (_M, "investigation", "count")),
         "risk": ((_W, "volcanic", "complexity"), (_W, "wasteland", "complexity")),
         "scarcity": ((_W, "desert", "complexity"), (_W, "tundra", "complexity")),
         "agency": ((_M, "crafting", "complexity"), (_M, "trading", "complexity")),
@@ -252,6 +253,7 @@ _PLAYABLE_RULES = {
     },
     "pipeline": {
         "risk": ((_M, "economy", "complexity"),),
+        "scarcity": ((_M, "economy", "intricacy"), (_M, "trading", "complexity")),
         "grind": ((_M, "building", "count"), (_M, "crafting", "count"), (_M, "forging", "count")),
         "agency": ((_M, "building", "intricacy"), (_M, "crafting", "intricacy")),
     },

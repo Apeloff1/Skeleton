@@ -225,43 +225,61 @@ func _physics_process(delta: float) -> void:
 '''
 
 _EXTRACTION = '''
-## Extraction: grab every loot cache, keep heat below the limit, reach extract.
+## Recover every cache, balance cargo heat and ration finite emergency coolant.
+const CACHE_GOAL := 3
 var loot: Array[Vector2] = [Vector2(220, 0), Vector2(220, 180), Vector2(0, 180)]
 var extract_point := Vector2(-160, 60)
 var carried: int = 0
 var heat: float = 0.0
+var coolant: int = 2
 const HEAT_LIMIT := 100.0
 const HEAT_PER_SECOND := 6.0
 const PICKUP_RADIUS := 12.0
+const CARGO_HEAT := 1.5
+const COOLANT_RESTORE := 30.0
+
+
+func _cool_down() -> bool:
+	if coolant <= 0 or heat < COOLANT_RESTORE:
+		return false
+	coolant -= 1
+	heat = maxf(0.0, heat - COOLANT_RESTORE)
+	return true
 
 
 func _tick(delta: float) -> void:
-\theat += HEAT_PER_SECOND * delta
-\tif heat >= HEAT_LIMIT:
-\t\t_finish(false, "heat critical")
-\t\treturn
-\tif loot.size() > 0:
-\t\tplayer.autopilot_target = loot[0]
-\t\tvar selected := _nearest_point(loot, PICKUP_RADIUS)
-\t\tif selected >= 0:
-\t\t\tloot.remove_at(selected)
-\t\t\tcarried += 1
-\telse:
-\t\tplayer.autopilot_target = extract_point
-\t\tif player.global_position.distance_to(extract_point) <= PICKUP_RADIUS:
-\t\t\t_finish(true, "extracted loot=%d heat=%d" % [carried, int(heat)])
+	# Carrying recovered cargo increases pressure but never changes the
+	# admitted base-world heat model; this is the isolated extraction scene.
+	heat += (HEAT_PER_SECOND + CARGO_HEAT * float(carried) / float(CACHE_GOAL)) * delta
+	var autopilot := bool(player.get("autopilot"))
+	if (autopilot and heat >= maxf(COOLANT_RESTORE, HEAT_LIMIT * 0.55)) or (not autopilot and Input.is_action_just_pressed("ui_accept")):
+		_cool_down()
+	if heat >= HEAT_LIMIT:
+		_finish(false, "heat critical")
+		return
+	if not loot.is_empty():
+		player.autopilot_target = loot[0]
+		var selected := _nearest_point(loot, PICKUP_RADIUS)
+		if selected >= 0:
+			loot.remove_at(selected)
+			carried += 1
+	else:
+		player.autopilot_target = extract_point
+		if player.global_position.distance_to(extract_point) <= PICKUP_RADIUS and carried == CACHE_GOAL:
+			_finish(true, "extracted loot=%d heat=%d coolant=%d" % [carried, int(heat), coolant])
 
 
 func _hud_status() -> String:
-\treturn "Caches: %d/3 | Heat: %d%% | Reach green extraction" % [carried, int(heat)]
+	return "Caches: %d/%d | Heat: %d%% | Coolant: %d | USE to cool" % [carried, CACHE_GOAL, int(100.0 * heat / HEAT_LIMIT), coolant]
 
 
 func _draw_objectives() -> void:
-\tfor cache in loot:
-\t\tdraw_rect(Rect2(cache - Vector2(11.0, 11.0), Vector2(22.0, 22.0)), TARGET_COLOR)
-\t\tdraw_circle(cache, 17.0, Color(0.9, 0.61, 0.11, 0.35))
-\tdraw_circle(extract_point, 25.0, GOAL_COLOR)
-\tdraw_circle(extract_point, 15.0, FLOOR)
+	for cache in loot:
+		draw_rect(Rect2(cache - Vector2(11.0, 11.0), Vector2(22.0, 22.0)), TARGET_COLOR)
+		draw_circle(cache, 17.0, Color(0.9, 0.61, 0.11, 0.35))
+	var extraction_color := GOAL_COLOR if loot.is_empty() else Color(0.34, 0.48, 0.41)
+	draw_circle(extract_point, 25.0, extraction_color)
+	draw_circle(extract_point, 15.0, FLOOR)
 '''
 
 _COMBAT = '''
@@ -362,54 +380,95 @@ func _draw_objectives() -> void:
 
 
 _PIPELINE = '''
-## Pipeline: haul raw ore source -> refinery -> depot until the quota ships.
+## Finite source inventory, physical cargo, timed conversion and verified shipping.
 const QUOTA := 4
 const RADIUS := 12.0
+const CARGO_CAPACITY := 1
+const REFINE_SECONDS_PER_UNIT := 0.25
 var source := Vector2(200, -80)
 var refinery := Vector2(0, 120)
 var depot := Vector2(-200, -80)
 var stage: String = "to_source"
+var source_stock: int = QUOTA
+var raw_cargo: int = 0
+var refined_cargo: int = 0
 var shipped: int = 0
 var refine_timer: float = 0.0
+var batch_count: int = 0
+
+
+func _inventory_valid() -> bool:
+	return source_stock >= 0 and raw_cargo >= 0 and refined_cargo >= 0 and shipped >= 0 and raw_cargo + refined_cargo <= CARGO_CAPACITY and source_stock + raw_cargo + refined_cargo + shipped == QUOTA
 
 
 func _tick(delta: float) -> void:
-\tmatch stage:
-\t\t"to_source":
-\t\t\tplayer.autopilot_target = source
-\t\t\tif player.global_position.distance_to(source) <= RADIUS:
-\t\t\t\tstage = "to_refinery"
-\t\t"to_refinery":
-\t\t\tplayer.autopilot_target = refinery
-\t\t\tif player.global_position.distance_to(refinery) <= RADIUS:
-\t\t\t\tstage = "refining"
-\t\t\t\trefine_timer = 0.25
-\t\t"refining":
-\t\t\tplayer.autopilot_target = refinery
-\t\t\tif player.global_position.distance_to(refinery) > RADIUS:
-\t\t\t\tstage = "to_refinery"
-\t\t\t\trefine_timer = 0.0
-\t\t\telse:
-\t\t\t\trefine_timer = maxf(0.0, refine_timer - delta)
-\t\t\t\tif refine_timer <= 0.0:
-\t\t\t\t\tstage = "to_depot"
-\t\t"to_depot":
-\t\t\tplayer.autopilot_target = depot
-\t\t\tif player.global_position.distance_to(depot) <= RADIUS:
-\t\t\t\tshipped += 1
-\t\t\t\tstage = "to_source"
-\tif shipped >= QUOTA:
-\t\t_finish(true, "shipped=%d" % shipped)
+	if not _inventory_valid():
+		_finish(false, "cargo ledger mismatch")
+		return
+	var autopilot := bool(player.get("autopilot"))
+	var interact := autopilot or Input.is_action_just_pressed("ui_accept")
+	match stage:
+		"to_source":
+			player.autopilot_target = source
+			if interact and player.global_position.distance_to(source) <= RADIUS:
+				if raw_cargo != 0 or refined_cargo != 0 or source_stock <= 0:
+					_finish(false, "invalid load state")
+					return
+				raw_cargo = mini(CARGO_CAPACITY, source_stock)
+				source_stock -= raw_cargo
+				stage = "to_refinery"
+		"to_refinery":
+			player.autopilot_target = refinery
+			if interact and player.global_position.distance_to(refinery) <= RADIUS:
+				if raw_cargo <= 0 or refined_cargo != 0:
+					_finish(false, "invalid refinery cargo")
+					return
+				stage = "refining"
+				refine_timer = REFINE_SECONDS_PER_UNIT * float(raw_cargo)
+		"refining":
+			player.autopilot_target = refinery
+			if player.global_position.distance_to(refinery) > RADIUS:
+				stage = "to_refinery"
+				refine_timer = 0.0
+			elif autopilot or Input.is_action_pressed("ui_accept"):
+				refine_timer = maxf(0.0, refine_timer - delta)
+				if refine_timer <= 0.0:
+					refined_cargo = raw_cargo
+					raw_cargo = 0
+					stage = "to_depot"
+		"to_depot":
+			player.autopilot_target = depot
+			if interact and player.global_position.distance_to(depot) <= RADIUS:
+				if refined_cargo <= 0 or raw_cargo != 0:
+					_finish(false, "invalid shipment cargo")
+					return
+				shipped += refined_cargo
+				refined_cargo = 0
+				batch_count += 1
+				stage = "to_source"
+		_:
+			_finish(false, "unknown production stage")
+			return
+	if not _inventory_valid():
+		_finish(false, "cargo ledger mismatch")
+		return
+	if shipped == QUOTA and source_stock == 0 and raw_cargo == 0 and refined_cargo == 0:
+		_finish(true, "shipped=%d batches=%d" % [shipped, batch_count])
 
 
 func _hud_status() -> String:
-\treturn "Shipments: %d/%d | Step: %s | Yellow source / blue refinery / green depot" % [shipped, QUOTA, stage]
+	return "Shipped: %d/%d | Stock: %d | Cargo: %d raw / %d refined | %s | USE load / refine / ship (%.1f s)" % [shipped, QUOTA, source_stock, raw_cargo, refined_cargo, stage, refine_timer]
 
 
 func _draw_objectives() -> void:
-\tdraw_rect(Rect2(source - Vector2(18.0, 18.0), Vector2(36.0, 36.0)), TARGET_COLOR)
-\tdraw_circle(refinery, 22.0, Color(0.32, 0.61, 1.0))
-\tdraw_circle(depot, 22.0, GOAL_COLOR)
+	var active_source := TARGET_COLOR if stage == "to_source" else Color(0.58, 0.46, 0.26)
+	var active_refinery := Color(0.32, 0.61, 1.0) if stage == "to_refinery" or stage == "refining" else Color(0.24, 0.34, 0.52)
+	var active_depot := GOAL_COLOR if stage == "to_depot" else Color(0.25, 0.43, 0.31)
+	draw_rect(Rect2(source - Vector2(18.0, 18.0), Vector2(36.0, 36.0)), active_source)
+	draw_circle(refinery, 22.0, active_refinery)
+	draw_circle(depot, 22.0, active_depot)
+	if raw_cargo + refined_cargo > 0:
+		draw_arc(player.global_position, 24.0, 0.0, TAU, 32, active_refinery if raw_cargo > 0 else GOAL_COLOR, 3.0)
 '''
 
 _SCENE = '''[gd_scene load_steps=4 format=3]
@@ -434,9 +493,9 @@ shape = SubResource("CircleShape2D_player")
 '''
 
 _INSTRUCTIONS = {
-    "extraction": "Collect three golden caches, then reach the green extraction point",
+    "extraction": "Recover all caches; use finite coolant before heat becomes critical",
     "combat_loop": "Move near enemies; hold Enter or USE to attack and survive the waves",
-    "pipeline": "Ship four loads through the source, refinery and depot",
+    "pipeline": "USE to load ore, hold USE at refinery, then USE at depot to ship",
 }
 
 # name -> (loop body, controller speed, frame budget)
@@ -902,6 +961,14 @@ def archetype_files(
     if "tempo" in axes:
         speed = round(speed * (0.75 + 0.5 * axes["tempo"]), 2)
     if name == "extraction":
+        if "grind" in axes:
+            count = 2 + int(4.0 * axes["grind"] + 0.5)
+            points = ((220, 0), (220, 180), (0, 180), (-180, 180), (-240, -80), (60, -180))
+            body = _swap_constant(body, "const CACHE_GOAL := 3", f"const CACHE_GOAL := {count}")
+            body = _swap_constant(
+                body, "Vector2(220, 0), Vector2(220, 180), Vector2(0, 180)",
+                ", ".join(f"Vector2({x}, {y})" for x, y in points[:count]),
+            )
         if "risk" in axes:
             body = _swap_constant(
                 body, "const HEAT_PER_SECOND := 6.0",
@@ -934,6 +1001,9 @@ def archetype_files(
                 "const ATTACK_RANGE := " + _number(16.0 + 24.0 * axes["agency"]),
             )
     elif name == "pipeline":
+        if "scarcity" in axes:
+            capacity = 3 - int(2.0 * axes["scarcity"] + 0.5)
+            body = _swap_constant(body, "const CARGO_CAPACITY := 1", f"const CARGO_CAPACITY := {capacity}")
         if "grind" in axes:
             body = _swap_constant(
                 body, "const QUOTA := 4",
