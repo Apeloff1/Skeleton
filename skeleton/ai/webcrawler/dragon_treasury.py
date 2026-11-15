@@ -20,7 +20,7 @@ from .dragon_companion import _lexemes, _signature, _similarity
 from .dragon_revisit_model import ChangeSample, infer_revisit
 
 SCHEMA = "skeleton.dragon.treasury.v1"
-PARSER = "retained-text-sections-v1"
+PARSER = "retained-text-sections-v2"
 MAX_SESSIONS = 8
 MAX_OBSERVATIONS = 512
 MAX_INDEXED = 128
@@ -294,6 +294,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
         if tied:
             latest["indexed"]=False
             latest["metadata_only"]=True
+            latest["latest_access"]=False
             parse_rows[latest["revision_id"]]=None
         alias_conflict = any(a["captured_at"]>=rows[-1].captured_at and
                              a["content_hash"]!=rows[-1].content_hash for a in blockers.get(rows[-1].url,()))
@@ -305,7 +306,8 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
         unique_edges=set()
         for k in range(1,len(versions)):
             a,b=versions[k-1],versions[k]
-            if a["indexed"] and b["indexed"] and a["last_seen"]<b["first_seen"] and b["delta"]["kind"]!="changed_unclassified":
+            if (a["indexed"] and b["indexed"] and a["last_seen"]<b["first_seen"]
+                    and b["delta"]["kind"]!="changed_unclassified" and b["first_seen"] not in ambiguous_times):
                 unique_edges.add(tuple(sorted((version_hashes[k-1],version_hashes[k]))))
         verified_transitions+=len(unique_edges)
         verified_families+=int(bool(unique_edges))
