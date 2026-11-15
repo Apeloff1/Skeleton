@@ -35,7 +35,7 @@ from .structured_discovery import (
 )
 from .frontier_scheduler import choose_frontier
 from .frontier_circuit import evaluate_frontier_candidate
-from .host_backpressure import origin_throttle
+from .host_backpressure import consent_bounded_retry_after, origin_throttle
 from .robots_rate import combine_robots_pacing
 from .capture_rights import source_capture_rights
 from .http_freshness import (
@@ -830,8 +830,9 @@ class CrawlRun:
             self._finish_item(item)
             return False
         item["attempts"] += 1
-        delay = min(300, max(1, retry_after if retry_after is not None else 2 ** item["attempts"]))
-        item["ready_at"] = now + delay
+        fallback = min(300, max(1, 2 ** item["attempts"]))
+        delay = fallback if retry_after is None else max(fallback, retry_after)
+        item["ready_at"] = min(now + delay, self._state["binding"]["consent"]["expires_at"])
         return True
 
     def _persist(self, event):
@@ -938,8 +939,11 @@ class CrawlRun:
             fetch_url = url
         host = urlsplit(fetch_url).hostname
         if state["host_ready"].get(host, 0) > now:
+            # A redirected robots target can have a different host clock.
+            # A None outcome rolls back the whole step; persist this deferral
+            # so the scheduler cannot spin on an apparently ready original URL.
             item["ready_at"] = state["host_ready"][host]
-            return None
+            return self._event("deferred", now=now, url=url, reason="target_host_cooldown")
         delay = self.request.min_host_delay_seconds
         cache = self._robots_cache(origin)
         if cache is not None:
@@ -1001,9 +1005,9 @@ class CrawlRun:
                 item["url"] = destination
             return self._event("redirect", now=now, url=fetch_url, reason=destination)
         if response.status in _RETRY:
-            retry_after = CrawlEngine._retry_after(response.headers, now=now)
-            if retry_after is not None and not math.isfinite(retry_after):
-                retry_after = None
+            retry_after = consent_bounded_retry_after(
+                response.headers, now=now, expires_at=state["binding"]["consent"]["expires_at"],
+            )
             # 429 and 503 constrain the *origin*, not just this item.
             # A sibling cannot bypass the server's Retry-After quota signal.
             throttle = origin_throttle(
@@ -1014,6 +1018,7 @@ class CrawlRun:
                 state["host_ready"][host] = max(
                     state["host_ready"].get(host, 0),
                     throttle.origin_ready_at,
+                    min(now + (retry_after or 0.0), state["binding"]["consent"]["expires_at"]),
                 )
                 retry_after = max(retry_after or 0.0, throttle.retry_seconds)
             retained = self._retry(item, now, retry_after=retry_after)
@@ -1030,7 +1035,7 @@ class CrawlRun:
             ctype = response.headers.get("content-type", "text/plain").split(";", 1)[0].strip().lower()
             if response.status in {404, 410}:
                 robots["text"] = ""
-            elif response.status == 200 and ctype in {"text/plain", "text/html"}:
+            elif response.status == 200 and ctype == "text/plain":
                 text = response.body.decode("utf-8", errors="replace")
                 retained = sum(
                     len(row["text"].encode()) for row in state["robots"].values() if row["text"] is not None
@@ -1053,6 +1058,13 @@ class CrawlRun:
                     # bypass depth, robots or network byte reservations.
                     self._enqueue(sitemap_url, depth=0, parent_url=None)
             return self._event("robots", now=now, url=fetch_url, reason=f"http_{response.status}")
+        # Denied and failed responses are not documents or discovery inputs.
+        # Never inspect their bodies, MIME hints, or Link headers for work.
+        if not 200 <= response.status < 300:
+            self._finish_item(item)
+            return self._event(
+                "rejected", now=now, url=url, reason=f"http_{response.status}_or_unsupported_type",
+            )
         # A partial response cannot be promoted as a complete source even
         # if a proxy falsely labels it HTTP 200 with Content-Range.
         if response.status == 206 or any(
