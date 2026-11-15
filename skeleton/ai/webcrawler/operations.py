@@ -981,7 +981,9 @@ class CrawlRun:
         robots = state["robots"].get(origin)
         needs_robots = robots is None or robots["text"] is None or now - robots["fetched_at"] >= 86400
         if needs_robots:
-            if robots is None:
+            if robots is None or (robots["text"] is not None and now - robots["fetched_at"] >= 86400):
+                # Start a fresh policy acquisition at the original authority;
+                # never reuse an old redirect chain or stale allow decision.
                 robots = {
                     "text": None,
                     "fetched_at": 0,
@@ -1135,6 +1137,23 @@ class CrawlRun:
                 )
             else:
                 robots["text"] = "User-agent: *\nDisallow: /"
+            # Newly learned pacing applies to the very first page after REP
+            # acquisition. A redirected policy still governs the initial host.
+            current_cache = self._robots_cache(origin)
+            rate = current_cache.request_rate(url)
+            pacing = combine_robots_pacing(
+                operator_delay=self.request.min_host_delay_seconds,
+                crawl_delay=current_cache.crawl_delay(url),
+                requests=rate.requests if rate else None,
+                seconds=rate.seconds if rate else None,
+            )
+            origin_host = p.hostname
+            horizon = state["binding"]["consent"]["expires_at"]
+            if pacing.denied or denied_until is not None:
+                deadline = horizon
+            else:
+                deadline = min(horizon, now + pacing.minimum_seconds)
+            state["host_ready"][origin_host] = max(state["host_ready"].get(origin_host, 0), deadline)
             if self.request.discover_sitemaps and robots["text"]:
                 for sitemap_url in extract_robots_sitemaps(
                     robots["text"], origin=origin, policy=self.policy,
