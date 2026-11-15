@@ -49,6 +49,7 @@ from .media_probe import inspect_download_media, valid_media_receipt
 from .link_header_discovery import parse_link_headers
 from .memento_relations import MementoDiscoveryError, discover_mementos
 from .document_formats import DocumentFormatError
+from .parser_isolation import ParserFault, discover_isolated, extract_isolated, requires_isolation
 from .http import SafeHttpFetcher
 from .research import EvidenceObservation
 
@@ -120,6 +121,8 @@ def implementation_digest():
                 "media_probe.py",
                 "pdf_documents.py",
                 "pdf_worker.py",
+                "parser_isolation.py",
+                "parser_worker.py",
                 "office_suites.py",
                 "robots_rate.py",
                 "robots_policy.py",
@@ -576,6 +579,8 @@ class CrawlRun:
             _text(source.get("title"), 4000, "source title", empty=True)
             _number(source.get("fetched_at"), 0, 1e12, "source timestamp")
             provenance = source["provenance"]
+            if "parser_execution" in provenance and provenance["parser_execution"] != "isolated_posix":
+                raise CrawlOperationError("unknown source parser execution receipt")
             if "http_freshness" in provenance and not verify_freshness_receipt(
                 provenance["http_freshness"], observed_at=source["fetched_at"],
             ):
@@ -1272,7 +1277,14 @@ class CrawlRun:
                     reason="structured_response_http_status_not_200",
                 )
             try:
-                if plaintext_sitemap:
+                if (not plaintext_sitemap or len(response.body) > 65536):
+                    discovery = discover_isolated(
+                        response.body, media_type=ctype, document_url=url,
+                        allowed_hosts=self.policy.allowed_hosts,
+                        max_bytes=self.request.max_response_bytes,
+                        deadline=self._slice_deadline, plaintext=plaintext_sitemap,
+                    )
+                elif plaintext_sitemap:
                     discovery = parse_plaintext_sitemap(
                         response.body, document_url=url,
                         policy=self.policy, max_links=128, max_entries=512,
@@ -1287,6 +1299,17 @@ class CrawlRun:
                 # A valid, non-feed XML root may be retained as inert,
                 # unreviewed source text; it cannot propose frontier URLs.
                 structured_type = False
+            except ParserFault as exc:
+                # Resource/worker failures cannot fall through to another
+                # parser or repeatedly consume network resources for the
+                # same hostile response. A genuine non-feed JSON document
+                # alone may take the existing inert-document path.
+                if exc.code == "parser_rejected" and ctype == "application/json":
+                    structured_type = False
+                else:
+                    self._finish_item(item)
+                    return self._event("rejected", now=time.time(), url=url,
+                                       reason="discovery_parser_" + exc.code)
             except (DiscoveryError, ValueError, UnicodeError):
                 if ctype != "application/json":
                     self._finish_item(item)
@@ -1321,12 +1344,25 @@ class CrawlRun:
                 "rejected", now=now, url=url, reason=f"http_{response.status}_or_unsupported_type"
             )
         try:
-            doc = extract_document(
-                response, item["original_url"],
-                max_links=128, max_text_chars=self.request.max_response_bytes,
-                link_base_url=url,
-            )
-        except (DocumentFormatError, UnicodeError, ValueError):
+            if requires_isolation(ctype, len(response.body)):
+                outcome = extract_isolated(
+                    response, item["original_url"], max_chars=self.request.max_response_bytes,
+                    deadline=self._slice_deadline,
+                )
+                doc = outcome.document
+            else:
+                if time.monotonic() >= self._slice_deadline:
+                    raise ParserFault("deadline")
+                doc = extract_document(
+                    response, item["original_url"],
+                    max_links=128, max_text_chars=self.request.max_response_bytes,
+                    link_base_url=url,
+                )
+        except ParserFault as exc:
+            self._finish_item(item)
+            return self._event("rejected", now=time.time(), url=url,
+                               reason="document_parser_" + exc.code)
+        except (DocumentFormatError, UnicodeError, ValueError, RecursionError, OverflowError):
             doc = None
         if doc is None:
             self._finish_item(item)
