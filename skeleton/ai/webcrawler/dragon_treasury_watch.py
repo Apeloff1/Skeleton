@@ -73,9 +73,10 @@ def same_watch_representation(parent:dict,candidate:dict)->bool:
         langs=receipt.get("languages")
         vary=receipt.get("vary_dimensions")
         if (not isinstance(media,str) or not 1<=len(media)<=256
-                or not isinstance(langs,list) or not isinstance(vary,list)
-                or len(langs)>64 or len(vary)>64
-                or not all(isinstance(v,str) and 1<=len(v)<=256 for v in langs+vary)):
+                or not isinstance(langs,(list,tuple)) or not isinstance(vary,(list,tuple))
+                or len(langs)>8 or len(vary)>4
+                or not all(isinstance(v,str) and 1<=len(v)<=256 for v in (*langs,*vary))
+                or list(langs)!=sorted(set(langs)) or list(vary)!=sorted(set(vary))):
             return None
         return source["fetched_url"],media,tuple(langs),tuple(vary)
     a,b=identity(parent),identity(candidate)

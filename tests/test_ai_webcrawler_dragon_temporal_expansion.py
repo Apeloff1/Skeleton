@@ -197,6 +197,9 @@ class WatchTests(unittest.TestCase):
         parent=source(fetched_url=BASE+"/page",content_type="text/plain")
         parent["provenance"]["http_freshness"].update(languages=["en"],vary_dimensions=["accept-language"])
         self.assertTrue(same_watch_representation(parent,copy.deepcopy(parent)))
+        tuple_form=copy.deepcopy(parent)
+        tuple_form["provenance"]["http_freshness"].update(languages=("en",),vary_dimensions=("accept-language",))
+        self.assertTrue(same_watch_representation(parent,tuple_form))
         for field,value in (("languages",["no"]),("vary_dimensions",[]),("private",True),
                             ("no_store",True),("sensitive_vary",True)):
             other=copy.deepcopy(parent)

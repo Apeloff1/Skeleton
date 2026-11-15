@@ -110,6 +110,33 @@ class TreasuryIntegrationTests(unittest.IsolatedAsyncioTestCase):
         with patch("core.dragon_crawler._now",return_value=now):
             self.assertEqual(await app._live(SCOPE,"child","worker",1,network_margin=True),child)
 
+    async def test_live_watch_representation_checks_actual_witnessed_parent(self):
+        from skeleton.ai.webcrawler.dragon_treasury_watch import create_watch,claim_watch,child_binding
+        row,captured=fixture()
+        source=next(iter(row["snapshot"]["sources"].values()))
+        issued=captured.timestamp()
+        watch=create_watch(operation="d"*64,parent_id=row["_id"],scope=SCOPE,
+            principal_email="owner@example.org",snapshot_digest=row["snapshot"]["snapshot_digest"],
+            source=source,policy_version=0,now=issued,days=2,cycles=2,
+            minimum_interval=21600,retention_days=1)
+        now=captured+timedelta(hours=6,seconds=1)
+        watch=claim_watch(watch,now=now.timestamp(),token="live")
+        row["treasury_watch"]=watch
+        app=object.__new__(DragonCrawlerApplication)
+        app.sessions=Mock()
+        app.sessions.find_one=AsyncMock(return_value=row)
+        app._grant_principal=AsyncMock()
+        binding=child_binding(watch)
+        with patch("core.dragon_crawler._now",return_value=now):
+            self.assertEqual((await app._watch_authority(SCOPE,binding,
+                observed_source=copy.deepcopy(source)))["claim_token"],"live")
+            changed=copy.deepcopy(source)
+            changed["provenance"]["http_freshness"]["languages"]=["no"]
+            with self.assertRaises(CrawlerError) as caught:
+                await app._watch_authority(SCOPE,binding,observed_source=changed)
+            self.assertEqual(caught.exception.code,"crawler_watch_representation")
+        self.assertEqual(app._grant_principal.await_count,1)
+
     async def test_expired_posting_cleanup_preserves_snapshot_and_uses_exact_version(self):
         row,captured=fixture()
         now=captured+timedelta(days=2)

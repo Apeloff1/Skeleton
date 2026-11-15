@@ -1545,7 +1545,7 @@ class DragonCrawlerApplication:
                                        *, principal: dict) -> dict:
         """Fresh bounded consent for a single previously captured public URL."""
         from skeleton.ai.webcrawler.dragon_treasury_watch import (
-            create_watch, validate_watch, public_watch,
+            create_watch, validate_watch, public_watch, same_watch_representation,
         )
         from skeleton.ai.webcrawler.dragon_archive_grant import eligible_source, archive_expiry
         if authenticated_scope(principal)!=scope or body.get("enabled") is True and principal.get("role") not in {"editor","admin"}:
@@ -1586,7 +1586,8 @@ class DragonCrawlerApplication:
             fresh=self._capture_freshness(row,source)
             archive=archive_expiry(_plain(row["archive_grant"]) if row.get("archive_grant") else None,
                 snapshot_digest=snapshot["snapshot_digest"],source=source,policy=policy,now=now)
-            if (not eligible_source(source,policy) or not (fresh["usable"] or archive is not None)):
+            if (not eligible_source(source,policy) or not same_watch_representation(source,source)
+                    or not (fresh["usable"] or archive is not None)):
                 raise CrawlerError("crawler_watch_source","A currently authorized public captured source is required.",403)
             try:
                 grant=create_watch(operation=operation,parent_id=identifier,scope=scope,
@@ -1725,12 +1726,19 @@ class DragonCrawlerApplication:
                 counts["superseded"]+=1
                 continue
             counts["claimed"]+=1
-            fence={"_id":identifier,**scope,"treasury_watch.epoch":watch["epoch"],
-                   "treasury_watch.claim_token":token,"treasury_watch.enabled":True}
+            def live_fence():
+                # Check the lease at the actual mutation boundary, not
+                # only at pulse admission. An expired token cannot charge,
+                # settle or disable a cycle another pulse may reclaim.
+                return {"_id":identifier,**scope,"treasury_watch.epoch":watch["epoch"],
+                        "treasury_watch.claim_token":token,"treasury_watch.enabled":True,
+                        "treasury_watch.claim_until":{"$gt":_now().timestamp()}}
             child_id=None
             try:
                 binding=child_binding(watch)
-                await self._watch_authority(scope,binding,margin=60)
+                live=await self._watch_authority(scope,binding,margin=60)
+                if live["claim_token"]!=token or live["claim_until"]<=_now().timestamp():
+                    raise CrawlerError("crawler_watch_lease","Watch claim was superseded.",409)
                 command={"idempotency_key":f"watch:{watch['epoch']}:{watch['active_cycle']}",
                          "title":"Hoarder scheduled source observation","seeds":[watch["url"]],"topics":[],
                          "max_requests":4,"max_documents":1,"max_bytes":2*1024*1024,"max_depth":0,
@@ -1744,7 +1752,7 @@ class DragonCrawlerApplication:
                         raise CrawlerError("crawler_watch_slice_budget","Reserved child exceeded its finite slice allowance.",429)
                     # Charge the slice before use; a crash or lost reply does
                     # not refund an uncertain attempt or mint another child.
-                    charged=await self.sessions.update_one(fence,
+                    charged=await self.sessions.update_one(live_fence(),
                         {"$inc":{"treasury_watch.slices_started":1,"version":1}})
                     if not charged.modified_count:
                         counts["superseded"]+=1
@@ -1829,7 +1837,7 @@ class DragonCrawlerApplication:
                         raise CrawlerError("crawler_watch_lease","Watch claim expired before settlement.",409)
                     watch=settle_watch(watch,now=_now().timestamp(),child_id=child_id,sample=sample,completed=bool(good and sample))
                     outcome="completed"
-                final=await self.sessions.update_one(fence,{"$set":{"treasury_watch":watch},"$inc":{"version":1}})
+                final=await self.sessions.update_one(live_fence(),{"$set":{"treasury_watch":watch},"$inc":{"version":1}})
                 counts[outcome if final.modified_count else "superseded"]+=1
             except (CrawlerError,ValueError,KeyError,TypeError,CheckpointReplicaError) as exc:
                 code=exc.code if isinstance(exc,CrawlerError) else "crawler_watch_integrity"
@@ -1841,7 +1849,7 @@ class DragonCrawlerApplication:
                         "treasury_watch.next_due":min(watch["expires_at"],_now().timestamp()+120),
                         "treasury_watch.state":"waiting" if transient else "blocked",
                         "treasury_watch.enabled":transient,"treasury_watch.stop_reason":code}
-                final=await self.sessions.update_one(fence,{"$set":update,"$inc":{"version":1}})
+                final=await self.sessions.update_one(live_fence(),{"$set":update,"$inc":{"version":1}})
                 counts[("waiting" if transient else "blocked") if final.modified_count else "superseded"]+=1
         return counts
 
