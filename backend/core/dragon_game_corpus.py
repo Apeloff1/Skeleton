@@ -23,7 +23,7 @@ from core.dragon_game_taxonomy import KINDS, cadence, priority, public_taxonomy,
 STAGES = {"announced", "early_access", "released", "updated", "delisted", "unknown"}
 KEY = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,127}\Z")
 DIGEST = re.compile(r"[a-f0-9]{64}\Z")
-MAX_SOURCES = 512
+MAX_SOURCES = 250_000
 MAX_GAMES = 2_000_000
 MAX_REVISIONS = 50_000_000
 SCHEMA = """
@@ -53,6 +53,10 @@ CREATE TABLE IF NOT EXISTS sources(
  FOREIGN KEY(owner,game) REFERENCES games(owner,id)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS source_due ON sources(owner,next_review,game,id);
+CREATE TABLE IF NOT EXISTS game_source_counts(
+ owner TEXT NOT NULL, game TEXT NOT NULL, total INTEGER NOT NULL CHECK(total>=0),
+ PRIMARY KEY(owner,game), FOREIGN KEY(owner,game) REFERENCES games(owner,id)
+) WITHOUT ROWID;
 CREATE VIRTUAL TABLE IF NOT EXISTS source_locator_fts USING fts5(
  owner, game UNINDEXED, source UNINDEXED, title, locator, category, tokenize='unicode61'
 );
@@ -247,9 +251,18 @@ class GameCorpus:
                 old_source = db.execute("SELECT 1 FROM sources WHERE owner=? AND game=? AND id=?",
                                         (owner,gid,sid)).fetchone()
                 if not old_source:
-                    count = db.execute("SELECT COUNT(*) FROM sources WHERE owner=? AND game=?",(owner,gid)).fetchone()[0]
+                    # Initialize the counter once for older catalogues, in the
+                    # same write transaction as the new source. Subsequent
+                    # admissions are O(1), not repeated per-game full scans.
+                    count_row=db.execute("SELECT total FROM game_source_counts WHERE owner=? AND game=?",(owner,gid)).fetchone()
+                    if count_row is None:
+                        count=db.execute("SELECT COUNT(*) FROM sources WHERE owner=? AND game=?",(owner,gid)).fetchone()[0]
+                        db.execute("INSERT INTO game_source_counts VALUES(?,?,?)",(owner,gid,count))
+                    else:
+                        count=count_row["total"]
                     if count >= MAX_SOURCES:
                         raise CatalogueHeld("per-game source quota reached")
+                    db.execute("UPDATE game_source_counts SET total=total+1 WHERE owner=? AND game=?",(owner,gid))
                 next_review = now + cadence(kind,stage)
                 db.execute("""INSERT INTO sources VALUES(?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(owner,game,id) DO UPDATE SET last_observed=excluded.last_observed,
