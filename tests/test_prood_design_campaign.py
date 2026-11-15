@@ -148,3 +148,22 @@ async def test_native_source_is_bound_to_verified_campaign(tmp_path):
         export_native_maze(journal,results,request,variant=2)
     db.close()
     rd.close()
+
+
+@pytest.mark.parametrize("output", [
+    "PROOD_MAZE_COMPLETE objectives=2 salvage=10 moves=9\nPROOD_MAZE_COMPLETE objectives=2 salvage=10 moves=9",
+    "PROOD_MAZE_COMPLETE objectives=2 salvage=10 moves=9\nPROOD_MAZE_FAILED obstruction",
+    "PROOD_MAZE_COMPLETE objectives=1 salvage=10 moves=9",
+    "PROOD_MAZE_COMPLETE objectives=2 salvage=9 moves=9",
+    "PROOD_MAZE_COMPLETE objectives=2 salvage=10 moves=1",
+    "PROOD_MAZE_COMPLETE objectives=2 salvage=10 moves=9 forged",
+])
+def test_native_evidence_never_accepts_incomplete_or_forged_markers(output):
+    from scripts.qualify_prood_native_maze import qualify_completion
+    with pytest.raises(ValueError):
+        qualify_completion(output,2,10,8)
+
+
+def test_native_evidence_checks_actual_counts_and_minimum_movement():
+    from scripts.qualify_prood_native_maze import qualify_completion
+    assert qualify_completion("PROOD_MAZE_COMPLETE objectives=2 salvage=10 moves=9",2,10,8)==(2,10,9)
