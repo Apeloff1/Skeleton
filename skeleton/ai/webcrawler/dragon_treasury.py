@@ -19,6 +19,7 @@ from urllib.parse import urlsplit
 from .dragon_companion import _lexemes, _signature, _similarity
 from .dragon_revisit_model import ChangeSample, infer_revisit
 from .dragon_temporal_selection import family_identity, select_candidates
+from .dragon_temporal_query import MAX_QUERY_SLOTS, rank_admission
 
 SCHEMA = "skeleton.dragon.treasury.v1"
 PARSER = "retained-text-sections-v3"
@@ -238,7 +239,23 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
         raise ValueError("archive expedition capacity exceeded")
     selected_observations=[row for rows in grouped.values() for row in rows]
     ordered = [row for row in selected_observations if row.text is not None]
-    indexed=select_candidates(grouped,budget=MAX_INDEXED,family=family,observed_before=observed_before)
+    baseline=select_candidates(grouped,budget=MAX_INDEXED,family=family,observed_before=observed_before)
+    # On a capped corpus, use a bounded first-stage search over exact,
+    # permitted representatives in the requested plane. Reserve the rest
+    # of the structural capacity for stable temporal coverage. On a fully
+    # admitted corpus the original partition is independent of query/mode.
+    admission=None
+    indexed=baseline
+    if len(ordered)>MAX_INDEXED and query.strip() and mode not in {"compare","timeline"}:
+        slots=min(MAX_QUERY_SLOTS,max(1,MAX_INDEXED*3//4))
+        admission=rank_admission(grouped,mode=mode,family=family,blockers=blockers,
+                                 query=query,lexemes=_lexemes,slots=slots)
+        selected={(row.session_id,row.source_id):row for row in admission.candidates}
+        for row in baseline:
+            if len(selected)>=MAX_INDEXED:
+                break
+            selected.setdefault((row.session_id,row.source_id),row)
+        indexed=list(selected.values())
     # Exact retained-text memoization; full-source hash alone is not a
     # sufficient key when a source was truncated. No cross-request cache.
     index, memo = {}, {}
@@ -481,5 +498,14 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
             "comparison":chosen,
             "earliest_source_expiry":min((x.usable_until for x in indexed),default=None),
             "latest_observed_only":True,"source_text_returned":False,"network_executed":False,
-            "index_admission":"temporal_diversity_v1","eligible_observations":len(ordered),"indexed_observations":len(indexed),
+            "index_admission":"temporal_query_rerank_v2" if admission is not None else "temporal_diversity_v1",
+            "query_admission":None if admission is None else {
+                "eligible_representatives":admission.eligible_representatives,
+                "scanned_representatives":admission.scanned_representatives,
+                "scanned_bytes":admission.scanned_bytes,
+                "matching_representatives":admission.matching_representatives,
+                "prioritized_representatives":len(admission.candidates),
+                "full_structural_corpus":False,
+            },
+            "eligible_observations":len(ordered),"indexed_observations":len(indexed),
             "training_permission":False,"fresh_consent_required":True}
