@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { CrawlSession, DragonCompanion } from '../../product/crawlerClient';
 import s, { colors } from './CrawlerWorkspace.styles';
 import AnimatedDragon from './companion/DragonCompanion';
+import {evidenceLevel} from './companion/dragonLevelProfile';
 import { companionFromEvidence, companionEvidenceCosmetics } from './companion/dragonCompanionState';
 import { useReducedMotion, useScreenReader } from './companion/useDragonMotion';
 import { usePowerAwareness } from '../../hooks/usePowerAwareness';
@@ -70,7 +71,7 @@ export default function DragonCompanionPanel({ session, lastEventKind }: { sessi
     <View style={local.hero}>
       <View style={local.actor}>
         <AnimatedDragon state={companionFromEvidence(session, lastEventKind)} evolutionStage={d.stage}
-          level={d.stage + 1} unlocked={companionEvidenceCosmetics(session)} researchMode
+          level={evidenceLevel(d.growth)} unlocked={companionEvidenceCosmetics(session)} researchMode
           screenReader={screenReader} motion={disableMotion ? 'off' : 'gentle'} reducedMotion={disableMotion} />
       </View>
       <View style={local.heroInfo}>
