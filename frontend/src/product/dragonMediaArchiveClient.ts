@@ -81,7 +81,17 @@ export async function verifiedBrowserMedia(record:MediaRecord,signal?:AbortSigna
  }finally{session.dispose();}
 }
 export function nativeMediaSource(record:MediaRecord){
- if(record.state!=='sealed'||record.expires_at*1000<=Date.now()||!record.mime.startsWith('video/'))throw Error('Local video is unavailable.');
+ if(record.state!=='sealed'||record.expires_at*1000<=Date.now())throw Error('Local video is unavailable.');
  const token=getAuthToken();if(!token)throw Error('Authentication required.');
  return {uri:absolute('/media/'+id(record.media_id)+'/content'),headers:{Authorization:'Bearer '+token},useCaching:false};
+}
+
+
+export async function verifyMediaAuthority(record:MediaRecord,signal?:AbortSignal){
+ const token=getAuthToken();
+ const p=await api.get<MediaRecord>(ROOT+'/media/'+id(record.media_id)+'/metadata',{signal,retries:0,timeoutMs:8000});
+ if(!p.ok||!p.data||token!==getAuthToken())throw Error('Media retention authority unavailable.');
+ const x=check(p.data);
+ if(x.media_id!==record.media_id||x.sha256!==record.sha256||x.mime!==record.mime||x.total_bytes!==record.total_bytes||x.game_id!==record.game_id||x.source_id!==record.source_id||x.state!=='sealed'||x.expires_at*1000<=Date.now())throw Error('Media authority changed.');
+ return x;
 }
