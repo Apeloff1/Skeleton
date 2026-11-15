@@ -343,13 +343,21 @@ async def context_sources(*, memory_references, crawler_context, user, tenant_id
             from core.dragon_crawler import read_crawler_context,read_historical_crawler_context
 
             historical=getattr(crawler_context,"historical_archive",False) is True
-            reader=read_historical_crawler_context if historical else read_crawler_context
-            projection = await reader(
-                user,
-                query=crawler_context.query,
-                max_docs=crawler_context.max_documents,
-                max_chars=crawler_context.max_characters,
-            )
+            game_id=getattr(crawler_context,"game_id",None)
+            if game_id is not None:
+                from core.dragon_crawler import authenticated_scope
+                from core.dragon_corpus_runtime import game_context
+                projection=await game_context(authenticated_scope(user),crawler_context.query,
+                    crawler_context.max_documents,crawler_context.max_characters,
+                    game=game_id,historical=historical)
+            else:
+                reader=read_historical_crawler_context if historical else read_crawler_context
+                projection = await reader(
+                    user,
+                    query=crawler_context.query,
+                    max_docs=crawler_context.max_documents,
+                    max_chars=crawler_context.max_characters,
+                )
         except Exception as exc:
             raise HTTPException(
                 status_code=503,
