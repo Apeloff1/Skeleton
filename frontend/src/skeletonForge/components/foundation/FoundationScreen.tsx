@@ -4,6 +4,7 @@
  * cockpit, not a second poller.
  */
 import React from 'react';
+import * as Crypto from 'expo-crypto';
 import { getAuthEpoch, subscribeAuthChanges } from '../../../auth/gameforgeAuth';
 import { shareGodotSourceArchive } from '../../shareSourceArchive';
 import type { RunRequest } from '../../types';
@@ -123,14 +124,19 @@ function FoundationScreenSession({ onSetup, onOpenCockpit }: { onSetup: () => vo
         throw new Error('Returned Forge draft is not source-bound to a Studio project');
       }
       if (epoch !== getAuthEpoch()) throw new Error('Account changed while applying Studio return');
+      const receipt = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256, 'skeleton.studio.return.v1:' + JSON.stringify(returned),
+      );
+      if (epoch !== getAuthEpoch()) throw new Error('Account changed while binding Studio return');
       const at = new Date().toISOString();
       const reconciled = reconcileStudioReturn(
         result.projects, returned.studioProjectId,
-        returned.studioProjectUpdatedAt, restored, at,
+        returned.studioProjectUpdatedAt, restored, at, receipt,
       );
+      if (reconciled.status === 'invalid') throw new Error('Returned Forge draft failed project admission');
       const originalUpdated = reconciled.status === 'applied' || reconciled.status === 'already-applied';
       const projects = originalUpdated ? reconciled.projects
-        : recoverStudioReturnAsCopy(result.projects, restored, at).projects;
+        : recoverStudioReturnAsCopy(result.projects, restored, at, receipt).projects;
       await saveFoundation(store, {
         onboarded: result.onboarded, projects, prefs: result.prefs,
         projectsCorrupt: false, holdSaves: false,
@@ -152,7 +158,7 @@ function FoundationScreenSession({ onSetup, onOpenCockpit }: { onSetup: () => vo
     const epoch = getAuthEpoch();
     try {
       const envelope = handoffFromStudio(project.questionnaire, project.id, project.updatedAt);
-      void storeCreatorBridge(envelope).then(() => {
+      void storeCreatorBridge(envelope, epoch).then(() => {
         if (epoch !== getAuthEpoch()) throw new Error('Account changed during Forge transfer');
         onOpenCockpit();
       }).catch(() => {
