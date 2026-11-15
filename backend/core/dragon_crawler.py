@@ -1717,6 +1717,20 @@ class DragonCrawlerApplication:
             fence={"_id":identifier,**scope,"version":item["version"],
                    "status":{"$in":["completed","budget_exhausted"]},
                    "treasury_repair_due":marker if "treasury_repair_due" in item else {"$exists":False}}
+            # Reserve the scheduled row before CPU or storage admission.
+            # Reuse its due marker as a finite lease: no extra authority,
+            # source version change or lease refund after a lost reply.
+            claimed_at=_now().timestamp()
+            claim_until=claimed_at+180
+            claimed=await self.sessions.update_one(
+                {**fence,"archive_grant.expires_at":{"$gt":claimed_at}},
+                {"$set":{"treasury_repair_due":claim_until}})
+            if not claimed.modified_count:
+                counts["superseded"]+=1
+                continue
+            fence["treasury_repair_due"]=claim_until
+            db_clock={"$divide":[{"$toLong":"$$NOW"},1000]}
+            fence["$expr"]={"$gt":["$treasury_repair_due",db_clock]}
             row=await self.sessions.find_one(fence,max_time_ms=2000)
             if row is None:
                 counts["superseded"]+=1
@@ -1750,7 +1764,12 @@ class DragonCrawlerApplication:
                 if set(policies)-set(row["snapshot"]["sources"]):
                     raise ValueError("treasury repair orphan policy")
                 expected=await asyncio.to_thread(build_manifest,snapshot,grant,now=stamp,policies=policies)
-                actual=_plain(row["treasury_index"]) if row.get("treasury_index") is not None else None
+                try:
+                    actual=_plain(row["treasury_index"]) if row.get("treasury_index") is not None else None
+                except CrawlerError:
+                    # An oversized or malformed derivative is repairable
+                    # when the independent primary and grant qualified.
+                    actual=None
                 checked=await asyncio.to_thread(same_manifest_projection,actual,expected,grant,now=stamp)
             except (ValueError,KeyError,TypeError,RecursionError,CheckpointReplicaError,CrawlerError):
                 # Invalid authority never becomes valid through a cache.
@@ -1765,9 +1784,12 @@ class DragonCrawlerApplication:
             if stamp>=grant["expires_at"]:
                 counts["expired"]+=1
                 continue
+            if stamp>=claim_until:
+                counts["superseded"]+=1
+                continue
             fence["archive_grant.expires_at"]=grant["expires_at"]
-            fence["$expr"]={"$gt":["$archive_grant.expires_at",
-                {"$divide":[{"$toLong":"$NOW"},1000]}]}
+            fence["$expr"]={"$and":[{"$gt":["$archive_grant.expires_at",db_clock]},
+                                     {"$gt":["$treasury_repair_due",db_clock]}]}
             due=min(grant["expires_at"],stamp+6*3600)
             if checked:
                 # Do not invalidate readers or reorder the catalogue on
@@ -2213,6 +2235,7 @@ class DragonCrawlerApplication:
         observations = []
         materialized = {}
         invalid_segments = 0
+        archival_expiries=[]
         index_health = {"active_grants":0,"qualified_segments":0,"missing_segments":0,
                         "stale_segments":0,"invalid_segments":0,"eligible_archive_members":0,
                         "materialized_archive_members":0}
@@ -2355,10 +2378,12 @@ class DragonCrawlerApplication:
                 # never furnish searchable text or stewardship credit.
                 local_aliases = [{"url": alias["fetched_url"], "captured_at": alias["captured_at"],
                                   "content_hash": alias["content_hash"]}
-                                 for alias in snapshot.get("source_aliases",[]) if legacy or "source_aliases" in snapshot]
+                                 for alias in (snapshot.get("source_aliases",[]) if legacy else snapshot["source_aliases"])]
                 observations.extend(local)
                 for key,count in local_health.items():
                     index_health[key]+=count
+                if active_grant:
+                    archival_expiries.append(grant["expires_at"])
                 invalid_segments+=local_health["invalid_segments"]+local_health["stale_segments"]
                 # Keep only the newest bounded candidate postings in memory.
                 materialized.update(local_materialized)
@@ -2388,7 +2413,8 @@ class DragonCrawlerApplication:
             # excludes their families. Its evidence must also survive until
             # the final publication fence.
             discovery_expiry=min((source.valid_until for source in eligible),default=None)
-            expiries=[value for value in (result["earliest_source_expiry"],discovery_expiry) if value is not None]
+            expiries=[value for value in (result["earliest_source_expiry"],discovery_expiry,*archival_expiries)
+                      if value is not None]
             result["earliest_source_expiry"]=min(expiries) if expiries else None
         except ValueError as exc:
             raise CrawlerError("crawler_treasury_invalid", "Treasury reparse could not be qualified.", 422) from exc
@@ -4519,9 +4545,19 @@ crawler_application = DragonCrawlerApplication()
 
 async def recover_crawler_runs(*, limit: int = 16) -> dict:
     result=await crawler_application.recover(limit=limit)
-    result["treasury_watches"]=await crawler_application.recover_treasury_watches()
-    result["treasury_expired_segments"]=await crawler_application.purge_expired_treasury_segments()
-    result["treasury_segment_repair"]=await crawler_application.repair_treasury_segments()
+    # An ancillary storage failure must not starve the other independent
+    # maintenance lanes. Cancellation is never swallowed; the existing
+    # scheduler still owns all invocations and resource ceilings.
+    for name,operation in (
+        ("treasury_watches",crawler_application.recover_treasury_watches),
+        ("treasury_expired_segments",crawler_application.purge_expired_treasury_segments),
+        ("treasury_segment_repair",crawler_application.repair_treasury_segments),
+    ):
+        try:
+            result[name]=await operation()
+        except (PyMongoError,CrawlerError,TimeoutError) as exc:
+            log.warning("Dragon ancillary recovery lane failed: %s (%s)",name,type(exc).__name__)
+            result[name]={"failed":True,"reason":"bounded_maintenance_unavailable"}
     return result
 
 

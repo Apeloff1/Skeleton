@@ -56,6 +56,16 @@ async function main(){
   assert.ok(p.hits[0].score>0);
   assert.equal(fixture.historic.hits.length,1);
   assert.equal(fixture.historic.hits[0].plane,'historic');
+  const healthy=structuredClone(p);
+  healthy.index_health={active_grants:2,qualified_segments:1,missing_segments:1,
+    stale_segments:0,invalid_segments:0,eligible_archive_members:12,materialized_archive_members:7};
+  const healthClient=client(healthy);
+  assert.deepEqual((await healthClient.read('current_only','magnetometer')).index_health,healthy.index_health);
+  for(const patch of [{active_grants:1},{materialized_archive_members:13},{missing_segments:-1},{stale_segments:1}]){
+    const bad=structuredClone(healthy);Object.assign(bad.index_health,patch);
+    healthClient.set(bad);
+    await assert.rejects(healthClient.read('current_only','magnetometer'),err=>err.kind==='protocol');
+  }
   const f=client(p);
   for(const mutation of [
     q=>{delete q.query_admission;},
@@ -73,6 +83,6 @@ async function main(){
     const corrupt=structuredClone(p);mutation(corrupt);f.set(corrupt);
     await assert.rejects(f.read('current_only','magnetometer'),err=>err.kind==='protocol');
   }
-  console.log('Canonical treasury Python -> TypeScript: 4 accepted projections, 11 rejected corrupt receipts.');
+  console.log('Canonical treasury Python -> TypeScript: 4 canonical projections, 1 valid health envelope and 15 rejected corrupt receipts.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

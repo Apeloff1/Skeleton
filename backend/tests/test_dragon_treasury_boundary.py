@@ -211,9 +211,14 @@ class TreasuryIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["repaired"],1)
         query,mutation=app.sessions.update_one.await_args.args
         self.assertEqual(query["version"],row["version"])
-        self.assertEqual(query["treasury_repair_due"],0.)
+        self.assertEqual(query["treasury_repair_due"],now.timestamp()+180)
         self.assertEqual(query["archive_grant.expires_at"],original["expires_at"])
-        self.assertIn("$expr",query)
+        claim_query,claim_update=app.sessions.update_one.await_args_list[0].args
+        self.assertEqual(claim_query["treasury_repair_due"],0.)
+        self.assertEqual(claim_update,{"$set":{"treasury_repair_due":now.timestamp()+180}})
+        db_clock={"$divide":[{"$toLong":"$$NOW"},1000]}
+        self.assertEqual(query["$expr"],{"$and":[{"$gt":["$archive_grant.expires_at",db_clock]},
+                                                 {"$gt":["$treasury_repair_due",db_clock]}]})
         self.assertEqual(mutation["$inc"],{"version":1})
         self.assertNotIn("archive_grant",mutation["$set"])
         self.assertNotIn("snapshot",mutation["$set"])
@@ -255,6 +260,30 @@ class TreasuryIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["superseded"],1)
         self.assertEqual(result["repaired"],0)
 
+    async def test_maintenance_lost_lease_prevents_storage_admission(self):
+        row,now=self.maintenance_fixture()
+        app=self.maintenance_app(row)
+        after=now+timedelta(seconds=181)
+        # Selection, reservation, grant verification, then elapsed CPU time.
+        with patch("core.dragon_crawler._now",side_effect=[now,now,now,after]):
+            result=await app.repair_treasury_segments()
+        self.assertEqual(result["superseded"],1)
+        self.assertEqual(app.sessions.update_one.await_count,1)
+        app._admit.assert_not_awaited()
+
+    async def test_maintenance_cannot_publish_after_concurrent_owner_update(self):
+        row,now=self.maintenance_fixture()
+        app=self.maintenance_app(row)
+        app.sessions.update_one.side_effect=[Mock(modified_count=1),Mock(modified_count=0)]
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.repair_treasury_segments()
+        self.assertEqual(result["superseded"],1)
+        self.assertEqual(result["repaired"],0)
+        app._admit.assert_awaited_once()
+        final=app.sessions.update_one.await_args.args[0]
+        self.assertEqual(final["owner_id"],SCOPE["owner_id"])
+        self.assertEqual(final["version"],row["version"])
+
     async def test_maintenance_storage_denial_defers_without_index(self):
         row,now=self.maintenance_fixture()
         app=self.maintenance_app(row,admission_error=CrawlerError("storage_denied","denied",503))
@@ -294,6 +323,35 @@ class TreasuryIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(query["version"],7)
         self.assertEqual(query["treasury_index.expires_at"],expired["treasury_index"]["expires_at"])
         self.assertEqual(mutation["$unset"],{"treasury_index":""})
+
+
+class RecoveryLaneTests(unittest.IsolatedAsyncioTestCase):
+    async def test_ancillary_storage_failure_does_not_starve_repair(self):
+        from core.dragon_crawler import recover_crawler_runs
+        from pymongo.errors import PyMongoError
+        app=Mock()
+        app.recover=AsyncMock(return_value={"scanned":0})
+        app.recover_treasury_watches=AsyncMock(side_effect=PyMongoError("fixture"))
+        app.purge_expired_treasury_segments=AsyncMock(return_value={"purged":1})
+        app.repair_treasury_segments=AsyncMock(return_value={"repaired":1})
+        with patch("core.dragon_crawler.crawler_application",app):
+            result=await recover_crawler_runs()
+        self.assertTrue(result["treasury_watches"]["failed"])
+        self.assertEqual(result["treasury_expired_segments"],{"purged":1})
+        self.assertEqual(result["treasury_segment_repair"],{"repaired":1})
+
+    async def test_ancillary_cancellation_propagates(self):
+        import asyncio
+        from core.dragon_crawler import recover_crawler_runs
+        app=Mock()
+        app.recover=AsyncMock(return_value={"scanned":0})
+        app.recover_treasury_watches=AsyncMock(side_effect=asyncio.CancelledError())
+        app.purge_expired_treasury_segments=AsyncMock()
+        app.repair_treasury_segments=AsyncMock()
+        with patch("core.dragon_crawler.crawler_application",app):
+            with self.assertRaises(asyncio.CancelledError):
+                await recover_crawler_runs()
+        app.repair_treasury_segments.assert_not_awaited()
 
 
 if __name__=="__main__":
