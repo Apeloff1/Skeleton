@@ -451,7 +451,7 @@ function validFamily(f: TreasuryFamily): boolean {
   if(!f||!HASH.test(f.family_id)||!HASH.test(f.current_revision)||!integer(f.revision_count,512)||f.revision_count===0
     ||!Number.isFinite(f.first_seen)||!Number.isFinite(f.last_seen)||f.last_seen<f.first_seen
     ||typeof f.current_indexed!=='boolean'||typeof f.simultaneous_conflict!=='boolean'||typeof f.alias_conflict!=='boolean'||((f.simultaneous_conflict||f.alias_conflict)&&f.current_indexed))return false;
-  if(f.refresh_url!==null){try{const u=new URL(f.refresh_url);if(f.refresh_url.length>2048||!['http:','https:'].includes(u.protocol)||u.username||u.password)return false;}catch{return false;}}
+  if(f.refresh_url!==null){try{const u=new URL(f.refresh_url);if(f.refresh_url.length>4096||!['http:','https:'].includes(u.protocol)||u.username||u.password)return false;}catch{return false;}}
   const r=f.revisit;
   return !!r&&Number.isFinite(r.due_at)&&r.due_at>=f.last_seen&&Number.isFinite(r.interval_seconds)&&r.interval_seconds>=3600
     &&Number.isFinite(r.change_probability_estimate)&&r.change_probability_estimate>=0&&r.change_probability_estimate<=1
@@ -461,6 +461,24 @@ function validFamily(f: TreasuryFamily): boolean {
     &&Number.isFinite(r.utility_per_cost)&&r.utility_per_cost>=0&&r.utility_per_cost<=1
     &&Number.isFinite(r.target_stale_risk)&&r.target_stale_risk>=.2&&r.target_stale_risk<=.45
     &&typeof r.ready_for_review==='boolean'&&r.fresh_consent_required===true&&r.network_executed===false;
+}
+export type TreasuryPassage = {
+  schema: 'skeleton.dragon.treasury-passage.v1'; session_id: string; source_id: string; session_version: number;
+  snapshot_digest: string; preserved_text_hash: string; captured_at: number; valid_until: number; as_of_unix: number;
+  offset: number; end: number; total_chars: number; text: string; span_sha256: string; next_offset: number | null;
+  history_only: boolean; review_state: 'unreviewed'; model_context_permission: false; training_permission: false; network_executed: false;
+};
+export async function getTreasuryPassage(sessionId: string, sourceId: string, offset=0, signal?: AbortSignal): Promise<TreasuryPassage> {
+  if(!HASH.test(sourceId)||!integer(offset,24000)) invalid('Invalid historical passage coordinates.');
+  const p=await read(api.get<TreasuryPassage>(ROOT+'/companion/treasury/'+identifier(sessionId)+'/'+sourceId+'/passage?offset='+offset+'&length=1600',options(signal)),getAuthToken(),'Historical passage is unavailable.');
+  if(!p||p.schema!=='skeleton.dragon.treasury-passage.v1'||p.session_id!==sessionId||p.source_id!==sourceId
+    ||!Number.isSafeInteger(p.session_version)||p.session_version<1||!HASH.test(p.snapshot_digest)||!HASH.test(p.preserved_text_hash)
+    ||!Number.isFinite(p.captured_at)||!Number.isFinite(p.as_of_unix)||!Number.isFinite(p.valid_until)||p.valid_until<=p.as_of_unix
+    ||p.offset!==offset||!integer(p.total_chars,24000)||!integer(p.end,p.total_chars)||p.end<p.offset||p.end-p.offset>1600
+    ||typeof p.text!=='string'||Array.from(p.text).length!==p.end-p.offset||!HASH.test(p.span_sha256)
+    ||p.next_offset!==(p.end<p.total_chars?p.end:null)||typeof p.history_only!=='boolean'||p.review_state!=='unreviewed'
+    ||p.model_context_permission!==false||p.training_permission!==false||p.network_executed!==false)invalid('Invalid historical passage custody.');
+  return p;
 }
 export async function getDragonTreasury(mode: TreasuryMode, query='', family?: string, signal?: AbortSignal): Promise<DragonTreasury> {
   if (!['current_only','historic_only','all_revisions','timeline','compare'].includes(mode)||query.length>256||family!==undefined&&!HASH.test(family)) invalid('Invalid treasury search.');
