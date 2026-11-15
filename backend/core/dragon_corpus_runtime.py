@@ -202,6 +202,12 @@ async def pulse_lead_graph():
                 try:results[key]=operation()
                 except (CatalogueHeld,ValueError,sqlite3.Error,OSError):
                     results[key]={"held":True,"reason":"lead_maintenance_held","network_executed":False}
+            if os.getenv("SKL_DRAGON_LEAD_INDEX_ROOT","").strip():
+                from core.dragon_lead_index_shards import pulse,IndexHeld
+                from core.dragon_owner_shards import ShardHeld
+                try:results["physical_index"]=pulse(graph)
+                except (IndexHeld,ShardHeld,ValueError,sqlite3.Error,OSError):
+                    results["physical_index"]={"held":True,"network_executed":False}
             return results
         return await _bounded(work)
     except (GameLearningError,CatalogueHeld,sqlite3.Error,OSError,TimeoutError):

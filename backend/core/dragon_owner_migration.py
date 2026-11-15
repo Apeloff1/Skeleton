@@ -35,6 +35,7 @@ CORPUS_TABLES=(
 )
 MANIFEST_TABLES=("manifest_counts","manifests","chunks","placements","manifest_garbage")
 FTS_TABLES=("game_search","lead_fts")
+DERIVED_TABLES=("lead_index_changes","lead_index_versions","lead_index_enrollment")
 PAGE=256
 
 
@@ -63,7 +64,7 @@ def _initialize(db,plane):
 
 
 def _unknown_owner_data(db,owner,plane):
-    allowed=set(CORPUS_TABLES+FTS_TABLES+("source_locator_fts","source_locator_rows","world_subscriptions","world_origin_guard")) if plane=="corpus" else set(MANIFEST_TABLES)
+    allowed=set(CORPUS_TABLES+FTS_TABLES+DERIVED_TABLES+("source_locator_fts","source_locator_rows","world_subscriptions","world_origin_guard")) if plane=="corpus" else set(MANIFEST_TABLES)
     for row in db.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"):
         table=row[0]
         if table in allowed or table.startswith(("sqlite_","dragon_shard_","dragon_owner_")):continue
@@ -149,6 +150,7 @@ def _copy(src,dst,owner,plane):
 
 def _remove(db,owner,plane):
     if plane=="corpus":
+        for name in DERIVED_TABLES:db.execute("DELETE FROM "+_quote(name)+" WHERE owner=?",(owner,))
         db.execute("DELETE FROM source_locator_rows WHERE owner=?",(owner,))
         db.execute("DELETE FROM source_locator_fts WHERE owner=?",(owner,))
         for table in FTS_TABLES:db.execute("DELETE FROM "+_quote(table)+" WHERE owner=?",(owner,))
