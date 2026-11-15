@@ -5,6 +5,7 @@ import {crawlRequestKey} from '../../product/crawlerClient';
 import {getSourceTaxonomy,searchSourceLibrary,searchGames,sourcePage,releaseTimeline,enqueueReleaseImport,importStatus,dispatchGameCapture,type GameIdentity,type GameSource,type ReleaseEvent,type TimelineCursor,type ImportReceipt,type ImportState,type CaptureReceipt,type TaxonomyEntry,type GlobalSource} from '../../product/dragonGameCorpusClient';
 import s,{colors as C} from './CrawlerWorkspace.styles';
 import DragonSourceViewer from './DragonSourceViewer';
+import DragonWorldArchivePanel from './DragonWorldArchivePanel';
 
 const field={color:C.text,backgroundColor:C.bg,borderWidth:1,borderColor:C.edge,borderRadius:9,padding:10};
 function Button({label,disabled,press}:{label:string;disabled?:boolean;press:()=>void}){
@@ -98,6 +99,7 @@ export default function DragonGameCorpusPanel({visible,canWrite}:{visible:boolea
     <Button label="Create canonical capture" disabled={!enabled||!consent} press={send}/>
     {capture&&<Text selectable style={s.small}>Session {capture.session.session_id} · {capture.session.status} · capture execution not confirmed.</Text>}
    </View>}
+   <DragonWorldArchivePanel key={game?.game_id||'world'} game={game?.game_id||null} visible={visible&&open} canWrite={canWrite}/>
    <Text style={s.label}>Release and patch timeline</Text>
    <View style={s.row}><Switch disabled={!enabled} value={latest} onValueChange={v=>{setLatest(v);setEvents([]);setEventCursor(null)}} accessibilityLabel="Latest observation per source"/><Text style={s.small}>{latest?'Latest observed per source':'Include historical observations'}</Text></View>
    {['','announced','early_access','released','updated','delisted','unknown'].map(v=><Button key={v||'all'} label={(stage===v?'Selected: ':'')+(v?human(v):'All stages')} disabled={!enabled} press={()=>{setStage(v);setEvents([]);setEventCursor(null);}}/>)}
