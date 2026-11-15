@@ -84,6 +84,12 @@ CREATE TABLE IF NOT EXISTS lead_snapshot_pages(
  PRIMARY KEY(owner,snapshot,ordinal),
  FOREIGN KEY(owner,snapshot) REFERENCES lead_snapshots(owner,id)
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS lead_expand_jobs(
+ owner TEXT NOT NULL,id TEXT NOT NULL,parent TEXT NOT NULL,appid TEXT NOT NULL,title TEXT NOT NULL,
+ witness TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('queued','done')),created_at INTEGER NOT NULL,
+ PRIMARY KEY(owner,id),FOREIGN KEY(owner,parent) REFERENCES lead_nodes(owner,id)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS lead_expand_ready ON lead_expand_jobs(state,created_at,owner,id);
 CREATE TABLE IF NOT EXISTS lead_review_events(
  owner TEXT NOT NULL,id TEXT NOT NULL,lead TEXT NOT NULL,decision TEXT NOT NULL,
  reason TEXT NOT NULL,created_at INTEGER NOT NULL,
@@ -430,9 +436,34 @@ class LeadGraph:
                 fingerprint=hashlib.sha256(raw).hexdigest()
                 for item in proposals:
                     witness=digest([subscription_id,fingerprint,item.event_key])
-                    self._add(db,owner,_schema_row(item.source,item.title,item.kind,(item.namespace+":"+item.external_id)[:256]),
+                    child=self._add(db,owner,_schema_row(item.source,item.title,item.kind,(item.namespace+":"+item.external_id)[:256]),
                         parent=root,relation="feed_discovery",witness=witness,now=now)
+                    if adapter=="steam" and item.namespace=="steam" and APPID.fullmatch(item.external_id):
+                        job=digest(["steam-app",child,item.external_id,item.title])
+                        db.execute("INSERT OR IGNORE INTO lead_expand_jobs VALUES(?,?,?,?,?,?,'queued',?)",
+                            (owner,job,child,item.external_id,item.title,witness,now))
                 db.execute("COMMIT");return {"enabled":True,"proposals":len(proposals),"network_authorized":False}
+            except BaseException:
+                if db.in_transaction:db.execute("ROLLBACK")
+                raise
+
+    def expansion_pulse(self):
+        """Expand feed-supplied AppIDs without guessing identifiers or fetching."""
+        now=int(time.time());_quota_disk(self.path)
+        with self._db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                jobs=db.execute("""SELECT j.* FROM lead_expand_jobs j JOIN lead_owner o ON o.owner=j.owner
+                    WHERE j.state='queued' AND o.enabled=1 ORDER BY j.created_at,j.owner,j.id LIMIT 16""").fetchall()
+                for job in jobs:
+                    if not APPID.fullmatch(job["appid"]):raise ValueError("expansion identity")
+                    for row in project({"appid":job["appid"],"title":job["title"]},"steam"):
+                        self._add(db,job["owner"],row,parent=job["parent"],relation="feed_discovery",
+                            witness=job["witness"],now=now)
+                    db.execute("UPDATE lead_expand_jobs SET state='done' WHERE owner=? AND id=?",
+                        (job["owner"],job["id"]))
+                db.execute("COMMIT")
+                return {"processed":len(jobs),"network_executed":False}
             except BaseException:
                 if db.in_transaction:db.execute("ROLLBACK")
                 raise
