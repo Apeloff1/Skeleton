@@ -184,15 +184,24 @@ class MediaArchive:
             return raw
 
     def revoke(self,scope,mid):
+        from core.dragon_media_captions import SCHEMA as CAPTIONS,erase_media_captions
         with self._db() as db:
-            db.executescript(SCHEMA)
-            row=db.execute("UPDATE media_objects SET state='revoked',expires_at=0 WHERE owner=? AND id=? AND state IN ('building','sealed')",
-                           (owner_key(scope),_id(mid)))
+            db.executescript(SCHEMA+CAPTIONS)
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                owner=owner_key(scope);mid=_id(mid)
+                row=db.execute("UPDATE media_objects SET state='revoked',expires_at=0 WHERE owner=? AND id=? AND state IN ('building','sealed')",(owner,mid))
+                if row.rowcount:erase_media_captions(db,owner,mid)
+                db.execute("COMMIT")
+            except BaseException:
+                if db.in_transaction:db.execute("ROLLBACK")
+                raise
         return {"revoked":row.rowcount==1,"secure_erasure":False}
 
     def cleanup(self,limit=4):
+        from core.dragon_media_captions import SCHEMA as CAPTIONS,erase_media_captions
         with self._db() as db:
-            db.executescript(SCHEMA)
+            db.executescript(SCHEMA+CAPTIONS)
             rows=db.execute("""SELECT * FROM media_objects WHERE state IN ('building','sealed','revoked')
                 AND (expires_at<=? OR state='revoked') ORDER BY expires_at,owner,id LIMIT ?""",
                 (int(time.time()),limit)).fetchall()
@@ -206,6 +215,7 @@ class MediaArchive:
                     current=self._row(db,scope,row["id"],("building","sealed","revoked"),live=False)
                     if current["state"]!="revoked" and current["expires_at"]>time.time():
                         db.execute("ROLLBACK");continue
+                    erase_media_captions(db,row["owner"],row["id"])
                     manifest=self.store.abort_intent(scope,logical_key=self._logical(row["id"]),operation=row["operation"],
                         expected_hash=row["sha256"],expected_bytes=row["total_bytes"])
                     result=self.store.collect_manifest(scope,manifest,limit=32)
