@@ -25,7 +25,8 @@ CLOCK = 1_800_000_000.0
 HOSTS = ("example.com", "example.org")
 A, B = ("https://" + host for host in HOSTS)
 ROBOTS = b"User-agent: *\nDisallow: /private\n"
-STRATEGIES = ("fifo", "balanced", "coverage_url_baseline", "coverage")
+STRATEGIES = ("fifo", "balanced", "coverage_url_baseline", "coverage",
+              "companion", "companion_curiosity", "companion_scholar", "companion_guardian")
 
 
 @dataclass(frozen=True)
@@ -82,7 +83,20 @@ def corpus_set() -> tuple[Corpus, ...]:
         A + "/orbital/second": page("Orbital mechanics second"),
         B + "/orbital/third": page("Orbital mechanics independent"),
     }
+    evidence_seeds = (A + "/orbital/notes", B + "/orbital/mirror", A + "/orbital/padded",
+                      B + "/mechanics/experiments", A + "/orbital/trajectory", B + "/mechanics/calibration")
+    report = ("Orbital mechanics uses gravitational measurements and angular momentum "
+              "to determine transfer windows, inclination, eccentricity, velocity and numerical residuals.")
+    diverse = {
+        **policy, evidence_seeds[0]: page(report), evidence_seeds[1]: page(report),
+        evidence_seeds[2]: page("orbital mechanics " * 55),
+        evidence_seeds[3]: page("Orbital mechanics observations compare spacecraft rendezvous and trajectories in three body systems. Engineers analyze perturbation, transfer energy, resonance and atmospheric drag."),
+        evidence_seeds[4]: page("Orbital mechanics calculations estimate elliptic parameters, reference frames, acceleration and integration uncertainty. Astronomers record velocity components and position coordinates."),
+        evidence_seeds[5]: Reply(200, "text/plain", "Orbital mechanics experiment calibration involves position sensors, telemetry noise, error propagation, observation epochs, acceleration residuals, and simulation reproducibility."),
+    }
     return (
+        Corpus("novelty_and_duplicate_farming", evidence_seeds, diverse,
+               frozenset({evidence_seeds[0], *evidence_seeds[3:]}), frozenset(), 8),
         Corpus("budgeted_relevance", (*irrelevant, *relevant), static, frozenset(relevant),
                frozenset(), 6),
         Corpus("bounded_discovery_and_quarantine", (A + "/start",), discovery,
@@ -161,7 +175,8 @@ def run_case(corpus: Corpus, strategy: str) -> dict:
 
     for second in range(1, 181):
         with patch("skeleton.ai.webcrawler.operations.time.time", return_value=CLOCK + second), \
-                patch("skeleton.ai.webcrawler.operations.choose_frontier", side_effect=ranking):
+                patch("skeleton.ai.webcrawler.operations.choose_frontier", side_effect=ranking), \
+                patch("skeleton.ai.webcrawler.operations.quantize_latency", return_value=1):
             run.run_slice(max_steps=1, max_seconds=5)
             snapshot = run.snapshot()
             max_snapshot = max(max_snapshot, len(_canonical(snapshot)))
@@ -188,12 +203,16 @@ def run_case(corpus: Corpus, strategy: str) -> dict:
     unique = len(seen)
     incidents = snapshot["instruction_incidents"]
     measurements = snapshot["acquisition_measurements"]
+    status = run.status()
+    companion = status["companion"]
+    curriculum = status["curriculum_trace"]
     violation = (
         unknown_calls + excluded + int(requests > corpus.request_budget)
         + int(len(measurements) != requests)
         + int(sum(row["charged_bytes"] for row in measurements) != snapshot["usage"]["bytes"])
         + int(sum(row["uncertain_bytes"] for row in measurements) != snapshot["usage"]["reserved_bytes"])
         + int(requests != len(transport.calls))
+        + int(curriculum["decisions"] != (requests if strategy.startswith("companion") else 0))
         + sum(row["execution_authorized"] is not False or row["payload_retained"] is not False
               for row in incidents)
     )
@@ -215,6 +234,11 @@ def run_case(corpus: Corpus, strategy: str) -> dict:
         "relevant_per_kib": relevant_count * 1024 / max(1, snapshot["usage"]["bytes"] + snapshot["usage"]["reserved_bytes"]),
         "measured_duplicate_requests": sum(row["kind"] == "duplicate" for row in measurements),
         "measured_policy_requests": sum(row["kind"] == "robots" for row in measurements),
+        "evidence_growth": companion["growth"],
+        "credited_sources": companion["questbook"]["credited_sources"],
+        "achievement_count": companion["questbook"]["completed"],
+        "curriculum_decisions": curriculum["decisions"],
+        "novelty_yield": companion["novelty_yield"],
         "security_incidents": len(incidents), "admission_violations": violation,
         "restarts": restart_count, "recovery_fixture_seconds": (
             recovered_at - first_fault_at if recovered_at is not None and first_fault_at is not None else None
@@ -243,6 +267,7 @@ def benchmark(repetitions: int = 3) -> dict:
     return {"schema": "skeleton.dragon.offline_baseline.v1",
             "implementation_digest": implementation_digest(),
             "external_network_used": False, "external_competitors_executed": [],
+            "transport_latency_quantum": "controlled_250ms_fixture_not_measured_public_web_latency",
             "comparative_superiority_claimed": False, "results": results}
 
 
