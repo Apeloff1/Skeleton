@@ -286,10 +286,11 @@ class GameForgeRun:
                 payload["galaxy_mechanics"] = run.context["galaxy_mechanics"]
             if run.succeeded and emitted_manifest is not None and run.context.get("galaxy_playable_controls") is not None:
                 payload["galaxy_playable_controls"] = run.context["galaxy_playable_controls"]
-        if playable_content and run.context.get("playable_mechanics_receipt") is not None:
-            payload["playable_mechanics"] = run.context["playable_mechanics_receipt"]
-        if playable_content and run.context.get("playable_tuning_receipt") is not None:
-            payload["playable_tuning"] = run.context["playable_tuning_receipt"]
+        if playable_content and run.succeeded and emitted_manifest is not None:
+            if run.context.get("playable_mechanics_receipt") is not None:
+                payload["playable_mechanics"] = run.context["playable_mechanics_receipt"]
+            if run.context.get("playable_tuning_receipt") is not None:
+                payload["playable_tuning"] = run.context["playable_tuning_receipt"]
         if playable_content and run.context.get("playable_portal_receipt") is not None:
             payload["playable_portal"] = {
                 **run.context["playable_portal_receipt"],
@@ -560,29 +561,22 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         ctx["file_count"] = len(files)
         ctx["playable_archetype"] = archetype_name
         ctx["playable_portal_receipt"] = portal_receipt
-        # New modes expose their actual sparse native effects; existing modes
-        # retain the established source-verified mechanics receipt.
+        # Every mode now emits exact scalar evidence for explicit edits.
+        # Verify the canonical source and its receipt before interpreting it.
         from skeleton.forge.playable_tuning import SOURCE_PATH
         import json
-        expanded_tuning = json.loads(files[SOURCE_PATH]) if SOURCE_PATH in files else None
-        if expanded_tuning is not None:
-            ctx["playable_tuning_receipt"] = expanded_tuning
+        if not verify_archetype_content(files, archetype_name, operator_axes=axes):
+            raise RuntimeError("initial native playable mechanics verification failed")
+        tuning = json.loads(files[SOURCE_PATH]) if SOURCE_PATH in files else None
+        if tuning is not None:
+            ctx["playable_tuning_receipt"] = tuning
         ctx["playable_mechanics_receipt"] = {
             "schema": "skeleton.forge.playable_mechanics.v1",
             "archetype": archetype_name,
             "applied_axes": {
-                name: value for name, value in axes.items()
-                if name in (set(expanded_tuning["mapped_axes"]) if expanded_tuning is not None else {
-                    "tempo",
-                    *({"agency"} if archetype_name in {"extraction", "combat_loop", "pipeline"} else set()),
-                    *({"risk", "scarcity", "grind"} if archetype_name == "extraction" else set()),
-                    *({"lethality", "grind"} if archetype_name == "combat_loop" else set()),
-                    *({"risk", "grind", "scarcity"} if archetype_name == "pipeline" else set()),
-                })
-            },
-            "source_verified": verify_archetype_content(
-                files, archetype_name, operator_axes=axes,
-            ),
+                name: tuning["axes"][name] for name in tuning["mapped_axes"]
+            } if tuning is not None else {},
+            "source_verified": True,
         }
     if ctx.get("quest_content"):
         from skeleton.ai.game_builder.godot_quest_bridge import attach_native_quest

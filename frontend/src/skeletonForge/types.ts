@@ -217,8 +217,18 @@ export interface RunPayload {
       sources: { path: string; value: number }[] }[];
     effective_axes: Record<string, number>;
     native_sources: Record<string, string>;
+    tuning_receipt_sha256?: string;
     source_verified: boolean;
     native_execution_qualified: false;
+  };
+  /** Sparse, source-verified native scalar effects; unmapped axes are explicit. */
+  playable_tuning?: {
+    schema: 'skeleton.gameforge.playable_tuning.v1';
+    mode: string;
+    axes: Record<string, number>;
+    applied: Record<string, number>;
+    mapped_axes: string[];
+    unmapped_axes: string[];
   };
   /** Mechanical controls actually written into the native playable script. */
   playable_mechanics?: {

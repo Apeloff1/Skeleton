@@ -957,71 +957,71 @@ def archetype_files(
     axes = _admit_axes(operator_axes)
     if name in _EXPANDED_SPECS:
         return _expanded_files(name, axes)
+    from skeleton.forge.playable_tuning import SCHEMA, SOURCE_PATH, tuning_source
+
     body, speed, max_frames = _SPECS[name]
+    applied: dict[str, float] = {}
+    used: set[str] = set()
+
+    def apply_constant(axis: str, effect: str, old: str, constant: str,
+                       value: float, *, integral: bool = False) -> None:
+        nonlocal body
+        literal = str(int(value)) if integral else _number(value)
+        body = _swap_constant(body, old, f"const {constant} := {literal}")
+        applied[effect] = float(literal)
+        used.add(axis)
+
     if "tempo" in axes:
         speed = round(speed * (0.75 + 0.5 * axes["tempo"]), 2)
+        applied["player.speed"] = speed
+        used.add("tempo")
     if name == "extraction":
         if "grind" in axes:
             count = 2 + int(4.0 * axes["grind"] + 0.5)
             points = ((220, 0), (220, 180), (0, 180), (-180, 180), (-240, -80), (60, -180))
-            body = _swap_constant(body, "const CACHE_GOAL := 3", f"const CACHE_GOAL := {count}")
+            apply_constant("grind", "extraction.caches_required", "const CACHE_GOAL := 3",
+                           "CACHE_GOAL", count, integral=True)
             body = _swap_constant(
                 body, "Vector2(220, 0), Vector2(220, 180), Vector2(0, 180)",
                 ", ".join(f"Vector2({x}, {y})" for x, y in points[:count]),
             )
         if "risk" in axes:
-            body = _swap_constant(
-                body, "const HEAT_PER_SECOND := 6.0",
-                "const HEAT_PER_SECOND := " + _number(3.0 + 7.0 * axes["risk"]),
-            )
+            apply_constant("risk", "extraction.heat_per_second", "const HEAT_PER_SECOND := 6.0",
+                           "HEAT_PER_SECOND", 3.0 + 7.0 * axes["risk"])
         if "scarcity" in axes:
-            body = _swap_constant(
-                body, "const HEAT_LIMIT := 100.0",
-                "const HEAT_LIMIT := " + _number(120.0 - 50.0 * axes["scarcity"]),
-            )
+            apply_constant("scarcity", "extraction.heat_limit", "const HEAT_LIMIT := 100.0",
+                           "HEAT_LIMIT", 120.0 - 50.0 * axes["scarcity"])
         if "agency" in axes:
-            body = _swap_constant(
-                body, "const PICKUP_RADIUS := 12.0",
-                "const PICKUP_RADIUS := " + _number(8.0 + 12.0 * axes["agency"]),
-            )
+            apply_constant("agency", "extraction.pickup_radius", "const PICKUP_RADIUS := 12.0",
+                           "PICKUP_RADIUS", 8.0 + 12.0 * axes["agency"])
     elif name == "combat_loop":
         if "lethality" in axes:
-            body = _swap_constant(
-                body, "const CONTACT_DAMAGE := 1",
-                "const CONTACT_DAMAGE := " + str(1 + int(4.0 * axes["lethality"] + 0.5)),
-            )
+            apply_constant("lethality", "combat_loop.contact_damage", "const CONTACT_DAMAGE := 1",
+                           "CONTACT_DAMAGE", 1 + int(4.0 * axes["lethality"] + 0.5), integral=True)
         if "grind" in axes:
-            body = _swap_constant(
-                body, "const WAVES := 3",
-                "const WAVES := " + str(2 + int(3.0 * axes["grind"] + 0.5)),
-            )
+            apply_constant("grind", "combat_loop.waves", "const WAVES := 3",
+                           "WAVES", 2 + int(3.0 * axes["grind"] + 0.5), integral=True)
         if "agency" in axes:
-            body = _swap_constant(
-                body, "const ATTACK_RANGE := 24.0",
-                "const ATTACK_RANGE := " + _number(16.0 + 24.0 * axes["agency"]),
-            )
+            apply_constant("agency", "combat_loop.attack_range", "const ATTACK_RANGE := 24.0",
+                           "ATTACK_RANGE", 16.0 + 24.0 * axes["agency"])
     elif name == "pipeline":
         if "scarcity" in axes:
-            capacity = 3 - int(2.0 * axes["scarcity"] + 0.5)
-            body = _swap_constant(body, "const CARGO_CAPACITY := 1", f"const CARGO_CAPACITY := {capacity}")
+            apply_constant("scarcity", "pipeline.cargo_capacity", "const CARGO_CAPACITY := 1",
+                           "CARGO_CAPACITY", 3 - int(2.0 * axes["scarcity"] + 0.5), integral=True)
         if "grind" in axes:
-            body = _swap_constant(
-                body, "const QUOTA := 4",
-                "const QUOTA := " + str(2 + int(6.0 * axes["grind"] + 0.5)),
-            )
+            apply_constant("grind", "pipeline.shipment_quota", "const QUOTA := 4",
+                           "QUOTA", 2 + int(6.0 * axes["grind"] + 0.5), integral=True)
         if "agency" in axes:
-            body = _swap_constant(
-                body, "const RADIUS := 12.0",
-                "const RADIUS := " + _number(8.0 + 12.0 * axes["agency"]),
-            )
+            apply_constant("agency", "pipeline.interaction_radius", "const RADIUS := 12.0",
+                           "RADIUS", 8.0 + 12.0 * axes["agency"])
         if "risk" in axes:
-            # High risk shortens the completion window but never removes
-            # enough time for a low-end machine to finish the 4-load demo.
             max_frames = round(max_frames * (1.5 - 0.5 * axes["risk"]))
+            applied["pipeline.frame_budget"] = float(max_frames)
+            used.add("risk")
 
     fmt = {"name": name, "version": ARCHETYPE_CONTENT_VERSION}
     title = "".join(part.capitalize() for part in name.split("_")) + "Main"
-    return {
+    emitted = {
         f"scenes/archetypes/{name}/main.tscn": _SCENE.format(name=name, title=title),
         f"scripts/archetypes/{name}/player_controller.gd": _CONTROLLER.format(speed=speed, **fmt),
         f"scripts/archetypes/{name}/core_loop.gd": _LOOP_HEADER.format(
@@ -1029,16 +1029,31 @@ def archetype_files(
             instruction=_INSTRUCTIONS[name], **fmt
         ) + body,
     }
+    # No implicit tuning artifact for an untouched baseline. All explicit
+    # edits, even unmapped creative-only axes, receive honest typed evidence.
+    if axes:
+        emitted[SOURCE_PATH] = tuning_source({
+            "schema": SCHEMA, "mode": name, "axes": dict(sorted(axes.items())),
+            "applied": dict(sorted(applied.items())), "mapped_axes": sorted(used),
+            "unmapped_axes": sorted(set(axes) - used),
+        })
+    return emitted
 
 
 def verify_archetype_content(
     files: Mapping[str, str], name: str, *, operator_axes: Optional[Mapping[str, float]] = None,
 ) -> bool:
     """Source-verification after all independent Godot/quest file writers."""
-    return isinstance(files, Mapping) and all(
-        files.get(path) == body
-        for path, body in archetype_files(name, operator_axes=operator_axes).items()
-    )
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+
+    if not isinstance(files, Mapping):
+        return False
+    expected = archetype_files(name, operator_axes=operator_axes)
+    receipt_paths = [path for path in files
+                     if isinstance(path, str) and path.casefold() == SOURCE_PATH.casefold()]
+    if receipt_paths != ([SOURCE_PATH] if SOURCE_PATH in expected else []):
+        return False
+    return all(files.get(path) == body for path, body in expected.items())
 
 
 def attach_archetype_content(
@@ -1057,9 +1072,17 @@ def attach_archetype_content(
     if any(type(path) is not str or type(body) is not str or len(body) > 4*1024*1024
            for path, body in files.items()):
         raise ValueError("playable project file identity or source is invalid")
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+
     key = name if name in content_archetypes() else "extraction"
+    expected = archetype_files(key, operator_axes=operator_axes)
+    for path in files:
+        if path.casefold() == SOURCE_PATH.casefold() and (
+            path != SOURCE_PATH or SOURCE_PATH not in expected or files[path] != expected[SOURCE_PATH]
+        ):
+            raise ValueError("playable tuning receipt collides with existing source: " + path)
     out = dict(files)
-    for path, body in archetype_files(key, operator_axes=operator_axes).items():
+    for path, body in expected.items():
         if path in out and out[path] != body:
             raise ValueError("playable archetype output collides with existing source: " + path)
         out[path] = body

@@ -341,6 +341,7 @@ def seal_galaxy_playable_controls(
 ) -> tuple[dict[str, str], dict[str, Any]]:
     """Bind actual generated native source to the resolved authoring receipt."""
     from skeleton.forge.archetype_content import verify_archetype_content
+    from skeleton.forge.playable_tuning import SOURCE_PATH
     if receipt.get("schema") != PLAYABLE_RECEIPT_SCHEMA or receipt.get("mode") not in _PLAYABLE_RULES:
         raise ValueError("invalid Galaxy playable receipt")
     if any(name.casefold() == PLAYABLE_RECEIPT_PATH.casefold() for name in files):
@@ -359,6 +360,8 @@ def seal_galaxy_playable_controls(
         path: hashlib.sha256(files[path].encode("utf-8", errors="strict")).hexdigest()
         for path in native_paths
     }, "source_verified": True, "native_execution_qualified": False}
+    if SOURCE_PATH in files:
+        document["tuning_receipt_sha256"] = hashlib.sha256(files[SOURCE_PATH].encode("utf-8")).hexdigest()
     encoded = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
     output = dict(files)
     output[PLAYABLE_RECEIPT_PATH] = encoded + "\n"

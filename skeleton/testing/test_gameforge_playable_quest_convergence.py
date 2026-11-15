@@ -195,3 +195,67 @@ def test_final_mechanics_attestation_rejects_quest_writer_modification(monkeypat
     }
     with pytest.raises(RuntimeError, match="final native playable mechanics verification failed"):
         pipeline._stage_emit(ctx)
+
+
+@pytest.mark.parametrize("mode,axes,expected", [
+    ("extraction", {"tempo": 0.0, "grind": 1.0, "risk": 1.0, "scarcity": 1.0, "agency": 0.0,
+                    "authorial": 0.5},
+     {"player.speed": 195.0, "extraction.caches_required": 6.0, "extraction.heat_per_second": 10.0,
+      "extraction.heat_limit": 70.0, "extraction.pickup_radius": 8.0}),
+    ("combat_loop", {"tempo": 1.0, "lethality": 1.0, "grind": 1.0, "agency": 1.0, "authorial": 0.5},
+     {"player.speed": 300.0, "combat_loop.contact_damage": 5.0, "combat_loop.waves": 5.0,
+      "combat_loop.attack_range": 40.0}),
+    ("pipeline", {"tempo": 0.0, "risk": 1.0, "grind": 1.0, "agency": 1.0, "scarcity": 0.0,
+                  "authorial": 0.5},
+     {"player.speed": 240.0, "pipeline.frame_budget": 3600.0, "pipeline.shipment_quota": 8.0,
+      "pipeline.interaction_radius": 20.0, "pipeline.cargo_capacity": 3.0}),
+])
+def test_original_native_modes_seal_effective_literals_and_unmapped_axes(mode, axes, expected):
+    import json
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+    from skeleton.forge.archetype_content import verify_archetype_content
+    files = archetype_files(mode, operator_axes=axes)
+    receipt = json.loads(files[SOURCE_PATH])
+    assert receipt["mode"] == mode
+    assert receipt["axes"] == axes
+    assert receipt["applied"] == expected
+    assert receipt["mapped_axes"] == sorted(set(axes) - {"authorial"})
+    assert receipt["unmapped_axes"] == ["authorial"]
+    assert verify_archetype_content(files, mode, operator_axes=axes)
+    receipt["applied"]["player.speed"] = -1
+    files[SOURCE_PATH] = json.dumps(receipt)
+    assert not verify_archetype_content(files, mode, operator_axes=axes)
+
+
+@pytest.mark.parametrize("mode", content_archetypes())
+def test_all_modes_reserve_tuning_artifact_and_deny_unexpected_authority(mode):
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+    from skeleton.forge.archetype_content import verify_archetype_content
+    baseline = archetype_files(mode)
+    assert SOURCE_PATH not in baseline
+    assert verify_archetype_content(baseline, mode)
+    assert not verify_archetype_content({**baseline, SOURCE_PATH: "{}"}, mode)
+    with pytest.raises(ValueError, match="tuning receipt collides"):
+        attach_archetype_content({**base(), SOURCE_PATH.upper(): "{}"}, mode)
+    tuned = archetype_files(mode, operator_axes={"authorial": 0.5})
+    assert not verify_archetype_content(tuned, mode)
+    assert verify_archetype_content(tuned, mode, operator_axes={"authorial": 0.5})
+    assert not verify_archetype_content({**tuned, SOURCE_PATH.upper(): tuned[SOURCE_PATH]},
+                                        mode, operator_axes={"authorial": 0.5})
+
+
+def test_emit_original_native_receipt_matches_exact_source_manifest(monkeypatch):
+    import json
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+    monkeypatch.setattr(pipeline, "_commit", lambda *args, **kwargs: None)
+    ctx = {
+        "era": "extraction_now", "target": "godot", "archetype": "pipeline",
+        "files": base(), "playable_content": True, "project_root": None,
+        "playtest_mode": "off", "operator_axes": {"grind": 1.0, "scarcity": 0.0, "authorial": 1.0},
+    }
+    assert pipeline._stage_emit(ctx)["emitted"]
+    receipt = json.loads(ctx["files"][SOURCE_PATH])
+    assert receipt == ctx["playable_tuning_receipt"]
+    assert receipt["applied"] == {"pipeline.cargo_capacity": 3.0, "pipeline.shipment_quota": 8.0}
+    assert ctx["playable_mechanics_receipt"]["applied_axes"] == {"grind": 1.0, "scarcity": 0.0}
+    assert SOURCE_PATH in source_manifest(ctx["files"])["files"]
