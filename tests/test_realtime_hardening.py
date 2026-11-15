@@ -636,3 +636,42 @@ def test_guard_aggregate_text_budget_is_fail_closed():
 def test_guard_aggregate_node_budget_is_fail_closed():
     with pytest.raises(RealtimeSecretError, match="node budget"):
         PayloadSecretGuard().scrub({"values": [None] * 100_001})
+
+
+def test_guard_bounds_numeric_conversion_before_inspection():
+    huge = 1 << 20000
+    cleaned, hits = PayloadSecretGuard().scrub({"metric": huge})
+    assert hits == 1 and cleaned["metric"] == REDACTED_MARK
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub({"metric": huge})
+
+
+@pytest.mark.parametrize("value", ['{"metric":1e999}', '{"metric":' + '9' * 310 + '}'])
+def test_guard_redacts_invalid_embedded_numeric_document_before_reemission(value):
+    cleaned, hits = PayloadSecretGuard().scrub({"note": value})
+    assert hits >= 1 and cleaned["note"] == REDACTED_MARK
+    with pytest.raises(RealtimeSecretError):
+        PayloadSecretGuard(mode="reject").scrub({"note": value})
+
+
+def test_guard_does_not_invoke_custom_json_container_or_scalar_behavior():
+    class HostileDict(dict):
+        def items(self):
+            raise AssertionError("untrusted mapping behavior")
+
+    class HostileList(list):
+        def __iter__(self):
+            raise AssertionError("untrusted sequence behavior")
+
+    class HostileText(str):
+        def __eq__(self, other):
+            raise AssertionError("untrusted scalar equality")
+
+        def encode(self, *args, **kwargs):
+            raise AssertionError("untrusted encoding behavior")
+
+    for value in (HostileDict(), HostileList(), HostileText("harmless")):
+        with pytest.raises(RealtimeSecretError):
+            PayloadSecretGuard().scrub({"value": value})
+    cleaned, hits = PayloadSecretGuard().scrub({"accessToken": HostileText("opaque")})
+    assert hits == 1 and cleaned["accessToken"] == REDACTED_MARK
