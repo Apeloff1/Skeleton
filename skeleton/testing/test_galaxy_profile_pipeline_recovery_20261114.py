@@ -8,7 +8,7 @@ import json
 import pytest
 
 from skeleton.context.galaxy_profile import (
-    ARTIFACT_PATH, MATRIX_FIELDS, SCHEMA, canonical_profile_bytes, normalise_galaxy_profile,
+    ARTIFACT_PATH, MATRIX_FIELDS, SCHEMA, attach_galaxy_profile, canonical_profile_bytes, normalise_galaxy_profile,
 )
 from skeleton.context.pipeline import GameForgeRun
 
