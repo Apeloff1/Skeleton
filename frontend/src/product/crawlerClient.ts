@@ -30,6 +30,15 @@ export type CrawlOriginHealth = {
 };
 export type CrawlDuplicateEvidence = { count: number; represented_sources: number; observed_origins: number; independent_evidence: false; raw_bytes_retained: false };
 export type CrawlCheckpointRecovery = { replica_present: boolean; replica_verified: false; reason: string; last_repair_at: string | null; last_repair_sequence: number | null; ancestor_rollback: false };
+export type CrawlHostEconomics = {
+  host: string; observations: number; successes: number; failures: number; novelty_observations: number;
+  mean_latency_seconds: number; tail_latency_seconds: number; mean_cost_bytes: number;
+  reliability: number; novelty_probability: number; uncertainty: number; conservative_delay: number;
+};
+export type CrawlAcquisitionEconomics = {
+  settled_requests: number; charged_bytes: number; uncertain_bytes: number;
+  hosts: Record<string, CrawlHostEconomics>; network_authority_expanded: false;
+};
 export type CrawlSession = {
   session_id: string; title: string; status: 'queued' | 'ready' | 'running' | 'paused' | 'completed' | 'cancelled' | 'budget_exhausted' | 'failed' | 'interrupted';
   state?: string; version: number; created_at: string; updated_at: string; seeds: string[];
@@ -39,6 +48,7 @@ export type CrawlSession = {
   automation?: CrawlAutomation; worker?: CrawlWorker; capabilities?: CrawlCapabilities;
   instruction_security?: CrawlInstructionSecurity; adaptive_origin_health?: Record<string, CrawlOriginHealth>;
   duplicate_evidence?: CrawlDuplicateEvidence; checkpoint_recovery?: CrawlCheckpointRecovery;
+  acquisition_economics?: CrawlAcquisitionEconomics;
   queue: { url: string; depth: number; attempts: number; ready_at: number }[];
 };
 export type SourceUsePolicy = { version: number; enabled: boolean; max_age_seconds: number; changed_at: string | null };
@@ -152,6 +162,25 @@ function session(value: CrawlSession, expectedId?: string): CrawlSession {
   for (const field of ['requests', 'bytes', 'documents', 'failures'] as const) if (!integer(value.counters[field], 33554432)) invalid('The crawler counters are incomplete.');
   if (value.instruction_security !== undefined && !validInstructionSecurity(value.instruction_security, value.counters.requests)) invalid('The crawler instruction incident custody is invalid.');
   if (value.adaptive_origin_health !== undefined && !validOriginHealth(value.adaptive_origin_health)) invalid('The crawler origin health projection is invalid.');
+  if (value.acquisition_economics !== undefined) {
+    const e = value.acquisition_economics;
+    const finite = (n: unknown, max: number) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= max;
+    if (!e || e.network_authority_expanded !== false || !integer(e.settled_requests, value.counters.requests)
+      || !integer(e.charged_bytes, 33554432) || !integer(e.uncertain_bytes, 33554432)
+      || e.charged_bytes !== value.counters.bytes || e.charged_bytes + e.uncertain_bytes > 33554432
+      || !e.hosts || typeof e.hosts !== 'object' || Array.isArray(e.hosts) || Object.keys(e.hosts).length > 16) invalid('Invalid acquisition economics custody.');
+    let counted = 0;
+    for (const [host, h] of Object.entries(e.hosts)) {
+      if (!h || h.host !== host || !/^[a-z0-9][a-z0-9.-]{0,252}$/.test(host)
+        || !integer(h.observations, e.settled_requests) || !integer(h.successes, Math.min(16, h.observations))
+        || !integer(h.failures, Math.min(16, h.observations)) || !integer(h.novelty_observations, Math.min(16, h.observations))
+        || !finite(h.mean_latency_seconds, 60) || !finite(h.tail_latency_seconds, 60)
+        || !finite(h.mean_cost_bytes, 2097152) || !finite(h.reliability, 1) || !finite(h.novelty_probability, 1)
+        || !finite(h.uncertainty, 1) || !finite(h.conservative_delay, 120)) invalid('Invalid host acquisition measurements.');
+      counted += h.observations;
+    }
+    if (counted !== e.settled_requests) invalid('Acquisition economics request accounting is incomplete.');
+  }
   if (value.duplicate_evidence !== undefined) {
     const d = value.duplicate_evidence;
     if (!d || !integer(d.count, Math.min(128, value.counters.requests)) || !integer(d.represented_sources, Math.min(d.count, value.source_count))
