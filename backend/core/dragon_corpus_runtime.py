@@ -97,6 +97,8 @@ async def dispatch_capture(scope,principal,*,game,source,observation_digest,oper
     identifier=session["session_id"]
     await _bounded(lambda:GameCorpus(_path()).bind_capture(scope,game=game,source=source,
                             observation_digest=observation_digest,session=identifier))
+    from core.dragon_game_routing import publish_route
+    await publish_route(crawler_application,scope,identifier)
     if autonomous:
         row=await crawler_application._owned(scope,identifier)
         # Never renew/re-enable on replay, after any intervening operation, or
@@ -120,13 +122,11 @@ async def game_session_ids(scope,game):
 async def game_context(scope,query,max_docs,max_chars,*,game,historical):
     from core.dragon_crawler import crawler_application
     session_ids,truncated=await game_session_ids(scope,game)
-    if not session_ids:
-        return {"documents":[],"references":[],"game_catalogue_only":True,"partial_routing":False}
     if historical:
-        value=await crawler_application.history_context(scope,query,max_docs,max_chars,session_ids=session_ids)
+        value=await crawler_application.history_context(scope,query,max_docs,max_chars,session_ids=session_ids,game_id=game)
     else:
-        value=await crawler_application.context(scope,query,max_docs,max_chars,session_ids=session_ids)
-    return {**value,"game_id":game,"game_capture_window_truncated":truncated,
+        value=await crawler_application.context(scope,query,max_docs,max_chars,session_ids=session_ids,game_id=game)
+    return {**value,"game_id":game,"legacy_capture_window_truncated":truncated,"indexed_game_routing":True,
             "partial_routing":True}
 
 async def world_discovery_call(scope,operation,*args,**kwargs):
