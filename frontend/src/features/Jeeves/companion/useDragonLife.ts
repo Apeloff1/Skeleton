@@ -4,6 +4,7 @@ import type {DragonCompanionState} from './dragonCompanionState';
 import type {CompanionMotion} from './dragonPreferences';
 import {directDragon, DRAGON_BEATS} from './dragonChoreography';
 import {dragonLevelProfile} from './dragonLevelProfile';
+import {evolutionRitual,evolutionPetReaction} from './dragonEvolutionRituals';
 import {DRAGON_POSES} from './dragonGesturePoses';
 
 const PET_REACTIONS=[
@@ -52,9 +53,11 @@ export function useDragonLife(
   // event phase, growth, progress, access, or operational state.
   const cuddle=!state.fire&&!state.embers&&(beatIndex+1)%profile.snuggleEvery===0;
   const cozyBeat=DRAGON_BEATS.snuggle[(beatIndex+profile.level)%DRAGON_BEATS.snuggle.length];
-  return {...origin,beat:cuddle?cozyBeat:origin.beat,tempoMs:profile.beatMs,
+  const baseline=cuddle?cozyBeat:origin.beat;
+  const beat=stage===undefined?baseline:evolutionRitual(profile,state.phase,beatIndex,baseline);
+  return {...origin,beat,tempoMs:profile.beatMs,
    amplitude:origin.amplitude*profile.amplitude};
- },[state.phase,state.fire,state.embers,state.glasses,state.snuggly,mode,beatIndex,reducedMotion,profile]);
+ },[state.phase,state.fire,state.embers,state.glasses,state.snuggly,mode,beatIndex,reducedMotion,profile,stage]);
  const enabled=active&&direction.animated;
  useEffect(()=>{
   const subscription=AppState.addEventListener('change',next=>setActive(next==='active'));
@@ -62,7 +65,7 @@ export function useDragonLife(
  },[]);
  useEffect(()=>{
   setBeatIndex(0);
- },[state.phase]);
+ },[state.phase,profile.stage,profile.level]);
  useEffect(()=>{
   if(!enabled)return;
   const id=setInterval(()=>setBeatIndex(prev=>(prev+1)%12),direction.tempoMs);
@@ -118,24 +121,24 @@ export function useDragonLife(
    pulse(v.lift,p.lift),pulse(v.headGesture,p.nod),
    pulse(v.eyeGesture,p.gaze),
   ];
+  if(mode==='full'||stage!==undefined) moves.push(pulse(v.wingGesture,p.wing),pulse(v.tailGesture,p.tail));
   if(mode==='full')moves.push(
-   pulse(v.wingGesture,p.wing),pulse(v.tailGesture,p.tail),
    pulse(v.hatGesture,p.hat),pulse(v.fxGesture,p.aura*10),
   );
   const action=Animated.parallel(moves);
   action.start();
   return ()=>action.stop();
- },[enabled,direction.beat.gesture,direction.amplitude,mode,v]);
+ },[enabled,direction.beat.gesture,direction.amplitude,mode,v,stage]);
  const pet=useCallback(()=>{
   const count=petCount+1;
   setPetCount(count);
-  setPetMessage(PET_REACTIONS[(count-1)%PET_REACTIONS.length]);
+  setPetMessage(stage===undefined?PET_REACTIONS[(count-1)%PET_REACTIONS.length]:evolutionPetReaction(profile,count));
   v.heart.stopAnimation();
   v.heart.setValue(0);
   if(enabled){
    Animated.sequence([timing(v.heart,1,340),timing(v.heart,0,700)]).start();
   }
- },[enabled,petCount,v]);
+ },[enabled,petCount,v,profile,stage]);
  useEffect(()=>{
   if(!petMessage)return;
   const id=setTimeout(()=>setPetMessage(''),3500);
