@@ -138,12 +138,14 @@ def host_economics(rows: list[dict], host: str, *, floor: float = .25) -> HostEc
     mean = .25
     delay = float(floor)
     for row in recent:
-        duration = (row["latency_bucket"] or MAX_LATENCY_BUCKET) * LATENCY_QUANTUM
+        # Unknown-outcome recovery is censored, not an observed 60s sample.
+        # Its multiplicative failure penalty remains, but do not invent latency.
+        duration = row["latency_bucket"] * LATENCY_QUANTUM if row["latency_bucket"] is not None else mean
         mean = .75 * mean + .25 * duration
         # Queue-depth target is exactly one; a shorter failed response may
         # not speed the crawler up. Robust tail latency and multiplicative
         # increase avoid punishing a host with bursts after one fast result.
-        target = max(floor, 1.25 * mean)
+        target = max(floor, 1.25 * max(0., mean - LATENCY_QUANTUM))
         if row["kind"] in _FAILURE or row["status"] is None or row["status"] >= 400:
             delay = max(delay, min(MAX_PACING, delay * 1.5), target)
         else:
