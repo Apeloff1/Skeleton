@@ -1,21 +1,18 @@
-"""
-gameforge.prood.event_sink — durable EventBus → Mongo sink (Stage B3).
-
-A single wildcard subscriber on the global ``event_bus`` mirrors every
-published event (saga.*, build.*, iq.*, ship.*) into the Mongo collection
-``prood_event_log`` so the Universal Logs feed can surface LIVE distributed
-activity that survives a restart (the in-memory ``event_bus.history`` does
-not). Writes are best-effort and capped.
-"""
+"""Restart-safe PROOD event delivery via the local transactional outbox."""
 from __future__ import annotations
 
+import os
 import time
+from pathlib import Path
 from typing import Any, Dict
 
 from gameforge.prood.event_bus import event_bus
+from zaibatsu.outbox import Outbox
 
 _LOG_COLLECTION = "prood_event_log"
 _installed = False
+_outbox: Outbox | None = None
+_admission_failures = 0
 
 
 def _severity_for(event_type: str) -> str:
@@ -24,40 +21,65 @@ def _severity_for(event_type: str) -> str:
     return "info"
 
 
-async def _persist(event_type: str, payload: Any):
+async def _mongo_sink(collection: str, document: dict) -> bool:
+    from core.databases import core_db
+    if collection != _LOG_COLLECTION:
+        raise ValueError("unexpected PROOD collection")
+    delivery_id = document["_outbox_id"]
+    body = {key: value for key, value in document.items() if key != "_outbox_id"}
+    # Crash after remote commit but before local acknowledgement is safe:
+    # Mongo's unique _id plus setOnInsert gives replay the same identity.
+    await core_db[collection].update_one(
+        {"_id": delivery_id}, {"$setOnInsert": body}, upsert=True)
+    return True
+
+
+def _journal() -> Outbox:
+    global _outbox
+    if _outbox is None:
+        path = os.environ.get("PROOD_EVENT_OUTBOX_PATH") or (
+            Path(__file__).resolve().parents[2] / "data" / "zaibatsu" / "prood.sqlite3")
+        _outbox = Outbox(_mongo_sink, path=path, cap=4096)
+    return _outbox
+
+
+async def _persist(event_type: str, payload: Any) -> str:
+    global _admission_failures
     try:
-        from core.databases import core_db
-        await core_db[_LOG_COLLECTION].insert_one({
+        if type(event_type) is not str or not 1 <= len(event_type) <= 128:
+            raise ValueError("invalid event type")
+        await _journal().journal(_LOG_COLLECTION, {
             "event_type": event_type,
             "severity": _severity_for(event_type),
-            "payload": payload if isinstance(payload, (dict, list, str, int, float, bool, type(None))) else str(payload),
+            "payload": payload,
             "ts": time.time(),
         })
-    except Exception:  # noqa: BLE001 — logging must never break a publish
-        pass
+        return "journaled"
+    except Exception:
+        _admission_failures += 1
+        return "unavailable"
+
+
+async def flush_pending_events(limit: int = 128) -> dict:
+    journal = _journal()
+    confirmed = await journal.reconcile(limit=limit)
+    return {"confirmed": confirmed, "pending": await journal.pending_count(),
+            "admission_failures": _admission_failures,
+            "scope": "local_outbox_to_mongo"}
 
 
 def install_event_sink() -> bool:
-    """Attach the durable wildcard subscriber exactly once."""
+    """Journal before fanout; preserve subscriber behavior and report custody."""
     global _installed
     if _installed:
         return False
-
-    def _handler(payload):
-        # event_bus passes only the payload to subscribers; we capture the
-        # type via a closure factory is not available, so we re-publish with a
-        # typed wrapper below. Simplest: rely on the wrapped publisher.
-        return None
-
-    # We need the event_type, which the bare "*" handler doesn't receive, so
-    # we wrap event_bus.publish to also persist. This preserves all existing
-    # behavior and adds durability.
     original_publish = event_bus.publish
 
     async def _publish_and_persist(event_type: str, payload: Any = None):
-        rec = await original_publish(event_type, payload)
-        await _persist(event_type, payload)
-        return rec
+        custody = await _persist(event_type, payload)
+        record = await original_publish(event_type, payload)
+        record["persistence"] = custody
+        return record
 
     event_bus.publish = _publish_and_persist  # type: ignore[assignment]
     _installed = True
@@ -65,16 +87,17 @@ def install_event_sink() -> bool:
 
 
 async def recent_events(limit: int = 60, severity: str | None = None) -> list[Dict]:
-    """Read the durable event log (newest first)."""
+    """Read confirmed durable events, newest first."""
     try:
         from core.databases import core_db
         q: Dict[str, Any] = {}
         if severity:
             q["severity"] = severity
-        cur = core_db[_LOG_COLLECTION].find(q, {"_id": 0}).sort("ts", -1).limit(int(limit))
-        return await cur.to_list(int(limit))
-    except Exception:  # noqa: BLE001
+        bound = max(1, min(int(limit), 500))
+        cur = core_db[_LOG_COLLECTION].find(q, {"_id": 0}).sort("ts", -1).limit(bound)
+        return await cur.to_list(bound)
+    except Exception:
         return []
 
 
-__all__ = ["install_event_sink", "recent_events"]
+__all__ = ["install_event_sink", "recent_events", "flush_pending_events"]
