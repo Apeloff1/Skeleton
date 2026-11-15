@@ -482,3 +482,68 @@ def test_portable_project_preserves_historical_source_but_strict_mode_refuses(tm
     with pytest.raises(PortableSourceError, match="current native template"):
         reopen_archive(archive, digest, output, require_current_template=True)
     assert not output.exists()
+
+
+def test_portable_zip_comparison_reports_source_changes_without_source_bodies(tmp_path):
+    from scripts.verify_gameforge_source_zip import compare_archives
+    before = {"project.godot": "config_version=5", "data/removed.txt": "private removed",
+              "data/changed.txt": "private before", "data/same.txt": "same"}
+    after = {"project.godot": "config_version=5", "data/added.txt": "private added",
+             "data/changed.txt": "private after", "data/same.txt": "same"}
+    left, right = tmp_path / "before.zip", tmp_path / "after.zip"
+    left.write_bytes(_portable_zip(before.items()))
+    right.write_bytes(_portable_zip(after.items()))
+    result = compare_archives(left, source_manifest(before)["sha256"], right, source_manifest(after)["sha256"])
+    assert result["counts"] == {"added": 1, "removed": 1, "modified": 1, "unchanged": 2}
+    assert result["added"][0]["path"] == "data/added.txt"
+    assert result["removed"][0]["path"] == "data/removed.txt"
+    assert result["modified"][0]["path"] == "data/changed.txt"
+    assert not result["source_identical"]
+    assert not result["native_effects_comparable"] and result["native_effect_changes"] is None
+    assert "private" not in str(result)
+
+
+def test_portable_zip_comparison_reports_verified_native_literal_changes(tmp_path):
+    from scripts.verify_gameforge_source_zip import compare_archives
+    left, right = tmp_path / "old.zip", tmp_path / "new.zip"
+    before = attach_archetype_content(base(), "pipeline", operator_axes={"grind": 0.0, "scarcity": 1.0})
+    after = attach_archetype_content(base(), "pipeline", operator_axes={"grind": 1.0, "scarcity": 0.0})
+    left.write_bytes(_portable_zip(sorted(before.items())))
+    right.write_bytes(_portable_zip(sorted(after.items())))
+    result = compare_archives(left, source_manifest(before)["sha256"], right, source_manifest(after)["sha256"])
+    assert result["native_effects_comparable"]
+    assert result["native_effect_changes"] == [
+        {"effect": "pipeline.cargo_capacity", "before": 1.0, "after": 3.0},
+        {"effect": "pipeline.shipment_quota", "before": 2.0, "after": 8.0},
+    ]
+    assert not result["native_execution_qualified"]
+
+
+def test_portable_zip_comparison_requires_both_independent_identities(tmp_path):
+    from scripts.verify_gameforge_source_zip import PortableSourceError, compare_archives
+    files = {"project.godot": "config_version=5"}
+    archive = tmp_path / "project.zip"
+    archive.write_bytes(_portable_zip(files.items()))
+    digest = source_manifest(files)["sha256"]
+    with pytest.raises(PortableSourceError, match="SHA-256 mismatch"):
+        compare_archives(archive, digest, archive, "0" * 64)
+    same = compare_archives(archive, digest, archive, digest)
+    assert same["source_identical"]
+    assert same["counts"] == {"added": 0, "removed": 0, "modified": 0, "unchanged": 1}
+
+
+def test_portable_zip_comparison_cli_is_read_only(tmp_path, capsys):
+    import json
+    from scripts.verify_gameforge_source_zip import main
+    files = {"project.godot": "config_version=5"}
+    archive = tmp_path / "project.zip"
+    archive.write_bytes(_portable_zip(files.items()))
+    digest = source_manifest(files)["sha256"]
+    args = [str(archive), "--expected-sha256", digest, "--compare-zip", str(archive), "--compare-sha256", digest]
+    assert main(args) == 0
+    assert json.loads(capsys.readouterr().out)["source_identical"]
+    output = tmp_path / "refused"
+    with pytest.raises(SystemExit) as refused:
+        main(args + ["--output", str(output)])
+    assert refused.value.code == 2
+    assert not output.exists()

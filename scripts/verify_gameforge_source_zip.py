@@ -366,6 +366,57 @@ def reopen_archive(path: Path, expected_sha256: str, output: Path | None = None,
     return receipt
 
 
+def compare_archives(
+    original: Path, original_sha256: str, revised: Path, revised_sha256: str,
+) -> dict[str, Any]:
+    """Compare two independently verified, bounded source snapshots.
+
+    Do not infer renames, compatibility, behavioral changes or migrations
+    from text identity. Never return source bodies or execute either project.
+    """
+    _, before = inspect_archive(_read_zip(original), original_sha256)
+    _, after = inspect_archive(_read_zip(revised), revised_sha256)
+    first = before["source_manifest"]["files"]
+    second = after["source_manifest"]["files"]
+    first_names, second_names = set(first), set(second)
+    added = sorted(second_names - first_names)
+    removed = sorted(first_names - second_names)
+    modified = sorted(name for name in first_names & second_names if first[name] != second[name])
+    unchanged = len(first_names & second_names) - len(modified)
+    def row(name: str) -> dict[str, Any]:
+        return {"path": name, "before_sha256": first.get(name), "after_sha256": second.get(name)}
+
+    old_inspection, new_inspection = before["project_inspection"], after["project_inspection"]
+    old_effects = old_inspection.get("applied", {})
+    new_effects = new_inspection.get("applied", {})
+    effect_comparable = (old_inspection["tuning"] == new_inspection["tuning"] == "verified"
+                         and old_inspection["native_template"] == new_inspection["native_template"] == "verified"
+                         and old_inspection["playable_modes"] == new_inspection["playable_modes"])
+    effects = None
+    if effect_comparable:
+        effects = [{"effect": name, "before": old_effects.get(name), "after": new_effects.get(name)}
+                   for name in sorted(set(old_effects) | set(new_effects))
+                   if old_effects.get(name) != new_effects.get(name)]
+    return {
+        "schema": "skeleton.gameforge.portable_source_comparison.v1",
+        "before_manifest_sha256": before["source_manifest"]["sha256"],
+        "after_manifest_sha256": after["source_manifest"]["sha256"],
+        "before_archive_sha256": before["archive_sha256"],
+        "after_archive_sha256": after["archive_sha256"],
+        "source_identical": not (added or removed or modified),
+        "counts": {"added": len(added), "removed": len(removed),
+                   "modified": len(modified), "unchanged": unchanged},
+        "added": [row(name) for name in added],
+        "removed": [row(name) for name in removed],
+        "modified": [row(name) for name in modified],
+        "before_project": old_inspection,
+        "after_project": new_inspection,
+        "native_effects_comparable": effect_comparable,
+        "native_effect_changes": effects,
+        "native_execution_qualified": False,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("archive", type=Path)
@@ -373,10 +424,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, help="New directory under a trusted local parent")
     parser.add_argument("--require-current-template", action="store_true",
                         help="Refuse historical or inconsistent native projects before reopening")
+    parser.add_argument("--compare-zip", type=Path, help="Compare against a second independently verified ZIP")
+    parser.add_argument("--compare-sha256", help="Full separately retained manifest identity of the second ZIP")
     args = parser.parse_args(argv)
+    if bool(args.compare_zip) != bool(args.compare_sha256):
+        parser.error("--compare-zip and --compare-sha256 must be provided together")
+    if args.compare_zip is not None and (args.output is not None or args.require_current_template):
+        parser.error("comparison is read-only and cannot be combined with reopening or strict template gating")
     try:
-        result = reopen_archive(args.archive, args.expected_sha256, args.output,
-                                require_current_template=args.require_current_template)
+        if args.compare_zip is not None:
+            result = compare_archives(args.archive, args.expected_sha256,
+                                      args.compare_zip, args.compare_sha256)
+        else:
+            result = reopen_archive(args.archive, args.expected_sha256, args.output,
+                                    require_current_template=args.require_current_template)
     except PortableSourceError as exc:
         print(f"Portable source refused: {exc}", file=sys.stderr)
         return 2
