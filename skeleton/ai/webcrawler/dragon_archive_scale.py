@@ -129,7 +129,79 @@ def decode_cursor(scope,query,value):
     return after
 
 
-def rank_exact(scope,snapshot,grant,policies,now,terms,allowed):
+def search_options(*,partition_id=None,order="relevance",match="any"):
+    if (partition_id is not None and (type(partition_id) is not int or not 0<=partition_id<SHARDS)
+            or order not in {"relevance","archive_newest","archive_oldest"}
+            or match not in {"any","all"}):
+        raise ValueError("invalid deep archive search options")
+    return {"partition":partition_id,"order":order,"match":match}
+
+
+def search_cursor(scope,query,options,*,identifier,accepted_at=None):
+    if not identity(identifier):
+        raise ValueError("invalid archive search cursor identity")
+    if options==search_options():
+        return cursor(scope,query,identifier)
+    prefix=digest({"scope":scope,"query":query,"options":options,"schema":"deep-search-v2"})
+    if options["order"]=="relevance":
+        return prefix+":"+identifier
+    if not finite(accepted_at):
+        raise ValueError("invalid archive search cursor time")
+    # float.hex preserves the exact sort field rather than a rounded display
+    # timestamp. Parsing never supplies authority; all results are live fenced.
+    return prefix+":"+float(accepted_at).hex()+":"+identifier
+
+
+def search_boundary(scope,query,options,value):
+    if value is None:
+        return None
+    if options==search_options():
+        return (decode_cursor(scope,query,value),None)
+    if not isinstance(value,str) or len(value)>240:
+        raise ValueError("invalid archive search cursor")
+    parts=value.split(":")
+    if options["order"]=="relevance":
+        if len(parts)!=2:
+            raise ValueError("invalid archive cursor geometry")
+        after,accepted=parts[1],None
+    else:
+        if len(parts)!=3:
+            raise ValueError("invalid temporal cursor geometry")
+        after=parts[2]
+        try:
+            accepted=float.fromhex(parts[1])
+        except (ValueError,OverflowError) as exc:
+            raise ValueError("invalid temporal cursor timestamp") from exc
+    if value!=search_cursor(scope,query,options,identifier=after,accepted_at=accepted):
+        raise ValueError("archive query, filter or sort changed")
+    return after,accepted
+
+
+def search_predicate(scope,tokens,now,options,boundary):
+    if not tokens or len(tokens)>32 or not all(hash_identity(x) for x in tokens):
+        raise ValueError("invalid indexed query terms")
+    predicate={**scope,"status":{"$in":["budget_exhausted","completed"]},
+        "deep_archive.released":True,"deep_index.expires_at":{"$gt":now},
+        "deep_index.tokens":{"$all" if options["match"]=="all" else "$in":tokens}}
+    if options["partition"] is not None:
+        predicate["deep_archive.partition"]=options["partition"]
+    order=options["order"]
+    if order=="relevance":
+        sort=[("_id",1)]
+        if boundary:
+            predicate["_id"]={"$gt":boundary[0]}
+    else:
+        direction=-1 if order=="archive_newest" else 1
+        compare="$lt" if direction==-1 else "$gt"
+        sort=[("deep_archive.accepted_at",direction),("_id",1)]
+        if boundary:
+            after,accepted=boundary
+            predicate["$or"]=[{"deep_archive.accepted_at":{compare:accepted}},
+                {"deep_archive.accepted_at":accepted,"_id":{"$gt":after}}]
+    return predicate,sort
+
+
+def rank_exact(scope,snapshot,grant,policies,now,terms,allowed,*,require_all=False):
     """Exact source-level token coverage. No raw text in candidate metadata."""
     from .dragon_archive_grant import archive_expiry
     wanted=set(terms)
@@ -142,7 +214,7 @@ def rank_exact(scope,snapshot,grant,policies,now,terms,allowed):
             continue
         counts=Counter(_lexemes(s["title"]+" "+s["text"]))
         overlap=wanted.intersection(counts)
-        if overlap:
+        if overlap and (not require_all or overlap==wanted):
             result.append({"source_id":sid,"preserved_text_hash":s["preserved_text_hash"],
                 "captured_at":s["fetched_at"],"valid_until":expiry,"matched_terms":len(overlap),
                 "term_frequency":sum(min(8,counts[t]) for t in overlap),"policy_version":policy["version"]})

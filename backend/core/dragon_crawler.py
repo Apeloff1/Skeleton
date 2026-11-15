@@ -164,6 +164,12 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                 ("deep_index.tokens",ASCENDING),("deep_index.expires_at",ASCENDING)])
             await self.sessions.create_index([("deep_index_due",ASCENDING),("archive_grant.expires_at",ASCENDING)])
             await self.sessions.create_index([("deep_index.expires_at",ASCENDING),("_id",ASCENDING)])
+            for direction in (ASCENDING,DESCENDING):
+                await self.sessions.create_index([("tenant_id",ASCENDING),("owner_id",ASCENDING),
+                    ("deep_archive.released",ASCENDING),("deep_archive.accepted_at",direction),("_id",ASCENDING)])
+                await self.sessions.create_index([("tenant_id",ASCENDING),("owner_id",ASCENDING),
+                    ("deep_archive.released",ASCENDING),("deep_archive.partition",ASCENDING),
+                    ("deep_archive.accepted_at",direction),("_id",ASCENDING)])
             self._indexes_ready = True
 
     async def readiness(self) -> dict[str, Any]:

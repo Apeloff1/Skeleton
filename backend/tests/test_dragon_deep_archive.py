@@ -70,3 +70,11 @@ class DeepArchiveTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(response["pointers"][0]["model_context_authorized"])
         self.assertNotIn("text",response["pointers"][0])
         app.deep_archive_search.assert_awaited_once_with(SCOPE,query="orbital",cursor=None)
+
+    async def test_live_wiki_mirror_and_canonical_version_are_identical(self):
+        from skeleton.distributed.galaxy.librarians import WikiLibrarian
+        from skeleton.ai.runtime.distributed.galaxy.librarians import WikiLibrarian as Mirror
+        projection={"documents":[],"references":[]}
+        first=WikiLibrarian.crawler_catalog(projection,mode="current",now=100)
+        self.assertEqual(first,Mirror.crawler_catalog(projection,mode="current",now=100))
+        self.assertEqual(first["stored_prose"],0)

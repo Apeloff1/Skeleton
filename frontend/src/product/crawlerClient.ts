@@ -664,14 +664,20 @@ export async function promoteDragonDeep(id:string,body:CrawlCommand&{retention_a
  ||p.network_executed!==false||p.source_permission_extended!==false)invalid('Invalid deep custody receipt.');
  return p;
 }
+export type DragonWikiSearchOptions={partition:number|null;order:'relevance'|'archive_newest'|'archive_oldest';match:'any'|'all'};
+const WIKI_DEFAULT:DragonWikiSearchOptions={partition:null,order:'relevance',match:'any'};
+const WIKI_CURSOR=/^[a-f0-9]{64}:(?:-?0x[0-9a-f.]+p[+-]?[0-9]+:)?[A-Za-z0-9_-]{1,128}$/;
 export type DragonWikiPointer={session_id:string;source_id:string;citation:string;valid_until:number;review_state:'unreviewed_external_evidence';stored_prose:0;
  plane:'current'|'historic';model_context_authorized:boolean;source_use_version:number;matched_terms?:number;captured_at?:number;
- version?:number;snapshot_digest?:string;preserved_text_hash?:string;passage_digest?:string};
+ version?:number;snapshot_digest?:string;preserved_text_hash?:string;passage_digest?:string;archived_at?:number;partition?:number};
 export type DragonWikiCatalog={schema:'skeleton.dragon.hoag-wiki-catalog.v1';nucleus:'wiki';mode:'current'|'historic';as_of_unix:number;valid_until:number;
- pointers:DragonWikiPointer[];next_cursor:string|null;request_local:true;stored_prose:0;knowledge_promoted:false;network_executed:false};
-export async function queryDragonWiki(query:string,mode:'current'|'historic',cursor?:string,signal?:AbortSignal):Promise<DragonWikiCatalog>{
- if(!query.trim()||query.length>512||cursor!==undefined&&!/^[a-f0-9]{64}:[A-Za-z0-9_-]{1,128}$/.test(cursor)||mode==='current'&&cursor!==undefined)invalid('Invalid Wiki query.');
- const p=await read(api.get<DragonWikiCatalog>(ROOT+'/companion/hoag-wiki?mode='+mode+'&query='+encodeURIComponent(query)+(cursor?'&cursor='+encodeURIComponent(cursor):''),options(signal)),getAuthToken(),'Wiki lookup unavailable.');
+ pointers:DragonWikiPointer[];next_cursor:string|null;request_local:true;stored_prose:0;knowledge_promoted:false;network_executed:false;search_options?:DragonWikiSearchOptions};
+export async function queryDragonWiki(query:string,mode:'current'|'historic',cursor?:string,signal?:AbortSignal,filters:DragonWikiSearchOptions=WIKI_DEFAULT):Promise<DragonWikiCatalog>{
+ if(!query.trim()||query.length>512||cursor!==undefined&&!WIKI_CURSOR.test(cursor)
+ ||!(filters.partition===null||integer(filters.partition,1023))||!['relevance','archive_newest','archive_oldest'].includes(filters.order)||!['any','all'].includes(filters.match)
+ ||mode==='current'&&(cursor!==undefined||filters.partition!==null||filters.order!=='relevance'||filters.match!=='any'))invalid('Invalid Wiki query.');
+ const queryFilters=mode==='historic'?'&order='+filters.order+'&match='+filters.match+(filters.partition===null?'':'&partition_id='+filters.partition):'';
+ const p=await read(api.get<DragonWikiCatalog>(ROOT+'/companion/hoag-wiki?mode='+mode+'&query='+encodeURIComponent(query)+(cursor?'&cursor='+encodeURIComponent(cursor):'')+queryFilters,options(signal)),getAuthToken(),'Wiki lookup unavailable.');
  if(!p||p.schema!=='skeleton.dragon.hoag-wiki-catalog.v1'||p.nucleus!=='wiki'||p.mode!==mode||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0
  ||!Number.isFinite(p.valid_until)||p.valid_until<=p.as_of_unix||p.valid_until>p.as_of_unix+60||!Array.isArray(p.pointers)||p.pointers.length>(mode==='current'?8:32)
  ||new Set(p.pointers.map(x=>x?.citation)).size!==p.pointers.length||p.pointers.some(x=>!x||!ID.test(x.session_id)||!HASH.test(x.source_id)
@@ -679,7 +685,9 @@ export async function queryDragonWiki(query:string,mode:'current'|'historic',cur
  ||x.review_state!=='unreviewed_external_evidence'||x.stored_prose!==0||x.plane!==mode||x.model_context_authorized!==(mode==='current')
  ||!integer(x.source_use_version)||('text' in x)||('title' in x)||('url' in x)
  ||(mode==='current'?!HASH.test(x.passage_digest??''):!integer(x.version??0)||x.version!<1||!HASH.test(x.snapshot_digest??'')||!HASH.test(x.preserved_text_hash??'')||!integer(x.matched_terms??0,32)||x.matched_terms!<1||!Number.isFinite(x.captured_at)||x.captured_at!<0))
- ||p.next_cursor!==null&&(mode==='current'||!/^[a-f0-9]{64}:[A-Za-z0-9_-]{1,128}$/.test(p.next_cursor))
+ ||p.next_cursor!==null&&(mode==='current'||!WIKI_CURSOR.test(p.next_cursor))
+ ||mode==='historic'&&p.search_options!==undefined&&(p.search_options.partition!==filters.partition||p.search_options.order!==filters.order||p.search_options.match!==filters.match)
+ ||mode==='historic'&&p.pointers.some(x=>filters.partition!==null&&x.partition!==filters.partition||x.archived_at!==undefined&&(!Number.isFinite(x.archived_at)||x.archived_at<0)||x.partition!==undefined&&!integer(x.partition,1023))
  ||p.request_local!==true||p.stored_prose!==0||p.knowledge_promoted!==false||p.network_executed!==false)invalid('Invalid Wiki citation receipt.');
  return p;
 }

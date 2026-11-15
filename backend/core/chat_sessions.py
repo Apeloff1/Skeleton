@@ -365,6 +365,13 @@ async def context_sources(*, memory_references, crawler_context, user, tenant_id
             or len(references) > 4
         ):
             raise EngineProtocolError("crawler context projection is invalid")
+        wiki_binding={}
+        if "hoag_wiki" in projection:
+            from skeleton.ai.webcrawler.dragon_hoag_catalog import validate_current_binding
+            try:
+                wiki_binding=validate_current_binding(projection,now=datetime.now(timezone.utc).timestamp())
+            except (ValueError,TypeError,KeyError) as exc:
+                raise EngineProtocolError("crawler Wiki provenance differs") from exc
         if not documents:
             raise HTTPException(
                 status_code=404,
@@ -440,7 +447,7 @@ async def context_sources(*, memory_references, crawler_context, user, tenant_id
                         source_ref,
                         "crawler-url:" + source_url,
                         "crawler-passage-sha256:" + content_digest,
-                    ),
+                    ) + (("hoag-wiki-current:"+source_ref,) if wiki_binding.get(source_ref)==content_digest else ()),
                     retention_class="conversation-source-evidence",
                 )
             )

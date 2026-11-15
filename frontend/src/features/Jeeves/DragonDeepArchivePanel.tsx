@@ -2,7 +2,7 @@ import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {AppState,ActivityIndicator,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {getAuthToken} from '../../auth/gameforgeAuth';
 import {getDragonDeepCatalog,queryDragonWiki,configureDragonArchive,configureLegacyTreasuryArchive,eraseCrawl,crawlRequestKey,
- type DragonDeepCatalog,type DragonDeepRecord,type DragonWikiCatalog} from '../../product/crawlerClient';
+ type DragonDeepCatalog,type DragonDeepRecord,type DragonWikiCatalog,type DragonWikiSearchOptions} from '../../product/crawlerClient';
 import s,{colors} from './CrawlerWorkspace.styles';
 type Props={revision:string;canWrite:boolean;disabled:boolean;onWindow:(ids?:string[],query?:string)=>void;onChanged:()=>void};
 function Button({label,action,disabled}:{label:string;action:()=>void;disabled?:boolean}){
@@ -14,6 +14,7 @@ export default function DragonDeepArchivePanel({revision,canWrite,disabled,onWin
  const [catalog,setCatalog]=useState<DragonDeepCatalog|null>(null),[wiki,setWiki]=useState<DragonWikiCatalog|null>(null);
  const [query,setQuery]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [mode,setMode]=useState<'historic'|'current'>('historic'),[managed,setManaged]=useState<string|null>(null);
+ const [sort,setSort]=useState<DragonWikiSearchOptions['order']>('relevance'),[requireAll,setRequireAll]=useState(false),[partition,setPartition]=useState('');
  const [rights,setRights]=useState(false),[erase,setErase]=useState(''),[days,setDays]=useState('30');
  const owner=useRef(getAuthToken()),epoch=useRef(0),pending=useRef<AbortController|null>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const invalidate=useCallback(()=>{epoch.current++;pending.current?.abort();pending.current=null;if(timer.current!==null)clearTimeout(timer.current);timer.current=null;},[]);
@@ -29,7 +30,10 @@ export default function DragonDeepArchivePanel({revision,canWrite,disabled,onWin
  try{const page=await getDragonDeepCatalog(cursor,run.ctrl.signal);if(run.valid())setCatalog(page);}
  catch(e){if(run.valid())setError(e instanceof Error?e.message:'Catalogue unavailable.');}finally{run.finish();}}
  async function search(cursor?:string){if(disabled||busy||!query.trim())return;const run=start();setWiki(null);const started=performance.now();
- try{const result=await queryDragonWiki(query,mode,cursor,run.ctrl.signal);if(!run.valid())return;
+ try{const part=partition.trim()===''?null:Number(partition);
+ if(mode==='historic'&&part!==null&&(!Number.isInteger(part)||part<0||part>1023)){setError('Choose a partition from 0 to 1023.');return;}
+ const filters:DragonWikiSearchOptions=mode==='historic'?{partition:part,order:sort,match:requireAll?'all':'any'}:{partition:null,order:'relevance',match:'any'};
+ const result=await queryDragonWiki(query,mode,cursor,run.ctrl.signal,filters);if(!run.valid())return;
  const ttl=(result.valid_until-result.as_of_unix)*1000-(performance.now()-started);
  if(ttl<=0){setError('Wiki citation permission expired.');return;}setWiki(result);
  timer.current=setTimeout(()=>{if(run.valid())setWiki(null);},ttl);
@@ -68,9 +72,15 @@ export default function DragonDeepArchivePanel({revision,canWrite,disabled,onWin
  <TextInput value={query} onChangeText={value=>{invalidate();setBusy(false);setWiki(null);setQuery(value);}} style={field} maxLength={256} editable={!locked} accessibilityLabel="HOAG Wiki search query"/>
  <View style={s.row}><Button label="Historical index" disabled={locked||mode==='historic'} action={()=>{setMode('historic');setWiki(null);}}/>
  <Button label="Current AI evidence" disabled={locked||mode==='current'} action={()=>{setMode('current');setWiki(null);}}/></View>
+ {mode==='historic'&&<View style={s.check}>
+ <Text style={s.small}>Index order: {sort==='relevance'?'relevance within candidate pages':sort==='archive_newest'?'newest archive admission first':'oldest archive admission first'}</Text>
+ <View style={s.row}>{(['relevance','archive_newest','archive_oldest'] as const).map(value=><Button key={value} label={value.replaceAll('_',' ')} disabled={locked||sort===value} action={()=>{setSort(value);setWiki(null);}}/>)}</View>
+ <View style={s.row}><Switch value={requireAll} onValueChange={value=>{setRequireAll(value);setWiki(null);}} disabled={locked} accessibilityLabel="Require all lexical terms"/><Text style={[s.small,s.grow]}>Require every normalized query term in an exact source</Text></View>
+ <TextInput value={partition} onChangeText={value=>{setPartition(value);setWiki(null);}} maxLength={4} keyboardType="number-pad" editable={!locked} style={field} placeholder="All partitions" accessibilityLabel="Optional archive partition number"/>
+ </View>}
  <Button label="Search selected evidence plane" disabled={locked||!query.trim()} action={()=>void search()}/>
  {wiki&&<View style={s.check}><Text style={s.small}>{wiki.pointers.length} request-local {wiki.mode} citations. No prose persisted into Wiki; no knowledge promotion.</Text>
- {wiki.pointers.map(hit=><Text selectable key={hit.citation} style={s.small}>{hit.citation}{hit.matched_terms?' · '+hit.matched_terms+' terms':''}</Text>)}
+ {wiki.pointers.map(hit=><Text selectable key={hit.citation} style={s.small}>{hit.citation}{hit.matched_terms?' · '+hit.matched_terms+' terms':''}{hit.partition!==undefined?' · partition '+hit.partition:''}{hit.archived_at!==undefined?' · archived '+new Date(hit.archived_at*1000).toLocaleDateString():''}</Text>)}
  {wiki.mode==='historic'&&<Button label="Inspect matching historical passages" disabled={locked||!wiki.pointers.length}
  action={()=>onWindow([...new Set(wiki.pointers.map(x=>x.session_id))].sort(),query)}/>}
  <Button label="Next indexed page" disabled={locked||!wiki.next_cursor} action={()=>void search(wiki.next_cursor??undefined)}/></View>}

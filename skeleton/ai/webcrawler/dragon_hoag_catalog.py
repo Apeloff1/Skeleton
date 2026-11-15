@@ -68,8 +68,14 @@ def history_catalog(projection,*,now):
         rows.append({**row,"plane":"historic","version":hit["version"],"snapshot_digest":hit["snapshot_digest"],
                      "preserved_text_hash":hit["preserved_text_hash"],"source_use_version":hit["policy_version"],
                      "matched_terms":hit["matched_terms"],"captured_at":_stamp(hit["captured_at"]),
+                     **({"archived_at":_stamp(hit["archived_at"]),"partition":hit["partition"]}
+                        if "archived_at" in hit and type(hit.get("partition")) is int and 0<=hit["partition"]<1024 else {}),
                      "model_context_authorized":False})
-    return envelope("historic",rows,now,projection["next_cursor"])
+    from .dragon_archive_scale import search_options
+    options=search_options(**{"partition_id":projection.get("search_options",{}).get("partition"),
+        "order":projection.get("search_options",{}).get("order","relevance"),
+        "match":projection.get("search_options",{}).get("match","any")})
+    return {**envelope("historic",rows,now,projection["next_cursor"]),"search_options":options}
 
 
 def envelope(mode,rows,now,cursor):
@@ -79,3 +85,23 @@ def envelope(mode,rows,now,cursor):
             "valid_until":min([now+60,*[r["valid_until"] for r in rows]]),
             "pointers":rows,"next_cursor":cursor,"request_local":True,
             "stored_prose":0,"knowledge_promoted":False,"network_executed":False}
+
+
+def validate_current_binding(projection,*,now):
+    """Ensure the exact request-local Wiki receipt matches the canonical chat evidence.
+
+    The receipt has no persistent authority. Existing source dependency
+    revalidation remains required before inference, resume and reuse.
+    """
+    receipt=projection.get("hoag_wiki")
+    if not isinstance(receipt,dict) or receipt.get("schema")!=SCHEMA or receipt.get("mode")!="current":
+        raise ValueError("missing current Wiki provenance")
+    issued=_stamp(receipt.get("as_of_unix"))
+    if issued>now or _stamp(receipt.get("valid_until"))<=now:
+        raise ValueError("Wiki provenance expired")
+    expected=current_catalog(projection,now=issued)
+    if expected!=receipt:
+        raise ValueError("Wiki provenance differs from live crawler projection")
+    if any(row["valid_until"]<=now for row in expected["pointers"]):
+        raise ValueError("crawler evidence expired")
+    return {row["citation"]:row["passage_digest"] for row in expected["pointers"]}

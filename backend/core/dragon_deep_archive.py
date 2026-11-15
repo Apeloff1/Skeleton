@@ -242,23 +242,22 @@ class DragonDeepArchiveMixin:
             totals["indexed" if changed.modified_count else "superseded"]+=1
         return totals
 
-    async def deep_archive_search(self,scope,*,query,cursor=None):
+    async def deep_archive_search(self,scope,*,query,cursor=None,partition_id=None,order="relevance",match="any"):
         """Indexed candidate pages, exact reparse of each admitted row."""
         from core.dragon_crawler import CrawlerError,_now
         try:
             terms,tokens=a.query_terms(scope,query)
-            after=a.decode_cursor(scope,query,cursor)
+            options=a.search_options(partition_id=partition_id,order=order,match=match)
+            boundary=a.search_boundary(scope,query,options,cursor)
         except ValueError as exc:
             raise CrawlerError("crawler_deep_query","Invalid archive search or cursor.",422) from exc
         await self.ensure_indexes()
         now=_now().timestamp()
-        predicate={**scope,"status":{"$in":sorted(TERMINAL)},"deep_archive.released":True,
-            "deep_index.tokens":{"$in":tokens},"deep_index.expires_at":{"$gt":now}}
-        if after:
-            predicate["_id"]={"$gt":after}
+        predicate,sort=a.search_predicate(scope,tokens,now,options,boundary)
         async def page():
-            return await self.sessions.find(predicate,{"_id":1,"version":1,"deep_index.digest":1}
-                ).sort("_id",ASCENDING).limit(a.PAGE+1).max_time_ms(3000).to_list(a.PAGE+1)
+            return await self.sessions.find(predicate,{"_id":1,"version":1,"deep_index.digest":1,
+                "deep_archive.accepted_at":1,"deep_archive.partition":1}
+                ).sort(sort).limit(a.PAGE+1).max_time_ms(3000).to_list(a.PAGE+1)
         rows=await page()
         hits=[]
         held=0
@@ -272,7 +271,8 @@ class DragonDeepArchiveMixin:
                 def rank():
                     snap,grant,policies,allowed=self._deep_material(scope,row,now)
                     a.validate_index(row["deep_index"],snap,grant,policies,now)
-                    return a.rank_exact(scope,snap,grant,policies,now,terms,allowed)
+                    return a.rank_exact(scope,snap,grant,policies,now,terms,allowed,
+                        require_all=match=="all")
                 matches=await _bounded_discovery_cpu(rank)
             except CrawlerError as exc:
                 if exc.code=="crawler_vault_busy":
@@ -285,18 +285,26 @@ class DragonDeepArchiveMixin:
             for h in matches:
                 expiries.append(h["valid_until"])
                 hits.append({**h,"session_id":row["_id"],"version":row["version"],
-                             "snapshot_digest":row["deep_archive"]["snapshot_digest"]})
+                             "snapshot_digest":row["deep_archive"]["snapshot_digest"],
+                             "archived_at":row["deep_archive"]["accepted_at"],
+                             "partition":row["deep_archive"]["partition"]})
         if rows!=await page() or expiries and min(expiries)<=_now().timestamp():
             raise CrawlerError("crawler_deep_changed","Archive authority changed during search.",409)
         # Bounded candidate rank, not global BM25. Preserve duplicate evidence
         # separately from source count; never present duplicates as corroboration.
-        hits.sort(key=lambda h:(-h["matched_terms"],-h["term_frequency"],-h["captured_at"],h["session_id"],h["source_id"]))
+        if order=="relevance":
+            hits.sort(key=lambda h:(-h["matched_terms"],-h["term_frequency"],-h["captured_at"],h["session_id"],h["source_id"]))
+        else:
+            direction=-1 if order=="archive_newest" else 1
+            hits.sort(key=lambda h:(direction*h["archived_at"],h["session_id"],-h["matched_terms"],h["source_id"]))
         unique={}
         for h in hits:
             unique.setdefault(h["preserved_text_hash"],h)
         return {"ok":True,"schema":"skeleton.dragon.deep-search.v1","scanned":min(len(rows),a.PAGE),
             "held":held,"matches":list(unique.values())[:32],"matching_payloads":len(unique),
-            "next_cursor":a.cursor(scope,query,rows[a.PAGE-1]["_id"]) if len(rows)>a.PAGE else None,
+            "next_cursor":a.search_cursor(scope,query,options,identifier=rows[a.PAGE-1]["_id"],
+                accepted_at=rows[a.PAGE-1]["deep_archive"]["accepted_at"]) if len(rows)>a.PAGE else None,
+            "search_options":options,
             "as_of_unix":now,"earliest_expiry":min(expiries) if expiries else None,
             "approximate_routing":True,"page_local_ranking":True,"history_only":True,
             "source_text_returned":False,"model_context_permission":False,"wiki_approval":False}
@@ -323,12 +331,16 @@ class DragonDeepArchiveMixin:
             purged+=int(bool(changed.modified_count))
         return {"scanned":len(rows),"purged":purged,"source_records_erased":0}
 
-    async def query_hoag_wiki(self,scope,*,query,mode="historic",cursor=None):
+    async def query_hoag_wiki(self,scope,*,query,mode="historic",cursor=None,partition_id=None,order="relevance",match="any"):
         from core.dragon_crawler import CrawlerError,_now
         from skeleton.distributed.galaxy.librarians import WikiLibrarian
         if mode=="historic":
-            result=await self.deep_archive_search(scope,query=query,cursor=cursor)
-        elif mode=="current" and cursor is None:
+            if partition_id is None and order=="relevance" and match=="any":
+                result=await self.deep_archive_search(scope,query=query,cursor=cursor)
+            else:
+                result=await self.deep_archive_search(scope,query=query,cursor=cursor,
+                    partition_id=partition_id,order=order,match=match)
+        elif mode=="current" and cursor is None and partition_id is None and order=="relevance" and match=="any":
             result=await self.context(scope,query,8,32000)
         else:
             raise CrawlerError("crawler_wiki_query","Invalid Wiki source plane or cursor.",422)

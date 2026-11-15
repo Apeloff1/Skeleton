@@ -202,8 +202,13 @@ async function main(){
     pointers:[{session_id:'deep-fixture',source_id:'a'.repeat(64),citation:'dragon-crawl://deep-fixture/'+'a'.repeat(64),
       valid_until:1800000040,review_state:'unreviewed_external_evidence',stored_prose:0,plane:'historic',model_context_authorized:false,
       source_use_version:0,matched_terms:2,captured_at:1700000000,version:7,snapshot_digest:'b'.repeat(64),preserved_text_hash:'c'.repeat(64)}],
-    next_cursor:null,request_local:true,stored_prose:0,knowledge_promoted:false,network_executed:false};
+    next_cursor:null,request_local:true,stored_prose:0,knowledge_promoted:false,network_executed:false,search_options:{partition:null,order:'relevance',match:'any'}};
   vc.set(wiki);assert.deepEqual(await vc.wiki('orbital','historic'),wiki);
+  vc.set({...wiki,search_options:{partition:7,order:'archive_newest',match:'all'},pointers:[]});
+  await assert.rejects(vc.wiki('orbital','historic'),e=>e.kind==='protocol');
+  const filtered={...wiki,search_options:{partition:7,order:'archive_newest',match:'all'},
+    pointers:[{...wiki.pointers[0],partition:7,archived_at:1700000000}]};
+  vc.set(filtered);assert.deepEqual(await vc.wiki('orbital','historic',undefined,undefined,filtered.search_options),filtered);
   for(const patch of [{model_context_authorized:true},{text:'not permitted'},{citation:'foreign'},{valid_until:1800000000}]){
     vc.set({...wiki,pointers:[{...wiki.pointers[0],...patch}]});await assert.rejects(vc.wiki('orbital','historic'),e=>e.kind==='protocol');
   }

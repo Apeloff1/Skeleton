@@ -2891,14 +2891,20 @@ async def crawler_deep_catalog(cursor:str|None=Query(default=None,max_length=128
 @router.get("/crawler/companion/hoag-wiki")
 async def crawler_hoag_wiki(query:str=Query(min_length=1,max_length=512),
     mode:Literal["historic","current"]=Query(default="historic"),
-    cursor:str|None=Query(default=None,max_length=193),scope:dict=Depends(_crawler_scope))->dict:
-    return await _crawler_result(crawler_application.query_hoag_wiki(scope,query=query,mode=mode,cursor=cursor))
+    cursor:str|None=Query(default=None,max_length=240),
+    partition_id:int|None=Query(default=None,ge=0,le=1023),
+    order:Literal["relevance","archive_newest","archive_oldest"]=Query(default="relevance"),
+    match:Literal["any","all"]=Query(default="any"),scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.query_hoag_wiki(scope,query=query,mode=mode,cursor=cursor,partition_id=partition_id,order=order,match=match))
 
 
 @router.get("/crawler/companion/deep-search")
 async def crawler_deep_search(query:str=Query(min_length=1,max_length=512),
-    cursor:str|None=Query(default=None,max_length=193),scope:dict=Depends(_crawler_scope))->dict:
-    return await _crawler_result(crawler_application.deep_archive_search(scope,query=query,cursor=cursor))
+    cursor:str|None=Query(default=None,max_length=240),
+    partition_id:int|None=Query(default=None,ge=0,le=1023),
+    order:Literal["relevance","archive_newest","archive_oldest"]=Query(default="relevance"),
+    match:Literal["any","all"]=Query(default="any"),scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.deep_archive_search(scope,query=query,cursor=cursor,partition_id=partition_id,order=order,match=match))
 
 
 @router.post("/crawler/sessions/{session_id}/deep-archive")
