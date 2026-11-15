@@ -22,9 +22,9 @@ from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from gameforge.prood import event_bus, saga_orchestrator, quorum_consensus, recent_events
+from gameforge.prood import event_bus, quorum_consensus, recent_events
 from gameforge.prood.quorum import QuorumConsensus
-from gameforge.prood.saga_orchestrator import SagaStep
+from gameforge.prood.saga_orchestrator import SagaOrchestrator, SagaStep
 from gameforge.workflow.internal_build_system import create_internal_build_system
 from gameforge.workflow.jeeves_vault import jeeves_vault
 
@@ -183,6 +183,8 @@ async def saga_deploy(req: SagaDemoRequest):
         if req.fail_at == "build":
             raise RuntimeError("injected build failure")
         b = builder.build_game({"project": req.project_name, "systems": {"demo": {}}}, phase="saga")
+        if not b.get("qualification", {}).get("replay_verified"):
+            raise RuntimeError("build did not qualify as a reference prototype")
         await event_bus.publish("saga.build.ok", {"project": req.project_name})
         return {"_bundle": b["bundle_bytes"], "package_name": b["package_name"],
                 "signature": b["signature"], "architectures": b["architectures"]}
@@ -192,17 +194,22 @@ async def saga_deploy(req: SagaDemoRequest):
             raise RuntimeError("injected register failure")
         pkg = jeeves_vault.register(
             project_name=req.project_name, package_name=ctx["package_name"],
-            package_bytes=ctx["_bundle"], quality=0.9,
+            package_bytes=ctx["_bundle"], quality=0.0,
             architectures=ctx["architectures"], signature=ctx["signature"],
-            metadata={"kind": "saga_demo"},
+            metadata={"kind": "saga_demo", "release_qualified": False},
         )
-        await event_bus.publish("saga.register.ok", {"package_id": pkg["package_id"]})
-        return {"package_id": pkg["package_id"], "download_path": pkg["download_path"]}
+        # Keep the compensation identity before any await can cancel us.
+        ctx.update({"package_id": pkg["package_id"], "download_path": pkg["download_path"]})
+        return {"package_id": pkg["package_id"], "download_path": pkg["download_path"],
+                "download_token": pkg["download_token"]}
 
     async def _unregister(ctx):
         # compensation for register: remove the package
         if ctx.get("package_id"):
-            jeeves_vault.delete(ctx["package_id"])
+            if not jeeves_vault.delete(ctx["package_id"]):
+                raise RuntimeError("package revocation failed")
+            ctx.pop("download_token", None)
+            ctx["download_path"] = None
             await event_bus.publish("saga.register.compensated", {"package_id": ctx["package_id"]})
         return {"package_id": None, "rolled_back": True}
 
@@ -211,17 +218,19 @@ async def saga_deploy(req: SagaDemoRequest):
             raise RuntimeError("injected deliver failure")
         return {"delivered": True, "download_path": ctx.get("download_path")}
 
-    saga_orchestrator.register_saga("prood_deploy", [
+    # Each request owns its closures and saga definition.
+    orchestrator = SagaOrchestrator()
+    orchestrator.register_saga("prood_deploy", [
         SagaStep("build", _build),
-        SagaStep("register", _register, compensate=_unregister),
+        SagaStep("register", _register, compensate=_unregister, requires_compensation=True),
         SagaStep("deliver", _deliver),
     ])
-    result = await saga_orchestrator.execute_saga("prood_deploy")
+    result = await orchestrator.execute_saga("prood_deploy")
     data = result.to_dict()
     # strip raw bytes from context before returning
     data["context"].pop("_bundle", None)
     data["context"].pop("signature", None)
-    return {"ok": result.status in ("completed", "compensated"), **data}
+    return {"ok": result.status == "completed", "release_qualified": False, **data}
 
 
 @router.get("/events")

@@ -14,7 +14,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 
-MAX_LEVELS = 128
+MAX_LEVELS = 256
 MAX_TURNS = 4096
 MAX_CAMPAIGN_BYTES = 256 * 1024
 ACTIONS = ("attack", "guard", "explore", "heal", "advance")
