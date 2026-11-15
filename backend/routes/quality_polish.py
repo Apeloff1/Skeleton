@@ -26,7 +26,7 @@ from core.forge_quality_contract import artifact_text, compatible_rewrite, sourc
 from fastapi import HTTPException
 
 from routes.quality import audit_quality, MIN_QUALITY, QUALITY_FACTORS
-from routes.playable import _GAME_ENSEMBLE, _llm_in_thread
+from routes.playable import PlayableModelFailure, _GAME_ENSEMBLE, _llm_in_thread
 
 # Tuned for the gate: polish passes are cheap relative to full forge re-rolls.
 MAX_POLISH_PASSES = 5
@@ -112,9 +112,11 @@ async def polish_pass(kind: str, content, simulate: bool = False,
         try:
             routed = await asyncio.to_thread(_llm_in_thread, prompt, system, _GAME_ENSEMBLE)
             candidate, proposed = artifact_text(routed.get("content", ""))
+            if type(content) in (dict, list):
+                candidate, proposed = artifact_text(proposed)
             if not compatible_rewrite(original, proposed):
                 raise ValueError("schema changed")
-        except HTTPException:
+        except (HTTPException, PlayableModelFailure):
             raise
         except Exception:
             passes.append(_trail(n, {
