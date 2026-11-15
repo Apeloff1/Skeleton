@@ -855,12 +855,19 @@ async def search_hoag_archive(scope:dict,query:str,limit:int=8,cursor:str|None=N
     No archive hint becomes a current Wiki approval or model training grant.
     """
     from skeleton.ai.runtime.distributed.galaxy.hoag import galaxy_card
-    reviewed=await search_reviewed_references(scope,query,limit)
+    wiki_state="available"
+    try:
+        reviewed=await search_reviewed_references(scope,query,limit)
+    except GameLearningError as exc:
+        if exc.status_code!=503:
+            raise
+        reviewed=None
+        wiki_state="unavailable"
     historical=await crawler_application.deep_archive_search(scope,query=query,cursor=cursor)
     topology=galaxy_card()
     return {"schema":"skeleton.dragon.hoag-archive-federation.v1",
         "nucleus":topology["nucleus"],"rings":topology["brains"],
-        "wiki_reviewed":reviewed,"archive_candidates":historical,
+        "wiki_reviewed":reviewed,"wiki_state":wiki_state,"archive_candidates":historical,
         "archive_route":["memory","editor","wiki"],
         "source_review_required":True,"history_only":True,
         "automatic_promotion":False,"training_allowed":False}

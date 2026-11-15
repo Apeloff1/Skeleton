@@ -233,6 +233,8 @@ class TreasuryIntegrationTests(unittest.IsolatedAsyncioTestCase):
         from skeleton.ai.webcrawler.dragon_index_manifest import build_manifest
         row,now=self.maintenance_fixture()
         row["treasury_index"]=build_manifest(row["snapshot"],row["archive_grant"],now=now.timestamp()-30)
+        from skeleton.ai.webcrawler.dragon_archive_routing import build_routing
+        row["treasury_archive_route"]=build_routing(SCOPE,row["treasury_index"],row["archive_grant"],now=now.timestamp())
         app=self.maintenance_app(row)
         with patch("core.dragon_crawler._now",return_value=now):
             result=await app.repair_treasury_segments()
@@ -300,7 +302,7 @@ class TreasuryIntegrationTests(unittest.IsolatedAsyncioTestCase):
         with patch("core.dragon_crawler._now",return_value=now):
             result=await app.repair_treasury_segments()
         self.assertEqual(result["blocked"],1)
-        self.assertEqual(app.sessions.update_one.await_args.args[1]["$unset"],{"treasury_index":""})
+        self.assertEqual(app.sessions.update_one.await_args.args[1]["$unset"],{"treasury_index":"","treasury_archive_route":""})
         app._admit.assert_not_awaited()
 
     async def test_expired_posting_cleanup_preserves_snapshot_and_uses_exact_version(self):

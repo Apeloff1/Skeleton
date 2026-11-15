@@ -1724,3 +1724,29 @@ export async function getCrawlAtlas(
   }
   return report;
 }
+
+export type DeepArchiveMarker={partition:number;snapshot_digest:string;accepted_at:number;state:'pending'|'archived';released:boolean};
+export type DeepArchiveRecord={session_id:string;version:number;archive:DeepArchiveMarker|null;grant_recorded:boolean;index_recorded:boolean;integrity_held:boolean};
+export type DeepArchiveCatalog={schema:'skeleton.dragon.deep-catalog.v1';records:DeepArchiveRecord[];next_cursor:string|null;partitions:1024;partition_capacity:1024;reservation_ceiling:1048576;storage_capacity_verified:false};
+export type DeepArchiveHit={session_id:string;source_id:string;version:number;snapshot_digest:string;preserved_text_hash:string;captured_at:number;valid_until:number;matched_terms:number;term_frequency:number};
+export type DeepArchiveSearch={schema:'skeleton.dragon.deep-search.v1';scanned:number;held:number;matches:DeepArchiveHit[];matching_payloads:number;next_cursor:string|null;as_of_unix:number;earliest_expiry:number|null;approximate_routing:true;page_local_ranking:true;history_only:true;source_text_returned:false;model_context_permission:false;wiki_approval:false};
+const deepMarker=(x:DeepArchiveMarker)=>!!x&&integer(x.partition,1023)&&HASH.test(x.snapshot_digest)&&Number.isFinite(x.accepted_at)&&x.accepted_at>=0&&['pending','archived'].includes(x.state)&&typeof x.released==='boolean'&&(!x.released||x.state==='archived');
+export async function archiveToDeep(id:string,body:CrawlCommand&{retention_acknowledged:true},signal?:AbortSignal){
+ const p=await read(api.post<{schema:string;session_id:string;version:number;archive:DeepArchiveMarker;outcome:string;network_executed:false;source_permission_extended:false}>(ROOT+'/sessions/'+identifier(id)+'/deep-archive',body,options(signal)),getAuthToken(),'Deep archive transfer unavailable.');
+ if(!p||p.schema!=='skeleton.dragon.deep-command.v1'||p.session_id!==id||!integer(p.version)||p.version<1||!deepMarker(p.archive)||!['archived','held','superseded','capacity_held'].includes(p.outcome)||p.network_executed!==false||p.source_permission_extended!==false)invalid('Invalid deep archive transfer receipt.');
+ return p;
+}
+export async function getDeepArchive(cursor?:string,signal?:AbortSignal):Promise<DeepArchiveCatalog>{
+ if(cursor!==undefined&&!ID.test(cursor))invalid('Invalid deep archive cursor.');
+ const p=await read(api.get<DeepArchiveCatalog>(ROOT+'/companion/deep-archive?limit=32'+(cursor?'&cursor='+encodeURIComponent(cursor):''),options(signal)),getAuthToken(),'Deep archive catalogue unavailable.');
+ if(!p||p.schema!=='skeleton.dragon.deep-catalog.v1'||p.partitions!==1024||p.partition_capacity!==1024||p.reservation_ceiling!==1048576||p.storage_capacity_verified!==false||!Array.isArray(p.records)||p.records.length>32||p.records.some((x,i)=>!x||!ID.test(x.session_id)||!integer(x.version)||x.version<1||typeof x.integrity_held!=='boolean'||typeof x.grant_recorded!=='boolean'||typeof x.index_recorded!=='boolean'||(x.integrity_held?x.archive!==null||x.grant_recorded||x.index_recorded:!x.archive||!deepMarker(x.archive))||i>0&&p.records[i-1].session_id>=x.session_id||cursor!==undefined&&x.session_id<=cursor)||p.next_cursor!==null&&(p.records.length!==32||p.next_cursor!==p.records[p.records.length-1].session_id))invalid('Invalid deep archive catalogue.');
+ return p;
+}
+export function validateDeepArchiveSearch(p:DeepArchiveSearch):DeepArchiveSearch{
+ if(!p||p.schema!=='skeleton.dragon.deep-search.v1'||!integer(p.scanned,32)||!integer(p.held,p.scanned)||!integer(p.matching_payloads,2048)||!Array.isArray(p.matches)||p.matches.length!==Math.min(32,p.matching_payloads)||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0||p.earliest_expiry!==null&&(!Number.isFinite(p.earliest_expiry)||p.earliest_expiry<=p.as_of_unix)||p.matches.length>0&&p.earliest_expiry===null||new Set(p.matches.map(x=>x?.preserved_text_hash)).size!==p.matches.length||p.matches.some(x=>!x||!ID.test(x.session_id)||!HASH.test(x.source_id)||!HASH.test(x.snapshot_digest)||!HASH.test(x.preserved_text_hash)||!integer(x.version)||x.version<1||!integer(x.matched_terms,32)||x.matched_terms<1||!integer(x.term_frequency,256)||!Number.isFinite(x.captured_at)||!Number.isFinite(x.valid_until)||x.valid_until<=p.as_of_unix)||p.next_cursor!==null&&(typeof p.next_cursor!=='string'||p.next_cursor.length>1024)||p.approximate_routing!==true||p.page_local_ranking!==true||p.history_only!==true||p.source_text_returned!==false||p.model_context_permission!==false||p.wiki_approval!==false)invalid('Invalid scoped historical archive search.');
+ return p;
+}
+export async function searchDeepArchive(query:string,cursor?:string,signal?:AbortSignal):Promise<DeepArchiveSearch>{
+ if(!query.trim()||query.length>512||cursor!==undefined&&cursor.length>1024)invalid('Invalid deep archive search.');
+ return validateDeepArchiveSearch(await read(api.get<DeepArchiveSearch>(ROOT+'/companion/deep-search?query='+encodeURIComponent(query)+(cursor?'&cursor='+encodeURIComponent(cursor):''),options(signal)),getAuthToken(),'Deep archive search unavailable.'));
+}

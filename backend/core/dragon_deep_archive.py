@@ -227,7 +227,11 @@ class DragonDeepArchiveMixin:
                     return a.build_index(scope,snap,grant,policies,now,allowed)
                 index=await _bounded_discovery_cpu(build)
                 await self._admit(scope,row["_id"],{"deep_index":index})
-            except (ValueError,TypeError,KeyError,CrawlerError,CheckpointReplicaError):
+            except CrawlerError:
+                await self.sessions.update_one(fence,{"$set":{"deep_index_due":_now().timestamp()+300}})
+                totals["held"]+=1
+                continue
+            except (ValueError,TypeError,KeyError,CheckpointReplicaError):
                 await self.sessions.update_one(fence,{"$unset":{"deep_index":""},
                       "$set":{"deep_index_due":_now().timestamp()+3600}})
                 totals["held"]+=1

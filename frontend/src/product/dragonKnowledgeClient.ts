@@ -1,7 +1,7 @@
 import api, { type ApiResult } from '../utils/apiClient';
 import { authHeaders, getAuthToken } from '../auth/gameforgeAuth';
 import { ChatClientError, chatApiError } from './chatErrors';
-import { crawlRequestKey } from './crawlerClient';
+import { crawlRequestKey,validateDeepArchiveSearch,type DeepArchiveSearch } from './crawlerClient';
 
 export type DragonMechanic = { id: string; label: string; practice_supported: boolean };
 export type DragonKnowledgeReadiness = {
@@ -158,4 +158,11 @@ export async function resumeDragonReview(current: DragonKnowledgeCandidate, sign
   if (current.state !== 'pending_review' || !current.prepared_review || current.current_source_usable !== true) throw new ChatClientError('This saved review cannot currently resume.', { kind: 'validation' });
   const result = await request<{ candidate: DragonKnowledgeCandidate }>('post', '/knowledge/candidates/' + id(current.candidate_id) + '/review/resume', { review_id: current.prepared_review.review_id }, signal);
   const value = candidate(result.candidate, current.candidate_id); if (value.review?.review_id !== current.prepared_review.review_id || value.source_digest !== current.source_digest) invalid('The recovered review differs from the saved decision.'); return value;
+}
+
+export async function searchHoagHistory(query:string,cursor?:string,signal?:AbortSignal){
+ if(!query.trim()||query.length>300)invalid('Invalid Hoag archive query.');
+ const p=await request<{schema:string;archive_candidates:DeepArchiveSearch;wiki_state:'available'|'unavailable';wiki_reviewed:unknown;archive_route:string[];source_review_required:true;history_only:true;automatic_promotion:false;training_allowed:false}>('get','/knowledge/hoag-archive?q='+encodeURIComponent(query)+(cursor?'&cursor='+encodeURIComponent(cursor):''),null,signal);
+ if(!p||p.schema!=='skeleton.dragon.hoag-archive-federation.v1'||!['available','unavailable'].includes(p.wiki_state)||p.source_review_required!==true||p.history_only!==true||p.automatic_promotion!==false||p.training_allowed!==false||JSON.stringify(p.archive_route)!=='["memory","editor","wiki"]')invalid('Invalid Hoag federation authority.');
+ return {...p,archive_candidates:validateDeepArchiveSearch(p.archive_candidates)};
 }
