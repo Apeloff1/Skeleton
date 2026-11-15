@@ -15,7 +15,7 @@ import math
 from core.forge_quality_contract import MAX_ARTIFACT_CHARS, checked_json, review_scores, source_digest
 from core.http_errors import redact_client_text
 
-from routes.playable import _GAME_ENSEMBLE, _llm_in_thread
+from routes.playable import PlayableModelFailure, _GAME_ENSEMBLE, _llm_in_thread
 from fastapi import HTTPException
 
 # HARDCODED — maximal quality. Not configurable. Do not lower.
@@ -69,7 +69,7 @@ async def audit_quality(kind: str, content: str, simulate: bool = False,
     try:
         routed = await asyncio.to_thread(_llm_in_thread, prompt, _AUDIT_SYS, _GAME_ENSEMBLE)
         overall, factors, feedback = review_scores(routed.get("content", ""), QUALITY_FACTORS)
-    except HTTPException:
+    except (HTTPException, PlayableModelFailure):
         raise
     except Exception:
         return _unqualified("Complete quality judgment unavailable", digest)
