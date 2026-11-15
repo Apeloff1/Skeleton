@@ -59,6 +59,22 @@ export interface ComposeResult {
   topology?: Topology;
 }
 
+export interface GenreControlProfile {
+  schema: string;
+  genre: string;
+  family: string;
+  catalogs: string[];
+  actions: { id: string; kind: string; context?: string }[];
+  bindings: {
+    action: string;
+    control: string;
+    modifiers: string[];
+    scale: number;
+    axis: string;
+    deadzone: number;
+  }[];
+}
+
 export interface Beat {
   id: string;
   prompt: string;
