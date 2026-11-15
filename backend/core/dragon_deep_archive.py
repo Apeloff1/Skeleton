@@ -154,7 +154,7 @@ class DragonDeepArchiveMixin:
             result=await self.sessions.update_one({"_id":row["_id"],"tenant_id":row["tenant_id"],"owner_id":row["owner_id"],
                 "version":row["version"],"deep_index.digest":index["digest"],"deep_index.expires_at":index["expires_at"],
                 "$expr":{"$lte":["$deep_index.expires_at",{"$divide":[{"$toLong":"$$NOW"},1000]}]}},
-                {"$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":"","deep_index_due":""}})
+                {"$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":"","deep_dense_route":"","deep_dense_due":"","deep_index_due":""}})
             purged+=result.modified_count
         return {"scanned":len(rows),"purged":purged}
 
@@ -279,7 +279,7 @@ class DragonDeepArchiveMixin:
                 totals["held"]+=1
                 continue
             except (ValueError,TypeError,KeyError,CheckpointReplicaError):
-                await self.sessions.update_one(fence,{"$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":""},
+                await self.sessions.update_one(fence,{"$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":"","deep_dense_route":"","deep_dense_due":""},
                       "$set":{"deep_index_due":_now().timestamp()+3600}})
                 totals["held"]+=1
                 continue
@@ -375,7 +375,7 @@ class DragonDeepArchiveMixin:
             "source_text_returned":False,"model_context_permission":False,"wiki_approval":False}
 
 
-    def _historical_document(self,scope,row,source_id,terms,max_chars,now):
+    def _historical_document(self,scope,row,source_id,terms,max_chars,now,dense_hit=None):
         """Exact historical Unicode passage, with no authority from the index."""
         import hashlib
         from skeleton.ai.webcrawler.dragon_archive_grant import archive_expiry
@@ -391,16 +391,23 @@ class DragonDeepArchiveMixin:
         text=source["text"]
         if not text:
             raise ValueError("empty source")
-        width=min(max_chars,4000,len(text))
-        wanted=set(terms)
-        stride=max(1,width//2,(max(0,len(text)-width)+126)//127)
-        starts=list(range(0,max(1,len(text)-width+1),stride))
-        if starts[-1]!=len(text)-width:
-            starts.append(len(text)-width)
-        start=max(starts,key=lambda x:(len(wanted.intersection(_lexemes(text[x:x+width]))),-x))
-        span=text[start:start+width]
-        if wanted and not wanted.intersection(_lexemes(span)):
-            raise ValueError("query matched metadata, not text")
+        if dense_hit is not None:
+            start,end=dense_hit["start"],dense_hit["end"]
+            if (type(start) is not int or type(end) is not int or not 0<=start<end<=len(text)
+                    or end-start>768 or hashlib.sha256(text[start:end].encode()).hexdigest()!=dense_hit["passage_digest"]):
+                raise ValueError("dense passage changed")
+            span=text[start:min(end,start+max_chars)]
+        else:
+            width=min(max_chars,4000,len(text))
+            wanted=set(terms)
+            stride=max(1,width//2,(max(0,len(text)-width)+126)//127)
+            starts=list(range(0,max(1,len(text)-width+1),stride))
+            if starts[-1]!=len(text)-width:
+                starts.append(len(text)-width)
+            start=max(starts,key=lambda x:(len(wanted.intersection(_lexemes(text[x:x+width]))),-x))
+            span=text[start:start+width]
+            if wanted and not wanted.intersection(_lexemes(span)):
+                raise ValueError("query matched metadata, not text")
         content=hashlib.sha256(span.encode("utf-8")).hexdigest()
         ref={"schema_version":"skeleton.dragon.historical-chat-reference.v1",
              "session_id":row["_id"],"source_id":source_id,"snapshot_digest":snap["snapshot_digest"],
@@ -438,6 +445,23 @@ class DragonDeepArchiveMixin:
                 by_key[key]=hit
                 lane.append(key)
             lanes.append(lane)
+        from core.dragon_local_embeddings import configured
+        dense_status="disabled"
+        if configured():
+            try:
+                vector_hits=await self.dense_archive_candidates(scope,query,session_ids=session_ids)
+                dense_status="available"
+                lane=[]
+                for hit in vector_hits:
+                    key=hit["session_id"]+":"+hit["source_id"]
+                    by_key.setdefault(key,hit)
+                    if key not in lane:
+                        lane.append(key)
+                if lane:
+                    lanes.append(lane)
+            except Exception:
+                # A missing or failed operator model never blocks exact lexical retrieval.
+                dense_status="held"
         ordered=fuse_ranked(lanes,limit=32)
         selected=[]
         seen_payloads=set()
@@ -459,7 +483,7 @@ class DragonDeepArchiveMixin:
                 raise CrawlerError("crawler_deep_changed","Selected historical evidence changed.",409)
             try:
                 doc,ref=await _bounded_discovery_cpu(self._historical_document,scope,row,
-                    hit["source_id"],terms,min(remaining,4000),_now().timestamp())
+                    hit["source_id"],terms,min(remaining,4000),_now().timestamp(),hit if hit.get("_dense") else None)
             except (ValueError,TypeError,KeyError,CheckpointReplicaError):
                 continue
             if ref["snapshot_digest"]!=hit["snapshot_digest"]:
@@ -468,7 +492,7 @@ class DragonDeepArchiveMixin:
             refs.append(ref)
             remaining-=len(doc["text"])
         await self.assert_history_context(scope,refs)
-        return {"documents":docs,"references":refs,"history_only":True,"partial_routing":True}
+        return {"documents":docs,"references":refs,"history_only":True,"partial_routing":True,"dense_status":dense_status}
 
     def _check_history_pin(self,scope,row,pin,now):
         import hashlib
