@@ -170,3 +170,155 @@ class ManifestPartitionTests(TestCase):
             self.assertEqual(reopened.usage(new)["unique_chunks"],0)
             self.assertEqual(reopened.read_chunk(old,legacy,0),raw)
             self.assertEqual(reopened.ledger_paths(),paths)
+
+
+class OfflineOwnerMigrationTests(TestCase):
+    def test_catalogue_graph_outbox_fts_and_atomic_route_cutover(self):
+        from core.dragon_owner_migration import migrate
+        from core.dragon_lead_graph import _schema_row,ZERO
+        with TemporaryDirectory() as d,patch("core.dragon_lead_graph.MIN_RESERVE",0):
+            root=Path(d).resolve()
+            paths=tuple(root/("lane-"+str(i)+".db") for i in range(LANES))
+            base=paths[0];base.touch(mode=0o600)
+            scope=scope_for(5);other=scope_for(6)
+            first=seed(GameCorpus(base),scope,"Historic Fixture")
+            seed(GameCorpus(base),other,"Other Fixture")
+            graph=LeadGraph(base);graph.configure(scope,enabled=True,acknowledged=True)
+            with graph._db() as db:
+                db.execute("BEGIN IMMEDIATE")
+                graph._add(db,owner_key(scope),_schema_row("https://example.org/archived","Historic Fixture","storefront","fixture"),
+                    parent=ZERO,relation="seed",witness="a"*64,now=1)
+                db.execute("COMMIT")
+            provision(base,"corpus",paths,offline_acknowledged=True)
+            self.assertEqual(owner_path(base,"corpus",scope),base)
+            receipt=migrate(base,"corpus",scope,5,offline_acknowledged=True)
+            self.assertEqual(receipt["state"],"complete")
+            self.assertGreater(receipt["rows"],1)
+            self.assertEqual(owner_path(base,"corpus",scope),paths[5])
+            self.assertEqual(owner_path(base,"corpus",other),base)
+            self.assertEqual(GameCorpus(paths[5]).search_source_library(scope,"Historic")["sources"][0]["game_id"],first["game_id"])
+            self.assertEqual(len(LeadGraph(paths[5]).page(scope,q="Historic")["leads"]),1)
+            with GameCorpus(base)._db() as db:
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM games WHERE owner=?",(owner_key(scope),)).fetchone()[0],0)
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM games WHERE owner=?",(owner_key(other),)).fetchone()[0],1)
+            self.assertTrue(migrate(base,"corpus",scope,5,offline_acknowledged=True)["replayed"])
+
+    def test_committed_copy_recovers_after_cutover_failure(self):
+        from core.dragon_owner_migration import migrate
+        with TemporaryDirectory() as d:
+            root=Path(d).resolve()
+            paths=tuple(root/("lane-"+str(i)+".db") for i in range(LANES))
+            base=paths[0];base.touch(mode=0o600);scope=scope_for(4)
+            seed(GameCorpus(base),scope,"Recovery Fixture")
+            provision(base,"corpus",paths,offline_acknowledged=True)
+            with patch("core.dragon_owner_migration._remove",side_effect=RuntimeError("fixture failure")):
+                with self.assertRaises(RuntimeError):migrate(base,"corpus",scope,4,offline_acknowledged=True)
+            with self.assertRaises(ShardHeld):owner_path(base,"corpus",scope)
+            with self.assertRaises(ShardHeld):next_path(base,"corpus","lead")
+            with GameCorpus(paths[4])._db() as db:
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM games WHERE owner=?",(owner_key(scope),)).fetchone()[0],1)
+            receipt=migrate(base,"corpus",scope,4,offline_acknowledged=True)
+            self.assertEqual(receipt["state"],"complete")
+            self.assertEqual(owner_path(base,"corpus",scope),paths[4])
+
+    def test_manifest_move_preserves_payload_reference_and_tombstone(self):
+        from core.dragon_owner_migration import migrate
+        disk=namedtuple("Disk","total used free")
+        with TemporaryDirectory() as d,patch("core.dragon_hoarder_bulk.shutil.disk_usage",return_value=disk(10*GIB,0,10*GIB)):
+            root=Path(d).resolve()
+            vol=Volume("primary",root,2*GIB);bulk=BulkArchive((vol,))
+            paths=tuple(root/("manifest-"+str(i)+".db") for i in range(LANES));base=paths[0]
+            scope=scope_for(2);raw=b"manifest migration bytes"
+            archive=ManifestArchive(base,bulk)
+            def put(op):
+                mid=archive.begin(scope,logical_key="fixture",operation=op,expected_hash=hashlib.sha256(raw).hexdigest(),
+                    expected_bytes=len(raw))["manifest"]
+                archive.append(scope,mid,0,raw);archive.seal(scope,mid)
+                return mid
+            first=put("first");second=put("second")
+            archive.abort(scope,first)
+            provision(base,"manifest",paths,offline_acknowledged=True)
+            migrate(base,"manifest",scope,2,offline_acknowledged=True)
+            reopened=ShardedManifestArchive(base,bulk)
+            reopened.collect_manifest(scope,first)
+            self.assertEqual(reopened.read_chunk(scope,second,0),raw)
+            self.assertEqual(reopened.usage(scope)["unique_chunks"],1)
+            self.assertEqual(owner_path(base,"manifest",scope),paths[2])
+
+
+class IntraOwnerIndexTests(TestCase):
+    def setUp(self):
+        d=TemporaryDirectory();self.addCleanup(d.cleanup)
+        self.root=Path(d.name).resolve()
+        self.index=self.root/"index";self.index.mkdir(mode=0o700)
+        self.graph=LeadGraph(self.root/"corpus.sqlite")
+        self.scope=scope_for(7);self.owner=owner_key(self.scope)
+        for patcher in (patch.dict(os.environ,{"SKL_DRAGON_LEAD_INDEX_ROOT":str(self.index)}),
+                        patch("core.dragon_lead_graph.MIN_RESERVE",0)):
+            patcher.start();self.addCleanup(patcher.stop)
+        self.graph.configure(self.scope,enabled=True,acknowledged=True)
+
+    def add_node(self,number):
+        from core.dragon_lead_graph import _schema_row,ZERO
+        with self.graph._db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            lead=self.graph._add(db,self.owner,_schema_row("https://example.org/game/"+str(number),"Fixture Game "+str(number),
+                "storefront","fixture"),parent=ZERO,relation="seed",witness="a"*64,now=1)
+            db.execute("COMMIT")
+        return lead
+
+    def pulse_all(self,count=3):
+        from core.dragon_lead_index_shards import pulse
+        for _ in range(count*LANES):
+            with self.graph._db() as db:db.execute("UPDATE lead_index_enrollment SET due=0")
+            pulse(self.graph)
+
+    def test_incremental_search_pagination_and_source_revision_fence(self):
+        from core.dragon_lead_index_shards import enroll
+        for i in range(35):self.add_node(i)
+        receipt=enroll(self.graph,self.scope,acknowledged=True)
+        self.assertFalse(self.graph.page(self.scope,q="Fixture")["physical_search_shards_used"])
+        self.pulse_all()
+        self.assertEqual(len(list((self.index/(self.owner+"-"+receipt["epoch"])).glob("lead-*.sqlite3"))),10)
+        using=self.graph.page(self.scope,q="Fixture",limit=7)
+        self.assertTrue(using["physical_search_shards_used"])
+        with patch.dict(os.environ,{"SKL_DRAGON_LEAD_INDEX_ROOT":""}):
+            baseline=self.graph.page(self.scope,q="Fixture",limit=7)
+        self.assertEqual(using["leads"],baseline["leads"])
+        self.assertEqual(using["next_cursor"],baseline["next_cursor"])
+        next_using=self.graph.page(self.scope,q="Fixture",limit=7,after=using["next_cursor"])
+        self.assertTrue(next_using["physical_search_shards_used"])
+        self.assertFalse({v["id"] for v in using["leads"]}&{v["id"] for v in next_using["leads"]})
+        new=self.add_node(99)
+        self.assertFalse(self.graph.page(self.scope,q="Fixture")["physical_search_shards_used"])
+        self.pulse_all()
+        result=self.graph.page(self.scope,q="Fixture",limit=100)
+        self.assertTrue(result["physical_search_shards_used"])
+        self.assertIn(new,{v["id"] for v in result["leads"]})
+        self.graph.review(self.scope,new,decision="held",reason="fixture",operation="review")
+        self.assertFalse(self.graph.page(self.scope,q="Fixture")["physical_search_shards_used"])
+        self.pulse_all()
+        self.assertNotIn(new,{v["id"] for v in self.graph.page(self.scope,q="Fixture",limit=100)["leads"]})
+        self.assertIn(new,{v["id"] for v in self.graph.page(self.scope,q="Fixture",state="held")["leads"]})
+
+    def test_index_loss_falls_back_and_rebuilds(self):
+        from core.dragon_lead_index_shards import enroll
+        self.add_node(1)
+        receipt=enroll(self.graph,self.scope,acknowledged=True)
+        self.pulse_all()
+        target=self.index/(self.owner+"-"+receipt["epoch"])/"lead-3.sqlite3"
+        target.unlink()
+        self.assertFalse(self.graph.page(self.scope,q="Fixture")["physical_search_shards_used"])
+        self.pulse_all()
+        self.assertTrue(self.graph.page(self.scope,q="Fixture")["physical_search_shards_used"])
+
+    def test_epoch_reset_after_restore_rejects_prior_files(self):
+        from core.dragon_lead_index_shards import enroll
+        self.add_node(1)
+        first=enroll(self.graph,self.scope,acknowledged=True)
+        self.pulse_all()
+        second=enroll(self.graph,self.scope,acknowledged=True,reset=True)
+        self.assertNotEqual(first["epoch"],second["epoch"])
+        self.assertFalse(self.graph.page(self.scope,q="Fixture")["physical_search_shards_used"])
+        self.pulse_all()
+        self.assertTrue(self.graph.page(self.scope,q="Fixture")["physical_search_shards_used"])

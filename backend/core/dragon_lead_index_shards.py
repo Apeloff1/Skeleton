@@ -46,7 +46,7 @@ def _trigger(name,event,expr,when):
     return f"""CREATE TRIGGER IF NOT EXISTS {name} AFTER {event} ON lead_nodes
     WHEN ({when}) AND EXISTS(SELECT 1 FROM lead_index_enrollment WHERE owner={expr}.owner)
     BEGIN
-      UPDATE lead_index_versions SET revision=revision+1 WHERE owner={expr}.owner AND lane={lane};
+      UPDATE lead_index_versions SET revision=revision+1,stamp=lower(hex(randomblob(32))) WHERE owner={expr}.owner AND lane={lane};
       INSERT INTO lead_index_changes(owner,lane,id,revision)
        SELECT {expr}.owner,{lane},{expr}.id,revision FROM lead_index_versions WHERE owner={expr}.owner AND lane={lane}
        ON CONFLICT(owner,lane,id) DO UPDATE SET revision=excluded.revision;
@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS lead_index_enrollment(
 CREATE INDEX IF NOT EXISTS lead_index_due ON lead_index_enrollment(due,owner);
 CREATE TABLE IF NOT EXISTS lead_index_versions(
  owner TEXT NOT NULL,lane INTEGER NOT NULL CHECK(lane BETWEEN 0 AND 9),revision INTEGER NOT NULL CHECK(revision>=0),
+ stamp TEXT NOT NULL CHECK(length(stamp)=64),floor INTEGER NOT NULL CHECK(floor>=0 AND floor<=revision),
  PRIMARY KEY(owner,lane)
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS lead_index_changes(
@@ -76,11 +77,12 @@ CREATE INDEX IF NOT EXISTS lead_index_change_order ON lead_index_changes(owner,l
 SCHEMA="""
 CREATE TABLE IF NOT EXISTS identity(
  singleton INTEGER PRIMARY KEY CHECK(singleton=1),owner TEXT NOT NULL,epoch TEXT NOT NULL,lane INTEGER NOT NULL,
- phase TEXT NOT NULL CHECK(phase IN ('scan','catchup')),cursor TEXT NOT NULL,revision INTEGER NOT NULL
+ phase TEXT NOT NULL CHECK(phase IN ('scan','catchup')),cursor TEXT NOT NULL,revision INTEGER NOT NULL,stamp TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS nodes(
  id TEXT PRIMARY KEY,owner TEXT NOT NULL,title TEXT NOT NULL,url TEXT NOT NULL,kind TEXT NOT NULL,
- family TEXT NOT NULL,host TEXT NOT NULL,state TEXT NOT NULL,next_review INTEGER NOT NULL
+ family TEXT NOT NULL,host TEXT NOT NULL,state TEXT NOT NULL,next_review INTEGER NOT NULL,
+ fts_row INTEGER NOT NULL UNIQUE
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS nodes_state ON nodes(state,id);
 CREATE INDEX IF NOT EXISTS nodes_family ON nodes(state,family,id);
@@ -130,9 +132,9 @@ def _shard(owner,epoch,lane,*,create=False):
         yield db
 
 
-def enroll(graph,scope,*,acknowledged=False):
+def enroll(graph,scope,*,acknowledged=False,reset=False):
     """Explicit operator opt-in; source generation is never reused after reset."""
-    if acknowledged is not True:raise ValueError("metadata index acknowledgement")
+    if acknowledged is not True or type(reset) is not bool:raise ValueError("metadata index acknowledgement")
     owner=owner_key(scope);_root()
     with graph._db() as db:
         db.execute("BEGIN IMMEDIATE")
@@ -140,11 +142,14 @@ def enroll(graph,scope,*,acknowledged=False):
             if not db.execute("SELECT 1 FROM lead_owner WHERE owner=?",(owner,)).fetchone():
                 raise LookupError("lead owner missing")
             row=db.execute("SELECT epoch FROM lead_index_enrollment WHERE owner=?",(owner,)).fetchone()
-            if row:epoch=row[0]
+            if row and not reset:epoch=row[0]
             else:
+                for name in ("lead_index_changes","lead_index_versions","lead_index_enrollment"):
+                    db.execute("DELETE FROM "+name+" WHERE owner=?",(owner,))
                 epoch=secrets.token_hex(32)
                 db.execute("INSERT INTO lead_index_enrollment VALUES(?,?,0,?)",(owner,epoch,int(time.time())))
-                db.executemany("INSERT INTO lead_index_versions VALUES(?,?,0)",((owner,n) for n in range(LANES)))
+                db.executemany("INSERT INTO lead_index_versions VALUES(?,?,0,?,0)",
+                    ((owner,n,secrets.token_hex(32)) for n in range(LANES)))
             db.execute("COMMIT")
         except BaseException:
             if db.in_transaction:db.execute("ROLLBACK")
@@ -153,17 +158,20 @@ def enroll(graph,scope,*,acknowledged=False):
 
 
 def _replace(db,row,identifier):
-    db.execute("DELETE FROM search WHERE id=?",(identifier,))
-    db.execute("DELETE FROM nodes WHERE id=?",(identifier,))
+    prior=db.execute("SELECT fts_row FROM nodes WHERE id=?",(identifier,)).fetchone()
+    if prior:
+        db.execute("DELETE FROM search WHERE rowid=?",(prior[0],))
+        db.execute("DELETE FROM nodes WHERE id=?",(identifier,))
     if row is not None:
-        db.execute("INSERT INTO nodes VALUES(?,?,?,?,?,?,?,?,?)",tuple(row))
-        db.execute("INSERT INTO search VALUES(?,?,?,?,?,?)",(row["owner"],row["id"],row["title"],row["url"],row["kind"],row["family"]))
+        posted=db.execute("INSERT INTO search VALUES(?,?,?,?,?,?)",
+            (row["owner"],row["id"],row["title"],row["url"],row["kind"],row["family"]))
+        db.execute("INSERT INTO nodes VALUES(?,?,?,?,?,?,?,?,?,?)",(*tuple(row),posted.lastrowid))
 
 
 def _version(db,owner,lane):
-    r=db.execute("SELECT revision FROM lead_index_versions WHERE owner=? AND lane=?",(owner,lane)).fetchone()
+    r=db.execute("SELECT revision,stamp,floor FROM lead_index_versions WHERE owner=? AND lane=?",(owner,lane)).fetchone()
     if not r:raise IndexHeld("source revision missing")
-    return r[0]
+    return r
 
 
 def _identity(db,owner,epoch,lane):
@@ -176,15 +184,18 @@ def _identity(db,owner,epoch,lane):
 def _pulse_lane(src,owner,epoch,lane):
     """One bounded scan or delta batch, against one source read snapshot."""
     low,high=bounds(lane)
-    version=_version(src,owner,lane)
+    source=_version(src,owner,lane);version=source['revision']
     with _shard(owner,epoch,lane,create=True) as dst:
         dst.execute("BEGIN IMMEDIATE")
         try:
             current=_identity(dst,owner,epoch,lane)
             if not current:
-                dst.execute("INSERT INTO identity VALUES(1,?,?,?,'scan','',?)",(owner,epoch,lane,version))
+                dst.execute("INSERT INTO identity VALUES(1,?,?,?,'scan','',?,?)",(owner,epoch,lane,version,source["stamp"]))
                 current=_identity(dst,owner,epoch,lane)
-            if current["revision"]>version:raise IndexHeld("projection ahead of source")
+            if current["revision"]>version or current["revision"]<source["floor"]:
+                raise IndexHeld("projection watermark outside retained source history; reset required")
+            if current["revision"]==version and current["stamp"]!=source["stamp"]:
+                raise IndexHeld("projection source lineage differs; reset required")
             fields=",".join(FIELDS)
             if current["phase"]=="scan":
                 rows=src.execute("SELECT "+fields+" FROM lead_nodes WHERE owner=? AND id>=? AND id<? AND id>? ORDER BY id LIMIT ?",
@@ -201,7 +212,8 @@ def _pulse_lane(src,owner,epoch,lane):
                     row=src.execute("SELECT "+fields+" FROM lead_nodes WHERE owner=? AND id=?",(owner,change["id"])).fetchone()
                     _replace(dst,row,change["id"])
                 watermark=rows[-1]["revision"] if len(rows)==BATCH else version
-                dst.execute("UPDATE identity SET revision=? WHERE singleton=1",(watermark,))
+                dst.execute("UPDATE identity SET revision=?,stamp=? WHERE singleton=1",
+                    (watermark,source["stamp"] if watermark==version else ""))
                 processed=len(rows)
             final=_identity(dst,owner,epoch,lane)
             dst.execute("COMMIT")
@@ -209,7 +221,7 @@ def _pulse_lane(src,owner,epoch,lane):
             if dst.in_transaction:dst.execute("ROLLBACK")
             raise
     return {"processed":processed,"phase":final["phase"],"revision":final["revision"],
-            "source_revision":version,"lane":lane}
+            "source_revision":version,"stamp":final["stamp"],"lane":lane}
 
 
 def pulse(graph):
@@ -243,6 +255,8 @@ def pulse(graph):
             db.execute("BEGIN IMMEDIATE")
             try:
                 if db.execute("SELECT 1 FROM lead_index_enrollment WHERE owner=? AND epoch=?",(owner,epoch)).fetchone():
+                    db.execute("UPDATE lead_index_versions SET floor=MAX(floor,?) WHERE owner=? AND lane=?",
+                        (result["revision"],owner,lane))
                     db.execute("DELETE FROM lead_index_changes WHERE owner=? AND lane=? AND revision<=?",(owner,lane,result["revision"]))
                 db.execute("COMMIT")
             except BaseException:
@@ -260,15 +274,16 @@ def lookup(db,owner,terms,*,state,family,host,lower,cutoff,limit):
     row=db.execute("SELECT epoch FROM lead_index_enrollment WHERE owner=?",(owner,)).fetchone()
     if not row:raise IndexHeld("owner projection not enrolled")
     epoch=row[0];deadline=time.monotonic()+2
-    ids=[]
+    ids=[];witnesses={}
     query='owner:"'+owner+'" AND '+' AND '.join('"'+term+'"' for term in terms)
     for lane in range(LANES):
+        if time.monotonic()>deadline:raise IndexHeld('projection query deadline')
         expected=_version(db,owner,lane)
         with _shard(owner,epoch,lane) as shard:
             shard.execute("BEGIN")
             try:
                 identity=_identity(shard,owner,epoch,lane)
-                if not identity or identity["phase"]!="catchup" or identity["revision"]!=expected:
+                if not identity or identity["phase"]!="catchup" or identity["revision"]!=expected["revision"] or identity["stamp"]!=expected["stamp"]:
                     raise IndexHeld("projection not current")
                 where=["n.owner=?","n.state=?","n.id>?","search MATCH ?"]
                 values=[owner,state,lower,query]
@@ -277,12 +292,12 @@ def lookup(db,owner,terms,*,state,family,host,lower,cutoff,limit):
                 if cutoff is not None:where.append("n.next_review<=?");values.append(cutoff)
                 values.append(limit+1)
                 shard.set_progress_handler(lambda:int(time.monotonic()>deadline),1000)
-                found=shard.execute("SELECT n.id FROM nodes n JOIN search f ON n.id=f.id WHERE "+
+                found=shard.execute("SELECT "+",".join("n."+field for field in FIELDS)+" FROM nodes n JOIN search f ON n.fts_row=f.rowid WHERE "+
                     " AND ".join(where)+" ORDER BY n.id LIMIT ?",values).fetchall()
                 for item in found:
                     if not HEX.fullmatch(item[0]) or not bounds(lane)[0]<=item[0]<bounds(lane)[1]:
                         raise IndexHeld("projection candidate identity")
-                    ids.append(item[0])
+                    ids.append(item[0]);witnesses[item[0]]=tuple(item)
                 shard.execute("COMMIT")
             except BaseException:
                 if shard.in_transaction:shard.execute("ROLLBACK")
@@ -295,9 +310,11 @@ def lookup(db,owner,terms,*,state,family,host,lower,cutoff,limit):
     if [r["id"] for r in rows]!=picked or any(r["state"]!=state or family and r["family"]!=family or
         host and r["host"]!=host or cutoff is not None and r["next_review"]>cutoff for r in rows):
         raise IndexHeld("canonical candidate differs")
-    # Recheck the canonical FTS rather than granting eligibility from the
-    # derived index. This does not make external source metadata verified.
-    # The derived index is not evidence and only exact source rows leave it.
+    if any(tuple(row[field] for field in FIELDS)!=witnesses[row["id"]] for row in rows):
+        raise IndexHeld("canonical search witness differs")
+    # Only canonical rows leave the projection. The derived index does not
+    # grant evidence rights, and same-UID malicious modifications are outside
+    # this local operator-controlled cache boundary.
     return rows
 
 
@@ -309,14 +326,17 @@ def main():
     parser.add_argument("--scope-json",required=True)
     parser.add_argument("--acknowledge-metadata-index",action="store_true")
     parser.add_argument("--pulse",type=int,default=1)
+    parser.add_argument("--reset-derived-index",action="store_true")
     args=parser.parse_args()
     if not 0<=args.pulse<=1000:parser.error("bounded pulse count")
     scope_path,_=_private(Path(args.scope_json))
     if scope_path.stat().st_size>4096:raise IndexHeld("scope file bound")
     scope=json.loads(scope_path.read_bytes())
     graph=LeadGraph(_path(scope=scope))
-    print(json.dumps(enroll(graph,scope,acknowledged=args.acknowledge_metadata_index)))
-    for _ in range(args.pulse):print(json.dumps(pulse(graph)))
+    print(json.dumps(enroll(graph,scope,acknowledged=args.acknowledge_metadata_index,reset=args.reset_derived_index)))
+    for i in range(args.pulse):
+        if i:time.sleep(1)
+        print(json.dumps(pulse(graph)))
 
 
 if __name__=="__main__":main()
