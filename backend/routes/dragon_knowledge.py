@@ -106,7 +106,7 @@ class SourceComparisonRequest(Request):
 
 class DiscoverySubscriptionRequest(Request):
     url: str = Field(min_length=1,max_length=2048)
-    adapter: Literal["manifest","steam","rss_atom","sitemap","eve_sde"]
+    adapter: Literal["manifest","steam","rss_atom","sitemap","classified_sitemap","eve_sde"]
     provider: str | None = Field(default=None,max_length=32)
     external_id: str | None = Field(default=None,max_length=128)
     title: str | None = Field(default=None,max_length=256)
