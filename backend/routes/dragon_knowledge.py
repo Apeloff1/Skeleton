@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from typing import Literal
+import asyncio
+import os
 
 from fastapi import Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
@@ -46,6 +48,19 @@ class PracticeRequest(Request):
     max_steps: int = Field(default=128, ge=16, le=512, strict=True)
     practice_consent: StrictBool
     idempotency_key: str = Field(min_length=1, max_length=128)
+
+
+class GameObservationRequest(Request):
+    namespace: str = Field(min_length=1, max_length=128)
+    external_id: str = Field(min_length=1, max_length=128)
+    title: str = Field(min_length=1, max_length=256)
+    stage: Literal["announced", "early_access", "released", "updated", "delisted", "unknown"]
+    source: str = Field(min_length=1, max_length=2048)
+    kind: str = Field(min_length=1, max_length=32)
+    language: str = Field(default="und", min_length=2, max_length=32)
+    event_key: str = Field(min_length=1, max_length=128)
+    version: str | None = Field(default=None, max_length=128)
+    released_on: str | None = Field(default=None, min_length=10, max_length=10)
 
 
 def register_knowledge_routes(router):
@@ -145,3 +160,66 @@ def register_knowledge_routes(router):
         candidate_id: str, body: ResumeReviewRequest, user: dict = Depends(get_current_user)
     ):
         return await call(runtime.resume_review(editor(user), candidate_id, body.review_id))
+
+
+    async def corpus_call(owner, operation, *args, **kwargs):
+        from core.dragon_game_corpus import GameCorpus, CatalogueHeld
+
+        def work():
+            path = runtime._path(
+                "SKL_DRAGON_GAME_CORPUS_DB_PATH",
+                create=operation == "observe" and os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP") == "1",
+            )
+            # Keep this derived metadata database separate from other stores.
+            for variable in ("SKL_DRAGON_KNOWLEDGE_DB_PATH", "SKL_DRAGON_PRACTICE_DB_PATH"):
+                configured = os.getenv(variable, "").strip()
+                if configured:
+                    from pathlib import Path
+                    other = Path(configured).expanduser()
+                    if other.exists() and path.samefile(other):
+                        raise GameLearningError("dragon_storage_invalid", "Game catalogue needs its own store.", 503)
+            return getattr(GameCorpus(path), operation)(owner, *args, **kwargs)
+
+        try:
+            return await asyncio.to_thread(work)
+        except (ValueError, OverflowError) as exc:
+            raise HTTPException(422, detail={"code": "dragon_game_catalogue_invalid"}) from exc
+        except CatalogueHeld as exc:
+            raise HTTPException(409, detail={"code": "dragon_game_catalogue_held"}) from exc
+        except GameLearningError as exc:
+            raise HTTPException(exc.status, detail={"code": exc.code, "message": exc.message}) from exc
+        except (OSError, runtime.sqlite3.Error) as exc:
+            raise HTTPException(503, detail={"code": "dragon_game_catalogue_unavailable"}) from exc
+
+    @router.post("/knowledge/game-corpus/observations")
+    async def observe_game(body: GameObservationRequest, user: dict = Depends(get_current_user)):
+        return await corpus_call(editor(user), "observe", **body.model_dump())
+
+    @router.get("/knowledge/game-corpus/search")
+    async def search_games(q: str = Query(min_length=1, max_length=256),
+                           limit: int = Query(32, ge=1, le=100),
+                           user: dict = Depends(get_current_user)):
+        return await corpus_call(scope(user), "search", q, limit=limit)
+
+    @router.get("/knowledge/game-corpus/due")
+    async def due_sources(limit: int = Query(32, ge=1, le=100),
+                          user: dict = Depends(get_current_user)):
+        return await corpus_call(editor(user), "due", limit=limit)
+
+    @router.get("/knowledge/game-corpus/{game_id}/sources")
+    async def game_sources(game_id: str, after: str | None = Query(None, max_length=64),
+                           limit: int = Query(64, ge=1, le=100),
+                           user: dict = Depends(get_current_user)):
+        return await corpus_call(scope(user), "sources", game_id, after=after, limit=limit)
+
+    @router.get("/knowledge/game-corpus/{game_id}/history")
+    async def game_history(game_id: str, stamp: int | None = Query(None, ge=0),
+                           source: str | None = Query(None, max_length=64),
+                           event: str | None = Query(None, max_length=128),
+                           limit: int = Query(32, ge=1, le=100),
+                           user: dict = Depends(get_current_user)):
+        cursor = (stamp, source, event)
+        if any(x is not None for x in cursor) and any(x is None for x in cursor):
+            raise HTTPException(422, detail={"code": "dragon_game_history_cursor_invalid"})
+        return await corpus_call(scope(user), "history", game_id, limit=limit,
+                                 before=cursor if stamp is not None else None)
