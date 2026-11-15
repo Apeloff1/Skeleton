@@ -21,6 +21,7 @@ import {
 import { saveCrawlerExport } from '../../product/crawlerExport';
 import CrawlerInstructionSecurityPanel from './CrawlerInstructionSecurityPanel';
 import DragonCompanionPanel from './DragonCompanionPanel';
+import DragonTreasuryPanel from './DragonTreasuryPanel';
 import { buildCrawlerEvidenceBundle } from '../../product/crawlerEvidenceBundle';
 import {
   DRAGON_BUNDLE_MAX_SOURCES, eligibleForEvidenceBundle,
@@ -672,6 +673,7 @@ function PilotContent() {
               <Metric name="Frontier queue" value={String(session.frontier_count)} detail="Pending eligible URLs" />
             </View>
             <DragonCompanionPanel key={'companion:' + session.session_id} session={session} />
+            <DragonTreasuryPanel revision={sessions.map(row=>row.session_id+':'+row.version).sort().join('|')} session={session} canWrite={canWrite} disabled={!!busy} onSession={update} />
             <CrawlerInstructionSecurityPanel session={session} />
             {typeof session.counters.reserved_bytes === 'number'
               && session.counters.reserved_bytes > 0
