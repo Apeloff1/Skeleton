@@ -26,6 +26,7 @@ from core.dragon_vault import DragonVaultMixin
 from core.dragon_deep_archive import DragonDeepArchiveMixin
 from core.dragon_dense_runtime import DragonDenseArchiveMixin
 from core.dragon_exhaustive_vectors import DragonExhaustiveVectorMixin
+from core.dragon_current_vectors import DragonCurrentVectorMixin
 from core.dragon_hoarder_copy import DragonHoarderCopyMixin
 from core.dragon_cold_primary import DragonColdPrimaryMixin
 from core.dragon_checkpoint_replica import (
@@ -122,7 +123,7 @@ def _safe_error(exc: BaseException) -> str:
     return "crawler_slice_interrupted"
 
 
-class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,DragonExhaustiveVectorMixin,DragonDenseArchiveMixin,DragonDeepArchiveMixin,DragonVaultMixin):
+class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,DragonExhaustiveVectorMixin,DragonCurrentVectorMixin,DragonDenseArchiveMixin,DragonDeepArchiveMixin,DragonVaultMixin):
     def __init__(self, database=core_db):
         self.database = database
         self.sessions = database["dragon_crawler_sessions"]
@@ -395,7 +396,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
             snapshot = run_type.from_snapshot(snapshot).snapshot()
         except (CrawlerError, CheckpointReplicaError, ValueError, TypeError, KeyError, RecursionError):
             if row.get("cold_primary"):
-                raise CrawlerError("crawler_cold_primary_held","Relocated checkpoint requires exact archive inspection.",503)
+                raise CrawlerError("crawler_integrity","Relocated checkpoint requires exact archive inspection.",503)
             row = await self._repair_exact_checkpoint(scope, row, run_type)
             snapshot = _plain(self._custody_snapshot(row))
         binding = snapshot.get("binding", {})
@@ -1804,7 +1805,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                     snapshot={**snapshot,"sources":{sid:snapshot["sources"][sid]
                               for sid in proof["verified_source_ids"]}}
                 policies=self._source_policies(row)
-                if set(policies)-set(row["snapshot"]["sources"]):
+                if set(policies)-set(snapshot["sources"]):
                     raise ValueError("treasury repair orphan policy")
                 expected=await asyncio.to_thread(build_manifest,snapshot,grant,now=stamp,policies=policies)
                 try:
@@ -3811,6 +3812,8 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                     "deep_dense_due": "",
                     "deep_full_state": "",
                     "deep_full_due": "",
+                    "current_vector_state": "",
+                    "current_vector_due": "",
                     "deep_index_due": "",
                     "treasury_vault_care_history": "",
                 },
@@ -4401,7 +4404,14 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                     "reference": self._source_reference(row, source),
                     "valid_until": self._capture_freshness(row, source)["valid_until"],
                 })
-        selected = select_diverse_evidence(candidates, limit=max_docs, distinct_sources=True)
+        from core.dragon_local_embeddings import configured as embeddings_configured
+        if embeddings_configured():
+            try:
+                candidates.extend(await self.current_semantic_candidates(scope,search_query,session_ids))
+            except Exception:
+                # Exact lexical retrieval survives local model or index holds.
+                pass
+        selected = select_diverse_evidence(candidates[:512], limit=max_docs, distinct_sources=True)
         documents, references, remaining = [], [], max_chars
         for hit in selected:
             if not remaining:
@@ -4677,6 +4687,8 @@ async def recover_crawler_runs(*, limit: int = 16) -> dict:
         ("deep_archive_index",crawler_application.build_deep_indexes),
         ("deep_archive_dense",crawler_application.build_deep_dense_indexes),
         ("deep_archive_full_vectors",crawler_application.build_full_vector_batch),
+        ("current_full_vectors",crawler_application.build_current_vector_batch),
+        ("current_vector_purge",crawler_application.purge_current_vector_batches),
         ("deep_archive_full_vector_purge",crawler_application.purge_stale_full_vector_batches),
         ("deep_archive_expiry",crawler_application.purge_expired_deep_indexes),
         ("deep_archive_erasure",crawler_application.recover_deep_erasure),
