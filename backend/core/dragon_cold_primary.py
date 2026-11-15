@@ -89,6 +89,8 @@ def custody_snapshot(row):
     to checkpoint repair or a stale replica. Readback is bounded to 4 MiB.
     """
     if isinstance(row.get("snapshot"),dict):return row["snapshot"]
+    if not row.get("cold_primary"):
+        raise CheckpointReplicaError("primary checkpoint unavailable")
     from core.dragon_crawler import CrawlerError
     scope={k:row[k] for k in ("tenant_id","owner_id")}
     try:
@@ -106,10 +108,10 @@ def custody_snapshot(row):
                 if snap["snapshot_digest"]!=mark["snapshot_digest"] or snap["binding"]["scope"]!=scope:
                     raise StorageHeld("external snapshot binding differs")
                 return snap
-            except (OSError,sqlite3.Error,ValueError,KeyError,TypeError,StorageHeld):
+            except (OSError,sqlite3.Error,ValueError,KeyError,TypeError,StorageHeld,CheckpointReplicaError):
                 continue
         raise StorageHeld("both external copies unavailable")
-    except (StorageHeld,OSError,sqlite3.Error,ValueError,KeyError,TypeError) as exc:
+    except (StorageHeld,OSError,sqlite3.Error,ValueError,KeyError,TypeError,CheckpointReplicaError) as exc:
         raise CrawlerError("crawler_cold_primary_held","Exact relocated archive is unavailable.",503) from exc
 
 
@@ -218,7 +220,9 @@ class DragonColdPrimaryMixin:
     async def reconcile_cold_primaries(self):
         from core.dragon_crawler import CrawlerError,_now
         now=_now().timestamp()
-        await self.sessions.create_index([("cold_primary.state",1),("cold_primary.expires_at",1)])
+        if not getattr(self,"_cold_index_ready",False):
+            await self.sessions.create_index([("cold_primary.state",1),("cold_primary.expires_at",1)])
+            self._cold_index_ready=True
         rows=await self.sessions.find({"cold_primary":{"$exists":True},"$or":[
             {"status":"deleted"},{"cold_primary_invalidated":True},{"cold_primary.expires_at":{"$lte":now}},
             {"cold_primary.state":"staging"}]},
