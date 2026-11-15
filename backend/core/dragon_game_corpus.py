@@ -72,6 +72,12 @@ CREATE INDEX IF NOT EXISTS release_event_stage ON release_facets(owner,stage,obs
 CREATE INDEX IF NOT EXISTS release_event_date ON release_facets(owner,released_on,game,source,event_key);
 CREATE INDEX IF NOT EXISTS release_event_kind ON release_facets(owner,kind,observed_at DESC,game DESC,source DESC,event_key DESC);
 CREATE INDEX IF NOT EXISTS release_event_language ON release_facets(owner,language,observed_at DESC,game DESC,source DESC,event_key DESC);
+CREATE TABLE IF NOT EXISTS capture_bindings(
+ owner TEXT NOT NULL, session TEXT NOT NULL, game TEXT NOT NULL, source TEXT NOT NULL,
+ observation_digest TEXT NOT NULL, recorded_at INTEGER NOT NULL,
+ PRIMARY KEY(owner,session), FOREIGN KEY(owner,game,source) REFERENCES sources(owner,game,id)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS capture_game_time ON capture_bindings(owner,game,recorded_at DESC,session);
 CREATE TABLE IF NOT EXISTS corpus_migration(
  name TEXT PRIMARY KEY, cursor TEXT, complete INTEGER NOT NULL CHECK(complete IN (0,1))
 ) WITHOUT ROWID;
@@ -407,3 +413,54 @@ class GameCorpus:
             except BaseException:
                 if db.in_transaction: db.execute("ROLLBACK")
                 raise
+
+
+    def bind_capture(self,scope,*,game,source,observation_digest,session):
+        """Internal receipt of a canonical session; metadata only, not authority."""
+        from uuid import UUID
+        owner=owner_key(scope)
+        game,source,observation_digest=map(_id,(game,source,observation_digest))
+        if not isinstance(session,str) or str(UUID(session))!=session:
+            raise ValueError("canonical session id required")
+        with self._db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                prior=db.execute("SELECT game,source,observation_digest FROM capture_bindings WHERE owner=? AND session=?",
+                                 (owner,session)).fetchone()
+                if prior and tuple(prior)!=(game,source,observation_digest):
+                    raise CatalogueHeld("session binding changed")
+                if prior:
+                    db.execute("COMMIT")
+                    return {"session_id":session,"replayed":True}
+                observed=db.execute("SELECT 1 FROM observations WHERE owner=? AND game=? AND source=? AND digest=? LIMIT 1",
+                                    (owner,game,source,observation_digest)).fetchone()
+                if not observed:
+                    raise CatalogueHeld("capture observation unavailable")
+                db.execute("INSERT INTO capture_bindings VALUES(?,?,?,?,?,?)",
+                           (owner,session,game,source,observation_digest,int(time.time())))
+                db.execute("COMMIT")
+                return {"session_id":session,"replayed":False}
+            except BaseException:
+                if db.in_transaction:db.execute("ROLLBACK")
+                raise
+
+    def capture_sessions(self,scope,game,*,limit=100,before=None):
+        owner=owner_key(scope)
+        game=_id(game)
+        limit=_limit(limit)
+        args=[owner,game]
+        where=""
+        if before is not None:
+            from uuid import UUID
+            if not isinstance(before,(tuple,list)) or len(before)!=2 or type(before[0]) is not int or str(UUID(before[1]))!=before[1]:
+                raise ValueError("capture cursor")
+            where=" AND (recorded_at < ? OR recorded_at=? AND session>?)"
+            args.extend([before[0],before[0],before[1]])
+        args.append(limit+1)
+        with self._db() as db:
+            rows=db.execute("""SELECT session AS session_id,source AS source_id,observation_digest,recorded_at
+                FROM capture_bindings WHERE owner=? AND game=?"""+where+
+                " ORDER BY recorded_at DESC,session LIMIT ?",args).fetchall()
+        return {"captures":[dict(row) for row in rows[:limit]],
+                "next_cursor":[rows[limit-1]["recorded_at"],rows[limit-1]["session_id"]] if len(rows)>limit else None,
+                "source_use_authorized":False,"historical_authority":False}
