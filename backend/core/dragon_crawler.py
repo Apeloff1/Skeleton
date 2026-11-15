@@ -2957,6 +2957,7 @@ class DragonCrawlerApplication:
             rank_query_passages,
             scan_untrusted_instructions,
         )
+        from skeleton.ai.webcrawler.evidence_selection import select_diverse_evidence
 
         if (
             not isinstance(query, str)
@@ -2991,8 +2992,10 @@ class DragonCrawlerApplication:
                         "authority": "external_evidence_only",
                     }
                 )
-            hits.sort(key=lambda hit: (-hit["lexical_score"], hit["source_id"], hit["start"]))
-            del hits[limit:]
+        # Diversity operates only over currently usable exact passages. Keep
+        # the bounded pool until selection so mirrored pages cannot crowd out
+        # otherwise relevant independent-origin candidates before ranking.
+        hits = select_diverse_evidence(hits, limit=limit, distinct_sources=distinct_sources)
         for hit in hits:
             hit["instruction_risks"] = [
                 asdict(risk) for risk in scan_untrusted_instructions(hit["text"], limit=16)
@@ -3021,6 +3024,7 @@ class DragonCrawlerApplication:
 
     async def context(self, scope: dict[str, str], query: str, max_docs: int, max_chars: int) -> dict:
         import re
+        from skeleton.ai.webcrawler.evidence_selection import select_diverse_evidence
 
         if (
             not isinstance(query, str)
@@ -3065,43 +3069,38 @@ class DragonCrawlerApplication:
                         "Selected evidence is not the exact captured source passage.",
                         503,
                     )
-                candidate = (hit["lexical_score"], source["fetched_at"], row, source, hit)
-                duplicate = next(
-                    (item for item in candidates if item[3]["content_hash"] == hit["content_hash"]), None
-                )
-                if duplicate is not None:
-                    if candidate[:2] <= duplicate[:2]:
-                        continue
-                    candidates.remove(duplicate)
-                candidates.append(candidate)
-                candidates.sort(key=lambda value: (value[0], value[1]), reverse=True)
-                # Retain only the selected bounded source records, rather
-                # than every account snapshot while scanning history.
-                del candidates[max_docs:]
-        candidates.sort(key=lambda value: (value[0], value[1]), reverse=True)
+                # A bounded projection (at most 32 sessions × 8 passages)
+                # avoids retaining full Mongo snapshots as ranking candidates.
+                # Exact source custody is rechecked immediately before return.
+                candidates.append({
+                    **hit, "capture_timestamp": source["fetched_at"],
+                    "reference": self._source_reference(row, source),
+                    "valid_until": self._capture_freshness(row, source)["valid_until"],
+                })
+        selected = select_diverse_evidence(candidates, limit=max_docs, distinct_sources=True)
         documents, references, remaining = [], [], max_chars
-        for _, _, row, source, hit in candidates[:max_docs]:
+        for hit in selected:
             if not remaining:
                 break
             text = hit["text"][:remaining]
             remaining -= len(text)
-            reference = self._source_reference(row, source)
+            reference = hit["reference"]
             documents.append(
                 {
-                    "source_id": source["source_id"],
-                    "title": source["title"],
+                    "source_id": hit["source_id"],
+                    "title": hit["title"],
                     "text": text,
                     "content_digest": hashlib.sha256(text.encode()).hexdigest(),
-                    "source_ref": "dragon-crawl://" + row["_id"] + "/" + source["source_id"],
-                    "source_url": source["canonical_url"],
-                    "captured_at": source["fetched_at"],
-                    "valid_until": self._capture_freshness(row, source)["valid_until"],
+                    "source_ref": "dragon-crawl://" + reference["session_id"] + "/" + hit["source_id"],
+                    "source_url": hit["canonical_url"],
+                    "captured_at": hit["capture_timestamp"],
+                    "valid_until": hit["valid_until"],
                     "source_use_version": reference["source_use_version"],
                     "review_state": "unreviewed",
                     "source_classification": "untrusted_external_material",
                     "authority": "external_evidence_only",
-                    "source_content_hash": source["content_hash"],
-                    "preserved_text_hash": source["preserved_text_hash"],
+                    "source_content_hash": hit["content_hash"],
+                    "preserved_text_hash": hit["preserved_text_hash"],
                     "passage_start": hit["start"],
                     "passage_end": hit["start"] + len(text),
                     "instruction_risks": [
