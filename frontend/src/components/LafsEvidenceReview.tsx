@@ -16,6 +16,7 @@ const validDigest = (value: unknown): value is string => typeof value === 'strin
 export default function LafsEvidenceReview() {
   const [rows, setRows] = React.useState<Source[]>([]);
   const [selected, setSelected] = React.useState<Source | null>(null);
+  const [reviewFilter, setReviewFilter] = React.useState<'pending' | 'approved'>('pending');
   const [note, setNote] = React.useState('');
   const [topic, setTopic] = React.useState('');
   const [status, setStatus] = React.useState('');
@@ -45,8 +46,8 @@ export default function LafsEvidenceReview() {
     finally { if (current()) { inFlight.current = false; setBusy(false); } }
   };
 
-  const refresh = async (current: () => boolean) => {
-    const res = await api.get<{ sources: Source[] }>('/api/lafs/sources/pending?limit=30', { retries: 0 });
+  const refresh = async (current: () => boolean, filter: 'pending' | 'approved' = reviewFilter) => {
+    const res = await api.get<{ sources: Source[] }>(`/api/lafs/sources/pending?limit=30&status=${filter}`, { retries: 0 });
     if (!current()) return;
     if (!res.ok || !Array.isArray(res.data?.sources)) {
       setRows([]); setSelected(null);
@@ -68,10 +69,11 @@ export default function LafsEvidenceReview() {
     if (current()) setStatus(res.data?.learned ? 'Revision retained for manual review.' : 'This evidence revision is already retained.');
   });
 
-  const decide = (decision: 'approved' | 'rejected') => run(async current => {
+  const decide = (decision: 'approved' | 'rejected' | 'revoked') => run(async current => {
     const row = selected;
     const digest = row?.provenance?.evidence_sha256;
-    if (!row || row.evidence_status !== 'pending' || !validId(row.id) || !validDigest(digest) || !note.trim()) return;
+    if (!row || !validId(row.id) || !validDigest(digest) || !note.trim() ||
+      (decision === 'revoked' ? row.evidence_status !== 'approved' : row.evidence_status !== 'pending')) return;
     const res = await api.post<any>(`/api/lafs/sources/${row.id}/review`,
       { digest, decision, note: note.trim() }, { retries: 0 });
     if (!current()) return;
@@ -80,7 +82,8 @@ export default function LafsEvidenceReview() {
     if (current()) setStatus('Review committed. Approval permits retrieval, not instruction authority.');
   });
 
-  const reviewable = selected?.evidence_status === 'pending' && validDigest(selected.provenance?.evidence_sha256);
+  const reviewable = (selected?.evidence_status === 'pending' || selected?.evidence_status === 'approved') &&
+    validDigest(selected?.provenance?.evidence_sha256);
   return <View style={s.card}>
     <Text style={s.heading}>LAFS source review</Text>
     <Text style={s.body}>External text is retained as untrusted evidence. Only explicit review enables retrieval.</Text>
@@ -89,7 +92,10 @@ export default function LafsEvidenceReview() {
         placeholderTextColor="#94a3b8" accessibilityLabel="Source topic" />
       <TouchableOpacity style={s.button} disabled={busy || topic.trim().length < 2} onPress={ingest}><Text style={s.buttonText}>Ingest</Text></TouchableOpacity>
     </View>
-    <TouchableOpacity style={s.button} disabled={busy} onPress={() => run(refresh)}><Text style={s.buttonText}>Load pending evidence</Text></TouchableOpacity>
+    <View style={s.row}>
+      <TouchableOpacity style={s.button} disabled={busy} onPress={() => { setReviewFilter('pending'); void run(current => refresh(current, 'pending')); }}><Text style={s.buttonText}>Pending evidence</Text></TouchableOpacity>
+      <TouchableOpacity style={s.button} disabled={busy} onPress={() => { setReviewFilter('approved'); void run(current => refresh(current, 'approved')); }}><Text style={s.buttonText}>Approved evidence</Text></TouchableOpacity>
+    </View>
     {busy && <ActivityIndicator color="#93c5fd" />}
     {!!status && <Text style={s.body}>{status}</Text>}
     {rows.map(row => <TouchableOpacity style={s.item} key={row.id} disabled={busy} onPress={() => { setSelected(row); setNote(''); }}>
@@ -106,8 +112,10 @@ export default function LafsEvidenceReview() {
         <TextInput style={s.input} value={note} onChangeText={setNote} maxLength={1024} multiline
           placeholder="Record review rationale" placeholderTextColor="#94a3b8" accessibilityLabel="Review rationale" />
         <View style={s.row}>
-          <TouchableOpacity style={s.button} disabled={busy || !note.trim()} onPress={() => decide('approved')}><Text style={s.buttonText}>Approve exact evidence</Text></TouchableOpacity>
-          <TouchableOpacity style={s.button} disabled={busy || !note.trim()} onPress={() => decide('rejected')}><Text style={s.buttonText}>Reject</Text></TouchableOpacity>
+          {selected.evidence_status === 'pending' ? <>
+            <TouchableOpacity style={s.button} disabled={busy || !note.trim()} onPress={() => decide('approved')}><Text style={s.buttonText}>Approve exact evidence</Text></TouchableOpacity>
+            <TouchableOpacity style={s.button} disabled={busy || !note.trim()} onPress={() => decide('rejected')}><Text style={s.buttonText}>Reject</Text></TouchableOpacity>
+          </> : <TouchableOpacity style={s.button} disabled={busy || !note.trim()} onPress={() => decide('revoked')}><Text style={s.buttonText}>Revoke retrieval</Text></TouchableOpacity>}
         </View>
       </> : <Text style={s.body}>Legacy evidence requires fresh source ingestion before review.</Text>}
     </View>}

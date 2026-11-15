@@ -56,3 +56,22 @@ def test_legacy_sources_are_not_canonical(monkeypatch):
                            author="Jeeves-Sweep")
     assert old.evidence_status == "legacy_unverified"
     assert ledger.probability_search("dragon") == []
+
+
+def test_approved_source_is_revalidated_and_can_be_revoked(monkeypatch):
+    store = Collection()
+    ledger = LeverArchFileSystem()
+    monkeypatch.setattr(ledger, "_col", lambda: store)
+    record = evidence("dragon lore")
+    sid = ledger.ingest_external("Meta", "Discovery", record)["sheet"]["id"]
+    ledger.external_review(sid, record["evidence_sha256"], "approved", "operator", "review")
+    assert ledger.external_queue(status="approved")[0]["id"] == sid
+    revoked = ledger.external_review(sid, record["evidence_sha256"], "revoked", "operator", "new evidence")
+    assert revoked["evidence_status"] == "revoked"
+    assert revoked["provenance"]["prior_review"]["review_status"] == "approved"
+    assert ledger.probability_search("dragon") == []
+    assert ledger.stats()["excluded_sheets"] == 1
+    # Deliberate corruption of source bytes after a review cannot enter RAG.
+    store.doc["sheets"][sid]["payload"]["extract"] = "mutated dragon"
+    assert ledger.external_queue(status="integrity_hold")[0]["id"] == sid
+    assert ledger.probability_search("dragon") == []

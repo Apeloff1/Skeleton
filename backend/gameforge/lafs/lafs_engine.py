@@ -286,7 +286,19 @@ class Sheet:
     @property
     def evidence_status(self) -> str:
         if self.provenance.get("kind") == "external_wikipedia":
-            return self.provenance.get("review_status", "pending")
+            from gameforge.lafs.source_evidence import validate_evidence
+            try:
+                evidence = validate_evidence(self.provenance)
+                if any(self.payload.get(k) != evidence[k] for k in ("title", "extract", "source_url", "revision")):
+                    return "integrity_hold"
+            except (ValueError, TypeError, AttributeError, OverflowError):
+                return "integrity_hold"
+            status = self.provenance.get("review_status", "pending")
+            if status not in {"pending", "approved", "rejected", "revoked"}:
+                return "integrity_hold"
+            if status != "pending" and not all(self.provenance.get(k) for k in ("reviewer", "reviewed_at", "review_note")):
+                return "integrity_hold"
+            return status
         # Existing records that claimed online provenance have not been
         # reviewed against immutable source bytes.
         if (self.author in {"Jeeves-Online", "Jeeves-Sweep"}
@@ -500,7 +512,7 @@ class LeverArchFileSystem:
         sheet = self.sheets.get(sheet_id)
         if sheet is None or sheet.provenance.get("kind") != "external_wikipedia":
             raise KeyError("external source not found")
-        if (decision not in {"approved", "rejected"} or not isinstance(reviewer, str)
+        if (decision not in {"approved", "rejected", "revoked"} or not isinstance(reviewer, str)
                 or not 1 <= len(reviewer) <= 320 or not isinstance(note, str)
                 or not 1 <= len(note.strip()) <= 1024):
             raise ValueError("invalid review")
@@ -509,8 +521,13 @@ class LeverArchFileSystem:
             raise CabinetConflict("reviewed evidence digest changed")
         if any(sheet.payload.get(k) != source[k] for k in ("title", "extract", "source_url", "revision")):
             raise CabinetConflict("source payload no longer matches evidence")
-        if sheet.evidence_status != "pending":
-            raise CabinetConflict("source review already finalized")
+        previous = sheet.evidence_status
+        if not ((previous == "pending" and decision in {"approved", "rejected"})
+                or (previous == "approved" and decision == "revoked")):
+            raise CabinetConflict("invalid source review transition")
+        if decision == "revoked":
+            sheet.provenance["prior_review"] = {k: sheet.provenance.get(k)
+                for k in ("review_status", "reviewer", "reviewed_at", "review_note")}
         sheet.provenance.update(review_status=decision, reviewer=reviewer,
                                 reviewed_at=_now(), review_note=note.strip())
         sheet.version += 1
@@ -518,12 +535,16 @@ class LeverArchFileSystem:
         return sheet.brief()
 
     @_fresh_command
-    def external_queue(self, limit: int = 50) -> List[Dict]:
+    def external_queue(self, limit: int = 50, status: str = "pending") -> List[Dict]:
         if type(limit) is not int or not 1 <= limit <= 100:
             raise ValueError("invalid queue limit")
         self._load()
+        if status not in {"pending", "approved", "rejected", "revoked", "integrity_hold", "all"}:
+            raise ValueError("invalid evidence status")
+        statuses = {"pending", "legacy_unverified", "integrity_hold"} if status == "pending" else {status}
         return [sheet.brief() for sheet in sorted(
-            (s for s in self.sheets.values() if s.evidence_status in {"pending", "legacy_unverified"}),
+            (s for s in self.sheets.values() if s.evidence_status != "internal"
+             and (status == "all" or s.evidence_status in statuses)),
             key=lambda s: (s.timestamp, s.id))[:limit]]
 
     def _propagate_belief(self, sheet_id: str, strength: float = 0.08):
@@ -666,9 +687,9 @@ class LeverArchFileSystem:
         sheet's Beta posterior predicts its own observed evidence (Brier +
         credible-interval coverage)."""
         self._load()
-        if sheet_id is not None and sheet_id not in self.sheets:
+        if sheet_id is not None and (sheet_id not in self.sheets or not self.sheets[sheet_id].retrievable):
             return {"ok": False, "error": "sheet_not_found"}
-        sheets = [self.sheets[sheet_id]] if sheet_id is not None else list(self.sheets.values())
+        sheets = [self.sheets[sheet_id]] if sheet_id is not None else [s for s in self.sheets.values() if s.retrievable]
         if not sheets:
             return {"ok": False, "error": "no_sheets"}
         total = sum(len(sheet.prob.forecast_log) for sheet in sheets)
@@ -714,10 +735,12 @@ class LeverArchFileSystem:
     @_fresh_command
     def stats(self) -> Dict:
         self._load()
-        posts = [s.prob.posterior_mean for s in self.sheets.values()]
-        ents = [s.prob.entropy for s in self.sheets.values()]
-        efes = [s.prob.expected_free_energy for s in self.sheets.values()]
-        return {"total_sheets": len(self.sheets),
+        eligible = [s for s in self.sheets.values() if s.retrievable]
+        posts = [s.prob.posterior_mean for s in eligible]
+        ents = [s.prob.entropy for s in eligible]
+        efes = [s.prob.expected_free_energy for s in eligible]
+        return {"total_sheets": len(self.sheets), "retrievable_sheets": len(eligible),
+                "excluded_sheets": len(self.sheets) - len(eligible),
                 "total_log_types_available": TOTAL_LOG_TYPES,
                 "domains": len(HIERARCHY),
                 "avg_posterior": round(float(np.mean(posts)), 4) if posts else 0.0,

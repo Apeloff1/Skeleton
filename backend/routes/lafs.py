@@ -208,8 +208,11 @@ class SourceReviewReq(BaseModel):
 
 
 @router.get("/sources/pending")
-def pending_sources(limit: int = 50):
-    return {"ok": True, "sources": lafs.external_queue(limit)}
+def pending_sources(limit: int = 50, status: str = "pending"):
+    try:
+        return {"ok": True, "sources": lafs.external_queue(limit, status)}
+    except ValueError:
+        raise HTTPException(422, "invalid_source_query") from None
 
 
 @router.post("/sources/{sheet_id}/review")
