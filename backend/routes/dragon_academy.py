@@ -2776,6 +2776,12 @@ async def crawler_readiness(owner: str = Depends(_principal)) -> dict:
     return await _crawler_result(crawler_application.readiness())
 
 
+@router.get("/crawler/companion/sanctuary")
+async def crawler_companion_sanctuary(scope: dict = Depends(_crawler_scope)) -> dict:
+    """Read-only owner sanctuary; no extra crawl, consent or training rights."""
+    return await _crawler_result(crawler_application.companion_sanctuary(scope))
+
+
 @router.get("/crawler/sessions")
 async def crawler_sessions(
     cursor: str | None = Query(default=None, min_length=1, max_length=128),
