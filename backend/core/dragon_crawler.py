@@ -208,6 +208,7 @@ class DragonCrawlerApplication:
                 "trusted_device_idle": False,
             },
             "scheduler": {"running": bool(observed["running"]), "crawler_job_registered": scheduled},
+            "local_resource_admission": getattr(self, "_resource_governor", ResourceGovernor()).projection(),
             "limits": {
                 "seed_urls": 16,
                 "sessions": MAX_SESSIONS,
@@ -221,7 +222,6 @@ class DragonCrawlerApplication:
                 "source_page": 32,
                 "session_page": 32,
                 "concurrent_slices": MAX_CONCURRENT_SLICES,
-                "local_resource_admission": getattr(self, "_resource_governor", ResourceGovernor()).projection(),
                 "autonomous_slices": MAX_AUTO_SLICES,
                 "autonomous_seconds": MAX_AUTO_SECONDS,
             },
