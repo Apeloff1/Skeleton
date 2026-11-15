@@ -30,7 +30,7 @@ MIN_INTERVAL=900
 MAX_INTERVAL=7*86400
 MAX_GRANT=30*86400
 MAX_ROBOTS=256*1024
-MAX_LARGE_FEED=16*1024*1024
+MAX_LARGE_FEED=4_000_000  # canonical pinned transport's hard response cap
 MAX_SITEMAP_URLS=50_000
 MAX_STEAM_APPS=250_000
 PAGES_PER_PULSE=4
@@ -88,6 +88,9 @@ def fetch_public_feed(url, *, fetcher=None,max_bytes=MAX_FEED_BYTES):
         raise DiscoveryHeld("feed response not exact")
     headers={str(k).lower():str(v).lower() for k,v in response.headers.items()}
     control=headers.get("cache-control","")
+    directives=headers.get("x-robots-tag","")
+    if any(x in directives for x in ("noarchive","noindex","none","nosnippet")):
+        raise DiscoveryHeld("response retention denied")
     if any(x in control for x in ("private","no-store")) or headers.get("vary","")=="*" or any(
         x in headers.get("vary","") for x in ("cookie","authorization")) or "set-cookie" in headers:
         raise DiscoveryHeld("private or sensitive response")
@@ -101,7 +104,7 @@ def sitemap_pages(raw,provider,external,title):
     if not isinstance(raw,bytes) or not 1<=len(raw)<=MAX_LARGE_FEED:
         raise ValueError("sitemap bounds")
     text=raw.decode("utf-8")
-    if "<!DOCTYPE" in text.upper() or "<!ENTITY" in text.upper() or "\x00" in text:
+    if __import__("re").search(r"<!\s*(DOCTYPE|ENTITY)",text,__import__("re").IGNORECASE) or "\x00" in text:
         raise ValueError("unsafe sitemap")
     root=ElementTree.fromstring(text)
     local=lambda tag:tag.rsplit("}",1)[-1]
