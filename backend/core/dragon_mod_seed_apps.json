@@ -1,0 +1,3321 @@
+{
+  "schema": "dragon.mod-seed-apps.v1",
+  "provenance": "Curated candidate Steam app IDs and optional Nexus game slugs; identity and route existence must be verified against provider source before representing as evidence. Not a copied live catalogue.",
+  "games": [
+    {
+      "appid": "72850",
+      "title": "Skyrim",
+      "genre": "roleplaying",
+      "nexus": "skyrim"
+    },
+    {
+      "appid": "489830",
+      "title": "Skyrim Special Edition",
+      "genre": "roleplaying",
+      "nexus": "skyrimspecialedition"
+    },
+    {
+      "appid": "611670",
+      "title": "Skyrim VR",
+      "genre": "roleplaying",
+      "nexus": "skyrimspecialedition"
+    },
+    {
+      "appid": "22330",
+      "title": "Oblivion",
+      "genre": "roleplaying",
+      "nexus": "oblivion"
+    },
+    {
+      "appid": "22320",
+      "title": "Morrowind",
+      "genre": "roleplaying",
+      "nexus": "morrowind"
+    },
+    {
+      "appid": "377160",
+      "title": "Fallout 4",
+      "genre": "roleplaying",
+      "nexus": "fallout4"
+    },
+    {
+      "appid": "611660",
+      "title": "Fallout 4 VR",
+      "genre": "roleplaying",
+      "nexus": "fallout4"
+    },
+    {
+      "appid": "22380",
+      "title": "Fallout New Vegas",
+      "genre": "roleplaying",
+      "nexus": "newvegas"
+    },
+    {
+      "appid": "22370",
+      "title": "Fallout 3 GOTY",
+      "genre": "roleplaying",
+      "nexus": "fallout3"
+    },
+    {
+      "appid": "38400",
+      "title": "Fallout",
+      "genre": "roleplaying",
+      "nexus": "fallout"
+    },
+    {
+      "appid": "38410",
+      "title": "Fallout 2",
+      "genre": "roleplaying",
+      "nexus": "fallout2"
+    },
+    {
+      "appid": "38420",
+      "title": "Fallout Tactics",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1151340",
+      "title": "Fallout 76",
+      "genre": "roleplaying",
+      "nexus": "fallout76"
+    },
+    {
+      "appid": "1716740",
+      "title": "Starfield",
+      "genre": "roleplaying",
+      "nexus": "starfield"
+    },
+    {
+      "appid": "1091500",
+      "title": "Cyberpunk 2077",
+      "genre": "roleplaying",
+      "nexus": "cyberpunk2077"
+    },
+    {
+      "appid": "292030",
+      "title": "The Witcher 3",
+      "genre": "roleplaying",
+      "nexus": "witcher3"
+    },
+    {
+      "appid": "20920",
+      "title": "The Witcher 2",
+      "genre": "roleplaying",
+      "nexus": "witcher2"
+    },
+    {
+      "appid": "20900",
+      "title": "The Witcher Enhanced Edition",
+      "genre": "roleplaying",
+      "nexus": "witcher"
+    },
+    {
+      "appid": "1086940",
+      "title": "Baldur's Gate 3",
+      "genre": "roleplaying",
+      "nexus": "baldursgate3"
+    },
+    {
+      "appid": "228280",
+      "title": "Baldur's Gate Enhanced Edition",
+      "genre": "roleplaying",
+      "nexus": "baldursgate"
+    },
+    {
+      "appid": "257350",
+      "title": "Baldur's Gate II Enhanced Edition",
+      "genre": "roleplaying",
+      "nexus": "baldursgate2"
+    },
+    {
+      "appid": "321800",
+      "title": "Icewind Dale Enhanced Edition",
+      "genre": "roleplaying",
+      "nexus": "icewinddaleenhancededition"
+    },
+    {
+      "appid": "291650",
+      "title": "Pillars of Eternity",
+      "genre": "roleplaying",
+      "nexus": "pillarsofeternity"
+    },
+    {
+      "appid": "560130",
+      "title": "Pillars of Eternity II Deadfire",
+      "genre": "roleplaying",
+      "nexus": "pillarsofeternity2"
+    },
+    {
+      "appid": "362960",
+      "title": "Tyranny",
+      "genre": "roleplaying",
+      "nexus": "tyranny"
+    },
+    {
+      "appid": "435150",
+      "title": "Divinity Original Sin 2",
+      "genre": "roleplaying",
+      "nexus": "divinityoriginalsin2"
+    },
+    {
+      "appid": "373420",
+      "title": "Divinity Original Sin Enhanced Edition",
+      "genre": "roleplaying",
+      "nexus": "divinityoriginalsinenhancededition"
+    },
+    {
+      "appid": "640820",
+      "title": "Pathfinder Kingmaker",
+      "genre": "roleplaying",
+      "nexus": "pathfinderkingmaker"
+    },
+    {
+      "appid": "1184370",
+      "title": "Pathfinder Wrath of the Righteous",
+      "genre": "roleplaying",
+      "nexus": "pathfinderwrathoftherighteous"
+    },
+    {
+      "appid": "2186680",
+      "title": "Warhammer 40000 Rogue Trader",
+      "genre": "roleplaying",
+      "nexus": "warhammer40kroguetrader"
+    },
+    {
+      "appid": "1888160",
+      "title": "Armored Core VI",
+      "genre": "roleplaying",
+      "nexus": "armoredcore6firesofrubicon"
+    },
+    {
+      "appid": "1245620",
+      "title": "Elden Ring",
+      "genre": "roleplaying",
+      "nexus": "eldenring"
+    },
+    {
+      "appid": "814380",
+      "title": "Sekiro Shadows Die Twice",
+      "genre": "roleplaying",
+      "nexus": "sekiro"
+    },
+    {
+      "appid": "374320",
+      "title": "Dark Souls III",
+      "genre": "roleplaying",
+      "nexus": "darksouls3"
+    },
+    {
+      "appid": "570940",
+      "title": "Dark Souls Remastered",
+      "genre": "roleplaying",
+      "nexus": "darksoulsremastered"
+    },
+    {
+      "appid": "335300",
+      "title": "Dark Souls II Scholar of the First Sin",
+      "genre": "roleplaying",
+      "nexus": "darksouls2"
+    },
+    {
+      "appid": "236430",
+      "title": "Dark Souls II",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "306130",
+      "title": "The Elder Scrolls Online",
+      "genre": "roleplaying",
+      "nexus": "elderscrollsonline"
+    },
+    {
+      "appid": "39210",
+      "title": "Final Fantasy XIV",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1174180",
+      "title": "Red Dead Redemption 2",
+      "genre": "roleplaying",
+      "nexus": "reddeadredemption2"
+    },
+    {
+      "appid": "271590",
+      "title": "Grand Theft Auto V Legacy",
+      "genre": "roleplaying",
+      "nexus": "grandtheftautov"
+    },
+    {
+      "appid": "3240220",
+      "title": "Grand Theft Auto V Enhanced",
+      "genre": "roleplaying",
+      "nexus": "grandtheftautovenhanced"
+    },
+    {
+      "appid": "12210",
+      "title": "Grand Theft Auto IV",
+      "genre": "roleplaying",
+      "nexus": "gta4"
+    },
+    {
+      "appid": "12120",
+      "title": "Grand Theft Auto San Andreas",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "12110",
+      "title": "Grand Theft Auto Vice City",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "12100",
+      "title": "Grand Theft Auto III",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1222700",
+      "title": "A Way Out",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1097840",
+      "title": "Gears 5",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "699130",
+      "title": "World War Z",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1778820",
+      "title": "Tekken 8",
+      "genre": "roleplaying",
+      "nexus": "tekken8"
+    },
+    {
+      "appid": "1172470",
+      "title": "Apex Legends",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "730",
+      "title": "Counter-Strike 2",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "440",
+      "title": "Team Fortress 2",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "570",
+      "title": "Dota 2",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "238960",
+      "title": "Path of Exile",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "2694490",
+      "title": "Path of Exile 2",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "230410",
+      "title": "Warframe",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1085660",
+      "title": "Destiny 2",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1172620",
+      "title": "Sea of Thieves",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "578080",
+      "title": "PUBG Battlegrounds",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "381210",
+      "title": "Dead by Daylight",
+      "genre": "roleplaying",
+      "nexus": "deadbydaylight"
+    },
+    {
+      "appid": "644930",
+      "title": "They Are Billions",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1687950",
+      "title": "Persona 5 Royal",
+      "genre": "roleplaying",
+      "nexus": "persona5royal"
+    },
+    {
+      "appid": "1113000",
+      "title": "Persona 4 Golden",
+      "genre": "roleplaying",
+      "nexus": "persona4golden"
+    },
+    {
+      "appid": "2161700",
+      "title": "Persona 3 Reload",
+      "genre": "roleplaying",
+      "nexus": "persona3reload"
+    },
+    {
+      "appid": "1382330",
+      "title": "Persona 5 Strikers",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1809700",
+      "title": "Persona 3 Portable",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "638970",
+      "title": "Yakuza 0",
+      "genre": "roleplaying",
+      "nexus": "yakuza0"
+    },
+    {
+      "appid": "834530",
+      "title": "Yakuza Kiwami",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "927380",
+      "title": "Yakuza Kiwami 2",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1235140",
+      "title": "Yakuza Like a Dragon",
+      "genre": "roleplaying",
+      "nexus": "yakuzalikeadragon"
+    },
+    {
+      "appid": "2072450",
+      "title": "Like a Dragon Infinite Wealth",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "2058180",
+      "title": "Like a Dragon Ishin",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1817070",
+      "title": "Marvel's Spider-Man Remastered",
+      "genre": "roleplaying",
+      "nexus": "marvelsspidermanremastered"
+    },
+    {
+      "appid": "1817190",
+      "title": "Marvel's Spider-Man Miles Morales",
+      "genre": "roleplaying",
+      "nexus": "marvelsspidermanmilesmorales"
+    },
+    {
+      "appid": "1593500",
+      "title": "God of War",
+      "genre": "roleplaying",
+      "nexus": "godofwar"
+    },
+    {
+      "appid": "2322010",
+      "title": "God of War Ragnarok",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1151640",
+      "title": "Horizon Zero Dawn",
+      "genre": "roleplaying",
+      "nexus": "horizonzerodawn"
+    },
+    {
+      "appid": "2420110",
+      "title": "Horizon Forbidden West",
+      "genre": "roleplaying",
+      "nexus": "horizonforbiddenwest"
+    },
+    {
+      "appid": "2215430",
+      "title": "Ghost of Tsushima Director's Cut",
+      "genre": "roleplaying",
+      "nexus": "ghostoftsushima"
+    },
+    {
+      "appid": "1659420",
+      "title": "Uncharted Legacy of Thieves Collection",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1888930",
+      "title": "The Last of Us Part I",
+      "genre": "roleplaying",
+      "nexus": "thelastofuspart1"
+    },
+    {
+      "appid": "990080",
+      "title": "Hogwarts Legacy",
+      "genre": "roleplaying",
+      "nexus": "hogwartslegacy"
+    },
+    {
+      "appid": "1938090",
+      "title": "Call of Duty",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1811260",
+      "title": "FIFA 23",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1222690",
+      "title": "Dragon Age Inquisition",
+      "genre": "roleplaying",
+      "nexus": "dragonageinquisition"
+    },
+    {
+      "appid": "47810",
+      "title": "Dragon Age Origins",
+      "genre": "roleplaying",
+      "nexus": "dragonage"
+    },
+    {
+      "appid": "1238040",
+      "title": "Dragon Age II",
+      "genre": "roleplaying",
+      "nexus": "dragonage2"
+    },
+    {
+      "appid": "1845910",
+      "title": "Dragon Age The Veilguard",
+      "genre": "roleplaying",
+      "nexus": "dragonagetheveilguard"
+    },
+    {
+      "appid": "1328670",
+      "title": "Mass Effect Legendary Edition",
+      "genre": "roleplaying",
+      "nexus": "masseffectlegendaryedition"
+    },
+    {
+      "appid": "17460",
+      "title": "Mass Effect",
+      "genre": "roleplaying",
+      "nexus": "masseffect"
+    },
+    {
+      "appid": "24980",
+      "title": "Mass Effect 2",
+      "genre": "roleplaying",
+      "nexus": "masseffect2"
+    },
+    {
+      "appid": "1238020",
+      "title": "Mass Effect 3",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1238000",
+      "title": "Mass Effect Andromeda",
+      "genre": "roleplaying",
+      "nexus": "masseffectandromeda"
+    },
+    {
+      "appid": "412020",
+      "title": "Metro Exodus",
+      "genre": "roleplaying",
+      "nexus": "metroexodus"
+    },
+    {
+      "appid": "286690",
+      "title": "Metro 2033 Redux",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "287390",
+      "title": "Metro Last Light Redux",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "412830",
+      "title": "Steins Gate",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "524220",
+      "title": "NieR Automata",
+      "genre": "roleplaying",
+      "nexus": "nierautomata"
+    },
+    {
+      "appid": "1113560",
+      "title": "NieR Replicant",
+      "genre": "roleplaying",
+      "nexus": "nierreplicant"
+    },
+    {
+      "appid": "601150",
+      "title": "Devil May Cry 5",
+      "genre": "roleplaying",
+      "nexus": "devilmaycry5"
+    },
+    {
+      "appid": "220440",
+      "title": "DmC Devil May Cry",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "631510",
+      "title": "Devil May Cry HD Collection",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "582010",
+      "title": "Monster Hunter World",
+      "genre": "roleplaying",
+      "nexus": "monsterhunterworld"
+    },
+    {
+      "appid": "1446780",
+      "title": "Monster Hunter Rise",
+      "genre": "roleplaying",
+      "nexus": "monsterhunterrise"
+    },
+    {
+      "appid": "2246340",
+      "title": "Monster Hunter Wilds",
+      "genre": "roleplaying",
+      "nexus": "monsterhunterwilds"
+    },
+    {
+      "appid": "2054970",
+      "title": "Dragon's Dogma 2",
+      "genre": "roleplaying",
+      "nexus": "dragonsdogma2"
+    },
+    {
+      "appid": "367500",
+      "title": "Dragon's Dogma Dark Arisen",
+      "genre": "roleplaying",
+      "nexus": "dragonsdogma"
+    },
+    {
+      "appid": "637650",
+      "title": "Final Fantasy XV",
+      "genre": "roleplaying",
+      "nexus": "finalfantasy15"
+    },
+    {
+      "appid": "1462040",
+      "title": "Final Fantasy VII Remake Intergrade",
+      "genre": "roleplaying",
+      "nexus": "finalfantasy7remake"
+    },
+    {
+      "appid": "2909400",
+      "title": "Final Fantasy VII Rebirth",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "2515020",
+      "title": "Final Fantasy XVI",
+      "genre": "roleplaying",
+      "nexus": "finalfantasy16"
+    },
+    {
+      "appid": "292120",
+      "title": "Final Fantasy XIII",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "359870",
+      "title": "Final Fantasy X X-2 HD Remaster",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "595520",
+      "title": "Final Fantasy XII The Zodiac Age",
+      "genre": "roleplaying",
+      "nexus": "finalfantasy12"
+    },
+    {
+      "appid": "377840",
+      "title": "Final Fantasy IX",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "39140",
+      "title": "Final Fantasy VII",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "39150",
+      "title": "Final Fantasy VIII",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1026680",
+      "title": "Final Fantasy VIII Remastered",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1173810",
+      "title": "Final Fantasy VI",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1173800",
+      "title": "Final Fantasy V",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1173790",
+      "title": "Final Fantasy IV",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1173780",
+      "title": "Final Fantasy III",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1173770",
+      "title": "Final Fantasy II",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1173760",
+      "title": "Final Fantasy",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "21690",
+      "title": "Resident Evil 5",
+      "genre": "roleplaying",
+      "nexus": "residentevil5"
+    },
+    {
+      "appid": "221040",
+      "title": "Resident Evil 6",
+      "genre": "roleplaying",
+      "nexus": "residentevil6"
+    },
+    {
+      "appid": "304240",
+      "title": "Resident Evil HD Remaster",
+      "genre": "roleplaying",
+      "nexus": "residentevilbiohazardhdremaster"
+    },
+    {
+      "appid": "339340",
+      "title": "Resident Evil 0",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "418370",
+      "title": "Resident Evil 7",
+      "genre": "roleplaying",
+      "nexus": "residentevil7"
+    },
+    {
+      "appid": "883710",
+      "title": "Resident Evil 2 Remake",
+      "genre": "roleplaying",
+      "nexus": "residentevil22019"
+    },
+    {
+      "appid": "952060",
+      "title": "Resident Evil 3 Remake",
+      "genre": "roleplaying",
+      "nexus": "residentevil32020"
+    },
+    {
+      "appid": "1196590",
+      "title": "Resident Evil Village",
+      "genre": "roleplaying",
+      "nexus": "residentevilvillage"
+    },
+    {
+      "appid": "2050650",
+      "title": "Resident Evil 4 Remake",
+      "genre": "roleplaying",
+      "nexus": "residentevil42023"
+    },
+    {
+      "appid": "254700",
+      "title": "Resident Evil 4 2005",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1259420",
+      "title": "Days Gone",
+      "genre": "roleplaying",
+      "nexus": "daysgone"
+    },
+    {
+      "appid": "239140",
+      "title": "Dying Light",
+      "genre": "roleplaying",
+      "nexus": "dyinglight"
+    },
+    {
+      "appid": "534380",
+      "title": "Dying Light 2",
+      "genre": "roleplaying",
+      "nexus": "dyinglight2"
+    },
+    {
+      "appid": "268910",
+      "title": "Cuphead",
+      "genre": "roleplaying",
+      "nexus": "cuphead"
+    },
+    {
+      "appid": "242760",
+      "title": "The Forest",
+      "genre": "roleplaying",
+      "nexus": "theforest"
+    },
+    {
+      "appid": "1326470",
+      "title": "Sons of the Forest",
+      "genre": "roleplaying",
+      "nexus": "sonsoftheforest"
+    },
+    {
+      "appid": "553850",
+      "title": "Helldivers 2",
+      "genre": "roleplaying",
+      "nexus": "helldivers2"
+    },
+    {
+      "appid": "394510",
+      "title": "Helldivers",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1282100",
+      "title": "Remnant II",
+      "genre": "roleplaying",
+      "nexus": "remnant2"
+    },
+    {
+      "appid": "617290",
+      "title": "Remnant From the Ashes",
+      "genre": "roleplaying",
+      "nexus": "remnantfromtheashes"
+    },
+    {
+      "appid": "782330",
+      "title": "Doom Eternal",
+      "genre": "roleplaying",
+      "nexus": "doometernal"
+    },
+    {
+      "appid": "379720",
+      "title": "Doom 2016",
+      "genre": "roleplaying",
+      "nexus": "doom"
+    },
+    {
+      "appid": "2280",
+      "title": "DOOM plus DOOM II",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "2300",
+      "title": "Doom II",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "9160",
+      "title": "Final Doom",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "208200",
+      "title": "Doom 3 BFG Edition",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "9050",
+      "title": "Doom 3",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "2310",
+      "title": "Quake",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "2320",
+      "title": "Quake II",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "2200",
+      "title": "Quake III Arena",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "242050",
+      "title": "Assassin's Creed IV Black Flag",
+      "genre": "roleplaying",
+      "nexus": "assassinscreedivblackflag"
+    },
+    {
+      "appid": "311560",
+      "title": "Assassin's Creed Rogue",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "289650",
+      "title": "Assassin's Creed Unity",
+      "genre": "roleplaying",
+      "nexus": "assassinscreedunity"
+    },
+    {
+      "appid": "368500",
+      "title": "Assassin's Creed Syndicate",
+      "genre": "roleplaying",
+      "nexus": "assassinscreedsyndicate"
+    },
+    {
+      "appid": "582160",
+      "title": "Assassin's Creed Origins",
+      "genre": "roleplaying",
+      "nexus": "assassinscreedorigins"
+    },
+    {
+      "appid": "812140",
+      "title": "Assassin's Creed Odyssey",
+      "genre": "roleplaying",
+      "nexus": "assassinscreedodyssey"
+    },
+    {
+      "appid": "2208920",
+      "title": "Assassin's Creed Valhalla",
+      "genre": "roleplaying",
+      "nexus": "assassinscreedvalhalla"
+    },
+    {
+      "appid": "3035570",
+      "title": "Assassin's Creed Mirage",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1517290",
+      "title": "Battlefield 2042",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1238840",
+      "title": "Battlefield 1",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1238810",
+      "title": "Battlefield V",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1238860",
+      "title": "Battlefield 4",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "24960",
+      "title": "Battlefield Bad Company 2",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "13210",
+      "title": "Unreal Tournament 3",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "13230",
+      "title": "Unreal Tournament 2004",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "13240",
+      "title": "Unreal Tournament GOTY",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "227300",
+      "title": "Euro Truck Simulator 2",
+      "genre": "roleplaying",
+      "nexus": "eurotrucksimulator2"
+    },
+    {
+      "appid": "270880",
+      "title": "American Truck Simulator",
+      "genre": "roleplaying",
+      "nexus": "americantrucksimulator"
+    },
+    {
+      "appid": "221100",
+      "title": "DayZ",
+      "genre": "roleplaying",
+      "nexus": "dayz"
+    },
+    {
+      "appid": "107410",
+      "title": "Arma 3",
+      "genre": "roleplaying",
+      "nexus": "arma3"
+    },
+    {
+      "appid": "33930",
+      "title": "Arma 2 Operation Arrowhead",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "33900",
+      "title": "Arma 2",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1874880",
+      "title": "Arma Reforger",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "393380",
+      "title": "Squad",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "686810",
+      "title": "Hell Let Loose",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "222880",
+      "title": "Insurgency",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "581320",
+      "title": "Insurgency Sandstorm",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "447820",
+      "title": "Day of Infamy",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "362890",
+      "title": "Black Mesa",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "10",
+      "title": "Counter-Strike",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "80",
+      "title": "Counter-Strike Condition Zero",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "240",
+      "title": "Counter-Strike Source",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "70",
+      "title": "Half-Life",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "130",
+      "title": "Half-Life Blue Shift",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "50",
+      "title": "Half-Life Opposing Force",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "220",
+      "title": "Half-Life 2",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "380",
+      "title": "Half-Life 2 Episode One",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "420",
+      "title": "Half-Life 2 Episode Two",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "340",
+      "title": "Half-Life 2 Lost Coast",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "546560",
+      "title": "Half-Life Alyx",
+      "genre": "roleplaying",
+      "nexus": "halflifealyx"
+    },
+    {
+      "appid": "400",
+      "title": "Portal",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "620",
+      "title": "Portal 2",
+      "genre": "roleplaying",
+      "nexus": "portal2"
+    },
+    {
+      "appid": "550",
+      "title": "Left 4 Dead 2",
+      "genre": "roleplaying",
+      "nexus": "left4dead2"
+    },
+    {
+      "appid": "500",
+      "title": "Left 4 Dead",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "4000",
+      "title": "Garry's Mod",
+      "genre": "roleplaying",
+      "nexus": "garrysmod"
+    },
+    {
+      "appid": "300",
+      "title": "Day of Defeat Source",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "30",
+      "title": "Day of Defeat",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "20",
+      "title": "Team Fortress Classic",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "280",
+      "title": "Half-Life Source",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "10180",
+      "title": "Call of Duty Modern Warfare 2 2009",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "7940",
+      "title": "Call of Duty 4 Modern Warfare",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "10090",
+      "title": "Call of Duty World at War",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "42700",
+      "title": "Call of Duty Black Ops",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "202970",
+      "title": "Call of Duty Black Ops II",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "311210",
+      "title": "Call of Duty Black Ops III",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "209160",
+      "title": "Call of Duty Ghosts",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "209650",
+      "title": "Call of Duty Advanced Warfare",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "292730",
+      "title": "Call of Duty Infinite Warfare",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "476600",
+      "title": "Call of Duty WWII",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1985810",
+      "title": "Call of Duty Black Ops Cold War",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "2000950",
+      "title": "Call of Duty Modern Warfare 2019",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "1599340",
+      "title": "Lost Ark",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "212160",
+      "title": "Vindictus",
+      "genre": "roleplaying"
+    },
+    {
+      "appid": "294100",
+      "title": "RimWorld",
+      "genre": "simulation-strategy",
+      "nexus": "rimworld"
+    },
+    {
+      "appid": "233450",
+      "title": "Prison Architect",
+      "genre": "simulation-strategy",
+      "nexus": "prisonarchitect"
+    },
+    {
+      "appid": "255710",
+      "title": "Cities Skylines",
+      "genre": "simulation-strategy",
+      "nexus": "citiesskylines"
+    },
+    {
+      "appid": "949230",
+      "title": "Cities Skylines II",
+      "genre": "simulation-strategy",
+      "nexus": "citiesskylines2"
+    },
+    {
+      "appid": "427520",
+      "title": "Factorio",
+      "genre": "simulation-strategy",
+      "nexus": "factorio"
+    },
+    {
+      "appid": "526870",
+      "title": "Satisfactory",
+      "genre": "simulation-strategy",
+      "nexus": "satisfactory"
+    },
+    {
+      "appid": "1366540",
+      "title": "Dyson Sphere Program",
+      "genre": "simulation-strategy",
+      "nexus": "dysonsphereprogram"
+    },
+    {
+      "appid": "1621690",
+      "title": "Core Keeper",
+      "genre": "simulation-strategy",
+      "nexus": "corekeeper"
+    },
+    {
+      "appid": "1118200",
+      "title": "People Playground",
+      "genre": "simulation-strategy",
+      "nexus": "peopleplayground"
+    },
+    {
+      "appid": "108600",
+      "title": "Project Zomboid",
+      "genre": "simulation-strategy",
+      "nexus": "projectzomboid"
+    },
+    {
+      "appid": "105600",
+      "title": "Terraria",
+      "genre": "simulation-strategy",
+      "nexus": "terraria"
+    },
+    {
+      "appid": "1281930",
+      "title": "tModLoader",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "413150",
+      "title": "Stardew Valley",
+      "genre": "simulation-strategy",
+      "nexus": "stardewvalley"
+    },
+    {
+      "appid": "892970",
+      "title": "Valheim",
+      "genre": "simulation-strategy",
+      "nexus": "valheim"
+    },
+    {
+      "appid": "252490",
+      "title": "Rust",
+      "genre": "simulation-strategy",
+      "nexus": "rust"
+    },
+    {
+      "appid": "346110",
+      "title": "ARK Survival Evolved",
+      "genre": "simulation-strategy",
+      "nexus": "arksurvivalevolved"
+    },
+    {
+      "appid": "2399830",
+      "title": "ARK Survival Ascended",
+      "genre": "simulation-strategy",
+      "nexus": "arksurvivalascended"
+    },
+    {
+      "appid": "440900",
+      "title": "Conan Exiles",
+      "genre": "simulation-strategy",
+      "nexus": "conanexiles"
+    },
+    {
+      "appid": "251570",
+      "title": "7 Days to Die",
+      "genre": "simulation-strategy",
+      "nexus": "7daystodie"
+    },
+    {
+      "appid": "244850",
+      "title": "Space Engineers",
+      "genre": "simulation-strategy",
+      "nexus": "spaceengineers"
+    },
+    {
+      "appid": "290080",
+      "title": "Life is Feudal Your Own",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1084600",
+      "title": "My Time at Sandrock",
+      "genre": "simulation-strategy",
+      "nexus": "mytimeatsandrock"
+    },
+    {
+      "appid": "666140",
+      "title": "My Time at Portia",
+      "genre": "simulation-strategy",
+      "nexus": "mytimeatportia"
+    },
+    {
+      "appid": "1343400",
+      "title": "RuneScape",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1343370",
+      "title": "Old School RuneScape",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1142710",
+      "title": "Total War Warhammer III",
+      "genre": "simulation-strategy",
+      "nexus": "totalwarwarhammer3"
+    },
+    {
+      "appid": "594570",
+      "title": "Total War Warhammer II",
+      "genre": "simulation-strategy",
+      "nexus": "totalwarwarhammer2"
+    },
+    {
+      "appid": "364360",
+      "title": "Total War Warhammer",
+      "genre": "simulation-strategy",
+      "nexus": "totalwarwarhammer"
+    },
+    {
+      "appid": "779340",
+      "title": "Total War Three Kingdoms",
+      "genre": "simulation-strategy",
+      "nexus": "totalwarthreekingdoms"
+    },
+    {
+      "appid": "325610",
+      "title": "Total War Attila",
+      "genre": "simulation-strategy",
+      "nexus": "totalwarattila"
+    },
+    {
+      "appid": "214950",
+      "title": "Total War Rome II",
+      "genre": "simulation-strategy",
+      "nexus": "totalwarrome2"
+    },
+    {
+      "appid": "34330",
+      "title": "Total War Shogun 2",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "34030",
+      "title": "Napoleon Total War",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "10500",
+      "title": "Empire Total War",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "4700",
+      "title": "Medieval II Total War",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "4760",
+      "title": "Rome Total War",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "885970",
+      "title": "Total War Rome Remastered",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1937780",
+      "title": "Total War Pharaoh",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "289070",
+      "title": "Civilization VI",
+      "genre": "simulation-strategy",
+      "nexus": "civilisationvi"
+    },
+    {
+      "appid": "8930",
+      "title": "Civilization V",
+      "genre": "simulation-strategy",
+      "nexus": "civilisationv"
+    },
+    {
+      "appid": "3900",
+      "title": "Civilization IV",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "3910",
+      "title": "Civilization III Complete",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "65980",
+      "title": "Civilization Beyond Earth",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1295660",
+      "title": "Civilization VII",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "281990",
+      "title": "Stellaris",
+      "genre": "simulation-strategy",
+      "nexus": "stellaris"
+    },
+    {
+      "appid": "236850",
+      "title": "Europa Universalis IV",
+      "genre": "simulation-strategy",
+      "nexus": "europauniversalisiv"
+    },
+    {
+      "appid": "1158310",
+      "title": "Crusader Kings III",
+      "genre": "simulation-strategy",
+      "nexus": "crusaderkings3"
+    },
+    {
+      "appid": "203770",
+      "title": "Crusader Kings II",
+      "genre": "simulation-strategy",
+      "nexus": "crusaderkings2"
+    },
+    {
+      "appid": "394360",
+      "title": "Hearts of Iron IV",
+      "genre": "simulation-strategy",
+      "nexus": "heartsofironiv"
+    },
+    {
+      "appid": "25890",
+      "title": "Hearts of Iron III",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "529340",
+      "title": "Victoria 3",
+      "genre": "simulation-strategy",
+      "nexus": "victoria3"
+    },
+    {
+      "appid": "42960",
+      "title": "Victoria II",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "859580",
+      "title": "Imperator Rome",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1527950",
+      "title": "Wartales",
+      "genre": "simulation-strategy",
+      "nexus": "wartales"
+    },
+    {
+      "appid": "261550",
+      "title": "Mount and Blade II Bannerlord",
+      "genre": "simulation-strategy",
+      "nexus": "mountandblade2bannerlord"
+    },
+    {
+      "appid": "48700",
+      "title": "Mount and Blade Warband",
+      "genre": "simulation-strategy",
+      "nexus": "mountandbladewarband"
+    },
+    {
+      "appid": "22100",
+      "title": "Mount and Blade",
+      "genre": "simulation-strategy",
+      "nexus": "mountandblade"
+    },
+    {
+      "appid": "48720",
+      "title": "Mount and Blade With Fire and Sword",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "365360",
+      "title": "Battle Brothers",
+      "genre": "simulation-strategy",
+      "nexus": "battlebrothers"
+    },
+    {
+      "appid": "268500",
+      "title": "XCOM 2",
+      "genre": "simulation-strategy",
+      "nexus": "xcom2"
+    },
+    {
+      "appid": "200510",
+      "title": "XCOM Enemy Unknown",
+      "genre": "simulation-strategy",
+      "nexus": "xcom"
+    },
+    {
+      "appid": "882100",
+      "title": "XCOM Chimera Squad",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "217200",
+      "title": "Worms Armageddon",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "327030",
+      "title": "Worms WMD",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "233860",
+      "title": "Kenshi",
+      "genre": "simulation-strategy",
+      "nexus": "kenshi"
+    },
+    {
+      "appid": "1361210",
+      "title": "Warhammer 40000 Darktide",
+      "genre": "simulation-strategy",
+      "nexus": "warhammer40kdarktide"
+    },
+    {
+      "appid": "552500",
+      "title": "Warhammer Vermintide 2",
+      "genre": "simulation-strategy",
+      "nexus": "warhammervermintide2"
+    },
+    {
+      "appid": "235540",
+      "title": "Warhammer End Times Vermintide",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "2183900",
+      "title": "Warhammer 40000 Space Marine 2",
+      "genre": "simulation-strategy",
+      "nexus": "warhammer40000spacemarine2"
+    },
+    {
+      "appid": "55150",
+      "title": "Warhammer 40000 Space Marine",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "9450",
+      "title": "Warhammer 40000 Dawn of War Soulstorm",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "4580",
+      "title": "Warhammer 40000 Dawn of War Dark Crusade",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "4570",
+      "title": "Warhammer 40000 Dawn of War",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "56400",
+      "title": "Warhammer 40000 Dawn of War II Retribution",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "43110",
+      "title": "Metro 2033",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "285190",
+      "title": "Warhammer 40000 Dawn of War III",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "231430",
+      "title": "Company of Heroes 2",
+      "genre": "simulation-strategy",
+      "nexus": "companyofheroes2"
+    },
+    {
+      "appid": "228200",
+      "title": "Company of Heroes",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1677280",
+      "title": "Company of Heroes 3",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "813780",
+      "title": "Age of Empires II Definitive Edition",
+      "genre": "simulation-strategy",
+      "nexus": "ageofempires2definitiveedition"
+    },
+    {
+      "appid": "221380",
+      "title": "Age of Empires II HD",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1017900",
+      "title": "Age of Empires Definitive Edition",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "933110",
+      "title": "Age of Empires III Definitive Edition",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1466860",
+      "title": "Age of Empires IV",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "266840",
+      "title": "Age of Mythology Extended Edition",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1934680",
+      "title": "Age of Mythology Retold",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "214490",
+      "title": "Alien Isolation",
+      "genre": "simulation-strategy",
+      "nexus": "alienisolation"
+    },
+    {
+      "appid": "1454400",
+      "title": "Cookie Clicker",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "333420",
+      "title": "Cossacks 3",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "504230",
+      "title": "Celeste",
+      "genre": "simulation-strategy",
+      "nexus": "celeste"
+    },
+    {
+      "appid": "367520",
+      "title": "Hollow Knight",
+      "genre": "simulation-strategy",
+      "nexus": "hollowknight"
+    },
+    {
+      "appid": "1030300",
+      "title": "Hollow Knight Silksong",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1145360",
+      "title": "Hades",
+      "genre": "simulation-strategy",
+      "nexus": "hades"
+    },
+    {
+      "appid": "1145350",
+      "title": "Hades II",
+      "genre": "simulation-strategy",
+      "nexus": "hades2"
+    },
+    {
+      "appid": "588650",
+      "title": "Dead Cells",
+      "genre": "simulation-strategy",
+      "nexus": "deadcells"
+    },
+    {
+      "appid": "311690",
+      "title": "Enter the Gungeon",
+      "genre": "simulation-strategy",
+      "nexus": "enterthegungeon"
+    },
+    {
+      "appid": "632360",
+      "title": "Risk of Rain 2",
+      "genre": "simulation-strategy",
+      "nexus": "riskofrain2"
+    },
+    {
+      "appid": "1337520",
+      "title": "Risk of Rain Returns",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "250900",
+      "title": "The Binding of Isaac Rebirth",
+      "genre": "simulation-strategy",
+      "nexus": "thebindingofisaacrebirth"
+    },
+    {
+      "appid": "113200",
+      "title": "The Binding of Isaac",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "646570",
+      "title": "Slay the Spire",
+      "genre": "simulation-strategy",
+      "nexus": "slaythespire"
+    },
+    {
+      "appid": "2868840",
+      "title": "Slay the Spire 2",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1092790",
+      "title": "Inscryption",
+      "genre": "simulation-strategy",
+      "nexus": "inscryption"
+    },
+    {
+      "appid": "2379780",
+      "title": "Balatro",
+      "genre": "simulation-strategy",
+      "nexus": "balatro"
+    },
+    {
+      "appid": "2427700",
+      "title": "Backpack Battles",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "2334730",
+      "title": "Death Must Die",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1794680",
+      "title": "Vampire Survivors",
+      "genre": "simulation-strategy",
+      "nexus": "vampiresurvivors"
+    },
+    {
+      "appid": "1942280",
+      "title": "Brotato",
+      "genre": "simulation-strategy",
+      "nexus": "brotato"
+    },
+    {
+      "appid": "2218750",
+      "title": "Halls of Torment",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1966900",
+      "title": "20 Minutes Till Dawn",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "387990",
+      "title": "Scrap Mechanic",
+      "genre": "simulation-strategy",
+      "nexus": "scrapmechanic"
+    },
+    {
+      "appid": "361420",
+      "title": "Astroneer",
+      "genre": "simulation-strategy",
+      "nexus": "astroneer"
+    },
+    {
+      "appid": "1069190",
+      "title": "Starbase",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1129580",
+      "title": "Medieval Dynasty",
+      "genre": "simulation-strategy",
+      "nexus": "medievaldynasty"
+    },
+    {
+      "appid": "690830",
+      "title": "Foundation",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1062090",
+      "title": "Timberborn",
+      "genre": "simulation-strategy",
+      "nexus": "timberborn"
+    },
+    {
+      "appid": "1891700",
+      "title": "Tap Ninja",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "242920",
+      "title": "Banished",
+      "genre": "simulation-strategy",
+      "nexus": "banished"
+    },
+    {
+      "appid": "464920",
+      "title": "Surviving Mars",
+      "genre": "simulation-strategy",
+      "nexus": "survivingmars"
+    },
+    {
+      "appid": "1324130",
+      "title": "Stranded Alien Dawn",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1782120",
+      "title": "Zero Sievert",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1284190",
+      "title": "The Planet Crafter",
+      "genre": "simulation-strategy",
+      "nexus": "theplanetcrafter"
+    },
+    {
+      "appid": "1106840",
+      "title": "Hydroneer",
+      "genre": "simulation-strategy",
+      "nexus": "hydroneer"
+    },
+    {
+      "appid": "1363080",
+      "title": "Manor Lords",
+      "genre": "simulation-strategy",
+      "nexus": "manorlords"
+    },
+    {
+      "appid": "457140",
+      "title": "Oxygen Not Included",
+      "genre": "simulation-strategy",
+      "nexus": "oxygennotincluded"
+    },
+    {
+      "appid": "322330",
+      "title": "Don't Starve Together",
+      "genre": "simulation-strategy",
+      "nexus": "dontstarvetogether"
+    },
+    {
+      "appid": "219740",
+      "title": "Don't Starve",
+      "genre": "simulation-strategy",
+      "nexus": "dontstarve"
+    },
+    {
+      "appid": "249130",
+      "title": "LEGO Marvel Super Heroes",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "613100",
+      "title": "House Flipper",
+      "genre": "simulation-strategy",
+      "nexus": "houseflipper"
+    },
+    {
+      "appid": "1190970",
+      "title": "House Flipper 2",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "445220",
+      "title": "Avorion",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "383120",
+      "title": "Empyrion Galactic Survival",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "275850",
+      "title": "No Man's Sky",
+      "genre": "simulation-strategy",
+      "nexus": "nomanssky"
+    },
+    {
+      "appid": "359320",
+      "title": "Elite Dangerous",
+      "genre": "simulation-strategy",
+      "nexus": "elitedangerous"
+    },
+    {
+      "appid": "220200",
+      "title": "Kerbal Space Program",
+      "genre": "simulation-strategy",
+      "nexus": "kerbalspaceprogram"
+    },
+    {
+      "appid": "954850",
+      "title": "Kerbal Space Program 2",
+      "genre": "simulation-strategy",
+      "nexus": "kerbalspaceprogram2"
+    },
+    {
+      "appid": "219990",
+      "title": "Grim Dawn",
+      "genre": "simulation-strategy",
+      "nexus": "grimdawn"
+    },
+    {
+      "appid": "41500",
+      "title": "Torchlight",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "200710",
+      "title": "Torchlight II",
+      "genre": "simulation-strategy",
+      "nexus": "torchlight2"
+    },
+    {
+      "appid": "1974050",
+      "title": "Torchlight Infinite",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "2344520",
+      "title": "Diablo IV",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "899770",
+      "title": "Last Epoch",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "287700",
+      "title": "Metal Gear Solid V The Phantom Pain",
+      "genre": "simulation-strategy",
+      "nexus": "metalgearsolidvtpp"
+    },
+    {
+      "appid": "311340",
+      "title": "Metal Gear Solid V Ground Zeroes",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "235460",
+      "title": "Metal Gear Rising Revengeance",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "2139460",
+      "title": "Once Human",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1149460",
+      "title": "Icarus",
+      "genre": "simulation-strategy",
+      "nexus": "icarus"
+    },
+    {
+      "appid": "232090",
+      "title": "Killing Floor 2",
+      "genre": "simulation-strategy",
+      "nexus": "killingfloor2"
+    },
+    {
+      "appid": "1250",
+      "title": "Killing Floor",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "548430",
+      "title": "Deep Rock Galactic",
+      "genre": "simulation-strategy",
+      "nexus": "deeprockgalactic"
+    },
+    {
+      "appid": "2357570",
+      "title": "Overwatch 2",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1105670",
+      "title": "The Last Spell",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1149620",
+      "title": "Gas Station Simulator",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "1519090",
+      "title": "The Last Stand Aftermath",
+      "genre": "simulation-strategy"
+    },
+    {
+      "appid": "284160",
+      "title": "BeamNG drive",
+      "genre": "racing-sports",
+      "nexus": "beamngdrive"
+    },
+    {
+      "appid": "244210",
+      "title": "Assetto Corsa",
+      "genre": "racing-sports",
+      "nexus": "assettocorsa"
+    },
+    {
+      "appid": "805550",
+      "title": "Assetto Corsa Competizione",
+      "genre": "racing-sports",
+      "nexus": "assettocorsacompetizione"
+    },
+    {
+      "appid": "3058630",
+      "title": "Assetto Corsa EVO",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "378860",
+      "title": "Project CARS 2",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "234630",
+      "title": "Project CARS",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "958400",
+      "title": "Project CARS 3",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1293830",
+      "title": "Forza Horizon 4",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1551360",
+      "title": "Forza Horizon 5",
+      "genre": "racing-sports",
+      "nexus": "forzahorizon5"
+    },
+    {
+      "appid": "2440510",
+      "title": "Forza Motorsport",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "2488620",
+      "title": "F1 24",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "2108330",
+      "title": "F1 23",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1692250",
+      "title": "F1 22",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1134570",
+      "title": "F1 2021",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1080110",
+      "title": "F1 2020",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "928600",
+      "title": "F1 2019",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "737800",
+      "title": "F1 2018",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "515220",
+      "title": "F1 2017",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "391040",
+      "title": "F1 2016",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "286570",
+      "title": "F1 2015",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "310560",
+      "title": "DiRT Rally",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "690790",
+      "title": "DiRT Rally 2.0",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "421020",
+      "title": "DiRT 4",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1038250",
+      "title": "DiRT 5",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1849250",
+      "title": "EA Sports WRC",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1462810",
+      "title": "WRC 10",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1953520",
+      "title": "WRC Generations",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "391220",
+      "title": "Rise of the Tomb Raider",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "750920",
+      "title": "Shadow of the Tomb Raider",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "203160",
+      "title": "Tomb Raider 2013",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "241560",
+      "title": "The Crew",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "646910",
+      "title": "The Crew 2",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "2698940",
+      "title": "The Crew Motorfest",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1554790",
+      "title": "Hot Wheels Unleashed",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "909140",
+      "title": "MotoGP 19",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1259980",
+      "title": "MotoGP 20",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1449060",
+      "title": "MotoGP 21",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1710580",
+      "title": "MotoGP 22",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "2100160",
+      "title": "MotoGP 23",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "2581700",
+      "title": "MotoGP 24",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "228380",
+      "title": "Wreckfest",
+      "genre": "racing-sports",
+      "nexus": "wreckfest"
+    },
+    {
+      "appid": "212480",
+      "title": "Sonic and All Stars Racing Transformed",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "212500",
+      "title": "Lord of the Rings Online",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "206480",
+      "title": "Dungeons and Dragons Online",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "9900",
+      "title": "Star Trek Online",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "9880",
+      "title": "Champions Online",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "42910",
+      "title": "Magicka",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "238460",
+      "title": "BattleBlock Theater",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "386940",
+      "title": "Ultimate Chicken Horse",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "526160",
+      "title": "The Wild Eight",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1259970",
+      "title": "eFootball PES 2021",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "996470",
+      "title": "eFootball PES 2020",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1665460",
+      "title": "eFootball",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "2195250",
+      "title": "EA Sports FC 24",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "2669320",
+      "title": "EA Sports FC 25",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "3405690",
+      "title": "EA Sports FC 26",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1919590",
+      "title": "NBA 2K23",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "2338770",
+      "title": "NBA 2K24",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "2878980",
+      "title": "NBA 2K25",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1644960",
+      "title": "NBA 2K22",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1225330",
+      "title": "NBA 2K21",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1089350",
+      "title": "NBA 2K20",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1715130",
+      "title": "Crysis 3 Remastered",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1714640",
+      "title": "Crysis 2 Remastered",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "17300",
+      "title": "Crysis",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "17330",
+      "title": "Crysis Warhead",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "108710",
+      "title": "Alan Wake",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "202750",
+      "title": "Alan Wake's American Nightmare",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "870780",
+      "title": "Control Ultimate Edition",
+      "genre": "racing-sports",
+      "nexus": "control"
+    },
+    {
+      "appid": "218620",
+      "title": "Payday 2",
+      "genre": "racing-sports",
+      "nexus": "payday2"
+    },
+    {
+      "appid": "1272080",
+      "title": "Payday 3",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "24240",
+      "title": "Payday The Heist",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "365590",
+      "title": "Tom Clancy's The Division",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "2221490",
+      "title": "Tom Clancy's The Division 2",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "359550",
+      "title": "Rainbow Six Siege",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "460930",
+      "title": "Ghost Recon Wildlands",
+      "genre": "racing-sports",
+      "nexus": "ghostreconwildlands"
+    },
+    {
+      "appid": "2231380",
+      "title": "Ghost Recon Breakpoint",
+      "genre": "racing-sports",
+      "nexus": "ghostreconbreakpoint"
+    },
+    {
+      "appid": "13560",
+      "title": "Splinter Cell",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "13570",
+      "title": "Splinter Cell Chaos Theory",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "235600",
+      "title": "Splinter Cell Blacklist",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "33320",
+      "title": "Prince of Persia The Forgotten Sands",
+      "genre": "racing-sports"
+    },
+    {
+      "appid": "1097150",
+      "title": "Fall Guys",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "945360",
+      "title": "Among Us",
+      "genre": "indie-classic",
+      "nexus": "amongus"
+    },
+    {
+      "appid": "1966720",
+      "title": "Lethal Company",
+      "genre": "indie-classic",
+      "nexus": "lethalcompany"
+    },
+    {
+      "appid": "2881650",
+      "title": "Content Warning",
+      "genre": "indie-classic",
+      "nexus": "contentwarning"
+    },
+    {
+      "appid": "3241660",
+      "title": "R E P O",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "1304930",
+      "title": "The Outlast Trials",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "238320",
+      "title": "Outlast",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "414700",
+      "title": "Outlast 2",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "319630",
+      "title": "Life is Strange",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "1265920",
+      "title": "Life is Strange Remastered",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "936790",
+      "title": "Life is Strange True Colors",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "532210",
+      "title": "Life is Strange 2",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "554620",
+      "title": "Life is Strange Before the Storm",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "261030",
+      "title": "The Walking Dead Season Two",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "207610",
+      "title": "The Walking Dead",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "536220",
+      "title": "The Walking Dead A New Frontier",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "866800",
+      "title": "The Walking Dead The Final Season",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "330830",
+      "title": "Tales from the Borderlands",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "409710",
+      "title": "BioShock Remastered",
+      "genre": "indie-classic",
+      "nexus": "bioshock"
+    },
+    {
+      "appid": "409720",
+      "title": "BioShock 2 Remastered",
+      "genre": "indie-classic",
+      "nexus": "bioshock2"
+    },
+    {
+      "appid": "8870",
+      "title": "BioShock Infinite",
+      "genre": "indie-classic",
+      "nexus": "bioshockinfinite"
+    },
+    {
+      "appid": "7670",
+      "title": "BioShock",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "8850",
+      "title": "BioShock 2",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "1222140",
+      "title": "Detroit Become Human",
+      "genre": "indie-classic",
+      "nexus": "detroitbecomehuman"
+    },
+    {
+      "appid": "960990",
+      "title": "Beyond Two Souls",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "960910",
+      "title": "Heavy Rain",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "704270",
+      "title": "Generation Zero",
+      "genre": "indie-classic",
+      "nexus": "generationzero"
+    },
+    {
+      "appid": "1128810",
+      "title": "Risk Global Domination",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "457550",
+      "title": "Bigscreen Beta",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "629730",
+      "title": "Blade and Sorcery",
+      "genre": "indie-classic",
+      "nexus": "bladeandsorcery"
+    },
+    {
+      "appid": "1592190",
+      "title": "BONELAB",
+      "genre": "indie-classic",
+      "nexus": "bonelab"
+    },
+    {
+      "appid": "823500",
+      "title": "BONEWORKS",
+      "genre": "indie-classic",
+      "nexus": "boneworks"
+    },
+    {
+      "appid": "450540",
+      "title": "Hot Dogs Horseshoes and Hand Grenades",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "555160",
+      "title": "Pavlov VR",
+      "genre": "indie-classic",
+      "nexus": "pavlovvr"
+    },
+    {
+      "appid": "620980",
+      "title": "Beat Saber",
+      "genre": "indie-classic",
+      "nexus": "beatsaber"
+    },
+    {
+      "appid": "1533390",
+      "title": "Gorilla Tag",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "1484280",
+      "title": "Demeo",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "433340",
+      "title": "Slime Rancher",
+      "genre": "indie-classic",
+      "nexus": "slimerancher"
+    },
+    {
+      "appid": "1657630",
+      "title": "Slime Rancher 2",
+      "genre": "indie-classic",
+      "nexus": "slimerancher2"
+    },
+    {
+      "appid": "592580",
+      "title": "PES 2018",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "1253920",
+      "title": "Rogue Legacy 2",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "241600",
+      "title": "Rogue Legacy",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "312520",
+      "title": "Rain World",
+      "genre": "indie-classic",
+      "nexus": "rainworld"
+    },
+    {
+      "appid": "387290",
+      "title": "Ori and the Blind Forest Definitive Edition",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "1057090",
+      "title": "Ori and the Will of the Wisps",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "313340",
+      "title": "Mountain",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "282140",
+      "title": "SOMA",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "57300",
+      "title": "Amnesia The Dark Descent",
+      "genre": "indie-classic",
+      "nexus": "amnesiathedarkdescent"
+    },
+    {
+      "appid": "239200",
+      "title": "Amnesia A Machine for Pigs",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "999220",
+      "title": "Amnesia Rebirth",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "1944430",
+      "title": "Amnesia The Bunker",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "383870",
+      "title": "Firewatch",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "753640",
+      "title": "Outer Wilds",
+      "genre": "indie-classic",
+      "nexus": "outerwilds"
+    },
+    {
+      "appid": "578650",
+      "title": "The Outer Worlds",
+      "genre": "indie-classic",
+      "nexus": "theouterworlds"
+    },
+    {
+      "appid": "1692700",
+      "title": "The Outer Worlds Spacer's Choice Edition",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "247080",
+      "title": "Crypt of the NecroDancer",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "734800",
+      "title": "Flashing Lights",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "285900",
+      "title": "Gang Beasts",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "508440",
+      "title": "Totally Accurate Battle Simulator",
+      "genre": "indie-classic",
+      "nexus": "totallyaccuratebattlesimulator"
+    },
+    {
+      "appid": "1167630",
+      "title": "Teardown",
+      "genre": "indie-classic",
+      "nexus": "teardown"
+    },
+    {
+      "appid": "1144200",
+      "title": "Ready or Not",
+      "genre": "indie-classic",
+      "nexus": "readyornot"
+    },
+    {
+      "appid": "1325200",
+      "title": "Nioh 2",
+      "genre": "indie-classic",
+      "nexus": "nioh2"
+    },
+    {
+      "appid": "485510",
+      "title": "Nioh Complete Edition",
+      "genre": "indie-classic",
+      "nexus": "nioh"
+    },
+    {
+      "appid": "378540",
+      "title": "The Surge",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "644830",
+      "title": "The Surge 2",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "1627720",
+      "title": "Lies of P",
+      "genre": "indie-classic",
+      "nexus": "liesofp"
+    },
+    {
+      "appid": "1604030",
+      "title": "V Rising",
+      "genre": "indie-classic",
+      "nexus": "vrising"
+    },
+    {
+      "appid": "1623730",
+      "title": "Palworld",
+      "genre": "indie-classic",
+      "nexus": "palworld"
+    },
+    {
+      "appid": "1364780",
+      "title": "Street Fighter 6",
+      "genre": "indie-classic",
+      "nexus": "streetfighter6"
+    },
+    {
+      "appid": "310950",
+      "title": "Street Fighter V",
+      "genre": "indie-classic",
+      "nexus": "streetfighterv"
+    },
+    {
+      "appid": "45760",
+      "title": "Ultra Street Fighter IV",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "389730",
+      "title": "Tekken 7",
+      "genre": "indie-classic",
+      "nexus": "tekken7"
+    },
+    {
+      "appid": "976310",
+      "title": "Mortal Kombat 11",
+      "genre": "indie-classic",
+      "nexus": "mortalkombat11"
+    },
+    {
+      "appid": "1971870",
+      "title": "Mortal Kombat 1",
+      "genre": "indie-classic",
+      "nexus": "mortalkombat1"
+    },
+    {
+      "appid": "307780",
+      "title": "Mortal Kombat X",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "1496790",
+      "title": "Gotham Knights",
+      "genre": "indie-classic",
+      "nexus": "gothamknights"
+    },
+    {
+      "appid": "208650",
+      "title": "Batman Arkham Knight",
+      "genre": "indie-classic",
+      "nexus": "batmanarkhamknight"
+    },
+    {
+      "appid": "200260",
+      "title": "Batman Arkham City GOTY",
+      "genre": "indie-classic",
+      "nexus": "batmanarkhamcity"
+    },
+    {
+      "appid": "35140",
+      "title": "Batman Arkham Asylum GOTY",
+      "genre": "indie-classic",
+      "nexus": "batmanarkhamasylum"
+    },
+    {
+      "appid": "209000",
+      "title": "Batman Arkham Origins",
+      "genre": "indie-classic",
+      "nexus": "batmanarkhamorigins"
+    },
+    {
+      "appid": "241930",
+      "title": "Middle-earth Shadow of Mordor",
+      "genre": "indie-classic",
+      "nexus": "middleearthshadowofmordor"
+    },
+    {
+      "appid": "356190",
+      "title": "Middle-earth Shadow of War",
+      "genre": "indie-classic",
+      "nexus": "middleearthshadowofwar"
+    },
+    {
+      "appid": "552520",
+      "title": "Far Cry 5",
+      "genre": "indie-classic",
+      "nexus": "farcry5"
+    },
+    {
+      "appid": "2369390",
+      "title": "Far Cry 6",
+      "genre": "indie-classic",
+      "nexus": "farcry6"
+    },
+    {
+      "appid": "298110",
+      "title": "Far Cry 4",
+      "genre": "indie-classic",
+      "nexus": "farcry4"
+    },
+    {
+      "appid": "220240",
+      "title": "Far Cry 3",
+      "genre": "indie-classic",
+      "nexus": "farcry3"
+    },
+    {
+      "appid": "19900",
+      "title": "Far Cry 2",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "13520",
+      "title": "Far Cry",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "371660",
+      "title": "Far Cry Primal",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "939960",
+      "title": "Far Cry New Dawn",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "243470",
+      "title": "Watch Dogs",
+      "genre": "indie-classic",
+      "nexus": "watchdogs"
+    },
+    {
+      "appid": "447040",
+      "title": "Watch Dogs 2",
+      "genre": "indie-classic",
+      "nexus": "watchdogs2"
+    },
+    {
+      "appid": "2239550",
+      "title": "Watch Dogs Legion",
+      "genre": "indie-classic",
+      "nexus": "watchdogslegion"
+    },
+    {
+      "appid": "868360",
+      "title": "Project Hospital",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "353030",
+      "title": "Lethal League",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "553310",
+      "title": "Lethal League Blaze",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "319510",
+      "title": "Five Nights at Freddy's",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "332800",
+      "title": "Five Nights at Freddy's 2",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "354140",
+      "title": "Five Nights at Freddy's 3",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "388090",
+      "title": "Five Nights at Freddy's 4",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "506610",
+      "title": "Five Nights at Freddy's Sister Location",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "747660",
+      "title": "Five Nights at Freddy's Security Breach",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "732690",
+      "title": "Five Nights at Freddy's Help Wanted",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "2287520",
+      "title": "Five Nights at Freddy's Help Wanted 2",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "256290",
+      "title": "Child of Light",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "214510",
+      "title": "LEGO Lord of the Rings",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "32440",
+      "title": "LEGO Star Wars The Complete Saga",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "920210",
+      "title": "LEGO Star Wars The Skywalker Saga",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "267530",
+      "title": "The LEGO Movie Videogame",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "438640",
+      "title": "LEGO Star Wars The Force Awakens",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "647830",
+      "title": "LEGO Marvel Super Heroes 2",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "829110",
+      "title": "LEGO DC Super Villains",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "17410",
+      "title": "Mirror's Edge",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "1233570",
+      "title": "Mirror's Edge Catalyst",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "287450",
+      "title": "Rise of Nations Extended Edition",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "314980",
+      "title": "Supreme Ruler Ultimate",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "9350",
+      "title": "Supreme Commander",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "9420",
+      "title": "Supreme Commander Forged Alliance",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "40100",
+      "title": "Supreme Commander 2",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "207140",
+      "title": "SpeedRunners",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "312530",
+      "title": "Duck Game",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "1059990",
+      "title": "The Long Drive",
+      "genre": "indie-classic",
+      "nexus": "thelongdrive"
+    },
+    {
+      "appid": "516750",
+      "title": "My Summer Car",
+      "genre": "indie-classic",
+      "nexus": "mysummercar"
+    },
+    {
+      "appid": "1119730",
+      "title": "Ranch Simulator",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "1248130",
+      "title": "Farming Simulator 22",
+      "genre": "indie-classic",
+      "nexus": "farmingsimulator22"
+    },
+    {
+      "appid": "2300320",
+      "title": "Farming Simulator 25",
+      "genre": "indie-classic",
+      "nexus": "farmingsimulator25"
+    },
+    {
+      "appid": "787860",
+      "title": "Farming Simulator 19",
+      "genre": "indie-classic",
+      "nexus": "farmingsimulator19"
+    },
+    {
+      "appid": "447020",
+      "title": "Farming Simulator 17",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "976730",
+      "title": "Halo The Master Chief Collection",
+      "genre": "indie-classic",
+      "nexus": "halothemasterchiefcollection"
+    },
+    {
+      "appid": "1240440",
+      "title": "Halo Infinite",
+      "genre": "indie-classic",
+      "nexus": "haloinfinite"
+    },
+    {
+      "appid": "49520",
+      "title": "Borderlands 2",
+      "genre": "indie-classic",
+      "nexus": "borderlands2"
+    },
+    {
+      "appid": "397540",
+      "title": "Borderlands 3",
+      "genre": "indie-classic",
+      "nexus": "borderlands3"
+    },
+    {
+      "appid": "261640",
+      "title": "Borderlands The Pre-Sequel",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "8980",
+      "title": "Borderlands",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "729040",
+      "title": "Borderlands GOTY Enhanced",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "1286680",
+      "title": "Tiny Tina's Wonderlands",
+      "genre": "indie-classic",
+      "nexus": "tinytinaswonderlands"
+    },
+    {
+      "appid": "255220",
+      "title": "GRID Autosport",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "44350",
+      "title": "GRID 2",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "703860",
+      "title": "GRID 2019",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "1307710",
+      "title": "GRID Legends",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "446150",
+      "title": "Guns Up",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "351100",
+      "title": "Niffelheim",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "244930",
+      "title": "SNOW",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "1172380",
+      "title": "Star Wars Jedi Fallen Order",
+      "genre": "indie-classic",
+      "nexus": "starwarsjedifallenorder"
+    },
+    {
+      "appid": "1774580",
+      "title": "Star Wars Jedi Survivor",
+      "genre": "indie-classic",
+      "nexus": "starwarsjedisurvivor"
+    },
+    {
+      "appid": "1237950",
+      "title": "Star Wars Battlefront II",
+      "genre": "indie-classic",
+      "nexus": "starwarsbattlefrontii"
+    },
+    {
+      "appid": "1058020",
+      "title": "Star Wars Battlefront 2004",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "6060",
+      "title": "Star Wars Battlefront II 2005",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "32370",
+      "title": "Star Wars Knights of the Old Republic",
+      "genre": "indie-classic",
+      "nexus": "kotor"
+    },
+    {
+      "appid": "208580",
+      "title": "Star Wars Knights of the Old Republic II",
+      "genre": "indie-classic",
+      "nexus": "kotor2"
+    },
+    {
+      "appid": "6030",
+      "title": "Star Wars Jedi Knight II Jedi Outcast",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "6020",
+      "title": "Star Wars Jedi Knight Jedi Academy",
+      "genre": "indie-classic",
+      "nexus": "starwarsjediknightjediacademy"
+    },
+    {
+      "appid": "6040",
+      "title": "Star Wars Jedi Knight Mysteries of the Sith",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "6000",
+      "title": "Star Wars Republic Commando",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "32430",
+      "title": "Star Wars The Force Unleashed",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "32500",
+      "title": "Star Wars The Force Unleashed II",
+      "genre": "indie-classic"
+    },
+    {
+      "appid": "32470",
+      "title": "Star Wars Empire at War Gold Pack",
+      "genre": "indie-classic"
+    }
+  ]
+}
