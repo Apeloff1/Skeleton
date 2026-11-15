@@ -25,10 +25,7 @@ HOSTS={
     "xbox":"www.xbox.com", "playstation":"www.playstation.com",
     "nintendo":"www.nintendo.com", "wikidata":"www.wikidata.org",
 }
-KINDS={"storefront","official_wiki","community_wiki","release_feed",
-       "patch_notes","developer_blog","manual","community_guide","mod_catalogue",
-       "technical_reference","preservation","engine_docs","localization",
-       "accessibility","esports"}
+from core.dragon_game_taxonomy import KINDS
 STAGES={"announced","early_access","released","updated","delisted","unknown"}
 
 
