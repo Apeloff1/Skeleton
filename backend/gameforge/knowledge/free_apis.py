@@ -14,7 +14,12 @@ import socket
 from typing import Any, Optional
 from urllib.parse import quote, urlencode, urlsplit
 
-from gameforge.egress_admission import DNS_RESOLVER, HTTP_ADMISSION, is_public_egress_address
+from gameforge.egress_admission import (
+    DNS_RESOLVER,
+    HTTP_ADMISSION,
+    is_public_egress_address,
+    require_identity_encoding,
+)
 
 # key -> {name, category, url (may contain {q}/{lat}/{lon}/{from}/{to}), note}
 FREE_APIS: dict[str, dict] = {
@@ -160,6 +165,7 @@ def _pin_public_origin(hostname: str) -> str:
 
 async def _read_bounded_body(response) -> bytes:
     """Read a streamed response without allowing unbounded buffering."""
+    require_identity_encoding(response.headers)
     declared = response.headers.get("content-length")
     if declared is not None:
         if (
@@ -227,7 +233,7 @@ async def fetch(api_key: str, params: dict) -> dict:
                     timeout=_MAX_HTTP_SECONDS,
                     follow_redirects=False,
                     trust_env=False,
-                    headers={**_HEADERS, "Host": hostname},
+                    headers={**_HEADERS, "Host": hostname, "Accept-Encoding": "identity"},
                 ) as c:
                     async with c.stream("GET", request_target, extensions={"sni_hostname": hostname}) as r:
                         raw = await _read_bounded_body(r)
