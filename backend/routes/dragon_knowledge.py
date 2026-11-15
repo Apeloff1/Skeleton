@@ -127,6 +127,16 @@ class MediaBeginRequest(Request):
     grant_seconds: int = Field(ge=300,le=2592000,strict=True)
 
 
+class ColdPrimaryRequest(Request):
+    expected_version: int = Field(ge=1,strict=True)
+    idempotency_key: str = Field(min_length=1,max_length=128)
+    acknowledged: StrictBool
+
+
+class ColdRestoreRequest(Request):
+    expected_version: int = Field(ge=1,strict=True)
+
+
 def register_knowledge_routes(router):
     def scope(user):
         try:
@@ -507,3 +517,24 @@ def register_knowledge_routes(router):
         if partial:headers["Content-Range"]=f"bytes {start}-{end}/{total}"
         return StreamingResponse(stream(),status_code=206 if partial else 200,
                                  media_type=meta["mime"],headers=headers)
+
+
+    @router.post("/knowledge/hoarder-primary/{session_id}/relocate")
+    async def relocate_primary(session_id:str,body:ColdPrimaryRequest,user:dict=Depends(get_current_user)):
+        from core.dragon_crawler import crawler_application
+        from core.dragon_hoarder_bulk import StorageHeld
+        try:
+            return await corpus_runtime_call(crawler_application.relocate_cold_primary(
+                editor(user),session_id,body.model_dump(),principal=user))
+        except StorageHeld as exc:
+            raise HTTPException(409,detail={"code":"dragon_cold_qualification_held"}) from exc
+
+    @router.post("/knowledge/hoarder-primary/{session_id}/restore")
+    async def restore_primary(session_id:str,body:ColdRestoreRequest,user:dict=Depends(get_current_user)):
+        from core.dragon_crawler import crawler_application
+        from core.dragon_hoarder_bulk import StorageHeld
+        try:
+            return await corpus_runtime_call(crawler_application.restore_cold_primary(
+                editor(user),session_id,expected_version=body.expected_version))
+        except StorageHeld as exc:
+            raise HTTPException(409,detail={"code":"dragon_cold_restore_held"}) from exc
