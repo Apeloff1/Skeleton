@@ -10,7 +10,7 @@ import asyncio
 import ipaddress
 import math
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from typing import TypeVar
 
@@ -36,7 +36,7 @@ class BoundedResolver:
     ) -> _T:
         if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
             raise ValueError("invalid resolver timeout")
-        if not math.isfinite(timeout) or not 0 < timeout <= 30:
+        if not 0 < timeout <= 30 or not math.isfinite(timeout):
             raise ValueError("invalid resolver timeout")
         loop = asyncio.get_running_loop()
         if not self._slots.acquire(blocking=False):
@@ -105,3 +105,14 @@ def is_public_egress_address(value: ipaddress.IPv4Address | ipaddress.IPv6Addres
         ):
             return False
     return True
+
+
+def require_identity_encoding(headers: Mapping[str, str]) -> None:
+    """Reject unsolicited compression before HTTPX can inflate a hostile chunk.
+
+    Both clients request identity transfer. The byte budget then applies to
+    the actual application payload, without a decompression allocation gap.
+    """
+    coding = headers.get("content-encoding", "")
+    if type(coding) is not str or coding.strip().lower() not in ("", "identity"):
+        raise ValueError("compressed external response is not admitted")
