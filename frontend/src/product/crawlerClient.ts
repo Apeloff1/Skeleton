@@ -142,7 +142,8 @@ export type DragonTreasury = {
   observations: number; families: number; revisions: number; changed_families: number; rollbacks: number;
   current_indexed: number; historic_indexed: number; metadata_only: number; blocked_current: number; changes: number; revalidated_revisions: number;
   verified_historic_transitions: number; verified_changed_families: number; alias_held_families: number; revisit_plan: string[]; parsed_unique_payloads: number;
-  materialized_payload_hits: number; invalid_materialized_segments: number;
+  materialized_payload_hits: number; invalid_materialized_segments: number; legacy_history_sessions: number;
+  index_admission: 'temporal_diversity_v1'; eligible_observations: number; indexed_observations: number;
   evolution: DragonEvolution; family_rows: TreasuryFamily[]; hits: TreasuryRevision[];
   timeline: TreasuryRevision[]; comparison: { current: TreasuryRevision; previous: TreasuryRevision; delta: TreasuryDelta } | null;
   earliest_source_expiry: number | null; latest_observed_only: true; source_text_returned: false;
@@ -527,20 +528,49 @@ export async function getDragonTreasury(mode: TreasuryMode, query='', family?: s
     ||!integer(p.changed_families,p.families)||!integer(p.rollbacks,p.revisions)||!integer(p.changes,p.revisions)
     ||!integer(p.revalidated_revisions,p.observations)||!integer(p.verified_historic_transitions,p.historic_indexed)
     ||!integer(p.verified_changed_families,p.changed_families)||!integer(p.alias_held_families,p.blocked_current)||!integer(p.parsed_unique_payloads,Math.min(256,p.observations))
-    ||!integer(p.materialized_payload_hits,p.parsed_unique_payloads)||!integer(p.invalid_materialized_segments,32)
+    ||!integer(p.materialized_payload_hits,p.parsed_unique_payloads)||!integer(p.invalid_materialized_segments,32)||!integer(p.legacy_history_sessions,32)
+    ||p.index_admission!=='temporal_diversity_v1'||!integer(p.eligible_observations,p.observations)||!integer(p.indexed_observations,Math.min(256,p.eligible_observations))
+    ||p.parsed_unique_payloads>p.indexed_observations
     ||!Array.isArray(p.revisit_plan)||p.revisit_plan.length>24||p.revisit_plan.length>p.families
     ||p.revisit_plan.some(id=>typeof id!=='string'||!HASH.test(id))||new Set(p.revisit_plan).size!==p.revisit_plan.length
     ||!validEvolution(p.evolution)||!Array.isArray(p.family_rows)||p.family_rows.length>24||!p.family_rows.every(validFamily)
     ||new Set(p.family_rows.map(f=>f.family_id)).size!==p.family_rows.length
     ||![p.hits,p.timeline].every(rows=>Array.isArray(rows)&&rows.length<=24&&rows.every(validRevision)&&new Set(rows.map(v=>v.revision_id)).size===rows.length)
     ||p.hits.some(v=>!v.indexed||mode==='current_only'&&v.plane!=='current'||mode==='historic_only'&&v.plane!=='historic'||family&&v.family_id!==family
-      ||mode==='at_time'&&(v.indexed_capture_at===null||v.indexed_capture_at>(observedBefore??0)))
+      ||mode==='at_time'&&(v.plane!=='historic'||v.last_seen>(observedBefore??0)||v.indexed_capture_at===null||v.indexed_capture_at>(observedBefore??0)))
     ||p.comparison!==null&&(!validRevision(p.comparison.current)||!validRevision(p.comparison.previous)||!validDelta(p.comparison.delta)
       ||p.comparison.current.family_id!==family||p.comparison.previous.family_id!==family
       ||left===undefined&&p.comparison.current.previous_revision_id!==p.comparison.previous.revision_id
       ||left!==undefined&&(p.comparison.previous.revision_id!==left||p.comparison.current.revision_id!==right))
     ||p.earliest_source_expiry!==null&&(!Number.isFinite(p.earliest_source_expiry)||p.earliest_source_expiry<=p.as_of_unix)
     ||p.latest_observed_only!==true||p.source_text_returned!==false||p.network_executed!==false||p.training_permission!==false||p.fresh_consent_required!==true)invalid('Invalid version-separated treasury projection.');
+  return p;
+}
+export type DragonLegacyCandidate = {
+  session_id:string;version:number;qualified:boolean;eligible_sources:number;
+  archive_grant:DragonArchiveGrant|null;snapshot_digest:string|null;historical_runtime_digest:string|null;
+};
+export type DragonLegacyCatalog = {
+  schema:'skeleton.dragon.legacy-catalog.v1';sessions:DragonLegacyCandidate[];
+  capacity_reached:boolean;execution_authorized:false;
+};
+export async function getLegacyTreasuryCatalog(signal?:AbortSignal):Promise<DragonLegacyCatalog>{
+  const p=await read(api.get<DragonLegacyCatalog>(ROOT+'/companion/legacy-catalog',options(signal)),getAuthToken(),'Historical catalogue unavailable.');
+  if(!p||p.schema!=='skeleton.dragon.legacy-catalog.v1'||p.execution_authorized!==false||typeof p.capacity_reached!=='boolean'
+    ||!Array.isArray(p.sessions)||p.sessions.length>32||new Set(p.sessions.map(v=>v?.session_id)).size!==p.sessions.length
+    ||p.sessions.some(v=>!v||typeof v.session_id!=='string'||!ID.test(v.session_id)||!integer(v.version)||v.version<1
+      ||typeof v.qualified!=='boolean'||!integer(v.eligible_sources,64)
+      ||v.qualified&&(!v.snapshot_digest||!HASH.test(v.snapshot_digest)||!v.historical_runtime_digest||!HASH.test(v.historical_runtime_digest)
+        ||!v.archive_grant||!validArchiveGrant(v.archive_grant,64))
+      ||!v.qualified&&(v.eligible_sources!==0||v.snapshot_digest!==null||v.historical_runtime_digest!==null||v.archive_grant!==null)))
+    invalid('Invalid legacy archive catalogue.');
+  return p;
+}
+export async function configureLegacyTreasuryArchive(id:string,body:CrawlCommand&{enabled:boolean;days:number;archive_rights_acknowledged:boolean},signal?:AbortSignal):Promise<{version:number;enabled:boolean;execution_authorized:false}>{
+  if(!integer(body.days,30)||body.days<1||typeof body.enabled!=='boolean'||typeof body.archive_rights_acknowledged!=='boolean'
+    ||body.enabled&&!body.archive_rights_acknowledged)invalid('Explicit historical retention rights required.');
+  const p=await read(api.post<{version:number;enabled:boolean;execution_authorized:false}>(ROOT+'/sessions/'+identifier(id)+'/legacy-archive',body,options(signal)),getAuthToken(),'Legacy archive command unconfirmed.');
+  if(!p||!integer(p.version)||p.version<body.expected_version||typeof p.enabled!=='boolean'||p.execution_authorized!==false)invalid('Invalid legacy archive receipt.');
   return p;
 }
 export async function configureTreasuryWatch(id:string,body:TreasuryWatchCommand,signal?:AbortSignal):Promise<{watch:DragonTreasuryWatch|null;version:number}> {
