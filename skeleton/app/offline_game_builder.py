@@ -756,13 +756,16 @@ class LocalGameBuilder:
         if self._closing or self._closed:
             raise GameBuildRejected(503, "local_service_shutting_down", "The local service is shutting down.")
 
-    def _row(self, request_id: str) -> dict[str, Any] | None:
+    def _scoped_row(self, model_digest: str, tokenizer_digest: str, request_id: str) -> dict[str, Any] | None:
         with self._store._lock:
             cursor = self._store._db.execute(
                 _RECORD_SELECT + " WHERE model_digest=? AND tokenizer_digest=? AND request_id=?",
-                (self.model_digest, self.tokenizer_digest, request_id))
+                (model_digest, tokenizer_digest, request_id))
             row = cursor.fetchone()
             return None if row is None else _validated_record(cursor, row)
+
+    def _row(self, request_id: str) -> dict[str, Any] | None:
+        return self._scoped_row(self.model_digest, self.tokenizer_digest, request_id)
 
     def _public(self, row: Mapping[str, Any]) -> dict[str, Any]:
         state = row["state"]
@@ -875,8 +878,11 @@ class LocalGameBuilder:
             if cursor.rowcount != 1:
                 raise ValueError("game build finality conflict")
 
-    def _fail(self, rid: str, code: str, result: dict[str, Any] | None = None) -> None:
+    def _fail(self, rid: str, code: str, result: dict[str, Any] | None = None,
+              *, expected: Mapping[str, Any] | None = None) -> None:
         with self._store._transaction():
+            if expected is not None and self._row(rid) != expected:
+                return  # Publication changed; leave recovery authority intact.
             self._store._db.execute(
                 "UPDATE offline_game_builds SET state='failed',stage='failed',updated_at=?,error_code=?,result_json=? "
                 "WHERE model_digest=? AND tokenizer_digest=? AND request_id=? AND state IN ('queued','planning','building','verifying')",
@@ -958,25 +964,30 @@ class LocalGameBuilder:
                     if time.monotonic() >= deadline_at:
                         self._fail(rid, "total_deadline_exceeded")
                         return
+                    publication_row = self._row(rid)
+                    if publication_row is None or publication_row["stage"] != "publishing":
+                        raise ValueError("missing game publication identity")
                     try:
                         _fsync_directory(bundle)
                         publish_create_only(bundle, self.artifact_root / artifact_id)
                         # A crash here is reconciled only from the previously
                         # recorded exact identities, never a model rerun.
-                        self._verify(self._row(rid))
+                        self._verify(publication_row)
                         _fsync_directory(self.artifact_root)
-                        self._complete(rid)
+                        self._complete(rid, publication_row)
                     except Exception:
                         # Ordinary publication failures settle while this
                         # worker still owns the work lease. Hard process death
                         # alone leaves the row for startup reconciliation.
                         try:
-                            self._verify(self._row(rid))
+                            # Do not adopt a different journal identity during
+                            # the retry. Startup may independently recover it.
+                            self._verify(publication_row)
                             _fsync_directory(self.artifact_root / artifact_id)
                             _fsync_directory(self.artifact_root)
-                            self._complete(rid)
+                            self._complete(rid, publication_row)
                         except Exception:
-                            self._fail(rid, "artifact_publication_failed")
+                            self._fail(rid, "artifact_publication_failed", expected=publication_row)
         except LocalInferenceLeaseBusy:
             if inserted:
                 self._fail(rid, "local_game_build_busy")
@@ -999,8 +1010,12 @@ class LocalGameBuilder:
         finally:
             admitted.set()
 
-    def _complete(self, rid: str) -> None:
+    def _complete(self, rid: str, expected: Mapping[str, Any]) -> None:
         with self._store._transaction():
+            # Compare under the SQLite writer reservation. Verification of
+            # a previous row cannot authorize publication of a changed row.
+            if self._row(rid) != expected:
+                raise ValueError("game publication journal changed")
             cursor = self._store._db.execute(
                 "UPDATE offline_game_builds SET state='complete',stage='complete',updated_at=?,error_code=NULL "
                 "WHERE model_digest=? AND tokenizer_digest=? AND request_id=? AND state='verifying' AND stage='publishing'",
@@ -1159,11 +1174,16 @@ class LocalGameBuilder:
                 except Exception:
                     pass
             with self._store._transaction():
-                self._store._db.execute(
+                current = self._scoped_row(row["model_digest"], row["tokenizer_digest"], row["request_id"])
+                if current != row:
+                    raise _invalid_record()
+                cursor = self._store._db.execute(
                     "UPDATE offline_game_builds SET state=?,stage=?,updated_at=?,error_code=? WHERE model_digest=? "
                     "AND tokenizer_digest=? AND request_id=? AND state IN ('queued','planning','building','verifying')",
                     ("complete" if completed else "failed", "complete" if completed else "failed", time.time(),
                      None if completed else "interrupted_build", row["model_digest"], row["tokenizer_digest"], row["request_id"]))
+                if cursor.rowcount != 1:
+                    raise _invalid_record()
 
     def close(self) -> None:
         with self._lock:

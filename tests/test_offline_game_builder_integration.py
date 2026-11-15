@@ -578,3 +578,69 @@ def test_corrupt_interrupted_row_blocks_recovery_without_reexecution(tmp_path, p
         assert connection.execute(
             "SELECT state FROM offline_game_builds WHERE request_id=?", ("interrupted-corrupt",)
         ).fetchone() == ("verifying",)
+
+
+def test_recovery_refuses_changed_record_between_proof_and_writer_reservation(tmp_path, pipeline, monkeypatch):
+    database = tmp_path / "workspace.sqlite3"
+    backend = model()
+    manager = LocalGameBuilder(backend, database)
+    try:
+        manager.submit("recovery-race", BRIEF)
+        assert terminal(manager, "recovery-race")["state"] == "complete"
+    finally:
+        manager.close()
+    mutate_row(database, "recovery-race", state="verifying", stage="publishing")
+    original = LocalGameBuilder._verify
+    def mutate_after_proof(owner, row):
+        raw = original(owner, row)
+        mutate_row(database, "recovery-race", updated_at=row["updated_at"] + 1)
+        return raw
+    with monkeypatch.context() as scoped:
+        scoped.setattr(LocalGameBuilder, "_verify", mutate_after_proof)
+        with pytest.raises(GameBuildRejected) as denied:
+            LocalGameBuilder(backend, database)
+        assert denied.value.code == "invalid_build_record"
+    with sqlite3.connect(database) as connection:
+        assert connection.execute(
+            "SELECT state,stage FROM offline_game_builds WHERE request_id=?", ("recovery-race",)
+        ).fetchone() == ("verifying", "publishing")
+    reopened = LocalGameBuilder(backend, database)
+    try:
+        assert reopened.get("recovery-race")["state"] == "complete"
+        assert len(pipeline.calls) == 1
+    finally:
+        reopened.close()
+
+
+def test_publication_retry_cannot_adopt_a_changed_pending_journal(tmp_path, pipeline, monkeypatch):
+    database = tmp_path / "workspace.sqlite3"
+    backend = model()
+    manager = LocalGameBuilder(backend, database)
+    original = manager._verify
+    observed = []
+    def changed(row):
+        raw = original(row)
+        observed.append(row["updated_at"])
+        if len(observed) == 1:
+            mutate_row(database, "publish-race", updated_at=row["updated_at"] + 1)
+        return raw
+    monkeypatch.setattr(manager, "_verify", changed)
+    try:
+        manager.submit("publish-race", BRIEF)
+        worker = manager._worker
+        assert worker is not None
+        worker.join(timeout=5)
+        assert not worker.is_alive()
+        assert len(observed) == 2 and observed[0] == observed[1]
+        assert manager.get("publish-race")["state"] == "verifying"
+        with pytest.raises(GameBuildRejected) as denied:
+            manager.archive("publish-race")
+        assert denied.value.code == "game_archive_not_ready"
+    finally:
+        manager.close()
+    reopened = LocalGameBuilder(backend, database)
+    try:
+        assert reopened.get("publish-race")["state"] == "complete"
+        assert len(pipeline.calls) == 1
+    finally:
+        reopened.close()
