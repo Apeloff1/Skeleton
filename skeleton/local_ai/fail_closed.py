@@ -4,8 +4,8 @@ Fail-closed guards for local AI. Reject on missing CAS, invalid schema, or clipp
 from typing import Any
 
 def guard_cas(cas: str) -> None:
-    if not cas or len(cas) < 16:
-        raise PermissionError("CAS required and must be >= 16 chars")
+    if type(cas) is not str or not 16 <= len(cas) <= 4096:
+        raise PermissionError("CAS required and must be >= 16 chars and <= 4096 chars")
 
 def guard_schema(config: dict) -> None:
     if "lora_rank" not in config or not (1 <= config["lora_rank"] <= 64):
