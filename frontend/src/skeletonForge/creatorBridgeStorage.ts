@@ -29,6 +29,7 @@ async function serializeKey<T>(key: string, task: () => Promise<T>): Promise<T> 
 }
 
 export async function storeCreatorBridge(draft: CreatorBridgeDraft, expectedEpoch: number = getAuthEpoch()): Promise<void> {
+  if (getAuthEpoch() !== expectedEpoch) throw new Error('Stale creator editor');
   const valid = parseCreatorBridge(draft, draft.target);
   if (!valid) throw new Error('Invalid or expired creator bridge');
   const encoded = JSON.stringify(valid);
@@ -38,12 +39,36 @@ export async function storeCreatorBridge(draft: CreatorBridgeDraft, expectedEpoc
   if (getAuthEpoch() !== expectedEpoch) throw new Error('Creator account changed before storage');
   return serializeKey(scope.key, async () => {
     if (!scope.stillCurrent() || getAuthEpoch() !== expectedEpoch) throw new Error('Account changed before handoff');
+    const previous = await AsyncStorage.getItem(scope.key);
+    if (!scope.stillCurrent()) throw new Error('Account changed before handoff publication');
     await AsyncStorage.setItem(scope.key, encoded);
     if (!scope.stillCurrent()) {
-      await AsyncStorage.removeItem(scope.key);
+      if (await AsyncStorage.getItem(scope.key) === encoded && previous !== encoded) {
+        if (previous === null) await AsyncStorage.removeItem(scope.key);
+        else await AsyncStorage.setItem(scope.key, previous);
+      }
       throw new Error('Account changed while saving the creator handoff');
     }
   });
+}
+
+/** Delete only the observed envelope under the same-runtime key queue.
+ * Cross-process CAS is not provided by AsyncStorage.
+ */
+async function removeObserved(
+  key: string, raw: string, stillCurrent: () => boolean, restoreOnStale: boolean,
+): Promise<void> {
+  if (!stillCurrent()) throw new Error('Account changed before creator handoff cleanup');
+  const current = await AsyncStorage.getItem(key);
+  if (!stillCurrent()) throw new Error('Account changed during creator handoff cleanup');
+  if (current !== raw) throw new Error('Creator handoff changed during publication');
+  await AsyncStorage.removeItem(key);
+  if (!stillCurrent()) {
+    if (restoreOnStale && await AsyncStorage.getItem(key) === null) {
+      await AsyncStorage.setItem(key, raw);
+    }
+    throw new Error('Account changed after creator handoff removal');
+  }
 }
 
 /**
@@ -67,33 +92,30 @@ export async function withCreatorBridge<T>(
     if (!scope.stillCurrent()) throw new Error('Account changed during Studio handoff read');
     if (!raw) return null;
     if (raw.length > CREATOR_BRIDGE_MAX_CHARS) {
-      await AsyncStorage.removeItem(scope.key);
+      await removeObserved(scope.key, raw, scope.stillCurrent, false);
       return null;
     }
     let parsed: unknown;
     try { parsed = JSON.parse(raw); }
-    catch { await AsyncStorage.removeItem(scope.key); return null; }
+    catch { await removeObserved(scope.key, raw, scope.stillCurrent, false); return null; }
     const envelope = parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
       ? parsed as Record<string, unknown> : null;
     if (!envelope || envelope.schema !== CREATOR_BRIDGE_SCHEMA) {
-      await AsyncStorage.removeItem(scope.key);
+      await removeObserved(scope.key, raw, scope.stillCurrent, false);
       return null;
     }
     if (envelope.target !== target) return null;
     const draft = parseCreatorBridge(parsed, target);
     if (!draft) {
-      await AsyncStorage.removeItem(scope.key);
+      await removeObserved(scope.key, raw, scope.stillCurrent, false);
       return null;
     }
     // The callback must either complete the receiving-project write, or
     // fail without consuming this one-time private handoff.
     const applied = await commit(draft);
     if (!scope.stillCurrent()) throw new Error('Account changed before Studio handoff acknowledgement');
-    const current = await AsyncStorage.getItem(scope.key);
-    if (!scope.stillCurrent()) throw new Error('Account changed while acknowledging Studio handoff');
-    if (current !== raw) throw new Error('Studio handoff changed during publication');
-    await AsyncStorage.removeItem(scope.key);
-    if (!scope.stillCurrent()) throw new Error('Account changed after Studio handoff acknowledgement');
+    // The receiving project is already committed; do not resurrect it.
+    await removeObserved(scope.key, raw, scope.stillCurrent, false);
     return applied;
   });
 }
@@ -105,23 +127,22 @@ export async function consumeCreatorBridge(target: CreatorBridgeTarget): Promise
     const raw = await AsyncStorage.getItem(scope.key);
     if (!scope.stillCurrent()) throw new Error('Account changed while reading the creator handoff');
     if (!raw || raw.length > CREATOR_BRIDGE_MAX_CHARS) {
-      if (raw) await AsyncStorage.removeItem(scope.key);
+      if (raw) await removeObserved(scope.key, raw, scope.stillCurrent, false);
       return null;
     }
     let parsed: unknown;
     try { parsed = JSON.parse(raw); }
-    catch { await AsyncStorage.removeItem(scope.key); return null; }
+    catch { await removeObserved(scope.key, raw, scope.stillCurrent, false); return null; }
     const envelope = parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
       ? parsed as Record<string, unknown> : null;
     if (!envelope || envelope.schema !== CREATOR_BRIDGE_SCHEMA) {
-      await AsyncStorage.removeItem(scope.key);
+      await removeObserved(scope.key, raw, scope.stillCurrent, false);
       return null;
     }
     // A wrong-direction reader must not consume someone else's valid handoff.
     if (envelope.target !== target) return null;
     const valid = parseCreatorBridge(parsed, target);
-    await AsyncStorage.removeItem(scope.key);
-    if (!scope.stillCurrent()) throw new Error('Account changed before applying the creator handoff');
+    await removeObserved(scope.key, raw, scope.stillCurrent, valid !== null);
     return valid;
   });
 }
