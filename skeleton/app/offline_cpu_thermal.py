@@ -6,7 +6,6 @@ sensor types, absent trips and non-Linux platforms never invent thresholds.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from itertools import islice
 import math
 import os
 import re
@@ -29,14 +28,16 @@ class CPUThermalSensor:
         if any(
             type(value) is not str or not 1 <= len(value) <= 128
             or value != value.strip()
-            or any(ord(ch) < 32 or ord(ch) > 126 for ch in value)
+            or re.fullmatch(r"[A-Za-z0-9_.:+ -]+", value) is None
             for value in (self.zone, self.kind)
         ):
             raise ValueError("invalid thermal sensor identity")
+        if self.temperature_c is None:
+            raise ValueError("missing measured thermal value")
         for value in (self.temperature_c, self.trip_c):
             if value is not None and (
-                isinstance(value, bool) or not isinstance(value, (int, float))
-                or not math.isfinite(value) or not -50 <= value <= 200
+                type(value) not in (int, float)
+                or not -50 <= value <= 200 or not math.isfinite(value)
             ):
                 raise ValueError("invalid measured thermal value")
 
@@ -44,7 +45,8 @@ class CPUThermalSensor:
 def _open_pinned_root(root: str | Path) -> int:
     """Open every Linux sysfs ancestor without following a symlink."""
     path = os.fspath(root)
-    if type(path) is not str or not path.startswith("/") or "\x00" in path:
+    if (type(path) is not str or len(path) > 4096
+            or not path.startswith("/") or "\x00" in path):
         raise ValueError("absolute sysfs root required")
     if any(part in (".", "..") for part in path.split("/")):
         raise ValueError("sysfs parent traversal forbidden")
@@ -97,6 +99,27 @@ def _pinned_temperature(zone_fd: int, name: str) -> float | None:
         return None
 
 
+def _directory_identity(details: os.stat_result) -> tuple[int, int, int, int, int]:
+    return (details.st_dev, details.st_ino, details.st_mode,
+            details.st_mtime_ns, details.st_ctime_ns)
+
+
+def _zone_inventory(root_fd: int) -> tuple[str, ...]:
+    names: list[str] = []
+    with os.scandir(root_fd) as entries:
+        for count, entry in enumerate(entries, 1):
+            if count > 8192:
+                raise ValueError("thermal topology exceeds entry budget")
+            name = entry.name
+            if not name.startswith("thermal_zone"):
+                continue
+            if (not re.fullmatch(r"thermal_zone(?:0|[1-9][0-9]{0,8})", name)
+                    or len(names) >= 256):
+                raise ValueError("thermal topology exceeds zone budget")
+            names.append(name)
+    return tuple(sorted(names))
+
+
 def probe_cpu_thermal(root: str | Path = "/sys/devices/virtual/thermal") -> tuple[CPUThermalSensor, ...]:
     """Fail-closed, descriptor-pinned Linux CPU/SOC thermal inventory.
 
@@ -111,26 +134,26 @@ def probe_cpu_thermal(root: str | Path = "/sys/devices/virtual/thermal") -> tupl
     except (OSError, ValueError, TypeError):
         return ()
     try:
-        zone_names: list[str] = []
-        with os.scandir(root_fd) as entries:
-            for entry in entries:
-                name = entry.name
-                if not name.startswith("thermal_zone"):
-                    continue
-                if (not re.fullmatch(r"thermal_zone[0-9]+", name)
-                        or len(zone_names) >= 256):
-                    return ()
-                zone_names.append(name)
+        root_identity = _directory_identity(os.fstat(root_fd))
+        zone_names = _zone_inventory(root_fd)
         result: list[CPUThermalSensor] = []
         flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
         for name in sorted(zone_names):
             zone_fd = os.open(name, flags, dir_fd=root_fd)
             try:
+                zone_identity = _directory_identity(os.fstat(zone_fd))
+                def recheck_zone() -> None:
+                    if (zone_identity != _directory_identity(os.fstat(zone_fd))
+                            or zone_identity != _directory_identity(
+                                os.stat(name, dir_fd=root_fd, follow_symlinks=False))):
+                        raise ValueError("thermal zone changed during observation")
+
                 kind = _read_pinned_ascii(zone_fd, "type", 128)
                 if not kind:
                     return ()
                 if not any(word in kind.lower()
                            for word in ("cpu", "soc", "package", "x86_pkg")):
+                    recheck_zone()
                     continue
                 temp = _pinned_temperature(zone_fd, "temp")
                 if temp is None:
@@ -147,11 +170,11 @@ def probe_cpu_thermal(root: str | Path = "/sys/devices/virtual/thermal") -> tupl
                         if not attr.startswith("trip_point_"):
                             continue
                         if attr.endswith("_temp") or "_temp" in attr:
-                            if not re.fullmatch(r"trip_point_[0-9]+_temp", attr):
+                            if not re.fullmatch(r"trip_point_(?:0|[1-9][0-9]{0,8})_temp", attr):
                                 return ()
                             trip_temps.add(attr[len("trip_point_"):-len("_temp")])
                         elif attr.endswith("_type") or "_type" in attr:
-                            if not re.fullmatch(r"trip_point_[0-9]+_type", attr):
+                            if not re.fullmatch(r"trip_point_(?:0|[1-9][0-9]{0,8})_type", attr):
                                 return ()
                             trip_types.add(attr[len("trip_point_"):-len("_type")])
                 if trip_temps != trip_types or len(trip_temps) > 64:
@@ -167,9 +190,19 @@ def probe_cpu_thermal(root: str | Path = "/sys/devices/virtual/thermal") -> tupl
                     if measured is None:
                         return ()
                     trip = measured if trip is None else min(trip, measured)
+                recheck_zone()
                 result.append(CPUThermalSensor(name, kind, temp, trip))
             finally:
                 os.close(zone_fd)
+        if (_zone_inventory(root_fd) != zone_names
+                or _directory_identity(os.fstat(root_fd)) != root_identity):
+            return ()
+        current_root = _open_pinned_root(root)
+        try:
+            if _directory_identity(os.fstat(current_root)) != root_identity:
+                return ()
+        finally:
+            os.close(current_root)
         return tuple(result)
     except (OSError, ValueError, UnicodeError):
         return ()
@@ -189,8 +222,8 @@ class CPUThermalController:
         self._transitions = 0
 
     def observe(self, sensors: tuple[CPUThermalSensor, ...]) -> None:
-        if type(sensors) is not tuple or any(
-            not isinstance(sensor, CPUThermalSensor) for sensor in sensors
+        if type(sensors) is not tuple or len(sensors) > 256 or any(
+            type(sensor) is not CPUThermalSensor for sensor in sensors
         ):
             raise TypeError("typed thermal sensors required")
         with self._lock:
@@ -198,7 +231,7 @@ class CPUThermalController:
             before = self._hold
             identity = tuple(sorted((s.zone, s.kind) for s in sensors))
             if sensors and self._baseline is None:
-                if len(set(identity)) != len(identity):
+                if len({sensor.zone for sensor in sensors}) != len(sensors):
                     self._identity_drift = True
                 else:
                     self._baseline = identity
