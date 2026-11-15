@@ -718,10 +718,12 @@ JAVASCRIPT = r"""'use strict';
   const unresolved = () => !!state.turn && !terminal(state.turn);
   const status = value => { get('status').textContent = value; };
   function queueAdmissionPossible(health, session) {
-    return !!session && health?.inference_lease?.state === 'busy' &&
-      !!health.active_turn && health.active_turn.session_id !== session &&
-      Number.isInteger(health.max_queued_turns) && health.max_queued_turns > 0 &&
-      Number.isInteger(health.queued_turn_count) && health.queued_turn_count >= 0 &&
+    return typeof session === 'string' && !!session.trim() &&
+      health?.ready === true && health.inference_lease?.state === 'busy' &&
+      typeof health.active_turn?.session_id === 'string' &&
+      !!health.active_turn.session_id.trim() && health.active_turn.session_id !== session &&
+      Number.isSafeInteger(health.max_queued_turns) && health.max_queued_turns > 0 &&
+      Number.isSafeInteger(health.queued_turn_count) && health.queued_turn_count >= 0 &&
       health.queued_turn_count < health.max_queued_turns;
   }
   function updateQueueIndicator(health) {

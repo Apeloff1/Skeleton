@@ -11,7 +11,7 @@ const assets = JSON.parse(execFileSync('python', ['-c',
   'import json; from skeleton.app.offline_web import HTML, JAVASCRIPT; print(json.dumps({"html":HTML,"javascript":JAVASCRIPT}))'],
 { cwd: root, encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 }));
 const source = ts.createSourceFile('offline-workspace.js', assets.javascript, ts.ScriptTarget.ES2022, true, ts.ScriptKind.JS);
-const wanted = ['nativeGameBrief', 'checkedForgeJob', 'forgeArchiveReady', 'readBoundedForgeArchive'];
+const wanted = ['nativeGameBrief', 'checkedForgeJob', 'forgeArchiveReady', 'readBoundedForgeArchive', 'queueAdmissionPossible'];
 const declarations = new Map();
 function visit(node) {
   if (ts.isFunctionDeclaration(node) && wanted.includes(node.name?.text)) declarations.set(node.name.text, node.getText(source));
@@ -141,4 +141,23 @@ test('embedded UI keeps same-origin credentials, lock/epoch fences and source-on
   assert.ok(!assets.javascript.includes('localStorage'));
   assert.ok(!assets.html.includes('<iframe'));
   assert.ok(assets.html.includes('Download Godot source ZIP'));
+});
+
+
+test('production queue policy permits only bounded peer-owned native waiting', () => {
+  const allowed = {ready:true, inference_lease:{state:'busy'},
+    active_turn:{session_id:'peer'}, max_queued_turns:4, queued_turn_count:3};
+  assert.equal(helpers.queueAdmissionPossible(allowed, 'mine'), true);
+  for (const invalid of [
+    {...allowed, ready:false}, {...allowed, active_turn:{}},
+    {...allowed, active_turn:{session_id:'mine'}},
+    {...allowed, active_turn:{session_id:' '}},
+    {...allowed, inference_lease:{state:'unavailable'}},
+    {...allowed, inference_lease:{state:'idle'}},
+    {...allowed, queued_turn_count:4}, {...allowed, queued_turn_count:-1},
+    {...allowed, queued_turn_count:NaN}, {...allowed,max_queued_turns:Infinity},
+    {...allowed, max_queued_turns:0}, {...allowed, max_queued_turns:'4'},
+  ]) assert.equal(helpers.queueAdmissionPossible(invalid, 'mine'), false);
+  assert.equal(helpers.queueAdmissionPossible(allowed, ''), false);
+  assert.equal(helpers.queueAdmissionPossible(null, 'mine'), false);
 });

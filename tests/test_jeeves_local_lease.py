@@ -463,7 +463,12 @@ def test_local_desktop_prototype_exposes_real_kernel_lock_and_fail_closed_send()
     assert 'id="lease-indicator"' in HTML
     assert "observed.inference_lease?.state" in JAVASCRIPT
     assert "const foreignLease = ['busy', 'unavailable'].includes" in JAVASCRIPT
-    assert "get('send').disabled = locked || working || foreignLease" in JAVASCRIPT
+    # Peer-owned execution may admit a waiting request only under the
+    # separately bounded queue contract; an unsafe lock never permits it.
+    assert "const mayQueue = queueAdmissionPossible(state.health, state.session)" in JAVASCRIPT
+    assert "get('send').disabled = locked || working || (foreignLease && !mayQueue) || !state.session || state.health?.ready !== true" in JAVASCRIPT
+    assert "health?.ready === true && health.inference_lease?.state === 'busy'" in JAVASCRIPT
+    assert "health.queued_turn_count < health.max_queued_turns" in JAVASCRIPT
     assert "get('selftest-start').disabled = locked || working || foreignLease" in JAVASCRIPT
     assert "get('lease-indicator').textContent = 'Execution lock unknown'" in JAVASCRIPT
     assert "LOCAL • ANOTHER EXECUTOR IS ACTIVE" in JAVASCRIPT

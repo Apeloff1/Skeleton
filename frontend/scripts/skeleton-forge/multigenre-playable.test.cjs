@@ -183,7 +183,7 @@ test('creator discloses progression and mystery effects only where implemented',
     'Tempo: movement', 'Risk: frame budget', 'Agency: interaction range', 'Progression depth: deliveries',
   ]);
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.combat_loop, [
-    'Tempo: movement', 'Lethality: contact damage',
+    'Tempo: movement', 'Lethality: contact damage', 'Agency: attack range',
     'Progression depth: waves',
   ]);
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.crafting, [
