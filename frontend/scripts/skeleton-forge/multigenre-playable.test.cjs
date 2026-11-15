@@ -23,8 +23,8 @@ test('historical creator offers all eight actual native mini-games, not 69 ficti
   assert.equal(new Set(Q.PLAYABLE_SLICES.map((s) => s.id)).size, 8);
   const html = display(reducer({ type: 'setPlayableEnabled', value: true }));
   assert.match(html, /data-testid="q-playable-slice-options"/);
-  assert.match(text(html), /eight implemented prototypes/);
-  assert.match(text(html), /not mean all 69 catalog genres/);
+  assert.match(text(html), /eight independent playable scenes/);
+  assert.match(text(html), /not a claim of 158 gameplay engines/);
 });
 
 test('default request unchanged until users explicitly opt in to playable content', () => {
@@ -77,7 +77,7 @@ test('JSON exports do not attach unusable native loops, and review explains why'
   assert.equal(req.playable_content, undefined);
   assert.equal(req.playable_archetype, undefined);
   assert.equal(req.playable_main_scene, undefined);
-  assert.match(text(display(state, 'review')), /Native playable mini-games require Godot output/);
+  assert.match(text(display(state, 'review')), /Playable sidecar scenes require Godot output/);
 });
 
 test('unknown playable IDs are rejected without changing author intent', () => {

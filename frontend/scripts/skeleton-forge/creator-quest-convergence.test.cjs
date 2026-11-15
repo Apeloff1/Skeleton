@@ -168,6 +168,6 @@ test('creator explicitly distinguishes mechanically applied sliders from design-
   const req = Q.buildRunRequest(state);
   assert.deepEqual(req.operator_axes, { tempo: 0.9, intimacy: 0.2 });
   const html = text(screen({ ...state, step: 'options' }));
-  assert.match(html, /sliders now modify the underlying generated Godot movement/);
-  assert.match(html, /other sliders currently tune the design tensor/);
+  assert.match(html, /Mechanical sliders change the generated movement, pressure, combat, interaction or goals/);
+  assert.match(html, /other axes shape the design blueprint/);
 });

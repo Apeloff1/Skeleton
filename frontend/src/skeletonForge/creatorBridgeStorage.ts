@@ -84,10 +84,13 @@ async function removeObserved(
 export async function withCreatorBridge<T>(
   target: CreatorBridgeTarget,
   commit: (draft: CreatorBridgeDraft) => Promise<T>,
+  expectedEpoch: number = getAuthEpoch(),
 ): Promise<T | null> {
+  if (getAuthEpoch() !== expectedEpoch) throw new Error('Account changed before Studio handoff scope');
   const scope = await creatorStorageScope(KEY);
+  if (getAuthEpoch() !== expectedEpoch) throw new Error('Account changed during Studio handoff scope');
   return serializeKey(scope.key, async () => {
-    if (!scope.stillCurrent()) throw new Error('Account changed before Studio handoff read');
+    if (getAuthEpoch() !== expectedEpoch || !scope.stillCurrent()) throw new Error('Account changed before Studio handoff read');
     const raw = await AsyncStorage.getItem(scope.key);
     if (!scope.stillCurrent()) throw new Error('Account changed during Studio handoff read');
     if (!raw) return null;
@@ -120,10 +123,12 @@ export async function withCreatorBridge<T>(
   });
 }
 
-export async function consumeCreatorBridge(target: CreatorBridgeTarget): Promise<CreatorBridgeDraft | null> {
+export async function consumeCreatorBridge(target: CreatorBridgeTarget, expectedEpoch: number = getAuthEpoch()): Promise<CreatorBridgeDraft | null> {
+  if (getAuthEpoch() !== expectedEpoch) throw new Error('Account changed before creator handoff scope');
   const scope = await creatorStorageScope(KEY);
+  if (getAuthEpoch() !== expectedEpoch) throw new Error('Account changed during creator handoff scope');
   return serializeKey(scope.key, async () => {
-    if (!scope.stillCurrent()) throw new Error('Account changed before reading creator handoff');
+    if (getAuthEpoch() !== expectedEpoch || !scope.stillCurrent()) throw new Error('Account changed before reading creator handoff');
     const raw = await AsyncStorage.getItem(scope.key);
     if (!scope.stillCurrent()) throw new Error('Account changed while reading the creator handoff');
     if (!raw || raw.length > CREATOR_BRIDGE_MAX_CHARS) {
