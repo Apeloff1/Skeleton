@@ -485,14 +485,26 @@ def register_knowledge_routes(router):
     async def media_append(media_id:str,ordinal:int,request:HttpRequest,user:dict=Depends(get_current_user)):
         from core.dragon_hoarder_manifests import BLOCK
         owner=editor(user)
-        if request.headers.get("content-type","").lower()!="application/octet-stream":
+        import base64
+        import binascii
+        mime=request.headers.get("content-type","").lower()
+        if mime not in {"application/octet-stream","application/base64"}:
             raise HTTPException(415,detail={"code":"dragon_media_binary_required"})
+        maximum=BLOCK if mime=="application/octet-stream" else 4*((BLOCK+2)//3)
         raw=bytearray()
         async for piece in request.stream():
-            if len(raw)+len(piece)>BLOCK:
+            if len(raw)+len(piece)>maximum:
                 raise HTTPException(413,detail={"code":"dragon_media_chunk_bound"})
             raw.extend(piece)
-        return await media_call(owner,"append",media_id,ordinal,bytes(raw))
+        if mime=="application/base64":
+            try:
+                decoded=base64.b64decode(raw,validate=True)
+                if len(decoded)>BLOCK or base64.b64encode(decoded)!=bytes(raw):
+                    raise ValueError("noncanonical block encoding")
+            except (ValueError,binascii.Error) as exc:
+                raise HTTPException(422,detail={"code":"dragon_media_block_encoding"}) from exc
+        else:decoded=bytes(raw)
+        return await media_call(owner,"append",media_id,ordinal,decoded)
 
     @router.post("/knowledge/media/{media_id}/seal")
     async def media_seal(media_id:str,user:dict=Depends(get_current_user)):
