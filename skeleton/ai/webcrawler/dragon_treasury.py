@@ -16,6 +16,7 @@ import re
 from urllib.parse import urlsplit
 
 from .dragon_companion import _lexemes, _signature, _similarity
+from .dragon_revisit_model import ChangeSample, infer_revisit
 
 SCHEMA = "skeleton.dragon.treasury.v1"
 PARSER = "retained-text-sections-v1"
@@ -125,25 +126,18 @@ def _delta(before: ParsedVersion | None, after: ParsedVersion | None,
             "numeric_change":numeric}
 
 
-def _revisit(versions: list[dict], latest: Observation, now: float) -> dict:
-    # Exposure is elapsed observation time, not a count of crawl requests.
-    # Gamma-like shrinkage to one change/week avoids unstable short samples.
-    first = versions[0]["first_seen"]
-    exposure_days = max(0., (latest.captured_at-first)/86400)
-    changes = max(0,len(versions)-1)
-    hazard = (1+changes)/(7+exposure_days)
-    # Target roughly 30% chance of change; bounded to 1h..7d. Advice only.
-    interval = max(3600., min(604800., -math.log(.7)*86400/hazard))
-    due = latest.captured_at + interval
-    if latest.advisory_due is not None:
-        # Publisher freshness hints can postpone, never accelerate a revisit.
-        due = max(due, latest.advisory_due)
-    age = max(0., now-latest.captured_at)
-    probability = 1-math.exp(-hazard*age/86400)
-    return {"due_at":round(due,3),"change_probability_estimate":round(probability,6),
-            "observed_changes":changes,"interval_seconds":round(due-latest.captured_at,3),
-            "ready_for_review":bool(latest.refresh_allowed and now>=due),
-            "fresh_consent_required":True,"network_executed":False}
+def _revisit(rows: list[Observation], now: float) -> dict:
+    latest = rows[-1]
+    # Higher-impact families are assigned a smaller target stale risk,
+    # while short repeated observations cannot manufacture confidence.
+    unique = len({row.content_hash for row in rows})
+    priority = .4 + .35 * min(1., (unique-1)/4) + .25 * int(latest.text is not None)
+    return infer_revisit(
+        [ChangeSample(row.captured_at,row.content_hash) for row in rows],
+        now=now, publisher_due=latest.advisory_due,
+        allowed=latest.refresh_allowed, priority_value=priority,
+        estimated_bytes=max(1,len(latest.text.encode()) if latest.text is not None else 65536),
+    )
 
 
 def progression(growth: int, stewardship: int, *, qualified: bool) -> dict:
@@ -157,7 +151,7 @@ def progression(growth: int, stewardship: int, *, qualified: bool) -> dict:
     stage = sum(effective >= threshold for threshold in _THRESHOLDS[1:-1])
     lo, hi = _THRESHOLDS[stage], _THRESHOLDS[stage+1]
     fraction = min(1., max(0., (effective-lo)/(hi-lo)))
-    level = min(60,stage*10+1+int(fraction*10))
+    level = min(stage*10+10,stage*10+1+int(fraction*10))
     return {"form":_STAGES[stage],"stage":stage,"level":level,
             "expedition_growth":growth,"treasury_growth":stewardship,
             "total_evolution":total,"effective_evolution":effective,
@@ -167,7 +161,8 @@ def progression(growth: int, stewardship: int, *, qualified: bool) -> dict:
 
 def build_treasury(observations: list[Observation], *, as_of: float, growth: int,
                    mode: str = "current_only", query: str = "", family: str | None = None,
-                   candidate_limit_reached: bool = False, excluded_sessions: int = 0) -> dict:
+                   candidate_limit_reached: bool = False, excluded_sessions: int = 0,
+                   alias_blockers: list[dict] | None = None) -> dict:
     if (not isinstance(observations,list) or len(observations)>MAX_OBSERVATIONS
             or type(as_of) not in (int,float) or not math.isfinite(as_of)
             or mode not in _MODES or not isinstance(query,str) or len(query.encode())>1024
@@ -175,6 +170,18 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
             or type(candidate_limit_reached) is not bool
             or type(excluded_sessions) is not int or not 0<=excluded_sessions<=MAX_SESSIONS):
         raise ValueError("invalid treasury query envelope")
+    aliases = alias_blockers if alias_blockers is not None else []
+    if not isinstance(aliases,list) or len(aliases)>1024:
+        raise ValueError("archive alias blocker capacity exceeded")
+    blockers = defaultdict(list)
+    for alias in aliases:
+        if (not isinstance(alias,dict) or set(alias)!={"url","captured_at","content_hash"}
+                or not isinstance(alias["url"],str) or len(alias["url"].encode())>4096
+                or type(alias["captured_at"]) not in (float,int) or not math.isfinite(alias["captured_at"])
+                or not 0<=alias["captured_at"]<=as_of+300
+                or not isinstance(alias["content_hash"],str) or not _HEX.fullmatch(alias["content_hash"])):
+            raise ValueError("invalid archive alias receipt")
+        blockers[alias["url"]].append(alias)
     grouped = defaultdict(list)
     identities = set()
     for row in observations:
@@ -192,13 +199,24 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
     ordered = sorted((x for x in observations if x.text is not None),
                      key=lambda x:(-x.captured_at,x.session_id,x.source_id))
     indexed = ordered[:MAX_INDEXED]
-    index = {(x.session_id,x.source_id):parse_retained_text(x.text) for x in indexed}
+    # Exact retained-text memoization; full-source hash alone is not a
+    # sufficient key when a source was truncated. No cross-request cache.
+    index, memo = {}, {}
+    for row in indexed:
+        key = hashlib.sha256(row.text.encode("utf-8")).hexdigest()
+        if key not in memo:
+            memo[key] = parse_retained_text(row.text)
+        index[row.session_id,row.source_id] = memo[key]
     capped = candidate_limit_reached or len(ordered)>MAX_INDEXED
     families, revisions, parse_rows = [], [], {}
     comparisons = {}
-    changed_families = changes = rollbacks = revalidated = blocked_current = 0
+    changed_families = changes = rollbacks = revalidated = blocked_current = alias_held = 0
+    family_origins = {}
     for fid, rows in sorted(grouped.items()):
         rows.sort(key=lambda x:(x.captured_at,x.session_id,x.source_id))
+        family_origins[fid] = urlsplit(rows[0].url).hostname
+        ambiguous_times = {stamp for stamp,count in Counter(x.captured_at for x in rows).items()
+                           if count>1 and len({x.content_hash for x in rows if x.captured_at==stamp})>1}
         versions = []
         prior = None
         observed_hashes = set()
@@ -224,7 +242,9 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
                       "changed_sections":None,"numeric_change":None} if prior is None else
                      _delta(index.get((prior.session_id,prior.source_id)),parsed,
                             complete=prior.complete_text and row.complete_text))
-            if row.content_hash in observed_hashes:
+            if prior is not None and (row.captured_at in ambiguous_times or prior.captured_at in ambiguous_times):
+                delta = _delta(None,None,complete=False)
+            elif row.content_hash in observed_hashes:
                 delta["kind"]="rollback"
                 rollbacks += 1
             observed_hashes.add(row.content_hash)
@@ -252,7 +272,14 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
             latest["indexed"]=False
             latest["metadata_only"]=True
             parse_rows[latest["revision_id"]]=None
-        current_available=latest["indexed"] and not latest["archive_only"]
+        alias_conflict = any(a["captured_at"]>=rows[-1].captured_at and
+                             a["content_hash"]!=rows[-1].content_hash for a in blockers.get(rows[-1].url,()))
+        alias_held += int(alias_conflict)
+        current_available=latest["indexed"] and not latest["archive_only"] and not alias_conflict
+        # Keep an earlier authorized payload available only to the historic
+        # plane when a newer variant-unknown receipt contradicts it.
+        if alias_conflict:
+            latest["archive_only"] = True
         blocked_current+=int(not current_available)
         for v in versions:
             v["plane"]="current" if v is latest and not v["archive_only"] else "historic"
@@ -264,9 +291,11 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
         families.append({"family_id":fid,"revision_count":len(versions),
                          "current_revision":latest["revision_id"],"first_seen":versions[0]["first_seen"],
                          "last_seen":latest["last_seen"],"current_indexed":current_available,
-                         "simultaneous_conflict":tied,"revisit":_revisit(versions,rows[-1],as_of),
-                         "refresh_url":rows[-1].url if rows[-1].refresh_allowed and not tied else None})
-        if len(versions)>1:
+                         "simultaneous_conflict":tied,"alias_conflict":alias_conflict,"revisit":_revisit(rows,as_of),
+                         "refresh_url":rows[-1].url if rows[-1].refresh_allowed and not tied and not alias_conflict else None})
+        if alias_conflict:
+            families[-1]["revisit"]["ready_for_review"] = False
+        if len(versions)>1 and not tied and not alias_conflict and latest["delta"]["kind"]!="changed_unclassified":
             comparisons[fid]={"current":latest,"previous":versions[-2],"delta":latest["delta"]}
     # Explicitly separate index corpora before computing document frequency.
     # Historic pages cannot leak into current-only scoring via IDF.
@@ -300,7 +329,25 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
                     +.15*min(1.,revalidated/4)*min(1.,historic_count/4))))
     qualified=(not capped and not excluded_sessions and verified_transitions>=3 and changed_families>=2
                and current_count>=2)
-    families.sort(key=lambda f:(not f["revisit"]["ready_for_review"],-f["last_seen"],f["family_id"]))
+    # Deficit-style round robin of due origins. Within each origin prioritize
+    # expected stale loss per retained-text cost, not repeated request count.
+    due = defaultdict(list)
+    for f in families:
+        if f["revisit"]["ready_for_review"] and f["refresh_url"]:
+            due[family_origins[f["family_id"]]].append(f)
+    for queue in due.values():
+        queue.sort(key=lambda f:(-f["revisit"]["utility_per_cost"],f["revisit"]["due_at"],f["family_id"]))
+    plan=[]
+    while due and len(plan)<MAX_RESULTS:
+        for host in sorted(due,key=lambda h:(-due[h][0]["revisit"]["utility_per_cost"],h)):
+            if len(plan)>=MAX_RESULTS:
+                break
+            f=due[host].pop(0)
+            plan.append(f["family_id"])
+            if not due[host]:
+                del due[host]
+    rank={fid:i for i,fid in enumerate(plan)}
+    families.sort(key=lambda f:(rank.get(f["family_id"],MAX_RESULTS),-f["revisit"]["utility_per_cost"],-f["last_seen"],f["family_id"]))
     family_rows=[f for f in families if family is None or f["family_id"]==family]
     history=sorted((v for v in revisions if family is None or v["family_id"]==family),
                    key=lambda v:(-v["last_seen"],v["revision_id"]))
@@ -314,7 +361,8 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
             "families":len(families),"revisions":len(revisions),"changed_families":changed_families,
             "rollbacks":rollbacks,"current_indexed":current_count,"historic_indexed":historic_count,
             "metadata_only":len(revisions)-current_count-historic_count,
-            "blocked_current":blocked_current,"changes":changes,"revalidated_revisions":revalidated,
+            "blocked_current":blocked_current,"alias_held_families":alias_held,"changes":changes,"revalidated_revisions":revalidated,
+            "revisit_plan":plan,"parsed_unique_payloads":len(memo),
             "verified_historic_transitions":verified_transitions,
             "evolution":progression(growth,stewardship,qualified=qualified),
             "family_rows":family_rows[:MAX_RESULTS],"hits":hits[:MAX_RESULTS],
