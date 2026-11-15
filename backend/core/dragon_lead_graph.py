@@ -32,6 +32,7 @@ MAX_PAGE_ROWS=128
 MAX_PAGE_BYTES=1024*1024
 MAX_GRANT=30*86400
 MAX_SEED_BATCH=256
+BUNDLE_PAGES_PER_PULSE=4
 MAX_BOOTSTRAP_OWNERS=100_000
 MIN_RESERVE=512*1024*1024
 ZERO="0"*64
@@ -97,7 +98,7 @@ CREATE TABLE IF NOT EXISTS lead_snapshot_pages(
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS lead_expand_jobs(
  owner TEXT NOT NULL,id TEXT NOT NULL,parent TEXT NOT NULL,appid TEXT NOT NULL,title TEXT NOT NULL,
- witness TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('queued','done','held')),created_at INTEGER NOT NULL,
+ witness TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('queued','done','held')),created_at INTEGER NOT NULL,snapshot TEXT,
  PRIMARY KEY(owner,id),FOREIGN KEY(owner,parent) REFERENCES lead_nodes(owner,id)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS lead_expand_ready ON lead_expand_jobs(state,created_at,owner,id);
@@ -175,7 +176,7 @@ def parse_page(raw,projection):
         if not line.strip() or len(line)>8192:raise ValueError("lead row bytes")
         item=json.loads(line,object_pairs_hook=_pairs)
         if not isinstance(item,dict):raise ValueError("lead row fields")
-        if projection=="steam":
+        if projection in {"steam","steam_seed"}:
             if set(item)!={"appid","title"}:raise ValueError("Steam projection schema")
             appid=item["appid"]
             if type(appid) is int:appid=str(appid)
@@ -341,8 +342,13 @@ class LeadGraph:
         if acknowledged is not True:raise ValueError("public dataset metadata rights acknowledgement")
         if item["access"] in {"credential_required","noncommercial_only","landing_only"}:
             raise ValueError("target requires separate source review or explicit export target")
-        if projection not in {"steam","modrinth","locator"}:raise ValueError("dataset projection")
-        if projection=="steam" and item["adapter"] not in {"steam_csv","steam_json"}:raise ValueError("Steam dataset target")
+        if projection not in {"steam","steam_seed","modrinth","locator"}:raise ValueError("dataset projection")
+        if projection=="steam_seed":
+            from core.dragon_bundled_steam_leads import summary as bundle_summary,TARGET
+            bundle=bundle_summary()
+            if target_id!=TARGET or source_sha!=bundle["bundle_revision"] or expected_rows!=bundle["title_identity_candidates"]:
+                raise ValueError("bundle target witness")
+        if projection in {"steam","steam_seed"} and item["adapter"] not in {"steam_csv","steam_json"}:raise ValueError("Steam dataset target")
         if projection=="modrinth" and item["adapter"]!="modrinth_json":raise ValueError("mod dataset target")
         source_sha=_id(source_sha);expected_rows=_int(expected_rows,1,MAX_SNAPSHOT_ROWS)
         rights_ref=clean(rights_ref,128);grant_seconds=_int(grant_seconds,900,MAX_GRANT)
@@ -402,13 +408,23 @@ class LeadGraph:
                     return {"ordinal":ordinal,"rows":prior["row_count"],"chain":prior["chain"],"replayed":True,"network_authorized":False}
                 if snap["state"]!="open" or snap["next_page"]!=ordinal or snap["chain"]!=previous_chain:
                     raise CatalogueHeld("lead snapshot ordering")
+                bundle_witness=None
+                if snap["projection"]=="steam_seed":
+                    from core.dragon_bundled_steam_leads import normalized_page,summary as bundle_summary
+                    expected,bundle_witness=normalized_page(ordinal)
+                    if snap["source_sha"]!=bundle_summary()["bundle_revision"] or expected!=raw:
+                        raise CatalogueHeld("bundled dataset page differs from pinned source")
                 items=parse_page(raw,snap["projection"])
                 if snap["rows"]+len(items)>snap["expected_rows"]:raise CatalogueHeld("lead snapshot row budget")
                 chain=digest([previous_chain,ordinal,sha256,len(items)])
                 for ix,item in enumerate(items):
-                    witness=digest([sid,ordinal,sha256,ix,item])
+                    witness=digest([sid,ordinal,sha256,bundle_witness,ix,item])
                     for row in project(item,snap["projection"]):
-                        self._add(db,owner,row,parent=snap["root"],relation="dataset_projection",witness=witness,now=now,snapshot=sid)
+                        child=self._add(db,owner,row,parent=snap["root"],relation="dataset_projection",witness=witness,now=now,snapshot=sid)
+                        if snap["projection"]=="steam_seed":
+                            job=digest(["bundle-steam-app",child,item["appid"],sid])
+                            db.execute("INSERT OR IGNORE INTO lead_expand_jobs VALUES(?,?,?,?,?,?,'queued',?,?)",
+                                (owner,job,child,item["appid"],item["title"],witness,now,sid))
                 db.execute("INSERT INTO lead_snapshot_pages VALUES(?,?,?,?,?,?)",(owner,sid,ordinal,sha256,len(items),chain))
                 db.execute("UPDATE lead_snapshots SET rows=rows+?,next_page=next_page+1,chain=? WHERE owner=? AND id=?",
                     (len(items),chain,owner,sid))
@@ -524,12 +540,70 @@ class LeadGraph:
                         parent=root,relation="feed_discovery",witness=witness,now=now)
                     if adapter=="steam" and item.namespace=="steam" and APPID.fullmatch(item.external_id):
                         job=digest(["steam-app",child,item.external_id,item.title])
-                        db.execute("INSERT OR IGNORE INTO lead_expand_jobs VALUES(?,?,?,?,?,?,'queued',?)",
+                        db.execute("INSERT OR IGNORE INTO lead_expand_jobs VALUES(?,?,?,?,?,?,'queued',?,NULL)",
                             (owner,job,child,item.external_id,item.title,witness,now))
                 db.execute("COMMIT");return {"enabled":True,"proposals":len(proposals),"network_authorized":False}
             except BaseException:
                 if db.in_transaction:db.execute("ROLLBACK")
                 raise
+
+    def bundle_status(self,scope):
+        from core.dragon_bundled_steam_leads import summary as bundle_summary,TARGET
+        summary=bundle_summary();owner=owner_key(scope)
+        with self._db() as db:
+            row=db.execute("""SELECT id,rows,expected_rows,next_page,state,expires_at FROM lead_snapshots
+                WHERE owner=? AND target_id=? AND projection='steam_seed' AND source_sha=?
+                ORDER BY created_at DESC,id LIMIT 1""",(owner,TARGET,summary["bundle_revision"])).fetchone()
+        return {**summary,"snapshot":dict(row) if row else None,
+                "snapshot_identity_candidates_ingested":row["rows"] if row else 0,
+                "growth_floor_met":self.status(scope)["growth_floor_met"]}
+
+    def enable_bundle(self,scope,*,rights_ref,grant_seconds,acknowledged):
+        from core.dragon_bundled_steam_leads import summary as bundle_summary,TARGET
+        info=bundle_summary();grant_seconds=_int(grant_seconds,900,MAX_GRANT)
+        if acknowledged is not True:raise ValueError("separate bundle rights acknowledgement required")
+        result=self.begin(scope,target_id=TARGET,projection="steam_seed",source_sha=info["bundle_revision"],
+            expected_rows=info["title_identity_candidates"],rights_ref=rights_ref,grant_seconds=grant_seconds,acknowledged=True)
+        # Renewal is explicit; reusing the same reviewed source identity
+        # extends the finite grant without discarding the committed cursor.
+        owner=owner_key(scope);now=int(time.time())
+        with self._db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                self._enabled(db,owner)
+                db.execute("""UPDATE lead_snapshots SET expires_at=? WHERE owner=? AND id=?
+                    AND state IN ('open','sealed') AND source_sha=?""",
+                    (now+grant_seconds,owner,result["id"],info["bundle_revision"]))
+                db.execute("COMMIT")
+            except BaseException:
+                if db.in_transaction:db.execute("ROLLBACK")
+                raise
+        return self.bundle_status(scope)
+
+    def bundle_pulse(self):
+        """Replay-safe bundled source admission (512 identity rows per pulse)."""
+        from core.dragon_bundled_steam_leads import summary as bundle_summary,normalized_page,TARGET
+        info=bundle_summary();now=int(time.time());_quota_disk(self.path)
+        with self._db() as db:
+            row=db.execute("""SELECT s.id,o.scope_json,s.owner FROM lead_snapshots s JOIN lead_owner o
+                ON o.owner=s.owner WHERE o.enabled=1 AND s.target_id=? AND s.projection='steam_seed'
+                AND s.source_sha=? AND s.state='open' AND s.expires_at>? ORDER BY s.next_page,s.owner,s.id LIMIT 1""",
+                (TARGET,info["bundle_revision"],now)).fetchone()
+        if row is None:return {"processed":0,"network_executed":False}
+        scope=json.loads(row["scope_json"])
+        if owner_key(scope)!=row["owner"]:raise ValueError("bundle owner witness")
+        processed=0
+        for _ in range(BUNDLE_PAGES_PER_PULSE):
+            snap=self.snapshot(scope,row["id"])
+            if snap["state"]!="open":break
+            if snap["rows"]==snap["expected_rows"]:
+                self.seal(scope,snap["id"],snap["chain"])
+                break
+            raw,witness=normalized_page(snap["next_page"])
+            receipt=self.append(scope,snap["id"],ordinal=snap["next_page"],raw=raw,
+                sha256=hashlib.sha256(raw).hexdigest(),previous_chain=snap["chain"])
+            if not receipt["replayed"]:processed+=receipt["rows"]
+        return {"processed":processed,"network_executed":False}
 
     def catalogue_pulse(self):
         """Consume the transactional canonical-release outbox exactly once."""
@@ -557,7 +631,7 @@ class LeadGraph:
                         if (item["namespace"]=="steam" and APPID.fullmatch(item["external_id"])
                             and _locator(url)==_locator("https://store.steampowered.com/app/"+item["external_id"]+"/")):
                             job_id=digest(["steam-app",child,item["external_id"],title])
-                            db.execute("INSERT OR IGNORE INTO lead_expand_jobs VALUES(?,?,?,?,?,?,'queued',?)",
+                            db.execute("INSERT OR IGNORE INTO lead_expand_jobs VALUES(?,?,?,?,?,?,'queued',?,NULL)",
                                 (job["owner"],job_id,child,item["external_id"],title,witness,now))
                         db.execute("UPDATE lead_release_outbox SET state='done' WHERE owner=? AND id=?",
                             (job["owner"],job["id"]))
@@ -582,15 +656,17 @@ class LeadGraph:
             db.execute("BEGIN IMMEDIATE")
             try:
                 jobs=db.execute("""SELECT j.* FROM lead_expand_jobs j JOIN lead_owner o ON o.owner=j.owner
-                    WHERE j.state='queued' AND o.enabled=1 ORDER BY j.created_at,j.owner,j.id LIMIT 16""").fetchall()
+                    WHERE j.state='queued' AND o.enabled=1 AND (j.snapshot IS NULL OR EXISTS(
+                    SELECT 1 FROM lead_snapshots s WHERE s.owner=j.owner AND s.id=j.snapshot AND s.state IN ('open','sealed') AND s.expires_at>?))
+                    ORDER BY j.created_at,j.owner,j.id LIMIT 16""",(now,)).fetchall()
                 processed=0;held=0
                 for job in jobs:
                     db.execute("SAVEPOINT lead_expansion_row")
                     try:
                         if not APPID.fullmatch(job["appid"]):raise ValueError("expansion identity")
                         for row in project({"appid":job["appid"],"title":job["title"]},"steam"):
-                            self._add(db,job["owner"],row,parent=job["parent"],relation="feed_discovery",
-                                witness=job["witness"],now=now)
+                            self._add(db,job["owner"],row,parent=job["parent"],relation="dataset_projection" if job["snapshot"] else "feed_discovery",
+                                witness=job["witness"],now=now,snapshot=job["snapshot"])
                         state="done";processed+=1
                     except (ValueError,TypeError,KeyError,CatalogueHeld):
                         db.execute("ROLLBACK TO lead_expansion_row")
