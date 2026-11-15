@@ -33,7 +33,7 @@ class QueueOverflowError(Exception): ...
 MAX_CONTENT_BYTES = 64 * 1024
 MAX_SESSION_COMMITS = 4096
 MAX_SESSIONS = 64
-_MAX_SUBS = 64
+_MAX_SUBS = 256
 
 
 # ══════════════════════════════════════════════════════════════
