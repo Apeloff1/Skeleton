@@ -290,7 +290,7 @@ class DragonDeepArchiveMixin:
             totals["indexed" if changed.modified_count else "superseded"]+=1
         return totals
 
-    async def deep_archive_search(self,scope,*,query,cursor=None,session_ids=None):
+    async def deep_archive_search(self,scope,*,query,cursor=None,session_ids=None,game_id=None):
         """Indexed candidate pages, exact reparse of each admitted row."""
         from core.dragon_crawler import CrawlerError,_now
         try:
@@ -301,7 +301,10 @@ class DragonDeepArchiveMixin:
             passage_tokens=query_keys(scope,query)
             if session_ids is not None and (not isinstance(session_ids,list) or len(session_ids)>100 or not all(identity(x) for x in session_ids)):
                 raise ValueError("session routing bound")
-            cursor_query=query if session_ids is None else query+":"+a.digest(sorted(set(session_ids)))
+            if game_id is not None:
+                from core.dragon_game_corpus import _id
+                _id(game_id)
+            cursor_query=query if session_ids is None and game_id is None else query+":"+a.digest([game_id,sorted(set(session_ids or []))])
             after=a.decode_cursor(scope,cursor_query,cursor)
         except ValueError as exc:
             raise CrawlerError("crawler_deep_query","Invalid archive search or cursor.",422) from exc
@@ -311,7 +314,9 @@ class DragonDeepArchiveMixin:
             "deep_index.expires_at":{"$gt":now},"$or":[{"deep_index.tokens":{"$in":tokens}},
             {"deep_hybrid_route.tokens":{"$in":rare_tokens},"deep_hybrid_route.expires_at":{"$gt":now}},
             {"deep_passage_route.tokens":{"$in":passage_tokens},"deep_passage_route.expires_at":{"$gt":now}}]}
-        if session_ids is not None:
+        if game_id is not None:
+            predicate["$and"]=[{"$or":[{"game_route.game_id":game_id},{"_id":{"$in":session_ids or []}}]}]
+        elif session_ids is not None:
             predicate["_id"]={"$in":session_ids}
         if after:
             predicate.setdefault("_id",{})["$gt"]=after
@@ -319,10 +324,17 @@ class DragonDeepArchiveMixin:
             return await self.sessions.find(predicate,{"_id":1,"version":1,"deep_index.digest":1,"deep_hybrid_route.digest":1,"deep_passage_route.digest":1}
                 ).sort("_id",ASCENDING).limit(a.PAGE+1).max_time_ms(3000).to_list(a.PAGE+1)
         rows=await page()
+        permitted=None
+        if game_id is not None:
+            from core.dragon_game_routing import verify_game_candidates
+            permitted=await verify_game_candidates(scope,game_id,[x["_id"] for x in rows])
         hits=[]
         held=0
         expiries=[]
         for item in rows[:a.PAGE]:
+            if permitted is not None and item["_id"] not in permitted:
+                held+=1
+                continue
             row=await self.sessions.find_one({**scope,"_id":item["_id"],"version":item["version"],
                 "deep_index.digest":item["deep_index"]["digest"],"status":{"$in":sorted(TERMINAL)}},max_time_ms=2000)
             if not row:
@@ -421,13 +433,14 @@ class DragonDeepArchiveMixin:
             "authority":"historical_external_evidence_only","training_permission":False}
         return doc,ref
 
-    async def history_context(self,scope,query,max_docs,max_chars,*,session_ids=None):
+    async def history_context(self,scope,query,max_docs,max_chars,*,session_ids=None,game_id=None):
         """Explicit local-chat history retrieval; no promotion or current facts."""
         from core.dragon_crawler import CrawlerError,_now
         if type(max_docs) is not int or not 1<=max_docs<=4 or type(max_chars) is not int or not 1<=max_chars<=16000:
             raise CrawlerError("crawler_deep_context_bounds","Invalid historical context budget.",422)
         terms,_=a.query_terms(scope,query)
         options={} if session_ids is None else {"session_ids":session_ids}
+        if game_id is not None:options["game_id"]=game_id
         page=await self.deep_archive_search(scope,query=query,**options)
         from core.dragon_hybrid_rank import fuse_ranked
         pages=[page]
@@ -449,9 +462,9 @@ class DragonDeepArchiveMixin:
         dense_status="disabled"
         if configured():
             try:
-                vector_hits=await self.dense_archive_candidates(scope,query,session_ids=session_ids)
+                vector_hits=await self.dense_archive_candidates(scope,query,**options)
                 try:
-                    full_hits=await self.full_vector_candidates(scope,query,session_ids=session_ids)
+                    full_hits=await self.full_vector_candidates(scope,query,**options)
                     vector_hits=sorted(full_hits+vector_hits,key=lambda h:(-h["score"],h["session_id"],h["source_id"],h["start"]))[:64]
                 except Exception:
                     # Preserve the already qualified sampled/lexical lanes.
@@ -477,10 +490,15 @@ class DragonDeepArchiveMixin:
             if payload not in seen_payloads:
                 selected.append(hit)
                 seen_payloads.add(payload)
+        permitted=None
+        if game_id is not None:
+            from core.dragon_game_routing import verify_game_candidates
+            permitted=await verify_game_candidates(scope,game_id,[h["session_id"] for h in selected])
         docs=[]
         refs=[]
         remaining=max_chars
         for hit in selected:
+            if permitted is not None and hit["session_id"] not in permitted:continue
             if len(docs)>=max_docs or remaining<=0:
                 break
             row=await self.sessions.find_one({**scope,"_id":hit["session_id"],"version":hit["version"],
