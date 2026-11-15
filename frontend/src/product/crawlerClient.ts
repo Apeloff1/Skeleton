@@ -39,6 +39,17 @@ export type CrawlAcquisitionEconomics = {
   settled_requests: number; charged_bytes: number; uncertain_bytes: number;
   hosts: Record<string, CrawlHostEconomics>; network_authority_expanded: false;
 };
+export type DragonSanctuary = {
+  schema: 'skeleton.dragon.sanctuary.v1'; collection_index: number; stage: number;
+  form: 'hatchling' | 'scout' | 'scholar' | 'pathfinder' | 'archivist';
+  eligible_expeditions: number; contributing_expeditions: number; unqualified_expeditions: number;
+  candidate_sources: number; distinct_content: number; credited_sources: number; exact_duplicates: number;
+  low_signal_sources: number; distinct_origins: number; habitats: Record<string, number>;
+  source_refs: { session_id: string; source_id: string; credit_milli: number }[];
+  revision_digest: string; candidate_limit_reached: boolean; as_of_unix: number; earliest_source_expiry: number | null;
+  current_consent_only: true; persistent_reward_wallet: false; source_text_returned: false;
+  training_permission: false; network_authority_expanded: false;
+};
 export type DragonQuest = {
   code: string; branch: 'discovery' | 'scholar' | 'ecology' | 'stewardship';
   target: number; progress: number; prerequisite: string | null;
@@ -359,6 +370,35 @@ function source(value: CapturedSource, id?: string): CapturedSource {
       || freshness.remote_freshness_verified !== false) invalid('The source-use or capture-age projection is invalid.');
   }
   return value;
+}
+export async function getDragonSanctuary(signal?: AbortSignal): Promise<DragonSanctuary> {
+  const p = await read(api.get<DragonSanctuary>(ROOT + '/companion/sanctuary', options(signal)), getAuthToken(), 'The companion sanctuary could not be refreshed.');
+  const forms = ['hatchling','scout','scholar','pathfinder','archivist'];
+  const habitats = ['web','document','structured','media','text','artifact'];
+  if (!p || p.schema !== 'skeleton.dragon.sanctuary.v1'
+    || !integer(p.collection_index, 1000) || !integer(p.stage, 4) || forms[p.stage] !== p.form
+    || p.stage !== [120,300,550,800].filter(t => p.collection_index >= t).length
+    || !integer(p.eligible_expeditions, 8) || !integer(p.unqualified_expeditions, 8)
+    || p.eligible_expeditions + p.unqualified_expeditions > 8
+    || !integer(p.contributing_expeditions, p.eligible_expeditions)
+    || !integer(p.candidate_sources, 128) || !integer(p.distinct_content, p.candidate_sources)
+    || !integer(p.exact_duplicates, p.candidate_sources) || p.distinct_content + p.exact_duplicates !== p.candidate_sources
+    || !integer(p.credited_sources, p.distinct_content) || !integer(p.low_signal_sources, p.distinct_content)
+    || p.credited_sources + p.low_signal_sources !== p.distinct_content || !integer(p.distinct_origins, p.credited_sources)
+    || !p.habitats || typeof p.habitats !== 'object' || Array.isArray(p.habitats)
+    || Object.entries(p.habitats).some(([k,n]) => !habitats.includes(k) || !integer(n,p.credited_sources) || n < 1)
+    || Object.values(p.habitats).reduce((a,n)=>a+n,0) !== p.credited_sources
+    || !Array.isArray(p.source_refs) || p.source_refs.length !== Math.min(16,p.credited_sources)
+    || p.source_refs.some(row => !row || !ID.test(row.session_id) || !HASH.test(row.source_id)
+      || !integer(row.credit_milli,1000) || row.credit_milli < 50)
+    || new Set(p.source_refs.map(row=>row.session_id+':'+row.source_id)).size !== p.source_refs.length
+    || !HASH.test(p.revision_digest) || typeof p.candidate_limit_reached !== 'boolean'
+    || !Number.isFinite(p.as_of_unix) || p.as_of_unix < 0
+    || (p.candidate_sources === 0) !== (p.earliest_source_expiry === null)
+    || p.earliest_source_expiry !== null && (!Number.isFinite(p.earliest_source_expiry) || p.earliest_source_expiry <= p.as_of_unix)
+    || p.current_consent_only !== true || p.persistent_reward_wallet !== false || p.source_text_returned !== false
+    || p.training_permission !== false || p.network_authority_expanded !== false) invalid('Invalid current-consent sanctuary projection.');
+  return p;
 }
 export async function getCrawlerReadiness(signal?: AbortSignal): Promise<CrawlerReadiness> {
   const value = await read(api.get<CrawlerReadiness>(ROOT + '/readiness', options(signal)), getAuthToken(), 'Crawler readiness is unavailable.');
