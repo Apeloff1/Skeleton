@@ -14,6 +14,8 @@ import threading
 import time
 from typing import Mapping
 
+from .offline_kernel_counters import MAX_KERNEL_COUNTER, parse_counter_table, read_kernel_ascii
+
 SCHEMA = "skeleton.offline.reclaim-pressure.v1"
 _MAX_STAT_BYTES = 64 * 1024
 _MIN_INTERVAL_NS = 100_000_000
@@ -28,10 +30,10 @@ class ReclaimCounters:
     major_faults: int
 
     def __post_init__(self) -> None:
-        if self.scope not in {"cgroup_v2", "host_vmstat"}:
+        if type(self.scope) is not str or self.scope not in {"cgroup_v2", "host_vmstat"}:
             raise ValueError("unknown kernel counter scope")
         if any(
-            type(value) is not int or value < 0
+            type(value) is not int or not 0 <= value <= MAX_KERNEL_COUNTER
             for value in (self.scanned_pages, self.reclaimed_pages, self.major_faults)
         ):
             raise ValueError("kernel counters must be non-negative integers")
@@ -44,22 +46,9 @@ def _read_stat(path: Path) -> dict[str, int] | None:
     selecting the most convenient reading.
     """
     try:
-        with path.open("rb") as handle:
-            raw = handle.read(_MAX_STAT_BYTES + 1)
-        if len(raw) > _MAX_STAT_BYTES:
-            return None
-        lines = raw.decode("ascii", errors="strict").splitlines()
-    except (OSError, UnicodeError):
+        return parse_counter_table(read_kernel_ascii(path, maximum=_MAX_STAT_BYTES))
+    except FileNotFoundError:
         return None
-    counters: dict[str, int] = {}
-    for line in lines:
-        fields = line.split()
-        if len(fields) != 2 or not fields[0].isidentifier() or not fields[1].isdecimal():
-            return None
-        if fields[0] in counters:
-            return None
-        counters[fields[0]] = int(fields[1])
-    return counters if counters else None
 
 
 def _host_total(values: Mapping[str, int], prefix: str) -> int | None:
@@ -80,14 +69,20 @@ def probe_reclaim_counters(
     """Prefer current cgroup's counters; label host fallback explicitly."""
     if sys.platform != "linux":
         return None
-    cgroup = _read_stat(Path(cgroup_path))
+    try:
+        cgroup = _read_stat(Path(cgroup_path))
+    except (OSError, UnicodeError, ValueError):
+        return None
     if cgroup is not None and all(
         key in cgroup for key in ("pgscan", "pgsteal", "pgmajfault")
     ):
         return ReclaimCounters(
             "cgroup_v2", cgroup["pgscan"], cgroup["pgsteal"], cgroup["pgmajfault"]
         )
-    host = _read_stat(Path(host_path))
+    try:
+        host = _read_stat(Path(host_path))
+    except (OSError, UnicodeError, ValueError):
+        return None
     if host is None:
         return None
     scanned = _host_total(host, "pgscan")
@@ -95,7 +90,10 @@ def probe_reclaim_counters(
     major = host.get("pgmajfault")
     if scanned is None or reclaimed is None or major is None:
         return None
-    return ReclaimCounters("host_vmstat", scanned, reclaimed, major)
+    try:
+        return ReclaimCounters("host_vmstat", scanned, reclaimed, major)
+    except ValueError:
+        return None
 
 
 class ReclaimPressureController:
@@ -123,9 +121,9 @@ class ReclaimPressureController:
         self, sample: ReclaimCounters | None, *,
         physical_ram_bytes: int, now_ns: int | None = None,
     ) -> None:
-        if type(physical_ram_bytes) is not int or physical_ram_bytes <= 0:
+        if type(physical_ram_bytes) is not int or not 1 <= physical_ram_bytes <= MAX_KERNEL_COUNTER:
             raise ValueError("measured physical RAM required")
-        if sample is not None and not isinstance(sample, ReclaimCounters):
+        if sample is not None and type(sample) is not ReclaimCounters:
             raise ValueError("typed kernel counter sample required")
         instant = time.monotonic_ns() if now_ns is None else now_ns
         if type(instant) is not int or instant < 0:
@@ -140,6 +138,7 @@ class ReclaimPressureController:
                 self._fault_rate = None
                 self._efficiency = None
                 # Unknown is not a calm sample; keep any existing hold.
+                self._quiet = 0
                 return
             self._scope = sample.scope
             previous, previous_ns = self._last, self._last_ns
@@ -155,6 +154,7 @@ class ReclaimPressureController:
                     self._resets += 1
                 self._last = sample
                 self._last_ns = instant
+                self._quiet = 0
                 self._scan_rate = None
                 self._fault_rate = None
                 self._efficiency = None
@@ -183,7 +183,7 @@ class ReclaimPressureController:
                 self._hold = True
                 self._quiet = 0
             else:
-                self._quiet += 1
+                self._quiet = min(_RECOVERY_SAMPLES, self._quiet + 1)
                 if self._quiet >= _RECOVERY_SAMPLES:
                     self._hold = False
             self._last = sample
