@@ -28,8 +28,9 @@ export interface CreatorStorageScope {
 
 export async function creatorStorageScope(prefix: string): Promise<CreatorStorageScope> {
   if (!ALLOWED_PREFIXES.has(prefix)) throw new Error('Unrecognized creator storage namespace');
-  await initializeStoredToken();
   const epoch = getAuthEpoch();
+  await initializeStoredToken();
+  if (getAuthEpoch() !== epoch) throw new Error('Account changed while initializing game draft storage');
   const token = getAuthToken();
   const fingerprint = token
     ? await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, token)
