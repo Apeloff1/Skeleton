@@ -23,9 +23,9 @@ from core.dragon_game_taxonomy import KINDS, cadence, priority, public_taxonomy,
 STAGES = {"announced", "early_access", "released", "updated", "delisted", "unknown"}
 KEY = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,127}\Z")
 DIGEST = re.compile(r"[a-f0-9]{64}\Z")
-MAX_SOURCES = 250_000
-MAX_GAMES = 2_000_000
-MAX_REVISIONS = 50_000_000
+MAX_SOURCES = 20_000_000
+MAX_GAMES = 50_000_000
+MAX_REVISIONS = 2_000_000_000
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS counters(
  owner TEXT PRIMARY KEY, games INTEGER NOT NULL DEFAULT 0,
