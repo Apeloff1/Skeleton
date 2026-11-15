@@ -39,6 +39,22 @@ export type CrawlAcquisitionEconomics = {
   settled_requests: number; charged_bytes: number; uncertain_bytes: number;
   hosts: Record<string, CrawlHostEconomics>; network_authority_expanded: false;
 };
+export type DragonCompanion = {
+  schema: 'skeleton.dragon.companion.v1';
+  form: 'hatchling' | 'scout' | 'scholar' | 'pathfinder' | 'archivist';
+  stage: number; growth: number;
+  skills: Record<'discovery' | 'understanding' | 'diversity' | 'discipline' | 'resilience', number>;
+  energy: number;
+  quest: 'explore' | 'synthesize' | 'diversify' | 'conserve' | 'recover' | 'rest';
+  posture: 'resting' | 'recovering' | 'studying' | 'roaming';
+  style: 'balanced' | 'curious' | 'scholarly' | 'guardian';
+  captured_sources: number; novel_origins: number; habitats: Record<string, number>;
+  covered_terms: number; term_count: number; multi_origin_terms: number;
+  recovery_observations: number; quarantines: number; uncertain_bytes: number;
+  unreviewed_evidence_only: true; network_authority_expanded: false;
+  training_permission: false; inactivity_penalty: false;
+  learning_progress: number; novelty_yield: number;
+};
 export type CrawlSession = {
   session_id: string; title: string; status: 'queued' | 'ready' | 'running' | 'paused' | 'completed' | 'cancelled' | 'budget_exhausted' | 'failed' | 'interrupted';
   state?: string; version: number; created_at: string; updated_at: string; seeds: string[];
@@ -49,6 +65,7 @@ export type CrawlSession = {
   instruction_security?: CrawlInstructionSecurity; adaptive_origin_health?: Record<string, CrawlOriginHealth>;
   duplicate_evidence?: CrawlDuplicateEvidence; checkpoint_recovery?: CrawlCheckpointRecovery;
   acquisition_economics?: CrawlAcquisitionEconomics;
+  companion?: DragonCompanion;
   queue: { url: string; depth: number; attempts: number; ready_at: number }[];
 };
 export type SourceUsePolicy = { version: number; enabled: boolean; max_age_seconds: number; changed_at: string | null };
@@ -180,6 +197,30 @@ function session(value: CrawlSession, expectedId?: string): CrawlSession {
       counted += h.observations;
     }
     if (counted !== e.settled_requests) invalid('Acquisition economics request accounting is incomplete.');
+  }
+  if (value.companion !== undefined) {
+    const p = value.companion;
+    const unit = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1;
+    const forms = ['hatchling', 'scout', 'scholar', 'pathfinder', 'archivist'];
+    const stages = [120, 300, 550, 800];
+    const skills = ['discovery', 'understanding', 'diversity', 'discipline', 'resilience'] as const;
+    const habitats = ['web', 'document', 'structured', 'media', 'text', 'artifact'];
+    if (!p || p.schema !== 'skeleton.dragon.companion.v1' || !integer(p.stage, 4) || forms[p.stage] !== p.form
+      || !integer(p.growth, 1000) || p.stage !== stages.filter(t => p.growth >= t).length
+      || !unit(p.energy) || !unit(p.learning_progress) || !unit(p.novelty_yield)
+      || !p.skills || Object.keys(p.skills).length !== skills.length || !skills.every(k => unit(p.skills[k]))
+      || !['explore', 'synthesize', 'diversify', 'conserve', 'recover', 'rest'].includes(p.quest)
+      || !['resting', 'recovering', 'studying', 'roaming'].includes(p.posture)
+      || !['balanced', 'curious', 'scholarly', 'guardian'].includes(p.style)
+      || !integer(p.captured_sources, value.source_count) || !integer(p.novel_origins, Math.min(16, p.captured_sources))
+      || !integer(p.term_count, 32) || !integer(p.covered_terms, p.term_count) || !integer(p.multi_origin_terms, p.covered_terms)
+      || !integer(p.recovery_observations, value.counters.requests) || !integer(p.quarantines, 128)
+      || !integer(p.uncertain_bytes, value.counters.reserved_bytes ?? 33554432)
+      || !p.habitats || typeof p.habitats !== 'object' || Array.isArray(p.habitats)
+      || Object.entries(p.habitats).some(([k, n]) => !habitats.includes(k) || !integer(n, p.captured_sources) || n < 1)
+      || Object.values(p.habitats).reduce((a, n) => a + n, 0) > p.captured_sources
+      || p.unreviewed_evidence_only !== true || p.network_authority_expanded !== false
+      || p.training_permission !== false || p.inactivity_penalty !== false) invalid('Invalid evidence-fed companion projection.');
   }
   if (value.duplicate_evidence !== undefined) {
     const d = value.duplicate_evidence;
