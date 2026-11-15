@@ -14,7 +14,12 @@
     "skeleton/ai/webcrawler/frontier_scheduler.py",
     "skeleton/ai/webcrawler/frontier_circuit.py",
     "skeleton/ai/webcrawler/robots_policy.py",
-    "skeleton/ai/webcrawler/frontier_coverage.py"
+    "skeleton/ai/webcrawler/frontier_coverage.py",
+    "skeleton/ai/webcrawler/parser_isolation.py",
+    "skeleton/ai/webcrawler/parser_worker.py",
+    "skeleton/ai/webcrawler/evidence_selection.py",
+    "skeleton/ai/webcrawler/duplicate_custody.py",
+    "backend/core/dragon_checkpoint_replica.py"
   ],
   "state_authority": "Existing CORE_DB Mongo application custody; pure snapshots have no independent storage authority",
   "public_api": {
@@ -42,11 +47,19 @@
     "adaptive_origin_event_samples": 16,
     "slice_steps": 4,
     "slice_seconds": 45,
-    "connect_read_timeout_seconds": 10
+    "connect_read_timeout_seconds": 10,
+    "parser_children_per_process": 3,
+    "parser_posix_address_space_bytes": 536870912,
+    "parser_cpu_seconds": 5,
+    "parser_wall_seconds_max": 8,
+    "parser_output_bytes": 12582912,
+    "exact_duplicate_receipts": 128,
+    "evidence_selection_candidates": 512,
+    "compressed_checkpoint_replica_max_bytes": 1572864
   },
   "semantics": {
     "robots": "Fail closed on unavailable robots other than explicit 404/410; accept text/plain rules, not unexpected HTML; revalidation, TTL and every redirect target; delays checkpointed. Retry-After cannot reopen an origin before its valid remote deadline within the finite consent window. Denials and overload bodies never become discovery inputs.",
-    "dedupe": "Canonical URL and full normalized content SHA256; same-content URL aliases retained",
+    "dedupe": "Canonical URL and full normalized content SHA256; exact aliases recorded with charged source provenance and never independent corroboration. Original primary remains immutable.",
     "provenance": "Actual requested/final URL, status, timestamps, raw body SHA256, full normalized text SHA256, preserved text SHA256/truncation and consent binding; no raw response bytes retained",
     "learning": "Bounded lexical evidence observations and exact-span retrieval under existing mission-quality functions, explicitly unreviewed external content. No verified knowledge, calibration, XP, model updates or training rights.",
     "durability": "Request slot and maximum possible response bytes are checkpointed BEFORE network as pending_dispatch; outcome atomically settles known bytes and content. Uncertain outcome retains reservation across recovery; committed source IDs dedupe. Full frontier, robots, retry timers and source text in same application snapshot.",
@@ -58,7 +71,10 @@
     "autonomous_application": "Application may consume explicit finite CORE_DB grants through the existing backend scheduler. Pure run_slice remains at most4steps/45seconds; no independent pure background loop, storage, scheduler or authority. Canonical code binding and pre-IO reservation remain unchanged.",
     "protocol_matching": "Bounded merged exact product-group rules, wildcard/terminal matching, percent-octet normalization; strictest valid selected pacing, fail closed on invalid pacing or match work exhaustion. Runtime-only parser cache must match snapshot text and time; first-page and redirect Retry-After pacing enforced.",
     "frontier_index": "Ephemeral query and source URL coverage projection built once per selection; no stored cross-owner index or authority.",
-    "offline_benchmark": "scripts/benchmark_dragon_crawler.py runs three real canonical strategies against three fixed offline workloads; no external competitor results claimed."
+    "offline_benchmark": "scripts/benchmark_dragon_crawler.py runs three real canonical strategies against three fixed offline workloads; no external competitor results claimed.",
+    "parser_containment": "Complex document and structured discovery parsing in disposable POSIX resource-limited children, with finite input/output, deadline, restricted environment and Python audit defense. Parent reconstructs custody and admits links. No same-response network retry for parser faults. Small simple text remains in-process; PDF has existing child. Non-POSIX complex parsing holds; not an OS sandbox.",
+    "retrieval_diversity": "Bounded exact-span lexical candidates, duplicate passage suppression and deterministic relevance-weighted novelty/origin ranking, rechecked owner and source custody. No new source authority or model training.",
+    "checkpoint_redundancy": "Each snapshot publication atomically includes exact-current identity witness and bounded compressed duplicate when total admitted storage envelope permits. Quiescent current-consent owner CAS repair only, exact runtime and scope validated; no ancestor rollback, new worker, revocation bypass or recovery if both fields are lost. Redundancy erased with owner session; not independent backup."
   },
   "network": {
     "direct": "Validated public DNS addresses pinned to socket with original TLS SNI/hostname verification",
