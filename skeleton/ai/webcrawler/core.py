@@ -485,6 +485,7 @@ def _archive_document_response(
 def extract_document(
     response: FetchResponse, canonical_url: str, *, max_links: int = 500,
     max_text_chars: int = 1_000_000, link_base_url: str | None = None,
+    pdf_deadline_seconds: float = 8.0,
 ) -> CrawlDocument | None:
     ctype = response.headers.get("content-type", "text/plain").split(";", 1)[0].strip().lower()
     if ctype in ML_MODEL_TYPES:
@@ -532,7 +533,8 @@ def extract_document(
             [], row.truncated,
         )
     if ctype == PDF_MEDIA_TYPE:
-        pdf = extract_pdf_document(response.body, max_chars=max(512, max_text_chars))
+        pdf = extract_pdf_document(response.body, max_chars=max(512, max_text_chars),
+                                   deadline_seconds=pdf_deadline_seconds)
         return _archive_document_response(
             response, canonical_url, ctype, pdf.text, pdf.title, [], pdf.truncated,
         )
