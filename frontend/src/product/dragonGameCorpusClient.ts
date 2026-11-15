@@ -131,3 +131,17 @@ export async function compareSourceDocuments(game:string,source:string,left:View
  if(!p||p.game_id!==game||p.catalogue_source_id!==source||p.partial_windows!==true||p.network_executed!==false||p.model_context_permission!==false||p.wiki_approved!==false||p.left_history!==left.history_only||p.right_history!==right.history_only||!sha(p.left_digest)||!sha(p.right_digest)||!finite(p.as_of_unix)||!finite(p.valid_until)||p.valid_until<=p.as_of_unix||!Array.isArray(p.changes)||p.changes.length>1024||p.changes.some(x=>!x||!['equal','replace','insert','delete'].includes(x.operation)||!int(x.left_offset,512)||!int(x.right_offset,512)||typeof x.left!=='string'||typeof x.right!=='string')||p.changes.reduce((n,x)=>n+Array.from(x.left).length+Array.from(x.right).length,0)>8000)invalid('Source comparison response invalid.');
  return p;
 }
+
+
+export type GlobalSource=GameSource&{game_id:string;game_title:string;namespace:string;external_id:string;first_stage:string;updated_at:number};
+export async function searchSourceLibrary(q:string,filters:{kind?:string;family?:string;language?:string},signal?:AbortSignal){
+ if(!q.trim()||q.length>256)invalid('Enter a bounded game, source or category query.');
+ const params=new URLSearchParams({q,limit:'32'});
+ for(const key of ['family','kind','language'] as const){
+  const v=filters[key];if(v){if(!text(v,32))invalid('Invalid source search filter.');params.set(key,v);}
+ }
+ const p=await request<{sources:GlobalSource[];truncated:boolean;index_backfill_complete:boolean;catalogue_only:true;network_executed:false;source_use_authorized:false}>('get','/source-search?'+params,signal);
+ if(!p||p.catalogue_only!==true||p.network_executed!==false||p.source_use_authorized!==false||typeof p.truncated!=='boolean'||typeof p.index_backfill_complete!=='boolean'||!Array.isArray(p.sources)||p.sources.length>32||
+  p.sources.some(s=>!s||!sha(s.game_id)||!sha(s.source_id)||!sha(s.observation_digest)||!text(s.game_title)||!text(s.url,2048)||!s.url.startsWith('https://')||!text(s.namespace,128)||!text(s.external_id,128)||!text(s.first_stage,32)||!text(s.family,32)||!text(s.kind,32)||!text(s.language,32)||!VIEW_MODES.includes(s.view_mode as ViewMode)||!int(s.updated_at)||!int(s.last_observed)||!int(s.next_review)||typeof s.has_capture_binding!=='boolean'||s.verified!==false||!s.latest_observation||!text(s.latest_observation.title)||!text(s.latest_observation.stage,32)||!nullable(s.latest_observation.version,128)||!nullable(s.latest_observation.released_on,10)))invalid('Indexed source library response invalid.');
+ return p;
+}
