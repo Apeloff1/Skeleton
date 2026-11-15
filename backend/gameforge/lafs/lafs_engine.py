@@ -18,6 +18,9 @@ from __future__ import annotations
 import json
 import math
 import uuid
+import threading
+from copy import deepcopy
+from functools import wraps
 from collections import defaultdict
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
@@ -95,6 +98,7 @@ class ProbabilityState:
     global_beta: float = 1.0
     shrinkage: float = 0.42
     evidence_log: List[float] = field(default_factory=list)
+    forecast_log: List[Tuple[float, float]] = field(default_factory=list)
     vi_mu: float = 0.0
     vi_sigma: float = 1.0
     expected_free_energy: float = 0.0
@@ -136,7 +140,17 @@ class ProbabilityState:
 
     def update(self, likelihood: float, weight: float = 1.0,
                tag: Optional[str] = None, deep: bool = False):
-        likelihood = float(np.clip(likelihood, 1e-6, 1 - 1e-6))
+        if not math.isfinite(likelihood) or not 0 <= likelihood <= 1:
+            raise ValueError("evidence must be finite and in [0, 1]")
+        if not math.isfinite(weight) or not 0 < weight <= 100:
+            raise ValueError("weight must be finite and in (0, 100]")
+        if tag is not None and (type(tag) is not str or len(tag) > 128):
+            raise ValueError("invalid evidence tag")
+        if tag and tag not in self.dp_counts and len(self.dp_counts) >= 256:
+            raise ValueError("evidence tag capacity reached")
+        self.forecast_log = (self.forecast_log + [(self.posterior_mean, likelihood)])[-400:]
+        self.particles = self.particle_weights = self.mcmc_samples = None
+        likelihood = float(likelihood)
         self.alpha += likelihood * weight
         self.beta += (1.0 - likelihood) * weight
         self.evidence_log.append(likelihood)
@@ -153,60 +167,29 @@ class ProbabilityState:
         self.last_updated = _now()
 
     def _deep_refresh(self):
+        # Conjugate Beta posterior is available analytically. Sampling from it
+        # is exact; reweighting with already-assimilated evidence double counts.
         self._adaptive_smc_mh(2048)
         self._variational_inference(80)
-        self.mcmc_samples = self._metropolis_hastings(1500, 400)
+        self.mcmc_samples = None
 
     def _adaptive_smc_mh(self, n_particles: int = 2048):
-        if not self.evidence_log:
-            self.particles = stats.beta.rvs(self.alpha, self.beta, size=n_particles)
-            self.particle_weights = np.ones(n_particles) / n_particles
-            return
-        particles = stats.beta.rvs(self.alpha, self.beta, size=n_particles)
-        weights = np.ones(n_particles)
-        for lik in self.evidence_log[-120:]:
-            weights *= stats.beta.pdf(particles, 1 + lik, 1 + (1 - lik)) + 1e-300
-            weights /= weights.sum() + 1e-300
-            ess = 1.0 / (np.sum(weights ** 2) + 1e-300)
-            if ess < n_particles * 0.35:
-                idx = np.searchsorted(np.cumsum(weights),
-                                      (np.arange(n_particles) + np.random.random()) / n_particles)
-                idx = np.clip(idx, 0, n_particles - 1)
-                particles = particles[idx]
-                weights.fill(1.0 / n_particles)
-                for _ in range(3):
-                    prop = np.clip(particles + np.random.normal(0, 0.04, n_particles), 1e-6, 1 - 1e-6)
-                    log_r = (stats.beta.logpdf(prop, self.alpha, self.beta)
-                             - stats.beta.logpdf(particles, self.alpha, self.beta))
-                    accept = np.log(np.random.random(n_particles)) < log_r
-                    particles = np.where(accept, prop, particles)
-        self.particles = particles
-        self.particle_weights = weights
+        if type(n_particles) is not int or not 1 <= n_particles <= 8192:
+            raise ValueError("invalid particle budget")
+        self.particles = np.random.beta(self.alpha, self.beta, size=n_particles)
+        self.particle_weights = np.full(n_particles, 1.0 / n_particles)
 
     def _metropolis_hastings(self, n_samples: int = 1500, burn: int = 400, thin: int = 2):
-        samples, current = [], self.posterior_mean
-        for i in range(n_samples + burn):
-            prop = float(np.clip(current + np.random.normal(0, 0.08), 1e-6, 1 - 1e-6))
-            log_r = (stats.beta.logpdf(prop, self.alpha, self.beta)
-                     - stats.beta.logpdf(current, self.alpha, self.beta))
-            if np.log(np.random.random()) < log_r:
-                current = prop
-            if i >= burn and (i - burn) % thin == 0:
-                samples.append(current)
-        return np.array(samples)
+        # Compatibility method: direct conjugate draws, not a Markov chain.
+        if type(n_samples) is not int or not 1 <= n_samples <= 8192:
+            raise ValueError("invalid sample budget")
+        return np.random.beta(self.alpha, self.beta, size=n_samples)
 
     def _variational_inference(self, steps: int = 80):
-        mu = np.log(self.posterior_mean / (1 - self.posterior_mean + 1e-12))
-        sigma = 0.8
-        for _ in range(steps):
-            samples = mu + sigma * np.random.randn(64)
-            p = 1 / (1 + np.exp(-samples))
-            log_p = stats.beta.logpdf(np.clip(p, 1e-6, 1 - 1e-6), self.alpha, self.beta)
-            grad_mu = np.mean((log_p - samples) * (p * (1 - p)))
-            grad_sigma = np.mean((log_p - samples) * ((samples - mu) / sigma)) - 1 / sigma
-            mu += 0.05 * grad_mu
-            sigma = max(0.05, sigma + 0.03 * grad_sigma)
-        self.vi_mu, self.vi_sigma = float(mu), float(sigma)
+        # Exact logit-Beta moments; a moment-matched diagnostic, not fitted VI.
+        from scipy.special import polygamma
+        self.vi_mu = float(digamma(self.alpha) - digamma(self.beta))
+        self.vi_sigma = math.sqrt(float(polygamma(1, self.alpha) + polygamma(1, self.beta)))
 
     def _compute_expected_free_energy(self):
         self.epistemic_value = self.expected_information_gain()
@@ -232,19 +215,16 @@ class ProbabilityState:
                      - (gammaln(self.alpha) + gammaln(self.beta) - gammaln(self.alpha + self.beta)))
 
     def brier_calibration(self) -> float:
-        if len(self.evidence_log) < 2:
-            return 0.25
-        preds = np.full(len(self.evidence_log), self.posterior_mean)
-        return float(np.mean((preds - np.asarray(self.evidence_log)) ** 2))
+        # Measure recorded forecasts BEFORE the corresponding evidence update.
+        # Legacy observations have no recorded forecast and are not scored.
+        if not self.forecast_log:
+            return 0.25  # neutral ranking prior; not observed calibration
+        return sum((p - y) ** 2 for p, y in self.forecast_log) / len(self.forecast_log)
 
     def deep_sample(self, n: int = 1):
-        if self.mcmc_samples is not None and len(self.mcmc_samples) > 10:
-            return np.random.choice(self.mcmc_samples, size=n)
-        if self.particles is not None:
-            idx = np.random.choice(len(self.particles), size=n, p=self.particle_weights)
-            return self.particles[idx]
-        logit = self.vi_mu + self.vi_sigma * np.random.randn(n)
-        return 1 / (1 + np.exp(-logit))
+        if type(n) is not int or not 1 <= n <= 8192:
+            raise ValueError("invalid sample budget")
+        return np.random.beta(self.alpha, self.beta, size=n)
 
     def thompson_sample(self, n: int = 1):
         return self.deep_sample(n)
@@ -261,7 +241,20 @@ class ProbabilityState:
         d = dict(d)
         for k in ("particles", "particle_weights", "mcmc_samples"):
             d.pop(k, None)
-        return cls(**d)
+        obj = cls(**d)
+        for k in ("alpha", "beta", "logtype_alpha", "logtype_beta",
+                  "domain_alpha", "domain_beta", "global_alpha", "global_beta"):
+            v = getattr(obj, k)
+            if not math.isfinite(v) or not 0 < v <= 1e12:
+                raise ValueError("invalid persisted Beta parameter")
+        if not math.isfinite(obj.shrinkage) or not 0 <= obj.shrinkage <= 1:
+            raise ValueError("invalid persisted shrinkage")
+        if len(obj.forecast_log) > 400 or any(
+            len(row) != 2 or any(not math.isfinite(v) or not 0 <= v <= 1 for v in row)
+            for row in obj.forecast_log
+        ):
+            raise ValueError("invalid persisted forecasts")
+        return obj
 
 
 @dataclass
@@ -299,6 +292,23 @@ class Sheet:
 
 
 # ── LAFS core (Mongo-persisted) ──────────────────────────────────────
+class CabinetConflict(RuntimeError):
+    """A concurrent writer won; retry the complete command, not a stale snapshot."""
+
+
+def _fresh_command(fn):
+    @wraps(fn)
+    def guarded(self, *args, **kwargs):
+        with self._lock:
+            self._loaded = False
+            try:
+                result = fn(self, *args, **kwargs)
+                return deepcopy(result)
+            finally:
+                self._loaded = False
+    return guarded
+
+
 class LeverArchFileSystem:
     def __init__(self):
         self.sheets: Dict[str, Sheet] = {}
@@ -309,6 +319,10 @@ class LeverArchFileSystem:
         self.domain_priors: Dict[str, Tuple[float, float]] = defaultdict(lambda: (1.0, 1.0))
         self.logtype_priors: Dict[str, Tuple[float, float]] = defaultdict(lambda: (1.0, 1.0))
         self._loaded = False
+        self._lock = threading.RLock()
+        self._revision = 0
+        self._existed = False
+        self._legacy_revision = False
 
     def _col(self):
         from core.databases import get_sync_db
@@ -318,27 +332,52 @@ class LeverArchFileSystem:
         if self._loaded:
             return
         doc = self._col().find_one({"_id": "cabinet"})
-        if doc:
-            self.sheets = {sid: Sheet.from_persist(d) for sid, d in doc.get("sheets", {}).items()}
-            self.path_index = defaultdict(set, {k: set(v) for k, v in doc.get("path_index", {}).items()})
-            self.graph = defaultdict(set, {k: set(v) for k, v in doc.get("graph", {}).items()})
-            self.global_alpha = doc.get("global_alpha", 1.0)
-            self.global_beta = doc.get("global_beta", 1.0)
-            self.domain_priors = defaultdict(lambda: (1.0, 1.0),
-                                             {k: tuple(v) for k, v in doc.get("domain_priors", {}).items()})
-            self.logtype_priors = defaultdict(lambda: (1.0, 1.0),
-                                              {k: tuple(v) for k, v in doc.get("logtype_priors", {}).items()})
+        source = doc or {}
+        revision = source.get("revision", 0)
+        if type(revision) is not int or not 0 <= revision < 2**63 - 1:
+            raise ValueError("invalid cabinet revision")
+        sheets = {sid: Sheet.from_persist(d) for sid, d in source.get("sheets", {}).items()}
+        if len(sheets) > 10000:
+            raise ValueError("cabinet exceeds supported sheet capacity; migrate without dropping data")
+        path_index = defaultdict(set, {k: set(v) for k, v in source.get("path_index", {}).items()})
+        graph = defaultdict(set, {k: set(v) for k, v in source.get("graph", {}).items()})
+        self.sheets, self.path_index, self.graph = sheets, path_index, graph
+        self.global_alpha = source.get("global_alpha", 1.0)
+        self.global_beta = source.get("global_beta", 1.0)
+        self.domain_priors = defaultdict(lambda: (1.0, 1.0),
+                                          {k: tuple(v) for k, v in source.get("domain_priors", {}).items()})
+        self.logtype_priors = defaultdict(lambda: (1.0, 1.0),
+                                           {k: tuple(v) for k, v in source.get("logtype_priors", {}).items()})
+        self._revision = revision
+        self._existed = doc is not None
+        self._legacy_revision = self._existed and "revision" not in source
         self._loaded = True
 
     def _save(self):
-        doc = {"_id": "cabinet",
+        doc = {"_id": "cabinet", "revision": self._revision + 1,
                "sheets": {sid: s.to_persist() for sid, s in self.sheets.items()},
                "path_index": {k: list(v) for k, v in self.path_index.items()},
                "graph": {k: list(v) for k, v in self.graph.items()},
                "global_alpha": self.global_alpha, "global_beta": self.global_beta,
                "domain_priors": {k: list(v) for k, v in self.domain_priors.items()},
                "logtype_priors": {k: list(v) for k, v in self.logtype_priors.items()}}
-        self._col().replace_one({"_id": "cabinet"}, doc, upsert=True)
+        from bson import BSON
+        from pymongo.errors import DuplicateKeyError
+        if len(BSON.encode(doc)) > 12 * 1024 * 1024:
+            raise ValueError("cabinet byte capacity reached; migration required")
+        if self._existed:
+            selector = {"_id": "cabinet", "revision": (
+                {"$exists": False} if self._legacy_revision else self._revision)}
+            result = self._col().replace_one(selector, doc, upsert=False)
+            if result.matched_count != 1:
+                raise CabinetConflict("cabinet revision changed")
+        else:
+            try:
+                self._col().insert_one(doc)
+            except DuplicateKeyError as exc:
+                raise CabinetConflict("cabinet was concurrently created") from exc
+        self._revision += 1
+        self._existed, self._legacy_revision = True, False
 
     def _update_hyperpriors(self):
         if not self.sheets:
@@ -356,10 +395,28 @@ class LeverArchFileSystem:
         for lt, (a, b) in lt_stats.items():
             self.logtype_priors[lt] = (float(np.mean(a)), float(np.mean(b)))
 
+    @_fresh_command
     def add_sheet(self, domain: str, log_type: str, payload: Dict[str, Any],
                   author: str = "system", cross_refs: Optional[List[str]] = None,
                   tags: Optional[List[str]] = None, prior_strength: float = 2.0) -> Sheet:
         self._load()
+        for value in (domain, log_type, author):
+            if type(value) is not str or not 1 <= len(value) <= 128:
+                raise ValueError("invalid sheet identity")
+        if "/" in domain or "/" in log_type or "." in domain or "." in log_type or "$" in domain or "$" in log_type:
+            raise ValueError("invalid domain or log type")
+        if not isinstance(payload, dict) or len(json.dumps(payload, allow_nan=False).encode()) > 32768:
+            raise ValueError("invalid or oversized payload")
+        if not math.isfinite(prior_strength) or not 0 < prior_strength <= 100:
+            raise ValueError("invalid prior")
+        refs, labels = list(cross_refs or []), list(tags or [])
+        if len(refs) > 128 or len(labels) > 64 or any(type(t) is not str or len(t) > 128 for t in labels):
+            raise ValueError("invalid sheet links or tags")
+        if any(type(ref) is not str or ref not in self.sheets for ref in refs):
+            raise ValueError("unknown cross-reference")
+        if len(self.sheets) >= 10000:
+            raise ValueError("cabinet capacity reached")
+        payload, cross_refs, tags = deepcopy(payload), list(dict.fromkeys(refs)), labels
         path = f"{domain}/{log_type}"
         sid = str(uuid.uuid4())
         d_a, d_b = self.domain_priors[domain]
@@ -393,9 +450,12 @@ class LeverArchFileSystem:
                 tgt.alpha = (1 - strength) * tgt.alpha + strength * src.alpha
                 tgt.beta = (1 - strength) * tgt.beta + strength * src.beta
 
+    @_fresh_command
     def get_related(self, sheet_id: str, depth: int = 1) -> List[Sheet]:
         self._load()
-        visited, result, frontier = set(), [], {sheet_id}
+        if type(depth) is not int or not 0 <= depth <= 8:
+            raise ValueError("invalid traversal depth")
+        visited, result, frontier = {sheet_id}, [], {sheet_id}
         for _ in range(depth):
             nxt = set()
             for sid in frontier:
@@ -405,12 +465,17 @@ class LeverArchFileSystem:
             frontier = nxt
         return result
 
+    @_fresh_command
     def probability_search(self, query: str, domain_filter: Optional[str] = None,
                            log_type_filter: Optional[str] = None, min_posterior: float = 0.05,
                            max_entropy: float = 6.0, top_k: int = 25,
                            context_ids: Optional[List[str]] = None,
                            acquisition: str = "efe", kappa: float = 2.2) -> List[Dict]:
         self._load()
+        if type(query) is not str or len(query) > 4096 or type(top_k) is not int or not 1 <= top_k <= 250:
+            raise ValueError("invalid search bounds")
+        if context_ids and len(context_ids) > 128:
+            raise ValueError("context capacity exceeded")
         q_tokens = set(query.lower().split())
         context_set: Set[str] = set()
         if context_ids:
@@ -427,6 +492,8 @@ class LeverArchFileSystem:
                 continue
             text = (json.dumps(sheet.payload) + " " + sheet.path + " " + " ".join(sheet.tags)).lower()
             lexical = sum(1 for t in q_tokens if t in text) / max(1, len(q_tokens))
+            if q_tokens and not lexical and sid not in context_set:
+                continue
             if acquisition == "ucb":
                 acq = p.upper_confidence_bound(kappa)
             elif acquisition == "eig":
@@ -451,6 +518,7 @@ class LeverArchFileSystem:
         out.sort(key=lambda x: x["score"], reverse=True)
         return out[:top_k]
 
+    @_fresh_command
     def reinforce(self, sheet_id: str, success: bool, weight: float = 1.0,
                   tag: Optional[str] = None, deep: bool = False):
         self._load()
@@ -463,6 +531,7 @@ class LeverArchFileSystem:
         return self.sheets[sheet_id].brief()
 
     # ── Stage C2: multi-hop belief propagation + posterior-predictive checks ──
+    @_fresh_command
     def belief_propagate(self, sheet_id: str, hops: int = 2, strength: float = 0.08) -> Dict:
         """Propagate the source sheet's belief across ``hops`` graph hops with
         geometric decay, returning a full trace of updated neighbors. This is
@@ -470,6 +539,8 @@ class LeverArchFileSystem:
         self._load()
         if sheet_id not in self.sheets:
             return {"ok": False, "error": "sheet_not_found"}
+        if type(hops) is not int or not 0 <= hops <= 8 or not math.isfinite(strength) or not 0 <= strength <= 1:
+            raise ValueError("invalid propagation bounds")
         src = self.sheets[sheet_id].prob
         visited: Set[str] = {sheet_id}
         frontier: Set[str] = {sheet_id}
@@ -499,40 +570,34 @@ class LeverArchFileSystem:
         return {"ok": True, "source": sheet_id, "hops": hops,
                 "updated": len(trace), "trace": trace}
 
+    @_fresh_command
     def posterior_predictive_check(self, sheet_id: Optional[str] = None) -> Dict:
         """Surface a posterior-predictive calibration check: how well each
         sheet's Beta posterior predicts its own observed evidence (Brier +
         credible-interval coverage)."""
         self._load()
-        sheets = ([self.sheets[sheet_id]] if sheet_id and sheet_id in self.sheets
-                  else list(self.sheets.values()))
+        if sheet_id is not None and sheet_id not in self.sheets:
+            return {"ok": False, "error": "sheet_not_found"}
+        sheets = [self.sheets[sheet_id]] if sheet_id is not None else list(self.sheets.values())
         if not sheets:
             return {"ok": False, "error": "no_sheets"}
-        briers, covered, total_obs = [], 0, 0
-        per_sheet = []
-        for s in sheets:
-            p = s.prob
-            brier = p.brier_calibration()
-            lo, hi = p.credible_interval()
-            obs = [1.0 if float(e) >= 0.5 else 0.0
-                   for e in getattr(p, "evidence_log", []) if isinstance(e, (int, float))]
-            in_ci = sum(1 for o in obs if lo <= o <= hi)
-            covered += in_ci
-            total_obs += len(obs)
-            briers.append(brier)
-            if sheet_id:
-                per_sheet.append({"sheet_id": s.id, "brier": round(brier, 4),
-                                  "ci95": [round(lo, 4), round(hi, 4)],
-                                  "posterior": round(p.posterior_mean, 4),
-                                  "observations": len(obs), "in_ci": in_ci})
-        avg_brier = float(np.mean(briers)) if briers else 0.0
-        coverage = (covered / total_obs) if total_obs else 0.0
+        total = sum(len(sheet.prob.forecast_log) for sheet in sheets)
+        squared_error = sum((p-y)**2 for sheet in sheets for p,y in sheet.prob.forecast_log)
+        avg = squared_error / total if total else None
+        rows = [{"sheet_id": sheet.id,
+                 "brier": round(sheet.prob.brier_calibration(), 4) if sheet.prob.forecast_log else None,
+                 "ci95": list(sheet.prob.credible_interval()),
+                 "posterior": round(sheet.prob.posterior_mean, 4),
+                 "observations": len(sheet.prob.forecast_log),
+                 "in_ci": None} for sheet in sheets] if sheet_id else []
         return {"ok": True, "sheets_checked": len(sheets),
-                "avg_brier": round(avg_brier, 4),
-                "calibration_quality": round(1.0 / (1.0 + 4 * avg_brier), 4),
-                "ci95_coverage": round(coverage, 4), "observations": total_obs,
-                "per_sheet": per_sheet}
+                "avg_brier": round(avg, 4) if avg is not None else None,
+                "calibration_quality": round(1.0 / (1.0 + 4 * avg), 4) if avg is not None else None,
+                "ci95_coverage": None, "observations": total, "per_sheet": rows,
+                "calibration_basis": "pre_update_probability_forecast",
+                "coverage_status": "not_estimable_from_binary_outcomes"}
 
+    @_fresh_command
     def top_efe(self, k: int = 8, domain_filter: Optional[str] = None) -> List[Dict]:
         """Top-k sheets by Expected Free Energy — 'what Jeeves knows best'."""
         self._load()
@@ -542,15 +607,21 @@ class LeverArchFileSystem:
         return [{**s.brief(), "efe": round(s.prob.expected_free_energy, 4),
                  "posterior": round(s.prob.posterior_mean, 4)} for s in rows[:k]]
 
+    @_fresh_command
     def queue_for_jury(self, sheet_id: str, reason: str = "high_entropy") -> Dict:
         self._load()
         s = self.sheets.get(sheet_id)
+        if s is None:
+            return {"ok": False, "error": "sheet_not_found"}
+        if type(reason) is not str or not 1 <= len(reason) <= 256:
+            raise ValueError("invalid jury reason")
         entry = {"id": sheet_id, "reason": reason,
                  "path": s.path if s else None,
                  "entropy": s.prob.entropy if s else None, "queued": _now()}
         self._col().database["lafs_jury_queue"].insert_one(dict(entry))
         return {k: v for k, v in entry.items() if k != "_id"}
 
+    @_fresh_command
     def stats(self) -> Dict:
         self._load()
         posts = [s.prob.posterior_mean for s in self.sheets.values()]
