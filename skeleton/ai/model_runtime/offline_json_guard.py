@@ -40,6 +40,12 @@ def load_strict_telemetry_json(
             raise ValueError("nonfinite telemetry number")
         return number
 
+    def integer(value: str) -> int:
+        # Keep parsing independent of interpreter-wide integer digit settings.
+        if len(value.lstrip("-")) > 128:
+            raise ValueError("telemetry integer exceeds digit budget")
+        return int(value)
+
     def constant(_: str) -> object:
         raise ValueError("nonfinite telemetry constant")
 
@@ -49,23 +55,42 @@ def load_strict_telemetry_json(
             object_pairs_hook=unique,
             parse_constant=constant,
             parse_float=finite,
+            parse_int=integer,
         )
     except (UnicodeError, RecursionError, OverflowError) as exc:
         raise ValueError("invalid or deeply nested telemetry JSON") from exc
 
-    stack: list[tuple[object, int]] = [(root, 0)]
-    nodes = 0
-    while stack:
-        item, depth = stack.pop()
-        nodes += 1
-        if nodes > max_nodes or depth > max_depth:
+    # Iterate children lazily rather than creating a second list of every
+    # decoded element. The walker uses only O(max_depth) temporary storage.
+    remaining = max_nodes
+
+    def visit(item: object, depth: int) -> None:
+        nonlocal remaining
+        remaining -= 1
+        if remaining < 0 or depth > max_depth:
             raise ValueError("telemetry JSON exceeds structure budget")
         if type(item) is dict:
-            stack.extend((value, depth + 1) for value in item.values())
+            if len(item) > remaining:
+                raise ValueError("telemetry JSON exceeds structure budget")
+            for key, value in item.items():
+                # Keys are also untrusted strings. Reject unpaired surrogates
+                # so downstream canonical UTF-8 is guaranteed to be possible.
+                key.encode("utf-8", errors="strict")
+                visit(value, depth + 1)
         elif type(item) is list:
-            stack.extend((value, depth + 1) for value in item)
+            if len(item) > remaining:
+                raise ValueError("telemetry JSON exceeds structure budget")
+            for value in item:
+                visit(value, depth + 1)
+        elif type(item) is str:
+            item.encode("utf-8", errors="strict")
         elif type(item) is float and not math.isfinite(item):
             raise ValueError("nonfinite telemetry number")
+
+    try:
+        visit(root, 0)
+    except (UnicodeError, RecursionError) as exc:
+        raise ValueError("invalid telemetry JSON text or structure") from exc
     return root
 
 

@@ -325,14 +325,15 @@ class InFlightCPUResourceGuard:
                     or generation != self._generation):
                 raise InFlightPressureDenied("stale or insufficient CPU quantum lease")
             reason = self._observe()
+            # Even a pressure-rejected re-probe must not convert an expired
+            # quantum into a resumable hold after its accounting deadline.
+            self._check_quantum_deadline()
             if reason != "measured_cpu_headroom":
                 self._authorized_quantum = 0
                 self._quantum_started_ns = None
                 self._enter_hold(reason)
                 self._generation += 1
                 return self._receipt()
-            # Vendor sampling may itself outlive a short quantum deadline.
-            self._check_quantum_deadline()
             return self._receipt()
 
     def checkpoint(self, *, generated_tokens: int) -> InFlightPressureDecision:
@@ -374,6 +375,10 @@ class InFlightCPUResourceGuard:
             # Never let repeated resume attempts extend a stalled lease.
             self._check_hold_deadline()
             reason = self._observe()
+            # A slow final good probe may cross the original HOLD deadline.
+            # Recheck while still held: clearing the state first would erase
+            # the only deadline authority and revive an expired request.
+            self._check_hold_deadline()
             self._reason = reason
             if reason == "measured_cpu_headroom":
                 self._good += 1
@@ -383,7 +388,6 @@ class InFlightCPUResourceGuard:
                     self._hold_started_ns = None
             else:
                 self._good = 0
-            self._check_hold_deadline()
             self._generation += 1
             return self._receipt()
 
