@@ -16,6 +16,7 @@ import unicodedata
 from urllib.parse import urlsplit
 
 from .frontier_coverage import _unicode_terms, _url_tokens
+from .dragon_questbook import Contribution, derive_questbook
 
 SCHEMA = "skeleton.dragon.companion.v1"
 MAX_SOURCES = 64
@@ -57,6 +58,19 @@ def _signature(text: str) -> frozenset[int]:
         "\x1f".join(words[i:i+3]).encode("utf-8"), digest_size=8,
         person=b"dragon-pet").digest(), "big") for i in range(len(words)-2)}
     return frozenset(sorted(hashes)[:MAX_SIGNATURES])
+
+
+def _lexical_quality(text: str) -> float:
+    """Saturating lexical density; repetition/keyword padding earns little."""
+    words = [m.group() for m in _WORD.finditer(unicodedata.normalize("NFKC", text).casefold())][:MAX_WORDS]
+    if len(words) < 8:
+        return 0.
+    counts = Counter(words)
+    distinct = len(counts)
+    entropy = -sum((n/len(words))*math.log2(n/len(words)) for n in counts.values())
+    richness = min(1., distinct / 16)
+    normalized = entropy / math.log2(max(2, min(len(words), 64)))
+    return min(1., richness * normalized)
 
 
 def _similarity(a: frozenset[int], b: frozenset[int]) -> float:
@@ -113,6 +127,9 @@ def build_companion(*, sources: dict, measurements: list[dict], query: str,
     host_rewards: dict[str, list[float]] = defaultdict(list)
     measured_rewards: dict[int, float] = {}
     novelty_mass = relevance_mass = 0.
+    contributions = []
+    origin_credit = defaultdict(float)
+    last_sequence = 0
     ordered = sorted(sources.values(), key=lambda s: (
         s.get("provenance", {}).get("capture_sequence", 10001),
         s.get("fetched_at", 0), s.get("source_id", "")))
@@ -135,19 +152,39 @@ def build_companion(*, sources: dict, measurements: list[dict], query: str,
         relevance = len(matches) / len(wanted) if wanted else .5
         # An extra hostname is only lexical diversity, not verified
         # independence. Near-identical text cannot award a new niche.
-        novel_enough = novelty >= .25 and len(text) >= 80
+        quality = _lexical_quality(text)
+        # A matching keyword alone is not evidence of useful novelty.
+        # Marginal credit saturates per origin, so repetitive one-origin
+        # harvesting cannot dominate a diversified, high-quality expedition.
+        credit = novelty * relevance * quality / math.sqrt(1 + origin_credit[host])
+        novel_enough = novelty >= .25 and len(text) >= 80 and credit >= .05
+        added = multi_added = 0
+        habitat = _medium(row["content_type"])
         if novel_enough:
             hosts.add(host)
-            niches[_medium(row["content_type"])] += 1
+            niches[habitat] += 1
+            origin_credit[host] += credit
             for term in matches:
+                prior = len(support[term])
                 support[term].add(host)
-        novelty_mass += novelty * relevance
+                current = len(support[term])
+                added += int(prior == 0 and current == 1)
+                multi_added += int(prior == 1 and current == 2)
+        reward = credit if novel_enough else 0.
+        novelty_mass += reward
         relevance_mass += relevance * int(novel_enough)
-        reward = novelty * relevance if novel_enough else 0.
         sequence = row.get("provenance", {}).get("capture_sequence")
         if type(sequence) is int:
             measured_rewards[sequence] = reward
+            if sequence <= last_sequence:
+                raise ValueError("duplicate or unordered companion acquisition sequence")
+            last_sequence = sequence
+            contributions.append(Contribution(row["source_id"], sequence, host, habitat,
+                round(reward, 6), round(novelty, 6), round(relevance, 6),
+                added, multi_added, novel_enough))
         else:
+            # Synthetic/legacy rows can remain visible to existing capture
+            # clients but cannot unlock a receipt requiring exact identity.
             host_rewards[host].append(reward)
     # Every attempted content acquisition participates in learning progress.
     # Failures and redundant pages have zero reward, not positive surprise.
@@ -178,8 +215,10 @@ def build_companion(*, sources: dict, measurements: list[dict], query: str,
     multi = sum(len(support[term]) >= 2 for term in wanted)
     requests_left = max(0, limits["max_requests"] - usage["requests"])
     bytes_left = max(0, limits["max_total_bytes"] - usage["bytes"] - usage["reserved_bytes"])
+    documents_left = max(0, limits["max_documents"] - usage["documents"])
     energy = min(requests_left / max(1, limits["max_requests"]),
-                 bytes_left / max(1, limits["max_total_bytes"]))
+                 bytes_left / max(1, limits["max_total_bytes"]),
+                 documents_left / max(1, limits["max_documents"]))
     recovery_pairs = 0
     prior_failure = set()
     for row in measurements:
@@ -235,6 +274,8 @@ def build_companion(*, sources: dict, measurements: list[dict], query: str,
         "learning_progress": _unit(max(host_progress.values(), default=0.)),
         "novelty_yield": _unit(novelty_mass / max(1, unique)),
     }
+    projection["questbook"] = derive_questbook(contributions, term_count=len(wanted),
+        settled=settled, request_budget=limits["max_requests"], source_budget=limits["max_documents"])
     return CompanionProfile(projection, host_progress, host_novelty,
                             {k: len(v) for k,v in support.items()}, frozenset(hosts), quest)
 
