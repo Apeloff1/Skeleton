@@ -626,6 +626,12 @@ class CrawlRun:
             provenance = source["provenance"]
             capture_seq = provenance.get("capture_sequence")
             measurement = captures[source_id]
+            if measurement["curriculum"] is not None:
+                try:
+                    validate_receipt(measurement["curriculum"], mode=request.frontier_strategy,
+                                     candidate=source["fetched_url"])
+                except (TypeError, ValueError) as exc:
+                    raise CrawlOperationError("captured curriculum target mismatch") from exc
             if (type(capture_seq) is not int or measurement["event_sequence"] != capture_seq
                     or measurement["host"] != urlsplit(source["fetched_url"]).hostname):
                 raise CrawlOperationError("companion source capture sequence mismatch")
@@ -713,6 +719,16 @@ class CrawlRun:
             ):
                 raise CrawlOperationError("event integrity mismatch")
             last = raw["sequence"]
+        # When the event remains in the display ring, independently join the
+        # settled receipt to its exact event identity. Older observations are
+        # preserved by snapshot custody and source conservation, not invented.
+        by_sequence = {event["sequence"]: event for event in events}
+        for observation in state["acquisition_measurements"]:
+            event = by_sequence.get(observation["event_sequence"])
+            if event is not None and (event["kind"] != observation["kind"]
+                    or event.get("source_id") != observation["source_id"]
+                    or urlsplit(event.get("url") or "").hostname != observation["host"]):
+                raise CrawlOperationError("acquisition event custody mismatch")
         return run
 
     def _admit(self, url):
