@@ -2649,6 +2649,9 @@ class DragonCrawlerApplication:
         )
 
     def _capture_freshness(self, row: dict, source: dict) -> dict:
+        from skeleton.ai.webcrawler.source_instruction_guard import inspect_extracted
+
+        observation = inspect_extracted(source["title"], source["text"])
         policy = self._capture_policy(row, source)
         now = _now()
         expiry = min(
@@ -2671,6 +2674,8 @@ class DragonCrawlerApplication:
                 )
             )
         )
+        if state == "current" and observation.held:
+            state = "instruction_quarantined"
         return {
             "usable": state == "current",
             "state": state,
@@ -2682,6 +2687,9 @@ class DragonCrawlerApplication:
     def _assert_source_use(self, row: dict, source: dict) -> None:
         self._source_use(row)
         state = self._capture_freshness(row, source)["state"]
+        if state == "instruction_quarantined":
+            raise CrawlerError("crawler_instruction_quarantined",
+                               "External instruction evidence cannot enter ordinary source retrieval.", 403)
         if state != "current":
             raise CrawlerError(
                 (
@@ -2808,6 +2816,9 @@ class DragonCrawlerApplication:
         }
 
     def _source_projection(self, source: dict, *, row: dict | None = None, text: bool = True) -> dict:
+        from skeleton.ai.webcrawler.source_instruction_guard import inspect_extracted
+
+        observation = inspect_extracted(source["title"], source["text"])
         result = dict(source)
         result.update(
             url=source["canonical_url"],
@@ -2816,7 +2827,15 @@ class DragonCrawlerApplication:
             fetched_at_unix=source["fetched_at"],
             source_classification="untrusted_external_material",
         )
-        if not text:
+        if observation.held:
+            # Metadata-only projection even for legacy/synthetic sources that
+            # did not encounter the acquisition guard. Raw title/text are not
+            # forwarded, and ordinary source-use controls cannot clear it.
+            result.pop("text", None)
+            result["title"] = "Quarantined external instruction evidence"
+            result["instruction_security"] = {"held": True, "categories": list(observation.categories),
+                                              "execution_authorized": False}
+        elif not text:
             result.pop("text", None)
         if row is not None:
             result["use_policy"] = self._capture_policy(row, source)
