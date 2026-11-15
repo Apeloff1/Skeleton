@@ -8,7 +8,11 @@
     "skeleton/ai/webcrawler/redirects.py",
     "skeleton/ai/webcrawler/bound_http.py",
     "skeleton/ai/webcrawler/http.py",
-    "skeleton/ai/webcrawler/dns_binding.py"
+    "skeleton/ai/webcrawler/dns_binding.py",
+    "skeleton/ai/webcrawler/source_instruction_guard.py",
+    "skeleton/ai/webcrawler/adaptive_navigation.py",
+    "skeleton/ai/webcrawler/frontier_scheduler.py",
+    "skeleton/ai/webcrawler/frontier_circuit.py"
   ],
   "state_authority": "Existing CORE_DB Mongo application custody; pure snapshots have no independent storage authority",
   "public_api": {
@@ -29,7 +33,11 @@
     "snapshot_bytes": 4194304,
     "preserved_text_utf8_bytes_per_source": 24000,
     "frontier_urls": 512,
-    "robots_bytes_per_origin": 65536,
+    "robots_bytes_per_origin": 524288,
+    "robots_cache_bytes": 1048576,
+    "instruction_incidents": 128,
+    "inspection_bytes_per_view": 2097152,
+    "adaptive_origin_event_samples": 16,
     "slice_steps": 4,
     "slice_seconds": 45,
     "connect_read_timeout_seconds": 10
@@ -43,6 +51,8 @@
     "recovery": "Backend fences old worker and exact observed session revision before restore. Stale automated stop, retry or integrity-block writes cannot override newer owner/grant state. Pending dispatch becomes unknown outcome with full cap retained and bounded retry; external IO is at-least-once, not exactly-once. Deferred redirected-robots target cooldown is checkpointed rather than discarded.",
     "control": "Explicit pause/resume/cancel; no OS idle/activity inference; consent must remain current before network and commit",
     "accounting": "usage.bytes is measured accepted transport-body bytes; usage.reserved_bytes is conservative allowance for in-flight or unknown failed response bytes. Both consume total byte budget. Request count is reserved dispatch attempts, not independently attested remote server requests.",
+    "instruction_boundary": "External text, titles, agent instruction artifacts, markup and arbitrary robots comments are inert; heuristic hits are held before discovery or retention. Owner-scoped incident receipts contain bounded pattern categories and permitted hashes, never raw instruction payloads. No-store/noindex/noarchive suppress retained fingerprints. Existing robots rules narrow admission and are not ignored. Ordinary retrieval and source-use controls cannot release quarantined material.",
+    "adaptive_navigation": "Only already-admitted due frontier rows may be reordered by bounded operator relevance, URL coverage and committed origin outcomes. Host failure streak can extend cooldown but never shorten robots, Retry-After or grant bounds; explicit access denial stops host acquisition for current consent. FIFO remains compatible. Redirects and restored targets undergo structural trap checks; no new URL authority.",
     "autonomous_application": "Application may consume explicit finite CORE_DB grants through the existing backend scheduler. Pure run_slice remains at most4steps/45seconds; no independent pure background loop, storage, scheduler or authority. Canonical code binding and pre-IO reservation remain unchanged."
   },
   "network": {
@@ -55,5 +65,5 @@
       "authority": "No new service/store/scheduler/runtime owner; configured proxy hostname may resolve privately as deployment trusted endpoint, origin DNS must resolve exclusively publicly"
     }
   },
-  "verification": "No tests per user instruction. Static checks plus actual authorized bounded public URL acquisition only. Candidate does not change closure/signoff."
+  "verification": "Exact-head offline adversarial and recovery regression suites, equal-budget deterministic coverage fixture, frontend protocol validation/typecheck, architecture/security/mirror checks, independent authorized network and device qualification required. Benchmark superiority is unqualified; no closure or signoff implied."
 }
