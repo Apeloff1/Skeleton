@@ -1,0 +1,2443 @@
+{
+  "schema": "dragon.mod-provider-seeds.v1",
+  "provenance": "Candidate community slugs and curated modding sites. Some slugs or routes may be retired or unsupported; live identity, policy and availability verification are separate.",
+  "communities": [
+    {
+      "provider": "thunderstore",
+      "slug": "lethal-company",
+      "title": "Lethal Company"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "valheim",
+      "title": "Valheim"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "risk-of-rain-2",
+      "title": "Risk of Rain 2"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "repo",
+      "title": "R.E.P.O."
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "h3vr",
+      "title": "Hot Dogs Horseshoes and Hand Grenades"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "peak",
+      "title": "PEAK"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "northstar",
+      "title": "Titanfall 2 Northstar"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "bonelab",
+      "title": "BONELAB"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "boneworks",
+      "title": "BONEWORKS"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "content-warning",
+      "title": "Content Warning"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "gtfo",
+      "title": "GTFO"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "rounds",
+      "title": "ROUNDS"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "ultrakill",
+      "title": "ULTRAKILL"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "atlyss",
+      "title": "ATLYSS"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "dyson-sphere-program",
+      "title": "Dyson Sphere Program"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "inscryption",
+      "title": "Inscryption"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "schedule-i",
+      "title": "Schedule I"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "outward",
+      "title": "Outward"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "bomb-rush-cyberfunk",
+      "title": "Bomb Rush Cyberfunk"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "hollow-knight-silksong",
+      "title": "Hollow Knight Silksong"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "webfishing",
+      "title": "WEBFISHING"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "talespire",
+      "title": "TaleSpire"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "enter-the-gungeon",
+      "title": "Enter the Gungeon"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "totally-accurate-battle-simulator",
+      "title": "Totally Accurate Battle Simulator"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "v-rising",
+      "title": "V Rising"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "bopl-battle",
+      "title": "Bopl Battle"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "cities-skylines-ii",
+      "title": "Cities Skylines II"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "nickelodeon-all-star-brawl",
+      "title": "Nickelodeon All-Star Brawl"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "rumble",
+      "title": "RUMBLE"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "balatro",
+      "title": "Balatro"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "voices-of-the-void",
+      "title": "Voices of the Void"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "hades-ii",
+      "title": "Hades II"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "muck",
+      "title": "Muck"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "risk-of-rain-returns",
+      "title": "Risk of Rain Returns"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "shadows-of-doubt",
+      "title": "Shadows of Doubt"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "void-crew",
+      "title": "Void Crew"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "across-the-obelisk",
+      "title": "Across the Obelisk"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "timberborn",
+      "title": "Timberborn"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "techtonica",
+      "title": "Techtonica"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "sons-of-the-forest",
+      "title": "Sons of the Forest"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "20-minutes-till-dawn",
+      "title": "20 Minutes Till Dawn"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "lethal-league-blaze",
+      "title": "Lethal League Blaze"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "wrestling-empire",
+      "title": "Wrestling Empire"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "cult-of-the-lamb",
+      "title": "Cult of the Lamb"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "gang-beasts",
+      "title": "Gang Beasts"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "sailwind",
+      "title": "Sailwind"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "subnautica-below-zero",
+      "title": "Subnautica Below Zero"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "hard-bullet",
+      "title": "Hard Bullet"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "trombone-champ",
+      "title": "Trombone Champ"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "subnautica",
+      "title": "Subnautica"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "among-us",
+      "title": "Among Us"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "crab-game",
+      "title": "Crab Game"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "against-the-storm",
+      "title": "Against the Storm"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "ultimate-chicken-horse",
+      "title": "Ultimate Chicken Horse"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "astroneer",
+      "title": "Astroneer"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "receiver-2",
+      "title": "Receiver 2"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "sulfur",
+      "title": "SULFUR"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "stacklands",
+      "title": "Stacklands"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "peglin",
+      "title": "Peglin"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "bloons-td-6",
+      "title": "Bloons TD 6"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "chrono-ark",
+      "title": "Chrono Ark"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "sunkenland",
+      "title": "Sunkenland"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "rogue-tower",
+      "title": "Rogue Tower"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "stick-fight-the-game",
+      "title": "Stick Fight"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "tcg-card-shop-simulator",
+      "title": "TCG Card Shop Simulator"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "ostranauts",
+      "title": "Ostranauts"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "broforce",
+      "title": "Broforce"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "stolen-realm",
+      "title": "Stolen Realm"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "atomicrops",
+      "title": "Atomicrops"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "sun-haven",
+      "title": "Sun Haven"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "wizard-of-legend",
+      "title": "Wizard of Legend"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "wobbly-life",
+      "title": "Wobbly Life"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "rogue-genesia",
+      "title": "Rogue Genesia"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "getting-over-it",
+      "title": "Getting Over It"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "ravenfield",
+      "title": "Ravenfield"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "the-planet-crafter",
+      "title": "The Planet Crafter"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "shapez-2",
+      "title": "Shapez 2"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "aloft",
+      "title": "Aloft"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "brotato",
+      "title": "Brotato"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "thronefall",
+      "title": "Thronefall"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "superhot",
+      "title": "SUPERHOT"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "grey-hack",
+      "title": "Grey Hack"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "crawl",
+      "title": "Crawl"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "wildfrost",
+      "title": "Wildfrost"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "lens-island",
+      "title": "Len's Island"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "pikuniku",
+      "title": "Pikuniku"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "castle-story",
+      "title": "Castle Story"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "scrap-mechanic",
+      "title": "Scrap Mechanic"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "logic-world",
+      "title": "Logic World"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "gloomwood",
+      "title": "Gloomwood"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "backpack-hero",
+      "title": "Backpack Hero"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "miside",
+      "title": "MiSide"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "bendy-and-the-ink-machine",
+      "title": "Bendy and the Ink Machine"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "return-of-the-obra-dinn",
+      "title": "Return of the Obra Dinn"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "pulsar-lost-colony",
+      "title": "PULSAR Lost Colony"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "dusk",
+      "title": "DUSK"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "rhythm-doctor",
+      "title": "Rhythm Doctor"
+    },
+    {
+      "provider": "thunderstore",
+      "slug": "soulcalibur-vi",
+      "title": "Soulcalibur VI"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "minecraft",
+      "title": "Minecraft"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "wow",
+      "title": "World of Warcraft"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "wow-classic",
+      "title": "WoW Classic"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "sims4",
+      "title": "The Sims 4"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "ark-survival-ascended",
+      "title": "ARK Survival Ascended"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "minecraft-bedrock",
+      "title": "Minecraft Bedrock"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "stardewvalley",
+      "title": "Stardew Valley"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "kerbal",
+      "title": "Kerbal Space Program"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "hogwarts-legacy",
+      "title": "Hogwarts Legacy"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "hytale",
+      "title": "Hytale"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "inZOI",
+      "title": "inZOI"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "terraria",
+      "title": "Terraria"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "sc2",
+      "title": "StarCraft II"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "worldoftanks",
+      "title": "World of Tanks"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "teso",
+      "title": "The Elder Scrolls Online"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "rift",
+      "title": "Rift"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "skyrim",
+      "title": "Skyrim"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "palworld",
+      "title": "Palworld"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "among-us",
+      "title": "Among Us"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "minecraft-dungeons",
+      "title": "Minecraft Dungeons"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "american-truck-simulator",
+      "title": "American Truck Simulator"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "7-days-to-die",
+      "title": "7 Days to Die"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "darkest-dungeon",
+      "title": "Darkest Dungeon"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "surviving-mars",
+      "title": "Surviving Mars"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "lethal-company",
+      "title": "Lethal Company"
+    },
+    {
+      "provider": "curseforge",
+      "slug": "baldursgate3",
+      "title": "Baldur's Gate 3"
+    },
+    {
+      "provider": "modio",
+      "slug": "baldursgate3",
+      "title": "Baldur's Gate 3"
+    },
+    {
+      "provider": "modio",
+      "slug": "bonelab",
+      "title": "BONELAB"
+    },
+    {
+      "provider": "modio",
+      "slug": "blade-and-sorcery",
+      "title": "Blade and Sorcery"
+    },
+    {
+      "provider": "modio",
+      "slug": "blade-and-sorcery-nomad",
+      "title": "Blade and Sorcery Nomad"
+    },
+    {
+      "provider": "modio",
+      "slug": "snowrunner",
+      "title": "SnowRunner"
+    },
+    {
+      "provider": "modio",
+      "slug": "insurgencysandstorm",
+      "title": "Insurgency Sandstorm"
+    },
+    {
+      "provider": "modio",
+      "slug": "readyornot",
+      "title": "Ready or Not"
+    },
+    {
+      "provider": "modio",
+      "slug": "deep-rock-galactic",
+      "title": "Deep Rock Galactic"
+    },
+    {
+      "provider": "modio",
+      "slug": "mordhau",
+      "title": "Mordhau"
+    },
+    {
+      "provider": "modio",
+      "slug": "spaceengineers",
+      "title": "Space Engineers"
+    },
+    {
+      "provider": "modio",
+      "slug": "skaterxl",
+      "title": "Skater XL"
+    },
+    {
+      "provider": "modio",
+      "slug": "tabs",
+      "title": "Totally Accurate Battle Simulator"
+    },
+    {
+      "provider": "modio",
+      "slug": "humankind",
+      "title": "Humankind"
+    },
+    {
+      "provider": "modio",
+      "slug": "descenders",
+      "title": "Descenders"
+    },
+    {
+      "provider": "modio",
+      "slug": "teardown",
+      "title": "Teardown"
+    },
+    {
+      "provider": "modio",
+      "slug": "groundbranch",
+      "title": "Ground Branch"
+    },
+    {
+      "provider": "modio",
+      "slug": "sapiens",
+      "title": "Sapiens"
+    },
+    {
+      "provider": "modio",
+      "slug": "swordsandsorcery",
+      "title": "Swords and Sorcery"
+    },
+    {
+      "provider": "modio",
+      "slug": "gloomhaven",
+      "title": "Gloomhaven"
+    },
+    {
+      "provider": "modio",
+      "slug": "bus-simulator-21",
+      "title": "Bus Simulator 21"
+    },
+    {
+      "provider": "modio",
+      "slug": "railroader",
+      "title": "Railroader"
+    },
+    {
+      "provider": "modio",
+      "slug": "foundation",
+      "title": "Foundation"
+    },
+    {
+      "provider": "modio",
+      "slug": "timberborn",
+      "title": "Timberborn"
+    },
+    {
+      "provider": "modio",
+      "slug": "pavlov",
+      "title": "Pavlov"
+    },
+    {
+      "provider": "modio",
+      "slug": "dungeons4",
+      "title": "Dungeons 4"
+    },
+    {
+      "provider": "modio",
+      "slug": "pathfinderwrathoftherighteous",
+      "title": "Pathfinder Wrath of the Righteous"
+    },
+    {
+      "provider": "moddb",
+      "slug": "half-life",
+      "title": "Half-Life"
+    },
+    {
+      "provider": "moddb",
+      "slug": "half-life-2",
+      "title": "Half-Life 2"
+    },
+    {
+      "provider": "moddb",
+      "slug": "half-life-2-episode-two",
+      "title": "Half-Life 2 Episode Two"
+    },
+    {
+      "provider": "moddb",
+      "slug": "counter-strike",
+      "title": "Counter-Strike"
+    },
+    {
+      "provider": "moddb",
+      "slug": "counter-strike-source",
+      "title": "Counter-Strike Source"
+    },
+    {
+      "provider": "moddb",
+      "slug": "doom",
+      "title": "Doom"
+    },
+    {
+      "provider": "moddb",
+      "slug": "doom-ii",
+      "title": "Doom II"
+    },
+    {
+      "provider": "moddb",
+      "slug": "doom-iii",
+      "title": "Doom III"
+    },
+    {
+      "provider": "moddb",
+      "slug": "quake",
+      "title": "Quake"
+    },
+    {
+      "provider": "moddb",
+      "slug": "quake-2",
+      "title": "Quake II"
+    },
+    {
+      "provider": "moddb",
+      "slug": "quake-iii-arena",
+      "title": "Quake III Arena"
+    },
+    {
+      "provider": "moddb",
+      "slug": "unreal",
+      "title": "Unreal"
+    },
+    {
+      "provider": "moddb",
+      "slug": "unreal-tournament",
+      "title": "Unreal Tournament"
+    },
+    {
+      "provider": "moddb",
+      "slug": "unreal-tournament-2004",
+      "title": "Unreal Tournament 2004"
+    },
+    {
+      "provider": "moddb",
+      "slug": "stalker-shadow-of-chernobyl",
+      "title": "STALKER Shadow of Chernobyl"
+    },
+    {
+      "provider": "moddb",
+      "slug": "stalker-clear-sky",
+      "title": "STALKER Clear Sky"
+    },
+    {
+      "provider": "moddb",
+      "slug": "stalker-call-of-pripyat",
+      "title": "STALKER Call of Pripyat"
+    },
+    {
+      "provider": "moddb",
+      "slug": "command-and-conquer-generals-zero-hour",
+      "title": "C&C Generals Zero Hour"
+    },
+    {
+      "provider": "moddb",
+      "slug": "cc-red-alert-2",
+      "title": "C&C Red Alert 2"
+    },
+    {
+      "provider": "moddb",
+      "slug": "cc-tiberian-sun",
+      "title": "C&C Tiberian Sun"
+    },
+    {
+      "provider": "moddb",
+      "slug": "command-conquer-red-alert-3",
+      "title": "C&C Red Alert 3"
+    },
+    {
+      "provider": "moddb",
+      "slug": "command-conquer-3-tiberium-wars",
+      "title": "C&C 3 Tiberium Wars"
+    },
+    {
+      "provider": "moddb",
+      "slug": "star-wars-empire-at-war",
+      "title": "Star Wars Empire at War"
+    },
+    {
+      "provider": "moddb",
+      "slug": "star-wars-jedi-academy",
+      "title": "Jedi Academy"
+    },
+    {
+      "provider": "moddb",
+      "slug": "star-wars-jedi-outcast",
+      "title": "Jedi Outcast"
+    },
+    {
+      "provider": "moddb",
+      "slug": "star-wars-battlefront-ii",
+      "title": "Star Wars Battlefront II"
+    },
+    {
+      "provider": "moddb",
+      "slug": "mount-blade-warband",
+      "title": "Mount and Blade Warband"
+    },
+    {
+      "provider": "moddb",
+      "slug": "mount-blade-ii-bannerlord",
+      "title": "Mount and Blade II Bannerlord"
+    },
+    {
+      "provider": "moddb",
+      "slug": "medieval-ii-total-war",
+      "title": "Medieval II Total War"
+    },
+    {
+      "provider": "moddb",
+      "slug": "rome-total-war",
+      "title": "Rome Total War"
+    },
+    {
+      "provider": "moddb",
+      "slug": "empire-total-war",
+      "title": "Empire Total War"
+    },
+    {
+      "provider": "moddb",
+      "slug": "napoleon-total-war",
+      "title": "Napoleon Total War"
+    },
+    {
+      "provider": "moddb",
+      "slug": "company-of-heroes",
+      "title": "Company of Heroes"
+    },
+    {
+      "provider": "moddb",
+      "slug": "company-of-heroes-2",
+      "title": "Company of Heroes 2"
+    },
+    {
+      "provider": "moddb",
+      "slug": "dawn-of-war",
+      "title": "Dawn of War"
+    },
+    {
+      "provider": "moddb",
+      "slug": "dawn-of-war-soulstorm",
+      "title": "Dawn of War Soulstorm"
+    },
+    {
+      "provider": "moddb",
+      "slug": "fallout",
+      "title": "Fallout"
+    },
+    {
+      "provider": "moddb",
+      "slug": "fallout-2",
+      "title": "Fallout 2"
+    },
+    {
+      "provider": "moddb",
+      "slug": "fallout-3",
+      "title": "Fallout 3"
+    },
+    {
+      "provider": "moddb",
+      "slug": "fallout-new-vegas",
+      "title": "Fallout New Vegas"
+    },
+    {
+      "provider": "moddb",
+      "slug": "fallout-4",
+      "title": "Fallout 4"
+    },
+    {
+      "provider": "moddb",
+      "slug": "elder-scrolls-iii-morrowind",
+      "title": "Morrowind"
+    },
+    {
+      "provider": "moddb",
+      "slug": "elder-scrolls-iv-oblivion",
+      "title": "Oblivion"
+    },
+    {
+      "provider": "moddb",
+      "slug": "elder-scrolls-v-skyrim",
+      "title": "Skyrim"
+    },
+    {
+      "provider": "moddb",
+      "slug": "the-witcher",
+      "title": "The Witcher"
+    },
+    {
+      "provider": "moddb",
+      "slug": "the-witcher-3-wild-hunt",
+      "title": "The Witcher 3"
+    },
+    {
+      "provider": "moddb",
+      "slug": "amnesia-the-dark-descent",
+      "title": "Amnesia"
+    },
+    {
+      "provider": "moddb",
+      "slug": "amnesia-a-machine-for-pigs",
+      "title": "Amnesia A Machine for Pigs"
+    },
+    {
+      "provider": "moddb",
+      "slug": "cry-of-fear",
+      "title": "Cry of Fear"
+    },
+    {
+      "provider": "moddb",
+      "slug": "crysis",
+      "title": "Crysis"
+    },
+    {
+      "provider": "moddb",
+      "slug": "crysis-warhead",
+      "title": "Crysis Warhead"
+    },
+    {
+      "provider": "moddb",
+      "slug": "crysis-2",
+      "title": "Crysis 2"
+    },
+    {
+      "provider": "moddb",
+      "slug": "far-cry",
+      "title": "Far Cry"
+    },
+    {
+      "provider": "moddb",
+      "slug": "far-cry-2",
+      "title": "Far Cry 2"
+    },
+    {
+      "provider": "moddb",
+      "slug": "far-cry-3",
+      "title": "Far Cry 3"
+    },
+    {
+      "provider": "moddb",
+      "slug": "grand-theft-auto-iii",
+      "title": "GTA III"
+    },
+    {
+      "provider": "moddb",
+      "slug": "grand-theft-auto-vice-city",
+      "title": "GTA Vice City"
+    },
+    {
+      "provider": "moddb",
+      "slug": "grand-theft-auto-san-andreas",
+      "title": "GTA San Andreas"
+    },
+    {
+      "provider": "moddb",
+      "slug": "grand-theft-auto-iv",
+      "title": "GTA IV"
+    },
+    {
+      "provider": "moddb",
+      "slug": "grand-theft-auto-v",
+      "title": "GTA V"
+    },
+    {
+      "provider": "moddb",
+      "slug": "garrys-mod",
+      "title": "Garry's Mod"
+    },
+    {
+      "provider": "moddb",
+      "slug": "portal",
+      "title": "Portal"
+    },
+    {
+      "provider": "moddb",
+      "slug": "portal-2",
+      "title": "Portal 2"
+    },
+    {
+      "provider": "moddb",
+      "slug": "left-4-dead",
+      "title": "Left 4 Dead"
+    },
+    {
+      "provider": "moddb",
+      "slug": "left-4-dead-2",
+      "title": "Left 4 Dead 2"
+    },
+    {
+      "provider": "moddb",
+      "slug": "battlefield-2",
+      "title": "Battlefield 2"
+    },
+    {
+      "provider": "moddb",
+      "slug": "battlefield-1942",
+      "title": "Battlefield 1942"
+    },
+    {
+      "provider": "moddb",
+      "slug": "battlefield-2142",
+      "title": "Battlefield 2142"
+    },
+    {
+      "provider": "moddb",
+      "slug": "battlefield-vietnam",
+      "title": "Battlefield Vietnam"
+    },
+    {
+      "provider": "moddb",
+      "slug": "call-of-duty",
+      "title": "Call of Duty"
+    },
+    {
+      "provider": "moddb",
+      "slug": "call-of-duty-2",
+      "title": "Call of Duty 2"
+    },
+    {
+      "provider": "moddb",
+      "slug": "call-of-duty-4-modern-warfare",
+      "title": "Call of Duty 4"
+    },
+    {
+      "provider": "moddb",
+      "slug": "call-of-duty-world-at-war",
+      "title": "Call of Duty World at War"
+    },
+    {
+      "provider": "moddb",
+      "slug": "minecraft",
+      "title": "Minecraft"
+    },
+    {
+      "provider": "moddb",
+      "slug": "terraria",
+      "title": "Terraria"
+    },
+    {
+      "provider": "moddb",
+      "slug": "rimworld",
+      "title": "RimWorld"
+    },
+    {
+      "provider": "moddb",
+      "slug": "factorio",
+      "title": "Factorio"
+    },
+    {
+      "provider": "moddb",
+      "slug": "openra",
+      "title": "OpenRA"
+    },
+    {
+      "provider": "moddb",
+      "slug": "openxcom",
+      "title": "OpenXcom"
+    },
+    {
+      "provider": "moddb",
+      "slug": "openttd",
+      "title": "OpenTTD"
+    },
+    {
+      "provider": "moddb",
+      "slug": "warzone-2100",
+      "title": "Warzone 2100"
+    },
+    {
+      "provider": "moddb",
+      "slug": "the-battle-for-wesnoth",
+      "title": "Wesnoth"
+    },
+    {
+      "provider": "moddb",
+      "slug": "neverwinternights",
+      "title": "Neverwinter Nights"
+    },
+    {
+      "provider": "moddb",
+      "slug": "neverwinter-nights-2",
+      "title": "Neverwinter Nights 2"
+    },
+    {
+      "provider": "moddb",
+      "slug": "diablo-ii",
+      "title": "Diablo II"
+    },
+    {
+      "provider": "moddb",
+      "slug": "torchlight-ii",
+      "title": "Torchlight II"
+    },
+    {
+      "provider": "moddb",
+      "slug": "homeworld",
+      "title": "Homeworld"
+    },
+    {
+      "provider": "moddb",
+      "slug": "homeworld-2",
+      "title": "Homeworld 2"
+    },
+    {
+      "provider": "moddb",
+      "slug": "supreme-commander-forged-alliance",
+      "title": "Supreme Commander Forged Alliance"
+    },
+    {
+      "provider": "moddb",
+      "slug": "freelancer",
+      "title": "Freelancer"
+    },
+    {
+      "provider": "moddb",
+      "slug": "x3-terran-conflict",
+      "title": "X3 Terran Conflict"
+    },
+    {
+      "provider": "moddb",
+      "slug": "x4-foundations",
+      "title": "X4 Foundations"
+    },
+    {
+      "provider": "moddb",
+      "slug": "freespace-2",
+      "title": "FreeSpace 2"
+    }
+  ],
+  "sites": [
+    {
+      "url": "https://www.nexusmods.com/",
+      "title": "Nexus Mods",
+      "kind": "mod_provider_directory"
+    },
+    {
+      "url": "https://forums.nexusmods.com/",
+      "title": "Nexus forums",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://help.nexusmods.com/",
+      "title": "Nexus help",
+      "kind": "modding_knowledge_base"
+    },
+    {
+      "url": "https://wiki.nexusmods.com/",
+      "title": "Nexus Wiki",
+      "kind": "modding_community_wiki"
+    },
+    {
+      "url": "https://collections.nexusmods.com/",
+      "title": "Nexus collections",
+      "kind": "mod_collection_directory"
+    },
+    {
+      "url": "https://www.moddb.com/",
+      "title": "ModDB",
+      "kind": "mod_provider_directory"
+    },
+    {
+      "url": "https://www.moddb.com/mods",
+      "title": "ModDB mods",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://www.moddb.com/games",
+      "title": "ModDB games",
+      "kind": "mod_game_directory"
+    },
+    {
+      "url": "https://www.moddb.com/engines",
+      "title": "ModDB engines",
+      "kind": "modding_tool_index"
+    },
+    {
+      "url": "https://www.moddb.com/groups",
+      "title": "ModDB groups",
+      "kind": "mod_team_catalogue"
+    },
+    {
+      "url": "https://www.moddb.com/tutorials",
+      "title": "ModDB tutorials",
+      "kind": "modding_guide_index"
+    },
+    {
+      "url": "https://www.moddb.com/downloads",
+      "title": "ModDB download metadata",
+      "kind": "mod_file_catalogue"
+    },
+    {
+      "url": "https://www.moddb.com/addons",
+      "title": "ModDB addons",
+      "kind": "addon_directory"
+    },
+    {
+      "url": "https://thunderstore.io/communities/",
+      "title": "Thunderstore communities",
+      "kind": "mod_game_directory"
+    },
+    {
+      "url": "https://wiki.thunderstore.io/",
+      "title": "Thunderstore wiki",
+      "kind": "mod_project_wiki"
+    },
+    {
+      "url": "https://thunderstore.io/api/docs/",
+      "title": "Thunderstore API docs",
+      "kind": "public_api_reference"
+    },
+    {
+      "url": "https://blog.thunderstore.io/",
+      "title": "Thunderstore news",
+      "kind": "modding_development_log"
+    },
+    {
+      "url": "https://modrinth.com/mods",
+      "title": "Modrinth mods",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://modrinth.com/modpacks",
+      "title": "Modrinth modpacks",
+      "kind": "mod_pack_directory"
+    },
+    {
+      "url": "https://modrinth.com/resourcepacks",
+      "title": "Modrinth resource packs",
+      "kind": "mod_texture_pack"
+    },
+    {
+      "url": "https://modrinth.com/shaders",
+      "title": "Modrinth shaders",
+      "kind": "mod_shader_pack"
+    },
+    {
+      "url": "https://docs.modrinth.com/",
+      "title": "Modrinth API docs",
+      "kind": "public_api_reference"
+    },
+    {
+      "url": "https://support.modrinth.com/",
+      "title": "Modrinth support",
+      "kind": "modding_public_support_index"
+    },
+    {
+      "url": "https://www.curseforge.com/",
+      "title": "CurseForge",
+      "kind": "mod_provider_directory"
+    },
+    {
+      "url": "https://docs.curseforge.com/",
+      "title": "CurseForge API docs",
+      "kind": "public_api_reference"
+    },
+    {
+      "url": "https://support.curseforge.com/",
+      "title": "CurseForge support",
+      "kind": "modding_public_support_index"
+    },
+    {
+      "url": "https://mod.io/",
+      "title": "mod.io",
+      "kind": "mod_provider_directory"
+    },
+    {
+      "url": "https://docs.mod.io/",
+      "title": "mod.io developer docs",
+      "kind": "public_api_reference"
+    },
+    {
+      "url": "https://gamebanana.com/",
+      "title": "GameBanana",
+      "kind": "mod_provider_directory"
+    },
+    {
+      "url": "https://gamebanana.com/games",
+      "title": "GameBanana games",
+      "kind": "mod_game_directory"
+    },
+    {
+      "url": "https://gamebanana.com/mods",
+      "title": "GameBanana mods",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://gamebanana.com/tools",
+      "title": "GameBanana tools",
+      "kind": "modding_tool_index"
+    },
+    {
+      "url": "https://gamebanana.com/tuts",
+      "title": "GameBanana tutorials",
+      "kind": "modding_guide_index"
+    },
+    {
+      "url": "https://gamebanana.com/wikis",
+      "title": "GameBanana wikis",
+      "kind": "modding_community_wiki"
+    },
+    {
+      "url": "https://steamcommunity.com/workshop/",
+      "title": "Steam Workshop",
+      "kind": "community_workshop"
+    },
+    {
+      "url": "https://partner.steamgames.com/doc/features/workshop",
+      "title": "Steam Workshop developer documentation",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://developer.valvesoftware.com/wiki/Category:Modding",
+      "title": "Valve modding documentation",
+      "kind": "modding_documentation_index"
+    },
+    {
+      "url": "https://developer.valvesoftware.com/wiki/Source_SDK_Base_2013",
+      "title": "Source SDK documentation",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://developer.valvesoftware.com/wiki/Source_2",
+      "title": "Source 2 documentation",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://www.gamemaps.com/",
+      "title": "GameMaps",
+      "kind": "mod_custom_map"
+    },
+    {
+      "url": "https://www.gamemaps.com/l4d2/",
+      "title": "Left 4 Dead 2 GameMaps",
+      "kind": "mod_custom_map"
+    },
+    {
+      "url": "https://www.smwcentral.net/",
+      "title": "SMW Central",
+      "kind": "rom_patch_metadata"
+    },
+    {
+      "url": "https://www.romhacking.net/",
+      "title": "ROMhacking.net historical metadata",
+      "kind": "mod_preservation_metadata"
+    },
+    {
+      "url": "https://www.romhacking.net/translations/",
+      "title": "Translation patch catalog",
+      "kind": "modding_translation_directory"
+    },
+    {
+      "url": "https://www.romhacks.org/",
+      "title": "ROM hacks metadata",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://www.romhacking.net/utilities/",
+      "title": "ROM patch utilities metadata",
+      "kind": "modding_tool_index"
+    },
+    {
+      "url": "https://www.pokecommunity.com/",
+      "title": "Pokemon community projects",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://www.sonicretro.org/",
+      "title": "Sonic Retro",
+      "kind": "modding_community_wiki"
+    },
+    {
+      "url": "https://www.sonicstadium.org/",
+      "title": "Sonic community",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://tcrf.net/",
+      "title": "The Cutting Room Floor",
+      "kind": "unused_content_reference"
+    },
+    {
+      "url": "https://www.doomworld.com/",
+      "title": "Doomworld",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://www.doomworld.com/idgames/",
+      "title": "idgames archive metadata",
+      "kind": "mod_archive_record"
+    },
+    {
+      "url": "https://zdoom.org/",
+      "title": "ZDoom",
+      "kind": "modding_framework_docs"
+    },
+    {
+      "url": "https://zdoom.org/wiki/Main_Page",
+      "title": "ZDoom wiki",
+      "kind": "mod_script_api"
+    },
+    {
+      "url": "https://forum.zdoom.org/",
+      "title": "ZDoom forums",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://www.quaddicted.com/",
+      "title": "Quake map archive",
+      "kind": "mod_custom_map"
+    },
+    {
+      "url": "https://www.slipseer.com/",
+      "title": "Quake mapping community",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://www.celephais.net/board/",
+      "title": "Quake func forum",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://www.quakewiki.org/",
+      "title": "Quake wiki",
+      "kind": "modding_community_wiki"
+    },
+    {
+      "url": "https://openarena.ws/",
+      "title": "OpenArena",
+      "kind": "modding_community_wiki"
+    },
+    {
+      "url": "https://www.sc2mapster.com/",
+      "title": "SC2Mapster",
+      "kind": "mod_authoring_hub"
+    },
+    {
+      "url": "https://www.hiveworkshop.com/",
+      "title": "Hive Workshop",
+      "kind": "mod_asset_reference_graph"
+    },
+    {
+      "url": "https://www.hiveworkshop.com/repositories/",
+      "title": "Hive resource catalogue",
+      "kind": "modding_resource_index"
+    },
+    {
+      "url": "https://www.epicwar.com/",
+      "title": "Warcraft III maps",
+      "kind": "mod_custom_map"
+    },
+    {
+      "url": "https://www.thehelper.net/",
+      "title": "Warcraft editor forums",
+      "kind": "modding_support_forum"
+    },
+    {
+      "url": "https://www.cnclabs.com/",
+      "title": "C&C Labs",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://www.ppmsite.com/",
+      "title": "Project Perfect Mod",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://www.sleipnirstuff.com/",
+      "title": "C&C projects",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://www.civfanatics.com/",
+      "title": "CivFanatics",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://forums.civfanatics.com/",
+      "title": "CivFanatics forums",
+      "kind": "modding_support_forum"
+    },
+    {
+      "url": "https://www.twcenter.net/",
+      "title": "Total War Center",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://www.paradoxplaza.com/",
+      "title": "Paradox publisher",
+      "kind": "publisher_profile"
+    },
+    {
+      "url": "https://mods.paradoxplaza.com/",
+      "title": "Paradox Mods",
+      "kind": "mod_provider_directory"
+    },
+    {
+      "url": "https://forum.paradoxplaza.com/",
+      "title": "Paradox forums",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://wikis.paradoxplaza.com/",
+      "title": "Paradox game wikis",
+      "kind": "modding_community_wiki"
+    },
+    {
+      "url": "https://www.nma-fallout.com/",
+      "title": "No Mutants Allowed",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://fallout.wiki/",
+      "title": "Independent Fallout Wiki",
+      "kind": "community_wiki"
+    },
+    {
+      "url": "https://geckwiki.com/",
+      "title": "GECK wiki",
+      "kind": "editor_scripting_guide"
+    },
+    {
+      "url": "https://ck.uesp.net/wiki/Main_Page",
+      "title": "Creation Kit wiki",
+      "kind": "mod_world_editor"
+    },
+    {
+      "url": "https://en.uesp.net/wiki/Skyrim:Modding",
+      "title": "UESP Skyrim modding",
+      "kind": "mod_documentation"
+    },
+    {
+      "url": "https://www.afkmods.com/",
+      "title": "AFK Mods",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://www.moddb.com/mods/enderal",
+      "title": "Enderal project",
+      "kind": "mod_total_conversion"
+    },
+    {
+      "url": "https://sureai.net/",
+      "title": "SureAI",
+      "kind": "mod_total_conversion"
+    },
+    {
+      "url": "https://www.moddb.com/mods/fallout-london",
+      "title": "Fallout London project",
+      "kind": "mod_total_conversion"
+    },
+    {
+      "url": "https://fallout4london.com/",
+      "title": "Fallout London",
+      "kind": "mod_expansion_campaign"
+    },
+    {
+      "url": "https://www.wabbajack.org/",
+      "title": "Wabbajack",
+      "kind": "mod_pack_directory"
+    },
+    {
+      "url": "https://loot.github.io/",
+      "title": "LOOT",
+      "kind": "plugin_load_order"
+    },
+    {
+      "url": "https://tes5edit.github.io/",
+      "title": "xEdit docs",
+      "kind": "plugin_record_schema"
+    },
+    {
+      "url": "https://moddinglinked.com/",
+      "title": "ModdingLinked",
+      "kind": "modding_guide_index"
+    },
+    {
+      "url": "https://vivanewvegas.moddinglinked.com/",
+      "title": "Viva New Vegas",
+      "kind": "mod_install_profile"
+    },
+    {
+      "url": "https://themidnightride.moddinglinked.com/",
+      "title": "The Midnight Ride",
+      "kind": "mod_install_profile"
+    },
+    {
+      "url": "https://stepmodifications.org/",
+      "title": "STEP",
+      "kind": "mod_install_profile"
+    },
+    {
+      "url": "https://www.uesp.net/",
+      "title": "UESP",
+      "kind": "community_wiki"
+    },
+    {
+      "url": "https://skse.silverlock.org/",
+      "title": "SKSE",
+      "kind": "scripting_extender_api"
+    },
+    {
+      "url": "https://f4se.silverlock.org/",
+      "title": "F4SE",
+      "kind": "scripting_extender_api"
+    },
+    {
+      "url": "https://sfse.silverlock.org/",
+      "title": "SFSE",
+      "kind": "scripting_extender_api"
+    },
+    {
+      "url": "https://www.gta5-mods.com/",
+      "title": "GTA5 Mods",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://www.gtagarage.com/",
+      "title": "GTA Garage",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://gtaforums.com/",
+      "title": "GTAForums",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://openiv.com/",
+      "title": "OpenIV",
+      "kind": "mod_record_editor"
+    },
+    {
+      "url": "https://www.gtagaming.com/",
+      "title": "GTA Gaming archive",
+      "kind": "mod_archive_record"
+    },
+    {
+      "url": "https://www.gtainside.com/",
+      "title": "GTA Inside",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://docs.fivem.net/",
+      "title": "FiveM",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://forum.cfx.re/",
+      "title": "Cfx forums",
+      "kind": "modding_support_forum"
+    },
+    {
+      "url": "https://documentation.qbox.re/",
+      "title": "Qbox documentation",
+      "kind": "mod_documentation"
+    },
+    {
+      "url": "https://docs.qbcore.org/",
+      "title": "QBCore documentation",
+      "kind": "mod_documentation"
+    },
+    {
+      "url": "https://docs.esx-framework.org/",
+      "title": "ESX documentation",
+      "kind": "mod_documentation"
+    },
+    {
+      "url": "https://overextended.dev/",
+      "title": "Overextended docs",
+      "kind": "mod_documentation"
+    },
+    {
+      "url": "https://wiki.multitheftauto.com/",
+      "title": "MTA wiki",
+      "kind": "modding_framework_docs"
+    },
+    {
+      "url": "https://open.mp/docs/",
+      "title": "open.mp docs",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://docs.altv.mp/",
+      "title": "alt:V docs",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://wiki.rage.mp/",
+      "title": "RAGE Multiplayer wiki",
+      "kind": "modding_framework_docs"
+    },
+    {
+      "url": "https://wiki.redmodding.org/",
+      "title": "Cyberpunk modding wiki",
+      "kind": "modding_documentation_index"
+    },
+    {
+      "url": "https://wiki.redmodding.org/wolvenkit",
+      "title": "WolvenKit",
+      "kind": "mod_asset_import_pipeline"
+    },
+    {
+      "url": "https://modding.wiki/",
+      "title": "Modding wiki",
+      "kind": "modding_community_wiki"
+    },
+    {
+      "url": "https://bg3.wiki/wiki/Modding:Modding",
+      "title": "BG3 modding wiki",
+      "kind": "modding_documentation_index"
+    },
+    {
+      "url": "https://docs.baldursgate3.game/",
+      "title": "BG3 Toolkit docs",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://www.moddingofisaac.com/",
+      "title": "Modding of Isaac",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://stardewvalleywiki.com/Modding:Index",
+      "title": "Stardew modding wiki",
+      "kind": "modding_documentation_index"
+    },
+    {
+      "url": "https://smapi.io/",
+      "title": "SMAPI",
+      "kind": "mod_loader"
+    },
+    {
+      "url": "https://smapi.io/mods",
+      "title": "SMAPI compatibility",
+      "kind": "mod_compatibility_evidence"
+    },
+    {
+      "url": "https://forums.stardewvalley.net/",
+      "title": "Stardew forums",
+      "kind": "modding_support_forum"
+    },
+    {
+      "url": "https://www.factorio.com/",
+      "title": "Factorio official",
+      "kind": "storefront"
+    },
+    {
+      "url": "https://mods.factorio.com/",
+      "title": "Factorio mods",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://lua-api.factorio.com/latest/",
+      "title": "Factorio API",
+      "kind": "mod_script_api"
+    },
+    {
+      "url": "https://wiki.factorio.com/Modding",
+      "title": "Factorio modding wiki",
+      "kind": "mod_documentation"
+    },
+    {
+      "url": "https://forums.factorio.com/",
+      "title": "Factorio forums",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://forums.terraria.org/",
+      "title": "Terraria forums",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://docs.tmodloader.net/",
+      "title": "tModLoader docs",
+      "kind": "mod_loader_api"
+    },
+    {
+      "url": "https://terraria.wiki.gg/wiki/Mods",
+      "title": "Terraria mods",
+      "kind": "mod_catalogue"
+    },
+    {
+      "url": "https://valheim-modding.github.io/Jotunn/",
+      "title": "Jotunn docs",
+      "kind": "mod_loader_api"
+    },
+    {
+      "url": "https://valheim-modding.github.io/",
+      "title": "Valheim modding docs",
+      "kind": "modding_documentation_index"
+    },
+    {
+      "url": "https://rimworldwiki.com/wiki/Modding_Tutorials",
+      "title": "RimWorld modding tutorials",
+      "kind": "modding_guide_index"
+    },
+    {
+      "url": "https://ludeon.com/forums/",
+      "title": "RimWorld forums",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://rwom.fandom.com/",
+      "title": "RimWorld of Magic wiki",
+      "kind": "mod_project_wiki"
+    },
+    {
+      "url": "https://pzwiki.net/wiki/Modding",
+      "title": "Project Zomboid modding",
+      "kind": "modding_documentation_index"
+    },
+    {
+      "url": "https://theindiestone.com/forums/",
+      "title": "Project Zomboid forums",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://docs.ficsit.app/",
+      "title": "Satisfactory modding docs",
+      "kind": "modding_documentation_index"
+    },
+    {
+      "url": "https://ficsit.app/",
+      "title": "Satisfactory mod catalogue",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://forum.kerbalspaceprogram.com/",
+      "title": "KSP forums",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://spacedock.info/",
+      "title": "SpaceDock",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://github.com/KSP-CKAN/CKAN/wiki",
+      "title": "CKAN wiki",
+      "kind": "mod_manager_profile"
+    },
+    {
+      "url": "https://minecraft.wiki/w/Mods",
+      "title": "Minecraft mods wiki",
+      "kind": "mod_catalogue"
+    },
+    {
+      "url": "https://www.planetminecraft.com/",
+      "title": "Planet Minecraft",
+      "kind": "ugc_world_directory"
+    },
+    {
+      "url": "https://www.minecraftforum.net/",
+      "title": "Minecraft Forum",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://www.minecraftmaps.com/",
+      "title": "Minecraft Maps",
+      "kind": "mod_custom_map"
+    },
+    {
+      "url": "https://www.spigotmc.org/resources/",
+      "title": "Spigot resources",
+      "kind": "mod_plugin_manifest"
+    },
+    {
+      "url": "https://dev.bukkit.org/",
+      "title": "Bukkit plugins",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://hangar.papermc.io/",
+      "title": "Paper Hangar",
+      "kind": "mod_plugin_manifest"
+    },
+    {
+      "url": "https://ore.spongepowered.org/",
+      "title": "Sponge Ore",
+      "kind": "mod_plugin_manifest"
+    },
+    {
+      "url": "https://docs.fabricmc.net/",
+      "title": "Fabric docs",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://docs.minecraftforge.net/",
+      "title": "Forge docs",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://docs.neoforged.net/",
+      "title": "NeoForge docs",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://wiki.quiltmc.org/",
+      "title": "Quilt docs",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://docs.papermc.io/",
+      "title": "Paper docs",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://docs.spongepowered.org/",
+      "title": "Sponge docs",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/minecraft/creator/",
+      "title": "Bedrock creator documentation",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://wiki.bedrock.dev/",
+      "title": "Bedrock Wiki",
+      "kind": "modding_documentation_index"
+    },
+    {
+      "url": "https://www.curseforge.com/minecraft/mc-mods",
+      "title": "Minecraft CurseForge mods",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://www.curseforge.com/minecraft/modpacks",
+      "title": "Minecraft modpacks",
+      "kind": "mod_pack_directory"
+    },
+    {
+      "url": "https://www.curseforge.com/minecraft/texture-packs",
+      "title": "Minecraft resource packs",
+      "kind": "mod_texture_pack"
+    },
+    {
+      "url": "https://www.curseforge.com/minecraft/shaders",
+      "title": "Minecraft shader packs",
+      "kind": "mod_shader_pack"
+    },
+    {
+      "url": "https://www.curseforge.com/minecraft/worlds",
+      "title": "Minecraft worlds",
+      "kind": "ugc_world_directory"
+    },
+    {
+      "url": "https://www.curseforge.com/minecraft-bedrock",
+      "title": "Bedrock addons",
+      "kind": "addon_directory"
+    },
+    {
+      "url": "https://www.feed-the-beast.com/",
+      "title": "Feed The Beast",
+      "kind": "mod_pack_directory"
+    },
+    {
+      "url": "https://www.atlauncher.com/",
+      "title": "ATLauncher",
+      "kind": "mod_pack_directory"
+    },
+    {
+      "url": "https://www.technicpack.net/",
+      "title": "Technic Pack",
+      "kind": "mod_pack_directory"
+    },
+    {
+      "url": "https://prismlauncher.org/",
+      "title": "Prism Launcher",
+      "kind": "mod_manager"
+    },
+    {
+      "url": "https://www.wowinterface.com/",
+      "title": "WoWInterface",
+      "kind": "addon_directory"
+    },
+    {
+      "url": "https://www.wowace.com/",
+      "title": "WoWAce",
+      "kind": "addon_source_repository"
+    },
+    {
+      "url": "https://warcraft.wiki.gg/wiki/World_of_Warcraft_API",
+      "title": "WoW API",
+      "kind": "addon_api_documentation"
+    },
+    {
+      "url": "https://wago.io/",
+      "title": "Wago",
+      "kind": "addon_profile_schema"
+    },
+    {
+      "url": "https://wago.tools/",
+      "title": "Wago Tools",
+      "kind": "game_data_browser"
+    },
+    {
+      "url": "https://wowup.io/",
+      "title": "WowUp",
+      "kind": "addon_directory"
+    },
+    {
+      "url": "https://www.esoui.com/",
+      "title": "ESO UI addons",
+      "kind": "addon_directory"
+    },
+    {
+      "url": "https://wiki.esoui.com/",
+      "title": "ESO UI wiki",
+      "kind": "addon_api_documentation"
+    },
+    {
+      "url": "https://www.lotrointerface.com/",
+      "title": "LOTRO Interface",
+      "kind": "addon_directory"
+    },
+    {
+      "url": "https://www.ffxiah.com/",
+      "title": "FFXI database",
+      "kind": "reference_database"
+    },
+    {
+      "url": "https://www.ffxiah.com/forum/",
+      "title": "FFXI forums",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://windower.net/",
+      "title": "Windower",
+      "kind": "addon_directory"
+    },
+    {
+      "url": "https://docs.windower.net/",
+      "title": "Windower documentation",
+      "kind": "addon_api_documentation"
+    },
+    {
+      "url": "https://docs.runelite.net/",
+      "title": "RuneLite docs",
+      "kind": "addon_api_documentation"
+    },
+    {
+      "url": "https://runelite.net/plugin-hub/",
+      "title": "RuneLite plugin hub",
+      "kind": "addon_directory"
+    },
+    {
+      "url": "https://dalamud.dev/",
+      "title": "Dalamud docs",
+      "kind": "addon_api_documentation"
+    },
+    {
+      "url": "https://goatcorp.github.io/",
+      "title": "Dalamud project docs",
+      "kind": "addon_api_documentation"
+    },
+    {
+      "url": "https://www.racedepartment.com/",
+      "title": "RaceDepartment archive",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://www.overtake.gg/",
+      "title": "OverTake simulation mods",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://www.beamng.com/resources/",
+      "title": "BeamNG mods",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://documentation.beamng.com/modding/",
+      "title": "BeamNG modding docs",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://www.lfs.net/files",
+      "title": "Live for Speed files",
+      "kind": "mod_file_catalogue"
+    },
+    {
+      "url": "https://www.farming-simulator.com/mods.php",
+      "title": "Farming Simulator ModHub",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://gdn.giants-software.com/",
+      "title": "GIANTS developer network",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://www.worldoftrucks.com/",
+      "title": "World of Trucks",
+      "kind": "community_workshop"
+    },
+    {
+      "url": "https://modding.scssoft.com/",
+      "title": "SCS modding wiki",
+      "kind": "modding_documentation_index"
+    },
+    {
+      "url": "https://forum.scssoft.com/",
+      "title": "SCS forums",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://flightsim.to/",
+      "title": "FlightSim.to",
+      "kind": "mod_asset_manifest"
+    },
+    {
+      "url": "https://forums.flightsimulator.com/",
+      "title": "MSFS forums",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://docs.flightsimulator.com/",
+      "title": "MSFS SDK",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://forums.x-plane.org/",
+      "title": "X-Plane forums",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://developer.x-plane.com/",
+      "title": "X-Plane SDK",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://www.digitalcombatsimulator.com/en/files/",
+      "title": "DCS user files",
+      "kind": "mod_file_catalogue"
+    },
+    {
+      "url": "https://www.simtropolis.com/",
+      "title": "Simtropolis",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://community.simtropolis.com/files/",
+      "title": "Simtropolis Exchange",
+      "kind": "mod_file_catalogue"
+    },
+    {
+      "url": "https://www.sc4devotion.com/",
+      "title": "SC4 Devotion historical",
+      "kind": "mod_archive_record"
+    },
+    {
+      "url": "https://modthesims.info/",
+      "title": "Mod The Sims",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://www.thesimsresource.com/",
+      "title": "The Sims Resource",
+      "kind": "mod_asset_manifest"
+    },
+    {
+      "url": "https://sims4studio.com/",
+      "title": "Sims 4 Studio",
+      "kind": "mod_package_builder"
+    },
+    {
+      "url": "https://www.carls-sims-4-guide.com/mods/",
+      "title": "Sims mods guides",
+      "kind": "modding_guide_index"
+    },
+    {
+      "url": "https://www.simlogical.com/",
+      "title": "Simlogical archive",
+      "kind": "mod_archive_record"
+    },
+    {
+      "url": "https://www.openrct2.org/",
+      "title": "OpenRCT2",
+      "kind": "modding_framework_docs"
+    },
+    {
+      "url": "https://openrct2.io/",
+      "title": "OpenRCT2 docs",
+      "kind": "mod_documentation"
+    },
+    {
+      "url": "https://bananas.openttd.org/",
+      "title": "BaNaNaS",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://newgrf-specs.tt-wiki.net/",
+      "title": "NewGRF specs",
+      "kind": "mod_format_specification"
+    },
+    {
+      "url": "https://www.tt-forums.net/",
+      "title": "Transport Tycoon forums",
+      "kind": "modding_community_forum"
+    },
+    {
+      "url": "https://www.transportfever.net/",
+      "title": "Transport Fever community",
+      "kind": "mod_project_directory"
+    },
+    {
+      "url": "https://www.nexusmods.com/about/vortex/",
+      "title": "Vortex",
+      "kind": "mod_manager"
+    },
+    {
+      "url": "https://reshade.me/",
+      "title": "ReShade",
+      "kind": "mod_shader_pack"
+    },
+    {
+      "url": "https://enbdev.com/",
+      "title": "ENB",
+      "kind": "mod_graphics_overhaul"
+    },
+    {
+      "url": "https://docs.bepinex.dev/",
+      "title": "BepInEx documentation",
+      "kind": "mod_loader_api"
+    },
+    {
+      "url": "https://melonwiki.xyz/",
+      "title": "MelonLoader docs",
+      "kind": "mod_loader_api"
+    },
+    {
+      "url": "https://harmony.pardeike.net/",
+      "title": "Harmony",
+      "kind": "mod_event_hook_reference"
+    },
+    {
+      "url": "https://ue4ss.com/",
+      "title": "UE4SS",
+      "kind": "mod_runtime_extension"
+    },
+    {
+      "url": "https://docs.ue4ss.com/",
+      "title": "UE4SS docs",
+      "kind": "mod_authoring_sdk"
+    },
+    {
+      "url": "https://docs.unrealengine.com/",
+      "title": "Unreal engine docs",
+      "kind": "mod_engine_binding"
+    },
+    {
+      "url": "https://docs.unity3d.com/Manual/AssetBundlesIntro.html",
+      "title": "Unity asset bundle docs",
+      "kind": "mod_asset_bundle_reference"
+    },
+    {
+      "url": "https://docs.blender.org/manual/en/latest/",
+      "title": "Blender",
+      "kind": "mod_asset_export_pipeline"
+    },
+    {
+      "url": "https://wiki.niftools.org/",
+      "title": "NifTools wiki",
+      "kind": "mod_mesh_authoring"
+    },
+    {
+      "url": "https://www.khronos.org/gltf/",
+      "title": "glTF",
+      "kind": "mod_format_specification"
+    },
+    {
+      "url": "https://www.nvidia.com/en-us/geforce/rtx-remix/",
+      "title": "RTX Remix",
+      "kind": "mod_graphics_overhaul"
+    },
+    {
+      "url": "https://www.pcgamingwiki.com/wiki/Home",
+      "title": "PCGamingWiki",
+      "kind": "mod_compatibility_evidence"
+    },
+    {
+      "url": "https://www.protondb.com/",
+      "title": "ProtonDB",
+      "kind": "compatibility_layer_report"
+    },
+    {
+      "url": "https://lutris.net/",
+      "title": "Lutris",
+      "kind": "compatibility_layer_report"
+    },
+    {
+      "url": "https://www.winehq.org/",
+      "title": "Wine",
+      "kind": "compatibility_layer_docs"
+    },
+    {
+      "url": "https://www.dosbox.com/",
+      "title": "DOSBox",
+      "kind": "emulator_core_docs"
+    },
+    {
+      "url": "https://www.scummvm.org/",
+      "title": "ScummVM",
+      "kind": "emulator_core_docs"
+    },
+    {
+      "url": "https://www.romhacking.net/documents/",
+      "title": "ROM patch format docs",
+      "kind": "rom_patch_format"
+    },
+    {
+      "url": "https://www.spriters-resource.com/",
+      "title": "Sprite reference metadata",
+      "kind": "sprite_sheet_catalogue"
+    },
+    {
+      "url": "https://www.models-resource.com/",
+      "title": "Model reference metadata",
+      "kind": "model_turnaround"
+    },
+    {
+      "url": "https://www.sounds-resource.com/",
+      "title": "Sound reference metadata",
+      "kind": "sound_effect_reference"
+    },
+    {
+      "url": "https://www.textures-resource.com/",
+      "title": "Texture reference metadata",
+      "kind": "texture_reference"
+    },
+    {
+      "url": "https://www.vgmaps.com/",
+      "title": "VGMaps level maps",
+      "kind": "level_blueprint_scan"
+    },
+    {
+      "url": "https://tasvideos.org/",
+      "title": "TASVideos",
+      "kind": "tas_route_analysis"
+    },
+    {
+      "url": "https://www.speedrun.com/",
+      "title": "Speedrun.com",
+      "kind": "speedrun_category_rules"
+    },
+    {
+      "url": "https://www.livesplit.org/",
+      "title": "LiveSplit",
+      "kind": "speedrun_tool_documentation"
+    }
+  ]
+}
