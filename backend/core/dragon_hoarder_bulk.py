@@ -43,6 +43,19 @@ def owner_key(scope: dict[str, str]) -> str:
     return hashlib.sha256(b"".join(len(p).to_bytes(4, "big") + p for p in parts)).hexdigest()
 
 
+def _storage_owner(scope,namespace=None):
+    """Internal domain separation for partition-local chunk references.
+
+    None preserves every legacy physical object ID. Namespace must be an
+    operator-created random partition witness, not an HTTP input.
+    """
+    owner=owner_key(scope)
+    if namespace is None:return owner
+    if not isinstance(namespace,str) or not _HASH.fullmatch(namespace):
+        raise ValueError("invalid storage namespace")
+    return hashlib.sha256(b"dragon.manifest.partition.v1\\0"+bytes.fromhex(owner)+bytes.fromhex(namespace)).hexdigest()
+
+
 @dataclass(frozen=True)
 class Volume:
     name: str
@@ -181,8 +194,8 @@ class BulkArchive:
             raise StorageHeld("object integrity failed")
         return raw
 
-    def put(self, volume: str, scope: dict[str, str], raw: bytes) -> Receipt:
-        owner = owner_key(scope)
+    def put(self, volume: str, scope: dict[str, str], raw: bytes, *, namespace=None) -> Receipt:
+        owner = _storage_owner(scope,namespace)
         if not isinstance(raw, bytes) or not 1 <= len(raw) <= MAX_OBJECT:
             raise ValueError("invalid object size")
         digest = hashlib.sha256(raw).hexdigest()
@@ -217,15 +230,15 @@ class BulkArchive:
                     db.execute("ROLLBACK")
                 raise
 
-    def _check_receipt(self, scope, receipt):
-        if (not isinstance(receipt, Receipt) or receipt.scope_key != owner_key(scope)
+    def _check_receipt(self, scope, receipt, *, namespace=None):
+        if (not isinstance(receipt, Receipt) or receipt.scope_key != _storage_owner(scope,namespace)
                 or not _HASH.fullmatch(receipt.digest)
                 or not 1 <= receipt.raw_bytes <= MAX_OBJECT
                 or not 1 <= receipt.compressed_bytes <= MAX_OBJECT + 65536):
             raise StorageHeld("object receipt invalid")
 
-    def read(self, scope: dict[str, str], receipt: Receipt) -> bytes:
-        self._check_receipt(scope, receipt)
+    def read(self, scope: dict[str, str], receipt: Receipt, *, namespace=None) -> bytes:
+        self._check_receipt(scope, receipt,namespace=namespace)
         with self._db(self.volumes[receipt.volume]) as db:
             row = db.execute(
                 "SELECT raw_bytes,compressed_bytes,payload FROM objects WHERE owner=? AND digest=?",
@@ -235,12 +248,12 @@ class BulkArchive:
             raise StorageHeld("object receipt unavailable")
         return self._decode(row[2], row[0], receipt.digest)
 
-    def erase_unreferenced(self, scope: dict[str, str], receipt: Receipt) -> bool:
+    def erase_unreferenced(self, scope: dict[str, str], receipt: Receipt, *, namespace=None) -> bool:
         """Caller MUST establish that no canonical reference retains this object.
 
         Logical removal, not secure physical erasure of WAL/pages/backups.
         """
-        self._check_receipt(scope, receipt)
+        self._check_receipt(scope, receipt,namespace=namespace)
         with self._db(self.volumes[receipt.volume]) as db:
             db.execute("BEGIN IMMEDIATE")
             try:
@@ -277,9 +290,9 @@ class BulkArchive:
         return result
 
 
-    def lookup(self,volume: str,scope:dict[str,str],digest:str)->Receipt|None:
+    def lookup(self,volume: str,scope:dict[str,str],digest:str,*,namespace=None)->Receipt|None:
         """Resolve a previously journaled object after uncertain publication."""
-        owner=owner_key(scope)
+        owner=_storage_owner(scope,namespace)
         if not isinstance(digest,str) or not _HASH.fullmatch(digest):
             raise ValueError("object digest")
         with self._db(self.volumes[volume]) as db:
