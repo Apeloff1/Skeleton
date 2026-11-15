@@ -143,6 +143,7 @@ class DragonCrawlerApplication:
                 [("treasury_watch.enabled",ASCENDING),("treasury_watch.next_due",ASCENDING),
                  ("treasury_watch.claim_until",ASCENDING)]
             )
+            await self.sessions.create_index([("treasury_index.expires_at",ASCENDING)])
             self._indexes_ready = True
 
     async def readiness(self) -> dict[str, Any]:
@@ -1646,6 +1647,33 @@ class DragonCrawlerApplication:
             raise denied from exc
         await self._grant_principal(scope,watch)
         return watch
+
+    async def purge_expired_treasury_segments(self, *, limit:int=8)->dict:
+        """Remove only expired derived postings; preserve original observations.
+
+        CAS includes exact expiry and version. Renewal/revocation/erase wins
+        over cleanup. This frees the materialized cache, not source retention.
+        No new capture or model permission is obtained.
+        """
+        if type(limit) is not int or not 1<=limit<=16:
+            raise ValueError("treasury cleanup is bounded")
+        await self.ensure_indexes()
+        now=_now().timestamp()
+        rows=await self.sessions.find({"status":{"$ne":"deleted"},
+            "treasury_index.expires_at":{"$lte":now}},
+            {"_id":1,"tenant_id":1,"owner_id":1,"version":1,"treasury_index.expires_at":1}
+        ).sort([("treasury_index.expires_at",ASCENDING),("_id",ASCENDING)]).limit(limit).max_time_ms(2000).to_list(limit)
+        purged=0
+        for row in rows:
+            expiry=row.get("treasury_index",{}).get("expires_at")
+            if type(expiry) not in (int,float) or not 0<=expiry<=now:
+                continue
+            result=await self.sessions.update_one({"_id":row["_id"],"tenant_id":row["tenant_id"],
+                "owner_id":row["owner_id"],"version":row["version"],"status":{"$ne":"deleted"},
+                "treasury_index.expires_at":expiry},
+                {"$unset":{"treasury_index":""},"$inc":{"version":1}})
+            purged+=int(bool(result.modified_count))
+        return {"scanned":len(rows),"purged":purged,"source_records_erased":0}
 
     async def recover_treasury_watches(self, *, limit:int=2)->dict:
         """Finite crash-resumable watch pulses through the canonical crawler.
@@ -4294,6 +4322,7 @@ crawler_application = DragonCrawlerApplication()
 async def recover_crawler_runs(*, limit: int = 16) -> dict:
     result=await crawler_application.recover(limit=limit)
     result["treasury_watches"]=await crawler_application.recover_treasury_watches()
+    result["treasury_expired_segments"]=await crawler_application.purge_expired_treasury_segments()
     return result
 
 
