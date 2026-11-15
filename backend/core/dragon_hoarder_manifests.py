@@ -21,9 +21,10 @@ from core.dragon_hoarder_bulk import BulkArchive,Receipt,StorageHeld,owner_key
 BLOCK=2*1024*1024
 MAX_BLOCKS=512
 MAX_DOCUMENT=BLOCK*MAX_BLOCKS
-MAX_MANIFESTS=10_000_000
+MAX_MANIFESTS=1_000_000_000
 HEX=re.compile(r"[a-f0-9]{64}\Z")
 SCHEMA="""
+CREATE TABLE IF NOT EXISTS manifest_counts(owner TEXT PRIMARY KEY,total INTEGER NOT NULL CHECK(total>=0)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS manifests(
  owner TEXT NOT NULL, id TEXT NOT NULL, logical_key TEXT NOT NULL,
  scope_json TEXT NOT NULL, expected_hash TEXT NOT NULL,
@@ -152,10 +153,16 @@ class ManifestArchive:
                 if (row["expected_hash"],row["expected_bytes"])!=(expected_hash,expected_bytes):
                     raise StorageHeld("manifest identity collision")
                 return {"manifest":identifier,"state":row["state"],"replayed":True}
-            if db.execute("SELECT COUNT(*) FROM manifests WHERE owner=?",(owner,)).fetchone()[0]>=MAX_MANIFESTS:
+            count=db.execute("SELECT total FROM manifest_counts WHERE owner=?",(owner,)).fetchone()
+            if count is None:
+                total=db.execute("SELECT COUNT(*) FROM manifests WHERE owner=?",(owner,)).fetchone()[0]
+                db.execute("INSERT INTO manifest_counts VALUES(?,?)",(owner,total))
+            else:total=count["total"]
+            if total>=MAX_MANIFESTS:
                 raise StorageHeld("manifest cap")
             db.execute("INSERT INTO manifests VALUES(?,?,?,?,?,?,'building',?,?)",
                        (owner,identifier,logical_key,json.dumps(scope,sort_keys=True),expected_hash,expected_bytes,now,now))
+            db.execute("UPDATE manifest_counts SET total=total+1 WHERE owner=?",(owner,))
         return {"manifest":identifier,"state":"building","replayed":False}
 
     def _manifest(self,db,owner,identifier,states):
