@@ -4,6 +4,7 @@ import {getAuthToken} from '../../auth/gameforgeAuth';
 import {getDragonTreasury,getTreasuryPassage,configureDragonArchive,configureTreasuryWatch,getCrawl,crawlRequestKey,type CrawlSession,type DragonTreasury,type TreasuryMode,type TreasuryRevision,type TreasuryPassage,type TreasurySearchOptions} from '../../product/crawlerClient';
 import s,{colors} from './CrawlerWorkspace.styles';
 import AnimatedDragon from './companion/DragonCompanion';
+import DragonLegacyTreasuryPanel from './DragonLegacyTreasuryPanel';
 import {INITIAL_DRAGON_STATE} from './companion/dragonCompanionState';
 import {useReducedMotion,useScreenReader} from './companion/useDragonMotion';
 import {usePowerAwareness} from '../../hooks/usePowerAwareness';
@@ -161,6 +162,7 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
   <Text style={s.small}>Keep versions separate. Reparse retained text without new network requests. Current means latest observed, not verified live truth.</Text>
   <Button label={open?'Close treasury':'Open treasury'} action={()=>{setOpen(!open);if(open){invalidate();setResult(null);setBusy(false);}}}/>
   {open&&<>
+   <DragonLegacyTreasuryPanel revision={revision} canWrite={canWrite} disabled={busy||disabled} onChanged={()=>{invalidate();setResult(null);setBusy(false);}}/>
    {terminal&&onSession&&<View style={s.check}>
     <Text style={s.label}>Historical retention for this finished expedition</Text>
     <Text style={s.small}>{session.archive_grant?.active?'Active until '+stamp(session.archive_grant.expires_at!):'No active historical-use grant.'} {session.archive_grant?.usable_sources??0} authorized retained sources.</Text>
@@ -200,6 +202,7 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
     <Text style={s.small}>Hoarder unlock requires discovery ≥800, sufficient authorized historic transitions and at least two current families. Permission changes may change the collection view, not pet health.</Text>
     <Text style={s.label}>Current indexed {visible.current_indexed} · Historic indexed {visible.historic_indexed} · Metadata only {visible.metadata_only}</Text>
     <Text style={s.small}>{visible.families} families · {visible.revisions} versions · {visible.rollbacks} rollbacks · {visible.blocked_current} current families unavailable · {visible.alias_held_families} alias conflicts</Text>
+    <Text style={s.small}>{visible.indexed_observations}/{visible.eligible_observations} permitted observations selected · {visible.legacy_history_sessions} older runtime sessions. Selected-family and historical-date queries reserve capacity for their requested evidence.</Text>
     {visible.invalid_materialized_segments>0&&<Text style={s.small}>An invalid derived index segment was ignored and recompiled from permitted text.</Text>}
     {(visible.candidate_limit_reached||visible.excluded_sessions>0)&&<Text style={s.small}>Bounded or unqualified corpus: this observation cannot establish complete archive coverage.</Text>}
     <Text style={s.heading}>Revision families and revisit recommendations</Text>
