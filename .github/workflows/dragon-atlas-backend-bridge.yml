@@ -59,3 +59,10 @@ jobs:
           PYTHONPATH: ".:backend:tests"
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -m unittest discover -s backend/tests -p 'test_dragon_restorative_recovery.py' -v
+      - name: Exact-revision redundancy and corruption recovery
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m py_compile backend/core/dragon_checkpoint_replica.py backend/core/dragon_crawler.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_checkpoint_replica.py' -v
