@@ -108,6 +108,7 @@ def implementation_digest():
                 "frontier_scheduler.py",
                 "adaptive_navigation.py",
                 "acquisition_feedback.py",
+                "information_portfolio.py",
                 "frontier_coverage.py",
                 "frontier_antichain.py",
                 "federated_activity.py",
@@ -1036,6 +1037,7 @@ class CrawlRun:
             host_ready=state["host_ready"], query=self.request.query,
             now=now, strategy=self.request.frontier_strategy, events=state["events"],
             measurements=state["acquisition_measurements"], robots=state["robots"],
+            remaining_requests=self.request.max_requests - state["usage"]["requests"],
         )
         if item is None:
             return None
