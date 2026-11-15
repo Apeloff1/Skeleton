@@ -464,3 +464,46 @@ def test_completed_native_generation_cannot_be_interrupted(monkeypatch):
     monkeypatch.setattr(backend, "_seal_interrupt_scope", seal)
     assert type(backend.generate(permit(), state())[1]) is bytes
     assert not backend.request_interrupt(tenant_id="alice", request_id="request-1")
+
+@pytest.mark.parametrize("field,value", [
+    ("device_qualified", 0), ("generation", True), ("tokens", True),
+    ("bytes_reserved", True), ("lease_id", "not-a-digest"),
+])
+def test_noncanonical_native_permit_preserves_prompt_grant(field, value):
+    _, registry, backend = setup()
+    malformed = replace(permit(), **{field: value})
+    with pytest.raises(NativeFairStreamDenied, match="canonical permit"):
+        backend.generate(malformed, state(malformed))
+    assert registry.status()["staged"] == 1
+
+
+@pytest.mark.parametrize("damage", ["text", "tokens", "events", "checkpoint", "finish"])
+def test_recomputed_output_digest_cannot_authorize_inconsistent_trajectory(monkeypatch, damage):
+    from skeleton.ai.model_runtime.flgb_model_runtime import digest_json
+    from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig
+
+    runtime, registry, backend = setup()
+    valid = runtime.generate("hello", GenerationConfig(max_new_tokens=2))
+    if damage == "text":
+        forged = replace(valid, text=valid.text + "unbound")
+    elif damage == "tokens":
+        forged = replace(valid, generated_tokens=("wrong",) * len(valid.generated_ids))
+    elif damage == "events":
+        forged = replace(valid, events=valid.events[:-1])
+    elif damage == "checkpoint":
+        forged = replace(valid, checkpoint_digest="invalid")
+    else:
+        forged = replace(valid, finish_reason="stop_token")
+    digest = digest_json({
+        "generated_ids": list(forged.generated_ids), "text": forged.text,
+        "finish_reason": forged.finish_reason,
+    })
+    receipt = replace(forged.replay_receipt, output_digest=digest)
+    events = forged.events
+    if events and events[-1].kind == "completed":
+        events = (*events[:-1], replace(events[-1], detail_digest=receipt.digest))
+    forged = replace(forged, replay_receipt=receipt, events=events)
+    monkeypatch.setattr(NativeLLMRuntime, "generate_sequence", lambda *a, **k: forged)
+    with pytest.raises(NativeFairStreamDenied, match="trajectory mismatch|checkpoint digest"):
+        backend.generate(permit(), state())
+    assert registry.status()["staged"] == 0

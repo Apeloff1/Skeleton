@@ -22,8 +22,8 @@ from .flgb_model_runtime import digest_json
 from .fair_stream_session import DispatchPermit
 from .fair_stream_queue import StreamRequest, WHOLE_REQUEST_SCHEMA
 from .native_llm_runtime import GenerationResult, NativeLLMRuntime
-from .runtime_contracts import GenerationConfig
-from .native_token_pressure import NativeTokenPressureGuard
+from .runtime_contracts import GenerationConfig, ReplayReceipt, RuntimeUsage, RuntimeEvent
+from .native_token_pressure import NativeTokenPressureGuard, _canonical_cpu_permit
 from .native_prompt_budget import NativePromptBudget, PromptBudgetLedger
 
 MAX_PROMPT_BYTES = 64 << 10
@@ -464,10 +464,11 @@ class NativeFairStreamBackend:
     def _pending(
         self, permit: DispatchPermit, state: Mapping[str, object],
     ) -> str:
-        if type(permit) is not DispatchPermit or permit.device_qualified:
+        if not _canonical_cpu_permit(permit):
             raise NativeFairStreamDenied("CPU-only canonical permit required")
         if (type(state) is not dict
                 or state.get("session_id") != self.registry.session_id
+                or type(state.get("generation")) is not int
                 or state.get("generation") != permit.generation
                 or state.get("checkpoint_digest") != permit.checkpoint_digest):
             raise NativeFairStreamDenied("session generation mismatch")
@@ -576,7 +577,9 @@ class NativeFairStreamBackend:
                         if type(result) is not GenerationResult:
                             raise NativeFairStreamDenied("untrusted native generation result")
                         receipt = result.replay_receipt
-                        if (type(result.text) is not str
+                        if (type(receipt) is not ReplayReceipt
+                                or type(result.usage) is not RuntimeUsage
+                                or type(result.text) is not str
                                 or type(result.finish_reason) is not str
                                 or type(result.generated_ids) is not tuple
                                 or any(type(token_id) is not int
@@ -585,7 +588,12 @@ class NativeFairStreamBackend:
                                 or type(result.usage.generated_tokens) is not int
                                 or result.usage.generated_tokens != len(result.generated_ids)
                                 or result.usage.generated_tokens > permit.tokens
+                                or type(result.usage.prompt_tokens) is not int
                                 or result.usage.prompt_tokens != len(sequence.token_ids)
+                                or type(result.usage.total_tokens) is not int
+                                or result.usage.model_bytes != self.runtime.model_bytes
+                                or type(result.usage.kv_peak_bytes) is not int
+                                or not 0 <= result.usage.kv_peak_bytes <= self.runtime.limits.max_kv_bytes
                                 or result.usage.total_tokens != (
                                     len(sequence.token_ids) + len(result.generated_ids)
                                 )
@@ -597,14 +605,40 @@ class NativeFairStreamBackend:
                                 or receipt.request_digest != self.runtime._request_digest(
                                     sequence, config,
                                 )
+                                or type(receipt.seed) is not int
                                 or receipt.seed != config.seed
                                 or receipt.output_digest != digest_json({
                                     "generated_ids": list(result.generated_ids),
                                     "text": result.text,
                                     "finish_reason": result.finish_reason,
                                 })
-                                or result.prompt_sequence.token_ids != sequence.token_ids):
+                                or type(result.prompt_sequence) is not type(sequence)
+                                or result.prompt_sequence != sequence):
                             raise NativeFairStreamDenied("native output attestation mismatch")
+                        # This adapter supplies a fixed positive-length policy
+                        # without stop IDs or stop strings. A shorter trajectory
+                        # is not an authentic completion under that policy.
+                        if (config.stop_token_ids or config.stop_strings
+                                or result.finish_reason != "length"
+                                or len(result.generated_ids) != config.max_new_tokens
+                                or type(result.generated_tokens) is not tuple
+                                or result.generated_tokens != tuple(
+                                    self.runtime.tokenizer.token_text(token_id)
+                                    for token_id in result.generated_ids
+                                )
+                                or result.text != self.runtime.tokenizer.decode_ids(result.generated_ids)
+                                or type(result.events) is not tuple
+                                or not result.events
+                                or len(result.events) > config.max_new_tokens + 4
+                                or any(type(event) is not RuntimeEvent for event in result.events)
+                                or tuple(event.sequence for event in result.events)
+                                != tuple(range(len(result.events)))
+                                or result.events[-1].kind != "completed"
+                                or result.events[-1].detail_digest != receipt.digest
+                                or tuple(event.token_id for event in result.events if event.kind == "token")
+                                != result.generated_ids):
+                            raise NativeFairStreamDenied("native output trajectory mismatch")
+                        _digest(result.checkpoint_digest, "native checkpoint digest")
                         try:
                             output = result.text.encode("utf-8", errors="strict")
                         except UnicodeEncodeError as exc:
