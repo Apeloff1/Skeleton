@@ -11,7 +11,7 @@ import uuid
 from pathlib import Path
 
 from core.exec_guard import execution_disabled_message, require_execution_allowed
-from gameforge.godot_engine.binary import get_binary
+from gameforge.godot_engine.binary import get_binary, reap_process
 from gameforge.godot_engine.logbuffer import get_buffer
 from gameforge.godot_engine.scheduler import JobScheduler, JobStatus, ScheduledJob, scheduler
 
@@ -23,8 +23,11 @@ async def _run_godot(job: ScheduledJob, argv: list[str], timeout: int) -> None:
         job.status = JobStatus.FAILED
         job.error = execution_disabled_message("Godot engine execution")
         return
+    admission = await asyncio.to_thread(get_binary().prepare_execution)
+    argv = [str(admission.path), *argv[1:]]
+    admission.assert_current()
     buf = get_buffer(job.id)
-    buf.append("system", f"exec: {' '.join(argv)}")
+    buf.append("system", "Godot execution admitted")
     proc = await asyncio.create_subprocess_exec(
         *argv,
         stdout=asyncio.subprocess.PIPE,
@@ -34,26 +37,34 @@ async def _run_godot(job: ScheduledJob, argv: list[str], timeout: int) -> None:
 
     async def _pump(stream, name):
         while True:
-            line = await stream.readline()
+            line = await stream.read(4096)
             if not line:
                 return
             buf.append(name, line.decode(errors="replace").rstrip())
 
-    try:
-        await asyncio.wait_for(
-            asyncio.gather(_pump(proc.stdout, "stdout"), _pump(proc.stderr, "stderr")),
-            timeout=timeout,
+    async def finish():
+        _, _, rc = await asyncio.gather(
+            _pump(proc.stdout, "stdout"), _pump(proc.stderr, "stderr"), proc.wait()
         )
+        return rc
+
+    try:
+        rc = await asyncio.wait_for(finish(), timeout=timeout)
     except asyncio.TimeoutError:
-        proc.kill()
-        await proc.wait()
         job.status = JobStatus.TIMED_OUT
         job.error = f"killed after {timeout}s"
         return
+    finally:
+        try:
+            if proc.returncode is None:
+                await reap_process(proc)
+        finally:
+            job._proc = None
 
-    rc = await proc.wait()
     job.result = {
         "returncode": rc,
+        "engine_sha256": admission.sha256,
+        "engine_integrity": admission.integrity,
         "stdout_tail": buf.tail("stdout", 120),
         "stderr_tail": buf.tail("stderr", 60),
     }
@@ -63,7 +74,7 @@ async def _run_godot(job: ScheduledJob, argv: list[str], timeout: int) -> None:
 
 def _argv(job: ScheduledJob) -> list[str]:
     p = job.payload
-    argv = [str(get_binary().path), "--headless"]
+    argv = ["godot", "--headless"]
     if p.get("project_dir"):
         argv += ["--path", p["project_dir"]]
     kind = job.kind
@@ -109,6 +120,18 @@ class GodotPipeline:
         timeout: int = DEFAULT_TIMEOUT,
         **payload,
     ) -> ScheduledJob:
+        runner = scheduler.runner_for(kind)
+        if not 1 <= timeout <= 3600:
+            raise ValueError("invalid job timeout")
+        terminal = {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.TIMED_OUT}
+        if len(self._jobs) >= 256:
+            for old_id, old in list(self._jobs.items()):
+                if old.status in terminal:
+                    self._jobs.pop(old_id)
+                    if len(self._jobs) < 256:
+                        break
+        if len(self._jobs) >= 256:
+            raise ValueError("Godot job capacity reached")
         job_id = uuid.uuid4().hex
         job = ScheduledJob(
             id=job_id,
@@ -120,8 +143,6 @@ class GodotPipeline:
             },
         )
         self._jobs[job_id] = job
-        runner = scheduler.runner_for(kind)
-
         async def execute() -> None:
             job.status = JobStatus.RUNNING
             try:
