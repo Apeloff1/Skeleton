@@ -27,8 +27,10 @@ def _path(*,create=False,scope=None):
             other=Path(raw).expanduser()
             if other.exists() and path.samefile(other):
                 raise GameLearningError("dragon_storage_invalid","Game corpus requires a separate store.",503)
+    from core.dragon_owner_shards import guard_root,owner_path,ShardHeld
+    try:guard_root(path,"corpus")
+    except ShardHeld as exc:raise CatalogueHeld("corpus migration held") from exc
     if scope is not None:
-        from core.dragon_owner_shards import owner_path,ShardHeld
         try:path=owner_path(path,"corpus",scope)
         except ShardHeld as exc:raise CatalogueHeld("corpus shard held") from exc
         for variable in ("SKL_DRAGON_KNOWLEDGE_DB_PATH","SKL_DRAGON_PRACTICE_DB_PATH"):
