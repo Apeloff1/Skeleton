@@ -1517,6 +1517,136 @@ class DragonCrawlerApplication:
             "next_cursor": rows[limit - 1]["_id"] if len(rows) > limit else None,
         }
 
+    async def companion_treasury(self, scope: dict[str, str], *, mode: str,
+                                 query: str = "", family: str | None = None) -> dict:
+        """Read and reparse only qualified retained text; preserve metadata-only lineage.
+
+        Older, expired source rows are not opened as text. Their verified
+        identities prevent stale promotion. Every read remains owner/version
+        fenced. No network, migration, write or grant extension occurs.
+        """
+        from skeleton.ai.webcrawler.dragon_sanctuary import SanctuarySource, project_sanctuary
+        from skeleton.ai.webcrawler.dragon_treasury import MAX_SESSIONS, Observation, build_treasury
+
+        at = _now()
+        when = at.timestamp()
+        _, run_type = _core()
+        metadata = await (
+            self.sessions.find({**scope, "status": {"$ne": "deleted"}}, {"_id": 1, "version": 1})
+            .sort([("updated_at", DESCENDING), ("_id", DESCENDING)])
+            .limit(MAX_SESSIONS + 1).max_time_ms(2000).to_list(MAX_SESSIONS + 1)
+        )
+        capped = len(metadata) > MAX_SESSIONS
+        excluded = 0
+        fence = []
+        observations = []
+        eligible = []
+        revisions = []
+        for item in metadata[:MAX_SESSIONS]:
+            identifier, version = item["_id"], item["version"]
+            row = await self.sessions.find_one(
+                {"_id": identifier, **scope, "version": version},
+                {"_id": 1, "tenant_id": 1, "owner_id": 1, "status": 1, "version": 1,
+                 "consent_expires_at": 1, "request": 1, "request_digest": 1, "consent": 1,
+                 "snapshot": 1, "checkpoint_identity": 1, "source_use_policies": 1},
+                max_time_ms=2000,
+            )
+            if row is None:
+                raise CrawlerError("crawler_treasury_changed", "Treasury changed during reparse.", 409)
+            fence.append((identifier, version))
+            try:
+                snapshot = _plain(row["snapshot"])
+                witness = row.get("checkpoint_identity")
+                if witness is None:
+                    raise ValueError("missing exact primary witness")
+                verify_primary(snapshot, _plain(witness))
+                runtime = run_type.from_snapshot(snapshot)
+                binding = snapshot["binding"]
+                if (row["status"] == "deleted" or binding["scope"] != scope
+                        or binding["consent"] != _plain(row["consent"])
+                        or _utc(row["consent_expires_at"]).timestamp() != binding["consent"]["expires_at"]
+                        or binding["request_digest"] != row["request_digest"]
+                        or _digest(_plain(row["request"])) != row["request_digest"]):
+                    raise ValueError("treasury owner or grant mismatch")
+                policies = self._source_policies(row)
+                if set(policies) - set(snapshot["sources"]):
+                    raise ValueError("orphaned source policy")
+                usable = []
+                local = []
+                # Metadata-only history may be retained by the existing
+                # owner checkpoint; no expired source text enters the index.
+                for source in sorted(runtime.sources(), key=lambda val: (
+                    val["fetched_at"], val["source_id"]), reverse=True):
+                    stamp = source["fetched_at"]
+                    if stamp > when + 300:
+                        raise ValueError("future archive observation")
+                    policy = policies.get(source["source_id"], {"enabled": True,
+                                          "max_age_seconds": MAX_SOURCE_AGE_SECONDS})
+                    fresh = None
+                    if (row["status"] != "cancelled" and policy["enabled"]
+                            and _utc(row["consent_expires_at"]) > at
+                            and stamp + policy["max_age_seconds"] > when):
+                        fresh = self._capture_freshness(row, source)
+                    allowed = bool(fresh and fresh["usable"])
+                    expiry = datetime.fromisoformat(fresh["valid_until"]).timestamp() if allowed else None
+                    if expiry is not None and expiry <= when:
+                        allowed, expiry = False, None
+                    freshness = source["provenance"].get("http_freshness", {})
+                    # Different declared language/representation and sensitive
+                    # Vary boundaries must not be collapsed by a fuzzy title.
+                    variant = _digest({
+                        "languages": freshness.get("languages", []),
+                        "vary": freshness.get("vary_dimensions", []),
+                        "sensitive": (str(identifier) + ":" + source["source_id"])
+                                     if freshness.get("sensitive_vary") or freshness.get("private") else None,
+                    })
+                    refresh_allowed = (row["status"] != "cancelled" and policy["enabled"]
+                                       and not freshness.get("private") and not freshness.get("sensitive_vary")
+                                       and not freshness.get("no_store"))
+                    # Stale source text remains unavailable. A fresh grant
+                    # may be proposed from previously authorized public URL
+                    # metadata only when the owner has not withdrawn it.
+                    local.append(Observation(
+                        str(identifier), source["source_id"], source["fetched_url"],
+                        source["content_hash"], stamp, source["text"] if allowed else None,
+                        expiry, source["content_type"], variant,
+                        freshness.get("advisory_due_unix"),
+                        not source["text_truncated"], refresh_allowed,
+                    ))
+                    if allowed:
+                        usable.append(SanctuarySource(
+                            str(identifier), source["source_id"], source["content_hash"],
+                            source["fetched_url"], source["content_type"], source["text"],
+                            row["request"].get("query", ""), stamp, expiry,
+                        ))
+                observations.extend(local)
+                if len(usable) > 16:
+                    capped = True
+                eligible.extend(usable[:16])
+                revisions.append({"session_id": str(identifier), "version": int(version),
+                                  "snapshot_digest": snapshot["snapshot_digest"]})
+            except (CrawlerError, CheckpointReplicaError, ValueError, KeyError, TypeError, RecursionError):
+                excluded += 1
+        try:
+            growth = project_sanctuary(eligible, as_of=when, selected_sessions=revisions,
+                                       excluded_sessions=excluded,
+                                       candidate_limit_reached=capped)["collection_index"]
+            result = build_treasury(observations, as_of=when, growth=growth, mode=mode, query=query,
+                                    family=family, candidate_limit_reached=capped, excluded_sessions=excluded)
+        except ValueError as exc:
+            raise CrawlerError("crawler_treasury_invalid", "Treasury reparse could not be qualified.", 422) from exc
+        for identifier, version in fence:
+            check = await self.sessions.find_one(
+                {"_id": identifier, **scope, "version": version, "status": {"$ne": "deleted"}},
+                {"_id": 1}, max_time_ms=2000,
+            )
+            if check is None:
+                raise CrawlerError("crawler_treasury_changed", "Treasury changed during reparse.", 409)
+        expiry = result["earliest_source_expiry"]
+        if expiry is not None and expiry <= _now().timestamp():
+            raise CrawlerError("crawler_treasury_changed", "Source permission expired during reparse.", 409)
+        return {"ok": True, **result}
+
     async def companion_sanctuary(self, scope: dict[str, str]) -> dict:
         """Bounded cross-expedition collection, using only current source consent.
 
