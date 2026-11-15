@@ -7,7 +7,10 @@ coverage is based on canonical URL metadata, never source body instructions.
 """
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
+from types import MappingProxyType
+from typing import Mapping
 import math
 import re
 import unicodedata
@@ -97,37 +100,49 @@ def _family(url: str) -> str:
             + "/".join(paths) + "?" + ",".join(keys))[:2048]
 
 
-def measure_frontier_coverage(
-    url: str, *, sources: dict, query: str,
-    depth: int, attempts: int,
-) -> CoveragePriority:
-    """Rank *one already admitted* candidate without reading external text.
+@dataclass(frozen=True)
+class CoverageIndex:
+    """Ephemeral projection of one canonical source set and operator query."""
+    wanted: frozenset[str]
+    observed: frozenset[str]
+    hosts: Mapping[str, int]
+    families: Mapping[str, int]
 
-    Source URL distribution helps prioritize underrepresented portions of
-    a permitted crawl. This is not a model-generated expansion and cannot
-    be called to issue a request.
-    """
-    host = _validate_url(url)
+
+def build_coverage_index(*, sources: dict, query: str) -> CoverageIndex:
     if (not isinstance(sources, dict) or len(sources) > MAX_SOURCE_URLS
-            or not isinstance(query, str) or len(query) > 1024
-            or type(depth) is not int or not 0 <= depth <= _MAX_CANDIDATE_DEPTH
-            or type(attempts) is not int or not 0 <= attempts <= 128):
+            or not isinstance(query, str) or len(query) > 1024):
         raise ValueError("frontier coverage input capacity exceeded")
-    query_terms = sorted(_unicode_terms(query))[:MAX_TERM_COUNT]
-    wanted = frozenset(query_terms)
+    wanted = frozenset(sorted(_unicode_terms(query))[:MAX_TERM_COUNT])
     observed = set()
-    by_host = by_family = 0
-    family = _family(url)
+    hosts: Counter[str] = Counter()
+    families: Counter[str] = Counter()
     for source in sources.values():
         if not isinstance(source, dict):
             raise ValueError("invalid retained source metadata")
         source_url = source.get("canonical_url")
-        source_host = _validate_url(source_url)
+        host = _validate_url(source_url)
         observed.update(_url_tokens(source_url) & wanted)
-        if source_host == host:
-            by_host += 1
-        if _family(source_url) == family:
-            by_family += 1
+        hosts[host] += 1
+        families[_family(source_url)] += 1
+    return CoverageIndex(wanted, frozenset(observed),
+                         MappingProxyType(dict(hosts)), MappingProxyType(dict(families)))
+
+
+def score_indexed_candidate(
+    url: str, *, index: CoverageIndex, depth: int, attempts: int,
+) -> CoveragePriority:
+    """Reuse a bounded snapshot projection; no per-candidate source scan."""
+    host = _validate_url(url)
+    if (not isinstance(index, CoverageIndex)
+            or type(depth) is not int or not 0 <= depth <= _MAX_CANDIDATE_DEPTH
+            or type(attempts) is not int or not 0 <= attempts <= 128):
+        raise ValueError("frontier coverage input capacity exceeded")
+    wanted = index.wanted
+    observed = index.observed
+    family = _family(url)
+    by_host = index.hosts.get(host, 0)
+    by_family = index.families.get(family, 0)
     tokens = _url_tokens(url)
     overlap = len(tokens & wanted) / len(wanted) if wanted else 0.0
     unmet = wanted - observed
@@ -151,4 +166,14 @@ def measure_frontier_coverage(
         operator_term_overlap=round(overlap, 8),
         uncovered_operator_overlap=round(unmet_overlap, 8),
         score=round(score, 8),
+    )
+
+
+def measure_frontier_coverage(
+    url: str, *, sources: dict, query: str, depth: int, attempts: int,
+) -> CoveragePriority:
+    """Compatibility API for a single already-admitted candidate."""
+    return score_indexed_candidate(
+        url, index=build_coverage_index(sources=sources, query=query),
+        depth=depth, attempts=attempts,
     )
