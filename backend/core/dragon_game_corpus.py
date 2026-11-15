@@ -284,3 +284,22 @@ class GameCorpus:
                             "verified":False} for row in rows[:limit]],
                 "next_cursor":rows[limit-1]["source_id"] if len(rows)>limit else None,
                 "crawl_authorized":False,"source_use_authorized":False}
+
+
+    def capture_plan(self,scope,game,source,observation_digest):
+        """Resolve exactly one current catalogue entry, not a URL supplied to dispatch."""
+        owner=owner_key(scope)
+        game,source,observation_digest=map(_id,(game,source,observation_digest))
+        with self._db() as db:
+            row=db.execute("""SELECT s.url,s.kind,s.language,o.digest,o.payload
+                FROM sources s JOIN observations o ON o.owner=s.owner AND o.game=s.game
+                AND o.source=s.id AND o.event_key=s.latest_event
+                WHERE s.owner=? AND s.game=? AND s.id=?""",(owner,game,source)).fetchone()
+        if not row or row["digest"]!=observation_digest:
+            raise CatalogueHeld("source candidate changed or unavailable")
+        payload=json.loads(row["payload"])
+        if digest(payload)!=observation_digest or source_url(row["url"])!=payload["source"]:
+            raise CatalogueHeld("source observation witness changed")
+        return {"game_id":game,"source_id":source,"observation_digest":observation_digest,
+                "url":row["url"],"kind":row["kind"],"language":row["language"],
+                "title":payload["title"],"crawl_authorized":False,"wiki_approved":False}
