@@ -176,3 +176,9 @@ def test_game_provider_environment_remains_explicitly_source_retained() -> None:
     assert "game-environment" in retained[0]["owner"]
     assert "outside credential-provider AI tree" in retained[0]["reason"]
     assert all(record.get("source") != source for record in manifest["mappings"])
+
+
+def test_guarded_admission_primitives_are_security_owned() -> None:
+    assert (ROOT / "skeleton/admission/__init__.py").is_file()
+    p = placement_for_path(load_machine_config(ROOT), "skeleton/admission/__init__.py")
+    assert (p.zone, p.owner, p.lifecycle) == ("security", "security-plane", "canonical")
