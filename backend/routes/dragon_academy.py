@@ -2776,6 +2776,19 @@ async def crawler_readiness(owner: str = Depends(_principal)) -> dict:
     return await _crawler_result(crawler_application.readiness())
 
 
+@router.get("/crawler/companion/treasury")
+async def crawler_companion_treasury(
+    mode: str = Query(default="current_only", pattern=r"^(current_only|historic_only|all_revisions|timeline|compare)$"),
+    query: str = Query(default="", max_length=256),
+    family: str | None = Query(default=None, pattern=r"^[a-f0-9]{64}$"),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    """Read-only current/history reparse; every source remains policy-bound."""
+    return await _crawler_result(crawler_application.companion_treasury(
+        scope, mode=mode, query=query, family=family,
+    ))
+
+
 @router.get("/crawler/companion/sanctuary")
 async def crawler_companion_sanctuary(scope: dict = Depends(_crawler_scope)) -> dict:
     """Read-only owner sanctuary; no extra crawl, consent or training rights."""
