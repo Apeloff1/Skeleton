@@ -79,6 +79,37 @@ def _check_file(info: os.stat_result, max_bytes: int) -> None:
         raise PrivateSQLiteUnavailable("untrusted private SQLite inode or file budget")
 
 
+def _check_sidecars(directory_fd: int, filename: str, max_bytes: int, *, create: bool = False) -> None:
+    """Validate sidecar inodes before SQLite can interpret or recover them.
+
+    A legitimate hot rollback journal must remain available to SQLite.
+    Never unlink or truncate recovery data. WAL and SHM are unsupported by
+    this DELETE-journal adapter. This is not same-UID race protection.
+    """
+    for suffix in ("-journal", "-wal", "-shm"):
+        try:
+            info = os.stat(filename + suffix, dir_fd=directory_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            continue
+        if create or suffix != "-journal":
+            raise PrivateSQLiteUnavailable("unexpected SQLite sidecar; explicit recovery required")
+        try:
+            _check_file(info, 2 * max_bytes + (1 << 20))
+        except PrivateSQLiteUnavailable as exc:
+            raise PrivateSQLiteUnavailable("untrusted SQLite rollback journal sidecar") from exc
+
+
+def _confirm_directory_path(directory_fd: int, path: str) -> None:
+    """Confirm all pathname components still lead to the retained directory."""
+    reopened = _directory_fd(path)
+    try:
+        held, found = os.fstat(directory_fd), os.fstat(reopened)
+        if (held.st_dev, held.st_ino) != (found.st_dev, found.st_ino):
+            raise PrivateSQLiteUnavailable("SQLite directory path custody changed")
+    finally:
+        os.close(reopened)
+
+
 @dataclass(slots=True)
 class PrivateSQLiteHandle:
     """Caller-owned lifetime for one verified SQLite connection and file descriptor."""
@@ -112,6 +143,7 @@ class PrivateSQLiteHandle:
                     or directory.st_uid != os.geteuid()
                     or directory.st_mode & 0o077):
                 raise PrivateSQLiteUnavailable("private directory custody changed")
+            _check_sidecars(self._directory_fd, self._filename, self._max_database_bytes)
             fd_info = os.fstat(self._file_fd)
             entry = os.stat(
                 self._filename, dir_fd=self._directory_fd,
@@ -139,7 +171,9 @@ class PrivateSQLiteHandle:
                 ).fetchone() is not None
             ):
                 raise PrivateSQLiteUnavailable("unexpected SQLite temporary objects")
+            _confirm_directory_path(self._directory_fd, os.path.dirname(by_name["main"]))
             actual = os.stat(by_name["main"], follow_symlinks=False)
+            _check_file(actual, self._max_database_bytes)
             if (actual.st_dev, actual.st_ino) != (
                 fd_info.st_dev, fd_info.st_ino,
             ):
@@ -221,7 +255,9 @@ def open_private_sqlite(
     file_fd: int | None = None
     connection: sqlite3.Connection | None = None
     try:
+        _check_sidecars(dir_fd, filename, max_database_bytes, create=create)
         flags = os.O_RDWR | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+        flags |= getattr(os, "O_NONBLOCK", 0)
         if create:
             flags |= os.O_CREAT | os.O_EXCL
         file_fd = os.open(filename, flags, 0o600, dir_fd=dir_fd)
@@ -229,12 +265,15 @@ def open_private_sqlite(
         _check_file(before, max_database_bytes)
         # The pathname is only used within an already validated private
         # directory. mode=rw forbids SQLite from creating a replacement.
+        _confirm_directory_path(dir_fd, raw)
         path = str(Path(raw) / filename)
         uri = "file:" + quote(path, safe="/") + "?mode=rw"
         connection = sqlite3.connect(
             uri, uri=True, timeout=1.0, isolation_level=None,
             check_same_thread=check_same_thread,
         )
+        _confirm_directory_path(dir_fd, raw)
+        _check_sidecars(dir_fd, filename, max_database_bytes)
         after = os.stat(filename, dir_fd=dir_fd, follow_symlinks=False)
         opened = os.fstat(file_fd)
         _check_file(after, max_database_bytes)
@@ -282,9 +321,11 @@ def open_private_sqlite(
         connection.execute("PRAGMA journal_size_limit = 65536")
         if connection.execute("PRAGMA quick_check(1)").fetchone()[0] != "ok":
             raise PrivateSQLiteUnavailable("SQLite integrity check failed")
-        return PrivateSQLiteHandle(
+        handle = PrivateSQLiteHandle(
             connection, file_fd, dir_fd, filename, max_database_bytes,
         )
+        handle.assert_current()
+        return handle
     except BaseException:
         if connection is not None:
             connection.close()
