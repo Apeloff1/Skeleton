@@ -35,6 +35,10 @@ from .structured_discovery import (
 from .frontier_scheduler import choose_frontier
 from .frontier_circuit import evaluate_frontier_candidate
 from .host_backpressure import consent_bounded_retry_after, origin_throttle
+from .source_instruction_guard import (
+    incident_receipt, incident_summary, inspect_extracted, inspect_response,
+    inspect_robots_comments, validate_incidents,
+)
 from .robots_rate import combine_robots_pacing
 from .capture_rights import source_capture_rights
 from .http_freshness import (
@@ -88,6 +92,7 @@ def implementation_digest():
                 "dns_binding.py",
                 "research.py",
                 "dragon_mission_quality.py",
+                "source_instruction_guard.py",
                 "structured_discovery.py",
                 "document_formats.py",
                 "frontier_scheduler.py",
@@ -339,6 +344,7 @@ class CrawlRun:
             "robots": {},
             "sources": {},
             "events": [],
+            "instruction_incidents": [],
             "stop_reason": None,
             "pending_dispatch": None,
         }
@@ -401,6 +407,7 @@ class CrawlRun:
             "robots",
             "sources",
             "events",
+            "instruction_incidents",
             "stop_reason",
             "pending_dispatch",
         }:
@@ -613,6 +620,11 @@ class CrawlRun:
                 asdict(EvidenceObservation.from_document(fragment, request.query))
             ):
                 raise CrawlOperationError("source observation mismatch")
+        try:
+            validate_incidents(state.get("instruction_incidents"),
+                               sequence=state["sequence"], requests=usage["requests"])
+        except ValueError as exc:
+            raise CrawlOperationError("instruction incident custody invalid") from exc
         events = state.get("events")
         if not isinstance(events, list) or len(events) > 64:
             raise CrawlOperationError("event history bound exceeded")
@@ -696,6 +708,7 @@ class CrawlRun:
             "frontier_count": len(state["frontier"]),
             "next_ready_at": min(ready) if ready else None,
             "source_count": len(state["sources"]),
+            "instruction_security": incident_summary(state["instruction_incidents"]),
             "stop_reason": state["stop_reason"],
             "consent_expires_at": state["binding"]["consent"]["expires_at"],
             "consent_current": now < state["binding"]["consent"]["expires_at"],
@@ -728,6 +741,8 @@ class CrawlRun:
         _integer(limit, 1, 8, "search limit")
         hits = []
         for source in self._state["sources"].values():
+            if inspect_extracted(source["title"], source["text"]).held:
+                continue
             for passage in rank_query_passages(source["text"], query, limit=limit):
                 span = passage.span
                 hits.append(
@@ -774,6 +789,21 @@ class CrawlRun:
         }
         event["event_digest"] = _digest(event)
         self._state["events"] = (self._state["events"] + [event])[-64:]
+        return event
+
+    def _record_instruction(self, observation, *, url, event, retain_fingerprint):
+        # Incident lifetime is the same as the canonical run snapshot, not the
+        # 64-event display ring. Each observation corresponds to one charged
+        # response. No source bytes or attacker-supplied instructions are copied.
+        receipt = incident_receipt(observation, url=url, sequence=event["sequence"],
+                                   retain_fingerprint=retain_fingerprint)
+        self._state["instruction_incidents"].append(receipt)
+
+    def _quarantine_instruction(self, item, observation, *, now, url, retain_fingerprint):
+        self._finish_item(item)
+        event = self._event("rejected", now=now, url=url, reason="external_instruction_quarantined")
+        self._record_instruction(observation, url=url, event=event,
+                                 retain_fingerprint=retain_fingerprint)
         return event
 
     def _control(self, action, now=None):
@@ -1056,7 +1086,15 @@ class CrawlRun:
                     # Explicit host-scope opt-in. Metadata roots do not
                     # bypass depth, robots or network byte reservations.
                     self._enqueue(sitemap_url, depth=0, parent_url=None)
-            return self._event("robots", now=now, url=fetch_url, reason=f"http_{response.status}")
+            event = self._event("robots", now=now, url=fetch_url, reason=f"http_{response.status}")
+            if response.status == 200 and ctype == "text/plain":
+                observation = inspect_robots_comments(response.body)
+                if observation.held:
+                    # REP allow/disallow remains authoritative for its limited
+                    # purpose; arbitrary comments have no operational authority.
+                    self._record_instruction(observation, url=fetch_url, event=event,
+                                             retain_fingerprint=False)
+            return event
         # Denied and failed responses are not documents or discovery inputs.
         # Never inspect their bodies, MIME hints, or Link headers for work.
         if not 200 <= response.status < 300:
@@ -1106,6 +1144,10 @@ class CrawlRun:
                 directives=tuple(sorted(set((*rights.directives,"no-store")))),
                 source=tuple(sorted(set((*rights.source,"http_cache_control")))),
             )
+        observation = inspect_response(url, ctype, response.body)
+        if observation is not None and observation.held:
+            return self._quarantine_instruction(item, observation, now=now, url=url,
+                                                retain_fingerprint=rights.retain)
         # HTTP Link pagination/feeds use the same exact, metered
         # canonical worker as HTML links; malformed headers are inert.
         try:
@@ -1190,8 +1232,8 @@ class CrawlRun:
                     reason=f"{discovery.kind}:{admitted}_frontier_links_admitted"
                     + (":bounded" if discovery.capped else ""),
                 )
-        self._finish_item(item)
         if not 200 <= response.status < 300 or ctype not in self.policy.allowed_content_types:
+            self._finish_item(item)
             return self._event(
                 "rejected", now=now, url=url, reason=f"http_{response.status}_or_unsupported_type"
             )
@@ -1204,7 +1246,13 @@ class CrawlRun:
         except (DocumentFormatError, UnicodeError, ValueError):
             doc = None
         if doc is None:
+            self._finish_item(item)
             return self._event("rejected", now=now, url=url, reason="empty_document")
+        observation = inspect_extracted(doc.title, doc.text)
+        if observation.held:
+            return self._quarantine_instruction(item, observation, now=now, url=url,
+                                                retain_fingerprint=rights.retain)
+        self._finish_item(item)
         if not rights.retain:
             if rights.follow:
                 for link in dict.fromkeys((*doc.links, *header_links)):
