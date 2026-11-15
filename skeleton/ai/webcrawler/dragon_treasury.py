@@ -18,6 +18,7 @@ from urllib.parse import urlsplit
 
 from .dragon_companion import _lexemes, _signature, _similarity
 from .dragon_revisit_model import ChangeSample, infer_revisit
+from .dragon_temporal_selection import family_identity, select_candidates
 
 SCHEMA = "skeleton.dragon.treasury.v1"
 PARSER = "retained-text-sections-v3"
@@ -219,7 +220,8 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
                 or not 0<=alias["captured_at"]<=as_of+300
                 or not isinstance(alias["content_hash"],str) or not _HEX.fullmatch(alias["content_hash"])):
             raise ValueError("invalid archive alias receipt")
-        blockers[alias["url"]].append(alias)
+        if observed_before is None or alias["captured_at"]<=observed_before:
+            blockers[alias["url"]].append(alias)
     grouped = defaultdict(list)
     identities = set()
     for row in observations:
@@ -230,13 +232,13 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
         identities.add(identity)
         # Exact fetched URL and representation boundary: never merge different
         # routes by a publisher canonical tag, title, redirect or fuzzy match.
-        family_id = _digest({"url":row.url,"media":row.media,"variant":row.variant})
-        grouped[family_id].append(row)
+        if observed_before is None or row.captured_at<=observed_before:
+            grouped[family_identity(row)].append(row)
     if len({x.session_id for x in observations})>MAX_SESSIONS:
         raise ValueError("archive expedition capacity exceeded")
-    ordered = sorted((x for x in observations if x.text is not None),
-                     key=lambda x:(-x.captured_at,x.session_id,x.source_id))
-    indexed = ordered[:MAX_INDEXED]
+    selected_observations=[row for rows in grouped.values() for row in rows]
+    ordered = [row for row in selected_observations if row.text is not None]
+    indexed=select_candidates(grouped,budget=MAX_INDEXED,family=family,observed_before=observed_before)
     # Exact retained-text memoization; full-source hash alone is not a
     # sufficient key when a source was truncated. No cross-request cache.
     index, memo = {}, {}
@@ -335,7 +337,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
         alias_conflict = any(a["captured_at"]>=rows[-1].captured_at and
                              a["content_hash"]!=rows[-1].content_hash for a in blockers.get(rows[-1].url,()))
         alias_held += int(alias_conflict)
-        current_available=latest["indexed"] and latest["latest_access"] and not alias_conflict
+        current_available=latest["indexed"] and latest["latest_access"] and not alias_conflict and observed_before is None
         # Keep an earlier authorized payload available only to the historic
         # plane when a newer variant-unknown receipt contradicts it.
         blocked_current+=int(not current_available)
@@ -361,7 +363,9 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
                          "current_revision":latest["revision_id"],"first_seen":versions[0]["first_seen"],
                          "last_seen":latest["last_seen"],"current_indexed":current_available,
                          "simultaneous_conflict":tied,"alias_conflict":alias_conflict,"revisit":_revisit(rows,as_of),
-                         "refresh_url":rows[-1].url if rows[-1].refresh_allowed and not tied else None})
+                         "refresh_url":rows[-1].url if rows[-1].refresh_allowed and not tied and observed_before is None else None})
+        if observed_before is not None:
+            families[-1]["revisit"]["ready_for_review"]=False
         if alias_conflict:
             # The ambiguous receipt cannot itself authorize work. A new grant
             # from the previously admitted URL can resolve it after a floor.
@@ -369,28 +373,17 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
             revisit=families[-1]["revisit"]
             revisit["due_at"]=max(revisit["due_at"],hold)
             revisit["interval_seconds"]=revisit["due_at"]-rows[-1].captured_at
-            revisit["ready_for_review"]=bool(rows[-1].refresh_allowed and not tied and as_of>=revisit["due_at"])
+            revisit["ready_for_review"]=bool(observed_before is None and rows[-1].refresh_allowed and not tied and as_of>=revisit["due_at"])
         if len(versions)>1 and not tied and not alias_conflict and latest["delta"]["kind"]!="changed_unclassified":
             comparisons[fid]={"current":latest,"previous":versions[-2],"delta":latest["delta"]}
     # Explicitly separate index corpora before computing document frequency.
     # Historic pages cannot leak into current-only scoring via IDF.
     if mode=="at_time":
-        # Historical time travel uses the as-observed latest version, and
-        # only when a permitted exact representative existed by that cutoff.
-        # Later identical observations do not retroactively certify the past.
-        cutoffs={}
-        for v in revisions:
-            if v["first_seen"]<=observed_before:
-                previous=cutoffs.get(v["family_id"])
-                if previous is None or v["first_seen"]>previous["first_seen"]:
-                    cutoffs[v["family_id"]]=v
-                elif v["first_seen"]==previous["first_seen"]:
-                    cutoffs[v["family_id"]]={**v,"indexed":False}
-        allowed=[v for fid,v in cutoffs.items() if v["indexed"] and (family is None or family==fid)
-                 and v["indexed_capture_at"]<=observed_before
-                 and not any(v["indexed_capture_at"]<=a["captured_at"]<=observed_before
-                             and a["content_hash"]!=version_content[v["revision_id"]]
-                             for a in blockers.get(grouped[fid][-1].url,()))]
+        # Build the lineage from observations at/before the requested cutoff.
+        # All results remain history-plane evidence, not present-day context.
+        held_by_family={f["family_id"] for f in families if f["simultaneous_conflict"] or f["alias_conflict"]}
+        allowed=[v for v in revisions if v["indexed"] and v["latest_observed"]
+                 and v["family_id"] not in held_by_family and (family is None or v["family_id"]==family)]
     else:
         allowed = [v for v in revisions if v["indexed"] and (family is None or v["family_id"]==family)
                    and (mode in {"all_revisions","timeline","compare"} or
@@ -419,7 +412,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
                     +.25*min(1.,verified_families/4)*min(1.,historic_count/4)
                     +.20*current_ratio*min(1.,historic_count/4)
                     +.15*min(1.,revalidated/4)*min(1.,historic_count/4))))
-    qualified=(not capped and not excluded_sessions and verified_transitions>=3 and verified_families>=2
+    qualified=(observed_before is None and not capped and not excluded_sessions and verified_transitions>=3 and verified_families>=2
                and current_count>=2)
     # Deficit-style round robin of due origins. Within each origin prioritize
     # expected stale loss per retained-text cost, not repeated request count.
@@ -448,7 +441,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
     # The receipt binds exact observations, parser identity, index partition
     # and projection content without emitting old source text.
     partition_digest=_digest({"parser":PARSER,"families":sorted(({k:v for k,v in f.items() if k not in {"revisit","refresh_url"}} for f in families),key=lambda f:f["family_id"]),
-                             "revisions":revisions,"alias_blockers":sorted((_digest(a) for a in aliases))})
+                             "revisions":revisions,"alias_blockers":sorted(_digest(a) for a in aliases if observed_before is None or a["captured_at"]<=observed_before)})
     chosen=comparisons.get(family) if mode=="compare" and family else None
     if left is not None:
         by_id={v["revision_id"]:v for v in revisions if v["family_id"]==family}
@@ -475,7 +468,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
             "observed_before":observed_before,"page_offset":offset,"next_cursor":next_cursor,
             "query_scope_digest":scope_digest,"comparison_selection":None if left is None else {"left":left,"right":right},
             "as_of_unix":as_of,"partition_digest":partition_digest,"candidate_limit_reached":capped,
-            "excluded_sessions":excluded_sessions,"observations":len(observations),
+            "excluded_sessions":excluded_sessions,"observations":len(selected_observations),
             "families":len(families),"revisions":len(revisions),"changed_families":changed_families,
             "rollbacks":rollbacks,"current_indexed":current_count,"historic_indexed":historic_count,
             "metadata_only":len(revisions)-current_count-historic_count,
@@ -488,4 +481,5 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
             "comparison":chosen,
             "earliest_source_expiry":min((x.usable_until for x in indexed),default=None),
             "latest_observed_only":True,"source_text_returned":False,"network_executed":False,
+            "index_admission":"temporal_diversity_v1","eligible_observations":len(ordered),"indexed_observations":len(indexed),
             "training_permission":False,"fresh_consent_required":True}
