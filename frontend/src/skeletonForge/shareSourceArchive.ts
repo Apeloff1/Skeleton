@@ -15,11 +15,23 @@ export async function shareGodotSourceArchive(
   if (!stillCurrent()) throw new Error('Godot source export cancelled because the account changed');
   // The builder independently applies a hard file/source/ZIP byte budget
   // before any platform-native dependencies or memory-heavy work.
-  const archive = buildGodotSourceArchive(payload);
-  // Snapshot in the same synchronous turn as ZIP construction. Hash the
-  // exact strings that produced the ZIP, not live references after await.
+  // Freeze the exact bounded input before both ZIP construction and
+  // asynchronous hashing. The returned HTTP JSON contains plain own fields.
+  // Reject an oversized inventory before copying its references.
+  if (!payload.files || !payload.source_manifest?.files
+      || Object.keys(payload.files).length > 256
+      || Object.keys(payload.source_manifest.files).length > 256) {
+    throw new Error('Godot source export inventory is missing or oversized');
+  }
   const files = Object.freeze({ ...payload.files! });
   const expected = Object.freeze({ ...payload.source_manifest!.files! });
+  const snapshot: RunPayload = {
+    succeeded: payload.succeeded,
+    files,
+    source_manifest: { ...payload.source_manifest, files: expected },
+    source_export: payload.source_export ? { ...payload.source_export } : undefined,
+  };
+  const archive = buildGodotSourceArchive(snapshot);
   const Crypto = await import('expo-crypto');
   const digest = Crypto.CryptoDigestAlgorithm.SHA256;
   const sorted = Object.keys(files).sort();

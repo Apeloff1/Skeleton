@@ -259,3 +259,29 @@ def test_emit_original_native_receipt_matches_exact_source_manifest(monkeypatch)
     assert receipt["applied"] == {"pipeline.cargo_capacity": 3.0, "pipeline.shipment_quota": 8.0}
     assert ctx["playable_mechanics_receipt"]["applied_axes"] == {"grind": 1.0, "scarcity": 0.0}
     assert SOURCE_PATH in source_manifest(ctx["files"])["files"]
+
+
+@pytest.mark.parametrize("paths", [
+    {"project.godot": "ok", "Assets": "leaf", "assets/item.txt": "child"},
+    {"project.godot": "ok", "assets/item.txt": "child", "Assets": "leaf"},
+    {"project.godot": "ok", "Assets/a.txt": "a", "assets/b.txt": "b"},
+    {"project.godot": "ok", "assets/../bad.txt": "bad"},
+    {"project.godot": "ok", "assets/invalid.txt": "\ud800"},
+    {"assets/item.txt": "missing project"},
+    {"project.godot": "ok", 7: "foreign key"},
+    {"project.godot": "ok", "assets/item.txt": None},
+])
+def test_portable_server_source_budget_rejects_invalid_inventories(paths):
+    from backend.routes.skeleton_gameforge import _portable_source_size
+    assert _portable_source_size(paths) is None
+
+
+def test_portable_server_source_byte_count_is_bounded_and_unicode_exact(monkeypatch):
+    from backend.routes import skeleton_gameforge as route
+    assert route._portable_source_size({"project.godot": "å😀", "data/a.txt": "界"}) == 9
+    monkeypatch.setattr(route, "_MAX_PORTABLE_SOURCE_BYTES", 8)
+    assert route._portable_source_size({"project.godot": "界" * 3}) is None
+    assert route._portable_source_size({"project.godot": "a" * 9}) is None
+    assert route._portable_source_size({"project.godot": "a" * 8}) == 8
+    monkeypatch.setattr(route, "_MAX_PORTABLE_ZIP_BYTES", 24)
+    assert route._portable_source_size({"project.godot": "ok"}) is None

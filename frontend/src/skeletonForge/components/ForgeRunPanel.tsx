@@ -112,7 +112,9 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
               <Fact k="Ledger" v={sum.ledgerValid === null ? '—' : sum.ledgerValid ? 'valid' : 'INVALID'} />
               {payload.forge?.playable_archetype ? <Fact k="Playable scene" v={payload.forge.playable_archetype} /> : null}
               {payload.playable_mechanics ? (
-                <Fact k="Native mechanics tuning" v={payload.playable_mechanics.source_verified === true
+                <Fact k="Native mechanics tuning" v={nativeControls?.state === 'unavailable'
+                  ? 'Source tuning not verified'
+                  : payload.playable_mechanics.source_verified === true
                   ? (Object.keys(payload.playable_mechanics.applied_axes || {}).length
                     ? Object.entries(payload.playable_mechanics.applied_axes || {})
                         .map(([axis, value]) => axis + ' ' + Math.round(value * 100) + '%').join(' · ')

@@ -171,3 +171,19 @@ test('share custody snapshots files before async hashing and deletes only owned 
   assert.ok(code.indexOf('Object.freeze(') < code.indexOf("await import('expo-crypto')"));
   assert.match(code, /if \(created && file.exists\) file.delete\(\)/);
 });
+
+
+test('export snapshot is the same input used for ZIP construction and hashing', () => {
+  const code = fs.readFileSync(path.resolve(__dirname, '../../src/skeletonForge/shareSourceArchive.ts'), 'utf8');
+  assert.ok(code.indexOf('const files = Object.freeze') < code.indexOf('buildGodotSourceArchive(snapshot)'));
+  assert.match(code, /source_manifest: \{ \.\.\.payload.source_manifest, files: expected \}/);
+  assert.match(code, /Crypto.digestStringAsync\(digest, files\[path\]\)/);
+});
+test('export lifecycle fences unmount, account rotation and stale failure callbacks', () => {
+  const code = fs.readFileSync(path.resolve(__dirname, '../../src/skeletonForge/components/ForgeCockpitScreen.tsx'), 'utf8');
+  assert.match(code, /subscribeAuthChanges\(\(\) => \{/);
+  assert.match(code, /runOwnerEpoch.current = null/);
+  assert.match(code, /exportMounted.current = false/);
+  assert.match(code, /const current = \(\) => exportMounted.current && ownerEpoch === getAuthEpoch\(\)/);
+  assert.match(code, /if \(!current\(\)\) return;\s+const message/);
+});
