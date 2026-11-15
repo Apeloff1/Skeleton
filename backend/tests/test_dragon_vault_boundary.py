@@ -648,6 +648,11 @@ class VaultCareTests(unittest.IsolatedAsyncioTestCase):
             fence,mutation=app.sessions.update_one.await_args.args
             self.assertEqual(fence["treasury_vault_care"],row["treasury_vault_care"])
             self.assertEqual(mutation["$set"]["treasury_vault_care"]["used"],1)
+            history=mutation["$set"]["treasury_vault_care_history"]
+            self.assertEqual(history["entries"][-1]["kind"],"auto_"+side)
+            self.assertEqual(history["entries"][-1]["used"],1)
+            self.assertEqual(history["entries"][-1]["version"],row["version"]+1)
+            self.assertEqual(fence["treasury_vault_care_history"],{"$exists":False})
             self.assertEqual(mutation["$set"]["treasury_vault_care"]["last_repair"]["side"],side)
             self.assertIn(field,mutation["$set"])
             self.assertEqual(mutation["$inc"],{"version":1})

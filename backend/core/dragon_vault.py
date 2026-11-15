@@ -903,12 +903,24 @@ class DragonVaultMixin:
         fence={**query,"version":row["version"],"treasury_vault":row["treasury_vault"],
                "treasury_vault_care":prior if "treasury_vault_care" in row else {"$exists":False}}
         fields={"treasury_vault_care":grant,"treasury_vault_scrub_due":now}
+        from skeleton.ai.webcrawler.dragon_vault_care_history import append_history
+        history=row.get("treasury_vault_care_history")
+        try:
+            fields["treasury_vault_care_history"]=append_history(_plain(history) if history is not None else None,
+                witness=witness,version=row["version"]+1,at=now,kind="grant" if body["enabled"] else "withdraw",
+                operation=operation,budget=grant["budget"],used=0,prefix_unknown=prior is not None)
+            fence["treasury_vault_care_history"]=history if "treasury_vault_care_history" in row else {"$exists":False}
+        except (ValueError,TypeError,KeyError,CrawlerError) as exc:
+            if body["enabled"]:
+                raise CrawlerError("crawler_vault_history_held","Custody history integrity held; no new maintenance authority.",409) from exc
+            # Withdrawal always wins over damaged bookkeeping.
         if body["enabled"]:
             fence.update({"checkpoint_identity":row["checkpoint_identity"],"worker_token":None,
                 "lease_until":None,"last_worker_exit_confirmed":{"$ne":False},
                 "$expr":{"$lte":["$consent_expires_at","$$NOW"]}})
             await self._grant_principal(scope,grant)
-            fields["storage_receipt"]=await self._admit(scope,identifier,{"treasury_vault_care":grant})
+            fields["storage_receipt"]=await self._admit(scope,identifier,{"treasury_vault_care":grant,
+                "treasury_vault_care_history":fields["treasury_vault_care_history"]})
             await self._grant_principal(scope,grant)
         # Withdrawal must remain available during storage-attester outages.
         # The small disabled receipt replaces the prior bounded grant.
@@ -949,7 +961,16 @@ class DragonVaultMixin:
             consumed=consume_care(grant,now=now,version=row["version"],witness=digest,side=side)
         except (ValueError,TypeError,KeyError,RecursionError,CheckpointReplicaError):
             return None
-        payload={field:replacement,"treasury_vault_care":consumed}
+        from core.dragon_crawler import _plain
+        from skeleton.ai.webcrawler.dragon_vault_care_history import append_history
+        history=row.get("treasury_vault_care_history")
+        try:
+            appended=append_history(_plain(history) if history is not None else None,
+                witness=digest,version=row["version"]+1,at=now,kind="auto_"+side,operation=grant["operation"],
+                budget=consumed["budget"],used=consumed["used"],prefix_unknown=True)
+        except (ValueError,TypeError,KeyError,CrawlerError):
+            return None
+        payload={field:replacement,"treasury_vault_care":consumed,"treasury_vault_care_history":appended}
         receipt=await self._admit(scope,row["_id"],payload)
         try:
             await self._grant_principal(scope,grant)
@@ -958,7 +979,9 @@ class DragonVaultMixin:
                 return None
             raise
         clock={"$divide":[{"$toLong":"$$NOW"},1000]}
-        fenced={**fence,"treasury_vault_care":grant,"worker_token":None,"lease_until":None,
+        fenced={**fence,"treasury_vault_care":grant,
+                "treasury_vault_care_history":history if "treasury_vault_care_history" in row else {"$exists":False},
+                "worker_token":None,"lease_until":None,
                 "last_worker_exit_confirmed":{"$ne":False},
                 "$expr":{"$and":[{"$gt":["$treasury_vault_scrub_due",clock]},
                     {"$gt":["$treasury_vault_care.expires_at",clock]},
@@ -1048,3 +1071,27 @@ class DragonVaultMixin:
         return {"ok":True,"schema":"skeleton.dragon.vault-health.v1","as_of_unix":now,
                 "valid_until":min([now+60,*transitions]),"records":len(rows),**counts,
                 "live_verified":False,"source_text_returned":False,"independent_backup":False}
+
+
+    async def treasury_vault_care_history(self,scope,identifier):
+        from core.dragon_crawler import CrawlerError,_plain,_now
+        from skeleton.ai.webcrawler.dragon_vault_care_history import public_history
+        if not identity(identifier):
+            raise CrawlerError("crawler_identifier_invalid","Invalid retired expedition identifier.")
+        query={"_id":identifier,**scope,"status":{"$in":sorted(TERMINAL)},"treasury_vault.state":"vaulted"}
+        projection={"_id":1,"version":1,"treasury_vault":1,"treasury_vault_care_history":1}
+        row=await self.sessions.find_one(query,projection,max_time_ms=2000)
+        if row is None:
+            raise CrawlerError("crawler_not_found","Retired expedition not found.",404)
+        try:
+            marker=validate_marker(_plain(row["treasury_vault"]))
+            history=public_history(_plain(row.get("treasury_vault_care_history")),
+                witness=marker["snapshot_digest"],version=row["version"])
+        except (ValueError,TypeError,KeyError,CrawlerError):
+            history={"state":"held","prefix_unknown":True,"omitted":0,"events":[]}
+        final=await self.sessions.find_one({**query,"version":row["version"]},projection,max_time_ms=2000)
+        if final!=row:
+            raise CrawlerError("crawler_conflict","Custody history changed; refresh.",409)
+        return {"ok":True,"schema":"skeleton.dragon.vault-care-history.v1","session_id":identifier,
+                "version":row["version"],"as_of_unix":_now().timestamp(),**history,
+                "read_only":True,"independent_audit":False,"source_text_returned":False,"network_executed":False}

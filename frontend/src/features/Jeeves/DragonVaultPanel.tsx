@@ -1,8 +1,8 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,AppState,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {getAuthToken} from '../../auth/gameforgeAuth';
-import {getDragonVault,getDragonVaultQuota,getDragonVaultHealth,discoverDragonVault,retireDragonSession,restoreDragonVaultPrimary,repairDragonVaultReplica,configureDragonVaultCare,getDragonVaultRedundancy,getCrawl,crawlRequestKey,configureDragonArchive,
- configureLegacyTreasuryArchive,eraseCrawl,type DragonVaultCatalog,type DragonVaultQuota,type DragonVaultHealth,type DragonVaultDiscovery,type DragonVaultRedundancy,type DragonVaultEntry,type CrawlSession} from '../../product/crawlerClient';
+import {getDragonVault,getDragonVaultQuota,getDragonVaultHealth,discoverDragonVault,retireDragonSession,restoreDragonVaultPrimary,repairDragonVaultReplica,configureDragonVaultCare,getDragonVaultCareHistory,getDragonVaultRedundancy,getCrawl,crawlRequestKey,configureDragonArchive,
+ configureLegacyTreasuryArchive,eraseCrawl,type DragonVaultCatalog,type DragonVaultQuota,type DragonVaultHealth,type DragonVaultDiscovery,type DragonVaultRedundancy,type DragonVaultCareHistory,type DragonVaultEntry,type CrawlSession} from '../../product/crawlerClient';
 import s,{colors} from './CrawlerWorkspace.styles';
 import {scanArchiveChambers,bestHistoryWindow,type ChamberScan,SCAN_DEADLINE_MS} from './dragonVaultScan';
 
@@ -20,6 +20,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
  const [quota,setQuota]=useState<DragonVaultQuota|null>(null);
  const [vaultHealth,setVaultHealth]=useState<DragonVaultHealth|null>(null);
  const [redundancy,setRedundancy]=useState<DragonVaultRedundancy|null>(null);
+ const [careHistory,setCareHistory]=useState<DragonVaultCareHistory|null>(null);
  const [discoveryQuery,setDiscoveryQuery]=useState('');
  const [discovery,setDiscovery]=useState<DragonVaultDiscovery|null>(null);
  const [discoveryBusy,setDiscoveryBusy]=useState(false);
@@ -43,7 +44,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   setDiscovery(null);setArchiveScan(null);setScanProgress(null);setDiscoveryBusy(false);
  },[]);
  const reset=useCallback(()=>{
-  invalidate();clearDiscovery();setDiscoveryQuery('');setCatalog(null);setQuota(null);setVaultHealth(null);setRedundancy(null);setSelected([]);setHistory([]);setCursor(undefined);setBusy(false);
+  invalidate();clearDiscovery();setDiscoveryQuery('');setCatalog(null);setQuota(null);setVaultHealth(null);setRedundancy(null);setCareHistory(null);setSelected([]);setHistory([]);setCursor(undefined);setBusy(false);
   setRetention(false);setManaged(null);setRights(false);setEraseText('');operation.current=null;setNotice('');setError('');
  },[invalidate,clearDiscovery]);
  useEffect(()=>{reset();return()=>{invalidate();clearDiscovery();};},[revision,reset,invalidate,clearDiscovery]);
@@ -56,7 +57,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
 
  async function load(next?:string){
   invalidate();const attempt=epoch.current,token=getAuthToken(),ctrl=new AbortController();
-  owner.current=token;pending.current=ctrl;setBusy(true);setCatalog(null);setQuota(null);setVaultHealth(null);setRedundancy(null);setError('');
+  owner.current=token;pending.current=ctrl;setBusy(true);setCatalog(null);setQuota(null);setVaultHealth(null);setRedundancy(null);setCareHistory(null);setError('');
   try{
    const started=performance.now();
    const [result,health,census]=await Promise.allSettled([getDragonVault(next,ctrl.signal),getDragonVaultQuota(ctrl.signal),getDragonVaultHealth(ctrl.signal)]);
@@ -68,7 +69,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
    const page=result.value;
    if(!valid(ctrl,attempt,token))return;
    setCatalog(page);setCursor(next);setManaged(null);setRights(false);setEraseText('');setRetention(false);
-   timer.current=setTimeout(()=>{if(epoch.current===attempt){setCatalog(null);setQuota(null);setVaultHealth(null);setRedundancy(null);setSelected([]);setManaged(null);setRights(false);setEraseText('');}},censusTtl>0?censusTtl:60000);
+   timer.current=setTimeout(()=>{if(epoch.current===attempt){setCatalog(null);setQuota(null);setVaultHealth(null);setRedundancy(null);setCareHistory(null);setSelected([]);setManaged(null);setRights(false);setEraseText('');}},censusTtl>0?censusTtl:60000);
   }catch(e){if(valid(ctrl,attempt,token))setError(e instanceof Error?e.message:'Vault catalogue unavailable.');}
   finally{if(epoch.current===attempt){pending.current=null;setBusy(false);}}
  }
@@ -115,10 +116,22 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   try{const ids=bestHistoryWindow(archiveScan,performance.now());if(ids.length)onWindow(ids,discoveryQuery);}
   catch(e){clearDiscovery();setError(e instanceof Error?e.message:'Archive ranking expired.');}
  }
+ async function readCareHistory(row:DragonVaultEntry){
+  if(busy||disabled||owner.current!==getAuthToken())return;
+  const ctrl=new AbortController(),token=getAuthToken(),attempt=epoch.current;
+  pending.current=ctrl;setBusy(true);setCareHistory(null);setError('');
+  try{
+   const result=await getDragonVaultCareHistory(row.session_id,ctrl.signal);
+   if(!valid(ctrl,attempt,token))return;
+   if(result.version!==row.version){setError('Custody history changed; refresh the catalogue.');setCatalog(null);return;}
+   setCareHistory(result);
+  }catch(e){if(valid(ctrl,attempt,token))setError(e instanceof Error?e.message:'Custody history unavailable.');}
+  finally{if(epoch.current===attempt){pending.current=null;setBusy(false);}}
+ }
  async function verifyCopies(row:DragonVaultEntry){
   if(busy||disabled||owner.current!==getAuthToken())return;
   const ctrl=new AbortController(),token=getAuthToken(),attempt=epoch.current;
-  pending.current=ctrl;setBusy(true);setRedundancy(null);setError('');
+  pending.current=ctrl;setBusy(true);setRedundancy(null);setCareHistory(null);setError('');
   try{
    const result=await getDragonVaultRedundancy(row.session_id,ctrl.signal);
    if(!valid(ctrl,attempt,token))return;
@@ -133,7 +146,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   const n=action==='grant'?Number(days):30;
   if(!Number.isInteger(n)||n<1||n>30){setError('Historical-use duration must be 1–30 days.');return;}
   clearDiscovery();invalidate();const token=getAuthToken(),attempt=epoch.current,ctrl=new AbortController();pending.current=ctrl;
-  setBusy(true);setError('');setNotice('');setCatalog(null);setQuota(null);setVaultHealth(null);setRedundancy(null);
+  setBusy(true);setError('');setNotice('');setCatalog(null);setQuota(null);setVaultHealth(null);setRedundancy(null);setCareHistory(null);
   const identity=[action,id,version,n].join(':');
   if(operation.current?.identity!==identity)operation.current={identity,key:crawlRequestKey('vault-'+action)};
   const command={expected_version:version,idempotency_key:operation.current.key};
@@ -256,7 +269,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
       {row.last_scrub&&<Text style={s.small}>Last integrity patrol: {row.last_scrub.state.replaceAll('_',' ')} · {stamp(row.last_scrub.checked_at)}. Past observation, not live verification.</Text>}
       {row.archive_expires_at!==null&&<Text style={s.small}>Recorded archive grant expires {stamp(row.archive_expires_at)}. Individual source permission is checked at read time.</Text>}
       <Button label={selected.includes(row.session_id)?'Remove from selected history':'Select for historical window'} disabled={busy||disabled||row.integrity_held||row.vault?.state!=='vaulted'||selected.length>=32&&!selected.includes(row.session_id)} action={()=>toggle(row)}/>
-      <Button label="Manage retained record" disabled={busy||disabled} action={()=>{setManaged(managed===row.session_id?null:row.session_id);setRedundancy(null);setRetention(false);setRights(false);setEraseText('');}}/>
+      <Button label="Manage retained record" disabled={busy||disabled} action={()=>{setManaged(managed===row.session_id?null:row.session_id);setRedundancy(null);setCareHistory(null);setRetention(false);setRights(false);setEraseText('');}}/>
       {managed===row.session_id&&<>
        {!row.integrity_held&&row.vault&&!row.vault.active_slot_released&&canWrite&&<>
         <View style={s.row}><Switch value={retention} onValueChange={setRetention} accessibilityLabel="Confirm pending retirement retry"/><Text style={[s.small,s.grow]}>Confirm the same cold-custody intent.</Text></View>
@@ -282,6 +295,16 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
         <Button label="Verify or repair retained duplicate" disabled={busy||disabled||!retention} action={()=>void mutate('replica',row.session_id,row.version)}/>
         <Text style={s.small}>Optional care grant: seven days, at most two repairs, only from a surviving exact copy. No crawling, source-use permission or independent backup.</Text>
         <Button label="Authorize seven-day automatic care" disabled={busy||disabled||!retention} action={()=>void mutate('care',row.session_id,row.version)}/>
+       </>}
+       {row.vault?.state==='vaulted'&&<>
+        <Button label="Inspect retained maintenance history" disabled={busy||disabled} action={()=>void readCareHistory(row)}/>
+        {careHistory?.session_id===row.session_id&&careHistory.version===row.version&&<View style={s.check}>
+         <Text style={s.label}>Care history · {careHistory.state}</Text>
+         {careHistory.prefix_unknown&&<Text style={s.small}>Earlier history is unknown; no prior repair is inferred.</Text>}
+         {careHistory.omitted>0&&<Text style={s.small}>{careHistory.omitted} older receipts omitted.</Text>}
+         {careHistory.events.map(event=><Text key={event.sequence} style={s.small}>{stamp(event.at)} · {event.kind.replaceAll('_',' ')} · version {event.version} · {event.used}/{event.budget} repairs consumed</Text>)}
+         <Text style={s.small}>Retained internal receipts only, not independent audit or source-use authority.</Text>
+        </View>}
        </>}
        {row.vault?.state==='vaulted'&&<Button label="Withdraw automatic care permission" disabled={busy||disabled} action={()=>void mutate('uncare',row.session_id,row.version)}/>}
        {canWrite&&<><Text style={s.small}>Permanent owner erasure removes the original record, its indexes and both quota IDs. Type ERASE to confirm.</Text>

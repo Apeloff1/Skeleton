@@ -215,5 +215,36 @@ class FiniteCareContractTests(unittest.TestCase):
                 validate_care({**grant,**patch})
 
 
+class CareHistoryTests(unittest.TestCase):
+    def test_bounded_history_advances_anchor_without_fabricating_prefix(self):
+        from skeleton.ai.webcrawler.dragon_vault_care_history import append_history,public_history,validate_history
+        value=None
+        for i in range(24):
+            value=append_history(value,witness="c"*64,version=i+2,at=NOW+i,kind="grant",
+               operation=f"{i:064x}",budget=2,used=0)
+        self.assertEqual(value["omitted"],8)
+        self.assertEqual(len(value["entries"]),16)
+        view=public_history(value,witness="c"*64,version=25)
+        self.assertEqual(view["events"][0]["sequence"],9)
+        self.assertNotIn("operation",view["events"][0])
+        self.assertFalse(view["prefix_unknown"])
+        with self.assertRaises(ValueError):
+            validate_history({**value,"head":"a"*64},witness="c"*64,version=25)
+
+    def test_repairs_consume_exact_credit_and_withdrawal_closes_grant(self):
+        from skeleton.ai.webcrawler.dragon_vault_care_history import append_history
+        args={"witness":"c"*64,"operation":"a"*64,"budget":2}
+        first=append_history(None,**args,version=7,at=NOW,kind="grant",used=0)
+        second=append_history(first,**args,version=8,at=NOW+1,kind="auto_primary",used=1)
+        for changes in ({"used":1},{"operation":"b"*64},{"at":NOW-1},{"version":8}):
+            with self.assertRaises(ValueError):
+                append_history(second,**{**args,"version":9,"at":NOW+2,"kind":"auto_replica","used":2,**changes})
+        withdrawn=append_history(second,**{**args,"operation":"b"*64},version=9,at=NOW+2,kind="withdraw",used=0)
+        with self.assertRaises(ValueError):
+            append_history(withdrawn,**args,version=10,at=NOW+3,kind="auto_replica",used=2)
+        legacy=append_history(None,**args,version=9,at=NOW+2,kind="auto_replica",used=2,prefix_unknown=True)
+        self.assertTrue(legacy["prefix_unknown"])
+
+
 if __name__=="__main__":
     unittest.main()

@@ -142,6 +142,27 @@ export type DragonVaultScrub = {checked_at:number;state:'redundant'|'primary_onl
   primary:'exact'|'held';replica:'exact'|'held'|'unavailable';live_verified:false};
 export type DragonVaultCare = {enabled:boolean;active:boolean;issued_at:number;expires_at:number;budget:number;used:number;remaining:number;
   last_repair:{side:'primary'|'replica';at:number;version:number}|null;source_use_authorized:false;network_authorized:false};
+export type DragonVaultCareHistory = {
+  schema:'skeleton.dragon.vault-care-history.v1';session_id:string;version:number;as_of_unix:number;
+  state:'recorded'|'unrecorded'|'held';prefix_unknown:boolean;omitted:number;
+  events:{sequence:number;version:number;at:number;kind:'grant'|'withdraw'|'auto_primary'|'auto_replica';budget:number;used:number}[];
+  read_only:true;independent_audit:false;source_text_returned:false;network_executed:false;
+};
+export async function getDragonVaultCareHistory(id:string,signal?:AbortSignal):Promise<DragonVaultCareHistory>{
+  const p=await read(api.get<DragonVaultCareHistory>(ROOT+'/sessions/'+identifier(id)+'/vault-care-history',options(signal)),
+    getAuthToken(),'Custody history unavailable.');
+  if(!p||p.schema!=='skeleton.dragon.vault-care-history.v1'||p.session_id!==id||!integer(p.version)||p.version<1
+    ||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0||!['recorded','unrecorded','held'].includes(p.state)
+    ||typeof p.prefix_unknown!=='boolean'||!integer(p.omitted,2147483647)||!Array.isArray(p.events)||p.events.length>16
+    ||(p.state==='recorded'?p.events.length===0:!p.prefix_unknown||p.omitted!==0||p.events.length!==0)
+    ||p.events.some((e,i)=>!e||e.sequence!==p.omitted+i+1||!integer(e.version,p.version)||e.version<1
+      ||!['grant','withdraw','auto_primary','auto_replica'].includes(e.kind)||!Number.isFinite(e.at)||e.at<0||e.at>p.as_of_unix
+      ||!integer(e.budget,3)||e.budget<1||!integer(e.used,e.budget)||(e.kind==='grant'||e.kind==='withdraw'?e.used!==0:e.used<1)
+      ||i>0&&(e.version<=p.events[i-1].version||e.at<p.events[i-1].at))
+    ||p.read_only!==true||p.independent_audit!==false||p.source_text_returned!==false||p.network_executed!==false)
+    invalid('Invalid custody history receipt.');
+  return p;
+}
 export type DragonVaultCareCommand = {schema:'skeleton.dragon.vault-care-command.v1';session_id:string;version:number;
   care:DragonVaultCare;network_executed:false};
 function validVaultCare(p:DragonVaultCare,version:number,asOf?:number):boolean{
