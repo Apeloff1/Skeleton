@@ -66,5 +66,71 @@ class TreasuryPassageTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(error.exception.status,409)
 
 
+class TreasuryIntegrationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_actual_historical_segment_reused_with_live_policy(self):
+        from core.dragon_crawler import DragonCrawlerApplication
+        from skeleton.ai.webcrawler.dragon_index_manifest import build_manifest
+        from test_dragon_sanctuary_boundary import application
+        row,captured=fixture()
+        now=captured+timedelta(days=2)
+        row["archive_grant"]=create_grant(snapshot=row["snapshot"],policies={},now=now.timestamp(),days=7)
+        row["treasury_index"]=build_manifest(row["snapshot"],row["archive_grant"],now=now.timestamp())
+        app=application(row)
+        with patch("core.dragon_crawler._now",return_value=now):
+            value=await app.companion_treasury(SCOPE,mode="historic_only")
+        self.assertEqual(value["historic_indexed"],1)
+        self.assertEqual(value["current_indexed"],0)
+        self.assertEqual(value["materialized_payload_hits"],1)
+        self.assertEqual(value["invalid_materialized_segments"],0)
+        app.sessions.update_one.assert_not_awaited()
+
+    async def test_new_owner_session_invalidates_fenced_catalogue(self):
+        from test_dragon_sanctuary_boundary import application
+        row,now=fixture()
+        app=application(row)
+        original=[{"_id":row["_id"],"version":row["version"]}]
+        app.sessions.find.return_value.to_list.side_effect=[original,original+[{"_id":"new","version":1}]]
+        with patch("core.dragon_crawler._now",return_value=now):
+            with self.assertRaises(CrawlerError) as caught:
+                await app.companion_treasury(SCOPE,mode="current_only")
+        self.assertEqual(caught.exception.code,"crawler_treasury_changed")
+
+    async def test_replaced_watch_claim_cannot_authorize_old_physical_worker(self):
+        row,now=fixture()
+        app=object.__new__(DragonCrawlerApplication)
+        app.sessions=Mock()
+        child={**row,"treasury_watch_parent":{"parent_id":"parent"},"worker_watch_claim":"old-claim"}
+        app.sessions.find_one=AsyncMock(return_value=child)
+        app._watch_authority=AsyncMock(return_value={"claim_token":"new-claim","claim_until":now.timestamp()+100})
+        with patch("core.dragon_crawler._now",return_value=now):
+            with self.assertRaises(CrawlerError) as caught:
+                await app._live(SCOPE,"child","worker",1,network_margin=True)
+        self.assertEqual(caught.exception.code,"crawler_watch_lease")
+        child["worker_watch_claim"]="new-claim"
+        with patch("core.dragon_crawler._now",return_value=now):
+            self.assertEqual(await app._live(SCOPE,"child","worker",1,network_margin=True),child)
+
+    async def test_expired_posting_cleanup_preserves_snapshot_and_uses_exact_version(self):
+        row,captured=fixture()
+        now=captured+timedelta(days=2)
+        app=object.__new__(DragonCrawlerApplication)
+        app.ensure_indexes=AsyncMock()
+        app.sessions=Mock()
+        cursor=app.sessions.find.return_value
+        cursor.sort.return_value=cursor
+        cursor.limit.return_value=cursor
+        cursor.max_time_ms.return_value=cursor
+        expired={"_id":row["_id"],**SCOPE,"version":7,"treasury_index":{"expires_at":now.timestamp()-1}}
+        cursor.to_list=AsyncMock(return_value=[expired])
+        app.sessions.update_one=AsyncMock(return_value=Mock(modified_count=1))
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.purge_expired_treasury_segments()
+        self.assertEqual(result,{"scanned":1,"purged":1,"source_records_erased":0})
+        query,mutation=app.sessions.update_one.await_args.args
+        self.assertEqual(query["version"],7)
+        self.assertEqual(query["treasury_index.expires_at"],expired["treasury_index"]["expires_at"])
+        self.assertEqual(mutation["$unset"],{"treasury_index":""})
+
+
 if __name__=="__main__":
     unittest.main()
