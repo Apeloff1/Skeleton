@@ -1576,6 +1576,62 @@ class DragonCrawlerApplication:
             raise CrawlerError("crawler_conflict","Expedition changed before archive permission committed.",409)
         return {"ok":True,"session":self._projection(await self._owned(scope,identifier))}
 
+    async def treasury_passage(self, scope: dict[str, str], identifier: str,
+                               source_id: str, *, offset: int = 0, length: int = 1600) -> dict:
+        """Read an exact retained-text span for owner inspection, never model context."""
+        from skeleton.ai.webcrawler.dragon_archive_grant import archive_expiry
+        if (not isinstance(source_id,str) or len(source_id)!=64
+                or any(ch not in "0123456789abcdef" for ch in source_id)
+                or type(offset) is not int or not 0<=offset<=24000
+                or type(length) is not int or not 1<=length<=4000):
+            raise CrawlerError("crawler_treasury_span_invalid","Invalid historical passage coordinates.")
+        row = await self._owned(scope,identifier)
+        snapshot = _plain(row["snapshot"])
+        source = snapshot["sources"].get(source_id)
+        if source is None:
+            raise CrawlerError("crawler_source_not_found","Retained source not found.",404)
+        if row["status"] in {"cancelled","deleted"} or not row.get("checkpoint_identity"):
+            raise CrawlerError("crawler_archive_unavailable","Source is not available for treasury inspection.",403)
+        verify_primary(snapshot,_plain(row["checkpoint_identity"]))
+        now = _now().timestamp()
+        policy = self._capture_policy(row,source)
+        expiry = None
+        history_only = False
+        if policy["enabled"] and _utc(row["consent_expires_at"]).timestamp()>now:
+            fresh = self._capture_freshness(row,source)
+            if fresh["usable"]:
+                expiry = datetime.fromisoformat(fresh["valid_until"]).timestamp()
+        if expiry is None and row["status"] in {"completed","budget_exhausted"}:
+            try:
+                expiry = archive_expiry(_plain(row["archive_grant"]) if row.get("archive_grant") else None,
+                    snapshot_digest=snapshot["snapshot_digest"],source=source,policy=policy,now=now)
+            except (ValueError,TypeError,KeyError) as exc:
+                raise CrawlerError("crawler_archive_unavailable","Archive permission is unavailable.",403) from exc
+            history_only = expiry is not None
+        if expiry is None or expiry<=now:
+            raise CrawlerError("crawler_archive_unavailable","Current source-use or historical-use permission required.",403)
+        text = source["text"]
+        if offset>len(text):
+            raise CrawlerError("crawler_treasury_span_invalid","Passage offset exceeds retained text.",422)
+        end = min(len(text),offset+length)
+        span = text[offset:end]
+        # A source-use change, archive revocation, erase or checkpoint
+        # mutation while reading invalidates this exact passage.
+        check = await self.sessions.find_one(
+            {"_id":identifier,**scope,"version":row["version"],
+             "status":{"$nin":["cancelled","deleted"]}},{"_id":1},max_time_ms=2000)
+        if check is None or expiry<=_now().timestamp():
+            raise CrawlerError("crawler_treasury_changed","Source permission changed during inspection.",409)
+        return {"ok":True,"schema":"skeleton.dragon.treasury-passage.v1",
+                "session_id":identifier,"source_id":source_id,"session_version":int(row["version"]),
+                "snapshot_digest":snapshot["snapshot_digest"],"preserved_text_hash":source["preserved_text_hash"],
+                "captured_at":source["fetched_at"],"valid_until":expiry,"as_of_unix":now,
+                "offset":offset,"end":end,"total_chars":len(text),
+                "text":span,"span_sha256":hashlib.sha256(span.encode("utf-8")).hexdigest(),
+                "next_offset":end if end<len(text) else None,"history_only":history_only,
+                "review_state":"unreviewed","model_context_permission":False,
+                "training_permission":False,"network_executed":False}
+
     async def companion_treasury(self, scope: dict[str, str], *, mode: str,
                                  query: str = "", family: str | None = None) -> dict:
         """Read and reparse only qualified retained text; preserve metadata-only lineage.
