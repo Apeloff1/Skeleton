@@ -611,6 +611,74 @@ def _fsync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
+_PUBLIC_PLANNING_VIOLATIONS = frozenset({
+    "json_object_required", "complete_design_required", "invalid_json_or_schema", "no_change",
+    "invalid:gameplay", "unknown:gameplay", "invalid:systems", "unknown:systems",
+    *(f"{prefix}:{field}" for prefix in ("invalid", "too_long")
+      for field in ("title", "fantasy", "core_loop")),
+    *(f"{prefix}:gameplay.{field}" for prefix in ("invalid", "missing", "constraints", "conflicting")
+      for field in ("difficulty", "theme", "objective_label", "player_speed", "encounter_style")),
+})
+
+
+def _public_planning(value: object) -> dict[str, Any] | None:
+    """Project only typed planning evidence, never arbitrary backend diagnostics."""
+    if value is None:
+        return None
+    if not isinstance(value, Mapping) or type(value.get("status")) is not str or value["status"] not in {
+        "accepted", "rejected", "timed_out", "unavailable",
+    }:
+        raise ValueError("invalid planning receipt")
+    attempts = value.get("attempts")
+    if type(attempts) is not list or len(attempts) > 2:
+        raise ValueError("invalid planning attempt inventory")
+    clean: dict[str, Any] = {"status": value["status"], "attempts": [], "quality_qualified": False}
+    for key in ("model_digest", "runtime_digest", "instruction_sha256"):
+        if key in value:
+            field = value[key]
+            if type(field) is not str or re.fullmatch(r"[0-9a-f]{64}", field) is None:
+                raise ValueError("invalid planning digest")
+            clean[key] = field
+    for key, expected in (("proposal_schema", PLAN_SCHEMA), ("instruction_policy", POLICY_ID)):
+        if key in value:
+            if value[key] != expected:
+                raise ValueError("invalid planning policy")
+            clean[key] = expected
+    for key in ("network_provider_used", "generated_source_admitted", "quality_qualified"):
+        if key in value and value[key] is not False:
+            raise ValueError("unsupported planning authority")
+        if key in value:
+            clean[key] = False
+    if value.get("fixture_only") is True:
+        clean["fixture_only"] = True
+    if value.get("reason") == "local_model_or_lease_unavailable":
+        clean["reason"] = "local_model_or_lease_unavailable"
+    for index, attempt in enumerate(attempts, 1):
+        if not isinstance(attempt, Mapping) or type(attempt.get("attempt")) is not int or attempt["attempt"] != index:
+            raise ValueError("invalid planning attempt identity")
+        elapsed, tokens = attempt.get("elapsed_seconds"), attempt.get("output_tokens")
+        if (type(elapsed) not in (int, float) or not 0 <= elapsed <= 600
+                or type(tokens) is not int or not 0 <= tokens <= 1024):
+            raise ValueError("invalid planning attempt counters")
+        evidence: dict[str, Any] = {"attempt": index, "elapsed_seconds": elapsed, "output_tokens": tokens}
+        for key in ("response_sha256", "execution_receipt_sha256"):
+            digest = attempt.get(key)
+            if type(digest) is not str or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+                raise ValueError("invalid planning attempt digest")
+            evidence[key] = digest
+        violations = attempt.get("violations")
+        if type(violations) is not list or len(violations) > 32 or any(type(item) is not str for item in violations):
+            raise ValueError("invalid planning violation inventory")
+        # Unknown codes may contain arbitrary backend data. Retain a generic
+        # rejection marker without propagating its text or path.
+        evidence["violations"] = [item if item in _PUBLIC_PLANNING_VIOLATIONS else "unclassified_rejection"
+                                  for item in violations]
+        clean["attempts"].append(evidence)
+    if clean["status"] == "accepted" and clean["attempts"] and clean["attempts"][-1]["violations"]:
+        raise ValueError("accepted planning attempt contains violations")
+    return clean
+
+
 def _public_result(report: Mapping[str, Any]) -> dict[str, Any]:
     """Project maintained receipts, excluding host commands, paths and logs."""
     build = report.get("build")
@@ -639,11 +707,13 @@ def _public_result(report: Mapping[str, Any]) -> dict[str, Any]:
                 clean_build["project"]["meta"] = {name: item["meta"][name] for name in
                     ("spec_id", "genre", "planning_status") if name in item["meta"]}
     result = {"schema": SCHEMA, "ok": report.get("ok") is True,
-              "planning": report.get("planning"), "build": clean_build,
+              "planning": _public_planning(report.get("planning")), "build": clean_build,
               "general_model_quality_qualified": False}
-    for key in ("reason", "elapsed_seconds"):
-        if key in report:
-            result[key] = report[key]
+    if report.get("reason") == "accepted_model_proposal_required":
+        result["reason"] = "accepted_model_proposal_required"
+    elapsed = report.get("elapsed_seconds")
+    if type(elapsed) in (int, float) and 0 <= elapsed <= 600:
+        result["elapsed_seconds"] = elapsed
     if len(_encoded(result)) > MAX_RECORD_BYTES:
         raise ValueError("game result exceeds record budget")
     return result
