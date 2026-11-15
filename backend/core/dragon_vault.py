@@ -103,6 +103,15 @@ class DragonVaultMixin:
             return "vaulted"
         if row.get("status") not in TERMINAL:
             return "held"
+        # Even after publication, a lost or replaced witness must not
+        # cause a second mutation that frees active capacity.
+        witness=row.get("checkpoint_identity")
+        if marker["state"]=="vaulted" and (
+                not isinstance(witness,dict) or witness.get("snapshot_digest")!=marker["snapshot_digest"]):
+            await self.sessions.update_one({"_id":identifier,**scope,"version":row["version"],
+                "treasury_vault.operation":marker["operation"],"treasury_vault.active_slot_released":False},
+                {"$set":{"treasury_vault.retry_at":_now().timestamp()+3600}})
+            return "held"
         fence={"_id":identifier,**scope,"version":row["version"],"status":{"$in":sorted(TERMINAL)},
                "treasury_vault.operation":marker["operation"],"treasury_vault.state":marker["state"],
                "treasury_vault.active_slot_released":False}
@@ -126,8 +135,7 @@ class DragonVaultMixin:
                 # Never refund a reservation on an uncertain branch: another
                 # pulse may already have published it. Deletion removes both.
                 return "superseded"
-            fence["version"]=row["version"]+1
-            fence["treasury_vault.state"]="vaulted"
+            fence={**fence,"version":row["version"]+1,"treasury_vault.state":"vaulted"}
         released=await self.limits.update_one(release_active_filter(scope,_digest(scope),identifier),
             {"$pull":{"session_ids":identifier}})
         if not released.matched_count:

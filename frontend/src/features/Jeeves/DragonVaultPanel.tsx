@@ -45,7 +45,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   try{
    const result=await getDragonVault(next,ctrl.signal);
    if(!valid(ctrl,attempt,token))return;
-   setCatalog(result);setCursor(next);setManaged(null);setRights(false);setEraseText('');
+   setCatalog(result);setCursor(next);setManaged(null);setRights(false);setEraseText('');setRetention(false);
    timer.current=setTimeout(()=>{if(epoch.current===attempt){setCatalog(null);setSelected([]);setManaged(null);setRights(false);setEraseText('');}},60000);
   }catch(e){if(valid(ctrl,attempt,token))setError(e instanceof Error?e.message:'Vault catalogue unavailable.');}
   finally{if(epoch.current===attempt){pending.current=null;setBusy(false);}}

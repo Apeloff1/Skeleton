@@ -654,6 +654,8 @@ function PilotContent() {
           {nextCursor && <Button title="Load more owned missions" disabled={!!busy}
             onPress={() => void overview(true)} />}
         </View>
+        <DragonTreasuryPanel revision={sessions.map(row=>row.session_id+':'+row.version).sort().join('|')}
+          session={session} canWrite={canWrite} disabled={!!busy} onSession={update}/>
       </View>}
 
       {stage === 'capture' && <View style={s.card}>

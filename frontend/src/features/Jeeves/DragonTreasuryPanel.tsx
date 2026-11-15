@@ -72,8 +72,12 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
   return ()=>invalidate();
  },[revision,invalidate]);
  useEffect(()=>{
-  const sub=AppState.addEventListener('change',state=>{if(state!=='active'){invalidate();setResult(null);setBusy(false);}});
-  return()=>sub.remove();
+  const sub=AppState.addEventListener('change',state=>{if(state!=='active'){invalidate();setResult(null);setBusy(false);setVaultWindow(undefined);setMode('current_only');}});
+  const tick=setInterval(()=>{if(owner.current!==getAuthToken()){
+   owner.current=getAuthToken();invalidate();setResult(null);setBusy(false);setVaultWindow(undefined);setMode('current_only');
+   setFamily(undefined);setSelectedChange(null);setPair(null);setQuery('');setError('');
+  }},1000);
+  return()=>{sub.remove();clearInterval(tick);};
  },[invalidate]);
  useEffect(()=>{setRights(false);grantKey.current=null;setWatchSource(null);setWatchCapture(false);setWatchArchive(false);watchKey.current=null;},[session?.session_id,session?.version]);
  const visible=result&&observed.current===revision&&owner.current===getAuthToken()?result:null;

@@ -109,6 +109,14 @@ class VaultBoundaryTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await app._finish_treasury_retirement(SCOPE,row["_id"]),"vaulted")
         self.assertEqual(events,[])
 
+    async def test_postpublication_witness_loss_does_not_release_active_capacity(self):
+        row,now=self.expired(stage="vaulted")
+        row["checkpoint_identity"]={}
+        app,events=self.app(row)
+        with patch("core.dragon_crawler._now",return_value=now):
+            self.assertEqual(await app._finish_treasury_retirement(SCOPE,row["_id"]),"held")
+        self.assertEqual([x[0] for x in events],["defer"])
+
     async def test_missing_vault_reservation_never_claims_release(self):
         row,now=self.expired(stage="vaulted")
         app,events=self.app(row,release=False)

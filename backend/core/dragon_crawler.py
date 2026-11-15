@@ -2064,7 +2064,8 @@ class DragonCrawlerApplication(DragonVaultMixin):
         """Discover exactly witnessed legacy terminal rows, never resume them."""
         from skeleton.ai.webcrawler.operations import implementation_digest
         metadata=await self.sessions.find({**scope,"status":{"$in":["completed","budget_exhausted"]},
-                  "snapshot.binding.code_digest":{"$ne":implementation_digest()}},
+                  "snapshot.binding.code_digest":{"$ne":implementation_digest()},
+                  "treasury_vault.state":{"$ne":"vaulted"}},
                   {"_id":1,"version":1}).sort("_id",DESCENDING).limit(MAX_SESSIONS+1).max_time_ms(2000).to_list(MAX_SESSIONS+1)
         items=[]
         for item in metadata[:MAX_SESSIONS]:
@@ -2089,7 +2090,8 @@ class DragonCrawlerApplication(DragonVaultMixin):
         # Recheck the set as well as individual versions; a changed catalogue
         # must not hand out a stale migration candidate.
         final=await self.sessions.find({**scope,"status":{"$in":["completed","budget_exhausted"]},
-                  "snapshot.binding.code_digest":{"$ne":implementation_digest()}},
+                  "snapshot.binding.code_digest":{"$ne":implementation_digest()},
+                  "treasury_vault.state":{"$ne":"vaulted"}},
                   {"_id":1,"version":1}).sort("_id",DESCENDING).limit(MAX_SESSIONS+1).max_time_ms(2000).to_list(MAX_SESSIONS+1)
         if final!=metadata:
             raise CrawlerError("crawler_treasury_changed","Historical catalogue changed. Refresh.",409)
