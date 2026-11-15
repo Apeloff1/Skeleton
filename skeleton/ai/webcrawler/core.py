@@ -21,7 +21,7 @@ from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from typing import Protocol
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
-from urllib.robotparser import RobotFileParser
+from .robots_policy import RobotsPolicy
 
 from .document_formats import (
     ADDITIONAL_TYPES, RESEARCH_ARTIFACT_TYPES,
@@ -717,7 +717,7 @@ class InMemoryCrawlStore:
 class RobotsCache:
     def __init__(self, user_agent: str) -> None:
         self.user_agent = user_agent
-        self._parsers: dict[str, RobotFileParser] = {}
+        self._parsers: dict[str, RobotsPolicy] = {}
         self._meta: dict[str, dict[str, object]] = {}
 
     def install(
@@ -729,21 +729,7 @@ class RobotsCache:
         etag: str | None = None,
         last_modified: str | None = None,
     ) -> None:
-        parser = RobotFileParser()
-        parser.set_url(origin.rstrip("/") + "/robots.txt")
-        parser.parse(robots_text.splitlines())
-        # stdlib RobotFileParser matches the *first* applicable rule. RFC 9309
-        # instead selects the longest path match, with Allow winning ties.
-        # Sort only rule lines within each parsed agent group so a broad
-        # Allow: / cannot accidentally override Disallow: /private.
-        groups = [*parser.entries]
-        if parser.default_entry is not None:
-            groups.append(parser.default_entry)
-        for group in groups:
-            group.rulelines.sort(
-                key=lambda rule: (len(rule.path), rule.allowance),
-                reverse=True,
-            )
+        parser = RobotsPolicy(robots_text)
         self._parsers[origin] = parser
         self._meta[origin] = {"fetched_at": fetched_at, "etag": etag, "last_modified": last_modified}
 
