@@ -130,3 +130,29 @@ def verify(item: TrainingExample) -> bool:
     if type(item) is not TrainingExample:
         deny("oracle-record")
     return expected_answer(item) == item.completion
+
+
+def verify_all(items: tuple[TrainingExample, ...]) -> dict:
+    """Check every original record; incomplete or duplicate inventories never pass."""
+    from .catalog import TOTAL_EXAMPLES, verify_exact
+
+    if type(items) is not tuple or len(items) > TOTAL_EXAMPLES:
+        deny("oracle-inventory")
+    seen: set[str] = set()
+    correct = 0
+    for item in items:
+        if type(item) is not TrainingExample:
+            deny("oracle-record")
+        if item.item_id in seen:
+            deny("oracle-duplicate")
+        seen.add(item.item_id)
+        if verify(item):
+            correct += 1
+    complete = len(items) == TOTAL_EXAMPLES and verify_exact(items)
+    return {
+        "count": len(items),
+        "correct_count": correct,
+        "incorrect_count": len(items) - correct,
+        "complete": complete,
+        "all_correct": complete and correct == TOTAL_EXAMPLES,
+    }
