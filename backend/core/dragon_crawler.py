@@ -24,6 +24,7 @@ from core.databases import core_db
 from core.dragon_resource_governor import ResourceGovernor
 from core.dragon_vault import DragonVaultMixin
 from core.dragon_deep_archive import DragonDeepArchiveMixin
+from core.dragon_hoarder_copy import DragonHoarderCopyMixin
 from core.dragon_checkpoint_replica import (
     CheckpointReplicaError, checkpoint_fields, decode_exact_replica, verify_primary,
 )
@@ -118,7 +119,7 @@ def _safe_error(exc: BaseException) -> str:
     return "crawler_slice_interrupted"
 
 
-class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
+class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonDeepArchiveMixin,DragonVaultMixin):
     def __init__(self, database=core_db):
         self.database = database
         self.sessions = database["dragon_crawler_sessions"]
@@ -167,6 +168,8 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                 ("deep_hybrid_route.tokens",ASCENDING),("deep_hybrid_route.expires_at",ASCENDING)])
             await self.sessions.create_index([("tenant_id",ASCENDING),("owner_id",ASCENDING),
                 ("deep_passage_route.tokens",ASCENDING),("deep_passage_route.expires_at",ASCENDING)])
+            await self.sessions.create_index([("bulk_copy.state",ASCENDING),("bulk_copy.retry_at",ASCENDING)])
+            await self.sessions.create_index([("bulk_copy.expires_at",ASCENDING),("bulk_copy_invalidated",ASCENDING)])
             self._indexes_ready = True
 
     async def readiness(self) -> dict[str, Any]:
@@ -2063,7 +2066,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             {"_id":identifier,**scope,"version":row["version"],"status":{"$ne":"deleted"}},
             {"$set":{"archive_grant":grant,"treasury_index":index_manifest,"treasury_archive_route":routing,
                      "treasury_repair_due":min(grant["expires_at"],now.timestamp()+6*3600) if grant else None,
-                     "updated_at":now,"storage_receipt":receipt,audit_path:audit,"deep_index_due":now.timestamp()},
+                     "updated_at":now,"storage_receipt":receipt,audit_path:audit,"deep_index_due":now.timestamp(),"bulk_copy_invalidated":True},
              "$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":""},"$inc":{"version":1}},
         )
         if not result.modified_count:
@@ -2167,7 +2170,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             "status":{"$in":["completed","budget_exhausted"]}},
             {"$set":{"archive_grant":grant,"treasury_index":segment,"treasury_archive_route":routing,"legacy_archive_receipt":proof,
                       "treasury_repair_due":min(grant["expires_at"],now+6*3600) if grant else None,
-                      "storage_receipt":receipt,"updated_at":_now(),path:audit,"deep_index_due":_now().timestamp()},
+                      "storage_receipt":receipt,"updated_at":_now(),path:audit,"deep_index_due":_now().timestamp(),"bulk_copy_invalidated":True},
              "$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":""},"$inc":{"version":1}})
         if not changed.modified_count:
             raise CrawlerError("crawler_conflict","Historical session changed before archive admission.",409)
@@ -3753,6 +3756,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                     "updated_at": _now(),
                     "deletion": {"operation": operation, "request_digest": digest},
                     "deep_slot_cleanup":bool(row.get("deep_archive")),
+                    "bulk_copy_invalidated":True,
                 },
                 "$inc": {"version": 1},
                 "$unset": {
@@ -4080,6 +4084,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                         "treasury_index": None,
                         "treasury_archive_route": None,
                         "deep_index":None,"deep_hybrid_route":None,"deep_passage_route":None,"deep_index_due":now.timestamp(),
+                        "bulk_copy_invalidated":True,
                         "treasury_repair_due":now.timestamp() if row.get("archive_grant") else None,
                         "updated_at": now,
                         "storage_receipt": receipt,
@@ -4652,6 +4657,8 @@ async def recover_crawler_runs(*, limit: int = 16) -> dict:
         ("deep_archive_index",crawler_application.build_deep_indexes),
         ("deep_archive_expiry",crawler_application.purge_expired_deep_indexes),
         ("deep_archive_erasure",crawler_application.recover_deep_erasure),
+        ("hoarder_copy_cleanup",crawler_application.cleanup_bulk_copies),
+        ("hoarder_copy_recovery",crawler_application.recover_bulk_copies),
     ):
         try:
             result[name]=await operation()
