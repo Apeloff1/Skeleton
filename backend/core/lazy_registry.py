@@ -194,6 +194,7 @@ _LOADERS = {
     'core.operation_stream_transport': lambda: importlib.import_module('core.operation_stream_transport'),
     'core.operator_control_projection': lambda: importlib.import_module('core.operator_control_projection'),
     'core.outcall_manager': lambda: importlib.import_module('core.outcall_manager'),
+    'core.path_hardening': lambda: importlib.import_module('core.path_hardening'),
     'core.path_safety': lambda: importlib.import_module('core.path_safety'),
     'core.perf': lambda: importlib.import_module('core.perf'),
     'core.phase_gates': lambda: importlib.import_module('core.phase_gates'),
