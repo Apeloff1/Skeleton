@@ -27,7 +27,10 @@
     "skeleton/ai/webcrawler/dragon_companion.py",
     "skeleton/ai/webcrawler/dragon_questbook.py",
     "skeleton/ai/webcrawler/dragon_curriculum_trace.py",
-    "skeleton/ai/webcrawler/dragon_sanctuary.py"
+    "skeleton/ai/webcrawler/dragon_sanctuary.py",
+    "skeleton/ai/webcrawler/dragon_treasury.py",
+    "skeleton/ai/webcrawler/dragon_archive_grant.py",
+    "skeleton/ai/webcrawler/dragon_revisit_model.py"
   ],
   "state_authority": "Existing CORE_DB Mongo application custody; pure snapshots have no independent storage authority",
   "public_api": {
@@ -75,7 +78,13 @@
     "companion_curriculum_trace": 128,
     "sanctuary_expeditions": 8,
     "sanctuary_candidates": 128,
-    "sanctuary_sources_per_expedition": 16
+    "sanctuary_sources_per_expedition": 16,
+    "treasury_observations": 512,
+    "treasury_indexed_payloads": 128,
+    "treasury_alias_blockers": 1024,
+    "treasury_retention_days": 30,
+    "treasury_passage_chars": 4000,
+    "treasury_levels": 60
   },
   "semantics": {
     "robots": "Fail closed on unavailable robots other than explicit 404/410; accept text/plain rules, not unexpected HTML; revalidation, TTL and every redirect target; delays checkpointed. Retry-After cannot reopen an origin before its valid remote deadline within the finite consent window. Denials and overload bodies never become discovery inputs.",
@@ -103,7 +112,10 @@
     "companion_questbook": "Twelve prerequisite-constrained achievements across discovery, scholarship, ecology and stewardship. Exact source capture identity/sequence; quest progress derived, not independently persisted. Source references filtered by current owner policy.",
     "companion_curriculum": "Confidence-shrunk host novelty/recent learning progress, bounded remaining-information and novelty exploration, maximum 12 percent priority contribution annealed by remaining budgets. Guardian weight halved. Policy, budget, DNS, robots, cooldown and owner lease gates remain canonical. Pre-dispatch choice receipt conserved through settled outcomes and uncertain recovery.",
     "companion_sanctuary": "Explicit owner read derives current-consent collection across eight version-fenced witnessed expeditions and sixteen current captures each; exact/near duplication, lexical density and per-origin saturation. Source-use withdrawal and expiry exclude candidates. No source text, durable XP wallet, network authority, or snapshot mutation. Not an atomic transaction; concurrent revision changes detected by final version fence.",
-    "companion_visual": "Existing animated companion receives five evidence-derived evolution stages, shell morph and palette, completed-quest cosmetics, reduced motion, power-aware rendering and decorative pet interaction; no independent training or work."
+    "companion_visual": "Existing animated companion receives five evidence-derived evolution stages, shell morph and palette, completed-quest cosmetics, reduced motion, power-aware rendering and decorative pet interaction; no independent training or work.",
+    "treasury": "Exact fetched URL and representation family; independent current/historic BM25 populations, ordered content-defined section digests and numeric drift, deduplicated transition stewardship, immutable re-observation and rollback lineage. Newer unavailable or variant-unknown conflicting alias blocks current promotion. Retained text read only under current source-use or explicit bounded archive rights; no training or new capture permission.",
+    "treasury_revisit": "Bounded 31-grid interval-censored posterior with exposure, contradictory timestamp holds, publisher hint postponement, origin-balanced cost-aware suggestions; new expedition requires explicit fresh grant. No automatic cross-session dispatch.",
+    "hoarder": "Six forms and 60 display levels; final form requires discovery >=800, sufficient distinct verified history transitions in multiple families, current coverage, and effective evolution >=1150. No reward for mirrored or oscillating content. Animated level-based breathing, blink, cozy poses, props and treasure den."
   },
   "network": {
     "direct": "Validated public DNS addresses pinned to socket with original TLS SNI/hostname verification",
