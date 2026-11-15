@@ -67,7 +67,7 @@ function CrawlerContent() {
   const generation = useRef(0); const requestsRef = useRef(new Set<AbortController>()); const token = useRef(getAuthToken()); const actionLocks = useRef({ run: false, mutation: false, control: false }); const confirming = useRef(false);
   const canWrite = auth.role === 'editor' || auth.role === 'admin';
   const accept = useCallback((value: CrawlSession) => {
-    setSessions(rows => { const found = rows.find(row => row.session_id === value.session_id); if (found && found.version > value.version) return rows; return [value, ...rows.filter(row => row.session_id !== value.session_id)].slice(0, 128); });
+    setSessions(rows => { const found = rows.find(row => row.session_id === value.session_id); if (found && found.version > value.version) return rows; return (value.treasury_vault?.state==='vaulted'?rows.filter(row=>row.session_id!==value.session_id):[value, ...rows.filter(row => row.session_id !== value.session_id)]).slice(0, 128); });
     if (activeRef.current?.session_id === value.session_id && value.version >= activeRef.current.version) { activeRef.current = value; setActive(value); }
   }, []);
   const perform = useCallback(async (task: (signal: AbortSignal) => Promise<void>) => {

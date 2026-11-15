@@ -136,10 +136,10 @@ function PilotContent() {
     const before = sessionRef.current;
     sessionRef.current = value;
     setSession(value);
-    setSessions(rows => [
+    setSessions(rows => (value.treasury_vault?.state==='vaulted'?rows.filter(row=>row.session_id!==value.session_id):[
       value,
       ...rows.filter(row => row.session_id !== value.session_id),
-    ].slice(0, 128));
+    ]).slice(0, 128));
     if (before && (before.session_id !== value.session_id ||
       before.version !== value.version ||
       before.consent_current !== value.consent_current ||

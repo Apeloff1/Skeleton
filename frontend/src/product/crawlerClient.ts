@@ -134,11 +134,22 @@ export type TreasuryFamily = {
     expected_changes_per_day: number; utility_per_cost: number; target_stale_risk: number;
     fresh_consent_required: true; network_executed: false };
 };
+export type DragonVaultState = {
+  state:'pending'|'vaulted'; accepted_at:number; active_slot_released:boolean; snapshot_digest:string;
+  execution_authorized:false; historical_grant_extended:false;
+};
+export type DragonVaultEntry = {session_id:string;version:number;vault:DragonVaultState|null;
+  archive_expires_at:number|null;legacy_runtime:boolean|null;integrity_held:boolean};
+export type DragonVaultCatalog = {schema:'skeleton.dragon.vault-catalog.v1';sessions:DragonVaultEntry[];
+  next_cursor:string|null;capacity:128;as_of_unix:number;archive_use_verified:false;network_executed:false};
+export type DragonVaultCommand = {schema:'skeleton.dragon.vault-command.v1';session_id:string;version:number;
+  vault:DragonVaultState;outcome:'vaulted'|'held'|'capacity_or_quota_held'|'quota_held'|'superseded';network_executed:false};
 export type DragonTreasury = {
   schema: 'skeleton.dragon.treasury.v1'; parser: 'retained-text-sections-v3'; mode: TreasuryMode;
   family: string | null; as_of_unix: number; partition_digest: string; candidate_limit_reached: boolean; excluded_sessions: number;
   observed_before: number | null; page_offset: number; next_cursor: string | null; query_scope_digest: string;
   comparison_selection: {left:string;right:string} | null;
+  vault_window?:string[]|null;
   observations: number; families: number; revisions: number; changed_families: number; rollbacks: number;
   current_indexed: number; historic_indexed: number; metadata_only: number; blocked_current: number; changes: number; revalidated_revisions: number;
   verified_historic_transitions: number; verified_changed_families: number; alias_held_families: number; revisit_plan: string[]; parsed_unique_payloads: number;
@@ -167,6 +178,7 @@ export type CrawlSession = {
   companion?: DragonCompanion;
   curriculum_trace?: DragonCurriculumTrace;
   archive_grant?: DragonArchiveGrant; treasury_watch?: DragonTreasuryWatch|null; watch_managed?: boolean;
+  treasury_vault?:DragonVaultState;
   queue: { url: string; depth: number; attempts: number; ready_at: number }[];
 };
 export type SourceUsePolicy = { version: number; enabled: boolean; max_age_seconds: number; changed_at: string | null };
@@ -365,6 +377,8 @@ function session(value: CrawlSession, expectedId?: string): CrawlSession {
   }
   if (value.archive_grant !== undefined && !validArchiveGrant(value.archive_grant, value.source_count)) invalid('Invalid historical grant projection.');
   if (value.treasury_watch!==undefined&&value.treasury_watch!==null&&!validWatch(value.treasury_watch)||value.watch_managed!==undefined&&typeof value.watch_managed!=='boolean') invalid('Invalid treasury watch projection.');
+  if (value.treasury_vault!==undefined&&(!validVaultState(value.treasury_vault)
+      ||value.consent_current||!['completed','budget_exhausted'].includes(value.status))) invalid('Invalid retired custody projection.');
   if (value.companion !== undefined) {
     const p = value.companion;
     const unit = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1;
@@ -509,19 +523,61 @@ export async function getTreasuryPassage(sessionId: string, sourceId: string, of
     ||p.model_context_permission!==false||p.training_permission!==false||p.network_executed!==false)invalid('Invalid historical passage custody.');
   return p;
 }
-export type TreasurySearchOptions = { cursor?:string; observedBefore?:number; left?:string; right?:string };
+function validVaultState(v:DragonVaultState):boolean{
+  return !!v&&['pending','vaulted'].includes(v.state)&&Number.isFinite(v.accepted_at)&&v.accepted_at>=0
+    &&typeof v.active_slot_released==='boolean'&&(!v.active_slot_released||v.state==='vaulted')
+    &&typeof v.snapshot_digest==='string'&&HASH.test(v.snapshot_digest)
+    &&v.execution_authorized===false&&v.historical_grant_extended===false;
+}
+function vaultSelection(ids:string[]):string[]{
+  if(!Array.isArray(ids)||ids.length<1||ids.length>32||ids.some(id=>typeof id!=='string'||!ID.test(id))
+      ||new Set(ids).size!==ids.length)invalid('Select 1–32 distinct retired expeditions.');
+  return [...ids].sort();
+}
+export async function getDragonVault(cursor?:string,signal?:AbortSignal):Promise<DragonVaultCatalog>{
+  if(cursor!==undefined&&!ID.test(cursor))invalid('Invalid vault catalogue cursor.');
+  const p=await read(api.get<DragonVaultCatalog>(ROOT+'/companion/vault?limit=32'+(cursor?'&cursor='+encodeURIComponent(cursor):''),options(signal)),getAuthToken(),'Vault catalogue unavailable.');
+  if(!p||p.schema!=='skeleton.dragon.vault-catalog.v1'||p.capacity!==128||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0
+    ||p.archive_use_verified!==false||p.network_executed!==false||!Array.isArray(p.sessions)||p.sessions.length>32
+    ||new Set(p.sessions.map(row=>row?.session_id)).size!==p.sessions.length
+    ||p.sessions.some((row,i)=>!row||typeof row.session_id!=='string'||!ID.test(row.session_id)||!integer(row.version)||row.version<1
+      ||(i>0&&p.sessions[i-1].session_id<=row.session_id)||(cursor!==undefined&&row.session_id>=cursor)
+      ||typeof row.integrity_held!=='boolean'
+      ||row.integrity_held&&(row.vault!==null||row.archive_expires_at!==null||row.legacy_runtime!==null)
+      ||!row.integrity_held&&(!row.vault||!validVaultState(row.vault)||typeof row.legacy_runtime!=='boolean'
+        ||row.archive_expires_at!==null&&(!Number.isFinite(row.archive_expires_at)||row.archive_expires_at<=p.as_of_unix)))
+    ||p.next_cursor!==null&&(p.sessions.length!==32||p.next_cursor!==p.sessions[p.sessions.length-1].session_id))invalid('Invalid vault catalogue custody.');
+  return p;
+}
+export async function retireDragonSession(id:string,body:CrawlCommand&{retention_acknowledged:true},signal?:AbortSignal):Promise<DragonVaultCommand>{
+  if(body.retention_acknowledged!==true||!integer(body.expected_version)||body.expected_version<1)invalid('Explicit retirement acknowledgement required.');
+  const p=await read(api.post<DragonVaultCommand>(ROOT+'/sessions/'+identifier(id)+'/retire-to-vault',body,options(signal)),getAuthToken(),'Vault retirement unconfirmed. Refresh before retrying.');
+  if(!p||p.schema!=='skeleton.dragon.vault-command.v1'||p.session_id!==id||!integer(p.version)||p.version<body.expected_version
+     ||!validVaultState(p.vault)||!['vaulted','held','capacity_or_quota_held','quota_held','superseded'].includes(p.outcome)
+     ||p.outcome==='vaulted'&&(!p.vault.active_slot_released||p.vault.state!=='vaulted')||p.network_executed!==false)invalid('Invalid retirement receipt.');
+  return p;
+}
+export type TreasurySearchOptions = { cursor?:string; observedBefore?:number; left?:string; right?:string; vaultSessions?:string[] };
 export async function getDragonTreasury(mode: TreasuryMode, query='', family?: string, signal?: AbortSignal, search: TreasurySearchOptions={}): Promise<DragonTreasury> {
-  const {cursor,observedBefore,left,right}=search;
+  const {cursor,observedBefore,left,right,vaultSessions}=search;
+  const selected=vaultSessions===undefined?null:vaultSelection(vaultSessions);
+  if(selected&&mode==='current_only')invalid('Selected vault windows are history-only.');
   if (!['current_only','historic_only','all_revisions','timeline','compare','at_time'].includes(mode)||query.length>256||family!==undefined&&!HASH.test(family)
     ||cursor!==undefined&&!/^[a-f0-9]{64}:[0-9]{1,4}$/.test(cursor)
     ||(mode==='at_time')!==(observedBefore!==undefined)||observedBefore!==undefined&&(!Number.isFinite(observedBefore)||observedBefore<0)
     ||(left===undefined)!==(right===undefined)||left!==undefined&&(!right||!HASH.test(left)||!HASH.test(right)||left===right||mode!=='compare'||!family)) invalid('Invalid treasury search.');
   const params='?mode='+mode+'&query='+encodeURIComponent(query)+(family?'&family='+family:'')
     +(cursor?'&cursor='+encodeURIComponent(cursor):'')+(observedBefore!==undefined?'&observed_before='+observedBefore:'')
-    +(left&&right?'&left='+left+'&right='+right:'');
+    +(left&&right?'&left='+left+'&right='+right:'')
+    +(selected?'&vault_sessions='+encodeURIComponent(selected.join(',')):'');
   const p=await read(api.get<DragonTreasury>(ROOT+'/companion/treasury'+params,options(signal)),getAuthToken(),'Treasury reparse failed.');
   if(!p||p.schema!=='skeleton.dragon.treasury.v1'||p.parser!=='retained-text-sections-v3'||p.mode!==mode||p.family!==(family??null)
     ||!Number.isFinite(p.as_of_unix)||!HASH.test(p.partition_digest)||typeof p.candidate_limit_reached!=='boolean'||!integer(p.excluded_sessions,32)
+    ||selected===null&&p.vault_window!=null
+    ||selected!==null&&(!Array.isArray(p.vault_window)||p.vault_window.length!==selected.length
+      ||p.vault_window.some((id,i)=>id!==selected[i])||p.current_indexed!==0||!p.candidate_limit_reached
+      ||p.evolution?.hoarder_qualified!==false||p.evolution?.expedition_growth!==0
+      ||!Array.isArray(p.revisit_plan)||p.revisit_plan.length!==0)
     ||p.observed_before!==(observedBefore??null)||!HASH.test(p.query_scope_digest)||!integer(p.page_offset,2048)||p.page_offset%24!==0
     ||p.page_offset!==(cursor?Number(cursor.split(':')[1]):0)||cursor!==undefined&&cursor.split(':')[0]!==p.query_scope_digest
     ||p.next_cursor!==null&&p.next_cursor!==p.query_scope_digest+':'+(p.page_offset+24)
@@ -564,6 +620,9 @@ export async function getDragonTreasury(mode: TreasuryMode, query='', family?: s
       ||p.comparison.current.family_id!==family||p.comparison.previous.family_id!==family
       ||left===undefined&&p.comparison.current.previous_revision_id!==p.comparison.previous.revision_id
       ||left!==undefined&&(p.comparison.previous.revision_id!==left||p.comparison.current.revision_id!==right))
+    ||selected!==null&&([...(p.hits??[]),...(p.timeline??[]),...(p.comparison?[p.comparison.current,p.comparison.previous]:[])]
+      .some(v=>v.plane!=='historic'||v.indexed&&(!v.session_id||!selected.includes(v.session_id)||!v.archive_only))
+      ||p.family_rows.some(v=>v.current_indexed||v.refresh_url!==null))
     ||p.earliest_source_expiry!==null&&(!Number.isFinite(p.earliest_source_expiry)||p.earliest_source_expiry<=p.as_of_unix)
     ||p.latest_observed_only!==true||p.source_text_returned!==false||p.network_executed!==false||p.training_permission!==false||p.fresh_consent_required!==true)invalid('Invalid version-separated treasury projection.');
   return p;

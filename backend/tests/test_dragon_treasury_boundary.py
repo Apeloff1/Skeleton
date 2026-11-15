@@ -334,11 +334,13 @@ class RecoveryLaneTests(unittest.IsolatedAsyncioTestCase):
         app.recover_treasury_watches=AsyncMock(side_effect=PyMongoError("fixture"))
         app.purge_expired_treasury_segments=AsyncMock(return_value={"purged":1})
         app.repair_treasury_segments=AsyncMock(return_value={"repaired":1})
+        app.recover_treasury_retirements=AsyncMock(return_value={"vaulted":1})
         with patch("core.dragon_crawler.crawler_application",app):
             result=await recover_crawler_runs()
         self.assertTrue(result["treasury_watches"]["failed"])
         self.assertEqual(result["treasury_expired_segments"],{"purged":1})
         self.assertEqual(result["treasury_segment_repair"],{"repaired":1})
+        self.assertEqual(result["treasury_retirements"],{"vaulted":1})
 
     async def test_ancillary_cancellation_propagates(self):
         import asyncio

@@ -5,6 +5,7 @@ import {getDragonTreasury,getTreasuryPassage,configureDragonArchive,configureTre
 import s,{colors} from './CrawlerWorkspace.styles';
 import AnimatedDragon from './companion/DragonCompanion';
 import DragonLegacyTreasuryPanel from './DragonLegacyTreasuryPanel';
+import DragonVaultPanel from './DragonVaultPanel';
 import {INITIAL_DRAGON_STATE} from './companion/dragonCompanionState';
 import {useReducedMotion,useScreenReader} from './companion/useDragonMotion';
 import {usePowerAwareness} from '../../hooks/usePowerAwareness';
@@ -31,6 +32,7 @@ function Revision({row,inspect,select,watch,disabled=false}:{row:TreasuryRevisio
 export default function DragonTreasuryPanel({revision,session,canWrite=false,onSession,onRevisit,disabled=false}:{revision:string;session?:CrawlSession|null;canWrite?:boolean;onSession?:(s:CrawlSession)=>void;onRevisit?:(url:string)=>void;disabled?:boolean}){
  const [result,setResult]=useState<DragonTreasury|null>(null);
  const [mode,setMode]=useState<TreasuryMode>('current_only');
+ const [vaultWindow,setVaultWindow]=useState<string[]|undefined>();
  const [query,setQuery]=useState('');
  const [cutoff,setCutoff]=useState('');
  const [selectedChange,setSelectedChange]=useState<TreasuryRevision|null>(null);
@@ -61,6 +63,10 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
   setPassage(null);setPassageBusy(false);
   if(timer.current!==null)clearTimeout(timer.current);timer.current=null;
  },[]);
+ const chooseVaultWindow=useCallback((ids?:string[])=>{
+  invalidate();setResult(null);setBusy(false);setSelectedChange(null);setPair(null);setFamily(undefined);
+  setVaultWindow(ids);setMode(ids?'historic_only':'current_only');
+ },[invalidate]);
  useEffect(()=>{
   if(observed.current!==revision){observed.current=revision;invalidate();setResult(null);setBusy(false);grantKey.current=null;setSelectedChange(null);setPair(null);}
   return ()=>invalidate();
@@ -72,7 +78,7 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
  useEffect(()=>{setRights(false);grantKey.current=null;setWatchSource(null);setWatchCapture(false);setWatchArchive(false);watchKey.current=null;},[session?.session_id,session?.version]);
  const visible=result&&observed.current===revision&&owner.current===getAuthToken()?result:null;
  async function observe(nextMode=mode,nextFamily=family,page?:string,comparison?:{left:string;right:string}){
-  const search:TreasurySearchOptions={cursor:page,...comparison};
+  const search:TreasurySearchOptions={cursor:page,...comparison,vaultSessions:vaultWindow};
   if(nextMode==='at_time'){
    if(!/^\d{4}-\d{2}-\d{2}$/.test(cutoff)){setError('Enter an observation date as YYYY-MM-DD (UTC).');return;}
    const date=Date.parse(cutoff+'T23:59:59Z');
@@ -163,6 +169,12 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
   <Button label={open?'Close treasury':'Open treasury'} action={()=>{setOpen(!open);if(open){invalidate();setResult(null);setBusy(false);}}}/>
   {open&&<>
    <DragonLegacyTreasuryPanel revision={revision} canWrite={canWrite} disabled={busy||disabled} onChanged={()=>{invalidate();setResult(null);setBusy(false);}}/>
+   <DragonVaultPanel revision={revision} session={session} canWrite={canWrite} disabled={busy||disabled}
+     onWindow={chooseVaultWindow} onSession={onSession} onChanged={()=>{invalidate();setResult(null);setBusy(false);}}/>
+   {vaultWindow&&<View style={s.check}><Text style={s.label}>Selected cold-custody window · {vaultWindow.length} expeditions</Text>
+    <Text style={s.small}>Only separately authorized historical text. This window cannot establish global current coverage or earn current discovery credit.</Text>
+    <Button label="Return to owner-wide treasury" disabled={busy||disabled} action={()=>chooseVaultWindow(undefined)}/>
+   </View>}
    {terminal&&onSession&&<View style={s.check}>
     <Text style={s.label}>Historical retention for this finished expedition</Text>
     <Text style={s.small}>{session.archive_grant?.active?'Active until '+stamp(session.archive_grant.expires_at!):'No active historical-use grant.'} {session.archive_grant?.usable_sources??0} authorized retained sources.</Text>
@@ -188,7 +200,7 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
     </>}
    </View>}
    <TextInput value={query} editable={!busy&&!disabled} onChangeText={v=>{setQuery(v);invalidate();setResult(null);setBusy(false);setSelectedChange(null);setPair(null);}} maxLength={256} placeholder="Search retained versions" placeholderTextColor={colors.muted} accessibilityLabel="Search treasury" style={field}/>
-   <View style={s.row}>{MODES.map(([id,label])=><TouchableOpacity key={id} style={[s.button,mode===id&&{backgroundColor:'#52382d'}]} accessibilityRole="button" accessibilityState={{selected:mode===id,disabled:busy||disabled}} disabled={busy||disabled} onPress={()=>{setMode(id);invalidate();setResult(null);setBusy(false);setSelectedChange(null);setPair(null);}}><Text style={s.buttonText}>{label}</Text></TouchableOpacity>)}</View>
+   <View style={s.row}>{MODES.filter(([id])=>!vaultWindow||id!=='current_only').map(([id,label])=><TouchableOpacity key={id} style={[s.button,mode===id&&{backgroundColor:'#52382d'}]} accessibilityRole="button" accessibilityState={{selected:mode===id,disabled:busy||disabled}} disabled={busy||disabled} onPress={()=>{setMode(id);invalidate();setResult(null);setBusy(false);setSelectedChange(null);setPair(null);}}><Text style={s.buttonText}>{label}</Text></TouchableOpacity>)}</View>
    {mode==='at_time'&&<TextInput value={cutoff} onChangeText={value=>{setCutoff(value);invalidate();setResult(null);setBusy(false);}} maxLength={10} placeholder="YYYY-MM-DD (UTC)" placeholderTextColor={colors.muted} accessibilityLabel="Historical observation date UTC" style={field}/>}
    {family&&<Button label={'Clear family filter '+short(family)} disabled={busy||disabled} action={()=>{setFamily(undefined);invalidate();setResult(null);setBusy(false);setSelectedChange(null);setPair(null);}}/>}
    {selectedChange&&<Text style={s.small}>Selected {short(selectedChange.revision_id)}. Choose another indexed version from the same family to compare.</Text>}
@@ -222,7 +234,7 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
     </View>)}
     {visible.comparison&&<View style={s.check}><Text style={s.heading}>{visible.comparison_selection?'Selected historical observations':'Latest and preceding observation'}</Text><Revision row={visible.comparison.current} inspect={inspect} disabled={passageBusy}/><Revision row={visible.comparison.previous} inspect={inspect} disabled={passageBusy}/></View>}
     <Text style={s.heading}>{mode==='timeline'?'Revision timeline':'Matching indexed revisions'}</Text>
-    {(mode==='timeline'?visible.timeline:visible.hits).map(v=><Revision key={v.revision_id} row={v} inspect={inspect} select={selectRevision} watch={terminal&&canWrite&&!session?.watch_managed&&!activeWatch?.enabled&&v.session_id===session?.session_id?pickWatch:undefined} disabled={passageBusy}/>)}
+    {(mode==='timeline'?visible.timeline:visible.hits).map(v=><Revision key={v.revision_id} row={v} inspect={inspect} select={selectRevision} watch={!vaultWindow&&terminal&&canWrite&&!session?.treasury_vault&&!session?.watch_managed&&!activeWatch?.enabled&&v.session_id===session?.session_id?pickWatch:undefined} disabled={passageBusy}/>)}
     {passageBusy&&<ActivityIndicator color={colors.accent}/>}
     {passage&&<View style={s.check}>
       <Text style={s.heading}>Exact retained source · {passage.history_only?'history only':'current use permitted'}</Text>

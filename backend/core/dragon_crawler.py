@@ -2181,7 +2181,7 @@ class DragonCrawlerApplication(DragonVaultMixin):
         policy = self._capture_policy(row,source)
         expiry = None
         history_only = False
-        if not legacy and policy["enabled"] and _utc(row["consent_expires_at"]).timestamp()>now:
+        if not legacy and row.get("treasury_vault") is None and policy["enabled"] and _utc(row["consent_expires_at"]).timestamp()>now:
             fresh = self._capture_freshness(row,source)
             if fresh["usable"]:
                 expiry = datetime.fromisoformat(fresh["valid_until"]).timestamp()
@@ -3834,7 +3834,7 @@ class DragonCrawlerApplication(DragonVaultMixin):
 
     @staticmethod
     def _source_use(row: dict) -> None:
-        if row["status"] in {"cancelled", "deleted"} or _utc(row["consent_expires_at"]) <= _now():
+        if row.get("treasury_vault") is not None or row["status"] in {"cancelled", "deleted"} or _utc(row["consent_expires_at"]) <= _now():
             raise CrawlerError(
                 "crawler_context_revoked",
                 "Current capture/use consent is required for source retrieval.",
