@@ -156,3 +156,103 @@ class BinaryMediaBoundaryTests(TestCase):
             with self.assertRaises(ValueError):byte_range(v,100)
         self.assertTrue(_signature("video/mp4",b"\x00\x00\x00\x18ftypisom"))
         self.assertFalse(_signature("video/mp4",b"<html>unsafe</html>"))
+
+
+class TenfoldDatasetShardTests(TestCase):
+    def setUp(self):
+        self.temp=TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root=Path(self.temp.name).resolve()
+
+    def next_game(self):
+        from core.dragon_game_datasets import game_shard_candidates
+        owner=owner_key(SCOPE)
+        for number in range(1,1000):
+            candidate=format(number,"064x")
+            bucket,lane=game_shard_candidates(owner,candidate)
+            if lane:
+                return candidate,bucket,lane
+        self.fail("no nonzero lane fixture")
+
+    def test_shard_cardinality_and_legacy_names(self):
+        from core.dragon_game_datasets import SHARDS,shard_path
+        self.assertEqual(SHARDS,2560)
+        self.assertEqual(len({shard_path(self.root,i) for i in range(SHARDS)}),SHARDS)
+        self.assertEqual(shard_path(self.root,255).name,"game-data-ff.sqlite3")
+        self.assertEqual(shard_path(self.root,256).name,"game-data-00-lane-1.sqlite3")
+        self.assertEqual(shard_path(self.root,2559).name,"game-data-ff-lane-9.sqlite3")
+
+    def test_new_game_assignment_restart_and_missing_shard_hold(self):
+        from core.dragon_game_datasets import shard_path
+        game,bucket,lane=self.next_game()
+        first=DatasetShard(SCOPE,game,root=self.root,create=True)
+        expected=shard_path(self.root,bucket+256*lane)
+        self.assertEqual(first.path,expected)
+        self.assertEqual(DatasetShard(SCOPE,game,root=self.root).path,expected)
+        self.assertEqual(DatasetShard(SCOPE,game,root=self.root,create=True).path,expected)
+        expected.unlink()
+        with self.assertRaises(LookupError):
+            DatasetShard(SCOPE,game,root=self.root,create=True)
+        self.assertFalse(expected.exists())
+
+    def test_existing_tombstone_pins_game_to_legacy(self):
+        import sqlite3
+        from core.dragon_game_datasets import SCHEMA,shard_path
+        game,bucket,lane=self.next_game()
+        legacy=shard_path(self.root,bucket)
+        legacy.touch(mode=0o600)
+        db=sqlite3.connect(legacy)
+        try:
+            db.executescript(SCHEMA)
+            db.execute("""INSERT INTO dataset_versions(owner,game,id,dataset,source,observation_digest,
+                label,expected_rows,expected_chain,chain,created_at,expires_at,state)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,'erased')""",
+                (owner_key(SCOPE),game,"a"*64,"fixture","b"*64,"c"*64,"legacy",1,"d"*64,ZERO,0,0))
+            db.commit()
+        finally:db.close()
+        self.assertEqual(DatasetShard(SCOPE,game,root=self.root,create=True).path,legacy)
+        self.assertEqual(DatasetShard(SCOPE,game,root=self.root).path,legacy)
+        self.assertFalse(shard_path(self.root,bucket+256*lane).exists())
+
+    def test_missing_legacy_directory_cannot_reassign_existing_game(self):
+        from core.dragon_game_datasets import shard_path
+        game,bucket,lane=self.next_game()
+        first=DatasetShard(SCOPE,game,root=self.root,create=True)
+        shard_path(self.root,bucket).unlink()
+        with self.assertRaises(CatalogueHeld):
+            DatasetShard(SCOPE,game,root=self.root,create=True)
+        self.assertTrue(first.path.exists())
+
+    def test_maintenance_advances_all_ten_slots(self):
+        import os
+        from core.dragon_game_datasets import sweep_dataset_shard
+        corpus=self.root/"corpus.sqlite"
+        with patch.dict(os.environ,{"SKL_DRAGON_DATASET_ROOT":str(self.root)}):
+            result=sweep_dataset_shard(corpus)
+        self.assertEqual(result["shards_visited"],10)
+        self.assertEqual(result["shards_held"],0)
+        with GameCorpus(corpus)._db() as db:
+            self.assertEqual(db.execute("SELECT cursor FROM dataset_maintenance").fetchone()[0],10)
+
+
+class TenfoldVolumeConfigurationTests(TestCase):
+    def test_file_configuration_avoids_environment_limit(self):
+        import os
+        from core.dragon_hoarder_bulk import MAX_VOLUMES,StorageHeld
+        from core.dragon_storage_topology import topology_config
+        self.assertEqual(MAX_VOLUMES,2560)
+        var="SKL_DRAGON_HOARDER_VOLUMES_JSON"
+        with TemporaryDirectory() as d:
+            path=Path(d).resolve()/"volumes.json"
+            raw=json.dumps([{"name":"v"+str(i),"root":"/private/example/"+str(i),"payload_budget":1073741824}
+                            for i in range(MAX_VOLUMES)])
+            path.write_text(raw,encoding="utf-8")
+            path.chmod(0o600)
+            with patch.dict(os.environ,{var:"",var+"_FILE":str(path)}):
+                self.assertEqual(topology_config(var),raw)
+            with patch.dict(os.environ,{var:"[]",var+"_FILE":str(path)}):
+                with self.assertRaises(StorageHeld):topology_config(var)
+            if os.name=="posix":
+                path.chmod(0o644)
+                with patch.dict(os.environ,{var:"",var+"_FILE":str(path)}):
+                    with self.assertRaises(StorageHeld):topology_config(var)

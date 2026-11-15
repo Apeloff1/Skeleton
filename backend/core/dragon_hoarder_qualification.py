@@ -25,6 +25,7 @@ MIN_PROBE=16*1024**2
 MAX_PROBE=GIB
 CHUNK=2*1024**2
 MAX_AGE=7*86400
+MAX_RECEIPT_BYTES=20*1024*1024
 SCHEMA="dragon.physical-qualification.v1"
 
 
@@ -140,6 +141,7 @@ def run_probe(primary,backup,*,probe_bytes=64*1024**2):
             "crash_power_loss_verified":False,"failure_domain_independence_verified":False}
     if independent(primary,backup)!=config:raise StorageHeld("topology changed during probe")
     raw=json.dumps(result,sort_keys=True,separators=(",",":")).encode()
+    if len(raw)>MAX_RECEIPT_BYTES:raise StorageHeld("qualification receipt exceeds bound")
     temp=path.parent/("."+path.name+"."+uuid4().hex)
     fd=os.open(temp,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
     try:
@@ -158,7 +160,7 @@ def run_probe(primary,backup,*,probe_bytes=64*1024**2):
 def require_probe(primary,backup):
     path=_receipt_path()
     st=path.stat()
-    if not stat.S_ISREG(st.st_mode) or st.st_size>20*1024*1024 or st.st_nlink!=1 or os.name=="posix" and (st.st_mode&0o077 or st.st_uid!=os.getuid()):
+    if not stat.S_ISREG(st.st_mode) or st.st_size>MAX_RECEIPT_BYTES or st.st_nlink!=1 or os.name=="posix" and (st.st_mode&0o077 or st.st_uid!=os.getuid()):
         raise StorageHeld("qualification receipt custody")
     value=json.loads(path.read_bytes())
     now=int(time.time())

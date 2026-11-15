@@ -175,13 +175,18 @@ class DatasetShard:
             raise CatalogueHeld("private dataset directory required")
         bucket,preferred=game_shard_candidates(self.owner,self.game)
         self.root_id=(st.st_dev,st.st_ino)
-        self._bind_file(shard_path(self.root,bucket),create=create)
+        legacy=shard_path(self.root,bucket)
+        if not legacy.exists() and any(
+                (p:=shard_path(self.root,bucket+lane*BASE_SHARDS)).exists() or p.is_symlink()
+                for lane in range(1,DATASET_LANES)):
+            raise CatalogueHeld("dataset routing directory missing")
+        self._bind_file(legacy,create=create)
         # Legacy file is also the immutable per-game routing directory.
         # An existing game (even erased version tombstones) stays in lane 0.
         # New games are assigned once under the legacy directory write lock.
         with self._db() as db:
             db.executescript(ROUTE_SCHEMA)
-            db.execute("BEGIN IMMEDIATE")
+            db.execute("BEGIN IMMEDIATE" if create else "BEGIN")
             try:
                 route=db.execute("SELECT lane FROM dataset_game_routes WHERE owner=? AND game=?",
                     (self.owner,self.game)).fetchone()
@@ -432,35 +437,48 @@ class DatasetShard:
         if type(index) is not int or not 0<=index<SHARDS:raise ValueError("shard number")
         root=_root()
         path=shard_path(root,index)
+        if path.is_symlink():raise CatalogueHeld("dataset shard symlink")
         if not path.exists():return None
         obj=cls.__new__(cls)
-        obj.root=root;obj.path=path
+        obj.root=root
         st=root.stat();obj.root_id=(st.st_dev,st.st_ino)
-        st=path.stat();obj.file_id=(st.st_dev,st.st_ino)
+        obj._bind_file(path,create=False)
         obj.scope=None;obj.owner=None;obj.game=None
         return obj
 
 
 def sweep_dataset_shard(corpus_path):
-    """Persistent round robin maintenance; no cross-owner result disclosure."""
+    """Persistent bounded round robin across ten independent dataset lanes."""
     with GameCorpus(corpus_path)._db() as db:
         db.execute("CREATE TABLE IF NOT EXISTS dataset_maintenance(singleton INTEGER PRIMARY KEY CHECK(singleton=1),cursor INTEGER NOT NULL)")
         db.execute("BEGIN IMMEDIATE")
         try:
             db.execute("INSERT OR IGNORE INTO dataset_maintenance VALUES(1,0)")
             idx=db.execute("SELECT cursor FROM dataset_maintenance WHERE singleton=1").fetchone()[0]
-            db.execute("UPDATE dataset_maintenance SET cursor=? WHERE singleton=1",((idx+1)%SHARDS,))
+            if type(idx) is not int or not 0<=idx<SHARDS:raise CatalogueHeld("dataset maintenance cursor")
+            db.execute("UPDATE dataset_maintenance SET cursor=? WHERE singleton=1",((idx+DATASET_LANES)%SHARDS,))
             db.execute("COMMIT")
         except BaseException:
             if db.in_transaction:db.execute("ROLLBACK")
             raise
-    obj=DatasetShard.operator_shard(idx)
-    if obj is None:return {"scanned":0,"removed_records":0}
-    with obj._db() as db:
-        rows=db.execute("""SELECT owner,game,id FROM dataset_versions WHERE state!='erased'
-            AND (expires_at<=? OR state='revoked') ORDER BY expires_at,owner,game,id LIMIT 2""",(int(time.time()),)).fetchall()
     total=0
-    for row in rows:
-        obj.owner=_id(row["owner"]);obj.game=_id(row["game"])
-        total+=obj.collect(row["id"])["removed_records"]
-    return {"scanned":len(rows),"removed_records":total,"secure_erasure":False}
+    scanned=0
+    held=0
+    visited=0
+    for index in ((idx+i)%SHARDS for i in range(DATASET_LANES)):
+        try:
+            obj=DatasetShard.operator_shard(index)
+            visited+=1
+            if obj is None:continue
+            with obj._db() as db:
+                rows=db.execute("""SELECT owner,game,id FROM dataset_versions WHERE state!='erased'
+                    AND (expires_at<=? OR state='revoked') ORDER BY expires_at,owner,game,id LIMIT 2""",(int(time.time()),)).fetchall()
+            for row in rows:
+                obj.owner=_id(row["owner"]);obj.game=_id(row["game"])
+                total+=obj.collect(row["id"])["removed_records"]
+                scanned+=1
+        except (CatalogueHeld,LookupError,ValueError,sqlite3.Error,OSError):
+            # A damaged shard must not starve the other nine. Retry next cycle.
+            held+=1
+    return {"scanned":scanned,"removed_records":total,"shards_visited":visited,
+            "shards_held":held,"secure_erasure":False}

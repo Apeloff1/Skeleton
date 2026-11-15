@@ -218,3 +218,44 @@ class LeadGraphTests(TestCase):
         self.assertTrue(result["growth_floor_met"])
         self.assertLess(result["nodes"],MAX_NODES)
         self.assertLess(result["edges"],MAX_EDGES)
+
+
+class TenfoldLeadQuotaTests(TestCase):
+    def test_lane_ranges_partition_the_entire_prefix_space(self):
+        from core.dragon_lead_graph import lead_lane,lane_bounds,LEAD_LANES,MAX_NODES,MAX_EDGES
+        self.assertEqual((LEAD_LANES,MAX_NODES,MAX_EDGES),(10,200_000_000,1_000_000_000))
+        for n in range(65536):
+            prefix=format(n,"04x")
+            lane=lead_lane(prefix+"0"*60)
+            low,high=lane_bounds(lane)
+            self.assertTrue(low<=prefix<high)
+
+    def test_partition_counts_replay_lazy_migration_and_isolation(self):
+        from core.dragon_lead_graph import lead_lane,_schema_row
+        from core.dragon_hoarder_bulk import owner_key
+        with TemporaryDirectory() as d,patch("core.dragon_lead_graph.MIN_RESERVE",0):
+            graph=LeadGraph(Path(d).resolve()/"corpus.sqlite")
+            graph.configure(OWNER,enabled=True,acknowledged=True)
+            graph.configure(OTHER,enabled=True,acknowledged=True)
+            owner=owner_key(OWNER);other=owner_key(OTHER)
+            row=_schema_row("https://example.org/game","fixture","storefront","fixture")
+            lane=lead_lane(lead_id(row[0]))
+            def add(db,witness,scope_owner=owner):
+                return graph._add(db,scope_owner,row,parent=ZERO,relation="seed",witness=witness,now=1)
+            with graph._db() as db:
+                db.execute("BEGIN IMMEDIATE")
+                add(db,"a"*64)
+                add(db,"a"*64)
+                add(db,"a"*64,other)
+                db.execute("DELETE FROM lead_lane_counts WHERE owner=?",(owner,))
+                add(db,"a"*64)
+                counts=lambda who:tuple(db.execute("SELECT nodes,edges FROM lead_lane_counts WHERE owner=? AND lane=?",(who,lane)).fetchone())
+                self.assertEqual(counts(owner),(1,1))
+                self.assertEqual(counts(other),(1,1))
+                with patch("core.dragon_lead_graph.EDGES_PER_LANE",1):
+                    with self.assertRaises(CatalogueHeld):add(db,"b"*64)
+                self.assertEqual(counts(owner),(1,1))
+                db.execute("COMMIT")
+            self.assertEqual(graph.status(OWNER)["nodes"],1)
+            self.assertEqual(graph.status(OWNER)["edges"],1)
+            self.assertFalse(graph.status(OWNER)["physical_graph_sharding"])
