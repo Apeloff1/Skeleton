@@ -37,7 +37,8 @@
     "skeleton/ai/webcrawler/dragon_temporal_selection.py",
     "skeleton/ai/webcrawler/dragon_temporal_query.py",
     "skeleton/ai/webcrawler/dragon_treasury_vault.py",
-    "backend/core/dragon_vault.py"
+    "backend/core/dragon_vault.py",
+    "skeleton/ai/webcrawler/dragon_vault_quota.py"
   ],
   "state_authority": "Existing CORE_DB Mongo application custody; pure snapshots have no independent storage authority",
   "public_api": {
@@ -136,7 +137,8 @@
     "treasury_legacy": "Original witnessed terminal snapshots can be separately verified for explicit history-only use without changing code, request, binding or snapshot digests. Never restore legacy execution or expand network/model rights.",
     "treasury_watch": "Owner/editor explicitly authorizes a finite single public URL watch. Deterministic child identity, cycle/slice charges, live parent/policy/principal and exact worker pulse token fences. Existing canonical robots, DNS, scope, request and physical leases remain governing. No automatic renewal.",
     "treasury_temporal_selection": "32-session owner catalogue, 2048 observations and 256 retained-text candidates. Selected-family and cutoff-first reservation, fair chronological version representatives, partition-bound pagination, past-cutoff historic-only results; held newest revisions cannot promote older different material.",
-    "treasury_vault": "Owner-explicit expired terminal retirement; reserve existing owner quota vault ID before row publication and active slot release. Metadata-only catalog, bounded selected history-only windows; no new permission, backup or physical storage. Exact owner erase removes both quota IDs."
+    "treasury_vault": "Owner-explicit expired terminal retirement; reserve existing owner quota vault ID before row publication and active slot release. Metadata-only catalog, bounded selected history-only windows; no new permission, backup or physical storage. Exact owner erase removes both quota IDs.",
+    "treasury_quota_audit": "Metadata-only owner quota reconciliation, exact arrays and immutable erased tombstones; missing reservations and malformed records held, never guessed deleted."
   },
   "network": {
     "direct": "Validated public DNS addresses pinned to socket with original TLS SNI/hostname verification",

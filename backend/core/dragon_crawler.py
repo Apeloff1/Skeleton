@@ -151,6 +151,7 @@ class DragonCrawlerApplication(DragonVaultMixin):
                 ("treasury_vault.state",ASCENDING),("updated_at",DESCENDING),("_id",DESCENDING)])
             await self.sessions.create_index([("treasury_vault.active_slot_released",ASCENDING),
                 ("treasury_vault.retry_at",ASCENDING)])
+            await self.limits.create_index([("treasury_quota_due",ASCENDING),("_id",ASCENDING)])
             self._indexes_ready = True
 
     async def readiness(self) -> dict[str, Any]:
@@ -2675,6 +2676,14 @@ class DragonCrawlerApplication(DragonVaultMixin):
             await self.sessions.insert_one(row)
         except DuplicateKeyError:
             prior = await self.sessions.find_one({"_id": identifier, **scope})
+            if prior is not None and prior.get("status")=="deleted":
+                # A late create reservation can race exact owner erasure. A
+                # permanent tombstone must never resurrect or consume quota.
+                from skeleton.ai.webcrawler.dragon_vault_quota import tombstone
+                if tombstone(prior):
+                    await self.limits.update_one({"_id":quota_id,**scope},
+                        {"$pull":{"session_ids":identifier,"vault_ids":identifier}})
+                raise CrawlerError("crawler_not_found","Crawler session not found.",404) from None
             if prior is None or prior["creation_digest"] != request_digest or prior.get("treasury_watch_parent")!=watch_binding:
                 raise CrawlerError(
                     "crawler_idempotency_conflict", "Concurrent crawler creation conflicted.", 409
@@ -4586,6 +4595,7 @@ async def recover_crawler_runs(*, limit: int = 16) -> dict:
         ("treasury_expired_segments",crawler_application.purge_expired_treasury_segments),
         ("treasury_segment_repair",crawler_application.repair_treasury_segments),
         ("treasury_retirements",crawler_application.recover_treasury_retirements),
+        ("treasury_quota_repair",crawler_application.reconcile_treasury_quotas),
     ):
         try:
             result[name]=await operation()

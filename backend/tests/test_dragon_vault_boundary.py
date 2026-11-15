@@ -216,5 +216,66 @@ class VaultBoundaryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.limits.update_one.await_args.args[1],{"$pull":{"session_ids":row["_id"],"vault_ids":row["_id"]}})
 
 
+class QuotaBoundaryTests(unittest.IsolatedAsyncioTestCase):
+    def harness(self,*,modified=1):
+        from core.dragon_crawler import _digest
+        app=object.__new__(DragonCrawlerApplication)
+        app.ensure_indexes=AsyncMock()
+        app.sessions=Mock()
+        app.limits=Mock()
+        _,now=fixture()
+        document={"_id":_digest(SCOPE),**SCOPE,"session_ids":["gone","missing","live"],
+                  "vault_ids":["gone"],"treasury_quota_due":0}
+        rows=[{"_id":"gone",**SCOPE,"version":4,"status":"deleted",
+               "deletion":{"operation":"a"*64,"request_digest":"b"*64}},
+              {"_id":"live",**SCOPE,"version":2,"status":"queued"}]
+        for collection,values in ((app.sessions,rows),(app.limits,[document])):
+            cursor=collection.find.return_value
+            cursor.sort.return_value=cursor
+            cursor.limit.return_value=cursor
+            cursor.max_time_ms.return_value=cursor
+            cursor.to_list=AsyncMock(return_value=values)
+        app.limits.update_one=AsyncMock(return_value=Mock(modified_count=modified))
+        app.limits.find_one=AsyncMock(return_value=document)
+        return app,document,rows,now
+
+    async def test_only_exact_tombstone_released_no_source_mutations(self):
+        app,doc,rows,now=self.harness()
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.reconcile_treasury_quotas()
+        self.assertEqual(result["reclaimed"],1)
+        self.assertEqual(result["missing_held"],1)
+        query,update=app.limits.update_one.await_args.args
+        self.assertEqual(query["session_ids"],doc["session_ids"])
+        self.assertEqual(query["vault_ids"],doc["vault_ids"])
+        self.assertEqual(query["owner_id"],SCOPE["owner_id"])
+        self.assertEqual(update["$pull"],{"session_ids":{"$in":["gone"]},"vault_ids":{"$in":["gone"]}})
+        app.sessions.update_one.assert_not_called()
+        app.sessions.delete_one.assert_not_called()
+
+    async def test_concurrent_quota_change_never_reports_reclaimed(self):
+        app,doc,rows,now=self.harness(modified=0)
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.reconcile_treasury_quotas()
+        self.assertEqual(result["superseded"],1)
+        self.assertEqual(result["reclaimed"],0)
+
+    async def test_read_health_is_fenced_and_never_returns_ids(self):
+        app,doc,rows,now=self.harness()
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.treasury_quota_status(SCOPE)
+        self.assertEqual(result["distinct_reserved"],3)
+        self.assertEqual(result["tombstoned"],1)
+        self.assertEqual(result["missing"],1)
+        self.assertFalse(result["missing_auto_reclaimed"])
+        self.assertNotIn("session_ids",result)
+        self.assertNotIn("gone",str(result))
+        app.limits.update_one.assert_not_awaited()
+        app.limits.find_one.side_effect=[doc,{**doc,"session_ids":["new"]}]
+        with patch("core.dragon_crawler._now",return_value=now):
+            with self.assertRaises(CrawlerError):
+                await app.treasury_quota_status(SCOPE)
+
+
 if __name__=="__main__":
     unittest.main()

@@ -85,5 +85,48 @@ class VaultContractTests(unittest.TestCase):
                 catalogue_scope=("a","b"),candidate_limit_reached=True,cursor=first["next_cursor"])
 
 
+class VaultQuotaTests(unittest.TestCase):
+    def test_conservative_classification_and_exact_array_fence(self):
+        from skeleton.ai.webcrawler.dragon_vault_quota import classify_quota,quota_fence
+        marker=make_marker(operation="a"*64,request_digest="b"*64,snapshot_digest="c"*64,now=NOW)
+        def row(sid,status,**rest):
+            return {"_id":sid,**SCOPE,"version":1,"status":status,**rest}
+        doc={"_id":"d"*64,"session_ids":["active","pending","both","missing","deleted","bad"],
+             "vault_ids":["both","vault","deleted"]}
+        witness={"snapshot_digest":"c"*64}
+        rows=[row("active","queued"),row("pending","completed",treasury_vault=marker,checkpoint_identity=witness),
+              row("both","completed",treasury_vault={**marker,"state":"vaulted"},checkpoint_identity=witness),
+              row("vault","completed",treasury_vault={**marker,"state":"vaulted","active_slot_released":True},checkpoint_identity=witness),
+              row("deleted","deleted",deletion={"operation":"d"*64,"request_digest":"e"*64}),
+              row("bad","deleted",deletion={"operation":"wrong","request_digest":"e"*64})]
+        counts,releasable=classify_quota(doc,rows,SCOPE)
+        self.assertEqual(releasable,["deleted"])
+        self.assertEqual((counts["active"],counts["vaulted"],counts["in_transit"],counts["missing"],
+                          counts["tombstoned"],counts["integrity_held"]),(1,1,2,1,1,1))
+        self.assertEqual(counts["dual_reserved"],2)
+        self.assertEqual(counts["distinct_reserved"],7)
+        self.assertEqual(quota_fence(doc,SCOPE)["session_ids"],doc["session_ids"])
+        self.assertEqual(quota_fence({"_id":"a"},SCOPE)["vault_ids"],{"$exists":False})
+
+    def test_rejects_malformed_or_foreign_metadata(self):
+        from skeleton.ai.webcrawler.dragon_vault_quota import classify_quota
+        for doc in ({"session_ids":["a","a"]},{"vault_ids":[str(i) for i in range(129)]},
+                    {"session_ids":["../bad"]},{"vault_ids":None}):
+            with self.assertRaises(ValueError):
+                classify_quota(doc,[],SCOPE)
+        for another in ({"_id":"a",**SCOPE,"owner_id":"foreign","version":1,"status":"deleted"},
+                        {"_id":"b",**SCOPE,"version":1,"status":"deleted"}):
+            with self.assertRaises(ValueError):
+                classify_quota({"session_ids":["a"]},[another],SCOPE)
+
+    def test_partial_tombstone_is_never_reclaimed(self):
+        from skeleton.ai.webcrawler.dragon_vault_quota import classify_quota
+        row={"_id":"a",**SCOPE,"version":1,"status":"deleted",
+             "deletion":{"operation":"a"*64,"request_digest":"b"*64},"checkpoint_identity":{}}
+        counts,removed=classify_quota({"session_ids":["a"]},[row],SCOPE)
+        self.assertEqual(removed,[])
+        self.assertEqual(counts["integrity_held"],1)
+
+
 if __name__=="__main__":
     unittest.main()

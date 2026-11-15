@@ -1,8 +1,8 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,AppState,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {getAuthToken} from '../../auth/gameforgeAuth';
-import {getDragonVault,retireDragonSession,getCrawl,crawlRequestKey,configureDragonArchive,
- configureLegacyTreasuryArchive,eraseCrawl,type DragonVaultCatalog,type DragonVaultEntry,type CrawlSession} from '../../product/crawlerClient';
+import {getDragonVault,getDragonVaultQuota,retireDragonSession,getCrawl,crawlRequestKey,configureDragonArchive,
+ configureLegacyTreasuryArchive,eraseCrawl,type DragonVaultCatalog,type DragonVaultQuota,type DragonVaultEntry,type CrawlSession} from '../../product/crawlerClient';
 import s,{colors} from './CrawlerWorkspace.styles';
 
 type Props={revision:string;session?:CrawlSession|null;canWrite:boolean;disabled:boolean;
@@ -16,6 +16,7 @@ const stamp=(n:number)=>new Date(n*1000).toLocaleString();
 
 export default function DragonVaultPanel({revision,session,canWrite,disabled,onWindow,onSession,onChanged}:Props){
  const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[catalog,setCatalog]=useState<DragonVaultCatalog|null>(null);
+ const [quota,setQuota]=useState<DragonVaultQuota|null>(null);
  const [history,setHistory]=useState<string[]>([]),[cursor,setCursor]=useState<string|undefined>();
  const [selected,setSelected]=useState<string[]>([]),[retention,setRetention]=useState(false);
  const [managed,setManaged]=useState<string|null>(null),[rights,setRights]=useState(false),[days,setDays]=useState('30');
@@ -28,7 +29,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   if(timer.current!==null)clearTimeout(timer.current);timer.current=null;
  },[]);
  const reset=useCallback(()=>{
-  invalidate();setCatalog(null);setSelected([]);setHistory([]);setCursor(undefined);setBusy(false);
+  invalidate();setCatalog(null);setQuota(null);setSelected([]);setHistory([]);setCursor(undefined);setBusy(false);
   setRetention(false);setManaged(null);setRights(false);setEraseText('');operation.current=null;setNotice('');setError('');
  },[invalidate]);
  useEffect(()=>{reset();return invalidate;},[revision,reset,invalidate]);
@@ -41,12 +42,16 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
 
  async function load(next?:string){
   invalidate();const attempt=epoch.current,token=getAuthToken(),ctrl=new AbortController();
-  owner.current=token;pending.current=ctrl;setBusy(true);setCatalog(null);setError('');
+  owner.current=token;pending.current=ctrl;setBusy(true);setCatalog(null);setQuota(null);setError('');
   try{
-   const result=await getDragonVault(next,ctrl.signal);
+   const [result,health]=await Promise.allSettled([getDragonVault(next,ctrl.signal),getDragonVaultQuota(ctrl.signal)]);
    if(!valid(ctrl,attempt,token))return;
-   setCatalog(result);setCursor(next);setManaged(null);setRights(false);setEraseText('');setRetention(false);
-   timer.current=setTimeout(()=>{if(epoch.current===attempt){setCatalog(null);setSelected([]);setManaged(null);setRights(false);setEraseText('');}},60000);
+   if(health.status==='fulfilled')setQuota(health.value);
+   if(result.status==='rejected')throw result.reason;
+   const page=result.value;
+   if(!valid(ctrl,attempt,token))return;
+   setCatalog(page);setCursor(next);setManaged(null);setRights(false);setEraseText('');setRetention(false);
+   timer.current=setTimeout(()=>{if(epoch.current===attempt){setCatalog(null);setQuota(null);setSelected([]);setManaged(null);setRights(false);setEraseText('');}},60000);
   }catch(e){if(valid(ctrl,attempt,token))setError(e instanceof Error?e.message:'Vault catalogue unavailable.');}
   finally{if(epoch.current===attempt){pending.current=null;setBusy(false);}}
  }
@@ -57,7 +62,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   const n=action==='grant'?Number(days):30;
   if(!Number.isInteger(n)||n<1||n>30){setError('Historical-use duration must be 1–30 days.');return;}
   invalidate();const token=getAuthToken(),attempt=epoch.current,ctrl=new AbortController();pending.current=ctrl;
-  setBusy(true);setError('');setNotice('');setCatalog(null);
+  setBusy(true);setError('');setNotice('');setCatalog(null);setQuota(null);
   const identity=[action,id,version,n].join(':');
   if(operation.current?.identity!==identity)operation.current={identity,key:crawlRequestKey('vault-'+action)};
   const command={expected_version:version,idempotency_key:operation.current.key};
@@ -98,6 +103,12 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   <Button label={open?'Close cold-custody catalogue':'Open cold-custody catalogue'} disabled={busy||disabled}
    action={()=>{if(open){reset();onWindow(undefined);}else void load();setOpen(!open);}}/>
   {open&&<>
+   {quota&&owner.current===getAuthToken()&&<View style={s.check}>
+    <Text style={s.label}>Den capacity and recovery</Text>
+    <Text style={s.small}>{quota.active_reserved}/{quota.active_capacity} active reservations · {quota.vault_reserved}/{quota.vault_capacity} cold-custody reservations</Text>
+    <Text style={s.small}>{quota.in_transit} retirement transitions · {quota.dual_reserved} dual reservations · {quota.tombstoned} erased records awaiting cleanup</Text>
+    <Text style={s.small}>{quota.missing} unresolved reservations · {quota.integrity_held} integrity holds. Missing records are never automatically reclaimed.</Text>
+   </View>}
    {eligible&&canWrite&&<View style={s.check}>
     <Text style={s.label}>Retire selected finished expedition · {session.session_id.slice(0,12)}</Text>
     <View style={s.row}><Switch value={retention} onValueChange={setRetention} disabled={busy||disabled}

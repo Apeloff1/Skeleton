@@ -2829,6 +2829,11 @@ async def crawler_legacy_archive(
     ))
 
 
+@router.get("/crawler/companion/vault-quota")
+async def crawler_treasury_quota(scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.treasury_quota_status(scope))
+
+
 @router.get("/crawler/companion/vault")
 async def crawler_treasury_vault(
     cursor: str|None = Query(default=None,pattern=r"^[A-Za-z0-9_-]{1,128}$"),

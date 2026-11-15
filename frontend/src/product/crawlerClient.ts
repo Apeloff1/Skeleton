@@ -534,6 +534,25 @@ function vaultSelection(ids:string[]):string[]{
       ||new Set(ids).size!==ids.length)invalid('Select 1–32 distinct retired expeditions.');
   return [...ids].sort();
 }
+export type DragonVaultQuota = {
+  schema:'skeleton.dragon.vault-quota.v1'; as_of_unix:number; active_reserved:number; vault_reserved:number;
+  distinct_reserved:number;dual_reserved:number;active_capacity:32;vault_capacity:128;
+  active:number;vaulted:number;in_transit:number;tombstoned:number;missing:number;integrity_held:number;
+  missing_auto_reclaimed:false;source_records_erased:false;read_only:true;
+};
+export async function getDragonVaultQuota(signal?:AbortSignal):Promise<DragonVaultQuota>{
+  const p=await read(api.get<DragonVaultQuota>(ROOT+'/companion/vault-quota',options(signal)),getAuthToken(),'Vault quota health unavailable.');
+  if(!p||p.schema!=='skeleton.dragon.vault-quota.v1'||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0
+    ||p.active_capacity!==32||p.vault_capacity!==128||!integer(p.active_reserved,32)||!integer(p.vault_reserved,128)
+    ||!integer(p.dual_reserved,Math.min(p.active_reserved,p.vault_reserved))
+    ||!integer(p.distinct_reserved,160)||p.distinct_reserved!==p.active_reserved+p.vault_reserved-p.dual_reserved
+    ||![p.active,p.vaulted,p.in_transit,p.tombstoned,p.missing,p.integrity_held].every(n=>integer(n,p.distinct_reserved))
+    ||p.active+p.vaulted+p.in_transit+p.tombstoned+p.missing+p.integrity_held!==p.distinct_reserved
+    ||p.active>p.active_reserved||p.vaulted>p.vault_reserved
+    ||p.missing_auto_reclaimed!==false||p.source_records_erased!==false||p.read_only!==true)
+    invalid('Invalid vault quota health projection.');
+  return p;
+}
 export async function getDragonVault(cursor?:string,signal?:AbortSignal):Promise<DragonVaultCatalog>{
   if(cursor!==undefined&&!ID.test(cursor))invalid('Invalid vault catalogue cursor.');
   const p=await read(api.get<DragonVaultCatalog>(ROOT+'/companion/vault?limit=32'+(cursor?'&cursor='+encodeURIComponent(cursor):''),options(signal)),getAuthToken(),'Vault catalogue unavailable.');

@@ -221,3 +221,85 @@ class DragonVaultMixin:
                 "next_cursor":rows[limit-1]["_id"] if len(rows)>limit else None,
                 "capacity":MAX_VAULT_SESSIONS,"as_of_unix":now,"archive_use_verified":False,
                 "network_executed":False}
+
+
+    async def _quota_rows(self,scope,document):
+        from skeleton.ai.webcrawler.dragon_vault_quota import quota_lists,MAX_RESERVED
+        active,vault=quota_lists(document)
+        identifiers=sorted(set(active)|set(vault))
+        if not identifiers:
+            return []
+        return await self.sessions.find({**scope,"_id":{"$in":identifiers}},
+            {"_id":1,"tenant_id":1,"owner_id":1,"version":1,"status":1,"deletion":1,
+             "treasury_vault":1,"checkpoint_identity.snapshot_digest":1}
+        ).sort("_id",ASCENDING).limit(MAX_RESERVED+1).max_time_ms(2000).to_list(MAX_RESERVED+1)
+
+    async def treasury_quota_status(self,scope):
+        """Read-only reservation health; no source text or identifier exposure."""
+        from core.dragon_crawler import CrawlerError,_digest,_now
+        from skeleton.ai.webcrawler.dragon_vault_quota import classify_quota,quota_lists
+        query={"_id":_digest(scope),**scope}
+        projection={"_id":1,"session_ids":1,"vault_ids":1}
+        document=await self.limits.find_one(query,projection,max_time_ms=2000)
+        try:
+            rows=await self._quota_rows(scope,document)
+            counts,_=classify_quota(document,rows,scope)
+            final=await self.limits.find_one(query,projection,max_time_ms=2000)
+            confirmed=await self._quota_rows(scope,final)
+            if final!=document or rows!=confirmed:
+                raise CrawlerError("crawler_quota_changed","Quota changed during inspection; refresh.",409)
+            quota_lists(final)
+        except (ValueError,TypeError,KeyError) as exc:
+            raise CrawlerError("crawler_quota_integrity","Quota reservation metadata requires review.",503) from exc
+        return {"ok":True,"schema":"skeleton.dragon.vault-quota.v1","as_of_unix":_now().timestamp(),
+                **counts,"missing_auto_reclaimed":False,"source_records_erased":False,"read_only":True}
+
+    async def reconcile_treasury_quotas(self,*,limit=2):
+        """Conservatively reclaim only proven permanent tombstones.
+
+        Owner quota documents are scanned round-robin by a bounded due marker.
+        Missing rows are never reclaimed: creation can have reserved a slot
+        before inserting the record. Exact-array CAS defeats concurrent moves.
+        """
+        from core.dragon_crawler import CrawlerError,_digest,_now
+        from skeleton.ai.webcrawler.dragon_vault_quota import classify_quota,quota_fence
+        if type(limit) is not int or not 1<=limit<=2:
+            raise ValueError("quota repair limit exceeded")
+        await self.ensure_indexes()
+        now=_now().timestamp()
+        documents=await self.limits.find({
+            "tenant_id":{"$type":"string"},"owner_id":{"$type":"string"},"session_ids":{"$exists":True},
+            "$or":[{"treasury_quota_due":{"$exists":False}},{"treasury_quota_due":{"$lte":now}}]},
+            {"_id":1,"tenant_id":1,"owner_id":1,"session_ids":1,"vault_ids":1,"treasury_quota_due":1}
+        ).sort([("treasury_quota_due",ASCENDING),("_id",ASCENDING)]).limit(limit).max_time_ms(2000).to_list(limit)
+        totals={"scanned":len(documents),"audited":0,"reclaimed":0,"missing_held":0,
+                "integrity_held":0,"superseded":0,"failed":0}
+        for document in documents:
+            scope={k:document[k] for k in ("tenant_id","owner_id")}
+            if document["_id"]!=_digest(scope):
+                totals["failed"]+=1
+                continue
+            try:
+                rows=await self._quota_rows(scope,document)
+                counts,removed=classify_quota(document,rows,scope)
+                fence=quota_fence(document,scope)
+                fence["treasury_quota_due"]=document.get("treasury_quota_due",{"$exists":False})
+                update={"$set":{"treasury_quota_due":_now().timestamp()+3600}}
+                if removed:
+                    update["$pull"]={"session_ids":{"$in":removed},"vault_ids":{"$in":removed}}
+                changed=await self.limits.update_one(fence,update)
+                if not changed.modified_count:
+                    totals["superseded"]+=1
+                    continue
+                totals["audited"]+=1
+                totals["reclaimed"]+=len(removed)
+                totals["missing_held"]+=counts["missing"]
+                totals["integrity_held"]+=counts["integrity_held"]
+            except (ValueError,TypeError,KeyError,CrawlerError,PyMongoError):
+                totals["failed"]+=1
+                # Quarantine the scheduler cursor without editing malformed
+                # reservations. Never allow one broken owner to monopolize it.
+                await self.limits.update_one({"_id":document["_id"],**scope,
+                    "treasury_quota_due":document.get("treasury_quota_due",{"$exists":False})},
+                    {"$set":{"treasury_quota_due":_now().timestamp()+3600}})
+        return totals
