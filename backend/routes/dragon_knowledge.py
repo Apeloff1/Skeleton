@@ -178,6 +178,12 @@ class LeadGraphConfiguration(Request):
     acknowledged: StrictBool
 
 
+class LeadBundleGrant(Request):
+    rights_ref: str = Field(min_length=1,max_length=128)
+    grant_seconds: int = Field(default=86400,ge=900,le=2592000,strict=True)
+    acknowledged: StrictBool
+
+
 class LeadDatasetBegin(Request):
     target_id: str = Field(min_length=1,max_length=64)
     projection: Literal["steam","modrinth","locator"]
@@ -857,3 +863,15 @@ def register_knowledge_routes(router):
     async def lead_dataset_revoke(snapshot:str,user:dict=Depends(get_current_user)):
         from core.dragon_corpus_runtime import lead_graph_call
         return await corpus_runtime_call(lead_graph_call(editor(user),"revoke",snapshot))
+
+
+    @router.get("/knowledge/game-corpus/lead-graph/bundle")
+    async def lead_bundle_status(response:Response,user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import lead_graph_call
+        response.headers["Cache-Control"]="private, no-store"
+        return await corpus_runtime_call(lead_graph_call(scope(user),"bundle_status"))
+
+    @router.post("/knowledge/game-corpus/lead-graph/bundle/enable")
+    async def lead_bundle_enable(body:LeadBundleGrant,user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import lead_graph_call
+        return await corpus_runtime_call(lead_graph_call(editor(user),"enable_bundle",**body.model_dump()))
