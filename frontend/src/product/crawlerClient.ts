@@ -39,6 +39,30 @@ export type CrawlAcquisitionEconomics = {
   settled_requests: number; charged_bytes: number; uncertain_bytes: number;
   hosts: Record<string, CrawlHostEconomics>; network_authority_expanded: false;
 };
+export type DragonQuest = {
+  code: string; branch: 'discovery' | 'scholar' | 'ecology' | 'stewardship';
+  target: number; progress: number; prerequisite: string | null;
+  state: 'completed' | 'active' | 'locked'; applicable: boolean;
+  source_ids: string[]; last_evidence_sequence: number | null; evidence_redacted?: boolean;
+};
+export type DragonQuestbook = {
+  schema: 'skeleton.dragon.questbook.v1'; completed: number; total: number; quests: DragonQuest[];
+  contribution_count: number; credited_sources: number; revision_digest: string;
+  derived_not_persisted: true; training_permission: false; network_authority_expanded: false;
+  evidence_access?: 'current_source_policy_filtered';
+};
+export type DragonCurriculumDecision = {
+  strategy: 'companion' | 'companion_curiosity' | 'companion_scholar' | 'companion_guardian';
+  quest: DragonCompanion['quest']; candidate_digest: string; eligible: number;
+  base_milli: number; priority_milli: number; phase: 'policy' | 'content';
+  network_authority_expanded: false; request: number; event_sequence: number;
+  outcome: string; source_id: string | null;
+};
+export type DragonCurriculumTrace = {
+  decisions: number;
+  quests: Record<DragonCompanion['quest'], { content_attempts: number; captures: number; policy_attempts: number; uncertain_attempts: number }>;
+  recent: DragonCurriculumDecision[]; training_permission: false; network_authority_expanded: false;
+};
 export type DragonCompanion = {
   schema: 'skeleton.dragon.companion.v1';
   form: 'hatchling' | 'scout' | 'scholar' | 'pathfinder' | 'archivist';
@@ -54,6 +78,7 @@ export type DragonCompanion = {
   unreviewed_evidence_only: true; network_authority_expanded: false;
   training_permission: false; inactivity_penalty: false;
   learning_progress: number; novelty_yield: number;
+  questbook?: DragonQuestbook;
 };
 export type CrawlSession = {
   session_id: string; title: string; status: 'queued' | 'ready' | 'running' | 'paused' | 'completed' | 'cancelled' | 'budget_exhausted' | 'failed' | 'interrupted';
@@ -66,6 +91,7 @@ export type CrawlSession = {
   duplicate_evidence?: CrawlDuplicateEvidence; checkpoint_recovery?: CrawlCheckpointRecovery;
   acquisition_economics?: CrawlAcquisitionEconomics;
   companion?: DragonCompanion;
+  curriculum_trace?: DragonCurriculumTrace;
   queue: { url: string; depth: number; attempts: number; ready_at: number }[];
 };
 export type SourceUsePolicy = { version: number; enabled: boolean; max_age_seconds: number; changed_at: string | null };
@@ -168,6 +194,70 @@ function validOriginHealth(value: Record<string, CrawlOriginHealth>): boolean {
     health.failure_streak <= health.failures &&
     [health.posterior_success, health.uncertainty].every(n => Number.isFinite(n) && n >= 0 && n <= 1));
 }
+const QUEST_SPEC: ReadonlyArray<readonly [string, DragonQuest['branch'], number, string | null]> = [
+  ['first_scale','discovery',1,null], ['novel_trail','discovery',3,'first_scale'],
+  ['cartographer','discovery',8,'novel_trail'], ['first_insight','scholar',1,null],
+  ['mosaic','scholar',70,'first_insight'], ['many_perspectives','scholar',2,'mosaic'],
+  ['new_habitat','ecology',2,null], ['habitat_keeper','ecology',3,'new_habitat'],
+  ['far_roamer','ecology',3,'new_habitat'], ['measured_expedition','stewardship',4,null],
+  ['careful_researcher','stewardship',60,'measured_expedition'], ['balanced_mastery','stewardship',4,'careful_researcher'],
+];
+function validQuestbook(book: DragonQuestbook, value: CrawlSession): boolean {
+  if (!book || book.schema !== 'skeleton.dragon.questbook.v1' || book.total !== QUEST_SPEC.length
+    || !integer(book.completed, book.total) || !integer(book.contribution_count, value.source_count)
+    || !integer(book.credited_sources, book.contribution_count) || !HASH.test(book.revision_digest)
+    || book.derived_not_persisted !== true || book.training_permission !== false || book.network_authority_expanded !== false
+    || (book.evidence_access !== undefined && book.evidence_access !== 'current_source_policy_filtered')
+    || !Array.isArray(book.quests) || book.quests.length !== book.total) return false;
+  const achieved = new Set<string>();
+  for (let i = 0; i < QUEST_SPEC.length; i++) {
+    const q = book.quests[i], [code, branch, target, prerequisite] = QUEST_SPEC[i];
+    if (!q || q.code !== code || q.branch !== branch || q.target !== target || q.prerequisite !== prerequisite
+      || !integer(q.progress, target) || typeof q.applicable !== 'boolean'
+      || !['completed', 'active', 'locked'].includes(q.state) || !Array.isArray(q.source_ids)
+      || q.source_ids.length > 8 || new Set(q.source_ids).size !== q.source_ids.length
+      || q.source_ids.some(id => typeof id !== 'string' || !HASH.test(id))
+      || q.evidence_redacted !== undefined && typeof q.evidence_redacted !== 'boolean') return false;
+    const ready = q.applicable && (prerequisite === null || achieved.has(prerequisite));
+    if ((!ready && q.state !== 'locked') || (ready && q.state === 'locked')) return false;
+    if (q.state === 'completed') {
+      if (q.progress !== target || (!q.source_ids.length && q.evidence_redacted !== true)
+        || !integer(q.last_evidence_sequence, 10000) || q.last_evidence_sequence === 0) return false;
+      achieved.add(q.code);
+    } else if (q.source_ids.length || q.last_evidence_sequence !== null || q.evidence_redacted === true) return false;
+  }
+  return achieved.size === book.completed;
+}
+function validCurriculumTrace(trace: DragonCurriculumTrace, value: CrawlSession): boolean {
+  if (!trace || !integer(trace.decisions, value.counters.requests) || trace.training_permission !== false
+    || trace.network_authority_expanded !== false || !trace.quests || !Array.isArray(trace.recent)
+    || trace.recent.length !== Math.min(trace.decisions, 8)) return false;
+  const quests = ['explore','synthesize','diversify','conserve','recover','rest'] as const;
+  if (Object.keys(trace.quests).length !== quests.length) return false;
+  let total = 0;
+  for (const key of quests) {
+    const q = trace.quests[key];
+    if (!q || !integer(q.content_attempts, trace.decisions) || !integer(q.policy_attempts, trace.decisions)
+      || !integer(q.captures, q.content_attempts) || !integer(q.uncertain_attempts, q.content_attempts + q.policy_attempts)) return false;
+    total += q.content_attempts + q.policy_attempts;
+  }
+  if (total !== trace.decisions) return false;
+  let prev = 0;
+  for (const d of trace.recent) {
+    if (!d || !['companion','companion_curiosity','companion_scholar','companion_guardian'].includes(d.strategy)
+      || d.strategy !== value.limits.frontier_strategy || !quests.includes(d.quest) || !HASH.test(d.candidate_digest)
+      || !integer(d.eligible, 512) || d.eligible === 0 || !integer(d.base_milli, 1000) || !integer(d.priority_milli, 1000)
+      || Math.abs(d.base_milli - d.priority_milli) > 121
+      || ['rest','recover','conserve'].includes(d.quest) && d.base_milli !== d.priority_milli
+      || !['policy','content'].includes(d.phase) || d.network_authority_expanded !== false
+      || !integer(d.request, value.counters.requests) || d.request <= prev
+      || !integer(d.event_sequence, 10000) || d.event_sequence === 0
+      || typeof d.outcome !== 'string' || d.outcome.length > 64
+      || d.source_id !== null && (d.outcome !== 'captured' || !HASH.test(d.source_id))) return false;
+    prev = d.request;
+  }
+  return true;
+}
 function session(value: CrawlSession, expectedId?: string): CrawlSession {
   if (!value || !ID.test(value.session_id) || expectedId && value.session_id !== expectedId || !STATUSES.has(value.status)
     || !integer(value.version) || value.version < 1 || typeof value.title !== 'string' || value.title.length > 160
@@ -221,7 +311,9 @@ function session(value: CrawlSession, expectedId?: string): CrawlSession {
       || Object.values(p.habitats).reduce((a, n) => a + n, 0) > p.captured_sources
       || p.unreviewed_evidence_only !== true || p.network_authority_expanded !== false
       || p.training_permission !== false || p.inactivity_penalty !== false) invalid('Invalid evidence-fed companion projection.');
+    if (p.questbook !== undefined && !validQuestbook(p.questbook, value)) invalid('Invalid source-bound companion questbook.');
   }
+  if (value.curriculum_trace !== undefined && !validCurriculumTrace(value.curriculum_trace, value)) invalid('Invalid companion decision trace.');
   if (value.duplicate_evidence !== undefined) {
     const d = value.duplicate_evidence;
     if (!d || !integer(d.count, Math.min(128, value.counters.requests)) || !integer(d.represented_sources, Math.min(d.count, value.source_count))
