@@ -22,7 +22,7 @@ from typing import Dict, Mapping, Optional, Tuple
 
 from skeleton.context.tensor import AXES
 
-ARCHETYPE_CONTENT_VERSION = 3
+ARCHETYPE_CONTENT_VERSION = 4
 COMPLETE_MARKER = "ARCHETYPE_LOOP_COMPLETE"
 FAILED_MARKER = "ARCHETYPE_LOOP_FAILED"
 
@@ -67,6 +67,8 @@ const GOAL_COLOR := Color(0.34, 0.94, 0.58, 1.0)
 var frames: int = 0
 var finished: bool = false
 var hud_label: Label = null
+var retry_button: Button = null
+var retry_pending: bool = false
 @onready var player: CharacterBody2D = $Player
 
 
@@ -98,6 +100,38 @@ func _ready() -> void:
 \t_add_direction(controls, "ui_left", "LEFT", Vector2(24.0, -130.0))
 \t_add_direction(controls, "ui_down", "DOWN", Vector2(90.0, -130.0))
 \t_add_direction(controls, "ui_right", "RIGHT", Vector2(156.0, -130.0))
+\t_add_direction(controls, "ui_accept", "USE", Vector2(230.0, -130.0))
+\tretry_button = Button.new()
+\tretry_button.name = "RetryPrototype"
+\tretry_button.text = "Retry challenge"
+\tretry_button.focus_mode = Control.FOCUS_NONE
+\toverlay.add_child(retry_button)
+\tretry_button.position = Vector2(20.0, 102.0)
+\tretry_button.custom_minimum_size = Vector2(200.0, 44.0)
+\tretry_button.hide()
+\tretry_button.pressed.connect(_request_retry)
+
+
+func _request_retry() -> void:
+\tif not finished or retry_pending or bool(player.get("autopilot")):
+\t\treturn
+\tretry_pending = true
+\tif retry_button != null:
+\t\tretry_button.disabled = true
+\tcall_deferred("_reload_challenge")
+
+
+func _reload_challenge() -> void:
+\t# A portal transition may win the race with retry. Never replace its scene.
+\tif not is_inside_tree() or get_tree().current_scene != self:
+\t\treturn
+\tvar status: Error = get_tree().reload_current_scene()
+\tif status != OK:
+\t\tretry_pending = false
+\t\tif retry_button != null:
+\t\t\tretry_button.disabled = false
+\t\tif hud_label != null:
+\t\t\thud_label.text += "\\nRetry unavailable; return to Forge world."
 
 
 func _add_direction(controls: Control, action: String, caption: String, offset: Vector2) -> void:
@@ -116,16 +150,21 @@ func _add_direction(controls: Control, action: String, caption: String, offset: 
 
 
 func _press_action(action: String) -> void:
-\tInput.action_press(action)
+\tif not finished:
+\t\tInput.action_press(action)
 
 
 func _release_action(action: String) -> void:
 \tInput.action_release(action)
 
 
-func _exit_tree() -> void:
-\tfor action in ["ui_up", "ui_down", "ui_left", "ui_right"]:
+func _release_controls() -> void:
+\tfor action in ["ui_up", "ui_down", "ui_left", "ui_right", "ui_accept"]:
 \t\tInput.action_release(action)
+
+
+func _exit_tree() -> void:
+\t_release_controls()
 
 
 func _draw() -> void:
@@ -143,8 +182,13 @@ func _finish(ok: bool, reason: String) -> void:
 \tif finished:
 \t\treturn
 \tfinished = true
+\t_release_controls()
+\tplayer.velocity = Vector2.ZERO
+\tplayer.set_physics_process(false)
+\tif retry_button != null:
+\t\tretry_button.show()
 \tif hud_label != null:
-\t\thud_label.text = ("COMPLETED: " if ok else "FAILED: ") + reason + "\\nReturn to Forge world using the top button"
+\t\thud_label.text = ("COMPLETED: " if ok else "FAILED: ") + reason + "\\nRetry challenge or return to Forge world"
 \tqueue_redraw()
 \tif ok:
 \t\tprint("{complete} ", ARCHETYPE, " ", reason)
@@ -165,7 +209,7 @@ func _physics_process(delta: float) -> void:
 \t\treturn
 \t_tick(delta)
 \tqueue_redraw()
-\tif hud_label != null:
+\tif not finished and hud_label != null:
 \t\thud_label.text = "{instruction}\\n" + _hud_status()
 '''
 
@@ -209,56 +253,101 @@ func _draw_objectives() -> void:
 '''
 
 _COMBAT = '''
-## Combat loop: survive and clear three escalating waves.
+## Combat: select the nearest living enemy, move, attack and survive waves.
 const WAVES := 3
 const ATTACK_RANGE := 24.0
 const ATTACK_DAMAGE := 5
 const CONTACT_DAMAGE := 1
+const ENEMY_SPEED := 30.0
+const ATTACK_INTERVAL := 0.10
+const CONTACT_INTERVAL := 0.50
 var wave: int = 0
 var enemies: Array[Dictionary] = []
 var player_hp: int = 100
 var kills: int = 0
+var attack_cooldown: float = 0.0
+var contact_cooldown: float = 0.0
+var attack_flash: float = 0.0
+var target_index: int = -1
 
 
 func _spawn_wave() -> void:
 \twave += 1
 \tfor i in range(wave + 1):
 \t\tvar angle := TAU * float(i) / float(wave + 1)
-\t\tenemies.append({"pos": Vector2(cos(angle), sin(angle)) * 160.0, "hp": 5 * wave})
+\t\tvar hp := 5 * wave
+\t\tenemies.append({"pos": Vector2(cos(angle), sin(angle)) * 160.0, "hp": hp, "max_hp": hp})
 
 
-func _tick(_delta: float) -> void:
+func _nearest_enemy() -> int:
+\tvar nearest: int = -1
+\tvar best_distance: float = INF
+\tfor index in range(enemies.size()):
+\t\tvar enemy_pos: Vector2 = enemies[index]["pos"]
+\t\tvar distance := enemy_pos.distance_squared_to(player.global_position)
+\t\tif distance < best_distance:
+\t\t\tnearest = index
+\t\t\tbest_distance = distance
+\treturn nearest
+
+
+func _tick(delta: float) -> void:
+\tattack_cooldown = maxf(0.0, attack_cooldown - delta)
+\tcontact_cooldown = maxf(0.0, contact_cooldown - delta)
+\tattack_flash = maxf(0.0, attack_flash - delta)
 \tif enemies.is_empty():
 \t\tif wave >= WAVES:
 \t\t\t_finish(true, "waves=%d kills=%d hp=%d" % [wave, kills, player_hp])
 \t\t\treturn
 \t\t_spawn_wave()
-\tvar target: Dictionary = enemies[0]
-\tplayer.autopilot_target = target["pos"]
+\tvar touching := false
 \tfor enemy in enemies:
-\t\tenemy["pos"] = enemy["pos"].move_toward(player.global_position, 0.5)
-\t\tif enemy["pos"].distance_to(player.global_position) < 8.0 and frames % 30 == 0:
-\t\t\tplayer_hp -= CONTACT_DAMAGE
+\t\tvar enemy_pos: Vector2 = enemy["pos"]
+\t\tenemy_pos = enemy_pos.move_toward(player.global_position, ENEMY_SPEED * delta)
+\t\tenemy["pos"] = enemy_pos
+\t\tif enemy_pos.distance_to(player.global_position) < 8.0:
+\t\t\ttouching = true
+\tif touching and contact_cooldown <= 0.0:
+\t\tplayer_hp = maxi(0, player_hp - CONTACT_DAMAGE)
+\t\tcontact_cooldown = CONTACT_INTERVAL
 \tif player_hp <= 0:
 \t\t_finish(false, "player down")
 \t\treturn
-\tif target["pos"].distance_to(player.global_position) <= ATTACK_RANGE and frames % 6 == 0:
-\t\ttarget["hp"] -= ATTACK_DAMAGE
-\t\tif target["hp"] <= 0:
-\t\t\tenemies.remove_at(0)
+\ttarget_index = _nearest_enemy()
+\tif target_index < 0:
+\t\treturn
+\tvar target: Dictionary = enemies[target_index]
+\tvar target_pos: Vector2 = target["pos"]
+\tplayer.set("autopilot_target", target_pos)
+\tvar wants_attack: bool = bool(player.get("autopilot")) or Input.is_action_pressed("ui_accept")
+\tif wants_attack and attack_cooldown <= 0.0 and target_pos.distance_to(player.global_position) <= ATTACK_RANGE:
+\t\tattack_cooldown = ATTACK_INTERVAL
+\t\tattack_flash = 0.12
+\t\ttarget["hp"] = int(target["hp"]) - ATTACK_DAMAGE
+\t\tif int(target["hp"]) <= 0:
+\t\t\tenemies.remove_at(target_index)
 \t\t\tkills += 1
+\t\t\ttarget_index = _nearest_enemy()
 
 
 func _hud_status() -> String:
-\treturn "Wave: %d/%d | Enemies: %d | HP: %d | Kills: %d" % [wave, WAVES, enemies.size(), player_hp, kills]
+\treturn "Wave: %d/%d | Enemies: %d | HP: %d | Kills: %d | Hold Enter or USE to attack" % [wave, WAVES, enemies.size(), player_hp, kills]
 
 
 func _draw_objectives() -> void:
-\tfor enemy in enemies:
+\tfor index in range(enemies.size()):
+\t\tvar enemy: Dictionary = enemies[index]
 \t\tvar pos: Vector2 = enemy["pos"]
 \t\tdraw_circle(pos, 12.0, Color(0.96, 0.32, 0.37))
-\t\tdraw_arc(pos, 17.0, 0.0, TAU, 24, TARGET_COLOR, 2.0)
+\t\tvar shade := TARGET_COLOR if index == target_index else Color(0.55, 0.27, 0.30)
+\t\tdraw_arc(pos, 17.0, 0.0, TAU, 24, shade, 2.0)
+\t\tvar ratio := clampf(float(enemy["hp"]) / float(enemy["max_hp"]), 0.0, 1.0)
+\t\tdraw_rect(Rect2(pos + Vector2(-14.0, -23.0), Vector2(28.0, 4.0)), FLOOR)
+\t\tdraw_rect(Rect2(pos + Vector2(-14.0, -23.0), Vector2(28.0 * ratio, 4.0)), GOAL_COLOR)
+\tif attack_flash > 0.0:
+\t\tdraw_arc(player.global_position, ATTACK_RANGE, 0.0, TAU, 32, TARGET_COLOR, 3.0)
 '''
+
 
 _PIPELINE = '''
 ## Pipeline: haul raw ore source -> refinery -> depot until the quota ships.
@@ -329,7 +418,7 @@ shape = SubResource("CircleShape2D_player")
 
 _INSTRUCTIONS = {
     "extraction": "Collect three golden caches, then reach the green extraction point",
-    "combat_loop": "Clear three enemy waves by approaching red targets",
+    "combat_loop": "Move near enemies; hold Enter or USE to attack and survive the waves",
     "pipeline": "Ship four loads through the source, refinery and depot",
 }
 
@@ -347,22 +436,7 @@ _EXPANDED_CONTROLLER = _CONTROLLER
 
 # Use the existing visual grid, live progress, headless isolation and D-pad.
 # Expanded interactions also need a dedicated pointer/touch USE action.
-_EXPANDED_LOOP_HEADER = (
-    _LOOP_HEADER
-    .replace(
-        '\t_add_direction(controls, "ui_right", "RIGHT", Vector2(156.0, -130.0))',
-        '\t_add_direction(controls, "ui_right", "RIGHT", Vector2(156.0, -130.0))\n'
-        '\t_add_direction(controls, "ui_accept", "USE", Vector2(230.0, -130.0))',
-    )
-    .replace(
-        '["ui_up", "ui_down", "ui_left", "ui_right"]',
-        '["ui_up", "ui_down", "ui_left", "ui_right", "ui_accept"]',
-    )
-    .replace(
-        'if hud_label != null:\n\t\thud_label.text = "{instruction}\\n" + _hud_status()',
-        'if not finished and hud_label != null:\n\t\thud_label.text = "{instruction}\\n" + _hud_status()',
-    )
-)
+_EXPANDED_LOOP_HEADER = _LOOP_HEADER
 
 
 _PUZZLE = '''
@@ -372,29 +446,61 @@ var switches: Array[Vector2] = [
 	Vector2(-40, 150), Vector2(-180, -20)
 ]
 var next_switch: int = 0
+var mistakes: int = 0
+var clue_until: int = 120
+const MAX_MISTAKES := 5
 const SHOW_ACTIVE_SWITCH := true
 const USE_RADIUS := 18.0
 
 func _draw_objectives() -> void:
 	for index in range(switches.size()):
-		var shade := Color(0.20, 0.90, 0.58) if SHOW_ACTIVE_SWITCH and index == next_switch else Color(0.4, 0.4, 0.4)
+		var solved := index < next_switch
+		var hinted := index == next_switch and (SHOW_ACTIVE_SWITCH or frames <= clue_until)
+		var shade := Color(0.20, 0.90, 0.58) if hinted else Color(0.4, 0.4, 0.4)
+		if solved:
+			shade = Color(0.25, 0.60, 0.95)
 		draw_circle(switches[index], 14.0, shade)
 		draw_arc(switches[index], USE_RADIUS, 0.0, TAU, 24, shade, 2.0)
 
+
+func _near_switch() -> int:
+	var nearest: int = -1
+	var best: float = USE_RADIUS
+	for index in range(switches.size()):
+		var distance := player.global_position.distance_to(switches[index])
+		if distance <= best:
+			nearest = index
+			best = distance
+	return nearest
+
+
 func _tick(_delta: float) -> void:
 	if next_switch >= switches.size():
-		_finish(true, "switches=%d" % next_switch)
+		_finish(true, "switches=%d mistakes=%d" % [next_switch, mistakes])
 		return
 	var target: Vector2 = switches[next_switch]
 	player.set("autopilot_target", target)
-	if player.global_position.distance_to(target) <= USE_RADIUS:
-		if bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
-			next_switch += 1
-			queue_redraw()
+	var autopilot := bool(player.get("autopilot"))
+	if not autopilot and not Input.is_action_just_pressed("ui_accept"):
+		return
+	var selected := _near_switch()
+	if selected < 0 or selected < next_switch:
+		return
+	if selected == next_switch:
+		next_switch += 1
+		clue_until = frames + 90
+	else:
+		mistakes += 1
+		clue_until = frames + 120
+		if mistakes >= MAX_MISTAKES:
+			_finish(false, "too many incorrect switches")
+	queue_redraw()
 
 
 func _hud_status() -> String:
-	return ("Switch %d/%d | Move into the bright ring and press Enter" % [next_switch, switches.size()]) if SHOW_ACTIVE_SWITCH else ("Switches remaining: %d | Discover the correct order" % (switches.size() - next_switch))
+	if SHOW_ACTIVE_SWITCH or frames <= clue_until:
+		return "Switch %d/%d | Green = next | Errors %d/%d" % [next_switch, switches.size(), mistakes, MAX_MISTAKES]
+	return "Switches remaining: %d | Remember the green clue | Errors %d/%d" % [switches.size() - next_switch, mistakes, MAX_MISTAKES]
 '''
 
 _RACING = '''
