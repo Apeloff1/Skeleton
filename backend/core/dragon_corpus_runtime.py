@@ -91,6 +91,8 @@ async def dispatch_capture(scope,principal,*,game,source,observation_digest,oper
           "consent":True,"rights_acknowledged":True,"idempotency_key":"game-capture:"+binding}
     session=await crawler_application.create(scope,body)
     identifier=session["session_id"]
+    await _bounded(lambda:GameCorpus(_path()).bind_capture(scope,game=game,source=source,
+                            observation_digest=observation_digest,session=identifier))
     if autonomous:
         row=await crawler_application._owned(scope,identifier)
         # Never renew/re-enable on replay, after any intervening operation, or
@@ -103,3 +105,22 @@ async def dispatch_capture(scope,principal,*,game,source,observation_digest,oper
     return {"session":session,"game_id":game,"source_id":source,"observation_digest":observation_digest,
             "network_executed":False,"canonical_scheduler":bool(autonomous),
             "source_is_reviewed":False,"wiki_approved":False,"archive_rights_extended":False}
+
+
+async def game_session_ids(scope,game):
+    """Bound only a query's routing set, never permission to use these sessions."""
+    page=await _bounded(lambda:GameCorpus(_path()).capture_sessions(scope,game,limit=100))
+    return [r["session_id"] for r in page["captures"]],page["next_cursor"] is not None
+
+
+async def game_context(scope,query,max_docs,max_chars,*,game,historical):
+    from core.dragon_crawler import crawler_application
+    session_ids,truncated=await game_session_ids(scope,game)
+    if not session_ids:
+        return {"documents":[],"references":[],"game_catalogue_only":True,"partial_routing":False}
+    if historical:
+        value=await crawler_application.history_context(scope,query,max_docs,max_chars,session_ids=session_ids)
+    else:
+        value=await crawler_application.context(scope,query,max_docs,max_chars,session_ids=session_ids)
+    return {**value,"game_id":game,"game_capture_window_truncated":truncated,
+            "partial_routing":True}
