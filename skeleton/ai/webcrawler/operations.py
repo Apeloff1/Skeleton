@@ -1371,12 +1371,14 @@ class CrawlRun:
                 )
                 doc = outcome.document
             else:
-                if time.monotonic() >= self._slice_deadline:
+                remaining = self._slice_deadline - time.monotonic()
+                if remaining <= 0 or (ctype == "application/pdf" and remaining < 1):
                     raise ParserFault("deadline")
                 doc = extract_document(
                     response, item["original_url"],
                     max_links=128, max_text_chars=self.request.max_response_bytes,
                     link_base_url=url,
+                    **({"pdf_deadline_seconds": min(8.0, remaining)} if ctype == "application/pdf" else {}),
                 )
         except ParserFault as exc:
             self._finish_item(item)
