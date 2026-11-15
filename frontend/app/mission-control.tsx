@@ -84,6 +84,12 @@ export default function MissionControl() {
   const [mobilizing, setMobilizing] = React.useState(false);
   const [attachment, setAttachment] = React.useState<any>(null);
   const [activateMsg, setActivateMsg] = React.useState('');
+  const [coverageUnavailable, setCoverageUnavailable] = React.useState(false);
+  const [sourcePage, setSourcePage] = React.useState<any>(null);
+  const [sourceFilter, setSourceFilter] = React.useState<'engines' | 'errors' | 'all'>('engines');
+  const [sourceBusy, setSourceBusy] = React.useState(false);
+  const [sourceError, setSourceError] = React.useState('');
+  const sourceRequest = React.useRef(0);
   const [selftest, setSelftest] = React.useState<any>(null);
   const [testing, setTesting] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
@@ -108,7 +114,8 @@ export default function MissionControl() {
     if (pos.ok) setPositions(pos.data);
     if (pl.ok) setPlans(pl.data?.plans || []);
     if (lg.ok) setLogs(lg.data?.logs || []);
-    if (cov.ok) setCoverage(cov.data);
+    setCoverage(cov.ok ? cov.data : null);
+    setCoverageUnavailable(!cov.ok);
     if (prd.ok) setProod(prd.data);
     if (fab.ok) setFabric(fab.data);
     if (dl.ok) setDelta(dl.data);
@@ -194,18 +201,55 @@ export default function MissionControl() {
     setAsking(false);
   };
 
-  const activateEngines = async () => {
-    setActivateMsg('Activating all engines…');
-    const r = await api.post<any>('/api/gameforge/coverage/activate', {}, { timeoutMs: 30000 });
-    setActivateMsg(r.ok ? r.data.message : 'Activation failed.');
-    load();
+  const refreshCoverage = async () => {
+    setActivateMsg('Reading source inventory…');
+    try {
+      const r = await api.get<any>('/api/gameforge/coverage/scan', { timeoutMs: 20000 });
+      setActivateMsg(r.ok
+        ? `${r.data.discovered} declared modules · ${r.data.complete ? 'scan complete' : 'scan incomplete'} · runtime not qualified`
+        : 'Source inventory unavailable.');
+      await load();
+    } catch {
+      setActivateMsg('Source inventory unavailable.');
+    }
+  };
+
+  const loadSourcePage = async (filter: 'engines' | 'errors' | 'all', offset = 0) => {
+    const request = ++sourceRequest.current;
+    setSourceBusy(true); setSourceError(''); setSourceFilter(filter);
+    if (offset === 0) setSourcePage(null);
+    try {
+      const result = await api.get<any>(
+        `/api/gameforge/coverage/sources?status=${filter}&offset=${offset}&limit=20`,
+        { timeoutMs: 20000 });
+      if (request !== sourceRequest.current) return;
+      if (!result.ok || !Array.isArray(result.data?.records)) {
+        setSourceError('Source evidence unavailable.');
+        return;
+      }
+      const page = result.data;
+      setSourcePage((previous: any) => {
+        // Never combine different inventory receipts. Refresh starts at zero.
+        if (offset > 0 && (!previous || previous.manifest_sha256 !== page.manifest_sha256)) {
+          return { ...page, receiptChanged: true };
+        }
+        return { ...page, records: offset > 0 ? [...previous.records, ...page.records] : page.records };
+      });
+    } catch {
+      if (request === sourceRequest.current) setSourceError('Source evidence unavailable.');
+    } finally {
+      if (request === sourceRequest.current) setSourceBusy(false);
+    }
   };
 
   const runSelfTest = async () => {
-    setTesting(true);
-    const r = await api.get<any>('/api/gameforge/coverage/selftest', { timeoutMs: 30000 });
-    if (r.ok) setSelftest(r.data);
-    setTesting(false);
+    setTesting(true); setSelftest(null);
+    try {
+      const r = await api.get<any>('/api/gameforge/coverage/selftest', { timeoutMs: 30000 });
+      if (r.ok) setSelftest(r.data);
+    } finally {
+      setTesting(false);
+    }
   };
 
   const runSaga = async (failAt: string | null) => {
@@ -288,48 +332,87 @@ export default function MissionControl() {
               </>
             )}
 
-            <Text style={s.h2}>📦 Zip Coverage ({coverage?.overall_percent ?? 0}%)</Text>
+            <Text style={s.h2}>Engine & archive evidence</Text>
             <View style={s.card}>
+              {coverageUnavailable && <Text style={s.msg}>Coverage unavailable. No readiness claim can be made.</Text>}
               <View style={s.statRow}>
-                <Stat label="Subsystems" value={`${coverage?.subsystem_count ?? 0}`} color={GREEN} />
-                <Stat label="Engines live" value={`${coverage?.engines?.live ?? 0}/${coverage?.engines?.total ?? 0}`} color={BLUE} />
-                <Stat label="Dormant" value={`${coverage?.engines?.failed ?? 0}`} color={(coverage?.engines?.failed ?? 0) === 0 ? GREEN : RED} />
+                <Stat label="Registered" value={coverage ? `${coverage.registered_subsystems}/${coverage.subsystem_count}` : '—'} color={BLUE} />
+                <Stat label="Discovered" value={coverage?.engines ? String(coverage.engines.discovered) : '—'} color={BLUE} />
+                <Stat label="Source errors" value={coverage?.engines ? String(coverage.engines.source_errors) : '—'} color={AMBER} />
               </View>
-              {(coverage?.zip_audit || []).map((z: any, i: number) => (
-                <View key={i} style={{ marginTop: 8 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={s.roomName} numberOfLines={1}>{z.zip}</Text>
-                    <Text style={s.roomMeta}>{z.percent}% · {z.modules} mods</Text>
-                  </View>
-                  <View style={s.covTrack}><View style={[s.covFill, { width: `${z.percent}%` }]} /></View>
+              <Text style={s.roomMeta}>
+                {coverage?.engines?.complete === true ? 'Static source scan complete; runtime tests not performed.'
+                  : coverage ? 'Source scan incomplete; inspect errors and limits.' : 'No current inventory.'}
+              </Text>
+              {!!coverage?.engines?.manifest_sha256 && (
+                <Text selectable style={s.roomMeta}>Inventory SHA-256: {coverage.engines.manifest_sha256}</Text>
+              )}
+              <Text style={s.roomMeta}>Archive parity: not established. Historical counts are not current coverage.</Text>
+              {(coverage?.zip_audit || []).map((z: any) => (
+                <View key={z.zip} style={{ marginTop: 8 }}>
+                  <Text style={s.roomName}>{z.zip}</Text>
+                  <Text style={s.roomMeta}>{z.modules} historically claimed modules · parity unverified</Text>
                 </View>
               ))}
-              <TouchableOpacity testID="mc-activate" style={s.activateBtn} onPress={activateEngines}>
-                <Ionicons name="flash" size={16} color="#04120a" />
-                <Text style={s.activateTxt}>Activate all engines (0 dormant)</Text>
+              <TouchableOpacity testID="mc-activate" style={s.activateBtn} onPress={refreshCoverage}>
+                <Ionicons name="refresh" size={16} color="#04120a" />
+                <Text style={s.activateTxt}>Read source inventory</Text>
               </TouchableOpacity>
               {!!activateMsg && <Text style={s.msg}>{activateMsg}</Text>}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                {(['engines', 'errors', 'all'] as const).map((filter) => (
+                  <TouchableOpacity key={filter} disabled={sourceBusy}
+                    accessibilityRole="button" accessibilityState={{ selected: sourceFilter === filter }}
+                    style={[s.activateBtn, { backgroundColor: sourceFilter === filter ? BLUE : MUTE }]}
+                    onPress={() => loadSourcePage(filter)}>
+                    <Text style={s.activateTxt}>{filter === 'engines' ? 'Engine declarations' : filter === 'errors' ? 'Source errors' : 'All source'}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {sourceBusy && <ActivityIndicator color={BLUE} />}
+              {!!sourceError && <Text style={s.msg}>{sourceError}</Text>}
+              {!!sourcePage?.receiptChanged && <Text style={s.msg}>Inventory changed. Select a filter to restart at the first page.</Text>}
+              {sourcePage && !sourcePage.receiptChanged && (
+                <>
+                  <Text style={s.roomMeta}>{sourcePage.records.length}/{sourcePage.total} records · {sourcePage.complete ? 'complete inventory' : 'partial inventory'}</Text>
+                  {sourcePage.records.map((record: any) => (
+                    <View key={record.path} style={{ marginTop: 8 }}>
+                      <Text selectable style={s.roomName}>{record.path}</Text>
+                      <Text style={s.roomMeta}>{record.status} · {record.classes.join(', ') || 'no matching declarations'}</Text>
+                      {!!record.sha256 && <Text selectable style={s.roomMeta}>SHA-256: {record.sha256}</Text>}
+                    </View>
+                  ))}
+                  {sourcePage.next_offset !== null && !sourceBusy && (
+                    <TouchableOpacity style={s.activateBtn}
+                      onPress={() => loadSourcePage(sourceFilter, sourcePage.next_offset)}>
+                      <Text style={s.activateTxt}>Load next evidence page</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
             </View>
 
-            <Text style={s.h2}>🩺 System Self-Test {selftest ? `(${selftest.passed}/${selftest.total})` : ''}</Text>
+            <Text style={s.h2}>Registration self-check {selftest ? `(${selftest.passed}/${selftest.total})` : ''}</Text>
             <View style={s.card}>
               {selftest ? (
                 <>
-                  <View style={[s.readyBanner, { backgroundColor: (selftest.ready ? GREEN : RED) + '22' }]}>
-                    <Ionicons name={selftest.ready ? 'checkmark-circle' : 'alert-circle'} size={16} color={selftest.ready ? GREEN : RED} />
-                    <Text style={[s.readyTxt, { color: selftest.ready ? GREEN : RED }]}>{selftest.ready ? 'All subsystems healthy — production ready' : 'Some subsystems are down'}</Text>
+                  <View style={[s.readyBanner, { backgroundColor: AMBER + '22' }]}>
+                    <Ionicons name="information-circle" size={16} color={AMBER} />
+                    <Text style={[s.readyTxt, { color: AMBER }]}>
+                      {selftest.registration_passed ? 'Static registration checks passed — runtime unqualified' : 'Static checks incomplete or failed — runtime unqualified'}
+                    </Text>
                   </View>
-                  {selftest.results.map((r: any, i: number) => (
-                    <View key={i} style={s.row}>
-                      <View style={[s.dot, { backgroundColor: r.ok ? GREEN : RED }]} />
+                  {(selftest.results || []).map((r: any) => (
+                    <View key={r.name} style={s.row}>
+                      <View style={[s.dot, { backgroundColor: r.ok ? BLUE : AMBER }]} />
                       <Text style={s.roomName} numberOfLines={1}>{r.name}</Text>
-                      <Text style={[s.pct, { color: r.ok ? GREEN : RED }]}>{r.ok ? 'OK' : 'FAIL'} · {r.latency_ms}ms</Text>
+                      <Text style={[s.pct, { color: r.ok ? BLUE : AMBER }]}>{r.ok ? 'REGISTERED / PARSED' : 'NOT VERIFIED'}</Text>
                     </View>
                   ))}
                 </>
-              ) : <Text style={s.empty}>Run a self-test to check every subsystem.</Text>}
-              <TouchableOpacity testID="mc-selftest" style={[s.activateBtn, { backgroundColor: GREEN }]} onPress={runSelfTest} disabled={testing}>
-                {testing ? <ActivityIndicator color="#04120a" size="small" /> : <><Ionicons name="pulse" size={16} color="#04120a" /><Text style={s.activateTxt}>Run System Self-Test</Text></>}
+              ) : <Text style={s.empty}>Inspect route bindings and source declarations without executing handlers.</Text>}
+              <TouchableOpacity testID="mc-selftest" style={[s.activateBtn, { backgroundColor: BLUE }]} onPress={runSelfTest} disabled={testing}>
+                {testing ? <ActivityIndicator color="#04120a" size="small" /> : <><Ionicons name="pulse" size={16} color="#04120a" /><Text style={s.activateTxt}>Run registration self-check</Text></>}
               </TouchableOpacity>
             </View>
 

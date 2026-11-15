@@ -190,6 +190,8 @@ def scan_sources(root: Path) -> Inventory:
             if stop:
                 break
     records.sort(key=lambda row: row.path)
+    if not records and stop is None:
+        stop = "no_source_files"
     complete = stop is None and directory_errors == 0 and all(row.status == "parsed" for row in records)
     # Domain-separated deterministic digest commits to source paths, bytes,
     # declared classes, outcomes and completeness, not wall-clock timestamps.
