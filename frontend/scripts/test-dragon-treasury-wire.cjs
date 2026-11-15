@@ -38,7 +38,7 @@ function client(initial){
   });
   return {requests,read:modules.getDragonTreasury,readVault:modules.getDragonVault,
     quota:modules.getDragonVaultQuota,discover:modules.discoverDragonVault,
-    retire:modules.retireDragonSession,restore:modules.restoreDragonVaultPrimary,redundancy:modules.getDragonVaultRedundancy,repairReplica:modules.repairDragonVaultReplica,care:modules.configureDragonVaultCare,health:modules.getDragonVaultHealth,set:value=>{payload=value;}};
+    retire:modules.retireDragonSession,restore:modules.restoreDragonVaultPrimary,redundancy:modules.getDragonVaultRedundancy,repairReplica:modules.repairDragonVaultReplica,care:modules.configureDragonVaultCare,careHistory:modules.getDragonVaultCareHistory,health:modules.getDragonVaultHealth,set:value=>{payload=value;}};
 }
 
 async function main(){
@@ -182,6 +182,17 @@ async function main(){
   for(const patch of [{records:7},{redundant:2},{remaining_repairs:4},{live_verified:true},{valid_until:1800000061}]){
     vc.set({...health,...patch});await assert.rejects(vc.health(),e=>e.kind==='protocol');
   }
-  console.log('Treasury and cold custody: canonical wire parity, archives, discovery, exact-copy repair, care consent and health census.');
+  const history={schema:'skeleton.dragon.vault-care-history.v1',session_id:'vaulted-fixture',version:3,as_of_unix:1800001000,
+    state:'recorded',prefix_unknown:false,omitted:0,events:[
+      {sequence:1,version:2,kind:'grant',at:1800000000,budget:2,used:0},
+      {sequence:2,version:3,kind:'auto_primary',at:1800000010,budget:2,used:1}],
+    read_only:true,independent_audit:false,source_text_returned:false,network_executed:false};
+  vc.set(history);assert.deepEqual(await vc.careHistory('vaulted-fixture'),history);
+  for(const patch of [{independent_audit:true},{state:'held'},{omitted:1},
+    {events:[{...history.events[0],used:1}]},
+    {events:[history.events[0],{...history.events[1],version:2}]}]){
+    vc.set({...history,...patch});await assert.rejects(vc.careHistory('vaulted-fixture'),e=>e.kind==='protocol');
+  }
+  console.log('Treasury and cold custody: canonical wire parity, archives, discovery, exact-copy repair, care consent, census and maintenance history.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

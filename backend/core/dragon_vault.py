@@ -1010,7 +1010,8 @@ class DragonVaultMixin:
         query={**scope,"status":{"$in":sorted(TERMINAL)},
                "treasury_vault.state":{"$in":["pending","vaulted"]}}
         fields={"_id":1,"version":1,"treasury_vault":1,"checkpoint_identity.snapshot_digest":1,
-                "treasury_vault_scrub":1,"treasury_vault_care":1,"treasury_vault_scrub_due":1}
+                "treasury_vault_scrub":1,"treasury_vault_care":1,"treasury_vault_scrub_due":1,
+                "treasury_vault_care_history":1}
         async def census():
             return await self.sessions.find(query,fields).sort("_id",ASCENDING).limit(
                 MAX_RESERVED+1).max_time_ms(2000).to_list(MAX_RESERVED+1)
@@ -1054,6 +1055,12 @@ class DragonVaultMixin:
                 transitions.append(due)
             grant=row.get("treasury_vault_care")
             care=self._public_care(row,now,witness)
+            if row.get("treasury_vault_care_history") is not None:
+                from skeleton.ai.webcrawler.dragon_vault_care_history import validate_history
+                try:
+                    validate_history(_plain(row["treasury_vault_care_history"]),witness=witness,version=row["version"])
+                except (ValueError,TypeError,KeyError,CrawlerError):
+                    care=None
             if grant is None:
                 counts["care_absent"]+=1
             elif care is None:

@@ -126,3 +126,5 @@ Autonomous grants now bind the authenticated granting account and reuse the exis
 ### Durable maintenance history
 
 Owner care grant, withdrawal and autonomous repairs now produce same-row atomic version-ordered receipts. A bounded 16-entry chain, prefix anchor and explicit unknown legacy prefix preserve recent maintenance history across renewals. Corrupt history blocks new maintenance authority and automatic mutation, never withdrawal; no source-use grant, independent audit or external backup is claimed. The owner reads redacted version-fenced receipts in the cockpit. Erasure removes the history.
+
+The health census treats malformed maintenance history as a care hold instead of counting its nominal repair credit. Added real adapter and TypeScript rejection cases for malformed/foreign/history-race receipts. The campaign origin regression now separately exercises rejected credential-bearing token URLs and an already-admitted ambiguous code-key review; the production navigation veto remains unchanged.

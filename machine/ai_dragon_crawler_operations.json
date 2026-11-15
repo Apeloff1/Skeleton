@@ -40,7 +40,8 @@
     "backend/core/dragon_vault.py",
     "skeleton/ai/webcrawler/dragon_vault_quota.py",
     "skeleton/ai/webcrawler/dragon_vault_discovery.py",
-    "skeleton/ai/webcrawler/dragon_vault_care.py"
+    "skeleton/ai/webcrawler/dragon_vault_care.py",
+    "skeleton/ai/webcrawler/dragon_vault_care_history.py"
   ],
   "state_authority": "Existing CORE_DB Mongo application custody; pure snapshots have no independent storage authority",
   "public_api": {
@@ -104,7 +105,8 @@
     "treasury_watch_slices_per_cycle": 8,
     "treasury_vault_sessions": 128,
     "treasury_vault_window": 32,
-    "treasury_vault_discovery_page": 8
+    "treasury_vault_discovery_page": 8,
+    "treasury_vault_care_history": 16
   },
   "semantics": {
     "robots": "Fail closed on unavailable robots other than explicit 404/410; accept text/plain rules, not unexpected HTML; revalidation, TTL and every redirect target; delays checkpointed. Retry-After cannot reopen an origin before its valid remote deadline within the finite consent window. Denials and overload bodies never become discovery inputs.",
@@ -143,7 +145,8 @@
     "treasury_vault": "Owner-explicit expired terminal retirement; reserve existing owner quota vault ID before row publication and active slot release. Metadata-only catalog, bounded selected history-only windows; no new permission, backup or physical storage. Exact owner erase removes both quota IDs.",
     "treasury_quota_audit": "Metadata-only owner quota reconciliation, exact arrays and immutable erased tombstones; missing reservations and malformed records held, never guessed deleted.",
     "treasury_vault_discovery": "Query-guided page-local discovery over up to 128 retired records, eight exact witnessed sessions per request; live archive membership, no source text, no context or network permission; catalogue/version/active-grant cursor binding.",
-    "treasury_vault_care": "Explicit maintenance grant, at most seven days/three exact-copy repairs; atomic grant/version/lease consumption and repair; no acquisition or source-use authority."
+    "treasury_vault_care": "Explicit maintenance grant, at most seven days/three exact-copy repairs; atomic grant/version/lease consumption and repair; no acquisition or source-use authority.",
+    "treasury_vault_care_history": "Same-row finite version-bound hash-linked grant/withdrawal/automatic repair receipts; unknown legacy prefix and held malformed history; no source access or independent audit authority."
   },
   "network": {
     "direct": "Validated public DNS addresses pinned to socket with original TLS SNI/hostname verification",

@@ -205,9 +205,18 @@ class DragonWave5Tests(unittest.TestCase):
 
     def test_url_query_secret_name_gets_review_not_value_export(self):
         marker = "VERBATIM_TEST_VALUE_NEVER_EXPORT_0001"
-        captured = self.f.with_sources((
-            "https://example.com/a?token=" + marker, self.body,
-        ))
+        from skeleton.ai.webcrawler.operations import CrawlOperationError
+        from skeleton.ai.webcrawler.frontier_circuit import navigation_hazard
+        # The newer upstream gate denies credential-bearing token keys
+        # before any capture. Keep that regression and separately exercise
+        # the review-only origin scanner on an admitted ambiguous code key.
+        blocked="https://example.com/a?token="+marker
+        self.assertIsNotNone(navigation_hazard(blocked))
+        with self.assertRaises(CrawlOperationError):
+            self.f.with_sources((blocked,self.body))
+        review="https://example.com/a?code="+marker
+        self.assertIsNone(navigation_hazard(review))
+        captured = self.f.with_sources((review,self.body))
         _, _, frames, report = self.inspect(captured)
         self.assertTrue(report.origins.risky_query_parameter_sources)
         self.assertTrue(any(row.sensitive_parameter_name_count for row

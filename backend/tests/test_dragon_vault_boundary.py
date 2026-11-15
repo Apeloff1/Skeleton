@@ -696,6 +696,40 @@ class VaultCareTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["superseded"],1)
         self.assertEqual(result["auto_primary_repaired"],0)
 
+    async def test_corrupt_history_blocks_automatic_repair_but_not_owner_withdrawal(self):
+        app,row,now=self.harness()
+        row["treasury_vault_care_history"]={"damaged":True}
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.scrub_treasury_vault()
+        self.assertEqual(result["auto_primary_repaired"],0)
+        self.assertEqual(result["repairable_primary"],1)
+        body={"expected_version":row["version"],"idempotency_key":"withdraw-history","enabled":False,
+              "days":7,"repairs":2,"retention_acknowledged":False}
+        with patch("core.dragon_crawler._now",return_value=now),patch(
+                "core.dragon_crawler.authenticated_scope",return_value=SCOPE):
+            receipt=await app.configure_vault_care(SCOPE,row["_id"],body,principal={"role":"viewer","email":"owner@example.test"})
+        self.assertFalse(receipt["care"]["active"])
+        self.assertNotIn("treasury_vault_care_history",app.sessions.update_one.await_args.args[1]["$set"])
+
+    async def test_history_read_is_version_fenced_and_redacted(self):
+        from skeleton.ai.webcrawler.dragon_vault_care_history import append_history
+        app,row,now=self.harness()
+        row["treasury_vault_care_history"]=append_history(None,
+            witness=row["treasury_vault"]["snapshot_digest"],version=row["version"],at=now.timestamp()-10,
+            kind="grant",operation="a"*64,budget=2,used=0)
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.treasury_vault_care_history(SCOPE,row["_id"])
+        self.assertEqual(result["state"],"recorded")
+        self.assertEqual(result["events"][0]["kind"],"grant")
+        self.assertNotIn("operation",result["events"][0])
+        self.assertFalse(result["independent_audit"])
+        app.sessions.update_one.assert_not_awaited()
+        app.sessions.find_one.side_effect=[row,{**row,"version":row["version"]+1}]
+        with patch("core.dragon_crawler._now",return_value=now):
+            with self.assertRaises(CrawlerError) as err:
+                await app.treasury_vault_care_history(SCOPE,row["_id"])
+        self.assertEqual(err.exception.code,"crawler_conflict")
+
     async def test_owner_issue_and_viewer_withdraw_without_source_read(self):
         app,row,now=self.harness()
         body={"expected_version":row["version"],"idempotency_key":"care-test","enabled":True,
