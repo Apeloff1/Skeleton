@@ -10,11 +10,13 @@ import asyncio
 import ipaddress
 import math
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import TypeVar
 
 _T = TypeVar("_T")
 _MAX_PENDING_DNS = 8
+_MAX_ACTIVE_EGRESS = 16
 
 
 class ResolverCapacityError(RuntimeError):
@@ -62,7 +64,30 @@ class BoundedResolver:
         return await asyncio.wait_for(asyncio.shield(future), timeout=timeout)
 
 
+class EgressCapacityError(RuntimeError):
+    """The process-wide outbound work budget has been exhausted."""
+
+
+class EgressAdmission:
+    """Bound concurrent outbound exchanges without queueing request objects."""
+
+    def __init__(self, capacity: int = _MAX_ACTIVE_EGRESS) -> None:
+        if type(capacity) is not int or not 1 <= capacity <= 128:
+            raise ValueError("invalid egress capacity")
+        self._slots = threading.BoundedSemaphore(capacity)
+
+    @contextmanager
+    def slot(self) -> Iterator[None]:
+        if not self._slots.acquire(blocking=False):
+            raise EgressCapacityError("outbound HTTP capacity exhausted")
+        try:
+            yield
+        finally:
+            self._slots.release()
+
+
 DNS_RESOLVER = BoundedResolver()
+HTTP_ADMISSION = EgressAdmission()
 
 
 def is_public_egress_address(value: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
