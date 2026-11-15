@@ -56,6 +56,8 @@ SCHEMA = "skeleton.ai.dragon.crawl_run.v1"
 MAX_SNAPSHOT_BYTES = 4 * 1024 * 1024
 MAX_TEXT_BYTES = 24000
 MAX_FRONTIER = 512
+MAX_ROBOTS_BYTES = 512 * 1024
+MAX_ROBOTS_CACHE_BYTES = 1024 * 1024
 _TERMINAL = {"completed", "cancelled", "budget_exhausted"}
 _STATES = {"ready", "running", "paused", "failed", *_TERMINAL}
 _REDIRECTS = {301, 302, 303, 307, 308}
@@ -532,7 +534,7 @@ class CrawlRun:
             }:
                 raise CrawlOperationError("invalid robots receipt")
             if row["text"] is not None:
-                _text(row["text"], 65536, "robots text", empty=True)
+                _text(row["text"], MAX_ROBOTS_BYTES, "robots text", empty=True)
             _number(row["fetched_at"], 0, 1e12, "robots timestamp")
             _integer(row["status"], 0, 599, "robots status")
             run._admit(row["pending_url"])
@@ -540,6 +542,9 @@ class CrawlRun:
                 raise CrawlOperationError("robots redirect bound exceeded")
             for url in row["redirects"]:
                 run._admit(url)
+        if sum(len(row["text"].encode()) for row in state["robots"].values()
+               if row["text"] is not None) > MAX_ROBOTS_CACHE_BYTES:
+            raise CrawlOperationError("robots cache capacity exceeded")
         sources = state.get("sources")
         if not isinstance(sources, dict) or len(sources) != usage["documents"]:
             raise CrawlOperationError("source counter mismatch")
@@ -724,7 +729,7 @@ class CrawlRun:
                     "url": row["url"],
                     "depth": row["depth"],
                     "attempts": row["attempts"],
-                    "ready_at": row["ready_at"],
+                    "ready_at": max(row["ready_at"], state["host_ready"].get(urlsplit(row["url"]).hostname, 0)),
                 }
                 for row in state["frontier"][:32]
             ],
@@ -1010,7 +1015,7 @@ class CrawlRun:
         limit = min(
             self.request.max_response_bytes,
             remaining,
-            65536 if needs_robots else self.request.max_response_bytes,
+            MAX_ROBOTS_BYTES if needs_robots else self.request.max_response_bytes,
         )
         try:
             response = self._fetch(fetch_url, limit=limit, item=item)
@@ -1097,15 +1102,23 @@ class CrawlRun:
             if response.status in {404, 410}:
                 robots["text"] = ""
             elif response.status == 200 and ctype == "text/plain":
-                text = response.body.decode("utf-8", errors="replace")
+                try:
+                    text = response.body.decode("utf-8-sig", errors="strict")
+                    # REP comments are never policy and never need raw retention.
+                    # Preserve group boundaries and all parseable rules.
+                    text = "\n".join(line.partition("#")[0] for line in text.splitlines())
+                    _text(text, MAX_ROBOTS_BYTES, "robots policy", empty=True)
+                except (ValueError, UnicodeError):
+                    text = "User-agent: *\nDisallow: /"
                 retained = sum(
-                    len(row["text"].encode()) for row in state["robots"].values() if row["text"] is not None
+                    len(row["text"].encode()) for row in state["robots"].values()
+                    if row is not robots and row["text"] is not None
                 )
                 # Never truncate robots rules: a dropped Disallow could grant
                 # access. Refuse this origin if the bounded cache cannot fit.
                 robots["text"] = (
                     text
-                    if len(text.encode()) <= 65536 and retained + len(text.encode()) <= 262144
+                    if len(text.encode()) <= MAX_ROBOTS_BYTES and retained + len(text.encode()) <= MAX_ROBOTS_CACHE_BYTES
                     else "User-agent: *\nDisallow: /"
                 )
             else:
