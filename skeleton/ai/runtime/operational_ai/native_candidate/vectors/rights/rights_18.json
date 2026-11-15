@@ -6,7 +6,7 @@
   "trust_boundary": "Third-party or unapproved content cannot enter native model training",
   "input": {
     "changes": {
-      "item_id": "BAD"
+      "id": "BAD"
     }
   },
   "expected_allow": false,
