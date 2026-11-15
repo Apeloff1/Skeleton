@@ -103,6 +103,17 @@ class SourceComparisonRequest(Request):
     right: SourceViewPin
 
 
+class DiscoverySubscriptionRequest(Request):
+    url: str = Field(min_length=1,max_length=2048)
+    adapter: Literal["manifest","steam","rss_atom","sitemap"]
+    provider: str | None = Field(default=None,max_length=32)
+    external_id: str | None = Field(default=None,max_length=128)
+    title: str | None = Field(default=None,max_length=256)
+    interval_seconds: int = Field(default=3600,ge=900,le=604800,strict=True)
+    grant_seconds: int = Field(default=86400,ge=900,le=2592000,strict=True)
+    rights_acknowledged: StrictBool
+
+
 def register_knowledge_routes(router):
     def scope(user):
         try:
@@ -388,3 +399,20 @@ def register_knowledge_routes(router):
                             user:dict=Depends(get_current_user)):
         return await corpus_call(scope(user),"search_source_library",q,kind=kind,family=family,
                                  language=language,limit=limit)
+
+
+    @router.post("/knowledge/game-corpus/discovery/subscriptions")
+    async def discovery_subscribe(body:DiscoverySubscriptionRequest,user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import world_discovery_call
+        return await corpus_runtime_call(world_discovery_call(editor(user),"configure",**body.model_dump()))
+
+    @router.get("/knowledge/game-corpus/discovery/subscriptions")
+    async def discovery_subscriptions(after:str|None=Query(None,max_length=64),limit:int=Query(32,ge=1,le=100),
+                                      user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import world_discovery_call
+        return await corpus_runtime_call(world_discovery_call(editor(user),"status",after=after,limit=limit))
+
+    @router.delete("/knowledge/game-corpus/discovery/subscriptions/{subscription_id}")
+    async def discovery_revoke(subscription_id:str,user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import world_discovery_call
+        return await corpus_runtime_call(world_discovery_call(editor(user),"revoke",subscription_id))
