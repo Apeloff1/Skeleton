@@ -45,6 +45,7 @@ from .source_instruction_guard import (
     inspect_robots_comments, retained_robots_policy, validate_incidents,
 )
 from .robots_rate import combine_robots_pacing
+from .structural_extraction import validate_structural_receipt
 from .capture_rights import source_capture_rights
 from .http_freshness import (
     FreshnessError,observe_http_freshness,verify_freshness_receipt,
@@ -126,6 +127,7 @@ def implementation_digest():
                 "capture_rights.py",
                 "html_semantics.py",
                 "html_landmarks.py",
+                "structural_extraction.py",
                 "media_probe.py",
                 "pdf_documents.py",
                 "pdf_worker.py",
@@ -596,6 +598,11 @@ class CrawlRun:
             _text(source.get("title"), 4000, "source title", empty=True)
             _number(source.get("fetched_at"), 0, 1e12, "source timestamp")
             provenance = source["provenance"]
+            if "structural_projection" in provenance and (
+                source["content_type"] not in {"text/html", "application/xhtml+xml"}
+                or not validate_structural_receipt(provenance["structural_projection"])
+            ):
+                raise CrawlOperationError("invalid structural projection receipt")
             if "parser_execution" in provenance and provenance["parser_execution"] != "isolated_posix":
                 raise CrawlOperationError("unknown source parser execution receipt")
             if "http_freshness" in provenance and not verify_freshness_receipt(
