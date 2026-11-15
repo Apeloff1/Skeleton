@@ -117,6 +117,27 @@ class DragonAtlasRegression(unittest.TestCase):
                     EvidenceObservation.from_document(document, self.request.query)
                 ),
             }
+        # Fixture-only exact synthetic transport receipts accompany each
+        # source. This preserves adversarial text cases while exercising
+        # production snapshot conservation without weakening the validator.
+        from skeleton.ai.webcrawler.acquisition_feedback import settled_observation
+        for source_id, source in snapshot["sources"].items():
+            snapshot["sequence"] += 1
+            source["provenance"]["capture_sequence"] = snapshot["sequence"]
+            snapshot["usage"]["requests"] += 1
+            snapshot["usage"]["documents"] += 1
+            charged = len(source["text"].encode("utf-8"))
+            snapshot["usage"]["bytes"] += charged
+            snapshot["acquisition_measurements"].append(settled_observation(
+                request=snapshot["usage"]["requests"], url=source["fetched_url"], kind="captured",
+                status=200, latency_bucket=1, charged_bytes=charged, uncertain_bytes=0,
+                event_sequence=snapshot["sequence"], source_id=source_id,
+            ))
+            event = {"sequence":snapshot["sequence"], "kind":"captured", "at":self.now,
+                     "url":source["fetched_url"], "source_id":source_id, "reason":None,
+                     "usage":dict(snapshot["usage"])}
+            event["event_digest"] = digest(event)
+            snapshot["events"].append(event)
         snapshot["usage"]["documents"] = len(snapshot["sources"])
         snapshot["snapshot_digest"] = digest(snapshot)
         CrawlRun.from_snapshot(snapshot)
