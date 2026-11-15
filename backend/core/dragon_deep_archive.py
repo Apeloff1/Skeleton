@@ -290,7 +290,7 @@ class DragonDeepArchiveMixin:
             totals["indexed" if changed.modified_count else "superseded"]+=1
         return totals
 
-    async def deep_archive_search(self,scope,*,query,cursor=None):
+    async def deep_archive_search(self,scope,*,query,cursor=None,session_ids=None):
         """Indexed candidate pages, exact reparse of each admitted row."""
         from core.dragon_crawler import CrawlerError,_now
         try:
@@ -299,7 +299,10 @@ class DragonDeepArchiveMixin:
             rare_tokens=route_terms(scope,query)
             from core.dragon_passage_index import query_keys
             passage_tokens=query_keys(scope,query)
-            after=a.decode_cursor(scope,query,cursor)
+            if session_ids is not None and (not isinstance(session_ids,list) or len(session_ids)>100 or not all(identity(x) for x in session_ids)):
+                raise ValueError("session routing bound")
+            cursor_query=query if session_ids is None else query+":"+a.digest(sorted(set(session_ids)))
+            after=a.decode_cursor(scope,cursor_query,cursor)
         except ValueError as exc:
             raise CrawlerError("crawler_deep_query","Invalid archive search or cursor.",422) from exc
         await self.ensure_indexes()
@@ -308,8 +311,10 @@ class DragonDeepArchiveMixin:
             "deep_index.expires_at":{"$gt":now},"$or":[{"deep_index.tokens":{"$in":tokens}},
             {"deep_hybrid_route.tokens":{"$in":rare_tokens},"deep_hybrid_route.expires_at":{"$gt":now}},
             {"deep_passage_route.tokens":{"$in":passage_tokens},"deep_passage_route.expires_at":{"$gt":now}}]}
+        if session_ids is not None:
+            predicate["_id"]={"$in":session_ids}
         if after:
-            predicate["_id"]={"$gt":after}
+            predicate.setdefault("_id",{})["$gt"]=after
         async def page():
             return await self.sessions.find(predicate,{"_id":1,"version":1,"deep_index.digest":1,"deep_hybrid_route.digest":1,"deep_passage_route.digest":1}
                 ).sort("_id",ASCENDING).limit(a.PAGE+1).max_time_ms(3000).to_list(a.PAGE+1)
@@ -364,7 +369,7 @@ class DragonDeepArchiveMixin:
             unique.setdefault(h["preserved_text_hash"],h)
         return {"ok":True,"schema":"skeleton.dragon.deep-search.v1","scanned":min(len(rows),a.PAGE),
             "held":held,"matches":list(unique.values())[:32],"matching_payloads":len(unique),
-            "next_cursor":a.cursor(scope,query,rows[a.PAGE-1]["_id"]) if len(rows)>a.PAGE else None,
+            "next_cursor":a.cursor(scope,cursor_query,rows[a.PAGE-1]["_id"]) if len(rows)>a.PAGE else None,
             "as_of_unix":now,"earliest_expiry":min(expiries) if expiries else None,
             "approximate_routing":True,"page_local_ranking":True,"ranking":"candidate_local_bm25_subword_passage_v2","history_only":True,
             "source_text_returned":False,"model_context_permission":False,"wiki_approval":False}
@@ -409,20 +414,21 @@ class DragonDeepArchiveMixin:
             "authority":"historical_external_evidence_only","training_permission":False}
         return doc,ref
 
-    async def history_context(self,scope,query,max_docs,max_chars):
+    async def history_context(self,scope,query,max_docs,max_chars,*,session_ids=None):
         """Explicit local-chat history retrieval; no promotion or current facts."""
         from core.dragon_crawler import CrawlerError,_now
         if type(max_docs) is not int or not 1<=max_docs<=4 or type(max_chars) is not int or not 1<=max_chars<=16000:
             raise CrawlerError("crawler_deep_context_bounds","Invalid historical context budget.",422)
         terms,_=a.query_terms(scope,query)
-        page=await self.deep_archive_search(scope,query=query)
+        options={} if session_ids is None else {"session_ids":session_ids}
+        page=await self.deep_archive_search(scope,query=query,**options)
         from core.dragon_hybrid_rank import fuse_ranked
         pages=[page]
         for _ in range(2):
             cursor=pages[-1].get("next_cursor")
             if not cursor:
                 break
-            pages.append(await self.deep_archive_search(scope,query=query,cursor=cursor))
+            pages.append(await self.deep_archive_search(scope,query=query,cursor=cursor,**options))
         by_key={}
         lanes=[]
         for result in pages:
