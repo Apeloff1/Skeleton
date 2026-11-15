@@ -36,7 +36,8 @@ def enter_local_lease(fd: int) -> Token[_LeaseBinding | None]:
     if type(fd) is not int or fd < 0:
         raise ValueError("invalid local inference lease descriptor")
     meta = os.fstat(fd)
-    if not stat.S_ISREG(meta.st_mode) or meta.st_nlink != 1:
+    if (not stat.S_ISREG(meta.st_mode) or meta.st_nlink != 1
+            or (os.name == "posix" and (meta.st_uid != os.getuid() or meta.st_mode & 0o077))):
         raise ValueError("invalid local inference lease identity")
     binding = _LeaseBinding(fd, meta.st_dev, meta.st_ino, os.getpid())
     token = _current_local_inference_lease.set(binding)
@@ -73,7 +74,8 @@ def _verified_fds(binding: _LeaseBinding) -> tuple[int, ...]:
         raise RuntimeError("local inference lease context revoked")
     meta = os.fstat(binding.fd)
     if (not stat.S_ISREG(meta.st_mode) or meta.st_nlink != 1
-            or (meta.st_dev, meta.st_ino) != (binding.device, binding.inode)):
+            or (meta.st_dev, meta.st_ino) != (binding.device, binding.inode)
+            or (os.name == "posix" and (meta.st_uid != os.getuid() or meta.st_mode & 0o077))):
         raise RuntimeError("local inference lease descriptor identity changed")
     return (binding.fd,)
 

@@ -119,10 +119,8 @@ class LocalInferenceLease:
                 raise LocalInferenceLeaseUnavailable("inference lease identity changed during admission")
             # Windows locks an exact byte range; establish its byte without
             # truncation. No user information or host secrets enter this file.
-            if metadata.st_size == 0 and initialize:
-                os.write(fd, bytes((0,)))
-                os.fsync(fd)
-            elif metadata.st_size != 1:
+            # Initialization belongs inside the acquired kernel lock.
+            if metadata.st_size not in (0, 1):
                 raise LocalInferenceLeaseUnavailable("inference lease marker format is invalid")
             return fd
         except OSError as exc:
@@ -234,6 +232,11 @@ class LocalInferenceLease:
             # Validate the exact marker under the OS lock. Reading before the
             # byte-range lock on Windows can misclassify contention as corruption.
             try:
+                if owned.st_size == 0 and initialize:
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    if os.write(fd, bytes((0,))) != 1:
+                        raise OSError("inference lease initialization incomplete")
+                    os.fsync(fd)
                 os.lseek(fd, 0, os.SEEK_SET)
                 marker = os.read(fd, 2)
             except OSError as exc:
