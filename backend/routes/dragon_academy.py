@@ -2782,6 +2782,19 @@ async def crawler_readiness(owner: str = Depends(_principal)) -> dict:
     return await _crawler_result(crawler_application.readiness())
 
 
+@router.get("/crawler/companion/treasury/{session_id}/{source_id}/passage")
+async def crawler_treasury_passage(
+    session_id: str = URLPath(min_length=1,max_length=128),
+    source_id: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+    offset: int = Query(default=0,ge=0,le=24000),
+    length: int = Query(default=1600,ge=1,le=4000),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    return await _crawler_result(crawler_application.treasury_passage(
+        scope,session_id,source_id,offset=offset,length=length,
+    ))
+
+
 @router.get("/crawler/companion/treasury")
 async def crawler_companion_treasury(
     mode: str = Query(default="current_only", pattern=r"^(current_only|historic_only|all_revisions|timeline|compare)$"),
