@@ -30,6 +30,10 @@ MIN_INTERVAL=900
 MAX_INTERVAL=7*86400
 MAX_GRANT=30*86400
 MAX_ROBOTS=256*1024
+MAX_LARGE_FEED=16*1024*1024
+MAX_SITEMAP_URLS=50_000
+MAX_STEAM_APPS=250_000
+PAGES_PER_PULSE=4
 SCHEMA="""
 CREATE TABLE IF NOT EXISTS world_subscriptions(
  owner TEXT NOT NULL,id TEXT NOT NULL,scope_json TEXT NOT NULL,url TEXT NOT NULL,
@@ -37,6 +41,7 @@ CREATE TABLE IF NOT EXISTS world_subscriptions(
  interval_seconds INTEGER NOT NULL,expires_at INTEGER NOT NULL,enabled INTEGER NOT NULL,
  due INTEGER NOT NULL,lease TEXT,lease_until INTEGER NOT NULL DEFAULT 0,
  failures INTEGER NOT NULL DEFAULT 0,last_digest TEXT,last_batch TEXT,reason TEXT,
+ pending_digest TEXT,pending_page INTEGER NOT NULL DEFAULT 0,
  PRIMARY KEY(owner,id)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS world_discovery_due ON world_subscriptions(enabled,due,owner,id);
@@ -56,8 +61,9 @@ class DiscoveryHeld(RuntimeError):
     pass
 
 
-def fetch_public_feed(url, *, fetcher=None):
+def fetch_public_feed(url, *, fetcher=None,max_bytes=MAX_FEED_BYTES):
     """Fail closed on robots, origin change and private/cache-sensitive responses."""
+    if type(max_bytes) is not int or not 1<=max_bytes<=MAX_LARGE_FEED:raise ValueError('feed byte cap')
     url=source_url(url)
     parsed=urlsplit(url)
     origin="https://"+parsed.hostname
@@ -77,7 +83,7 @@ def fetch_public_feed(url, *, fetcher=None):
     if delay>5 or request_rate is not None:
         raise DiscoveryHeld("robots rate requires external scheduling review")
     time.sleep(max(1.0,float(delay)))
-    response=transport.fetch_once(url,user_agent=AGENT,max_bytes=MAX_FEED_BYTES)
+    response=transport.fetch_once(url,user_agent=AGENT,max_bytes=max_bytes)
     if response.status!=200 or response.url!=url:
         raise DiscoveryHeld("feed response not exact")
     headers={str(k).lower():str(v).lower() for k,v in response.headers.items()}
@@ -85,14 +91,14 @@ def fetch_public_feed(url, *, fetcher=None):
     if any(x in control for x in ("private","no-store")) or headers.get("vary","")=="*" or any(
         x in headers.get("vary","") for x in ("cookie","authorization")) or "set-cookie" in headers:
         raise DiscoveryHeld("private or sensitive response")
-    if not response.body or len(response.body)>MAX_FEED_BYTES:
+    if not response.body or len(response.body)>max_bytes:
         raise DiscoveryHeld("feed size")
     return response.body
 
 
-def sitemap_manifest(raw,provider,external,title):
-    """Sitemap URL proposals for one explicit game, not autonomous fetch targets."""
-    if not isinstance(raw,bytes) or not 1<=len(raw)<=MAX_FEED_BYTES:
+def sitemap_pages(raw,provider,external,title):
+    """Partition a standards-size sitemap into stable bounded candidate batches."""
+    if not isinstance(raw,bytes) or not 1<=len(raw)<=MAX_LARGE_FEED:
         raise ValueError("sitemap bounds")
     text=raw.decode("utf-8")
     if "<!DOCTYPE" in text.upper() or "<!ENTITY" in text.upper() or "\x00" in text:
@@ -100,23 +106,58 @@ def sitemap_manifest(raw,provider,external,title):
     root=ElementTree.fromstring(text)
     local=lambda tag:tag.rsplit("}",1)[-1]
     if local(root.tag)!="urlset":
-        raise ValueError("sitemap index requires explicit subscription per child")
+        raise ValueError("sitemap index requires separate child subscriptions")
     urls=[]
+    scanned=0
     for child in root:
-        if local(child.tag)!="url":
-            continue
+        if local(child.tag)!="url":continue
+        scanned+=1
+        if scanned>MAX_SITEMAP_URLS:raise ValueError("sitemap entry cap")
         loc=next((x.text for x in child if local(x.tag)=="loc"),None)
         if loc:
             try:urls.append(source_url(loc.strip()))
             except ValueError:continue
-        if len(urls)>4000:
-            raise ValueError("partition sitemap before ingestion")
     urls=sorted(set(urls))
-    if not urls:
-        raise ValueError("empty sitemap")
-    chunks=[urls[i:i+8] for i in range(0,len(urls),8)]
-    entries=[{"id":external,"title":title,"links":[{"url":x,"kind":"reference_database","language":"und"} for x in group]} for group in chunks]
-    return json.dumps({"schema":"dragon.game-feed.v1","provider":provider,"entries":entries},ensure_ascii=False).encode()
+    if not urls:raise ValueError("empty sitemap")
+    # Limit 512 links/page, even worst-case 2K-character URLs fit the
+    # normalized import queue's 2 MiB bound. Split further if encoded bytes
+    # (Unicode or JSON escaping) exceed the cap.
+    def encode(group):
+        entries=[{"id":external,"title":title,"links":[{"url":x,"kind":"reference_database","language":"und"} for x in group[i:i+8]]}
+                 for i in range(0,len(group),8)]
+        raw=json.dumps({"schema":"dragon.game-feed.v1","provider":provider,"entries":entries},ensure_ascii=False).encode()
+        if len(raw)<=MAX_FEED_BYTES:return [raw]
+        if len(group)<=1:raise ValueError("oversize sitemap locator")
+        mid=len(group)//2
+        return encode(group[:mid])+encode(group[mid:])
+    for i in range(0,len(urls),512):
+        yield from encode(urls[i:i+512])
+
+
+def steam_pages(raw):
+    if not isinstance(raw,bytes) or not 1<=len(raw)<=MAX_LARGE_FEED:raise ValueError("catalogue size")
+    data=json.loads(raw)
+    entries=data.get("applist",{}).get("apps")
+    if not isinstance(entries,list) or not 1<=len(entries)<=MAX_STEAM_APPS:raise ValueError("catalogue bounds")
+    accepted={}
+    for item in entries:
+        if not isinstance(item,dict) or type(item.get("appid")) is not int or not 0<item["appid"]<2**63:
+            continue
+        name=item.get("name")
+        if not isinstance(name,str) or not name.strip() or len(name)>256:continue
+        accepted[item["appid"]]={"appid":item["appid"],"name":name}
+    values=[accepted[k] for k in sorted(accepted)]
+    for i in range(0,len(values),500):
+        yield json.dumps({"applist":{"apps":values[i:i+500]}},ensure_ascii=False).encode()
+
+
+def partition_feed(row,raw):
+    adapter=row["adapter"]
+    if adapter=="sitemap":
+        return "manifest",sitemap_pages(raw,row["provider"],row["game_external_id"],row["title"]),{}
+    if adapter=="steam":return "steam",steam_pages(raw),{}
+    options={"provider":row["provider"],"external_id":row["game_external_id"],"title":row["title"]} if adapter=="rss_atom" else {}
+    return adapter,iter([raw]),options
 
 
 class WorldDiscovery:
@@ -222,26 +263,39 @@ class WorldDiscovery:
         elif raw is not None and fingerprint!=row["last_digest"]:
             scope=json.loads(row["scope_json"])
             if owner_key(scope)!=row["owner"]:raise DiscoveryHeld("scope mismatch")
-            options={}
-            adapter=row["adapter"]
-            if adapter=="sitemap":
-                raw=sitemap_manifest(raw,row["provider"],row["game_external_id"],row["title"])
-                adapter="manifest"
-            elif adapter=="rss_atom":
-                options={"provider":row["provider"],"external_id":row["game_external_id"],"title":row["title"]}
-            try:
-                batch=self.queue.enqueue(scope,raw=raw,adapter=adapter,operation=digest([row["id"],fingerprint]),**options)["batch_id"]
-            except (ValueError,TypeError,KeyError,RuntimeError,sqlite3.Error):
-                reason="import_held";fingerprint=None
-        failures=0 if reason is None else min(20,row["failures"]+1)
-        delay=row["interval_seconds"] if reason is None else min(86400,max(900,300*2**min(8,failures)))
+            import itertools
+            adapter,pages,options=partition_feed(row,raw)
+            cursor=row["pending_page"] if row["pending_digest"]==fingerprint else 0
+            window=list(itertools.islice(pages,cursor,cursor+PAGES_PER_PULSE+1))
+            if not window:raise DiscoveryHeld("feed partition unavailable")
+            for page_idx,page in enumerate(window[:PAGES_PER_PULSE],cursor):
+                now=int(time.time())
+                with self._db() as db:
+                    still=db.execute("""SELECT 1 FROM world_subscriptions WHERE owner=? AND id=? AND enabled=1
+                        AND expires_at>? AND lease=? AND lease_until>?""",(row["owner"],row["id"],now,row["lease"],now)).fetchone()
+                if not still:reason="superseded";break
+                try:
+                    batch=self.queue.enqueue(scope,raw=page,adapter=adapter,
+                        operation=digest([row["id"],fingerprint,page_idx]),**options)["batch_id"]
+                except (ValueError,TypeError,KeyError,RuntimeError,sqlite3.Error):
+                    reason="import_held";break
+                cursor=page_idx+1
+                with self._db() as db:
+                    changed=db.execute("""UPDATE world_subscriptions SET pending_digest=?,pending_page=?,last_batch=?
+                        WHERE owner=? AND id=? AND lease=? AND enabled=1""",(fingerprint,cursor,batch,row["owner"],row["id"],row["lease"]))
+                if not changed.rowcount:reason="superseded";break
+            if reason is None and len(window)>PAGES_PER_PULSE:reason="partition_pending"
+        failures=0 if reason in (None,"partition_pending") else min(20,row["failures"]+1)
+        delay=row["interval_seconds"] if reason is None else 60 if reason=="partition_pending" else min(86400,max(900,300*2**min(8,failures)))
         with self._db() as db:
             db.execute("BEGIN IMMEDIATE")
             try:
                 db.execute("""UPDATE world_subscriptions SET lease=NULL,lease_until=0,due=?,failures=?,reason=?,
-                    last_digest=COALESCE(?,last_digest),last_batch=COALESCE(?,last_batch)
+                    last_digest=COALESCE(?,last_digest),last_batch=COALESCE(?,last_batch),
+                    pending_digest=CASE WHEN ? IS NULL THEN NULL ELSE pending_digest END,
+                    pending_page=CASE WHEN ? IS NULL THEN 0 ELSE pending_page END
                     WHERE owner=? AND id=? AND lease=? AND enabled=1""",
-                    (now+delay,failures,reason,fingerprint if reason is None else None,batch,row["owner"],row["id"],row["lease"]))
+                    (now+delay,failures,reason,fingerprint if reason is None else None,batch,reason,reason,row["owner"],row["id"],row["lease"]))
                 db.execute("UPDATE world_origin_guard SET lease=NULL,lease_until=0,ready=? WHERE origin=? AND lease=?",
                     (now+60,row["origin"],row["lease"]))
                 db.execute("COMMIT")
@@ -256,7 +310,7 @@ class WorldDiscovery:
         row=self._claim()
         if row is None:return {"enabled":True,"outcome":"idle","network_executed":False}
         try:
-            raw=fetch_public_feed(row["url"],fetcher=fetcher)
+            raw=fetch_public_feed(row["url"],fetcher=fetcher,max_bytes=MAX_LARGE_FEED if row["adapter"] in {"steam","sitemap"} else MAX_FEED_BYTES)
         except Exception:
             return {"enabled":True,"outcome":self._finish(row,None,"fetch_held"),"network_attempted":True}
         try:
