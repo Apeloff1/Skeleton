@@ -163,6 +163,8 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             await self.sessions.create_index([("tenant_id",ASCENDING),("owner_id",ASCENDING),
                 ("deep_index.tokens",ASCENDING),("deep_index.expires_at",ASCENDING)])
             await self.sessions.create_index([("deep_index_due",ASCENDING),("archive_grant.expires_at",ASCENDING)])
+            await self.sessions.create_index([("tenant_id",ASCENDING),("owner_id",ASCENDING),
+                ("deep_hybrid_route.tokens",ASCENDING),("deep_hybrid_route.expires_at",ASCENDING)])
             self._indexes_ready = True
 
     async def readiness(self) -> dict[str, Any]:
@@ -2060,7 +2062,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             {"$set":{"archive_grant":grant,"treasury_index":index_manifest,"treasury_archive_route":routing,
                      "treasury_repair_due":min(grant["expires_at"],now.timestamp()+6*3600) if grant else None,
                      "updated_at":now,"storage_receipt":receipt,audit_path:audit,"deep_index_due":now.timestamp()},
-             "$unset":{"deep_index":""},"$inc":{"version":1}},
+             "$unset":{"deep_index":"","deep_hybrid_route":""},"$inc":{"version":1}},
         )
         if not result.modified_count:
             raise CrawlerError("crawler_conflict","Expedition changed before archive permission committed.",409)
@@ -2164,7 +2166,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             {"$set":{"archive_grant":grant,"treasury_index":segment,"treasury_archive_route":routing,"legacy_archive_receipt":proof,
                       "treasury_repair_due":min(grant["expires_at"],now+6*3600) if grant else None,
                       "storage_receipt":receipt,"updated_at":_now(),path:audit,"deep_index_due":_now().timestamp()},
-             "$unset":{"deep_index":""},"$inc":{"version":1}})
+             "$unset":{"deep_index":"","deep_hybrid_route":""},"$inc":{"version":1}})
         if not changed.modified_count:
             raise CrawlerError("crawler_conflict","Historical session changed before archive admission.",409)
         return {"ok":True,"version":int(row["version"])+1,"enabled":grant is not None,"execution_authorized":False}
@@ -3781,6 +3783,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                     "treasury_vault_care": "",
                     "deep_archive": "",
                     "deep_index": "",
+                    "deep_hybrid_route": "",
                     "deep_index_due": "",
                     "treasury_vault_care_history": "",
                 },
@@ -4073,7 +4076,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                         "source_use_policies." + source_id: policy,
                         "treasury_index": None,
                         "treasury_archive_route": None,
-                        "deep_index":None,"deep_index_due":now.timestamp(),
+                        "deep_index":None,"deep_hybrid_route":None,"deep_index_due":now.timestamp(),
                         "treasury_repair_due":now.timestamp() if row.get("archive_grant") else None,
                         "updated_at": now,
                         "storage_receipt": receipt,
@@ -4648,6 +4651,14 @@ async def recover_crawler_runs(*, limit: int = 16) -> dict:
         except (PyMongoError,CrawlerError,TimeoutError) as exc:
             log.warning("Dragon ancillary recovery lane failed: %s (%s)",name,type(exc).__name__)
             result[name]={"failed":True,"reason":"bounded_maintenance_unavailable"}
+    # The release queue accepts only editor-submitted metadata. Network
+    # permission remains in the canonical crawler, never in this worker.
+    try:
+        from core.dragon_corpus_runtime import pulse_release_imports
+        result["game_release_imports"]=await pulse_release_imports()
+    except (OSError,TimeoutError,ValueError) as exc:
+        log.warning("Dragon release import maintenance failed: %s",type(exc).__name__)
+        result["game_release_imports"]={"failed":True,"reason":"bounded_maintenance_unavailable"}
     return result
 
 
