@@ -1,0 +1,1096 @@
+{
+  "schema": "dragon.dataset-library.v1",
+  "description": "Public resource leads, including documented exports, APIs, catalogues, and discovery directories. Not a verified download manifest, source-use grant or additive unique-row estimate. Advertised counts overlap.",
+  "targets": [
+    {
+      "id": "steam-appid-mirror",
+      "domain": "games",
+      "url": "https://github.com/jsnli/steamappidlist/blob/master/data/games_appid.json",
+      "adapter": "steam_json",
+      "advertised_rows": 200704,
+      "access": "policy_review",
+      "cadence": "daily",
+      "notes": "Bundled candidate AppID/title snapshot from public mirror; 200704 structurally validated rows. Upstream identity and redistribution/use permission still require review."
+    },
+    {
+      "id": "steam-fronkon",
+      "domain": "games",
+      "url": "https://huggingface.co/datasets/FronkonGames/steam-games-dataset",
+      "adapter": "steam_csv",
+      "advertised_rows": 120000,
+      "access": "public_download",
+      "cadence": "weekly",
+      "notes": "Steam title identities; upstream redistribution review required"
+    },
+    {
+      "id": "steam-z02z",
+      "domain": "games",
+      "url": "https://huggingface.co/datasets/Z02Z/steam-games-dataset",
+      "adapter": "steam_csv",
+      "advertised_rows": 120000,
+      "access": "public_download",
+      "cadence": "monthly",
+      "notes": "Alternate snapshot; deduplicate by AppID"
+    },
+    {
+      "id": "steam-march-2025",
+      "domain": "games",
+      "url": "https://www.kaggle.com/dsv/11017460",
+      "adapter": "steam_csv",
+      "advertised_rows": 90000,
+      "access": "manual_download",
+      "cadence": "historical",
+      "notes": "Published March 2025; inspect snapshot rights"
+    },
+    {
+      "id": "steam-full-sample",
+      "domain": "games",
+      "url": "https://github.com/torpadeka/steam-games-dataset",
+      "adapter": "steam_json",
+      "advertised_rows": 11130,
+      "access": "public_download",
+      "cadence": "historical",
+      "notes": "10 percent sample; not full 111301 rows"
+    },
+    {
+      "id": "steam-nikdavis",
+      "domain": "games",
+      "url": "https://www.kaggle.com/nikdavis/steam-store-games",
+      "adapter": "steam_csv",
+      "advertised_rows": null,
+      "access": "manual_download",
+      "cadence": "historical",
+      "notes": "Historical snapshot"
+    },
+    {
+      "id": "steam-census",
+      "domain": "games",
+      "url": "https://thegamecensus.com/data",
+      "adapter": "steam_csv",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "weekly",
+      "notes": "CC BY 4.0 advertised; validate individual file terms"
+    },
+    {
+      "id": "steam-census-index",
+      "domain": "games",
+      "url": "https://thegamecensus.com/data/games-index.csv",
+      "adapter": "steam_csv",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "weekly",
+      "notes": "Public game index"
+    },
+    {
+      "id": "steam-platform-api",
+      "domain": "games",
+      "url": "https://partner.steamgames.com/doc/webapi/IStoreService",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "credential_required",
+      "cadence": "weekly",
+      "notes": "API authorization required; no keys stored"
+    },
+    {
+      "id": "steam-store",
+      "domain": "games",
+      "url": "https://store.steampowered.com/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "landing_only",
+      "cadence": "daily",
+      "notes": "Store discovery metadata"
+    },
+    {
+      "id": "steam-app-list",
+      "domain": "games",
+      "url": "https://partner.steamgames.com/doc/webapi/ISteamApps",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "App-list API availability and terms require review"
+    },
+    {
+      "id": "steamspy",
+      "domain": "games",
+      "url": "https://steamspy.com/api.php",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Statistics and app IDs"
+    },
+    {
+      "id": "wikidata",
+      "domain": "games",
+      "url": "https://www.wikidata.org/wiki/Wikidata:Database_download",
+      "adapter": "wikidata_jsonl",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "weekly",
+      "notes": "Bulk dump; project typed game entities"
+    },
+    {
+      "id": "wikidata-video-games",
+      "domain": "games",
+      "url": "https://www.wikidata.org/wiki/Wikidata:WikiProject_Video_games",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "landing_only",
+      "cadence": "weekly",
+      "notes": "Game identity and platform graph"
+    },
+    {
+      "id": "wikipedia-dumps",
+      "domain": "games",
+      "url": "https://dumps.wikimedia.org/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "monthly",
+      "notes": "Language dumps; attribution and license review"
+    },
+    {
+      "id": "igdb",
+      "domain": "games",
+      "url": "https://api-docs.igdb.com/",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "credential_required",
+      "cadence": "weekly",
+      "notes": "OAuth API"
+    },
+    {
+      "id": "mobygames",
+      "domain": "games",
+      "url": "https://www.mobygames.com/info/api/",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "credential_required",
+      "cadence": "weekly",
+      "notes": "Subscription API"
+    },
+    {
+      "id": "openvgdb",
+      "domain": "preservation",
+      "url": "https://github.com/OpenVGDB/OpenVGDB",
+      "adapter": "sqlite_metadata",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "monthly",
+      "notes": "Hash and title metadata only"
+    },
+    {
+      "id": "libretro",
+      "domain": "preservation",
+      "url": "https://github.com/libretro/libretro-database",
+      "adapter": "dat_metadata",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "weekly",
+      "notes": "DAT/RDB metadata, no game ROM ingestion"
+    },
+    {
+      "id": "no-intro",
+      "domain": "preservation",
+      "url": "https://datomatic.no-intro.org/",
+      "adapter": "dat_metadata",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Checksums and editions; metadata only"
+    },
+    {
+      "id": "redump",
+      "domain": "preservation",
+      "url": "https://redump.org/",
+      "adapter": "dat_metadata",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Disc catalogue and hashes only"
+    },
+    {
+      "id": "tosec",
+      "domain": "preservation",
+      "url": "https://www.tosecdev.org/",
+      "adapter": "dat_metadata",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Historical software metadata"
+    },
+    {
+      "id": "mame",
+      "domain": "preservation",
+      "url": "https://github.com/mamedev/mame",
+      "adapter": "dat_metadata",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "monthly",
+      "notes": "Hardware and software lists"
+    },
+    {
+      "id": "fbneo",
+      "domain": "preservation",
+      "url": "https://github.com/finalburnneo/FBNeo",
+      "adapter": "dat_metadata",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "monthly",
+      "notes": "Arcade metadata"
+    },
+    {
+      "id": "zxspectrum",
+      "domain": "preservation",
+      "url": "https://github.com/zxdb/ZXDB",
+      "adapter": "sql_metadata",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "monthly",
+      "notes": "Spectrum reference"
+    },
+    {
+      "id": "cpc-power",
+      "domain": "preservation",
+      "url": "https://www.cpc-power.com/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Amstrad catalogue"
+    },
+    {
+      "id": "gamebase64",
+      "domain": "preservation",
+      "url": "https://www.gamebase64.com/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Commodore 64 catalogue"
+    },
+    {
+      "id": "launchbox",
+      "domain": "preservation",
+      "url": "https://gamesdb.launchbox-app.com/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Metadata export terms must be checked"
+    },
+    {
+      "id": "gametdb",
+      "domain": "preservation",
+      "url": "https://www.gametdb.com/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Console IDs and editions"
+    },
+    {
+      "id": "screenscraper",
+      "domain": "preservation",
+      "url": "https://www.screenscraper.fr/",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "credential_required",
+      "cadence": "monthly",
+      "notes": "Metadata API terms"
+    },
+    {
+      "id": "thegamesdb",
+      "domain": "games",
+      "url": "https://thegamesdb.net/",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "credential_required",
+      "cadence": "monthly",
+      "notes": "Game identity metadata"
+    },
+    {
+      "id": "regvault",
+      "domain": "preservation",
+      "url": "https://regvault.org/credits",
+      "adapter": "directory",
+      "advertised_rows": 91000,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Fused overlapping catalogue; attribution and upstream rights"
+    },
+    {
+      "id": "opengamedb",
+      "domain": "games",
+      "url": "https://github.com/karlforshaw/opengamedb",
+      "adapter": "csv_metadata",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "monthly",
+      "notes": "Cross-platform CSV; inspect license"
+    },
+    {
+      "id": "preserve-games",
+      "domain": "preservation",
+      "url": "https://preserve.games/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "landing_only",
+      "cadence": "monthly",
+      "notes": "Preservation directory"
+    },
+    {
+      "id": "vghf",
+      "domain": "preservation",
+      "url": "https://gamehistory.org/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "landing_only",
+      "cadence": "monthly",
+      "notes": "Archival publications"
+    },
+    {
+      "id": "internet-archive",
+      "domain": "preservation",
+      "url": "https://archive.org/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Metadata and rights-vetted collections only"
+    },
+    {
+      "id": "scummvm",
+      "domain": "preservation",
+      "url": "https://www.scummvm.org/compatibility/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "landing_only",
+      "cadence": "monthly",
+      "notes": "Classic games and compatibility"
+    },
+    {
+      "id": "flashpoint",
+      "domain": "preservation",
+      "url": "https://flashpointarchive.org/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Browser game metadata only"
+    },
+    {
+      "id": "itch",
+      "domain": "games",
+      "url": "https://itch.io/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Indie and jam release catalogue"
+    },
+    {
+      "id": "gog",
+      "domain": "games",
+      "url": "https://www.gog.com/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Store catalogue"
+    },
+    {
+      "id": "vndb",
+      "domain": "games",
+      "url": "https://vndb.org/d14",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Database dump documentation lead; not live verified in this pass"
+    },
+    {
+      "id": "ifdb",
+      "domain": "games",
+      "url": "https://ifdb.org/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Interactive fiction"
+    },
+    {
+      "id": "boardgamegeek",
+      "domain": "games",
+      "url": "https://boardgamegeek.com/wiki/page/BGG_XML_API2",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "credential_required",
+      "cadence": "monthly",
+      "notes": "Board games and variants"
+    },
+    {
+      "id": "modrinth",
+      "domain": "mods",
+      "url": "https://docs.modrinth.com/api/operations/searchprojects/",
+      "adapter": "modrinth_json",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "daily",
+      "notes": "Paginated project search; query parameters not auto-fetched"
+    },
+    {
+      "id": "modrinth-projects",
+      "domain": "mods",
+      "url": "https://modrinth.com/mods",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "landing_only",
+      "cadence": "daily",
+      "notes": "Project discovery"
+    },
+    {
+      "id": "curseforge",
+      "domain": "mods",
+      "url": "https://docs.curseforge.com/",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "credential_required",
+      "cadence": "daily",
+      "notes": "Requires API key"
+    },
+    {
+      "id": "thunderstore",
+      "domain": "mods",
+      "url": "https://thunderstore.io/communities/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "daily",
+      "notes": "Community package catalogue"
+    },
+    {
+      "id": "thunderstore-api",
+      "domain": "mods",
+      "url": "https://thunderstore.io/api/docs/",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "daily",
+      "notes": "Package API documentation candidate"
+    },
+    {
+      "id": "nexus",
+      "domain": "mods",
+      "url": "https://www.nexusmods.com/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "daily",
+      "notes": "Game domains and projects"
+    },
+    {
+      "id": "nexus-api",
+      "domain": "mods",
+      "url": "https://app.swaggerhub.com/apis-docs/NexusMods/nexus-mods_public_api_params_in_form_data/1.0",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "credential_required",
+      "cadence": "weekly",
+      "notes": "API docs candidate; key and terms required"
+    },
+    {
+      "id": "modio",
+      "domain": "mods",
+      "url": "https://docs.mod.io/",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "credential_required",
+      "cadence": "daily",
+      "notes": "Games, mods, dependencies and versions"
+    },
+    {
+      "id": "moddb",
+      "domain": "mods",
+      "url": "https://www.moddb.com/mods",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "daily",
+      "notes": "Mod project pages"
+    },
+    {
+      "id": "gamebanana",
+      "domain": "mods",
+      "url": "https://gamebanana.com/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "daily",
+      "notes": "Mod metadata and creator resources"
+    },
+    {
+      "id": "factorio",
+      "domain": "mods",
+      "url": "https://mods.factorio.com/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "daily",
+      "notes": "Mod portal"
+    },
+    {
+      "id": "factorio-api",
+      "domain": "mods",
+      "url": "https://wiki.factorio.com/Mod_portal_API",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Public mod portal API reference"
+    },
+    {
+      "id": "smapi",
+      "domain": "mods",
+      "url": "https://smapi.io/mods",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Stardew compatibility"
+    },
+    {
+      "id": "wabbajack",
+      "domain": "mods",
+      "url": "https://github.com/wabbajack-tools/wabbajack",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "weekly",
+      "notes": "Modpack manifests"
+    },
+    {
+      "id": "loot",
+      "domain": "mods",
+      "url": "https://github.com/loot/loot",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "weekly",
+      "notes": "Load-order metadata"
+    },
+    {
+      "id": "modrinth-platform",
+      "domain": "mods",
+      "url": "https://github.com/modrinth/code",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "weekly",
+      "notes": "Public platform SDK source metadata"
+    },
+    {
+      "id": "steam-workshop",
+      "domain": "mods",
+      "url": "https://partner.steamgames.com/doc/features/workshop",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Workshop publishing contract"
+    },
+    {
+      "id": "spacedock",
+      "domain": "mods",
+      "url": "https://spacedock.info/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "daily",
+      "notes": "KSP mods"
+    },
+    {
+      "id": "ckan",
+      "domain": "mods",
+      "url": "https://github.com/KSP-CKAN/CKAN-meta",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "daily",
+      "notes": "KSP dependency metadata"
+    },
+    {
+      "id": "paper-hangar",
+      "domain": "mods",
+      "url": "https://hangar.papermc.io/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "daily",
+      "notes": "Minecraft plugins"
+    },
+    {
+      "id": "opencomputers",
+      "domain": "mods",
+      "url": "https://github.com/MightyPirates/OpenComputers",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "monthly",
+      "notes": "Mod documentation and versions"
+    },
+    {
+      "id": "luanti",
+      "domain": "mods",
+      "url": "https://content.luanti.org/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Open game content and packages"
+    },
+    {
+      "id": "eve-sde",
+      "domain": "game-data",
+      "url": "https://developers.eveonline.com/docs/services/static-data/",
+      "adapter": "jsonl_metadata",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "daily",
+      "notes": "Official versioned static data"
+    },
+    {
+      "id": "eve-sde-latest",
+      "domain": "game-data",
+      "url": "https://developers.eveonline.com/static-data/tranquility/latest.jsonl",
+      "adapter": "eve_sde",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "daily",
+      "notes": "Existing official update pointer adapter"
+    },
+    {
+      "id": "eve-ref",
+      "domain": "game-data",
+      "url": "https://docs.everef.net/datasets/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "daily",
+      "notes": "Historical static, market and reference datasets"
+    },
+    {
+      "id": "eve-ref-data",
+      "domain": "game-data",
+      "url": "https://data.everef.net/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "daily",
+      "notes": "Data release directory"
+    },
+    {
+      "id": "eve-esi",
+      "domain": "game-data",
+      "url": "https://developers.eveonline.com/docs/services/esi/overview/",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Public vs authenticated routes kept separate"
+    },
+    {
+      "id": "wow-wago",
+      "domain": "game-data",
+      "url": "https://wago.tools/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "daily",
+      "notes": "Versioned DB2 reference; game asset rights review"
+    },
+    {
+      "id": "wow-dbc",
+      "domain": "game-data",
+      "url": "https://github.com/RPGLogs/wow-dbc",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "weekly",
+      "notes": "DBC data mapping"
+    },
+    {
+      "id": "wow-ui",
+      "domain": "game-data",
+      "url": "https://github.com/Gethe/wow-ui-source",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "UI API reference; source rights review"
+    },
+    {
+      "id": "wow-bnet",
+      "domain": "game-data",
+      "url": "https://develop.battle.net/",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "credential_required",
+      "cadence": "weekly",
+      "notes": "Official developer APIs"
+    },
+    {
+      "id": "ffxiv",
+      "domain": "game-data",
+      "url": "https://github.com/xivapi/ffxiv-datamining",
+      "adapter": "csv_metadata",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Versioned CSV metadata; publisher rights review"
+    },
+    {
+      "id": "xivapi",
+      "domain": "game-data",
+      "url": "https://xivapi.com/",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Structured item and quest data"
+    },
+    {
+      "id": "gw2",
+      "domain": "game-data",
+      "url": "https://wiki.guildwars2.com/wiki/API:Main",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Public game catalogue, no account data"
+    },
+    {
+      "id": "runelite",
+      "domain": "game-data",
+      "url": "https://github.com/runelite/runelite",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "weekly",
+      "notes": "Public plugin and game ID metadata"
+    },
+    {
+      "id": "destiny",
+      "domain": "game-data",
+      "url": "https://bungie-net.github.io/",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "credential_required",
+      "cadence": "weekly",
+      "notes": "Manifest documentation"
+    },
+    {
+      "id": "warframe",
+      "domain": "game-data",
+      "url": "https://warframe.market/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "daily",
+      "notes": "Public item market aggregate only"
+    },
+    {
+      "id": "gta-data",
+      "domain": "game-data",
+      "url": "https://github.com/DurtyFree/gta-v-data-dumps",
+      "adapter": "jsonl_metadata",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Public game metadata; asset terms review"
+    },
+    {
+      "id": "cfx-natives",
+      "domain": "game-data",
+      "url": "https://github.com/citizenfx/natives",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "weekly",
+      "notes": "Native API reference"
+    },
+    {
+      "id": "poe",
+      "domain": "game-data",
+      "url": "https://www.pathofexile.com/developer/docs",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "credential_required",
+      "cadence": "weekly",
+      "notes": "API terms and authentication"
+    },
+    {
+      "id": "scryfall",
+      "domain": "game-data",
+      "url": "https://scryfall.com/docs/api/bulk-data",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "daily",
+      "notes": "Bulk metadata; artwork rights separate"
+    },
+    {
+      "id": "mtgjson",
+      "domain": "game-data",
+      "url": "https://mtgjson.com/downloads/all-files/",
+      "adapter": "jsonl_metadata",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "weekly",
+      "notes": "Card datasets; separate art rights"
+    },
+    {
+      "id": "pokemon",
+      "domain": "game-data",
+      "url": "https://github.com/PokeAPI/pokeapi",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Game entity catalogue; rights separate"
+    },
+    {
+      "id": "pokeapi-data",
+      "domain": "game-data",
+      "url": "https://github.com/PokeAPI/pokeapi-data",
+      "adapter": "csv_metadata",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Game data metadata"
+    },
+    {
+      "id": "riot",
+      "domain": "competitive",
+      "url": "https://developer.riotgames.com/docs/lol",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "credential_required",
+      "cadence": "weekly",
+      "notes": "API and Data Dragon policy"
+    },
+    {
+      "id": "opendota",
+      "domain": "competitive",
+      "url": "https://docs.opendota.com/",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Public aggregate match metadata"
+    },
+    {
+      "id": "dotaconstants",
+      "domain": "competitive",
+      "url": "https://github.com/odota/dotaconstants",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "weekly",
+      "notes": "Game constants"
+    },
+    {
+      "id": "liquipedia",
+      "domain": "competitive",
+      "url": "https://liquipedia.net/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Competition metadata; API terms"
+    },
+    {
+      "id": "speedrun-archive",
+      "domain": "competitive",
+      "url": "https://docs.speedrun.io/",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "noncommercial_only",
+      "cadence": "historical",
+      "notes": "CC BY-NC archive; exclude personal user histories"
+    },
+    {
+      "id": "speedrun-tas",
+      "domain": "competitive",
+      "url": "https://tasvideos.org/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Run metadata and technique documentation"
+    },
+    {
+      "id": "vgm",
+      "domain": "media",
+      "url": "https://vgmdb.net/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Soundtrack metadata; no audio rights assumed"
+    },
+    {
+      "id": "game-music",
+      "domain": "media",
+      "url": "https://www.vgmpf.com/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Soundtrack reference metadata"
+    },
+    {
+      "id": "wikimedia-commons",
+      "domain": "media",
+      "url": "https://commons.wikimedia.org/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Per-file license and attribution"
+    },
+    {
+      "id": "open-game-art",
+      "domain": "media",
+      "url": "https://opengameart.org/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Per-asset licenses"
+    },
+    {
+      "id": "kenney",
+      "domain": "media",
+      "url": "https://kenney.nl/assets",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Public game asset library; verify each pack"
+    },
+    {
+      "id": "hf-game-datasets",
+      "domain": "research",
+      "url": "https://huggingface.co/datasets",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "landing_only",
+      "cadence": "weekly",
+      "notes": "Dataset catalogue; individual terms"
+    },
+    {
+      "id": "kaggle-game-datasets",
+      "domain": "research",
+      "url": "https://www.kaggle.com/datasets",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "landing_only",
+      "cadence": "weekly",
+      "notes": "Dataset catalogue; individual terms"
+    },
+    {
+      "id": "zenodo",
+      "domain": "research",
+      "url": "https://zenodo.org/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "landing_only",
+      "cadence": "monthly",
+      "notes": "Research datasets with individual licenses"
+    },
+    {
+      "id": "openalex",
+      "domain": "research",
+      "url": "https://docs.openalex.org/download-all-data/openalex-snapshot",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Game-related research metadata only"
+    },
+    {
+      "id": "crossref",
+      "domain": "research",
+      "url": "https://www.crossref.org/documentation/retrieve-metadata/rest-api/",
+      "adapter": "documentation",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Publication metadata only"
+    },
+    {
+      "id": "digra",
+      "domain": "research",
+      "url": "https://www.digra.org/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Game studies"
+    },
+    {
+      "id": "game-studies",
+      "domain": "research",
+      "url": "https://gamestudies.org/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Game research"
+    },
+    {
+      "id": "godot",
+      "domain": "development",
+      "url": "https://github.com/godotengine/godot-demo-projects",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "public_download",
+      "cadence": "weekly",
+      "notes": "Example project metadata and licenses"
+    },
+    {
+      "id": "unreal",
+      "domain": "development",
+      "url": "https://dev.epicgames.com/documentation/en-us/unreal-engine/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Engine docs"
+    },
+    {
+      "id": "unity",
+      "domain": "development",
+      "url": "https://docs.unity3d.com/Manual/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "weekly",
+      "notes": "Engine documentation"
+    },
+    {
+      "id": "gdc",
+      "domain": "development",
+      "url": "https://www.gdcvault.com/",
+      "adapter": "directory",
+      "advertised_rows": null,
+      "access": "policy_review",
+      "cadence": "monthly",
+      "notes": "Public talk metadata; no paywall bypass"
+    }
+  ]
+}

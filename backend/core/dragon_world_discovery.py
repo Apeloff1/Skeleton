@@ -325,6 +325,11 @@ class WorldDiscovery:
                 try:
                     batch=self.queue.enqueue(scope,raw=page,adapter=adapter,
                         operation=digest([row["id"],fingerprint,page_idx]),**options)["batch_id"]
+                    # Lead projection uses existing approved feed bytes and
+                    # durable provenance. It cannot fetch child URLs.
+                    from core.dragon_lead_graph import LeadGraph
+                    LeadGraph(self.corpus.path).feed_page(scope,url=row["url"],raw=page,adapter=adapter,
+                        options=options,subscription_id=row["id"])
                 except (ValueError,TypeError,KeyError,RuntimeError,sqlite3.Error):
                     reason="import_held";break
                 cursor=page_idx+1

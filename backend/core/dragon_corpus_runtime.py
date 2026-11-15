@@ -171,3 +171,32 @@ async def pulse_game_datasets():
         return await _bounded(lambda:sweep_dataset_shard(_path()))
     except (GameLearningError,sqlite3.Error,OSError,TimeoutError,ValueError,RuntimeError):
         return {"configured":True,"held":True}
+
+
+async def pulse_lead_graph():
+    """Metadata-only graph maintenance: no extra network request or capture."""
+    if not os.getenv("SKL_DRAGON_GAME_CORPUS_DB_PATH","").strip():
+        return {"configured":False,"network_executed":False}
+    try:
+        from core.dragon_lead_graph import LeadGraph
+        def work():
+            graph=LeadGraph(_path())
+            results={}
+            for key,operation in (("bootstrap",graph.bootstrap_pulse),("catalogue",graph.catalogue_pulse),("bundle",graph.bundle_pulse),("expansion",graph.expansion_pulse)):
+                try:results[key]=operation()
+                except (CatalogueHeld,ValueError,sqlite3.Error,OSError):
+                    results[key]={"held":True,"reason":"lead_maintenance_held","network_executed":False}
+            return results
+        return await _bounded(work)
+    except (GameLearningError,sqlite3.Error,OSError,TimeoutError):
+        return {"held":True,"reason":"lead_store_unavailable","network_executed":False}
+
+
+async def lead_graph_call(scope,operation,*args,**kwargs):
+    from core.dragon_lead_graph import LeadGraph
+    if operation not in {"configure","status","page","edges","begin","snapshot","append","seal","revoke","review","dataset_candidates","register_target","bundle_status","enable_bundle"}:
+        raise ValueError("lead graph operation")
+    def work():
+        path=_path(create=operation=="configure" and os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1")
+        return getattr(LeadGraph(path),operation)(scope,*args,**kwargs)
+    return await _bounded(work)

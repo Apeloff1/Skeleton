@@ -173,6 +173,46 @@ class ModSeedSpecialistsRequest(Request):
     acknowledged: StrictBool
 
 
+class LeadGraphConfiguration(Request):
+    enabled: StrictBool
+    acknowledged: StrictBool
+
+
+class LeadBundleGrant(Request):
+    rights_ref: str = Field(min_length=1,max_length=128)
+    grant_seconds: int = Field(default=86400,ge=900,le=2592000,strict=True)
+    acknowledged: StrictBool
+
+
+class LeadDatasetBegin(Request):
+    target_id: str = Field(min_length=1,max_length=64)
+    projection: Literal["steam","modrinth","locator"]
+    source_sha: str = Field(pattern=r"^[0-9a-f]{64}$")
+    expected_rows: int = Field(ge=1,le=100000000,strict=True)
+    rights_ref: str = Field(min_length=1,max_length=128)
+    grant_seconds: int = Field(ge=900,le=2592000,strict=True)
+    acknowledged: StrictBool
+
+
+class LeadDatasetSeal(Request):
+    chain: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class LeadReview(Request):
+    decision: Literal["candidate","held","retired"]
+    reason: str = Field(min_length=1,max_length=512)
+    operation: str = Field(min_length=1,max_length=128)
+    interval_seconds: int = Field(default=604800,ge=900,le=7776000,strict=True)
+
+
+class LeadTargetRegistration(Request):
+    projection: Literal["steam","modrinth","locator"]
+    rights_ref: str = Field(min_length=1,max_length=128)
+    grant_seconds: int = Field(ge=900,le=2592000,strict=True)
+    enabled: StrictBool
+    acknowledged: StrictBool
+
+
 def register_knowledge_routes(router):
     def scope(user):
         try:
@@ -726,3 +766,112 @@ def register_knowledge_routes(router):
         owner=editor(user)
         return await corpus_runtime_call(_bounded(lambda:attach_specialists(
             _path(create=False),owner,**body.model_dump())))
+
+
+    @router.get("/knowledge/game-corpus/dataset-library")
+    async def dataset_library(response:Response,domain:str|None=Query(None,max_length=32),
+            access:str|None=Query(None,max_length=32),q:str|None=Query(None,max_length=256),
+            after:str|None=Query(None,max_length=129),limit:int=Query(32,ge=1,le=100),
+            user:dict=Depends(get_current_user)):
+        from core.dragon_dataset_library import library
+        from core.dragon_corpus_runtime import _bounded
+        scope(user);response.headers["Cache-Control"]="private, no-store"
+        return await corpus_runtime_call(_bounded(lambda:library(domain=domain,access=access,q=q,after=after,limit=limit)))
+
+    @router.get("/knowledge/game-corpus/lead-graph")
+    async def lead_graph_status(response:Response,user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import lead_graph_call
+        response.headers["Cache-Control"]="private, no-store"
+        return await corpus_runtime_call(lead_graph_call(scope(user),"status"))
+
+    @router.post("/knowledge/game-corpus/lead-graph/configure")
+    async def lead_graph_configure(body:LeadGraphConfiguration,user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import lead_graph_call
+        return await corpus_runtime_call(lead_graph_call(editor(user),"configure",**body.model_dump()))
+
+    @router.get("/knowledge/game-corpus/lead-graph/leads")
+    async def lead_graph_page(response:Response,q:str|None=Query(None,max_length=256),
+            family:str|None=Query(None,max_length=32),host:str|None=Query(None,max_length=253),
+            state:Literal["candidate","held","retired"]="candidate",due_only:bool=False,
+            after:str|None=Query(None,max_length=129),limit:int=Query(32,ge=1,le=100),
+            user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import lead_graph_call
+        response.headers["Cache-Control"]="private, no-store"
+        return await corpus_runtime_call(lead_graph_call(scope(user),"page",q=q,family=family,host=host,
+            state=state,due_only=due_only,after=after,limit=limit))
+
+    @router.get("/knowledge/game-corpus/lead-graph/leads/{lead}/edges")
+    async def lead_graph_edges(lead:str,response:Response,direction:Literal["parents","children"]="children",
+            after:str|None=Query(None,max_length=64),limit:int=Query(32,ge=1,le=100),
+            user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import lead_graph_call
+        response.headers["Cache-Control"]="private, no-store"
+        return await corpus_runtime_call(lead_graph_call(scope(user),"edges",lead,direction=direction,after=after,limit=limit))
+
+    @router.post("/knowledge/game-corpus/lead-graph/leads/{lead}/review")
+    async def lead_graph_review(lead:str,body:LeadReview,user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import lead_graph_call
+        return await corpus_runtime_call(lead_graph_call(editor(user),"review",lead,**body.model_dump()))
+
+    @router.get("/knowledge/game-corpus/lead-graph/dataset-candidates")
+    async def lead_dataset_candidates(response:Response,after:str|None=Query(None,max_length=64),
+            limit:int=Query(32,ge=1,le=100),user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import lead_graph_call
+        response.headers["Cache-Control"]="private, no-store"
+        return await corpus_runtime_call(lead_graph_call(scope(user),"dataset_candidates",after=after,limit=limit))
+
+    @router.post("/knowledge/game-corpus/lead-graph/dataset-candidates/{lead}")
+    async def lead_dataset_register(lead:str,body:LeadTargetRegistration,user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import lead_graph_call
+        return await corpus_runtime_call(lead_graph_call(editor(user),"register_target",lead,**body.model_dump()))
+
+    @router.post("/knowledge/game-corpus/lead-graph/snapshots")
+    async def lead_dataset_begin(body:LeadDatasetBegin,user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import lead_graph_call
+        return await corpus_runtime_call(lead_graph_call(editor(user),"begin",**body.model_dump()))
+
+    @router.get("/knowledge/game-corpus/lead-graph/snapshots/{snapshot}")
+    async def lead_dataset_status(snapshot:str,response:Response,user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import lead_graph_call
+        response.headers["Cache-Control"]="private, no-store"
+        return await corpus_runtime_call(lead_graph_call(scope(user),"snapshot",snapshot))
+
+    @router.put("/knowledge/game-corpus/lead-graph/snapshots/{snapshot}/pages/{ordinal}")
+    async def lead_dataset_append(snapshot:str,ordinal:int,request:HttpRequest,
+            sha256:str=Query(pattern=r"^[0-9a-f]{64}$"),previous_chain:str=Query(pattern=r"^[0-9a-f]{64}$"),
+            user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import lead_graph_call
+        from core.dragon_lead_graph import MAX_PAGE_BYTES
+        owner=editor(user)
+        if request.headers.get("content-type","").split(";")[0].strip().lower() not in {"application/x-ndjson","application/octet-stream"}:
+            raise HTTPException(415,detail={"code":"dragon_lead_page_content_type"})
+        # Bound the streaming body before allocating the next chunk.
+        raw=bytearray()
+        async for block in request.stream():
+            if len(block)>MAX_PAGE_BYTES-len(raw):
+                raise HTTPException(413,detail={"code":"dragon_lead_page_bound"})
+            raw.extend(block)
+        return await corpus_runtime_call(lead_graph_call(owner,"append",snapshot,ordinal=ordinal,
+            raw=bytes(raw),sha256=sha256,previous_chain=previous_chain))
+
+    @router.post("/knowledge/game-corpus/lead-graph/snapshots/{snapshot}/seal")
+    async def lead_dataset_seal(snapshot:str,body:LeadDatasetSeal,user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import lead_graph_call
+        return await corpus_runtime_call(lead_graph_call(editor(user),"seal",snapshot,body.chain))
+
+    @router.delete("/knowledge/game-corpus/lead-graph/snapshots/{snapshot}")
+    async def lead_dataset_revoke(snapshot:str,user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import lead_graph_call
+        return await corpus_runtime_call(lead_graph_call(editor(user),"revoke",snapshot))
+
+
+    @router.get("/knowledge/game-corpus/lead-graph/bundle")
+    async def lead_bundle_status(response:Response,user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import lead_graph_call
+        response.headers["Cache-Control"]="private, no-store"
+        return await corpus_runtime_call(lead_graph_call(scope(user),"bundle_status"))
+
+    @router.post("/knowledge/game-corpus/lead-graph/bundle/enable")
+    async def lead_bundle_enable(body:LeadBundleGrant,user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import lead_graph_call
+        return await corpus_runtime_call(lead_graph_call(editor(user),"enable_bundle",**body.model_dump()))

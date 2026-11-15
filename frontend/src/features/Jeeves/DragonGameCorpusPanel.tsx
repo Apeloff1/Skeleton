@@ -7,6 +7,7 @@ import s,{colors as C} from './CrawlerWorkspace.styles';
 import DragonSourceViewer from './DragonSourceViewer';
 import DragonSourceDirectoryPanel from './DragonSourceDirectoryPanel';
 import DragonModSeedPanel from './DragonModSeedPanel';
+import DragonLeadGraphPanel from './DragonLeadGraphPanel';
 import DragonWorldArchivePanel from './DragonWorldArchivePanel';
 
 const field={color:C.text,backgroundColor:C.bg,borderWidth:1,borderColor:C.edge,borderRadius:9,padding:10};
@@ -68,6 +69,7 @@ export default function DragonGameCorpusPanel({visible,canWrite}:{visible:boolea
    {games.map(g=><View key={g.game_id} style={s.check}><Text style={s.label}>{g.first_title}</Text><Text style={s.small}>{g.namespace} · {g.external_id} · first observation: {human(g.first_stage)}</Text><Text selectable style={s.small}>Game ID: {g.game_id}</Text><Button label="Inspect game sources" disabled={!enabled} press={()=>choose(g)}/></View>)}
    <DragonSourceDirectoryPanel game={game} canWrite={canWrite} visible={visible&&open} disabled={busy}/>
    <DragonModSeedPanel game={game} canWrite={canWrite} visible={visible&&open} disabled={busy}/>
+   <DragonLeadGraphPanel canWrite={canWrite} visible={visible&&open} disabled={busy}/>
    <Button label="Load source category explorer" disabled={!enabled} press={loadTaxonomy}/>
    {taxonomy&&<View style={s.check}>
     <Text style={s.label}>{taxonomy.source_classes.length} source categories · {taxonomy.families.length} families</Text>

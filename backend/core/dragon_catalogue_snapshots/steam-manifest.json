@@ -1,0 +1,165 @@
+{
+  "schema": "dragon.steam-identity-snapshot.v2",
+  "source_repository": "jsnli/steamappidlist",
+  "source_path": "data/games_appid.json",
+  "source_blob": "c44a5fcbd6f9260ceddc6005917812eaaf620137",
+  "source_records": 200724,
+  "accepted": 200704,
+  "excluded": 20,
+  "identity_status": "provider-mirror candidate; not independently confirmed, not a release or capture grant",
+  "fields": [
+    "appid",
+    "name"
+  ],
+  "shards": [
+    {
+      "file": "steam-games-000.jsonl",
+      "count": 10000,
+      "first": 10,
+      "last": 508600,
+      "git_blob": "82824d9355f219760d8d8f4b010523b1461072af"
+    },
+    {
+      "file": "steam-games-001.jsonl",
+      "count": 10000,
+      "first": 508610,
+      "last": 780190,
+      "git_blob": "b4bce071bdd78f7c83f559935c3eb3e4f1fa0e1c"
+    },
+    {
+      "file": "steam-games-002.jsonl",
+      "count": 10000,
+      "first": 780210,
+      "last": 1047430,
+      "git_blob": "e1e45004a1d7a349529a6cc286072d48bdb81af3"
+    },
+    {
+      "file": "steam-games-003.jsonl",
+      "count": 10000,
+      "first": 1047440,
+      "last": 1290620,
+      "git_blob": "15d2bfc72d01a41457185669e6df1958a483d9b9"
+    },
+    {
+      "file": "steam-games-004.jsonl",
+      "count": 10000,
+      "first": 1290650,
+      "last": 1538340,
+      "git_blob": "8b0dd5450a1814e654fa71bedc8d96bfb0e5aeea"
+    },
+    {
+      "file": "steam-games-005.jsonl",
+      "count": 10000,
+      "first": 1538350,
+      "last": 1783060,
+      "git_blob": "701886bee35bfdf5684739e0b9b03f11a3dc159f"
+    },
+    {
+      "file": "steam-games-006.jsonl",
+      "count": 10000,
+      "first": 1783080,
+      "last": 2027970,
+      "git_blob": "506ec6e34e574e182ca7c369cd86ef84d9113e88"
+    },
+    {
+      "file": "steam-games-007.jsonl",
+      "count": 10000,
+      "first": 2028270,
+      "last": 2293620,
+      "git_blob": "48b95c4a8deb2603631ef3601fcae64b98fa16b3"
+    },
+    {
+      "file": "steam-games-008.jsonl",
+      "count": 10000,
+      "first": 2293640,
+      "last": 2537560,
+      "git_blob": "13bbbdc8117f1e3f6ca2d8ad27f41e0aa2c9edf2"
+    },
+    {
+      "file": "steam-games-009.jsonl",
+      "count": 10000,
+      "first": 2537590,
+      "last": 2799560,
+      "git_blob": "6aeceb7aaec790bf544659ebaa12f267523df3cc"
+    },
+    {
+      "file": "steam-games-010.jsonl",
+      "count": 10000,
+      "first": 2799570,
+      "last": 3054540,
+      "git_blob": "e4bc67ca2de437c2a37227d1757f40e6d4eada84"
+    },
+    {
+      "file": "steam-games-011.jsonl",
+      "count": 10000,
+      "first": 3054550,
+      "last": 3310100,
+      "git_blob": "f484d20b7cad88b44d69065a77a2836027446878"
+    },
+    {
+      "file": "steam-games-012.jsonl",
+      "count": 10000,
+      "first": 3310110,
+      "last": 3571840,
+      "git_blob": "eb95d294293e422945636d4a7cbf05286aa9ac91"
+    },
+    {
+      "file": "steam-games-013.jsonl",
+      "count": 10000,
+      "first": 3571850,
+      "last": 3838860,
+      "git_blob": "c26ac48863c18a105a21b34c9cf3dee137acd8d7"
+    },
+    {
+      "file": "steam-games-014.jsonl",
+      "count": 10000,
+      "first": 3838900,
+      "last": 4101570,
+      "git_blob": "1a038406205219c70f95dbc2e47d3ce169f0fed8"
+    },
+    {
+      "file": "steam-games-015.jsonl",
+      "count": 10000,
+      "first": 4101590,
+      "last": 4365610,
+      "git_blob": "5010c2f800cef2a7e80332a3cbf5fb1f84f7b7bc"
+    },
+    {
+      "file": "steam-games-016.jsonl",
+      "count": 10000,
+      "first": 4365620,
+      "last": 4645670,
+      "git_blob": "0862555de1a914ca5e9c33997184ae6cfdf87be7"
+    },
+    {
+      "file": "steam-games-017.jsonl",
+      "count": 10000,
+      "first": 4645680,
+      "last": 4932480,
+      "git_blob": "14a7641ce1aed819f5d0132eec1cc497de0c2d10"
+    },
+    {
+      "file": "steam-games-018.jsonl",
+      "count": 10000,
+      "first": 4932500,
+      "last": 5205460,
+      "git_blob": "9b70cea382ac919feee15ed00e752d278424928a"
+    },
+    {
+      "file": "steam-games-019.jsonl",
+      "count": 10000,
+      "first": 5205490,
+      "last": 5547990,
+      "git_blob": "73296db9ca33c900ce5989726a7726fabe1c0160"
+    },
+    {
+      "file": "steam-games-020.jsonl",
+      "count": 704,
+      "first": 5548000,
+      "last": 5598680,
+      "git_blob": "51ac187ca7e00e371a3a8c5acf43f43b7c53a2e3"
+    }
+  ],
+  "structural_validation": "200704 rows, strictly ascending unique integer AppIDs, bounded NFC-compatible nonempty names, 21 exact shard counts and ranges checked by repository connector. Public mirror rights not established.",
+  "source_use_status": "review_required"
+}
