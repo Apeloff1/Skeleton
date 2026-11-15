@@ -1619,6 +1619,7 @@ class DragonCrawlerApplication:
     async def _watch_authority(self, scope:dict[str,str], binding:dict, *, margin:float=0)->dict:
         """Check live parent, source policy and principal before child IO."""
         from skeleton.ai.webcrawler.dragon_treasury_watch import child_matches,validate_watch
+        from skeleton.ai.webcrawler.dragon_archive_grant import eligible_source
         denied=CrawlerError("crawler_watch_revoked","The parent treasury watch is no longer authorized.",403)
         if not isinstance(binding,dict) or not isinstance(binding.get("parent_id"),str):
             raise denied
@@ -1638,7 +1639,8 @@ class DragonCrawlerApplication:
                 raise denied
             source=snapshot["sources"][watch["source_id"]]
             policy=self._capture_policy(parent,source)
-            if not policy["enabled"] or policy["version"]!=watch["policy_version"] or source["fetched_url"]!=watch["url"]:
+            if (not policy["enabled"] or policy["version"]!=watch["policy_version"]
+                    or source["fetched_url"]!=watch["url"] or not eligible_source(source,policy)):
                 raise denied
         except (ValueError,KeyError,TypeError,CheckpointReplicaError) as exc:
             raise denied from exc
@@ -2158,7 +2160,7 @@ class DragonCrawlerApplication:
             growth = project_sanctuary(eligible, as_of=when, selected_sessions=revisions,
                                        excluded_sessions=min(excluded,MAX_EXPEDITIONS),
                                        candidate_limit_reached=capped)["collection_index"]
-            result = build_treasury(observations, as_of=when, growth=growth, mode=mode, query=query,
+            result = await asyncio.to_thread(build_treasury,observations, as_of=when, growth=growth, mode=mode, query=query,
                                     family=family, candidate_limit_reached=capped, excluded_sessions=excluded,
                                     alias_blockers=alias_blockers,materialized=materialized,cursor=cursor,
                                     observed_before=observed_before,left=left,right=right)
@@ -2173,6 +2175,13 @@ class DragonCrawlerApplication:
             )
             if check is None:
                 raise CrawlerError("crawler_treasury_changed", "Treasury changed during reparse.", 409)
+        # A newly inserted session (or a source removed from the owner set)
+        # also invalidates the read, even if all selected versions survived.
+        final_metadata=await (self.sessions.find({**scope,"status":{"$ne":"deleted"}},{"_id":1,"version":1})
+            .sort([("updated_at",DESCENDING),("_id",DESCENDING)])
+            .limit(MAX_SESSIONS+1).max_time_ms(2000).to_list(MAX_SESSIONS+1))
+        if [(item["_id"],item["version"]) for item in final_metadata]!=[(item["_id"],item["version"]) for item in metadata]:
+            raise CrawlerError("crawler_treasury_changed","Owner catalogue changed during reparse.",409)
         expiry = result["earliest_source_expiry"]
         if expiry is not None and expiry <= _now().timestamp():
             raise CrawlerError("crawler_treasury_changed", "Source permission expired during reparse.", 409)
@@ -2632,8 +2641,12 @@ class DragonCrawlerApplication:
             )
         if row.get("treasury_watch_parent") is not None:
             watch=await self._watch_authority(scope,_plain(row["treasury_watch_parent"]),margin=15 if network_margin else 0)
-            if network_margin and watch["claim_until"]<=_now().timestamp()+15:
-                raise CrawlerError("crawler_watch_lease","The reserved watch pulse expired before network admission.",403)
+            # Each worker is bound to the exact claim, not merely the
+            # cycle. A replacement pulse cannot lend its lease to an old
+            # still-draining worker. Missing legacy claim fails closed.
+            if (not row.get("worker_watch_claim") or row["worker_watch_claim"]!=watch["claim_token"]
+                    or watch["claim_until"]<=_now().timestamp()+(15 if network_margin else 0)):
+                raise CrawlerError("crawler_watch_lease","The reserved watch pulse lost its exact authority.",403)
         if row.get("worker_automation_epoch") is not None:
             grant = row.get("automation", {})
             margin = timedelta(seconds=15 if network_margin else 0)
@@ -2676,7 +2689,7 @@ class DragonCrawlerApplication:
             "state": "interrupted",
             "error_code": code,
         }
-        unset = {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""}
+        unset = {"worker_token": "", "lease_until": "", "worker_automation_epoch": "", "worker_watch_claim": ""}
         interrupted = {
             "status": "interrupted",
             "worker_epoch": epoch,
@@ -2819,6 +2832,8 @@ class DragonCrawlerApplication:
             if (watch_claim is None or watch["claim_token"]!=watch_claim or watch["claim_until"]<=_now().timestamp()
                     or not 1<=watch["slices_started"]<=8):
                 raise CrawlerError("crawler_watch_managed","Only the reserved treasury watch pulse can dispatch this child.",403)
+        elif watch_claim is not None:
+            raise CrawlerError("crawler_watch_managed","A watch claim cannot dispatch an unrelated crawl.",403)
         grant = row.get("automation", {})
         if automation_epoch is None and grant.get("enabled"):
             raise CrawlerError(
@@ -2936,6 +2951,7 @@ class DragonCrawlerApplication:
                         "worker_token": token,
                         "worker_epoch": epoch,
                         "lease_until": now + timedelta(seconds=LEASE_SECONDS),
+                        **({"worker_watch_claim":watch_claim} if watch_claim is not None else {}),
                         "updated_at": now,
                         "operations."
                         + operation: {"request_digest": digest, "action": "run", "state": "running"},
@@ -2956,6 +2972,7 @@ class DragonCrawlerApplication:
                     "$unset": {
                         "error": "",
                         **({"worker_automation_epoch": ""} if automation_epoch is None else {}),
+                        **({"worker_watch_claim": ""} if watch_claim is None else {}),
                     },
                 },
             )
@@ -3300,7 +3317,7 @@ class DragonCrawlerApplication:
                         **automation_update,
                     },
                     "$inc": {"version": 1},
-                    "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
+                    "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": "", "worker_watch_claim": ""},
                 },
             )
             if not result.modified_count:
@@ -3343,7 +3360,7 @@ class DragonCrawlerApplication:
                             },
                         },
                         "$inc": {"version": 1},
-                        "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
+                        "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": "", "worker_watch_claim": ""},
                     },
                 )
                 if not settled.matched_count:
@@ -3358,7 +3375,7 @@ class DragonCrawlerApplication:
                                 "last_worker_exit_confirmed": True,
                             },
                             "$inc": {"version": 1},
-                            "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
+                            "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": "", "worker_watch_claim": ""},
                         },
                     )
                     # Erasure keeps only its tombstone and physical-exit metadata;
@@ -3367,7 +3384,7 @@ class DragonCrawlerApplication:
                         {**owned_worker, "status": "deleted"},
                         {
                             "$set": {"last_worker_exit_confirmed": True},
-                            "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": ""},
+                            "$unset": {"worker_token": "", "lease_until": "", "worker_automation_epoch": "", "worker_watch_claim": ""},
                         },
                     )
         finally:
@@ -3429,6 +3446,7 @@ class DragonCrawlerApplication:
                     "storage_receipt": "",
                     "automation": "",
                     "worker_automation_epoch": "",
+                    "worker_watch_claim": "",
                     "safety_control": "",
                     "source_use_policies": "",
                     "archive_grant": "",
