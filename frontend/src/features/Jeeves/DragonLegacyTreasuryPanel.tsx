@@ -1,7 +1,7 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,AppState,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {getAuthToken} from '../../auth/gameforgeAuth';
-import {getLegacyTreasuryCatalog,configureLegacyTreasuryArchive,crawlRequestKey,type DragonLegacyCandidate,type DragonLegacyCatalog} from '../../product/crawlerClient';
+import {getLegacyTreasuryCatalog,configureLegacyTreasuryArchive,retireDragonSession,crawlRequestKey,type DragonLegacyCandidate,type DragonLegacyCatalog} from '../../product/crawlerClient';
 import s,{colors} from './CrawlerWorkspace.styles';
 
 function Button({title,onPress,disabled=false}:{title:string;onPress:()=>void;disabled?:boolean}){
@@ -15,6 +15,8 @@ export default function DragonLegacyTreasuryPanel({revision,canWrite,disabled,on
  const [open,setOpen]=useState(false),[busy,setBusy]=useState(false);
  const [error,setError]=useState('');
  const [selected,setSelected]=useState<string|null>(null),[days,setDays]=useState('30'),[rights,setRights]=useState(false);
+ const [retireId,setRetireId]=useState<string|null>(null),[retention,setRetention]=useState(false);
+ const [notice,setNotice]=useState('');
  const pending=useRef<AbortController|null>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const epoch=useRef(0),owner=useRef(getAuthToken()),operation=useRef<{identity:string;key:string}|null>(null);
  const invalidate=useCallback(()=>{
@@ -22,7 +24,7 @@ export default function DragonLegacyTreasuryPanel({revision,canWrite,disabled,on
   if(timer.current!==null)clearTimeout(timer.current);timer.current=null;
  },[]);
  const reset=useCallback(()=>{
-  invalidate();setCatalog(null);setBusy(false);setSelected(null);setRights(false);operation.current=null;setError('');
+  invalidate();setCatalog(null);setBusy(false);setSelected(null);setRights(false);setRetireId(null);setRetention(false);operation.current=null;setError('');setNotice('');
  },[invalidate]);
  useEffect(()=>{reset();return invalidate;},[revision,reset,invalidate]);
  useEffect(()=>{
@@ -57,6 +59,20 @@ export default function DragonLegacyTreasuryPanel({revision,canWrite,disabled,on
   }catch(e){if(!ctrl.signal.aborted&&epoch.current===attempt&&getAuthToken()===token)setError(e instanceof Error?e.message:'Archive permission command unconfirmed. Reload before retrying.');}
   finally{if(epoch.current===attempt){pending.current=null;setBusy(false);}}
  }
+ async function retire(row:DragonLegacyCandidate){
+  if(busy||disabled||!canWrite||!row.qualified||retireId!==row.session_id||!retention||owner.current!==getAuthToken())return;
+  invalidate();const token=getAuthToken(),attempt=epoch.current,ctrl=new AbortController();
+  pending.current=ctrl;setBusy(true);setError('');setNotice('');setCatalog(null);
+  const identity=['retire',row.session_id,row.version].join(':');
+  if(operation.current?.identity!==identity)operation.current={identity,key:crawlRequestKey('legacy-retire')};
+  try{
+   const receipt=await retireDragonSession(row.session_id,{expected_version:row.version,idempotency_key:operation.current.key,retention_acknowledged:true},ctrl.signal);
+   if(ctrl.signal.aborted||epoch.current!==attempt||token!==getAuthToken())return;
+   operation.current=null;setRetention(false);setRetireId(null);onChanged();await load();
+   setNotice(receipt.vault.active_slot_released?'Historical record retired into cold custody.':'Retirement intent recorded; slot release pending.');
+  }catch(e){if(!ctrl.signal.aborted&&epoch.current===attempt&&token===getAuthToken())setError(e instanceof Error?e.message:'Retirement command unconfirmed.');}
+  finally{if(epoch.current===attempt){pending.current=null;setBusy(false);}}
+ }
  const value=owner.current===getAuthToken()?catalog:null;
  return <View style={s.check}>
   <Text style={s.heading}>Historical relic recovery</Text>
@@ -65,6 +81,7 @@ export default function DragonLegacyTreasuryPanel({revision,canWrite,disabled,on
   {open&&<>
    <Button title={busy?'Inspecting witnessed checkpoints…':'Inspect historical catalogue'} disabled={busy||disabled} onPress={()=>void load()}/>
    {busy&&<ActivityIndicator color={colors.accent}/>}
+   {!!notice&&<Text style={s.small} accessibilityLiveRegion="polite">{notice}</Text>}
    {!!error&&<Text style={s.error} accessibilityLiveRegion="polite">{error}</Text>}
    {value&&<>
     <Text style={s.small}>{value.sessions.length} historical candidates{value.capacity_reached?' · bounded scan':''}. Execution remains disabled.</Text>
@@ -84,6 +101,14 @@ export default function DragonLegacyTreasuryPanel({revision,canWrite,disabled,on
       </>}
      </>}
      <Button title="Revoke historical use" disabled={busy||disabled} onPress={()=>void grant(row,false)}/>
+     {canWrite&&row.qualified&&<>
+      <Button title="Move older record into cold custody" disabled={busy||disabled} onPress={()=>{setRetireId(retireId===row.session_id?null:row.session_id);setRetention(false);}}/>
+      {retireId===row.session_id&&<>
+       <Text style={s.small}>The server requires expired acquisition consent, no live watch or worker, and a witnessed terminal checkpoint.</Text>
+       <View style={s.row}><Switch value={retention} onValueChange={setRetention} disabled={busy||disabled} accessibilityLabel="Confirm retained historical record custody"/><Text style={[s.small,s.grow]}>I have rights to retain this original historical record. This does not renew permission to use its text.</Text></View>
+       <Button title="Confirm cold-custody retirement" disabled={!retention||busy||disabled} onPress={()=>void retire(row)}/>
+      </>}
+     </>}
     </View>)}
    </>}
   </>}

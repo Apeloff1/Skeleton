@@ -1,0 +1,89 @@
+"""Cold custody contract and history-only bounded retrieval regressions."""
+from __future__ import annotations
+
+from dataclasses import replace
+import unittest
+
+from skeleton.ai.webcrawler.dragon_treasury_vault import (
+    MAX_VAULT_SESSIONS, selected_ids, make_marker, validate_marker,
+    reserve_filter, release_active_filter, public_marker,
+)
+from skeleton.ai.webcrawler.dragon_treasury import build_treasury
+from test_ai_webcrawler_dragon_treasury import obs,A,B,NOW,DAY,BASE
+
+SCOPE={"tenant_id":"tenant","owner_id":"owner"}
+
+
+class VaultContractTests(unittest.TestCase):
+    def marker(self):
+        return make_marker(operation="a"*64,request_digest="b"*64,
+                           snapshot_digest="c"*64,now=NOW)
+
+    def test_finite_distinct_window(self):
+        self.assertEqual(selected_ids(["b","a"]),("a","b"))
+        self.assertEqual(len(selected_ids([str(i) for i in range(32)])),32)
+        for values in ([],["a","a"],["a/b"],["../x"],["x"*129],
+                       [str(i) for i in range(33)],["a",None],"a"):
+            with self.subTest(values=values), self.assertRaises(ValueError):
+                selected_ids(values)
+
+    def test_irrevocable_marker_never_claims_new_authority(self):
+        marker=self.marker()
+        self.assertFalse(public_marker(marker)["execution_authorized"])
+        self.assertFalse(public_marker(marker)["historical_grant_extended"])
+        self.assertNotIn("operation",public_marker(marker))
+        self.assertNotIn("request_digest",public_marker(marker))
+        for patch in ({"active_slot_released":True},{"retry_at":NOW-1},
+                      {"accepted_at":float("nan")},{"state":"active"},
+                      {"snapshot_digest":"invalid"},{"execution_authorized":True}):
+            with self.subTest(patch=patch), self.assertRaises(ValueError):
+                validate_marker({**marker,**patch})
+        self.assertTrue(public_marker({**marker,"state":"vaulted",
+                                       "active_slot_released":True})["active_slot_released"])
+
+    def test_quota_filter_reserves_before_release(self):
+        query=reserve_filter(SCOPE,"d"*64,"session")
+        self.assertEqual(query["$or"],[{"vault_ids":"session"},
+            {"session_ids":"session",f"vault_ids.{MAX_VAULT_SESSIONS-1}":{"$exists":False}}])
+        release=release_active_filter(SCOPE,"d"*64,"session")
+        self.assertEqual(release["vault_ids"],"session")
+        self.assertEqual(release["owner_id"],SCOPE["owner_id"])
+
+    def test_window_never_promotes_history_or_offers_revisit(self):
+        rows=[replace(obs("a",BASE+"/doc",A,NOW-2*DAY,archive=True),refresh_allowed=False),
+              replace(obs("b",BASE+"/doc",B,NOW-DAY,archive=True),refresh_allowed=False)]
+        result=build_treasury(rows,as_of=NOW,growth=0,mode="historic_only",
+            catalogue_scope=("a","b"),candidate_limit_reached=True)
+        self.assertEqual(result["historic_indexed"],2)
+        self.assertEqual(result["current_indexed"],0)
+        self.assertEqual(result["revisit_plan"],[])
+        self.assertFalse(result["evolution"]["hoarder_qualified"])
+        self.assertEqual(result["evolution"]["expedition_growth"],0)
+        self.assertTrue(all(hit["archive_only"] and hit["plane"]=="historic" for hit in result["hits"]))
+        for changes in ({"mode":"current_only"},{"candidate_limit_reached":False},
+                        {"growth":800},{"catalogue_scope":("a",)}):
+            kwargs={"mode":"historic_only","candidate_limit_reached":True,"growth":0,
+                    "catalogue_scope":("a","b"),**changes}
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                build_treasury(rows,as_of=NOW,**kwargs)
+        for bad in (replace(rows[0],archive_only=False),replace(rows[0],refresh_allowed=True)):
+            with self.assertRaises(ValueError):
+                build_treasury([bad,rows[1]],as_of=NOW,growth=0,mode="historic_only",
+                    catalogue_scope=("a","b"),candidate_limit_reached=True)
+
+    def test_cursor_binds_selected_scope_even_if_no_text_differs(self):
+        rows=[replace(obs("a",BASE+f"/doc/{i}",A,NOW-i,archive=True),refresh_allowed=False)
+              for i in range(50)]
+        first=build_treasury(rows,as_of=NOW,growth=0,mode="historic_only",
+                             catalogue_scope=("a",),candidate_limit_reached=True)
+        self.assertIsNotNone(first["next_cursor"])
+        second=build_treasury(rows,as_of=NOW,growth=0,mode="historic_only",
+            catalogue_scope=("a",),candidate_limit_reached=True,cursor=first["next_cursor"])
+        self.assertEqual(second["page_offset"],24)
+        with self.assertRaisesRegex(ValueError,"cursor"):
+            build_treasury(rows,as_of=NOW,growth=0,mode="historic_only",
+                catalogue_scope=("a","b"),candidate_limit_reached=True,cursor=first["next_cursor"])
+
+
+if __name__=="__main__":
+    unittest.main()

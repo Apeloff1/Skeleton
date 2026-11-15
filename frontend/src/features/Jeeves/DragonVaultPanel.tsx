@@ -80,7 +80,8 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
    }
    if(!valid(ctrl,attempt,token))return;
    operation.current=null;setRetention(false);setRights(false);setEraseText('');setSelected(ids=>ids.filter(x=>x!==id));
-   onWindow(undefined);onChanged();setHistory([]);await load();setNotice(message);
+   onWindow(undefined);onChanged();setHistory([]);await load();
+   if(token===getAuthToken())setNotice(message);
   }catch(e){if(valid(ctrl,attempt,token))setError(e instanceof Error?e.message:'Vault command unconfirmed. Reload before retrying.');}
   finally{if(epoch.current===attempt){pending.current=null;setBusy(false);}}
  }

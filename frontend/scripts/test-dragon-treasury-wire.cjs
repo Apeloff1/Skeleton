@@ -29,12 +29,15 @@ function client(initial){
     '../utils/apiBase':{API_BASE:'https://backend.test'},
     '../utils/apiClient':{__esModule:true,default:{get:async(url,options)=>{
       requests.push({url,options});return {ok:true,status:200,data:payload,error:null,rid:'wire-fixture'};
+    },post:async(url,body,options)=>{
+      requests.push({url,body,options});return {ok:true,status:200,data:payload,error:null,rid:'wire-fixture'};
     }}},
     '../auth/gameforgeAuth':{getAuthToken:()=> 'fixture-owner',authHeaders:()=>({Authorization:'Bearer fixture-owner'})},
     './chatErrors':load('src/product/chatErrors.ts'),
     './crawlerPilotReceipt':load('src/product/crawlerPilotReceipt.ts')
   });
-  return {requests,read:modules.getDragonTreasury,set:value=>{payload=value;}};
+  return {requests,read:modules.getDragonTreasury,readVault:modules.getDragonVault,
+    retire:modules.retireDragonSession,set:value=>{payload=value;}};
 }
 
 async function main(){
@@ -83,6 +86,37 @@ async function main(){
     const corrupt=structuredClone(p);mutation(corrupt);f.set(corrupt);
     await assert.rejects(f.read('current_only','magnetometer'),err=>err.kind==='protocol');
   }
-  console.log('Canonical treasury Python -> TypeScript: 4 canonical projections, 1 valid health envelope and 15 rejected corrupt receipts.');
+  const vault=fixture.vault,vc=client(vault),selection=vault.vault_window;
+  assert.deepEqual(await vc.read('historic_only','magnetometer',undefined,undefined,{vaultSessions:selection}),vault);
+  assert.ok(vc.requests[0].url.includes('vault_sessions='+selection.join(',')));
+  assert.equal(vault.current_indexed,0);
+  assert.equal(vault.evolution.expedition_growth,0);
+  for(const change of [
+    v=>{v.vault_window=['other'];},v=>{v.current_indexed=1;},
+    v=>{v.evolution.expedition_growth=100;},v=>{v.revisit_plan=['a'.repeat(64)];},
+    v=>{v.hits[0].session_id='other';},v=>{v.hits[0].archive_only=false;},
+    v=>{v.family_rows[0].refresh_url='https://example.org/';}
+  ]){
+    const bad=structuredClone(vault);change(bad);vc.set(bad);
+    await assert.rejects(vc.read('historic_only','magnetometer',undefined,undefined,{vaultSessions:selection}),e=>e.kind==='protocol');
+  }
+  await assert.rejects(vc.read('current_only','',undefined,undefined,{vaultSessions:selection}),e=>e.kind==='protocol');
+  await assert.rejects(vc.read('historic_only','',undefined,undefined,{vaultSessions:['same','same']}),e=>e.kind==='protocol');
+  const state={state:'vaulted',accepted_at:1700000000,active_slot_released:true,snapshot_digest:'a'.repeat(64),
+    execution_authorized:false,historical_grant_extended:false};
+  const page={schema:'skeleton.dragon.vault-catalog.v1',sessions:[
+    {session_id:'vaulted-fixture',version:3,vault:state,archive_expires_at:null,legacy_runtime:false,integrity_held:false}],
+    next_cursor:null,capacity:128,as_of_unix:1800000000,archive_use_verified:false,network_executed:false};
+  vc.set(page);assert.deepEqual(await vc.readVault(),page);
+  for(const patch of [{capacity:129},{archive_use_verified:true},{next_cursor:'vaulted-fixture'}]){
+    vc.set({...page,...patch});await assert.rejects(vc.readVault(),e=>e.kind==='protocol');
+  }
+  const receipt={schema:'skeleton.dragon.vault-command.v1',session_id:'vaulted-fixture',version:3,
+    vault:state,outcome:'vaulted',network_executed:false};
+  const command={expected_version:1,idempotency_key:'test-retire',retention_acknowledged:true};
+  vc.set(receipt);assert.deepEqual(await vc.retire('vaulted-fixture',command),receipt);
+  vc.set({...receipt,vault:{...state,active_slot_released:false}});
+  await assert.rejects(vc.retire('vaulted-fixture',command),e=>e.kind==='protocol');
+  console.log('Treasury and cold custody: canonical wire parity, validated archive windows, finite catalogue and retirement receipt.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

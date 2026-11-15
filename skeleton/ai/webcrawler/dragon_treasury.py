@@ -214,8 +214,9 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
     if catalogue_scope is not None:
         from .dragon_treasury_vault import selected_ids
         if (not isinstance(catalogue_scope,tuple) or tuple(selected_ids(list(catalogue_scope)))!=catalogue_scope
-                or mode=="current_only" or not candidate_limit_reached
-                or any(row.session_id not in catalogue_scope or (row.text is not None and not row.archive_only)
+                or mode=="current_only" or not candidate_limit_reached or growth!=0
+                or any(not isinstance(row,Observation) or row.session_id not in catalogue_scope
+                       or row.refresh_allowed or (row.text is not None and not row.archive_only)
                        for row in observations)):
             raise ValueError("invalid history-only catalogue window")
     aliases = alias_blockers if alias_blockers is not None else []

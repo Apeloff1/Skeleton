@@ -101,6 +101,8 @@ class DragonVaultMixin:
         marker=validate_marker(_plain(row["treasury_vault"]))
         if marker["active_slot_released"]:
             return "vaulted"
+        if row.get("status") not in TERMINAL:
+            return "held"
         fence={"_id":identifier,**scope,"version":row["version"],"status":{"$in":sorted(TERMINAL)},
                "treasury_vault.operation":marker["operation"],"treasury_vault.state":marker["state"],
                "treasury_vault.active_slot_released":False}
@@ -201,6 +203,9 @@ class DragonVaultMixin:
                 result.append({"session_id":row["_id"],"version":int(row["version"]),
                     "vault":None,"archive_expires_at":None,"legacy_runtime":None,"integrity_held":True})
         final=await page()
+        if any(item["archive_expires_at"] is not None and item["archive_expires_at"]<=_now().timestamp()
+               for item in result):
+            raise CrawlerError("crawler_vault_changed","Historical grant expired during catalogue read.",409)
         if [(x["_id"],x["version"],x.get("treasury_vault")) for x in rows]!=[
                 (x["_id"],x["version"],x.get("treasury_vault")) for x in final]:
             raise CrawlerError("crawler_vault_changed","Vault catalogue changed; reload.",409)

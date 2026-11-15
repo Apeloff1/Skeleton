@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import replace
 
 from skeleton.ai.webcrawler.dragon_treasury import Observation, build_treasury
 
@@ -36,7 +37,14 @@ def fixture()->dict:
         value=build_treasury(source_rows,as_of=NOW,growth=600,mode=mode,query=query,**kwargs)
         return {"ok":True,**value,"invalid_materialized_segments":0,"legacy_history_sessions":0}
 
+    vault_rows=[replace(row,archive_only=True,refresh_allowed=False) for row in rows[:2]]
+    selected=tuple(sorted({row.session_id for row in vault_rows}))
+    vault=build_treasury(vault_rows,as_of=NOW,growth=0,mode="historic_only",query="magnetometer",
+                         catalogue_scope=selected,candidate_limit_reached=True)
+    vault={"ok":True,**vault,"vault_window":list(selected),"invalid_materialized_segments":0,
+           "legacy_history_sessions":0}
     return {
+        "vault":vault,
         "normal":project("current_only","magnetometer",rows[:2]),
         "capped":project("current_only","magnetometer",rows),
         "historic":project("historic_only","relic",rows),
