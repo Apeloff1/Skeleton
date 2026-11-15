@@ -99,6 +99,16 @@ def load_policy(path: Path) -> dict[str, Any]:
         if lane["job_id"] in seen:
             raise PolicyError(f"{where}.job_id {lane['job_id']!r} is duplicated")
         seen.add(lane["job_id"])
+    source_workflows = data.get("source_qualification_workflows")
+    source_ids = {f"source_{i:02d}" for i in range(1, 26)}
+    if (not isinstance(source_workflows, dict) or set(source_workflows) != source_ids
+            or any(not isinstance(path, str) or re.fullmatch(
+                r"\.github/workflows/[a-z0-9-]+\.yml", path) is None
+                for path in source_workflows.values())
+            or len(set(source_workflows.values())) != len(source_ids)):
+        raise PolicyError("source qualification inventory must bind 25 distinct local workflows")
+    if "source_qualification_gate" not in seen:
+        raise PolicyError("source qualification gate is mandatory")
     protection = data.get("protection")
     if not isinstance(protection, dict):
         raise PolicyError("protection must be an object")
@@ -236,6 +246,25 @@ def check_workflow(policy: dict[str, Any], root: Path) -> list[str]:
             failures.append(
                 f"{where}: lane {lane['job_id']!r} must not hide failures with continue-on-error"
             )
+    source_workflows = policy["source_qualification_workflows"]
+    qualification = jobs.get("source_qualification_gate", {}).get("block") or ""
+    source_needs = re.search(
+        r"^    needs:\s*\n((?:      - .+\n?)+)", qualification, re.MULTILINE
+    )
+    actual_sources = [line.strip()[2:].strip()
+                      for line in source_needs.group(1).splitlines()] if source_needs else []
+    if sorted(actual_sources) != sorted(source_workflows):
+        failures.append(f"{where}: source qualification needs must match the exact 25-workflow inventory")
+    declared_source_jobs = {job_id for job_id in jobs if re.fullmatch(r"source_\d+", job_id)}
+    if declared_source_jobs != set(source_workflows):
+        failures.append(f"{where}: source qualification job inventory mismatch")
+    for job_id, workflow in source_workflows.items():
+        caller = jobs.get(job_id, {}).get("block") or ""
+        targets = re.findall(r"^    uses:\s*(\S+)\s*$", caller, re.MULTILINE)
+        if targets != ["./" + workflow]:
+            failures.append(f"{where}: source qualification caller {job_id} must use {workflow}")
+        if "continue-on-error:" in caller:
+            failures.append(f"{where}: source qualification caller {job_id} must not suppress failure")
     return failures
 
 

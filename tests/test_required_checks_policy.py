@@ -92,6 +92,48 @@ def test_detects_dropped_restored_ci_lane(repo_copy: Path) -> None:
     assert any("aggregate needs" in item for item in failures)
 
 
+def test_source_lane_identity_and_missing_or_skipped_evidence() -> None:
+    lane = next(lane for lane in POLICY["aggregate_lanes"] if lane["job_id"] == "source_qualification_gate")
+    assert lane["name"] == "Required source qualification"
+    assert lane["result_env"] == "SOURCE_RESULT"
+    assert status.classify_run(lane["name"], [], 15368).state == "missing"
+    for conclusion in ("failure", "cancelled", "skipped"):
+        assert status.classify_run(lane["name"], [_run(lane["name"], conclusion)], 15368).state == "failure"
+
+
+def test_detects_dropped_source_gate_dependency(repo_copy: Path) -> None:
+    _edit(repo_copy / ".github/workflows/merge-readiness.yml", "      - source_qualification_gate\n", "")
+    assert any("aggregate needs" in item for item in guard.run(repo_copy, guard.DEFAULT_POLICY)[0])
+
+
+def test_detects_missing_source_child_dependency(repo_copy: Path) -> None:
+    _edit(repo_copy / ".github/workflows/merge-readiness.yml", "      - source_25\n", "")
+    assert any("source qualification needs" in item for item in guard.run(repo_copy, guard.DEFAULT_POLICY)[0])
+
+
+def test_detects_wrong_source_workflow_target(repo_copy: Path) -> None:
+    original = POLICY["source_qualification_workflows"]["source_01"]
+    foreign = POLICY["source_qualification_workflows"]["source_02"]
+    _edit(repo_copy / ".github/workflows/merge-readiness.yml", "uses: ./" + original, "uses: ./" + foreign)
+    assert any("source qualification caller source_01" in item for item in guard.run(repo_copy, guard.DEFAULT_POLICY)[0])
+
+
+@pytest.mark.parametrize("mutation", ["drop", "duplicate", "remote"])
+def test_rejects_malformed_source_workflow_inventory(repo_copy: Path, mutation: str) -> None:
+    path = repo_copy / guard.DEFAULT_POLICY
+    policy = json.loads(path.read_text(encoding="utf-8"))
+    inventory = policy["source_qualification_workflows"]
+    if mutation == "drop":
+        del inventory["source_25"]
+    elif mutation == "duplicate":
+        inventory["source_25"] = inventory["source_24"]
+    else:
+        inventory["source_25"] = "foreign/repo/.github/workflows/test.yml@main"
+    path.write_text(json.dumps(policy), encoding="utf-8")
+    failures, parsed = guard.run(repo_copy, guard.DEFAULT_POLICY)
+    assert parsed is None and any("source qualification inventory" in item for item in failures)
+
+
 def test_restored_ci_lane_is_reusable_and_required() -> None:
     lanes = {lane["job_id"]: lane for lane in POLICY["aggregate_lanes"]}
     assert lanes["ci"]["name"] == "CI/CD"

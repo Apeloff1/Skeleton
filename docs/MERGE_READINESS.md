@@ -51,6 +51,7 @@ and it fails unless all of these constituent gates succeed for the same head:
 - **PR Automation Tests** — compiles the automation packages and runs the
   auto-merge, runner-v2, repository-machine, and filesystem/tool transaction
   contracts.
+- **Required source qualification** — requires the exact 25-workflow inventory bound in the policy, rejects missing, failed, cancelled or skipped source results, and gates CI/CD. Main pushes and manual runs also require their own source qualification.
 - **CI/CD** — calls the reusable `.github/workflows/ci.yml` (restored in
   #4104 after ace886be archived it): Frontend, Backend Lint/Test/Import Smoke,
   Skeleton GameForge, Java/Assembly accelerators, Jeeves, Cockpit Smoke and a
