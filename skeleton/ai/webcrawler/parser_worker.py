@@ -97,7 +97,8 @@ def _parse(meta: dict, body: bytes) -> tuple[str, dict | None]:
                 return "empty", None
             return "ok", {"title": doc.title, "text": doc.text,
                           "links": list(doc.links[:128]),
-                          "truncated": doc.provenance.get("parser_text_truncated") is True}
+                          "truncated": doc.provenance.get("parser_text_truncated") is True,
+                          "structural_projection": doc.provenance.get("structural_projection")}
         if mode in {"sitemap", "discovery"}:
             if set(meta) != {"mode", "url", "media", "hosts", "max_bytes", "body_size"}:
                 raise ValueError("invalid discovery metadata")
