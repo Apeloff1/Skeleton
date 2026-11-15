@@ -57,6 +57,11 @@ def build_assets(tiles):
             " ".join(str(channel) for p in row for channel in palette[p]) for row in tile["pixels"]
         )+"\n"
         files["tiles/"+tile["id"]+".ppm"]=body
-    from skeleton.forge.source_manifest import source_manifest
-    return {"tile_digest":digest(tiles),"files":files,"source_manifest":source_manifest(files),
+    from hashlib import sha256
+    hashes={name:sha256(body.encode("ascii")).hexdigest() for name,body in sorted(files.items())}
+    # This is an asset-only pack, not a complete Godot project. Do not use
+    # the project manifest validator, which requires project.godot.
+    return {"tile_digest":digest(tiles),"files":files,
+            "source_manifest":{"schema":"prood.asset-manifest.v1","file_count":len(files),
+                               "files":hashes,"sha256":digest(hashes)},
             "external_assets_used":False}

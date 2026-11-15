@@ -170,6 +170,7 @@ jobs:
           tests/test_frontier_durable_work.py
           tests/test_frontier_durable_delivery.py
           tests/test_prood_local_executor.py
+          tests/test_prood_design_campaign.py
           tests/test_app_offline_custody.py
           tests/test_frontier_replay_byte_custody.py
       - name: Recovered guarded activation, secret envelopes and isolated planning

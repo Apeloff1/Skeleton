@@ -1,4 +1,4 @@
-"""Original deterministic regional graph and branching quest generation."""
+"""Original deterministic regional graph and traversable quest generation."""
 from collections import deque
 from hashlib import sha256
 import random
