@@ -21,6 +21,9 @@ from pymongo import ASCENDING, DESCENDING, ReturnDocument
 from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from core.databases import core_db
+from core.dragon_checkpoint_replica import (
+    CheckpointReplicaError, checkpoint_fields, decode_exact_replica, verify_primary,
+)
 from core.engine_client import EngineAuthorizationError, EngineClient, EngineClientError
 
 log = logging.getLogger(__name__)
@@ -340,8 +343,17 @@ class DragonCrawlerApplication:
         if _digest(_plain(row["request"])) != row["request_digest"]:
             raise CrawlerError("crawler_integrity", "Crawler request integrity check failed.", 503)
         _, run_type = _core()
-        run = run_type.from_snapshot(_plain(row["snapshot"]))
-        snapshot = run.snapshot()
+        identity = row.get("checkpoint_identity")
+        try:
+            snapshot = _plain(row["snapshot"])
+            if identity is not None:
+                verify_primary(snapshot, _plain(identity))
+            elif row.get("checkpoint_replica") is not None:
+                raise CheckpointReplicaError("replica has no current witness")
+            snapshot = run_type.from_snapshot(snapshot).snapshot()
+        except (CrawlerError, CheckpointReplicaError, ValueError, TypeError, KeyError, RecursionError):
+            row = await self._repair_exact_checkpoint(scope, row, run_type)
+            snapshot = _plain(row["snapshot"])
         binding = snapshot.get("binding", {})
         if (
             binding.get("scope") != scope
@@ -355,6 +367,73 @@ class DragonCrawlerApplication:
         if set(policies) - set(snapshot["sources"]):
             raise CrawlerError("crawler_integrity", "Source-use policies refer to missing captures.", 503)
         return row
+
+    async def _repair_exact_checkpoint(self, scope: dict[str, str], row: dict, run_type) -> dict:
+        """Reconstruct only the currently witnessed, quiescent checkpoint.
+
+        Never infer physical exit from lease expiry, replace a live worker's
+        image, roll back a request reservation, or restore an old grant.
+        """
+        unavailable = CrawlerError(
+            "crawler_checkpoint_unrecoverable",
+            "The current crawler checkpoint cannot be repaired safely.", 503,
+        )
+        if (
+            row.get("status") not in {"queued", "ready", "paused", "interrupted",
+                                      "completed", "budget_exhausted", "failed"}
+            or row.get("worker_token") is not None
+            or row.get("lease_until") is not None
+            or type(row.get("version")) is not int
+            or row.get("consent_expires_at") is None
+            or _utc(row["consent_expires_at"]) <= _now()
+        ):
+            raise unavailable
+        identity = row.get("checkpoint_identity")
+        try:
+            candidate = decode_exact_replica(row.get("checkpoint_replica"), _plain(identity))
+            restored = run_type.from_snapshot(candidate).snapshot()
+            verify_primary(restored, _plain(identity))
+            binding = restored["binding"]
+            if (binding["scope"] != scope
+                    or binding["request_digest"] != row["request_digest"]
+                    or binding["consent"] != _plain(row["consent"])
+                    or set(self._source_policies(row)) - set(restored["sources"])):
+                raise CheckpointReplicaError("repair authority mismatch")
+        except (CrawlerError, CheckpointReplicaError, ValueError, KeyError, TypeError, RecursionError) as exc:
+            raise unavailable from exc
+        repaired_at = _now()
+        repair = {
+            "sequence": restored["sequence"], "snapshot_digest": restored["snapshot_digest"],
+            "identity_sha256": _digest(_plain(identity)), "repaired_at": repaired_at.isoformat(),
+            "ancestor_rollback": False, "worker_restarted": False,
+        }
+        receipt = await self._admit(
+            scope, row["_id"], {"snapshot": restored, "checkpoint_repair": repair},
+        )
+        result = await self.sessions.update_one(
+            {"_id": row["_id"], **scope, "version": row["version"],
+             "worker_epoch": row["worker_epoch"], "status": row["status"],
+             "worker_token": None, "lease_until": None,
+             "checkpoint_identity": identity,
+             "consent_expires_at": row["consent_expires_at"],
+             "$expr": {"$gt": ["$consent_expires_at", "$NOW"]}},
+            {"$set": {"snapshot": restored, "checkpoint_repair": repair,
+                      "storage_receipt": receipt, "updated_at": repaired_at},
+             "$inc": {"version": 1}},
+        )
+        if not result.modified_count:
+            raise CrawlerError("crawler_conflict", "Checkpoint repair was superseded.", 409)
+        # Re-read the owner-scoped committed row; never return an unpersisted
+        # candidate. A concurrent deletion/revocation wins.
+        current = await self.sessions.find_one({"_id": row["_id"], **scope})
+        if current is None or current.get("status") == "deleted":
+            raise CrawlerError("crawler_not_found", "Crawler session not found.", 404)
+        try:
+            verify_primary(_plain(current["snapshot"]), _plain(current["checkpoint_identity"]))
+            run_type.from_snapshot(_plain(current["snapshot"]))
+        except (CrawlerError, CheckpointReplicaError, ValueError, TypeError, KeyError) as exc:
+            raise unavailable from exc
+        return current
 
     def _worker_state(self, row: dict) -> dict:
         handle = self._workers.get(row.get("worker_token"))
@@ -1437,6 +1516,7 @@ class DragonCrawlerApplication:
         }
         runtime = run_type.create(request, scope=scope, consent=consent, now=now.timestamp())
         snapshot = runtime.snapshot()
+        checkpoint = checkpoint_fields(snapshot, accompanying={"request": request.as_dict()})
         row = {
             "_id": identifier,
             **scope,
@@ -1444,7 +1524,7 @@ class DragonCrawlerApplication:
             "creation_digest": request_digest,
             "request": request.as_dict(),
             "request_digest": _digest(request.as_dict()),
-            "snapshot": snapshot,
+            **checkpoint,
             "status": "queued",
             "version": 1,
             "worker_epoch": 0,
@@ -1455,7 +1535,7 @@ class DragonCrawlerApplication:
             "operations": {},
         }
         row["storage_receipt"] = await self._admit(
-            scope, identifier, {"request": row["request"], "snapshot": snapshot}
+            scope, identifier, {"request": row["request"], **checkpoint}
         )
         quota_id = _digest(scope)
         await self.limits.update_one(
@@ -1579,25 +1659,18 @@ class DragonCrawlerApplication:
             runtime.pause()
             state = "paused"
         snapshot = runtime.snapshot()
-        receipt = await self._admit(
-            scope,
-            identifier,
-            {
-                "snapshot": snapshot,
-                "grant": {
-                    **grant,
-                    "authorized_at": now.isoformat(),
-                    "expires_at": expiry.isoformat(),
-                    "next_run_at": now.isoformat(),
-                },
-            },
-        )
+        grant_write = {"grant": {
+            **grant, "authorized_at": now.isoformat(), "expires_at": expiry.isoformat(),
+            "next_run_at": now.isoformat(),
+        }}
+        checkpoint = checkpoint_fields(snapshot, accompanying=grant_write)
+        receipt = await self._admit(scope, identifier, {**grant_write, **checkpoint})
         changed = await self.sessions.update_one(
             {"_id": identifier, **scope, "version": row["version"]},
             {
                 "$set": {
                     "automation": grant,
-                    "snapshot": snapshot,
+                    **checkpoint,
                     "status": state,
                     "storage_receipt": receipt,
                     "updated_at": now,
@@ -1644,12 +1717,13 @@ class DragonCrawlerApplication:
         getattr(runtime, action)()
         snapshot = runtime.snapshot()
         state = "queued" if action == "resume" else ("paused" if action == "pause" else "cancelled")
-        receipt = await self._admit(scope, identifier, snapshot)
+        checkpoint = checkpoint_fields(snapshot)
+        receipt = await self._admit(scope, identifier, checkpoint)
         changed = await self.sessions.update_one(
             {"_id": identifier, **scope, "version": row["version"]},
             {
                 "$set": {
-                    "snapshot": snapshot,
+                    **checkpoint,
                     "status": state,
                     "updated_at": _now(),
                     "storage_receipt": receipt,
@@ -2065,7 +2139,8 @@ class DragonCrawlerApplication:
         async def commit(snapshot: dict, event: dict):
             raw = _plain(snapshot)
             await self._live(scope, identifier, token, epoch)
-            receipt = await self._admit(scope, identifier, raw)
+            checkpoint = checkpoint_fields(raw)
+            receipt = await self._admit(scope, identifier, checkpoint)
             await self._live(scope, identifier, token, epoch)
             result = await self.sessions.update_one(
                 {
@@ -2093,7 +2168,7 @@ class DragonCrawlerApplication:
                 },
                 {
                     "$set": {
-                        "snapshot": raw,
+                        **checkpoint,
                         "storage_receipt": receipt,
                         "updated_at": _now(),
                         "last_event": _plain(event),
@@ -2286,7 +2361,8 @@ class DragonCrawlerApplication:
                     interrupted = True
             current = await self._live(scope, identifier, token, epoch)
             snapshot = _plain(snapshot)
-            receipt = await self._admit(scope, identifier, snapshot)
+            checkpoint = checkpoint_fields(snapshot)
+            receipt = await self._admit(scope, identifier, checkpoint)
             current = await self._live(scope, identifier, token, epoch)
             _, run_type = _core()
             state = str(run_type.from_snapshot(snapshot).status()["state"])
@@ -2369,7 +2445,7 @@ class DragonCrawlerApplication:
                 {
                     "$set": {
                         "status": state,
-                        "snapshot": snapshot,
+                        **checkpoint,
                         "storage_receipt": receipt,
                         "updated_at": _now(),
                         "operations." + operation: operation_receipt,
@@ -2496,6 +2572,9 @@ class DragonCrawlerApplication:
                 "$inc": {"version": 1},
                 "$unset": {
                     "snapshot": "",
+                    "checkpoint_identity": "",
+                    "checkpoint_replica": "",
+                    "checkpoint_repair": "",
                     "request": "",
                     "consent": "",
                     "operations": "",
