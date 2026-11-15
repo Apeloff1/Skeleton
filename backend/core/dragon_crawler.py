@@ -482,6 +482,8 @@ class DragonCrawlerApplication:
                     "_id": row["_id"],
                     **scope,
                     "status": "running",
+                    "version": row["version"],
+                    "worker_epoch": row["worker_epoch"],
                     "worker_token": row.get("worker_token"),
                     "lease_until": lease,
                 },
@@ -3200,6 +3202,10 @@ class DragonCrawlerApplication:
         async def pulse(item):
             scope = {key: item[key] for key in ("tenant_id", "owner_id")}
             identifier, epoch = item["_id"], item["automation"]["epoch"]
+            # Every recovery mutation is leased to the exact observed row.
+            # A concurrent pause, cancel, revoke, newer worker or grant update
+            # wins; the next pulse rereads authority rather than overwriting it.
+            row = item
             try:
                 row = await self._reconcile(scope, await self._owned(scope, identifier))
                 grant = row.get("automation", {})
@@ -3215,8 +3221,9 @@ class DragonCrawlerApplication:
                 elif len(row.get("operations", {})) >= MAX_OPERATIONS:
                     reason = "command_budget"
                 if reason:
-                    await self.sessions.update_one(
-                        {"_id": identifier, **scope, "automation.epoch": epoch},
+                    changed = await self.sessions.update_one(
+                        {"_id": identifier, **scope, "version": row["version"],
+                         "automation.epoch": epoch, "automation.enabled": True},
                         {
                             "$set": {
                                 "automation.enabled": False,
@@ -3226,7 +3233,7 @@ class DragonCrawlerApplication:
                             "$inc": {"version": 1},
                         },
                     )
-                    return "stopped"
+                    return "stopped" if changed.modified_count else "superseded"
                 if self._worker_state(row)["active"]:
                     await self._defer_recovery(row)
                     return "waiting"
@@ -3234,8 +3241,9 @@ class DragonCrawlerApplication:
                 _, run_type = _core()
                 ready = run_type.from_snapshot(_plain(row["snapshot"])).status()["next_ready_at"]
                 if ready is not None and ready > _now().timestamp():
-                    await self.sessions.update_one(
-                        {"_id": identifier, **scope, "version": row["version"], "automation.epoch": epoch},
+                    changed = await self.sessions.update_one(
+                        {"_id": identifier, **scope, "version": row["version"],
+                         "automation.epoch": epoch, "automation.enabled": True},
                         {
                             "$set": {
                                 "automation.next_run_at": datetime.fromtimestamp(
@@ -3246,7 +3254,7 @@ class DragonCrawlerApplication:
                             "$inc": {"version": 1},
                         },
                     )
-                    return "waiting"
+                    return "waiting" if changed.modified_count else "superseded"
                 body = {
                     "expected_version": int(row["version"]),
                     "idempotency_key": f"autonomous:{epoch}:{grant['slices_started'] + 1}",
@@ -3259,8 +3267,9 @@ class DragonCrawlerApplication:
                     "crawler_integrity",
                     "crawler_grant_revoked",
                 }
-                await self.sessions.update_one(
-                    {"_id": identifier, **scope, "automation.epoch": epoch, "automation.enabled": True},
+                changed = await self.sessions.update_one(
+                    {"_id": identifier, **scope, "version": row["version"],
+                     "automation.epoch": epoch, "automation.enabled": True},
                     {
                         "$set": {
                             "automation.next_run_at": _now() + timedelta(seconds=10),
@@ -3271,11 +3280,12 @@ class DragonCrawlerApplication:
                         "$inc": {"version": 1},
                     },
                 )
-                return "waiting" if retry else "blocked"
+                return ("waiting" if retry else "blocked") if changed.modified_count else "superseded"
             except (ValueError, TypeError, KeyError):
                 # Old/invalid runtime or grant evidence never gets silently upgraded.
-                await self.sessions.update_one(
-                    {"_id": identifier, **scope, "automation.epoch": epoch},
+                changed = await self.sessions.update_one(
+                    {"_id": identifier, **scope, "version": row["version"],
+                     "automation.epoch": epoch, "automation.enabled": True},
                     {
                         "$set": {
                             "automation.enabled": False,
@@ -3285,7 +3295,7 @@ class DragonCrawlerApplication:
                         "$inc": {"version": 1},
                     },
                 )
-                return "blocked"
+                return "blocked" if changed.modified_count else "superseded"
 
         outcomes = await asyncio.gather(*(pulse(row) for row in selected), return_exceptions=True)
         result = {
