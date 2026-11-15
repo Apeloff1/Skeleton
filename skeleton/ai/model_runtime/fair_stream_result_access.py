@@ -117,7 +117,8 @@ def verify_result_read_grant(
         _validate_permit(permit)
     except ValueError as exc:
         raise ResultReadDenied("canonical CPU-only permit required") from exc
-    if type(grant) is not dict or set(grant) != set(_FIELDS) | {"signature"}:
+    if (type(grant) is not dict or len(grant) != len(_FIELDS) + 1
+            or set(grant) != set(_FIELDS) | {"signature"}):
         raise ResultReadDenied("invalid grant fields")
     if type(grant["schema"]) is not str or grant["schema"] != SCHEMA:
         raise ResultReadDenied("unsupported result read grant schema")
@@ -246,6 +247,19 @@ class AuthorizedSealedResultReader:
         except CustodySchemaError as exc:
             raise ResultReadDenied("grant ledger schema changed") from exc
 
+    def _consumed_identity(self, nonce: str) -> tuple[str, str] | None:
+        """Bound the SQL projection; malformed existent rows never mean absence."""
+        row = self._connection.execute(
+            "SELECT CASE WHEN typeof(lease_id)='text' AND length(CAST(lease_id AS BLOB))=64"
+            " THEN lease_id END, CASE WHEN typeof(receipt_digest)='text'"
+            " AND length(CAST(receipt_digest AS BLOB))=64 THEN receipt_digest END"
+            " FROM " + _TABLE + " WHERE nonce=?", (nonce,),
+        ).fetchone()
+        if row is None:
+            return None
+        return (_hex(row[0], 64, "consumed lease identity"),
+                _hex(row[1], 64, "consumed receipt digest"))
+
     def _confirm_consumption(self, *, nonce: str, lease_id: str, digest: str) -> None:
         """Recheck committed consumption within an independent read snapshot."""
         try:
@@ -255,10 +269,7 @@ class AuthorizedSealedResultReader:
             self._connection.execute("BEGIN")
             try:
                 self._assert_schema()
-                row = self._connection.execute(
-                    "SELECT lease_id, receipt_digest FROM " + _TABLE + " WHERE nonce=?",
-                    (nonce,),
-                ).fetchone()
+                row = self._consumed_identity(nonce)
                 if row != (lease_id, digest):
                     raise ResultReadDenied("committed grant consumption unavailable")
                 self._handle.assert_current()
@@ -360,9 +371,7 @@ class AuthorizedSealedResultReader:
                 )
                 self._handle.assert_current()
                 self._assert_schema()
-                row = self._connection.execute(
-                    "SELECT lease_id, receipt_digest FROM " + _TABLE + " WHERE nonce=?", (nonce,),
-                ).fetchone()
+                row = self._consumed_identity(nonce)
                 if row != (permit.lease_id, digest):
                     raise ResultReadDenied("grant consumption readback mismatch")
                 self._connection.commit()
