@@ -169,6 +169,25 @@ class VaultDiscoveryTests(unittest.TestCase):
                 query_terms(query)
         with self.assertRaises(ValueError):
             catalogue_signature([{"_id":str(i),"version":1} for i in range(129)],now=NOW)
+        for rows in ([None],[{"_id":"a","version":1,"archive_grant":"broken"}]):
+            with self.assertRaises(ValueError):
+                catalogue_signature(rows,now=NOW)
+
+    def test_all_128_positions_are_covered_in_sixteen_disjoint_batches(self):
+        from skeleton.ai.webcrawler.dragon_vault_discovery import PAGE,catalogue_signature,digest_scope,page_offset,query_terms
+        rows=[{"_id":f"chamber-{i:03}","version":1} for i in reversed(range(128))]
+        sig=catalogue_signature(rows,now=NOW)
+        bound=digest_scope(SCOPE,sig,query_terms("optical"))
+        cursor=None
+        visited=[]
+        for batch in range(16):
+            offset=page_offset(cursor,bound,len(rows))
+            self.assertEqual(offset,batch*PAGE)
+            visited.extend(row["_id"] for row in rows[offset:offset+PAGE])
+            cursor=bound+":"+str(offset+PAGE) if offset+PAGE<len(rows) else None
+        self.assertIsNone(cursor)
+        self.assertEqual(len(set(visited)),128)
+        self.assertEqual(visited,[row["_id"] for row in rows])
 
 
 if __name__=="__main__":

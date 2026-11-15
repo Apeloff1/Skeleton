@@ -6,7 +6,6 @@ a current index, or permission to fetch. Text and tokens never leave it.
 """
 from __future__ import annotations
 
-from collections import Counter
 import hashlib
 import json
 import re
@@ -33,18 +32,24 @@ def query_terms(query):
 
 def catalogue_signature(rows,*,now):
     """Bind cursors to all bounded owner rows and live grant-expiry states."""
-    if not isinstance(rows,list) or len(rows)>MAX_VAULT_SESSIONS or not math.isfinite(now):
+    if (not isinstance(rows,list) or len(rows)>MAX_VAULT_SESSIONS
+            or type(now) not in (int,float) or not math.isfinite(now) or now<0):
         raise ValueError("chamber catalogue exceeds bound")
     clean=[]
     previous=None
     for row in rows:
+        if not isinstance(row,dict):
+            raise ValueError("invalid chamber catalogue row")
         sid=row.get("_id")
         version=row.get("version")
         if (not identity(sid) or type(version) is not int or version<1
                 or previous is not None and sid>=previous):
             raise ValueError("invalid chamber catalogue ordering")
         previous=sid
-        grant=row.get("archive_grant") or {}
+        grant=row.get("archive_grant")
+        if grant is not None and not isinstance(grant,dict):
+            raise ValueError("invalid chamber grant metadata")
+        grant=grant or {}
         issued,expiry=grant.get("issued_at"),grant.get("expires_at")
         active=(type(issued) in (float,int) and type(expiry) in (float,int)
                 and math.isfinite(issued) and math.isfinite(expiry) and issued<=now<expiry)
@@ -85,7 +90,10 @@ def summarize_sources(sources,terms):
                 or len(text.encode("utf-8"))>MAX_TEXT_BYTES
                 or hashlib.sha256(text.encode("utf-8")).hexdigest()!=key):
             raise ValueError("retained chamber bytes mismatch")
-        size+=len(text.encode("utf-8"))
+        encoded=text.encode("utf-8")
+        size+=len(encoded)
+        if size>MAX_SOURCES*MAX_TEXT_BYTES:
+            raise ValueError("chamber scan byte bound exceeded")
         if key not in distinct:
             distinct[key]=wanted.intersection(_lexemes(text))
         hits=distinct[key]

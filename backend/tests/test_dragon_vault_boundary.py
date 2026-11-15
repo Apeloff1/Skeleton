@@ -340,5 +340,57 @@ class DiscoveryBoundaryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(err.exception.code,"crawler_vault_search_changed")
 
 
+class PhysicalDiscoveryAdmissionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_cancelled_request_does_not_refund_physical_cpu_permit(self):
+        import asyncio
+        import threading
+        from core.dragon_vault import _bounded_discovery_cpu
+        gate=threading.BoundedSemaphore(1)
+        entered=threading.Event()
+        release=threading.Event()
+        def physical():
+            entered.set()
+            if not release.wait(3):
+                raise RuntimeError("fixture timeout")
+            return "finished"
+        with patch("core.dragon_vault._DISCOVERY_CPU",gate):
+            task=asyncio.create_task(_bounded_discovery_cpu(physical))
+            try:
+                for _ in range(200):
+                    if entered.is_set():
+                        break
+                    await asyncio.sleep(.005)
+                self.assertTrue(entered.is_set())
+                task.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await task
+                with self.assertRaises(CrawlerError) as failure:
+                    await _bounded_discovery_cpu(lambda: "must not run")
+                self.assertEqual(failure.exception.code,"crawler_vault_busy")
+            finally:
+                release.set()
+                if not task.done():
+                    task.cancel()
+                # Allow the uncancelled executor future's done callback to
+                # release the gate before the mock binding is restored.
+                for _ in range(400):
+                    if gate.acquire(blocking=False):
+                        gate.release()
+                        break
+                    await asyncio.sleep(.005)
+                else:
+                    self.fail("physical discovery permit was not released")
+            self.assertEqual(await _bounded_discovery_cpu(lambda: "ready"),"ready")
+
+    async def test_busy_is_not_misreported_as_held_chamber(self):
+        app,row,metadata,now=DiscoveryBoundaryTests().harness()
+        with patch("core.dragon_crawler._now",return_value=now),patch(
+                "core.dragon_vault._bounded_discovery_cpu",
+                side_effect=CrawlerError("crawler_vault_busy","busy",429)):
+            with self.assertRaises(CrawlerError) as failure:
+                await app.discover_treasury_vault(SCOPE,query="optical")
+        self.assertEqual(failure.exception.code,"crawler_vault_busy")
+
+
 if __name__=="__main__":
     unittest.main()

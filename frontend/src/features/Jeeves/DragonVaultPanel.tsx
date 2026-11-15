@@ -6,7 +6,7 @@ import {getDragonVault,getDragonVaultQuota,discoverDragonVault,retireDragonSessi
 import s,{colors} from './CrawlerWorkspace.styles';
 
 type Props={revision:string;session?:CrawlSession|null;canWrite:boolean;disabled:boolean;
- onWindow:(ids?:string[])=>void;onSession?:(s:CrawlSession)=>void;onChanged:()=>void};
+ onWindow:(ids?:string[],query?:string)=>void;onSession?:(s:CrawlSession)=>void;onChanged:()=>void};
 const field={backgroundColor:colors.bg,borderWidth:1,borderColor:colors.edge,borderRadius:9,padding:10,color:colors.text};
 function Button({label,action,disabled=false}:{label:string;action:()=>void;disabled?:boolean}){
  return <TouchableOpacity accessibilityRole="button" accessibilityState={{disabled}} disabled={disabled}
@@ -150,8 +150,8 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
          disabled={busy||disabled||selected.length>=32&&!selected.includes(row.session_id)}
          action={()=>setSelected(ids=>ids.includes(row.session_id)?ids.filter(x=>x!==row.session_id):[...ids,row.session_id])}/>
       </View>)}
-      <Button label="Reparse matching chambers in detail" disabled={busy||disabled||!discovery.matches.length}
-        action={()=>onWindow(discovery.matches.map(row=>row.session_id).sort())}/>
+      <Button label="Open matching chambers for detailed reparse" disabled={busy||disabled||!discovery.matches.length}
+        action={()=>onWindow(discovery.matches.map(row=>row.session_id).sort(),discoveryQuery)}/>
     </>}
    </View>
    {eligible&&canWrite&&<View style={s.check}>

@@ -6,6 +6,9 @@ both quotas, never release the active slot before retirement is committed.
 """
 from __future__ import annotations
 
+import asyncio
+import threading
+
 from pymongo import ASCENDING,DESCENDING
 from pymongo.errors import PyMongoError
 from skeleton.ai.webcrawler.dragon_treasury_vault import (
@@ -13,6 +16,31 @@ from skeleton.ai.webcrawler.dragon_treasury_vault import (
     public_marker,reserve_filter,release_active_filter,
 )
 from core.dragon_checkpoint_replica import verify_primary,CheckpointReplicaError
+
+
+# Separate process-wide CPU admission. Keep the permit until the real thread
+# finishes, even if the requesting HTTP coroutine has been cancelled.
+_DISCOVERY_CPU=threading.BoundedSemaphore(2)
+
+
+async def _bounded_discovery_cpu(operation,*args):
+    from core.dragon_crawler import CrawlerError
+    if not _DISCOVERY_CPU.acquire(blocking=False):
+        raise CrawlerError("crawler_vault_busy","Historical chamber parsing is at local capacity. Retry after the active scan completes.",429)
+    try:
+        future=asyncio.get_running_loop().run_in_executor(None,operation,*args)
+    except BaseException:
+        _DISCOVERY_CPU.release()
+        raise
+
+    def finished(result):
+        _DISCOVERY_CPU.release()
+        # Observe any late exception even if the client detached.
+        if not result.cancelled():
+            result.exception()
+
+    future.add_done_callback(finished)
+    return await asyncio.shield(future)
 
 
 class DragonVaultMixin:
@@ -352,7 +380,6 @@ class DragonVaultMixin:
         states, but each page rechecks current archive authority independently.
         Results are page-local candidate advice, not an exhaustive global rank.
         """
-        import asyncio
         from core.dragon_crawler import CrawlerError,_now
         from skeleton.ai.webcrawler.dragon_vault_discovery import (
             PAGE,query_terms,catalogue_signature,digest_scope,page_offset,order_matches,
@@ -384,8 +411,14 @@ class DragonVaultMixin:
             if row is None:
                 raise CrawlerError("crawler_vault_search_changed","Chamber changed during discovery.",409)
             try:
-                status,summary,expiry=await asyncio.to_thread(self._discover_vault_row,scope,row,terms,now)
-            except (ValueError,TypeError,KeyError,RecursionError,CheckpointReplicaError,CrawlerError):
+                status,summary,expiry=await _bounded_discovery_cpu(self._discover_vault_row,scope,row,terms,now)
+            except CrawlerError as exc:
+                if exc.code=="crawler_vault_busy":
+                    # Transient local capacity must not masquerade as a
+                    # source-integrity hold or advance the scan cursor.
+                    raise
+                status,summary,expiry="held",None,None
+            except (ValueError,TypeError,KeyError,RecursionError,CheckpointReplicaError):
                 status,summary,expiry="held",None,None
             counts[status]+=1
             if summary is not None:

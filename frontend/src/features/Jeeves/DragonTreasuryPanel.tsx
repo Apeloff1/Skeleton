@@ -63,8 +63,9 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
   setPassage(null);setPassageBusy(false);
   if(timer.current!==null)clearTimeout(timer.current);timer.current=null;
  },[]);
- const chooseVaultWindow=useCallback((ids?:string[])=>{
+ const chooseVaultWindow=useCallback((ids?:string[],discoveryQuery?:string)=>{
   invalidate();setResult(null);setBusy(false);setSelectedChange(null);setPair(null);setFamily(undefined);
+  if(discoveryQuery!==undefined)setQuery(discoveryQuery);
   setVaultWindow(ids);setMode(ids?'historic_only':'current_only');
  },[invalidate]);
  useEffect(()=>{
