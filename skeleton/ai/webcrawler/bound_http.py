@@ -232,9 +232,17 @@ class SocketBoundFetcher:
             out_headers = {key.lower(): value for key, value in response_headers}
             _coalesce_bounded_link_headers(response_headers, out_headers)
             _coalesce_bounded_xrobots_headers(response_headers, out_headers)
+            # A duplicate Retry-After is ambiguous; the conservative local
+            # interpretation is to hold for the entire possible consent horizon.
+            # Never use a last-header-wins value that might shorten the hold.
+            if sum(key.lower() == "retry-after" for key, _ in response_headers) > 1:
+                out_headers["retry-after"] = "86400"
             if "content-length" in out_headers and "transfer-encoding" in out_headers:
                 raise ValueError("ambiguous response framing")
-            if response.status in {301, 302, 303, 307, 308}:
+            # Status-only responses cannot become captured sources. Do not
+            # decompress attacker-controlled denial/overload/redirect bodies;
+            # preserve the status and bounded headers, including Retry-After.
+            if not 200 <= response.status < 300:
                 body = b""
                 wire_bytes, wire_hash, coding = None, None, "identity"
             else:
