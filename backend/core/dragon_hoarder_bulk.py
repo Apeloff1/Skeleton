@@ -112,11 +112,14 @@ class BulkArchive:
         if len(self.volumes) != len(volumes):
             raise ValueError("duplicate volume name")
         devices = set()
+        self._root_identities = {}
+        self._file_identities = {}
         for volume in volumes:
             identity = volume.root.stat()
             if identity.st_dev in devices:
                 raise ValueError("configure one volume per filesystem device")
             devices.add(identity.st_dev)
+            self._root_identities[volume.name] = (identity.st_dev, identity.st_ino)
             # Initialize separately so an interrupted initialization is repeatable.
             with self._db(volume) as db:
                 db.executescript(_SCHEMA)
@@ -130,18 +133,31 @@ class BulkArchive:
         # not a sandbox for malicious processes running under the same UID.
         if volume.root.resolve(strict=True) != volume.root:
             raise StorageHeld("volume root changed")
+        root_stat = volume.root.stat()
+        if (root_stat.st_dev,root_stat.st_ino) != self._root_identities[volume.name]:
+            raise StorageHeld("mounted volume identity changed")
+        if os.name == "posix" and (root_stat.st_mode & 0o077 or root_stat.st_uid != os.getuid()):
+            raise StorageHeld("volume permissions changed")
         path = volume.root / "hoarder-payload-v1.sqlite3"
         for file in (path, Path(str(path) + "-wal"), Path(str(path) + "-shm")):
             if file.is_symlink() or (file.exists() and not file.is_file()):
                 raise StorageHeld("unsafe storage entry")
         if not path.exists():
+            if volume.name in self._file_identities:
+                raise StorageHeld("payload database disappeared")
             try:
                 fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
             except FileExistsError:
                 pass
             else:
                 os.close(fd)
-        db = sqlite3.connect(path, timeout=5, isolation_level=None)
+        st = path.stat()
+        if os.name == "posix" and (st.st_uid != os.getuid() or st.st_mode & 0o077 or st.st_nlink != 1):
+            raise StorageHeld("payload permissions or links changed")
+        current = (st.st_dev,st.st_ino)
+        if self._file_identities.setdefault(volume.name,current) != current:
+            raise StorageHeld("payload database identity changed")
+        db = sqlite3.connect(path.as_uri() + "?mode=rw", uri=True, timeout=5, isolation_level=None)
         try:
             db.execute("PRAGMA trusted_schema=OFF")
             db.execute("PRAGMA busy_timeout=5000")
