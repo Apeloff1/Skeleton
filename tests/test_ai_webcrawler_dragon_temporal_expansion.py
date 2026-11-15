@@ -105,6 +105,38 @@ class TemporalSelectionTests(unittest.TestCase):
         self.assertEqual(result["comparison"]["current"]["source_id"],rows[1].source_id)
         self.assertTrue(result["comparison"]["delta"]["numeric_change"])
 
+    def test_capped_bm25_retains_full_permitted_plane_statistics(self):
+        url=BASE+"/ranked"
+        rows=[obs("a",url+"/rare",A+" rare magnetometer",NOW-5000),
+              obs("b",url+"/common",B+" optical magnetometer optical optical",NOW-4000)]
+        rows.extend(obs("flood",url+"/"+str(i),C+" optical",NOW-i) for i in range(40))
+        full=build_treasury(rows,as_of=NOW,growth=500,mode="current_only",
+                           query="magnetometer optical")
+        full_scores={x["source_id"]:x["score"] for x in full["hits"]}
+        with patch("skeleton.ai.webcrawler.dragon_treasury.MAX_INDEXED",8):
+            limited=build_treasury(rows,as_of=NOW,growth=500,mode="current_only",
+                                  query="magnetometer optical")
+        self.assertEqual(limited["index_admission"],"temporal_query_rerank_v2")
+        self.assertEqual(limited["query_admission"]["score_basis"],"permitted_plane_scan_bm25")
+        self.assertEqual(limited["hits"][0]["source_id"],full["hits"][0]["source_id"])
+        for hit in limited["hits"]:
+            if hit["source_id"] in full_scores:
+                self.assertEqual(hit["score"],full_scores[hit["source_id"]])
+        self.assertLess(limited["indexed_observations"],limited["eligible_observations"])
+
+    def test_capped_history_scan_never_scores_withheld_or_current_only_text(self):
+        url=BASE+"/dual-plane"
+        rows=[obs("historic",url,A+" relic",NOW-3*DAY,archive=True),
+              obs("current",url,B+" relic",NOW-100)]
+        rows.extend(obs("flood",BASE+"/other"+str(i),C+" relic",NOW-i-10) for i in range(40))
+        rows.append(obs("held",BASE+"/held",A+" relic",NOW-20,permitted=False))
+        with patch("skeleton.ai.webcrawler.dragon_treasury.MAX_INDEXED",4):
+            history=build_treasury(rows,as_of=NOW,growth=500,mode="historic_only",query="relic")
+        self.assertEqual(history["query_admission"]["eligible_representatives"],1)
+        self.assertEqual(history["query_admission"]["matching_representatives"],1)
+        self.assertEqual([x["source_id"] for x in history["hits"]],[rows[0].source_id])
+        self.assertEqual(history["hits"][0]["plane"],"historic")
+
     def test_paging_bound_to_query_and_partition(self):
         rows=[obs("a",BASE+"/doc"+str(i),A,NOW-i) for i in range(32)]
         first=build_treasury(rows,as_of=NOW,growth=500,query="legacy")

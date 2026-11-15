@@ -418,7 +418,17 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
             idf=math.log(1+(len(allowed)-frequency[term]+.5)/(frequency[term]+.5))
             value+=idf*tf*2.2/(tf+1.2*(.25+.75*length/max(1,average)))
         return round(value,6)
-    hits=[{**v,"score":score(v)} for v in allowed]
+    if admission is not None and terms:
+        # The capped structural subset must not redefine IDF or length
+        # statistics. Reuse the full permitted-plane scan's exact BM25
+        # value only when the final representative is the same source.
+        # An admitted historic baseline must not impersonate a matching
+        # current representative (or vice versa).
+        scanned_scores={(session,source):value for session,source,value in admission.scores}
+        hits=[{**v,"score":scanned_scores[v["session_id"],v["source_id"]]} for v in allowed
+              if (v["session_id"],v["source_id"]) in scanned_scores]
+    else:
+        hits=[{**v,"score":score(v)} for v in allowed]
     hits=[v for v in hits if not terms or v["score"]>0]
     hits.sort(key=lambda v:(-v["score"],-v["last_seen"],v["revision_id"]))
     current_count=sum(v["plane"]=="current" and v["indexed"] for v in revisions)
@@ -507,6 +517,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
                 "matching_representatives":admission.matching_representatives,
                 "prioritized_representatives":len(admission.candidates),
                 "full_structural_corpus":False,
+                "score_basis":"permitted_plane_scan_bm25",
             },
             "eligible_observations":len(ordered),"indexed_observations":len(indexed),
             "training_permission":False,"fresh_consent_required":True}

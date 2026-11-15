@@ -24,6 +24,9 @@ class QueryAdmission:
     scanned_representatives: int
     scanned_bytes: int
     matching_representatives: int
+    # Exact permitted representative scores; internal only, no lexemes
+    # or per-source scan data leave the projection.
+    scores: tuple[tuple[str,str,float], ...]
 
 
 def _runs(rows):
@@ -72,7 +75,7 @@ def rank_admission(grouped,*,mode,family,blockers,query,lexemes,slots:int)->Quer
         raise ValueError("invalid temporal query admission capacity")
     terms=tuple(dict.fromkeys(lexemes(query)))[:MAX_QUERY_TERMS]
     if not terms or not slots:
-        return QueryAdmission((),0,0,0,0)
+        return QueryAdmission((),0,0,0,0,())
     wanted=set(terms)
     rows=list(representatives(grouped,mode=mode,family=family,blockers=blockers))
     if len(rows)>MAX_SCAN_OBSERVATIONS:
@@ -103,9 +106,7 @@ def rank_admission(grouped,*,mode,family,blockers,query,lexemes,slots:int)->Quer
         norm=1.2*(.25+.75*length/max(1,average))
         score=sum(math.log1p((n-df[t]+.5)/(df[t]+.5))*count*2.2/(count+norm)
                   for t,count in counts.items())
-        # A tiny bounded coverage tie-breaker rewards distinct requested
-        # terms, not repetitions; sort deterministically by exact identity.
-        score+=.05*len(counts)/len(terms)
-        scores.append((score,row))
+        scores.append((round(score,6),row))
     scores.sort(key=lambda item:(-item[0],-item[1].captured_at,item[1].session_id,item[1].source_id))
-    return QueryAdmission(tuple(row for _,row in scores[:slots]),len(rows),n,scanned_bytes,len(scores))
+    return QueryAdmission(tuple(row for _,row in scores[:slots]),len(rows),n,scanned_bytes,len(scores),
+                          tuple((row.session_id,row.source_id,score) for score,row in scores))
