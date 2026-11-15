@@ -13,7 +13,7 @@ function Input({value,change,label,off,max=256}:{value:string;change:(v:string)=
  return <TextInput accessibilityLabel={label} placeholder={label} placeholderTextColor={C.muted} value={value} onChangeText={change} editable={!off} maxLength={max} style={field}/>;
 }
 const EVE='https://developers.eveonline.com/static-data/tranquility/latest.jsonl';
-const adapters:SubscriptionInput['adapter'][]=['manifest','steam','rss_atom','sitemap','eve_sde'];
+const adapters:SubscriptionInput['adapter'][]=['manifest','steam','rss_atom','sitemap','classified_sitemap','eve_sde'];
 
 export default function DragonWorldArchivePanel({game,visible,canWrite}:{game:string|null;visible:boolean;canWrite:boolean}){
  const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
@@ -43,7 +43,7 @@ export default function DragonWorldArchivePanel({game,visible,canWrite}:{game:st
  const add=()=>run(async(signal,valid)=>{
   if(!canWrite||!rights)return;
   const input:SubscriptionInput={url,adapter,interval_seconds:3600,grant_seconds:7*86400,rights_acknowledged:true};
-  if(adapter==='rss_atom'||adapter==='sitemap'){input.provider=provider;input.external_id=external;input.title=title;}
+  if(adapter==='rss_atom'||adapter==='sitemap'||adapter==='classified_sitemap'){input.provider=provider;input.external_id=external;input.title=title;}
   const p=await subscribeDiscovery(input,signal);if(valid()){setRights(false);setNotice('Feed mandate created; network work depends on operator runtime configuration and robots policy. '+p.subscription_id);}
  });
  const loadVersions=(after?:string)=>{if(!game)return;run(async(signal,valid)=>{const p=await datasetVersions(game,after,signal);if(valid()){setVersions(p.versions);setVersionCursor(p.next_cursor);setVersion(null);setRecords([]);setEdges([]);}});};
@@ -65,7 +65,7 @@ export default function DragonWorldArchivePanel({game,visible,canWrite}:{game:st
     <Button label="Prepare official EVE SDE build subscription" off={!enabled} press={()=>{setAdapter('eve_sde');setUrl(EVE);setRights(false);}}/>
     {adapters.map(a=><Button key={a} label={(adapter===a?'Selected: ':'Adapter: ')+a} off={!enabled} press={()=>{setAdapter(a);setRights(false);if(a==='eve_sde')setUrl(EVE);}}/>)}
     <Input label="Public HTTPS feed URL" value={url} change={v=>{setUrl(v);setRights(false);}} max={2048} off={!enabled||adapter==='eve_sde'}/>
-    {(adapter==='rss_atom'||adapter==='sitemap')&&<>
+    {(adapter==='rss_atom'||adapter==='sitemap'||adapter==='classified_sitemap')&&<>
      <Input label="Provider namespace" value={provider} change={v=>{setProvider(v);setRights(false);}} max={32} off={!enabled}/>
      <Input label="Existing game external ID" value={external} change={v=>{setExternal(v);setRights(false);}} max={128} off={!enabled}/>
      <Input label="Game title" value={title} change={v=>{setTitle(v);setRights(false);}} off={!enabled}/>
