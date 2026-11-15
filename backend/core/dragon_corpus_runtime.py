@@ -182,7 +182,7 @@ async def pulse_lead_graph():
         def work():
             graph=LeadGraph(_path())
             results={}
-            for key,operation in (("bootstrap",graph.bootstrap_pulse),("expansion",graph.expansion_pulse)):
+            for key,operation in (("bootstrap",graph.bootstrap_pulse),("catalogue",graph.catalogue_pulse),("expansion",graph.expansion_pulse)):
                 try:results[key]=operation()
                 except (CatalogueHeld,ValueError,sqlite3.Error,OSError):
                     results[key]={"held":True,"reason":"lead_maintenance_held","network_executed":False}
