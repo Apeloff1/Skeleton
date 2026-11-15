@@ -23,9 +23,17 @@ MAX_INCIDENTS = 128
 # attacker-controlled regexes, nested repetition or open-ended wildcards.
 _PATTERNS = {
     "authority_override": re.compile(
-        r"\b(?:ignore|disregard|override|forget|bypass)\s{1,16}(?:all\s{1,16})?"
+        r"(?:\b(?:ignore|disregard|override|forget|bypass)\s{1,16}(?:all\s{1,16})?"
         r"(?:previous|prior|earlier|system|developer|user|safety|security|original)"
         r"\s{1,16}(?:instructions?|rules?|polic(?:y|ies)|prompts?|restrictions?)\b"
+        r"|\b(?:ignorer?|se bort fra|overstyr)\s{1,16}(?:alle\s{1,16})?"
+        r"(?:tidligere|forrige|systemets)\s{1,16}(?:instruksjoner|regler)\b"
+        r"|\bignoriere\s{1,16}(?:alle\s{1,16})?(?:vorherigen|bisherigen)\s{1,16}anweisungen\b"
+        r"|\bignore[rz]?\s{1,16}(?:toutes\s{1,16})?(?:les\s{1,16})?instructions\s{1,16}(?:précédentes|antérieures)\b"
+        r"|\bignora\s{1,16}(?:todas\s{1,16})?(?:las\s{1,16})?instrucciones\s{1,16}(?:anteriores|previas)\b"
+        r"|\bignore\s{1,16}(?:todas\s{1,16})?(?:as\s{1,16})?instruções\s{1,16}anteriores\b"
+        r"|(?:忽略|无视)(?:所有)?(?:之前|先前|以上|系统)(?:的)?(?:指令|指示)"
+        r"|(?:以前|これまで|前)の(?:指示|命令)を(?:無視|上書き))"
     ),
     "role_impersonation": re.compile(
         r"(?:<\|(?:im_start|system|assistant|developer|endoftext)\|>|\[inst\]|"
@@ -65,6 +73,14 @@ _INSTRUCTION_NAMES = frozenset({
 _TAG = re.compile(r"<[a-z/!][^<>]{0,512}>", re.I)
 _SPACE = re.compile(r"\s{1,256}")
 _HEX = re.compile(r"[0-9a-f]{64}\Z")
+_JSON_ESCAPE = re.compile(r"\\u([0-9a-fA-F]{4})")
+_REP_FIELDS = frozenset({"user-agent", "allow", "disallow", "crawl-delay", "request-rate", "sitemap"})
+
+
+def _decode_escape(match: re.Match[str]) -> str:
+    value = int(match.group(1), 16)
+    # Never produce unpaired surrogate characters in a detection view.
+    return match.group() if 0xD800 <= value <= 0xDFFF else chr(value)
 _TEXT_TYPES = frozenset({
     "application/json", "application/xml", "application/xhtml+xml",
     "application/javascript", "application/ld+json", "application/rss+xml",
@@ -94,7 +110,13 @@ def _digest(raw: bytes) -> str:
 def _normalize(text: str) -> str:
     # Drop zero-width/bidi formatting in the detection view only. Original
     # text and provenance are never rewritten or reinterpreted as authority.
-    text = unicodedata.normalize("NFKC", html.unescape(text)).casefold()
+    # Two finite layers catch escaped strings without evaluating JSON, scripts,
+    # or arbitrary encoded payloads. Source bytes remain untouched.
+    for _ in range(2):
+        text = html.unescape(_JSON_ESCAPE.sub(_decode_escape, text))
+        if len(text) > MAX_NORMALIZED_CHARS:
+            raise ValueError("inspection normalization limit")
+    text = unicodedata.normalize("NFKC", text).casefold()
     if len(text) > MAX_NORMALIZED_CHARS:
         raise ValueError("inspection normalization limit")
     return "".join(
@@ -171,9 +193,30 @@ def inspect_extracted(title: str, text: str) -> InstructionObservation:
 def inspect_robots_comments(body: bytes) -> InstructionObservation:
     if type(body) is not bytes:
         raise ValueError("invalid robots input")
-    # Valid robots rules must still be obeyed. Comments are not instructions.
-    comments = b"\n".join(line.partition(b"#")[2] for line in body.splitlines() if b"#" in line)
-    return _inspect(comments, stage="robots_comment")
+    # Comments and non-REP fields carry no access or tool authority. Known
+    # access/retention metadata is interpreted separately by its typed parser.
+    inert = []
+    for line in body.splitlines():
+        policy, separator, comment = line.partition(b"#")
+        if separator and comment:
+            inert.append(comment)
+        key, colon, _ = policy.partition(b":")
+        if policy.strip() and (not colon or key.strip().decode("ascii", "ignore").casefold() not in _REP_FIELDS):
+            inert.append(policy)
+    return _inspect(b"\n".join(inert), stage="robots_comment")
+
+
+def retained_robots_policy(text: str) -> str:
+    """Store only known policy fields; comments and arbitrary prose are inert."""
+    lines = []
+    for line in text.splitlines():
+        policy = line.partition("#")[0]
+        key, colon, _ = policy.partition(":")
+        if colon and key.strip().casefold() in _REP_FIELDS:
+            lines.append(policy)
+        else:
+            lines.append("")
+    return "\n".join(lines)
 
 
 def incident_receipt(
