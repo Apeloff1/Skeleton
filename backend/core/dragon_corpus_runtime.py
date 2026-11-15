@@ -66,7 +66,11 @@ async def pulse_release_imports():
                 index=GameCorpus(path).backfill_facets(limit=32)
             except (CatalogueHeld,ValueError,TypeError,KeyError,sqlite3.Error):
                 index={"failed":True,"reason":"facet_index_held"}
-            return {**queue,"facet_backfill":index}
+            try:
+                sources=GameCorpus(path).backfill_source_locators(limit=32)
+            except (CatalogueHeld,ValueError,TypeError,KeyError,sqlite3.Error):
+                sources={"failed":True,"reason":"locator_index_held"}
+            return {**queue,"facet_backfill":index,"source_locator_backfill":sources}
         return await _bounded(pulse)
     except (GameLearningError,sqlite3.Error,OSError,TimeoutError):
         return {"failed":True,"reason":"release_store_held","network_executed":False}
