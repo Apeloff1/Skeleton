@@ -1517,6 +1517,109 @@ class DragonCrawlerApplication:
             "next_cursor": rows[limit - 1]["_id"] if len(rows) > limit else None,
         }
 
+    async def companion_sanctuary(self, scope: dict[str, str]) -> dict:
+        """Bounded cross-expedition collection, using only current source consent.
+
+        This read does not invoke the repairing owner lookup or write a reward
+        wallet. Every contributing revision must be witnessed and stable across
+        the read. This is a version-fenced view, not a Mongo transaction.
+        """
+        from skeleton.ai.webcrawler.dragon_sanctuary import (
+            MAX_EXPEDITIONS, SanctuarySource, project_sanctuary,
+        )
+
+        at = _now()
+        _, run_type = _core()
+        query = {**scope, "status": {"$nin": ["deleted", "cancelled"]},
+                 "consent_expires_at": {"$gt": at}}
+        metadata = await (
+            self.sessions.find(query, {"_id": 1, "version": 1})
+            .sort([("updated_at", DESCENDING), ("_id", DESCENDING)])
+            .limit(MAX_EXPEDITIONS + 1).max_time_ms(2000).to_list(MAX_EXPEDITIONS + 1)
+        )
+        capped = len(metadata) > MAX_EXPEDITIONS
+        revisions, candidates = [], []
+        excluded = 0
+        fence = []
+        for item in metadata[:MAX_EXPEDITIONS]:
+            identifier, version = item["_id"], item["version"]
+            row = await self.sessions.find_one(
+                {"_id": identifier, **scope, "version": version},
+                {"_id": 1, "tenant_id": 1, "owner_id": 1, "status": 1, "version": 1,
+                 "consent_expires_at": 1, "request": 1, "request_digest": 1,
+                 "consent": 1, "snapshot": 1, "checkpoint_identity": 1,
+                 "source_use_policies": 1}, max_time_ms=2000,
+            )
+            if row is None:
+                raise CrawlerError("crawler_sanctuary_changed",
+                                   "Expeditions changed during collection. Refresh the sanctuary.", 409)
+            fence.append((identifier, version))
+            try:
+                snapshot = _plain(row["snapshot"])
+                identity = row.get("checkpoint_identity")
+                if identity is None:
+                    raise ValueError("unwitnessed revision")
+                verify_primary(snapshot, _plain(identity))
+                runtime = run_type.from_snapshot(snapshot)
+                binding = snapshot["binding"]
+                if (row["status"] in {"deleted", "cancelled"}
+                        or _utc(row["consent_expires_at"]) <= at
+                        or binding["scope"] != scope or binding["consent"] != _plain(row["consent"])
+                        or binding["request_digest"] != row["request_digest"]
+                        or _digest(_plain(row["request"])) != row["request_digest"]):
+                    raise ValueError("scope or request binding mismatch")
+                self._source_policies(row)
+                if set(self._source_policies(row)) - set(snapshot["sources"]):
+                    raise ValueError("orphan source-use policy")
+                local = []
+                for source in sorted(runtime.sources(), key=lambda value: (
+                    value["fetched_at"], value["source_id"]), reverse=True):
+                    freshness = self._capture_freshness(row, source)
+                    if not freshness["usable"]:
+                        continue
+                    expiry = datetime.fromisoformat(freshness["valid_until"]).timestamp()
+                    if expiry <= at.timestamp():
+                        continue
+                    local.append(SanctuarySource(
+                        str(identifier), source["source_id"], source["content_hash"],
+                        source["fetched_url"], source["content_type"], source["text"],
+                        row["request"].get("query", ""), source["fetched_at"], expiry,
+                    ))
+                    if len(local) > 16:
+                        capped = True
+                        break
+                candidates.extend(local[:16])
+                revisions.append({"session_id": str(identifier), "version": int(version),
+                                  "snapshot_digest": snapshot["snapshot_digest"]})
+            except (CrawlerError, CheckpointReplicaError, ValueError, KeyError, TypeError, RecursionError):
+                # Unqualified, stale-code or corrupt checkpoints do not
+                # contribute. No silent promotion, repair or legacy migration.
+                excluded += 1
+        try:
+            issued = project_sanctuary(candidates, as_of=at.timestamp(),
+                                       selected_sessions=revisions, excluded_sessions=excluded,
+                                       candidate_limit_reached=capped)
+        except ValueError as exc:
+            raise CrawlerError("crawler_integrity", "Sanctuary evidence could not be qualified.", 503) from exc
+        # A concurrent erase, source withdrawal, worker commit or consent
+        # update invalidates the entire projection instead of returning old
+        # evidence as currently available. Version fences are read-only.
+        for identifier, version in fence:
+            check = await self.sessions.find_one(
+                {"_id": identifier, **scope, "version": version,
+                 "status": {"$nin": ["deleted", "cancelled"]},
+                 "consent_expires_at": {"$gt": _now()}},
+                {"_id": 1}, max_time_ms=2000,
+            )
+            if check is None:
+                raise CrawlerError("crawler_sanctuary_changed",
+                                   "Expeditions changed during collection. Refresh the sanctuary.", 409)
+        expiry = issued["earliest_source_expiry"]
+        if expiry is not None and expiry <= _now().timestamp():
+            raise CrawlerError("crawler_sanctuary_changed",
+                               "Source consent expired during collection. Refresh the sanctuary.", 409)
+        return {"ok": True, **issued}
+
     async def create(self, scope: dict[str, str], body: dict) -> dict:
         if body.get("consent") is not True or body.get("rights_acknowledged") is not True:
             raise CrawlerError(
