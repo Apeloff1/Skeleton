@@ -20,7 +20,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 )
 
 from .fair_stream_execution_journal import (
-    FairStreamExecutionJournal,
+    FairStreamExecutionJournal, _validate_permit,
 )
 from .fair_stream_result_vault import (
     SealedFairStreamResultVault,
@@ -112,12 +112,16 @@ def verify_result_read_grant(
     """Verify exact signed lease, model-result receipt and one-use nonce."""
     if not isinstance(public_key, Ed25519PublicKey):
         raise ResultReadDenied("trusted operator verification key required")
-    if type(permit) is not DispatchPermit or permit.device_qualified:
-        raise ResultReadDenied("canonical CPU-only permit required")
+    try:
+        _validate_permit(permit)
+    except ValueError as exc:
+        raise ResultReadDenied("canonical CPU-only permit required") from exc
     if type(grant) is not dict or set(grant) != set(_FIELDS) | {"signature"}:
         raise ResultReadDenied("invalid grant fields")
-    if grant["schema"] != SCHEMA:
+    if type(grant["schema"]) is not str or grant["schema"] != SCHEMA:
         raise ResultReadDenied("unsupported result read grant schema")
+    _hex(session_id, 32, "session")
+    _hex(result_digest, 64, "result")
     body = _body(
         session_id=grant["session_id"], generation=grant["generation"],
         checkpoint_digest=grant["checkpoint_digest"],
@@ -224,6 +228,35 @@ class AuthorizedSealedResultReader:
         except CustodySchemaError as exc:
             raise ResultReadDenied("grant ledger schema changed") from exc
 
+    def _confirm_consumption(self, *, nonce: str, lease_id: str, digest: str) -> None:
+        """Recheck committed consumption within an independent read snapshot."""
+        try:
+            self._handle.assert_current()
+            if self._connection.in_transaction:
+                raise ResultReadDenied("grant ledger has unexpected transaction")
+            self._connection.execute("BEGIN")
+            try:
+                self._assert_schema()
+                row = self._connection.execute(
+                    "SELECT lease_id, receipt_digest FROM " + _TABLE + " WHERE nonce=?",
+                    (nonce,),
+                ).fetchone()
+                if row != (lease_id, digest):
+                    raise ResultReadDenied("committed grant consumption unavailable")
+                self._handle.assert_current()
+            finally:
+                self._connection.rollback()
+        except (PrivateSQLiteUnavailable, sqlite3.Error) as exc:
+            raise ResultReadDenied("grant ledger unavailable after consumption") from exc
+
+    def _confirm_receipt(self, permit: DispatchPermit, expected: dict[str, object]) -> None:
+        try:
+            current = self._journal.recover_committed_receipt(permit)
+        except (ValueError, RuntimeError, sqlite3.Error) as exc:
+            raise ResultReadDenied("committed journal authority changed during read") from exc
+        if type(current) is not dict or current != expected:
+            raise ResultReadDenied("committed journal authority changed during read")
+
     def read_once(
         self, permit: DispatchPermit, *,
         operator_grant: Mapping[str, object],
@@ -297,6 +330,14 @@ class AuthorizedSealedResultReader:
             # No decrypt before durable grant consumption. A crash between
             # COMMIT and decrypt burns the grant; the operator must issue a
             # different signed nonce after reviewing the uncertain read.
-            return self._vault.read_committed(
+            # Check the durable grant and signed journal again before AND
+            # after decrypting. Never release plaintext on a detected custody
+            # change. Independent rollback protection remains caller-owned.
+            self._confirm_consumption(nonce=nonce, lease_id=permit.lease_id, digest=digest)
+            self._confirm_receipt(permit, receipt)
+            plaintext = self._vault.read_committed(
                 permit, expected_result_digest=digest, expected_consumed_tokens=consumed,
             )
+            self._confirm_receipt(permit, receipt)
+            self._confirm_consumption(nonce=nonce, lease_id=permit.lease_id, digest=digest)
+            return plaintext

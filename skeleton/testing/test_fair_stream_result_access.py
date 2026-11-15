@@ -345,3 +345,62 @@ def test_inherited_grant_reader_refuses_before_lock(setup, monkeypatch):
         patch.setattr(os, "getpid", lambda: pid + 1)
         with pytest.raises(ResultReadDenied, match="unavailable"):
             setup["reader"].read_once(permit(), operator_grant=g)
+
+@pytest.mark.parametrize("override", [
+    {"generation": True}, {"device_qualified": 0}, {"tokens": True},
+    {"bytes_reserved": False}, {"request_id": "bad\x00id"},
+])
+def test_grant_verifier_rejects_noncanonical_permit(setup, override):
+    from dataclasses import replace
+    public = setup["key"].public_key()
+    with pytest.raises(ResultReadDenied, match="canonical CPU-only"):
+        verify_result_read_grant(
+            grant(setup), public_key=public, permit=replace(permit(), **override),
+            session_id=SESSION, result_digest=setup["receipt"]["result_digest"],
+        )
+
+
+def test_journal_change_after_grant_commit_blocks_decrypt(setup, monkeypatch):
+    reader = setup["reader"]
+    original = reader._confirm_consumption
+
+    def damage(**kwargs):
+        original(**kwargs)
+        setup["journal"]._connection.execute(
+            "UPDATE local_fair_stream_execution_journal SET receipt=?", (b"{}",),
+        )
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("plaintext decrypt started after journal custody changed")
+
+    monkeypatch.setattr(reader, "_confirm_consumption", damage)
+    monkeypatch.setattr(setup["vault"], "read_committed", forbidden)
+    with pytest.raises(ResultReadDenied, match="journal authority changed"):
+        reader.read_once(permit(), operator_grant=grant(setup))
+    assert setup["grant_handle"].connection.execute(
+        "SELECT COUNT(*) FROM local_fair_stream_result_read_grants"
+    ).fetchone() == (1,)
+
+
+@pytest.mark.parametrize("ledger", ["grant", "journal"])
+def test_custody_change_during_decrypt_prevents_plaintext_release(setup, monkeypatch, ledger):
+    reader = setup["reader"]
+    original = setup["vault"].read_committed
+
+    def changed(*args, **kwargs):
+        plaintext = original(*args, **kwargs)
+        if ledger == "grant":
+            setup["grant_handle"].connection.execute(
+                "UPDATE local_fair_stream_result_read_grants SET receipt_digest=?", ("0" * 64,),
+            )
+        else:
+            setup["journal"]._connection.execute(
+                "UPDATE local_fair_stream_execution_journal SET receipt=?", (b"{}",),
+            )
+        return plaintext
+
+    monkeypatch.setattr(setup["vault"], "read_committed", changed)
+    with pytest.raises(ResultReadDenied, match="authority changed|consumption unavailable"):
+        reader.read_once(permit(), operator_grant=grant(setup))
+    assert setup["backend"].calls == 1
+    assert not setup["grant_handle"].connection.in_transaction
