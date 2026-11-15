@@ -139,6 +139,17 @@ def sign_recovery(challenge: RecoveryChallenge, *, state: str,
                                  hmac.new(recovery_key, payload, sha256).hexdigest())
 
 
+@dataclass(frozen=True, slots=True)
+class WorkInventory:
+    scope: str
+    count: int
+    digest: str
+    states: tuple[tuple[str, int], ...]
+    ready: tuple[str, ...]
+    blocked: tuple[str, ...]
+    unresolved: tuple[str, ...]
+
+
 class DurableWorkJournal:
     """Source-neutral, bounded transaction owner; admission is explicit.
 
@@ -428,6 +439,67 @@ class DurableWorkJournal:
                 if len(ready) == limit:
                     break
         return tuple(ready)
+
+    def inventory(self, *, expected_digest: str | None = None) -> WorkInventory:
+        """Audit every authenticated row and dependency in a single snapshot.
+
+        An independently retained digest detects rollback or deletion relative
+        to that exact checkpoint. It is not a remotely anchored history or
+        an authorization to execute, and must never be auto-refreshed on open.
+        """
+        if expected_digest is not None:
+            _hex(expected_digest)
+        with self._tx():
+            self._capacity()
+            raw_ids = self._db.execute(
+                f"SELECT work_id FROM {_TABLE} WHERE scope=? ORDER BY work_id",
+                (self._scope,),
+            )
+            ids = tuple(item[0] for item in raw_ids)
+            rows = {}
+            digest = sha256(b"frontier.inventory.v1\\0" + _encode(self._scope))
+            for wid in ids:
+                row = self._require(wid)
+                rows[wid] = self._status(row)
+                digest.update(bytes.fromhex(wid))
+                digest.update(bytes.fromhex(row[-1]))
+            observed = digest.hexdigest()
+            if expected_digest is not None and not hmac.compare_digest(expected_digest, observed):
+                raise WorkIntegrityError("independent work inventory checkpoint differs")
+            children = {wid: [] for wid in rows}
+            indegree = {}
+            for wid, row in rows.items():
+                indegree[wid] = len(row.dependencies)
+                for dep in row.dependencies:
+                    if dep not in rows:
+                        raise WorkIntegrityError("authenticated work has missing dependency")
+                    children[dep].append(wid)
+                    if row.state in {"claimed", "succeeded", "failed", "uncertain"} and rows[dep].state != "succeeded":
+                        raise WorkIntegrityError("executed work has an unfulfilled dependency")
+            # Iterative traversal avoids Python recursion on a long DAG.
+            from collections import deque
+            queue = deque(wid for wid in ids if indegree[wid] == 0)
+            visited = 0
+            while queue:
+                wid = queue.popleft()
+                visited += 1
+                for child in children[wid]:
+                    indegree[child] -= 1
+                    if indegree[child] == 0:
+                        queue.append(child)
+            if visited != len(rows):
+                raise WorkIntegrityError("authenticated work dependency cycle")
+            counts = {state: 0 for state in _STATES}
+            ready, blocked, unresolved = [], [], []
+            for wid, row in rows.items():
+                counts[row.state] += 1
+                if row.state == "pending":
+                    (ready if all(rows[dep].state == "succeeded" for dep in row.dependencies)
+                     else blocked).append(wid)
+                elif row.state in {"claimed", "uncertain"}:
+                    unresolved.append(wid)
+            return WorkInventory(self._scope, len(rows), observed, tuple(sorted(counts.items())),
+                                 tuple(ready), tuple(blocked), tuple(unresolved))
 
     def recovery_challenge(self, work_id: str) -> RecoveryChallenge:
         """Expose only the authenticated record identity for external reconciliation."""
