@@ -150,3 +150,14 @@ async def pulse_world_discovery():
         return await _bounded(lambda:WorldDiscovery(_path()).pulse())
     except (GameLearningError,sqlite3.Error,OSError,TimeoutError,ValueError,RuntimeError):
         return {"enabled":True,"outcome":"held"}
+
+
+async def pulse_media_archive():
+    from core.dragon_hoarder_copy import configured,_io
+    if not configured():
+        return {"configured":False}
+    from core.dragon_media_archive import MediaArchive
+    try:
+        return await _io(lambda:MediaArchive().cleanup())
+    except (OSError,TimeoutError,ValueError,RuntimeError,sqlite3.Error,GameLearningError):
+        return {"configured":True,"held":True}
