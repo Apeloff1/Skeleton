@@ -84,7 +84,9 @@ def _exchange(metadata: dict, body: bytes, deadline: float) -> dict:
     header = _json(metadata)
     if len(header) > MAX_HEADER:
         raise ParserFault("parser_rejected")
-    if not _CHILDREN.acquire(blocking=False):
+    # Brief bounded admission wait absorbs ordinary simultaneous slices.
+    # Never consume the entire remaining slice waiting for capacity.
+    if not _CHILDREN.acquire(timeout=min(.5, remaining / 4)):
         raise ParserFault("capacity")
     try:
         program = Path(__file__).resolve().with_name("parser_worker.py")
@@ -110,6 +112,8 @@ def _exchange(metadata: dict, body: bytes, deadline: float) -> dict:
                 raise ParserFault("launch") from exc
             if result.returncode:
                 raise ParserFault("worker_exit")
+            if time.monotonic() >= deadline:
+                raise ParserFault("deadline")
             spool.seek(0)
             raw = spool.read(MAX_OUTPUT + 1)
         if len(raw) > MAX_OUTPUT:
