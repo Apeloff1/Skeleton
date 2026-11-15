@@ -16,6 +16,7 @@ from threading import RLock
 from typing import Mapping, Protocol
 
 from .fair_stream_custody import sign_abandonment, sign_execution_result, sign_unstarted_cancellation
+from .fair_stream_admission import validate_admission_batch, validate_request_identity
 from .fair_stream_session import DispatchPermit
 from .private_sqlite import PrivateSQLiteHandle
 from .sqlite_custody_schema import assert_custody_schema
@@ -235,22 +236,27 @@ class FairStreamExecutionJournal:
 
     def request_exists(self, request_id: str) -> bool:
         """Observation only; begin() remains the atomic replay fence."""
-        if (type(request_id) is not str or not request_id
-                or len(request_id.encode("utf-8")) > 128):
-            raise ValueError("bounded request identity required")
+        validate_request_identity(request_id)
         with self._read_snapshot():
             return self._request_fenced(request_id)
 
     def assert_request_admissible(self, request_id: str, *, queued_count: int = 0) -> None:
         """Observe capacity across both execution and cancellation fences."""
-        if type(request_id) is not str or not 1 <= len(request_id.encode("utf-8")) <= 128:
-            raise ValueError("bounded request identity required")
-        if type(queued_count) is not int or not 0 <= queued_count <= MAX_JOURNAL_ROWS:
-            raise ValueError("invalid queued request count")
+        self.assert_requests_admissible((request_id,), additional_queued=queued_count)
+
+    def assert_requests_admissible(
+        self, request_ids: tuple[str, ...], *, additional_queued: int = 0,
+    ) -> None:
+        """Verify the complete queued inventory in one read-only snapshot."""
+        identities = validate_admission_batch(
+            request_ids, additional_queued=additional_queued, maximum=MAX_JOURNAL_ROWS,
+        )
         with self._read_snapshot():
-            if self._request_fenced(request_id):
-                raise ExecutionOutcomeUnknown("request already executed, reserved or cancelled")
-            self._capacity(queued_count=queued_count)
+            for request_id in identities:
+                if self._request_fenced(request_id):
+                    raise ExecutionOutcomeUnknown("request already executed, reserved or cancelled")
+            # _capacity reserves one implicit incoming slot.
+            self._capacity(queued_count=len(identities) + additional_queued - 1)
 
     def _request_fenced(self, request_id: str) -> bool:
         return self._connection.execute(

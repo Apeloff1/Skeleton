@@ -156,14 +156,12 @@ def bind_native_cpu_dispatch_service(
     def verify_queued_authority(snapshot: dict[str, object]) -> None:
         requests = snapshot["checkpoint"]["requests"]
         registry.verify_queued(requests)
-        for request in requests:
-            if journal.request_exists(request["request_id"]):
-                raise ValueError("queued identity already has execution custody")
-            # Each request must have space in both ledgers, conservatively
-            # allowing a maximum-sized sealed result for every queued peer.
-            peers = len(requests) - 1
-            journal.assert_request_admissible(request["request_id"], queued_count=peers)
-            vault.assert_request_admissible(request["request_id"], queued_count=peers)
+        # Capacity is checked once per ledger, not once per queued peer.
+        # Both remain observational; transactional claims still fence races.
+        identities = tuple(request["request_id"] for request in requests)
+        if identities:
+            journal.assert_requests_admissible(identities)
+            vault.assert_requests_admissible(identities)
 
     def prepare_native_request(request: StreamRequest) -> StreamRequest:
         if journal.request_exists(request.request_id):

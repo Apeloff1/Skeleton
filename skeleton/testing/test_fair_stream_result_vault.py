@@ -463,3 +463,23 @@ def test_admission_reserves_worst_case_queued_capacity(vault_dir, monkeypatch):
             vault.assert_request_admissible("request-1")
     finally:
         handle.close()
+
+def test_batch_vault_admission_has_one_aggregate_scan_and_no_writes(vault_dir, monkeypatch):
+    import skeleton.ai.model_runtime.fair_stream_result_vault as module
+    handle, vault = open_vault(vault_dir)
+    statements = []
+    handle.connection.set_trace_callback(statements.append)
+    try:
+        monkeypatch.setattr(module, "MAX_RESULT_ROWS", 3)
+        vault.assert_requests_admissible(("a", "b", "c"))
+        assert sum("SUM(LENGTH(ciphertext))" in sql for sql in statements) == 1
+        with pytest.raises(SealedResultUnavailable, match="capacity"):
+            vault.assert_requests_admissible(("a", "b", "c", "d"))
+        for invalid in ((), ("a", "a"), ("bad\x00id",), (True,), ["a"]):
+            with pytest.raises(ValueError):
+                vault.assert_requests_admissible(invalid)
+        assert not handle.connection.in_transaction
+        assert handle.connection.execute("SELECT COUNT(*) FROM local_fair_stream_sealed_results").fetchone() == (0,)
+    finally:
+        handle.connection.set_trace_callback(None)
+        handle.close()

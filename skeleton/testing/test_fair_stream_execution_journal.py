@@ -428,3 +428,27 @@ def test_cancellation_lease_collision_is_rejected_without_creating_second_fence(
         db.fence_unstarted(replace(original, request_id="different"))
     assert db.recover_cancelled_receipt(original) == first
     assert not db.request_exists("different")
+
+def test_batched_admission_uses_one_capacity_snapshot(monkeypatch):
+    import skeleton.ai.model_runtime.fair_stream_execution_journal as module
+
+    db = journal()
+    db.fence_unstarted(permit())
+    monkeypatch.setattr(module, "MAX_JOURNAL_ROWS", 4)
+    calls = []
+    original = db._capacity
+    def capacity(**kwargs):
+        calls.append(kwargs["queued_count"])
+        return original(**kwargs)
+    monkeypatch.setattr(db, "_capacity", capacity)
+    db.assert_requests_admissible(("a", "b", "c"))
+    assert calls == [2]
+    with pytest.raises(ExecutionOutcomeUnknown, match="capacity"):
+        db.assert_requests_admissible(("a", "b", "c", "d"))
+    with pytest.raises(ExecutionOutcomeUnknown, match="cancelled"):
+        db.assert_requests_admissible(("a", permit().request_id))
+    for invalid in ((), ("a", "a"), ("a", "bad\x00id"), ("a", 1), ["a"]):
+        with pytest.raises(ValueError):
+            db.assert_requests_admissible(invalid)
+    assert not db._connection.in_transaction
+    assert db._connection.execute("SELECT COUNT(*) FROM local_fair_stream_cancelled_intents").fetchone() == (1,)

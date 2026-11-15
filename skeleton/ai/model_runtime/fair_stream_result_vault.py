@@ -20,6 +20,7 @@ from typing import Mapping, Protocol
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from .fair_stream_admission import validate_admission_batch
 from .fair_stream_session import DispatchPermit
 from .private_sqlite import PrivateSQLiteHandle, PrivateSQLiteUnavailable
 from .sqlite_custody_schema import CustodySchemaError, assert_custody_schema
@@ -437,25 +438,34 @@ class SealedFairStreamResultVault:
 
     def assert_request_admissible(self, request_id: str, *, queued_count: int = 0) -> None:
         """Conservative local preflight, not a cross-process reservation."""
-        if type(request_id) is not str or not 1 <= len(request_id.encode("utf-8")) <= 128:
-            raise ValueError("bounded request identity required")
-        if type(queued_count) is not int or not 0 <= queued_count <= MAX_RESULT_ROWS:
-            raise ValueError("invalid queued result count")
+        self.assert_requests_admissible((request_id,), additional_queued=queued_count)
+
+    def assert_requests_admissible(
+        self, request_ids: tuple[str, ...], *, additional_queued: int = 0,
+    ) -> None:
+        """Check replay and worst-case result capacity once per queue snapshot."""
+        identities = validate_admission_batch(
+            request_ids, additional_queued=additional_queued, maximum=MAX_RESULT_ROWS,
+        )
+        requested_rows = len(identities) + additional_queued
         self._require_owner()
         with self._lock:
             self._require_open()
             self._connection.execute("BEGIN")
             try:
                 self._assert_schema()
-                if self._request_seen(request_id):
-                    raise SealedResultUnavailable("result request already published")
+                for request_id in identities:
+                    if self._request_seen(request_id):
+                        raise SealedResultUnavailable("result request already published")
                 rows, total = self._connection.execute(
                     "SELECT COUNT(*), COALESCE(SUM(LENGTH(ciphertext)), 0) FROM " + _TABLE
                 ).fetchone()
-                if (rows + queued_count >= MAX_RESULT_ROWS
-                        or total + (queued_count + 1) * (MAX_RESULT_BYTES + 16) > MAX_CIPHERTEXT_BYTES):
+                if (rows + requested_rows > MAX_RESULT_ROWS
+                        or total + requested_rows * (MAX_RESULT_BYTES + 16) > MAX_CIPHERTEXT_BYTES):
                     raise SealedResultUnavailable("result vault admission capacity exhausted")
                 self._handle.assert_current()
+            except PrivateSQLiteUnavailable as exc:
+                raise SealedResultUnavailable("result database custody changed") from exc
             finally:
                 self._connection.rollback()
 
