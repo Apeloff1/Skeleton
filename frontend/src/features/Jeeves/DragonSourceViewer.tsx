@@ -16,17 +16,17 @@ export default function DragonSourceViewer({game,source,visible,disabled}:Props)
  const [captures,setCaptures]=useState<CaptureBinding[]>([]),[captureCursor,setCaptureCursor]=useState<CaptureCursor|null>(null);
  const [session,setSession]=useState<string|null>(null),[docs,setDocs]=useState<CaptureDocument[]>([]),[docCursor,setDocCursor]=useState<string|null>(null),[held,setHeld]=useState<number|null>(null);
  const [span,setSpan]=useState<DocumentSpan|null>(null),[pin,setPin]=useState<ViewPin|null>(null),[left,setLeft]=useState<ViewPin|null>(null),[diff,setDiff]=useState<DocumentDiff|null>(null);
- const active=useRef<AbortController|null>(null),epoch=useRef(0),token=useRef(getAuthToken()),timer=useRef<ReturnType<typeof setTimeout>|null>(null);
+ const active=useRef<AbortController|null>(null),epoch=useRef(0),token=useRef(getAuthToken()),timer=useRef<ReturnType<typeof setTimeout>|null>(null),docTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
  function clearText(){if(timer.current){clearTimeout(timer.current);timer.current=null;}setSpan(null);setPin(null);setDiff(null);}
  function reset(){
   epoch.current++;active.current?.abort();active.current=null;setBusy(false);setError('');setConfirm(false);
-  clearText();setCaptures([]);setCaptureCursor(null);setDocs([]);setDocCursor(null);setSession(null);setHeld(null);setLeft(null);
+  clearText();if(docTimer.current){clearTimeout(docTimer.current);docTimer.current=null;}setCaptures([]);setCaptureCursor(null);setDocs([]);setDocCursor(null);setSession(null);setHeld(null);setLeft(null);
  }
  useEffect(()=>{
   token.current=getAuthToken();reset();
   const sub=AppState.addEventListener('change',x=>{if(x!=='active')reset();});
   const t=setInterval(()=>{if(token.current!==getAuthToken()){token.current=getAuthToken();reset();}},500);
-  return()=>{sub.remove();clearInterval(t);epoch.current++;active.current?.abort();active.current=null;if(timer.current)clearTimeout(timer.current);};
+  return()=>{sub.remove();clearInterval(t);epoch.current++;active.current?.abort();active.current=null;if(timer.current)clearTimeout(timer.current);if(docTimer.current)clearTimeout(docTimer.current);};
  },[game,source.source_id,visible]);
  const enabled=visible&&!disabled&&!busy&&token.current===getAuthToken();
  function run(work:(signal:AbortSignal,still:()=>boolean)=>Promise<void>){
@@ -40,7 +40,7 @@ export default function DragonSourceViewer({game,source,visible,disabled}:Props)
   const ttl=Math.min(30000,(until-asOf)*1000-(Date.now()-started)-250);
   if(ttl<=0)throw Error('Source view expired; reload the exact capture.');
   if(timer.current)clearTimeout(timer.current);
-  timer.current=setTimeout(()=>{setSpan(null);setPin(null);setDiff(null);setDocs([]);setDocCursor(null);},ttl);
+  timer.current=setTimeout(()=>{setSpan(null);setPin(null);setDiff(null);},ttl);
  }
  const history=(before?:CaptureCursor)=>run(async(signal,still)=>{
   const p=await sourceCaptures(game,source.source_id,before,signal);
@@ -49,7 +49,12 @@ export default function DragonSourceViewer({game,source,visible,disabled}:Props)
  const browse=(id:string,after?:string)=>run(async(signal,still)=>{
   const started=Date.now(),p=await sourceDocuments(game,source.source_id,id,after,signal);
   if(still()){
-   if(p.earliest_expiry!==null)expire(p.as_of_unix,p.earliest_expiry,started);
+   if(docTimer.current){clearTimeout(docTimer.current);docTimer.current=null;}
+   if(p.earliest_expiry!==null){
+    const ttl=Math.min(30000,(p.earliest_expiry-p.as_of_unix)*1000-(Date.now()-started)-250);
+    if(ttl<=0)throw Error('Source listing expired; refresh.');
+    docTimer.current=setTimeout(()=>{setDocs([]);setDocCursor(null);},ttl);
+   }
    setSession(id);setDocs(p.documents);setDocCursor(p.next_cursor);setHeld(p.held);
   }
  });
