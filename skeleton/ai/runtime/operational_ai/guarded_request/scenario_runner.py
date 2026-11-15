@@ -59,6 +59,17 @@ def iter_scenarios() -> Iterator[dict]:
                 raise AssertionError("scenario input must be mapping")
             if not isinstance(record.get("threat"), str) or not record["threat"]:
                 raise AssertionError("scenario must document threat")
+            # This exact source-owned vector crosses the runtime JSON envelope.
+            # Decode its bounded recipe first, then pass identical expanded bytes
+            # to the actual policy/receipt boundary. Never relax ingress limits.
+            if sid == "tokens-24":
+                recipe = record["input"].get("prompt")
+                if (type(recipe) is not dict or set(recipe) != {"repeat_ascii", "count"}
+                        or recipe["repeat_ascii"] != "x"
+                        or type(recipe["count"]) is not int or recipe["count"] != 32769
+                        or record["expected_allow"] is not False):
+                    raise AssertionError("invalid bounded oversized scenario recipe")
+                record["input"]["prompt"] = "x" * 32769
             seen.add(sid)
             counts[domain] += 1
             yield record
