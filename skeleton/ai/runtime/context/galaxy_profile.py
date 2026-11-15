@@ -266,12 +266,15 @@ _PLAYABLE_RULES = {
         "agency": ((_M, "driving", "intricacy"),),
     },
     "survival": {
+        "risk": ((_W, "weather", "complexity"), (_W, "volcanic", "complexity")),
         "scarcity": ((_W, "desert", "complexity"), (_W, "tundra", "complexity"), (_W, "wasteland", "complexity")),
         "grind": ((_M, "cooking", "count"), (_M, "farming", "count")),
         "agency": ((_M, "farming", "intricacy"),),
     },
     "stealth": {
         "risk": ((_M, "stealth", "complexity"),),
+        "lethality": ((_M, "stealth", "secrets"),),
+        "grind": ((_M, "stealth", "count"), (_M, "hacking", "count")),
         "opacity": ((_M, "stealth", "intricacy"), (_M, "hacking", "intricacy")),
         "agency": ((_M, "hacking", "complexity"),),
     },

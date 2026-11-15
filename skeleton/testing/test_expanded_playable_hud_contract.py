@@ -119,3 +119,90 @@ def test_galaxy_crafting_complexity_drives_native_assembly_duration():
     assert "const ASSEMBLY_SECONDS := 1.80" in loop
     assert "crafted = collected == 5" in loop
     assert receipt["mapped_matrix_dials"] == 2
+
+
+@pytest.mark.parametrize("risk,rate", [(0.0, 1.0), (0.5, 3.0), (1.0, 5.0)])
+def test_survival_exposure_rate_and_finite_water_inventory(risk, rate):
+    import json
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+    files = archetype_files("survival", operator_axes={"risk": risk})
+    loop = files["scripts/archetypes/survival/core_loop.gd"]
+    assert f"const EXPOSURE_DRAIN := {rate:.2f}" in loop
+    assert "var water_reserve: int = 0" in loop
+    assert "water_reserve += WATER_PER_SUPPLY" in loop
+    assert "water_reserve <= 0 or hydration >= 100.0" in loop
+    assert "water_reserve -= 1" in loop
+    assert "use_pressed = false" in loop
+    assert "not autopilot and use_pressed" in loop
+    assert "EXPOSURE_DRAIN if exposed else 0.0" in loop
+    assert "supplies.is_empty() and player.global_position.distance_to(shelter)" in loop
+    assert json.loads(files[SOURCE_PATH])["applied"]["survival.exposure_drain_per_second"] == rate
+
+
+@pytest.mark.parametrize("severity,rate", [(0.0, 0.55), (0.5, 0.95), (1.0, 1.35)])
+def test_stealth_moving_patrol_and_progressive_detection(severity, rate):
+    import json
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+    files = archetype_files("stealth", operator_axes={"lethality": severity, "risk": 1.0, "opacity": 1.0})
+    loop = files["scripts/archetypes/stealth/core_loop.gd"]
+    assert f"const ALERT_RISE := {rate:.2f}" in loop
+    assert "const DETECTION_RADIUS := 80.00" in loop
+    assert "const SHOW_GUARD_ZONES := false" in loop
+    assert "patrol_time += delta" in loop
+    assert "Vector2(cos(phase), sin(phase)) * PATROL_AMPLITUDE" in loop
+    assert "pressure = maxf(pressure, 1.0 - distance / DETECTION_RADIUS)" in loop
+    assert "alert = minf(1.0, alert + ALERT_RISE" in loop
+    assert "alert = maxf(0.0, alert - ALERT_DECAY * delta)" in loop
+    assert 'if alert >= 1.0:' in loop
+    assert "distance < PROXIMITY_RADIUS" in loop
+    assert json.loads(files[SOURCE_PATH])["applied"]["stealth.alert_rise_per_second"] == rate
+
+
+@pytest.mark.parametrize("depth,count", [(0.0, 2), (0.5, 4), (1.0, 6)])
+def test_stealth_intel_route_count_matches_native_progression(depth, count):
+    import re
+    import json
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+    files = archetype_files("stealth", operator_axes={"grind": depth})
+    loop = files["scripts/archetypes/stealth/core_loop.gd"]
+    route = re.search(r"var objectives: Array\[Vector2\] = \[(.*?)\]", loop, re.S).group(1)
+    assert route.count("Vector2(") == count
+    assert f"Intel %d/{count}" in loop
+    assert "if not objectives.is_empty():" in loop
+    assert "objectives.remove_at(selected)" in loop
+    assert "and not exposed:" in loop
+    assert json.loads(files[SOURCE_PATH])["applied"]["stealth.objectives_required"] == count
+
+
+def test_stealth_fixed_route_avoids_maximum_patrol_envelope():
+    # Independent analytic route check, not a Godot execution claim.
+    import math
+    from skeleton.forge.playable_tuning import _ROUTE_POINTS
+    points = _ROUTE_POINTS["stealth"][1]
+    guards = ((90, -120), (260, -80), (40, 320), (-240, 170))
+    def distance_to_segment(point, start, end):
+        dx, dy = end[0] - start[0], end[1] - start[1]
+        fraction = max(0.0, min(1.0, ((point[0] - start[0])*dx + (point[1] - start[1])*dy) / (dx*dx + dy*dy)))
+        return math.hypot(point[0] - (start[0] + fraction*dx), point[1] - (start[1] + fraction*dy))
+    # Maximum radius 80 and patrol displacement 14. Allow additional
+    # 22.5-unit interaction completion tolerance around route objectives.
+    for count in (2, 3, 4, 5, 6):
+        route = ((0, 0), *points[:count], (-180, 50))
+        for a, b in zip(route, route[1:]):
+            assert min(distance_to_segment(guard, a, b) for guard in guards) > 80 + 14 + 22.5
+
+
+@pytest.mark.parametrize("mode,matrix,phase,axis,control", [
+    ("survival", "world_matrix", "weather", "complexity", "risk"),
+    ("stealth", "mechanics_matrix", "stealth", "count", "grind"),
+    ("stealth", "mechanics_matrix", "stealth", "secrets", "lethality"),
+])
+def test_galaxy_new_survival_and_stealth_controls_are_effective(mode, matrix, phase, axis, control):
+    from skeleton.context.galaxy_profile import MATRIX_FIELDS, SCHEMA, compile_galaxy_playable_axes
+    config = {field: {} for field in MATRIX_FIELDS}
+    config.update(title="Original challenge", genre=mode, narrative_phases={}, extra_params={}, style_params={})
+    config[matrix][phase] = {axis: 1000}
+    effective, receipt = compile_galaxy_playable_axes({"schema": SCHEMA, "config": config}, mode, {})
+    assert effective == {control: 1.0}
+    assert receipt["mapped_matrix_dials"] == 1
+    assert archetype_files(mode, operator_axes=effective) != archetype_files(mode)

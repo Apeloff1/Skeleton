@@ -78,8 +78,8 @@ export const PLAYABLE_TUNING_EFFECTS: Record<string, readonly string[]> = {
   pipeline: ['Tempo: movement', 'Risk: frame budget', 'Agency: interaction range', 'Progression depth: deliveries'],
   puzzle: ['Tempo: movement', 'Mystery: switch hints', 'Agency: switch range', 'Progression depth: switches'],
   racing: ['Tempo: movement', 'Risk: time limit', 'Progression depth: laps', 'Agency: checkpoint range'],
-  survival: ['Tempo: movement', 'Scarcity: hydration', 'Agency: pickup range', 'Progression depth: supplies'],
-  stealth: ['Tempo: movement', 'Risk: guard radius', 'Mystery: guard visibility', 'Agency: interaction range'],
+  survival: ['Tempo: movement', 'Scarcity: hydration', 'Risk: exposure drain', 'Agency: pickup range', 'Progression depth: supplies'],
+  stealth: ['Tempo: movement', 'Risk: guard radius', 'Lethality: detection pressure', 'Mystery: guard visibility', 'Agency: interaction range', 'Progression depth: intel'],
   crafting: ['Tempo: movement', 'Progression depth: materials', 'Agency: work range', 'Risk: assembly duration'],
 };
 

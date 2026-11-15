@@ -53,12 +53,15 @@ _ROUTE_POINTS = {
                                (-170, -150), (40, -165))),
     "survival": ("supplies", ((160, 80), (90, 220), (-160, 180),
                                  (-210, 80), (-80, -60), (65, -130))),
+    "stealth": ("objectives", ((160, 20), (260, 170), (-20, 200),
+                                  (-90, 110), (-130, -50), (25, 65))),
     "crafting": ("materials", ((160, -80), (240, 170), (-80, 210),
                                   (-230, 40), (-30, -150), (125, 40))),
 }
 _ORIGINAL_ROUTE = {
     "puzzle": "Vector2(180, 0), Vector2(180, 150),\n\tVector2(-40, 150), Vector2(-180, -20)",
     "survival": "Vector2(160, 80), Vector2(90, 220), Vector2(-160, 180)",
+    "stealth": "Vector2(160, 20), Vector2(260, 170), Vector2(-20, 200)",
     "crafting": "Vector2(160, -80), Vector2(240, 170), Vector2(-80, 210)",
 }
 
@@ -72,6 +75,8 @@ def _tune_objectives(loop: str, name: str, value: float) -> tuple[str, int]:
     loop = _replace_exact(loop, _ORIGINAL_ROUTE[name], replacement)
     if name == "survival":
         loop = _replace_exact(loop, "Supplies %d/3 |", f"Supplies %d/{count} |")
+    elif name == "stealth":
+        loop = _replace_exact(loop, "Intel %d/3 |", f"Intel %d/{count} |")
     elif name == "crafting":
         loop = _replace_exact(loop, "crafted = collected == 3", f"crafted = collected == {count}")
         loop = _replace_exact(loop, "Materials %d/3 |", f"Materials %d/{count} |")
@@ -160,6 +165,20 @@ def compile_playable_tuning(
         )
         effects["stealth.detection_radius"] = effective
         used.add("risk")
+
+    if "risk" in axes and name == "survival":
+        exposure = _fixed(1.0 + 4.0 * axes["risk"])
+        loop = _replace_exact(loop, "const EXPOSURE_DRAIN := 3.0",
+                              f"const EXPOSURE_DRAIN := {exposure:.2f}")
+        effects["survival.exposure_drain_per_second"] = exposure
+        used.add("risk")
+
+    if "lethality" in axes and name == "stealth":
+        rise = _fixed(0.55 + 0.8 * axes["lethality"])
+        loop = _replace_exact(loop, "const ALERT_RISE := 0.95",
+                              f"const ALERT_RISE := {rise:.2f}")
+        effects["stealth.alert_rise_per_second"] = rise
+        used.add("lethality")
 
     if "risk" in axes and name == "crafting":
         duration = _fixed(0.6 + 1.2 * axes["risk"])

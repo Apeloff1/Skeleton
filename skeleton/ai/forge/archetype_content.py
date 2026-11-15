@@ -561,47 +561,75 @@ func _hud_status() -> String:
 '''
 
 _SURVIVAL = '''
-## Survive thirst, scavenge essentials and reach a safe shelter.
+## Collect essentials, manage a finite water reserve and cross exposed terrain.
 var supplies: Array[Vector2] = [
 	Vector2(160, 80), Vector2(90, 220), Vector2(-160, 180)
 ]
 var shelter := Vector2(-220, -120)
+var hot_zones: Array[Vector2] = [Vector2(180, -180), Vector2(-240, 0)]
 var collected: int = 0
+var water_reserve: int = 0
 var hydration: float = 75.0
 const DRAIN_PER_SECOND := 2.0
+const EXPOSURE_DRAIN := 3.0
+const EXPOSURE_RADIUS := 70.0
+const WATER_PER_SUPPLY := 1
+const DRINK_RESTORE := 24.0
 const PICKUP_RADIUS := 19.0
+var exposed: bool = false
+
 
 func _draw_objectives() -> void:
+	for zone in hot_zones:
+		draw_circle(zone, EXPOSURE_RADIUS, Color(0.95, 0.49, 0.12, 0.13))
+		draw_arc(zone, EXPOSURE_RADIUS, 0.0, TAU, 40, Color(0.95, 0.49, 0.12), 2.0)
 	for location in supplies:
 		draw_circle(location, 11.0, Color(0.25, 0.72, 0.98))
-	draw_circle(shelter, 21.0, Color(0.38, 0.9, 0.36))
+	var shelter_color := Color(0.38, 0.9, 0.36) if supplies.is_empty() else Color(0.35, 0.45, 0.43)
+	draw_circle(shelter, 21.0, shelter_color)
+
+
+func _drink() -> bool:
+	if water_reserve <= 0 or hydration >= 100.0:
+		return false
+	water_reserve -= 1
+	hydration = minf(100.0, hydration + DRINK_RESTORE)
+	return true
+
 
 func _tick(delta: float) -> void:
-	hydration -= DRAIN_PER_SECOND * delta
+	exposed = _nearest_point(hot_zones, EXPOSURE_RADIUS) >= 0
+	hydration = maxf(0.0, hydration - (DRAIN_PER_SECOND + (EXPOSURE_DRAIN if exposed else 0.0)) * delta)
+	var autopilot := bool(player.get("autopilot"))
+	var use_pressed := Input.is_action_just_pressed("ui_accept")
+	if not supplies.is_empty():
+		player.set("autopilot_target", supplies[0])
+		var selected := _nearest_point(supplies, PICKUP_RADIUS)
+		if selected >= 0 and (autopilot or use_pressed):
+			supplies.remove_at(selected)
+			collected += 1
+			water_reserve += WATER_PER_SUPPLY
+			use_pressed = false
+			queue_redraw()
+	else:
+		player.set("autopilot_target", shelter)
+	# A manual interaction gathers OR drinks, never both. Autoplay follows
+	# the same finite inventory and can use reserves at the low-water threshold.
+	if (autopilot and hydration <= 55.0) or (not autopilot and use_pressed):
+		_drink()
 	if hydration <= 0.0:
 		_finish(false, "dehydrated")
 		return
-	if supplies.size() > 0:
-		player.set("autopilot_target", supplies[0])
-		var selected := _nearest_point(supplies, PICKUP_RADIUS)
-		if selected >= 0:
-			if bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
-				supplies.remove_at(selected)
-				collected += 1
-				hydration = min(100.0, hydration + 12.0)
-				queue_redraw()
-	else:
-		player.set("autopilot_target", shelter)
-		if player.global_position.distance_to(shelter) <= PICKUP_RADIUS:
-			_finish(true, "supplies=%d hydration=%d" % [collected, int(hydration)])
+	if supplies.is_empty() and player.global_position.distance_to(shelter) <= PICKUP_RADIUS:
+		_finish(true, "supplies=%d hydration=%d reserve=%d" % [collected, int(hydration), water_reserve])
 
 
 func _hud_status() -> String:
-	return "Supplies %d/3 | Hydration %d | Press Enter to gather" % [collected, int(hydration)]
+	return "Supplies %d/3 | Hydration %d | Water %d | %s | USE gather / drink" % [collected, int(hydration), water_reserve, "EXPOSED" if exposed else "Safe terrain"]
 '''
 
 _STEALTH = '''
-## Recover intel and reach extraction without crossing guard vision radii.
+## Recover intel while managing progressive detection from moving sentries.
 var patrols: Array[Vector2] = [
 	Vector2(90, -120), Vector2(260, -80),
 	Vector2(40, 320), Vector2(-240, 170)
@@ -611,40 +639,71 @@ var objectives: Array[Vector2] = [
 ]
 var exit_point := Vector2(-180, 50)
 var intel: int = 0
+var patrol_time: float = 0.0
+var alert: float = 0.0
+var exposed: bool = false
 const DETECTION_RADIUS := 64.0
 const SHOW_GUARD_ZONES := true
 const USE_RADIUS := 18.0
+const PATROL_AMPLITUDE := 14.0
+const PATROL_FREQUENCY := 0.85
+const ALERT_RISE := 0.95
+const ALERT_DECAY := 0.48
+const PROXIMITY_RADIUS := 12.0
+
+
+func _guard_position(index: int) -> Vector2:
+	var phase := patrol_time * PATROL_FREQUENCY + float(index) * 1.570796
+	return patrols[index] + Vector2(cos(phase), sin(phase)) * PATROL_AMPLITUDE
+
 
 func _draw_objectives() -> void:
-	for guard in patrols:
+	for index in range(patrols.size()):
+		var guard := _guard_position(index)
 		if SHOW_GUARD_ZONES:
 			draw_circle(guard, DETECTION_RADIUS, Color(0.9, 0.22, 0.24, 0.16))
 		draw_circle(guard, 9.0, Color(0.96, 0.26, 0.24))
+		draw_arc(guard, PROXIMITY_RADIUS, 0.0, TAU, 24, Color(0.96, 0.26, 0.24), 2.0)
 	for intel_point in objectives:
 		draw_circle(intel_point, 11.0, Color(0.25, 0.82, 0.98))
-	draw_circle(exit_point, 20.0, Color(0.25, 0.88, 0.32))
+	var exit_color := Color(0.25, 0.88, 0.32) if objectives.is_empty() else Color(0.35, 0.45, 0.43)
+	draw_circle(exit_point, 20.0, exit_color)
 
-func _tick(_delta: float) -> void:
-	for guard in patrols:
-		if player.global_position.distance_to(guard) < DETECTION_RADIUS:
-			_finish(false, "spotted by patrol")
+
+func _tick(delta: float) -> void:
+	patrol_time += delta
+	exposed = false
+	var pressure: float = 0.0
+	for index in range(patrols.size()):
+		var distance := player.global_position.distance_to(_guard_position(index))
+		if distance < PROXIMITY_RADIUS:
+			_finish(false, "intercepted by patrol")
 			return
-	if objectives.size() > 0:
+		if distance < DETECTION_RADIUS:
+			exposed = true
+			pressure = maxf(pressure, 1.0 - distance / DETECTION_RADIUS)
+	if exposed:
+		alert = minf(1.0, alert + ALERT_RISE * (0.35 + pressure) * delta)
+	else:
+		alert = maxf(0.0, alert - ALERT_DECAY * delta)
+	if alert >= 1.0:
+		_finish(false, "spotted by patrol")
+		return
+	if not objectives.is_empty():
 		player.set("autopilot_target", objectives[0])
 		var selected := _nearest_point(objectives, USE_RADIUS)
-		if selected >= 0:
-			if bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
-				objectives.remove_at(selected)
-				intel += 1
-				queue_redraw()
+		if selected >= 0 and (bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept")):
+			objectives.remove_at(selected)
+			intel += 1
+			queue_redraw()
 	else:
 		player.set("autopilot_target", exit_point)
-		if player.global_position.distance_to(exit_point) <= USE_RADIUS:
-			_finish(true, "intel=%d undetected" % intel)
+		if player.global_position.distance_to(exit_point) <= USE_RADIUS and not exposed:
+			_finish(true, "intel=%d alert=%d" % [intel, int(alert * 100.0)])
 
 
 func _hud_status() -> String:
-	return "Intel %d/3 | Avoid red guard zones | Press Enter to retrieve" % [intel]
+	return "Intel %d/3 | Alert %d%% | %s | USE to retrieve" % [intel, int(alert * 100.0), "EXPOSED" if exposed else "Unseen"]
 '''
 
 _CRAFTING = '''
