@@ -1533,6 +1533,7 @@ class DragonCrawlerApplication:
                                       body: dict, *, principal: dict) -> dict:
         """Authorize or revoke bounded archive-only reparse of exact retained captures."""
         from skeleton.ai.webcrawler.dragon_archive_grant import create_grant
+        from skeleton.ai.webcrawler.dragon_index_manifest import build_manifest
         if authenticated_scope(principal) != scope or (
             body.get("enabled") is True and principal.get("role") not in {"editor","admin"}
         ):
@@ -1554,6 +1555,7 @@ class DragonCrawlerApplication:
         snapshot = _plain(row["snapshot"])
         now = _now()
         grant = None
+        index_manifest = None
         if body["enabled"]:
             if row["status"] not in {"completed","budget_exhausted"} or not row.get("checkpoint_identity"):
                 raise CrawlerError("crawler_archive_not_terminal", "Archive permission requires a finished witnessed expedition.",409)
@@ -1561,15 +1563,16 @@ class DragonCrawlerApplication:
             try:
                 grant = create_grant(snapshot=snapshot,policies=self._source_policies(row),
                                      now=now.timestamp(),days=body["days"])
+                index_manifest=await asyncio.to_thread(build_manifest,snapshot,grant,now=now.timestamp())
             except ValueError as exc:
                 raise CrawlerError("crawler_archive_unavailable","No qualified retained sources available.",403) from exc
         audit = {"operation":operation,"request_digest":digest,"action":"archive_grant","state":"completed",
                  "enabled":body["enabled"],"snapshot_digest":snapshot["snapshot_digest"]}
-        receipt = await self._admit(scope,identifier,{"archive_grant":grant,"audit":audit})
+        receipt = await self._admit(scope,identifier,{"archive_grant":grant,"treasury_index":index_manifest,"audit":audit})
         audit_path = "safety_control" if len(row.get("operations",{})) >= MAX_OPERATIONS else "operations."+operation
         result = await self.sessions.update_one(
             {"_id":identifier,**scope,"version":row["version"],"status":{"$ne":"deleted"}},
-            {"$set":{"archive_grant":grant,"updated_at":now,"storage_receipt":receipt,audit_path:audit},
+            {"$set":{"archive_grant":grant,"treasury_index":index_manifest,"updated_at":now,"storage_receipt":receipt,audit_path:audit},
              "$inc":{"version":1}},
         )
         if not result.modified_count:
@@ -1640,7 +1643,8 @@ class DragonCrawlerApplication:
         identities prevent stale promotion. Every read remains owner/version
         fenced. No network, migration, write or grant extension occurs.
         """
-        from skeleton.ai.webcrawler.dragon_sanctuary import SanctuarySource, project_sanctuary
+        from skeleton.ai.webcrawler.dragon_sanctuary import MAX_EXPEDITIONS, SanctuarySource, project_sanctuary
+        from skeleton.ai.webcrawler.dragon_index_manifest import load_manifest, usable_posting
         from skeleton.ai.webcrawler.dragon_archive_grant import archive_expiry, validate_grant
         from skeleton.ai.webcrawler.dragon_treasury import MAX_SESSIONS, Observation, build_treasury
 
@@ -1656,6 +1660,8 @@ class DragonCrawlerApplication:
         excluded = 0
         fence = []
         observations = []
+        materialized = {}
+        invalid_segments = 0
         alias_blockers = []
         eligible = []
         revisions = []
@@ -1666,7 +1672,7 @@ class DragonCrawlerApplication:
                 {"_id": 1, "tenant_id": 1, "owner_id": 1, "status": 1, "version": 1,
                  "consent_expires_at": 1, "request": 1, "request_digest": 1, "consent": 1,
                  "snapshot": 1, "checkpoint_identity": 1, "source_use_policies": 1,
-                 "archive_grant": 1}, max_time_ms=2000,
+                 "archive_grant": 1, "treasury_index": 1}, max_time_ms=2000,
             )
             if row is None:
                 raise CrawlerError("crawler_treasury_changed", "Treasury changed during reparse.", 409)
@@ -1691,8 +1697,17 @@ class DragonCrawlerApplication:
                 grant = row.get("archive_grant") if row["status"] in {"completed","budget_exhausted"} else None
                 if grant is not None:
                     validate_grant(grant)
+                try:
+                    segment = load_manifest(row.get("treasury_index"),grant,
+                        snapshot_digest=snapshot["snapshot_digest"],now=when)
+                except (ValueError,TypeError,KeyError,RecursionError):
+                    # Rebuild only in-memory from still-authorized exact text.
+                    # No corrupt derived cache can prevent source visibility.
+                    invalid_segments += 1
+                    segment = {}
                 usable = []
                 local = []
+                local_materialized = {}
                 # Metadata-only history may be retained by the existing
                 # owner checkpoint; no expired source text enters the index.
                 for source in sorted(runtime.sources(), key=lambda val: (
@@ -1740,6 +1755,9 @@ class DragonCrawlerApplication:
                         not source["text_truncated"], refresh_allowed, archive_only,
                     ))
                     if allowed:
+                        posting=usable_posting(segment,source,{**{"version":0},**policy})
+                        if posting is not None:
+                            local_materialized[str(identifier),source["source_id"]]=posting
                         usable.append(SanctuarySource(
                             str(identifier), source["source_id"], source["content_hash"],
                             source["fetched_url"], source["content_type"], source["text"],
@@ -1752,21 +1770,22 @@ class DragonCrawlerApplication:
                                   "content_hash": alias["content_hash"]}
                                  for alias in snapshot["source_aliases"]]
                 observations.extend(local)
+                materialized.update(local_materialized)
                 alias_blockers.extend(local_aliases)
-                if len(usable) > 16:
-                    capped = True
-                eligible.extend(usable[:16])
-                revisions.append({"session_id": str(identifier), "version": int(version),
-                                  "snapshot_digest": snapshot["snapshot_digest"]})
+                if len(revisions)<MAX_EXPEDITIONS:
+                    eligible.extend(usable[:16])
+                    revisions.append({"session_id": str(identifier), "version": int(version),
+                                      "snapshot_digest": snapshot["snapshot_digest"]})
             except (CrawlerError, CheckpointReplicaError, ValueError, KeyError, TypeError, RecursionError):
                 excluded += 1
         try:
             growth = project_sanctuary(eligible, as_of=when, selected_sessions=revisions,
-                                       excluded_sessions=excluded,
+                                       excluded_sessions=min(excluded,MAX_EXPEDITIONS),
                                        candidate_limit_reached=capped)["collection_index"]
             result = build_treasury(observations, as_of=when, growth=growth, mode=mode, query=query,
                                     family=family, candidate_limit_reached=capped, excluded_sessions=excluded,
-                                    alias_blockers=alias_blockers)
+                                    alias_blockers=alias_blockers,materialized=materialized)
+            result["invalid_materialized_segments"]=invalid_segments
         except ValueError as exc:
             raise CrawlerError("crawler_treasury_invalid", "Treasury reparse could not be qualified.", 422) from exc
         for identifier, version in fence:
@@ -3008,6 +3027,7 @@ class DragonCrawlerApplication:
                     "safety_control": "",
                     "source_use_policies": "",
                     "archive_grant": "",
+                    "treasury_index": "",
                 },
             },
         )
