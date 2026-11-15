@@ -49,6 +49,8 @@ export interface StudioProject {
   lastRun: RunSnapshot | null;
   /** Previous successful receipt is retained, but no longer builds this brief. */
   lastRunOutdated?: boolean;
+  /** Digest of the last acknowledged source-bound Forge return. */
+  studioReturnReceipt?: string;
 }
 
 export interface AuthView {
@@ -558,7 +560,9 @@ function sanitizeProject(raw: unknown): StudioProject | null {
   if (!raw || typeof raw !== 'object') return null;
   const item = raw as Record<string, unknown>;
   if (typeof item.id !== 'string' || !item.id.trim()) return null;
-  if (typeof item.createdAt !== 'string' || typeof item.updatedAt !== 'string') return null;
+  if (typeof item.createdAt !== 'string' || typeof item.updatedAt !== 'string'
+      || !Number.isFinite(Date.parse(item.createdAt)) || !Number.isFinite(Date.parse(item.updatedAt))) return null;
+  if (item.studioReturnReceipt !== undefined && !validReturnReceipt(item.studioReturnReceipt)) return null;
   const q = item.questionnaire;
   if (!q || typeof q !== 'object') return null;
   const questionnaire = q as QuestionnaireState;
@@ -642,6 +646,7 @@ function sanitizeProject(raw: unknown): StudioProject | null {
     },
     lastRun,
     lastRunOutdated: Boolean(lastRun && item.lastRunOutdated === true),
+    ...(typeof item.studioReturnReceipt === 'string' ? { studioReturnReceipt: item.studioReturnReceipt } : {}),
   };
 }
 
@@ -651,15 +656,17 @@ export function sanitizeProjects(raw: unknown): { projects: StudioProject[]; cor
   if (!Array.isArray(raw)) return { projects: [], corrupt: true };
   const projects: StudioProject[] = [];
   const ids = new Set<string>();
+  const receipts = new Set<string>();
   for (const item of raw) {
     const project = sanitizeProject(item);
-    if (!project || ids.has(project.id)) {
+    if (!project || ids.has(project.id) || (project.studioReturnReceipt !== undefined && receipts.has(project.studioReturnReceipt))) {
       // Duplicate IDs make project navigation ambiguous and may overwrite
       // an existing account's project during an explicit legacy import.
       // Fail the entire batch rather than silently dropping authored data.
       return { projects: [], corrupt: true };
     }
     ids.add(project.id);
+    if (project.studioReturnReceipt !== undefined) receipts.add(project.studioReturnReceipt);
     projects.push(project);
   }
   return { projects, corrupt: false };
@@ -707,15 +714,24 @@ export async function bootstrap(load: () => Promise<LoadResult>, auth: AuthClien
 }
 
 
+function validReturnReceipt(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+}
+
 /** Reconcile one edited Forge questionnaire into exactly its originating
  * Studio project. ID and source revision must match; a concurrent edit or
  * deleted project is never overwritten just because a bridge exists. */
 export function reconcileStudioReturn(
   projects: readonly StudioProject[], projectId: string,
   expectedUpdatedAt: string, questionnaire: QuestionnaireState,
-  at: string,
+  at: string, receipt?: string,
 ): { status: 'applied' | 'already-applied' | 'conflict' | 'missing' | 'invalid'; projects: StudioProject[] } {
   const snapshot = [...projects];
+  if (receipt !== undefined && !validReturnReceipt(receipt)) return { status: 'invalid', projects: snapshot };
+  // A committed return remains acknowledged even if the user edited the
+  // receiving project again before a failed envelope removal was retried.
+  const admitted = receipt === undefined ? undefined : snapshot.find(p => p.studioReturnReceipt === receipt);
+  if (admitted) return { status: admitted.id === projectId ? 'already-applied' : 'conflict', projects: snapshot };
   const index = snapshot.findIndex((p) => p.id === projectId);
   if (index < 0) return { status: 'missing', projects: snapshot };
   if (snapshot[index].updatedAt !== expectedUpdatedAt) {
@@ -733,6 +749,7 @@ export function reconcileStudioReturn(
     if (!current.corrupt && current.projects.length === 1
         && JSON.stringify(current.projects[0].questionnaire)
           === JSON.stringify(incoming.projects[0].questionnaire)) {
+      if (receipt !== undefined) snapshot[index] = { ...snapshot[index], studioReturnReceipt: receipt };
       return { status: 'already-applied', projects: snapshot };
     }
     return { status: 'conflict', projects: snapshot };
@@ -746,6 +763,7 @@ export function reconcileStudioReturn(
           || changedBuildInputs(snapshot[index].questionnaire, questionnaire))
       : false,
     updatedAt: nextStudioRevision(snapshot[index].updatedAt, at),
+    ...(receipt === undefined ? {} : { studioReturnReceipt: receipt }),
   };
   const vetted = sanitizeProjects([draft]);
   if (vetted.corrupt || vetted.projects.length !== 1) {
@@ -758,8 +776,11 @@ export function reconcileStudioReturn(
 /** User-approved return from Forge: preserve edits as a new project if the
  * original was changed/deleted while the cockpit was open. */
 export function recoverStudioReturnAsCopy(
-  projects: readonly StudioProject[], questionnaire: QuestionnaireState, at: string,
+  projects: readonly StudioProject[], questionnaire: QuestionnaireState, at: string, receipt?: string,
 ): { project: StudioProject; projects: StudioProject[] } {
+  if (receipt !== undefined && !validReturnReceipt(receipt)) throw new Error('Invalid Studio return receipt');
+  const existing = receipt === undefined ? undefined : projects.find(p => p.studioReturnReceipt === receipt);
+  if (existing) return { project: existing, projects: [...projects] };
   const occupied = new Set(projects.map((p) => p.id));
   const stamp = Date.parse(at);
   if (!Number.isFinite(stamp)) throw new Error('Invalid Studio return timestamp');
@@ -772,6 +793,7 @@ export function recoverStudioReturnAsCopy(
   const candidate: StudioProject = {
     id, title: projectTitle(questionnaire.vision) + ' (Forge copy)',
     createdAt: at, updatedAt: at, questionnaire, lastRun: null,
+    ...(receipt === undefined ? {} : { studioReturnReceipt: receipt }),
   };
   const checked = sanitizeProjects([candidate]);
   if (checked.corrupt || checked.projects.length !== 1) {
