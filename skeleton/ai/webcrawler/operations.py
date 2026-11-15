@@ -36,6 +36,7 @@ from .structured_discovery import (
 )
 from .frontier_scheduler import choose_frontier
 from .dragon_companion import build_companion, companion_style
+from .dragon_curriculum_trace import decision_receipt, validate_receipt, trace_summary
 from .adaptive_navigation import access_denied_hold, origin_health, restorative_wait
 from .acquisition_feedback import (host_economics, portfolio_summary, quantize_latency,
                                    settled_observation, validate_measurements)
@@ -112,6 +113,8 @@ def implementation_digest():
                 "acquisition_feedback.py",
                 "information_portfolio.py",
                 "dragon_companion.py",
+                "dragon_questbook.py",
+                "dragon_curriculum_trace.py",
                 "frontier_coverage.py",
                 "frontier_antichain.py",
                 "federated_activity.py",
@@ -515,10 +518,19 @@ class CrawlRun:
                 "limit",
                 "sequence",
                 "started_at",
+                "curriculum",
             }:
                 raise CrawlOperationError("invalid pending dispatch")
             for key in ("url", "item_url", "original_url"):
                 run._admit(pending[key])
+            try:
+                if request.frontier_strategy.startswith("companion"):
+                    validate_receipt(pending["curriculum"], mode=request.frontier_strategy,
+                                     candidate=pending["item_url"])
+                elif pending["curriculum"] is not None:
+                    raise ValueError("curriculum not selected")
+            except (ValueError, TypeError) as exc:
+                raise CrawlOperationError("pending curriculum custody mismatch") from exc
             _integer(pending["limit"], 1, request.max_response_bytes, "reserved byte cap")
             _integer(pending["sequence"], 1, state["sequence"], "dispatch sequence")
             _number(pending["started_at"], 0, 1e12, "dispatch timestamp")
@@ -574,6 +586,17 @@ class CrawlRun:
         sources = state.get("sources")
         if not isinstance(sources, dict) or len(sources) != usage["documents"]:
             raise CrawlOperationError("source counter mismatch")
+        captures = {m["source_id"]: m for m in state["acquisition_measurements"] if m["kind"] == "captured"}
+        if (set(captures) != set(sources) or len(captures) != sum(m["kind"] == "captured" for m in state["acquisition_measurements"])):
+            raise CrawlOperationError("acquisition source conservation mismatch")
+        for m in state["acquisition_measurements"]:
+            try:
+                if request.frontier_strategy.startswith("companion"):
+                    validate_receipt(m["curriculum"], mode=request.frontier_strategy)
+                elif m["curriculum"] is not None:
+                    raise ValueError("curriculum not selected")
+            except (ValueError, TypeError) as exc:
+                raise CrawlOperationError("settled curriculum custody mismatch") from exc
         for source_id, source in sources.items():
             if (
                 not isinstance(source, dict)
@@ -601,14 +624,11 @@ class CrawlRun:
             _text(source.get("title"), 4000, "source title", empty=True)
             _number(source.get("fetched_at"), 0, 1e12, "source timestamp")
             provenance = source["provenance"]
-            if "capture_sequence" in provenance:
-                capture_seq = provenance["capture_sequence"]
-                if type(capture_seq) is not int or not any(
-                    m["event_sequence"] == capture_seq and m["kind"] == "captured"
-                    and m["host"] == urlsplit(source["fetched_url"]).hostname
-                    for m in state["acquisition_measurements"]
-                ):
-                    raise CrawlOperationError("companion source capture sequence mismatch")
+            capture_seq = provenance.get("capture_sequence")
+            measurement = captures[source_id]
+            if (type(capture_seq) is not int or measurement["event_sequence"] != capture_seq
+                    or measurement["host"] != urlsplit(source["fetched_url"]).hostname):
+                raise CrawlOperationError("companion source capture sequence mismatch")
             if "structural_projection" in provenance and (
                 source["content_type"] not in {"text/html", "application/xhtml+xml"}
                 or not validate_structural_receipt(provenance["structural_projection"])
@@ -766,6 +786,7 @@ class CrawlRun:
             "instruction_security": incident_summary(state["instruction_incidents"]),
             "duplicate_evidence": alias_summary(state["source_aliases"]),
             "companion": self._companion(now, due=bool(ready and min(ready) <= now)).projection,
+            "curriculum_trace": trace_summary(state["acquisition_measurements"]),
             "acquisition_economics": portfolio_summary(state["acquisition_measurements"],
                 self.request.allowed_hosts, floor=self.request.min_host_delay_seconds),
             "adaptive_origin_health": {
@@ -971,7 +992,7 @@ class CrawlRun:
             raise _CheckpointInterrupted("crawl authority or checkpoint rejected") from exc
         self._rollback_state = copy.deepcopy(self._state)
 
-    def _fetch(self, url, *, limit, item):
+    def _fetch(self, url, *, limit, item, curriculum=None):
         self._admit(url)
         self._state["usage"]["requests"] += 1
         self._state["usage"]["reserved_bytes"] += limit
@@ -983,6 +1004,7 @@ class CrawlRun:
             "limit": limit,
             "sequence": self._state["sequence"] + 1,
             "started_at": started,
+            "curriculum": curriculum,
         }
         self._persist(
             self._event(
@@ -999,7 +1021,8 @@ class CrawlRun:
         # Measure only the transport call, not storage or parsing latency.
         started_mono = time.monotonic()
         self._last_transport = {"url": url, "status": None, "latency_bucket": None,
-                                "charged_bytes": 0, "uncertain_bytes": limit}
+                                "charged_bytes": 0, "uncertain_bytes": limit,
+                                "curriculum": curriculum}
         timeout = getattr(self.fetcher, "timeout_seconds", None)
         if timeout is not None:
             self.fetcher.timeout_seconds = min(timeout, max(0.01, self._slice_deadline - time.monotonic()))
@@ -1043,11 +1066,13 @@ class CrawlRun:
         observation = getattr(self, "_last_transport", None)
         if pending is not None:
             observation = {"url": pending["url"], "status": None, "latency_bucket": None,
-                           "charged_bytes": 0, "uncertain_bytes": pending["limit"]}
+                           "charged_bytes": 0, "uncertain_bytes": pending["limit"],
+                           "curriculum": pending["curriculum"]}
         if observation is None:
             return
         row = settled_observation(request=state["usage"]["requests"],
-            kind=event["kind"], event_sequence=event["sequence"], **observation)
+            kind=event["kind"], event_sequence=event["sequence"],
+            source_id=event["source_id"] if event["kind"] == "captured" else None, **observation)
         state["acquisition_measurements"].append(row)
         # Latency feedback is an additional hold, never an override of REP,
         # server cooldown, existing host readiness or operator consent.
@@ -1124,8 +1149,14 @@ class CrawlRun:
             remaining,
             MAX_ROBOTS_BYTES if needs_robots else self.request.max_response_bytes,
         )
+        curriculum = None
+        if self.request.frontier_strategy.startswith("companion"):
+            curriculum = decision_receipt(mode=self.request.frontier_strategy,
+                quest=_selection.curriculum_quest, candidate=url, eligible=_selection.eligible_urls,
+                base=_selection.curriculum_base_score, priority=_selection.fairness_score,
+                policy=needs_robots)
         try:
-            response = self._fetch(fetch_url, limit=limit, item=item)
+            response = self._fetch(fetch_url, limit=limit, item=item, curriculum=curriculum)
         except _CheckpointInterrupted:
             raise
         except Exception as exc:  # noqa: BLE001 -- failed transport attempts retain budget
