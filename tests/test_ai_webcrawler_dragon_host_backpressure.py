@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
+from skeleton.ai.webcrawler.bound_http import SocketBoundFetcher
+from skeleton.ai.webcrawler.dns_binding import ResolvedTarget
 from skeleton.ai.webcrawler.core import FetchResponse
 from skeleton.ai.webcrawler.host_backpressure import consent_bounded_retry_after, origin_throttle
 from skeleton.ai.webcrawler.operations import CrawlOperationError, CrawlRequest, CrawlRun
@@ -243,6 +245,42 @@ class CanonicalThrottleTests(unittest.TestCase):
                          reserved["usage"]["reserved_bytes"])
         self.assertEqual(resumed.snapshot()["usage"]["requests"], 1)
         self.assertEqual(resumed.snapshot()["usage"]["failures"], 1)
+
+
+
+class TransportIsolationTests(unittest.TestCase):
+    def test_denial_and_overload_bodies_are_not_read(self):
+        for status in (403, 429, 503):
+            with self.subTest(status=status):
+                url = "https://example.com/first"
+                target = ResolvedTarget(url, "example.com", 443, ("93.184.216.34",))
+                connection, response = Mock(), Mock()
+                response.status = status
+                response.getheaders.return_value = [
+                    ("Content-Length", "999999999"),
+                    ("Content-Encoding", "gzip"),
+                    ("Retry-After", "900"),
+                    ("Retry-After", "1"),
+                ]
+                response.read1.side_effect = AssertionError("error body must remain unread")
+                connection.getresponse.return_value = response
+                with (
+                    patch("skeleton.ai.webcrawler.bound_http.resolve_target", return_value=target),
+                    patch("skeleton.ai.webcrawler.bound_http._PinnedHTTPSConnection", return_value=connection),
+                    patch("skeleton.ai.webcrawler.bound_http.threading.Timer"),
+                ):
+                    result = SocketBoundFetcher().fetch_once(
+                        url, user_agent="SkeletonAI-Crawler/1.0", max_bytes=4096,
+                    )
+                self.assertEqual(result.status, status)
+                self.assertEqual(result.body, b"")
+                self.assertEqual(result.headers["retry-after"], "86400")
+                response.read1.assert_not_called()
+                connection.close.assert_called_once()
+                headers = connection.request.call_args.kwargs["headers"]
+                self.assertEqual(headers["User-Agent"], "SkeletonAI-Crawler/1.0")
+                self.assertNotIn("Cookie", headers)
+                self.assertNotIn("Authorization", headers)
 
 
 if __name__ == "__main__":
