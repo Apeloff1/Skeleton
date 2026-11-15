@@ -333,9 +333,9 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
           <Text style={st.help}>Godot ZIP preparation requires a Godot source target.</Text>
         ) : null}
       </View>
-      <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Godot headless qualification" testID="q-playtest-controls">
+      <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Godot headless qualification" testID="q-playtest-controls"><View testID="q-native-playtest-mode">
         <Text style={st.q}>Godot headless playtest</Text>
-        <Text style={st.help}>Optional runtime check: boot the generated main world in locally installed Godot; when a playable sidecar is selected, run its complete win/lose scene separately. Best effort reports unavailable engines; Require rejects the build if an engine is missing or either scene fails. No engine is downloaded or contacted remotely.</Text>
+        <Text style={st.help}>Optional runtime check: boot the generated main world in locally installed Godot; when a playable sidecar is selected, run its complete win/lose scene independently of the main world. Best effort reports unavailable engines; Require rejects the build if an engine is missing or either scene fails. No engine is downloaded or contacted remotely.</Text>
         <View style={st.chips}>
           <Chip label="Off" selected={!state.playtest || state.playtest === 'off'}
             onPress={() => dispatch({ type: 'setPlaytestMode', value: 'off' })}
@@ -349,7 +349,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
             onPress={() => dispatch({ type: 'setPlaytestMode', value: 'require' })}
             testID="q-playtest-require" />
         </View>
-      </View>
+      </View></View>
       <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Era override">
         <Text style={st.q}>Pin an era? <Text style={st.help}>(optional)</Text></Text>
         <View style={st.chips}>
