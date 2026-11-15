@@ -165,3 +165,71 @@ def test_native_policy_remains_authenticated_during_forward_recovery():
     assert recovered.verify()["checkpoint"]["requests"][0]["authorization_digest"] == "f" * 64
     with pytest.raises(ValueError, match="execution policy"):
         recovered.plan(budget(), whole_request=False)
+
+def test_candidate_rejects_anchor_change_during_authenticated_restore(monkeypatch):
+    db, anchor, _ = failed_transition()
+    original = db._restore
+
+    def moved(*args, **kwargs):
+        owner = original(*args, **kwargs)
+        anchor.state = (123, "e" * 64)
+        return owner
+
+    monkeypatch.setattr(db, "_restore", moved)
+    with pytest.raises(AnchorRecoveryDenied, match="anchor changed"):
+        inspect_forward_candidate(db, anchor)
+    assert not db._connection.in_transaction
+
+
+def test_forward_recovery_refuses_anchor_callback_that_releases_writer_reservation(monkeypatch):
+    db, anchor, _ = failed_transition()
+    approval, key = approved(db, anchor)
+    original = anchor.advance
+
+    def releases(**kwargs):
+        original(**kwargs)
+        db._connection.commit()
+
+    monkeypatch.setattr(anchor, "advance", releases)
+    with pytest.raises(AnchorRecoveryDenied, match="writer reservation"):
+        recover_forward_anchor(db, anchor, approval=approval, operator_public_key=key)
+    assert not db._connection.in_transaction
+    assert anchor.read() == (approval.candidate.next_generation, approval.candidate.next_digest)
+
+
+def test_forward_recovery_refuses_changed_successor_after_anchor_commit(monkeypatch):
+    db, anchor, _ = failed_transition()
+    approval, key = approved(db, anchor)
+    original = anchor.advance
+
+    def changed(**kwargs):
+        original(**kwargs)
+        db._connection.execute("UPDATE local_fair_stream_custody SET payload=?", (b"{}",))
+
+    monkeypatch.setattr(anchor, "advance", changed)
+    with pytest.raises(AnchorRecoveryDenied, match="successor changed"):
+        recover_forward_anchor(db, anchor, approval=approval, operator_public_key=key)
+    assert not db._connection.in_transaction
+    assert DurableFairStreamSession(db, anchor).verify()["digest"] == approval.candidate.next_digest
+
+
+def test_composed_forward_authority_rejects_self_signed_candidate():
+    from cryptography.hazmat.primitives import serialization
+    from skeleton.ai.model_runtime.fair_stream_anchor_recovery import ForwardAnchorRecoveryAuthority
+
+    db, anchor, _ = failed_transition()
+    operator = Ed25519PrivateKey.generate()
+    authority = ForwardAnchorRecoveryAuthority(
+        store=db, watermark=anchor, operator_public_key=operator.public_key().public_bytes(
+            serialization.Encoding.Raw, serialization.PublicFormat.Raw,
+        ),
+    )
+    candidate = authority.inspect()
+    prior = anchor.read()
+    attacker = issue_forward_approval(candidate, nonce="a" * 32,
+                                      signing_key=Ed25519PrivateKey.generate())
+    with pytest.raises(AnchorRecoveryDenied, match="signature"):
+        authority.recover(attacker)
+    assert anchor.read() == prior
+    grant = issue_forward_approval(candidate, nonce="b" * 32, signing_key=operator)
+    assert authority.recover(grant).verify()["digest"] == candidate.next_digest

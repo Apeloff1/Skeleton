@@ -103,7 +103,10 @@ def _verify(approval: ForwardApproval, key: Ed25519PublicKey) -> None:
 
 
 def _anchor(watermark: TrustedHighWatermark) -> tuple[int, str]:
-    generation, digest = watermark.read()
+    observation = watermark.read()
+    if type(observation) is not tuple or len(observation) != 2:
+        raise AnchorRecoveryDenied("invalid independent anchor shape")
+    generation, digest = observation
     if type(generation) is not int or not 0 <= generation <= MAX_GENERATION:
         raise AnchorRecoveryDenied("invalid independent anchor generation")
     _hex(digest, 64)
@@ -123,6 +126,14 @@ def _candidate_locked(
     state = owner.export()
     if not hmac.compare_digest(state["previous_digest"], prior_digest):
         raise AnchorRecoveryDenied("candidate does not descend from independent anchor")
+    if not store._connection.in_transaction:
+        raise AnchorRecoveryDenied("candidate lost its writer reservation")
+    if _anchor(watermark) != (prior_generation, prior_digest):
+        raise AnchorRecoveryDenied("independent anchor changed during candidate inspection")
+    store._assert_private()
+    store._assert_schema()
+    if store._read() != row:
+        raise AnchorRecoveryDenied("stored candidate changed during inspection")
     checkpoint = state["checkpoint"]
     return ForwardCandidate(
         store.session_id, prior_generation, prior_digest, row[0], row[1],
@@ -169,6 +180,9 @@ def recover_forward_anchor(
             store._assert_private()
             # No mutation if the verified private handle or schema has changed.
             store._assert_schema()
+            approved_row = store._read()
+            if approved_row is None or approved_row[:2] != (candidate.next_generation, candidate.next_digest):
+                raise AnchorRecoveryDenied("approved successor unavailable")
             watermark.advance(
                 expected_generation=candidate.prior_generation,
                 expected_digest=candidate.prior_digest,
@@ -177,10 +191,46 @@ def recover_forward_anchor(
             )
             if _anchor(watermark) != (candidate.next_generation, candidate.next_digest):
                 raise AnchorRecoveryDenied("independent anchor did not confirm advance")
+            if not store._connection.in_transaction:
+                raise AnchorRecoveryDenied("anchor callback released custody writer reservation")
             store._assert_private()
             store._assert_schema()
+            if store._read() != approved_row:
+                raise AnchorRecoveryDenied("approved successor changed during anchor advancement")
+            if _anchor(watermark) != (candidate.next_generation, candidate.next_digest):
+                raise AnchorRecoveryDenied("independent anchor changed during readback")
         finally:
             # This transaction performs no SQL writes. Release the writer
             # reservation even when the CAS outcome is uncertain.
             store._connection.rollback()
     return DurableFairStreamSession(store, watermark)
+
+class ForwardAnchorRecoveryAuthority:
+    """Trusted composition seam with provisioned verifier and exact custody.
+
+    API handlers use inspect()/recover(approval), never a verifier supplied
+    alongside a request. Low-level recovery remains a trusted operator tool.
+    This class does not attest process quiescence or provision an anchor.
+    """
+
+    def __init__(
+        self, *, store: DurableFairStreamStore, watermark: TrustedHighWatermark,
+        operator_public_key: bytes,
+    ) -> None:
+        if type(store) is not DurableFairStreamStore:
+            raise AnchorRecoveryDenied("canonical custody store required")
+        store._require_owner_process()
+        if type(operator_public_key) is not bytes or len(operator_public_key) != 32:
+            raise AnchorRecoveryDenied("pinned Ed25519 operator public key required")
+        self._store = store
+        self._watermark = watermark
+        self._verifier = Ed25519PublicKey.from_public_bytes(operator_public_key)
+
+    def inspect(self) -> ForwardCandidate:
+        return inspect_forward_candidate(self._store, self._watermark)
+
+    def recover(self, approval: ForwardApproval) -> DurableFairStreamSession:
+        return recover_forward_anchor(
+            self._store, self._watermark,
+            approval=approval, operator_public_key=self._verifier,
+        )
