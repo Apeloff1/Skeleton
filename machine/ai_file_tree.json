@@ -470,7 +470,7 @@
       "source": "skeleton/frontier",
       "destination": "skeleton/ai/runtime/frontier",
       "kind": "tree",
-      "source_git_object_sha": "42596af7e0405f134dd0892f0d4078b455af083e",
+      "source_git_object_sha": "936c73c069a3bcf82492e1ded0721ea5804989c8",
       "role": "Frontier domain runtime with canonical runtime/control-plane primitives under runtime/, progression/meta systems under progression/, ecology/lifecycle systems under ecology/, commerce/cooking/crafting/energy/equipment systems under economy/, NPC/character systems under characters/, and gameplay/voyage/world systems under game/, mirrored exactly into skeleton/ai/runtime/frontier.",
       "work_package_refs": [
         "WP-W04",
@@ -539,7 +539,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "d8ba29ae574b829a768be0907e0e7bdf69f96c0f",
+      "source_git_object_sha": "9e8e95c5395ab0644072b8d11873d27be828766b",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -7687,7 +7687,7 @@
     "frontend_changes_against_main": 0,
     "note": "TREE-030 canonicalized School under skeleton/learning/school, retained skeleton/school as an explicitly classified compatibility boundary, preserved exact AI School parity, and left acquired.py as the only AIFT-LEARNING overlay.",
     "current_mapping_count": 183,
-    "audit_scope_status": "validated historical line extended_to_177_requires_full_exact_head_refresh",
+    "audit_scope_status": "reconciled_source_identities_pending_full_exact_head_refresh",
     "pending_mapping_ids": [
       "AIFT-V2B-GAMEFORGE-AGENTS",
       "AIFT-V2B-GAMEFORGE-JEEVES",
