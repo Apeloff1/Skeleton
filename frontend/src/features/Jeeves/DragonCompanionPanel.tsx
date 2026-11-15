@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { CrawlSession, DragonCompanion } from '../../product/crawlerClient';
 import s, { colors } from './CrawlerWorkspace.styles';
+import AnimatedDragon from './companion/DragonCompanion';
+import { companionFromEvidence, companionEvidenceCosmetics } from './companion/dragonCompanionState';
+import { useReducedMotion, useScreenReader } from './companion/useDragonMotion';
+import { usePowerAwareness } from '../../hooks/usePowerAwareness';
 
 const FORMS = ['Hatchling', 'Scout', 'Scholar', 'Pathfinder', 'Archivist'];
 const QUESTS: Record<DragonCompanion['quest'], { title: string; detail: string }> = {
@@ -44,27 +48,30 @@ function Meter({ value, title, tint = colors.accent }: { value: number; title: s
   </View>;
 }
 
-export default function DragonCompanionPanel({ session }: { session: CrawlSession }) {
+export default function DragonCompanionPanel({ session, lastEventKind }: { session: CrawlSession; lastEventKind?: string }) {
   const d = session.companion;
   const [details, setDetails] = useState(false);
   const [habitatsOpen, setHabitatsOpen] = useState(true);
   const [questbookOpen, setQuestbookOpen] = useState(true);
   const [traceOpen, setTraceOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
+  const screenReader = useScreenReader();
+  const power = usePowerAwareness();
+  const disableMotion = reduceMotion || power.shouldReduceAnimations || screenReader;
   if (!d) return <View style={s.card}><Text style={s.heading}>Dragon companion</Text><Text style={s.small}>No validated companion projection is available from this backend.</Text></View>;
   const quest = QUESTS[d.quest];
   const next = STAGES[Math.min(d.stage + 1, STAGES.length - 1)];
   const previous = STAGES[d.stage];
   const stageProgress = Math.max(0, Math.min(1, (d.growth - previous) / Math.max(1, next - previous)));
   const asleep = !session.consent_current || ['paused', 'cancelled', 'completed', 'budget_exhausted', 'failed', 'interrupted'].includes(session.status) || d.posture === 'resting';
-  const posture = asleep ? 'resting' : d.posture;
   const mode = typeof session.limits.frontier_strategy === 'string' && session.limits.frontier_strategy.startsWith('companion');
   return <View style={s.card}>
     <Text style={s.eyebrow}>DRAGON · LIVING RESEARCH COMPANION</Text>
     <View style={local.hero}>
-      <View accessible accessibilityLabel={FORMS[d.stage] + ', ' + posture} style={[local.den, asleep && local.sleepDen]}>
-        <View style={[local.aura, { borderColor: d.stage >= 3 ? '#fbbf24' : '#a78bfa' }]} />
-        <Text style={local.dragon}>{d.stage >= 3 ? '🐉' : '🐲'}</Text>
-        <Text style={local.pose}>{posture.toUpperCase()}</Text>
+      <View style={local.actor}>
+        <AnimatedDragon state={companionFromEvidence(session, lastEventKind)} evolutionStage={d.stage}
+          level={d.stage + 1} unlocked={companionEvidenceCosmetics(session)} researchMode
+          screenReader={screenReader} motion={disableMotion ? 'off' : 'gentle'} reducedMotion={disableMotion} />
       </View>
       <View style={local.heroInfo}>
         <Text style={s.heading}>{FORMS[d.stage]}</Text>
@@ -125,11 +132,7 @@ export default function DragonCompanionPanel({ session }: { session: CrawlSessio
 
 const local = StyleSheet.create({
   hero: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 18 },
-  den: { width: 132, height: 132, borderRadius: 24, borderWidth: 1, borderColor: '#64558c', backgroundColor: '#211a36', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  sleepDen: { backgroundColor: '#17223a', borderColor: '#526381' },
-  aura: { position: 'absolute', width: 105, height: 105, borderRadius: 54, borderWidth: 2, opacity: .55 },
-  dragon: { fontSize: 56, lineHeight: 70 },
-  pose: { fontSize: 10, fontWeight: '700', color: colors.muted, letterSpacing: 1 },
+  actor: { flexGrow: 1, flexBasis: 300, minWidth: 260 },
   heroInfo: { flex: 1, minWidth: 160, gap: 6 },
   meter: { gap: 5, marginVertical: 3 },
   meterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
