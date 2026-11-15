@@ -19,16 +19,23 @@ from skeleton.frontier.runtime.contracts import (
 )
 from skeleton.frontier.runtime.retrieval_context import (
     MemoryRetriever,
+    RetrievedMemory,
     RetrieverContract,
     retrieval_audit_summary,
 )
 
 
 _RETRIEVED_CONTEXT_KEY = "retrieved_context"
+_MAX_RETRIEVAL_LIMIT = 128
+_MAX_REPLAY_OUTPUT = 8 << 20
 
 
 class AgentFailure(RuntimeError):
     """Raised when an agent cannot complete a task."""
+
+
+class AgentOutcomeUnknown(AgentFailure):
+    """Dispatch began before cancellation; do not automatically reexecute."""
 
 
 def _public_agent_failure(error: BaseException) -> str:
@@ -48,6 +55,8 @@ def _require_normalized_text(value: object, field_name: str) -> str:
         raise ValueError(f"{field_name} must not be empty")
     if normalized != value:
         raise ValueError(f"{field_name} must be normalized")
+    if len(value) > 1_048_576 or len(value.encode("utf-8")) > 1_048_576:
+        raise ValueError(f"{field_name} exceeds text budget")
     return value
 
 
@@ -71,8 +80,10 @@ def _normalize_capabilities(
     except TypeError as exc:
         raise TypeError(f"{field_name} must be an iterable of strings") from exc
 
-    for capability in iterator:
-        if not isinstance(capability, str):
+    for index, capability in enumerate(iterator):
+        if index >= 4096:
+            raise ValueError(f"{field_name} exceeds inventory budget")
+        if not isinstance(capability, str) or len(capability) > 256:
             raise TypeError(f"{field_name} entries must be strings")
         value = capability.strip().lower()
         if not value:
@@ -91,30 +102,37 @@ def _canonical_idempotency_value(value: object, *, path: str) -> Any:
     remaining_bytes = 8_388_608
     active: set[int] = set()
 
+    def charge(size: int) -> None:
+        nonlocal remaining_bytes
+        remaining_bytes -= size
+        if remaining_bytes < 0:
+            raise ValueError(f"{path} exceeds encoded identity budget")
+
     def visit(item: object, depth: int) -> Any:
         nonlocal remaining_nodes, remaining_bytes
         remaining_nodes -= 1
         if remaining_nodes < 0 or depth > 64:
             raise ValueError(f"{path} exceeds structural identity budget")
         if item is None or type(item) is bool:
+            charge(5)
             return item
         if type(item) is str:
             if len(item) > 1_048_576:
                 raise ValueError(f"{path} exceeds text identity budget")
             try:
-                remaining_bytes -= len(item.encode("utf-8"))
+                charge(len(json.dumps(item, ensure_ascii=False).encode("utf-8")))
             except UnicodeError as exc:
                 raise ValueError(f"{path} contains invalid Unicode") from exc
-            if remaining_bytes < 0:
-                raise ValueError(f"{path} exceeds text identity budget")
             return item
         if type(item) is int:
             if item.bit_length() > 4096:
                 raise ValueError(f"{path} exceeds integer identity budget")
+            charge(len(str(item)))
             return item
         if type(item) is float:
             if not math.isfinite(item):
                 raise ValueError(f"{path} must contain only finite JSON numbers")
+            charge(len(json.dumps(item, allow_nan=False)))
             return item
         if isinstance(item, (list, Mapping)):
             identity = id(item)
@@ -122,6 +140,7 @@ def _canonical_idempotency_value(value: object, *, path: str) -> Any:
                 raise ValueError(f"{path} must not contain recursive containers")
             if len(item) > remaining_nodes:
                 raise ValueError(f"{path} exceeds structural identity budget")
+            charge(2 + len(item) * 2)
             active.add(identity)
             try:
                 if isinstance(item, list):
@@ -182,6 +201,10 @@ class AgentRuntime:
     memory: MemoryContract | None = None
     retriever: RetrieverContract | None = None
     max_idempotency_waiters: int = 128
+    replay_byte_capacity: int = 64 << 20
+    max_idempotency_inflight: int = 64
+    _replay_bytes: int = field(default=0, init=False, repr=False)
+    _replay_sizes: dict[str, int] = field(default_factory=dict, init=False, repr=False)
     _waiter_counts: dict[asyncio.Future[ExecutionResult], int] = field(default_factory=dict, init=False, repr=False)
     _idempotency_lock: asyncio.Lock = field(
         default_factory=asyncio.Lock,
@@ -201,6 +224,10 @@ class AgentRuntime:
             raise ValueError("idempotency_capacity must be in [1, 65536]")
         if type(self.max_idempotency_waiters) is not int or not 1 <= self.max_idempotency_waiters <= 4096:
             raise ValueError("max_idempotency_waiters must be in [1, 4096]")
+        if type(self.replay_byte_capacity) is not int or not 1 << 20 <= self.replay_byte_capacity <= 512 << 20:
+            raise ValueError("invalid replay byte capacity")
+        if type(self.max_idempotency_inflight) is not int or not 1 <= self.max_idempotency_inflight <= 4096:
+            raise ValueError("invalid in-flight idempotency capacity")
         if self.memory is not None and self.retriever is not None:
             raise ValueError("configure either memory or retriever, not both")
         if self.retriever is None and self.memory is not None:
@@ -223,6 +250,57 @@ class AgentRuntime:
         except KeyError as exc:
             raise KeyError(f"unknown agent: {normalized_name}") from exc
 
+    @property
+    def retained_replay_bytes(self) -> int:
+        """Encoded replay payload and metadata allowance; not process RSS."""
+        return self._replay_bytes
+
+    def _evict_completed(self, *, exclude: str | None = None) -> bool:
+        candidate = next((
+            key for key, (_, future) in self._idempotent_executions.items()
+            if key != exclude and future.done()
+        ), None)
+        if candidate is None:
+            return False
+        self._idempotent_executions.pop(candidate)
+        self._replay_bytes -= self._replay_sizes.pop(candidate, 0)
+        return True
+
+    async def _publish_idempotency(self, key: str, future, result: ExecutionResult) -> None:
+        output = result.output
+        encoded_bytes = len(output) if type(output) is bytes else len(
+            json.dumps(output, sort_keys=True, separators=(",", ":"),
+                       ensure_ascii=False, allow_nan=False).encode("utf-8")
+        )
+        # Include the bounded encoded provenance and task text. Provenance
+        # records are immutable public-contract objects with metadata.
+        metadata_bytes = 8192 + len(result.task.encode("utf-8")) + len(result.agent.encode("utf-8"))
+        if result.provenance is not None:
+            metadata_bytes += len(json.dumps(
+                result.provenance.metadata, sort_keys=True, separators=(",", ":"),
+                ensure_ascii=False, allow_nan=False,
+            ).encode("utf-8"))
+        size = encoded_bytes + metadata_bytes
+        async with self._idempotency_lock:
+            if future.done():
+                return
+            if size > self.replay_byte_capacity:
+                unknown = AgentOutcomeUnknown("execution completed but replay exceeds retention budget; reconcile")
+                future.set_exception(unknown)
+                future.exception()
+                self._replay_sizes[key] = 1024
+                self._replay_bytes += 1024
+            else:
+                while self._replay_bytes + size > self.replay_byte_capacity:
+                    if not self._evict_completed(exclude=key):
+                        raise RuntimeError("replay byte accounting inconsistent")
+                self._replay_sizes[key] = size
+                self._replay_bytes += size
+                future.set_result(deepcopy(result))
+            while self._replay_bytes > self.replay_byte_capacity:
+                if not self._evict_completed(exclude=key):
+                    raise RuntimeError("replay byte accounting inconsistent")
+
     async def _reserve_idempotency(
         self,
         key: str,
@@ -244,20 +322,14 @@ class AgentRuntime:
                 self._idempotent_executions.move_to_end(key)
                 return future, False
 
+            inflight = sum(not row[1].done() for row in self._idempotent_executions.values())
+            if inflight >= self.max_idempotency_inflight:
+                raise RuntimeError("idempotent execution capacity reached")
             while len(self._idempotent_executions) >= self.idempotency_capacity:
-                completed_key = next(
-                    (
-                        candidate_key
-                        for candidate_key, (_, candidate_future) in self._idempotent_executions.items()
-                        if candidate_future.done()
-                    ),
-                    None,
-                )
-                if completed_key is None:
+                if not self._evict_completed():
                     raise RuntimeError(
                         "idempotency registry full — in-flight executions are backpressured"
                     )
-                self._idempotent_executions.pop(completed_key, None)
 
             future = asyncio.get_running_loop().create_future()
             self._idempotent_executions[key] = (fingerprint, future)
@@ -267,12 +339,25 @@ class AgentRuntime:
         self,
         key: str,
         future: asyncio.Future[ExecutionResult],
+        *,
+        dispatched: bool,
     ) -> None:
         async with self._idempotency_lock:
             existing = self._idempotent_executions.get(key)
-            if existing is not None and existing[1] is future:
+            if existing is None or existing[1] is not future or future.done():
+                return
+            if dispatched:
+                # Retain a bounded uncertainty tombstone. It prevents a
+                # retry from duplicating side effects within this local window.
+                future.set_exception(AgentOutcomeUnknown("dispatch outcome unknown; reconcile"))
+                future.exception()
+                self._replay_sizes[key] = 1024
+                self._replay_bytes += 1024
+                while self._replay_bytes > self.replay_byte_capacity:
+                    if not self._evict_completed(exclude=key):
+                        break
+            else:
                 self._idempotent_executions.pop(key, None)
-            if not future.done():
                 future.cancel()
 
     async def execute(
@@ -308,6 +393,8 @@ class AgentRuntime:
             context if context is not None else {}, path="context"
         )
 
+        if _RETRIEVED_CONTEXT_KEY in normalized_context:
+            raise ValueError(f"context key {_RETRIEVED_CONTEXT_KEY!r} is reserved for runtime retrieval")
         normalized_memory_query: str | None = None
         canonical_memory_filters: dict[str, Any] | None = None
         if memory_query is not None:
@@ -317,8 +404,8 @@ class AgentRuntime:
             )
             if isinstance(memory_limit, bool) or not isinstance(memory_limit, int):
                 raise TypeError("memory_limit must be an integer")
-            if memory_limit < 1:
-                raise ValueError("memory_limit must be positive")
+            if not 1 <= memory_limit <= _MAX_RETRIEVAL_LIMIT:
+                raise ValueError("memory_limit exceeds bounded retrieval admission")
             if memory_filters is not None and not isinstance(memory_filters, Mapping):
                 raise TypeError("memory_filters must be a mapping")
             if _RETRIEVED_CONTEXT_KEY in normalized_context:
@@ -425,6 +512,7 @@ class AgentRuntime:
             }
 
         started = datetime.now(timezone.utc)
+        dispatched = False
         try:
             try:
                 execution_context = normalized_context
@@ -438,12 +526,18 @@ class AgentRuntime:
                         limit=memory_limit,
                         filters=canonical_memory_filters,
                     )
-                    execution_context = dict(normalized_context)
-                    execution_context[_RETRIEVED_CONTEXT_KEY] = [
-                        hit.as_agent_context() for hit in hits
-                    ]
-                    provenance_metadata["retrieval_hits"] = retrieval_audit_summary(hits)
+                    bounded_hits = []
+                    for index, hit in enumerate(hits):
+                        if index >= memory_limit or type(hit) is not RetrievedMemory:
+                            raise ValueError("retriever returned invalid hit inventory")
+                        bounded_hits.append(hit)
+                    execution_context = _canonical_idempotency_value({
+                        **normalized_context,
+                        _RETRIEVED_CONTEXT_KEY: [hit.as_agent_context() for hit in bounded_hits],
+                    }, path="execution context")
+                    provenance_metadata["retrieval_hits"] = retrieval_audit_summary(bounded_hits)
 
+                dispatched = True
                 output = await agent.run(normalized_task, execution_context)
                 if shared_future is not None:
                     # Bound and detach replayable output before computing provenance.
@@ -493,10 +587,10 @@ class AgentRuntime:
                     ),
                 )
 
-            if shared_future is not None and not shared_future.done():
-                shared_future.set_result(deepcopy(result))
+            if shared_future is not None and normalized_key is not None:
+                await self._publish_idempotency(normalized_key, shared_future, result)
             return result
         except BaseException:
             if normalized_key is not None and shared_future is not None:
-                await self._cancel_idempotency(normalized_key, shared_future)
+                await self._cancel_idempotency(normalized_key, shared_future, dispatched=dispatched)
             raise

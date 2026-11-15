@@ -167,6 +167,8 @@ jobs:
           tests/test_frontier_memory_adapters.py
           tests/test_frontier_sqlite_namespace_custody.py
           tests/test_frontier_singleflight_recovery.py
+          tests/test_frontier_durable_work.py
+          tests/test_frontier_replay_byte_custody.py
       - name: Recovered guarded activation, secret envelopes and isolated planning
         run: |
           set -euo pipefail
