@@ -24,9 +24,10 @@ for the same head SHA:
 | Integration Smoke | `integration_smoke` | backend import against live MongoDB and the cross-subsystem integration matrix |
 | Lint Type Security | `quality_security` | high-confidence security gates and full-history Gitleaks. Backend Ruff and frontend lint/typecheck stay with CI/CD when that lane runs them |
 | PR Automation Tests | `pr_automation` | auto-merge and runner-v2 privileged contracts, repository machine contracts, filesystem/tool transaction boundaries |
+| Consolidated Source Qualification Gate | `source_qualification_gate` | All 25 required exact-head source checks must succeed on non-draft PRs; incomplete source evidence blocks CI/CD and merge readiness. Non-PR runs report PR-only source evidence as not run, never qualified. |
 | CI/CD | `ci` | reusable `.github/workflows/ci.yml` (restored in #4104): Frontend lint/typecheck/`test:*`/stability suites/`export:web`, Backend Lint, Backend Test, Backend Import Smoke, Skeleton GameForge, Java/Assembly accelerators, Jeeves School Reasoning, Cockpit Smoke, Docker Build (build-only). Per-lane checks appear as `CI/CD / <job>`; lanes whose inputs a PR does not touch are skipped (skip counts as success). |
 
-A failed, cancelled, or skipped lane makes `Merge Readiness` fail. Repository
+On a pull request, a failed, cancelled, or skipped required lane makes `Merge Readiness` fail. Non-PR runs do not establish PR-only source qualification. Repository
 rules therefore need exactly one stable required-check name while the per-lane
 checks keep detailed diagnostics.
 
