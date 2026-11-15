@@ -3,7 +3,7 @@ import {AppState,Linking,Text,TextInput,TouchableOpacity,View} from 'react-nativ
 import {getAuthToken} from '../../auth/gameforgeAuth';
 import {crawlRequestKey} from '../../product/crawlerClient';
 import {safeOriginalLink} from '../../product/dragonGameCorpusClient';
-import {leadStatus,configureLeadGraph,publicDatasetLibrary,listLeads,leadEdges,recordLeadReview,listDatasetCandidates,registerDatasetCandidate,type GraphStatus,type DatasetTarget,type Lead,type Edge,type DatasetCandidate,type LeadState,type Projection,type TargetRegistration} from '../../product/dragonLeadGraphClient';
+import {leadBundleStatus,enableLeadBundle,type BundleStatus,leadStatus,configureLeadGraph,publicDatasetLibrary,listLeads,leadEdges,recordLeadReview,listDatasetCandidates,registerDatasetCandidate,type GraphStatus,type DatasetTarget,type Lead,type Edge,type DatasetCandidate,type LeadState,type Projection,type TargetRegistration} from '../../product/dragonLeadGraphClient';
 import s,{colors as C} from './CrawlerWorkspace.styles';
 
 const field={color:C.text,backgroundColor:C.bg,borderWidth:1,borderColor:C.edge,borderRadius:9,padding:10};
@@ -14,6 +14,7 @@ type Tab='library'|'leads'|'datasets';
 type Props={visible:boolean;disabled:boolean;canWrite:boolean};
 export default function DragonLeadGraphPanel({visible,disabled,canWrite}:Props){
  const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[status,setStatus]=useState<GraphStatus|null>(null);
+ const [bundle,setBundle]=useState<BundleStatus|null>(null),[bundleRights,setBundleRights]=useState(''),[bundleAck,setBundleAck]=useState(false);
  const [tab,setTab]=useState<Tab>('library'),[q,setQ]=useState(''),[domain,setDomain]=useState(''),[state,setState]=useState<LeadState>('candidate'),[due,setDue]=useState(false);
  const [targets,setTargets]=useState<DatasetTarget[]>([]),[leads,setLeads]=useState<Lead[]>([]),[datasets,setDatasets]=useState<DatasetCandidate[]>([]),[cursor,setCursor]=useState<string|null>(null),[total,setTotal]=useState(0);
  const [selected,setSelected]=useState<Lead|null>(null),[edges,setEdges]=useState<Edge[]>([]),[edgeCursor,setEdgeCursor]=useState<string|null>(null),[direction,setDirection]=useState<'parents'|'children'>('children');
@@ -21,7 +22,7 @@ export default function DragonLeadGraphPanel({visible,disabled,canWrite}:Props){
  const active=useRef<AbortController|null>(null),epoch=useRef(0),reviewOp=useRef<{identity:string;key:string}|null>(null);
  function clearResults(){setTargets([]);setLeads([]);setDatasets([]);setCursor(null);setSelected(null);setEdges([]);setEdgeCursor(null);setCandidate(null);setRegistration(null);setOutbound(null);setAck(false);setRights('');setReason('');reviewOp.current=null;}
  function reset(){
-  epoch.current++;active.current?.abort();active.current=null;setOpen(false);setBusy(false);setError('');setStatus(null);setTab('library');setQ('');setDomain('');setState('candidate');setDue(false);setTotal(0);setConfigAck(false);clearResults();
+  epoch.current++;active.current?.abort();active.current=null;setOpen(false);setBusy(false);setError('');setStatus(null);setBundle(null);setBundleRights('');setBundleAck(false);setTab('library');setQ('');setDomain('');setState('candidate');setDue(false);setTotal(0);setConfigAck(false);clearResults();
  }
  useEffect(()=>{
   const token=getAuthToken();if(!visible)reset();
@@ -37,6 +38,11 @@ export default function DragonLeadGraphPanel({visible,disabled,canWrite}:Props){
   void work(ctrl.signal,current).catch(e=>{if(current())setError(e instanceof Error?e.message:'Lead graph unavailable.');}).finally(()=>{if(active.current===ctrl){active.current=null;setBusy(false);}});
  }
  function loadStatus(){run(async(signal,current)=>{const x=await leadStatus(signal);if(current())setStatus(x);});}
+ function loadBundle(){run(async(signal,current)=>{const x=await leadBundleStatus(signal);if(current())setBundle(x);});}
+ function authorizeBundle(){
+  if(!canWrite||!status?.enabled||!bundleAck||!bundleRights.trim())return;
+  run(async(signal,current)=>{const x=await enableLeadBundle(bundleRights,signal);if(current()){setBundle(x);setBundleAck(false);setBundleRights('');}});
+ }
  function configure(value:boolean){
   if(!canWrite||!configAck)return;
   run(async(signal,current)=>{const x=await configureLeadGraph(value,signal);if(current()){setStatus(x);setConfigAck(false);}});
@@ -80,6 +86,19 @@ export default function DragonLeadGraphPanel({visible,disabled,canWrite}:Props){
   <TouchableOpacity accessibilityRole="button" disabled={disabled||busy} onPress={()=>open?reset():setOpen(true)} style={s.button}><Text style={s.buttonText}>{open?'Close lead graph':'Explore lead graph'}</Text></TouchableOpacity>
   {open&&<>
    {button('Refresh measured graph status',loadStatus)}
+   {button('Inspect bundled identity snapshot',loadBundle)}
+   {bundle&&<View style={s.check}>
+    <Text style={s.label}>{number(bundle.title_identity_candidates)} bundled candidate AppIDs</Text>
+    <Text style={s.small}>{number(bundle.store_locator_floor)} distinct candidate storefront locators · {bundle.shards} pinned shards · {number(bundle.gross_optional_route_candidates)} gross optional routes (not verified).</Text>
+    <Text style={s.small}>{number(bundle.snapshot_identity_candidates_ingested)} / {number(bundle.title_identity_candidates)} identity rows admitted · {bundle.snapshot?.state||'not started'} · source rights not independently verified.</Text>
+    <Text selectable style={s.small}>Source: {bundle.source_url} · revision {bundle.bundle_revision}</Text>
+    {external(bundle.source_url)}
+    {canWrite&&<>
+     <TextInput style={field} accessibilityLabel="Bundled source rights reference" placeholder="Reviewed metadata rights reference" placeholderTextColor={C.muted} value={bundleRights} maxLength={128} editable={enabled} onChangeText={v=>{setBundleRights(v);setBundleAck(false);}}/>
+     {button(bundleAck?'Metadata rights acknowledged':'Acknowledge reviewed metadata rights',()=>setBundleAck(v=>!v),!bundleRights.trim())}
+     {button('Enable or renew 30-day bundle admission',authorizeBundle,!status?.enabled||!bundleRights.trim()||!bundleAck)}
+    </>}
+   </View>}
    {status&&<View style={s.check}>
     <Text style={s.label}>{number(status.nodes)} unique owned lead nodes · {number(status.edges)} provenance edges</Text>
     <Text style={s.small}>{number(status.bootstrap_cursor)} / {number(status.bootstrap_target_rows)} bootstrap input records processed · {status.bootstrapped?'complete':'in progress or disabled'}</Text>
