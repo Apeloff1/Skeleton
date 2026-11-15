@@ -1,8 +1,8 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,AppState,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {getAuthToken} from '../../auth/gameforgeAuth';
-import {getDragonVault,getDragonVaultQuota,retireDragonSession,getCrawl,crawlRequestKey,configureDragonArchive,
- configureLegacyTreasuryArchive,eraseCrawl,type DragonVaultCatalog,type DragonVaultQuota,type DragonVaultEntry,type CrawlSession} from '../../product/crawlerClient';
+import {getDragonVault,getDragonVaultQuota,discoverDragonVault,retireDragonSession,getCrawl,crawlRequestKey,configureDragonArchive,
+ configureLegacyTreasuryArchive,eraseCrawl,type DragonVaultCatalog,type DragonVaultQuota,type DragonVaultDiscovery,type DragonVaultEntry,type CrawlSession} from '../../product/crawlerClient';
 import s,{colors} from './CrawlerWorkspace.styles';
 
 type Props={revision:string;session?:CrawlSession|null;canWrite:boolean;disabled:boolean;
@@ -17,6 +17,10 @@ const stamp=(n:number)=>new Date(n*1000).toLocaleString();
 export default function DragonVaultPanel({revision,session,canWrite,disabled,onWindow,onSession,onChanged}:Props){
  const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[catalog,setCatalog]=useState<DragonVaultCatalog|null>(null);
  const [quota,setQuota]=useState<DragonVaultQuota|null>(null);
+ const [discoveryQuery,setDiscoveryQuery]=useState('');
+ const [discovery,setDiscovery]=useState<DragonVaultDiscovery|null>(null);
+ const [discoveryBusy,setDiscoveryBusy]=useState(false);
+ const scanAbort=useRef<AbortController|null>(null),scanEpoch=useRef(0),scanTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const [history,setHistory]=useState<string[]>([]),[cursor,setCursor]=useState<string|undefined>();
  const [selected,setSelected]=useState<string[]>([]),[retention,setRetention]=useState(false);
  const [managed,setManaged]=useState<string|null>(null),[rights,setRights]=useState(false),[days,setDays]=useState('30');
@@ -28,11 +32,16 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   epoch.current++;pending.current?.abort();pending.current=null;
   if(timer.current!==null)clearTimeout(timer.current);timer.current=null;
  },[]);
+ const clearDiscovery=useCallback(()=>{
+  scanEpoch.current++;scanAbort.current?.abort();scanAbort.current=null;
+  if(scanTimer.current!==null)clearTimeout(scanTimer.current);scanTimer.current=null;
+  setDiscovery(null);setDiscoveryBusy(false);
+ },[]);
  const reset=useCallback(()=>{
-  invalidate();setCatalog(null);setQuota(null);setSelected([]);setHistory([]);setCursor(undefined);setBusy(false);
+  invalidate();clearDiscovery();setDiscoveryQuery('');setCatalog(null);setQuota(null);setSelected([]);setHistory([]);setCursor(undefined);setBusy(false);
   setRetention(false);setManaged(null);setRights(false);setEraseText('');operation.current=null;setNotice('');setError('');
- },[invalidate]);
- useEffect(()=>{reset();return invalidate;},[revision,reset,invalidate]);
+ },[invalidate,clearDiscovery]);
+ useEffect(()=>{reset();return()=>{invalidate();clearDiscovery();};},[revision,reset,invalidate,clearDiscovery]);
  useEffect(()=>{
   const sub=AppState.addEventListener('change',state=>{if(state!=='active'){reset();onWindow(undefined);}});
   const tick=setInterval(()=>{if(owner.current!==getAuthToken()){owner.current=getAuthToken();reset();onWindow(undefined);}},1000);
@@ -46,8 +55,8 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   try{
    const [result,health]=await Promise.allSettled([getDragonVault(next,ctrl.signal),getDragonVaultQuota(ctrl.signal)]);
    if(!valid(ctrl,attempt,token))return;
-   if(health.status==='fulfilled')setQuota(health.value);
    if(result.status==='rejected')throw result.reason;
+   if(health.status==='fulfilled')setQuota(health.value);
    const page=result.value;
    if(!valid(ctrl,attempt,token))return;
    setCatalog(page);setCursor(next);setManaged(null);setRights(false);setEraseText('');setRetention(false);
@@ -56,12 +65,26 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   finally{if(epoch.current===attempt){pending.current=null;setBusy(false);}}
  }
 
+ async function scan(cursor?:string){
+  if(discoveryBusy||busy||disabled||!discoveryQuery.trim())return;
+  clearDiscovery();const token=getAuthToken(),attempt=scanEpoch.current,ctrl=new AbortController(),started=Date.now();
+  scanAbort.current=ctrl;setDiscoveryBusy(true);setError('');
+  try{
+   const result=await discoverDragonVault(discoveryQuery,cursor,ctrl.signal);
+   if(ctrl.signal.aborted||attempt!==scanEpoch.current||token!==getAuthToken())return;
+   const ttl=result.earliest_expiry===null?60000:Math.min(60000,1000*(result.earliest_expiry-result.as_of_unix)-(Date.now()-started));
+   if(ttl<=0){setError('Historical-use permission expired during chamber discovery.');return;}
+   setDiscovery(result);
+   scanTimer.current=setTimeout(()=>{if(attempt===scanEpoch.current)setDiscovery(null);},ttl);
+  }catch(e){if(!ctrl.signal.aborted&&attempt===scanEpoch.current&&token===getAuthToken())setError(e instanceof Error?e.message:'Chamber discovery unavailable.');}
+  finally{if(attempt===scanEpoch.current){scanAbort.current=null;setDiscoveryBusy(false);}}
+ }
  async function mutate(action:'retire'|'grant'|'revoke'|'erase',id:string,version:number,legacy=false){
   if(busy||disabled||owner.current!==getAuthToken()||action!=='revoke'&&!canWrite)return;
   if(action==='retire'&&!retention||action==='grant'&&!rights||action==='erase'&&eraseText!=='ERASE')return;
   const n=action==='grant'?Number(days):30;
   if(!Number.isInteger(n)||n<1||n>30){setError('Historical-use duration must be 1–30 days.');return;}
-  invalidate();const token=getAuthToken(),attempt=epoch.current,ctrl=new AbortController();pending.current=ctrl;
+  clearDiscovery();invalidate();const token=getAuthToken(),attempt=epoch.current,ctrl=new AbortController();pending.current=ctrl;
   setBusy(true);setError('');setNotice('');setCatalog(null);setQuota(null);
   const identity=[action,id,version,n].join(':');
   if(operation.current?.identity!==identity)operation.current={identity,key:crawlRequestKey('vault-'+action)};
@@ -109,6 +132,28 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
     <Text style={s.small}>{quota.in_transit} retirement transitions · {quota.dual_reserved} dual reservations · {quota.tombstoned} erased records awaiting cleanup</Text>
     <Text style={s.small}>{quota.missing} unresolved reservations · {quota.integrity_held} integrity holds. Missing records are never automatically reclaimed.</Text>
    </View>}
+   <View style={s.check}>
+    <Text style={s.label}>Discover matching historical chambers</Text>
+    <Text style={s.small}>Scans eight historical records at a time, only under current archive-use permission. Matching counts are page-local lexical advice, not independent evidence or global rank.</Text>
+    <TextInput value={discoveryQuery} onChangeText={value=>{clearDiscovery();setDiscoveryQuery(value);}} maxLength={256}
+      editable={!busy&&!disabled} style={field} placeholder="Find retained subject or phrase" placeholderTextColor={colors.muted} accessibilityLabel="Historical chamber discovery query"/>
+    <View style={s.row}><Button label={discoveryBusy?'Scanning…':'Scan first chambers'} disabled={busy||disabled||discoveryBusy||!discoveryQuery.trim()} action={()=>void scan()}/>
+     <Button label="Next discovery batch" disabled={busy||disabled||discoveryBusy||!discovery?.next_cursor} action={()=>void scan(discovery?.next_cursor??undefined)}/></View>
+    {discoveryBusy&&<ActivityIndicator color={colors.accent}/>}
+    {discovery&&owner.current===getAuthToken()&&<>
+      <Text style={s.small}>{discovery.page_offset+discovery.scanned_sessions}/{discovery.catalogue_size} catalogue positions · {discovery.qualified} qualified · {discovery.no_grant} without usable permission · {discovery.held} held</Text>
+      {!discovery.matches.length&&<Text style={s.small}>No qualified lexical match in this batch.</Text>}
+      {discovery.matches.map(row=><View key={row.session_id} style={s.check}>
+        <Text selectable style={s.label}>{row.session_id}</Text>
+        <Text style={s.small}>{row.matched_terms}/{discovery.query_terms} query terms · {row.matched_sources} matching captures · {row.distinct_matching_payloads} distinct matching payloads</Text>
+        <Button label={selected.includes(row.session_id)?'Remove matching chamber':'Add matching chamber to selected history'}
+         disabled={busy||disabled||selected.length>=32&&!selected.includes(row.session_id)}
+         action={()=>setSelected(ids=>ids.includes(row.session_id)?ids.filter(x=>x!==row.session_id):[...ids,row.session_id])}/>
+      </View>)}
+      <Button label="Reparse matching chambers in detail" disabled={busy||disabled||!discovery.matches.length}
+        action={()=>onWindow(discovery.matches.map(row=>row.session_id).sort())}/>
+    </>}
+   </View>
    {eligible&&canWrite&&<View style={s.check}>
     <Text style={s.label}>Retire selected finished expedition · {session.session_id.slice(0,12)}</Text>
     <View style={s.row}><Switch value={retention} onValueChange={setRetention} disabled={busy||disabled}

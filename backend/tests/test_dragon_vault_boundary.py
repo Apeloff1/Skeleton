@@ -277,5 +277,68 @@ class QuotaBoundaryTests(unittest.IsolatedAsyncioTestCase):
                 await app.treasury_quota_status(SCOPE)
 
 
+class DiscoveryBoundaryTests(unittest.IsolatedAsyncioTestCase):
+    def harness(self):
+        row,now=VaultBoundaryTests().expired(stage="vaulted",released=True)
+        row["archive_grant"]=create_grant(snapshot=row["snapshot"],policies={},now=now.timestamp()-60,days=7)
+        app=object.__new__(DragonCrawlerApplication)
+        app.ensure_indexes=AsyncMock()
+        app.sessions=Mock()
+        cursor=app.sessions.find.return_value
+        cursor.sort.return_value=cursor
+        cursor.limit.return_value=cursor
+        cursor.max_time_ms.return_value=cursor
+        metadata={"_id":row["_id"],"version":row["version"],"archive_grant":{
+            "issued_at":row["archive_grant"]["issued_at"],"expires_at":row["archive_grant"]["expires_at"]}}
+        cursor.to_list=AsyncMock(return_value=[metadata])
+        app.sessions.find_one=AsyncMock(return_value=row)
+        return app,row,metadata,now
+
+    async def test_actual_granted_source_scan_and_no_text_return(self):
+        app,row,metadata,now=self.harness()
+        from skeleton.ai.webcrawler.dragon_companion import _lexemes
+        source=next(iter(row["snapshot"]["sources"].values()))
+        query=_lexemes(source["text"])[0]
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.discover_treasury_vault(SCOPE,query=query)
+        self.assertEqual(result["qualified"],1)
+        self.assertEqual(result["matches"][0]["session_id"],row["_id"])
+        self.assertEqual(result["matches"][0]["matched_sources"],1)
+        self.assertFalse(result["source_text_returned"])
+        self.assertFalse(result["model_context_permission"])
+        self.assertEqual(result["earliest_expiry"],row["archive_grant"]["expires_at"])
+        self.assertNotIn("text",result["matches"][0])
+        self.assertEqual(app.sessions.find_one.await_args.args[0]["owner_id"],SCOPE["owner_id"])
+        self.assertEqual(app.sessions.find_one.await_args.args[0]["version"],row["version"])
+        app.sessions.update_one.assert_not_called()
+
+    async def test_missing_archive_grant_never_reaches_text_scanner(self):
+        app,row,metadata,now=self.harness()
+        row.pop("archive_grant")
+        metadata.pop("archive_grant")
+        with patch("core.dragon_crawler._now",return_value=now),patch(
+            "skeleton.ai.webcrawler.dragon_vault_discovery.summarize_sources") as scanner:
+            result=await app.discover_treasury_vault(SCOPE,query="optical")
+        self.assertEqual(result["no_grant"],1)
+        self.assertEqual(result["matches"],[])
+        scanner.assert_not_called()
+
+    async def test_corrupt_primary_holds_even_with_grant(self):
+        app,row,metadata,now=self.harness()
+        row["checkpoint_identity"]={}
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.discover_treasury_vault(SCOPE,query="optical")
+        self.assertEqual(result["held"],1)
+        self.assertEqual(result["eligible_sources"],0)
+
+    async def test_new_version_invalidates_catalogue(self):
+        app,row,metadata,now=self.harness()
+        app.sessions.find.return_value.to_list.side_effect=[[metadata],[{**metadata,"version":metadata["version"]+1}]]
+        with patch("core.dragon_crawler._now",return_value=now):
+            with self.assertRaises(CrawlerError) as err:
+                await app.discover_treasury_vault(SCOPE,query="optical")
+        self.assertEqual(err.exception.code,"crawler_vault_search_changed")
+
+
 if __name__=="__main__":
     unittest.main()

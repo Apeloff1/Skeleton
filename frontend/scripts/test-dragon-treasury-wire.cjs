@@ -37,6 +37,7 @@ function client(initial){
     './crawlerPilotReceipt':load('src/product/crawlerPilotReceipt.ts')
   });
   return {requests,read:modules.getDragonTreasury,readVault:modules.getDragonVault,
+    quota:modules.getDragonVaultQuota,discover:modules.discoverDragonVault,
     retire:modules.retireDragonSession,set:value=>{payload=value;}};
 }
 
@@ -117,6 +118,25 @@ async function main(){
   vc.set(receipt);assert.deepEqual(await vc.retire('vaulted-fixture',command),receipt);
   vc.set({...receipt,vault:{...state,active_slot_released:false}});
   await assert.rejects(vc.retire('vaulted-fixture',command),e=>e.kind==='protocol');
-  console.log('Treasury and cold custody: canonical wire parity, validated archive windows, finite catalogue and retirement receipt.');
+  const quota={schema:'skeleton.dragon.vault-quota.v1',as_of_unix:1800000000,active_reserved:3,vault_reserved:2,
+    distinct_reserved:4,dual_reserved:1,active_capacity:32,vault_capacity:128,active:1,vaulted:1,in_transit:1,
+    tombstoned:0,missing:1,integrity_held:0,missing_auto_reclaimed:false,source_records_erased:false,read_only:true};
+  vc.set(quota);assert.deepEqual(await vc.quota(),quota);
+  for(const patch of [{dual_reserved:2},{missing:0},{missing_auto_reclaimed:true},{vault_reserved:129}]){
+    vc.set({...quota,...patch});await assert.rejects(vc.quota(),e=>e.kind==='protocol');
+  }
+  const discovery={schema:'skeleton.dragon.vault-discovery.v1',scope_digest:'e'.repeat(64),as_of_unix:1800000000,
+    earliest_expiry:1800000100,catalogue_size:12,page_offset:0,scanned_sessions:8,query_terms:2,
+    qualified:1,no_grant:6,held:1,eligible_sources:3,scanned_bytes:900,
+    matches:[{session_id:'vaulted-fixture',version:3,valid_until:1800000100,eligible_sources:3,
+      matched_sources:2,distinct_matching_payloads:1,matched_terms:2,best_source_terms:1,scanned_bytes:900}],
+    next_cursor:'e'.repeat(64)+':8',page_local_ranking:true,source_text_returned:false,network_executed:false,model_context_permission:false};
+  vc.set(discovery);assert.deepEqual(await vc.discover('optical magnetometer'),discovery);
+  for(const mutate of [
+    x=>{x.next_cursor='a'.repeat(64)+':8';},x=>{x.qualified=2;},x=>{x.matches[0].matched_sources=4;},
+    x=>{x.matches[0].valid_until=x.as_of_unix;},x=>{x.model_context_permission=true;},
+    x=>{x.matches[0].distinct_matching_payloads=3;},x=>{x.matches[0].scanned_bytes=901;},
+  ]){const bad=structuredClone(discovery);mutate(bad);vc.set(bad);await assert.rejects(vc.discover('optical'),e=>e.kind==='protocol');}
+  console.log('Treasury and cold custody: canonical wire parity, validated archive windows, quota health and bounded discovery receipts.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

@@ -303,3 +303,111 @@ class DragonVaultMixin:
                     "treasury_quota_due":document.get("treasury_quota_due",{"$exists":False})},
                     {"$set":{"treasury_quota_due":_now().timestamp()+3600}})
         return totals
+
+
+    def _discover_vault_row(self,scope,row,terms,now):
+        """Qualify original bytes before any lexical operation."""
+        from core.dragon_crawler import _plain
+        from skeleton.ai.webcrawler.dragon_archive_grant import validate_grant,archive_expiry
+        from skeleton.ai.webcrawler.dragon_vault_discovery import summarize_sources
+        from skeleton.ai.webcrawler.operations import implementation_digest
+        marker=validate_marker(_plain(row["treasury_vault"]))
+        if marker["state"]!="vaulted":
+            raise ValueError("chamber not retired")
+        grant=row.get("archive_grant")
+        if grant is None:
+            return "no_grant",None,None
+        grant=_plain(grant)
+        validate_grant(grant)
+        if not grant["issued_at"]<=now<grant["expires_at"]:
+            return "no_grant",None,None
+        snapshot=self._vault_primary(scope,row)
+        if snapshot["snapshot_digest"]!=marker["snapshot_digest"] or grant["snapshot_digest"]!=marker["snapshot_digest"]:
+            raise ValueError("chamber grant/witness mismatch")
+        policies=self._source_policies(row)
+        if set(policies)-set(snapshot["sources"]):
+            raise ValueError("chamber orphan policy")
+        permitted_ids=set(snapshot["sources"])
+        if snapshot["binding"]["code_digest"]!=implementation_digest():
+            proof=self._legacy_inspection(scope,row,snapshot)
+            if row.get("legacy_archive_receipt")!=proof:
+                raise ValueError("older chamber lacks historical-use admission")
+            permitted_ids=set(proof["verified_source_ids"])
+        permitted=[]
+        for sid in sorted(permitted_ids):
+            source=snapshot["sources"][sid]
+            if archive_expiry(grant,snapshot_digest=snapshot["snapshot_digest"],source=source,
+                    policy=policies.get(sid,{"enabled":True,"version":0}),now=now) is not None:
+                permitted.append(source)
+        if not permitted:
+            return "no_grant",None,None
+        summary=summarize_sources(permitted,terms)
+        return "qualified",{"session_id":row["_id"],"version":row["version"],
+                          "valid_until":grant["expires_at"],**summary},grant["expires_at"]
+
+    async def discover_treasury_vault(self,scope,*,query,cursor=None):
+        """Scan up to eight original cold-custody records per page.
+
+        Cursor binds the complete bounded metadata catalogue and grant-active
+        states, but each page rechecks current archive authority independently.
+        Results are page-local candidate advice, not an exhaustive global rank.
+        """
+        import asyncio
+        from core.dragon_crawler import CrawlerError,_now
+        from skeleton.ai.webcrawler.dragon_vault_discovery import (
+            PAGE,query_terms,catalogue_signature,digest_scope,page_offset,order_matches,
+        )
+        try:
+            terms=query_terms(query)
+        except (ValueError,UnicodeError) as exc:
+            raise CrawlerError("crawler_vault_query","Enter a bounded lexical query.") from exc
+        await self.ensure_indexes()
+        catalogue={**scope,"status":{"$in":sorted(TERMINAL)},"treasury_vault.state":"vaulted"}
+        projection={"_id":1,"version":1,"archive_grant.issued_at":1,"archive_grant.expires_at":1}
+        async def metadata():
+            return await self.sessions.find(catalogue,projection).sort("_id",DESCENDING).limit(
+                MAX_VAULT_SESSIONS+1).max_time_ms(2000).to_list(MAX_VAULT_SESSIONS+1)
+        now=_now().timestamp()
+        rows=await metadata()
+        try:
+            signature=catalogue_signature(rows,now=now)
+            bound=digest_scope(scope,signature,terms)
+            offset=page_offset(cursor,bound,len(rows))
+        except (ValueError,TypeError,KeyError) as exc:
+            raise CrawlerError("crawler_vault_search_changed","Chamber catalogue or search cursor changed. Restart from the first page.",409) from exc
+        matches=[]
+        counts={"qualified":0,"no_grant":0,"held":0,"eligible_sources":0,"scanned_bytes":0}
+        expiries=[]
+        for item in rows[offset:offset+PAGE]:
+            row=await self.sessions.find_one({**catalogue,"_id":item["_id"],"version":item["version"]},
+                  max_time_ms=2000)
+            if row is None:
+                raise CrawlerError("crawler_vault_search_changed","Chamber changed during discovery.",409)
+            try:
+                status,summary,expiry=await asyncio.to_thread(self._discover_vault_row,scope,row,terms,now)
+            except (ValueError,TypeError,KeyError,RecursionError,CheckpointReplicaError,CrawlerError):
+                status,summary,expiry="held",None,None
+            counts[status]+=1
+            if summary is not None:
+                counts["eligible_sources"]+=summary["eligible_sources"]
+                counts["scanned_bytes"]+=summary["scanned_bytes"]
+                if summary["matched_sources"]:
+                    matches.append(summary)
+            if expiry is not None:
+                expiries.append(expiry)
+        final=await metadata()
+        final_time=_now().timestamp()
+        try:
+            if catalogue_signature(final,now=final_time)!=signature or (expiries and min(expiries)<=final_time):
+                raise ValueError("chamber authority changed")
+        except (ValueError,TypeError,KeyError) as exc:
+            raise CrawlerError("crawler_vault_search_changed","Chamber catalogue or historical authority changed during scan.",409) from exc
+        scanned=min(PAGE,len(rows)-offset)
+        next_offset=offset+scanned
+        return {"ok":True,"schema":"skeleton.dragon.vault-discovery.v1","scope_digest":bound,
+                "as_of_unix":now,"earliest_expiry":min(expiries) if expiries else None,
+                "catalogue_size":len(rows),"page_offset":offset,"scanned_sessions":scanned,
+                "query_terms":len(terms),**counts,"matches":order_matches(matches),
+                "next_cursor":bound+":"+str(next_offset) if next_offset<len(rows) else None,
+                "page_local_ranking":True,"source_text_returned":False,"network_executed":False,
+                "model_context_permission":False}

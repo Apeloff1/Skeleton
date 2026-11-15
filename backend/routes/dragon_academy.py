@@ -2829,6 +2829,15 @@ async def crawler_legacy_archive(
     ))
 
 
+@router.get("/crawler/companion/vault-discovery")
+async def crawler_treasury_vault_discovery(
+    query:str=Query(min_length=1,max_length=256),
+    cursor:str|None=Query(default=None,pattern=r"^[a-f0-9]{64}:[0-9]{1,3}$"),
+    scope:dict=Depends(_crawler_scope),
+)->dict:
+    return await _crawler_result(crawler_application.discover_treasury_vault(scope,query=query,cursor=cursor))
+
+
 @router.get("/crawler/companion/vault-quota")
 async def crawler_treasury_quota(scope:dict=Depends(_crawler_scope))->dict:
     return await _crawler_result(crawler_application.treasury_quota_status(scope))

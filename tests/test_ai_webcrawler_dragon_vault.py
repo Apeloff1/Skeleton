@@ -128,5 +128,48 @@ class VaultQuotaTests(unittest.TestCase):
         self.assertEqual(counts["integrity_held"],1)
 
 
+class VaultDiscoveryTests(unittest.TestCase):
+    def test_exact_retained_payload_dedup_and_coverage(self):
+        import hashlib
+        from skeleton.ai.webcrawler.dragon_vault_discovery import query_terms,summarize_sources
+        def source(text):
+            return {"text":text,"preserved_text_hash":hashlib.sha256(text.encode()).hexdigest()}
+        rows=[source("optical magnetometer"),source("optical magnetometer"),source("magnetometer"),source("unrelated")]
+        summary=summarize_sources(rows,query_terms("optical magnetometer"))
+        self.assertEqual(summary["matched_sources"],3)
+        self.assertEqual(summary["distinct_matching_payloads"],2)
+        self.assertEqual(summary["matched_terms"],2)
+        self.assertEqual(summary["best_source_terms"],2)
+        with self.assertRaises(ValueError):
+            summarize_sources([{**rows[0],"text":"tampered"}],query_terms("optical"))
+
+    def test_catalogue_cursor_changes_on_query_version_and_grant_expiry(self):
+        from skeleton.ai.webcrawler.dragon_vault_discovery import catalogue_signature,digest_scope,page_offset,query_terms
+        rows=[{"_id":f"s{i:02}","version":1,"archive_grant":{"issued_at":NOW-100,"expires_at":NOW+1}}
+              for i in reversed(range(12))]
+        sig=catalogue_signature(rows,now=NOW)
+        bound=digest_scope(SCOPE,sig,query_terms("optical"))
+        cursor=bound+":8"
+        self.assertEqual(page_offset(cursor,bound,12),8)
+        for other in (digest_scope(SCOPE,sig,query_terms("other")),
+                      digest_scope(SCOPE,catalogue_signature(rows,now=NOW+2),query_terms("optical")),
+                      digest_scope({**SCOPE,"owner_id":"other"},sig,query_terms("optical"))):
+            with self.assertRaises(ValueError):
+                page_offset(cursor,other,12)
+        for bad in (bound+":1",bound+":0",bound+":08",bound+":16"):
+            with self.assertRaises(ValueError):
+                page_offset(bad,bound,12)
+        rows[0]["version"]=2
+        self.assertNotEqual(digest_scope(SCOPE,catalogue_signature(rows,now=NOW),query_terms("optical")),bound)
+
+    def test_invalid_query_or_oversized_catalogue_rejected(self):
+        from skeleton.ai.webcrawler.dragon_vault_discovery import query_terms,catalogue_signature
+        for query in ("","   ","x"*257,"!!!"):
+            with self.assertRaises(ValueError):
+                query_terms(query)
+        with self.assertRaises(ValueError):
+            catalogue_signature([{"_id":str(i),"version":1} for i in range(129)],now=NOW)
+
+
 if __name__=="__main__":
     unittest.main()

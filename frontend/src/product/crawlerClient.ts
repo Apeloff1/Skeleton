@@ -534,6 +534,41 @@ function vaultSelection(ids:string[]):string[]{
       ||new Set(ids).size!==ids.length)invalid('Select 1–32 distinct retired expeditions.');
   return [...ids].sort();
 }
+export type DragonVaultDiscoveryMatch = {session_id:string;version:number;valid_until:number;eligible_sources:number;
+  matched_sources:number;distinct_matching_payloads:number;matched_terms:number;best_source_terms:number;scanned_bytes:number};
+export type DragonVaultDiscovery = {schema:'skeleton.dragon.vault-discovery.v1';scope_digest:string;as_of_unix:number;
+  earliest_expiry:number|null;catalogue_size:number;page_offset:number;scanned_sessions:number;query_terms:number;
+  qualified:number;no_grant:number;held:number;eligible_sources:number;scanned_bytes:number;matches:DragonVaultDiscoveryMatch[];
+  next_cursor:string|null;page_local_ranking:true;source_text_returned:false;network_executed:false;model_context_permission:false};
+export async function discoverDragonVault(query:string,cursor?:string,signal?:AbortSignal):Promise<DragonVaultDiscovery>{
+  if(typeof query!=='string'||!query.trim()||query.length>256||cursor!==undefined&&!/^[a-f0-9]{64}:[0-9]{1,3}$/.test(cursor))invalid('Invalid chamber discovery.');
+  const p=await read(api.get<DragonVaultDiscovery>(ROOT+'/companion/vault-discovery?query='+encodeURIComponent(query)
+    +(cursor?'&cursor='+encodeURIComponent(cursor):''),options(signal)),getAuthToken(),'Chamber discovery unavailable.');
+  if(!p||p.schema!=='skeleton.dragon.vault-discovery.v1'||!HASH.test(p.scope_digest)||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0
+    ||!integer(p.catalogue_size,128)||!integer(p.page_offset,p.catalogue_size)||p.page_offset%8!==0
+    ||p.page_offset!==(cursor?Number(cursor.split(':')[1]):0)||cursor&&cursor.split(':')[0]!==p.scope_digest
+    ||p.scanned_sessions!==Math.min(8,p.catalogue_size-p.page_offset)||!integer(p.query_terms,32)||p.query_terms<1
+    ||![p.qualified,p.no_grant,p.held].every(n=>integer(n,p.scanned_sessions))||p.qualified+p.no_grant+p.held!==p.scanned_sessions
+    ||!integer(p.eligible_sources,64*p.qualified)||p.eligible_sources<p.qualified||!integer(p.scanned_bytes,24000*p.eligible_sources)
+    ||(p.qualified===0)!==(p.earliest_expiry===null)
+    ||p.earliest_expiry!==null&&(!Number.isFinite(p.earliest_expiry)||p.earliest_expiry<=p.as_of_unix)
+    ||p.next_cursor!==(p.page_offset+p.scanned_sessions<p.catalogue_size?p.scope_digest+':'+(p.page_offset+p.scanned_sessions):null)
+    ||!Array.isArray(p.matches)||p.matches.length>p.qualified||new Set(p.matches.map(x=>x?.session_id)).size!==p.matches.length
+    ||p.matches.some((x,i)=>!x||typeof x.session_id!=='string'||!ID.test(x.session_id)||!integer(x.version)||x.version<1
+       ||!Number.isFinite(x.valid_until)||x.valid_until<=p.as_of_unix||p.earliest_expiry===null||x.valid_until<p.earliest_expiry
+       ||!integer(x.eligible_sources,64)||!integer(x.matched_sources,x.eligible_sources)||x.matched_sources<1
+       ||!integer(x.distinct_matching_payloads,x.matched_sources)||x.distinct_matching_payloads<1
+       ||!integer(x.matched_terms,p.query_terms)||x.matched_terms<1||!integer(x.best_source_terms,x.matched_terms)||x.best_source_terms<1
+       ||!integer(x.scanned_bytes,24000*x.eligible_sources)
+       ||(i>0&&(()=>{const a=p.matches[i-1];return a.matched_terms<x.matched_terms
+          ||a.matched_terms===x.matched_terms&&(a.best_source_terms<x.best_source_terms
+           ||a.best_source_terms===x.best_source_terms&&(a.distinct_matching_payloads<x.distinct_matching_payloads
+             ||a.distinct_matching_payloads===x.distinct_matching_payloads&&a.session_id>=x.session_id));})()))
+    ||p.matches.reduce((n,x)=>n+x.eligible_sources,0)>p.eligible_sources||p.matches.reduce((n,x)=>n+x.scanned_bytes,0)>p.scanned_bytes
+    ||p.page_local_ranking!==true||p.source_text_returned!==false||p.network_executed!==false||p.model_context_permission!==false)
+    invalid('Invalid chamber discovery receipt.');
+  return p;
+}
 export type DragonVaultQuota = {
   schema:'skeleton.dragon.vault-quota.v1'; as_of_unix:number; active_reserved:number; vault_reserved:number;
   distinct_reserved:number;dual_reserved:number;active_capacity:32;vault_capacity:128;
