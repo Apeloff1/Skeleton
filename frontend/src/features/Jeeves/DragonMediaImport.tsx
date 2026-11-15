@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {AppState,Text,TouchableOpacity,View} from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import {File} from 'expo-file-system';
+import {File,Paths} from 'expo-file-system';
 import * as Crypto from 'expo-crypto';
 import {getAuthToken} from '../../auth/gameforgeAuth';
 import {crawlRequestKey} from '../../product/crawlerClient';
@@ -12,6 +12,9 @@ import s from './CrawlerWorkspace.styles';
 const MAX_NATIVE_BYTES=32*1024*1024;
 type Selection={uri:string;name:string;size:number;mime:MediaMime};
 async function sha(bytes:Uint8Array){return Array.from(new Uint8Array(await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256,new Uint8Array(bytes)))).map(x=>x.toString(16).padStart(2,'0')).join('');}
+function deleteCacheCopy(uri:string){
+ try{const f=new File(uri),root=Paths.cache.uri.replace(/\/$/,'')+'/';if(f.uri.startsWith(root)&&!f.uri.slice(root.length).split('/').some(p=>p==='..'||p==='.'||p.includes('%')))f.delete();}catch{/* never remove an unqualified path */}
+}
 function mimeFor(name:string,provided?:string):MediaMime|null{
  if(provided&&allowedMediaMime(provided))return provided;
  const ext=name.toLowerCase().split('.').pop();
@@ -25,7 +28,7 @@ export default function DragonMediaImport({game,source,onChanged,disabled}:{game
  function discard(){
   // The selected URI is a picker-owned cache copy, not a user original.
   const old=fileRef.current;fileRef.current=null;
-  if(old){try{new File(old.uri).delete();}catch{/* cache may already be gone */}}
+  if(old)deleteCacheCopy(old.uri);
  }
  function reset(){epoch.current++;active.current?.abort();active.current=null;discard();operation.current=null;setBusy(false);setFile(null);setConsent(false);setNotice('');}
  useEffect(()=>{
@@ -42,9 +45,9 @@ export default function DragonMediaImport({game,source,onChanged,disabled}:{game
    if(result.canceled)return;
    const asset=result.assets[0],kind=mimeFor(asset.name,asset.mimeType);
    // Ignore stale picker responses; they cannot change the source or account.
-   if(generation!==epoch.current||account!==getAuthToken()){try{new File(asset.uri).delete();}catch{}return;}
+   if(generation!==epoch.current||account!==getAuthToken()){deleteCacheCopy(asset.uri);return;}
    if(!kind||!asset.size||asset.size>MAX_NATIVE_BYTES||!asset.uri.startsWith('file://')){
-    if(asset.uri.startsWith('file://')){try{new File(asset.uri).delete();}catch{}}
+    deleteCacheCopy(asset.uri);
     throw Error('Select a supported file no larger than 32 MiB.');
    }
    discard();const item={uri:asset.uri,name:asset.name,size:asset.size,mime:kind};
