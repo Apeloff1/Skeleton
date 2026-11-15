@@ -297,3 +297,117 @@ class DragonDeepArchiveMixin:
             "as_of_unix":now,"earliest_expiry":min(expiries) if expiries else None,
             "approximate_routing":True,"page_local_ranking":True,"history_only":True,
             "source_text_returned":False,"model_context_permission":False,"wiki_approval":False}
+
+
+    def _historical_document(self,scope,row,source_id,terms,max_chars,now):
+        """Exact historical Unicode passage, with no authority from the index."""
+        import hashlib
+        from skeleton.ai.webcrawler.dragon_archive_grant import archive_expiry
+        from skeleton.ai.webcrawler.dragon_companion import _lexemes
+        snap,grant,policies,allowed=self._deep_material(scope,row,now)
+        if source_id not in allowed:
+            raise ValueError("source unavailable")
+        source=snap["sources"][source_id]
+        policy=policies.get(source_id,{"enabled":True,"version":0})
+        expiry=archive_expiry(grant,snapshot_digest=snap["snapshot_digest"],source=source,policy=policy,now=now)
+        if expiry is None:
+            raise ValueError("historical permission unavailable")
+        text=source["text"]
+        if not text:
+            raise ValueError("empty source")
+        width=min(max_chars,4000,len(text))
+        wanted=set(terms)
+        stride=max(1,width//2)
+        starts=list(range(0,max(1,len(text)-width+1),stride))
+        if starts[-1]!=len(text)-width:
+            starts.append(len(text)-width)
+        start=max(starts,key=lambda x:(len(wanted.intersection(_lexemes(text[x:x+width]))),-x))
+        span=text[start:start+width]
+        if wanted and not wanted.intersection(_lexemes(span)):
+            raise ValueError("query matched metadata, not text")
+        content=hashlib.sha256(span.encode("utf-8")).hexdigest()
+        ref={"schema_version":"skeleton.dragon.historical-chat-reference.v1",
+             "session_id":row["_id"],"source_id":source_id,"snapshot_digest":snap["snapshot_digest"],
+             "source_digest":a.digest(source),"grant_digest":a.digest(grant),"policy_version":policy["version"],
+             "start":start,"end":start+len(span),"passage_digest":content,"valid_until":expiry}
+        doc={"source_id":source_id,"text":span,"content_digest":content,
+            "source_ref":"dragon-archive://"+row["_id"]+"/"+source_id,
+            "source_url":source["canonical_url"],"title":source["title"],
+            "captured_at":source["fetched_at"],"valid_until":expiry,
+            "history_only":True,"review_state":"unreviewed","source_classification":"untrusted_external_material",
+            "authority":"historical_external_evidence_only","training_permission":False}
+        return doc,ref
+
+    async def history_context(self,scope,query,max_docs,max_chars):
+        """Explicit local-chat history retrieval; no promotion or current facts."""
+        from core.dragon_crawler import CrawlerError,_now
+        if type(max_docs) is not int or not 1<=max_docs<=4 or type(max_chars) is not int or not 1<=max_chars<=16000:
+            raise CrawlerError("crawler_deep_context_bounds","Invalid historical context budget.",422)
+        terms,_=a.query_terms(scope,query)
+        page=await self.deep_archive_search(scope,query=query)
+        docs=[]
+        refs=[]
+        remaining=max_chars
+        for hit in page["matches"]:
+            if len(docs)>=max_docs or remaining<=0:
+                break
+            row=await self.sessions.find_one({**scope,"_id":hit["session_id"],"version":hit["version"],
+                "deep_archive.released":True,"status":{"$in":sorted(TERMINAL)}},max_time_ms=2000)
+            if row is None:
+                raise CrawlerError("crawler_deep_changed","Selected historical evidence changed.",409)
+            try:
+                doc,ref=await _bounded_discovery_cpu(self._historical_document,scope,row,
+                    hit["source_id"],terms,min(remaining,4000),_now().timestamp())
+            except (ValueError,TypeError,KeyError,CheckpointReplicaError):
+                continue
+            if ref["snapshot_digest"]!=hit["snapshot_digest"]:
+                raise CrawlerError("crawler_deep_changed","Historical witness changed.",409)
+            docs.append(doc)
+            refs.append(ref)
+            remaining-=len(doc["text"])
+        await self.assert_history_context(scope,refs)
+        return {"documents":docs,"references":refs,"history_only":True,"partial_routing":True}
+
+    def _check_history_pin(self,scope,row,pin,now):
+        import hashlib
+        from skeleton.ai.webcrawler.dragon_archive_grant import archive_expiry
+        snap,grant,policies,allowed=self._deep_material(scope,row,now)
+        if pin["source_id"] not in allowed:
+            raise ValueError("historical source unavailable")
+        source=snap["sources"][pin["source_id"]]
+        policy=policies.get(pin["source_id"],{"enabled":True,"version":0})
+        expiry=archive_expiry(grant,snapshot_digest=snap["snapshot_digest"],source=source,policy=policy,now=now)
+        if (expiry is None or expiry!=pin["valid_until"] or snap["snapshot_digest"]!=pin["snapshot_digest"]
+                or a.digest(source)!=pin["source_digest"] or a.digest(grant)!=pin["grant_digest"]
+                or policy["version"]!=pin["policy_version"] or pin["end"]>len(source["text"])
+                or hashlib.sha256(source["text"][pin["start"]:pin["end"]].encode()).hexdigest()!=pin["passage_digest"]):
+            raise ValueError("historical evidence identity changed")
+
+    async def assert_history_context(self,scope,references):
+        """Separate chat-only verifier; never a current reviewed Wiki pin."""
+        from core.dragon_crawler import CrawlerError,_now
+        from skeleton.ai.webcrawler.dragon_treasury_vault import hash_identity,finite
+        if not isinstance(references,list) or len(references)>4:
+            raise CrawlerError("crawler_deep_reference","Historical references exceed bound.",403)
+        for pin in references:
+            if (not isinstance(pin,dict) or set(pin)!={"schema_version","session_id","source_id","snapshot_digest",
+                    "source_digest","grant_digest","policy_version","start","end","passage_digest","valid_until"}
+                    or pin["schema_version"]!="skeleton.dragon.historical-chat-reference.v1"
+                    or not identity(pin["session_id"])
+                    or not all(hash_identity(pin[k]) for k in ("source_id","snapshot_digest","source_digest","grant_digest","passage_digest"))
+                    or type(pin["policy_version"]) is not int or not 0<=pin["policy_version"]<=2**31-1
+                    or type(pin["start"]) is not int or type(pin["end"]) is not int
+                    or not 0<=pin["start"]<pin["end"]<=24000 or pin["end"]-pin["start"]>4000
+                    or not finite(pin["valid_until"]) or pin["valid_until"]<=_now().timestamp()):
+                raise CrawlerError("crawler_deep_reference","Historical reference invalid or expired.",403)
+            query={**scope,"_id":pin["session_id"],"deep_archive.released":True,"status":{"$in":sorted(TERMINAL)}}
+            row=await self.sessions.find_one(query,max_time_ms=2000)
+            if row is None:
+                raise CrawlerError("crawler_deep_reference","Historical evidence unavailable.",403)
+            try:
+                await _bounded_discovery_cpu(self._check_history_pin,scope,row,pin,_now().timestamp())
+            except (ValueError,TypeError,KeyError,CheckpointReplicaError) as exc:
+                raise CrawlerError("crawler_deep_reference","Historical evidence changed or withdrawn.",403) from exc
+            final=await self.sessions.find_one({**query,"version":row["version"]},{"_id":1},max_time_ms=2000)
+            if final is None or pin["valid_until"]<=_now().timestamp():
+                raise CrawlerError("crawler_deep_reference","Historical evidence changed during verification.",403)

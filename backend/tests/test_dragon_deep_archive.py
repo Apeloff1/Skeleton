@@ -34,3 +34,28 @@ class DeepArchiveTests(unittest.IsolatedAsyncioTestCase):
             result=await app._finish_deep_archive(SCOPE,row["_id"])
         self.assertEqual(result,"superseded")
         self.assertEqual(events,["init","reserve"])
+
+
+class HistoricalChatTests(unittest.IsolatedAsyncioTestCase):
+    async def test_exact_archive_context_and_permission_fence(self):
+        from core.dragon_crawler import CrawlerError
+        from skeleton.ai.webcrawler.dragon_archive_grant import create_grant
+        from skeleton.ai.webcrawler.dragon_companion import _lexemes
+        app,row,now,events=DeepArchiveTests().harness()
+        row["deep_archive"].update(state="archived",released=True)
+        row["archive_grant"]=create_grant(snapshot=row["snapshot"],policies={},now=now.timestamp()-1,days=7)
+        source=next(iter(row["snapshot"]["sources"].values()))
+        word=_lexemes(source["text"])[0]
+        hit={"session_id":row["_id"],"version":row["version"],"source_id":source["source_id"],
+             "snapshot_digest":row["snapshot"]["snapshot_digest"]}
+        app.deep_archive_search=AsyncMock(return_value={"matches":[hit]})
+        with patch("core.dragon_crawler._now",return_value=now):
+            projection=await app.history_context(SCOPE,word,4,4000)
+            self.assertEqual(len(projection["documents"]),1)
+            self.assertTrue(projection["documents"][0]["history_only"])
+            pin=projection["references"][0]
+            self.assertEqual(pin["schema_version"],"skeleton.dragon.historical-chat-reference.v1")
+            await app.assert_history_context(SCOPE,[pin])
+            row["archive_grant"]=None
+            with self.assertRaises(CrawlerError):
+                await app.assert_history_context(SCOPE,[pin])

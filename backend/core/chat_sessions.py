@@ -340,9 +340,11 @@ async def context_sources(*, memory_references, crawler_context, user, tenant_id
         )
     if crawler_context is not None:
         try:
-            from core.dragon_crawler import read_crawler_context
+            from core.dragon_crawler import read_crawler_context,read_historical_crawler_context
 
-            projection = await read_crawler_context(
+            historical=getattr(crawler_context,"historical_archive",False) is True
+            reader=read_historical_crawler_context if historical else read_crawler_context
+            projection = await reader(
                 user,
                 query=crawler_context.query,
                 max_docs=crawler_context.max_documents,
@@ -365,12 +367,17 @@ async def context_sources(*, memory_references, crawler_context, user, tenant_id
             or len(references) > 4
         ):
             raise EngineProtocolError("crawler context projection is invalid")
+        if historical and (projection.get("history_only") is not True or len(documents)!=len(references)
+                or any(not isinstance(doc,dict) or doc.get("history_only") is not True for doc in documents)
+                or any(not isinstance(pin,dict) or pin.get("schema_version")!="skeleton.dragon.historical-chat-reference.v1" for pin in references)):
+            raise EngineProtocolError("historical context authority differs")
         if not documents:
             raise HTTPException(
                 status_code=404,
                 detail={
                     "code": "chat_crawler_no_sources",
-                    "message": "No current captured sources match this query. Capture an authorized source or choose a different query.",
+                    "message": ("No authorized indexed historical passages match this query." if historical else
+                        "No current captured sources match this query. Capture an authorized source or choose a different query."),
                 },
             )
         for document in documents:
@@ -415,6 +422,9 @@ async def context_sources(*, memory_references, crawler_context, user, tenant_id
                     "review_state": "unreviewed",
                     "passage_sha256": content_digest,
                     "passage": text,
+                    **({"authority":"historical_external_evidence_only","history_only":True,
+                        "captured_at":document["captured_at"],"not_current_fact":True,
+                        "partial_routing":True} if historical else {}),
                 }
             ).decode("utf-8")
             total_bytes += len(evidence.encode("utf-8"))
