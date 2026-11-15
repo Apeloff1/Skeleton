@@ -20,6 +20,17 @@ const SKILLS: { key: keyof DragonCompanion['skills']; title: string; description
   { key: 'resilience', title: 'Operational resilience', description: 'Bounded outcome estimate, not a reliability guarantee.' },
 ];
 const STAGES = [0, 120, 300, 550, 800, 1000];
+const QUEST_NAMES: Record<string, string> = {
+  first_scale: 'First scale', novel_trail: 'Novel trail', cartographer: 'Cartographer',
+  first_insight: 'First insight', mosaic: 'Research mosaic', many_perspectives: 'Many perspectives',
+  new_habitat: 'New habitat', habitat_keeper: 'Habitat keeper', far_roamer: 'Far roamer',
+  measured_expedition: 'Measured expedition', careful_researcher: 'Careful researcher',
+  balanced_mastery: 'Balanced mastery',
+};
+const BRANCHES = [
+  ['discovery', 'Discovery constellation'], ['scholar', 'Scholar constellation'],
+  ['ecology', 'Habitat constellation'], ['stewardship', 'Stewardship constellation'],
+] as const;
 const HABITATS: Record<string, string> = {
   web: 'Web forest', document: 'Archive vault', structured: 'Data crystals',
   media: 'Media caverns', text: 'Scribe library', artifact: 'Artifact forge',
@@ -37,11 +48,13 @@ export default function DragonCompanionPanel({ session }: { session: CrawlSessio
   const d = session.companion;
   const [details, setDetails] = useState(false);
   const [habitatsOpen, setHabitatsOpen] = useState(true);
+  const [questbookOpen, setQuestbookOpen] = useState(true);
+  const [traceOpen, setTraceOpen] = useState(false);
   if (!d) return <View style={s.card}><Text style={s.heading}>Dragon companion</Text><Text style={s.small}>No validated companion projection is available from this backend.</Text></View>;
   const quest = QUESTS[d.quest];
   const next = STAGES[Math.min(d.stage + 1, STAGES.length - 1)];
   const previous = STAGES[d.stage];
-  const stageProgress = (d.growth - previous) / Math.max(1, next - previous);
+  const stageProgress = Math.max(0, Math.min(1, (d.growth - previous) / Math.max(1, next - previous)));
   const asleep = !session.consent_current || ['paused', 'cancelled', 'completed', 'budget_exhausted', 'failed', 'interrupted'].includes(session.status) || d.posture === 'resting';
   const posture = asleep ? 'resting' : d.posture;
   const mode = typeof session.limits.frontier_strategy === 'string' && session.limits.frontier_strategy.startsWith('companion');
@@ -74,6 +87,37 @@ export default function DragonCompanionPanel({ session }: { session: CrawlSessio
       <Text style={s.small}>Learning progress {Math.round(d.learning_progress * 100)}% · relevant novelty yield {Math.round(d.novelty_yield * 100)}%</Text>
       <Text style={s.small}>{d.quarantines} quarantine incidents · {d.recovery_observations} observed recoveries. No reward for incidents or repeated failures.</Text>
     </View>
+    {d.questbook && <View style={s.check}>
+      <Text style={s.heading}>Expedition skill tree · {d.questbook.completed}/{d.questbook.total}</Text>
+      <Text style={s.small}>Achievements are earned only by retained, distinct, useful evidence. Source-use withdrawal can hide supporting references without fabricating new progress.</Text>
+      <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: questbookOpen }} style={s.button} onPress={() => setQuestbookOpen(v => !v)}><Text style={s.buttonText}>{questbookOpen ? 'Hide skill tree' : 'Open skill tree'}</Text></TouchableOpacity>
+      {questbookOpen && BRANCHES.map(([branch, title]) => <View key={branch} style={local.branch}>
+        <Text style={s.label}>{title}</Text>
+        {d.questbook!.quests.filter(q => q.branch === branch).map(q => <View key={q.code} style={[local.milestone, q.state === 'completed' && local.unlocked]}>
+          <View style={local.meterRow}><Text style={s.label}>{QUEST_NAMES[q.code] ?? q.code}</Text><Text style={[s.small, q.state === 'completed' && s.success]}>{q.state === 'completed' ? 'Earned' : q.applicable ? q.state : 'Not applicable'}</Text></View>
+          <Meter title="Evidence progress" value={q.progress / q.target} />
+          {q.prerequisite && q.state === 'locked' && <Text style={s.small}>Requires {QUEST_NAMES[q.prerequisite]}</Text>}
+          {q.state === 'completed' && <Text style={s.small}>Evidence checkpoint {q.last_evidence_sequence} · {q.source_ids.length} visible supporting source references{q.evidence_redacted ? ' · other references currently unavailable' : ''}</Text>}
+          {details && q.source_ids.map(id => <Text key={id} selectable style={s.small}>Source ID: {id}</Text>)}
+        </View>)}
+      </View>)}
+    </View>}
+    {session.curriculum_trace && <View style={s.check}>
+      <Text style={s.heading}>Curriculum flight recorder</Text>
+      <Text style={s.small}>{session.curriculum_trace.decisions} settled adaptive decisions. Policy acquisitions are separate from content attempts; selection receipts do not authorize network access.</Text>
+      <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: traceOpen }} style={s.button} onPress={() => setTraceOpen(v => !v)}><Text style={s.buttonText}>{traceOpen ? 'Hide flight recorder' : 'Inspect real decision outcomes'}</Text></TouchableOpacity>
+      {traceOpen && <>
+        {Object.entries(session.curriculum_trace.quests).map(([key, counts]) => <View key={key} style={local.milestone}>
+          <Text style={s.label}>{QUESTS[key as DragonCompanion['quest']].title}</Text>
+          <Text style={s.small}>{counts.captures}/{counts.content_attempts} captures · {counts.policy_attempts} policy requests · {counts.uncertain_attempts} uncertain outcomes</Text>
+        </View>)}
+        {session.curriculum_trace.recent.slice().reverse().map(d => <View key={d.request} style={local.milestone}>
+          <Text style={s.label}>Request {d.request} · {d.phase} · {d.outcome.replaceAll('_',' ')}</Text>
+          <Text style={s.small}>{QUESTS[d.quest].title} · {d.eligible} eligible options · base {d.base_milli / 1000} → adjusted {d.priority_milli / 1000}</Text>
+          <Text selectable style={s.small}>Candidate fingerprint: {d.candidate_digest}</Text>
+        </View>)}
+      </>}
+    </View>}
     <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: details }} style={s.button} onPress={() => setDetails(v => !v)}><Text style={s.buttonText}>{details ? 'Hide metric explanations' : 'Inspect how Dragon learns'}</Text></TouchableOpacity>
     <Text style={s.small}>This companion visualizes one bounded crawl. No hunger timers, lost streaks, hidden work, model-weight changes or expanded source permissions. The captured evidence is unreviewed.</Text>
   </View>;
@@ -92,6 +136,8 @@ const local = StyleSheet.create({
   track: { height: 8, borderRadius: 8, backgroundColor: colors.edge, overflow: 'hidden' },
   fill: { height: 8, borderRadius: 8 },
   quest: { padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#64558c', backgroundColor: '#1c1831', gap: 6 },
+  branch: { gap: 8, borderLeftWidth: 2, borderColor: '#64558c', paddingLeft: 12 },
+  milestone: { borderWidth: 1, borderColor: colors.edge, borderRadius: 10, padding: 10, gap: 6 },
   habitats: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   habitat: { flexGrow: 1, flexBasis: 130, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.edge, gap: 4 },
   unlocked: { borderColor: '#635080', backgroundColor: '#211a36' },
