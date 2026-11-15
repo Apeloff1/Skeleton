@@ -108,6 +108,16 @@ def register_knowledge_routes(router):
     async def review(candidate_id: str, body: ReviewRequest, user: dict = Depends(get_current_user)):
         return await call(runtime.review_candidate(editor(user), candidate_id, body.model_dump()))
 
+    @router.get("/knowledge/hoag-archive")
+    async def hoag_archive(q:str=Query(min_length=1,max_length=300),limit:int=Query(8,ge=1,le=8),
+        cursor:str|None=Query(default=None,max_length=193),user:dict=Depends(get_current_user)):
+        from core.dragon_crawler import CrawlerError
+        try:
+            return await call(runtime.search_hoag_archive(scope(user),q,limit,cursor))
+        except CrawlerError as exc:
+            raise HTTPException(exc.status,detail={"code":exc.code,"message":exc.message}) from exc
+
+
     @router.get("/knowledge/search")
     async def search(
         q: str = Query(min_length=1, max_length=300),

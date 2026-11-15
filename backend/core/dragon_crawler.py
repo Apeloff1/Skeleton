@@ -2163,7 +2163,8 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             "status":{"$in":["completed","budget_exhausted"]}},
             {"$set":{"archive_grant":grant,"treasury_index":segment,"treasury_archive_route":routing,"legacy_archive_receipt":proof,
                       "treasury_repair_due":min(grant["expires_at"],now+6*3600) if grant else None,
-                      "storage_receipt":receipt,"updated_at":_now(),path:audit},"$inc":{"version":1}})
+                      "storage_receipt":receipt,"updated_at":_now(),path:audit,"deep_index_due":_now().timestamp()},
+             "$unset":{"deep_index":""},"$inc":{"version":1}})
         if not changed.modified_count:
             raise CrawlerError("crawler_conflict","Historical session changed before archive admission.",409)
         return {"ok":True,"version":int(row["version"])+1,"enabled":grant is not None,"execution_authorized":False}
@@ -4072,6 +4073,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                         "source_use_policies." + source_id: policy,
                         "treasury_index": None,
                         "treasury_archive_route": None,
+                        "deep_index":None,"deep_index_due":now.timestamp(),
                         "treasury_repair_due":now.timestamp() if row.get("archive_grant") else None,
                         "updated_at": now,
                         "storage_receipt": receipt,
@@ -4651,5 +4653,18 @@ async def read_crawler_context(user: dict, query: str, max_docs: int = 4, max_ch
     return await crawler_application.context(authenticated_scope(user), query, max_docs, max_chars)
 
 
+async def read_historical_crawler_context(user: dict, query: str, max_docs: int = 4, max_chars: int = 16000) -> dict:
+    return await crawler_application.history_context(authenticated_scope(user),query,max_docs,max_chars)
+
+
 async def assert_crawler_context(user: dict, references: list[dict]) -> None:
-    await crawler_application.assert_context(authenticated_scope(user), references)
+    scope=authenticated_scope(user)
+    if not isinstance(references,list) or len(references)>8:
+        raise CrawlerError("crawler_reference_bounds","Chat source references exceed bound.",403)
+    history=[pin for pin in references if isinstance(pin,dict) and
+        pin.get("schema_version")=="skeleton.dragon.historical-chat-reference.v1"]
+    current=[pin for pin in references if pin not in history]
+    if current or not history:
+        await crawler_application.assert_context(scope,current)
+    if history:
+        await crawler_application.assert_history_context(scope,history)
