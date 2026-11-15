@@ -66,19 +66,26 @@ class LocalWorkerExecutor:
         self._handlers = MappingProxyType(dict(handlers))
         self._active = False
 
+    def accepts(self, work_id: str) -> bool:
+        """Reject incompatible plan contexts and unsupported roles before claiming."""
+        body = self._journal.pending_payload(work_id, kind="prood.worker")
+        return self._compatible(body)
+
+    def _compatible(self, body):
+        return (type(body) is dict and body.get("schema") == "prood.worker.v1"
+                and body.get("context_digest") == self._context_digest
+                and body.get("execution_verified") is False
+                and type(body.get("role")) is str and body["role"] in self._handlers)
+
     async def execute_and_commit(self, claim: WorkClaim) -> WorkerOutcome:
         if self._active:
             raise WorkConflict("local worker already executing")
         self._active = True
         try:
             body = self._journal.verify_claim(claim, kind="prood.worker")
-            if (type(body) is not dict or body.get("schema") != "prood.worker.v1"
-                    or body.get("context_digest") != self._context_digest
-                    or body.get("execution_verified") is not False):
-                raise WorkConflict("worker plan context does not match admitted input")
-            role = body.get("role")
-            if type(role) is not str or role not in self._handlers:
-                raise WorkConflict("worker role has no admitted local handler")
+            if not self._compatible(body):
+                raise WorkConflict("worker plan context or role does not match admitted input")
+            role = body["role"]
             status = self._journal.status(claim.work_id)
             predecessors = []
             total = 0

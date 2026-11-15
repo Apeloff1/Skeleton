@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from skeleton.frontier.durable_work import DurableWorkJournal, WorkClaim, WorkStatus
+from skeleton.frontier.durable_work import DurableWorkJournal, WorkClaim, WorkStatus, WorkConflict
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,10 +70,26 @@ class ProodSupervisor:
         try:
             candidates = self._journal.ready(kind="prood.worker", limit=limit)
             for work in candidates:
+                # An adapter can refuse unsupported input before the irreversible
+                # claim. The admission policy remains an independent requirement.
+                accepts = getattr(self._executor, "accepts", None)
+                if callable(accepts):
+                    try:
+                        if accepts(work.work_id) is not True:
+                            denied.append(work.work_id)
+                            continue
+                    except (KeyError, WorkConflict):
+                        denied.append(work.work_id)
+                        continue
                 if self._admission.allow(work) is not True:
                     denied.append(work.work_id)
                     continue
-                claim = self._journal.claim(work.work_id, owner=self._owner)
+                try:
+                    claim = self._journal.claim(work.work_id, owner=self._owner)
+                except (KeyError, WorkConflict):
+                    # Another owner may have claimed or cancelled the snapshot.
+                    denied.append(work.work_id)
+                    continue
                 claimed += 1
                 try:
                     outcome = await self._executor.execute_and_commit(claim)

@@ -418,6 +418,14 @@ class DurableWorkJournal:
                     result.append(self._status(row))
             return tuple(result)
 
+    def pending_payload(self, work_id: str, *, kind: str) -> object:
+        """Inspect authenticated pending input solely for pre-claim admission."""
+        with self._tx():
+            row = self._require(work_id)
+            if row[2] != _text(kind) or row[5] != "pending":
+                raise WorkConflict("pending work kind or state is not authorized")
+            return json.loads(row[3])
+
     def ready(self, *, kind: str | None = None, limit: int = 64) -> tuple[WorkStatus, ...]:
         """Return authenticated dependency-ready candidates, not actual admission permits."""
         if kind is not None:

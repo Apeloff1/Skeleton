@@ -102,3 +102,64 @@ async def test_worker_context_mismatch_never_invokes_handler(tmp_path):
     assert work.status(claim.work_id).state == "claimed"
     db.close()
     out.close()
+
+
+@pytest.mark.asyncio
+async def test_incompatible_plan_stays_pending_instead_of_being_claimed(tmp_path):
+    db, out, work, results = stores(tmp_path)
+    plan = admit_build(work, build_id="foreign", phases=["world"], platoon_size=1, game_ctx={"a":1})
+    async def handler(_):
+        pytest.fail("unsupported plan must not run")
+    class Policy:
+        def allow(self, _):
+            return True
+    executor = LocalWorkerExecutor(work, results, game_context={"a":2}, handlers={"world":handler})
+    report = await ProodSupervisor(work, Policy(), executor, owner="operator").dispatch()
+    assert report.claimed == 0 and report.denied == (plan.work[0].work_id,)
+    assert work.status(plan.work[0].work_id).state == "pending"
+    db.close()
+    out.close()
+
+
+@pytest.mark.asyncio
+async def test_result_survives_crash_window_without_reexecution(tmp_path):
+    from skeleton.prood.recovery_review import review_worker_result
+    db, out, work, results = stores(tmp_path)
+    plan = admit_build(work, build_id="restart", phases=["world"], platoon_size=1)
+    wid = plan.work[0].work_id
+    claim = work.claim(wid, owner="operator")
+    calls = []
+    async def handler(data):
+        calls.append(data.work_id)
+        return ComputedResult(True, {"region": data.seat})
+    executor = LocalWorkerExecutor(work, results, game_context={}, handlers={"world":handler})
+    outcome = await executor.execute_and_commit(claim)
+    assert work.status(wid).state == "claimed"
+    db.close()
+    out.close()
+    db, out, work, results = stores(tmp_path)
+    review = review_worker_result(work, results, wid)
+    assert review.proposed_state == "succeeded"
+    assert review.receipt_digest == outcome.receipt_digest
+    assert not review.independent_quiescence_verified
+    assert work.ready() == ()
+    # No execution is triggered by recovery inspection.
+    assert calls == [wid]
+    assert work.status(wid).state == "claimed"
+    db.close()
+    out.close()
+
+
+def test_private_result_reopen_and_explicit_creation(tmp_path):
+    import os
+    from skeleton.app.offline_custody import open_worker_results
+    if os.name != "posix":
+        pytest.skip("canonical private SQLite POSIX custody")
+    tmp_path.chmod(0o700)
+    with open_worker_results(tmp_path, scope="tenant", key=b"z"*32, create=True) as store:
+        first = store.publish("a"*64, digest="b"*64, succeeded=True, output={"regions": [1,2]})
+    with open_worker_results(tmp_path, scope="tenant", key=b"z"*32, create=False) as store:
+        assert store.load("a"*64) == first
+    with pytest.raises(FileExistsError):
+        with open_worker_results(tmp_path, scope="tenant", key=b"z"*32, create=True):
+            pass
