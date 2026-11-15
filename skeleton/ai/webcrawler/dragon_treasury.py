@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 import hashlib
 import json
 import math
@@ -57,9 +58,9 @@ class Observation:
 @dataclass(frozen=True)
 class ParsedVersion:
     terms: Counter
-    section_hashes: frozenset[str]
+    section_hashes: tuple[str, ...]
     signature: frozenset[int]
-    numbers: frozenset[str]
+    numbers: tuple[str, ...]
     digest: str
 
 
@@ -70,12 +71,25 @@ def parse_retained_text(text: str) -> ParsedVersion:
     words = _lexemes(text)[:MAX_TERMS]
     # Stable block geometry for change localization; no attacker-controlled
     # markup is executed and no raw source vocabulary is returned to caller.
-    blocks = [words[i:i+64] for i in range(0,len(words),64)][:MAX_SECTIONS]
-    hashes = frozenset(_digest(block) for block in blocks)
-    numbers = frozenset(word for word in words if word.isdecimal())
+    # Content-defined landmarks survive insertions better than fixed offsets.
+    # A hard tail cap preserves the complete remaining bounded token range.
+    blocks, start = [], 0
+    for i,word in enumerate(words):
+        width=i-start+1
+        if len(blocks)==MAX_SECTIONS-1:
+            break
+        anchor=width>=32 and int.from_bytes(hashlib.blake2s(word.encode(),digest_size=2).digest(),"big")%32==0
+        if anchor or width>=128:
+            blocks.append(words[start:i+1]);start=i+1
+    if start<len(words):
+        blocks.append(words[start:])
+    hashes = tuple(_digest(block) for block in blocks)
+    # Ordered signed/decimal/percentage tokens preserve swaps and repeats.
+    # Do not publish numbers or context in the archive projection.
+    numbers = tuple(m.group() for m in re.finditer(r"(?<!\w)[+-]?\d+(?:[.,]\d+)*(?:%|‰)?",text[:24000]))[:MAX_TERMS]
     return ParsedVersion(Counter(words), hashes, _signature(text), numbers,
                          _digest({"parser": PARSER, "text_sha256": hashlib.sha256(text.encode()).hexdigest(),
-                                  "section_hashes": sorted(hashes)}))
+                                  "section_hashes": hashes}))
 
 
 def _validate(row: Observation, *, now: float) -> None:
@@ -119,10 +133,11 @@ def _delta(before: ParsedVersion | None, after: ParsedVersion | None,
     if not before.signature or not after.signature:
         similarity = len(a&b)/max(1,len(a|b))
     numeric = before.numbers != after.numbers
+    common=sum(match.size for match in SequenceMatcher(None,before.section_hashes,after.section_hashes,autojunk=False).get_matching_blocks())
     kind = "minor_update" if similarity >= .85 and not numeric else (
         "substantive_update" if similarity >= .35 or numeric else "major_rewrite")
     return {"kind":kind,"similarity":round(similarity,6),"added_terms":len(b-a),
-            "removed_terms":len(a-b),"changed_sections":len(before.section_hashes^after.section_hashes),
+            "removed_terms":len(a-b),"changed_sections":len(before.section_hashes)+len(after.section_hashes)-2*common,
             "numeric_change":numeric}
 
 
@@ -211,6 +226,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
     families, revisions, parse_rows = [], [], {}
     comparisons = {}
     changed_families = changes = rollbacks = revalidated = blocked_current = alias_held = 0
+    verified_transitions = verified_families = 0
     family_origins = {}
     for fid, rows in sorted(grouped.items()):
         rows.sort(key=lambda x:(x.captured_at,x.session_id,x.source_id))
@@ -218,6 +234,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
         ambiguous_times = {stamp for stamp,count in Counter(x.captured_at for x in rows).items()
                            if count>1 and len({x.content_hash for x in rows if x.captured_at==stamp})>1}
         versions = []
+        version_hashes = []
         prior = None
         observed_hashes = set()
         previous_hash = None
@@ -232,10 +249,14 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
                     revalidated += int(latest["reobservations"] == 0)
                 latest["last_seen"] = row.captured_at
                 latest["reobservations"] += 1
-                latest.update(session_id=row.session_id,source_id=row.source_id,
-                              indexed=parsed is not None,metadata_only=parsed is None,
-                              archive_only=row.archive_only)
-                parse_rows[latest["revision_id"]] = parsed
+                latest["latest_access"] = parsed is not None and not row.archive_only
+                # A later held duplicate cannot grant access or erase an
+                # earlier independently permitted historic representative.
+                if parsed is not None:
+                    latest.update(session_id=row.session_id,source_id=row.source_id,
+                                  indexed=True,metadata_only=False,archive_only=row.archive_only,
+                                  indexed_capture_at=row.captured_at)
+                    parse_rows[latest["revision_id"]] = parsed
                 prior = row
                 continue
             delta = ({"kind":"initial","similarity":None,"added_terms":None,"removed_terms":None,
@@ -255,9 +276,11 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
                        "session_id":row.session_id,"source_id":row.source_id,
                        "first_seen":row.captured_at,"last_seen":row.captured_at,
                        "reobservations":0,"indexed":parsed is not None,"metadata_only":parsed is None,
-                       "archive_only":row.archive_only,
+                       "archive_only":row.archive_only,"latest_access":parsed is not None and not row.archive_only,
+                       "indexed_capture_at":row.captured_at if parsed is not None else None,
                        "delta":delta}
             versions.append(version)
+            version_hashes.append(row.content_hash)
             parse_rows[rid]=parsed
             prior=row
             previous_hash=row.content_hash
@@ -275,12 +298,22 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
         alias_conflict = any(a["captured_at"]>=rows[-1].captured_at and
                              a["content_hash"]!=rows[-1].content_hash for a in blockers.get(rows[-1].url,()))
         alias_held += int(alias_conflict)
-        current_available=latest["indexed"] and not latest["archive_only"] and not alias_conflict
+        current_available=latest["indexed"] and latest["latest_access"] and not alias_conflict
         # Keep an earlier authorized payload available only to the historic
         # plane when a newer variant-unknown receipt contradicts it.
         blocked_current+=int(not current_available)
+        unique_edges=set()
+        for k in range(1,len(versions)):
+            a,b=versions[k-1],versions[k]
+            if a["indexed"] and b["indexed"] and a["last_seen"]<b["first_seen"] and b["delta"]["kind"]!="changed_unclassified":
+                unique_edges.add(tuple(sorted((version_hashes[k-1],version_hashes[k]))))
+        verified_transitions+=len(unique_edges)
+        verified_families+=int(bool(unique_edges))
         for v in versions:
-            v["plane"]="current" if v is latest and not v["archive_only"] and not alias_conflict else "historic"
+            v["plane"]="current" if v is latest and current_available else "historic"
+            v.pop("latest_access",None)
+            if not v["indexed"]:
+                v["indexed_capture_at"]=None
             v["latest_observed"]=v is latest
             v["source_id"]=v["source_id"] if v["indexed"] else None
             v["session_id"]=v["session_id"] if v["indexed"] else None
@@ -323,15 +356,14 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
     hits.sort(key=lambda v:(-v["score"],-v["last_seen"],v["revision_id"]))
     current_count=sum(v["plane"]=="current" and v["indexed"] for v in revisions)
     historic_count=sum(v["plane"]=="historic" and v["indexed"] for v in revisions)
-    verified_transitions=sum(not v["latest_observed"] and v["indexed"] for v in revisions)
     current_ratio=current_count/max(1,len(families))
     # Reward preserved, currently indexable history, not repeated fetches or
     # unverifiable metadata. Coverage-incomplete views cannot unlock Hoarder.
     stewardship=int(round(500*(.40*min(1.,verified_transitions/8)
-                    +.25*min(1.,changed_families/4)*min(1.,historic_count/4)
+                    +.25*min(1.,verified_families/4)*min(1.,historic_count/4)
                     +.20*current_ratio*min(1.,historic_count/4)
                     +.15*min(1.,revalidated/4)*min(1.,historic_count/4))))
-    qualified=(not capped and not excluded_sessions and verified_transitions>=3 and changed_families>=2
+    qualified=(not capped and not excluded_sessions and verified_transitions>=3 and verified_families>=2
                and current_count>=2)
     # Deficit-style round robin of due origins. Within each origin prioritize
     # expected stale loss per retained-text cost, not repeated request count.
@@ -367,7 +399,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
             "metadata_only":len(revisions)-current_count-historic_count,
             "blocked_current":blocked_current,"alias_held_families":alias_held,"changes":changes,"revalidated_revisions":revalidated,
             "revisit_plan":plan,"parsed_unique_payloads":len(memo),
-            "verified_historic_transitions":verified_transitions,
+            "verified_historic_transitions":verified_transitions,"verified_changed_families":verified_families,
             "evolution":progression(growth,stewardship,qualified=qualified),
             "family_rows":family_rows[:MAX_RESULTS],"hits":hits[:MAX_RESULTS],
             "timeline":history[:MAX_RESULTS] if mode in {"timeline","compare"} else [],
