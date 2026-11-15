@@ -259,3 +259,17 @@ class BulkArchive:
                                (disk.free - v.free_reserve - 1024 ** 2) // 4)),
                            "capacity_is_guaranteed": False})
         return result
+
+
+    def lookup(self,volume: str,scope:dict[str,str],digest:str)->Receipt|None:
+        """Resolve a previously journaled object after uncertain publication."""
+        owner=owner_key(scope)
+        if not isinstance(digest,str) or not _HASH.fullmatch(digest):
+            raise ValueError("object digest")
+        with self._db(self.volumes[volume]) as db:
+            row=db.execute("SELECT raw_bytes,compressed_bytes,payload FROM objects WHERE owner=? AND digest=?",
+                           (owner,digest)).fetchone()
+        if not row:
+            return None
+        self._decode(row[2],row[0],digest)
+        return Receipt(volume,owner,digest,row[0],row[1])
