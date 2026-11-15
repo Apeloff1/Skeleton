@@ -4729,6 +4729,9 @@ async def recover_crawler_runs(*, limit: int = 16) -> dict:
     except (OSError,TimeoutError,ValueError) as exc:
         log.warning("Dragon release import maintenance failed: %s",type(exc).__name__)
         result["game_release_imports"]={"failed":True,"reason":"bounded_maintenance_unavailable"}
+    # Independent lead maintenance runs even if another archive lane is held.
+    from core.dragon_corpus_runtime import pulse_lead_graph
+    result["lead_graph"]=await pulse_lead_graph()
     return result
 
 
