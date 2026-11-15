@@ -65,6 +65,7 @@ class DragonCurrentVectorMixin:
         col=self._current_vectors()
         await col.create_index([("tenant_id",ASCENDING),("owner_id",ASCENDING),
             ("model",ASCENDING),("batch.tokens",ASCENDING),("expires",ASCENDING)])
+        await col.create_index([("tenant_id",1),("owner_id",1),("game_id",1),("model",1),("batch.tokens",1),("expires",1)])
         await col.create_index([("tenant_id",1),("owner_id",1),("session",1),("generation",1),("ordinal",1)],unique=True)
         await col.create_index("expires",expireAfterSeconds=0)
         await self.sessions.create_index([("current_vector_due",1),("consent_expires_at",1)])
@@ -105,6 +106,7 @@ class DragonCurrentVectorMixin:
                 batch=await _cpu(lambda:build_current_batch(scope,snap,windows[cursor:end],encoder))
                 expiry=min(x[3] for x in windows[cursor:end])
                 posting={**scope,"session":row["_id"],"generation":gen,"model":encoder.identity,
+                    "game_id":(row.get("game_route") or {}).get("game_id"),
                     "ordinal":cursor,"batch":batch,"expires":datetime.fromtimestamp(expiry,timezone.utc)}
                 await self._admit(scope,row["_id"],{"current_semantic_batch":{**posting,"expires":expiry}})
                 await self._current_vectors().replace_one({**scope,"session":row["_id"],"generation":gen,
@@ -126,14 +128,16 @@ class DragonCurrentVectorMixin:
         except (CrawlerError,ValueError,KeyError,TypeError,RuntimeError,TimeoutError,OSError):
             return {"enabled":True,"held":True}
 
-    async def current_semantic_candidates(self,scope,query,session_ids=None):
+    async def current_semantic_candidates(self,scope,query,session_ids=None,game_id=None):
         from core.dragon_crawler import _now,_plain,CrawlerError
         from skeleton.ai.webcrawler.dragon_mission_quality import scan_untrusted_instructions
         if not local.configured():return []
         await self.ensure_current_vector_indexes()
         q=await _cpu(lambda:dense.query(scope,query[:512],local.encoder()))
         predicate={**scope,"model":q["model_identity"],"batch.tokens":{"$in":q["tokens"]},"expires":{"$gt":_now()}}
-        if session_ids is not None:predicate["session"]={"$in":session_ids}
+        if game_id is not None:
+            predicate["$or"]=[{"game_id":game_id},{"session":{"$in":session_ids or []}}]
+        elif session_ids is not None:predicate["session"]={"$in":session_ids}
         postings=await self._current_vectors().find(predicate).sort([("session",1),("ordinal",1)]).limit(
             MAX_BATCHES).max_time_ms(2000).to_list(MAX_BATCHES)
         hits=[]
