@@ -404,3 +404,62 @@ def test_custody_change_during_decrypt_prevents_plaintext_release(setup, monkeyp
         reader.read_once(permit(), operator_grant=grant(setup))
     assert setup["backend"].calls == 1
     assert not setup["grant_handle"].connection.in_transaction
+
+@pytest.mark.parametrize("target", ["result.db", "grant.db", "other.db"])
+def test_unpinned_disk_execution_journal_cannot_authorize_reader(setup, target):
+    from pathlib import Path
+    connection = sqlite3.connect(Path(setup["directory"]) / target, isolation_level=None)
+    try:
+        journal = FairStreamExecutionJournal(connection, session_id=SESSION, execution_key=EXECUTION_KEY)
+        with pytest.raises(ValueError, match="exact private handle"):
+            AuthorizedSealedResultReader(
+                journal=journal, vault=setup["vault"], grant_handle=setup["grant_handle"],
+                operator_public_key=setup["public"],
+            )
+    finally:
+        connection.close()
+
+
+def test_pinned_journal_cannot_alias_result_inode(setup):
+    handle = open_private_sqlite(setup["directory"], filename="result.db", create=False)
+    try:
+        journal = FairStreamExecutionJournal(handle.connection, session_id=SESSION, execution_key=EXECUTION_KEY)
+        journal.bind_private_handle(handle)
+        with pytest.raises(ValueError, match="distinct journal inode"):
+            AuthorizedSealedResultReader(
+                journal=journal, vault=setup["vault"], grant_handle=setup["grant_handle"],
+                operator_public_key=setup["public"],
+            )
+    finally:
+        handle.close()
+
+
+def test_nested_read_burns_outer_nonce_without_disclosing_plaintext(setup, monkeypatch):
+    reader = setup["reader"]
+    original = setup["vault"].read_committed
+    outer, inner = grant(setup), grant(setup, nonce="1" * 32)
+
+    def recursive(*args, **kwargs):
+        with pytest.raises(ResultReadDenied, match="recursive result read"):
+            reader.read_once(permit(), operator_grant=inner)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(setup["vault"], "read_committed", recursive)
+    with pytest.raises(ResultReadDenied, match="invalidated"):
+        reader.read_once(permit(), operator_grant=outer)
+    assert setup["grant_handle"].connection.execute(
+        "SELECT nonce FROM local_fair_stream_result_read_grants",
+    ).fetchall() == [(NONCE,)]
+    monkeypatch.setattr(setup["vault"], "read_committed", original)
+    with pytest.raises(ResultReadDenied, match="already consumed"):
+        reader.read_once(permit(), operator_grant=outer)
+    assert reader.read_once(permit(), operator_grant=inner) == b"secret offline generated text"
+
+
+def test_invalid_plaintext_shape_burns_valid_nonce(setup, monkeypatch):
+    monkeypatch.setattr(setup["vault"], "read_committed", lambda *a, **k: bytearray(b"invalid"))
+    approval = grant(setup)
+    with pytest.raises(ResultReadDenied, match="unbounded"):
+        setup["reader"].read_once(permit(), operator_grant=approval)
+    with pytest.raises(ResultReadDenied, match="already consumed"):
+        setup["reader"].read_once(permit(), operator_grant=approval)

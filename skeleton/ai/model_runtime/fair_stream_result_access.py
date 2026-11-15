@@ -7,6 +7,7 @@ a crash cannot silently replay the grant. No prompt or plaintext is logged.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 import hmac
 import json
 import os
@@ -23,7 +24,7 @@ from .fair_stream_execution_journal import (
     FairStreamExecutionJournal, _validate_permit,
 )
 from .fair_stream_result_vault import (
-    SealedFairStreamResultVault,
+    MAX_RESULT_BYTES, SealedFairStreamResultVault,
 )
 from .fair_stream_session import DispatchPermit
 from .private_sqlite import PrivateSQLiteHandle, PrivateSQLiteUnavailable
@@ -79,7 +80,7 @@ def _encode(body: Mapping[str, object]) -> bytes:
             body, sort_keys=True, separators=(",", ":"),
             ensure_ascii=True, allow_nan=False,
         ).encode("ascii")
-    except (TypeError, ValueError, OverflowError) as exc:
+    except (TypeError, ValueError, OverflowError, RecursionError) as exc:
         raise ResultReadDenied("invalid grant serialization") from exc
     if len(raw) > MAX_GRANT_BYTES:
         raise ResultReadDenied("grant exceeds byte budget")
@@ -166,8 +167,14 @@ class AuthorizedSealedResultReader:
             raise ValueError("live private grant-ledger handle required")
         if type(operator_public_key) is not bytes or len(operator_public_key) != 32:
             raise ValueError("pinned Ed25519 operator public key required")
+        journal._require_owner_process()
+        vault._require_owner()
         if journal.session_id != vault.session_id:
             raise ValueError("journal and vault session mismatch")
+        if journal._connection is vault._connection:
+            raise ValueError("independent journal and result connections required")
+        if hmac.compare_digest(operator_public_key, journal._key):
+            raise ValueError("independent operator verification key required")
         if (
             grant_handle is vault._handle
             or grant_handle.connection is vault._connection
@@ -176,12 +183,21 @@ class AuthorizedSealedResultReader:
             raise ValueError("independent grant ledger required")
         grant_handle.assert_current()
         vault._handle.assert_current()
-        if journal._private_handle is not None:
+        if journal._private_handle is None:
+            # In-memory journal is retained for deterministic test composition.
+            # Real disk custody cannot be certified by connection identity alone.
+            databases = journal._connection.execute("PRAGMA database_list").fetchall()
+            main = [row for row in databases if row[1] == "main"]
+            if (len(main) != 1 or main[0][2] != ""
+                    or any(row[1] not in {"main", "temp"} for row in databases)):
+                raise ValueError("disk journal requires an exact private handle")
+        else:
             journal._private_handle.assert_current()
             journal_inode = os.fstat(journal._private_handle._file_fd)
-            grant_identity = os.fstat(grant_handle._file_fd)
-            if (journal_inode.st_dev, journal_inode.st_ino) == (grant_identity.st_dev, grant_identity.st_ino):
-                raise ValueError("grant ledger must use a distinct journal inode")
+            for handle in (grant_handle, vault._handle):
+                identity = os.fstat(handle._file_fd)
+                if (journal_inode.st_dev, journal_inode.st_ino) == (identity.st_dev, identity.st_ino):
+                    raise ValueError("grant and result ledgers must use a distinct journal inode")
         result_inode = os.fstat(vault._handle._file_fd)
         grant_inode = os.fstat(grant_handle._file_fd)
         if (result_inode.st_dev, result_inode.st_ino) == (
@@ -196,6 +212,8 @@ class AuthorizedSealedResultReader:
         self._handle = grant_handle
         self._connection = grant_handle.connection
         self._lock = RLock()
+        self._active = False
+        self._invalidated = False
         if self._connection.in_transaction:
             raise ValueError("idle grant-ledger connection required")
         self._connection.execute(
@@ -257,6 +275,28 @@ class AuthorizedSealedResultReader:
         if type(current) is not dict or current != expected:
             raise ResultReadDenied("committed journal authority changed during read")
 
+    @contextmanager
+    def _read_operation(self):
+        # Process checks must precede any potentially inherited Python lock.
+        try:
+            self._handle.require_owner_process()
+            self._journal._require_owner_process()
+            self._vault._require_owner()
+        except (PrivateSQLiteUnavailable, RuntimeError) as exc:
+            raise ResultReadDenied("grant ledger unavailable") from exc
+        with self._lock:
+            if self._active:
+                self._invalidated = True
+                raise ResultReadDenied("recursive result read denied")
+            self._active = True
+            self._invalidated = False
+            try:
+                yield
+                if self._invalidated:
+                    raise ResultReadDenied("recursive result read invalidated authorization")
+            finally:
+                self._active = False
+
     def read_once(
         self, permit: DispatchPermit, *,
         operator_grant: Mapping[str, object],
@@ -266,18 +306,18 @@ class AuthorizedSealedResultReader:
         The caller must enforce app user authorization before invoking this
         method. A consumed grant remains consumed if decryption later fails.
         """
-        try:
-            self._handle.require_owner_process()
-        except PrivateSQLiteUnavailable as exc:
-            raise ResultReadDenied("grant ledger unavailable") from exc
-        with self._lock:
-            if self._connection.in_transaction:
-                raise ResultReadDenied("grant ledger unavailable")
+        with self._read_operation():
             try:
+                _validate_permit(permit)
+            except ValueError as exc:
+                raise ResultReadDenied("canonical CPU-only permit required") from exc
+            try:
+                self._assert_schema()
                 self._handle.assert_current()
-            except PrivateSQLiteUnavailable as exc:
-                raise ResultReadDenied("grant ledger inode custody changed") from exc
-            self._assert_schema()
+                if self._connection.in_transaction:
+                    raise ResultReadDenied("grant ledger unavailable")
+            except (PrivateSQLiteUnavailable, sqlite3.Error) as exc:
+                raise ResultReadDenied("grant ledger unavailable or inode custody changed") from exc
             try:
                 receipt = self._journal.recover_committed_receipt(permit)
             except (ValueError, RuntimeError, sqlite3.Error) as exc:
@@ -298,6 +338,8 @@ class AuthorizedSealedResultReader:
                 permit=permit, session_id=self._journal.session_id,
                 result_digest=digest,
             )
+            if self._invalidated:
+                raise ResultReadDenied("recursive result read invalidated authorization")
             self._connection.execute("BEGIN IMMEDIATE")
             try:
                 self._assert_schema()
@@ -335,9 +377,13 @@ class AuthorizedSealedResultReader:
             # change. Independent rollback protection remains caller-owned.
             self._confirm_consumption(nonce=nonce, lease_id=permit.lease_id, digest=digest)
             self._confirm_receipt(permit, receipt)
+            if self._invalidated:
+                raise ResultReadDenied("recursive result read invalidated authorization")
             plaintext = self._vault.read_committed(
                 permit, expected_result_digest=digest, expected_consumed_tokens=consumed,
             )
+            if type(plaintext) is not bytes or len(plaintext) > MAX_RESULT_BYTES:
+                raise ResultReadDenied("unbounded result plaintext")
             self._confirm_receipt(permit, receipt)
             self._confirm_consumption(nonce=nonce, lease_id=permit.lease_id, digest=digest)
             return plaintext
