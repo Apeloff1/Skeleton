@@ -30,7 +30,11 @@
     "skeleton/ai/webcrawler/dragon_sanctuary.py",
     "skeleton/ai/webcrawler/dragon_treasury.py",
     "skeleton/ai/webcrawler/dragon_archive_grant.py",
-    "skeleton/ai/webcrawler/dragon_revisit_model.py"
+    "skeleton/ai/webcrawler/dragon_revisit_model.py",
+    "skeleton/ai/webcrawler/dragon_index_manifest.py",
+    "skeleton/ai/webcrawler/dragon_legacy_archive.py",
+    "skeleton/ai/webcrawler/dragon_treasury_watch.py",
+    "skeleton/ai/webcrawler/dragon_temporal_selection.py"
   ],
   "state_authority": "Existing CORE_DB Mongo application custody; pure snapshots have no independent storage authority",
   "public_api": {
@@ -79,12 +83,19 @@
     "sanctuary_expeditions": 8,
     "sanctuary_candidates": 128,
     "sanctuary_sources_per_expedition": 16,
-    "treasury_observations": 512,
-    "treasury_indexed_payloads": 128,
-    "treasury_alias_blockers": 1024,
+    "treasury_observations": 2048,
+    "treasury_indexed_payloads": 256,
+    "treasury_alias_blockers": 4096,
     "treasury_retention_days": 30,
     "treasury_passage_chars": 4000,
-    "treasury_levels": 60
+    "treasury_levels": 60,
+    "treasury_sessions": 32,
+    "treasury_posting_raw_bytes": 2097152,
+    "treasury_posting_compressed_bytes": 1048576,
+    "treasury_watch_days": 7,
+    "treasury_watch_cycles": 6,
+    "treasury_watch_min_interval_seconds": 21600,
+    "treasury_watch_slices_per_cycle": 8
   },
   "semantics": {
     "robots": "Fail closed on unavailable robots other than explicit 404/410; accept text/plain rules, not unexpected HTML; revalidation, TTL and every redirect target; delays checkpointed. Retry-After cannot reopen an origin before its valid remote deadline within the finite consent window. Denials and overload bodies never become discovery inputs.",
@@ -115,7 +126,11 @@
     "companion_visual": "Existing animated companion receives five evidence-derived evolution stages, shell morph and palette, completed-quest cosmetics, reduced motion, power-aware rendering and decorative pet interaction; no independent training or work.",
     "treasury": "Exact fetched URL and representation family; independent current/historic BM25 populations, ordered content-defined section digests and numeric drift, deduplicated transition stewardship, immutable re-observation and rollback lineage. Newer unavailable or variant-unknown conflicting alias blocks current promotion. Retained text read only under current source-use or explicit bounded archive rights; no training or new capture permission.",
     "treasury_revisit": "Bounded 31-grid interval-censored posterior with exposure, contradictory timestamp holds, publisher hint postponement, origin-balanced cost-aware suggestions; new expedition requires explicit fresh grant. No automatic cross-session dispatch.",
-    "hoarder": "Six forms and 60 display levels; final form requires discovery >=800, sufficient distinct verified history transitions in multiple families, current coverage, and effective evolution >=1150. No reward for mirrored or oscillating content. Animated level-based breathing, blink, cozy poses, props and treasure den."
+    "hoarder": "Six forms and 60 display levels; final form requires discovery >=800, sufficient distinct verified history transitions in multiple families, current coverage, and effective evolution >=1150. No reward for mirrored or oscillating content. Animated level-based breathing, blink, cozy poses, props and treasure den.",
+    "treasury_materialization": "Grant-bound compressed per-session lexical fingerprints; no plaintext archive duplicate. Explicit source-policy updates invalidate the derivative; bounded maintenance removes expired derived segments while preserving capture records.",
+    "treasury_legacy": "Original witnessed terminal snapshots can be separately verified for explicit history-only use without changing code, request, binding or snapshot digests. Never restore legacy execution or expand network/model rights.",
+    "treasury_watch": "Owner/editor explicitly authorizes a finite single public URL watch. Deterministic child identity, cycle/slice charges, live parent/policy/principal and exact worker pulse token fences. Existing canonical robots, DNS, scope, request and physical leases remain governing. No automatic renewal.",
+    "treasury_temporal_selection": "32-session owner catalogue, 2048 observations and 256 retained-text candidates. Selected-family and cutoff-first reservation, fair chronological version representatives, partition-bound pagination, past-cutoff historic-only results; held newest revisions cannot promote older different material."
   },
   "network": {
     "direct": "Validated public DNS addresses pinned to socket with original TLS SNI/hostname verification",
