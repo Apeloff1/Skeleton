@@ -125,10 +125,23 @@ def register_knowledge_routes(router):
 
     @router.get("/knowledge/hoag-archive")
     async def hoag_archive(q:str=Query(min_length=1,max_length=300),limit:int=Query(8,ge=1,le=8),
-        cursor:str|None=Query(default=None,max_length=193),user:dict=Depends(get_current_user)):
+        cursor:str|None=Query(default=None,max_length=193),user:dict=Depends(get_current_user),
+        game_catalogue:bool=Query(False)):
         from core.dragon_crawler import CrawlerError
         try:
-            return await call(runtime.search_hoag_archive(scope(user),q,limit,cursor))
+            owner = scope(user)
+            result = await call(runtime.search_hoag_archive(owner,q,limit,cursor))
+            if game_catalogue:
+                try:
+                    hints = await corpus_call(owner, "search", q, limit=limit)
+                except HTTPException as exc:
+                    if exc.status_code != 503:
+                        raise
+                    result = {**result, "game_catalogue_state": "unavailable", "game_catalogue": None}
+                else:
+                    result = {**result, "game_catalogue_state": "available", "game_catalogue": hints,
+                              "game_catalogue_is_evidence": False}
+            return result
         except CrawlerError as exc:
             raise HTTPException(exc.status,detail={"code":exc.code,"message":exc.message}) from exc
 
