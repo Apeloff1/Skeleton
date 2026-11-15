@@ -44,8 +44,6 @@ export interface ForgeCockpitViewProps {
   console: CockpitConsoleProps;
   /** Optional offline/backend banner shown above every tab. */
   notice?: string | null;
-  /** Explicit save-back action only for a source-bound Studio project. */
-  onReturnToStudio?: () => void;
   /** Overrides the OS reduce-motion preference when set. */
   reduceMotion?: boolean;
   testID?: string;
