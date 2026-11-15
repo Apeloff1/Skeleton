@@ -1486,7 +1486,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "92ca05527e2862a8961045aebae2e8112f6e0866",
+      "source_git_object_sha": "d345d46de133dc25c3613652eac73f5332832e22",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -3411,7 +3411,7 @@
       "source": "skeleton/telemetry",
       "destination": "skeleton/ai/compat/telemetry",
       "kind": "tree",
-      "source_git_object_sha": "64b2f20e9df931233131ed5d4542b5fdb97fccd6",
+      "source_git_object_sha": "1db48998fb0b1cd5a4dd568177b5936f70fdb27f",
       "role": "legacy telemetry/SSE facade retained for convergence into canonical observability and streaming owners",
       "work_package_refs": [
         "WP-W21",

@@ -275,3 +275,23 @@ def test_interrupted_success_response_records_failure_without_rewriting_wire_sta
     assert span["attributes"]["http.status_code"] == 200
     assert span["attributes"]["http.response_interrupted"] is True
     assert tel.summary("api", "request")["errors"] == 1.0
+
+def test_telemetry_request_id_minting_preserves_wire_contract_without_api_import():
+    import ast
+    import re
+
+    from skeleton.telemetry.wiring import _scope_request_id
+
+    assert _scope_request_id({"headers": [(b"x-request-id", b"valid-correlation")]}) == "valid-correlation"
+    for invalid in ([], [(b"x-request-id", b"bad id!")],
+                    [(b"x-request-id", b"one"), (b"x-request-id", b"two")]):
+        assert re.fullmatch(r"[0-9a-f]{16}", _scope_request_id({"headers": invalid}))
+    for path in ("skeleton/telemetry/wiring.py", "skeleton/ai/compat/telemetry/wiring.py"):
+        tree = ast.parse((ROOT / path).read_text(encoding="utf-8"))
+        imports = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imports.extend(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                imports.append(node.module or "")
+        assert not any(name == "skeleton.api" or name.startswith("skeleton.api.") for name in imports)

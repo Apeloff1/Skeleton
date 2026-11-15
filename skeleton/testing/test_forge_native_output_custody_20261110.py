@@ -66,8 +66,10 @@ def test_native_digest_rejects_swapped_ancestor_even_when_bytes_match(tmp_path):
         return data
 
     with patch.object(forge_export.os, "read", side_effect=swap_when_read):
-        with pytest.raises(ValueError, match="ancestor path"):
+        with pytest.raises(ValueError, match="artifact parent changed during hashing") as caught:
             forge_export._artifact_digest(target)
+        assert isinstance(caught.value.__cause__, ValueError)
+        assert "ancestor path" in str(caught.value.__cause__)
     assert swapped
     assert (parent / "game.pck").read_bytes() == payload
 

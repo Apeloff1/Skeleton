@@ -26,6 +26,7 @@ from __future__ import annotations
 import functools
 import inspect
 import re
+import uuid
 from contextlib import ExitStack
 from typing import Any, Awaitable, Callable, Dict, Iterable, Optional, TypeVar
 
@@ -245,8 +246,6 @@ def _header_values(headers: Iterable[Any], name: bytes) -> list[str]:
 
 
 def _scope_request_id(scope: Dict[str, Any]) -> str:
-    from skeleton.api.middleware import get_request_id
-
     state = scope.get("state")
     if isinstance(state, dict):
         for attribute in ("seal", "request_id"):
@@ -256,7 +255,8 @@ def _scope_request_id(scope: Dict[str, Any]) -> str:
     supplied = _header_values(scope.get("headers") or (), b"x-request-id")
     # Exactly one well-formed header may seed the id; duplicates fail closed to a minted id.
     candidate = supplied[0] if len(supplied) == 1 else None
-    return get_request_id(candidate if _safe_correlation_id(candidate) else None)
+    # Preserve the wire contract without an upward dependency on the API layer.
+    return candidate if _safe_correlation_id(candidate) else uuid.uuid4().hex[:16]
 
 
 class PlaneTelemetryMiddleware:

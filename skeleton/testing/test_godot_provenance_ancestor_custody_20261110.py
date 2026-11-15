@@ -192,9 +192,9 @@ def test_source_root_changed_after_scan_cannot_qualify(tmp_path):
     original = provenance._digest_beneath
     switched = False
 
-    def digest_then_swap(dir_root, relative):
+    def digest_then_swap(dir_root, relative, *, max_bytes):
         nonlocal switched
-        result = original(dir_root, relative)
+        result = original(dir_root, relative, max_bytes=max_bytes)
         if not switched:
             root.rename(previous)
             waiting.rename(root)
