@@ -40,7 +40,7 @@ export default function SkeletonForgeRoute() {
     setHandoffError(null);
     setRecoveryError(false);
     const isCurrent = () => mounted && getAuthEpoch() === authEpoch;
-    void recoverCreatorRoute(loadGalaxyDraft, () => consumeCreatorBridge('forge'), isCurrent)
+    void recoverCreatorRoute(loadGalaxyDraft, () => consumeCreatorBridge('forge', authEpoch, isCurrent), isCurrent)
       .then(({ handoff, draft }) => {
         if (!isCurrent()) return;
         setIncoming(handoff);

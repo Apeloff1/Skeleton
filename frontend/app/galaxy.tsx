@@ -46,7 +46,7 @@ export default function GalaxyRoute() {
     setHandoffError(null);
     setRecoveryError(false);
     const isCurrent = () => mounted && getAuthEpoch() === authEpoch;
-    void recoverCreatorRoute(loadGalaxyDraft, () => consumeCreatorBridge('galaxy'), isCurrent)
+    void recoverCreatorRoute(loadGalaxyDraft, () => consumeCreatorBridge('galaxy', authEpoch, isCurrent), isCurrent)
       .then(({ handoff, draft }) => {
         if (!isCurrent()) return;
         setIncoming(handoff);

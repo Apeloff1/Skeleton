@@ -12,6 +12,7 @@ const kv = new Map();
 let bearer = 'alice-offline-bearer';
 let epoch = 1;
 let rotateOnWrite = false;
+let afterRemove = null;
 const mockAuth = {
   initializeStoredToken: async () => {},
   getAuthToken: () => bearer,
@@ -34,7 +35,10 @@ const mockStorage = {
       epoch += 1;
     }
   },
-  removeItem: async (key) => { kv.delete(key); },
+  removeItem: async (key) => {
+    kv.delete(key);
+    if (afterRemove) { const callback = afterRemove; afterRemove = null; callback(key); }
+  },
 };
 let scope, bridgeStorage, galaxyStorage, studioStorage;
 try {
@@ -64,6 +68,7 @@ test.beforeEach(() => {
   bearer = 'alice-offline-bearer';
   epoch = 1;
   rotateOnWrite = false;
+  afterRemove = null;
 });
 
 test('SHA-256 scoped local keys cannot expose raw bearer values', async () => {
@@ -378,4 +383,32 @@ test('Studio return retry after auth-rotated write preserves original project by
   assert.equal(await studioStorage.asyncStorageKv().getItem(key), null);
   bearer = 'alice-offline-bearer'; epoch++;
   assert.equal(await studioStorage.asyncStorageKv().getItem(key), original);
+});
+
+
+test('superseded creator receiver cannot consume a previously stored draft', async () => {
+  await bridgeStorage.storeCreatorBridge(H.handoffFromForge(Q.INITIAL_STATE));
+  await assert.rejects(bridgeStorage.consumeCreatorBridge('galaxy', epoch, () => false), /superseded/);
+  assert.equal(kv.size, 1);
+  assert.ok(await bridgeStorage.consumeCreatorBridge('galaxy', epoch, () => true));
+  assert.equal(kv.size, 0);
+});
+
+test('route unmount during removal restores the exact valid handoff', async () => {
+  await bridgeStorage.storeCreatorBridge(H.handoffFromForge(Q.INITIAL_STATE));
+  const original = [...kv.values()][0];
+  let mounted = true;
+  afterRemove = () => { mounted = false; };
+  await assert.rejects(bridgeStorage.consumeCreatorBridge('galaxy', epoch, () => mounted), /Account changed/);
+  assert.deepEqual([...kv.values()], [original]);
+  assert.ok(await bridgeStorage.consumeCreatorBridge('galaxy'));
+  assert.equal(kv.size, 0);
+});
+
+test('superseded removal cannot overwrite a newly written handoff', async () => {
+  await bridgeStorage.storeCreatorBridge(H.handoffFromForge(Q.INITIAL_STATE));
+  let mounted = true;
+  afterRemove = key => { mounted = false; kv.set(key, 'new external value'); };
+  await assert.rejects(bridgeStorage.consumeCreatorBridge('galaxy', epoch, () => mounted), /Account changed/);
+  assert.deepEqual([...kv.values()], ['new external value']);
 });
