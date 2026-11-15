@@ -3,6 +3,16 @@
   "description": "Public resource leads, including documented exports, APIs, catalogues, and discovery directories. Not a verified download manifest, source-use grant or additive unique-row estimate. Advertised counts overlap.",
   "targets": [
     {
+      "id": "steam-appid-mirror",
+      "domain": "games",
+      "url": "https://github.com/jsnli/steamappidlist/blob/master/data/games_appid.json",
+      "adapter": "steam_json",
+      "advertised_rows": 200704,
+      "access": "policy_review",
+      "cadence": "daily",
+      "notes": "Bundled candidate AppID/title snapshot from public mirror; 200704 structurally validated rows. Upstream identity and redistribution/use permission still require review."
+    },
+    {
       "id": "steam-fronkon",
       "domain": "games",
       "url": "https://huggingface.co/datasets/FronkonGames/steam-games-dataset",
