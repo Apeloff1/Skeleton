@@ -187,6 +187,13 @@ def compile_playable_tuning(
         effects["crafting.assembly_seconds"] = duration
         used.add("risk")
 
+    if "scarcity" in axes and name == "racing":
+        recharge = _fixed(20.0 - 15.0 * axes["scarcity"])
+        player = _replace_exact(player, "const BOOST_RECHARGE := 12.5",
+                                f"const BOOST_RECHARGE := {recharge:.2f}")
+        effects["racing.boost_recharge_per_second"] = recharge
+        used.add("scarcity")
+
     if "scarcity" in axes and name == "survival":
         effective = _fixed(2.0 * (0.5 + axes["scarcity"]))
         loop = _replace_exact(

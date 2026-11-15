@@ -262,6 +262,7 @@ _PLAYABLE_RULES = {
     },
     "racing": {
         "risk": ((_M, "driving", "complexity"),),
+        "scarcity": ((_M, "economy", "complexity"),),
         "grind": ((_M, "driving", "count"),),
         "agency": ((_M, "driving", "intricacy"),),
     },

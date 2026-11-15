@@ -206,3 +206,47 @@ def test_galaxy_new_survival_and_stealth_controls_are_effective(mode, matrix, ph
     assert effective == {control: 1.0}
     assert receipt["mapped_matrix_dials"] == 1
     assert archetype_files(mode, operator_axes=effective) != archetype_files(mode)
+
+
+@pytest.mark.parametrize("scarcity,recharge", [(0.0, 20.0), (0.5, 12.5), (1.0, 5.0)])
+def test_racing_specialized_controller_has_finite_boost_and_acceleration(scarcity, recharge):
+    import json
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+    files = archetype_files("racing", operator_axes={"scarcity": scarcity, "tempo": 1.0})
+    player = files["scripts/archetypes/racing/player_controller.gd"]
+    assert "@export var speed: float = 525.00" in player
+    assert f"const BOOST_RECHARGE := {recharge:.2f}" in player
+    assert "boost_charge >= BOOST_DRAIN * delta" in player
+    assert "boost_charge - BOOST_DRAIN * delta" in player
+    assert "minf(100.0, boost_charge + BOOST_RECHARGE * delta)" in player
+    assert 'Input.is_action_pressed("ui_accept")' in player
+    assert "velocity.move_toward(desired, acceleration * delta)" in player
+    assert "sqrt(2.0 * BRAKE_ACCELERATION * distance)" in player
+    assert json.loads(files[SOURCE_PATH])["applied"]["racing.boost_recharge_per_second"] == recharge
+
+
+def test_racing_first_checkpoint_starts_lap_and_each_lap_requires_closed_circuit():
+    loop = archetype_files("racing", operator_axes={"grind": 1.0})["scripts/archetypes/racing/core_loop.gd"]
+    assert "const GOAL_LAPS := 4" in loop
+    assert "var started: bool = false" in loop
+    assert "if not started:" in loop and "waypoint = 1" in loop
+    assert "if waypoint == 0:" in loop
+    assert "laps += 1" in loop
+    assert "waypoint = (waypoint + 1) % course.size()" in loop
+    assert "last_sector = elapsed - sector_started_at" in loop
+    assert "last_lap = elapsed - lap_started_at" in loop
+    assert "lap_times.append(last_lap)" in loop
+    assert "last_lap < best_lap" in loop
+    assert "elapsed >= TIME_LIMIT" in loop
+
+
+def test_galaxy_economy_tunes_racing_boost_regeneration():
+    from skeleton.context.galaxy_profile import MATRIX_FIELDS, SCHEMA, compile_galaxy_playable_axes
+    config = {field: {} for field in MATRIX_FIELDS}
+    config.update(title="Time trial", genre="racing", narrative_phases={}, extra_params={}, style_params={})
+    config["mechanics_matrix"]["economy"] = {"complexity": 1000}
+    axes, receipt = compile_galaxy_playable_axes({"schema": SCHEMA, "config": config}, "racing", {})
+    assert axes == {"scarcity": 1.0}
+    player = archetype_files("racing", operator_axes=axes)["scripts/archetypes/racing/player_controller.gd"]
+    assert "const BOOST_RECHARGE := 5.00" in player
+    assert receipt["mapped_matrix_dials"] == 1

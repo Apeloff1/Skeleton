@@ -451,6 +451,44 @@ _SPECS: Dict[str, Tuple[str, float, int]] = {
 # remains the canonical deterministic CharacterBody2D implementation.
 _EXPANDED_CONTROLLER = _CONTROLLER
 
+_RACING_CONTROLLER = '''extends CharacterBody2D
+## {name} acceleration and finite boost controller v{version}.
+@export var speed: float = {speed}
+const ACCELERATION := 1800.0
+const BRAKE_ACCELERATION := 2400.0
+const BOOST_SCALE := 1.35
+const BOOST_DRAIN := 30.0
+const BOOST_RECHARGE := 12.5
+var autopilot: bool = false
+var autopilot_target: Vector2 = Vector2.ZERO
+var boost_charge: float = 100.0
+var boosting: bool = false
+
+func _ready() -> void:
+	autopilot = DisplayServer.get_name() == "headless" or OS.get_cmdline_user_args().has("--autoplay")
+
+func _physics_process(delta: float) -> void:
+	var desired := Vector2.ZERO
+	boosting = false
+	if autopilot:
+		var offset := autopilot_target - global_position
+		var distance := offset.length()
+		if distance > 4.0:
+			var arrival_speed := minf(speed, sqrt(2.0 * BRAKE_ACCELERATION * distance))
+			desired = offset.normalized() * arrival_speed
+	else:
+		var direction := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+		boosting = direction.length_squared() > 0.0 and Input.is_action_pressed("ui_accept") and boost_charge >= BOOST_DRAIN * delta
+		desired = direction * speed * (BOOST_SCALE if boosting else 1.0)
+	if boosting:
+		boost_charge = maxf(0.0, boost_charge - BOOST_DRAIN * delta)
+	else:
+		boost_charge = minf(100.0, boost_charge + BOOST_RECHARGE * delta)
+	var acceleration := ACCELERATION if desired.length_squared() > velocity.length_squared() else BRAKE_ACCELERATION
+	velocity = velocity.move_toward(desired, acceleration * delta)
+	move_and_slide()
+'''
+
 # Use the existing visual grid, live progress, headless isolation and D-pad.
 # Expanded interactions also need a dedicated pointer/touch USE action.
 _EXPANDED_LOOP_HEADER = _LOOP_HEADER
@@ -521,7 +559,7 @@ func _hud_status() -> String:
 '''
 
 _RACING = '''
-## 2D checkpoint time trial. Complete three ordered laps before the clock.
+## Complete full ordered checkpoint circuits before the deadline.
 var course: Array[Vector2] = [
 	Vector2(210, -90), Vector2(290, 130), Vector2(40, 230),
 	Vector2(-240, 110), Vector2(-180, -150)
@@ -532,6 +570,13 @@ const TIME_LIMIT := 45.0
 var waypoint: int = 0
 var laps: int = 0
 var elapsed: float = 0.0
+var lap_started_at: float = 0.0
+var sector_started_at: float = 0.0
+var last_sector: float = 0.0
+var last_lap: float = 0.0
+var best_lap: float = 0.0
+var lap_times: Array[float] = []
+var started: bool = false
 
 func _draw_objectives() -> void:
 	for idx in range(course.size()):
@@ -539,6 +584,10 @@ func _draw_objectives() -> void:
 		draw_line(course[idx], end, Color(0.32, 0.4, 0.7), 7.0)
 		var shade := Color(0.2, 0.96, 0.35) if idx == waypoint else Color(0.86, 0.77, 0.28)
 		draw_circle(course[idx], LAP_RADIUS, shade)
+		if idx == waypoint:
+			draw_arc(course[idx], LAP_RADIUS + 8.0, 0.0, TAU, 32, shade, 2.0)
+	if bool(player.get("boosting")):
+		draw_arc(player.global_position, 24.0, 0.0, TAU, 32, Color(0.39, 0.78, 1.0), 3.0)
 
 func _tick(delta: float) -> void:
 	elapsed += delta
@@ -547,17 +596,29 @@ func _tick(delta: float) -> void:
 		return
 	player.set("autopilot_target", course[waypoint])
 	if player.global_position.distance_to(course[waypoint]) <= LAP_RADIUS:
-		waypoint += 1
-		if waypoint >= course.size():
-			waypoint = 0
+		if not started:
+			started = true
+			lap_started_at = elapsed
+			sector_started_at = elapsed
+			waypoint = 1
+			return
+		last_sector = elapsed - sector_started_at
+		sector_started_at = elapsed
+		if waypoint == 0:
 			laps += 1
+			last_lap = elapsed - lap_started_at
+			lap_started_at = elapsed
+			lap_times.append(last_lap)
+			if best_lap <= 0.0 or last_lap < best_lap:
+				best_lap = last_lap
 			if laps >= GOAL_LAPS:
-				_finish(true, "laps=%d time=%.1f" % [laps, elapsed])
+				_finish(true, "laps=%d time=%.1f best=%.2f" % [laps, elapsed, best_lap])
+				return
+		waypoint = (waypoint + 1) % course.size()
 		queue_redraw()
 
-
 func _hud_status() -> String:
-	return "Lap %d/%d | Checkpoint %d/%d | Time %.1f/%.1f s" % [laps, GOAL_LAPS, waypoint + 1, course.size(), elapsed, TIME_LIMIT]
+	return "Lap %d/%d | Gate %d/%d | Time %.1f/%.1f s | Best %.2f | Sector %.2f | Boost %d%% (hold USE)" % [mini(laps + 1, GOAL_LAPS), GOAL_LAPS, waypoint + 1, course.size(), elapsed, TIME_LIMIT, best_lap, last_sector, int(player.get("boost_charge"))]
 '''
 
 _SURVIVAL = '''
@@ -777,7 +838,8 @@ def _expanded_files(name: str, axes: Mapping[str, float]) -> Dict[str, str]:
     body, speed, max_frames = _EXPANDED_SPECS[name]
     fmt = {"name": name, "version": ARCHETYPE_CONTENT_VERSION}
     title = "".join(part.capitalize() for part in name.split("_")) + "Main"
-    player = _EXPANDED_CONTROLLER.format(speed=speed, **fmt)
+    controller = _RACING_CONTROLLER if name == "racing" else _EXPANDED_CONTROLLER
+    player = controller.format(speed=speed, **fmt)
     loop = _EXPANDED_LOOP_HEADER.format(
         max_frames=max_frames, complete=COMPLETE_MARKER, failed=FAILED_MARKER,
         instruction=name.capitalize() + " | arrows or touch to move | Enter or USE to interact", **fmt
