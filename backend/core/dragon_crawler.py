@@ -4640,6 +4640,8 @@ async def recover_crawler_runs(*, limit: int = 16) -> dict:
         ("treasury_vault_scrub",crawler_application.scrub_treasury_vault),
         ("deep_archive_retirements",crawler_application.recover_deep_archive),
         ("deep_archive_index",crawler_application.build_deep_indexes),
+        ("deep_archive_expiry",crawler_application.purge_expired_deep_indexes),
+        ("deep_archive_erasure",crawler_application.recover_deep_erasure),
     ):
         try:
             result[name]=await operation()

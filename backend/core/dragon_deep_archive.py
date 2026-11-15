@@ -138,6 +138,48 @@ class DragonDeepArchiveMixin:
                     {"$set":{"deep_archive.retry_at":_now().timestamp()+3600}})
         return totals
 
+    async def purge_expired_deep_indexes(self,*,limit=8):
+        """Drop only derived routing fields, never preserved source bytes."""
+        from core.dragon_crawler import _now
+        if type(limit) is not int or not 1<=limit<=32:
+            raise ValueError("purge bound")
+        await self.ensure_indexes()
+        now=_now().timestamp()
+        rows=await self.sessions.find({"deep_index.expires_at":{"$lte":now}},
+            {"_id":1,"tenant_id":1,"owner_id":1,"version":1,"deep_index.digest":1,"deep_index.expires_at":1}
+            ).sort("deep_index.expires_at",ASCENDING).limit(limit).max_time_ms(2000).to_list(limit)
+        purged=0
+        for row in rows:
+            index=row["deep_index"]
+            result=await self.sessions.update_one({"_id":row["_id"],"tenant_id":row["tenant_id"],"owner_id":row["owner_id"],
+                "version":row["version"],"deep_index.digest":index["digest"],"deep_index.expires_at":index["expires_at"],
+                "$expr":{"$lte":["$deep_index.expires_at",{"$divide":[{"$toLong":"$$NOW"},1000]}]}},
+                {"$unset":{"deep_index":"","deep_index_due":""}})
+            purged+=result.modified_count
+        return {"scanned":len(rows),"purged":purged}
+
+    async def recover_deep_erasure(self,*,limit=8):
+        """Finish partition cleanup after a crash following durable deletion."""
+        from skeleton.ai.webcrawler.dragon_vault_quota import tombstone
+        if type(limit) is not int or not 1<=limit<=32:
+            raise ValueError("cleanup bound")
+        await self.ensure_indexes()
+        rows=await self.sessions.find({"status":"deleted","deep_slot_cleanup":True},
+            {"_id":1,"tenant_id":1,"owner_id":1,"version":1,"status":1,"deletion":1,"deep_slot_cleanup":1}
+            ).sort("_id",ASCENDING).limit(limit).max_time_ms(2000).to_list(limit)
+        cleaned=held=0
+        for row in rows:
+            if not tombstone(row):
+                held+=1
+                continue
+            scope={k:row[k] for k in ("tenant_id","owner_id")}
+            await self._release_deep_slot(scope,row["_id"])
+            result=await self.sessions.update_one({**scope,"_id":row["_id"],"version":row["version"],
+                "status":"deleted","deletion":row["deletion"],"deep_slot_cleanup":True},
+                {"$unset":{"deep_slot_cleanup":""}})
+            cleaned+=result.modified_count
+        return {"scanned":len(rows),"cleaned":cleaned,"held":held}
+
     async def deep_archive_catalog(self,scope,*,cursor=None,limit=32):
         from core.dragon_crawler import CrawlerError,_now
         if type(limit) is not int or not 1<=limit<=64 or cursor is not None and not identity(cursor):
@@ -321,7 +363,7 @@ class DragonDeepArchiveMixin:
             raise ValueError("empty source")
         width=min(max_chars,4000,len(text))
         wanted=set(terms)
-        stride=max(1,width//2)
+        stride=max(1,width//2,(max(0,len(text)-width)+126)//127)
         starts=list(range(0,max(1,len(text)-width+1),stride))
         if starts[-1]!=len(text)-width:
             starts.append(len(text)-width)

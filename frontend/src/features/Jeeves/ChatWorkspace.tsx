@@ -247,6 +247,8 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
     return () => clearTimeout(timer);
   }, [conversation.id, conversation.messages.length, busy]);
 
+  useEffect(()=>{setHistoricalArchive(false);},[conversation.id]);
+
   const storageLabel = useMemo(() => ({ loading: 'Opening chat cache…', saving: 'Caching…', saved: 'Account cache saved', error: 'Cache not saved' })[snapshot.saveState], [snapshot.saveState]);
 
   const send = () => {

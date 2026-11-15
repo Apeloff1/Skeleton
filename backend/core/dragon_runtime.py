@@ -859,7 +859,7 @@ async def search_hoag_archive(scope:dict,query:str,limit:int=8,cursor:str|None=N
     try:
         reviewed=await search_reviewed_references(scope,query,limit)
     except GameLearningError as exc:
-        if exc.status_code!=503:
+        if exc.status!=503:
             raise
         reviewed=None
         wiki_state="unavailable"
