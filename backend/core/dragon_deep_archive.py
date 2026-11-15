@@ -154,7 +154,7 @@ class DragonDeepArchiveMixin:
             result=await self.sessions.update_one({"_id":row["_id"],"tenant_id":row["tenant_id"],"owner_id":row["owner_id"],
                 "version":row["version"],"deep_index.digest":index["digest"],"deep_index.expires_at":index["expires_at"],
                 "$expr":{"$lte":["$deep_index.expires_at",{"$divide":[{"$toLong":"$$NOW"},1000]}]}},
-                {"$unset":{"deep_index":"","deep_index_due":""}})
+                {"$unset":{"deep_index":"","deep_hybrid_route":"","deep_index_due":""}})
             purged+=result.modified_count
         return {"scanned":len(rows),"purged":purged}
 
@@ -266,21 +266,23 @@ class DragonDeepArchiveMixin:
             try:
                 def build():
                     snap,grant,policies,allowed=self._deep_material(scope,row,now)
-                    return a.build_index(scope,snap,grant,policies,now,allowed)
-                index=await _bounded_discovery_cpu(build)
-                await self._admit(scope,row["_id"],{"deep_index":index})
+                    from core.dragon_hybrid_rank import build_route
+                    return (a.build_index(scope,snap,grant,policies,now,allowed),
+                            build_route(scope,snap,grant,policies,now,allowed))
+                index,hybrid=await _bounded_discovery_cpu(build)
+                await self._admit(scope,row["_id"],{"deep_index":index,"deep_hybrid_route":hybrid})
             except CrawlerError:
                 await self.sessions.update_one(fence,{"$set":{"deep_index_due":_now().timestamp()+300}})
                 totals["held"]+=1
                 continue
             except (ValueError,TypeError,KeyError,CheckpointReplicaError):
-                await self.sessions.update_one(fence,{"$unset":{"deep_index":""},
+                await self.sessions.update_one(fence,{"$unset":{"deep_index":"","deep_hybrid_route":""},
                       "$set":{"deep_index_due":_now().timestamp()+3600}})
                 totals["held"]+=1
                 continue
             fence={**fence,"archive_grant":row["archive_grant"],"$expr":{"$and":[
                   {"$gt":["$deep_index_due",clock]},{"$gt":["$archive_grant.expires_at",clock]}]}}
-            changed=await self.sessions.update_one(fence,{"$set":{"deep_index":index,
+            changed=await self.sessions.update_one(fence,{"$set":{"deep_index":index,"deep_hybrid_route":hybrid,
                 "deep_index_due":min(index["expires_at"],_now().timestamp()+86400)}})
             totals["indexed" if changed.modified_count else "superseded"]+=1
         return totals
@@ -290,17 +292,20 @@ class DragonDeepArchiveMixin:
         from core.dragon_crawler import CrawlerError,_now
         try:
             terms,tokens=a.query_terms(scope,query)
+            from core.dragon_hybrid_rank import route_terms
+            rare_tokens=route_terms(scope,query)
             after=a.decode_cursor(scope,query,cursor)
         except ValueError as exc:
             raise CrawlerError("crawler_deep_query","Invalid archive search or cursor.",422) from exc
         await self.ensure_indexes()
         now=_now().timestamp()
         predicate={**scope,"status":{"$in":sorted(TERMINAL)},"deep_archive.released":True,
-            "deep_index.tokens":{"$in":tokens},"deep_index.expires_at":{"$gt":now}}
+            "deep_index.expires_at":{"$gt":now},"$or":[{"deep_index.tokens":{"$in":tokens}},
+            {"deep_hybrid_route.tokens":{"$in":rare_tokens},"deep_hybrid_route.expires_at":{"$gt":now}}]}
         if after:
             predicate["_id"]={"$gt":after}
         async def page():
-            return await self.sessions.find(predicate,{"_id":1,"version":1,"deep_index.digest":1}
+            return await self.sessions.find(predicate,{"_id":1,"version":1,"deep_index.digest":1,"deep_hybrid_route.digest":1}
                 ).sort("_id",ASCENDING).limit(a.PAGE+1).max_time_ms(3000).to_list(a.PAGE+1)
         rows=await page()
         hits=[]
@@ -316,6 +321,9 @@ class DragonDeepArchiveMixin:
                     from core.dragon_hybrid_rank import Candidate,rank as hybrid_rank
                     snap,grant,policies,allowed=self._deep_material(scope,row,now)
                     a.validate_index(row["deep_index"],snap,grant,policies,now)
+                    if "deep_hybrid_route" in row:
+                        from core.dragon_hybrid_rank import validate_route
+                        validate_route(row["deep_hybrid_route"],snap,grant,policies,now)
                     exact=a.rank_exact(scope,snap,grant,policies,now,terms,allowed)
                     ranks=hybrid_rank(query,[Candidate(h["source_id"],snap["sources"][h["source_id"]]["title"],
                         snap["sources"][h["source_id"]]["text"]) for h in exact])
