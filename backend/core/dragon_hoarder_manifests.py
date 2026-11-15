@@ -45,6 +45,10 @@ CREATE TABLE IF NOT EXISTS placements(
  FOREIGN KEY(owner,digest) REFERENCES chunks(owner,digest)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS chunk_references ON placements(owner,digest);
+CREATE TABLE IF NOT EXISTS manifest_garbage(
+ owner TEXT NOT NULL, manifest TEXT NOT NULL, digest TEXT NOT NULL,
+ PRIMARY KEY(owner,manifest,digest)
+) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS manifest_lifecycle ON manifests(state,updated_at,owner,id);
 CREATE INDEX IF NOT EXISTS manifest_history ON manifests(owner,logical_key,created_at DESC,id);
 """
@@ -267,6 +271,8 @@ class ManifestArchive:
             row=self._manifest(db,owner,identifier,{"building","sealed","aborted"})
             if row["state"]=="aborted":
                 return False
+            db.execute("""INSERT OR IGNORE INTO manifest_garbage
+                SELECT owner,manifest,digest FROM placements WHERE owner=? AND manifest=?""",(owner,identifier))
             db.execute("DELETE FROM placements WHERE owner=? AND manifest=?",(owner,identifier))
             db.execute("UPDATE manifests SET state='aborted',updated_at=? WHERE owner=? AND id=?",
                        (int(time.time()),owner,identifier))
@@ -324,3 +330,46 @@ class ManifestArchive:
             row=db.execute("SELECT COUNT(*) AS n,COALESCE(SUM(raw_bytes),0) AS raw,COALESCE(SUM(compressed_bytes),0) AS compressed FROM chunks WHERE owner=?",(owner,)).fetchone()
             return {"manifests":states,"unique_chunks":row["n"],"unique_raw_bytes":row["raw"],
                     "unique_compressed_bytes":row["compressed"],"capacity_guaranteed":False}
+
+
+    def abort_intent(self,scope,*,logical_key,operation,expected_hash,expected_bytes):
+        """Create a permanent tombstone even if an external write has not begun."""
+        receipt=self.begin(scope,logical_key=logical_key,operation=operation,
+                           expected_hash=expected_hash,expected_bytes=expected_bytes)
+        identifier=receipt["manifest"]
+        self.abort(scope,identifier)
+        return identifier
+
+    def collect_manifest(self,scope,identifier,*,limit=32):
+        """Resolve exactly this tombstone's pending garbage, including crash replay."""
+        owner=owner_key(scope)
+        identifier=_hex(identifier)
+        if type(limit) is not int or not 1<=limit<=128:
+            raise ValueError("collection bound")
+        processed=erased=0
+        for _ in range(limit):
+            with self._write() as db:
+                self._manifest(db,owner,identifier,{"aborted"})
+                row=db.execute("""SELECT digest FROM manifest_garbage
+                    WHERE owner=? AND manifest=? ORDER BY digest LIMIT 1""",(owner,identifier)).fetchone()
+                if row is None:
+                    break
+                digest=row["digest"]
+                live=db.execute("SELECT 1 FROM placements WHERE owner=? AND digest=? LIMIT 1",(owner,digest)).fetchone()
+                if not live:
+                    chunk=db.execute("SELECT * FROM chunks WHERE owner=? AND digest=?",(owner,digest)).fetchone()
+                    if chunk:
+                        receipt=self.bulk.lookup(chunk["volume"],scope,digest)
+                        if receipt:
+                            if receipt.raw_bytes!=chunk["raw_bytes"]:
+                                raise StorageHeld("manifest garbage witness differs")
+                            self.bulk.erase_unreferenced(scope,receipt)
+                            erased+=1
+                        db.execute("DELETE FROM chunks WHERE owner=? AND digest=?",(owner,digest))
+                db.execute("DELETE FROM manifest_garbage WHERE owner=? AND manifest=? AND digest=?",
+                           (owner,identifier,digest))
+                processed+=1
+        with self._db() as db:
+            remaining=db.execute("SELECT COUNT(*) FROM manifest_garbage WHERE owner=? AND manifest=?",
+                                 (owner,identifier)).fetchone()[0]
+        return {"processed":processed,"erased":erased,"remaining":remaining,"physical_secure_erasure":False}
