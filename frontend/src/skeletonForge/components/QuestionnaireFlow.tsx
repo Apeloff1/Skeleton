@@ -11,6 +11,9 @@ import { GALAXY_CHOICES, galaxyGenre, mappedBriefGenre } from '../galaxyGenres';
 import { GENRE_COUNT, GENRE_GROUPS, filterGenreChoices } from '../genreCatalog';
 import DesignInstruments from './DesignInstruments';
 import DesignPresetPanel from './DesignPresetPanel';
+import GenreControlsPreview from './GenreControlsPreview';
+import ConductorPreviewPanel from './ConductorPreviewPanel';
+import JeevesQualityPanel from './JeevesQualityPanel';
 import { suggestPlayableMode } from '../playableSuggestions';
 import {
   ARCHETYPES, BRIEF_FACETS, ERA_SOURCE_COPY, PLAYABLE_SLICES, PLAYABLE_TUNING_EFFECTS, STEP_LABELS, STEPS, TARGETS, VISION_MAX,
@@ -196,6 +199,7 @@ function GenrePicker({ value, onPick }: { value?: string; onPick: (v: string) =>
         ))}
       </View>
       {!shown.length ? <Text style={st.help}>No matching genre. Try a broader term or another category.</Text> : null}
+      {value ? <GenreControlsPreview genre={value} /> : null}
     </View>
   );
 }
@@ -239,6 +243,8 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
   return (
     <Card>
       <DesignPresetPanel state={state} dispatch={dispatch} />
+      <ConductorPreviewPanel vision={state.vision} />
+      <JeevesQualityPanel />
       {state.galaxyProfile ? <Banner tone="idle">The complete Galaxy questionnaire is attached to this build.</Banner> : null}
       <View accessibilityRole="radiogroup" accessibilityLabel="Forge archetype" style={st.group}>
         <Text style={st.q}>How should the blueprint be built?</Text>
