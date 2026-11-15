@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from contextvars import ContextVar
+from dataclasses import dataclass
 import os
 import threading
 from typing import Iterator
@@ -16,7 +17,16 @@ from typing import Iterator
 from .fair_stream_queue import MAX_TOKENS
 from .fair_stream_session import DispatchPermit
 
-_scope: ContextVar[tuple[DispatchPermit, int, int, int] | None] = ContextVar(
+@dataclass(slots=True)
+class _ExecutionScope:
+    permit: DispatchPermit
+    ceiling: int
+    pid: int
+    thread: int
+    active: bool = True
+
+
+_scope: ContextVar[_ExecutionScope | None] = ContextVar(
     "fair_stream_revalidation", default=None,
 )
 
@@ -28,10 +38,14 @@ def bound_revalidation_budget(permit: DispatchPermit, token_budget: int) -> Iter
             or not 1 <= permit.tokens <= token_budget <= MAX_TOKENS
             or _scope.get() is not None):
         raise ValueError("canonical non-nested revalidation envelope required")
-    token = _scope.set((permit, token_budget, os.getpid(), threading.get_ident()))
+    scope = _ExecutionScope(permit, token_budget, os.getpid(), threading.get_ident())
+    token = _scope.set(scope)
     try:
         yield
     finally:
+        # copy_context() preserves object identity. Revocation must affect
+        # every copied context, not solely the original ContextVar binding.
+        scope.active = False
         _scope.reset(token)
 
 
@@ -41,8 +55,8 @@ def revalidation_budget(permit: DispatchPermit) -> int:
         # Standalone callers have no original planning witness. Preserve
         # conservative revalidation rather than inventing a larger ceiling.
         return permit.tokens
-    issued, ceiling, pid, thread = observed
-    if (issued is not permit or pid != os.getpid()
-            or thread != threading.get_ident()):
+    if (not observed.active or observed.permit is not permit
+            or observed.pid != os.getpid()
+            or observed.thread != threading.get_ident()):
         raise ValueError("revalidation envelope does not bind this execution")
-    return ceiling
+    return observed.ceiling

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
-from threading import RLock
+from threading import RLock, get_ident
 from time import monotonic_ns
 
 from .fair_stream_live_budget import LiveStreamBudgetSampler
@@ -172,6 +172,9 @@ class NativeTokenPressureGuard:
         self._epoch = 0
         self._used_leases: set[str] = set()
         self._samples = 0
+        self._verified_samples = 0
+        self._sampling = False
+        self._active_thread: int | None = None
         self._stopped = False
         self._pressure: int | None = None
         self._start_ns: int | None = None
@@ -209,10 +212,12 @@ class NativeTokenPressureGuard:
         try:
             now = monotonic_ns()
         except BaseException as exc:
+            self._recoverable_stop = False
             self._stopped = True
             raise NativePressureInterrupted("monotonic execution clock unavailable") from exc
         if (type(now) is not int or now < 0 or self._start_ns is None
                 or self._last_ns is None or now < self._last_ns):
+            self._recoverable_stop = False
             self._stopped = True
             raise NativePressureInterrupted("monotonic execution clock regressed")
         self._last_ns = now
@@ -259,7 +264,9 @@ class NativeTokenPressureGuard:
             self._last_permit = permit
             self._recoverable_stop = True
             self._active = permit.lease_id
+            self._active_thread = get_ident()
             self._samples = 0
+            self._verified_samples = 0
             self._pressure = None
 
         def interrupt() -> None:
@@ -268,11 +275,16 @@ class NativeTokenPressureGuard:
                 if (self._active != permit.lease_id
                         or self._epoch != epoch or self._stopped):
                     raise NativePressureInterrupted("pressure guard no longer active")
+                if self._active_thread != get_ident() or self._sampling:
+                    self._recoverable_stop = False
+                    self._stopped = True
+                    raise NativePressureInterrupted("recursive or foreign-thread pressure callback")
                 self._check_deadline()
                 if self._samples >= self._max_probes:
                     self._stopped = True
                     raise NativePressureInterrupted("per-lease probe budget exhausted")
                 self._samples += 1
+                self._sampling = True
                 try:
                     budget, evidence = self._sampler.sample(
                         token_budget=ceiling, storage_path=self._storage_path,
@@ -280,6 +292,10 @@ class NativeTokenPressureGuard:
                 except BaseException as exc:
                     self._stopped = True
                     raise NativePressureInterrupted("live OS pressure unavailable") from exc
+                finally:
+                    self._sampling = False
+                if self._stopped or self._active != permit.lease_id or self._epoch != epoch:
+                    raise NativePressureInterrupted("pressure callback authority changed during sampling")
                 # Probe latency itself consumes the lease's deadline.
                 self._check_deadline()
                 if (type(budget) is not MeasuredStreamBudget
@@ -298,6 +314,7 @@ class NativeTokenPressureGuard:
                         or budget.available_for_streams < permit.bytes_reserved):
                     self._stopped = True
                     raise NativePressureInterrupted("live memory or thermal pressure hold")
+                self._verified_samples += 1
 
         return interrupt
 
@@ -307,6 +324,10 @@ class NativeTokenPressureGuard:
         with self._lock:
             if type(success) is not bool:
                 raise ValueError("explicit completion outcome required")
+            if self._sampling or (self._active is not None and self._active_thread != get_ident()):
+                self._recoverable_stop = False
+                self._stopped = True
+                raise NativePressureInterrupted("pressure completion during callback or foreign thread")
             if success and self._active is not None and not self._stopped:
                 try:
                     self._check_deadline()
@@ -317,7 +338,7 @@ class NativeTokenPressureGuard:
             # A success without a model callback AND postflight probe, or a tripped guard
             # cannot be promoted to a reusable CPU execution permit.
             if success and (
-                self._active is None or self._samples < 2 or self._stopped
+                self._active is None or self._verified_samples < 2 or self._stopped
             ):
                 self._active = None
                 self._recoverable_stop = False
@@ -326,6 +347,7 @@ class NativeTokenPressureGuard:
                     "unverified pressure guard completion"
                 )
             self._active = None
+            self._active_thread = None
             if success:
                 self._recoverable_stop = False
             else:

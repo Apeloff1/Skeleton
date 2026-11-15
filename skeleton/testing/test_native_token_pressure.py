@@ -456,3 +456,80 @@ def test_exact_retired_lease_can_reauthorize_without_replaying_old_callback(monk
     guard.finish(success=True)
     with pytest.raises(NativePressureInterrupted, match="replay"):
         guard.start(P)
+
+def test_copied_context_cannot_resurrect_expired_planning_ceiling():
+    from contextvars import copy_context
+    from skeleton.ai.model_runtime.fair_stream_revalidation import (
+        bound_revalidation_budget, revalidation_budget,
+    )
+
+    with bound_revalidation_budget(P, 8):
+        copied = copy_context()
+        assert copied.run(revalidation_budget, P) == 8
+    with pytest.raises(ValueError, match="does not bind"):
+        copied.run(revalidation_budget, P)
+    assert revalidation_budget(P) == P.tokens
+
+
+@pytest.mark.parametrize("nested", ["probe", "finish"])
+def test_sampler_cannot_reenter_pressure_authority_even_if_error_swallowed(monkeypatch, nested):
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    callback = guard.start(P)
+
+    def sample(self, *, token_budget, storage_path):
+        with pytest.raises(NativePressureInterrupted, match="callback"):
+            if nested == "probe":
+                callback()
+            else:
+                guard.finish(success=True)
+        return budget(), canonical_evidence()
+
+    monkeypatch.setattr(LiveStreamBudgetSampler, "sample", sample)
+    with pytest.raises(NativePressureInterrupted, match="authority changed"):
+        callback()
+    assert guard.status().samples == 1
+    assert guard._verified_samples == 0
+    guard.finish(success=False)
+    with pytest.raises(NativePressureInterrupted, match="retired lease"):
+        guard.reauthorize_retired_lease(P)
+
+
+def test_foreign_thread_cannot_sample_active_native_lease(monkeypatch):
+    from threading import Thread
+
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    callback = guard.start(P)
+    errors = []
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("foreign thread sampled native hardware")
+
+    monkeypatch.setattr(LiveStreamBudgetSampler, "sample", forbidden)
+
+    def attempt():
+        try:
+            callback()
+        except NativePressureInterrupted as exc:
+            errors.append(str(exc))
+
+    thread = Thread(target=attempt)
+    thread.start()
+    thread.join(5)
+    assert not thread.is_alive()
+    assert len(errors) == 1 and "foreign-thread" in errors[0]
+    assert guard.status().samples == 0 and guard.status().stopped
+    guard.finish(success=False)
+    with pytest.raises(NativePressureInterrupted, match="retired lease"):
+        guard.reauthorize_retired_lease(P)
+
+
+def test_clock_regression_cannot_be_reauthorized_by_retirement(monkeypatch):
+    values = iter((100, 99))
+    monkeypatch.setattr(pressure_module, "monotonic_ns", lambda: next(values))
+    guard = NativeTokenPressureGuard(LiveStreamBudgetSampler(), storage_path=".")
+    callback = guard.start(P)
+    with pytest.raises(NativePressureInterrupted, match="clock regressed"):
+        callback()
+    guard.finish(success=False)
+    with pytest.raises(NativePressureInterrupted, match="retired lease"):
+        guard.reauthorize_retired_lease(P)
