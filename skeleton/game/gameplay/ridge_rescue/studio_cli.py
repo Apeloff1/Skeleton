@@ -27,6 +27,24 @@ COMMANDS = {
     "challenges": ("challenges_cli", "Eight original playable terrain rescue frontiers"),
 }
 
+# Literal imports are delayed until the selected command executes. The catalog
+# stays cheap and user input cannot construct an import target.
+_ENTRYPOINTS: dict[str, Callable[[], Callable[[list[str] | None], int]]] = {
+    "rescue": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.cli").main,
+    "consumer": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.consumer_cli").main,
+    "campaign": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.campaign_cli").main,
+    "missions": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.missions_cli").main,
+    "journal": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.journal_cli").main,
+    "package": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.package_cli").main,
+    "routebook": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.routebook_cli").main,
+    "tactics": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.tactics_cli").main,
+    "workbench": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.workbench_cli").main,
+    "league": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.league_cli").main,
+    "league-demo": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.league_acceptance").main,
+    "acceptance": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.qualification_cli").main,
+    "challenges": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.challenges_cli").main,
+}
+
 
 def catalog() -> dict:
     return {"schema": "ridge.rescue.launcher.v1", "game_id": "cinder-ridge-rescue",
@@ -46,10 +64,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if parsed.system not in COMMANDS:
         parser.error("unknown Cinder Ridge subsystem")
-    module_name = COMMANDS[parsed.system][0]
-    # Only the closed, statically defined package namespace may be imported.
-    module = importlib.import_module("." + module_name, package=__package__)
-    entrypoint: Callable[[list[str] | None], int] = getattr(module, "main")
+    entrypoint = _ENTRYPOINTS[parsed.system]()
     return entrypoint(parsed.args)
 
 

@@ -21,7 +21,7 @@ class MongoRoleCustodyTests(unittest.TestCase):
         right = _role_custody({"authInfo": {"authenticatedUserRoles": list(reversed(roles))}})
         self.assertEqual(left, right)
         self.assertNotEqual(left, _role_custody({"authInfo": {
-            "authenticatedUserRoles": [{"db": "admin", "role": "read"}]}))
+            "authenticatedUserRoles": [{"db": "admin", "role": "read"}]}}))
 
     def test_explicit_null_and_duplicates_fail_closed(self):
         for roles in (None, {}, [None], [{"db": "admin", "role": "read"}] * 2):
