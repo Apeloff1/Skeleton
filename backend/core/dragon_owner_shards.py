@@ -88,6 +88,10 @@ def _table(db,name):
     return db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(name,)).fetchone() is not None
 
 
+def _required(plane):
+    return os.getenv("SKL_DRAGON_"+plane.upper()+"_SHARDS_REQUIRED","")=="1"
+
+
 def _layout(db,plane):
     if not _table(db,"dragon_shard_topology"):return None
     r=db.execute("SELECT layout FROM dragon_shard_topology WHERE plane=?",(plane,)).fetchone()
@@ -102,7 +106,8 @@ def _layout(db,plane):
 
 
 def _target(base,plane,layout,lane):
-    if Path(layout["paths"][0])!=base:raise ShardHeld("shard root binding differs")
+    if type(lane) is not int or not 0<=lane<LANES or Path(layout["paths"][0])!=base:
+        raise ShardHeld("shard root binding differs")
     p,_=_private(layout["paths"][lane])
     with _open(p) as db:
         if not _table(db,"dragon_shard_identity"):raise ShardHeld("shard identity missing")
@@ -154,7 +159,7 @@ def provision(base,plane,paths,*,offline_acknowledged=False):
 def _legacy_owner(db,owner):
     # Canonical ordinary tables with a leading owner key. Virtual FTS shadows
     # are excluded; their rows are subordinate to canonical owner records.
-    for row in db.execute("SELECT name,sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"):
+    for row in db.execute("SELECT name,sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"):
         name=row["name"]
         if name.startswith("dragon_shard_") or name in {"world_subscriptions","world_origin_guard"} or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*",name):
             continue
@@ -174,7 +179,7 @@ def owner_path(base,plane,scope):
     with _open(base) as db:
         layout=_layout(db,plane)
         if layout is None:
-            if _table(db,"dragon_shard_identity"):raise ShardHeld("missing root topology")
+            if _required(plane) or _table(db,"dragon_shard_identity"):raise ShardHeld("missing root topology")
             return base
         # Validate root marker without a second connection.
         if not _table(db,"dragon_shard_identity"):raise ShardHeld("root marker missing")
@@ -204,7 +209,7 @@ def shard_paths(base,plane):
     with _open(base) as db:
         layout=_layout(db,plane)
         if layout is None:
-            if _table(db,"dragon_shard_identity"):raise ShardHeld("missing root topology")
+            if _required(plane) or _table(db,"dragon_shard_identity"):raise ShardHeld("missing root topology")
             return (base,)
     return tuple(_target(base,plane,layout,i) for i in range(LANES))
 
@@ -217,7 +222,7 @@ def next_path(base,plane,job):
     with _open(base) as db:
         layout=_layout(db,plane)
         if layout is None:
-            if _table(db,"dragon_shard_identity"):raise ShardHeld("missing root topology")
+            if _required(plane) or _table(db,"dragon_shard_identity"):raise ShardHeld("missing root topology")
             return base
         db.execute("BEGIN IMMEDIATE")
         try:
