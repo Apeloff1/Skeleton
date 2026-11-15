@@ -185,3 +185,20 @@ test('Studio upgrades missing legacy cockpit fields without discarding modern ma
     assert.equal(Foundation.sanitizeProjects([{ ...project, questionnaire: { ...legacy, ...invalid } }]).corrupt, true);
   }
 });
+
+test('preset replay retains exact headless and portable source opt-ins', () => {
+  let state = filled();
+  state = Q.questionnaireReducer(state, { type: 'setPlaytestMode', value: 'require' });
+  state = Q.questionnaireReducer(state, { type: 'setSourceExportEnabled', value: true });
+  const restored = P.decodeDesignPresets(P.encodeDesignPresets([P.makeDesignPreset('full', state, 42)]))[0].state;
+  assert.deepEqual(Q.buildRunRequest(restored), Q.buildRunRequest(state));
+  assert.throws(() => P.makeDesignPreset('bad', { ...state, playtest: 'skip' }, 42), /preset rejected/i);
+  assert.throws(() => P.makeDesignPreset('bad', { ...state, sourceExport: { enabled: 'true' } }, 42), /preset rejected/i);
+});
+
+
+test('oversized preset inventory is rejected before individual records are normalized', () => {
+  const raw = JSON.stringify({ schema: P.DESIGN_PRESET_SCHEMA,
+    entries: Array.from({ length: P.MAX_SAVED_PRESETS + 1 }, () => null) });
+  assert.throws(() => P.decodeDesignPresets(raw), /too many saved designs/);
+});

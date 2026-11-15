@@ -1,7 +1,7 @@
 """Safe canonical data and digest bindings shared with the native candidate source."""
 from __future__ import annotations
 from .errors import refuse
-from ..native_candidate.strict import digest, bytes_sha as bytes_sha
+from ..native_candidate.strict import digest, bytes_sha as bytes_sha, encode as encode
 
 
 def required_sha(value: object, label: str) -> str:

@@ -92,6 +92,27 @@ def test_detects_dropped_restored_ci_lane(repo_copy: Path) -> None:
     assert any("aggregate needs" in item for item in failures)
 
 
+def test_detects_dropped_source_qualification_lane(repo_copy: Path) -> None:
+    _edit(
+        repo_copy / ".github/workflows/merge-readiness.yml",
+        "      - source_qualification_gate\n",
+        "",
+    )
+    failures, _ = guard.run(repo_copy, guard.DEFAULT_POLICY)
+    assert any("aggregate needs" in item for item in failures)
+
+
+def test_source_qualification_is_explicit_policy_lane() -> None:
+    lanes = {lane["job_id"]: lane for lane in POLICY["aggregate_lanes"]}
+    lane = lanes["source_qualification_gate"]
+    assert lane["name"] == "Consolidated Source Qualification Gate"
+    assert lane["result_env"] == "SOURCE_QUALIFICATION_RESULT"
+    assert status.classify_run(lane["name"], [], 15368).state == "missing"
+    assert status.classify_run(
+        lane["name"], [_run(lane["name"], "failure")], 15368
+    ).state == "failure"
+
+
 def test_restored_ci_lane_is_reusable_and_required() -> None:
     lanes = {lane["job_id"]: lane for lane in POLICY["aggregate_lanes"]}
     assert lanes["ci"]["name"] == "CI/CD"

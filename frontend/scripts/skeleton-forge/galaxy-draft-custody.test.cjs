@@ -133,7 +133,7 @@ test('Galaxy studio button snapshots draft before invoking the separate Forge ha
   const root = path.resolve(__dirname, '../..');
   const modal = fs.readFileSync(path.join(root, 'src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal.tsx'), 'utf8');
   const route = fs.readFileSync(path.join(root, 'app/galaxy.tsx'), 'utf8');
-  assert.match(modal, /await saveGalaxyDraft\(snapshot\)/);
+  assert.match(modal, /await saveGalaxyDraft\(snapshot, editorEpoch\.current\)/);
   assert.match(modal, /matrices: matrixValues, narrative: narrativePhaseValues/);
   assert.match(modal, /disabled=\{handoffBusy\}/);
   assert.match(modal, /onRequestClose=\{\(\) => \{ void persistAndClose\(\); \}\}/);

@@ -11,7 +11,9 @@ import { getAuthEpoch, getAuthToken, initializeStoredToken } from '../auth/gamef
 
 const ALLOWED_PREFIXES = new Set([
   '@skeleton_creator_bridge_v1',
+  '@skeleton_gameforge_design_presets_v1',
   '@skeleton_galaxy_editor_draft_v1',
+  '@skeleton_galaxy_profile_snapshot_v1',
   // First-install project state is now protected by the same offline
   // account-epoch custody as the advanced creator workspaces.
   'skeleton.studio.onboarded.v1',
@@ -27,8 +29,9 @@ export interface CreatorStorageScope {
 
 export async function creatorStorageScope(prefix: string): Promise<CreatorStorageScope> {
   if (!ALLOWED_PREFIXES.has(prefix)) throw new Error('Unrecognized creator storage namespace');
-  await initializeStoredToken();
   const epoch = getAuthEpoch();
+  await initializeStoredToken();
+  if (getAuthEpoch() !== epoch) throw new Error('Account changed while initializing game draft storage');
   const token = getAuthToken();
   const fingerprint = token
     ? await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, token)
