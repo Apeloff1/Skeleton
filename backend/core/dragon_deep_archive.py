@@ -154,7 +154,7 @@ class DragonDeepArchiveMixin:
             result=await self.sessions.update_one({"_id":row["_id"],"tenant_id":row["tenant_id"],"owner_id":row["owner_id"],
                 "version":row["version"],"deep_index.digest":index["digest"],"deep_index.expires_at":index["expires_at"],
                 "$expr":{"$lte":["$deep_index.expires_at",{"$divide":[{"$toLong":"$$NOW"},1000]}]}},
-                {"$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":"","deep_dense_route":"","deep_dense_due":"","deep_index_due":""}})
+                {"$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":"","deep_dense_route":"","deep_dense_due":"","deep_full_state":"","deep_full_due":"","deep_index_due":""}})
             purged+=result.modified_count
         return {"scanned":len(rows),"purged":purged}
 
@@ -279,7 +279,7 @@ class DragonDeepArchiveMixin:
                 totals["held"]+=1
                 continue
             except (ValueError,TypeError,KeyError,CheckpointReplicaError):
-                await self.sessions.update_one(fence,{"$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":"","deep_dense_route":"","deep_dense_due":""},
+                await self.sessions.update_one(fence,{"$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":"","deep_dense_route":"","deep_dense_due":"","deep_full_state":"","deep_full_due":""},
                       "$set":{"deep_index_due":_now().timestamp()+3600}})
                 totals["held"]+=1
                 continue
@@ -450,6 +450,12 @@ class DragonDeepArchiveMixin:
         if configured():
             try:
                 vector_hits=await self.dense_archive_candidates(scope,query,session_ids=session_ids)
+                try:
+                    full_hits=await self.full_vector_candidates(scope,query,session_ids=session_ids)
+                    vector_hits=sorted(full_hits+vector_hits,key=lambda h:(-h["score"],h["session_id"],h["source_id"],h["start"]))[:64]
+                except Exception:
+                    # Preserve the already qualified sampled/lexical lanes.
+                    pass
                 dense_status="available"
                 lane=[]
                 for hit in vector_hits:
