@@ -33,6 +33,7 @@ from .structured_discovery import (
     extract_robots_sitemaps,
 )
 from .frontier_scheduler import choose_frontier
+from .adaptive_navigation import access_denied_hold, origin_health, restorative_wait
 from .frontier_circuit import evaluate_frontier_candidate
 from .host_backpressure import consent_bounded_retry_after, origin_throttle
 from .source_instruction_guard import (
@@ -96,6 +97,7 @@ def implementation_digest():
                 "structured_discovery.py",
                 "document_formats.py",
                 "frontier_scheduler.py",
+                "adaptive_navigation.py",
                 "frontier_coverage.py",
                 "frontier_antichain.py",
                 "federated_activity.py",
@@ -709,6 +711,10 @@ class CrawlRun:
             "next_ready_at": min(ready) if ready else None,
             "source_count": len(state["sources"]),
             "instruction_security": incident_summary(state["instruction_incidents"]),
+            "adaptive_origin_health": {
+                host: asdict(origin_health(state["events"], host))
+                for host in self.request.allowed_hosts
+            },
             "stop_reason": state["stop_reason"],
             "consent_expires_at": state["binding"]["consent"]["expires_at"],
             "consent_current": now < state["binding"]["consent"]["expires_at"],
@@ -854,6 +860,15 @@ class CrawlRun:
             if url not in self._state["seen"]:
                 self._state["seen"].append(url)
 
+    def _restore_host_delay(self, host, now):
+        # Outcome-driven recovery is additional delay only, never promotion
+        # of a previously denied URL or relaxation of a source hold.
+        deadline = restorative_wait(self._state["events"], host, now=now,
+                                     expires_at=self._state["binding"]["consent"]["expires_at"])
+        if deadline is not None:
+            ready = self._state["host_ready"]
+            ready[host] = max(ready.get(host, 0), deadline)
+
     def _retry(self, item, now, *, retry_after=None):
         if item["attempts"] >= 3:
             self._finish_item(item)
@@ -939,7 +954,7 @@ class CrawlRun:
         item, _selection = choose_frontier(
             state["frontier"], sources=state["sources"],
             host_ready=state["host_ready"], query=self.request.query,
-            now=now, strategy=self.request.frontier_strategy,
+            now=now, strategy=self.request.frontier_strategy, events=state["events"],
         )
         if item is None:
             return None
@@ -1005,6 +1020,8 @@ class CrawlRun:
             # The attempt consumed a dispatch slot; remote bytes discarded by a
             # failed transport are unknown, so reserve its entire admitted cap.
             state["pending_dispatch"] = None
+            now = time.time()
+            self._restore_host_delay(host, now)
             retained = self._retry(item, now)
             return self._event(
                 "error",
@@ -1034,6 +1051,7 @@ class CrawlRun:
                 item["url"] = destination
             return self._event("redirect", now=now, url=fetch_url, reason=destination)
         if response.status in _RETRY:
+            self._restore_host_delay(host, now)
             retry_after = consent_bounded_retry_after(
                 response.headers, now=now, expires_at=state["binding"]["consent"]["expires_at"],
             )
@@ -1057,6 +1075,10 @@ class CrawlRun:
                 url=fetch_url,
                 reason=f"http_{response.status}:{'scheduled' if retained else 'exhausted'}",
             )
+        denied_until = access_denied_hold(response.status, now=now,
+                                           expires_at=state["binding"]["consent"]["expires_at"])
+        if denied_until is not None:
+            state["host_ready"][host] = max(state["host_ready"].get(host, 0), denied_until)
         if needs_robots:
             robots["status"] = response.status
             robots["fetched_at"] = now
@@ -1339,7 +1361,9 @@ class CrawlRun:
                     )
                     self._state["pending_dispatch"] = None
                     usage["failures"] += 1
-                    self._retry(item, time.time())
+                    at = time.time()
+                    self._restore_host_delay(urlsplit(pending["url"]).hostname, at)
+                    self._retry(item, at)
                     event = self._event(
                         "interrupted_dispatch",
                         now=time.time(),
