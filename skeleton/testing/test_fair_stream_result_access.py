@@ -463,3 +463,35 @@ def test_invalid_plaintext_shape_burns_valid_nonce(setup, monkeypatch):
         setup["reader"].read_once(permit(), operator_grant=approval)
     with pytest.raises(ResultReadDenied, match="already consumed"):
         setup["reader"].read_once(permit(), operator_grant=approval)
+
+
+@pytest.mark.parametrize("column", ["lease_id", "receipt_digest"])
+def test_oversized_grant_identity_blocks_plaintext_after_consumption(setup, monkeypatch, column):
+    reader = setup["reader"]
+    read = setup["vault"].read_committed
+
+    def corrupt(*args, **kwargs):
+        plaintext = read(*args, **kwargs)
+        setup["grant_handle"].connection.execute(
+            "UPDATE local_fair_stream_result_read_grants SET " + column + "=?",
+            ("f" * 65536,),
+        )
+        return plaintext
+
+    monkeypatch.setattr(setup["vault"], "read_committed", corrupt)
+    approval = grant(setup)
+    with pytest.raises(ResultReadDenied, match="invalid consumed"):
+        reader.read_once(permit(), operator_grant=approval)
+    assert not setup["grant_handle"].connection.in_transaction
+    with pytest.raises(ResultReadDenied, match="already consumed"):
+        reader.read_once(permit(), operator_grant=approval)
+
+
+def test_oversized_grant_field_inventory_is_denied_before_consumption(setup):
+    approval = grant(setup)
+    approval.update({f"extra-{i}": None for i in range(20000)})
+    with pytest.raises(ResultReadDenied, match="fields"):
+        setup["reader"].read_once(permit(), operator_grant=approval)
+    assert setup["grant_handle"].connection.execute(
+        "SELECT COUNT(*) FROM local_fair_stream_result_read_grants"
+    ).fetchone() == (0,)
