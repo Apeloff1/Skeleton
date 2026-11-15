@@ -38,7 +38,7 @@ function client(initial){
   });
   return {requests,read:modules.getDragonTreasury,readVault:modules.getDragonVault,
     quota:modules.getDragonVaultQuota,discover:modules.discoverDragonVault,
-    retire:modules.retireDragonSession,restore:modules.restoreDragonVaultPrimary,redundancy:modules.getDragonVaultRedundancy,repairReplica:modules.repairDragonVaultReplica,care:modules.configureDragonVaultCare,careHistory:modules.getDragonVaultCareHistory,health:modules.getDragonVaultHealth,set:value=>{payload=value;}};
+    retire:modules.retireDragonSession,restore:modules.restoreDragonVaultPrimary,redundancy:modules.getDragonVaultRedundancy,repairReplica:modules.repairDragonVaultReplica,care:modules.configureDragonVaultCare,careHistory:modules.getDragonVaultCareHistory,health:modules.getDragonVaultHealth,deep:modules.getDragonDeepCatalog,wiki:modules.queryDragonWiki,indexed:modules.searchDragonArchiveIndex,set:value=>{payload=value;}};
 }
 
 async function main(){
@@ -193,6 +193,20 @@ async function main(){
     {events:[history.events[0],{...history.events[1],version:2}]}]){
     vc.set({...history,...patch});await assert.rejects(vc.careHistory('vaulted-fixture'),e=>e.kind==='protocol');
   }
-  console.log('Treasury and cold custody: canonical wire parity, archives, discovery, exact-copy repair, care consent, census and maintenance history.');
+  const deepPage={schema:'skeleton.dragon.deep-catalog.v1',records:[{session_id:'deep-fixture',version:7,archive:{partition:1,snapshot_digest:'a'.repeat(64),accepted_at:1800000000,state:'archived',released:true},
+    grant_recorded:true,index_recorded:true,legacy_runtime:false,integrity_held:false}],next_cursor:null,
+    partitions:1024,partition_capacity:1024,reservation_ceiling:1048576,storage_capacity_verified:false};
+  vc.set(deepPage);assert.deepEqual(await vc.deep(),deepPage);
+  vc.set({...deepPage,storage_capacity_verified:true});await assert.rejects(vc.deep(),e=>e.kind==='protocol');
+  const wiki={schema:'skeleton.dragon.hoag-wiki-catalog.v1',nucleus:'wiki',mode:'historic',as_of_unix:1800000000,valid_until:1800000030,
+    pointers:[{session_id:'deep-fixture',source_id:'a'.repeat(64),citation:'dragon-crawl://deep-fixture/'+'a'.repeat(64),
+      valid_until:1800000040,review_state:'unreviewed_external_evidence',stored_prose:0,plane:'historic',model_context_authorized:false,
+      source_use_version:0,matched_terms:2,captured_at:1700000000,version:7,snapshot_digest:'b'.repeat(64),preserved_text_hash:'c'.repeat(64)}],
+    next_cursor:null,request_local:true,stored_prose:0,knowledge_promoted:false,network_executed:false};
+  vc.set(wiki);assert.deepEqual(await vc.wiki('orbital','historic'),wiki);
+  for(const patch of [{model_context_authorized:true},{text:'not permitted'},{citation:'foreign'},{valid_until:1800000000}]){
+    vc.set({...wiki,pointers:[{...wiki.pointers[0],...patch}]});await assert.rejects(vc.wiki('orbital','historic'),e=>e.kind==='protocol');
+  }
+  console.log('Treasury and cold custody: deep archive and HOAG pointer contracts qualified by fixtures.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

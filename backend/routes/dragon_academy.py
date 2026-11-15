@@ -9,6 +9,8 @@ Requires an operator-configured durable SQLite path; no in-memory fallback.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from contextlib import contextmanager
 from dataclasses import asdict
 from hashlib import sha256
@@ -2884,6 +2886,13 @@ async def crawler_vault_care_history(
 async def crawler_deep_catalog(cursor:str|None=Query(default=None,max_length=128),
     limit:int=Query(default=32,ge=1,le=64),scope:dict=Depends(_crawler_scope))->dict:
     return await _crawler_result(crawler_application.deep_archive_catalog(scope,cursor=cursor,limit=limit))
+
+
+@router.get("/crawler/companion/hoag-wiki")
+async def crawler_hoag_wiki(query:str=Query(min_length=1,max_length=512),
+    mode:Literal["historic","current"]=Query(default="historic"),
+    cursor:str|None=Query(default=None,max_length=193),scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.query_hoag_wiki(scope,query=query,mode=mode,cursor=cursor))
 
 
 @router.get("/crawler/companion/deep-search")

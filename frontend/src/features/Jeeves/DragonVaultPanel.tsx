@@ -1,10 +1,11 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,AppState,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {getAuthToken} from '../../auth/gameforgeAuth';
-import {getDragonVault,getDragonVaultQuota,getDragonVaultHealth,discoverDragonVault,searchDragonArchiveIndex,retireDragonSession,restoreDragonVaultPrimary,repairDragonVaultReplica,configureDragonVaultCare,getDragonVaultCareHistory,getDragonVaultRedundancy,getCrawl,crawlRequestKey,configureDragonArchive,
+import {getDragonVault,getDragonVaultQuota,getDragonVaultHealth,discoverDragonVault,searchDragonArchiveIndex,promoteDragonDeep,retireDragonSession,restoreDragonVaultPrimary,repairDragonVaultReplica,configureDragonVaultCare,getDragonVaultCareHistory,getDragonVaultRedundancy,getCrawl,crawlRequestKey,configureDragonArchive,
  configureLegacyTreasuryArchive,eraseCrawl,type DragonVaultCatalog,type DragonVaultQuota,type DragonVaultHealth,type DragonVaultDiscovery,type DragonArchiveIndexSearch,type DragonVaultRedundancy,type DragonVaultCareHistory,type DragonVaultEntry,type CrawlSession} from '../../product/crawlerClient';
 import s,{colors} from './CrawlerWorkspace.styles';
 import {scanArchiveChambers,bestHistoryWindow,type ChamberScan,SCAN_DEADLINE_MS} from './dragonVaultScan';
+import DragonDeepArchivePanel from './DragonDeepArchivePanel';
 
 type Props={revision:string;session?:CrawlSession|null;canWrite:boolean;disabled:boolean;
  onWindow:(ids?:string[],query?:string)=>void;onSession?:(s:CrawlSession)=>void;onChanged:()=>void};
@@ -155,9 +156,9 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   }catch(e){if(valid(ctrl,attempt,token))setError(e instanceof Error?e.message:'Historical copy verification unavailable.');}
   finally{if(epoch.current===attempt){pending.current=null;setBusy(false);}}
  }
- async function mutate(action:'retire'|'restore'|'replica'|'care'|'uncare'|'grant'|'revoke'|'erase',id:string,version:number,legacy=false){
+ async function mutate(action:'retire'|'deep'|'restore'|'replica'|'care'|'uncare'|'grant'|'revoke'|'erase',id:string,version:number,legacy=false){
   if(busy||disabled||owner.current!==getAuthToken()||action!=='revoke'&&action!=='uncare'&&!canWrite)return;
-  if((action==='retire'||action==='restore'||action==='replica'||action==='care')&&!retention||action==='grant'&&!rights||action==='erase'&&eraseText!=='ERASE')return;
+  if((action==='retire'||action==='deep'||action==='restore'||action==='replica'||action==='care')&&!retention||action==='grant'&&!rights||action==='erase'&&eraseText!=='ERASE')return;
   const n=action==='grant'?Number(days):30;
   if(!Number.isInteger(n)||n<1||n>30){setError('Historical-use duration must be 1–30 days.');return;}
   clearDiscovery();invalidate();const token=getAuthToken(),attempt=epoch.current,ctrl=new AbortController();pending.current=ctrl;
@@ -174,6 +175,9 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
     if(session?.session_id===id&&onSession){
      const updated=await getCrawl(id,ctrl.signal);if(!valid(ctrl,attempt,token))return;onSession(updated);
     }
+   }else if(action==='deep'){
+    const result=await promoteDragonDeep(id,{...command,retention_acknowledged:true},ctrl.signal);
+    message=result.archive.released?'Deep custody committed; the working chamber reservation was released.':'Deep custody recorded; reservation release remains pending.';
    }else if(action==='restore'){
     const receipt=await restoreDragonVaultPrimary(id,{...command,retention_acknowledged:true},ctrl.signal);
     message=receipt.outcome==='restored'?'Exact original primary restored. No permission renewed.':'Original primary is intact. No changes made.';
@@ -212,6 +216,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   <Button label={open?'Close cold-custody catalogue':'Open cold-custody catalogue'} disabled={busy||disabled}
    action={()=>{if(open){reset();onWindow(undefined);}else void load();setOpen(!open);}}/>
   {open&&<>
+   <DragonDeepArchivePanel revision={revision} canWrite={canWrite} disabled={disabled||busy} onWindow={onWindow} onChanged={onChanged}/>
    {vaultHealth&&owner.current===getAuthToken()&&<View style={s.check}>
     <Text style={s.heading}>Hoarder den health</Text>
     <Text style={s.small}>{vaultHealth.vaulted} retired · {vaultHealth.pending} retiring · {vaultHealth.marker_held} metadata holds</Text>
@@ -313,6 +318,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
        {canWrite&&row.vault?.state==='vaulted'&&<>
         <Text style={s.small}>Check the original primary and repair only from its exact existing witnessed replica. This cannot restore an older revision or renew permission.</Text>
         <View style={s.row}><Switch value={retention} onValueChange={setRetention} disabled={busy||disabled} accessibilityLabel="Confirm rights to restore original retained custody"/><Text style={[s.small,s.grow]}>I have rights to maintain this retained record.</Text></View>
+        {row.vault.active_slot_released&&<Button label="Move into partitioned deep archive" disabled={busy||disabled||!retention} action={()=>void mutate('deep',row.session_id,row.version)}/>}
         <Button label="Verify or repair original primary" disabled={busy||disabled||!retention} action={()=>void mutate('restore',row.session_id,row.version)}/>
         <Button label="Verify or repair retained duplicate" disabled={busy||disabled||!retention} action={()=>void mutate('replica',row.session_id,row.version)}/>
         <Text style={s.small}>Optional care grant: seven days, at most two repairs, only from a surviving exact copy. No crawling, source-use permission or independent backup.</Text>

@@ -553,7 +553,7 @@ class DragonVaultMixin:
             receipt=await self._admit(scope,identifier,{"snapshot":candidate,"treasury_vault_restore":repair})
             result=await self.sessions.update_one(fence,{"$set":{"snapshot":candidate,
                  "treasury_vault_restore":repair,"storage_receipt":receipt,"treasury_repair_due":_now().timestamp()},
-                 "$unset":{"treasury_index":"","treasury_archive_route":""},"$inc":{"version":1}})
+                 "$unset":{"treasury_index":"","treasury_archive_route":"","deep_index":""},"$inc":{"version":1}})
             if not result.modified_count:
                 raise CrawlerError("crawler_conflict","Retained record changed before repair publication.",409)
             fence={**fence,"version":row["version"]+1}
@@ -992,6 +992,8 @@ class DragonVaultMixin:
         if side=="primary":
             update["$unset"]["treasury_index"]=""
             update["$unset"]["treasury_archive_route"]=""
+            update["$unset"]["deep_index"]=""
+            update["$set"]["deep_index_due"]=now
             update["$set"]["treasury_repair_due"]=now
         changed=await self.sessions.update_one(fenced,update)
         return "auto_"+side+"_repaired" if changed.modified_count else "superseded"
@@ -1155,7 +1157,7 @@ class DragonVaultMixin:
         qualified_rows=[]
         for candidate in rows[:MAX_RECHECK]:
             row=await self.sessions.find_one({**scope,"_id":candidate["_id"],"version":candidate["version"],
-                "status":{"$in":sorted(TERMINAL)},"treasury_vault.state":"vaulted",
+                "status":{"$in":sorted(TERMINAL)},"treasury_vault.state":"vaulted","deep_archive.released":{"$ne":True},
                 "treasury_archive_route.digest":candidate["digest"]},max_time_ms=2000)
             if row is None:
                 raise CrawlerError("crawler_vault_changed","Indexed archive changed; refresh.",409)

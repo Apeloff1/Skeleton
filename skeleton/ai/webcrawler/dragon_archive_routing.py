@@ -86,7 +86,7 @@ def candidate_pipeline(scope,keys,now):
         raise ValueError("invalid routing candidate request")
     return [
         {"$match":{**scope,"status":{"$in":["completed","budget_exhausted"]},
-             "treasury_vault.state":"vaulted","treasury_archive_route.schema":SCHEMA,
+             "treasury_vault.state":"vaulted","deep_archive.released":{"$ne":True},"treasury_archive_route.schema":SCHEMA,
              "treasury_archive_route.expires_at":{"$gt":now},"treasury_archive_route.keys":{"$in":list(keys)}}},
         {"$project":{"_id":1,"version":1,"digest":"$treasury_archive_route.digest",
              "overlap":{"$size":{"$setIntersection":["$treasury_archive_route.keys",list(keys)]}}}},

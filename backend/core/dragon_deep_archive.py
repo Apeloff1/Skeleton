@@ -147,12 +147,14 @@ class DragonDeepArchiveMixin:
         if cursor is not None:
             query["_id"]={"$gt":cursor}
         fields={"_id":1,"version":1,"deep_archive":1,"checkpoint_identity.snapshot_digest":1,
-                "archive_grant.expires_at":1,"deep_index.expires_at":1}
+                "archive_grant.expires_at":1,"deep_index.expires_at":1,"snapshot.binding.code_digest":1}
         async def page():
             return await self.sessions.find(query,fields).sort("_id",ASCENDING).limit(limit+1).max_time_ms(2000).to_list(limit+1)
         rows=await page()
         results=[]
         now=_now().timestamp()
+        from skeleton.ai.webcrawler.operations import implementation_digest
+        runtime=implementation_digest()
         for row in rows[:limit]:
             try:
                 mark=a.validate_marker(row["deep_archive"],scope,row["_id"])
@@ -162,10 +164,11 @@ class DragonDeepArchiveMixin:
                 idx=(row.get("deep_index") or {}).get("expires_at")
                 results.append({"session_id":row["_id"],"version":row["version"],"archive":a.public_marker(mark),
                     "grant_recorded":a.finite(expiry) and expiry>now,"index_recorded":a.finite(idx) and idx>now,
+                    "legacy_runtime":(row.get("snapshot") or {}).get("binding",{}).get("code_digest")!=runtime,
                     "integrity_held":False})
             except (ValueError,TypeError,KeyError,AttributeError):
                 results.append({"session_id":row["_id"],"version":row["version"],"archive":None,
-                    "grant_recorded":False,"index_recorded":False,"integrity_held":True})
+                    "grant_recorded":False,"index_recorded":False,"legacy_runtime":None,"integrity_held":True})
         if rows!=await page():
             raise CrawlerError("crawler_deep_changed","Archive catalogue changed.",409)
         return {"ok":True,"schema":"skeleton.dragon.deep-catalog.v1","records":results,
@@ -297,3 +300,40 @@ class DragonDeepArchiveMixin:
             "as_of_unix":now,"earliest_expiry":min(expiries) if expiries else None,
             "approximate_routing":True,"page_local_ranking":True,"history_only":True,
             "source_text_returned":False,"model_context_permission":False,"wiki_approval":False}
+
+
+    async def purge_expired_deep_indexes(self,*,limit=16):
+        from core.dragon_crawler import _now
+        if type(limit) is not int or not 1<=limit<=32:
+            raise ValueError("deep index expiry limit")
+        await self.ensure_indexes()
+        now=_now().timestamp()
+        rows=await self.sessions.find({"deep_index.expires_at":{"$lte":now},"status":{"$ne":"deleted"}},
+            {"_id":1,"tenant_id":1,"owner_id":1,"version":1,"deep_index.expires_at":1}
+        ).sort([("deep_index.expires_at",ASCENDING),("_id",ASCENDING)]).limit(limit).max_time_ms(2000).to_list(limit)
+        purged=0
+        for row in rows:
+            expiry=row.get("deep_index",{}).get("expires_at")
+            if not a.finite(expiry) or expiry>now:continue
+            clock={"$divide":[{"$toLong":"$$NOW"},1000]}
+            changed=await self.sessions.update_one({"_id":row["_id"],"tenant_id":row["tenant_id"],
+                "owner_id":row["owner_id"],"version":row["version"],"status":{"$ne":"deleted"},
+                "deep_index.expires_at":expiry,"$expr":{"$lte":["$deep_index.expires_at",clock]}},
+                {"$unset":{"deep_index":""},"$inc":{"version":1}})
+            purged+=int(bool(changed.modified_count))
+        return {"scanned":len(rows),"purged":purged,"source_records_erased":0}
+
+    async def query_hoag_wiki(self,scope,*,query,mode="historic",cursor=None):
+        from core.dragon_crawler import CrawlerError,_now
+        from skeleton.distributed.galaxy.librarians import WikiLibrarian
+        if mode=="historic":
+            result=await self.deep_archive_search(scope,query=query,cursor=cursor)
+        elif mode=="current" and cursor is None:
+            result=await self.context(scope,query,8,32000)
+        else:
+            raise CrawlerError("crawler_wiki_query","Invalid Wiki source plane or cursor.",422)
+        try:
+            catalog=WikiLibrarian.crawler_catalog(result,mode=mode,now=_now().timestamp())
+        except (ValueError,TypeError,KeyError) as exc:
+            raise CrawlerError("crawler_wiki_changed","Crawler citation authority changed.",409) from exc
+        return {"ok":True,**catalog}

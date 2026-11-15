@@ -640,6 +640,49 @@ export async function getDragonVaultHealth(signal?:AbortSignal):Promise<DragonVa
     invalid('Invalid retained custody health census.');
   return p;
 }
+export type DragonDeepMarker={partition:number;snapshot_digest:string;accepted_at:number;state:'pending'|'archived';released:boolean};
+export type DragonDeepRecord={session_id:string;version:number;archive:DragonDeepMarker|null;grant_recorded:boolean;index_recorded:boolean;legacy_runtime:boolean|null;integrity_held:boolean};
+export type DragonDeepCatalog={schema:'skeleton.dragon.deep-catalog.v1';records:DragonDeepRecord[];next_cursor:string|null;
+ partitions:1024;partition_capacity:1024;reservation_ceiling:1048576;storage_capacity_verified:false};
+function validDeepMarker(a:DragonDeepMarker):boolean{return !!a&&integer(a.partition,1023)&&HASH.test(a.snapshot_digest)
+ &&Number.isFinite(a.accepted_at)&&a.accepted_at>=0&&['pending','archived'].includes(a.state)&&typeof a.released==='boolean'&&!(a.state==='pending'&&a.released);}
+export async function getDragonDeepCatalog(cursor?:string,signal?:AbortSignal):Promise<DragonDeepCatalog>{
+ if(cursor!==undefined&&!ID.test(cursor))invalid('Invalid deep cursor.');
+ const p=await read(api.get<DragonDeepCatalog>(ROOT+'/companion/deep-archive?limit=32'+(cursor?'&cursor='+encodeURIComponent(cursor):''),options(signal)),getAuthToken(),'Deep archive unavailable.');
+ if(!p||p.schema!=='skeleton.dragon.deep-catalog.v1'||p.partitions!==1024||p.partition_capacity!==1024||p.reservation_ceiling!==1048576
+ ||p.storage_capacity_verified!==false||!Array.isArray(p.records)||p.records.length>32||new Set(p.records.map(x=>x?.session_id)).size!==p.records.length
+ ||p.records.some((x,i)=>!x||!ID.test(x.session_id)||!integer(x.version)||x.version<1||typeof x.integrity_held!=='boolean'
+ ||typeof x.grant_recorded!=='boolean'||typeof x.index_recorded!=='boolean'||i>0&&p.records[i-1].session_id>=x.session_id||cursor!==undefined&&x.session_id<=cursor
+ ||(x.integrity_held?(x.archive!==null||x.legacy_runtime!==null||x.grant_recorded||x.index_recorded):(!x.archive||!validDeepMarker(x.archive)||typeof x.legacy_runtime!=='boolean')))
+ ||p.next_cursor!==null&&(p.records.length!==32||p.next_cursor!==p.records.at(-1)?.session_id))invalid('Invalid deep catalogue.');
+ return p;
+}
+export async function promoteDragonDeep(id:string,body:CrawlCommand&{retention_acknowledged:true},signal?:AbortSignal){
+ const p=await read(api.post<{schema:string;session_id:string;version:number;archive:DragonDeepMarker;outcome:string;network_executed:false;source_permission_extended:false}>(ROOT+'/sessions/'+identifier(id)+'/deep-archive',body,options(signal)),getAuthToken(),'Deep custody unconfirmed.');
+ if(!p||p.schema!=='skeleton.dragon.deep-command.v1'||p.session_id!==id||!integer(p.version)||p.version<body.expected_version
+ ||!validDeepMarker(p.archive)||!['archived','held','capacity_held','superseded'].includes(p.outcome)
+ ||p.network_executed!==false||p.source_permission_extended!==false)invalid('Invalid deep custody receipt.');
+ return p;
+}
+export type DragonWikiPointer={session_id:string;source_id:string;citation:string;valid_until:number;review_state:'unreviewed_external_evidence';stored_prose:0;
+ plane:'current'|'historic';model_context_authorized:boolean;source_use_version:number;matched_terms?:number;captured_at?:number;
+ version?:number;snapshot_digest?:string;preserved_text_hash?:string;passage_digest?:string};
+export type DragonWikiCatalog={schema:'skeleton.dragon.hoag-wiki-catalog.v1';nucleus:'wiki';mode:'current'|'historic';as_of_unix:number;valid_until:number;
+ pointers:DragonWikiPointer[];next_cursor:string|null;request_local:true;stored_prose:0;knowledge_promoted:false;network_executed:false};
+export async function queryDragonWiki(query:string,mode:'current'|'historic',cursor?:string,signal?:AbortSignal):Promise<DragonWikiCatalog>{
+ if(!query.trim()||query.length>512||cursor!==undefined&&!/^[a-f0-9]{64}:[A-Za-z0-9_-]{1,128}$/.test(cursor)||mode==='current'&&cursor!==undefined)invalid('Invalid Wiki query.');
+ const p=await read(api.get<DragonWikiCatalog>(ROOT+'/companion/hoag-wiki?mode='+mode+'&query='+encodeURIComponent(query)+(cursor?'&cursor='+encodeURIComponent(cursor):''),options(signal)),getAuthToken(),'Wiki lookup unavailable.');
+ if(!p||p.schema!=='skeleton.dragon.hoag-wiki-catalog.v1'||p.nucleus!=='wiki'||p.mode!==mode||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0
+ ||!Number.isFinite(p.valid_until)||p.valid_until<=p.as_of_unix||p.valid_until>p.as_of_unix+60||!Array.isArray(p.pointers)||p.pointers.length>(mode==='current'?8:32)
+ ||new Set(p.pointers.map(x=>x?.citation)).size!==p.pointers.length||p.pointers.some(x=>!x||!ID.test(x.session_id)||!HASH.test(x.source_id)
+ ||x.citation!=='dragon-crawl://'+x.session_id+'/'+x.source_id||!Number.isFinite(x.valid_until)||x.valid_until<p.valid_until
+ ||x.review_state!=='unreviewed_external_evidence'||x.stored_prose!==0||x.plane!==mode||x.model_context_authorized!==(mode==='current')
+ ||!integer(x.source_use_version)||('text' in x)||('title' in x)||('url' in x)
+ ||(mode==='current'?!HASH.test(x.passage_digest??''):!integer(x.version??0)||x.version!<1||!HASH.test(x.snapshot_digest??'')||!HASH.test(x.preserved_text_hash??'')||!integer(x.matched_terms??0,32)||x.matched_terms!<1||!Number.isFinite(x.captured_at)||x.captured_at!<0))
+ ||p.next_cursor!==null&&(mode==='current'||!/^[a-f0-9]{64}:[A-Za-z0-9_-]{1,128}$/.test(p.next_cursor))
+ ||p.request_local!==true||p.stored_prose!==0||p.knowledge_promoted!==false||p.network_executed!==false)invalid('Invalid Wiki citation receipt.');
+ return p;
+}
 export type DragonArchivePointer = {session_id:string;source_id:string;version:number;score:number;valid_until:number;
   citation:string;plane:'historic';review_state:'unreviewed_external_evidence';model_context_authorized:false;stored_prose:0};
 export type DragonArchiveIndexSearch = {schema:'skeleton.dragon.archive-index-search.v1';as_of_unix:number;

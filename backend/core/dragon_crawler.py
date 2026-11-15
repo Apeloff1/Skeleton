@@ -163,6 +163,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             await self.sessions.create_index([("tenant_id",ASCENDING),("owner_id",ASCENDING),
                 ("deep_index.tokens",ASCENDING),("deep_index.expires_at",ASCENDING)])
             await self.sessions.create_index([("deep_index_due",ASCENDING),("archive_grant.expires_at",ASCENDING)])
+            await self.sessions.create_index([("deep_index.expires_at",ASCENDING),("_id",ASCENDING)])
             self._indexes_ready = True
 
     async def readiness(self) -> dict[str, Any]:
@@ -2163,7 +2164,8 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             "status":{"$in":["completed","budget_exhausted"]}},
             {"$set":{"archive_grant":grant,"treasury_index":segment,"treasury_archive_route":routing,"legacy_archive_receipt":proof,
                       "treasury_repair_due":min(grant["expires_at"],now+6*3600) if grant else None,
-                      "storage_receipt":receipt,"updated_at":_now(),path:audit},"$inc":{"version":1}})
+                      "storage_receipt":receipt,"updated_at":_now(),path:audit,"deep_index_due":_now().timestamp()},
+             "$unset":{"deep_index":""},"$inc":{"version":1}})
         if not changed.modified_count:
             raise CrawlerError("crawler_conflict","Historical session changed before archive admission.",409)
         return {"ok":True,"version":int(row["version"])+1,"enabled":grant is not None,"execution_authorized":False}
@@ -4072,6 +4074,8 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                         "source_use_policies." + source_id: policy,
                         "treasury_index": None,
                         "treasury_archive_route": None,
+                        "deep_index": None,
+                        "deep_index_due":now.timestamp(),
                         "treasury_repair_due":now.timestamp() if row.get("archive_grant") else None,
                         "updated_at": now,
                         "storage_receipt": receipt,
@@ -4638,6 +4642,7 @@ async def recover_crawler_runs(*, limit: int = 16) -> dict:
         ("treasury_vault_scrub",crawler_application.scrub_treasury_vault),
         ("deep_archive_retirements",crawler_application.recover_deep_archive),
         ("deep_archive_index",crawler_application.build_deep_indexes),
+        ("deep_archive_expiry",crawler_application.purge_expired_deep_indexes),
     ):
         try:
             result[name]=await operation()
@@ -4648,7 +4653,11 @@ async def recover_crawler_runs(*, limit: int = 16) -> dict:
 
 
 async def read_crawler_context(user: dict, query: str, max_docs: int = 4, max_chars: int = 16000) -> dict:
-    return await crawler_application.context(authenticated_scope(user), query, max_docs, max_chars)
+    # HOAG's Wiki sees only canonical permission-checked citation pointers;
+    # actual passages remain untrusted context in the established chat path.
+    from skeleton.distributed.galaxy.librarians import WikiLibrarian
+    projection=await crawler_application.context(authenticated_scope(user),query,max_docs,max_chars)
+    return {**projection,"hoag_wiki":WikiLibrarian.crawler_catalog(projection,mode="current",now=_now().timestamp())}
 
 
 async def assert_crawler_context(user: dict, references: list[dict]) -> None:
