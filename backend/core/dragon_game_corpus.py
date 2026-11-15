@@ -60,6 +60,18 @@ CREATE TABLE IF NOT EXISTS observations(
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS observation_history
  ON observations(owner,game,recorded_at DESC,source DESC,event_key DESC);
+CREATE TABLE IF NOT EXISTS release_facets(
+ owner TEXT NOT NULL, game TEXT NOT NULL, source TEXT NOT NULL, event_key TEXT NOT NULL,
+ stage TEXT NOT NULL, kind TEXT NOT NULL, language TEXT NOT NULL, released_on TEXT,
+ observed_at INTEGER NOT NULL, version TEXT, priority INTEGER NOT NULL,
+ PRIMARY KEY(owner,game,source,event_key),
+ FOREIGN KEY(owner,game,source,event_key) REFERENCES observations(owner,game,source,event_key)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS release_event_time ON release_facets(owner,observed_at DESC,game DESC,source DESC,event_key DESC);
+CREATE INDEX IF NOT EXISTS release_event_stage ON release_facets(owner,stage,observed_at DESC,game DESC,source DESC,event_key DESC);
+CREATE INDEX IF NOT EXISTS release_event_date ON release_facets(owner,released_on,game,source,event_key);
+CREATE INDEX IF NOT EXISTS game_source_kind ON sources(owner,kind,game,id);
+CREATE INDEX IF NOT EXISTS game_source_language ON sources(owner,language,game,id);
 """
 
 
@@ -201,6 +213,7 @@ class GameCorpus:
                     next_review=excluded.next_review,latest_event=excluded.latest_event""",(owner,gid,sid,url,kind,language,now,next_review,event_key))
                 db.execute("INSERT INTO observations VALUES(?,?,?,?,?,?,?)",
                            (owner,gid,sid,event_key,fingerprint,json.dumps(payload,ensure_ascii=False,sort_keys=True),now))
+                self._index_observation(db,owner,gid,sid,event_key,payload,now)
                 db.execute("UPDATE counters SET revisions=revisions+1 WHERE owner=?",(owner,))
                 db.execute("COMMIT")
                 return self._receipt(gid,sid,fingerprint,False)
@@ -295,3 +308,73 @@ class GameCorpus:
         return {"game_id":game,"source_id":source,"observation_digest":observation_digest,
                 "url":row["url"],"kind":row["kind"],"language":row["language"],
                 "title":payload["title"],"crawl_authorized":False,"wiki_approved":False}
+
+
+    @staticmethod
+    def _index_observation(db,owner,gid,sid,event,payload,now):
+        db.execute("""INSERT OR IGNORE INTO release_facets
+            VALUES(?,?,?,?,?,?,?,?,?,?,?)""",(owner,gid,sid,event,payload["stage"],payload["kind"],
+            payload["language"],payload["released_on"],now,payload["version"],
+            priority(payload["kind"],payload["stage"])))
+
+    def release_timeline(self,scope,*,stage=None,kind=None,language=None,current_only=False,
+                         limit=32,before=None):
+        """Owner-scoped release and patch timeline; latest observation is not truth."""
+        owner=owner_key(scope)
+        limit=_limit(limit)
+        if type(current_only) is not bool:
+            raise ValueError("current flag")
+        clauses=["f.owner=?"]
+        args=[owner]
+        if stage is not None:
+            if stage not in STAGES: raise ValueError("stage")
+            clauses.append("f.stage=?");args.append(stage)
+        if kind is not None:
+            if kind not in KINDS: raise ValueError("source kind")
+            clauses.append("f.kind=?");args.append(kind)
+        if language is not None:
+            language=clean(language,32).lower()
+            clauses.append("f.language=?");args.append(language)
+        if current_only:
+            clauses.append("s.latest_event=f.event_key")
+        if before is not None:
+            if not isinstance(before,(tuple,list)) or len(before)!=4 or type(before[0]) is not int:
+                raise ValueError("timeline cursor")
+            clauses.append("(f.observed_at,f.game,f.source,f.event_key)<(?,?,?,?)")
+            args.extend([before[0],_id(before[1]),_id(before[2]),key(before[3])])
+        args.append(limit+1)
+        with self._db() as db:
+            rows=db.execute("""SELECT f.game AS game_id,f.source AS source_id,f.event_key,
+                f.stage,f.kind,f.language,f.released_on,f.observed_at,f.version,f.priority,
+                g.title AS first_title,o.digest AS observation_digest,
+                s.latest_event=f.event_key AS latest_for_source
+                FROM release_facets f JOIN sources s ON s.owner=f.owner AND s.game=f.game AND s.id=f.source
+                JOIN games g ON g.owner=f.owner AND g.id=f.game
+                JOIN observations o ON o.owner=f.owner AND o.game=f.game AND o.source=f.source AND o.event_key=f.event_key
+                WHERE """+" AND ".join(clauses)+
+                " ORDER BY f.observed_at DESC,f.game DESC,f.source DESC,f.event_key DESC LIMIT ?",args).fetchall()
+        result=[{**dict(row),"latest_for_source":bool(row["latest_for_source"]),"verified":False} for row in rows[:limit]]
+        cursor=[rows[limit-1][k] for k in ("observed_at","game_id","source_id","event_key")] if len(rows)>limit else None
+        return {"events":result,"next_cursor":cursor,"catalogue_only":True,"verified":False,
+                "current_means_latest_observed":True,"index_may_be_partial":True}
+
+    def backfill_facets(self,*,limit=32):
+        """Bounded resumable historical index population after schema upgrade."""
+        limit=_limit(limit)
+        with self._db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                rows=db.execute("""SELECT o.owner,o.game,o.source,o.event_key,o.payload,o.digest,o.recorded_at
+                    FROM observations o WHERE NOT EXISTS (SELECT 1 FROM release_facets f
+                    WHERE f.owner=o.owner AND f.game=o.game AND f.source=o.source AND f.event_key=o.event_key)
+                    ORDER BY o.owner,o.game,o.source,o.event_key LIMIT ?""",(limit,)).fetchall()
+                for row in rows:
+                    payload=json.loads(row["payload"])
+                    if digest(payload)!=row["digest"]:
+                        raise CatalogueHeld("historical observation witness mismatch")
+                    self._index_observation(db,row["owner"],row["game"],row["source"],row["event_key"],payload,row["recorded_at"])
+                db.execute("COMMIT")
+                return {"indexed":len(rows),"network_executed":False}
+            except BaseException:
+                if db.in_transaction: db.execute("ROLLBACK")
+                raise
