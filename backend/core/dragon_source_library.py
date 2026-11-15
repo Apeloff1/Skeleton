@@ -67,7 +67,7 @@ async def capture_documents(scope,game,source,session,*,after=None,limit=MAX_REC
         _id(after)
     app,binding,row=await _session(scope,game,source,session)
     try:
-        snapshot=_plain(row["snapshot"])
+        snapshot=_plain(app._custody_snapshot(row))
         verify_primary(snapshot,_plain(row["checkpoint_identity"]))
         if snapshot["binding"]["scope"]!=scope or snapshot["binding"]["request_digest"]!=row["request_digest"]:
             raise ValueError("capture scope mismatch")
