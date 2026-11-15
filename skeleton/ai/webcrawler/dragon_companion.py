@@ -29,6 +29,11 @@ _QUESTS = ("explore", "synthesize", "diversify", "conserve", "recover", "rest")
 _STYLES = ("balanced", "curious", "scholarly", "guardian")
 
 
+def companion_style(strategy: str) -> str:
+    return {"companion_curiosity": "curious", "companion_scholar": "scholarly",
+            "companion_guardian": "guardian"}.get(strategy, "balanced")
+
+
 def _unit(value: float) -> float:
     return round(max(0., min(1., value)), 6)
 
@@ -106,6 +111,7 @@ def build_companion(*, sources: dict, measurements: list[dict], query: str,
     hosts = set()
     niches = Counter()
     host_rewards: dict[str, list[float]] = defaultdict(list)
+    measured_rewards: dict[int, float] = {}
     novelty_mass = relevance_mass = 0.
     ordered = sorted(sources.values(), key=lambda s: (
         s.get("provenance", {}).get("capture_sequence", 10001),
@@ -137,7 +143,19 @@ def build_companion(*, sources: dict, measurements: list[dict], query: str,
                 support[term].add(host)
         novelty_mass += novelty * relevance
         relevance_mass += relevance * int(novel_enough)
-        host_rewards[host].append(novelty * relevance)
+        reward = novelty * relevance if novel_enough else 0.
+        sequence = row.get("provenance", {}).get("capture_sequence")
+        if type(sequence) is int:
+            measured_rewards[sequence] = reward
+        else:
+            host_rewards[host].append(reward)
+    # Every attempted content acquisition participates in learning progress.
+    # Failures and redundant pages have zero reward, not positive surprise.
+    for measurement in measurements:
+        if measurement["kind"] not in {"robots", "redirect"}:
+            host_rewards[measurement["host"]].append(
+                measured_rewards.get(measurement["event_sequence"], 0.)
+            )
     host_progress = {}
     host_novelty = {}
     for host, rewards in host_rewards.items():
@@ -180,11 +198,11 @@ def build_companion(*, sources: dict, measurements: list[dict], query: str,
         "discipline": _unit(productive / max(1, settled) * min(1., unique/4)),
         # No points for generating failures/incidents. This is an operational
         # readiness meter, not an experience currency.
-        "resilience": _unit((2 + productive)/(2 + settled + negatives)),
+        "resilience": _unit((1 + productive)/(2 + settled + negatives)),
     }
     # No reward for raw volume, denial encounters, or repeated recovery.
-    growth = int(round(1000 * (.35*skills["discovery"] + .35*skills["understanding"]
-                               + .20*skills["diversity"] + .10*skills["discipline"])))
+    growth = int(round(1000 * (.40*skills["discovery"] + .38*skills["understanding"]
+                               + .22*skills["diversity"])))
     stage = sum(growth >= t for t in (120, 300, 550, 800))
     dormant = not consent_current or state in {"paused", "cancelled", "completed", "budget_exhausted", "failed"}
     if dormant or not due or not frontier_count:
@@ -214,6 +232,8 @@ def build_companion(*, sources: dict, measurements: list[dict], query: str,
         "uncertain_bytes": unknown, "unreviewed_evidence_only": True,
         "network_authority_expanded": False, "training_permission": False,
         "inactivity_penalty": False,
+        "learning_progress": _unit(max(host_progress.values(), default=0.)),
+        "novelty_yield": _unit(novelty_mass / max(1, unique)),
     }
     return CompanionProfile(projection, host_progress, host_novelty,
                             {k: len(v) for k,v in support.items()}, frozenset(hosts), quest)
