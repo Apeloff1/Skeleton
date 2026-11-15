@@ -52,12 +52,19 @@ def _read_zip(path: Path) -> bytes:
              | getattr(os, "O_NONBLOCK", 0))
     if path.is_symlink():
         raise PortableSourceError("archive must be a regular file")
+    # Inspect the raw descriptor before wrapping it as a Python file:
+    # directory descriptors may be rejected by fdopen itself on some hosts.
+    if not path.is_file():
+        raise PortableSourceError("archive is not a file")
     fd = os.open(path, flags)
-    with os.fdopen(fd, "rb") as handle:
-        info = os.fstat(handle.fileno())
+    try:
+        info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode) or not 22 <= info.st_size <= MAX_ZIP_BYTES:
             raise PortableSourceError("archive exceeds portable ZIP budget or is not a file")
-        raw = handle.read(MAX_ZIP_BYTES + 1)
+        with os.fdopen(fd, "rb", closefd=False) as handle:
+            raw = handle.read(MAX_ZIP_BYTES + 1)
+    finally:
+        os.close(fd)
     if len(raw) != info.st_size or len(raw) > MAX_ZIP_BYTES:
         raise PortableSourceError("archive changed size during bounded read")
     return raw
