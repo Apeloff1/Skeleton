@@ -401,3 +401,107 @@ def test_pure_game_build_admission_rejects_invalid_briefs(brief):
 def test_pure_game_build_admission_preserves_request_identity():
     from skeleton.app.offline_game_builder import validate_game_build_request
     assert validate_game_build_request("local-build_17", BRIEF) == "local-build_17"
+
+
+def test_closed_game_builder_refuses_public_operations_with_typed_errors(tmp_path, pipeline):
+    manager = LocalGameBuilder(model(), tmp_path / "workspace.sqlite3")
+    manager.close()
+    manager.close()
+    assert manager.availability()["ready"] is False
+    for operation in (
+        lambda: manager.submit("after-close", BRIEF),
+        lambda: manager.get("after-close"),
+        manager.list_jobs,
+        lambda: manager.archive("after-close"),
+    ):
+        with pytest.raises(GameBuildRejected) as denied:
+            operation()
+        assert denied.value.status == 503
+        assert denied.value.code == "local_service_shutting_down"
+    assert not pipeline.calls
+
+
+def test_readiness_callback_cannot_submit_recursively(tmp_path, pipeline, monkeypatch):
+    manager = LocalGameBuilder(model(), tmp_path / "workspace.sqlite3")
+    original = manager.availability
+    def reenter():
+        with pytest.raises(GameBuildRejected) as denied:
+            manager.submit("recursive", BRIEF)
+        assert denied.value.status == 423
+        return original()
+    monkeypatch.setattr(manager, "availability", reenter)
+    try:
+        manager.submit("outer", BRIEF)
+        assert terminal(manager, "outer")["state"] == "complete"
+        assert len(pipeline.calls) == 1
+        assert [job["request_id"] for job in manager.list_jobs()] == ["outer"]
+    finally:
+        manager.close()
+
+
+def test_readiness_callback_shutdown_cannot_start_worker(tmp_path, pipeline, monkeypatch):
+    manager = LocalGameBuilder(model(), tmp_path / "workspace.sqlite3")
+    def shutdown():
+        manager.close()
+        return {"ready": True, "code": "ready"}
+    monkeypatch.setattr(manager, "availability", shutdown)
+    try:
+        with pytest.raises(GameBuildRejected) as denied:
+            manager.submit("stale-readiness", BRIEF)
+        assert denied.value.code == "local_service_shutting_down"
+        assert manager._worker is None
+        assert not pipeline.calls
+    finally:
+        manager.close()
+
+
+def test_worker_reentrant_close_preserves_journal_until_external_drain(tmp_path, pipeline):
+    database = tmp_path / "workspace.sqlite3"
+    backend = model()
+    manager = LocalGameBuilder(backend, database)
+    observed = []
+    pipeline.release.clear()
+    def request_close(_report, _project):
+        try:
+            manager.close()
+        except GameBuildRejected as denied:
+            observed.append((denied.code, manager._closed))
+    pipeline.mutate = request_close
+    try:
+        manager.submit("worker-close", BRIEF)
+        assert pipeline.entered.wait(3)
+        pipeline.release.set()
+        worker = manager._worker
+        assert worker is not None
+        worker.join(timeout=5)
+        assert not worker.is_alive()
+        assert observed == [("game_worker_draining", False)]
+        assert manager._closed is False
+    finally:
+        pipeline.release.set()
+        manager.close()
+    reopened = LocalGameBuilder(backend, database)
+    try:
+        assert reopened.get("worker-close")["state"] == "failed"
+        assert len(pipeline.calls) == 1
+    finally:
+        reopened.close()
+
+
+def test_worker_start_failure_does_not_poison_future_admission(tmp_path, pipeline, monkeypatch):
+    manager = LocalGameBuilder(model(), tmp_path / "workspace.sqlite3")
+    def unavailable(_worker):
+        raise RuntimeError("fixture thread startup failure")
+    try:
+        with monkeypatch.context() as scoped:
+            scoped.setattr(threading.Thread, "start", unavailable)
+            with pytest.raises(GameBuildRejected) as denied:
+                manager.submit("failed-start", BRIEF)
+        assert denied.value.code == "game_admission_unavailable"
+        assert manager._worker is None
+        assert manager.list_jobs() == []
+        manager.submit("valid-retry", BRIEF)
+        assert terminal(manager, "valid-retry")["state"] == "complete"
+        assert len(pipeline.calls) == 1
+    finally:
+        manager.close()

@@ -606,6 +606,7 @@ class LocalGameBuilder:
         self._cancel = threading.Event()
         self._closing = False
         self._closed = False
+        self._admitting = False
         self._store = OfflineChatStore(self.database)
         try:
             self._store._db.execute("""CREATE TABLE IF NOT EXISTS offline_game_builds (
@@ -678,6 +679,10 @@ class LocalGameBuilder:
             return {"ready": False, "code": "local_model_or_storage_unavailable"}
         return {"ready": True, "code": "ready"}
 
+    def _require_open(self) -> None:
+        if self._closing or self._closed:
+            raise GameBuildRejected(503, "local_service_shutting_down", "The local service is shutting down.")
+
     def _row(self, request_id: str) -> dict[str, Any] | None:
         with self._store._lock:
             cursor = self._store._db.execute(
@@ -704,17 +709,21 @@ class LocalGameBuilder:
             rid = _identifier("game request id", request_id)
         except ValueError:
             raise GameBuildRejected(400, "invalid_request_id", "Use a bounded game request identifier.") from None
-        row = self._row(rid)
-        if row is None:
-            raise GameBuildRejected(404, "unknown_game_build", "This local model has no saved build with that identifier.")
-        return self._public(row)
+        with self._lock:
+            self._require_open()
+            row = self._row(rid)
+            if row is None:
+                raise GameBuildRejected(404, "unknown_game_build", "This local model has no saved build with that identifier.")
+            return self._public(row)
 
     def list_jobs(self) -> list[dict[str, Any]]:
-        with self._store._lock:
-            rows = self._store._db.execute(
-                "SELECT request_id FROM offline_game_builds WHERE model_digest=? AND tokenizer_digest=? "
-                "ORDER BY created_at DESC, request_id LIMIT 100", (self.model_digest, self.tokenizer_digest)).fetchall()
-        return [self.get(row[0]) for row in rows]
+        with self._lock:
+            self._require_open()
+            with self._store._lock:
+                rows = self._store._db.execute(
+                    "SELECT request_id FROM offline_game_builds WHERE model_digest=? AND tokenizer_digest=? "
+                    "ORDER BY created_at DESC, request_id LIMIT 100", (self.model_digest, self.tokenizer_digest)).fetchall()
+            return [self.get(row[0]) for row in rows]
 
     def submit(self, request_id: str, brief: str) -> dict[str, Any]:
         rid = validate_game_build_request(request_id, brief)
@@ -724,6 +733,9 @@ class LocalGameBuilder:
             "proposal_schema_sha256": sha256(_encoded(PROPOSAL_SCHEMA)).hexdigest(),
             "limits": self.limits()})).hexdigest()
         with self._lock:
+            self._require_open()
+            if self._admitting:
+                raise GameBuildRejected(423, "local_game_build_busy", "Another local game build is already active.")
             existing = self._row(rid)
             if existing is not None:
                 if existing["request_digest"] != digest:
@@ -731,7 +743,14 @@ class LocalGameBuilder:
                 return self._public(existing)
             if self._worker is not None and self._worker.is_alive():
                 raise GameBuildRejected(423, "local_game_build_busy", "Another local game build is already active.")
-            readiness = self.availability()
+            self._admitting = True
+            try:
+                readiness = self.availability()
+            finally:
+                self._admitting = False
+            # The readiness provider can reenter on this thread. A shutdown
+            # during the callback must not be followed by new worker admission.
+            self._require_open()
             if not readiness["ready"]:
                 raise GameBuildRejected(423 if readiness["code"] in {"local_game_build_busy", "local_inference_busy"} else 503,
                     readiness["code"], "A ready local Jeeves model and native Godot are required for a new build.")
@@ -742,16 +761,23 @@ class LocalGameBuilder:
             worker = threading.Thread(target=self._run, args=(rid, brief, digest, admitted, failures, cancel),
                                       name="jeeves-local-game", daemon=False)
             self._worker = worker
-            worker.start()
+            try:
+                worker.start()
+            except Exception:
+                self._worker = None
+                cancel.set()
+                raise GameBuildRejected(503, "game_admission_unavailable", "Local game build admission failed.") from None
         if not admitted.wait(12):
             cancel.set()
             raise GameBuildRejected(503, "game_admission_unavailable", "Local build admission did not settle; check this request before submitting a new one.")
-        if failures:
-            existing = self._row(rid)
-            if existing is not None and existing["request_digest"] == digest:
-                return self._public(existing)
-            raise failures[0]
-        return self.get(rid)
+        with self._lock:
+            self._require_open()
+            if failures:
+                existing = self._row(rid)
+                if existing is not None and existing["request_digest"] == digest:
+                    return self._public(existing)
+                raise failures[0]
+            return self.get(rid)
 
     def _set_state(self, rid: str, state: str, *, stage: str | None = None) -> None:
         if state not in ACTIVE_STATES:
@@ -1012,14 +1038,18 @@ class LocalGameBuilder:
         return raw
 
     def archive(self, request_id: str) -> bytes:
-        self.get(request_id)
-        row = self._row(request_id)
-        if row["state"] != "complete":
-            raise GameBuildRejected(409, "game_archive_not_ready", "A verified source archive is available only after the build completes.")
-        try:
-            return self._verify(row)
-        except Exception:
-            raise GameBuildRejected(409, "game_archive_changed", "The saved source archive failed its integrity check; no bytes were exported.") from None
+        with self._lock:
+            self._require_open()
+            self.get(request_id)
+            row = self._row(request_id)
+            if row["state"] != "complete":
+                raise GameBuildRejected(409, "game_archive_not_ready", "A verified source archive is available only after the build completes.")
+            try:
+                raw = self._verify(row)
+            except Exception:
+                raise GameBuildRejected(409, "game_archive_changed", "The saved source archive failed its integrity check; no bytes were exported.") from None
+            self._require_open()
+            return raw
 
     def _recover(self) -> None:
         # Caller owns the distinct work lease. A live peer can therefore never
@@ -1051,7 +1081,11 @@ class LocalGameBuilder:
             self._closing = True
             self._cancel.set()
             worker = self._worker
-        if worker is not None and worker is not threading.current_thread():
+        if worker is threading.current_thread():
+            # Cancellation is now fenced, but the worker still owns journal
+            # authority. Only an external caller may drain and close it.
+            raise GameBuildRejected(503, "game_worker_draining", "The local build worker is still settling.")
+        if worker is not None:
             worker.join(timeout=190)
             if worker.is_alive():
                 # Keep the authority open while an owned worker drains. The
