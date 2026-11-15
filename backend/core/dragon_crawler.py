@@ -1564,7 +1564,7 @@ class DragonCrawlerApplication:
                 binding = snapshot["binding"]
                 if (row["status"] == "deleted" or binding["scope"] != scope
                         or binding["consent"] != _plain(row["consent"])
-                        or _utc(row["consent_expires_at"]).timestamp() != binding["consent"]["expires_at"]
+                        or abs(_utc(row["consent_expires_at"]).timestamp() - binding["consent"]["expires_at"]) >= .002
                         or binding["request_digest"] != row["request_digest"]
                         or _digest(_plain(row["request"])) != row["request_digest"]):
                     raise ValueError("treasury owner or grant mismatch")
@@ -1591,7 +1591,7 @@ class DragonCrawlerApplication:
                     expiry = datetime.fromisoformat(fresh["valid_until"]).timestamp() if allowed else None
                     if expiry is not None and expiry <= when:
                         allowed, expiry = False, None
-                    freshness = source["provenance"].get("http_freshness", {})
+                    freshness = source["provenance"].get("http_freshness", {}) or {}
                     # Different declared language/representation and sensitive
                     # Vary boundaries must not be collapsed by a fuzzy title.
                     variant = _digest({
