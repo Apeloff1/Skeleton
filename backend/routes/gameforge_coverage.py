@@ -31,6 +31,7 @@ SUBSYSTEMS = (
     ("Storage / Unbulk", "/api/storage", "/api/storage/savings"),
     ("Build ledger", "/api/galaxy-studio/builds", None),
 )
+LIVE_SUBSYSTEMS = [(name, prefix) for name, prefix, _ in SUBSYSTEMS]
 
 # Historical archive claims are kept as provenance of the old dashboard,
 # not counted as current verified parity. Original archive bytes and
@@ -65,8 +66,8 @@ def route_inventory(routes) -> tuple[dict, ...]:
 
 
 @router.get("/scan")
-def scan():
-    return {"ok": True, **_INVENTORY.get().summary()}
+def scan(refresh: bool = False):
+    return {"ok": True, **_INVENTORY.get(force=refresh).summary()}
 
 
 @router.get("/sources")
@@ -78,7 +79,7 @@ def sources(offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=200),
 @router.post("/activate")
 def activate():
     """Compatibility boundary: dynamic activation remains forbidden."""
-    res = _INVENTORY.get().summary()
+    res = _INVENTORY.get(force=True).summary()
     return {"ok": False, "activated": 0, "blocked": res["discovered"],
             "unloadable": None, "unloadable_detail": [], "activation_allowed": False,
             "message": "Dynamic activation is disabled: discovered modules are inventory only. "
@@ -96,7 +97,7 @@ def selftest(request: Request):
                  "runtime_qualified": False})
     passed = sum(bool(row["ok"]) for row in rows)
     return {"ok": True, "passed": passed, "total": len(rows),
-            "registration_passed": passed == len(rows), "ready": False,
+            "registration_passed": passed == len(rows), "registration_complete": passed == len(rows), "ready": False,
             "scope": "static_registration_and_source_only",
             "production_qualified": False, "runtime_qualified": False,
             "inventory_sha256": inventory.manifest_sha256,
@@ -114,10 +115,11 @@ def coverage(request: Request):
                  "verified_modules": None} for name, count in ZIP_AUDIT]
     return {
         "ok": True, "overall_percent": None,
-        "coverage_basis": "archive_parity_not_established",
+        "coverage_basis": "archive_parity_not_established", "archive_qualification": "unverified",
         "production_qualified": False, "runtime_qualified": False,
         "subsystems": subsystems, "subsystem_count": len(subsystems),
         "registered_subsystems": sum(row["ok"] for row in subsystems),
+        "registered_subsystem_count": sum(row["ok"] for row in subsystems),
         "zip_audit": archives, "historical_claimed_modules": sum(row["modules"] for row in archives),
         "engines": {"total": inventory["total_engine_modules"], **inventory},
     }

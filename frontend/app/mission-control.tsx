@@ -204,7 +204,7 @@ export default function MissionControl() {
   const refreshCoverage = async () => {
     setActivateMsg('Reading source inventory…');
     try {
-      const r = await api.get<any>('/api/gameforge/coverage/scan', { timeoutMs: 20000 });
+      const r = await api.get<any>('/api/gameforge/coverage/scan?refresh=true', { timeoutMs: 20000 });
       setActivateMsg(r.ok
         ? `${r.data.discovered} declared modules · ${r.data.complete ? 'scan complete' : 'scan incomplete'} · runtime not qualified`
         : 'Source inventory unavailable.');
