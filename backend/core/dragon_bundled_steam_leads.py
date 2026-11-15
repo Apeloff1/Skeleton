@@ -107,3 +107,12 @@ def summary():
             "store_locator_floor":total,"gross_optional_route_candidates":total*17,
             "shards":len(shards),"source_rights_verified":False,"source_verified":False,
             "network_authorized":False,"source_url":SOURCE}
+
+
+def normalized_page(ordinal,rows_per_page=128):
+    if type(ordinal) is not int or ordinal<0 or rows_per_page!=128:
+        raise ValueError("bundle ordinal")
+    rows,witness=page(ordinal*rows_per_page,rows_per_page)
+    if not rows:raise ValueError("bundle page unavailable")
+    raw=b"".join(json.dumps(row,ensure_ascii=False,sort_keys=True,separators=(",",":")).encode()+b"\n" for row in rows)
+    return raw,witness
