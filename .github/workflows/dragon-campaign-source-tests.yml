@@ -266,6 +266,12 @@ jobs:
           python -m py_compile skeleton/ai/webcrawler/source_instruction_guard.py skeleton/ai/webcrawler/adaptive_navigation.py skeleton/ai/webcrawler/operations.py
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_adaptive_instruction_guard.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_host_backpressure.py' -v
+      - name: Qualify evidence-fed companion, skill tree and exact curriculum replay
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m py_compile skeleton/ai/webcrawler/dragon_companion.py skeleton/ai/webcrawler/dragon_questbook.py skeleton/ai/webcrawler/dragon_curriculum_trace.py skeleton/ai/webcrawler/operations.py
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_companion_curriculum.py' -v
       - name: Qualify REP protocol and indexed navigation
         env:
           PYTHONDONTWRITEBYTECODE: "1"
