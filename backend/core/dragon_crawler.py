@@ -151,6 +151,8 @@ class DragonCrawlerApplication(DragonVaultMixin):
                 ("treasury_vault.state",ASCENDING),("updated_at",DESCENDING),("_id",DESCENDING)])
             await self.sessions.create_index([("treasury_vault.active_slot_released",ASCENDING),
                 ("treasury_vault.retry_at",ASCENDING)])
+            await self.sessions.create_index([("treasury_vault.state",ASCENDING),
+                ("treasury_vault_scrub_due",ASCENDING),("_id",ASCENDING)])
             await self.limits.create_index([("treasury_quota_due",ASCENDING),("_id",ASCENDING)])
             self._indexes_ready = True
 
@@ -4603,6 +4605,7 @@ async def recover_crawler_runs(*, limit: int = 16) -> dict:
         ("treasury_segment_repair",crawler_application.repair_treasury_segments),
         ("treasury_retirements",crawler_application.recover_treasury_retirements),
         ("treasury_quota_repair",crawler_application.reconcile_treasury_quotas),
+        ("treasury_vault_scrub",crawler_application.scrub_treasury_vault),
     ):
         try:
             result[name]=await operation()

@@ -59,7 +59,7 @@ class ReplicaCodecTests(unittest.TestCase):
         _,row=fixture()
         witness=copy.deepcopy(row["checkpoint_identity"])
         encoded=reconstruct_exact_replica(row["snapshot"],witness)
-        self.assertEqual(decode_exact_replica(encoded,witness),row["snapshot"])
+        verify_primary(decode_exact_replica(encoded,witness),witness)
         no_replica={**witness,"replica_available":False,"reason":"replica_capacity"}
         with self.assertRaises(CheckpointReplicaError):
             reconstruct_exact_replica(row["snapshot"],no_replica)

@@ -172,6 +172,6 @@ def reconstruct_exact_replica(snapshot: dict, identity: object) -> str:
     replacement=base64.b64encode(compressed).decode("ascii")
     _encode({"snapshot":snapshot,"checkpoint_identity":witness,"checkpoint_replica":replacement},
             MAX_WRITE_FIELDS_BYTES)
-    if decode_exact_replica(replacement,witness)!=snapshot:
+    if _encode(decode_exact_replica(replacement,witness))!=raw:
         raise CheckpointReplicaError("replacement replica differs from exact primary")
     return replacement

@@ -235,7 +235,8 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
     {active.sessions.map(row=><View key={row.session_id} style={s.check}>
       <Text selectable style={s.label}>{row.session_id}</Text>
       <Text style={s.small}>{row.integrity_held?'Held metadata · repair or explicitly erase':row.vault?.state==='pending'?'Retirement pending':row.vault?.active_slot_released?'Retired · active slot released':'Retired · active slot release pending'}</Text>
-      {row.vault&&<Text style={s.small}>Accepted {stamp(row.vault.accepted_at)} · {row.legacy_runtime?'older-runtime witness':'current-runtime witness'}</Text>}
+      {row.vault&&<Text style={s.small}>Accepted {stamp(row.vault.accepted_at)} · {row.legacy_runtime===null?'primary runtime unknown; verify copies':row.legacy_runtime?'older-runtime witness':'current-runtime witness'}</Text>}
+      {row.last_scrub&&<Text style={s.small}>Last integrity patrol: {row.last_scrub.state.replaceAll('_',' ')} · {stamp(row.last_scrub.checked_at)}. Past observation, not live verification.</Text>}
       {row.archive_expires_at!==null&&<Text style={s.small}>Recorded archive grant expires {stamp(row.archive_expires_at)}. Individual source permission is checked at read time.</Text>}
       <Button label={selected.includes(row.session_id)?'Remove from selected history':'Select for historical window'} disabled={busy||disabled||row.integrity_held||row.vault?.state!=='vaulted'||selected.length>=32&&!selected.includes(row.session_id)} action={()=>toggle(row)}/>
       <Button label="Manage retained record" disabled={busy||disabled} action={()=>{setManaged(managed===row.session_id?null:row.session_id);setRedundancy(null);setRetention(false);setRights(false);setEraseText('');}}/>
@@ -244,7 +245,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
         <View style={s.row}><Switch value={retention} onValueChange={setRetention} accessibilityLabel="Confirm pending retirement retry"/><Text style={[s.small,s.grow]}>Confirm the same cold-custody intent.</Text></View>
         <Button label="Retry retirement" disabled={busy||disabled||!retention} action={()=>void mutate('retire',row.session_id,row.version)}/>
        </>}
-       {!row.integrity_held&&row.vault&&<>
+       {!row.integrity_held&&row.vault&&row.legacy_runtime!==null&&<>
         {canWrite&&<><TextInput style={field} value={days} onChangeText={setDays} keyboardType="number-pad" maxLength={2} accessibilityLabel="Vault archive-use days"/>
          <View style={s.row}><Switch value={rights} onValueChange={setRights} accessibilityLabel="Authorize historical source use"/><Text style={[s.small,s.grow]}>I hold rights for this separate historical-use period.</Text></View>
          <Button label="Authorize historical use" disabled={busy||disabled||!rights} action={()=>void mutate('grant',row.session_id,row.version,!!row.legacy_runtime)}/></>}

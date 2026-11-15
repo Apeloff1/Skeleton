@@ -218,7 +218,8 @@ class DragonVaultMixin:
         if cursor:
             query["_id"]={"$lt":cursor}
         projection={"_id":1,"version":1,"treasury_vault":1,"archive_grant":1,
-                    "snapshot.binding.code_digest":1,"checkpoint_identity.snapshot_digest":1}
+                    "snapshot.binding.code_digest":1,"checkpoint_identity.snapshot_digest":1,
+                    "treasury_vault_scrub":1}
         async def page():
             return await self.sessions.find(query,projection).sort("_id",DESCENDING).limit(limit+1).max_time_ms(2000).to_list(limit+1)
         rows=await page()
@@ -237,19 +238,26 @@ class DragonVaultMixin:
                     validate_grant(grant)
                     if grant["snapshot_digest"]==witness and grant["issued_at"]<=now<grant["expires_at"]:
                         expiry=grant["expires_at"]
+                # The primary may be missing or corrupt. A surviving exact
+                # marker/witness must keep the repair controls reachable.
+                from skeleton.ai.webcrawler.dragon_treasury_vault import hash_identity
+                snapshot=row.get("snapshot")
+                binding=snapshot.get("binding") if isinstance(snapshot,dict) else None
+                code=binding.get("code_digest") if isinstance(binding,dict) else None
+                legacy=code!=runtime_digest if hash_identity(code) else None
+                audit=self._public_vault_scrub(row,now,witness)
                 result.append({"session_id":row["_id"],"version":int(row["version"]),
                     "vault":public_marker(marker),"archive_expires_at":expiry,
-                    "legacy_runtime":row["snapshot"]["binding"]["code_digest"]!=runtime_digest,
-                    "integrity_held":False})
+                    "legacy_runtime":legacy,"integrity_held":False,"last_scrub":audit})
             except (ValueError,TypeError,KeyError,RecursionError):
                 result.append({"session_id":row["_id"],"version":int(row["version"]),
-                    "vault":None,"archive_expires_at":None,"legacy_runtime":None,"integrity_held":True})
+                    "vault":None,"archive_expires_at":None,"legacy_runtime":None,"integrity_held":True,
+                    "last_scrub":None})
         final=await page()
         if any(item["archive_expires_at"] is not None and item["archive_expires_at"]<=_now().timestamp()
                for item in result):
             raise CrawlerError("crawler_vault_changed","Historical grant expired during catalogue read.",409)
-        if [(x["_id"],x["version"],x.get("treasury_vault")) for x in rows]!=[
-                (x["_id"],x["version"],x.get("treasury_vault")) for x in final]:
+        if rows!=final:
             raise CrawlerError("crawler_vault_changed","Vault catalogue changed; reload.",409)
         return {"ok":True,"schema":"skeleton.dragon.vault-catalog.v1","sessions":result,
                 "next_cursor":rows[limit-1]["_id"] if len(rows)>limit else None,
@@ -707,3 +715,112 @@ class DragonVaultMixin:
                 "version":current["version"],"outcome":outcome,"snapshot_digest":marker["snapshot_digest"],
                 "primary_rewritten":False,"witness_rewritten":False,"historical_grant_extended":False,
                 "network_executed":False,"independent_backup":False}
+
+
+    @staticmethod
+    def _public_vault_scrub(row,now,witness):
+        """A past inspection is not live verification or permission."""
+        import math
+        value=row.get("treasury_vault_scrub")
+        if (not isinstance(value,dict) or set(value)!={"schema","version","snapshot_digest","checked_at","state","primary","replica"}
+                or value["schema"]!="skeleton.dragon.vault-scrub.v1"
+                or value["version"]!=row["version"] or value["snapshot_digest"]!=witness
+                or type(value["checked_at"]) not in (float,int) or not math.isfinite(value["checked_at"])
+                or not 0<=value["checked_at"]<=now
+                or value["primary"] not in ("exact","held") or value["replica"] not in ("exact","held","unavailable")):
+            return None
+        state=("redundant" if value["primary"]==value["replica"]=="exact" else
+               "primary_only" if value["primary"]=="exact" else
+               "repairable_primary" if value["replica"]=="exact" else "held")
+        if value["state"]!=state:
+            return None
+        return {"checked_at":value["checked_at"],"state":state,"primary":value["primary"],
+                "replica":value["replica"],"live_verified":False}
+
+    async def scrub_treasury_vault(self,*,limit=2):
+        """Bounded integrity patrol. Never rewrite retained bytes or authorize use.
+
+        Fair per-owner selection and a 180s server-clock publication lease
+        prevent duplicate maintenance from claiming fresh evidence after
+        a lost lease. Explicit owners, not the patrol, authorize repairs.
+        """
+        from core.dragon_crawler import CrawlerError,_now
+        from skeleton.ai.webcrawler.dragon_treasury_vault import hash_identity
+        if type(limit) is not int or not 1<=limit<=2:
+            raise ValueError("vault patrol limit exceeded")
+        await self.ensure_indexes()
+        now=_now().timestamp()
+        eligible={"status":{"$in":sorted(TERMINAL)},"treasury_vault.state":"vaulted",
+                  "$or":[{"treasury_vault_scrub_due":{"$exists":False}},
+                         {"treasury_vault_scrub_due":{"$lte":now}}]}
+        metadata={"_id":1,"tenant_id":1,"owner_id":1,"version":1,"treasury_vault_scrub_due":1}
+        rows=await self.sessions.find(eligible,metadata).sort(
+            [("treasury_vault_scrub_due",ASCENDING),("_id",ASCENDING)]).limit(8).max_time_ms(2000).to_list(8)
+        totals={"scanned":len(rows),"selected":0,"redundant":0,"primary_only":0,
+                "repairable_primary":0,"held":0,"superseded":0,"busy":0,"failed":0}
+        owners=set()
+        for item in rows:
+            scope={k:item[k] for k in ("tenant_id","owner_id")}
+            owner=tuple(scope.values())
+            if owner in owners or totals["selected"]>=limit:
+                continue
+            owners.add(owner)
+            totals["selected"]+=1
+            marked=_now().timestamp()
+            claim_until=marked+180
+            fence={"_id":item["_id"],**scope,"version":item["version"],
+                   "status":{"$in":sorted(TERMINAL)},"treasury_vault.state":"vaulted",
+                   "treasury_vault_scrub_due":item.get("treasury_vault_scrub_due",{"$exists":False})}
+            claim=await self.sessions.update_one(fence,{"$set":{"treasury_vault_scrub_due":claim_until}})
+            if not claim.modified_count:
+                totals["superseded"]+=1
+                continue
+            clock={"$divide":[{"$toLong":"$$NOW"},1000]}
+            fence={**fence,"treasury_vault_scrub_due":claim_until,
+                   "$expr":{"$gt":["$treasury_vault_scrub_due",clock]}}
+            row=await self.sessions.find_one(fence,max_time_ms=2000)
+            if row is None:
+                totals["superseded"]+=1
+                continue
+            try:
+                primary,replica,digest=await _bounded_discovery_cpu(self._inspect_vault_redundancy,scope,row)
+            except CrawlerError as exc:
+                if exc.code=="crawler_vault_busy":
+                    totals["busy"]+=1
+                    continue
+                primary,replica,digest="held","held",None
+            except (ValueError,TypeError,KeyError,RecursionError,CheckpointReplicaError):
+                primary,replica,digest="held","held",None
+            checked=_now().timestamp()
+            if checked>=claim_until:
+                totals["superseded"]+=1
+                continue
+            state=("redundant" if primary==replica=="exact" else
+                   "primary_only" if primary=="exact" else
+                   "repairable_primary" if replica=="exact" else "held")
+            # A malformed witness gets a bounded hold, not a fabricated
+            # digest or a persistent qualified inspection.
+            witness=row.get("checkpoint_identity")
+            fence={**fence,"checkpoint_identity":witness if "checkpoint_identity" in row else {"$exists":False},
+                   "treasury_vault":row["treasury_vault"]}
+            due=checked+(24*3600 if state=="redundant" else 6*3600)
+            if not hash_identity(digest):
+                changed=await self.sessions.update_one(fence,{"$set":{"treasury_vault_scrub_due":due},
+                    "$unset":{"treasury_vault_scrub":""}})
+            else:
+                audit={"schema":"skeleton.dragon.vault-scrub.v1","version":row["version"],
+                       "snapshot_digest":digest,"checked_at":checked,"state":state,"primary":primary,"replica":replica}
+                try:
+                    # Persist only the admitted tiny observation; no source
+                    # copy, authority, grant or previous write receipt changes.
+                    await self._admit(scope,row["_id"],{"treasury_vault_scrub":audit})
+                except CrawlerError:
+                    totals["failed"]+=1
+                    continue
+                changed=await self.sessions.update_one(fence,{"$set":{"treasury_vault_scrub":audit,
+                    "treasury_vault_scrub_due":due}})
+            if changed.modified_count:
+                totals[state]+=1
+            else:
+                totals["superseded"]+=1
+        return totals

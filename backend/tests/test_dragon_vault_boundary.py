@@ -397,7 +397,11 @@ class VaultRestoreTests(unittest.IsolatedAsyncioTestCase):
         from core.dragon_checkpoint_replica import checkpoint_fields
         row,now=VaultBoundaryTests().expired(stage="vaulted",released=True)
         row.update(checkpoint_fields(row["snapshot"]))
-        original=copy.deepcopy(row["snapshot"])
+        # Mongo's JSON-compatible arrays replace Python tuples, without
+        # changing canonical encoded bytes or the immutable digest.
+        from core.dragon_crawler import _plain
+        original=_plain(row["snapshot"])
+        row["snapshot"]=copy.deepcopy(original)
         if damaged:
             row["snapshot"]={"damaged":True}
         row["archive_grant"]=create_grant(snapshot=original,policies={},now=now.timestamp()-4*86400,days=1)
@@ -559,6 +563,68 @@ class VaultRestoreTests(unittest.IsolatedAsyncioTestCase):
                 await app.restore_treasury_vault(SCOPE,row["_id"],command,principal={"role":"viewer"})
         self.assertEqual(error.exception.status,403)
         app.sessions.find_one.assert_not_awaited()
+
+
+class VaultScrubTests(unittest.IsolatedAsyncioTestCase):
+    def harness(self,damaged=False):
+        app,row,original,now,command=VaultRestoreTests().harness(damaged=damaged)
+        app.ensure_indexes=AsyncMock()
+        cursor=app.sessions.find.return_value
+        cursor.sort.return_value=cursor
+        cursor.limit.return_value=cursor
+        cursor.max_time_ms.return_value=cursor
+        cursor.to_list=AsyncMock(return_value=[{k:row[k] for k in ("_id","tenant_id","owner_id","version")}])
+        app.sessions.update_one=AsyncMock(return_value=Mock(modified_count=1))
+        return app,row,now
+
+    async def test_patrol_records_exact_observation_without_changing_authority(self):
+        app,row,now=self.harness()
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.scrub_treasury_vault()
+        self.assertEqual(result["redundant"],1)
+        self.assertEqual(app.sessions.update_one.await_count,2)
+        query,update=app.sessions.update_one.await_args.args
+        audit=update["$set"]["treasury_vault_scrub"]
+        self.assertEqual(audit["version"],row["version"])
+        self.assertEqual(audit["snapshot_digest"],row["snapshot"]["snapshot_digest"])
+        self.assertEqual(set(update["$set"]),{"treasury_vault_scrub","treasury_vault_scrub_due"})
+        self.assertNotIn("$inc",update)
+        self.assertEqual(query["treasury_vault_scrub_due"],now.timestamp()+180)
+        self.assertIn("$expr",query)
+        app._admit.assert_awaited_once()
+        public=app._public_vault_scrub({**row,"treasury_vault_scrub":audit},now.timestamp(),audit["snapshot_digest"])
+        self.assertFalse(public["live_verified"])
+        self.assertIsNone(app._public_vault_scrub({**row,"version":row["version"]+1,"treasury_vault_scrub":audit},
+                                                now.timestamp(),audit["snapshot_digest"]))
+
+    async def test_damaged_primary_detected_but_not_repaired_automatically(self):
+        app,row,now=self.harness(damaged=True)
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.scrub_treasury_vault()
+        self.assertEqual(result["repairable_primary"],1)
+        self.assertEqual(row["snapshot"],{"damaged":True})
+        self.assertNotIn("snapshot",app.sessions.update_one.await_args.args[1]["$set"])
+
+    async def test_lost_lease_cannot_publish_audit(self):
+        app,row,now=self.harness()
+        app.sessions.update_one.side_effect=[Mock(modified_count=1),Mock(modified_count=0)]
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.scrub_treasury_vault()
+        self.assertEqual(result["superseded"],1)
+        self.assertEqual(result["redundant"],0)
+
+    async def test_catalogue_keeps_damaged_primary_repair_reachable(self):
+        app,row,now=self.harness(damaged=True)
+        # Actual Mongo projection has no binding when primary is damaged.
+        meta={k:row[k] for k in ("_id","version","treasury_vault","checkpoint_identity","archive_grant")}
+        app.sessions.find.return_value.to_list=AsyncMock(return_value=[meta])
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.treasury_vault_catalog(SCOPE)
+        item=result["sessions"][0]
+        self.assertEqual(item["vault"]["state"],"vaulted")
+        self.assertIsNone(item["legacy_runtime"])
+        self.assertFalse(item["integrity_held"])
+        self.assertIsNone(item["last_scrub"])
 
 
 if __name__=="__main__":

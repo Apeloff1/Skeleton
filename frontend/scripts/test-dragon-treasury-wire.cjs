@@ -109,6 +109,13 @@ async function main(){
     {session_id:'vaulted-fixture',version:3,vault:state,archive_expires_at:null,legacy_runtime:false,integrity_held:false}],
     next_cursor:null,capacity:128,as_of_unix:1800000000,archive_use_verified:false,network_executed:false};
   vc.set(page);assert.deepEqual(await vc.readVault(),page);
+  const degraded=structuredClone(page);degraded.sessions[0].legacy_runtime=null;
+  degraded.sessions[0].last_scrub={checked_at:1799999900,state:'repairable_primary',primary:'held',replica:'exact',live_verified:false};
+  vc.set(degraded);assert.deepEqual(await vc.readVault(),degraded);
+  for(const patch of [{state:'redundant'},{live_verified:true},{checked_at:1800000001}]){
+    const bad=structuredClone(degraded);Object.assign(bad.sessions[0].last_scrub,patch);
+    vc.set(bad);await assert.rejects(vc.readVault(),e=>e.kind==='protocol');
+  }
   for(const patch of [{capacity:129},{archive_use_verified:true},{next_cursor:'vaulted-fixture'}]){
     vc.set({...page,...patch});await assert.rejects(vc.readVault(),e=>e.kind==='protocol');
   }

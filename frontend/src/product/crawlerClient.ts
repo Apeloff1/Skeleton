@@ -138,8 +138,10 @@ export type DragonVaultState = {
   state:'pending'|'vaulted'; accepted_at:number; active_slot_released:boolean; snapshot_digest:string;
   execution_authorized:false; historical_grant_extended:false;
 };
+export type DragonVaultScrub = {checked_at:number;state:'redundant'|'primary_only'|'repairable_primary'|'held';
+  primary:'exact'|'held';replica:'exact'|'held'|'unavailable';live_verified:false};
 export type DragonVaultEntry = {session_id:string;version:number;vault:DragonVaultState|null;
-  archive_expires_at:number|null;legacy_runtime:boolean|null;integrity_held:boolean};
+  archive_expires_at:number|null;legacy_runtime:boolean|null;integrity_held:boolean;last_scrub?:DragonVaultScrub|null};
 export type DragonVaultCatalog = {schema:'skeleton.dragon.vault-catalog.v1';sessions:DragonVaultEntry[];
   next_cursor:string|null;capacity:128;as_of_unix:number;archive_use_verified:false;network_executed:false};
 export type DragonVaultCommand = {schema:'skeleton.dragon.vault-command.v1';session_id:string;version:number;
@@ -597,8 +599,13 @@ export async function getDragonVault(cursor?:string,signal?:AbortSignal):Promise
     ||p.sessions.some((row,i)=>!row||typeof row.session_id!=='string'||!ID.test(row.session_id)||!integer(row.version)||row.version<1
       ||(i>0&&p.sessions[i-1].session_id<=row.session_id)||(cursor!==undefined&&row.session_id>=cursor)
       ||typeof row.integrity_held!=='boolean'
-      ||row.integrity_held&&(row.vault!==null||row.archive_expires_at!==null||row.legacy_runtime!==null)
-      ||!row.integrity_held&&(!row.vault||!validVaultState(row.vault)||typeof row.legacy_runtime!=='boolean'
+      ||row.integrity_held&&(row.vault!==null||row.archive_expires_at!==null||row.legacy_runtime!==null||row.last_scrub!=null)
+      ||row.last_scrub!=null&&(!Number.isFinite(row.last_scrub.checked_at)||row.last_scrub.checked_at<0||row.last_scrub.checked_at>p.as_of_unix
+          ||row.last_scrub.live_verified!==false||!['exact','held'].includes(row.last_scrub.primary)
+          ||!['exact','held','unavailable'].includes(row.last_scrub.replica)
+          ||row.last_scrub.state!==(row.last_scrub.primary==='exact'?(row.last_scrub.replica==='exact'?'redundant':'primary_only'):
+                                    row.last_scrub.replica==='exact'?'repairable_primary':'held'))
+      ||!row.integrity_held&&(!row.vault||!validVaultState(row.vault)||row.legacy_runtime!==null&&typeof row.legacy_runtime!=='boolean'
         ||row.archive_expires_at!==null&&(!Number.isFinite(row.archive_expires_at)||row.archive_expires_at<=p.as_of_unix)))
     ||p.next_cursor!==null&&(p.sessions.length!==32||p.next_cursor!==p.sessions[p.sessions.length-1].session_id))invalid('Invalid vault catalogue custody.');
   return p;
