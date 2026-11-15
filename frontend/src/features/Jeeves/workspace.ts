@@ -76,7 +76,7 @@ export type ChatBody = {
   provider_id?: string;
   model_id?: string;
   max_output_tokens?: number;
-  crawler_context?: { query: string; max_documents: number; max_characters: number; historical_archive?: boolean };
+  crawler_context?: { query: string; max_documents: number; max_characters: number; historical_archive?: boolean; game_id?: string };
   cooperation?: ChatCooperationPolicy;
   resume_existing?: boolean;
   resume_only?: boolean;
@@ -192,8 +192,8 @@ function restoreRetryRequest(value: unknown): Message['retryRequest'] {
 }
 function restoreCrawlerContext(value: unknown): Pick<ChatBody, 'crawler_context'> {
   const item = record(value);
-  return item && typeof item.query === 'string' && item.query.length > 0 && item.query.length <= (item.historical_archive===true?512:1024) && (item.historical_archive===undefined || typeof item.historical_archive==='boolean') && Number.isSafeInteger(item.max_documents) && (item.max_documents as number) >= 1 && (item.max_documents as number) <= 4 && Number.isSafeInteger(item.max_characters) && (item.max_characters as number) >= 1 && (item.max_characters as number) <= 16000
-    ? { crawler_context: { query: item.query, max_documents: item.max_documents as number, max_characters: item.max_characters as number, ...(item.historical_archive===true?{historical_archive:true}:{}) } } : {};
+  return item && typeof item.query === 'string' && item.query.length > 0 && item.query.length <= (item.historical_archive===true?512:1024) && (item.historical_archive===undefined || typeof item.historical_archive==='boolean') && (item.game_id===undefined || typeof item.game_id==='string' && /^[a-f0-9]{64}$/.test(item.game_id)) && Number.isSafeInteger(item.max_documents) && (item.max_documents as number) >= 1 && (item.max_documents as number) <= 4 && Number.isSafeInteger(item.max_characters) && (item.max_characters as number) >= 1 && (item.max_characters as number) <= 16000
+    ? { crawler_context: { query: item.query, max_documents: item.max_documents as number, max_characters: item.max_characters as number, ...(item.historical_archive===true?{historical_archive:true}:{}), ...(typeof item.game_id==='string'?{game_id:item.game_id}:{}) } } : {};
 }
 function restoreCursor(value: unknown): Pick<ChatBody, 'resume_cursor'> {
   const item = record(value);
