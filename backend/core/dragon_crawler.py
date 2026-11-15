@@ -21,6 +21,7 @@ from pymongo import ASCENDING, DESCENDING, ReturnDocument
 from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from core.databases import core_db
+from core.dragon_resource_governor import ResourceGovernor
 from core.dragon_checkpoint_replica import (
     CheckpointReplicaError, checkpoint_fields, decode_exact_replica, verify_primary,
 )
@@ -125,6 +126,7 @@ class DragonCrawlerApplication:
         except EngineClientError:
             self.engine = None
         self._indexes_ready = False
+        self._resource_governor = ResourceGovernor(MAX_CONCURRENT_SLICES)
         # Handles only: Mongo owns intent, reservations, leases and snapshots.
         self._workers: dict[str, tuple[threading.Event, asyncio.Future]] = {}
 
@@ -219,6 +221,7 @@ class DragonCrawlerApplication:
                 "source_page": 32,
                 "session_page": 32,
                 "concurrent_slices": MAX_CONCURRENT_SLICES,
+                "local_resource_admission": getattr(self, "_resource_governor", ResourceGovernor()).projection(),
                 "autonomous_slices": MAX_AUTO_SLICES,
                 "autonomous_seconds": MAX_AUTO_SECONDS,
             },
@@ -2016,8 +2019,15 @@ class DragonCrawlerApplication:
             raise CrawlerError(
                 "crawler_capacity", "The previous local account worker must physically drain.", 429
             )
-        if sum(not handle[1].done() for handle in self._workers.values()) >= MAX_CONCURRENT_SLICES:
-            raise CrawlerError("crawler_capacity", "Local physical crawler capacity is occupied.", 429)
+        # Resource metrics can narrow the existing physical credit pool.
+        # No measurement can grant more than the original shared limit.
+        governor = getattr(self, "_resource_governor", None)
+        if governor is None:
+            governor = self._resource_governor = ResourceGovernor(MAX_CONCURRENT_SLICES)
+        capacity = governor.current()
+        if (capacity.limit == 0 or
+                sum(not handle[1].done() for handle in self._workers.values()) >= capacity.limit):
+            raise CrawlerError("crawler_capacity", "Local resource headroom does not admit another crawler slice.", 429)
         now, epoch = _now(), int(row["worker_epoch"]) + 1
         claim_pending = False
         try:
@@ -2041,7 +2051,7 @@ class DragonCrawlerApplication:
                     "crawler_capacity", "This account already has an active bounded crawler slice.", 429
                 )
             global_credit = None
-            for index in range(MAX_CONCURRENT_SLICES):
+            for index in range(capacity.limit):
                 slot = "crawler-slice:" + str(index)
                 await self.limits.update_one(
                     {"_id": slot},
@@ -3374,6 +3384,7 @@ class DragonCrawlerApplication:
             except CrawlerError as exc:
                 retry = exc.status in {409, 429, 503} and exc.code not in {
                     "crawler_integrity",
+                    "crawler_checkpoint_unrecoverable",
                     "crawler_grant_revoked",
                 }
                 changed = await self.sessions.update_one(
