@@ -267,7 +267,7 @@ class WorldDiscovery:
             adapter,pages,options=partition_feed(row,raw)
             cursor=row["pending_page"] if row["pending_digest"]==fingerprint else 0
             window=list(itertools.islice(pages,cursor,cursor+PAGES_PER_PULSE+1))
-            if not window:raise DiscoveryHeld("feed partition unavailable")
+            if not window and cursor==0:raise DiscoveryHeld("feed partition unavailable")
             for page_idx,page in enumerate(window[:PAGES_PER_PULSE],cursor):
                 now=int(time.time())
                 with self._db() as db:
