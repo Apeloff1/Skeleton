@@ -34,6 +34,9 @@ export interface QuestionnaireFlowProps {
   onForge: (req: RunRequest) => void;
   /** Navigate to the full historical Galaxy Studio matrix/slider questionnaire. */
   onOpenGalaxyStudio?: () => void;
+  onRestoreGalaxyProfile?: () => void;
+  galaxyRestoreBusy?: boolean;
+  galaxyRestoreNotice?: string | null;
   forging?: boolean;
   /** Short compose summary shown on the review step. */
   composeSummary?: string | null;
@@ -234,7 +237,7 @@ function BeatsStep({ state, dispatch, beats, beatsLive }: QuestionnaireFlowProps
   );
 }
 
-function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalaxyStudio }: QuestionnaireFlowProps) {
+function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalaxyStudio, onRestoreGalaxyProfile, galaxyRestoreBusy, galaxyRestoreNotice }: QuestionnaireFlowProps) {
   const [instrumentsOpen, setInstrumentsOpen] = React.useState(false);
   const [galaxyOpen, setGalaxyOpen] = React.useState(false);
   const [genreSearch, setGenreSearch] = React.useState('');
@@ -417,6 +420,15 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
           <Chip label="Launch prototype as startup scene" selected={!!state.playable.launch} disabled={!!state.quest?.enabled}
             onPress={() => dispatch({ type: 'setPlayableMainScene', value: true })} testID="q-playable-launch" />
           {state.quest?.enabled ? <Text style={st.help}>Room-entry quests require the original Godot launch scene.</Text> : null}
+        </View>
+      ) : null}
+      {onRestoreGalaxyProfile ? (
+        <View style={st.group} testID="q-galaxy-saved-design-restore">
+          <Text style={st.q}>Restore saved full Galaxy design</Text>
+          <Text style={st.help}>Explicitly import your account's saved vision, genre and complete matrices. Existing Forge choices and explicitly edited axes are retained.</Text>
+          <Button label="Restore saved full Galaxy design" tone="secondary" compact
+            onPress={onRestoreGalaxyProfile} disabled={galaxyRestoreBusy} testID="q-galaxy-restore-saved" />
+          {galaxyRestoreNotice ? <Text accessibilityLiveRegion="polite" style={st.help}>{galaxyRestoreNotice}</Text> : null}
         </View>
       ) : null}
       {onOpenGalaxyStudio ? (
