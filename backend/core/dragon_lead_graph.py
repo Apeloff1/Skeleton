@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS lead_snapshot_pages(
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS lead_expand_jobs(
  owner TEXT NOT NULL,id TEXT NOT NULL,parent TEXT NOT NULL,appid TEXT NOT NULL,title TEXT NOT NULL,
- witness TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('queued','done')),created_at INTEGER NOT NULL,
+ witness TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('queued','done','held')),created_at INTEGER NOT NULL,
  PRIMARY KEY(owner,id),FOREIGN KEY(owner,parent) REFERENCES lead_nodes(owner,id)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS lead_expand_ready ON lead_expand_jobs(state,created_at,owner,id);
@@ -223,7 +223,7 @@ class LeadGraph:
     def configure(self,scope,*,enabled,acknowledged):
         if type(enabled) is not bool or acknowledged is not True:raise ValueError("metadata-only acknowledgement")
         owner=owner_key(scope);now=int(time.time())
-        _quota_disk(self.path)
+        if enabled:_quota_disk(self.path)
         with self._db() as db:
             db.execute("BEGIN IMMEDIATE")
             try:
@@ -531,6 +531,50 @@ class LeadGraph:
                 if db.in_transaction:db.execute("ROLLBACK")
                 raise
 
+    def catalogue_pulse(self):
+        """Consume the transactional canonical-release outbox exactly once."""
+        from core.dragon_release_queue import ReleaseQueue
+        now=int(time.time());_quota_disk(self.path)
+        with ReleaseQueue(self.path)._db() as db:pass
+        with self._db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            counts={"processed":0,"held":0,"network_executed":False}
+            try:
+                jobs=db.execute("""SELECT j.owner,j.id,j.payload,j.batch,o.scope_json FROM lead_release_outbox q
+                    JOIN release_jobs j ON j.owner=q.owner AND j.id=q.id
+                    JOIN lead_owner o ON o.owner=q.owner
+                    WHERE q.state='queued' AND o.enabled=1 ORDER BY q.created_at,q.owner,q.id LIMIT 64""").fetchall()
+                for job in jobs:
+                    db.execute("SAVEPOINT lead_catalogue_row")
+                    try:
+                        if owner_key(json.loads(job["scope_json"]))!=job["owner"]:raise ValueError("catalogue scope")
+                        item=json.loads(job["payload"])
+                        witness=digest([job["batch"],job["id"],item])
+                        url=source_url(item["source"]);title=clean(item["title"],256)
+                        child=self._add(db,job["owner"],_schema_row(url,title,item["kind"],
+                            (item["namespace"]+":"+item["external_id"])[:256]),
+                            parent=ZERO,relation="catalogue_observation",witness=witness,now=now)
+                        if (item["namespace"]=="steam" and APPID.fullmatch(item["external_id"])
+                            and _locator(url)==_locator("https://store.steampowered.com/app/"+item["external_id"]+"/")):
+                            job_id=digest(["steam-app",child,item["external_id"],title])
+                            db.execute("INSERT OR IGNORE INTO lead_expand_jobs VALUES(?,?,?,?,?,?,'queued',?)",
+                                (job["owner"],job_id,child,item["external_id"],title,witness,now))
+                        db.execute("UPDATE lead_release_outbox SET state='done' WHERE owner=? AND id=?",
+                            (job["owner"],job["id"]))
+                        db.execute("RELEASE lead_catalogue_row")
+                        counts["processed"]+=1
+                    except (ValueError,TypeError,KeyError,CatalogueHeld):
+                        db.execute("ROLLBACK TO lead_catalogue_row")
+                        db.execute("RELEASE lead_catalogue_row")
+                        db.execute("UPDATE lead_release_outbox SET state='held' WHERE owner=? AND id=?",
+                            (job["owner"],job["id"]))
+                        counts["held"]+=1
+                db.execute("COMMIT")
+                return counts
+            except BaseException:
+                if db.in_transaction:db.execute("ROLLBACK")
+                raise
+
     def expansion_pulse(self):
         """Expand feed-supplied AppIDs without guessing identifiers or fetching."""
         now=int(time.time());_quota_disk(self.path)
@@ -539,15 +583,23 @@ class LeadGraph:
             try:
                 jobs=db.execute("""SELECT j.* FROM lead_expand_jobs j JOIN lead_owner o ON o.owner=j.owner
                     WHERE j.state='queued' AND o.enabled=1 ORDER BY j.created_at,j.owner,j.id LIMIT 16""").fetchall()
+                processed=0;held=0
                 for job in jobs:
-                    if not APPID.fullmatch(job["appid"]):raise ValueError("expansion identity")
-                    for row in project({"appid":job["appid"],"title":job["title"]},"steam"):
-                        self._add(db,job["owner"],row,parent=job["parent"],relation="feed_discovery",
-                            witness=job["witness"],now=now)
-                    db.execute("UPDATE lead_expand_jobs SET state='done' WHERE owner=? AND id=?",
-                        (job["owner"],job["id"]))
+                    db.execute("SAVEPOINT lead_expansion_row")
+                    try:
+                        if not APPID.fullmatch(job["appid"]):raise ValueError("expansion identity")
+                        for row in project({"appid":job["appid"],"title":job["title"]},"steam"):
+                            self._add(db,job["owner"],row,parent=job["parent"],relation="feed_discovery",
+                                witness=job["witness"],now=now)
+                        state="done";processed+=1
+                    except (ValueError,TypeError,KeyError,CatalogueHeld):
+                        db.execute("ROLLBACK TO lead_expansion_row")
+                        state="held";held+=1
+                    db.execute("RELEASE lead_expansion_row")
+                    db.execute("UPDATE lead_expand_jobs SET state=? WHERE owner=? AND id=?",
+                        (state,job["owner"],job["id"]))
                 db.execute("COMMIT")
-                return {"processed":len(jobs),"network_executed":False}
+                return {"processed":processed,"held":held,"network_executed":False}
             except BaseException:
                 if db.in_transaction:db.execute("ROLLBACK")
                 raise
