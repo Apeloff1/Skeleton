@@ -144,6 +144,8 @@ class DragonCrawlerApplication:
                  ("treasury_watch.claim_until",ASCENDING)]
             )
             await self.sessions.create_index([("treasury_index.expires_at",ASCENDING)])
+            await self.sessions.create_index([("treasury_repair_due",ASCENDING),
+                                              ("archive_grant.expires_at",ASCENDING)])
             self._indexes_ready = True
 
     async def readiness(self) -> dict[str, Any]:
@@ -1680,6 +1682,112 @@ class DragonCrawlerApplication:
             purged+=int(bool(result.modified_count))
         return {"scanned":len(rows),"purged":purged,"source_records_erased":0}
 
+    async def repair_treasury_segments(self, *, limit:int=2)->dict:
+        """Audit and repair derived indexes through existing owner custody.
+
+        No fetch, model call, snapshot rewrite or grant renewal. The pulse
+        independently derives postings from a witnessed terminal snapshot
+        and the live intersection of archival membership and source policy.
+        """
+        from skeleton.ai.webcrawler.dragon_archive_grant import validate_grant
+        from skeleton.ai.webcrawler.dragon_index_manifest import build_manifest,same_manifest_projection
+        if type(limit) is not int or not 1<=limit<=2:
+            raise ValueError("treasury repair pulse is bounded")
+        await self.ensure_indexes()
+        now=_now().timestamp()
+        eligible={"status":{"$in":["completed","budget_exhausted"]},
+                  "archive_grant.expires_at":{"$gt":now},
+                  "$or":[{"treasury_repair_due":{"$exists":False}},
+                         {"treasury_repair_due":{"$lte":now}}]}
+        rows=await self.sessions.find(eligible,
+            {"_id":1,"tenant_id":1,"owner_id":1,"version":1,"treasury_repair_due":1}
+        ).sort([("treasury_repair_due",ASCENDING),("_id",ASCENDING)]).limit(8).max_time_ms(2000).to_list(8)
+        counts={"scanned":len(rows),"selected":0,"healthy":0,"repaired":0,
+                "blocked":0,"deferred":0,"superseded":0,"expired":0}
+        owners=set()
+        for item in rows:
+            scope={k:item[k] for k in ("tenant_id","owner_id")}
+            owner=tuple(scope.values())
+            if owner in owners or counts["selected"]>=limit:
+                continue
+            owners.add(owner)
+            counts["selected"]+=1
+            identifier=item["_id"]
+            marker=item.get("treasury_repair_due")
+            fence={"_id":identifier,**scope,"version":item["version"],
+                   "status":{"$in":["completed","budget_exhausted"]},
+                   "treasury_repair_due":marker if "treasury_repair_due" in item else {"$exists":False}}
+            row=await self.sessions.find_one(fence,max_time_ms=2000)
+            if row is None:
+                counts["superseded"]+=1
+                continue
+            try:
+                grant=_plain(row["archive_grant"])
+                validate_grant(grant)
+                stamp=_now().timestamp()
+                if not grant["issued_at"]<=stamp<grant["expires_at"]:
+                    counts["expired"]+=1
+                    continue
+                snapshot=_plain(row["snapshot"])
+                verify_primary(snapshot,_plain(row["checkpoint_identity"]))
+                binding=snapshot["binding"]
+                if (binding["scope"]!=scope or binding["consent"]!=_plain(row["consent"])
+                        or binding["request_digest"]!=row["request_digest"]
+                        or _digest(_plain(row["request"]))!=row["request_digest"]
+                        or abs(_utc(row["consent_expires_at"]).timestamp()-binding["consent"]["expires_at"])>=.002
+                        or snapshot["state"]!=row["status"]):
+                    raise ValueError("treasury repair binding mismatch")
+                _,run_type=_core()
+                try:
+                    run_type.from_snapshot(snapshot)
+                except (ValueError,TypeError,KeyError):
+                    proof=self._legacy_inspection(scope,row,snapshot)
+                    if row.get("legacy_archive_receipt")!=proof:
+                        raise ValueError("legacy repair lacks witnessed admission")
+                    snapshot={**snapshot,"sources":{sid:snapshot["sources"][sid]
+                              for sid in proof["verified_source_ids"]}}
+                policies=self._source_policies(row)
+                if set(policies)-set(row["snapshot"]["sources"]):
+                    raise ValueError("treasury repair orphan policy")
+                expected=await asyncio.to_thread(build_manifest,snapshot,grant,now=stamp,policies=policies)
+                actual=_plain(row["treasury_index"]) if row.get("treasury_index") is not None else None
+                checked=await asyncio.to_thread(same_manifest_projection,actual,expected,grant,now=stamp)
+            except (ValueError,KeyError,TypeError,RecursionError,CheckpointReplicaError,CrawlerError):
+                # Invalid authority never becomes valid through a cache.
+                # Remove only derived material and back off.
+                update={"$set":{"treasury_repair_due":_now().timestamp()+3600}}
+                if row.get("treasury_index") is not None:
+                    update.update({"$unset":{"treasury_index":""},"$inc":{"version":1}})
+                result=await self.sessions.update_one(fence,update)
+                counts["blocked" if result.modified_count else "superseded"]+=1
+                continue
+            stamp=_now().timestamp()
+            if stamp>=grant["expires_at"]:
+                counts["expired"]+=1
+                continue
+            fence["archive_grant.expires_at"]=grant["expires_at"]
+            fence["$expr"]={"$gt":["$archive_grant.expires_at",
+                {"$divide":[{"$toLong":"$NOW"},1000]}]}
+            due=min(grant["expires_at"],stamp+6*3600)
+            if checked:
+                # Do not invalidate readers or reorder the catalogue on
+                # a healthy audit that changes no evidence.
+                result=await self.sessions.update_one(fence,{"$set":{"treasury_repair_due":due}})
+                counts["healthy" if result.modified_count else "superseded"]+=1
+                continue
+            try:
+                receipt=await self._admit(scope,identifier,{"treasury_index":expected,
+                    "snapshot_digest":grant["snapshot_digest"],"maintenance":"exact_projection_repair"})
+            except CrawlerError:
+                result=await self.sessions.update_one(fence,{"$set":{"treasury_repair_due":
+                    min(grant["expires_at"],_now().timestamp()+300)}})
+                counts["deferred" if result.modified_count else "superseded"]+=1
+                continue
+            result=await self.sessions.update_one(fence,{"$set":{"treasury_index":expected,
+                "treasury_repair_due":due,"storage_receipt":receipt},"$inc":{"version":1}})
+            counts["repaired" if result.modified_count else "superseded"]+=1
+        return counts
+
     async def recover_treasury_watches(self, *, limit:int=2)->dict:
         """Finite crash-resumable watch pulses through the canonical crawler.
 
@@ -1887,7 +1995,8 @@ class DragonCrawlerApplication:
             try:
                 grant = create_grant(snapshot=snapshot,policies=self._source_policies(row),
                                      now=now.timestamp(),days=body["days"])
-                index_manifest=await asyncio.to_thread(build_manifest,snapshot,grant,now=now.timestamp())
+                index_manifest=await asyncio.to_thread(build_manifest,snapshot,grant,now=now.timestamp(),
+                    policies=self._source_policies(row))
             except ValueError as exc:
                 raise CrawlerError("crawler_archive_unavailable","No qualified retained sources available.",403) from exc
         audit = {"operation":operation,"request_digest":digest,"action":"archive_grant","state":"completed",
@@ -1896,7 +2005,9 @@ class DragonCrawlerApplication:
         audit_path = "safety_control" if len(row.get("operations",{})) >= MAX_OPERATIONS else "operations."+operation
         result = await self.sessions.update_one(
             {"_id":identifier,**scope,"version":row["version"],"status":{"$ne":"deleted"}},
-            {"$set":{"archive_grant":grant,"treasury_index":index_manifest,"updated_at":now,"storage_receipt":receipt,audit_path:audit},
+            {"$set":{"archive_grant":grant,"treasury_index":index_manifest,
+                     "treasury_repair_due":min(grant["expires_at"],now.timestamp()+6*3600) if grant else None,
+                     "updated_at":now,"storage_receipt":receipt,audit_path:audit},
              "$inc":{"version":1}},
         )
         if not result.modified_count:
@@ -1984,7 +2095,7 @@ class DragonCrawlerApplication:
                 filtered={**snapshot,"sources":{sid:snapshot["sources"][sid] for sid in proof["verified_source_ids"]}}
                 now=_now().timestamp()
                 grant=create_grant(snapshot=filtered,policies=self._source_policies(row),now=now,days=body["days"])
-                segment=await asyncio.to_thread(build_manifest,filtered,grant,now=now)
+                segment=await asyncio.to_thread(build_manifest,filtered,grant,now=now,policies=self._source_policies(row))
             except (ValueError,TypeError,KeyError,CheckpointReplicaError) as exc:
                 raise CrawlerError("crawler_legacy_hold","Historical bytes did not qualify for read-only migration.",403) from exc
         audit={"operation":operation,"request_digest":digest,"action":"legacy_archive","state":"completed",
@@ -1995,6 +2106,7 @@ class DragonCrawlerApplication:
         changed=await self.sessions.update_one({"_id":identifier,**scope,"version":row["version"],
             "status":{"$in":["completed","budget_exhausted"]}},
             {"$set":{"archive_grant":grant,"treasury_index":segment,"legacy_archive_receipt":proof,
+                      "treasury_repair_due":min(grant["expires_at"],now+6*3600) if grant else None,
                       "storage_receipt":receipt,"updated_at":_now(),path:audit},"$inc":{"version":1}})
         if not changed.modified_count:
             raise CrawlerError("crawler_conflict","Historical session changed before archive admission.",409)
@@ -3528,6 +3640,7 @@ class DragonCrawlerApplication:
                     "source_use_policies": "",
                     "archive_grant": "",
                     "treasury_index": "",
+                    "treasury_repair_due": "",
                     "legacy_archive_receipt": "",
                     "treasury_watch": "",
                     "treasury_watch_parent": "",
@@ -3817,6 +3930,7 @@ class DragonCrawlerApplication:
                     "$set": {
                         "source_use_policies." + source_id: policy,
                         "treasury_index": None,
+                        "treasury_repair_due":now.timestamp() if row.get("archive_grant") else None,
                         "updated_at": now,
                         "storage_receipt": receipt,
                         (
@@ -4372,6 +4486,7 @@ async def recover_crawler_runs(*, limit: int = 16) -> dict:
     result=await crawler_application.recover(limit=limit)
     result["treasury_watches"]=await crawler_application.recover_treasury_watches()
     result["treasury_expired_segments"]=await crawler_application.purge_expired_treasury_segments()
+    result["treasury_segment_repair"]=await crawler_application.repair_treasury_segments()
     return result
 
 

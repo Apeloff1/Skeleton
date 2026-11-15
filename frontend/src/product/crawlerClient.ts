@@ -143,7 +143,9 @@ export type DragonTreasury = {
   current_indexed: number; historic_indexed: number; metadata_only: number; blocked_current: number; changes: number; revalidated_revisions: number;
   verified_historic_transitions: number; verified_changed_families: number; alias_held_families: number; revisit_plan: string[]; parsed_unique_payloads: number;
   materialized_payload_hits: number; invalid_materialized_segments: number; legacy_history_sessions: number;
-  index_admission: 'temporal_diversity_v1'; eligible_observations: number; indexed_observations: number;
+  index_admission: 'temporal_diversity_v1'|'temporal_query_rerank_v2'; eligible_observations: number; indexed_observations: number;
+  query_admission?: {eligible_representatives:number; scanned_representatives:number; scanned_bytes:number;
+    matching_representatives:number; prioritized_representatives:number; full_structural_corpus:false}|null;
   evolution: DragonEvolution; family_rows: TreasuryFamily[]; hits: TreasuryRevision[];
   timeline: TreasuryRevision[]; comparison: { current: TreasuryRevision; previous: TreasuryRevision; delta: TreasuryDelta } | null;
   earliest_source_expiry: number | null; latest_observed_only: true; source_text_returned: false;
@@ -529,7 +531,16 @@ export async function getDragonTreasury(mode: TreasuryMode, query='', family?: s
     ||!integer(p.revalidated_revisions,p.observations)||!integer(p.verified_historic_transitions,p.historic_indexed)
     ||!integer(p.verified_changed_families,p.changed_families)||!integer(p.alias_held_families,p.blocked_current)||!integer(p.parsed_unique_payloads,Math.min(256,p.observations))
     ||!integer(p.materialized_payload_hits,p.parsed_unique_payloads)||!integer(p.invalid_materialized_segments,32)||!integer(p.legacy_history_sessions,32)
-    ||p.index_admission!=='temporal_diversity_v1'||!integer(p.eligible_observations,p.observations)||!integer(p.indexed_observations,Math.min(256,p.eligible_observations))
+    ||!['temporal_diversity_v1','temporal_query_rerank_v2'].includes(p.index_admission)
+    ||!integer(p.eligible_observations,p.observations)||!integer(p.indexed_observations,Math.min(256,p.eligible_observations))
+    ||p.index_admission==='temporal_diversity_v1'&&p.query_admission!=null
+    ||p.index_admission==='temporal_query_rerank_v2'&&(!p.candidate_limit_reached||!p.query_admission
+      ||!integer(p.query_admission.eligible_representatives,p.eligible_observations)
+      ||p.query_admission.scanned_representatives!==p.query_admission.eligible_representatives
+      ||!integer(p.query_admission.scanned_bytes,24000*p.query_admission.scanned_representatives)
+      ||!integer(p.query_admission.matching_representatives,p.query_admission.scanned_representatives)
+      ||!integer(p.query_admission.prioritized_representatives,Math.min(192,p.query_admission.matching_representatives,p.indexed_observations))
+      ||p.query_admission.full_structural_corpus!==false)
     ||p.parsed_unique_payloads>p.indexed_observations
     ||!Array.isArray(p.revisit_plan)||p.revisit_plan.length>24||p.revisit_plan.length>p.families
     ||p.revisit_plan.some(id=>typeof id!=='string'||!HASH.test(id))||new Set(p.revisit_plan).size!==p.revisit_plan.length

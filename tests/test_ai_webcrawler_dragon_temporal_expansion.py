@@ -7,7 +7,7 @@ from dataclasses import replace
 from unittest.mock import patch
 
 from skeleton.ai.webcrawler.dragon_archive_grant import create_grant
-from skeleton.ai.webcrawler.dragon_index_manifest import build_manifest,load_manifest,usable_posting
+from skeleton.ai.webcrawler.dragon_index_manifest import build_manifest,load_manifest,usable_posting,same_manifest_projection
 from skeleton.ai.webcrawler.dragon_temporal_selection import family_identity,select_candidates
 from skeleton.ai.webcrawler.dragon_treasury import build_treasury
 from skeleton.ai.webcrawler.dragon_treasury_watch import (
@@ -117,6 +117,56 @@ class TemporalSelectionTests(unittest.TestCase):
 
 
 class PostingManifestTests(unittest.TestCase):
+    def test_rebuild_excludes_revoked_members_without_touching_original_grant(self):
+        first=source(fetched_at=NOW-20)
+        other=source(source_id="c"*64,fetched_at=NOW-10)
+        snap=snapshot(first)
+        snap["sources"][other["source_id"]]=other
+        grant=create_grant(snapshot=snap,policies={},now=NOW,days=2)
+        original=copy.deepcopy(grant)
+        prior=build_manifest(snap,grant,now=NOW)
+        repaired=build_manifest(snap,grant,now=NOW+1,policies={SID:{"enabled":False,"version":1}})
+        loaded=load_manifest(repaired,grant,snapshot_digest=CHECKPOINT,now=NOW+1)
+        self.assertEqual(set(loaded),{other["source_id"]})
+        self.assertEqual(grant,original)
+        self.assertEqual(repaired["grant_digest"],prior["grant_digest"])
+        self.assertFalse(same_manifest_projection(prior,repaired,grant,now=NOW+1))
+        self.assertTrue(same_manifest_projection(repaired,repaired,grant,now=NOW+1))
+
+    def test_all_members_withdrawn_produces_valid_empty_derivative(self):
+        snap=snapshot(source(fetched_at=NOW-20))
+        grant=create_grant(snapshot=snap,policies={},now=NOW,days=1)
+        empty=build_manifest(snap,grant,now=NOW+1,policies={SID:{"enabled":True,"version":1}})
+        self.assertEqual(empty["source_count"],0)
+        self.assertEqual(load_manifest(empty,grant,snapshot_digest=CHECKPOINT,now=NOW+1),{})
+        self.assertTrue(same_manifest_projection(empty,empty,grant,now=NOW+1))
+        self.assertFalse(same_manifest_projection({"source_count":0},empty,grant,now=NOW+1))
+
+    def test_scheduled_audit_independently_checks_projection_and_corruption(self):
+        snap=snapshot(source(fetched_at=NOW-20))
+        grant=create_grant(snapshot=snap,policies={},now=NOW,days=1)
+        expected=build_manifest(snap,grant,now=NOW+100,policies={})
+        initial=build_manifest(snap,grant,now=NOW,policies={})
+        self.assertTrue(same_manifest_projection(initial,expected,grant,now=NOW+100))
+        self.assertFalse(same_manifest_projection({**initial,"segment":"AAAA"},expected,grant,now=NOW+100))
+        self.assertFalse(same_manifest_projection({**initial,"raw_sha256":"f"*64},expected,grant,now=NOW+100))
+
+    def test_segment_compression_admission_is_bounded(self):
+        snap=snapshot(source(fetched_at=NOW-20))
+        for i in range(1,12):
+            sid=format(i,"064x")
+            snap["sources"][sid]=source(source_id=sid,fetched_at=NOW-i,
+                text=" ".join(hashlib.sha256(f"{i}-{j}".encode()).hexdigest() for j in range(200)))
+            row=snap["sources"][sid]
+            row["preserved_text_hash"]=hashlib.sha256(row["text"].encode()).hexdigest()
+        grant=create_grant(snapshot=snap,policies={},now=NOW,days=1)
+        with patch("skeleton.ai.webcrawler.dragon_index_manifest.MAX_COMPRESSED",4000):
+            result=build_manifest(snap,grant,now=NOW,policies={})
+            entries=load_manifest(result,grant,snapshot_digest=CHECKPOINT,now=NOW)
+            self.assertLess(len(entries),len(grant["members"]))
+            self.assertEqual(len(entries),result["source_count"])
+
+
     def test_cached_projection_equals_reparse_and_policy_change_fails_closed(self):
         src=source(fetched_at=NOW-100)
         snap=snapshot(src)

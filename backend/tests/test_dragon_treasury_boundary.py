@@ -137,6 +137,102 @@ class TreasuryIntegrationTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(caught.exception.code,"crawler_watch_representation")
         self.assertEqual(app._grant_principal.await_count,1)
 
+    def maintenance_app(self,row,*,modified=1,admission_error=None):
+        app=object.__new__(DragonCrawlerApplication)
+        app.ensure_indexes=AsyncMock()
+        app.sessions=Mock()
+        cursor=app.sessions.find.return_value
+        cursor.sort.return_value=cursor
+        cursor.limit.return_value=cursor
+        cursor.max_time_ms.return_value=cursor
+        item={"_id":row["_id"],**SCOPE,"version":row["version"],"treasury_repair_due":0.}
+        cursor.to_list=AsyncMock(return_value=[item])
+        app.sessions.find_one=AsyncMock(return_value=row)
+        app.sessions.update_one=AsyncMock(return_value=Mock(modified_count=modified))
+        app._admit=AsyncMock(return_value={"receipt":"test"},side_effect=admission_error)
+        return app
+
+    def maintenance_fixture(self):
+        row,captured=fixture()
+        now=captured+timedelta(days=2)
+        row["archive_grant"]=create_grant(snapshot=row["snapshot"],policies={},
+                                           now=now.timestamp()-60,days=3)
+        row["treasury_repair_due"]=0.
+        return row,now
+
+    async def test_maintenance_repairs_missing_index_without_renewal(self):
+        from skeleton.ai.webcrawler.dragon_index_manifest import load_manifest
+        row,now=self.maintenance_fixture()
+        original=copy.deepcopy(row["archive_grant"])
+        app=self.maintenance_app(row)
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.repair_treasury_segments()
+        self.assertEqual(result["repaired"],1)
+        query,mutation=app.sessions.update_one.await_args.args
+        self.assertEqual(query["version"],row["version"])
+        self.assertEqual(query["treasury_repair_due"],0.)
+        self.assertEqual(query["archive_grant.expires_at"],original["expires_at"])
+        self.assertIn("$expr",query)
+        self.assertEqual(mutation["$inc"],{"version":1})
+        self.assertNotIn("archive_grant",mutation["$set"])
+        self.assertNotIn("snapshot",mutation["$set"])
+        self.assertNotIn("updated_at",mutation["$set"])
+        index=mutation["$set"]["treasury_index"]
+        self.assertEqual(len(load_manifest(index,original,snapshot_digest=original["snapshot_digest"],
+                                             now=now.timestamp())),1)
+        self.assertEqual(row["archive_grant"],original)
+        app._admit.assert_awaited_once()
+
+    async def test_maintenance_healthy_audit_never_republishes_or_changes_version(self):
+        from skeleton.ai.webcrawler.dragon_index_manifest import build_manifest
+        row,now=self.maintenance_fixture()
+        row["treasury_index"]=build_manifest(row["snapshot"],row["archive_grant"],now=now.timestamp()-30)
+        app=self.maintenance_app(row)
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.repair_treasury_segments()
+        self.assertEqual(result["healthy"],1)
+        app._admit.assert_not_awaited()
+        self.assertEqual(set(app.sessions.update_one.await_args.args[1]),{"$set"})
+        self.assertEqual(set(app.sessions.update_one.await_args.args[1]["$set"]),{"treasury_repair_due"})
+
+    async def test_maintenance_withdrawn_source_cannot_be_reindexed(self):
+        row,now=self.maintenance_fixture()
+        sid=next(iter(row["snapshot"]["sources"]))
+        row["source_use_policies"]={sid:{"enabled":False,"version":1,
+            "max_age_seconds":86400,"changed_at":now.isoformat()}}
+        app=self.maintenance_app(row)
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.repair_treasury_segments()
+        self.assertEqual(result["repaired"],1)
+        self.assertEqual(app.sessions.update_one.await_args.args[1]["$set"]["treasury_index"]["source_count"],0)
+
+    async def test_maintenance_cas_loss_is_not_reported_as_repair(self):
+        row,now=self.maintenance_fixture()
+        app=self.maintenance_app(row,modified=0)
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.repair_treasury_segments()
+        self.assertEqual(result["superseded"],1)
+        self.assertEqual(result["repaired"],0)
+
+    async def test_maintenance_storage_denial_defers_without_index(self):
+        row,now=self.maintenance_fixture()
+        app=self.maintenance_app(row,admission_error=CrawlerError("storage_denied","denied",503))
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.repair_treasury_segments()
+        self.assertEqual(result["deferred"],1)
+        self.assertEqual(set(app.sessions.update_one.await_args.args[1]["$set"]),{"treasury_repair_due"})
+
+    async def test_maintenance_corrupt_witness_drops_only_derived_index(self):
+        row,now=self.maintenance_fixture()
+        row["treasury_index"]={"damaged":True}
+        row["checkpoint_identity"]={}
+        app=self.maintenance_app(row)
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.repair_treasury_segments()
+        self.assertEqual(result["blocked"],1)
+        self.assertEqual(app.sessions.update_one.await_args.args[1]["$unset"],{"treasury_index":""})
+        app._admit.assert_not_awaited()
+
     async def test_expired_posting_cleanup_preserves_snapshot_and_uses_exact_version(self):
         row,captured=fixture()
         now=captured+timedelta(days=2)

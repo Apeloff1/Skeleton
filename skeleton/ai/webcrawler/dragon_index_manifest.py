@@ -78,32 +78,65 @@ def _deserialize(row:dict,text_hash:str)->ParsedVersion:
     return ParsedVersion(counts,tuple(sections),values,tuple(numbers),digest)
 
 
-def build_manifest(snapshot:dict,grant:dict,*,now:float)->dict:
-    """Create newest-first deterministic segment with explicit capacity count."""
-    from .dragon_archive_grant import validate_grant
+def build_manifest(snapshot:dict,grant:dict,*,now:float,policies:dict|None=None)->dict:
+    """Materialize newest authorized grant members without renewing the grant.
+
+    Maintenance supplies current policies; a policy change only subtracts
+    members. The original grant digest and expiry remain immutable.
+    """
+    from .dragon_archive_grant import validate_grant, archive_expiry
     validate_grant(grant)
     if (snapshot.get("snapshot_digest")!=grant["snapshot_digest"]
             or type(now) not in (int,float) or not math.isfinite(now)
             or not grant["issued_at"]<=now<grant["expires_at"]):
         raise ValueError("manifest not bound to active grant")
+    if not set(grant["members"])<=set(snapshot["sources"]):
+        raise ValueError("manifest grant contains absent source")
     ordered=sorted(grant["members"],key=lambda sid:(-snapshot["sources"][sid]["fetched_at"],sid))
     entries={}
+    raw_size=2
     for sid in ordered:
         source=snapshot["sources"][sid]
         member=grant["members"][sid]
+        if policies is not None:
+            policy=policies.get(sid,{"version":0,"enabled":True})
+            if archive_expiry(grant,snapshot_digest=snapshot["snapshot_digest"],
+                              source=source,policy=policy,now=now) is None:
+                continue
         text=source["text"]
         actual=_sha(text.encode("utf-8"))
         if actual!=member["text_digest"] or actual!=source["preserved_text_hash"]:
             raise ValueError("manifest source changed")
         entry={"text_digest":actual,"policy_version":member["policy_version"],
                "posting":_serialize(parse_retained_text(text))}
-        candidate={**entries,sid:entry}
-        raw=_json(candidate)
-        if len(raw)>MAX_RAW or len(zlib.compress(raw,level=1))>MAX_COMPRESSED:
+        # Exact canonical JSON byte accounting, not repeated compression
+        # of every accumulated prefix.
+        cost=len(_json(sid))+1+len(_json(entry))+int(bool(entries))
+        if raw_size+cost>MAX_RAW:
             continue
-        entries=candidate
+        entries[sid]=entry
+        raw_size+=cost
     raw=_json(entries)
     compressed=zlib.compress(raw,level=1)
+    if len(compressed)>MAX_COMPRESSED:
+        # Keep an actually fitting newest prefix. Compression need not be
+        # monotone, so do not claim optimal packing.
+        items=list(entries.items())
+        low,high=0,len(items)
+        best_raw,best_blob=_json({}),zlib.compress(_json({}),level=1)
+        while high-low>1:
+            mid=(low+high)//2
+            candidate=_json(dict(items[:mid]))
+            blob=zlib.compress(candidate,level=1)
+            if len(blob)<=MAX_COMPRESSED:
+                low=mid
+                best_raw,best_blob=candidate,blob
+            else:
+                high=mid
+        entries=dict(items[:low])
+        raw,compressed=best_raw,best_blob
+    if len(raw)>MAX_RAW or len(compressed)>MAX_COMPRESSED:
+        raise ValueError("index capacity cannot fit empty segment")
     return {"schema":SCHEMA,"parser":PARSER,"snapshot_digest":grant["snapshot_digest"],
             "grant_digest":_sha(_json(grant)),"created_at":now,"expires_at":grant["expires_at"],
             "source_count":len(entries),"eligible_count":len(ordered),
@@ -173,3 +206,17 @@ def usable_posting(entries:dict,source:dict,policy:dict)->ParsedVersion|None:
             or _sha(source["text"].encode("utf-8"))!=member["text_digest"]):
         return None
     return posting
+
+
+def same_manifest_projection(previous:object, expected:dict, grant:dict, *, now:float)->bool:
+    """Compare actual decoded bytes with an independently derived projection."""
+    if not isinstance(previous,dict):
+        return False
+    try:
+        loaded=load_manifest(previous,grant,snapshot_digest=grant["snapshot_digest"],now=now)
+    except (ValueError,TypeError,KeyError,RecursionError):
+        return False
+    return (len(loaded)==expected["source_count"]
+            and all(previous.get(key)==expected[key] for key in
+                    ("schema","parser","snapshot_digest","grant_digest","expires_at",
+                     "source_count","eligible_count","raw_bytes","raw_sha256")))
