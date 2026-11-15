@@ -19,6 +19,7 @@ from urllib.parse import unquote, urlsplit
 
 from .frontier_coverage import build_coverage_index, score_indexed_candidate
 from .adaptive_navigation import adaptive_priority, origin_health
+from .information_portfolio import build_information_portfolio, marginal_yield
 
 
 _TOKEN = re.compile(r"[a-z0-9]{2,64}")
@@ -48,6 +49,7 @@ def _lexical_terms(text: str) -> frozenset[str]:
 def choose_frontier(
     frontier: list[dict], *, sources: dict, host_ready: dict,
     query: str, now: float, strategy: str = "fifo", events=None,
+    measurements=None, robots=None, remaining_requests=None,
 ) -> tuple[dict | None, FrontierDecision | None]:
     if strategy not in ("fifo", "balanced", "coverage"):
         raise ValueError("unknown bounded frontier scheduling algorithm")
@@ -113,6 +115,10 @@ def choose_frontier(
     else:
         ranked = []
         index = build_coverage_index(sources=sources, query=query)
+        portfolio = None
+        if measurements is not None and robots is not None:
+            portfolio = build_information_portfolio(coverage=index, sources=sources,
+                frontier=frontier, measurements=measurements, robots=robots, now=now)
         for candidate in eligible:
             ordinal, row, host, overlap, _score, due = candidate
             scorecard = score_indexed_candidate(
@@ -120,7 +126,13 @@ def choose_frontier(
                 depth=row["depth"], attempts=row["attempts"],
             )
             score = scorecard.score
-            if events is not None:
+            if portfolio is not None:
+                estimate = marginal_yield(row, portfolio=portfolio, ordinal=ordinal,
+                    eligible_count=len(eligible), remaining_requests=remaining_requests)
+                # Absolute coverage remains an exploration backstop when URL
+                # metadata is sparse; measured marginal yield dominates.
+                score = .20 * score + .80 * estimate.priority
+            elif events is not None:
                 if candidate[2] not in health_by_host:
                     health_by_host[candidate[2]] = origin_health(events, candidate[2])
                 score = adaptive_priority(score, health_by_host[candidate[2]], coverage_cost=False)
