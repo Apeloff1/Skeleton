@@ -120,7 +120,7 @@ def test_digest_rejects_parent_replacement_after_open(
         return payload
 
     monkeypatch.setattr(p.os, "read", move_parent_while_reading)
-    with pytest.raises(ValueError, match="directory changed"):
+    with pytest.raises(ValueError, match="directory changed|ancestor path changed"):
         p._digest_beneath(root, "scripts/scene.gd")
     assert changed
     assert source.is_file()  # through the swapped path; no source trust granted
@@ -149,7 +149,7 @@ def test_digest_rejects_replacement_directory_even_with_same_file_bytes(
         return chunk
 
     monkeypatch.setattr(p.os, "read", reparent)
-    with pytest.raises(ValueError, match="directory replaced"):
+    with pytest.raises(ValueError, match="directory replaced|ancestor path replaced"):
         p._digest_beneath(root, "scripts/scene.gd")
     assert changed
 
@@ -191,6 +191,43 @@ def test_tree_hash_nontrivial_project_has_bounded_sorted_output(tmp_path: Path):
     second = p.tree_digest(root)
     assert first == second
     assert len(first) == 64
+
+
+def test_later_hash_cannot_hide_mutation_of_previously_hashed_file(tmp_path, monkeypatch):
+    root = tmp_path / "tree"
+    root.mkdir()
+    for name in ("a.gd", "b.gd"):
+        (root / name).write_bytes(b"original")
+    real = p._digest_beneath
+    processed = []
+
+    def mutate_after_first(root, relative, **kwargs):
+        result = real(root, relative, **kwargs)
+        if processed:
+            (root / processed[0]).write_bytes(b"modified")
+        processed.append(relative)
+        return result
+
+    monkeypatch.setattr(p, "_digest_beneath", mutate_after_first)
+    with pytest.raises(ValueError, match="changed after hashing"):
+        p.tree_digest(root)
+
+
+def test_budget_rejects_oversized_source_before_hashing(tmp_path, monkeypatch):
+    root = tmp_path / "tree"
+    root.mkdir()
+    (root / "large.gd").write_bytes(b"x" * 128)
+    monkeypatch.setattr(p, "MAX_SOURCE_BYTES", 64)
+    monkeypatch.setattr(p, "_digest_beneath", lambda *a, **k: pytest.fail("oversized source hashed"))
+    with pytest.raises(ValueError, match="size budget"):
+        p.tree_digest(root)
+
+
+def test_ignored_cache_name_cannot_hide_symlink(tmp_path):
+    root = project(tmp_path)
+    (root / ".godot").symlink_to(tmp_path, target_is_directory=True)
+    with pytest.raises(ValueError, match="unsafe symlink"):
+        p.tree_digest(root)
 
 
 if __name__ == "__main__":
