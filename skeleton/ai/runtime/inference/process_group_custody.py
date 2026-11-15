@@ -15,7 +15,7 @@ import time
 
 def supports_group_custody() -> bool:
     return os.name == "posix" and all(
-        hasattr(os, name) for name in ("waitid", "P_PID", "WEXITED", "WNOWAIT", "WNOHANG", "killpg")
+        hasattr(os, name) for name in ("waitid", "P_PID", "WEXITED", "WNOWAIT", "WNOHANG", "killpg", "getpgid", "getsid")
     )
 
 
@@ -37,12 +37,26 @@ def observe_worker_exit(process: subprocess.Popen[bytes]) -> bool:
             raise RuntimeError("GGUF process leader no longer exclusively waitable") from exc
 
 
-def _signal_group(process: subprocess.Popen[bytes], sig: int) -> None:
-    # Revalidate that the leader remains waitable immediately before signalling.
-    # Exclusivity of the wait owner is part of the trusted spawn contract.
+def _require_owned_group(process: subprocess.Popen[bytes]) -> None:
+    """Require the original, unreaped session leader, not merely a live PID."""
+    pid = process.pid
+    if type(pid) is not int or pid <= 1 or pid == os.getpid():
+        raise RuntimeError("invalid GGUF process group identity")
     if process.returncode is not None:
         raise RuntimeError("cannot signal a reaped GGUF process group")
     observe_worker_exit(process)
+    try:
+        group, session = os.getpgid(pid), os.getsid(pid)
+    except OSError as exc:
+        raise RuntimeError("GGUF process group identity unavailable") from exc
+    if group != pid or session != pid:
+        raise RuntimeError("GGUF process is not the owned session leader")
+
+
+def _signal_group(process: subprocess.Popen[bytes], sig: int) -> None:
+    # Revalidate that the leader remains waitable immediately before signalling.
+    # Exclusivity of the wait owner is part of the trusted spawn contract.
+    _require_owned_group(process)
     try:
         os.killpg(process.pid, sig)
     except ProcessLookupError:
@@ -60,8 +74,10 @@ def terminate_owned_process_group(process: subprocess.Popen[bytes]) -> bool:
     if not supports_group_custody():
         return False
     if process.returncode is not None:
-        # Never reuse the PID/PGID of an already reaped leader.
+        # Never reuse the PID/PGID of an already reaped leader. This means
+        # no further signalling is permitted, not proof of descendant exit.
         return True
+    _require_owned_group(process)
     if not observe_worker_exit(process):
         _signal_group(process, signal.SIGTERM)
         deadline = time.monotonic() + 1.0
