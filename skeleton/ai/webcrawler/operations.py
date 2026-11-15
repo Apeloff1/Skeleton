@@ -27,6 +27,7 @@ from .core import (
     extract_document,
 )
 from .dragon_mission_quality import rank_query_passages, scan_untrusted_instructions
+from .evidence_selection import select_diverse_evidence
 from .structured_discovery import (
     DiscoveryError, UnsupportedDiscoveryRoot, SUPPORTED_MEDIA,
     parse_structured_discovery, parse_plaintext_sitemap,
@@ -96,6 +97,7 @@ def implementation_digest():
                 "dns_binding.py",
                 "research.py",
                 "dragon_mission_quality.py",
+                "evidence_selection.py",
                 "source_instruction_guard.py",
                 "structured_discovery.py",
                 "document_formats.py",
@@ -782,12 +784,12 @@ class CrawlRun:
                         ],
                     }
                 )
-        hits.sort(key=lambda row: (-row["lexical_score"], row["source_id"], row["start"]))
+        hits = select_diverse_evidence(hits, limit=limit)
         result = {
             "schema_version": "skeleton.ai.dragon.crawl_evidence.v1",
             "run_id": self._state["run_id"],
             "query": query,
-            "hits": hits[:limit],
+            "hits": hits,
             "verified_knowledge": False,
             "training_permission": False,
         }
