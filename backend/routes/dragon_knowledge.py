@@ -329,18 +329,8 @@ def register_knowledge_routes(router):
         from core.dragon_game_corpus import GameCorpus, CatalogueHeld
 
         def work():
-            path = runtime._path(
-                "SKL_DRAGON_GAME_CORPUS_DB_PATH",
-                create=operation == "observe" and os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP") == "1",
-            )
-            # Keep this derived metadata database separate from other stores.
-            for variable in ("SKL_DRAGON_KNOWLEDGE_DB_PATH", "SKL_DRAGON_PRACTICE_DB_PATH"):
-                configured = os.getenv(variable, "").strip()
-                if configured:
-                    from pathlib import Path
-                    other = Path(configured).expanduser()
-                    if other.exists() and path.samefile(other):
-                        raise GameLearningError("dragon_storage_invalid", "Game catalogue needs its own store.", 503)
+            from core.dragon_corpus_runtime import _path
+            path=_path(scope=owner,create=operation=="observe" and os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1")
             return getattr(GameCorpus(path), operation)(owner, *args, **kwargs)
 
         try:
@@ -519,13 +509,14 @@ def register_knowledge_routes(router):
 
     async def media_call(owner,op,*args,**kwargs):
         from core.dragon_media_archive import MediaArchive
+        from core.dragon_corpus_runtime import _path as corpus_path
         from core.dragon_hoarder_copy import _io
         from core.dragon_hoarder_bulk import StorageHeld
         from core.dragon_game_corpus import CatalogueHeld
         if op not in {"begin","append","seal","list","metadata","part","revoke"}:
             raise HTTPException(422,detail={"code":"dragon_media_operation"})
         try:
-            return await _io(lambda:getattr(MediaArchive(),op)(owner,*args,**kwargs))
+            return await _io(lambda:getattr(MediaArchive(path=corpus_path(scope=owner)),op)(owner,*args,**kwargs))
         except (StorageHeld,CatalogueHeld) as exc:
             raise HTTPException(409,detail={"code":"dragon_media_storage_held"}) from exc
         except LookupError as exc:
@@ -719,7 +710,7 @@ def register_knowledge_routes(router):
         from core.dragon_corpus_runtime import _bounded,_path
         owner=editor(user)
         return await corpus_runtime_call(_bounded(lambda:enqueue(
-            _path(create=os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1"),owner,**body.model_dump())))
+            _path(scope=owner,create=os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1"),owner,**body.model_dump())))
 
 
     @router.get("/knowledge/game-corpus/mod-seeds")
@@ -757,7 +748,7 @@ def register_knowledge_routes(router):
         from core.dragon_corpus_runtime import _bounded,_path
         owner=editor(user)
         return await corpus_runtime_call(_bounded(lambda:import_applications(
-            _path(create=os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1"),owner,**body.model_dump())))
+            _path(scope=owner,create=os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1"),owner,**body.model_dump())))
 
     @router.post("/knowledge/game-corpus/mod-seeds/attach")
     async def mod_seed_attach(body:ModSeedSpecialistsRequest,user:dict=Depends(get_current_user)):
@@ -765,7 +756,7 @@ def register_knowledge_routes(router):
         from core.dragon_corpus_runtime import _bounded,_path
         owner=editor(user)
         return await corpus_runtime_call(_bounded(lambda:attach_specialists(
-            _path(create=False),owner,**body.model_dump())))
+            _path(scope=owner,create=False),owner,**body.model_dump())))
 
 
     @router.get("/knowledge/game-corpus/dataset-library")

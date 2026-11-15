@@ -269,7 +269,7 @@ class DatasetShard:
         if type(grant_seconds) is not int or not 300<=grant_seconds<=MAX_GRANT:raise ValueError("dataset grant duration")
         dataset=key(dataset);source,observation_digest,expected_chain=map(_id,(source,observation_digest,expected_chain))
         label=clean(label,128)
-        (corpus or GameCorpus(_path())).capture_plan(self.scope,self.game,source,observation_digest)
+        (corpus or GameCorpus(_path(scope=self.scope))).capture_plan(self.scope,self.game,source,observation_digest)
         version=digest([self.owner,self.game,dataset,source,label,expected_rows,expected_chain])
         now=int(time.time())
         with self._db() as db:
