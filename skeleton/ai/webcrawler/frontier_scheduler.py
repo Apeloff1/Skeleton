@@ -18,6 +18,7 @@ import re
 from urllib.parse import unquote, urlsplit
 
 from .frontier_coverage import measure_frontier_coverage
+from .adaptive_navigation import adaptive_priority, origin_health
 
 
 _TOKEN = re.compile(r"[a-z0-9]{2,64}")
@@ -46,7 +47,7 @@ def _lexical_terms(text: str) -> frozenset[str]:
 
 def choose_frontier(
     frontier: list[dict], *, sources: dict, host_ready: dict,
-    query: str, now: float, strategy: str = "fifo",
+    query: str, now: float, strategy: str = "fifo", events=None,
 ) -> tuple[dict | None, FrontierDecision | None]:
     if strategy not in ("fifo", "balanced", "coverage"):
         raise ValueError("unknown bounded frontier scheduling algorithm")
@@ -64,6 +65,9 @@ def choose_frontier(
             raise ValueError("invalid canonical source row")
         host = urlsplit(source["canonical_url"]).hostname
         counted[host] += 1
+    # FIFO remains strictly compatible. Outcome-driven scores apply only to
+    # the two explicit adaptive selection strategies, not eligibility.
+    health_by_host = {}
     eligible = []
     for ordinal, row in enumerate(frontier):
         if not isinstance(row, dict):
@@ -87,6 +91,10 @@ def choose_frontier(
             + .11 / (1 + attempts),
             8,
         )
+        if events is not None and strategy == "balanced":
+            if host not in health_by_host:
+                health_by_host[host] = origin_health(events, host)
+            score = adaptive_priority(score, health_by_host[host], coverage_cost=False)
         eligible.append((
             ordinal, row, host, overlap, score, due,
         ))
@@ -110,7 +118,12 @@ def choose_frontier(
                 row["url"], sources=sources, query=query,
                 depth=row["depth"], attempts=row["attempts"],
             )
-            ranked.append((scorecard.score, due, ordinal, candidate))
+            score = scorecard.score
+            if events is not None:
+                if candidate[2] not in health_by_host:
+                    health_by_host[candidate[2]] = origin_health(events, candidate[2])
+                score = adaptive_priority(score, health_by_host[candidate[2]], coverage_cost=False)
+            ranked.append((score, due, ordinal, candidate))
         _coverage, _due, _ordinal, selected = min(
             ranked, key=lambda x: (
                 -x[0], x[1], x[3][2], x[3][1]["url"], x[2],
