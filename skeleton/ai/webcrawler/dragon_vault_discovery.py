@@ -18,7 +18,7 @@ PAGE=8
 MAX_SOURCES=64
 MAX_TEXT_BYTES=24000
 MAX_QUERY_TERMS=32
-_CURSOR=re.compile(r"([a-f0-9]{64}):([0-9]{1,3})\Z")
+_CURSOR=re.compile(r"([a-f0-9]{64}):([0-9]{1,4})\Z")
 
 
 def query_terms(query):

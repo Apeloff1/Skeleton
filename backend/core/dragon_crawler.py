@@ -146,6 +146,8 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                  ("treasury_watch.claim_until",ASCENDING)]
             )
             await self.sessions.create_index([("treasury_index.expires_at",ASCENDING)])
+            await self.sessions.create_index([("tenant_id",ASCENDING),("owner_id",ASCENDING),
+                ("treasury_archive_route.keys",ASCENDING),("treasury_archive_route.expires_at",ASCENDING)])
             await self.sessions.create_index([("treasury_repair_due",ASCENDING),
                                               ("archive_grant.expires_at",ASCENDING)])
             await self.sessions.create_index([("tenant_id",ASCENDING),("owner_id",ASCENDING),
@@ -1701,7 +1703,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             result=await self.sessions.update_one({"_id":row["_id"],"tenant_id":row["tenant_id"],
                 "owner_id":row["owner_id"],"version":row["version"],"status":{"$ne":"deleted"},
                 "treasury_index.expires_at":expiry},
-                {"$unset":{"treasury_index":""},"$inc":{"version":1}})
+                {"$unset":{"treasury_index":"","treasury_archive_route":""},"$inc":{"version":1}})
             purged+=int(bool(result.modified_count))
         return {"scanned":len(rows),"purged":purged,"source_records_erased":0}
 
@@ -1714,6 +1716,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         """
         from skeleton.ai.webcrawler.dragon_archive_grant import validate_grant
         from skeleton.ai.webcrawler.dragon_index_manifest import build_manifest,same_manifest_projection
+        from skeleton.ai.webcrawler.dragon_archive_routing import build_routing
         if type(limit) is not int or not 1<=limit<=2:
             raise ValueError("treasury repair pulse is bounded")
         await self.ensure_indexes()
@@ -1794,12 +1797,14 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                     # when the independent primary and grant qualified.
                     actual=None
                 checked=await asyncio.to_thread(same_manifest_projection,actual,expected,grant,now=stamp)
+                routing=await asyncio.to_thread(build_routing,scope,expected,grant,now=stamp)
+                checked=checked and row.get("treasury_archive_route")==routing
             except (ValueError,KeyError,TypeError,RecursionError,CheckpointReplicaError,CrawlerError):
                 # Invalid authority never becomes valid through a cache.
                 # Remove only derived material and back off.
                 update={"$set":{"treasury_repair_due":_now().timestamp()+3600}}
-                if row.get("treasury_index") is not None:
-                    update.update({"$unset":{"treasury_index":""},"$inc":{"version":1}})
+                if row.get("treasury_index") is not None or row.get("treasury_archive_route") is not None:
+                    update.update({"$unset":{"treasury_index":"","treasury_archive_route":""},"$inc":{"version":1}})
                 result=await self.sessions.update_one(fence,update)
                 counts["blocked" if result.modified_count else "superseded"]+=1
                 continue
@@ -1821,14 +1826,14 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                 counts["healthy" if result.modified_count else "superseded"]+=1
                 continue
             try:
-                receipt=await self._admit(scope,identifier,{"treasury_index":expected,
+                receipt=await self._admit(scope,identifier,{"treasury_index":expected,"treasury_archive_route":routing,
                     "snapshot_digest":grant["snapshot_digest"],"maintenance":"exact_projection_repair"})
             except CrawlerError:
                 result=await self.sessions.update_one(fence,{"$set":{"treasury_repair_due":
                     min(grant["expires_at"],_now().timestamp()+300)}})
                 counts["deferred" if result.modified_count else "superseded"]+=1
                 continue
-            result=await self.sessions.update_one(fence,{"$set":{"treasury_index":expected,
+            result=await self.sessions.update_one(fence,{"$set":{"treasury_index":expected,"treasury_archive_route":routing,
                 "treasury_repair_due":due,"storage_receipt":receipt},"$inc":{"version":1}})
             counts["repaired" if result.modified_count else "superseded"]+=1
         return counts
@@ -2046,11 +2051,13 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                 raise CrawlerError("crawler_archive_unavailable","No qualified retained sources available.",403) from exc
         audit = {"operation":operation,"request_digest":digest,"action":"archive_grant","state":"completed",
                  "enabled":body["enabled"],"snapshot_digest":snapshot["snapshot_digest"]}
-        receipt = await self._admit(scope,identifier,{"archive_grant":grant,"treasury_index":index_manifest,"audit":audit})
+        from skeleton.ai.webcrawler.dragon_archive_routing import build_routing
+        routing=await asyncio.to_thread(build_routing,scope,index_manifest,grant,now=now.timestamp()) if grant else None
+        receipt = await self._admit(scope,identifier,{"archive_grant":grant,"treasury_index":index_manifest,"treasury_archive_route":routing,"audit":audit})
         audit_path = "safety_control" if len(row.get("operations",{})) >= MAX_OPERATIONS else "operations."+operation
         result = await self.sessions.update_one(
             {"_id":identifier,**scope,"version":row["version"],"status":{"$ne":"deleted"}},
-            {"$set":{"archive_grant":grant,"treasury_index":index_manifest,
+            {"$set":{"archive_grant":grant,"treasury_index":index_manifest,"treasury_archive_route":routing,
                      "treasury_repair_due":min(grant["expires_at"],now.timestamp()+6*3600) if grant else None,
                      "updated_at":now,"storage_receipt":receipt,audit_path:audit,"deep_index_due":now.timestamp()},
              "$unset":{"deep_index":""},"$inc":{"version":1}},
@@ -2147,12 +2154,14 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                 raise CrawlerError("crawler_legacy_hold","Historical bytes did not qualify for read-only migration.",403) from exc
         audit={"operation":operation,"request_digest":digest,"action":"legacy_archive","state":"completed",
                "enabled":body["enabled"]}
+        from skeleton.ai.webcrawler.dragon_archive_routing import build_routing
+        routing=await asyncio.to_thread(build_routing,scope,segment,grant,now=now) if grant else None
         receipt=await self._admit(scope,identifier,{"archive_grant":grant,"treasury_index":segment,
-                                                  "legacy_archive_receipt":proof,"audit":audit})
+                                                  "treasury_archive_route":routing,"legacy_archive_receipt":proof,"audit":audit})
         path="safety_control" if len(row.get("operations",{}))>=MAX_OPERATIONS else "operations."+operation
         changed=await self.sessions.update_one({"_id":identifier,**scope,"version":row["version"],
             "status":{"$in":["completed","budget_exhausted"]}},
-            {"$set":{"archive_grant":grant,"treasury_index":segment,"legacy_archive_receipt":proof,
+            {"$set":{"archive_grant":grant,"treasury_index":segment,"treasury_archive_route":routing,"legacy_archive_receipt":proof,
                       "treasury_repair_due":min(grant["expires_at"],now+6*3600) if grant else None,
                       "storage_receipt":receipt,"updated_at":_now(),path:audit},"$inc":{"version":1}})
         if not changed.modified_count:
@@ -3758,6 +3767,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                     "source_use_policies": "",
                     "archive_grant": "",
                     "treasury_index": "",
+                    "treasury_archive_route": "",
                     "treasury_repair_due": "",
                     "legacy_archive_receipt": "",
                     "treasury_watch": "",
@@ -4061,6 +4071,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                     "$set": {
                         "source_use_policies." + source_id: policy,
                         "treasury_index": None,
+                        "treasury_archive_route": None,
                         "treasury_repair_due":now.timestamp() if row.get("archive_grant") else None,
                         "updated_at": now,
                         "storage_receipt": receipt,

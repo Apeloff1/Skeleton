@@ -110,7 +110,7 @@ class VaultQuotaTests(unittest.TestCase):
 
     def test_rejects_malformed_or_foreign_metadata(self):
         from skeleton.ai.webcrawler.dragon_vault_quota import classify_quota
-        for doc in ({"session_ids":["a","a"]},{"vault_ids":[str(i) for i in range(129)]},
+        for doc in ({"session_ids":["a","a"]},{"vault_ids":[str(i) for i in range(MAX_VAULT_SESSIONS+1)]},
                     {"session_ids":["../bad"]},{"vault_ids":None}):
             with self.assertRaises(ValueError):
                 classify_quota(doc,[],SCOPE)
@@ -168,7 +168,7 @@ class VaultDiscoveryTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 query_terms(query)
         with self.assertRaises(ValueError):
-            catalogue_signature([{"_id":str(i),"version":1} for i in range(129)],now=NOW)
+            catalogue_signature([{"_id":str(i),"version":1} for i in range(MAX_VAULT_SESSIONS+1)],now=NOW)
         for rows in ([None],[{"_id":"a","version":1,"archive_grant":"broken"}]):
             with self.assertRaises(ValueError):
                 catalogue_signature(rows,now=NOW)
@@ -244,6 +244,26 @@ class CareHistoryTests(unittest.TestCase):
             append_history(withdrawn,**args,version=10,at=NOW+3,kind="auto_replica",used=2)
         legacy=append_history(None,**args,version=9,at=NOW+2,kind="auto_replica",used=2,prefix_unknown=True)
         self.assertTrue(legacy["prefix_unknown"])
+
+
+class ArchiveRoutingTests(unittest.TestCase):
+    def test_scoped_keys_and_index_pipeline(self):
+        from skeleton.ai.webcrawler.dragon_archive_routing import query_keys,candidate_pipeline
+        keys=query_keys(SCOPE,"Optical magnetometer")
+        self.assertEqual(len(keys),2)
+        self.assertNotEqual(keys,query_keys({**SCOPE,"owner_id":"other"},"Optical magnetometer"))
+        pipeline=candidate_pipeline(SCOPE,keys,NOW)
+        self.assertEqual(pipeline[0]["$match"]["owner_id"],SCOPE["owner_id"])
+        self.assertEqual(pipeline[-1],{"$limit":65})
+        self.assertNotIn("Optical",str(pipeline))
+
+    def test_capacity_expansion_keeps_active_and_window_bounds(self):
+        from skeleton.ai.webcrawler.dragon_vault_quota import MAX_RESERVED,quota_lists
+        from skeleton.ai.webcrawler.dragon_treasury_vault import MAX_VAULT_SESSIONS,MAX_WINDOW
+        self.assertEqual((MAX_VAULT_SESSIONS,MAX_RESERVED,MAX_WINDOW),(1024,1056,32))
+        self.assertEqual(len(quota_lists({"vault_ids":[f"c{i}" for i in range(1024)]})[1]),1024)
+        with self.assertRaises(ValueError):
+            quota_lists({"vault_ids":[f"c{i}" for i in range(1025)]})
 
 
 if __name__=="__main__":

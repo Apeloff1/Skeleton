@@ -5,7 +5,7 @@ import math
 import re
 
 SCHEMA="skeleton.dragon.vault.v1"
-MAX_VAULT_SESSIONS=128
+MAX_VAULT_SESSIONS=1024
 MAX_WINDOW=32
 TERMINAL=frozenset({"completed","budget_exhausted"})
 _HASH=re.compile(r"[a-f0-9]{64}\Z")

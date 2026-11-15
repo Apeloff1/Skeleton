@@ -190,7 +190,7 @@ export async function configureDragonVaultCare(id:string,body:CrawlCommand&{enab
 export type DragonVaultEntry = {session_id:string;version:number;vault:DragonVaultState|null;
   archive_expires_at:number|null;legacy_runtime:boolean|null;integrity_held:boolean;last_scrub?:DragonVaultScrub|null;care?:DragonVaultCare|null};
 export type DragonVaultCatalog = {schema:'skeleton.dragon.vault-catalog.v1';sessions:DragonVaultEntry[];
-  next_cursor:string|null;capacity:128;as_of_unix:number;archive_use_verified:false;network_executed:false};
+  next_cursor:string|null;capacity:1024;as_of_unix:number;archive_use_verified:false;network_executed:false};
 export type DragonVaultCommand = {schema:'skeleton.dragon.vault-command.v1';session_id:string;version:number;
   vault:DragonVaultState;outcome:'vaulted'|'held'|'capacity_or_quota_held'|'quota_held'|'superseded';network_executed:false};
 export type DragonTreasury = {
@@ -590,11 +590,11 @@ export type DragonVaultDiscovery = {schema:'skeleton.dragon.vault-discovery.v1';
   qualified:number;no_grant:number;held:number;eligible_sources:number;scanned_bytes:number;matches:DragonVaultDiscoveryMatch[];
   next_cursor:string|null;page_local_ranking:true;source_text_returned:false;network_executed:false;model_context_permission:false};
 export async function discoverDragonVault(query:string,cursor?:string,signal?:AbortSignal):Promise<DragonVaultDiscovery>{
-  if(typeof query!=='string'||!query.trim()||query.length>256||cursor!==undefined&&!/^[a-f0-9]{64}:[0-9]{1,3}$/.test(cursor))invalid('Invalid chamber discovery.');
+  if(typeof query!=='string'||!query.trim()||query.length>256||cursor!==undefined&&!/^[a-f0-9]{64}:[0-9]{1,4}$/.test(cursor))invalid('Invalid chamber discovery.');
   const p=await read(api.get<DragonVaultDiscovery>(ROOT+'/companion/vault-discovery?query='+encodeURIComponent(query)
     +(cursor?'&cursor='+encodeURIComponent(cursor):''),options(signal)),getAuthToken(),'Chamber discovery unavailable.');
   if(!p||p.schema!=='skeleton.dragon.vault-discovery.v1'||!HASH.test(p.scope_digest)||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0
-    ||!integer(p.catalogue_size,128)||!integer(p.page_offset,p.catalogue_size)||p.page_offset%8!==0
+    ||!integer(p.catalogue_size,1024)||!integer(p.page_offset,p.catalogue_size)||p.page_offset%8!==0
     ||p.page_offset!==(cursor?Number(cursor.split(':')[1]):0)||cursor&&cursor.split(':')[0]!==p.scope_digest
     ||p.scanned_sessions!==Math.min(8,p.catalogue_size-p.page_offset)||!integer(p.query_terms,32)||p.query_terms<1
     ||![p.qualified,p.no_grant,p.held].every(n=>integer(n,p.scanned_sessions))||p.qualified+p.no_grant+p.held!==p.scanned_sessions
@@ -629,7 +629,7 @@ export async function getDragonVaultHealth(signal?:AbortSignal):Promise<DragonVa
   const p=await read(api.get<DragonVaultHealth>(ROOT+'/companion/vault-health',options(signal)),getAuthToken(),'Custody health unavailable.');
   if(!p||p.schema!=='skeleton.dragon.vault-health.v1'||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0
     ||!Number.isFinite(p.valid_until)||p.valid_until<=p.as_of_unix||p.valid_until>p.as_of_unix+60
-    ||!integer(p.records,160)||![p.pending,p.vaulted,p.marker_held].every(x=>integer(x,p.records))
+    ||!integer(p.records,1056)||![p.pending,p.vaulted,p.marker_held].every(x=>integer(x,p.records))
     ||p.pending+p.vaulted+p.marker_held!==p.records
     ||![p.uninspected,p.stale,p.redundant,p.primary_only,p.repairable_primary,p.held,p.due,
          p.care_active,p.care_inactive,p.care_absent,p.care_held].every(x=>integer(x,p.vaulted))
@@ -640,18 +640,42 @@ export async function getDragonVaultHealth(signal?:AbortSignal):Promise<DragonVa
     invalid('Invalid retained custody health census.');
   return p;
 }
+export type DragonArchivePointer = {session_id:string;source_id:string;version:number;score:number;valid_until:number;
+  citation:string;plane:'historic';review_state:'unreviewed_external_evidence';model_context_authorized:false;stored_prose:0};
+export type DragonArchiveIndexSearch = {schema:'skeleton.dragon.archive-index-search.v1';as_of_unix:number;
+  candidate_chambers:number;candidate_limit_reached:boolean;rechecked_chambers:number;held_chambers:number;
+  results:DragonArchivePointer[];result_limit_reached:boolean;ranking:'indexed_term_overlap_then_exact_coverage';
+  complete_corpus:false;stored_prose:0;model_context_authorized:false;network_executed:false};
+export async function searchDragonArchiveIndex(query:string,signal?:AbortSignal):Promise<DragonArchiveIndexSearch>{
+  if(typeof query!=='string'||!query.trim()||query.length>256)invalid('Invalid archive query.');
+  const p=await read(api.get<DragonArchiveIndexSearch>(ROOT+'/companion/archive-index?query='+encodeURIComponent(query),options(signal)),
+    getAuthToken(),'Archive index unavailable.');
+  if(!p||p.schema!=='skeleton.dragon.archive-index-search.v1'||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0
+    ||!integer(p.candidate_chambers,64)||p.rechecked_chambers!==Math.min(16,p.candidate_chambers)
+    ||!integer(p.held_chambers,p.rechecked_chambers)||p.candidate_limit_reached!==(p.candidate_chambers>16)
+    ||typeof p.result_limit_reached!=='boolean'||!Array.isArray(p.results)||p.results.length>32
+    ||new Set(p.results.map(x=>x?.citation)).size!==p.results.length
+    ||p.results.some((x,i)=>!x||!ID.test(x.session_id)||!HASH.test(x.source_id)||!integer(x.version)||x.version<1
+      ||!integer(x.score,32)||x.score<1||!Number.isFinite(x.valid_until)||x.valid_until<=p.as_of_unix
+      ||x.citation!=='dragon-crawl://'+x.session_id+'/'+x.source_id||x.plane!=='historic'
+      ||x.review_state!=='unreviewed_external_evidence'||x.model_context_authorized!==false||x.stored_prose!==0
+      ||i>0&&p.results[i-1].score<x.score)
+    ||p.ranking!=='indexed_term_overlap_then_exact_coverage'||p.complete_corpus!==false||p.stored_prose!==0
+    ||p.model_context_authorized!==false||p.network_executed!==false)invalid('Invalid archive index receipt.');
+  return p;
+}
 export type DragonVaultQuota = {
   schema:'skeleton.dragon.vault-quota.v1'; as_of_unix:number; active_reserved:number; vault_reserved:number;
-  distinct_reserved:number;dual_reserved:number;active_capacity:32;vault_capacity:128;
+  distinct_reserved:number;dual_reserved:number;active_capacity:32;vault_capacity:1024;
   active:number;vaulted:number;in_transit:number;tombstoned:number;missing:number;integrity_held:number;
   missing_auto_reclaimed:false;source_records_erased:false;read_only:true;
 };
 export async function getDragonVaultQuota(signal?:AbortSignal):Promise<DragonVaultQuota>{
   const p=await read(api.get<DragonVaultQuota>(ROOT+'/companion/vault-quota',options(signal)),getAuthToken(),'Vault quota health unavailable.');
   if(!p||p.schema!=='skeleton.dragon.vault-quota.v1'||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0
-    ||p.active_capacity!==32||p.vault_capacity!==128||!integer(p.active_reserved,32)||!integer(p.vault_reserved,128)
+    ||p.active_capacity!==32||p.vault_capacity!==1024||!integer(p.active_reserved,32)||!integer(p.vault_reserved,1024)
     ||!integer(p.dual_reserved,Math.min(p.active_reserved,p.vault_reserved))
-    ||!integer(p.distinct_reserved,160)||p.distinct_reserved!==p.active_reserved+p.vault_reserved-p.dual_reserved
+    ||!integer(p.distinct_reserved,1056)||p.distinct_reserved!==p.active_reserved+p.vault_reserved-p.dual_reserved
     ||![p.active,p.vaulted,p.in_transit,p.tombstoned,p.missing,p.integrity_held].every(n=>integer(n,p.distinct_reserved))
     ||p.active+p.vaulted+p.in_transit+p.tombstoned+p.missing+p.integrity_held!==p.distinct_reserved
     ||p.active>p.active_reserved||p.vaulted>p.vault_reserved
@@ -662,7 +686,7 @@ export async function getDragonVaultQuota(signal?:AbortSignal):Promise<DragonVau
 export async function getDragonVault(cursor?:string,signal?:AbortSignal):Promise<DragonVaultCatalog>{
   if(cursor!==undefined&&!ID.test(cursor))invalid('Invalid vault catalogue cursor.');
   const p=await read(api.get<DragonVaultCatalog>(ROOT+'/companion/vault?limit=32'+(cursor?'&cursor='+encodeURIComponent(cursor):''),options(signal)),getAuthToken(),'Vault catalogue unavailable.');
-  if(!p||p.schema!=='skeleton.dragon.vault-catalog.v1'||p.capacity!==128||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0
+  if(!p||p.schema!=='skeleton.dragon.vault-catalog.v1'||p.capacity!==1024||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0
     ||p.archive_use_verified!==false||p.network_executed!==false||!Array.isArray(p.sessions)||p.sessions.length>32
     ||new Set(p.sessions.map(row=>row?.session_id)).size!==p.sessions.length
     ||p.sessions.some((row,i)=>!row||typeof row.session_id!=='string'||!ID.test(row.session_id)||!integer(row.version)||row.version<1

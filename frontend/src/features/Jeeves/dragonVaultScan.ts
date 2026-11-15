@@ -34,7 +34,8 @@ export function appendChamberPage(prior:ChamberScan|null,page:DragonVaultDiscove
   started:number,finished:number,absoluteDeadline:number):ChamberScan {
   if(!finite(started)||!finite(finished)||finished<started||finished>=absoluteDeadline)
     fail('Archive-wide scan exceeded its bounded time window.');
-  if(page.catalogue_size>MAX_CHAMBERS||page.scanned_sessions>PAGE_SIZE||
+  if(page.catalogue_size>MAX_CHAMBERS)fail('Catalogue exceeds the exhaustive scan bound; use the indexed archive search.');
+  if(page.scanned_sessions>PAGE_SIZE||
       page.page_offset!==(prior?.scanned??0)||prior?.complete||
       (prior!==null&&(page.scope_digest!==prior.scopeDigest||page.catalogue_size!==prior.catalogueSize||
        page.query_terms!==prior.queryTerms||prior.nextCursor!==page.scope_digest+':'+page.page_offset)))

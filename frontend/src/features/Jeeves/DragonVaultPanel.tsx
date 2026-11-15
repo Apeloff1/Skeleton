@@ -1,8 +1,8 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,AppState,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {getAuthToken} from '../../auth/gameforgeAuth';
-import {getDragonVault,getDragonVaultQuota,getDragonVaultHealth,discoverDragonVault,retireDragonSession,restoreDragonVaultPrimary,repairDragonVaultReplica,configureDragonVaultCare,getDragonVaultCareHistory,getDragonVaultRedundancy,getCrawl,crawlRequestKey,configureDragonArchive,
- configureLegacyTreasuryArchive,eraseCrawl,type DragonVaultCatalog,type DragonVaultQuota,type DragonVaultHealth,type DragonVaultDiscovery,type DragonVaultRedundancy,type DragonVaultCareHistory,type DragonVaultEntry,type CrawlSession} from '../../product/crawlerClient';
+import {getDragonVault,getDragonVaultQuota,getDragonVaultHealth,discoverDragonVault,searchDragonArchiveIndex,retireDragonSession,restoreDragonVaultPrimary,repairDragonVaultReplica,configureDragonVaultCare,getDragonVaultCareHistory,getDragonVaultRedundancy,getCrawl,crawlRequestKey,configureDragonArchive,
+ configureLegacyTreasuryArchive,eraseCrawl,type DragonVaultCatalog,type DragonVaultQuota,type DragonVaultHealth,type DragonVaultDiscovery,type DragonArchiveIndexSearch,type DragonVaultRedundancy,type DragonVaultCareHistory,type DragonVaultEntry,type CrawlSession} from '../../product/crawlerClient';
 import s,{colors} from './CrawlerWorkspace.styles';
 import {scanArchiveChambers,bestHistoryWindow,type ChamberScan,SCAN_DEADLINE_MS} from './dragonVaultScan';
 
@@ -25,6 +25,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
  const [discovery,setDiscovery]=useState<DragonVaultDiscovery|null>(null);
  const [discoveryBusy,setDiscoveryBusy]=useState(false);
  const [archiveScan,setArchiveScan]=useState<ChamberScan|null>(null);
+ const [indexed,setIndexed]=useState<DragonArchiveIndexSearch|null>(null);
  const [scanProgress,setScanProgress]=useState<{scanned:number;total:number}|null>(null);
  const scanAbort=useRef<AbortController|null>(null),scanEpoch=useRef(0),scanTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const [history,setHistory]=useState<string[]>([]),[cursor,setCursor]=useState<string|undefined>();
@@ -41,7 +42,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
  const clearDiscovery=useCallback(()=>{
   scanEpoch.current++;scanAbort.current?.abort();scanAbort.current=null;
   if(scanTimer.current!==null)clearTimeout(scanTimer.current);scanTimer.current=null;
-  setDiscovery(null);setArchiveScan(null);setScanProgress(null);setDiscoveryBusy(false);
+  setDiscovery(null);setArchiveScan(null);setIndexed(null);setScanProgress(null);setDiscoveryBusy(false);
  },[]);
  const reset=useCallback(()=>{
   invalidate();clearDiscovery();setDiscoveryQuery('');setCatalog(null);setQuota(null);setVaultHealth(null);setRedundancy(null);setCareHistory(null);setSelected([]);setHistory([]);setCursor(undefined);setBusy(false);
@@ -86,6 +87,20 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
    setDiscovery(result);
    scanTimer.current=setTimeout(()=>{if(attempt===scanEpoch.current)setDiscovery(null);},ttl);
   }catch(e){if(!ctrl.signal.aborted&&attempt===scanEpoch.current&&token===getAuthToken())setError(e instanceof Error?e.message:'Chamber discovery unavailable.');}
+  finally{if(attempt===scanEpoch.current){scanAbort.current=null;setDiscoveryBusy(false);}}
+ }
+ async function indexedSearch(){
+  if(discoveryBusy||busy||disabled||!discoveryQuery.trim())return;
+  clearDiscovery();const token=getAuthToken(),attempt=scanEpoch.current,ctrl=new AbortController(),started=performance.now();
+  scanAbort.current=ctrl;setDiscoveryBusy(true);setError('');
+  try{
+   const result=await searchDragonArchiveIndex(discoveryQuery,ctrl.signal);
+   if(ctrl.signal.aborted||attempt!==scanEpoch.current||token!==getAuthToken())return;
+   const expiry=Math.min(60_000,...result.results.map(x=>1000*(x.valid_until-result.as_of_unix)))-(performance.now()-started);
+   if(expiry<=0){setError('Archive index results expired.');return;}
+   setIndexed(result);
+   scanTimer.current=setTimeout(()=>{if(attempt===scanEpoch.current)setIndexed(null);},expiry);
+  }catch(e){if(!ctrl.signal.aborted&&attempt===scanEpoch.current&&token===getAuthToken())setError(e instanceof Error?e.message:'Archive index unavailable.');}
   finally{if(attempt===scanEpoch.current){scanAbort.current=null;setDiscoveryBusy(false);}}
  }
  async function scanAll(){
@@ -193,7 +208,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
  }
  return <View style={s.check}>
   <Text style={s.heading}>Hoarder cold-custody chambers</Text>
-  <Text style={s.small}>Retain up to 128 retired expedition records separately from the 32 active slots. Retirement moves quota classification, not bytes. Historical use still requires its own finite permission. Retired expeditions cannot start watches or resume capture.</Text>
+  <Text style={s.small}>Retain up to 1,024 retired expedition records separately from the 32 active slots. Retirement moves quota classification, not bytes. Historical use still requires its own finite permission. Retired expeditions cannot start watches or resume capture.</Text>
   <Button label={open?'Close cold-custody catalogue':'Open cold-custody catalogue'} disabled={busy||disabled}
    action={()=>{if(open){reset();onWindow(undefined);}else void load();setOpen(!open);}}/>
   {open&&<>
@@ -218,7 +233,14 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
       editable={!busy&&!disabled} style={field} placeholder="Find retained subject or phrase" placeholderTextColor={colors.muted} accessibilityLabel="Historical chamber discovery query"/>
     <View style={s.row}><Button label={discoveryBusy?'Scanning…':'Scan first chambers'} disabled={busy||disabled||discoveryBusy||!discoveryQuery.trim()} action={()=>void scan()}/>
      <Button label="Next discovery batch" disabled={busy||disabled||discoveryBusy||!discovery?.next_cursor} action={()=>void scan(discovery?.next_cursor??undefined)}/></View>
-    <View style={s.row}><Button label="Scan entire cold-custody catalogue" disabled={busy||disabled||discoveryBusy||!discoveryQuery.trim()} action={()=>void scanAll()}/>
+    <Button label="Search automatic archive index" disabled={busy||disabled||discoveryBusy||!discoveryQuery.trim()} action={()=>void indexedSearch()}/>
+    {indexed&&owner.current===getAuthToken()&&<View style={s.check}>
+     <Text style={s.label}>Indexed historical references</Text>
+     <Text style={s.small}>{indexed.candidate_chambers} routed chambers · {indexed.rechecked_chambers} rechecked · {indexed.held_chambers} held. Index is partial; historical rights and exact passages are checked again when opened.</Text>
+     {indexed.results.map(hit=><Text key={hit.citation} selectable style={s.small}>{hit.citation} · {hit.score} matching query terms</Text>)}
+     <Button label="Open indexed historical window" disabled={busy||disabled||!indexed.results.length} action={()=>onWindow([...new Set(indexed.results.map(hit=>hit.session_id))].sort(),discoveryQuery)}/>
+    </View>}
+    <View style={s.row}><Button label="Exhaustive scan (up to 128 chambers)" disabled={busy||disabled||discoveryBusy||!discoveryQuery.trim()} action={()=>void scanAll()}/>
      <Button label="Stop discovery" disabled={!discoveryBusy} action={clearDiscovery}/></View>
     {discoveryBusy&&<><ActivityIndicator color={colors.accent}/>{scanProgress&&<Text style={s.small} accessibilityLiveRegion="polite">{scanProgress.scanned}/{scanProgress.total} chambers checked. No partial ranking published.</Text>}</>}
     {archiveScan&&owner.current===getAuthToken()&&<>

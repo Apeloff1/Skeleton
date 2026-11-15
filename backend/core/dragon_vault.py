@@ -553,7 +553,7 @@ class DragonVaultMixin:
             receipt=await self._admit(scope,identifier,{"snapshot":candidate,"treasury_vault_restore":repair})
             result=await self.sessions.update_one(fence,{"$set":{"snapshot":candidate,
                  "treasury_vault_restore":repair,"storage_receipt":receipt,"treasury_repair_due":_now().timestamp()},
-                 "$unset":{"treasury_index":""},"$inc":{"version":1}})
+                 "$unset":{"treasury_index":"","treasury_archive_route":""},"$inc":{"version":1}})
             if not result.modified_count:
                 raise CrawlerError("crawler_conflict","Retained record changed before repair publication.",409)
             fence={**fence,"version":row["version"]+1}
@@ -991,6 +991,7 @@ class DragonVaultMixin:
                 "$unset":{"treasury_vault_scrub":""},"$inc":{"version":1}}
         if side=="primary":
             update["$unset"]["treasury_index"]=""
+            update["$unset"]["treasury_archive_route"]=""
             update["$set"]["treasury_repair_due"]=now
         changed=await self.sessions.update_one(fenced,update)
         return "auto_"+side+"_repaired" if changed.modified_count else "superseded"
@@ -999,8 +1000,8 @@ class DragonVaultMixin:
     async def treasury_vault_health(self,scope):
         """Exact owner-bounded metadata census, not a live byte verification.
 
-        Retirements can temporarily occupy both quotas. At most 160 distinct
-        records are possible across the 128 cold and 32 active reservations.
+        Retirements can temporarily occupy both quotas. At most 1,056 distinct
+        records are possible across the 1,024 cold and 32 active reservations.
         Invalid records remain visible as holds rather than disappearing.
         """
         from core.dragon_crawler import CrawlerError,_now,_plain
@@ -1102,3 +1103,84 @@ class DragonVaultMixin:
         return {"ok":True,"schema":"skeleton.dragon.vault-care-history.v1","session_id":identifier,
                 "version":row["version"],"as_of_unix":_now().timestamp(),**history,
                 "read_only":True,"independent_audit":False,"source_text_returned":False,"network_executed":False}
+
+
+    def _verify_indexed_archive_candidate(self,scope,row,query,now):
+        from core.dragon_crawler import _plain
+        from skeleton.ai.webcrawler.dragon_archive_routing import validate_routing,pointer
+        from skeleton.ai.webcrawler.dragon_archive_grant import archive_expiry
+        from skeleton.ai.webcrawler.dragon_vault_discovery import query_terms
+        from skeleton.ai.webcrawler.dragon_companion import _lexemes
+        from skeleton.ai.webcrawler.operations import implementation_digest
+        snapshot=self._vault_primary(scope,row)
+        grant=_plain(row["archive_grant"])
+        if not validate_routing(_plain(row["treasury_archive_route"]),scope,
+                                _plain(row["treasury_index"]),grant,now=now):
+            return []
+        if grant["snapshot_digest"]!=snapshot["snapshot_digest"]:
+            return []
+        policies=self._source_policies(row)
+        ids=set(snapshot["sources"])
+        if snapshot["binding"]["code_digest"]!=implementation_digest():
+            proof=self._legacy_inspection(scope,row,snapshot)
+            if row.get("legacy_archive_receipt")!=proof:
+                return []
+            ids=set(proof["verified_source_ids"])
+        terms=set(query_terms(query))
+        matches=[]
+        for sid in sorted(ids):
+            source=snapshot["sources"][sid]
+            expiry=archive_expiry(grant,snapshot_digest=snapshot["snapshot_digest"],source=source,
+                policy=policies.get(sid,{"enabled":True,"version":0}),now=now)
+            if expiry is None:continue
+            hits=len(terms.intersection(_lexemes(source["text"])))
+            if hits:
+                matches.append(pointer(row["_id"],sid,row["version"],hits,expiry=expiry))
+        return matches
+
+    async def search_indexed_archive(self,scope,*,query):
+        """Indexed historical pointer lookup; never a model context grant."""
+        from core.dragon_crawler import CrawlerError,_now
+        from skeleton.ai.webcrawler.dragon_archive_routing import query_keys,candidate_pipeline,MAX_CANDIDATES,MAX_RECHECK,MAX_RESULTS
+        try:
+            keys=query_keys(scope,query)
+        except (ValueError,UnicodeError) as exc:
+            raise CrawlerError("crawler_archive_query","Enter a bounded lexical archive query.") from exc
+        await self.ensure_indexes()
+        stamp=_now().timestamp()
+        pipeline=candidate_pipeline(scope,keys,stamp)
+        rows=await self.sessions.aggregate(pipeline,maxTimeMS=2500).to_list(MAX_CANDIDATES+1)
+        matches=[]
+        held=0
+        qualified_rows=[]
+        for candidate in rows[:MAX_RECHECK]:
+            row=await self.sessions.find_one({**scope,"_id":candidate["_id"],"version":candidate["version"],
+                "status":{"$in":sorted(TERMINAL)},"treasury_vault.state":"vaulted",
+                "treasury_archive_route.digest":candidate["digest"]},max_time_ms=2000)
+            if row is None:
+                raise CrawlerError("crawler_vault_changed","Indexed archive changed; refresh.",409)
+            try:
+                hits=await _bounded_discovery_cpu(self._verify_indexed_archive_candidate,scope,row,query,stamp)
+            except CrawlerError as exc:
+                if exc.code=="crawler_vault_busy":raise
+                hits=None
+            except (ValueError,TypeError,KeyError,RecursionError,CheckpointReplicaError):
+                hits=None
+            if hits is None:
+                held+=1
+                continue
+            matches.extend(hits)
+            qualified_rows.append(candidate)
+        # Recheck exact candidate versions and authority, not cached text.
+        final=await self.sessions.aggregate(pipeline,maxTimeMS=2500).to_list(MAX_CANDIDATES+1)
+        now=_now().timestamp()
+        if rows!=final or any(hit["valid_until"]<=now for hit in matches):
+            raise CrawlerError("crawler_vault_changed","Indexed archive changed during retrieval.",409)
+        matches.sort(key=lambda hit:(-hit["score"],hit["session_id"],hit["source_id"]))
+        # Citation handles are transient, not promoted into knowledge.
+        return {"ok":True,"schema":"skeleton.dragon.archive-index-search.v1","as_of_unix":stamp,
+                "candidate_chambers":min(len(rows),MAX_CANDIDATES),"candidate_limit_reached":len(rows)>MAX_RECHECK,
+                "rechecked_chambers":min(len(rows),MAX_RECHECK),"held_chambers":held,
+                "results":matches[:MAX_RESULTS],"result_limit_reached":len(matches)>MAX_RESULTS,
+                "ranking":"indexed_term_overlap_then_exact_coverage","complete_corpus":False,
+                "stored_prose":0,"model_context_authorized":False,"network_executed":False}

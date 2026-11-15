@@ -322,7 +322,7 @@ class TreasuryIntegrationTests(unittest.IsolatedAsyncioTestCase):
         query,mutation=app.sessions.update_one.await_args.args
         self.assertEqual(query["version"],7)
         self.assertEqual(query["treasury_index.expires_at"],expired["treasury_index"]["expires_at"])
-        self.assertEqual(mutation["$unset"],{"treasury_index":""})
+        self.assertEqual(mutation["$unset"],{"treasury_index":"","treasury_archive_route":""})
 
 
 class RecoveryLaneTests(unittest.IsolatedAsyncioTestCase):

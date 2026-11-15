@@ -107,7 +107,7 @@ async function main(){
     execution_authorized:false,historical_grant_extended:false};
   const page={schema:'skeleton.dragon.vault-catalog.v1',sessions:[
     {session_id:'vaulted-fixture',version:3,vault:state,archive_expires_at:null,legacy_runtime:false,integrity_held:false}],
-    next_cursor:null,capacity:128,as_of_unix:1800000000,archive_use_verified:false,network_executed:false};
+    next_cursor:null,capacity:1024,as_of_unix:1800000000,archive_use_verified:false,network_executed:false};
   vc.set(page);assert.deepEqual(await vc.readVault(),page);
   const degraded=structuredClone(page);degraded.sessions[0].legacy_runtime=null;
   degraded.sessions[0].last_scrub={checked_at:1799999900,state:'repairable_primary',primary:'held',replica:'exact',live_verified:false};
@@ -116,7 +116,7 @@ async function main(){
     const bad=structuredClone(degraded);Object.assign(bad.sessions[0].last_scrub,patch);
     vc.set(bad);await assert.rejects(vc.readVault(),e=>e.kind==='protocol');
   }
-  for(const patch of [{capacity:129},{archive_use_verified:true},{next_cursor:'vaulted-fixture'}]){
+  for(const patch of [{capacity:1025},{archive_use_verified:true},{next_cursor:'vaulted-fixture'}]){
     vc.set({...page,...patch});await assert.rejects(vc.readVault(),e=>e.kind==='protocol');
   }
   const receipt={schema:'skeleton.dragon.vault-command.v1',session_id:'vaulted-fixture',version:3,
@@ -126,10 +126,10 @@ async function main(){
   vc.set({...receipt,vault:{...state,active_slot_released:false}});
   await assert.rejects(vc.retire('vaulted-fixture',command),e=>e.kind==='protocol');
   const quota={schema:'skeleton.dragon.vault-quota.v1',as_of_unix:1800000000,active_reserved:3,vault_reserved:2,
-    distinct_reserved:4,dual_reserved:1,active_capacity:32,vault_capacity:128,active:1,vaulted:1,in_transit:1,
+    distinct_reserved:4,dual_reserved:1,active_capacity:32,vault_capacity:1024,active:1,vaulted:1,in_transit:1,
     tombstoned:0,missing:1,integrity_held:0,missing_auto_reclaimed:false,source_records_erased:false,read_only:true};
   vc.set(quota);assert.deepEqual(await vc.quota(),quota);
-  for(const patch of [{dual_reserved:2},{missing:0},{missing_auto_reclaimed:true},{vault_reserved:129}]){
+  for(const patch of [{dual_reserved:2},{missing:0},{missing_auto_reclaimed:true},{vault_reserved:1025}]){
     vc.set({...quota,...patch});await assert.rejects(vc.quota(),e=>e.kind==='protocol');
   }
   const discovery={schema:'skeleton.dragon.vault-discovery.v1',scope_digest:'e'.repeat(64),as_of_unix:1800000000,
