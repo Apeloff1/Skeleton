@@ -19,6 +19,7 @@ import sqlite3
 import threading
 from typing import Any, Iterable
 
+from skeleton.ai.model_runtime.private_sqlite import PrivateSQLiteHandle
 from skeleton.frontier.payloads import json_snapshot
 
 _MAX_ROWS = 16_384
@@ -149,7 +150,9 @@ class DurableWorkJournal:
     def __init__(self, connection: sqlite3.Connection, *, scope: str,
                  custody_key: bytes, max_rows: int = 4096,
                  max_bytes: int = 64 << 20,
-                 recovery_key: bytes | None = None):
+                 recovery_key: bytes | None = None,
+                 private_handle: PrivateSQLiteHandle | None = None,
+                 initialize: bool = True):
         if not isinstance(connection, sqlite3.Connection) or connection.in_transaction:
             raise ValueError("exclusive idle SQLite connection required")
         if type(custody_key) is not bytes or len(custody_key) != 32:
@@ -158,6 +161,13 @@ class DurableWorkJournal:
             raise ValueError("invalid work row budget")
         if type(max_bytes) is not int or not 4096 <= max_bytes <= _MAX_BYTES:
             raise ValueError("invalid work byte budget")
+        if type(initialize) is not bool:
+            raise ValueError("explicit initialization policy required")
+        if private_handle is not None:
+            if type(private_handle) is not PrivateSQLiteHandle or private_handle.connection is not connection:
+                raise ValueError("private SQLite handle must own the exact connection")
+            private_handle.assert_current()
+        self._private_handle = private_handle
         self._db = connection
         self._scope = _text(scope)
         if recovery_key is not None and (type(recovery_key) is not bytes
@@ -172,15 +182,16 @@ class DurableWorkJournal:
         self._closed = False
         # Set no persistent connection mode silently. The app owns the DB.
         with self._tx(check_schema=False):
-            connection.execute(
-                f"CREATE TABLE IF NOT EXISTS {_TABLE} ("
-                "scope TEXT NOT NULL, work_id TEXT NOT NULL, kind TEXT NOT NULL,"
-                "body BLOB NOT NULL, dependencies BLOB NOT NULL,"
-                "state TEXT NOT NULL CHECK(state IN "
-                "('pending','claimed','succeeded','failed','cancelled','uncertain')),"
-                "owner TEXT NOT NULL, token_digest TEXT NOT NULL, receipt TEXT NOT NULL,"
-                "mac TEXT NOT NULL, PRIMARY KEY(scope,work_id)) WITHOUT ROWID"
-            )
+            if initialize:
+                connection.execute(
+                    f"CREATE TABLE IF NOT EXISTS {_TABLE} ("
+                    "scope TEXT NOT NULL, work_id TEXT NOT NULL, kind TEXT NOT NULL,"
+                    "body BLOB NOT NULL, dependencies BLOB NOT NULL,"
+                    "state TEXT NOT NULL CHECK(state IN "
+                    "('pending','claimed','succeeded','failed','cancelled','uncertain')),"
+                    "owner TEXT NOT NULL, token_digest TEXT NOT NULL, receipt TEXT NOT NULL,"
+                    "mac TEXT NOT NULL, PRIMARY KEY(scope,work_id)) WITHOUT ROWID"
+                )
             self._schema()
             self._capacity()
 
@@ -191,6 +202,8 @@ class DurableWorkJournal:
     def _owner(self) -> None:
         if self._closed or os.getpid() != self._pid or threading.get_ident() != self._thread:
             raise RuntimeError("work journal owner is closed or changed")
+        if self._private_handle is not None:
+            self._private_handle.assert_current()
         if self._db.in_transaction:
             raise RuntimeError("work journal requires exclusive transaction authority")
 
@@ -211,9 +224,13 @@ class DurableWorkJournal:
         self._owner()
         self._db.execute("BEGIN IMMEDIATE")
         try:
+            if self._private_handle is not None:
+                self._private_handle.assert_current()
             if check_schema:
                 self._schema()
             yield
+            if self._private_handle is not None:
+                self._private_handle.assert_current()
             self._db.commit()
         except BaseException:
             self._db.rollback()
@@ -480,15 +497,29 @@ class DurableWorkJournal:
         """Fence an ambiguous outcome permanently; never requeue automatically."""
         return self._finish(claim, "uncertain", receipt_digest)
 
-    def _finish(self, claim: WorkClaim, state: str, receipt_digest: str) -> WorkStatus:
-        receipt_digest = _hex(receipt_digest)
+    def _authenticate_claim(self, claim: WorkClaim) -> tuple:
         if type(claim) is not WorkClaim or claim.scope != self._scope:
             raise WorkConflict("invalid claim scope")
         token_digest = sha256(_hex(claim.token).encode("ascii")).hexdigest()
+        prior = self._require(claim.work_id)
+        if (prior[6] != claim.owner or not hmac.compare_digest(prior[7], token_digest)
+                or not hmac.compare_digest(prior[3], _encode(claim.payload))):
+            raise WorkConflict("stale, foreign or modified work claim")
+        return prior
+
+    def verify_claim(self, claim: WorkClaim, *, kind: str) -> object:
+        """Authenticate the claim and return the independent persisted payload."""
         with self._tx():
-            prior = self._require(claim.work_id)
-            if prior[6] != claim.owner or not hmac.compare_digest(prior[7], token_digest):
-                raise WorkConflict("stale or foreign work claim")
+            prior = self._authenticate_claim(claim)
+            if prior[2] != _text(kind) or prior[5] != "claimed":
+                raise WorkConflict("claim kind or state is not authorized")
+            return json.loads(prior[3])
+
+    def _finish(self, claim: WorkClaim, state: str, receipt_digest: str) -> WorkStatus:
+        receipt_digest = _hex(receipt_digest)
+        with self._tx():
+            prior = self._authenticate_claim(claim)
+            token_digest = prior[7]
             if prior[5] == state and prior[8] == receipt_digest:
                 return self._status(prior)
             if prior[5] != "claimed":

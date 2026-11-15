@@ -277,7 +277,7 @@ class AgentRuntime:
         metadata_bytes = 8192 + len(result.task.encode("utf-8")) + len(result.agent.encode("utf-8"))
         if result.provenance is not None:
             metadata_bytes += len(json.dumps(
-                result.provenance.metadata, sort_keys=True, separators=(",", ":"),
+                result.provenance.as_dict(), sort_keys=True, separators=(",", ":"),
                 ensure_ascii=False, allow_nan=False,
             ).encode("utf-8"))
         size = encoded_bytes + metadata_bytes

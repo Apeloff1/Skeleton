@@ -17,6 +17,8 @@ import secrets
 import sqlite3
 import threading
 
+from skeleton.ai.model_runtime.private_sqlite import PrivateSQLiteHandle
+
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -77,7 +79,9 @@ class AcademyCheckpointStore:
     """Caller owns the trusted connection, its permissions and the key lifecycle."""
 
     def __init__(self, connection: sqlite3.Connection, *, owner: str, key: bytes,
-                 max_revisions: int = 256, max_total_bytes: int = 64 << 20):
+                 max_revisions: int = 256, max_total_bytes: int = 64 << 20,
+                 private_handle: PrivateSQLiteHandle | None = None,
+                 initialize: bool = True):
         if not isinstance(connection, sqlite3.Connection) or connection.in_transaction:
             raise ValueError("exclusive idle SQLite connection required")
         if type(key) is not bytes or len(key) != 32:
@@ -86,6 +90,13 @@ class AcademyCheckpointStore:
             raise ValueError("invalid checkpoint revision budget")
         if type(max_total_bytes) is not int or not 4096 <= max_total_bytes <= 512 << 20:
             raise ValueError("invalid checkpoint storage budget")
+        if type(initialize) is not bool:
+            raise ValueError("explicit initialization policy required")
+        if private_handle is not None:
+            if type(private_handle) is not PrivateSQLiteHandle or private_handle.connection is not connection:
+                raise ValueError("private SQLite handle must own the exact connection")
+            private_handle.assert_current()
+        self._private_handle = private_handle
         self._db = connection
         self._key = key
         self._cipher = AESGCM(hmac.new(key, b"academy.checkpoint.aead.v1", sha256).digest())
@@ -96,13 +107,14 @@ class AcademyCheckpointStore:
         self._thread = threading.get_ident()
         self._closed = False
         with self._tx(check=False):
-            connection.execute(
-                f"CREATE TABLE IF NOT EXISTS {_TABLE} ("
-                "owner TEXT NOT NULL, learner TEXT NOT NULL, revision INTEGER NOT NULL,"
-                "previous TEXT NOT NULL, digest TEXT NOT NULL, request TEXT NOT NULL,"
-                "nonce BLOB NOT NULL, ciphertext BLOB NOT NULL, receipt TEXT NOT NULL,"
-                "PRIMARY KEY(owner,learner,revision), UNIQUE(owner,learner,request)) WITHOUT ROWID"
-            )
+            if initialize:
+                connection.execute(
+                    f"CREATE TABLE IF NOT EXISTS {_TABLE} ("
+                    "owner TEXT NOT NULL, learner TEXT NOT NULL, revision INTEGER NOT NULL,"
+                    "previous TEXT NOT NULL, digest TEXT NOT NULL, request TEXT NOT NULL,"
+                    "nonce BLOB NOT NULL, ciphertext BLOB NOT NULL, receipt TEXT NOT NULL,"
+                    "PRIMARY KEY(owner,learner,revision), UNIQUE(owner,learner,request)) WITHOUT ROWID"
+                )
             self._schema()
 
     def _opaque(self, *parts):
@@ -143,6 +155,8 @@ class AcademyCheckpointStore:
     def _require_owner(self):
         if self._closed or self._pid != os.getpid() or self._thread != threading.get_ident():
             raise RuntimeError("Academy storage owner closed or changed")
+        if self._private_handle is not None:
+            self._private_handle.assert_current()
         if self._db.in_transaction:
             raise RuntimeError("Academy requires exclusive transaction ownership")
 
@@ -151,9 +165,13 @@ class AcademyCheckpointStore:
         self._require_owner()
         self._db.execute("BEGIN IMMEDIATE")
         try:
+            if self._private_handle is not None:
+                self._private_handle.assert_current()
             if check:
                 self._schema()
             yield
+            if self._private_handle is not None:
+                self._private_handle.assert_current()
             self._db.commit()
         except BaseException:
             self._db.rollback()
@@ -274,7 +292,7 @@ class AcademyCheckpointStore:
         expected_revision = _revision(expected_revision, genesis=True)
         request_id = identity(request_id)
         raw = encode_state(state)
-        student_id = state.student.student_id
+        student_id = decode_state(raw).student.student_id
         learner = self._learner(student_id)
         request = self._opaque("request", self._owner_id, learner, request_id)
         digest = sha256(raw).hexdigest()

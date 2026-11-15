@@ -93,6 +93,15 @@ class DurableOutbox:
             raise TypeError("canonical delivery and acknowledgement required")
         if not callable(verify_acknowledgement):
             raise ValueError("destination receipt verifier required")
+        if type(delivery.message) is not OutboxMessage:
+            raise WorkConflict("canonical outbox message required")
+        body = self._journal.verify_claim(delivery.claim, kind=_KIND)
+        presented = {"message_id": delivery.message.message_id,
+                     "destination": delivery.message.destination,
+                     "payload": delivery.message.payload}
+        if (_digest(body) != _digest(presented)
+                or _digest(body) != delivery.message_digest):
+            raise WorkConflict("delivery does not bind authenticated stored payload")
         if (ack.message_id != delivery.message.message_id
                 or ack.destination != delivery.message.destination
                 or ack.message_digest != delivery.message_digest

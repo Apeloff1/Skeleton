@@ -108,3 +108,21 @@ async def test_supervisor_never_retries_ambiguous_exception(tmp_path):
     second = await supervisor.dispatch()
     assert second.claimed == 0 and worker.calls == 1
     db.close()
+
+
+def test_forged_delivery_and_mutated_claim_cannot_publish(tmp_path):
+    db, store = journal(tmp_path / "queue.sqlite")
+    outbox = DurableOutbox(store)
+    pending = outbox.enqueue(OutboxMessage("id", "receiver", {"payload": [1]}))
+    delivery = outbox.claim(pending.work_id, owner="sender")
+    ack = DestinationAcknowledgement("id", "receiver", delivery.message_digest, "a" * 64)
+    forged = replace(delivery, message=OutboxMessage("id", "receiver", {"payload": [2]}))
+    called = []
+    with pytest.raises(WorkConflict):
+        outbox.acknowledge(forged, ack, verify_acknowledgement=lambda _: called.append(True))
+    assert not called
+    delivery.claim.payload["payload"]["payload"].append(2)
+    with pytest.raises(WorkConflict):
+        store.finish(delivery.claim, succeeded=True, receipt_digest="a" * 64)
+    assert store.status(pending.work_id).state == "claimed"
+    db.close()
