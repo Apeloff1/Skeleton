@@ -53,6 +53,16 @@ CREATE TABLE IF NOT EXISTS sources(
  FOREIGN KEY(owner,game) REFERENCES games(owner,id)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS source_due ON sources(owner,next_review,game,id);
+CREATE VIRTUAL TABLE IF NOT EXISTS source_locator_fts USING fts5(
+ owner, game UNINDEXED, source UNINDEXED, title, locator, category, tokenize='unicode61'
+);
+CREATE TABLE IF NOT EXISTS source_locator_rows(
+ owner TEXT NOT NULL, game TEXT NOT NULL, source TEXT NOT NULL, fts_row INTEGER NOT NULL,
+ indexed_digest TEXT NOT NULL, PRIMARY KEY(owner,game,source),
+ UNIQUE(fts_row), FOREIGN KEY(owner,game,source) REFERENCES sources(owner,game,id)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS global_source_kind ON sources(owner,kind,game,id);
+CREATE INDEX IF NOT EXISTS global_source_language ON sources(owner,language,game,id);
 CREATE TABLE IF NOT EXISTS observations(
  owner TEXT NOT NULL, game TEXT NOT NULL, source TEXT NOT NULL,
  event_key TEXT NOT NULL, digest TEXT NOT NULL, payload TEXT NOT NULL,
@@ -247,6 +257,7 @@ class GameCorpus:
                 db.execute("INSERT INTO observations VALUES(?,?,?,?,?,?,?)",
                            (owner,gid,sid,event_key,fingerprint,json.dumps(payload,ensure_ascii=False,sort_keys=True),now))
                 self._index_observation(db,owner,gid,sid,event_key,payload,now)
+                self._index_locator(db,owner,gid,sid,payload,fingerprint)
                 db.execute("UPDATE counters SET revisions=revisions+1 WHERE owner=?",(owner,))
                 db.execute("COMMIT")
                 return self._receipt(gid,sid,fingerprint,False)
@@ -543,3 +554,110 @@ class GameCorpus:
         return {"captures":[dict(row) for row in rows[:limit]],
                 "next_cursor":[rows[limit-1]["recorded_at"],rows[limit-1]["session_id"]] if len(rows)>limit else None,
                 "source_use_authorized":False,"historical_authority":False}
+
+
+    @staticmethod
+    def _index_locator(db,owner,gid,sid,payload,fingerprint):
+        """Index latest catalogue identity, not captured content or truth."""
+        prior=db.execute("SELECT fts_row,indexed_digest FROM source_locator_rows WHERE owner=? AND game=? AND source=?",
+                         (owner,gid,sid)).fetchone()
+        if prior and prior["indexed_digest"]==fingerprint:
+            return False
+        if prior:
+            db.execute("DELETE FROM source_locator_fts WHERE rowid=?",(prior["fts_row"],))
+            db.execute("DELETE FROM source_locator_rows WHERE owner=? AND game=? AND source=?",(owner,gid,sid))
+        category=payload["kind"].replace("_"," ")+" "+SOURCE_CLASSES[payload["kind"]].family.replace("_"," ")
+        inserted=db.execute("INSERT INTO source_locator_fts(owner,game,source,title,locator,category) VALUES(?,?,?,?,?,?)",
+                            (owner,gid,sid,payload["title"],source_url(payload["source"]),category))
+        db.execute("INSERT INTO source_locator_rows VALUES(?,?,?,?,?)",(owner,gid,sid,inserted.lastrowid,fingerprint))
+        return True
+
+    def search_source_library(self,scope,query,*,kind=None,family=None,language=None,limit=32):
+        """Bound title/category/URL ranking across games; no remote source use."""
+        owner=owner_key(scope)
+        limit=_limit(limit)
+        tokens=re.findall(r"[^\W_]+",clean(query,256),flags=re.UNICODE)[:12]
+        if not tokens:
+            raise ValueError("source search terms required")
+        fts='owner : "'+owner+'" AND {title locator category} : ('+' AND '.join('"'+t+'"' for t in tokens)+')'
+        clauses=["source_locator_fts MATCH ?","s.owner=?","o.digest=i.indexed_digest"]
+        args=[fts,owner]
+        if kind is not None:
+            if kind not in KINDS:raise ValueError("category")
+            clauses.append("s.kind=?");args.append(kind)
+        if family is not None:
+            if family not in FAMILIES:raise ValueError("family")
+            kinds=sorted(k for k,v in SOURCE_CLASSES.items() if v.family==family)
+            clauses.append("s.kind IN ("+",".join("?" for _ in kinds)+")");args.extend(kinds)
+        if language is not None:
+            language=clean(language,32).lower()
+            if not re.fullmatch(r"[a-z]{2,8}(?:-[a-z0-9]{1,8}){0,3}|und",language):raise ValueError("language")
+            clauses.append("s.language=?");args.append(language)
+        args.append(limit+1)
+        with self._db() as db:
+            import time as _time
+            deadline=_time.monotonic()+2
+            db.set_progress_handler(lambda: int(_time.monotonic()>deadline),1000)
+            try:
+                rows=db.execute("""SELECT s.game AS game_id,s.id AS source_id,s.url,s.kind,s.language,s.last_observed,s.next_review,
+                    o.payload AS latest_observation,o.digest AS observation_digest,g.title AS game_title,
+                    g.namespace,g.external_id,g.stage AS first_stage,g.updated_at,
+                    EXISTS(SELECT 1 FROM capture_bindings b WHERE b.owner=s.owner AND b.game=s.game AND b.source=s.id) AS has_capture_binding
+                    FROM source_locator_fts JOIN source_locator_rows i ON i.fts_row=source_locator_fts.rowid
+                    JOIN sources s ON s.owner=i.owner AND s.game=i.game AND s.id=i.source
+                    JOIN games g ON g.owner=s.owner AND g.id=s.game
+                    JOIN observations o ON o.owner=s.owner AND o.game=s.game AND o.source=s.id AND o.event_key=s.latest_event
+                    WHERE """+" AND ".join(clauses)+
+                    " ORDER BY bm25(source_locator_fts,0.0,0.0,0.0,3.0,1.5,2.0),s.game,s.id LIMIT ?",args).fetchall()
+            finally:
+                db.set_progress_handler(None,0)
+            state=db.execute("SELECT complete FROM corpus_migration WHERE name='source-locator-v1'").fetchone()
+        result=[]
+        for row in rows[:limit]:
+            payload=json.loads(row["latest_observation"])
+            if digest(payload)!=row["observation_digest"] or payload["source"]!=row["url"]:
+                raise CatalogueHeld("source search witness differs")
+            item=dict(row)
+            item.update(latest_observation=payload,verified=False,family=SOURCE_CLASSES[row["kind"]].family,
+                        view_mode=view_mode(row["kind"]),has_capture_binding=bool(row["has_capture_binding"]))
+            result.append(item)
+        return {"sources":result,"truncated":len(rows)>limit,"index_backfill_complete":bool(state and state["complete"]),
+                "catalogue_only":True,"network_executed":False,"source_use_authorized":False}
+
+    def backfill_source_locators(self,*,limit=32):
+        """Durable cursor; current writes maintain postings independently."""
+        limit=_limit(limit)
+        with self._db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                db.execute("INSERT OR IGNORE INTO corpus_migration VALUES('source-locator-v1',NULL,0)")
+                state=db.execute("SELECT cursor,complete FROM corpus_migration WHERE name='source-locator-v1'").fetchone()
+                if state["complete"]:
+                    db.execute("COMMIT")
+                    return {"visited":0,"indexed":0,"complete":True}
+                where=""
+                args=[]
+                if state["cursor"] is not None:
+                    cursor=json.loads(state["cursor"])
+                    if not isinstance(cursor,list) or len(cursor)!=3 or not all(isinstance(x,str) for x in cursor):
+                        raise CatalogueHeld("source migration cursor invalid")
+                    where=" WHERE (s.owner,s.game,s.id)>(?,?,?)"
+                    args.extend(cursor)
+                args.append(limit)
+                rows=db.execute("""SELECT s.owner,s.game,s.id,o.payload,o.digest FROM sources s JOIN observations o
+                    ON o.owner=s.owner AND o.game=s.game AND o.source=s.id AND o.event_key=s.latest_event"""+
+                    where+" ORDER BY s.owner,s.game,s.id LIMIT ?",args).fetchall()
+                indexed=0
+                for row in rows:
+                    payload=json.loads(row["payload"])
+                    if digest(payload)!=row["digest"]:
+                        raise CatalogueHeld("source observation witness mismatch")
+                    indexed+=self._index_locator(db,row["owner"],row["game"],row["id"],payload,row["digest"])
+                cursor=json.dumps([rows[-1][k] for k in ("owner","game","id")]) if rows else state["cursor"]
+                complete=len(rows)<limit
+                db.execute("UPDATE corpus_migration SET cursor=?,complete=? WHERE name='source-locator-v1'",(cursor,int(complete)))
+                db.execute("COMMIT")
+                return {"visited":len(rows),"indexed":indexed,"complete":complete}
+            except BaseException:
+                if db.in_transaction:db.execute("ROLLBACK")
+                raise
