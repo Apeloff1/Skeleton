@@ -204,6 +204,22 @@ export interface RunPayload {
     return_supported?: boolean; headless_inert?: boolean; sealed?: boolean;
   };
   operator_axes?: Record<string, number>;
+  /** Source-verified Galaxy matrix -> native gameplay tuning, not device acceptance. */
+  galaxy_playable_controls?: {
+    schema: 'skeleton.gameforge.galaxy_playable_controls.v1';
+    mode: string;
+    profile_sha256: string;
+    active_matrix_dials: number;
+    mapped_matrix_dials: number;
+    unmapped_matrix_dials: number;
+    axes: { axis: string; requested: number; effective: number;
+      authority: 'forge_override' | 'galaxy_matrix';
+      sources: { path: string; value: number }[] }[];
+    effective_axes: Record<string, number>;
+    native_sources: Record<string, string>;
+    source_verified: boolean;
+    native_execution_qualified: false;
+  };
   /** Mechanical controls actually written into the native playable script. */
   playable_mechanics?: {
     schema?: 'skeleton.forge.playable_mechanics.v1';

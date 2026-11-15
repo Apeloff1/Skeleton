@@ -230,3 +230,118 @@ def apply_galaxy_mechanics(plan: Any, profile: Optional[Mapping[str, Any]]) -> t
         receipt["room_votes"] = {category: strength for strength, category, _ in votes}
     receipt["unmapped_matrix_dials"] = max(0, active_total - len(receipt["supported_inputs"]))
     return plan, receipt
+
+
+# Sparse historical authoring -> existing native gameplay compiler.
+# A zero is the historical default, not an explicit zero-valued Forge edit.
+# Saturating maximum avoids additive amplification across related dials.
+PLAYABLE_RECEIPT_PATH = "design/galaxy_playable_controls.json"
+PLAYABLE_RECEIPT_SCHEMA = "skeleton.gameforge.galaxy_playable_controls.v1"
+_M = "mechanics_matrix"
+_W = "world_matrix"
+_PLAYABLE_RULES = {
+    "extraction": {
+        "risk": ((_W, "volcanic", "complexity"), (_W, "wasteland", "complexity")),
+        "scarcity": ((_W, "desert", "complexity"), (_W, "tundra", "complexity")),
+        "agency": ((_M, "crafting", "complexity"), (_M, "trading", "complexity")),
+    },
+    "combat_loop": {
+        "lethality": ((_M, "melee", "complexity"), (_M, "gunplay", "complexity"), (_M, "ranged", "complexity")),
+        "grind": ((_W, "raid", "count"), (_W, "lair", "count"), (_M, "tactical", "count")),
+        "agency": ((_M, "melee", "intricacy"), (_M, "tactical", "intricacy")),
+    },
+    "pipeline": {
+        "risk": ((_M, "economy", "complexity"),),
+        "grind": ((_M, "building", "count"), (_M, "crafting", "count"), (_M, "forging", "count")),
+        "agency": ((_M, "building", "intricacy"), (_M, "crafting", "intricacy")),
+    },
+    "puzzle": {"opacity": ((_M, "puzzle", "complexity"), (_M, "investigation", "complexity"))},
+    "racing": {
+        "risk": ((_M, "driving", "complexity"),),
+        "grind": ((_M, "driving", "count"),),
+    },
+    "survival": {"scarcity": ((_W, "desert", "complexity"), (_W, "tundra", "complexity"), (_W, "wasteland", "complexity"))},
+    "stealth": {
+        "risk": ((_M, "stealth", "complexity"),),
+        "opacity": ((_M, "stealth", "intricacy"), (_M, "hacking", "intricacy")),
+    },
+    "crafting": {},
+}
+
+
+def compile_galaxy_playable_axes(
+    profile: Optional[Mapping[str, Any]], mode: str, operator_axes: Mapping[str, float],
+) -> tuple[dict[str, float], Optional[dict[str, Any]]]:
+    """Resolve supported native controls without changing the base world tensor.
+
+    Explicit Forge controls, including zero, take priority. Other Galaxy
+    intentions remain source metadata; no arbitrary source or feature
+    implementation is inferred from a positive matrix value.
+    """
+    if mode not in _PLAYABLE_RULES:
+        raise ValueError("unsupported Galaxy playable mode")
+    axes = dict(operator_axes)
+    if profile is None:
+        return axes, None
+    config = profile["config"]
+    rules = {"tempo": ((_M, "parkour", "complexity"),), **_PLAYABLE_RULES[mode]}
+    if mode == "racing":
+        rules["tempo"] = (*rules["tempo"], (_M, "driving", "intricacy"))
+    rows = []
+    for axis, sources in sorted(rules.items()):
+        votes = []
+        for matrix, phase, dial in sources:
+            value = config[matrix].get(phase, {}).get(dial, 0)
+            if value > 0:
+                votes.append({"path": f"{matrix}.{phase}.{dial}", "value": value})
+        if not votes:
+            continue
+        requested = max(0.01, round(max(vote["value"] for vote in votes) / 1000, 2))
+        overridden = axis in axes
+        if not overridden:
+            axes[axis] = requested
+        rows.append({"axis": axis, "requested": requested, "effective": axes[axis],
+                     "authority": "forge_override" if overridden else "galaxy_matrix",
+                     "sources": votes})
+    active = sum(1 for matrix in MATRIX_FIELDS for phase in config[matrix].values()
+                 for value in phase.values() if value > 0)
+    mapped = {vote["path"] for row in rows for vote in row["sources"]}
+    return axes, {
+        "schema": PLAYABLE_RECEIPT_SCHEMA,
+        "mode": mode,
+        "profile_sha256": galaxy_profile_receipt(profile)["sha256"],
+        "active_matrix_dials": active,
+        "mapped_matrix_dials": len(mapped),
+        "unmapped_matrix_dials": active - len(mapped),
+        "axes": rows,
+        "effective_axes": dict(sorted(axes.items())),
+    }
+
+
+def seal_galaxy_playable_controls(
+    files: Mapping[str, str], receipt: Mapping[str, Any],
+) -> tuple[dict[str, str], dict[str, Any]]:
+    """Bind actual generated native source to the resolved authoring receipt."""
+    from skeleton.forge.archetype_content import verify_archetype_content
+    if receipt.get("schema") != PLAYABLE_RECEIPT_SCHEMA or receipt.get("mode") not in _PLAYABLE_RULES:
+        raise ValueError("invalid Galaxy playable receipt")
+    if any(name.casefold() == PLAYABLE_RECEIPT_PATH.casefold() for name in files):
+        raise ValueError("Galaxy playable receipt path collision")
+    mode = receipt["mode"]
+    native_paths = (
+        f"scenes/archetypes/{mode}/main.tscn",
+        f"scripts/archetypes/{mode}/player_controller.gd",
+        f"scripts/archetypes/{mode}/core_loop.gd",
+    )
+    if any(path not in files or type(files[path]) is not str for path in native_paths):
+        raise ValueError("Galaxy playable generated source missing")
+    if not verify_archetype_content(files, mode, operator_axes=receipt["effective_axes"]):
+        raise ValueError("Galaxy playable source does not match resolved controls")
+    document = {**receipt, "native_sources": {
+        path: hashlib.sha256(files[path].encode("utf-8", errors="strict")).hexdigest()
+        for path in native_paths
+    }, "source_verified": True, "native_execution_qualified": False}
+    encoded = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
+    output = dict(files)
+    output[PLAYABLE_RECEIPT_PATH] = encoded + "\n"
+    return output, document

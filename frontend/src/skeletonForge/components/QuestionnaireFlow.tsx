@@ -248,7 +248,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
       <DesignPresetPanel state={state} dispatch={dispatch} />
       <ConductorPreviewPanel vision={state.vision} />
       <JeevesQualityPanel />
-      {state.galaxyProfile ? <Banner tone="idle">The complete Galaxy questionnaire is attached to this build.</Banner> : null}
+      {state.galaxyProfile ? <Banner tone="idle">The complete Galaxy questionnaire is attached. When a playable scene is enabled, supported nonzero Galaxy mechanics and world dials tune its native controls. Explicit Forge slider edits take precedence; other matrix dials remain design metadata.</Banner> : null}
       <View accessibilityRole="radiogroup" accessibilityLabel="Forge archetype" style={st.group}>
         <Text style={st.q}>How should the blueprint be built?</Text>
         {ARCHETYPES.map((a) => {

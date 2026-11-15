@@ -110,3 +110,94 @@ def test_profile_accepts_safe_fractional_and_boundary_numbers():
     full = profile()
     full["config"]["extra_params"].update({"fractional": 0.125, "boundary": float(2**53 - 1)})
     assert normalise_galaxy_profile(full) == full
+
+
+@pytest.mark.parametrize("mode,matrix,phase,dial,axis", [
+    ("extraction", "world_matrix", "volcanic", "complexity", "risk"),
+    ("combat_loop", "mechanics_matrix", "melee", "complexity", "lethality"),
+    ("pipeline", "mechanics_matrix", "building", "count", "grind"),
+    ("puzzle", "mechanics_matrix", "puzzle", "complexity", "opacity"),
+    ("racing", "mechanics_matrix", "driving", "count", "grind"),
+    ("survival", "world_matrix", "desert", "complexity", "scarcity"),
+    ("stealth", "mechanics_matrix", "stealth", "complexity", "risk"),
+    ("crafting", "mechanics_matrix", "parkour", "complexity", "tempo"),
+])
+def test_galaxy_controls_change_real_native_source(mode, matrix, phase, dial, axis):
+    from skeleton.context.galaxy_profile import compile_galaxy_playable_axes, seal_galaxy_playable_controls
+    from skeleton.forge.archetype_content import archetype_files, verify_archetype_content
+    raw = profile()
+    raw["config"][matrix][phase] = {dial: 1000}
+    admitted = normalise_galaxy_profile(raw)
+    baseline = archetype_files(mode)
+    effective, receipt = compile_galaxy_playable_axes(admitted, mode, {})
+    assert effective[axis] == 1.0
+    generated = archetype_files(mode, operator_axes=effective)
+    assert generated != baseline
+    assert verify_archetype_content(generated, mode, operator_axes=effective)
+    sealed, doc = seal_galaxy_playable_controls(generated, receipt)
+    assert doc["axes"][0]["authority"] == "galaxy_matrix"
+    assert doc["native_execution_qualified"] is False
+    for path, digest in doc["native_sources"].items():
+        assert digest == hashlib.sha256(sealed[path].encode()).hexdigest()
+
+
+def test_galaxy_control_precedence_and_max_vote_are_deterministic():
+    from skeleton.context.galaxy_profile import compile_galaxy_playable_axes
+    from skeleton.ai.runtime.context.galaxy_profile import compile_galaxy_playable_axes as mirrored
+    raw = profile()
+    raw["config"]["world_matrix"].update(volcanic={"complexity": 900}, wasteland={"complexity": 600})
+    original = copy.deepcopy(raw)
+    effective, receipt = compile_galaxy_playable_axes(raw, "extraction", {"risk": 0.0, "tempo": 0.42})
+    assert effective == {"risk": 0.0, "tempo": 0.42}
+    assert receipt["axes"] == [{
+        "axis": "risk", "requested": 0.9, "effective": 0.0, "authority": "forge_override",
+        "sources": [{"path": "world_matrix.volcanic.complexity", "value": 900},
+                    {"path": "world_matrix.wasteland.complexity", "value": 600}],
+    }]
+    assert mirrored(raw, "extraction", {"risk": 0.0, "tempo": 0.42}) == (effective, receipt)
+    assert raw == original
+
+
+def test_galaxy_controls_zero_and_unmapped_data_do_not_change_playable_axes():
+    from skeleton.context.galaxy_profile import compile_galaxy_playable_axes
+    raw = profile()
+    raw["config"]["mechanics_matrix"]["parkour"] = {"complexity": 0}
+    raw["config"]["audio_matrix"]["music"] = {"depth": 100}
+    axes, receipt = compile_galaxy_playable_axes(raw, "crafting", {})
+    assert axes == {} and receipt["axes"] == []
+    assert receipt["unmapped_matrix_dials"] == receipt["active_matrix_dials"]
+    assert compile_galaxy_playable_axes(None, "crafting", {"tempo": 0.5}) == ({"tempo": 0.5}, None)
+
+
+def test_galaxy_playable_receipt_is_in_final_source_manifest():
+    from skeleton.context.galaxy_profile import PLAYABLE_RECEIPT_PATH
+    raw = profile()
+    raw["config"]["mechanics_matrix"]["driving"] = {"count": 1000, "complexity": 800}
+    result = GameForgeRun().execute(
+        "An original extraction world with a racing scene", era="extraction_now",
+        archetype="extraction", playable_content=True, playable_archetype="racing",
+        galaxy_profile=raw, operator_axes={"risk": 0.0},
+    )
+    assert result["succeeded"], result.get("run")
+    doc = result["galaxy_playable_controls"]
+    assert json.loads(result["files"][PLAYABLE_RECEIPT_PATH]) == doc
+    assert PLAYABLE_RECEIPT_PATH in result["source_manifest"]["files"]
+    assert doc["effective_axes"] == {"grind": 1.0, "risk": 0.0}
+    assert result["playable_mechanics"]["applied_axes"] == {"grind": 1.0, "risk": 0.0}
+    assert "const GOAL_LAPS := 4" in result["files"]["scripts/archetypes/racing/core_loop.gd"]
+    for path, digest in doc["native_sources"].items():
+        assert digest == hashlib.sha256(result["files"][path].encode()).hexdigest()
+
+
+def test_galaxy_playable_receipt_refuses_collision_or_missing_native_source():
+    from skeleton.context.galaxy_profile import (
+        PLAYABLE_RECEIPT_PATH, compile_galaxy_playable_axes, seal_galaxy_playable_controls,
+    )
+    from skeleton.forge.archetype_content import archetype_files
+    axes, receipt = compile_galaxy_playable_axes(profile(), "racing", {})
+    files = archetype_files("racing", operator_axes=axes)
+    with pytest.raises(ValueError, match="collision"):
+        seal_galaxy_playable_controls({**files, PLAYABLE_RECEIPT_PATH.upper(): "existing"}, receipt)
+    files.pop("scripts/archetypes/racing/core_loop.gd")
+    with pytest.raises(ValueError, match="missing"):
+        seal_galaxy_playable_controls(files, receipt)

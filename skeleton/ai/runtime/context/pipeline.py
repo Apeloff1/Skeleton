@@ -17,6 +17,7 @@ from skeleton.context.dodeca import Dodecahedron
 from skeleton.context.galaxy_profile import (
     ARTIFACT_PATH, apply_galaxy_mechanics, attach_galaxy_profile,
     galaxy_profile_receipt, normalise_galaxy_profile,
+    compile_galaxy_playable_axes, seal_galaxy_playable_controls,
 )
 from skeleton.context.oracle import Magic8Ball
 from skeleton.context.tensor import AXES, ContextTensor, detect_era
@@ -283,6 +284,8 @@ class GameForgeRun:
             }
             if run.context.get("galaxy_mechanics") is not None:
                 payload["galaxy_mechanics"] = run.context["galaxy_mechanics"]
+            if run.succeeded and emitted_manifest is not None and run.context.get("galaxy_playable_controls") is not None:
+                payload["galaxy_playable_controls"] = run.context["galaxy_playable_controls"]
         if playable_content and run.context.get("playable_mechanics_receipt") is not None:
             payload["playable_mechanics"] = run.context["playable_mechanics_receipt"]
         if playable_content and run.context.get("playable_tuning_receipt") is not None:
@@ -536,9 +539,13 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
             content_archetypes, attach_archetype_content, verify_archetype_content,
         )
         requested = ctx.get("playable_archetype_selection") or ctx.get("archetype") or "extraction"
-        axes = ctx.get("operator_axes") or {}
-        files = attach_archetype_content(files, requested, operator_axes=axes)
         archetype_name = requested if requested in content_archetypes() else "extraction"
+        axes, galaxy_playable = compile_galaxy_playable_axes(
+            ctx.get("galaxy_profile"), archetype_name, ctx.get("operator_axes") or {},
+        )
+        ctx["effective_playable_axes"] = axes
+        ctx["pending_galaxy_playable_controls"] = galaxy_playable
+        files = attach_archetype_content(files, archetype_name, operator_axes=axes)
         # Source-admitted in-game launcher: without it the playable sidecar
         # only exists as a hidden file in the Godot editor and cannot be
         # reached from the shipped world's main scene.
@@ -597,12 +604,19 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         active = str(ctx.get("playable_archetype") or "extraction")
         if not verify_playable_portal(files, active, start_in_prototype=ctx.get("playable_main_scene") is True):
             raise RuntimeError("final in-game playable portal verification failed")
-        if not verify_archetype_content(files, active, operator_axes=ctx.get("operator_axes")):
+        if not verify_archetype_content(files, active, operator_axes=ctx.get("effective_playable_axes")):
             raise RuntimeError("final native playable mechanics verification failed")
     if ctx.get("quest_content"):
         from skeleton.ai.game_builder.godot_quest_bridge import verify_native_quest
         if not verify_native_quest(files):
             raise RuntimeError("final native room quest verification failed")
+    if ctx.get("pending_galaxy_playable_controls") is not None:
+        files, galaxy_playable = seal_galaxy_playable_controls(
+            files, ctx["pending_galaxy_playable_controls"],
+        )
+        ctx["galaxy_playable_controls"] = galaxy_playable
+        ctx["files"] = files
+        ctx["file_count"] = len(files)
     # Validate names in both API/in-memory and disk build modes, before any
     # expensive engine checks or project publication.
     source_manifest(files)
