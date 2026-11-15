@@ -3313,6 +3313,7 @@ class DragonCrawlerApplication:
                 {
                     "$set": {
                         "source_use_policies." + source_id: policy,
+                        "treasury_index": None,
                         "updated_at": now,
                         "storage_receipt": receipt,
                         (
