@@ -70,6 +70,11 @@ CREATE TABLE IF NOT EXISTS release_facets(
 CREATE INDEX IF NOT EXISTS release_event_time ON release_facets(owner,observed_at DESC,game DESC,source DESC,event_key DESC);
 CREATE INDEX IF NOT EXISTS release_event_stage ON release_facets(owner,stage,observed_at DESC,game DESC,source DESC,event_key DESC);
 CREATE INDEX IF NOT EXISTS release_event_date ON release_facets(owner,released_on,game,source,event_key);
+CREATE INDEX IF NOT EXISTS release_event_kind ON release_facets(owner,kind,observed_at DESC,game DESC,source DESC,event_key DESC);
+CREATE INDEX IF NOT EXISTS release_event_language ON release_facets(owner,language,observed_at DESC,game DESC,source DESC,event_key DESC);
+CREATE TABLE IF NOT EXISTS corpus_migration(
+ name TEXT PRIMARY KEY, cursor TEXT, complete INTEGER NOT NULL CHECK(complete IN (0,1))
+) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS game_source_kind ON sources(owner,kind,game,id);
 CREATE INDEX IF NOT EXISTS game_source_language ON sources(owner,language,game,id);
 """
@@ -359,22 +364,46 @@ class GameCorpus:
                 "current_means_latest_observed":True,"index_may_be_partial":True}
 
     def backfill_facets(self,*,limit=32):
-        """Bounded resumable historical index population after schema upgrade."""
+        """Bounded keyset migration, no repeated whole-corpus missing-row scan.
+
+        New writes publish facets atomically; migration only repairs older rows.
+        A corrupt existing row holds the cursor instead of silently skipping it.
+        """
         limit=_limit(limit)
         with self._db() as db:
             db.execute("BEGIN IMMEDIATE")
             try:
+                db.execute("INSERT OR IGNORE INTO corpus_migration VALUES('release-facets-v1',NULL,0)")
+                state=db.execute("SELECT cursor,complete FROM corpus_migration WHERE name='release-facets-v1'").fetchone()
+                if state["complete"]:
+                    db.execute("COMMIT")
+                    return {"indexed":0,"visited":0,"complete":True,"network_executed":False}
+                where=""
+                args=[]
+                if state["cursor"] is not None:
+                    cursor=json.loads(state["cursor"])
+                    if not isinstance(cursor,list) or len(cursor)!=4 or not all(isinstance(x,str) for x in cursor):
+                        raise CatalogueHeld("facet migration cursor invalid")
+                    where=" WHERE (o.owner,o.game,o.source,o.event_key)>(?,?,?,?)"
+                    args.extend(cursor)
+                args.append(limit)
                 rows=db.execute("""SELECT o.owner,o.game,o.source,o.event_key,o.payload,o.digest,o.recorded_at
-                    FROM observations o WHERE NOT EXISTS (SELECT 1 FROM release_facets f
-                    WHERE f.owner=o.owner AND f.game=o.game AND f.source=o.source AND f.event_key=o.event_key)
-                    ORDER BY o.owner,o.game,o.source,o.event_key LIMIT ?""",(limit,)).fetchall()
+                    FROM observations o"""+where+" ORDER BY o.owner,o.game,o.source,o.event_key LIMIT ?",args).fetchall()
+                indexed=0
                 for row in rows:
+                    existing=db.execute("SELECT 1 FROM release_facets WHERE owner=? AND game=? AND source=? AND event_key=?",
+                                        (row["owner"],row["game"],row["source"],row["event_key"])).fetchone()
+                    if existing: continue
                     payload=json.loads(row["payload"])
                     if digest(payload)!=row["digest"]:
                         raise CatalogueHeld("historical observation witness mismatch")
                     self._index_observation(db,row["owner"],row["game"],row["source"],row["event_key"],payload,row["recorded_at"])
+                    indexed+=1
+                cursor=json.dumps([rows[-1][k] for k in ("owner","game","source","event_key")]) if rows else state["cursor"]
+                complete=len(rows)<limit
+                db.execute("UPDATE corpus_migration SET cursor=?,complete=? WHERE name='release-facets-v1'",(cursor,int(complete)))
                 db.execute("COMMIT")
-                return {"indexed":len(rows),"network_executed":False}
+                return {"indexed":indexed,"visited":len(rows),"complete":complete,"network_executed":False}
             except BaseException:
                 if db.in_transaction: db.execute("ROLLBACK")
                 raise
