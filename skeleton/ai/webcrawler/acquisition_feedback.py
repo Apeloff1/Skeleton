@@ -13,6 +13,8 @@ import re
 from typing import Iterable
 from urllib.parse import urlsplit
 
+from .dragon_curriculum_trace import validate_receipt
+
 MAX_OBSERVATIONS = 128
 MAX_BYTES = 2_097_152
 MAX_LATENCY_BUCKET = 240
@@ -25,7 +27,7 @@ _OUTCOMES = frozenset({"captured", "duplicate", "discovered", "robots", "redirec
 _USEFUL = frozenset({"captured", "discovered"})
 _FAILURE = frozenset({"retry", "error", "interrupted_dispatch"})
 _FIELDS = {"request", "host", "kind", "status", "latency_bucket",
-           "charged_bytes", "uncertain_bytes", "event_sequence"}
+           "charged_bytes", "uncertain_bytes", "event_sequence", "source_id", "curriculum"}
 
 
 @dataclass(frozen=True)
@@ -53,11 +55,13 @@ def quantize_latency(seconds: float) -> int:
 
 def settled_observation(*, request: int, url: str, kind: str, status: int | None,
                         latency_bucket: int | None, charged_bytes: int, uncertain_bytes: int,
-                        event_sequence: int) -> dict:
+                        event_sequence: int, source_id: str | None = None,
+                        curriculum: dict | None = None) -> dict:
     host = urlsplit(url).hostname
     row = {"request": request, "host": host, "kind": kind, "status": status,
            "latency_bucket": latency_bucket, "charged_bytes": charged_bytes,
-           "uncertain_bytes": uncertain_bytes, "event_sequence": event_sequence}
+           "uncertain_bytes": uncertain_bytes, "event_sequence": event_sequence,
+           "source_id": source_id, "curriculum": curriculum}
     _validate(row)
     return row
 
@@ -73,6 +77,14 @@ def _validate(row: object) -> None:
     for field in ("charged_bytes", "uncertain_bytes"):
         if type(row[field]) is not int or not 0 <= row[field] <= MAX_BYTES:
             raise ValueError("invalid acquisition byte accounting")
+    source = row["source_id"]
+    if source is not None and (row["kind"] != "captured" or not isinstance(source, str)
+                               or not re.fullmatch(r"[a-f0-9]{64}", source)):
+        raise ValueError("invalid acquisition source identity")
+    if row["curriculum"] is not None:
+        validate_receipt(row["curriculum"])
+        if row["kind"] == "captured" and row["curriculum"]["phase"] != "content":
+            raise ValueError("policy acquisition cannot earn capture credit")
     status, latency = row["status"], row["latency_bucket"]
     if status is None:
         if latency is not None and (type(latency) is not int or not 1 <= latency <= MAX_LATENCY_BUCKET):
