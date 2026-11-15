@@ -20,7 +20,7 @@ const count=(x:unknown,max:number):x is number=>typeof x==='number'&&Number.isSa
 const live=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)&&x*1000>Date.now();
 const validChange=(x:unknown):x is ChangeType=>typeof x==='string'&&['added','removed','changed','unchanged'].includes(x);
 function id(x:string){return sha(x)?x:fail();}
-function segment(x:string){if(!key(x)||x.includes('/'))return fail();return encodeURIComponent(x);}
+function entityKey(x:string){if(!key(x))return fail();return encodeURIComponent(x);}
 function root(game:string,version?:string){return ROOT+id(game)+'/datasets'+(version?'/'+id(version):'');}
 function record(x:unknown):x is EntityRecord{
  if(!x||typeof x!=='object')return false;
@@ -49,14 +49,14 @@ export async function datasetRecords(game:string,version:DatasetVersion,q:string
 }
 export async function datasetRecord(game:string,version:DatasetVersion,entity:string,signal?:AbortSignal){
  if(!validVersion(version,game)||version.state!=='sealed')return fail();
- const p=await get<EntityRecord&{version:string;valid_until:number;source_verified:false;training_allowed:false}>(root(game,version.id)+'/record/'+segment(entity),signal);
+ const p=await get<EntityRecord&{version:string;valid_until:number;source_verified:false;training_allowed:false}>(root(game,version.id)+'/record?record='+entityKey(entity),signal);
  if(!record(p)||p.key!==entity||p.version!==version.id||p.valid_until!==version.expires_at||!live(p.valid_until)||p.source_verified!==false||p.training_allowed!==false)return fail();
  return p;
 }
 export async function datasetGraph(game:string,version:DatasetVersion,entity:string,direction:'in'|'out'|'both',depth:number,signal?:AbortSignal){
- if(!validVersion(version,game)||version.state!=='sealed'||!count(depth,6)||!['in','out','both'].includes(direction))return fail();
- const params=new URLSearchParams({direction,max_depth:String(depth),node_limit:'128',edge_limit:'256'});
- const p=await get<EntityGraph>(root(game,version.id)+'/graph/'+segment(entity)+'?'+params,signal);
+ if(!validVersion(version,game)||version.state!=='sealed'||!key(entity)||!count(depth,6)||!['in','out','both'].includes(direction))return fail();
+ const params=new URLSearchParams({record:entity,direction,max_depth:String(depth),node_limit:'128',edge_limit:'256'});
+ const p=await get<EntityGraph>(root(game,version.id)+'/graph?'+params,signal);
  if(p.version!==version.id||p.root!==entity||!Array.isArray(p.nodes)||p.nodes.length<1||p.nodes.length>128||
  p.nodes.some(n=>!n||!key(n.key)||!count(n.depth,depth)||typeof n.present!=='boolean'||n.present&&!sha(n.sha256)||!n.present&&n.sha256!==null)||
  new Set(p.nodes.map(n=>n.key)).size!==p.nodes.length||p.nodes[0].key!==entity||!p.nodes[0].present||
