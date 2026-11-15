@@ -1851,6 +1851,1092 @@
           "kind": "accessibility_feature_matrix"
         }
       ]
+    },
+    {
+      "id": "jrpg-action",
+      "domain": "genre",
+      "game": null,
+      "title": null,
+      "leads": [
+        {
+          "label": "Final Fantasy official",
+          "url": "https://www.finalfantasy.com/",
+          "provider": "publisher",
+          "kind": "franchise_catalogue"
+        },
+        {
+          "label": "Final Fantasy Wiki",
+          "url": "https://finalfantasy.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Kingdom Hearts Wiki",
+          "url": "https://www.khwiki.com/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Dragon Quest Wiki",
+          "url": "https://dragon-quest.org/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Persona Wiki",
+          "url": "https://megamitensei.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Xeno Series Wiki",
+          "url": "https://www.xenoserieswiki.org/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Fire Emblem Wiki",
+          "url": "https://fireemblemwiki.org/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Serenes Forest",
+          "url": "https://serenesforest.net/",
+          "provider": "community",
+          "kind": "strategy_database"
+        },
+        {
+          "label": "Bulbapedia",
+          "url": "https://bulbapedia.bulbagarden.net/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Serebii",
+          "url": "https://www.serebii.net/",
+          "provider": "community",
+          "kind": "reference_database"
+        },
+        {
+          "label": "Pokémon Database",
+          "url": "https://pokemondb.net/",
+          "provider": "community",
+          "kind": "creature_reference"
+        },
+        {
+          "label": "Pokémon Showdown",
+          "url": "https://pokemonshowdown.com/",
+          "provider": "community",
+          "kind": "damage_simulator"
+        },
+        {
+          "label": "Smogon",
+          "url": "https://www.smogon.com/",
+          "provider": "community",
+          "kind": "matchup_matrix"
+        },
+        {
+          "label": "Zelda Wiki",
+          "url": "https://zeldawiki.wiki/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Zelda Dungeon",
+          "url": "https://www.zeldadungeon.net/",
+          "provider": "community",
+          "kind": "strategy_database"
+        },
+        {
+          "label": "Zelda speedrunning",
+          "url": "https://www.zeldaspeedruns.com/",
+          "provider": "community",
+          "kind": "speedrun_route_version"
+        },
+        {
+          "label": "Metroid Wiki",
+          "url": "https://metroidwiki.org/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Metroid Database",
+          "url": "https://www.metroid-database.com/",
+          "provider": "community",
+          "kind": "franchise_catalogue"
+        },
+        {
+          "label": "Sonic Retro",
+          "url": "https://sonicretro.org/",
+          "provider": "community",
+          "kind": "franchise_catalogue"
+        },
+        {
+          "label": "Sonic Wiki Zone",
+          "url": "https://sonic.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Kirby Wiki",
+          "url": "https://wikirby.com/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Mega Man Wiki",
+          "url": "https://megaman.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Monster Hunter Wiki",
+          "url": "https://monsterhunter.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Kiranico",
+          "url": "https://www.kiranico.com/",
+          "provider": "community",
+          "kind": "item_database"
+        }
+      ]
+    },
+    {
+      "id": "western-rpg",
+      "domain": "genre",
+      "game": null,
+      "title": null,
+      "leads": [
+        {
+          "label": "UESP",
+          "url": "https://en.uesp.net/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Elder Scrolls Wiki",
+          "url": "https://elderscrolls.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Skyrim Nexus",
+          "url": "https://www.nexusmods.com/skyrimspecialedition",
+          "provider": "nexusmods",
+          "kind": "mod_collection_catalogue"
+        },
+        {
+          "label": "SKSE",
+          "url": "https://skse.silverlock.org/",
+          "provider": "community",
+          "kind": "scripting_extender_api"
+        },
+        {
+          "label": "Wabbajack",
+          "url": "https://www.wabbajack.org/",
+          "provider": "community",
+          "kind": "mod_pack_manifest"
+        },
+        {
+          "label": "NifSkope",
+          "url": "https://github.com/niftools/nifskope",
+          "provider": "github",
+          "kind": "mesh_format_reference"
+        },
+        {
+          "label": "OpenMW",
+          "url": "https://openmw.org/",
+          "provider": "open_source",
+          "kind": "engine_migration_guide"
+        },
+        {
+          "label": "Baldur's Gate 3 Wiki",
+          "url": "https://bg3.wiki/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "BG3 mod tools",
+          "url": "https://mod.io/g/baldursgate3",
+          "provider": "community",
+          "kind": "mod_collection_catalogue"
+        },
+        {
+          "label": "Larian",
+          "url": "https://larian.com/",
+          "provider": "publisher",
+          "kind": "developer_blog"
+        },
+        {
+          "label": "The Witcher Wiki",
+          "url": "https://witcher.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Cyberpunk Wiki",
+          "url": "https://cyberpunk.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "WolvenKit",
+          "url": "https://wiki.redmodding.org/wolvenkit",
+          "provider": "community",
+          "kind": "editor_workflow"
+        },
+        {
+          "label": "REDmod documentation",
+          "url": "https://www.cyberpunk.net/en/modding-support",
+          "provider": "publisher",
+          "kind": "modding_framework_docs"
+        },
+        {
+          "label": "Elden Ring Wiki",
+          "url": "https://eldenring.wiki.fextralife.com/",
+          "provider": "community",
+          "kind": "strategy_database"
+        },
+        {
+          "label": "Dark Souls Wikidot",
+          "url": "https://darksouls.wikidot.com/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Dark Souls 3 Wikidot",
+          "url": "https://darksouls3.wikidot.com/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Bloodborne Wiki",
+          "url": "https://www.bloodborne-wiki.com/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Diablo Wiki",
+          "url": "https://diablo.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Grim Dawn Wiki",
+          "url": "https://grimdawn.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "GrimTools",
+          "url": "https://www.grimtools.com/",
+          "provider": "community",
+          "kind": "build_planner"
+        }
+      ]
+    },
+    {
+      "id": "survival-sandbox",
+      "domain": "creator-platform",
+      "game": null,
+      "title": null,
+      "leads": [
+        {
+          "label": "ARK Wiki",
+          "url": "https://ark.wiki.gg/",
+          "provider": "wiki_gg",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Dododex",
+          "url": "https://www.dododex.com/",
+          "provider": "community",
+          "kind": "resource_calculator"
+        },
+        {
+          "label": "Rust Wiki",
+          "url": "https://wiki.facepunch.com/rust/",
+          "provider": "developer",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Rust Labs",
+          "url": "https://rustlabs.com/",
+          "provider": "community",
+          "kind": "item_database"
+        },
+        {
+          "label": "Valheim Wiki",
+          "url": "https://valheim.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Don't Starve Wiki",
+          "url": "https://dontstarve.wiki.gg/",
+          "provider": "wiki_gg",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Project Zomboid Wiki",
+          "url": "https://pzwiki.net/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "7 Days to Die Wiki",
+          "url": "https://7daystodie.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "DayZ Wiki",
+          "url": "https://dayz.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Subnautica Wiki",
+          "url": "https://subnautica.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "No Man's Sky Wiki",
+          "url": "https://nomanssky.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "No Man's Sky Assistant",
+          "url": "https://nmsassistant.com/",
+          "provider": "community",
+          "kind": "crafting_planner"
+        },
+        {
+          "label": "Elite Dangerous Inara",
+          "url": "https://inara.cz/",
+          "provider": "community",
+          "kind": "economy_dashboard"
+        },
+        {
+          "label": "Elite Dangerous EDSM",
+          "url": "https://www.edsm.net/",
+          "provider": "community",
+          "kind": "galaxy_map"
+        },
+        {
+          "label": "Star Citizen RSI",
+          "url": "https://robertsspaceindustries.com/",
+          "provider": "publisher",
+          "kind": "storefront"
+        },
+        {
+          "label": "Star Citizen Tools Wiki",
+          "url": "https://starcitizen.tools/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Hytale",
+          "url": "https://hytale.com/",
+          "provider": "publisher",
+          "kind": "developer_blog"
+        },
+        {
+          "label": "Space Engineers Wiki",
+          "url": "https://spaceengineers.wiki.gg/",
+          "provider": "wiki_gg",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Sims Wiki",
+          "url": "https://sims.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "The Sims Resource",
+          "url": "https://www.thesimsresource.com/",
+          "provider": "community",
+          "kind": "ugc_asset_directory"
+        },
+        {
+          "label": "Mod The Sims",
+          "url": "https://modthesims.info/",
+          "provider": "community",
+          "kind": "mod_collection_catalogue"
+        }
+      ]
+    },
+    {
+      "id": "strategy-management",
+      "domain": "genre",
+      "game": null,
+      "title": null,
+      "leads": [
+        {
+          "label": "Civilization Wiki",
+          "url": "https://civilization.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "CivFanatics",
+          "url": "https://www.civfanatics.com/",
+          "provider": "community",
+          "kind": "strategy_database"
+        },
+        {
+          "label": "Age of Empires Wiki",
+          "url": "https://ageofempires.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "AoE4 World",
+          "url": "https://aoe4world.com/",
+          "provider": "community",
+          "kind": "strategy_matchup_reference"
+        },
+        {
+          "label": "AoE2 Insights",
+          "url": "https://www.aoe2insights.com/",
+          "provider": "community",
+          "kind": "public_statistics_dashboard"
+        },
+        {
+          "label": "StarCraft Liquipedia",
+          "url": "https://liquipedia.net/starcraft2/",
+          "provider": "esports",
+          "kind": "strategy_build_order"
+        },
+        {
+          "label": "TeamLiquid",
+          "url": "https://tl.net/",
+          "provider": "community",
+          "kind": "public_discussion"
+        },
+        {
+          "label": "Total War Wiki",
+          "url": "https://wiki.totalwar.com/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Total War forums",
+          "url": "https://community.totalwar.com/",
+          "provider": "community",
+          "kind": "public_discussion"
+        },
+        {
+          "label": "Crusader Kings 3 Wiki",
+          "url": "https://ck3.paradoxwikis.com/",
+          "provider": "publisher",
+          "kind": "strategy_unit_database"
+        },
+        {
+          "label": "Stellaris Wiki",
+          "url": "https://stellaris.paradoxwikis.com/",
+          "provider": "publisher",
+          "kind": "strategy_tech_tree"
+        },
+        {
+          "label": "Hearts of Iron IV Wiki",
+          "url": "https://hoi4.paradoxwikis.com/",
+          "provider": "publisher",
+          "kind": "strategy_tech_tree"
+        },
+        {
+          "label": "Europa Universalis IV Wiki",
+          "url": "https://eu4.paradoxwikis.com/",
+          "provider": "publisher",
+          "kind": "strategy_resource_balance"
+        },
+        {
+          "label": "Cities Skylines Wiki",
+          "url": "https://skylines.paradoxwikis.com/",
+          "provider": "publisher",
+          "kind": "colony_population_model"
+        },
+        {
+          "label": "Oxygen Not Included Wiki",
+          "url": "https://oxygennotincluded.wiki.gg/",
+          "provider": "wiki_gg",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Factorio calculator",
+          "url": "https://factoriocalculator.com/",
+          "provider": "community",
+          "kind": "automation_ratio_calculator"
+        },
+        {
+          "label": "Satisfactory calculator",
+          "url": "https://satisfactory-calculator.com/",
+          "provider": "community",
+          "kind": "production_planner"
+        },
+        {
+          "label": "Anno Wiki",
+          "url": "https://anno1800.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Transport Fever Wiki",
+          "url": "https://www.transportfever2.com/wiki/",
+          "provider": "publisher",
+          "kind": "simulation_control_reference"
+        }
+      ]
+    },
+    {
+      "id": "competitive-fps",
+      "domain": "genre",
+      "game": null,
+      "title": null,
+      "leads": [
+        {
+          "label": "Counter-Strike official",
+          "url": "https://www.counter-strike.net/",
+          "provider": "publisher",
+          "kind": "live_event_calendar"
+        },
+        {
+          "label": "Counter-Strike Liquipedia",
+          "url": "https://liquipedia.net/counterstrike/",
+          "provider": "esports",
+          "kind": "match_result"
+        },
+        {
+          "label": "CS demo analysis",
+          "url": "https://cs-demo-manager.com/",
+          "provider": "community",
+          "kind": "replay_viewer"
+        },
+        {
+          "label": "Valorant official",
+          "url": "https://playvalorant.com/",
+          "provider": "publisher",
+          "kind": "storefront"
+        },
+        {
+          "label": "VLR",
+          "url": "https://www.vlr.gg/",
+          "provider": "esports",
+          "kind": "match_report"
+        },
+        {
+          "label": "Valorant Wiki",
+          "url": "https://valorant.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Overwatch official",
+          "url": "https://overwatch.blizzard.com/",
+          "provider": "publisher",
+          "kind": "storefront"
+        },
+        {
+          "label": "Overwatch Wiki",
+          "url": "https://overwatch.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Apex Legends Wiki",
+          "url": "https://apexlegends.wiki.gg/",
+          "provider": "wiki_gg",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Apex Legends Status",
+          "url": "https://apexlegendsstatus.com/",
+          "provider": "community",
+          "kind": "public_server_status"
+        },
+        {
+          "label": "Halo Waypoint",
+          "url": "https://www.halowaypoint.com/",
+          "provider": "publisher",
+          "kind": "storefront"
+        },
+        {
+          "label": "Halopedia",
+          "url": "https://www.halopedia.org/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Call of Duty official",
+          "url": "https://www.callofduty.com/",
+          "provider": "publisher",
+          "kind": "franchise_catalogue"
+        },
+        {
+          "label": "Call of Duty Wiki",
+          "url": "https://callofduty.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Battlefield official",
+          "url": "https://www.ea.com/games/battlefield",
+          "provider": "publisher",
+          "kind": "franchise_catalogue"
+        },
+        {
+          "label": "Battlefield Wiki",
+          "url": "https://battlefield.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Team Fortress Wiki",
+          "url": "https://wiki.teamfortress.com/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Quake Wiki",
+          "url": "https://quakewiki.org/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Doom Wiki",
+          "url": "https://doomwiki.org/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Doomworld",
+          "url": "https://www.doomworld.com/",
+          "provider": "community",
+          "kind": "mod_collection_catalogue"
+        },
+        {
+          "label": "Source developer wiki",
+          "url": "https://developer.valvesoftware.com/",
+          "provider": "developer",
+          "kind": "level_design_tutorial"
+        }
+      ]
+    },
+    {
+      "id": "racing-sport-flight",
+      "domain": "genre",
+      "game": null,
+      "title": null,
+      "leads": [
+        {
+          "label": "Gran Turismo official",
+          "url": "https://www.gran-turismo.com/",
+          "provider": "publisher",
+          "kind": "franchise_catalogue"
+        },
+        {
+          "label": "GTPlanet",
+          "url": "https://www.gtplanet.net/",
+          "provider": "community",
+          "kind": "racing_setup_reference"
+        },
+        {
+          "label": "Forza official",
+          "url": "https://forza.net/",
+          "provider": "publisher",
+          "kind": "franchise_catalogue"
+        },
+        {
+          "label": "Forza Wiki",
+          "url": "https://forza.fandom.com/",
+          "provider": "fandom",
+          "kind": "vehicle_database"
+        },
+        {
+          "label": "Assetto Corsa",
+          "url": "https://assettocorsa.gg/",
+          "provider": "publisher",
+          "kind": "storefront"
+        },
+        {
+          "label": "OverTake",
+          "url": "https://www.overtake.gg/",
+          "provider": "community",
+          "kind": "racing_setup_reference"
+        },
+        {
+          "label": "Trackmania Exchange",
+          "url": "https://tm.mania.exchange/",
+          "provider": "community",
+          "kind": "ugc_map_directory"
+        },
+        {
+          "label": "Trackmania records",
+          "url": "https://trackmania.io/",
+          "provider": "community",
+          "kind": "leaderboard_record"
+        },
+        {
+          "label": "BeamNG documentation",
+          "url": "https://documentation.beamng.com/",
+          "provider": "developer",
+          "kind": "vehicle_physics_table"
+        },
+        {
+          "label": "BeamNG mods",
+          "url": "https://www.beamng.com/resources/",
+          "provider": "community",
+          "kind": "mod_collection_catalogue"
+        },
+        {
+          "label": "Microsoft Flight Simulator SDK",
+          "url": "https://docs.flightsimulator.com/",
+          "provider": "developer",
+          "kind": "flight_aircraft_data"
+        },
+        {
+          "label": "FlightSim.to",
+          "url": "https://flightsim.to/",
+          "provider": "community",
+          "kind": "ugc_asset_directory"
+        },
+        {
+          "label": "X-Plane developer",
+          "url": "https://developer.x-plane.com/",
+          "provider": "developer",
+          "kind": "flight_navigation_reference"
+        },
+        {
+          "label": "DCS World",
+          "url": "https://www.digitalcombatsimulator.com/",
+          "provider": "publisher",
+          "kind": "simulation_control_reference"
+        },
+        {
+          "label": "EA Sports",
+          "url": "https://www.ea.com/sports",
+          "provider": "publisher",
+          "kind": "franchise_catalogue"
+        },
+        {
+          "label": "Futbin",
+          "url": "https://www.futbin.com/",
+          "provider": "community",
+          "kind": "sports_roster_database"
+        },
+        {
+          "label": "SoFIFA",
+          "url": "https://sofifa.com/",
+          "provider": "community",
+          "kind": "sports_roster_database"
+        },
+        {
+          "label": "NBA2K ratings",
+          "url": "https://www.2kratings.com/",
+          "provider": "community",
+          "kind": "sports_roster_database"
+        },
+        {
+          "label": "Football Manager community",
+          "url": "https://www.fmscout.com/",
+          "provider": "community",
+          "kind": "sports_tactics_reference"
+        }
+      ]
+    },
+    {
+      "id": "puzzle-narrative",
+      "domain": "genre",
+      "game": null,
+      "title": null,
+      "leads": [
+        {
+          "label": "Portal Wiki",
+          "url": "https://theportalwiki.com/",
+          "provider": "community",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Puzzling Stack Exchange",
+          "url": "https://puzzling.stackexchange.com/",
+          "provider": "community",
+          "kind": "puzzle_constraint_rules"
+        },
+        {
+          "label": "PuzzleScript",
+          "url": "https://www.puzzlescript.net/",
+          "provider": "open_source",
+          "kind": "puzzle_generator_reference"
+        },
+        {
+          "label": "Sokoban Wiki",
+          "url": "https://www.sokobano.de/wiki/",
+          "provider": "community",
+          "kind": "puzzle_solution_graph"
+        },
+        {
+          "label": "Myst Wiki",
+          "url": "https://dni.fandom.com/",
+          "provider": "fandom",
+          "kind": "community_wiki"
+        },
+        {
+          "label": "Adventure Gamers",
+          "url": "https://adventuregamers.com/",
+          "provider": "press",
+          "kind": "game_review"
+        },
+        {
+          "label": "Adventure Game Studio",
+          "url": "https://www.adventuregamestudio.co.uk/",
+          "provider": "community",
+          "kind": "game_engine_catalogue"
+        },
+        {
+          "label": "ScummVM compatibility",
+          "url": "https://www.scummvm.org/compatibility/",
+          "provider": "open_source",
+          "kind": "emulator_core_compatibility"
+        },
+        {
+          "label": "Text Adventure archive",
+          "url": "https://www.ifarchive.org/",
+          "provider": "preservation",
+          "kind": "archive_index"
+        },
+        {
+          "label": "Choice of Games",
+          "url": "https://www.choiceofgames.com/",
+          "provider": "publisher",
+          "kind": "interactive_fiction_catalogue"
+        },
+        {
+          "label": "ChoiceScript documentation",
+          "url": "https://www.choiceofgames.com/make-your-own-games/choicescript-intro/",
+          "provider": "developer",
+          "kind": "branching_narrative_schema"
+        },
+        {
+          "label": "itch visual novels",
+          "url": "https://itch.io/games/genre-visual-novel",
+          "provider": "itch",
+          "kind": "visual_novel_catalogue"
+        },
+        {
+          "label": "Ren'Py games",
+          "url": "https://games.renpy.org/",
+          "provider": "community",
+          "kind": "visual_novel_catalogue"
+        }
+      ]
+    },
+    {
+      "id": "vr-accessibility",
+      "domain": "technology",
+      "game": null,
+      "title": null,
+      "leads": [
+        {
+          "label": "OpenXR",
+          "url": "https://www.khronos.org/openxr/",
+          "provider": "developer",
+          "kind": "vr_tracking_reference"
+        },
+        {
+          "label": "OpenVR SDK",
+          "url": "https://github.com/ValveSoftware/openvr",
+          "provider": "github",
+          "kind": "vr_tracking_reference"
+        },
+        {
+          "label": "Godot XR docs",
+          "url": "https://docs.godotengine.org/en/stable/tutorials/xr/",
+          "provider": "open_source",
+          "kind": "vr_comfort_reference"
+        },
+        {
+          "label": "Meta developer",
+          "url": "https://developers.meta.com/horizon/",
+          "provider": "developer",
+          "kind": "vr_tracking_reference"
+        },
+        {
+          "label": "SteamVR",
+          "url": "https://www.steamvr.com/",
+          "provider": "publisher",
+          "kind": "vr_release"
+        },
+        {
+          "label": "UploadVR",
+          "url": "https://www.uploadvr.com/",
+          "provider": "press",
+          "kind": "game_review"
+        },
+        {
+          "label": "Road to VR",
+          "url": "https://www.roadtovr.com/",
+          "provider": "press",
+          "kind": "game_review"
+        },
+        {
+          "label": "Can I Play That",
+          "url": "https://caniplaythat.com/",
+          "provider": "press",
+          "kind": "accessibility_analysis"
+        },
+        {
+          "label": "Game Accessibility Nexus",
+          "url": "https://www.gameaccessibilitynexus.com/",
+          "provider": "community",
+          "kind": "accessibility_feature_matrix"
+        },
+        {
+          "label": "Xbox Accessibility Guidelines",
+          "url": "https://learn.microsoft.com/en-us/gaming/accessibility/",
+          "provider": "developer",
+          "kind": "accessibility_compliance"
+        },
+        {
+          "label": "Accessible Games Initiative",
+          "url": "https://accessiblegames.com/",
+          "provider": "community",
+          "kind": "accessibility_feature_matrix"
+        },
+        {
+          "label": "SpecialEffect",
+          "url": "https://www.specialeffect.org.uk/",
+          "provider": "community",
+          "kind": "adaptive_controller_profile"
+        }
+      ]
+    },
+    {
+      "id": "media-industry",
+      "domain": "media",
+      "game": null,
+      "title": null,
+      "leads": [
+        {
+          "label": "YouTube",
+          "url": "https://www.youtube.com/",
+          "provider": "youtube",
+          "kind": "gameplay_video"
+        },
+        {
+          "label": "Twitch",
+          "url": "https://www.twitch.tv/",
+          "provider": "twitch",
+          "kind": "livestream_archive"
+        },
+        {
+          "label": "Vimeo",
+          "url": "https://vimeo.com/",
+          "provider": "vimeo",
+          "kind": "developer_diary"
+        },
+        {
+          "label": "PeerTube",
+          "url": "https://joinpeertube.org/",
+          "provider": "peertube",
+          "kind": "video_interview"
+        },
+        {
+          "label": "Longplays",
+          "url": "https://longplays.org/",
+          "provider": "community",
+          "kind": "longplay_recording"
+        },
+        {
+          "label": "Digital Foundry",
+          "url": "https://www.digitalfoundry.net/",
+          "provider": "press",
+          "kind": "comparative_rendering_video"
+        },
+        {
+          "label": "Game Developer",
+          "url": "https://www.gamedeveloper.com/",
+          "provider": "press",
+          "kind": "development_log"
+        },
+        {
+          "label": "GamesIndustry.biz",
+          "url": "https://www.gamesindustry.biz/",
+          "provider": "press",
+          "kind": "industry_news"
+        },
+        {
+          "label": "Game Informer",
+          "url": "https://gameinformer.com/",
+          "provider": "press",
+          "kind": "game_review"
+        },
+        {
+          "label": "IGN",
+          "url": "https://www.ign.com/",
+          "provider": "press",
+          "kind": "game_review"
+        },
+        {
+          "label": "GamesRadar",
+          "url": "https://www.gamesradar.com/",
+          "provider": "press",
+          "kind": "game_review"
+        },
+        {
+          "label": "Rock Paper Shotgun",
+          "url": "https://www.rockpapershotgun.com/",
+          "provider": "press",
+          "kind": "game_review"
+        },
+        {
+          "label": "PC Gamer",
+          "url": "https://www.pcgamer.com/",
+          "provider": "press",
+          "kind": "game_review"
+        },
+        {
+          "label": "Polygon",
+          "url": "https://www.polygon.com/",
+          "provider": "press",
+          "kind": "game_review"
+        },
+        {
+          "label": "GameSpot",
+          "url": "https://www.gamespot.com/",
+          "provider": "press",
+          "kind": "game_review"
+        },
+        {
+          "label": "Game Studies",
+          "url": "https://gamestudies.org/",
+          "provider": "academic",
+          "kind": "game_studies"
+        },
+        {
+          "label": "DiGRA",
+          "url": "https://www.digra.org/",
+          "provider": "academic",
+          "kind": "game_studies"
+        },
+        {
+          "label": "ACM CHI PLAY",
+          "url": "https://chiplay.acm.org/",
+          "provider": "academic",
+          "kind": "player_research"
+        },
+        {
+          "label": "Game Accessibility Conference",
+          "url": "https://www.gaconf.com/",
+          "provider": "academic",
+          "kind": "accessibility_report"
+        }
+      ]
     }
   ]
 }
