@@ -2806,6 +2806,25 @@ async def crawler_treasury_passage(
     ))
 
 
+@router.get("/crawler/companion/legacy-catalog")
+async def crawler_legacy_catalog(scope: dict = Depends(_crawler_scope)) -> dict:
+    """Metadata-only discovery of owner-scoped held historical checkpoints."""
+    return await _crawler_result(crawler_application.legacy_treasury_catalog(scope))
+
+
+@router.post("/crawler/sessions/{session_id}/legacy-archive")
+async def crawler_legacy_archive(
+    body: CrawlerArchiveGrantRequest,
+    session_id: str = URLPath(min_length=1,max_length=128),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Explicit historical-use permission without rewriting old checkpoints."""
+    return await _crawler_result(crawler_application.configure_legacy_archive(
+        scope,session_id,body.model_dump(),principal=user,
+    ))
+
+
 @router.get("/crawler/companion/treasury")
 async def crawler_companion_treasury(
     mode: str = Query(default="current_only", pattern=r"^(current_only|historic_only|all_revisions|timeline|compare|at_time)$"),
