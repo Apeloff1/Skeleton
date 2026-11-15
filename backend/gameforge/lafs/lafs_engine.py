@@ -16,7 +16,6 @@ graph belief propagation and contextual acquisition are preserved.
 from __future__ import annotations
 
 import json
-import hashlib
 import math
 import uuid
 import threading
@@ -398,7 +397,10 @@ class LeverArchFileSystem:
 
     def _update_hyperpriors(self):
         eligible = [s for s in self.sheets.values() if s.retrievable]
+        self.domain_priors = defaultdict(lambda: (1.0, 1.0))
+        self.logtype_priors = defaultdict(lambda: (1.0, 1.0))
         if not eligible:
+            self.global_alpha = self.global_beta = 1.0
             return
         self.global_alpha = float(np.mean([s.prob.alpha for s in eligible]))
         self.global_beta = float(np.mean([s.prob.beta for s in eligible]))
@@ -434,6 +436,7 @@ class LeverArchFileSystem:
             raise ValueError("unknown cross-reference")
         if len(self.sheets) >= 10000:
             raise ValueError("cabinet capacity reached")
+        self._update_hyperpriors()
         payload, cross_refs, tags = deepcopy(payload), list(dict.fromkeys(refs)), labels
         path = f"{domain}/{log_type}"
         sid = str(uuid.uuid4())
@@ -538,6 +541,8 @@ class LeverArchFileSystem:
         self._load()
         if type(depth) is not int or not 0 <= depth <= 8:
             raise ValueError("invalid traversal depth")
+        if sheet_id not in self.sheets or not self.sheets[sheet_id].retrievable:
+            return []
         visited, result, frontier = {sheet_id}, [], {sheet_id}
         for _ in range(depth):
             nxt = set()

@@ -295,6 +295,41 @@ def _isolated_extract(payload: bytes, media_type: str) -> dict:
             process.close()
 
 
+async def extract_ephemeral_attachment(payload: bytes, media_type: str) -> dict:
+    """Use the same isolated decoder and physical admission as uploads.
+
+    No persistence, no tool authority, no global working-memory write.
+    Capacity is retained until the native child actually terminates.
+    """
+    if type(payload) is not bytes or not 1 <= len(payload) <= MAX_ATTACHMENT_BYTES:
+        raise ChatAttachmentError("Attachment exceeds the byte budget", 413)
+    allowed = {row["media_type"] for row in attachment_capabilities()["types"] if row["available"]}
+    if media_type not in allowed:
+        raise ChatAttachmentError("Isolated decoding is unavailable for this media type", 503)
+    slots = _UPLOAD_SLOTS.get()
+    try:
+        await asyncio.wait_for(slots.acquire(), timeout=1)
+    except TimeoutError as exc:
+        raise ChatAttachmentError("The file extractor is busy; retry shortly", 429) from exc
+    work = None
+    try:
+        work = asyncio.create_task(asyncio.to_thread(_isolated_extract, payload, media_type))
+        return await asyncio.shield(work)
+    finally:
+        if work is None or work.done():
+            slots.release()
+        else:
+            # Awaiting request may have been cancelled. Observe the exception
+            # and release only once the underlying decoder thread has stopped.
+            def finished(task):
+                try:
+                    if not task.cancelled():
+                        task.exception()
+                finally:
+                    slots.release()
+            work.add_done_callback(finished)
+
+
 def _collection():
     from core.databases import core_db
 
@@ -612,27 +647,7 @@ async def upload_attachment(
         _validate_row(existing)
         return _public(existing)
     await _cleanup_owner(tenant_id, owner_id)
-    slots = _UPLOAD_SLOTS.get()
-    try:
-        await asyncio.wait_for(slots.acquire(), timeout=1)
-    except TimeoutError as exc:
-        raise ChatAttachmentError("The file extractor is busy; retry shortly", 429) from exc
-    try:
-        work = asyncio.create_task(asyncio.to_thread(_isolated_extract, payload, mime))
-        try:
-            extracted = await asyncio.shield(work)
-        except asyncio.CancelledError:
-            # Keep the slot until the bounded child has actually quiesced.
-            try:
-                await asyncio.shield(work)
-            except Exception:
-                pass
-            raise
-    finally:
-        if work.done():
-            slots.release()
-        else:
-            work.add_done_callback(lambda _completed: slots.release())
+    extracted = await extract_ephemeral_attachment(payload, mime)
     created = _now()
     expires = created + timedelta(seconds=RETENTION_SECONDS)
     context_text = f"Uploaded file: {name}\nMedia type: {mime}\n" + (

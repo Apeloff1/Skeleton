@@ -10,13 +10,14 @@ import time
 from urllib.parse import quote, urlsplit
 
 import httpx
+from core.loop_local_asyncio import LoopLocalAsyncPrimitive
 
 MAX_BODY = 128 * 1024
 MAX_EXTRACT = 12000
 MAX_TOPIC = 160
 HOST = "en.wikipedia.org"
 ROOT = f"https://{HOST}/api/rest_v1/page/summary/"
-_GATE = asyncio.Semaphore(2)
+_GATE = LoopLocalAsyncPrimitive(lambda: asyncio.Semaphore(2))
 _DIGEST = re.compile(r"[0-9a-f]{64}", re.ASCII)
 
 
@@ -71,7 +72,7 @@ async def wiki_summary(topic: str) -> dict | None:
     url = ROOT + quote(topic, safe="")
     # One admission window covers waiting, connecting, headers and all body bytes.
     async with asyncio.timeout(15):
-        async with _GATE:
+        async with _GATE.get():
             async with httpx.AsyncClient(timeout=8, follow_redirects=False, trust_env=False,
                   headers={"User-Agent": "GameForge-LAFS/2.0 (https://github.com/Apeloff1/Skeleton)",
                            "Accept": "application/json", "Accept-Encoding": "identity"}) as client:
