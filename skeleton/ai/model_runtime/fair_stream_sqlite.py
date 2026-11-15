@@ -165,8 +165,10 @@ class DurableFairStreamStore:
         self._assert_private()
         self._assert_schema()
         row = self._connection.execute(
-            "SELECT generation, digest, payload FROM " + _TABLE +
-            " WHERE session_id = ?", (self.session_id,),
+            "SELECT generation, CASE WHEN typeof(digest)='text' AND length(CAST(digest AS BLOB))=64"
+            " THEN digest END, CASE WHEN typeof(payload)='blob' AND length(payload)<=?"
+            " THEN payload END FROM " + _TABLE + " WHERE session_id = ?",
+            (MAX_BYTES, self.session_id),
         ).fetchone()
         if row is None:
             return None

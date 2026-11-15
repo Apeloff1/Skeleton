@@ -227,12 +227,18 @@ class FairStreamExecutionJournal:
 
     def _row(self, lease_id: str) -> tuple[object, ...] | None:
         self._assert_private()
-        return self._connection.execute(
+        row = self._connection.execute(
             "SELECT session_id, generation, checkpoint_digest, request_id,"
-            " state, consumed_tokens, result_digest, receipt"
+            " state, consumed_tokens, result_digest,"
+            " CASE WHEN receipt IS NULL THEN NULL"
+            " WHEN typeof(receipt)='blob' AND length(receipt)<=? THEN receipt"
+            " ELSE X'FF' END"
             " FROM local_fair_stream_execution_journal WHERE lease_id = ?",
-            (lease_id,),
+            (MAX_RECEIPT_BYTES, lease_id),
         ).fetchone()
+        if row is not None and row[-1] == b"\xff":
+            raise ExecutionOutcomeUnknown("invalid stored execution receipt")
+        return row
 
     def request_exists(self, request_id: str) -> bool:
         """Observation only; begin() remains the atomic replay fence."""
@@ -332,9 +338,10 @@ class FairStreamExecutionJournal:
             self._begin()
             try:
                 row = self._connection.execute(
-                    "SELECT lease_id,receipt FROM local_fair_stream_cancelled_intents "
+                    "SELECT lease_id, CASE WHEN typeof(receipt)='blob' AND length(receipt)<=?"
+                    " THEN receipt END FROM local_fair_stream_cancelled_intents "
                     "WHERE session_id=? AND request_id=?",
-                    (self.session_id, permit.request_id),
+                    (MAX_RECEIPT_BYTES, self.session_id, permit.request_id),
                 ).fetchone()
                 if row is None or row[0] != permit.lease_id:
                     raise ExecutionOutcomeUnknown("no exact cancellation receipt to reconcile")

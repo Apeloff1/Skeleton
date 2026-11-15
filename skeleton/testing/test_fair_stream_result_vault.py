@@ -554,3 +554,26 @@ def test_backend_mutated_pending_state_cannot_publish(vault_dir, monkeypatch):
         assert handle.connection.execute("SELECT COUNT(*) FROM local_fair_stream_sealed_results").fetchone() == (0,)
     finally:
         handle.close()
+
+def test_oversized_ciphertext_preserves_existing_replay_fence(vault_dir, monkeypatch):
+    import skeleton.ai.model_runtime.fair_stream_result_vault as module
+
+    backend = Backend()
+    handle, vault = open_vault(vault_dir, backend)
+    try:
+        _, digest = vault.run_and_commit(permit(), state())
+        handle.connection.execute(
+            "UPDATE local_fair_stream_sealed_results SET ciphertext=zeroblob(8192)",
+        )
+        monkeypatch.setattr(module, "MAX_RESULT_BYTES", 1024)
+        with pytest.raises(SealedResultUnavailable, match="digest"):
+            vault.read_committed(permit(), expected_result_digest=digest)
+        with pytest.raises(SealedResultUnavailable, match="digest"):
+            vault.run_and_commit(permit(), state())
+        assert backend.calls == 1
+        assert handle.connection.execute(
+            "SELECT length(ciphertext) FROM local_fair_stream_sealed_results",
+        ).fetchone() == (8192,)
+        assert not handle.connection.in_transaction
+    finally:
+        handle.close()

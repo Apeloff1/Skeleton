@@ -216,10 +216,20 @@ class SealedFairStreamResultVault:
         self._assert_schema()
 
     def _row(self, lease_id: str) -> tuple[object, ...] | None:
-        return self._connection.execute(
-            "SELECT " + ", ".join(_COLUMNS) + " FROM " + _TABLE
-            + " WHERE lease_id=?", (lease_id,),
+        # Project bounded binary fields in SQLite, rather than allocating
+        # attacker-sized corrupted ciphertext or nonce bytes in Python.
+        prefix = ", ".join(_COLUMNS[:-3])
+        row = self._connection.execute(
+            "SELECT " + prefix
+            + ", CASE WHEN typeof(nonce)='blob' AND length(nonce)=12 THEN nonce END"
+            + ", CASE WHEN typeof(ciphertext)='blob' AND length(ciphertext)<=? THEN ciphertext END"
+            + ", CASE WHEN typeof(result_digest)='text' AND length(CAST(result_digest AS BLOB))=64"
+              " THEN result_digest END FROM " + _TABLE + " WHERE lease_id=?",
+            (MAX_RESULT_BYTES + 16, lease_id),
         ).fetchone()
+        if row is not None and any(value is None for value in row[-3:]):
+            raise SealedResultUnavailable("result binding or digest mismatch")
+        return row
 
     def _request_seen(self, request_id: str) -> bool:
         return self._connection.execute(

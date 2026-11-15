@@ -476,3 +476,23 @@ def test_recursive_owner_cannot_commit_outer_or_create_inner_intent(monkeypatch)
         "SELECT lease_id,state FROM local_fair_stream_execution_journal",
     ).fetchall() == [(LEASE, "running")]
     assert not j.request_exists(second.request_id)
+
+def test_oversized_receipt_cannot_alias_running_intent(monkeypatch):
+    import skeleton.ai.model_runtime.fair_stream_execution_journal as module
+
+    j = journal()
+    p = permit()
+    j.begin(p)
+    j._connection.execute(
+        "UPDATE local_fair_stream_execution_journal SET receipt=zeroblob(8192)",
+    )
+    j._connection.commit()
+    monkeypatch.setattr(module, "MAX_RECEIPT_BYTES", 1024)
+    with pytest.raises(ExecutionOutcomeUnknown, match="invalid stored execution receipt"):
+        j.require_running_intent(p)
+    with pytest.raises(ExecutionOutcomeUnknown, match="invalid stored execution receipt"):
+        j.commit(p, consumed_tokens=1, result_digest="d" * 64)
+    assert j._connection.execute(
+        "SELECT state,length(receipt) FROM local_fair_stream_execution_journal",
+    ).fetchone() == ("running", 8192)
+    assert not j._connection.in_transaction

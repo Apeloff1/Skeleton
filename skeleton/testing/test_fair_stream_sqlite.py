@@ -297,3 +297,17 @@ def test_whole_request_policy_survives_schema_guarded_reopen(tmp_path):
                                        session_id=SESSION)
         with pytest.raises(ValueError, match="execution policy"):
             wrong.load(expected_generation=0, expected_digest=state["digest"])
+
+def test_oversized_stored_payload_is_not_materialized(monkeypatch):
+    from skeleton.ai.model_runtime import fair_stream_sqlite as module
+
+    conn = sqlite3.connect(":memory:")
+    db = make(conn)
+    before = db.initialize()
+    monkeypatch.setattr(module, "MAX_BYTES", 1024)
+    conn.execute("UPDATE local_fair_stream_custody SET payload=zeroblob(8192)")
+    conn.commit()
+    with pytest.raises(ValueError, match="stored custody bytes"):
+        db.load(expected_generation=0, expected_digest=before["digest"])
+    assert not conn.in_transaction
+    assert conn.execute("SELECT length(payload) FROM local_fair_stream_custody").fetchone() == (8192,)
