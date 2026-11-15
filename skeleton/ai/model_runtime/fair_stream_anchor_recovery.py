@@ -116,11 +116,20 @@ def _anchor(watermark: TrustedHighWatermark) -> tuple[int, str]:
 def _candidate_locked(
     store: DurableFairStreamStore, watermark: TrustedHighWatermark,
 ) -> ForwardCandidate:
+    changes = store._connection.total_changes
+    schema_version = store._connection.execute("PRAGMA main.schema_version").fetchone()
+    store._assert_private()
+    store._assert_schema()
+    row = store._read()
     prior_generation, prior_digest = _anchor(watermark)
     if not store._connection.in_transaction:
         raise AnchorRecoveryDenied("anchor callback released custody writer reservation")
-    changes = store._connection.total_changes
-    row = store._read()
+    store._assert_private()
+    store._assert_schema()
+    if (store._connection.total_changes != changes
+            or store._connection.execute("PRAGMA main.schema_version").fetchone() != schema_version
+            or store._read() != row):
+        raise AnchorRecoveryDenied("stored candidate changed during initial anchor inspection")
     if row is None or row[0] != prior_generation + 1:
         raise AnchorRecoveryDenied("only a one-generation forward gap can be repaired")
     # Verify canonical encoding, HMAC, checkpoint and session binding, without
@@ -137,7 +146,8 @@ def _candidate_locked(
         raise AnchorRecoveryDenied("anchor callback released custody writer reservation")
     store._assert_private()
     store._assert_schema()
-    if store._read() != row or store._connection.total_changes != changes:
+    if (store._read() != row or store._connection.total_changes != changes
+            or store._connection.execute("PRAGMA main.schema_version").fetchone() != schema_version):
         raise AnchorRecoveryDenied("stored candidate changed during inspection")
     checkpoint = state["checkpoint"]
     return ForwardCandidate(
@@ -191,6 +201,7 @@ def recover_forward_anchor(
             if not store._connection.in_transaction:
                 raise AnchorRecoveryDenied("candidate lost its writer reservation")
             changes = store._connection.total_changes
+            schema_version = store._connection.execute("PRAGMA main.schema_version").fetchone()
             watermark.advance(
                 expected_generation=candidate.prior_generation,
                 expected_digest=candidate.prior_digest,
@@ -210,7 +221,9 @@ def recover_forward_anchor(
             if not store._connection.in_transaction:
                 raise AnchorRecoveryDenied("anchor callback released custody writer reservation")
             store._assert_private()
-            if store._read() != approved_row or store._connection.total_changes != changes:
+            store._assert_schema()
+            if (store._read() != approved_row or store._connection.total_changes != changes
+                    or store._connection.execute("PRAGMA main.schema_version").fetchone() != schema_version):
                 raise AnchorRecoveryDenied("approved successor changed during final readback")
         finally:
             # This transaction performs no SQL writes. Release the writer
