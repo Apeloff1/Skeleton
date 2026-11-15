@@ -61,7 +61,7 @@ def _require_owner_process(owner_pid: int) -> None:
 
 
 def _id(value: object, label: str) -> str:
-    if type(value) is not str or not value:
+    if type(value) is not str or not value or len(value) > MAX_ID_BYTES:
         raise NativeFairStreamDenied("invalid " + label)
     try:
         raw = value.encode("utf-8", errors="strict")
@@ -122,6 +122,8 @@ class PinnedNativePrompt:
         _digest(self.tokenizer_digest, "tokenizer digest")
         if type(self.prompt) is not str:
             raise NativeFairStreamDenied("text prompt required")
+        if not 1 <= len(self.prompt) <= MAX_PROMPT_BYTES:
+            raise NativeFairStreamDenied("prompt byte budget exceeded")
         try:
             raw = self.prompt.encode("utf-8", errors="strict")
         except UnicodeEncodeError as exc:
@@ -139,15 +141,20 @@ def pin_native_prompt(
     tenant_id: str, prompt: str, max_output_tokens: int,
 ) -> PinnedNativePrompt:
     """Admit a prompt against the SAME CPU model/tokenizer used at execution."""
-    model_digest, tokenizer_digest = _cpu_runtime(runtime)
+    _id(session_id, "session")
+    _id(request_id, "request")
+    _id(tenant_id, "tenant")
     if type(prompt) is not str:
         raise NativeFairStreamDenied("text prompt required")
+    if not 1 <= len(prompt) <= MAX_PROMPT_BYTES:
+        raise NativeFairStreamDenied("prompt byte budget exceeded")
     try:
         raw = prompt.encode("utf-8", errors="strict")
     except UnicodeEncodeError as exc:
         raise NativeFairStreamDenied("invalid prompt Unicode") from exc
     if not raw or len(raw) > MAX_PROMPT_BYTES:
         raise NativeFairStreamDenied("prompt byte budget exceeded")
+    model_digest, tokenizer_digest = _cpu_runtime(runtime)
     if (type(max_output_tokens) is not int
             or not 1 <= max_output_tokens <= runtime.limits.max_new_tokens):
         raise NativeFairStreamDenied("output exceeds native runtime limit")
@@ -191,24 +198,31 @@ class NativePromptRegistry:
             raise NativeFairStreamDenied("invalid prompt staging lifetime")
         self._owner_pid = os.getpid()
         self._binding_key = secrets.token_bytes(32)
+        if type(self._binding_key) is not bytes or len(self._binding_key) != 32:
+            raise NativeFairStreamDenied("prompt binding key generation failed")
         self._lock = RLock()
         self._staged: dict[str, PinnedNativePrompt] = {}
         self._staged_at: dict[str, int] = {}
         self._used: set[str] = set()
-        self._budget = PromptBudgetLedger(budget or NativePromptBudget())
+        self._budget = PromptBudgetLedger(NativePromptBudget() if budget is None else budget)
         self._max_stage_age_ns = max_stage_age_ns
         self._last_clock_ns = -1
+        self._clock_invalidated = False
 
     def _require_owner_process(self) -> None:
         _require_owner_process(self._owner_pid)
 
     def _clock_locked(self) -> int:
         """Never grant on unknown, nonmonotonic or malformed local time."""
+        if self._clock_invalidated:
+            raise NativeFairStreamDenied("prompt monotonic clock authority invalidated; reopen required")
         try:
             now = monotonic_ns()
         except BaseException as exc:
+            self._clock_invalidated = True
             raise NativeFairStreamDenied("prompt monotonic clock unavailable") from exc
         if type(now) is not int or now < 0 or now < self._last_clock_ns:
+            self._clock_invalidated = True
             raise NativeFairStreamDenied("prompt monotonic clock regressed")
         self._last_clock_ns = now
         return now
@@ -219,6 +233,14 @@ class NativePromptRegistry:
                 or any(type(ts) is not int or ts < 0 or ts > now
                        for ts in self._staged_at.values())):
             raise NativeFairStreamDenied("prompt staging timestamp invariant failed")
+        if (len(self._staged) > MAX_STAGED_PROMPTS
+                or len(self._staged) + len(self._used) > MAX_PROMPT_IDENTITIES
+                or not self._used.isdisjoint(self._staged)
+                or any(type(pinned) is not PinnedNativePrompt
+                       or pinned.request_id != rid or pinned.session_id != self.session_id
+                       for rid, pinned in self._staged.items())
+                or self._budget.snapshot()["staged_grants"] != len(self._staged)):
+            raise NativeFairStreamDenied("prompt registry custody invariant failed")
         # A bounded registry guarantees this sweep is never unbounded.
         expired = [request_id for request_id, staged_at in self._staged_at.items()
                    if now - staged_at >= self._max_stage_age_ns]
@@ -328,9 +350,14 @@ class NativePromptRegistry:
             raise NativeFairStreamDenied("native queued prompt capacity exceeded")
         with self._lock:
             self._expire_locked(self._clock_locked())
+            seen: set[str] = set()
             for request in requests:
                 if type(request) is not dict:
                     raise NativeFairStreamDenied("invalid native queued request")
+                rid = _id(request.get("request_id"), "request")
+                if rid in seen:
+                    raise NativeFairStreamDenied("duplicate queued prompt identity")
+                seen.add(rid)
                 self._verified_pinned(request, bound=True)
 
     def revoke(self, request_id: str) -> None:
@@ -352,7 +379,8 @@ class NativePromptRegistry:
     def discard_cancelled(self, request_id: str) -> None:
         """Release an explicitly cancelled grant even if the clock failed.
 
-        Invoke only after the authenticated durable cancellation commits.
+        Invoke only on an authenticated cancellation or failed admission;
+        cleanup may precede final queue retirement to make it recoverable.
         Unknown identities need not grow the lifetime set beyond its cap:
         admission is already exhausted until the registry is retired.
         """

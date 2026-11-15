@@ -305,3 +305,56 @@ def test_inherited_prompt_ledger_denies_before_lock(monkeypatch):
                       lambda: ledger.release("alice", 1)):
         with pytest.raises(PromptBudgetDenied, match="inherited"):
             operation()
+
+def test_clock_recovery_cannot_reanimate_old_prompt_authority(monkeypatch):
+    from skeleton.ai.model_runtime import native_fair_stream_backend as module
+
+    model = runtime()
+    registry = NativePromptRegistry(session_id=SESSION)
+    readings = iter((100, 99, 101))
+    monkeypatch.setattr(module, "monotonic_ns", lambda: next(readings))
+    registry.stage(grant(model, "alice", "one"))
+    with pytest.raises(NativeFairStreamDenied, match="clock regressed"):
+        registry.claim("one", "alice")
+    with pytest.raises(NativeFairStreamDenied, match="clock authority invalidated"):
+        registry.claim("one", "alice")
+    registry.discard_cancelled("one")
+    assert registry._staged == {}
+    assert registry._budget.snapshot()["staged_grants"] == 0
+    assert registry._used == {"one"}
+
+
+def test_registry_accounting_drift_denies_claim_before_burning_grant():
+    model = runtime()
+    registry = NativePromptRegistry(session_id=SESSION)
+    registry.stage(grant(model, "alice", "one"))
+    registry._budget.reserve("alice", 1)
+    with pytest.raises(NativeFairStreamDenied, match="custody invariant"):
+        registry.claim("one", "alice")
+    assert "one" in registry._staged
+    assert "one" not in registry._used
+
+
+def test_duplicate_durable_queue_identity_denied_before_claim():
+    from skeleton.ai.model_runtime.fair_stream_queue import StreamRequest
+    from skeleton.ai.model_runtime.iteration_scheduler import InferencePhase
+
+    model = runtime()
+    registry = NativePromptRegistry(session_id=SESSION)
+    registry.stage(grant(model, "alice", "one"))
+    bound = registry.bind_request(StreamRequest("one", "alice", InferencePhase.PREFILL, 1, 16))
+    row = {
+        "request_id": bound.request_id, "tenant_id": bound.tenant_id,
+        "remaining_tokens": bound.remaining_tokens, "bytes_per_token": bound.bytes_per_token,
+        "phase": bound.phase.value, "priority": bound.priority,
+        "authorization_digest": bound.authorization_digest,
+    }
+    with pytest.raises(NativeFairStreamDenied, match="duplicate queued"):
+        registry.verify_queued([row, dict(row)])
+    assert registry.status()["staged"] == 1
+
+
+@pytest.mark.parametrize("invalid", [False, 0, {}, ""])
+def test_registry_cannot_default_invalid_budget(invalid):
+    with pytest.raises(ValueError, match="canonical"):
+        NativePromptRegistry(session_id=SESSION, budget=invalid)
