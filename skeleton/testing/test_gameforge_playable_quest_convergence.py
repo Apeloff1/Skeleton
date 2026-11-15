@@ -369,3 +369,49 @@ def test_portable_zip_does_not_replace_existing_project(tmp_path):
     with pytest.raises(PortableSourceError, match="already exists"):
         reopen_archive(archive, source_manifest(files)["sha256"], destination)
     assert marker.read_text(encoding="utf-8") == "original"
+
+
+@pytest.mark.parametrize("damage", ["prefix", "suffix", "local_crc", "local_flags",
+                                    "local_size", "local_name", "central_offset",
+                                    "central_disk"])
+def test_portable_zip_rejects_hidden_or_divergent_container_bytes(damage):
+    import struct
+    from scripts.verify_gameforge_source_zip import PortableSourceError, inspect_archive
+    files = {"project.godot": "config_version=5", "data/x.txt": "valid"}
+    raw = bytearray(_portable_zip(files.items()))
+    if damage == "prefix":
+        raw = bytearray(b"hidden-prefix") + raw
+    elif damage == "suffix":
+        raw.extend(b"hidden-suffix")
+    elif damage == "local_crc":
+        struct.pack_into("<I", raw, 14, 0)
+    elif damage == "local_flags":
+        struct.pack_into("<H", raw, 6, 8)
+    elif damage == "local_size":
+        struct.pack_into("<I", raw, 18, 0)
+    elif damage == "local_name":
+        raw[30] = ord("P")
+    elif damage == "central_offset":
+        end = len(raw) - 22
+        struct.pack_into("<I", raw, end + 16, struct.unpack_from("<I", raw, end + 16)[0] - 1)
+    elif damage == "central_disk":
+        end = len(raw) - 22
+        struct.pack_into("<H", raw, end + 6, 1)
+    with pytest.raises(PortableSourceError):
+        inspect_archive(bytes(raw), source_manifest(files)["sha256"])
+
+
+def test_portable_zip_refuses_symlink_and_nonregular_input(tmp_path):
+    from scripts.verify_gameforge_source_zip import PortableSourceError, reopen_archive
+    files = {"project.godot": "config_version=5"}
+    archive = tmp_path / "source.zip"
+    archive.write_bytes(_portable_zip(files.items()))
+    alias = tmp_path / "alias.zip"
+    try:
+        alias.symlink_to(archive)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable on this host")
+    with pytest.raises(PortableSourceError, match="regular file"):
+        reopen_archive(alias, source_manifest(files)["sha256"])
+    with pytest.raises(PortableSourceError, match="not a file"):
+        reopen_archive(tmp_path, source_manifest(files)["sha256"])

@@ -15,6 +15,7 @@ import json
 import os
 import re
 import stat
+import struct
 import sys
 import zipfile
 from pathlib import Path
@@ -47,7 +48,8 @@ def _safe_path(name: str) -> bool:
 def _read_zip(path: Path) -> bytes:
     # The bounded in-memory snapshot prevents subsequent path replacement
     # from changing the bytes inspected by the ZIP reader.
-    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = (os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+             | getattr(os, "O_NONBLOCK", 0))
     if path.is_symlink():
         raise PortableSourceError("archive must be a regular file")
     fd = os.open(path, flags)
@@ -59,6 +61,57 @@ def _read_zip(path: Path) -> bytes:
     if len(raw) != info.st_size or len(raw) > MAX_ZIP_BYTES:
         raise PortableSourceError("archive changed size during bounded read")
     return raw
+
+
+def _validate_zip_layout(raw: bytes, members: list[zipfile.ZipInfo]) -> None:
+    """Validate the exact single-disk stored ZIP layout, not just its index.
+
+    No self-extracting prefix, trailing payload, overlapping members, extra
+    unindexed local entries, data descriptors or divergent local metadata.
+    The Godot source digest is not an authorization for arbitrary ZIP bytes.
+    """
+    end = len(raw) - 22
+    signature, disk, central_disk, count_disk, count, size, offset, comment = struct.unpack_from(
+        "<4s4H2IH", raw, end,
+    )
+    if (signature != b"PK\\x05\\x06" or disk or central_disk or comment
+            or count != count_disk or count != len(members)
+            or offset + size != end or offset > end):
+        raise PortableSourceError("invalid or noncanonical ZIP end record")
+    cursor = 0
+    central_cursor = offset
+    for member in members:
+        if member.header_offset != cursor or cursor + 30 > offset:
+            raise PortableSourceError("unindexed or overlapping ZIP source data")
+        local = struct.unpack_from("<4s5H3I2H", raw, cursor)
+        signature, version, flags, method, _, _, crc, packed, unpacked, name_len, extra_len = local
+        if (signature != b"PK\\x03\\x04" or version > 20 or flags != member.flag_bits
+                or method != member.compress_type or crc != member.CRC
+                or packed != member.compress_size or unpacked != member.file_size
+                or extra_len or name_len != len(member.filename)):
+            raise PortableSourceError("ZIP local header differs from source inventory")
+        name_at = cursor + 30
+        data_at = name_at + name_len
+        if data_at + packed > offset or raw[name_at:data_at] != member.filename.encode("ascii"):
+            raise PortableSourceError("ZIP local member name or bounds mismatch")
+        cursor = data_at + packed
+        if central_cursor + 46 > end:
+            raise PortableSourceError("truncated ZIP central directory")
+        fields = struct.unpack_from("<4s6H3I5H2I", raw, central_cursor)
+        (signature, _, version, flags, method, _, _, crc, packed, unpacked,
+         name_len, extra_len, comment_len, disk, _, _, local_offset) = fields
+        if (signature != b"PK\\x01\\x02" or version > 20 or flags != member.flag_bits
+                or method != member.compress_type or crc != member.CRC
+                or packed != member.compress_size or unpacked != member.file_size
+                or disk or extra_len or comment_len or local_offset != member.header_offset
+                or name_len != len(member.filename)):
+            raise PortableSourceError("ZIP central member metadata mismatch")
+        name_at = central_cursor + 46
+        central_cursor = name_at + name_len
+        if central_cursor > end or raw[name_at:central_cursor] != member.filename.encode("ascii"):
+            raise PortableSourceError("ZIP central name or bounds mismatch")
+    if cursor != offset or central_cursor != end:
+        raise PortableSourceError("unindexed ZIP content is not portable source")
 
 
 def inspect_archive(raw: bytes, expected_sha256: str) -> tuple[dict[str, str], dict[str, Any]]:
@@ -80,6 +133,9 @@ def inspect_archive(raw: bytes, expected_sha256: str) -> tuple[dict[str, str], d
             members = archive.infolist()
             if archive.comment or not 0 < len(members) <= MAX_FILES:
                 raise PortableSourceError("invalid ZIP member inventory")
+            if any(not _safe_path(member.filename) for member in members):
+                raise PortableSourceError("unsafe ZIP member name")
+            _validate_zip_layout(raw, members)
             for member in members:
                 name = member.filename
                 kind = stat.S_IFMT(member.external_attr >> 16)
@@ -108,7 +164,7 @@ def inspect_archive(raw: bytes, expected_sha256: str) -> tuple[dict[str, str], d
                     raise PortableSourceError("ZIP member size mismatch")
                 total += len(data)
                 files[name] = data.decode("utf-8", errors="strict")
-    except (zipfile.BadZipFile, UnicodeError, RuntimeError, NotImplementedError, EOFError) as exc:
+    except (zipfile.BadZipFile, UnicodeError, RuntimeError, NotImplementedError, EOFError, struct.error) as exc:
         raise PortableSourceError("invalid portable ZIP data") from exc
     try:
         manifest = source_manifest(files)
