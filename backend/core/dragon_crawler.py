@@ -139,6 +139,9 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
 
     async def ensure_indexes(self):
         if not self._indexes_ready:
+            await self.sessions.create_index([("tenant_id",1),("owner_id",1),("game_route.game_id",1),("updated_at",-1)])
+            await self.sessions.create_index([("tenant_id",1),("owner_id",1),("game_route.game_id",1),("deep_index.tokens",1),("deep_index.expires_at",1)])
+            await self.sessions.create_index([("game_route_retry",1),("_id",1)])
             await self.sessions.create_index(
                 [("tenant_id", ASCENDING), ("owner_id", ASCENDING), ("_id", DESCENDING)]
             )
@@ -3778,6 +3781,8 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                 "$inc": {"version": 1},
                 "$unset": {
                     "snapshot": "",
+                    "game_route": "",
+                    "game_route_retry": "",
                     "checkpoint_identity": "",
                     "checkpoint_replica": "",
                     "checkpoint_repair": "",
@@ -4345,7 +4350,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
         await self.assert_context(scope, references)
         return {**evidence, "session_id": identifier, "version": int(row["version"])}
 
-    async def context(self, scope: dict[str, str], query: str, max_docs: int, max_chars: int, *, session_ids=None) -> dict:
+    async def context(self, scope: dict[str, str], query: str, max_docs: int, max_chars: int, *, session_ids=None, game_id=None) -> dict:
         import re
         from skeleton.ai.webcrawler.evidence_selection import select_diverse_evidence
 
@@ -4369,6 +4374,11 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
             if not isinstance(session_ids,list) or len(session_ids)>100 or not all(identity(x) for x in session_ids):
                 raise CrawlerError("crawler_context_bounds","Game routing set exceeds bound.")
             predicate["_id"]={"$in":session_ids}
+        if game_id is not None:
+            from core.dragon_game_corpus import _id
+            _id(game_id)
+            predicate.pop("_id",None)
+            predicate["$or"]=[{"game_route.game_id":game_id},{"_id":{"$in":session_ids or []}}]
         rows = (
             self.sessions.find(predicate)
             .sort("updated_at", DESCENDING)
@@ -4407,10 +4417,15 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
         from core.dragon_local_embeddings import configured as embeddings_configured
         if embeddings_configured():
             try:
-                candidates.extend(await self.current_semantic_candidates(scope,search_query,session_ids))
+                candidates.extend(await self.current_semantic_candidates(scope,search_query,session_ids,game_id=game_id))
             except Exception:
                 # Exact lexical retrieval survives local model or index holds.
                 pass
+        if game_id is not None:
+            from core.dragon_game_routing import verify_game_candidates
+            identities=list(dict.fromkeys(c["reference"]["session_id"] for c in candidates))
+            permitted=await verify_game_candidates(scope,game_id,identities[:100])
+            candidates=[c for c in candidates if c["reference"]["session_id"] in permitted]
         selected = select_diverse_evidence(candidates[:512], limit=max_docs, distinct_sources=True)
         documents, references, remaining = [], [], max_chars
         for hit in selected:
@@ -4709,6 +4724,8 @@ async def recover_crawler_runs(*, limit: int = 16) -> dict:
         result["world_discovery"]=await pulse_world_discovery()
         result["binary_media_cleanup"]=await pulse_media_archive()
         result["dataset_cleanup"]=await pulse_game_datasets()
+        from core.dragon_game_routing import backfill_routes
+        result["game_routing_backfill"]=await backfill_routes(crawler_application)
     except (OSError,TimeoutError,ValueError) as exc:
         log.warning("Dragon release import maintenance failed: %s",type(exc).__name__)
         result["game_release_imports"]={"failed":True,"reason":"bounded_maintenance_unavailable"}
