@@ -1,5 +1,5 @@
 """TD adversarial tests for #4253 (not committed upstream)."""
-import asyncio, base64, json, time, urllib.parse
+import asyncio, base64, json, secrets, time, urllib.parse
 import pytest
 fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
@@ -59,21 +59,23 @@ def test_heartbeat_cannot_grow_meta_past_cap():
         h.presence("heartbeat", client_id="c", principal="a", meta=_meta_of(4000))
 
 # secrets
+# Fresh synthetic canary: never embed a credential-shaped constant in source.
+API_CANARY = secrets.token_hex(16)
 def _scrub(p):
     clean, n = PayloadSecretGuard().scrub(p); return json.dumps(clean), n
 
 @pytest.mark.parametrize("payload", [
-    {"X-API-KEY": "abc123def456"}, {"x-Api-Key": "abc123def456"}, {"XApiKey": "abc123def456"},
+    {"X-API-KEY": API_CANARY}, {"x-Api-Key": API_CANARY}, {"XApiKey": API_CANARY},
     {"note": urllib.parse.quote(urllib.parse.quote("token=" + GH))},
     {"note": urllib.parse.quote(urllib.parse.quote(GH))},
-    {"note": '{"\\u0074oken": "abc123def456"}'},
+    {"note": json.dumps({"\\u0074oken": API_CANARY})},
     {"note": '{"inner": "\\u0067hp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8"}'},
     {"note": base64.urlsafe_b64encode(("Bearer " + GH).encode()).decode().rstrip("=")},
     {"note": base64.b64encode(json.dumps({"password": "hunter2hunter2"}).encode()).decode()},
 ])
 def test_secret_variants(payload):
     s, n = _scrub(payload)
-    assert n >= 1 and GH not in s and "hunter2" not in s and "abc123def456" not in s, s
+    assert n >= 1 and GH not in s and "hunter2" not in s and API_CANARY not in s, s
 
 def test_bytes_refused():
     with pytest.raises(Exception):

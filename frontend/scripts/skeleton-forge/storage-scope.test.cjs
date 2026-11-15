@@ -40,7 +40,7 @@ let scope, bridgeStorage, galaxyStorage, studioStorage;
 try {
   Module._load = function isolatedAuthAndStorage(request, parent, isMain) {
     if (request === 'expo-crypto') return mockCrypto;
-    if (request === '../auth/gameforgeAuth') return mockAuth;
+    if (/^(?:\.\.\/)+auth\/gameforgeAuth$/.test(request)) return mockAuth;
     if (request === '@react-native-async-storage/async-storage') return {
       __esModule: true, default: mockStorage,
     };
