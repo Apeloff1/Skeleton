@@ -3,15 +3,16 @@ import {AppState,Linking,Text,TouchableOpacity,View} from 'react-native';
 import {getAuthToken} from '../../auth/gameforgeAuth';
 import {safeOriginalLink,sourceCaptures,sourceDocuments,createViewPin,viewSourceDocument,compareSourceDocuments,type GameSource,type CaptureBinding,type CaptureCursor,type CaptureDocument,type DocumentSpan,type ViewPin,type DocumentDiff} from '../../product/dragonGameCorpusClient';
 import s from './CrawlerWorkspace.styles';
+import DragonMediaLibrary from './DragonMediaLibrary';
 
 function Button({label,disabled,press}:{label:string;disabled?:boolean;press:()=>void}){
  return <TouchableOpacity accessibilityRole="button" accessibilityState={{disabled:!!disabled}} disabled={disabled} style={[s.button,disabled&&s.disabled]} onPress={press}><Text style={s.buttonText}>{label}</Text></TouchableOpacity>;
 }
 const date=(n:number)=>new Date(n*1000).toLocaleString();
 const human=(v:string)=>v.replaceAll('_',' ');
-type Props={game:string;source:GameSource;visible:boolean;disabled:boolean};
+type Props={game:string;source:GameSource;visible:boolean;disabled:boolean;canWrite:boolean};
 
-export default function DragonSourceViewer({game,source,visible,disabled}:Props){
+export default function DragonSourceViewer({game,source,visible,disabled,canWrite}:Props){
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[confirm,setConfirm]=useState(false);
  const [captures,setCaptures]=useState<CaptureBinding[]>([]),[captureCursor,setCaptureCursor]=useState<CaptureCursor|null>(null);
  const [session,setSession]=useState<string|null>(null),[docs,setDocs]=useState<CaptureDocument[]>([]),[docCursor,setDocCursor]=useState<string|null>(null),[held,setHeld]=useState<number|null>(null);
@@ -79,6 +80,7 @@ export default function DragonSourceViewer({game,source,visible,disabled}:Props)
   <Text style={s.small}>{human(source.view_mode||'text')} reference · original site and retained capture are distinct. No automatic remote media, script or download runs.</Text>
   <Button label={confirm?'Cancel external navigation':'Prepare to open original source'} disabled={!enabled} press={()=>setConfirm(v=>!v)}/>
   {confirm&&<View style={s.check}><Text style={s.small}>You are leaving Dragon for this unverified source. The destination can track visits, redirect or offer downloads.</Text><Button label="Open original in external browser" disabled={!enabled} press={original}/></View>}
+  <DragonMediaLibrary game={game} source={source} canWrite={canWrite} disabled={!enabled}/>
   <Button label="Load retained capture versions" disabled={!enabled} press={()=>history()}/>
   {captures.map(c=><View key={c.session_id} style={s.check}>
    <Text selectable style={s.small}>{c.session_id}</Text>
