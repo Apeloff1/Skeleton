@@ -1717,8 +1717,15 @@ class DragonCrawlerApplication:
                         continue
                     watch["slices_started"]+=1
                     await self.run(scope,child_id,{"idempotency_key":f"watch-slice:{watch['epoch']}:{watch['active_cycle']}:{watch['slices_started']}",
-                         "expected_version":int(child["version"]),"max_steps":4})
+                         "expected_version":int(child["version"]),"max_steps":4},watch_claim=token)
                     child=await self._reconcile(scope,await self._owned(scope,child_id))
+                # Never carry an explicit access refusal, robots denial, or
+                # instruction incident into a fresh cross-session retry.
+                reasons=[str(e.get("reason") or "") for e in child["snapshot"]["events"]]
+                denied=any(reason.startswith(("robots_denied","robots_rate_outside","http_401","http_403","http_451",
+                                                "external_instruction_quarantined")) for reason in reasons)
+                if denied or child["snapshot"].get("instruction_incidents"):
+                    raise CrawlerError("crawler_watch_policy_hold","Source access or instruction policy requires human review.",403)
                 if child["status"]=="running" or child["status"] in {"queued","interrupted"}:
                     watch.update(state="waiting",claim_token=None,claim_until=0.,
                                  next_due=min(watch["expires_at"],_now().timestamp()+60))
@@ -1726,6 +1733,8 @@ class DragonCrawlerApplication:
                 else:
                     good=child["status"] in {"completed","budget_exhausted"}
                     sample=None
+                    if child["status"] in {"paused","cancelled","deleted"}:
+                        raise CrawlerError("crawler_watch_child_stopped","The operator stopped the watched expedition.",403)
                     if good:
                         await self._watch_authority(scope,binding,margin=0)
                         from skeleton.ai.webcrawler.dragon_archive_grant import eligible_source
@@ -2497,7 +2506,9 @@ class DragonCrawlerApplication:
                 "crawler_worker_fenced", "Crawler worker lost its live session authority.", 409
             )
         if row.get("treasury_watch_parent") is not None:
-            await self._watch_authority(scope,_plain(row["treasury_watch_parent"]),margin=15 if network_margin else 0)
+            watch=await self._watch_authority(scope,_plain(row["treasury_watch_parent"]),margin=15 if network_margin else 0)
+            if network_margin and watch["claim_until"]<=_now().timestamp()+15:
+                raise CrawlerError("crawler_watch_lease","The reserved watch pulse expired before network admission.",403)
         if row.get("worker_automation_epoch") is not None:
             grant = row.get("automation", {})
             margin = timedelta(seconds=15 if network_margin else 0)
@@ -2656,7 +2667,8 @@ class DragonCrawlerApplication:
             log.warning("Crawler pre-dispatch settlement unavailable", exc_info=False)
 
     async def run(
-        self, scope: dict[str, str], identifier: str, body: dict, *, automation_epoch: int | None = None
+        self, scope: dict[str, str], identifier: str, body: dict, *, automation_epoch: int | None = None,
+        watch_claim: str | None = None
     ) -> dict:
         row = await self._reconcile(scope, await self._owned(scope, identifier))
         operation, digest = _operation(body["idempotency_key"]), _digest(body)
@@ -2678,7 +2690,10 @@ class DragonCrawlerApplication:
                 "crawler_consent_expired", "Capture consent expired; create a newly authorized crawl.", 403
             )
         if row.get("treasury_watch_parent") is not None:
-            await self._watch_authority(scope,_plain(row["treasury_watch_parent"]),margin=15)
+            watch=await self._watch_authority(scope,_plain(row["treasury_watch_parent"]),margin=15)
+            if (watch_claim is None or watch["claim_token"]!=watch_claim or watch["claim_until"]<=_now().timestamp()
+                    or not 1<=watch["slices_started"]<=8):
+                raise CrawlerError("crawler_watch_managed","Only the reserved treasury watch pulse can dispatch this child.",403)
         grant = row.get("automation", {})
         if automation_epoch is None and grant.get("enabled"):
             raise CrawlerError(
