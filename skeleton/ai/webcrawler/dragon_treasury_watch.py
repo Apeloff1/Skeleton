@@ -54,6 +54,34 @@ def safe_watch_url(url):
         return False
 
 
+def same_watch_representation(parent:dict,candidate:dict)->bool:
+    """A public revisit sample must describe the same representation family.
+
+    Matching URLs alone are insufficient: declared media, languages and
+    Vary dimensions are independent boundaries. Missing receipt fields,
+    private or uncacheable captures, and sensitive variance fail closed.
+    """
+    def identity(source):
+        if not isinstance(source,dict) or not safe_watch_url(source.get("fetched_url")):
+            return None
+        provenance=source.get("provenance")
+        receipt=provenance.get("http_freshness") if isinstance(provenance,dict) else None
+        if (not isinstance(receipt,dict)
+                or any(receipt.get(k) is not False for k in ("private","no_store","sensitive_vary"))):
+            return None
+        media=source.get("content_type")
+        langs=receipt.get("languages")
+        vary=receipt.get("vary_dimensions")
+        if (not isinstance(media,str) or not 1<=len(media)<=256
+                or not isinstance(langs,list) or not isinstance(vary,list)
+                or len(langs)>64 or len(vary)>64
+                or not all(isinstance(v,str) and 1<=len(v)<=256 for v in langs+vary)):
+            return None
+        return source["fetched_url"],media,tuple(langs),tuple(vary)
+    a,b=identity(parent),identity(candidate)
+    return a is not None and a==b
+
+
 def create_watch(*, operation:str, parent_id:str, scope:dict, principal_email:str,
                  snapshot_digest:str, source:dict, policy_version:int, now:float,
                  days:int, cycles:int, minimum_interval:int, retention_days:int)->dict:
@@ -136,7 +164,8 @@ def validate_watch(value:object)->dict:
 
 def claim_watch(value:dict,*,now:float,token:str)->dict:
     w=dict(validate_watch(value))
-    if (not w["enabled"] or w["expires_at"]<=now+60 or w["next_due"]>now
+    if (not _number(now) or now<0 or not w["enabled"] or w["state"] not in {"waiting","working"}
+            or w["expires_at"]<=now+60 or w["next_due"]>now
             or w["claim_until"]>now or not isinstance(token,str) or not 1<=len(token)<=64):
         raise ValueError("watch is not claimable")
     if w["active_cycle"] is None:
@@ -161,14 +190,19 @@ def child_binding(watch:dict)->dict:
 def child_matches(binding:dict,watch:dict,*,now:float,margin:float=0)->bool:
     try:
         w=validate_watch(watch)
-        return w["enabled"] and now+margin<w["expires_at"] and binding==child_binding(w)
+        return (_number(now) and _number(margin) and now>=0 and margin>=0
+                and w["enabled"] and w["state"] in {"waiting","working"}
+                and now+margin<w["expires_at"] and binding==child_binding(w))
     except (ValueError,TypeError,KeyError):
         return False
 
 
 def settle_watch(value:dict,*,now:float,child_id:str,sample:dict|None,completed:bool)->dict:
     w=dict(validate_watch(value))
-    if w["active_cycle"] is None or type(completed) is not bool:
+    if (not _number(now) or now<0 or w["active_cycle"] is None
+            or not w["enabled"] or w["state"]!="working" or not w["claim_token"]
+            or now>=w["claim_until"] or type(completed) is not bool
+            or not isinstance(child_id,str) or not 1<=len(child_id)<=128):
         raise ValueError("unreserved watch settlement")
     w["samples"]=list(w["samples"])
     if sample is not None:

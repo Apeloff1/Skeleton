@@ -12,6 +12,7 @@ from skeleton.ai.webcrawler.dragon_temporal_selection import family_identity,sel
 from skeleton.ai.webcrawler.dragon_treasury import build_treasury
 from skeleton.ai.webcrawler.dragon_treasury_watch import (
     create_watch,validate_watch,claim_watch,child_binding,child_matches,settle_watch,public_watch,
+    same_watch_representation,
 )
 from test_ai_webcrawler_dragon_treasury import obs,A,B,C,NOW,DAY,BASE
 from test_ai_webcrawler_dragon_archive_grant import source,snapshot,CHECKPOINT,SID
@@ -73,6 +74,36 @@ class TemporalSelectionTests(unittest.TestCase):
         self.assertEqual([(x.session_id,x.source_id) for x in first],[(x.session_id,x.source_id) for x in other])
         self.assertEqual(len(first),16)
         self.assertGreaterEqual(len({family_identity(x) for x in first}),8)
+
+    def test_duplicate_flood_preserves_latest_transition(self):
+        url=BASE+"/long-lived"
+        old=obs("first",url,A,NOW-3*DAY,archive=True)
+        first_change=obs("change",url,B,NOW-2*DAY)
+        copies=[obs("repeat",url,B,NOW-1000+i) for i in range(50)]
+        rows=[old,first_change]+copies
+        fid=family_identity(old)
+        with patch("skeleton.ai.webcrawler.dragon_treasury.MAX_INDEXED",4):
+            result=build_treasury(rows,as_of=NOW,growth=1000,family=fid,mode="compare")
+        self.assertTrue(result["candidate_limit_reached"])
+        self.assertTrue(result["comparison"]["delta"]["numeric_change"])
+        self.assertEqual(result["comparison"]["previous"]["source_id"],old.source_id)
+        self.assertEqual(result["comparison"]["current"]["source_id"],copies[-1].source_id)
+
+    def test_selected_historical_pair_survives_recent_revision_flood(self):
+        url=BASE+"/long-lived"
+        rows=[obs("one",url,A,NOW-4*DAY,archive=True),
+              obs("two",url,B,NOW-3*DAY,archive=True)]
+        rows.extend(obs("later",url,C+" "+str(i),NOW-1000+i) for i in range(20))
+        fid=family_identity(rows[0])
+        full=build_treasury(rows,as_of=NOW,growth=1000,family=fid,mode="timeline")
+        # The timeline is ordered newest first; identify original source IDs.
+        by_source={v["source_id"]:v["revision_id"] for v in full["timeline"]}
+        with patch("skeleton.ai.webcrawler.dragon_treasury.MAX_INDEXED",4):
+            result=build_treasury(rows,as_of=NOW,growth=1000,family=fid,mode="compare",
+                                 left=by_source[rows[0].source_id],right=by_source[rows[1].source_id])
+        self.assertEqual(result["comparison"]["previous"]["source_id"],rows[0].source_id)
+        self.assertEqual(result["comparison"]["current"]["source_id"],rows[1].source_id)
+        self.assertTrue(result["comparison"]["delta"]["numeric_change"])
 
     def test_paging_bound_to_query_and_partition(self):
         rows=[obs("a",BASE+"/doc"+str(i),A,NOW-i) for i in range(32)]
@@ -161,6 +192,37 @@ class WatchTests(unittest.TestCase):
         self.assertEqual(failed["samples"],watch["samples"])
         self.assertGreaterEqual(failed["next_due"],due+DAY)
         self.assertEqual(failed["cycles_completed"],1)
+
+    def test_representation_boundary_holds_language_media_vary_and_missing_receipts(self):
+        parent=source(fetched_url=BASE+"/page",content_type="text/plain")
+        parent["provenance"]["http_freshness"].update(languages=["en"],vary_dimensions=["accept-language"])
+        self.assertTrue(same_watch_representation(parent,copy.deepcopy(parent)))
+        for field,value in (("languages",["no"]),("vary_dimensions",[]),("private",True),
+                            ("no_store",True),("sensitive_vary",True)):
+            other=copy.deepcopy(parent)
+            other["provenance"]["http_freshness"][field]=value
+            self.assertFalse(same_watch_representation(parent,other))
+        self.assertFalse(same_watch_representation(parent,{**parent,"content_type":"text/html"}))
+        self.assertFalse(same_watch_representation(parent,{**parent,"fetched_url":BASE+"/redirect"}))
+        other=copy.deepcopy(parent)
+        del other["provenance"]["http_freshness"]["languages"]
+        self.assertFalse(same_watch_representation(parent,other))
+
+    def test_expired_claim_and_nonfinite_clock_cannot_settle(self):
+        watch=self.new_watch()
+        due=watch["next_due"]
+        active=claim_watch(watch,now=due,token="first")
+        with self.assertRaises(ValueError):
+            claim_watch(watch,now=float("nan"),token="first")
+        with self.assertRaises(ValueError):
+            settle_watch(active,now=active["claim_until"],child_id="child",sample=None,completed=False)
+        self.assertFalse(child_matches(child_binding(active),active,now=float("nan")))
+        self.assertFalse(child_matches(child_binding(active),active,now=due,margin=-1))
+        self.assertFalse(child_matches(child_binding(active),{**active,"state":"blocked"},now=due))
+        resumed=claim_watch(active,now=active["claim_until"],token="second")
+        self.assertEqual(child_binding(active),child_binding(resumed))
+        result=settle_watch(resumed,now=resumed["claim_until"]-1,child_id="child",sample=None,completed=False)
+        self.assertEqual(result["cycles_completed"],1)
 
     def test_invalid_watch_scope_and_deadline_denied(self):
         for url in ("https://example.org/a?token=x","https://user@example.org/a","file:///tmp/a"):

@@ -1617,9 +1617,10 @@ class DragonCrawlerApplication:
             raise CrawlerError("crawler_conflict","Watch authorization changed before publication.",409)
         return {"ok":True,"watch":public_watch(grant,now=now),"version":int(row["version"])+1}
 
-    async def _watch_authority(self, scope:dict[str,str], binding:dict, *, margin:float=0)->dict:
+    async def _watch_authority(self, scope:dict[str,str], binding:dict, *, margin:float=0,
+                               observed_source:dict|None=None)->dict:
         """Check live parent, source policy and principal before child IO."""
-        from skeleton.ai.webcrawler.dragon_treasury_watch import child_matches,validate_watch
+        from skeleton.ai.webcrawler.dragon_treasury_watch import child_matches,validate_watch,same_watch_representation
         from skeleton.ai.webcrawler.dragon_archive_grant import eligible_source
         denied=CrawlerError("crawler_watch_revoked","The parent treasury watch is no longer authorized.",403)
         if not isinstance(binding,dict) or not isinstance(binding.get("parent_id"),str):
@@ -1643,6 +1644,9 @@ class DragonCrawlerApplication:
             if (not policy["enabled"] or policy["version"]!=watch["policy_version"]
                     or source["fetched_url"]!=watch["url"] or not eligible_source(source,policy)):
                 raise denied
+            if observed_source is not None and not same_watch_representation(source,observed_source):
+                raise CrawlerError("crawler_watch_representation",
+                    "The observed representation differs from the authorized source family.",403)
         except (ValueError,KeyError,TypeError,CheckpointReplicaError) as exc:
             raise denied from exc
         await self._grant_principal(scope,watch)
@@ -1772,20 +1776,57 @@ class DragonCrawlerApplication:
                                  if s["fetched_url"]==watch["url"] and eligible_source(s,self._capture_policy(child,s))]
                         if sources:
                             src=max(sources,key=lambda s:s["fetched_at"])
+                            live=await self._watch_authority(scope,binding,margin=0,observed_source=src)
+                            if live["claim_token"]!=token or live["claim_until"]<=_now().timestamp():
+                                raise CrawlerError("crawler_watch_lease","Watch claim was superseded.",409)
                             principal=await self.database["gameforge_users"].find_one(
                                 {"email":watch["principal_email"],"disabled":{"$ne":True}})
                             if principal is None:
                                 raise CrawlerError("crawler_watch_revoked","Watch owner authority was withdrawn.",403)
                             # Separate retention grant explicitly authorized at
                             # watch creation. Its exact operation is idempotent.
-                            await self.configure_archive_grant(scope,child_id,
-                                {"expected_version":int(child["version"]),"idempotency_key":f"watch-archive:{watch['epoch']}:{watch['active_cycle']}",
-                                 "enabled":True,"days":watch["retention_days"],"archive_rights_acknowledged":True},
-                                principal=principal)
+                            archive_key=f"watch-archive:{watch['epoch']}:{watch['active_cycle']}"
+                            archive_operation=_operation(archive_key)
+                            archive_receipt=child.get("operations",{}).get(archive_operation)
+                            safety=child.get("safety_control") or {}
+                            if archive_receipt is None and safety.get("operation")==archive_operation:
+                                archive_receipt=safety
+                            if archive_receipt is not None:
+                                # A lost reply after grant publication must not
+                                # reissue a command with a new expected_version
+                                # or silently renew a withdrawn archive grant.
+                                from skeleton.ai.webcrawler.dragon_archive_grant import archive_expiry
+                                grant=child.get("archive_grant")
+                                if (archive_receipt.get("action")!="archive_grant"
+                                        or archive_receipt.get("enabled") is not True
+                                        or archive_receipt.get("state")!="completed"
+                                        or archive_receipt.get("snapshot_digest")!=child["snapshot"]["snapshot_digest"]
+                                        or archive_expiry(_plain(grant) if grant else None,
+                                            snapshot_digest=child["snapshot"]["snapshot_digest"],source=src,
+                                            policy=self._capture_policy(child,src),now=_now().timestamp()) is None):
+                                    raise CrawlerError("crawler_watch_archive_hold",
+                                        "The previously issued archive permission is no longer valid.",403)
+                            else:
+                                # Honor a manual archive withdrawal even if
+                                # the first automatic archive command has not
+                                # yet been published.
+                                actions=list(child.get("operations",{}).values())+[safety]
+                                if any(a.get("action")=="archive_grant" and a.get("enabled") is False
+                                       for a in actions):
+                                    raise CrawlerError("crawler_watch_archive_hold",
+                                        "The operator withdrew historical use of this expedition.",403)
+                                await self.configure_archive_grant(scope,child_id,
+                                    {"expected_version":int(child["version"]),"idempotency_key":archive_key,
+                                     "enabled":True,"days":watch["retention_days"],"archive_rights_acknowledged":True},
+                                    principal=principal)
                             # Sample only the exact original resource. A
                             # redirect or representation change never supplies
                             # a transition estimate for another family.
                             sample={"at":src["fetched_at"],"digest":src["content_hash"]}
+                    # Expired or replaced claims never settle a cycle. A
+                    # later pulse resumes the same deterministic child.
+                    if _now().timestamp()>=watch["claim_until"]:
+                        raise CrawlerError("crawler_watch_lease","Watch claim expired before settlement.",409)
                     watch=settle_watch(watch,now=_now().timestamp(),child_id=child_id,sample=sample,completed=bool(good and sample))
                     outcome="completed"
                 final=await self.sessions.update_one(fence,{"$set":{"treasury_watch":watch},"$inc":{"version":1}})

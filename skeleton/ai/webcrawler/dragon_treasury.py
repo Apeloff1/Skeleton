@@ -239,7 +239,8 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
         raise ValueError("archive expedition capacity exceeded")
     selected_observations=[row for rows in grouped.values() for row in rows]
     ordered = [row for row in selected_observations if row.text is not None]
-    baseline=select_candidates(grouped,budget=MAX_INDEXED,family=family,observed_before=observed_before)
+    baseline=select_candidates(grouped,budget=MAX_INDEXED,family=family,observed_before=observed_before,
+                               comparison=(left,right) if left is not None else None)
     # On a capped corpus, use a bounded first-stage search over exact,
     # permitted representatives in the requested plane. Reserve the rest
     # of the structural capacity for stable temporal coverage. On a fully
