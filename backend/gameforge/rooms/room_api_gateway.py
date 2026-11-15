@@ -24,6 +24,8 @@ import time
 from urllib.parse import urlsplit
 from typing import Any
 
+from gameforge.egress_admission import DNS_RESOLVER, HTTP_ADMISSION, is_public_egress_address
+
 _EXTERNAL_ENABLED = os.getenv("GAMEFORGE_ENABLE_EXTERNAL_APIS", "0") == "1"
 _EXTERNAL_API_HOSTS = frozenset(
     host.strip().lower()
@@ -98,7 +100,7 @@ def _resolve_public_host(hostname: str) -> str:
             ip = ipaddress.ip_address(address[4][0])
         except (ValueError, IndexError, TypeError) as exc:
             raise ValueError("external API host returned an invalid address") from exc
-        if not ip.is_global:
+        if not is_public_egress_address(ip):
             raise ValueError("external API host resolves to a non-public address")
         approved.add(ip.compressed)
     return sorted(approved, key=lambda item: (ipaddress.ip_address(item).version, item))[0]
@@ -339,41 +341,38 @@ async def _api_query(target: dict) -> dict:
         headers = _safe_headers(target.get("headers")) or {}
         params = _safe_params(target.get("params"))
         payload = _safe_payload(target.get("json"))
-        # DNS resolution runs off the event loop under bounded wait. Double
-        # resolution remains fail-closed: both checks reject non-public IPs
-        # and the *second* answer is used as the actual socket authority.
-        base_url, request_target = await asyncio.wait_for(
-            asyncio.to_thread(_prepare_external_request, url), timeout=5.0
-        )
-        hostname = urlsplit(base_url).hostname
-        if hostname is None:
-            raise ValueError("external API host is missing")
-        pinned_ip = await asyncio.wait_for(
-            asyncio.to_thread(_resolve_public_host, hostname), timeout=5.0
-        )
-        headers["Host"] = hostname
-        import httpx
-        # HTTPX's timeout is per I/O phase. A slow-drip stream could otherwise
-        # keep delivering small chunks forever while staying below both
-        # per-read and overall response-byte limits. Bound the entire exchange.
-        async with asyncio.timeout(timeout):
-            async with httpx.AsyncClient(
-                base_url=_origin_for_host(pinned_ip),
-                timeout=timeout,
-                follow_redirects=False,
-                trust_env=False,
-            ) as client:
-                async with client.stream(
-                    method,
-                    request_target,
-                    params=params,
-                    headers=headers,
-                    json=payload,
-                    extensions={"sni_hostname": hostname},
-                ) as response:
-                    body = await _read_external_response(response)
-                    return {"channel": "api", "target": name, "ok": response.is_success,
-                            "status": response.status_code, "body": body}
+        with HTTP_ADMISSION.slot():
+            # DNS resolution runs off the event loop under bounded wait. Double
+            # resolution remains fail-closed: both checks reject non-public IPs
+            # and the *second* answer is used as the actual socket authority.
+            base_url, request_target = await DNS_RESOLVER.run(_prepare_external_request, url, timeout=5.0)
+            hostname = urlsplit(base_url).hostname
+            if hostname is None:
+                raise ValueError("external API host is missing")
+            pinned_ip = await DNS_RESOLVER.run(_resolve_public_host, hostname, timeout=5.0)
+            headers["Host"] = hostname
+            import httpx
+            # HTTPX's timeout is per I/O phase. A slow-drip stream could otherwise
+            # keep delivering small chunks forever while staying below both
+            # per-read and overall response-byte limits. Bound the entire exchange.
+            async with asyncio.timeout(timeout):
+                async with httpx.AsyncClient(
+                    base_url=_origin_for_host(pinned_ip),
+                    timeout=timeout,
+                    follow_redirects=False,
+                    trust_env=False,
+                ) as client:
+                    async with client.stream(
+                        method,
+                        request_target,
+                        params=params,
+                        headers=headers,
+                        json=payload,
+                        extensions={"sni_hostname": hostname},
+                    ) as response:
+                        body = await _read_external_response(response)
+                        return {"channel": "api", "target": name, "ok": response.is_success,
+                                "status": response.status_code, "body": body}
     except Exception:  # noqa: BLE001
         return {"channel": "api", "target": "external_api", "ok": False, "error": "api_query_failed"}
 
