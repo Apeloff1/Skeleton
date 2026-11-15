@@ -41,6 +41,29 @@ class ComputedResult:
 Handler = Callable[[WorkerInput], Awaitable[ComputedResult]]
 
 
+def verified_predecessors(journal: DurableWorkJournal, results: WorkerResultStore,
+                          dependencies: tuple[str, ...]) -> tuple[tuple[str, object], ...]:
+    if journal.scope != results.scope:
+        raise WorkConflict("worker result scope mismatch")
+    predecessors = []
+    total = 0
+    for dep in dependencies:
+        upstream = journal.status(dep)
+        result = results.load(dep)
+        if (upstream.state != "succeeded" or result is None or not result.succeeded
+                or upstream.receipt != result.receipt_digest):
+            raise WorkConflict("dependency lacks matching durable worker result")
+        total += len(encode_result(result.output))
+        if total > 1 << 20:
+            raise WorkConflict("aggregate dependency output exceeds worker input budget")
+        predecessors.append((dep, result.output))
+    return tuple(predecessors)
+
+
+def worker_input_digest(body, predecessors):
+    return input_digest([body, [[wid, value] for wid, value in predecessors]])
+
+
 class LocalWorkerExecutor:
     """Bind one planned context and closed handler catalog to a result store."""
 
@@ -87,19 +110,8 @@ class LocalWorkerExecutor:
                 raise WorkConflict("worker plan context or role does not match admitted input")
             role = body["role"]
             status = self._journal.status(claim.work_id)
-            predecessors = []
-            total = 0
-            for dep in status.dependencies:
-                upstream = self._journal.status(dep)
-                result = self._results.load(dep)
-                if (upstream.state != "succeeded" or result is None or not result.succeeded
-                        or upstream.receipt != result.receipt_digest):
-                    raise WorkConflict("dependency lacks matching durable worker result")
-                total += len(encode_result(result.output))
-                if total > 1 << 20:
-                    raise WorkConflict("aggregate dependency output exceeds worker input budget")
-                predecessors.append((dep, result.output))
-            digest = input_digest([body, [[wid, value] for wid, value in predecessors]])
+            predecessors = verified_predecessors(self._journal, self._results, status.dependencies)
+            digest = worker_input_digest(body, predecessors)
             previous = self._results.load(claim.work_id)
             if previous is not None:
                 # A crash between result commit and journal settlement cannot

@@ -10,6 +10,7 @@ import json
 
 from skeleton.frontier.durable_work import DurableWorkJournal, RecoveryChallenge, WorkConflict
 from skeleton.frontier.worker_results import WorkerResultStore
+from skeleton.prood.local_executor import verified_predecessors, worker_input_digest
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +41,10 @@ def review_worker_result(journal: DurableWorkJournal, results: WorkerResultStore
         receipt = sha256(("missing-worker-result:" + challenge.record_mac).encode("ascii")).hexdigest()
         digest = None
     else:
+        body = journal.recovery_input(challenge, kind="prood.worker")
+        predecessors = verified_predecessors(journal, results, status.dependencies)
+        if result.input_digest != worker_input_digest(body, predecessors):
+            raise WorkConflict("durable result does not bind the original claimed input")
         state = "succeeded" if result.succeeded else "failed"
         receipt = result.receipt_digest
         digest = result.input_digest

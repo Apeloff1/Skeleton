@@ -163,3 +163,17 @@ def test_private_result_reopen_and_explicit_creation(tmp_path):
     with pytest.raises(FileExistsError):
         with open_worker_results(tmp_path, scope="tenant", key=b"z"*32, create=True):
             pass
+
+
+def test_recovery_rejects_authenticated_result_for_wrong_input(tmp_path):
+    from skeleton.prood.recovery_review import review_worker_result
+    db, out, work, results = stores(tmp_path)
+    plan = admit_build(work, build_id="wrong-input", phases=["world"], platoon_size=1)
+    wid = plan.work[0].work_id
+    work.claim(wid, owner="operator")
+    results.publish(wid, digest="0"*64, succeeded=True, output={"wrong":True})
+    with pytest.raises(WorkConflict, match="original claimed input"):
+        review_worker_result(work, results, wid)
+    assert work.status(wid).state == "claimed"
+    db.close()
+    out.close()

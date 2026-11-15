@@ -517,6 +517,17 @@ class DurableWorkJournal:
                 raise WorkConflict("only a claimed order requires reconciliation")
             return RecoveryChallenge(self._scope, row[1], row[6], row[-1])
 
+    def recovery_input(self, challenge: RecoveryChallenge, *, kind: str) -> object:
+        """Inspect the exact current authenticated claim, not a stale challenge."""
+        if type(challenge) is not RecoveryChallenge or challenge.scope != self._scope:
+            raise WorkConflict("foreign recovery challenge")
+        with self._tx():
+            row = self._require(challenge.work_id)
+            if (row[2] != _text(kind) or row[5] != "claimed" or row[6] != challenge.owner
+                    or not hmac.compare_digest(row[-1], challenge.record_mac)):
+                raise WorkConflict("stale recovery input")
+            return json.loads(row[3])
+
     def reconcile_claimed(self, authorization: RecoveryAuthorization) -> WorkStatus:
         """Resolve a lost claim using independent operator proof; never replay."""
         if self._recovery_key is None:
