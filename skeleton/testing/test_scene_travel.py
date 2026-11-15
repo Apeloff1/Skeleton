@@ -101,7 +101,7 @@ def test_invalid_actions_never_mutate_existing_session(action) -> None:
 
 
 @pytest.mark.parametrize("tamper", [
-    lambda s: s["state"].update(scene_id="sanctuary"),
+    lambda s: s["state"].update(scene_id="quay"),
     lambda s: s["state"]["inventory"].append("master_key"),
     lambda s: s["journal"][0].update(receipt="0" * 64),
     lambda s: s["journal"].reverse(),
@@ -112,7 +112,9 @@ def test_invalid_actions_never_mutate_existing_session(action) -> None:
 def test_replay_rejects_modified_state_and_history(tamper) -> None:
     world, actions = original_demo()
     session = simulate(world, actions)
+    before = copy.deepcopy(session)
     tamper(session)
+    assert session != before  # each vector must actually change the receipt
     with pytest.raises(SceneTravelError):
         verify_session(session)
 

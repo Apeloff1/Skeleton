@@ -562,26 +562,17 @@ class LaptopFlow:
                     })
                 existing = None
                 if slot is not None:
-                    # The acceptance caller already owns the canonical world
-                    # lease. Re-entering LaptopFlow.inspect_session/export/
-                    # preflight_restore would invoke verify() and deadlock on
-                    # that same non-reentrant lease (lease_busy). Read through
-                    # the SessionStore using the pinned source digest instead.
-                    # Its read-only methods revalidate replay and save checks,
-                    # while the outer lease excludes concurrent world/session
-                    # writers for the entire three-step inspection.
-                    source_lease = receipt["source_digest"]
-                    view = self.sessions.inspect(
-                        world_id, slot, expected_world_digest=source_lease)
-                    exported = self.sessions.export(
-                        world_id, slot, expected_world_digest=source_lease)
-                    preview = self.sessions.preflight_import(
-                        world_id, exported, expected_world_digest=source_lease)
-                    if preview["session_digest"] != view["session_digest"]:
+                    # Acceptance owns the canonical world writer lease and its
+                    # descriptor. Public session methods acquire their own lock.
+                    self.sessions._require_world_lease(world, receipt["source_digest"])
+                    state = self.sessions._session(fd, world_id, slot, world)
+                    exported = portable_export(state, world)
+                    restored = portable_import(exported, world)
+                    if restored != state or digest(restored) != digest(state):
                         raise CanonError("laptop_acceptance_session_mismatch")
                     existing = {
-                        "slot": slot, "session_digest": view["session_digest"],
-                        "revision": preview["revision"], "restorable": preview["restorable"],
+                        "slot": slot, "session_digest": digest(state),
+                        "revision": restored["revision"], "restorable": True,
                     }
                 return {
                     "schema": "jeeves.world.laptop_acceptance.v1",

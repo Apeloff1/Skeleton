@@ -122,21 +122,22 @@ def test_acceptance_persisted_save_uses_one_nonreentrant_world_lease(tmp_path, m
     created = flow.create_session("lighthouse", "saved")
     flow.choose("lighthouse", "saved", "rescue", created["session_digest"])
     observed = []
-    for method in ("inspect", "export", "preflight_import"):
-        original = getattr(flow.sessions, method)
+    original = flow.sessions._session
 
-        def guarded(*args, _original=original, _method=method, **kwargs):
-            assert (tmp_path / "lighthouse.lock").exists()
-            assert kwargs["expected_world_digest"] == digest(
-                flow.worlds.read("lighthouse"))
-            observed.append(_method)
-            return _original(*args, **kwargs)
+    def guarded(fd, world_id, slot, world):
+        assert (tmp_path / "lighthouse.lock").exists()
+        assert digest(world) == digest(flow.worlds.read(world_id))
+        with pytest.raises(CanonError) as busy:
+            flow.sessions.inspect(world_id, slot)
+        assert busy.value.code == "lease_busy"
+        observed.append(slot)
+        return original(fd, world_id, slot, world)
 
-        monkeypatch.setattr(flow.sessions, method, guarded)
+    monkeypatch.setattr(flow.sessions, "_session", guarded)
     report = flow.acceptance("lighthouse", "saved")
     assert report["persisted_slot_verified"] is True
     assert report["existing_session"]["restorable"] is True
-    assert observed == ["inspect", "export", "preflight_import"]
+    assert observed == ["saved"]
     assert not (tmp_path / "lighthouse.lock").exists()
 
 

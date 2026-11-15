@@ -120,8 +120,10 @@ def test_model_client_refuses_redirects_that_could_expose_credentials(
     client.model = "test-model"
     client.timeout = 5
     assert client.chat("safe system", "safe request") == "accepted"
-    assert len(observed) == 1
-    assert isinstance(observed[0], free_model._RejectRedirects)
+    assert len(observed) == 2
+    assert isinstance(observed[0], urllib.request.ProxyHandler)
+    assert observed[0].proxies == {}  # environment proxies must not receive credentials
+    assert isinstance(observed[1], free_model._RejectRedirects)
 
 
 def test_provider_transport_failure_never_exposes_untrusted_exception_text(
