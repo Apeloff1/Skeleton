@@ -695,13 +695,13 @@ def register_knowledge_routes(router):
             raise HTTPException(422,detail={"code":"dragon_dataset_explorer_invalid"})
         return await corpus_runtime_call(_bounded(lambda:getattr(DatasetExplorer(owner,game),operation)(*args,**kwargs)))
 
-    @router.get("/knowledge/game-corpus/{game_id}/datasets/{version}/record/{record}")
-    async def dataset_exact_record(game_id:str,version:str,record:str,response:Response,user:dict=Depends(get_current_user)):
+    @router.get("/knowledge/game-corpus/{game_id}/datasets/{version}/record")
+    async def dataset_exact_record(game_id:str,version:str,response:Response,record:str=Query(min_length=1,max_length=128),user:dict=Depends(get_current_user)):
         response.headers["Cache-Control"]="private, no-store"
         return await dataset_explorer_call(scope(user),game_id,"record",version,record)
 
-    @router.get("/knowledge/game-corpus/{game_id}/datasets/{version}/graph/{record}")
-    async def dataset_entity_graph(game_id:str,version:str,record:str,response:Response,
+    @router.get("/knowledge/game-corpus/{game_id}/datasets/{version}/graph")
+    async def dataset_entity_graph(game_id:str,version:str,response:Response,record:str=Query(min_length=1,max_length=128),
             direction:Literal["in","out","both"]="both",relation:str|None=Query(None,max_length=128),
             max_depth:int=Query(3,ge=0,le=6),node_limit:int=Query(128,ge=1,le=256),
             edge_limit:int=Query(256,ge=1,le=512),user:dict=Depends(get_current_user)):
@@ -717,8 +717,8 @@ def register_knowledge_routes(router):
         return await dataset_explorer_call(scope(user),game_id,"compare",version,other_version,
                    after=after,limit=limit,changes_only=changes_only)
 
-    @router.get("/knowledge/game-corpus/{game_id}/datasets/{version}/compare/{other_version}/record/{record}")
-    async def dataset_compare_exact_record(game_id:str,version:str,other_version:str,record:str,response:Response,
+    @router.get("/knowledge/game-corpus/{game_id}/datasets/{version}/compare/{other_version}/record")
+    async def dataset_compare_exact_record(game_id:str,version:str,other_version:str,response:Response,record:str=Query(min_length=1,max_length=128),
             user:dict=Depends(get_current_user)):
         response.headers["Cache-Control"]="private, no-store"
         return await dataset_explorer_call(scope(user),game_id,"compare_record",version,other_version,record)
