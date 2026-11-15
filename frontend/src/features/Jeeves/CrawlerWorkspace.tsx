@@ -13,6 +13,7 @@ import CrawlerSourceLibrary, { type CrawlPassageSelection } from './CrawlerSourc
 import CrawlerResearchAtlasPanel from './CrawlerResearchAtlasPanel';
 import CrawlerInstructionSecurityPanel from './CrawlerInstructionSecurityPanel';
 import DragonCompanionPanel from './DragonCompanionPanel';
+import DragonTreasuryPanel from './DragonTreasuryPanel';
 import DragonSanctuaryPanel from './DragonSanctuaryPanel';
 import DragonKnowledgePanel from './DragonKnowledgePanel';
 import { saveCrawlerExport } from '../../product/crawlerExport';
@@ -210,6 +211,8 @@ function CrawlerContent() {
       {sessions.map(row => <TouchableOpacity key={row.session_id} accessibilityRole="button" accessibilityState={{ selected: active?.session_id === row.session_id }} style={[s.check, active?.session_id === row.session_id && { backgroundColor: '#251f38', padding: 12, borderRadius: 8 }]} onPress={() => open(row)}><Text style={s.label}>{row.title}</Text><Text style={s.small}>{label(row.status)} · {row.counters.documents} captures · {row.counters.requests} requests</Text></TouchableOpacity>)}
       {nextCursor && <Button title="Load more crawls" onPress={() => void perform(async signal => { const page = await listCrawls(nextCursor, signal); if (!signal.aborted) { setSessions(rows => [...rows, ...page.sessions.filter(row => !rows.some(old => old.session_id === row.session_id))].slice(0, 128)); setNextCursor(page.next_cursor); } })} />}
     </View><View style={[s.column, { flexBasis: 620, gap: 20 }]}>
+      <DragonTreasuryPanel revision={sessions.map(row=>row.session_id+':'+row.version).sort().join('|')} session={active} canWrite={canWrite} disabled={!!busy||running} onSession={accept}
+        onRevisit={url=>{if(!canWrite||busy||running||token.current!==getAuthToken())return;setCreating(true);setSeeds(url);setTitle('Treasury revisit');setRequests('4');setDocuments('1');setDepth('0');setDiscoverSitemaps(false);setBalancedFrontier(false);setCoverageFrontier(false);setCompanionMode('companion_guardian');setConsent(false);setRights(false);setError('');}} />
       {(creating || !active) && <View style={s.card}><Text style={s.heading}>New bounded crawl</Text><Text style={s.small}>Only explicitly selected seed hosts are admitted. Consent expires within 24 hours. Create the source scope first, then authorize a finite automatic run or one manual slice.</Text><WorkflowTemplatePicker surface="crawler" contextKey={`${active?.session_id ?? 'new'}:${creating ? 'new' : 'initial'}:${pane}:${generation.current}`} disabled={!canWrite || !!busy || running || pane !== 'capture'} unavailableReason={templateUnavailable} onApply={applyTemplate} />
         <Text style={s.label}>Name (optional)</Text><TextInput accessibilityLabel="Crawl name" value={title} onChangeText={setTitle} maxLength={160} style={field} placeholder="Engine documentation" placeholderTextColor={colors.muted} />
         <Text style={s.label}>Seed URLs · one per line</Text><TextInput accessibilityLabel="Seed URLs" value={seeds} onChangeText={setSeeds} maxLength={32768} multiline style={[field, { minHeight: 110 }]} placeholder={'https://example.org/sitemap.xml\nhttps://example.org/feed.xml'} placeholderTextColor={colors.muted} autoCapitalize="none" />
