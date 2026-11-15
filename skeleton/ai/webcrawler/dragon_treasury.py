@@ -278,11 +278,9 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
         current_available=latest["indexed"] and not latest["archive_only"] and not alias_conflict
         # Keep an earlier authorized payload available only to the historic
         # plane when a newer variant-unknown receipt contradicts it.
-        if alias_conflict:
-            latest["archive_only"] = True
         blocked_current+=int(not current_available)
         for v in versions:
-            v["plane"]="current" if v is latest and not v["archive_only"] else "historic"
+            v["plane"]="current" if v is latest and not v["archive_only"] and not alias_conflict else "historic"
             v["latest_observed"]=v is latest
             v["source_id"]=v["source_id"] if v["indexed"] else None
             v["session_id"]=v["session_id"] if v["indexed"] else None
@@ -292,9 +290,15 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
                          "current_revision":latest["revision_id"],"first_seen":versions[0]["first_seen"],
                          "last_seen":latest["last_seen"],"current_indexed":current_available,
                          "simultaneous_conflict":tied,"alias_conflict":alias_conflict,"revisit":_revisit(rows,as_of),
-                         "refresh_url":rows[-1].url if rows[-1].refresh_allowed and not tied and not alias_conflict else None})
+                         "refresh_url":rows[-1].url if rows[-1].refresh_allowed and not tied else None})
         if alias_conflict:
-            families[-1]["revisit"]["ready_for_review"] = False
+            # The ambiguous receipt cannot itself authorize work. A new grant
+            # from the previously admitted URL can resolve it after a floor.
+            hold = max(a["captured_at"] for a in blockers[rows[-1].url])+3600
+            revisit=families[-1]["revisit"]
+            revisit["due_at"]=max(revisit["due_at"],hold)
+            revisit["interval_seconds"]=revisit["due_at"]-rows[-1].captured_at
+            revisit["ready_for_review"]=bool(rows[-1].refresh_allowed and not tied and as_of>=revisit["due_at"])
         if len(versions)>1 and not tied and not alias_conflict and latest["delta"]["kind"]!="changed_unclassified":
             comparisons[fid]={"current":latest,"previous":versions[-2],"delta":latest["delta"]}
     # Explicitly separate index corpora before computing document frequency.
@@ -354,7 +358,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
     # The receipt binds exact observations, parser identity, index partition
     # and projection content without emitting old source text.
     partition_digest=_digest({"parser":PARSER,"families":sorted(({k:v for k,v in f.items() if k not in {"revisit","refresh_url"}} for f in families),key=lambda f:f["family_id"]),
-                             "revisions":revisions})
+                             "revisions":revisions,"alias_blockers":sorted((_digest(a) for a in aliases))})
     return {"schema":SCHEMA,"parser":PARSER,"mode":mode,"family":family,
             "as_of_unix":as_of,"partition_digest":partition_digest,"candidate_limit_reached":capped,
             "excluded_sessions":excluded_sessions,"observations":len(observations),
