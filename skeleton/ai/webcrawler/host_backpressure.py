@@ -27,7 +27,7 @@ class OriginThrottle:
     affects_siblings: bool = True
 
 
-def _header_seconds(raw: str | None, now: float) -> float | None:
+def _header_seconds(raw: str | None, now: float, *, cap: float = MAX_BACKOFF_SECONDS) -> float | None:
     if not isinstance(raw, str) or not raw.strip() or len(raw) > 128:
         return None
     value = raw.strip()
@@ -35,8 +35,8 @@ def _header_seconds(raw: str | None, now: float) -> float | None:
     # floats, negative durations, JSON directives or header composites.
     if value.isascii() and value.isdecimal():
         if len(value) > 9:
-            return MAX_BACKOFF_SECONDS
-        return min(MAX_BACKOFF_SECONDS, float(int(value)))
+            return cap
+        return min(cap, float(int(value)))
     if value.lstrip("+-").replace(".", "", 1).isdigit():
         return None
     try:
@@ -46,7 +46,7 @@ def _header_seconds(raw: str | None, now: float) -> float | None:
         seconds = when.timestamp() - now
         if not math.isfinite(seconds):
             return None
-        return min(MAX_BACKOFF_SECONDS, max(0.0, seconds))
+        return min(cap, max(0.0, seconds))
     except (TypeError, ValueError, OverflowError):
         return None
 
@@ -81,3 +81,31 @@ def origin_throttle(
         origin_ready_at=now + seconds,
         header_accepted=user_seconds is not None,
     )
+
+
+def consent_bounded_retry_after(
+    headers: Mapping[str, str], *, now: float, expires_at: float,
+) -> float | None:
+    """Honor a valid remote cooldown for the entire remaining consent window.
+
+    The legacy throttle score remains capped for compatibility, but a live
+    dispatch must never reopen earlier than Retry-After. A deadline beyond
+    consent means no further dispatch under that grant. This is a hold, never
+    a new authorization or permission to circumvent a source's restrictions.
+    """
+    if (
+        not isinstance(headers, Mapping)
+        or any(isinstance(v, bool) or not isinstance(v, (int, float))
+               or not math.isfinite(v) or not 0 <= v <= 1e12
+               for v in (now, expires_at))
+    ):
+        raise ValueError("invalid retry authority horizon")
+    cap = max(0.0, min(86400.0, expires_at - now))
+    values = [
+        value for key, value in headers.items()
+        if isinstance(key, str) and key.casefold() == "retry-after"
+    ]
+    # Conflicting response fields must not choose the shortest cooldown.
+    if len(values) > 1:
+        return cap
+    return _header_seconds(values[0] if values else None, now, cap=cap)
