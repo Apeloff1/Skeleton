@@ -514,6 +514,40 @@ class DragonCrawlerApplication:
             counters=status.get("usage", {}),
             limits=row["request"],
         )
+        # The companion is historical operational metadata. Current source-use
+        # policy separately governs whether its evidence references are shown.
+        # A session-level pause/cancel/lease interruption takes precedence
+        # over the pure runtime's last checkpoint posture.
+        companion = status.get("companion")
+        if isinstance(companion, dict):
+            if not status["consent_current"] or row["status"] in {
+                "paused", "interrupted", "cancelled", "completed", "budget_exhausted", "failed",
+            }:
+                companion.update(posture="resting", quest="rest")
+            book = companion.get("questbook")
+            trace = status.get("curriculum_trace")
+            policies = self._source_policies(row)
+            permitted = set()
+            held = not status["consent_current"] or row["status"] in {"cancelled", "deleted"}
+            if not held:
+                now = _now().timestamp()
+                for source in runtime.sources():
+                    policy = policies.get(source["source_id"], {"enabled": True, "max_age_seconds": MAX_SOURCE_AGE_SECONDS})
+                    expiry = min(_utc(row["consent_expires_at"]).timestamp(),
+                                 source["fetched_at"] + policy["max_age_seconds"])
+                    if policy["enabled"] and source["fetched_at"] <= now + 300 and now < expiry:
+                        permitted.add(source["source_id"])
+            if isinstance(book, dict):
+                for quest in book["quests"]:
+                    original = quest["source_ids"]
+                    quest["source_ids"] = [sid for sid in original if sid in permitted]
+                    quest["evidence_redacted"] = len(original) != len(quest["source_ids"])
+                book["evidence_access"] = "current_source_policy_filtered"
+            if isinstance(trace, dict):
+                for decision in trace["recent"]:
+                    sid = decision.get("source_id")
+                    if sid is not None and sid not in permitted:
+                        decision["source_id"] = None
         witness = row.get("checkpoint_identity") or {}
         repair = row.get("checkpoint_repair") or {}
         status["checkpoint_recovery"] = {
@@ -2676,6 +2710,7 @@ class DragonCrawlerApplication:
             }
         try:
             _, run_type = _core()
+            row = await self._owned(scope, row["_id"])
             snapshot = run_type.from_snapshot(_plain(row["snapshot"])).snapshot()
             request = row.get("request")
             seeds = request.get("seed_urls") if isinstance(request, dict) else ()
@@ -2696,7 +2731,10 @@ class DragonCrawlerApplication:
             raise CrawlerError(
                 "crawler_integrity", "Crawler checkpoint is not companion-replayable.", 503
             ) from exc
-        return {"session_id": str(row["_id"]), "active": True, **projected}
+        session_projection = self._projection(row)
+        return {"session_id": str(row["_id"]), "active": True, **projected,
+                "companion": session_projection.get("companion"),
+                "curriculum_trace": session_projection.get("curriculum_trace")}
 
     @staticmethod
     def _source_use(row: dict) -> None:
