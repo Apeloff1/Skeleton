@@ -734,6 +734,24 @@ purpose = "Dependency and provenance supply-chain controls."
 audience = "both"
 lifecycle = "canonical"
 
+[[zone]]
+name = "local-admission"
+prefixes = ["skeleton/admission/"]
+owner = "security-plane"
+criticality = "critical"
+purpose = "Host-local transactional admission ledger and expiring push leases; remote expected-head enforcement remains independently mandatory."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "prood-planning-compat"
+prefixes = ["skeleton/prood/"]
+owner = "delivery-plane"
+criticality = "high"
+purpose = "Recovered provider-neutral game asset era data, forge registry and bounded planning; no runtime admission or execution authority."
+audience = "both"
+lifecycle = "transitional"
+
 [ignore]
 prefixes = [
   ".git/",
