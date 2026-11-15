@@ -211,7 +211,6 @@ async def lead_graph_call(scope,operation,*args,**kwargs):
     if operation not in {"configure","status","page","edges","begin","snapshot","append","seal","revoke","review","dataset_candidates","register_target","bundle_status","enable_bundle"}:
         raise ValueError("lead graph operation")
     def work():
-        path=_path(create=operation=="configure" and os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1")
-        path=_path(scope=scope)
+        path=_path(scope=scope,create=operation=="configure" and os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1")
         return getattr(LeadGraph(path),operation)(scope,*args,**kwargs)
     return await _bounded(work)

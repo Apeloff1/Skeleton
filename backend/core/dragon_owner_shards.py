@@ -93,7 +93,7 @@ def _layout(db,plane):
     r=db.execute("SELECT layout FROM dragon_shard_topology WHERE plane=?",(plane,)).fetchone()
     if not r:return None
     value=json.loads(r["layout"])
-    if not isinstance(value,dict) or set(value)!={"id","paths"} or not KEY.fullmatch(value["id"]) or (
+    if not isinstance(value,dict) or set(value)!={"id","paths"} or not isinstance(value["id"],str) or not KEY.fullmatch(value["id"]) or (
             not isinstance(value["paths"],list) or len(value["paths"])!=LANES or
             any(not isinstance(p,str) or not Path(p).is_absolute() for p in value["paths"]) or
             len(set(value["paths"]))!=LANES):
@@ -156,7 +156,7 @@ def _legacy_owner(db,owner):
     # are excluded; their rows are subordinate to canonical owner records.
     for row in db.execute("SELECT name,sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"):
         name=row["name"]
-        if name.startswith("dragon_shard_") or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*",name):
+        if name.startswith("dragon_shard_") or name in {"world_subscriptions","world_origin_guard"} or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*",name):
             continue
         if not row["sql"] or "CREATE VIRTUAL TABLE" in row["sql"].upper():continue
         cols=db.execute('PRAGMA table_info("'+name+'")').fetchall()
@@ -177,6 +177,7 @@ def owner_path(base,plane,scope):
             if _table(db,"dragon_shard_identity"):raise ShardHeld("missing root topology")
             return base
         # Validate root marker without a second connection.
+        if not _table(db,"dragon_shard_identity"):raise ShardHeld("root marker missing")
         marker=db.execute("SELECT plane,lane,topology_id FROM dragon_shard_identity WHERE singleton=1").fetchone()
         if marker is None or tuple(marker)!=(plane,0,layout["id"]):raise ShardHeld("root marker differs")
         row=db.execute("SELECT lane FROM dragon_shard_routes WHERE plane=? AND owner=?",(plane,key)).fetchone()
@@ -186,7 +187,7 @@ def owner_path(base,plane,scope):
             db.execute("BEGIN IMMEDIATE")
             try:
                 row=db.execute("SELECT lane FROM dragon_shard_routes WHERE plane=? AND owner=?",(plane,key)).fetchone()
-                lane=row["lane"] if row is not None else 0 if _legacy_owner(db,key) else int(key[:16],16)%LANES
+                lane=row["lane"] if row is not None else (0 if _legacy_owner(db,key) else int(key[:16],16)%LANES)
                 if row is None:
                     if lane:_target(base,plane,layout,lane)
                     db.execute("INSERT INTO dragon_shard_routes VALUES(?,?,?)",(plane,key,lane))

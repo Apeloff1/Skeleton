@@ -17,7 +17,8 @@ import threading
 from pymongo import ASCENDING
 from core.dragon_hoarder_bulk import BulkArchive,Volume,StorageHeld,owner_key,MAX_VOLUMES
 from core.dragon_storage_topology import topology_config
-from core.dragon_hoarder_manifests import ManifestArchive,BLOCK
+from core.dragon_hoarder_manifests import BLOCK
+from core.dragon_manifest_shards import ShardedManifestArchive
 from core.dragon_checkpoint_replica import CheckpointReplicaError
 from core.dragon_vault import _bounded_discovery_cpu
 from skeleton.ai.webcrawler import dragon_archive_scale as a
@@ -63,7 +64,7 @@ def _archive():
             volumes.append(volume)
         if not bootstrap and not path.is_file():
             raise StorageHeld("manifest ledger unavailable")
-        _store=ManifestArchive(path,BulkArchive(tuple(volumes)))
+        _store=ShardedManifestArchive(path,BulkArchive(tuple(volumes)))
         _config=config
         return _store
 
