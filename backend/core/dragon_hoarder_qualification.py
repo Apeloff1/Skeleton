@@ -36,10 +36,10 @@ def topology(archive):
 def open_backup():
     raw=os.environ.get("SKL_DRAGON_HOARDER_BACKUP_VOLUMES_JSON","").strip()
     path=Path(os.environ.get("SKL_DRAGON_HOARDER_BACKUP_MANIFEST_PATH",""))
-    if not raw or len(raw)>65536 or not path.is_absolute():
+    if not raw or len(raw)>262144 or not path.is_absolute():
         raise StorageHeld("configure independent backup volumes")
     specs=json.loads(raw)
-    if not isinstance(specs,list) or not 1<=len(specs)<=64:
+    if not isinstance(specs,list) or not 1<=len(specs)<=256:
         raise ValueError("backup volume count")
     volumes=[]
     bootstrap=os.getenv("SKL_DRAGON_HOARDER_BOOTSTRAP")=="1"
@@ -157,7 +157,7 @@ def run_probe(primary,backup,*,probe_bytes=64*1024**2):
 def require_probe(primary,backup):
     path=_receipt_path()
     st=path.stat()
-    if not stat.S_ISREG(st.st_mode) or st.st_size>256*1024 or st.st_nlink!=1 or os.name=="posix" and (st.st_mode&0o077 or st.st_uid!=os.getuid()):
+    if not stat.S_ISREG(st.st_mode) or st.st_size>2*1024*1024 or st.st_nlink!=1 or os.name=="posix" and (st.st_mode&0o077 or st.st_uid!=os.getuid()):
         raise StorageHeld("qualification receipt custody")
     value=json.loads(path.read_bytes())
     now=int(time.time())
