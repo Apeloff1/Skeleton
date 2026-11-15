@@ -23,7 +23,10 @@
     "skeleton/ai/webcrawler/acquisition_feedback.py",
     "skeleton/ai/webcrawler/information_portfolio.py",
     "skeleton/ai/webcrawler/structural_extraction.py",
-    "backend/core/dragon_resource_governor.py"
+    "backend/core/dragon_resource_governor.py",
+    "skeleton/ai/webcrawler/dragon_companion.py",
+    "skeleton/ai/webcrawler/dragon_questbook.py",
+    "skeleton/ai/webcrawler/dragon_curriculum_trace.py"
   ],
   "state_authority": "Existing CORE_DB Mongo application custody; pure snapshots have no independent storage authority",
   "public_api": {
@@ -63,7 +66,12 @@
     "acquisition_measurements": 128,
     "structural_html_tags": 32768,
     "structural_html_blocks": 2048,
-    "resource_governor_max_slots": 4
+    "resource_governor_max_slots": 4,
+    "companion_contributions": 64,
+    "companion_quests": 12,
+    "companion_lexemes": 2048,
+    "companion_bottom_k": 96,
+    "companion_curriculum_trace": 128
   },
   "semantics": {
     "robots": "Fail closed on unavailable robots other than explicit 404/410; accept text/plain rules, not unexpected HTML; revalidation, TTL and every redirect target; delays checkpointed. Retry-After cannot reopen an origin before its valid remote deadline within the finite consent window. Denials and overload bodies never become discovery inputs.",
@@ -79,14 +87,17 @@
     "autonomous_application": "Application may consume explicit finite CORE_DB grants through the existing backend scheduler. Pure run_slice remains at most4steps/45seconds; no independent pure background loop, storage, scheduler or authority. Canonical code binding and pre-IO reservation remain unchanged.",
     "protocol_matching": "Bounded merged exact product-group rules, wildcard/terminal matching, percent-octet normalization; strictest valid selected pacing, fail closed on invalid pacing or match work exhaustion. Runtime-only parser cache must match snapshot text and time; first-page and redirect Retry-After pacing enforced.",
     "frontier_index": "Ephemeral query and source URL coverage projection built once per selection; no stored cross-owner index or authority.",
-    "offline_benchmark": "Four modes including an isolated URL-only coverage ablation; identical offline fixtures, transport, rights and request limits. Reports known/uncertain cost, policy requests and duplicate acquisition; external engines not executed.",
+    "offline_benchmark": "Eight strategies and four deterministic corpora (96 planned fixture runs at 3 repetitions), including mirror and keyword-padding controls. Fixed synthetic transport latency bucket is not a performance measurement; real wall runtime reported separately. No third-party engine executed.",
     "parser_containment": "Complex document and structured discovery parsing in disposable POSIX resource-limited children, with finite input/output, deadline, restricted environment and Python audit defense. Parent reconstructs custody and admits links. No same-response network retry for parser faults. Small simple text remains in-process; PDF has existing child. Non-POSIX complex parsing holds; not an OS sandbox.",
     "retrieval_diversity": "Bounded exact-span lexical candidates, duplicate passage suppression and deterministic relevance-weighted novelty/origin ranking, rechecked owner and source custody. No new source authority or model training.",
     "checkpoint_redundancy": "Each snapshot publication atomically includes exact-current identity witness and bounded compressed duplicate when total admitted storage envelope permits. Quiescent current-consent owner CAS repair only, exact runtime and scope validated; no ancestor rollback, new worker, revocation bypass or recovery if both fields are lost. Redundancy erased with owner session; not independent backup.",
     "acquisition_feedback": "One bounded settled observation per charged request, conservation of known and uncertain bytes across pending-dispatch recovery, quantized transport latency excluding checkpoint and extraction time. Adaptive tail/EMA pacing adds holds and never overrides server or operator policy.",
     "information_portfolio": "Coverage strategy combines indexed URL exploration and actual retained source term coverage, distinct hostname support, rarity, cost-adjusted marginal expected yield and conservatively shrunk host reward. No source text creates new authority. FIFO and original balanced remain selectable.",
     "adaptive_extraction": "Structural HTML main/article and density inference chooses only high-confidence source-order projections or preserves prior extraction on ambiguity. Existing semantic enrichments and canonical link admission remain. Source hashes bind retained projected wording; no independent verification.",
-    "resource_governor": "Kernel-reported memory/cgroup/CPU/pressure headroom narrows existing physical slice credit ceiling with immediate downscale and gradual recovery. Unsupported metrics restrict local capacity to one; measured critical pressure may stop new admissions. Existing leases remain authoritative."
+    "resource_governor": "Kernel-reported memory/cgroup/CPU/pressure headroom narrows existing physical slice credit ceiling with immediate downscale and gradual recovery. Unsupported metrics restrict local capacity to one; measured critical pressure may stop new admissions. Existing leases remain authoritative.",
+    "companion_evolution": "Evidence-derived, reversible, lexical-quality-weighted source novelty, diminishing same-origin credit, bounded continuous-script tokenization, no XP for requests, denials, time elapsed, or inactivity. Five forms; four explicit temperament modes; no independent authority, training, or background work.",
+    "companion_questbook": "Twelve prerequisite-constrained achievements across discovery, scholarship, ecology and stewardship. Exact source capture identity/sequence; quest progress derived, not independently persisted. Source references filtered by current owner policy.",
+    "companion_curriculum": "Confidence-shrunk host novelty/recent learning progress, bounded remaining-information and novelty exploration, maximum 12 percent priority contribution annealed by remaining budgets. Guardian weight halved. Policy, budget, DNS, robots, cooldown and owner lease gates remain canonical. Pre-dispatch choice receipt conserved through settled outcomes and uncertain recovery."
   },
   "network": {
     "direct": "Validated public DNS addresses pinned to socket with original TLS SNI/hostname verification",
