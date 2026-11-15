@@ -22,6 +22,7 @@ import time
 
 from .core import CrawlDocument, FetchResponse, _source_score, canonicalize_url
 from .structured_discovery import StructuredDiscovery, UnsupportedDiscoveryRoot
+from .structural_extraction import validate_structural_receipt
 
 MAX_BODY = 2_097_152
 MAX_HEADER = 16_384
@@ -160,7 +161,7 @@ def extract_isolated(response: FetchResponse, canonical_url: str, *,
     if status == "rejected" and payload is None:
         raise ParserFault("parser_rejected")
     if status != "ok" or not isinstance(payload, dict) or set(payload) != {
-        "title", "text", "links", "truncated",
+        "title", "text", "links", "truncated", "structural_projection",
     }:
         raise ParserFault("invalid_output")
     text = _text(payload["text"], MAX_TEXT * 4)
@@ -171,6 +172,10 @@ def extract_isolated(response: FetchResponse, canonical_url: str, *,
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
     decoded = hashlib.sha256(response.body).hexdigest()
     effective = media.split(";", 1)[0].strip().lower()
+    structural = payload["structural_projection"]
+    if structural is not None and (effective not in {"text/html", "application/xhtml+xml"}
+                                    or not validate_structural_receipt(structural)):
+        raise ParserFault("invalid_output")
     # The parent creates all authority/provenance fields from the already
     # metered response. A child's claims about hashes, URLs, rights and
     # transport cannot become evidence.
@@ -185,7 +190,8 @@ def extract_isolated(response: FetchResponse, canonical_url: str, *,
          "wire_bytes": response.wire_bytes if response.wire_bytes is not None else len(response.body),
          "content_encoding": response.content_encoding,
          "parser_text_truncated": payload["truncated"],
-         "parser_execution": "isolated_posix"},
+         "parser_execution": "isolated_posix",
+         **({"structural_projection": structural} if structural is not None else {})},
         links,
     )
     return ParserOutcome(document, "isolated_posix")
