@@ -28,6 +28,8 @@ export type CrawlOriginHealth = {
   successes: number; failures: number; rejections: number; failure_streak: number;
   posterior_success: number; uncertainty: number; evidence_count: number;
 };
+export type CrawlDuplicateEvidence = { count: number; represented_sources: number; observed_origins: number; independent_evidence: false; raw_bytes_retained: false };
+export type CrawlCheckpointRecovery = { replica_present: boolean; replica_verified: false; reason: string; last_repair_at: string | null; last_repair_sequence: number | null; ancestor_rollback: false };
 export type CrawlSession = {
   session_id: string; title: string; status: 'queued' | 'ready' | 'running' | 'paused' | 'completed' | 'cancelled' | 'budget_exhausted' | 'failed' | 'interrupted';
   state?: string; version: number; created_at: string; updated_at: string; seeds: string[];
@@ -36,6 +38,7 @@ export type CrawlSession = {
   next_ready_at?: number | null; stop_reason?: string | null; error?: { code?: string; message?: string } | null;
   automation?: CrawlAutomation; worker?: CrawlWorker; capabilities?: CrawlCapabilities;
   instruction_security?: CrawlInstructionSecurity; adaptive_origin_health?: Record<string, CrawlOriginHealth>;
+  duplicate_evidence?: CrawlDuplicateEvidence; checkpoint_recovery?: CrawlCheckpointRecovery;
   queue: { url: string; depth: number; attempts: number; ready_at: number }[];
 };
 export type SourceUsePolicy = { version: number; enabled: boolean; max_age_seconds: number; changed_at: string | null };
@@ -149,6 +152,19 @@ function session(value: CrawlSession, expectedId?: string): CrawlSession {
   for (const field of ['requests', 'bytes', 'documents', 'failures'] as const) if (!integer(value.counters[field], 33554432)) invalid('The crawler counters are incomplete.');
   if (value.instruction_security !== undefined && !validInstructionSecurity(value.instruction_security, value.counters.requests)) invalid('The crawler instruction incident custody is invalid.');
   if (value.adaptive_origin_health !== undefined && !validOriginHealth(value.adaptive_origin_health)) invalid('The crawler origin health projection is invalid.');
+  if (value.duplicate_evidence !== undefined) {
+    const d = value.duplicate_evidence;
+    if (!d || !integer(d.count, Math.min(128, value.counters.requests)) || !integer(d.represented_sources, Math.min(d.count, value.source_count))
+      || !integer(d.observed_origins, d.count) || d.independent_evidence !== false || d.raw_bytes_retained !== false) invalid('Invalid exact-duplicate evidence custody.');
+  }
+  if (value.checkpoint_recovery !== undefined) {
+    const c = value.checkpoint_recovery;
+    if (!c || typeof c.replica_present !== 'boolean' || c.replica_verified !== false || c.ancestor_rollback !== false
+      || !['exact_current_revision', 'replica_capacity', 'write_envelope_capacity', 'legacy_unwitnessed'].includes(c.reason)
+      || (c.last_repair_at === null) !== (c.last_repair_sequence === null)
+      || c.last_repair_at !== null && (typeof c.last_repair_at !== 'string' || !Number.isFinite(Date.parse(c.last_repair_at)))
+      || c.last_repair_sequence !== null && !integer(c.last_repair_sequence, 10000)) invalid('Invalid exact-checkpoint recovery projection.');
+  }
   for (const row of value.queue) if (!row || typeof row.url !== 'string' || row.url.length > 4096 || !integer(row.depth, 3) || !integer(row.attempts, 128) || typeof row.ready_at !== 'number' || !Number.isFinite(row.ready_at)) invalid('The crawler queue is invalid.');
   if (value.automation) {
     const a = value.automation;
