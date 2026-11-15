@@ -2,7 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {AppState,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {getAuthToken} from '../../auth/gameforgeAuth';
 import {crawlRequestKey} from '../../product/crawlerClient';
-import {getSourceTaxonomy,searchGames,sourcePage,releaseTimeline,enqueueReleaseImport,importStatus,dispatchGameCapture,type GameIdentity,type GameSource,type ReleaseEvent,type TimelineCursor,type ImportReceipt,type ImportState,type CaptureReceipt,type TaxonomyEntry} from '../../product/dragonGameCorpusClient';
+import {getSourceTaxonomy,searchSourceLibrary,searchGames,sourcePage,releaseTimeline,enqueueReleaseImport,importStatus,dispatchGameCapture,type GameIdentity,type GameSource,type ReleaseEvent,type TimelineCursor,type ImportReceipt,type ImportState,type CaptureReceipt,type TaxonomyEntry,type GlobalSource} from '../../product/dragonGameCorpusClient';
 import s,{colors as C} from './CrawlerWorkspace.styles';
 import DragonSourceViewer from './DragonSourceViewer';
 
@@ -16,6 +16,7 @@ export default function DragonGameCorpusPanel({visible,canWrite}:{visible:boolea
  const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [query,setQuery]=useState(''),[games,setGames]=useState<GameIdentity[]>([]);
  const [game,setGame]=useState<GameIdentity|null>(null),[sources,setSources]=useState<GameSource[]>([]),[sourceCursor,setSourceCursor]=useState<string|null>(null);
+ const [globalQuery,setGlobalQuery]=useState(''),[globalResults,setGlobalResults]=useState<GlobalSource[]>([]),[globalNotice,setGlobalNotice]=useState('');
  const [viewer,setViewer]=useState<GameSource|null>(null);
  const [taxonomy,setTaxonomy]=useState<{source_classes:TaxonomyEntry[];families:string[]}|null>(null),[family,setFamily]=useState(''),[kind,setKind]=useState(''),[language,setLanguage]=useState(''),[categoryQuery,setCategoryQuery]=useState(''),[categoryPage,setCategoryPage]=useState(0);
  const [selected,setSelected]=useState<GameSource|null>(null),[consent,setConsent]=useState(false),[auto,setAuto]=useState(false),[capture,setCapture]=useState<CaptureReceipt|null>(null);
@@ -26,7 +27,7 @@ export default function DragonGameCorpusPanel({visible,canWrite}:{visible:boolea
  function clear(){
   epoch.current++;active.current?.abort();active.current=null;
   setBusy(false);setError('');setQuery('');setGames([]);setGame(null);setSources([]);setSourceCursor(null);
-  setViewer(null);setTaxonomy(null);setFamily('');setKind('');setLanguage('');setCategoryQuery('');setCategoryPage(0);
+  setGlobalQuery('');setGlobalResults([]);setGlobalNotice('');setViewer(null);setTaxonomy(null);setFamily('');setKind('');setLanguage('');setCategoryQuery('');setCategoryPage(0);
   setSelected(null);setConsent(false);setAuto(false);setCapture(null);setEvents([]);setEventCursor(null);
   setPayload('');setBatch(null);setStatus(null);captureOp.current=null;importOp.current=null;
  }
@@ -47,7 +48,8 @@ export default function DragonGameCorpusPanel({visible,canWrite}:{visible:boolea
  const search=()=>run(async(signal,valid)=>{const rows=await searchGames(query.trim(),signal);if(valid()){setGames(rows);setGame(null);setViewer(null);setSources([]);setSourceCursor(null);setSelected(null);setCapture(null);setConsent(false);}});
  const choose=(value:GameIdentity,after?:string)=>run(async(signal,valid)=>{const p=await sourcePage(value.game_id,after,signal,{family:family||undefined,kind:kind||undefined,language:language.trim()||undefined});if(valid()){setGame(value);setViewer(null);setSources(p.sources);setSourceCursor(p.next_cursor);setSelected(null);setCapture(null);setConsent(false);}});
  const loadTaxonomy=()=>run(async(signal,valid)=>{const p=await getSourceTaxonomy(signal);if(valid())setTaxonomy(p);});
- const clearFilters=()=>{setSources([]);setSourceCursor(null);setSelected(null);setViewer(null);setCapture(null);setConsent(false);};
+ const clearFilters=()=>{setGlobalResults([]);setGlobalNotice('');setSources([]);setSourceCursor(null);setSelected(null);setViewer(null);setCapture(null);setConsent(false);};
+ const globalSearch=()=>run(async(signal,valid)=>{const p=await searchSourceLibrary(globalQuery.trim(),{family:family||undefined,kind:kind||undefined,language:language.trim()||undefined},signal);if(valid()){setGlobalResults(p.sources);setGlobalNotice((p.truncated?'Top matching source references; narrow the query.':'Matched catalogue source references.')+(p.index_backfill_complete?'':' Historical indexing is still incomplete.'));}});
  const classes=(taxonomy?.source_classes||[]).filter(x=>(!family||x.family===family)&&(!categoryQuery.trim()||human(x.kind).includes(categoryQuery.trim().toLowerCase().replaceAll('_',' '))||human(x.family).includes(categoryQuery.trim().toLowerCase())));
  const timeline=(cursor?:TimelineCursor)=>run(async(signal,valid)=>{const p=await releaseTimeline(stage,latest,cursor,signal);if(valid()){setEvents(p.events);setEventCursor(p.next_cursor);}});
  const send=()=>{if(!game||!selected||!canWrite||!consent)return;const match=[game.game_id,selected.source_id,selected.observation_digest,auto].join(':');if(captureOp.current?.id!==match)captureOp.current={id:match,key:crawlRequestKey('game-capture')};const key=captureOp.current.key;run(async(signal,valid)=>{const p=await dispatchGameCapture(game.game_id,selected,key,auto,signal);if(valid()){setCapture(p);setConsent(false);}});};
@@ -74,6 +76,18 @@ export default function DragonGameCorpusPanel({visible,canWrite}:{visible:boolea
     <View style={s.row}><Button label="Previous categories" disabled={!enabled||categoryPage===0} press={()=>setCategoryPage(v=>v-1)}/><Button label="Next categories" disabled={!enabled||(categoryPage+1)*16>=classes.length} press={()=>setCategoryPage(v=>v+1)}/></View>
     <TextInput accessibilityLabel="Source language filter" value={language} onChangeText={v=>{setLanguage(v);clearFilters();}} editable={enabled} maxLength={32} style={field} placeholder="Optional language (en, ja, nb)" placeholderTextColor={C.muted}/>
    </View>}
+   <View style={s.check}>
+    <Text style={s.label}>Search sources across all games</Text>
+    <TextInput accessibilityLabel="Global source search" value={globalQuery} onChangeText={v=>{setGlobalQuery(v);setGlobalResults([]);setGlobalNotice('');}} editable={enabled} maxLength={256} style={field} placeholder="Wiki, mechanics, trailer, map, guide, hostname…" placeholderTextColor={C.muted}/>
+    <Button label="Search indexed source directory" disabled={!enabled||!globalQuery.trim()} press={globalSearch}/>
+    {!!globalNotice&&<Text style={s.small}>{globalNotice}</Text>}
+    {globalResults.map(x=><View key={x.game_id+':'+x.source_id} style={s.check}>
+     <Text style={s.label}>{x.game_title}</Text>
+     <Text style={s.small}>{human(x.kind)} · {x.view_mode} · {x.language}</Text>
+     <Text selectable style={s.small}>{x.url}</Text>
+     <Button label="View this source" disabled={!enabled} press={()=>{setGame({game_id:x.game_id,first_title:x.game_title,namespace:x.namespace,external_id:x.external_id,first_stage:x.first_stage,updated_at:x.updated_at});setViewer(x);setSources([]);setSourceCursor(null);setSelected(null);setConsent(false);setCapture(null);}}/>
+    </View>)}
+   </View>
    {game&&<><Text style={s.label}>Sources for {game.first_title}</Text><Button label="Refresh filtered sources" disabled={!enabled} press={()=>choose(game)}/></>}
    {sources.map(x=><View key={x.source_id} style={s.check}><Text selectable style={s.small}>{x.url}</Text><Text style={s.small}>{human(x.family||"source")} · {human(x.kind)} · {x.view_mode||"text"} · {x.language} · {human(x.latest_observation.stage)} · {x.latest_observation.version||'version not supplied'}</Text><Text style={s.small}>Observed {day(x.last_observed)} · review due {day(x.next_review)}</Text><Button label="Open source viewer" disabled={!enabled} press={()=>setViewer(x)}/><Button label="Select exact source observation" disabled={!enabled||!canWrite} press={()=>{setSelected(x);setConsent(false);setCapture(null);}}/></View>)}
    <Button label="Next source page" disabled={!enabled||!game||!sourceCursor} press={()=>{if(game&&sourceCursor)choose(game,sourceCursor)}}/>
