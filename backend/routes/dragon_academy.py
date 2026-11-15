@@ -2666,6 +2666,12 @@ class CrawlerAutomationRequest(CrawlerWriteRequest):
     max_seconds: int = Field(default=900, ge=15, le=3600, strict=True)
 
 
+class CrawlerArchiveGrantRequest(CrawlerWriteRequest):
+    enabled: bool = Field(strict=True)
+    days: int = Field(default=30, ge=1, le=30, strict=True)
+    archive_rights_acknowledged: bool = Field(strict=True)
+
+
 class CrawlerSourceUseRequest(CrawlerWriteRequest):
     enabled: bool = Field(strict=True)
     max_age_seconds: int = Field(ge=60, le=86400, strict=True)
@@ -2985,6 +2991,19 @@ async def crawler_source_text(
             expected_content_digest=expected_content_digest,
         )
     )
+
+
+@router.post("/crawler/sessions/{session_id}/archive-grant")
+async def crawler_archive_grant(
+    body: CrawlerArchiveGrantRequest,
+    session_id: str = URLPath(min_length=1, max_length=128),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Owner-only grant; enabling requires editor, owner may revoke."""
+    return await _crawler_result(crawler_application.configure_archive_grant(
+        scope, session_id, body.model_dump(), principal=user,
+    ))
 
 
 @router.post("/crawler/sessions/{session_id}/sources/{source_id}/use")
