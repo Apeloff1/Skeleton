@@ -1,7 +1,7 @@
 import React,{useEffect,useState} from 'react';
 import {Text,View} from 'react-native';
 import {getAuthToken} from '../../auth/gameforgeAuth';
-import {verifiedBrowserMedia,type MediaRecord} from '../../product/dragonMediaArchiveClient';
+import {verifiedBrowserMedia,verifyMediaAuthority,type MediaRecord} from '../../product/dragonMediaArchiveClient';
 
 export default function DragonMediaPlayer({record}:{record:MediaRecord}){
  const [uri,setUri]=useState(''),[error,setError]=useState('');
@@ -14,8 +14,16 @@ export default function DragonMediaPlayer({record}:{record:MediaRecord}){
    url=URL.createObjectURL(blob);setUri(url);
   }).catch(e=>{if(live&&!controller.signal.aborted)setError(e instanceof Error?e.message:'Media unavailable.');});
   const timer=setInterval(()=>{if(token!==getAuthToken()||record.expires_at*1000<=Date.now()||document.hidden)stop();},250);
-  const timeout=setTimeout(stop,Math.min(30000,Math.max(0,record.expires_at*1000-Date.now())));
-  return()=>{live=false;clearInterval(timer);clearTimeout(timeout);stop();};
+  let deadline=Date.now()+20000,checking=false;
+  const heartbeat=setInterval(()=>{
+   if(controller.signal.aborted)return;
+   if(Date.now()>=deadline){stop();return;}
+   if(checking)return;
+   checking=true;
+   void verifyMediaAuthority(record,controller.signal).then(()=>{if(!controller.signal.aborted)deadline=Date.now()+20000;}).catch(stop).finally(()=>{checking=false;});
+  },8000);
+  const guard=setInterval(()=>{if(Date.now()>=deadline)stop();},500);
+  return()=>{live=false;clearInterval(timer);clearInterval(heartbeat);clearInterval(guard);stop();};
  },[record]);
  return <View>
   {!!error&&<Text>{error}</Text>}
