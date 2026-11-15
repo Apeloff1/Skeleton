@@ -7,9 +7,17 @@ const { load } = require('./harness.cjs');
 
 const stored = new Map();
 const auth = { token: 'account-A', epoch: 1 };
+let rotateDuringWrite = false;
 const nativeStorage = {
   getItem: async key => stored.has(key) ? stored.get(key) : null,
-  setItem: async (key, value) => { stored.set(key, value); },
+  setItem: async (key, value) => {
+    stored.set(key, value);
+    if (rotateDuringWrite) {
+      rotateDuringWrite = false;
+      auth.token = 'account-C';
+      auth.epoch++;
+    }
+  },
   removeItem: async key => { stored.delete(key); },
 };
 const original = Module._load;
@@ -70,4 +78,24 @@ test('clear is scoped to current account and never resurrects previous draft', a
   assert.equal(await custody.loadGalaxyProfile(), null);
   auth.token = 'account-B'; auth.epoch++;
   assert.equal((await custody.loadGalaxyProfile()).config.title, 'B only');
+});
+
+test('stale explicit epoch cannot modify or read a saved design', async () => {
+  const previousEpoch = auth.epoch;
+  auth.epoch++;
+  await assert.rejects(custody.saveGalaxyProfile(complete(), previousEpoch), /Stale/);
+  await assert.rejects(custody.loadGalaxyProfile(previousEpoch), /Stale/);
+  await assert.rejects(custody.clearSavedGalaxyProfile(previousEpoch), /Stale/);
+});
+
+test('rotating mid-save restores the previous profile without leaking to the next account', async () => {
+  auth.token = 'account-A';
+  auth.epoch++;
+  await custody.saveGalaxyProfile({ ...complete(), title: 'Preserved design' });
+  rotateDuringWrite = true;
+  await assert.rejects(custody.saveGalaxyProfile({ ...complete(), title: 'Interrupted design' }), /Account changed/);
+  assert.equal(await custody.loadGalaxyProfile(), null);
+  auth.token = 'account-A';
+  auth.epoch++;
+  assert.equal((await custody.loadGalaxyProfile()).config.title, 'Preserved design');
 });
