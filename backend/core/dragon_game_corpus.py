@@ -14,11 +14,12 @@ import time
 import unicodedata
 from contextlib import contextmanager
 from pathlib import Path
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlsplit, urlunsplit, parse_qsl
+import ipaddress
 
 from core.dragon_hoarder_bulk import owner_key
 
-from core.dragon_game_taxonomy import KINDS, cadence, priority, public_taxonomy
+from core.dragon_game_taxonomy import KINDS, cadence, priority, public_taxonomy, SOURCE_CLASSES, view_mode, FAMILIES
 STAGES = {"announced", "early_access", "released", "updated", "delisted", "unknown"}
 KEY = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,127}\Z")
 DIGEST = re.compile(r"[a-f0-9]{64}\Z")
@@ -78,6 +79,9 @@ CREATE TABLE IF NOT EXISTS capture_bindings(
  PRIMARY KEY(owner,session), FOREIGN KEY(owner,game,source) REFERENCES sources(owner,game,id)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS capture_game_time ON capture_bindings(owner,game,recorded_at DESC,session);
+CREATE INDEX IF NOT EXISTS capture_source_time ON capture_bindings(owner,game,source,recorded_at DESC,session);
+CREATE INDEX IF NOT EXISTS source_kind_page ON sources(owner,game,kind,id);
+CREATE INDEX IF NOT EXISTS source_language_page ON sources(owner,game,language,id);
 CREATE TABLE IF NOT EXISTS corpus_migration(
  name TEXT PRIMARY KEY, cursor TEXT, complete INTEGER NOT NULL CHECK(complete IN (0,1))
 ) WITHOUT ROWID;
@@ -117,13 +121,31 @@ def source_url(value):
     parsed = urlsplit(value)
     if parsed.scheme != "https" or not parsed.hostname or parsed.username is not None or parsed.password is not None:
         raise ValueError("HTTPS source identifier required")
-    if parsed.port not in (None, 443) or parsed.query or parsed.fragment:
-        # Avoid persisting URL tokens or signed queries in the candidate catalogue.
+    if parsed.port not in (None,443) or parsed.fragment:
         raise ValueError("plain HTTPS source identifier required")
-    host = parsed.hostname.encode("idna").decode("ascii").lower()
-    if not re.fullmatch(r"[a-z0-9-]+(?:\.[a-z0-9-]+)+", host):
+    host=parsed.hostname.encode("idna").decode("ascii").lower()
+    if not re.fullmatch(r"[a-z0-9-]+(?:\.[a-z0-9-]+)+",host):
         raise ValueError("DNS source identifier required")
-    return urlunsplit(("https", host, parsed.path or "/", "", ""))
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        pass
+    else:
+        raise ValueError("literal IP source identifier prohibited")
+    if host.endswith((".local",".localhost",".internal",".home.arpa",".onion")):
+        raise ValueError("nonpublic hostname")
+    # Only a narrow public video identity query is accepted. No arbitrary
+    # query, tracking, auth tokens or signed URL credentials are persisted.
+    if host in {"youtube.com","www.youtube.com","m.youtube.com"} and parsed.path=="/watch":
+        pairs=parse_qsl(parsed.query,keep_blank_values=True,strict_parsing=True,max_num_fields=1)
+        if len(pairs)!=1 or pairs[0][0]!="v" or not re.fullmatch(r"[A-Za-z0-9_-]{11}",pairs[0][1]):
+            raise ValueError("invalid public video identity")
+        return "https://youtu.be/"+pairs[0][1]
+    if parsed.query:
+        raise ValueError("plain HTTPS source identifier required")
+    if host=="youtu.be" and not re.fullmatch(r"/[A-Za-z0-9_-]{11}",parsed.path):
+        raise ValueError("invalid public video identity")
+    return urlunsplit(("https",host,parsed.path or "/","",""))
 
 
 def game_id(namespace, external_id):
@@ -284,22 +306,79 @@ class GameCorpus:
         return {"review_candidates":[dict(row) for row in rows],
                 "network_executed":False,"crawl_authorized":False}
 
-    def sources(self, scope, game, *, after=None, limit=64):
-        owner = owner_key(scope)
-        game = _id(game)
-        limit = _limit(limit)
-        after = _id(after) if after is not None else ""
+    def sources(self, scope, game, *, after=None, limit=64, kind=None, family=None, language=None):
+        owner=owner_key(scope)
+        game=_id(game)
+        limit=_limit(limit)
+        after=_id(after) if after is not None else ""
+        clauses=["s.owner=?","s.game=?","s.id>?"]
+        args=[owner,game,after]
+        if kind is not None:
+            if kind not in KINDS: raise ValueError("source category")
+            clauses.append("s.kind=?");args.append(kind)
+        if family is not None:
+            if family not in FAMILIES: raise ValueError("source family")
+            kinds=sorted(k for k,v in SOURCE_CLASSES.items() if v.family==family)
+            clauses.append("s.kind IN ("+",".join("?" for _ in kinds)+")");args.extend(kinds)
+        if language is not None:
+            language=clean(language,32).lower()
+            if not re.fullmatch(r"[a-z]{2,8}(?:-[a-z0-9]{1,8}){0,3}|und",language):
+                raise ValueError("language tag")
+            clauses.append("s.language=?");args.append(language)
+        args.append(limit+1)
         with self._db() as db:
-            rows = db.execute("""SELECT s.id AS source_id,s.url,s.kind,s.language,s.last_observed,s.next_review,
-                o.payload AS latest_observation,o.digest AS observation_digest
+            rows=db.execute("""SELECT s.id AS source_id,s.url,s.kind,s.language,s.last_observed,s.next_review,
+                o.payload AS latest_observation,o.digest AS observation_digest,
+                EXISTS(SELECT 1 FROM capture_bindings b WHERE b.owner=s.owner AND b.game=s.game AND b.source=s.id) AS has_capture_binding
                 FROM sources s JOIN observations o ON o.owner=s.owner AND o.game=s.game
                 AND o.source=s.id AND o.event_key=s.latest_event
-                WHERE s.owner=? AND s.game=? AND s.id>? ORDER BY s.id LIMIT ?""",
-                (owner,game,after,limit+1)).fetchall()
-        return {"sources":[{**dict(row),"latest_observation":json.loads(row["latest_observation"]),
-                            "verified":False} for row in rows[:limit]],
-                "next_cursor":rows[limit-1]["source_id"] if len(rows)>limit else None,
+                WHERE """+" AND ".join(clauses)+" ORDER BY s.id LIMIT ?",args).fetchall()
+        items=[]
+        for row in rows[:limit]:
+            value=dict(row)
+            value.update(latest_observation=json.loads(row["latest_observation"]),verified=False,
+                         family=SOURCE_CLASSES[row["kind"]].family,view_mode=view_mode(row["kind"]),
+                         has_capture_binding=bool(row["has_capture_binding"]))
+            items.append(value)
+        return {"sources":items,"next_cursor":rows[limit-1]["source_id"] if len(rows)>limit else None,
                 "crawl_authorized":False,"source_use_authorized":False}
+
+    def source_captures(self,scope,game,source,*,limit=32,before=None):
+        """Listed records are routing hints, never a statement of live text authority."""
+        from uuid import UUID
+        owner=owner_key(scope)
+        game,source=map(_id,(game,source))
+        limit=_limit(limit)
+        args=[owner,game,source]
+        where=""
+        if before is not None:
+            if not isinstance(before,(tuple,list)) or len(before)!=2 or type(before[0]) is not int or str(UUID(before[1]))!=before[1]:
+                raise ValueError("capture cursor")
+            where=" AND (recorded_at<? OR recorded_at=? AND session>?)"
+            args.extend([before[0],before[0],before[1]])
+        args.append(limit+1)
+        with self._db() as db:
+            rows=db.execute("""SELECT session AS session_id,observation_digest,recorded_at
+                FROM capture_bindings WHERE owner=? AND game=? AND source=?"""+where+
+                " ORDER BY recorded_at DESC,session LIMIT ?",args).fetchall()
+        return {"captures":[dict(row) for row in rows[:limit]],
+                "next_cursor":[rows[limit-1]["recorded_at"],rows[limit-1]["session_id"]] if len(rows)>limit else None,
+                "source_use_authorized":False}
+
+    def inspect_capture_binding(self,scope,game,source,session):
+        from uuid import UUID
+        owner=owner_key(scope)
+        game,source=map(_id,(game,source))
+        if not isinstance(session,str) or str(UUID(session))!=session:
+            raise ValueError("session id")
+        with self._db() as db:
+            row=db.execute("""SELECT b.observation_digest,s.url,s.kind,s.language
+                FROM capture_bindings b JOIN sources s ON s.owner=b.owner AND s.game=b.game AND s.id=b.source
+                WHERE b.owner=? AND b.game=? AND b.source=? AND b.session=?""",
+                (owner,game,source,session)).fetchone()
+        if not row:
+            raise LookupError("capture binding unavailable")
+        return dict(row)
 
 
     def capture_plan(self,scope,game,source,observation_digest):
