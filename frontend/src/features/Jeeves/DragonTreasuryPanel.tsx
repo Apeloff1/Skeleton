@@ -1,7 +1,7 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,AppState,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {getAuthToken} from '../../auth/gameforgeAuth';
-import {getDragonTreasury,configureDragonArchive,crawlRequestKey,type CrawlSession,type DragonTreasury,type TreasuryMode,type TreasuryRevision} from '../../product/crawlerClient';
+import {getDragonTreasury,getTreasuryPassage,configureDragonArchive,crawlRequestKey,type CrawlSession,type DragonTreasury,type TreasuryMode,type TreasuryRevision,type TreasuryPassage} from '../../product/crawlerClient';
 import s,{colors} from './CrawlerWorkspace.styles';
 import AnimatedDragon from './companion/DragonCompanion';
 import {INITIAL_DRAGON_STATE} from './companion/dragonCompanionState';
@@ -15,13 +15,14 @@ const short=(s:string)=>s.slice(0,12);
 function Button({label,action,disabled=false}:{label:string;action:()=>void;disabled?:boolean}){
  return <TouchableOpacity style={[s.button,disabled&&s.disabled]} accessibilityRole="button" accessibilityState={{disabled}} disabled={disabled} onPress={action}><Text style={s.buttonText}>{label}</Text></TouchableOpacity>;
 }
-function Revision({row}:{row:TreasuryRevision}){
+function Revision({row,inspect,disabled=false}:{row:TreasuryRevision;inspect?:(row:TreasuryRevision)=>void;disabled?:boolean}){
  return <View style={s.check}>
   <Text selectable style={s.label}>{row.plane==='current'?'Current':'Historic'} · {short(row.revision_id)} · {row.delta.kind.replaceAll('_',' ')}</Text>
   <Text style={s.small}>{stamp(row.first_seen)} → {stamp(row.last_seen)} · {row.reobservations} subsequent observations</Text>
   <Text style={s.small}>{row.indexed?(row.archive_only?'Historical permission only':'Authorized retained text'):'Metadata only · no searchable text'}{row.latest_observed?' · latest observed':''}</Text>
   {row.delta.similarity!==null&&<Text style={s.small}>Lexical similarity {Math.round(row.delta.similarity*100)}% · {row.delta.added_terms} added terms · {row.delta.removed_terms} removed · numeric change {row.delta.numeric_change?'observed':'not observed'}</Text>}
   {row.source_id&&<Text selectable style={s.small}>Source {row.source_id}{row.indexed_capture_at!==null?' · indexed observation '+stamp(row.indexed_capture_at):''}</Text>}
+  {row.indexed&&inspect&&<Button label="Inspect exact retained text" disabled={disabled} action={()=>inspect(row)}/>}
  </View>;
 }
 export default function DragonTreasuryPanel({revision,session,canWrite=false,onSession,onRevisit,disabled=false}:{revision:string;session?:CrawlSession|null;canWrite?:boolean;onSession?:(s:CrawlSession)=>void;onRevisit?:(url:string)=>void;disabled?:boolean}){
@@ -34,12 +35,18 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
  const [days,setDays]=useState('30');
  const [rights,setRights]=useState(false);
  const [open,setOpen]=useState(false);
+ const [passage,setPassage]=useState<TreasuryPassage|null>(null);
+ const [passageBusy,setPassageBusy]=useState(false);
+ const passageRequest=useRef<AbortController|null>(null),passageTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const request=useRef<AbortController|null>(null), timer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const generation=useRef(0), owner=useRef(getAuthToken()), observed=useRef(revision);
  const grantKey=useRef<{identity:string;key:string}|null>(null);
  const reduced=useReducedMotion(),screenReader=useScreenReader(),power=usePowerAwareness();
  const invalidate=useCallback(()=>{
   generation.current++;request.current?.abort();request.current=null;
+  passageRequest.current?.abort();passageRequest.current=null;
+  if(passageTimer.current!==null)clearTimeout(passageTimer.current);passageTimer.current=null;
+  setPassage(null);setPassageBusy(false);
   if(timer.current!==null)clearTimeout(timer.current);timer.current=null;
  },[]);
  useEffect(()=>{
@@ -64,6 +71,21 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
    timer.current=setTimeout(()=>{if(epoch===generation.current)setResult(null);},ttl);
   }catch(e){if(!ctrl.signal.aborted&&epoch===generation.current&&token===getAuthToken())setError(e instanceof Error?e.message:'Treasury unavailable.');}
   finally{if(epoch===generation.current){request.current=null;setBusy(false);}}
+ }
+ async function inspect(row:{session_id:string|null;source_id:string|null},offset=0){
+  if(!visible||!row.session_id||!row.source_id||passageBusy)return;
+  const sid=row.session_id,source=row.source_id,token=getAuthToken(),epoch=generation.current,started=Date.now();
+  passageRequest.current?.abort();if(passageTimer.current!==null)clearTimeout(passageTimer.current);
+  const ctrl=new AbortController();passageRequest.current=ctrl;setPassageBusy(true);setPassage(null);setError('');
+  try{
+   const p=await getTreasuryPassage(sid,source,offset,ctrl.signal);
+   if(ctrl.signal.aborted||generation.current!==epoch||getAuthToken()!==token)return;
+   const ttl=Math.min(120000,1000*(p.valid_until-p.as_of_unix)-(Date.now()-started));
+   if(ttl<=0){setError('Source permission expired during inspection.');return;}
+   setPassage(p);
+   passageTimer.current=setTimeout(()=>{if(generation.current===epoch)setPassage(null);},ttl);
+  }catch(e){if(!ctrl.signal.aborted&&generation.current===epoch&&getAuthToken()===token)setError(e instanceof Error?e.message:'Historical inspection unavailable.');}
+  finally{if(passageRequest.current===ctrl){passageRequest.current=null;setPassageBusy(false);}}
  }
  async function grant(enabled:boolean){
   if(!session||!onSession||busy||disabled||enabled&&(!canWrite||!rights))return;
@@ -118,9 +140,22 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
      <Button label="Compare versions" disabled={busy||disabled} action={()=>{setFamily(f.family_id);setMode('compare');void observe('compare',f.family_id);}}/>
      {!!f.refresh_url&&!!onRevisit&&canWrite&&f.revisit.ready_for_review&&<Button label="Prepare fresh expedition" disabled={busy||disabled} action={()=>{onRevisit(f.refresh_url!);invalidate();setResult(null);}}/>}
     </View>)}
-    {visible.comparison&&<View style={s.check}><Text style={s.heading}>Latest and preceding observation</Text><Revision row={visible.comparison.current}/><Revision row={visible.comparison.previous}/></View>}
+    {visible.comparison&&<View style={s.check}><Text style={s.heading}>Latest and preceding observation</Text><Revision row={visible.comparison.current} inspect={inspect} disabled={passageBusy}/><Revision row={visible.comparison.previous} inspect={inspect} disabled={passageBusy}/></View>}
     <Text style={s.heading}>{mode==='timeline'?'Revision timeline':'Matching indexed revisions'}</Text>
-    {(mode==='timeline'?visible.timeline:visible.hits).map(v=><Revision key={v.revision_id} row={v}/>)}
+    {(mode==='timeline'?visible.timeline:visible.hits).map(v=><Revision key={v.revision_id} row={v} inspect={inspect} disabled={passageBusy}/>)}
+    {passageBusy&&<ActivityIndicator color={colors.accent}/>}
+    {passage&&<View style={s.check}>
+      <Text style={s.heading}>Exact retained source · {passage.history_only?'history only':'current use permitted'}</Text>
+      <Text style={s.small}>Captured {stamp(passage.captured_at)} · characters {passage.offset}–{passage.end} of {passage.total_chars}. Unreviewed; not authorized for model context by this reader.</Text>
+      <Text selectable style={s.message}>{passage.text}</Text>
+      <Text selectable style={s.small}>Span SHA-256: {passage.span_sha256}</Text>
+      <Text selectable style={s.small}>Retained text SHA-256: {passage.preserved_text_hash}</Text>
+      <View style={s.row}>
+        <Button label="Previous passage" disabled={passageBusy||passage.offset===0} action={()=>void inspect(passage,Math.max(0,passage.offset-1600))}/>
+        <Button label="Next passage" disabled={passageBusy||passage.next_offset===null} action={()=>void inspect(passage,passage.next_offset??0)}/>
+        <Button label="Close passage" action={()=>setPassage(null)}/>
+      </View>
+    </View>}
     <Text selectable style={s.small}>Index receipt {visible.partition_digest}</Text>
    </>}
   </>}
