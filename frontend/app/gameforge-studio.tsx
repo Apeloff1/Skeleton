@@ -201,7 +201,7 @@ function StudioInner() {
   }, []);
 
   const loadVaultPkgs = React.useCallback(async () => {
-    const r = await api.get<any>(`${WF}/vault?limit=25`, { timeoutMs: 15000 });
+    const r = await api.get<any>(`${WF}/vault?limit=25`, authOpts(15000));
     if (r.ok && r.data?.ok) setVaultPkgs(r.data.packages || []);
   }, []);
 
@@ -281,12 +281,15 @@ function StudioInner() {
   const downloadPackage = async (pkg: any) => {
     if (!pkg?.package_id) return;
     setDlMsg(`Fetching ${pkg.package_name}…`);
-    const r = await api.get<any>(`${WF}/vault/${pkg.package_id}/download`, { timeoutMs: 30000 });
+    const r = await api.get<any>(`${WF}/vault/${encodeURIComponent(pkg.package_id)}/download`, { ...authOpts(30000), maxResponseChars: 12 * 1024 * 1024 });
     if (!r.ok || !r.data?.ok || !r.data?.content_base64) {
       setDlMsg(`Download failed: ${r.data?.detail || 'unavailable'}`);
       return;
     }
     const { content_base64, package_name, sha256 } = r.data;
+    if (typeof package_name !== "string" || !/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,159}$/.test(package_name) || !/^[a-f0-9]{64}$/.test(String(sha256))) {
+      setDlMsg("Package metadata failed integrity admission."); return;
+    }
     try {
       if (Platform.OS === 'web') {
         const bytes = Uint8Array.from(atob(content_base64), (c) => c.charCodeAt(0));

@@ -7,9 +7,23 @@ Mongo-backed (survives restarts/forks). Persists both finished run records
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import time
+import uuid
 from urllib.parse import urlsplit, urlunsplit
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
+
+from gameforge.workflow.delivery_scope import current_scope
+
+
+def _owned():
+    return {"scope_key": current_scope().key, "format": 2}
+
+
+def _key(kind: str, identity: str) -> str:
+    return hashlib.sha256(json.dumps([kind, current_scope().key, identity],
+                                     separators=(",", ":")).encode()).hexdigest()
 
 
 # Historical receipts must not become a second source of bearer tokens.
@@ -43,36 +57,37 @@ class WorkflowPersistence:
 
     # ── finished runs (history) ───────────────────────────────────────
     def save_run(self, project_name: str, run: Dict) -> str:
-        run_id = run.get("run_id") or f"{project_name}_{int(time.time()*1000)}"
-        doc = {**_without_delivery_credentials(run), "run_id": run_id, "project_name": project_name, "saved_at": time.time()}
-        self._runs().update_one({"run_id": run_id}, {"$set": doc}, upsert=True)
+        run_id = run.get("run_id") or uuid.uuid4().hex
+        doc = {**_without_delivery_credentials(run), **_owned(),
+               "run_id": run_id, "project_name": project_name, "saved_at": time.time()}
+        self._runs().update_one({"_id": _key("run", run_id), **_owned()}, {"$set": doc}, upsert=True)
         return run_id
 
     def list_runs(self, project_name: Optional[str] = None, limit: int = 25) -> List[Dict]:
-        q: Dict = {}
+        q: Dict = _owned()
         if project_name:
             q["project_name"] = project_name
-        docs = self._runs().find(q, {"_id": 0}).sort("saved_at", -1).limit(int(limit))
+        docs = self._runs().find(q, {"_id": 0, "scope_key": 0, "format": 0}).sort("saved_at", -1).limit(max(1, min(int(limit), 100)))
         return [_without_delivery_credentials(doc) for doc in docs]
 
     def get_run(self, run_id: str) -> Optional[Dict]:
-        doc = self._runs().find_one({"run_id": run_id}, {"_id": 0})
+        doc = self._runs().find_one({"_id": _key("run", run_id), **_owned()}, {"_id": 0, "scope_key": 0, "format": 0})
         return _without_delivery_credentials(doc) if doc else None
 
     # ── in-flight state (resume) ──────────────────────────────────────
     def save_state(self, project_name: str, state: Dict) -> None:
         self._state().update_one(
-            {"project_name": project_name},
-            {"$set": {"project_name": project_name, "state": state, "updated_at": time.time()}},
+            {"_id": _key("state", project_name), **_owned(), "state.run_id": state["run_id"]},
+            {"$set": {**_owned(), "project_name": project_name, "state": state, "updated_at": time.time()}},
             upsert=True,
         )
 
     def load_latest_state(self, project_name: str) -> Optional[Dict]:
-        doc = self._state().find_one({"project_name": project_name}, {"_id": 0})
+        doc = self._state().find_one({"_id": _key("state", project_name), **_owned()}, {"_id": 0})
         return doc.get("state") if doc else None
 
-    def clear_state(self, project_name: str) -> None:
-        self._state().delete_one({"project_name": project_name})
+    def clear_state(self, project_name: str, run_id: str) -> None:
+        self._state().delete_one({"_id": _key("state", project_name), **_owned(), "state.run_id": run_id})
 
 
 workflow_persistence = WorkflowPersistence()

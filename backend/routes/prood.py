@@ -19,7 +19,7 @@ from typing import Dict, List, Optional
 
 import httpx
 from core.public_exception_route import PublicExceptionRoute
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
 from gameforge.prood import event_bus, quorum_consensus, recent_events
@@ -27,6 +27,8 @@ from gameforge.prood.quorum import QuorumConsensus
 from gameforge.prood.saga_orchestrator import SagaOrchestrator, SagaStep
 from gameforge.workflow.internal_build_system import create_internal_build_system
 from gameforge.workflow.jeeves_vault import jeeves_vault
+from gameforge.workflow.delivery_scope import scope_for_user, use_scope
+from routes.gameforge_auth import require_role
 
 router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/prood", tags=["prood"])
 
@@ -173,10 +175,13 @@ class SagaDemoRequest(BaseModel):
 
 
 @router.post("/saga/deploy")
-async def saga_deploy(req: SagaDemoRequest):
+async def saga_deploy(req: SagaDemoRequest, response: Response, user=Depends(require_role("editor"))):
     """Run the PROOD deployment saga: build → register → deliver. Pass
     `fail_at` to inject a failure and prove automatic compensation (rollback
     in reverse) — a registered package is deleted on rollback."""
+    scope = scope_for_user(user)
+    if scope is None:
+        raise HTTPException(401, "workflow_identity_required")
     builder = create_internal_build_system(req.project_name)
 
     async def _build(ctx):
@@ -225,7 +230,9 @@ async def saga_deploy(req: SagaDemoRequest):
         SagaStep("register", _register, compensate=_unregister, requires_compensation=True),
         SagaStep("deliver", _deliver),
     ])
-    result = await orchestrator.execute_saga("prood_deploy")
+    with use_scope(scope):
+        result = await orchestrator.execute_saga("prood_deploy")
+    response.headers["Cache-Control"] = "no-store"
     data = result.to_dict()
     # strip raw bytes from context before returning
     data["context"].pop("_bundle", None)
