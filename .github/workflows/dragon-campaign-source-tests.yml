@@ -274,6 +274,13 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_companion_curriculum.py' -v
           python -m py_compile skeleton/ai/webcrawler/dragon_sanctuary.py
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_sanctuary.py' -v
+      - name: Qualify Hoarder temporal indexing, posterior refresh and archival permission
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m py_compile skeleton/ai/webcrawler/dragon_treasury.py skeleton/ai/webcrawler/dragon_revisit_model.py skeleton/ai/webcrawler/dragon_archive_grant.py
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_treasury.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_grant.py' -v
       - name: Qualify REP protocol and indexed navigation
         env:
           PYTHONDONTWRITEBYTECODE: "1"
