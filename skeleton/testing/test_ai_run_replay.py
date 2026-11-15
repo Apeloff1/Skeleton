@@ -176,3 +176,52 @@ def test_unbounded_and_cyclic_replay_payload_rejected() -> None:
     with pytest.raises(AiRunReplayError):
         recorder.record("act", {"text": "x" * (16 * 1024 * 1024 + 1)})
     assert not recorder.tape.events
+
+
+def test_cumulative_tape_admission_rejects_before_logical_clock_advances(monkeypatch):
+    from skeleton.quality import ai_run_replay as replay
+    monkeypatch.setattr(replay, "_MAX_RECORDED_EVENT_BYTES", 1000)
+    recorder = AiRunRecorder("bounded")
+    recorder.record("act", {"text": "a" * 400})
+    before = recorder.export()
+    clock = recorder.clock.now_ms()
+    with pytest.raises(AiRunReplayError, match="cumulative replay event byte budget"):
+        recorder.record("act", {"text": "b" * 400})
+    assert recorder.clock.now_ms() == clock
+    assert recorder.export() == before
+
+
+def test_escaped_content_is_counted_before_serialization(monkeypatch):
+    from skeleton.quality import ai_run_replay as replay
+    monkeypatch.setattr(replay, "_MAX_JSON_BYTES", 1024)
+    with pytest.raises(AiRunReplayError, match="JSON text exceeds bounds"):
+        replay._canonical_bytes({"text": "界" * 300})
+
+
+@pytest.mark.parametrize("bad", [True, -1, float("inf"), float("nan"), 10**400, "10"])
+def test_direct_performance_construction_rejects_invalid_values(bad):
+    with pytest.raises(AiRunReplayError):
+        PerfBudgets(frame_ms=bad)
+    with pytest.raises(AiRunReplayError):
+        PerfObservation(frame_ms=(bad,))
+
+
+def test_direct_performance_observation_detaches_mutable_input():
+    source = [1.0]
+    observation = PerfObservation(frame_ms=source)
+    source.append(999.0)
+    assert observation.frame_ms == (1.0,)
+
+
+def test_event_kind_bound_is_transactional():
+    recorder = AiRunRecorder("bounded")
+    with pytest.raises(AiRunReplayError, match="event kind"):
+        recorder.record("x" * 129, {})
+    assert recorder.clock.now_ms() == 0
+    assert not recorder.tape.events
+
+
+@pytest.mark.parametrize("perf", [False, [], {"unexpected": 1}])
+def test_scripted_run_rejects_invalid_performance_shape(perf):
+    with pytest.raises(AiRunReplayError, match="performance fields"):
+        record_scripted_ai_run("bounded", [{"kind": "act", "perf": perf}])
