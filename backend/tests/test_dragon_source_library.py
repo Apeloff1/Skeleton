@@ -8,7 +8,7 @@ import hashlib
 import json
 import sqlite3
 
-from core.dragon_game_corpus import GameCorpus,source_url,CatalogueHeld
+from core.dragon_game_corpus import GameCorpus,source_url,CatalogueHeld,MAX_SOURCES
 from core.dragon_game_taxonomy import SOURCE_CLASSES,FAMILIES,public_taxonomy,view_mode
 from core.dragon_release_discovery import parse_manifest
 from core import dragon_source_library as library
@@ -89,6 +89,22 @@ class SourceDirectoryTests(TestCase):
         self.assertEqual(a["indexed"]+b["indexed"]+c["indexed"],2)
         self.assertTrue(c["complete"])
         self.assertTrue(self.store.search_source_library(SCOPE,"manual")["index_backfill_complete"])
+
+    def test_transactional_source_count_legacy_initialization_and_quota(self):
+        first=self.observe()
+        self.assertEqual(MAX_SOURCES,250_000)
+        # Simulate the first write following an older catalogue migration.
+        with sqlite3.connect(self.path) as db:
+            db.execute("DELETE FROM game_source_counts")
+        self.observe("pdf_manual","https://example.org/manual.pdf")
+        self.observe(event="v2")
+        with sqlite3.connect(self.path) as db:
+            self.assertEqual(db.execute("SELECT total FROM game_source_counts WHERE game=?",(first["game_id"],)).fetchone()[0],2)
+        with patch("core.dragon_game_corpus.MAX_SOURCES",2):
+            with self.assertRaises(CatalogueHeld):
+                self.observe("gameplay_video","https://youtu.be/AbCdEf0123_")
+        with sqlite3.connect(self.path) as db:
+            self.assertEqual(db.execute("SELECT total FROM game_source_counts WHERE game=?",(first["game_id"],)).fetchone()[0],2)
 
     def test_bound_capture_history_is_game_source_and_owner_specific(self):
         wiki=self.observe()
