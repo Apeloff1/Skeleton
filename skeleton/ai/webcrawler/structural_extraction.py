@@ -242,3 +242,25 @@ def extract_structural_text(raw: str, *, max_chars: int) -> StructuralProjection
     return StructuralProjection(joined[:max_chars], strategy, len(blocks), len(selected),
                                 visible, min(max_chars, len(joined)), round(confidence, 8),
                                 fallback, limited)
+
+
+def validate_structural_receipt(value: object) -> bool:
+    keys = {"strategy", "total_blocks", "selected_blocks", "visible_chars",
+            "selected_chars", "confidence", "fallback", "truncated",
+            "source_trusted", "network_used"}
+    if not isinstance(value, dict) or set(value) != keys:
+        return False
+    if (value["strategy"] not in {"landmark_density_v1", "ambiguous_full_projection"}
+            or type(value["fallback"]) is not bool or type(value["truncated"]) is not bool
+            or value["source_trusted"] is not False or value["network_used"] is not False
+            or value["fallback"] != (value["strategy"] == "ambiguous_full_projection")):
+        return False
+    for key, cap in (("total_blocks", MAX_BLOCKS), ("selected_blocks", MAX_BLOCKS),
+                     ("visible_chars", MAX_TOTAL_CHARS), ("selected_chars", MAX_TOTAL_CHARS)):
+        if type(value[key]) is not int or not 0 <= value[key] <= cap:
+            return False
+    score = value["confidence"]
+    return (isinstance(score, (int, float)) and not isinstance(score, bool)
+            and math.isfinite(score) and 0 <= score <= 1
+            and value["selected_blocks"] <= value["total_blocks"]
+            and (value["fallback"] or (value["confidence"] >= .70 and value["selected_blocks"] >= 2)))
