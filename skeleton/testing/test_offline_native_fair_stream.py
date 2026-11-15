@@ -797,3 +797,82 @@ def test_native_composition_rejects_cross_role_or_wrong_keys(private_files, role
     assert session.verify() == before
     assert journal._private_handle is None
     assert registry.status()["staged"] == 0
+
+def test_authenticated_native_interrupt_cannot_publish_or_reexecute(private_files, monkeypatch):
+    from skeleton.app.offline_native_fair_stream import interrupt_authenticated_native_cpu_prompt
+    from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchUncertain
+
+    install_probe(monkeypatch)
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1], journal=journal,
+        result_key=RESULT_KEY, sampler=LiveStreamBudgetSampler(), storage_path=".",
+        operator_recovery_key=b"o" * 32,
+    )
+    stage_native_cpu_prompt(
+        runtime=runtime, registry=registry, request_id="interrupt-native",
+        tenant_id="alice", prompt="hello", max_output_tokens=2,
+    )
+    service.submit(StreamRequest("interrupt-native", "alice", InferencePhase.PREFILL, 2, 16))
+    calls = []
+
+    def generate(self, sequence, config, *, interrupt=None):
+        calls.append(sequence)
+        assert not interrupt_authenticated_native_cpu_prompt(
+            service=service, authenticated_tenant_id="bob", request_id="interrupt-native",
+        )
+        assert not interrupt_authenticated_native_cpu_prompt(
+            service=service, authenticated_tenant_id="alice", request_id="foreign",
+        )
+        assert interrupt_authenticated_native_cpu_prompt(
+            service=service, authenticated_tenant_id="alice", request_id="interrupt-native",
+        )
+        assert callable(interrupt)
+        interrupt()
+        pytest.fail("signalled execution reached completion")
+
+    monkeypatch.setattr(NativeLLMRuntime, "generate_sequence", generate)
+    with pytest.raises(DispatchUncertain, match="uncertain"):
+        service.execute_next(token_budget=2)
+    assert service.status().execution_uncertain
+    assert service.status().pending_leases == 1
+    assert vault._connection.execute("SELECT COUNT(*) FROM local_fair_stream_sealed_results").fetchone() == (0,)
+    assert journal._connection.execute("SELECT state,receipt FROM local_fair_stream_execution_journal").fetchone() == ("running", None)
+    assert not interrupt_authenticated_native_cpu_prompt(
+        service=service, authenticated_tenant_id="alice", request_id="interrupt-native",
+    )
+    with pytest.raises(DispatchUncertain):
+        service.execute_next(token_budget=2)
+    assert len(calls) == 1
+
+
+def test_queued_cleanup_failure_preserves_item_for_explicit_cancellation(private_files, monkeypatch):
+    from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchDeferred
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, _ = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1], journal=journal,
+        result_key=RESULT_KEY, sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    stage_native_cpu_prompt(
+        runtime=runtime, registry=registry, request_id="cleanup-native",
+        tenant_id="alice", prompt="hello", max_output_tokens=2,
+    )
+    service.submit(StreamRequest("cleanup-native", "alice", InferencePhase.PREFILL, 2, 16))
+    before = session.verify()
+    original = service._guard._cancel_cleanup
+
+    def failed(request_id):
+        original(request_id)
+        raise OSError("cleanup response lost")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(service._guard, "_cancel_cleanup", failed)
+        with pytest.raises(DispatchDeferred, match="cleanup"):
+            service.cancel("cleanup-native", tenant_id="alice")
+    assert session.verify() == before
+    assert registry.status()["staged"] == 0
+    assert service.cancel("cleanup-native", tenant_id="alice").pending_leases == 0
+    assert session.verify()["checkpoint"]["requests"] == []
+    assert not journal.request_exists("cleanup-native")

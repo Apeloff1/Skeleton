@@ -348,3 +348,38 @@ def test_submit_status_uses_exact_mutation_without_second_observation(monkeypatc
     assert status.generation == 1
     assert status.pending_leases == 0
     assert not status.execution_uncertain
+
+@pytest.mark.parametrize("key", [b"short", C, E, "not-bytes", b"x" * 129])
+def test_invalid_operator_key_never_bootstraps_custody(key):
+    connection = sqlite3.connect(":memory:")
+    anchor = ExternalAnchor()
+    try:
+        with pytest.raises(ValueError, match="independent operator recovery key"):
+            OfflineAdaptiveDispatchService.from_trusted_handles(
+                connection=connection, custody_key=C, execution_key=E,
+                session_id=SESSION, watermark=anchor,
+                owner=SimulatedDurableOwner(), storage_path=".", bootstrap=True,
+                operator_recovery_key=key,
+            )
+        assert anchor.state is None
+        assert connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall() == []
+    finally:
+        connection.close()
+
+
+def test_preparation_callback_cannot_reenter_app_dispatch(monkeypatch):
+    app = make()
+    original = app._session.verify()
+
+    def prepare(item):
+        assert app.status().execution_uncertain
+        with pytest.raises(DispatchUncertain):
+            app.submit(request())
+        with pytest.raises(DispatchUncertain):
+            app.execute_next(token_budget=32)
+        return item
+
+    monkeypatch.setattr(app._guard, "_prepare_request", prepare)
+    assert app.submit(request()).generation == original["generation"] + 1
+    assert not app.status().execution_uncertain
+    assert len(app._session.verify()["checkpoint"]["requests"]) == 1

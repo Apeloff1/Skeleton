@@ -386,3 +386,25 @@ def test_unconfigured_recovery_fails_closed(monkeypatch, tmp_path):
         )
     assert app._session.verify() == before
     assert backend.calls == 1
+
+def test_cleanup_failure_does_not_consume_cancel_recovery_approval(monkeypatch, tmp_path):
+    app, journal, backend, permit, _ = setup_cancelled_restart(monkeypatch, tmp_path)
+    before = app._session.verify()
+    approval = grant(app, purpose="cancelled")
+    attempts = []
+
+    def cleanup(request_id):
+        attempts.append(request_id)
+        if len(attempts) == 1:
+            raise OSError("simulated cleanup failure")
+
+    monkeypatch.setattr(app._guard, "_cancel_cleanup", cleanup)
+    with pytest.raises(DispatchUncertain, match="cancelled receipt"):
+        app.reconcile_cancelled(authorization=approval, recovery_key=RECOVERY_KEY)
+    assert app._session.verify() == before
+    assert app.status().execution_uncertain
+    assert journal.recover_cancelled_receipt(permit)
+    status = app.reconcile_cancelled(authorization=approval, recovery_key=RECOVERY_KEY)
+    assert status.pending_leases == 0 and not status.execution_uncertain
+    assert attempts == [permit.request_id, permit.request_id]
+    assert backend.calls == 0

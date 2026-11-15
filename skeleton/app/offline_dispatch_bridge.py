@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass
+import hmac
 import sqlite3
 import os
 from typing import TYPE_CHECKING, Callable
@@ -27,6 +28,18 @@ from skeleton.ai.model_runtime.fair_stream_session import (
 )
 from skeleton.ai.model_runtime.fair_stream_sqlite import DurableFairStreamStore
 from skeleton.ai.model_runtime.private_sqlite import PrivateSQLiteHandle, open_private_sqlite
+
+
+def _validate_operator_provisioning(
+    operator_key: bytes | None, custody_key: bytes, execution_key: bytes,
+) -> None:
+    """Reject invalid recovery configuration before opening or bootstrapping custody."""
+    if operator_key is not None and (
+        type(operator_key) is not bytes or not 32 <= len(operator_key) <= 128
+        or any(type(key) is not bytes or hmac.compare_digest(operator_key, key)
+               for key in (custody_key, execution_key))
+    ):
+        raise ValueError("independent operator recovery key required")
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,6 +95,7 @@ class OfflineAdaptiveDispatchService:
         """Never silently reset a previous session on a restart."""
         if type(bootstrap) is not bool:
             raise ValueError("explicit bootstrap boolean required")
+        _validate_operator_provisioning(operator_recovery_key, custody_key, execution_key)
         store = DurableFairStreamStore(
             connection, custody_key=custody_key, execution_key=execution_key,
             session_id=session_id, whole_request=whole_request,
@@ -110,6 +124,7 @@ class OfflineAdaptiveDispatchService:
         """
         if type(bootstrap) is not bool:
             raise ValueError("explicit bootstrap boolean required")
+        _validate_operator_provisioning(operator_recovery_key, custody_key, execution_key)
         handle = open_private_sqlite(
             directory, create=bootstrap, max_database_bytes=max_database_bytes,
         )

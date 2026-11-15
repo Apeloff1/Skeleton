@@ -19,3 +19,18 @@ constructors remain explicitly unqualified. The status reports restart-lost
 pending leases as uncertain. External-anchor divergence, hard process
 termination, Windows custody and real-device qualification are outside this
 repair.
+
+Operator recovery must be configured at trusted service composition using a
+separate high-entropy recovery key. A request-provided key is checked against
+the configured domain-separated commitment before its signed approval is
+verified. Without provisioning, all operator recovery fails closed. Invalid
+configuration is rejected before creating or bootstrapping custody. Preserve
+the same separately managed authority across a restart; no secret is written
+into public status or the SQL ledger. The caller remains responsible for
+independent operator authentication and exclusive ownership.
+
+Cancellation revokes the process-local grant before retiring canonical state.
+For an issued permit, the permanent journal cancellation fence is committed
+first; an existing sealed output blocks retirement. A failed cleanup leaves
+the pending checkpoint and exact cancellation receipt available for explicit
+operator recovery. No repair recreates the revoked plaintext grant.
