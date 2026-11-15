@@ -2860,6 +2860,17 @@ async def crawler_vault_redundancy(
     return await _crawler_result(crawler_application.treasury_vault_redundancy(scope,session_id))
 
 
+@router.post("/crawler/sessions/{session_id}/repair-vault-replica")
+async def crawler_repair_vault_replica(
+    body: CrawlerVaultRetireRequest,
+    session_id: str = URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    return await _crawler_result(crawler_application.repair_treasury_vault_replica(
+        scope,session_id,body.model_dump(),principal=user))
+
+
 @router.post("/crawler/sessions/{session_id}/restore-vault-primary")
 async def crawler_restore_vault_primary(
     body: CrawlerVaultRetireRequest,

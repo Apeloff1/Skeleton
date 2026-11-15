@@ -54,6 +54,20 @@ class ReplicaCodecTests(unittest.TestCase):
         verify_primary(restored, row["checkpoint_identity"])
         self.assertEqual(CrawlRun.from_snapshot(restored).snapshot(), snapshot)
 
+    def test_reconstruct_only_originally_admitted_duplicate(self):
+        from core.dragon_checkpoint_replica import reconstruct_exact_replica
+        _,row=fixture()
+        witness=copy.deepcopy(row["checkpoint_identity"])
+        encoded=reconstruct_exact_replica(row["snapshot"],witness)
+        self.assertEqual(decode_exact_replica(encoded,witness),row["snapshot"])
+        no_replica={**witness,"replica_available":False,"reason":"replica_capacity"}
+        with self.assertRaises(CheckpointReplicaError):
+            reconstruct_exact_replica(row["snapshot"],no_replica)
+        altered=copy.deepcopy(row["snapshot"])
+        altered["sequence"]+=1
+        with self.assertRaises(CheckpointReplicaError):
+            reconstruct_exact_replica(altered,witness)
+
     def test_stale_or_trailing_replica_cannot_replace_current(self):
         run, row = fixture()
         run.pause()

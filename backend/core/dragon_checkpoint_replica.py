@@ -152,3 +152,26 @@ def decode_exact_replica(replica: object, identity: object) -> dict:
     if _encode(snapshot) != raw:
         raise CheckpointReplicaError("replica representation changed")
     return snapshot
+
+
+def reconstruct_exact_replica(snapshot: dict, identity: object) -> str:
+    """Encode a replacement for an originally admitted replica.
+
+    The existing witness is immutable. An originally unavailable duplicate
+    is not a reservation that can be silently expanded. Re-qualify decoded
+    bytes and the combined checkpoint write envelope before returning.
+    """
+    witness=validate_identity(identity)
+    verify_primary(snapshot,witness)
+    if not witness["replica_available"]:
+        raise CheckpointReplicaError("original replica was not admitted")
+    raw=_encode(snapshot)
+    compressed=zlib.compress(raw,level=1)
+    if len(compressed)>MAX_REPLICA_BYTES:
+        raise CheckpointReplicaError("replacement replica exceeds original bound")
+    replacement=base64.b64encode(compressed).decode("ascii")
+    _encode({"snapshot":snapshot,"checkpoint_identity":witness,"checkpoint_replica":replacement},
+            MAX_WRITE_FIELDS_BYTES)
+    if decode_exact_replica(replacement,witness)!=snapshot:
+        raise CheckpointReplicaError("replacement replica differs from exact primary")
+    return replacement

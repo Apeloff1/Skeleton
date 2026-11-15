@@ -501,6 +501,57 @@ class VaultRestoreTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(error.exception.code,"crawler_vault_restore_held")
         app._admit.assert_not_awaited()
 
+    async def test_explicit_duplicate_repair_preserves_original_and_grant(self):
+        app,row,original,now,command=self.harness(damaged=False)
+        witness=copy.deepcopy(row["checkpoint_identity"])
+        grant=copy.deepcopy(row["archive_grant"])
+        row["checkpoint_replica"]="damaged"
+        from core.dragon_checkpoint_replica import decode_exact_replica
+        with patch("core.dragon_crawler._now",return_value=now),patch(
+                "core.dragon_crawler.authenticated_scope",return_value=SCOPE):
+            first=await app.repair_treasury_vault_replica(SCOPE,row["_id"],command,principal={"role":"editor"})
+            second=await app.repair_treasury_vault_replica(SCOPE,row["_id"],command,principal={"role":"editor"})
+        self.assertEqual(first,second)
+        self.assertEqual(first["outcome"],"repaired")
+        self.assertEqual(decode_exact_replica(row["checkpoint_replica"],witness),original)
+        self.assertEqual(row["checkpoint_identity"],witness)
+        self.assertEqual(row["archive_grant"],grant)
+        _,update=app.sessions.update_one.await_args.args
+        self.assertNotIn("snapshot",update["$set"])
+        self.assertNotIn("checkpoint_identity",update["$set"])
+        self.assertNotIn("archive_grant",update["$set"])
+        app._admit.assert_awaited_once()
+        app.sessions.update_one.assert_awaited_once()
+
+    async def test_duplicate_repair_denies_unavailable_original_reservation(self):
+        app,row,original,now,command=self.harness(damaged=False)
+        row["checkpoint_identity"].update(replica_available=False,reason="write_envelope_capacity")
+        row["checkpoint_replica"]=None
+        with patch("core.dragon_crawler._now",return_value=now),patch(
+                "core.dragon_crawler.authenticated_scope",return_value=SCOPE):
+            with self.assertRaises(CrawlerError) as error:
+                await app.repair_treasury_vault_replica(SCOPE,row["_id"],command,principal={"role":"editor"})
+        self.assertEqual(error.exception.code,"crawler_vault_replica_held")
+        app._admit.assert_not_awaited()
+
+    async def test_duplicate_repair_cannot_use_corrupt_primary(self):
+        app,row,original,now,command=self.harness()
+        with patch("core.dragon_crawler._now",return_value=now),patch(
+                "core.dragon_crawler.authenticated_scope",return_value=SCOPE):
+            with self.assertRaises(CrawlerError) as error:
+                await app.repair_treasury_vault_replica(SCOPE,row["_id"],command,principal={"role":"editor"})
+        self.assertEqual(error.exception.code,"crawler_vault_replica_held")
+        app._admit.assert_not_awaited()
+
+    async def test_duplicate_repair_already_intact_is_noop(self):
+        app,row,original,now,command=self.harness(damaged=False)
+        with patch("core.dragon_crawler._now",return_value=now),patch(
+                "core.dragon_crawler.authenticated_scope",return_value=SCOPE):
+            result=await app.repair_treasury_vault_replica(SCOPE,row["_id"],command,principal={"role":"editor"})
+        self.assertEqual(result["outcome"],"already_intact")
+        app._admit.assert_not_awaited()
+        app.sessions.update_one.assert_not_awaited()
+
     async def test_viewer_cannot_restore(self):
         app,row,original,now,command=self.harness()
         with patch("core.dragon_crawler.authenticated_scope",return_value=SCOPE):

@@ -3750,6 +3750,9 @@ class DragonCrawlerApplication(DragonVaultMixin):
                     "treasury_watch_parent": "",
                     "treasury_vault": "",
                     "treasury_vault_restore": "",
+                    "treasury_vault_replica_repair": "",
+                    "treasury_vault_scrub_due": "",
+                    "treasury_vault_scrub": "",
                 },
             },
         )

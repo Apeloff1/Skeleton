@@ -623,6 +623,24 @@ export async function getDragonVaultRedundancy(id:string,signal?:AbortSignal):Pr
     invalid('Invalid historical redundancy receipt.');
   return p;
 }
+export type DragonVaultReplicaRepair = {
+  schema:'skeleton.dragon.vault-replica-repair.v1';session_id:string;version:number;outcome:'repaired'|'already_intact';
+  snapshot_digest:string;primary_rewritten:false;witness_rewritten:false;historical_grant_extended:false;
+  network_executed:false;independent_backup:false;
+};
+export async function repairDragonVaultReplica(id:string,body:CrawlCommand&{retention_acknowledged:true},
+  signal?:AbortSignal):Promise<DragonVaultReplicaRepair>{
+  if(body.retention_acknowledged!==true||!integer(body.expected_version)||body.expected_version<1)
+    invalid('Explicit retained duplicate repair acknowledgement required.');
+  const p=await read(api.post<DragonVaultReplicaRepair>(ROOT+'/sessions/'+identifier(id)+'/repair-vault-replica',body,options(signal)),
+    getAuthToken(),'Retained duplicate repair unconfirmed.');
+  if(!p||p.schema!=='skeleton.dragon.vault-replica-repair.v1'||p.session_id!==id||!integer(p.version)||p.version<body.expected_version
+    ||!['repaired','already_intact'].includes(p.outcome)||p.outcome==='repaired'&&p.version<=body.expected_version
+    ||!HASH.test(p.snapshot_digest)||p.primary_rewritten!==false||p.witness_rewritten!==false
+    ||p.historical_grant_extended!==false||p.network_executed!==false||p.independent_backup!==false)
+    invalid('Invalid retained duplicate repair receipt.');
+  return p;
+}
 export type DragonVaultRestore = {
   schema:'skeleton.dragon.vault-restore.v1';session_id:string;version:number;outcome:'restored'|'already_intact';
   snapshot_digest:string;ancestor_rollback:false;capture_consent_extended:false;historical_grant_extended:false;

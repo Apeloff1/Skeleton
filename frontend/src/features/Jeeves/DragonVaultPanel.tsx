@@ -1,7 +1,7 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,AppState,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {getAuthToken} from '../../auth/gameforgeAuth';
-import {getDragonVault,getDragonVaultQuota,discoverDragonVault,retireDragonSession,restoreDragonVaultPrimary,getDragonVaultRedundancy,getCrawl,crawlRequestKey,configureDragonArchive,
+import {getDragonVault,getDragonVaultQuota,discoverDragonVault,retireDragonSession,restoreDragonVaultPrimary,repairDragonVaultReplica,getDragonVaultRedundancy,getCrawl,crawlRequestKey,configureDragonArchive,
  configureLegacyTreasuryArchive,eraseCrawl,type DragonVaultCatalog,type DragonVaultQuota,type DragonVaultDiscovery,type DragonVaultRedundancy,type DragonVaultEntry,type CrawlSession} from '../../product/crawlerClient';
 import s,{colors} from './CrawlerWorkspace.styles';
 import {scanArchiveChambers,bestHistoryWindow,type ChamberScan,SCAN_DEADLINE_MS} from './dragonVaultScan';
@@ -123,9 +123,9 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   }catch(e){if(valid(ctrl,attempt,token))setError(e instanceof Error?e.message:'Historical copy verification unavailable.');}
   finally{if(epoch.current===attempt){pending.current=null;setBusy(false);}}
  }
- async function mutate(action:'retire'|'restore'|'grant'|'revoke'|'erase',id:string,version:number,legacy=false){
+ async function mutate(action:'retire'|'restore'|'replica'|'grant'|'revoke'|'erase',id:string,version:number,legacy=false){
   if(busy||disabled||owner.current!==getAuthToken()||action!=='revoke'&&!canWrite)return;
-  if((action==='retire'||action==='restore')&&!retention||action==='grant'&&!rights||action==='erase'&&eraseText!=='ERASE')return;
+  if((action==='retire'||action==='restore'||action==='replica')&&!retention||action==='grant'&&!rights||action==='erase'&&eraseText!=='ERASE')return;
   const n=action==='grant'?Number(days):30;
   if(!Number.isInteger(n)||n<1||n>30){setError('Historical-use duration must be 1–30 days.');return;}
   clearDiscovery();invalidate();const token=getAuthToken(),attempt=epoch.current,ctrl=new AbortController();pending.current=ctrl;
@@ -145,6 +145,9 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
    }else if(action==='restore'){
     const receipt=await restoreDragonVaultPrimary(id,{...command,retention_acknowledged:true},ctrl.signal);
     message=receipt.outcome==='restored'?'Exact original primary restored. No permission renewed.':'Original primary is intact. No changes made.';
+   }else if(action==='replica'){
+    const receipt=await repairDragonVaultReplica(id,{...command,retention_acknowledged:true},ctrl.signal);
+    message=receipt.outcome==='repaired'?'Exact retained duplicate repaired; original primary and witness unchanged.':'Retained duplicate already intact.';
    }else if(action==='erase'){
     await eraseCrawl(id,command,ctrl.signal);message='Original retained session erased; exported copies remain outside the app.';
    }else{
@@ -258,6 +261,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
         <Text style={s.small}>Check the original primary and repair only from its exact existing witnessed replica. This cannot restore an older revision or renew permission.</Text>
         <View style={s.row}><Switch value={retention} onValueChange={setRetention} disabled={busy||disabled} accessibilityLabel="Confirm rights to restore original retained custody"/><Text style={[s.small,s.grow]}>I have rights to maintain this retained record.</Text></View>
         <Button label="Verify or repair original primary" disabled={busy||disabled||!retention} action={()=>void mutate('restore',row.session_id,row.version)}/>
+        <Button label="Verify or repair retained duplicate" disabled={busy||disabled||!retention} action={()=>void mutate('replica',row.session_id,row.version)}/>
        </>}
        {canWrite&&<><Text style={s.small}>Permanent owner erasure removes the original record, its indexes and both quota IDs. Type ERASE to confirm.</Text>
         <TextInput style={field} value={eraseText} onChangeText={setEraseText} autoCapitalize="characters" maxLength={5} accessibilityLabel="Type ERASE to confirm permanent deletion"/>

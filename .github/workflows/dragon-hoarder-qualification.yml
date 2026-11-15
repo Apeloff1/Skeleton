@@ -6,6 +6,9 @@ on:
       - 'skeleton/ai/webcrawler/**'
       - 'backend/core/dragon_crawler.py'
       - 'backend/core/dragon_vault.py'
+      - 'backend/core/dragon_checkpoint_replica.py'
+      - 'backend/tests/test_dragon_checkpoint_replica.py'
+      - 'frontend/scripts/test-dragon-vault-scan.cjs'
       - 'backend/tests/test_dragon_vault_boundary.py'
       - 'tests/test_ai_webcrawler_dragon_vault.py'
       - 'backend/routes/dragon_academy.py'
@@ -91,6 +94,7 @@ jobs:
           python -m py_compile backend/core/dragon_crawler.py backend/routes/dragon_academy.py
           python -m unittest discover -s backend/tests -p 'test_dragon_treasury_boundary.py' -v
           python -m unittest discover -s backend/tests -p 'test_dragon_vault_boundary.py' -v
+          python -m unittest discover -s backend/tests -p 'test_dragon_checkpoint_replica.py' -v
   hoarder_motion:
     name: Level-based physical animation and cozy repertoire
     runs-on: ubuntu-latest
