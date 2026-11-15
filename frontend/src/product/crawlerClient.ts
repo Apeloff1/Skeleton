@@ -14,6 +14,20 @@ export type CrawlAutomation = {
 };
 export type CrawlWorker = { active: boolean; quiescent: boolean; local: boolean; lease_until: string | null; confirmation?: string; recovery_eligible?: boolean };
 export type CrawlCapabilities = { can_run: boolean; can_pause: boolean; can_resume: boolean; can_cancel: boolean; can_erase: boolean; can_automate: boolean };
+export type CrawlInstructionIncident = {
+  sequence: number; url_digest: string; stage: 'response' | 'extracted' | 'robots_comment';
+  categories: string[]; match_count_lower_bound: number; inspection_limited: boolean;
+  inspected_bytes: number; input_digest: string | null; match_fingerprints: Record<string, string>;
+  payload_retained: false; execution_authorized: false;
+};
+export type CrawlInstructionSecurity = {
+  count: number; categories: Record<string, number>; records: CrawlInstructionIncident[];
+  payload_retained: false; execution_authorized: false;
+};
+export type CrawlOriginHealth = {
+  successes: number; failures: number; rejections: number; failure_streak: number;
+  posterior_success: number; uncertainty: number; evidence_count: number;
+};
 export type CrawlSession = {
   session_id: string; title: string; status: 'queued' | 'ready' | 'running' | 'paused' | 'completed' | 'cancelled' | 'budget_exhausted' | 'failed' | 'interrupted';
   state?: string; version: number; created_at: string; updated_at: string; seeds: string[];
@@ -21,15 +35,16 @@ export type CrawlSession = {
   counters: CrawlUsage; frontier_count: number; source_count: number; consent_current: boolean; consent_expires_at: string;
   next_ready_at?: number | null; stop_reason?: string | null; error?: { code?: string; message?: string } | null;
   automation?: CrawlAutomation; worker?: CrawlWorker; capabilities?: CrawlCapabilities;
+  instruction_security?: CrawlInstructionSecurity; adaptive_origin_health?: Record<string, CrawlOriginHealth>;
   queue: { url: string; depth: number; attempts: number; ready_at: number }[];
 };
 export type SourceUsePolicy = { version: number; enabled: boolean; max_age_seconds: number; changed_at: string | null };
 export type SourceFreshness = {
-  usable: boolean; state: 'current' | 'withdrawn' | 'stale' | 'consent_expired' | 'session_revoked' | 'capture_time_invalid';
+  usable: boolean; state: 'current' | 'withdrawn' | 'stale' | 'consent_expired' | 'session_revoked' | 'capture_time_invalid' | 'instruction_quarantined';
   capture_age_seconds: number; valid_until: string; remote_freshness_verified: false;
 };
 export type CapturedSource = { source_id: string; url: string; canonical_url?: string; title: string; text?: string; content_digest: string; fetched_at: string; review_state: string; provenance: Record<string, unknown>; text_truncated?: boolean; use_policy?: SourceUsePolicy; freshness?: SourceFreshness };
-export type CrawlCreate = { idempotency_key: string; seeds: string[]; title?: string; topics: string[]; max_requests: number; max_documents: number; max_bytes: number; max_depth: number; discover_sitemaps?: boolean; frontier_strategy?: 'fifo' | 'balanced'; consent: true; rights_acknowledged: true };
+export type CrawlCreate = { idempotency_key: string; seeds: string[]; title?: string; topics: string[]; max_requests: number; max_documents: number; max_bytes: number; max_depth: number; discover_sitemaps?: boolean; frontier_strategy?: 'fifo' | 'balanced' | 'coverage'; consent: true; rights_acknowledged: true };
 export type CrawlCommand = { idempotency_key: string; expected_version: number };
 export type SourceExport = { filename: string; media_type: string; content: string; content_digest: string; session_id: string; source_id: string };
 const ROOT = '/api/dragon-academy/crawler';
@@ -84,6 +99,45 @@ async function read<T>(operation: Promise<ApiResult<T>>, token: string, message:
   return result.data;
 }
 function options(signal?: AbortSignal) { return { signal, headers: authHeaders(), timeoutMs: 65000, retries: 0 }; }
+const INSTRUCTION_CODES = new Set(['authority_override', 'role_impersonation', 'secret_request',
+  'tool_execution', 'agent_directive', 'policy_evasion', 'instruction_artifact', 'instruction_file', 'inspection_limit']);
+function validInstructionSecurity(value: CrawlInstructionSecurity, requests: number): boolean {
+  if (!value || !integer(value.count, Math.min(128, requests)) ||
+      !Array.isArray(value.records) || value.records.length !== value.count ||
+      value.payload_retained !== false || value.execution_authorized !== false ||
+      !value.categories || typeof value.categories !== 'object' || Array.isArray(value.categories)) return false;
+  const counts: Record<string, number> = {};
+  let previous = 0;
+  for (const record of value.records) {
+    if (!record || typeof record !== 'object' || !integer(record.sequence, 10000) || record.sequence <= previous ||
+        typeof record.url_digest !== 'string' || !HASH.test(record.url_digest) ||
+        !['response', 'extracted', 'robots_comment'].includes(record.stage) ||
+        !Array.isArray(record.categories) || !record.categories.length || record.categories.length > INSTRUCTION_CODES.size ||
+        new Set(record.categories).size !== record.categories.length ||
+        record.categories.some(code => !INSTRUCTION_CODES.has(code)) ||
+        !integer(record.match_count_lower_bound, 16) || !integer(record.inspected_bytes, 2097152) ||
+        record.inspection_limited !== record.categories.includes('inspection_limit') ||
+        record.payload_retained !== false || record.execution_authorized !== false ||
+        (record.input_digest !== null && (typeof record.input_digest !== 'string' || !HASH.test(record.input_digest))) ||
+        !record.match_fingerprints || typeof record.match_fingerprints !== 'object' || Array.isArray(record.match_fingerprints) ||
+        Object.entries(record.match_fingerprints).some(([key, digest]) =>
+          !record.categories.includes(key) || typeof digest !== 'string' || !HASH.test(digest)) ||
+        (record.input_digest === null && Object.keys(record.match_fingerprints).length > 0)) return false;
+    previous = record.sequence;
+    for (const code of record.categories) counts[code] = (counts[code] || 0) + 1;
+  }
+  return Object.keys(counts).length === Object.keys(value.categories).length &&
+    Object.entries(counts).every(([code, count]) => value.categories[code] === count);
+}
+function validOriginHealth(value: Record<string, CrawlOriginHealth>): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length > 16) return false;
+  return Object.entries(value).every(([host, health]) => /^[a-z0-9.-]{1,253}$/.test(host) &&
+    health && typeof health === 'object' &&
+    [health.successes, health.failures, health.rejections, health.failure_streak, health.evidence_count].every(n => integer(n, 16)) &&
+    health.successes + health.failures + health.rejections === health.evidence_count &&
+    health.failure_streak <= health.failures &&
+    [health.posterior_success, health.uncertainty].every(n => Number.isFinite(n) && n >= 0 && n <= 1));
+}
 function session(value: CrawlSession, expectedId?: string): CrawlSession {
   if (!value || !ID.test(value.session_id) || expectedId && value.session_id !== expectedId || !STATUSES.has(value.status)
     || !integer(value.version) || value.version < 1 || typeof value.title !== 'string' || value.title.length > 160
@@ -93,6 +147,8 @@ function session(value: CrawlSession, expectedId?: string): CrawlSession {
     || !Array.isArray(value.queue) || value.queue.length > 32 || JSON.stringify(value).length > 512 * 1024) invalid('The crawler returned an invalid session projection.');
   for (const count of Object.values(value.counters)) if (!integer(count, 33554432)) invalid('The crawler counters are invalid.');
   for (const field of ['requests', 'bytes', 'documents', 'failures'] as const) if (!integer(value.counters[field], 33554432)) invalid('The crawler counters are incomplete.');
+  if (value.instruction_security !== undefined && !validInstructionSecurity(value.instruction_security, value.counters.requests)) invalid('The crawler instruction incident custody is invalid.');
+  if (value.adaptive_origin_health !== undefined && !validOriginHealth(value.adaptive_origin_health)) invalid('The crawler origin health projection is invalid.');
   for (const row of value.queue) if (!row || typeof row.url !== 'string' || row.url.length > 4096 || !integer(row.depth, 3) || !integer(row.attempts, 128) || typeof row.ready_at !== 'number' || !Number.isFinite(row.ready_at)) invalid('The crawler queue is invalid.');
   if (value.automation) {
     const a = value.automation;
@@ -119,7 +175,7 @@ function source(value: CapturedSource, id?: string): CapturedSource {
     if (!integer(policy.version, 2147483647) || typeof policy.enabled !== 'boolean' || !integer(policy.max_age_seconds, 86400) || policy.max_age_seconds < 60
       || policy.changed_at !== null && (typeof policy.changed_at !== 'string' || !Number.isFinite(Date.parse(policy.changed_at)))
       || policy.version === 0 && policy.changed_at !== null || policy.version > 0 && policy.changed_at === null
-      || typeof freshness.usable !== 'boolean' || !['current', 'withdrawn', 'stale', 'consent_expired', 'session_revoked', 'capture_time_invalid'].includes(freshness.state)
+      || typeof freshness.usable !== 'boolean' || !['current', 'withdrawn', 'stale', 'consent_expired', 'session_revoked', 'capture_time_invalid', 'instruction_quarantined'].includes(freshness.state)
       || freshness.usable !== (freshness.state === 'current') || freshness.usable && !policy.enabled
       || !integer(freshness.capture_age_seconds) || typeof freshness.valid_until !== 'string' || !Number.isFinite(Date.parse(freshness.valid_until))
       || freshness.remote_freshness_verified !== false) invalid('The source-use or capture-age projection is invalid.');
@@ -140,7 +196,7 @@ export async function getCrawl(id: string, signal?: AbortSignal): Promise<CrawlS
   const value = await read(api.get<{ session: CrawlSession }>(ROOT + '/sessions/' + identifier(id), options(signal)), getAuthToken(), 'The crawler session could not be refreshed.'); return session(value.session, id);
 }
 export async function createCrawl(body: CrawlCreate, signal?: AbortSignal): Promise<CrawlSession> {
-  if (body.frontier_strategy !== undefined && !['fifo', 'balanced'].includes(body.frontier_strategy)) throw new ChatClientError('Choose a canonical bounded frontier scheduling strategy.', { kind: 'validation' });
+  if (body.frontier_strategy !== undefined && !['fifo', 'balanced', 'coverage'].includes(body.frontier_strategy)) throw new ChatClientError('Choose a canonical bounded frontier scheduling strategy.', { kind: 'validation' });
   if (body.discover_sitemaps !== undefined && typeof body.discover_sitemaps !== 'boolean') throw new ChatClientError('Sitemap discovery must be explicitly enabled or disabled.', { kind: 'validation' });
   if (body.seeds.length < 1 || body.seeds.length > 16 || new Set(body.seeds).size !== body.seeds.length || body.consent !== true || body.rights_acknowledged !== true) throw new ChatClientError('Provide distinct seed URLs and acknowledge capture rights.', { kind: 'validation' });
   for (const seed of body.seeds) { let url: URL; try { url = new URL(seed); } catch { throw new ChatClientError('Enter complete http or https seed URLs, one per line.', { kind: 'validation' }); } if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || seed.length > 2048) throw new ChatClientError('Use http or https URLs without embedded credentials.', { kind: 'validation' }); }
