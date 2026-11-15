@@ -38,8 +38,14 @@ def _audit(event: str, args: tuple) -> None:
     if (event.startswith("socket.") or event.startswith("subprocess.")
             or event in {"os.system", "os.fork", "os.forkpty", "os.exec",
                          "os.posix_spawn", "os.spawn", "os.kill", "os.killpg",
-                         "ctypes.dlopen", "ctypes.dlsym"}):
+                         "ctypes.dlopen", "ctypes.dlsym", "os.remove", "os.unlink",
+                         "os.rename", "os.rmdir", "os.mkdir", "os.chmod", "os.chown",
+                         "os.chdir", "os.truncate", "os.link", "os.symlink"}):
         raise PermissionError("isolated parser has no external execution authority")
+    if event == "open" and len(args) == 3:
+        _, _, flags = args
+        if isinstance(flags, int) and flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC | os.O_APPEND):
+            raise PermissionError("isolated parser cannot open writable files")
 
 
 def _receive() -> tuple[dict, bytes]:
