@@ -109,16 +109,19 @@ export type TreasuryRevision = {
 };
 export type TreasuryFamily = {
   family_id: string; revision_count: number; current_revision: string; first_seen: number; last_seen: number;
-  current_indexed: boolean; simultaneous_conflict: boolean; refresh_url: string | null;
+  current_indexed: boolean; simultaneous_conflict: boolean; alias_conflict: boolean; refresh_url: string | null;
   revisit: { due_at: number; change_probability_estimate: number; observed_changes: number; interval_seconds: number;
-    ready_for_review: boolean; fresh_consent_required: true; network_executed: false };
+    ready_for_review: boolean; model: 'interval_censored_grid_v1'; qualified_intervals: number; ambiguous_intervals: number;
+    expected_changes_per_day: number; utility_per_cost: number; target_stale_risk: number;
+    fresh_consent_required: true; network_executed: false };
 };
 export type DragonTreasury = {
   schema: 'skeleton.dragon.treasury.v1'; parser: 'retained-text-sections-v1'; mode: TreasuryMode;
   family: string | null; as_of_unix: number; partition_digest: string; candidate_limit_reached: boolean; excluded_sessions: number;
   observations: number; families: number; revisions: number; changed_families: number; rollbacks: number;
   current_indexed: number; historic_indexed: number; metadata_only: number; blocked_current: number; changes: number; revalidated_revisions: number;
-  verified_historic_transitions: number; evolution: DragonEvolution; family_rows: TreasuryFamily[]; hits: TreasuryRevision[];
+  verified_historic_transitions: number; alias_held_families: number; revisit_plan: string[]; parsed_unique_payloads: number;
+  evolution: DragonEvolution; family_rows: TreasuryFamily[]; hits: TreasuryRevision[];
   timeline: TreasuryRevision[]; comparison: { current: TreasuryRevision; previous: TreasuryRevision; delta: TreasuryDelta } | null;
   earliest_source_expiry: number | null; latest_observed_only: true; source_text_returned: false;
   network_executed: false; training_permission: false; fresh_consent_required: true;
@@ -445,12 +448,17 @@ function validRevision(v: TreasuryRevision): boolean {
 function validFamily(f: TreasuryFamily): boolean {
   if(!f||!HASH.test(f.family_id)||!HASH.test(f.current_revision)||!integer(f.revision_count,512)||f.revision_count===0
     ||!Number.isFinite(f.first_seen)||!Number.isFinite(f.last_seen)||f.last_seen<f.first_seen
-    ||typeof f.current_indexed!=='boolean'||typeof f.simultaneous_conflict!=='boolean'||(f.simultaneous_conflict&&f.current_indexed))return false;
+    ||typeof f.current_indexed!=='boolean'||typeof f.simultaneous_conflict!=='boolean'||typeof f.alias_conflict!=='boolean'||((f.simultaneous_conflict||f.alias_conflict)&&f.current_indexed))return false;
   if(f.refresh_url!==null){try{const u=new URL(f.refresh_url);if(f.refresh_url.length>2048||!['http:','https:'].includes(u.protocol)||u.username||u.password)return false;}catch{return false;}}
   const r=f.revisit;
   return !!r&&Number.isFinite(r.due_at)&&r.due_at>=f.last_seen&&Number.isFinite(r.interval_seconds)&&r.interval_seconds>=3600
     &&Number.isFinite(r.change_probability_estimate)&&r.change_probability_estimate>=0&&r.change_probability_estimate<=1
-    &&integer(r.observed_changes,511)&&typeof r.ready_for_review==='boolean'&&r.fresh_consent_required===true&&r.network_executed===false;
+    &&integer(r.observed_changes,511)&&integer(r.qualified_intervals,511)&&integer(r.ambiguous_intervals,511)
+    &&r.observed_changes<=r.qualified_intervals&&r.model==='interval_censored_grid_v1'
+    &&Number.isFinite(r.expected_changes_per_day)&&r.expected_changes_per_day>=0&&r.expected_changes_per_day<=64
+    &&Number.isFinite(r.utility_per_cost)&&r.utility_per_cost>=0&&r.utility_per_cost<=1
+    &&Number.isFinite(r.target_stale_risk)&&r.target_stale_risk>=.2&&r.target_stale_risk<=.45
+    &&typeof r.ready_for_review==='boolean'&&r.fresh_consent_required===true&&r.network_executed===false;
 }
 export async function getDragonTreasury(mode: TreasuryMode, query='', family?: string, signal?: AbortSignal): Promise<DragonTreasury> {
   if (!['current_only','historic_only','all_revisions','timeline','compare'].includes(mode)||query.length>256||family!==undefined&&!HASH.test(family)) invalid('Invalid treasury search.');
@@ -463,6 +471,9 @@ export async function getDragonTreasury(mode: TreasuryMode, query='', family?: s
     ||!integer(p.blocked_current,p.families)||p.blocked_current+p.current_indexed!==p.families
     ||!integer(p.changed_families,p.families)||!integer(p.rollbacks,p.revisions)||!integer(p.changes,p.revisions)
     ||!integer(p.revalidated_revisions,p.observations)||!integer(p.verified_historic_transitions,p.historic_indexed)
+    ||!integer(p.alias_held_families,p.blocked_current)||!integer(p.parsed_unique_payloads,Math.min(128,p.observations))
+    ||!Array.isArray(p.revisit_plan)||p.revisit_plan.length>24||p.revisit_plan.length>p.families
+    ||p.revisit_plan.some(id=>typeof id!=='string'||!HASH.test(id))||new Set(p.revisit_plan).size!==p.revisit_plan.length
     ||!validEvolution(p.evolution)||!Array.isArray(p.family_rows)||p.family_rows.length>24||!p.family_rows.every(validFamily)
     ||new Set(p.family_rows.map(f=>f.family_id)).size!==p.family_rows.length
     ||![p.hits,p.timeline].every(rows=>Array.isArray(rows)&&rows.length<=24&&rows.every(validRevision)&&new Set(rows.map(v=>v.revision_id)).size===rows.length)
