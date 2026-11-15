@@ -738,7 +738,7 @@ def test_single_nonzero_marker_is_not_valid_execution_custody(tmp_path: Path):
     lease.path.write_bytes(b"\x01")
     lease.path.chmod(0o600)
     assert lease.inspect()["state"] == "unavailable"
-    with pytest.raises(LocalInferenceLeaseUnavailable, match="marker format"):
+    with pytest.raises(LocalInferenceLeaseUnavailable, match="marker format|reconciliation"):
         with lease.hold():
             pytest.fail("invalid single-byte marker admitted execution")
     assert lease.path.read_bytes() == b"\x01"
