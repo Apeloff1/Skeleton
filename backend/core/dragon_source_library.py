@@ -131,6 +131,17 @@ async def read_document(scope,game,source,session,capture_source,*,offset,length
     app,_,row=await _session(scope,game,source,session)
     if row["version"]!=session_version:
         raise CrawlerError("crawler_source_changed","Capture changed; refresh.",409)
+    try:
+        from core.dragon_crawler import _plain
+        from core.dragon_checkpoint_replica import verify_primary
+        snapshot=_plain(row["snapshot"])
+        verify_primary(snapshot,_plain(row["checkpoint_identity"]))
+        if snapshot["binding"]["scope"]!=scope or snapshot["snapshot_digest"]!=snapshot_digest:
+            raise ValueError("snapshot authority differs")
+        candidate=snapshot["sources"][capture_source]
+        canonical_url=source_url(candidate["canonical_url"])
+    except (ValueError,TypeError,KeyError) as exc:
+        raise CrawlerError("crawler_source_changed","Capture witness unavailable; refresh.",409) from exc
     receipt=await app.treasury_passage(scope,session,capture_source,offset=offset,length=length)
     if (receipt["session_version"]!=session_version or receipt["snapshot_digest"]!=snapshot_digest
             or receipt["preserved_text_hash"]!=preserved_text_hash
@@ -140,7 +151,7 @@ async def read_document(scope,game,source,session,capture_source,*,offset,length
         raise CrawlerError("crawler_source_changed","Capture changed; refresh.",409)
     # Never render captured HTML, scripts or SVG. Exact plaintext only.
     return {**receipt,"game_id":game,"catalogue_source_id":source,"representation":"captured_text",
-            "wiki_approved":False,"network_executed":False}
+            "wiki_approved":False,"network_executed":False,"canonical_url":canonical_url}
 
 
 async def compare_documents(scope,game,source,left,right):
@@ -159,6 +170,8 @@ async def compare_documents(scope,game,source,left,right):
         return await read_document(scope,game,source,**pin)
     a=await read(left)
     b=await read(right)
+    if a["canonical_url"]!=b["canonical_url"]:
+        raise ValueError("comparison requires the same canonical source URL")
     if a["session_id"]==b["session_id"] and a["source_id"]==b["source_id"]:
         raise ValueError("choose distinct retained documents")
     # SequenceMatcher on line chunks is bounded by max 4,000 codepoints each;
