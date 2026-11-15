@@ -236,6 +236,15 @@ class DurableWorkJournal:
             raise WorkIntegrityError("invalid authenticated work record") from exc
 
     def _row(self, wid: str) -> tuple | None:
+        oversized = self._db.execute(
+            f"SELECT 1 FROM {_TABLE} WHERE scope=? AND work_id=? AND "
+            "(length(body)>? OR length(dependencies)>? OR length(owner)>128 "
+            "OR length(kind)>128 OR length(mac)<>64 OR length(token_digest)>64 "
+            "OR length(receipt)>64)",
+            (self._scope, _hex(wid), _MAX_BODY, _MAX_BODY),
+        ).fetchone()
+        if oversized:
+            raise WorkIntegrityError("stored work row exceeds validation budget")
         row = self._db.execute(
             f"SELECT {','.join(_FIELDS)} FROM {_TABLE} WHERE scope=? AND work_id=?",
             (self._scope, _hex(wid)),
@@ -267,6 +276,7 @@ class DurableWorkJournal:
     def submit(self, orders: Iterable[WorkOrder]) -> tuple[WorkStatus, ...]:
         """Atomically admit a topologically ordered batch; no work executes."""
         prepared = []
+        prepared_bytes = 0
         ids = set()
         for index, item in enumerate(orders):
             if index >= _MAX_BATCH:
@@ -274,6 +284,9 @@ class DurableWorkJournal:
             row = self._prepare(item)
             if row[1] in ids:
                 raise WorkConflict("duplicate identity inside batch")
+            prepared_bytes += len(row[3]) + len(row[4]) + 1024
+            if prepared_bytes > self._max_bytes:
+                raise WorkCapacity("work batch exceeds preparation byte budget")
             ids.add(row[1])
             prepared.append(row)
         with self._tx():
@@ -312,6 +325,15 @@ class DurableWorkJournal:
             raise ValueError("invalid status limit")
         with self._tx():
             self._capacity()
+            oversized = self._db.execute(
+                f"SELECT 1 FROM {_TABLE} WHERE scope=? AND "
+                "(length(body)>? OR length(dependencies)>? OR length(owner)>128 "
+                "OR length(kind)>128 OR length(mac)<>64 OR length(token_digest)>64 "
+                "OR length(receipt)>64) LIMIT 1",
+                (self._scope, _MAX_BODY, _MAX_BODY),
+            ).fetchone()
+            if oversized:
+                raise WorkIntegrityError("stored work row exceeds validation budget")
             # Validate all scope rows before filtering. A forged state cannot hide
             # an unauthenticated record from a recovery/ready scan.
             raw = self._db.execute(

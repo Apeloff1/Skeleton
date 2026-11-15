@@ -530,9 +530,17 @@ def test_witnessed_publication_and_retirement_hold_source_epoch_until_acknowledg
     )
     from skeleton.testing.test_mongo_source_epoch import Database
 
+    async def migration_authorizer(**scope):
+        # Explicit, exact fixture-only operator authority, not a runtime fallback.
+        return scope == {
+            "tenant_id": "tenant", "actor_id": "owner",
+            "database_name": "unit_test_canonical",
+            "purpose": "quiescent-initial-epoch-v1",
+        }
+
     async def scenario():
         archive, mongo, witness, guard = setup()
-        epoch = MongoCanonicalSourceEpoch(Database())
+        epoch = MongoCanonicalSourceEpoch(Database(), migration_authorizer=migration_authorizer)
         mongo.conversation = SimpleNamespace(canonical_source_epoch=epoch, memento_witness=witness)
         await epoch.provision_migration_epoch(tenant_id="tenant", actor_id="owner")
         original_cas = witness.compare_and_set
@@ -569,9 +577,17 @@ def test_unacknowledged_witness_commit_quarantines_canonical_source_epoch():
     )
     from skeleton.testing.test_mongo_source_epoch import Database
 
+    async def migration_authorizer(**scope):
+        # Explicit, exact fixture-only operator authority, not a runtime fallback.
+        return scope == {
+            "tenant_id": "tenant", "actor_id": "owner",
+            "database_name": "unit_test_canonical",
+            "purpose": "quiescent-initial-epoch-v1",
+        }
+
     async def scenario():
         archive, mongo, witness, guard = setup()
-        epoch = MongoCanonicalSourceEpoch(Database())
+        epoch = MongoCanonicalSourceEpoch(Database(), migration_authorizer=migration_authorizer)
         mongo.conversation = SimpleNamespace(canonical_source_epoch=epoch, memento_witness=witness)
         await epoch.provision_migration_epoch(tenant_id="tenant", actor_id="owner")
         witness.reject = True
