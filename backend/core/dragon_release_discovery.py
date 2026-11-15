@@ -6,7 +6,7 @@ network admission. All external content is treated as data.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass,replace
 from datetime import date
 import hashlib
 import json
@@ -186,6 +186,13 @@ def parse_release_feed(raw,*,provider,external_id,title):
                     break
         if not link:
             continue
-        result.append(_proposal(provider,{"id":external_id,"title":title,"stage":"unknown"},
-            {"url":link,"kind":"release_feed"}))
+        candidate=_proposal(provider,{"id":external_id,"title":title,"stage":"unknown"},
+            {"url":link,"kind":"release_feed"})
+        # Same article URL can carry distinct patch announcements. Bind event
+        # identity to bounded explicit feed fields without interpreting claims.
+        marker=[]
+        for child in item:
+            if tag(child.tag) in {"guid","id","title","published","updated","pubDate"}:
+                marker.append([tag(child.tag),(child.text or "")[:2048]])
+        result.append(replace(candidate,event_key=_sha([candidate.event_key,marker])))
     return list({x.event_key:x for x in result}.values())
