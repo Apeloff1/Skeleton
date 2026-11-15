@@ -9,6 +9,7 @@ import {useReducedMotion,useScreenReader} from './companion/useDragonMotion';
 import {usePowerAwareness} from '../../hooks/usePowerAwareness';
 
 const MODES: readonly [TreasuryMode,string][]=[['current_only','Current chest'],['historic_only','Historic vault'],['all_revisions','All versions'],['timeline','Timeline'],['compare','Compare']];
+const field={backgroundColor:colors.bg,borderWidth:1,borderColor:colors.edge,borderRadius:9,padding:12,color:colors.text,fontSize:14};
 const stamp=(n:number)=>new Date(n*1000).toLocaleString();
 const short=(s:string)=>s.slice(0,12);
 function Button({label,action,disabled=false}:{label:string;action:()=>void;disabled?:boolean}){
@@ -66,7 +67,7 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
  }
  async function grant(enabled:boolean){
   if(!session||!onSession||busy||disabled||enabled&&(!canWrite||!rights))return;
-  const n=Number(days);if(!Number.isInteger(n)||n<1||n>30){setError('Choose a retention period of 1–30 days.');return;}
+  const n=enabled?Number(days):30;if(!Number.isInteger(n)||n<1||n>30){setError('Choose a retention period of 1–30 days.');return;}
   invalidate();const ctrl=new AbortController(),epoch=generation.current,token=getAuthToken();
   owner.current=token;request.current=ctrl;setBusy(true);setError('');setResult(null);
   const identity=[session.session_id,session.version,enabled,n,enabled&&rights].join(':');
@@ -89,14 +90,14 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
    {terminal&&onSession&&<View style={s.check}>
     <Text style={s.label}>Historical retention for this finished expedition</Text>
     <Text style={s.small}>{session.archive_grant?.active?'Active until '+stamp(session.archive_grant.expires_at!):'No active historical-use grant.'} {session.archive_grant?.usable_sources??0} authorized retained sources.</Text>
-    {canWrite&&<><TextInput style={s.input} value={days} onChangeText={setDays} keyboardType="number-pad" maxLength={2} accessibilityLabel="Historical retention days"/>
-     <View style={s.row}><Switch value={rights} onValueChange={setRights} accessibilityLabel="Confirm historical archive rights"/><Text style={[s.small,s.grow]}>I have rights to retain and reparse eligible captured text for the selected period. This does not renew crawl or model-use consent.</Text></View>
+    {canWrite&&<><TextInput style={field} value={days} editable={!busy&&!disabled} onChangeText={setDays} keyboardType="number-pad" maxLength={2} accessibilityLabel="Historical retention days"/>
+     <View style={s.row}><Switch value={rights} disabled={busy||disabled} onValueChange={setRights} accessibilityLabel="Confirm historical archive rights"/><Text style={[s.small,s.grow]}>I have rights to retain and reparse eligible captured text for the selected period. This does not renew crawl or model-use consent.</Text></View>
      <Button label="Authorize historical use" disabled={!rights||busy||disabled} action={()=>void grant(true)}/></>}
     {session.archive_grant&&<Button label="Revoke historical use" disabled={busy||disabled} action={()=>void grant(false)}/>}
    </View>}
-   <TextInput value={query} onChangeText={v=>{setQuery(v);invalidate();setResult(null);setBusy(false);}} maxLength={256} placeholder="Search retained versions" placeholderTextColor={colors.muted} accessibilityLabel="Search treasury" style={s.input}/>
-   <View style={s.row}>{MODES.map(([id,label])=><TouchableOpacity key={id} style={[s.button,mode===id&&{backgroundColor:'#52382d'}]} accessibilityRole="button" accessibilityState={{selected:mode===id}} onPress={()=>{setMode(id);invalidate();setResult(null);setBusy(false);}}><Text style={s.buttonText}>{label}</Text></TouchableOpacity>)}</View>
-   {family&&<Button label={'Clear family filter '+short(family)} action={()=>{setFamily(undefined);invalidate();setResult(null);setBusy(false);}}/>}
+   <TextInput value={query} editable={!busy&&!disabled} onChangeText={v=>{setQuery(v);invalidate();setResult(null);setBusy(false);}} maxLength={256} placeholder="Search retained versions" placeholderTextColor={colors.muted} accessibilityLabel="Search treasury" style={field}/>
+   <View style={s.row}>{MODES.map(([id,label])=><TouchableOpacity key={id} style={[s.button,mode===id&&{backgroundColor:'#52382d'}]} accessibilityRole="button" accessibilityState={{selected:mode===id,disabled:busy||disabled}} disabled={busy||disabled} onPress={()=>{setMode(id);invalidate();setResult(null);setBusy(false);}}><Text style={s.buttonText}>{label}</Text></TouchableOpacity>)}</View>
+   {family&&<Button label={'Clear family filter '+short(family)} disabled={busy||disabled} action={()=>{setFamily(undefined);invalidate();setResult(null);setBusy(false);}}/>}
    <Button label={busy?'Reparsing…':'Reparse authorized versions'} disabled={busy||disabled} action={()=>void observe()}/>
    {busy&&<ActivityIndicator color={colors.accent}/>}
    {!!error&&<Text style={s.error} accessibilityLiveRegion="polite">{error}</Text>}
