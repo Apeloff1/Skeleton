@@ -58,7 +58,7 @@ CREATE INDEX IF NOT EXISTS lead_nodes_host ON lead_nodes(owner,host,id);
 CREATE TABLE IF NOT EXISTS lead_edges(
  owner TEXT NOT NULL,id TEXT NOT NULL,parent TEXT NOT NULL,child TEXT NOT NULL,
  relation TEXT NOT NULL,subject TEXT NOT NULL,kind TEXT NOT NULL,title TEXT NOT NULL,
- witness TEXT NOT NULL,first_seen INTEGER NOT NULL,last_seen INTEGER NOT NULL,
+ witness TEXT NOT NULL,snapshot TEXT,first_seen INTEGER NOT NULL,last_seen INTEGER NOT NULL,
  PRIMARY KEY(owner,id),
  FOREIGN KEY(owner,child) REFERENCES lead_nodes(owner,id),
  CHECK(length(witness)=64)
@@ -181,14 +181,14 @@ def project(item,projection):
     if projection=="steam":
         # Exactly existing provider route families; no fabricated AppIDs.
         for provider,kind,label,route,_ in STEAM_ROUTES:
-            yield _schema_row(route.format(id=item["appid"]),item["title"]+" · "+label,kind,"steam:"+item["appid"])
+            yield _schema_row(route.format(id=item["appid"]),(item["title"]+" · "+label)[:256],kind,"steam:"+item["appid"])
     elif projection=="modrinth":
         kind={"mod":"mod_project_readme","modpack":"mod_pack_manifest","resourcepack":"mod_texture_pack",
               "shader":"mod_shader_pack","plugin":"mod_plugin_manifest","datapack":"mod_project_readme",
               "project":"mod_project_readme"}[item["project_type"]]
         base="https://modrinth.com/"+item["project_type"]+"/"+item["slug"] if item["project_type"]!="project" else "https://modrinth.com/project/"+item["id"]
         for url,k,label in ((base,kind,"project"),(base+"/versions","mod_project_releases","versions")):
-            yield _schema_row(url,item["title"]+" · "+label,k,"modrinth:"+item["id"])
+            yield _schema_row(url,(item["title"]+" · "+label)[:256],k,"modrinth:"+item["id"])
     else:
         yield _schema_row(item["url"],item["title"],item["kind"],item["subject"])
 
@@ -226,7 +226,7 @@ class LeadGraph:
         if row is None or not row["enabled"]:raise CatalogueHeld("lead expansion disabled")
         return row
 
-    def _add(self,db,owner,row,*,parent,relation,witness,now):
+    def _add(self,db,owner,row,*,parent,relation,witness,now,snapshot=None):
         url,title,kind,subject=row
         if relation not in RELATIONS:raise ValueError("lead relation")
         witness=_id(witness);identifier=lead_id(url)
@@ -245,12 +245,12 @@ class LeadGraph:
             db.execute("INSERT INTO lead_fts(owner,id,title,url,kind,family) VALUES(?,?,?,?,?,?)",
                 (owner,identifier,title,url,kind,spec.family))
             db.execute("UPDATE lead_owner SET nodes=nodes+1 WHERE owner=?",(owner,))
-        eid=digest([parent,identifier,relation,subject,kind,title,witness])
+        eid=digest([parent,identifier,relation,subject,kind,title,witness,snapshot])
         edge=db.execute("SELECT 1 FROM lead_edges WHERE owner=? AND id=?",(owner,eid)).fetchone()
         if edge is None:
             if caps["edges"]>=MAX_EDGES:raise CatalogueHeld("lead evidence quota")
-            db.execute("INSERT INTO lead_edges VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                (owner,eid,parent,identifier,relation,subject,kind,title,witness,now,now))
+            db.execute("INSERT INTO lead_edges VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                (owner,eid,parent,identifier,relation,subject,kind,title,witness,snapshot,now,now))
             db.execute("UPDATE lead_owner SET edges=edges+1 WHERE owner=?",(owner,))
             db.execute("UPDATE lead_nodes SET observations=observations+1,last_seen=MAX(last_seen,?) WHERE owner=? AND id=?",
                 (now,owner,identifier))
@@ -368,7 +368,7 @@ class LeadGraph:
                 for ix,item in enumerate(items):
                     witness=digest([sid,ordinal,sha256,ix,item])
                     for row in project(item,snap["projection"]):
-                        self._add(db,owner,row,parent=snap["root"],relation="dataset_projection",witness=witness,now=now)
+                        self._add(db,owner,row,parent=snap["root"],relation="dataset_projection",witness=witness,now=now,snapshot=sid)
                 db.execute("INSERT INTO lead_snapshot_pages VALUES(?,?,?,?,?,?)",(owner,sid,ordinal,sha256,len(items),chain))
                 db.execute("UPDATE lead_snapshots SET rows=rows+?,next_page=next_page+1,chain=? WHERE owner=? AND id=?",
                     (len(items),chain,owner,sid))
@@ -430,7 +430,7 @@ class LeadGraph:
                 fingerprint=hashlib.sha256(raw).hexdigest()
                 for item in proposals:
                     witness=digest([subscription_id,fingerprint,item.event_key])
-                    self._add(db,owner,_schema_row(item.source,item.title,item.kind,item.namespace+":"+item.external_id),
+                    self._add(db,owner,_schema_row(item.source,item.title,item.kind,(item.namespace+":"+item.external_id)[:256]),
                         parent=root,relation="feed_discovery",witness=witness,now=now)
                 db.execute("COMMIT");return {"enabled":True,"proposals":len(proposals),"network_authorized":False}
             except BaseException:
@@ -473,7 +473,7 @@ class LeadGraph:
         field="parent" if direction=="children" else "child"
         with self._db() as db:
             if not db.execute("SELECT 1 FROM lead_nodes WHERE owner=? AND id=?",(owner,lead)).fetchone():raise LookupError("lead missing")
-            rows=db.execute("SELECT * FROM lead_edges WHERE owner=? AND "+field+"=? AND id>? ORDER BY id LIMIT ?",
+            rows=db.execute("SELECT e.*,s.state AS snapshot_state,s.expires_at AS snapshot_expires_at FROM lead_edges e LEFT JOIN lead_snapshots s ON s.owner=e.owner AND s.id=e.snapshot WHERE e.owner=? AND e."+field+"=? AND e.id>? ORDER BY e.id LIMIT ?",
                 (owner,lead,_id(after) if after else "",limit+1)).fetchall()
         return {"edges":[dict(r) for r in rows[:limit]],"next_cursor":rows[limit-1]["id"] if len(rows)>limit else None,
                 "candidate_only":True,"network_authorized":False}
