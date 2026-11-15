@@ -17,6 +17,8 @@ export const KEYS = {
 export interface Kv {
   getItem(key: string): Promise<string | null>;
   setItem(key: string, value: string): Promise<void>;
+  /** Optional namespace-wide queue provided by the device adapter. */
+  runExclusive?<T>(task: () => Promise<T>, mode: 'read' | 'write' | 'refresh'): Promise<T>;
 }
 
 export function memoryKv(seed: Record<string, string> = {}): Kv & { dump(): Record<string, string> } {
@@ -83,7 +85,8 @@ async function readFoundation(store: Kv): Promise<LoadResult> {
 // saves per injected store: the newest submitted complete snapshot wins.
 const saveTails = new WeakMap<Kv, Promise<void>>();
 
-function enqueue<T>(store: Kv, task: () => Promise<T>): Promise<T> {
+function enqueue<T>(store: Kv, task: () => Promise<T>, mode: 'read' | 'write' | 'refresh'): Promise<T> {
+  if (store.runExclusive) return store.runExclusive(task, mode);
   const previous = saveTails.get(store) ?? Promise.resolve();
   const job = previous.catch(() => {}).then(task);
   const completion = job.then(() => {}, () => {});
@@ -95,7 +98,7 @@ function enqueue<T>(store: Kv, task: () => Promise<T>): Promise<T> {
 }
 
 export function loadFoundation(store: Kv): Promise<LoadResult> {
-  return enqueue(store, () => readFoundation(store));
+  return enqueue(store, () => readFoundation(store), 'read');
 }
 
 function encodeSnapshot(snap: PersistSnapshot) {
@@ -129,7 +132,7 @@ export function saveFoundation(store: Kv, snap: PersistSnapshot): Promise<void> 
   // Capture ownership-independent content at submission, before another edit.
   try {
     const encoded = encodeSnapshot(snap);
-    return enqueue(store, () => publish(store, encoded));
+    return enqueue(store, () => publish(store, encoded), 'write');
   } catch (error) {
     return Promise.reject(error);
   }
@@ -149,5 +152,5 @@ export function updateFoundation<T>(
     if (snapshot.holdSaves || snapshot.projectsCorrupt) throw new Error('Studio return snapshot is held');
     await publish(store, encodeSnapshot(snapshot));
     return result;
-  });
+  }, 'refresh');
 }
