@@ -156,7 +156,7 @@ class OwnerWriteLanes:
                     raise StorageHeld("partition identity differs")
             # Refuse missing partitions; ManifestArchive normally initializes
             # a missing file, so verify before and immediately after opening.
-            result=ManifestArchive(path,PartitionBulk(self.legacy.bulk,self.owner,_namespace(self.epoch,lane)))
+            result=ManifestArchive(path,PartitionBulk(self.legacy.bulk,self.owner,_namespace(self.epoch,lane)),create=False)
             if _private(path)[1]!=identity:raise StorageHeld("partition file replaced")
             return result
         except (ShardHeld,OSError) as exc:raise StorageHeld("manifest write lane held") from exc
@@ -214,3 +214,24 @@ class OwnerWriteLanes:
             if collected>=limit:break
             collected+=self.archive((start+offset)%LANES).collect(self.scope,limit=limit-collected)["collected"]
         return {"collected":collected,"physical_secure_erasure":False}
+
+
+def main():
+    import argparse
+    from core.dragon_hoarder_copy import _archive
+    from core.dragon_hoarder_qualification import open_backup
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--copy",choices=("primary","backup"),required=True)
+    parser.add_argument("--scope-json",required=True)
+    parser.add_argument("--offline-writers-stopped",action="store_true")
+    args=parser.parse_args()
+    if not args.offline_writers_stopped:parser.error("all writers must be stopped")
+    path,_=_private(Path(args.scope_json))
+    if path.stat().st_size>4096:raise StorageHeld("scope file bound")
+    scope=json.loads(path.read_bytes())
+    archive=_archive() if args.copy=="primary" else open_backup()
+    owner=archive._owner(scope)
+    print(json.dumps(provision(owner.path,scope,offline_acknowledged=True),sort_keys=True))
+
+
+if __name__=="__main__":main()

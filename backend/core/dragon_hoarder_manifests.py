@@ -72,7 +72,7 @@ def _key(value):
 
 
 class ManifestArchive:
-    def __init__(self,path:Path,bulk:BulkArchive):
+    def __init__(self,path:Path,bulk:BulkArchive,*,create=True):
         self.path=Path(path)
         self.bulk=bulk
         if not self.path.is_absolute() or self.path.parent.resolve(strict=True)!=self.path.parent:
@@ -83,6 +83,7 @@ class ManifestArchive:
         if self.path.is_symlink():
             raise StorageHeld("unsafe manifest path")
         if not self.path.exists():
+            if not create:raise StorageHeld("manifest ledger missing")
             try:
                 fd=os.open(self.path,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
             except FileExistsError:
