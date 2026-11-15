@@ -1,9 +1,10 @@
-import React,{useEffect,useState} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 import {Text,View} from 'react-native';
 import {getAuthToken} from '../../auth/gameforgeAuth';
 import {verifiedBrowserMedia,verifyMediaAuthority,type MediaRecord} from '../../product/dragonMediaArchiveClient';
 
-export default function DragonMediaPlayer({record}:{record:MediaRecord}){
+export default function DragonMediaPlayer({record,seek}:{record:MediaRecord;seek?:{seconds:number;nonce:number}|null}){
+ const element=useRef<HTMLMediaElement|null>(null);
  const [uri,setUri]=useState(''),[error,setError]=useState('');
  useEffect(()=>{
   const controller=new AbortController();const token=getAuthToken();let url='',live=true;
@@ -25,11 +26,18 @@ export default function DragonMediaPlayer({record}:{record:MediaRecord}){
   const guard=setInterval(()=>{if(Date.now()>=deadline)stop();},500);
   return()=>{live=false;clearInterval(timer);clearInterval(heartbeat);clearInterval(guard);stop();};
  },[record]);
+ useEffect(()=>{
+  const current=element.current;
+  if(!uri||!current||!seek||!Number.isFinite(seek.seconds)||seek.seconds<0||seek.seconds>604800)return;
+  const apply=()=>{try{current.currentTime=Math.min(seek.seconds,Number.isFinite(current.duration)?current.duration:seek.seconds);}catch{}};
+  if(current.readyState>=1)apply();else current.addEventListener('loadedmetadata',apply,{once:true});
+  return()=>current.removeEventListener('loadedmetadata',apply);
+ },[seek,uri]);
  return <View>
   {!!error&&<Text>{error}</Text>}
   {!uri&&!error&&<Text>Verifying local media or playback window expired. Reopen to play.</Text>}
-  {!!uri&&(record.mime.startsWith('video/')?React.createElement('video',{src:uri,controls:true,playsInline:true,preload:'metadata',style:{width:'100%',maxHeight:500}}):
-   record.mime.startsWith('audio/')?React.createElement('audio',{src:uri,controls:true,preload:'metadata',style:{width:'100%'}}):
+  {!!uri&&(record.mime.startsWith('video/')?React.createElement('video',{ref:(x:HTMLVideoElement|null)=>{element.current=x;},src:uri,controls:true,playsInline:true,preload:'metadata',style:{width:'100%',maxHeight:500}}):
+   record.mime.startsWith('audio/')?React.createElement('audio',{ref:(x:HTMLAudioElement|null)=>{element.current=x;},src:uri,controls:true,preload:'metadata',style:{width:'100%'}}):
    React.createElement('img',{src:uri,alt:'Authorized retained visual reference',style:{width:'100%',objectFit:'contain',maxHeight:500}}))}
  </View>;
 }
