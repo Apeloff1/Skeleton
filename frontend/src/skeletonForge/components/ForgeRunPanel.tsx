@@ -14,6 +14,7 @@ import { featureMeta, humanize } from '../graph';
 import type { RunPhase } from '../hooks';
 import { formatElapsed, formatScore, pendingStages, playableSceneView, summarizeRun, type StageView } from '../run';
 import type { RunPayload } from '../types';
+import { nativeControlView } from '../nativeControlEvidence';
 import { Banner, Button, Card, Meter, SectionTitle, StatusPill } from './primitives';
 import { C, TONE_COLOR, TONE_GLYPH } from './theme';
 
@@ -51,6 +52,7 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
   const elapsed = startedAt != null ? (finishedAt ?? now) - startedAt : 0;
   const sum = React.useMemo(() => summarizeRun(payload), [payload]);
   const playableEvidence = React.useMemo(() => playableSceneView(payload), [payload]);
+  const nativeControls = React.useMemo(() => nativeControlView(payload), [payload]);
 
   if (phase === 'idle') {
     return (
@@ -124,6 +126,30 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
               {payload.native_quest?.steps ? <Fact k="Native quest" v={String(payload.native_quest.steps) + ' room objectives' + (payload.native_quest.sealed ? ' · source sealed' : ' · unsealed')} /> : null}
               {sum.generation ? <Fact k="Hardware" v={humanize(sum.generation)} /> : null}
             </View>
+            {nativeControls ? (
+              <View testID="run-native-control-evidence" style={{ marginTop: 12 }}>
+                <Text style={st.cardTitle}>Generated gameplay controls</Text>
+                {nativeControls.state === 'unavailable' ? (
+                  <Banner tone="warn">Native control evidence is missing or inconsistent.</Banner>
+                ) : (
+                  <>
+                    <Text style={st.small}>Source-reported mechanics, not device or player acceptance.</Text>
+                    {nativeControls.effects.map(effect => <Fact key={effect.key} k={effect.label} v={effect.value} />)}
+                    {nativeControls.unmapped.length ? <Text style={st.small}>Design only: {nativeControls.unmapped.join(' · ')}</Text> : null}
+                    {nativeControls.galaxy ? (
+                      <>
+                        <Fact k="Galaxy matrix connection" v={nativeControls.galaxy.mapped + ' / ' + nativeControls.galaxy.active + ' active dials connected'} />
+                        <Fact k="Remaining design-only dials" v={String(nativeControls.galaxy.remaining)} />
+                        {nativeControls.galaxy.overrides.map(row => (
+                          <Fact key={row.axis} k={row.axis + ' · Forge override'}
+                            v={Math.round(row.requested * 100) + '% → ' + Math.round(row.effective * 100) + '%'} />
+                        ))}
+                      </>
+                    ) : null}
+                  </>
+                )}
+              </View>
+            ) : null}
             {payload.source_export?.status === 'ready' && payload.succeeded === true ? (
               <View style={{ marginTop: 12 }} testID="run-source-export">
                 <Text style={st.cardTitle}>Portable Godot source project</Text>

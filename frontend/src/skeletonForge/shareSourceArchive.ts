@@ -16,8 +16,10 @@ export async function shareGodotSourceArchive(
   // The builder independently applies a hard file/source/ZIP byte budget
   // before any platform-native dependencies or memory-heavy work.
   const archive = buildGodotSourceArchive(payload);
-  const files = payload.files!;
-  const expected = payload.source_manifest!.files!;
+  // Snapshot in the same synchronous turn as ZIP construction. Hash the
+  // exact strings that produced the ZIP, not live references after await.
+  const files = Object.freeze({ ...payload.files! });
+  const expected = Object.freeze({ ...payload.source_manifest!.files! });
   const Crypto = await import('expo-crypto');
   const digest = Crypto.CryptoDigestAlgorithm.SHA256;
   const sorted = Object.keys(files).sort();
@@ -35,6 +37,7 @@ export async function shareGodotSourceArchive(
   if (!stillCurrent()) throw new Error('Godot source export cancelled because the account changed');
 
   const { Platform } = await import('react-native');
+  if (!stillCurrent()) throw new Error('Godot source export cancelled because the account changed');
   if (Platform.OS === 'web') {
     // Web File Sharing cannot share local file:// URIs. A user-initiated
     // download keeps the source on their device, not on any upload server.
@@ -59,6 +62,7 @@ export async function shareGodotSourceArchive(
   }
   if (!stillCurrent()) throw new Error('Godot source export cancelled because the account changed');
   const { File, Paths } = await import('expo-file-system');
+  if (!stillCurrent()) throw new Error('Godot source export cancelled because the account changed');
   // A unique native cache object avoids overlapping share operations
   // clobbering another user/session's ZIP with the same manifest name.
   const uniqueName = archive.filename.replace(/\.zip$/, `-${Crypto.randomUUID()}.zip`);
@@ -66,9 +70,11 @@ export async function shareGodotSourceArchive(
   // Never retain another authenticated user's authored project in the
   // shared device cache. A share sheet can fail or be cancelled, so cleanup
   // must run for both success and failure, not just auth rotation.
+  let created = false;
   try {
     if (file.exists) throw new Error('Godot share temp file already exists');
     file.create();
+    created = true;
     file.write(archive.bytes);
     if (!stillCurrent()) {
       throw new Error('Godot source export cancelled because the account changed');
@@ -79,7 +85,7 @@ export async function shareGodotSourceArchive(
       UTI: 'public.zip-archive',
     });
   } finally {
-    try { if (file.exists) file.delete(); }
+    try { if (created && file.exists) file.delete(); }
     catch { /* Sharing result/error must not be disguised by cache cleanup. */ }
   }
 }

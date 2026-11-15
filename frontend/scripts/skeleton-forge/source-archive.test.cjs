@@ -154,3 +154,20 @@ test('run panel only reveals the local share action for a successful, prepared s
   assert.match(code, /Sharing\.shareAsync\(/);
   assert.match(code, /owner|stillCurrent/);
 });
+
+
+test('portable ZIP rejects file-directory and case-aliased parent conflicts', () => {
+  for (const [a,b] of [['assets','assets/child.txt'], ['Assets/a.txt','assets/b.txt'],
+    ['Assets','assets/nested/file.txt'], ['assets/deep','assets/deep/x.txt']]) {
+    assert.throws(() => Archive.buildGodotSourceArchive(fixture({
+      'project.godot': 'config_version=5', [a]: 'first', [b]: 'second',
+    })), /collision|Case-colliding/);
+  }
+});
+test('share custody snapshots files before async hashing and deletes only owned cache files', () => {
+  const code = fs.readFileSync(path.resolve(__dirname, '../../src/skeletonForge/shareSourceArchive.ts'), 'utf8');
+  assert.match(code, /Object.freeze\(\{ \.\.\.payload.files!/);
+  assert.match(code, /Object.freeze\(\{ \.\.\.payload.source_manifest!.files!/);
+  assert.ok(code.indexOf('Object.freeze(') < code.indexOf("await import('expo-crypto')"));
+  assert.match(code, /if \(created && file.exists\) file.delete\(\)/);
+});
