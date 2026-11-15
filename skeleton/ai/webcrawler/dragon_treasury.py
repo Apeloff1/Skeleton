@@ -28,7 +28,7 @@ MAX_SECTIONS = 32
 MAX_TERMS = 2048
 MAX_RESULTS = 24
 _HEX = re.compile(r"[a-f0-9]{64}\Z")
-_MODES = frozenset({"current_only", "historic_only", "all_revisions", "timeline", "compare"})
+_MODES = frozenset({"current_only", "historic_only", "all_revisions", "timeline", "compare", "at_time"})
 _STAGES = ("hatchling", "scout", "scholar", "pathfinder", "archivist", "hoarder")
 _THRESHOLDS = (0, 120, 300, 550, 800, 1150, 1500)
 
@@ -192,11 +192,19 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
                    mode: str = "current_only", query: str = "", family: str | None = None,
                    candidate_limit_reached: bool = False, excluded_sessions: int = 0,
                    alias_blockers: list[dict] | None = None,
-                   materialized: dict[tuple[str,str],ParsedVersion] | None = None) -> dict:
+                   materialized: dict[tuple[str,str],ParsedVersion] | None = None,
+                   cursor: str | None = None, observed_before: float | None = None,
+                   left: str | None = None, right: str | None = None) -> dict:
     if (not isinstance(observations,list) or len(observations)>MAX_OBSERVATIONS
             or type(as_of) not in (int,float) or not math.isfinite(as_of)
             or mode not in _MODES or not isinstance(query,str) or len(query.encode())>1024
             or family is not None and (not isinstance(family,str) or not _HEX.fullmatch(family))
+            or cursor is not None and (not isinstance(cursor,str) or not re.fullmatch(r"[0-9a-f]{64}:[0-9]{1,4}",cursor))
+            or (mode=="at_time") != (observed_before is not None)
+            or observed_before is not None and (type(observed_before) not in (float,int) or not math.isfinite(observed_before) or not 0<=observed_before<=as_of)
+            or (left is None)!=(right is None)
+            or left is not None and (mode!="compare" or family is None or left==right
+                or not isinstance(left,str) or not _HEX.fullmatch(left) or not isinstance(right,str) or not _HEX.fullmatch(right))
             or type(candidate_limit_reached) is not bool
             or type(excluded_sessions) is not int or not 0<=excluded_sessions<=MAX_SESSIONS):
         raise ValueError("invalid treasury query envelope")
@@ -364,9 +372,24 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
             comparisons[fid]={"current":latest,"previous":versions[-2],"delta":latest["delta"]}
     # Explicitly separate index corpora before computing document frequency.
     # Historic pages cannot leak into current-only scoring via IDF.
-    allowed = [v for v in revisions if v["indexed"] and (family is None or v["family_id"]==family)
-               and (mode in {"all_revisions","timeline","compare"} or
-                    v["plane"]==("current" if mode=="current_only" else "historic"))]
+    if mode=="at_time":
+        # Historical time travel uses the as-observed latest version, and
+        # only when a permitted exact representative existed by that cutoff.
+        # Later identical observations do not retroactively certify the past.
+        cutoffs={}
+        for v in revisions:
+            if v["first_seen"]<=observed_before:
+                previous=cutoffs.get(v["family_id"])
+                if previous is None or v["first_seen"]>previous["first_seen"]:
+                    cutoffs[v["family_id"]]=v
+                elif v["first_seen"]==previous["first_seen"]:
+                    cutoffs[v["family_id"]]={**v,"indexed":False}
+        allowed=[v for fid,v in cutoffs.items() if v["indexed"] and (family is None or family==fid)
+                 and v["indexed_capture_at"]<=observed_before]
+    else:
+        allowed = [v for v in revisions if v["indexed"] and (family is None or v["family_id"]==family)
+                   and (mode in {"all_revisions","timeline","compare"} or
+                        v["plane"]==("current" if mode=="current_only" else "historic"))]
     terms = list(dict.fromkeys(term_key(token) for token in _lexemes(query)))[:32]
     frequency = Counter(term for v in allowed for term in terms if term in parse_rows[v["revision_id"]].terms)
     average = sum(sum(parse_rows[v["revision_id"]].terms.values()) for v in allowed)/max(1,len(allowed))
@@ -419,7 +442,31 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
     # and projection content without emitting old source text.
     partition_digest=_digest({"parser":PARSER,"families":sorted(({k:v for k,v in f.items() if k not in {"revisit","refresh_url"}} for f in families),key=lambda f:f["family_id"]),
                              "revisions":revisions,"alias_blockers":sorted((_digest(a) for a in aliases))})
+    chosen=comparisons.get(family) if mode=="compare" and family else None
+    if left is not None:
+        by_id={v["revision_id"]:v for v in revisions if v["family_id"]==family}
+        before,after=by_id.get(left),by_id.get(right)
+        if before is None or after is None or not before["indexed"] or not after["indexed"]:
+            raise ValueError("selected historic comparison is not currently indexable")
+        # Nonadjacent comparisons are observations, never inferred causality.
+        chosen={"current":after,"previous":before,"delta":_delta(parse_rows[left],parse_rows[right],complete=False)}
+        chosen["delta"]=_delta(parse_rows[left],parse_rows[right],complete=all(
+            row.complete_text for row in grouped[family] if row.source_id in {before["source_id"],after["source_id"]}))
+    scope_digest=_digest({"partition":partition_digest,"mode":mode,"family":family,"query":query,
+                         "observed_before":observed_before,"left":left,"right":right})
+    offset=0
+    if cursor is not None:
+        bound,raw_offset=cursor.split(":",1)
+        if bound!=scope_digest:
+            raise ValueError("treasury cursor no longer matches index partition")
+        offset=int(raw_offset)
+        if offset%MAX_RESULTS or not 0<offset<=MAX_OBSERVATIONS:
+            raise ValueError("invalid treasury cursor offset")
+    total=max(len(family_rows),len(hits),len(history) if mode in {"timeline","compare"} else 0)
+    next_cursor=f"{scope_digest}:{offset+MAX_RESULTS}" if offset+MAX_RESULTS<total else None
     return {"schema":SCHEMA,"parser":PARSER,"mode":mode,"family":family,
+            "observed_before":observed_before,"page_offset":offset,"next_cursor":next_cursor,
+            "query_scope_digest":scope_digest,"comparison_selection":None if left is None else {"left":left,"right":right},
             "as_of_unix":as_of,"partition_digest":partition_digest,"candidate_limit_reached":capped,
             "excluded_sessions":excluded_sessions,"observations":len(observations),
             "families":len(families),"revisions":len(revisions),"changed_families":changed_families,
@@ -429,9 +476,9 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
             "revisit_plan":plan,"parsed_unique_payloads":len(memo),"materialized_payload_hits":materialized_hits,
             "verified_historic_transitions":verified_transitions,"verified_changed_families":verified_families,
             "evolution":progression(growth,stewardship,qualified=qualified),
-            "family_rows":family_rows[:MAX_RESULTS],"hits":hits[:MAX_RESULTS],
-            "timeline":history[:MAX_RESULTS] if mode in {"timeline","compare"} else [],
-            "comparison":comparisons.get(family) if mode=="compare" and family else None,
+            "family_rows":family_rows[offset:offset+MAX_RESULTS],"hits":hits[offset:offset+MAX_RESULTS],
+            "timeline":history[offset:offset+MAX_RESULTS] if mode in {"timeline","compare"} else [],
+            "comparison":chosen,
             "earliest_source_expiry":min((x.usable_until for x in indexed),default=None),
             "latest_observed_only":True,"source_text_returned":False,"network_executed":False,
             "training_permission":False,"fresh_consent_required":True}
