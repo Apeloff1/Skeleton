@@ -79,7 +79,7 @@ def _pairs(items):
 
 def _scalar(value):
     if type(value) is int:
-        if not -(2**63)<=value<2**63:raise ValueError("record id integer bound")
+        if not 0<=value<2**63:raise ValueError("record id integer bound")
         return str(value)
     return key(value)
 
@@ -355,3 +355,52 @@ class DatasetShard:
             except BaseException:
                 if db.in_transaction:db.execute("ROLLBACK")
                 raise
+
+
+    def versions(self,*,after=None,limit=32):
+        if type(limit) is not int or not 1<=limit<=100:raise ValueError("dataset version page")
+        with self._db() as db:
+            rows=db.execute("""SELECT * FROM dataset_versions WHERE owner=? AND game=? AND id>?
+                AND expires_at>? AND state IN ('building','sealed') ORDER BY id LIMIT ?""",
+                (self.owner,self.game,_id(after) if after else "",int(time.time()),limit+1)).fetchall()
+        return {"versions":[self._public(x) for x in rows[:limit]],
+                "next_cursor":rows[limit-1]["id"] if len(rows)>limit else None,
+                "source_verified":False,"training_allowed":False}
+
+    @classmethod
+    def operator_shard(cls,index):
+        if type(index) is not int or not 0<=index<SHARDS:raise ValueError("shard number")
+        root=_root()
+        path=root/("game-data-"+format(index,"02x")+".sqlite3")
+        if not path.exists():return None
+        obj=cls.__new__(cls)
+        obj.root=root;obj.path=path
+        st=root.stat();obj.root_id=(st.st_dev,st.st_ino)
+        st=path.stat();obj.file_id=(st.st_dev,st.st_ino)
+        obj.scope=None;obj.owner=None;obj.game=None
+        return obj
+
+
+def sweep_dataset_shard(corpus_path):
+    """Persistent round robin maintenance; no cross-owner result disclosure."""
+    with GameCorpus(corpus_path)._db() as db:
+        db.execute("CREATE TABLE IF NOT EXISTS dataset_maintenance(singleton INTEGER PRIMARY KEY CHECK(singleton=1),cursor INTEGER NOT NULL)")
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            db.execute("INSERT OR IGNORE INTO dataset_maintenance VALUES(1,0)")
+            idx=db.execute("SELECT cursor FROM dataset_maintenance WHERE singleton=1").fetchone()[0]
+            db.execute("UPDATE dataset_maintenance SET cursor=? WHERE singleton=1",((idx+1)%SHARDS,))
+            db.execute("COMMIT")
+        except BaseException:
+            if db.in_transaction:db.execute("ROLLBACK")
+            raise
+    obj=DatasetShard.operator_shard(idx)
+    if obj is None:return {"scanned":0,"removed_records":0}
+    with obj._db() as db:
+        rows=db.execute("""SELECT owner,game,id FROM dataset_versions WHERE state!='erased'
+            AND (expires_at<=? OR state='revoked') ORDER BY expires_at,owner,game,id LIMIT 2""",(int(time.time()),)).fetchall()
+    total=0
+    for row in rows:
+        obj.owner=_id(row["owner"]);obj.game=_id(row["game"])
+        total+=obj.collect(row["id"])["removed_records"]
+    return {"scanned":len(rows),"removed_records":total,"secure_erasure":False}
