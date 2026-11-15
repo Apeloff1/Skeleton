@@ -240,12 +240,12 @@ def test_aggregate_output_budget_refuses_synthetic_success(
         ex, "resolve_binary", lambda binary=None: ("/bin/true", "mock-runner", False),
     )
     monkeypatch.setattr(ex, "_run", fake_runner)
-    monkeypatch.setattr(ex, "MAX_OUTPUT_BYTES", 9000)
+    monkeypatch.setattr(ex, "MAX_EXPORT_TOTAL_BYTES", 9000)
     result = ex.export_build(
         files, tmp_path / "native-out", presets=("Linux",),
     )
     assert result["passed"] is False
-    assert result["presets"]["Linux"]["reason"] == "artifact-custody-failed"
+    assert result["presets"]["Linux"]["reason"] == "cumulative-output-byte-budget-exceeded"
     assert result["release_certified"] is False
 
 
