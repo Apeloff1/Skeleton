@@ -28,6 +28,7 @@ from .core import (
 )
 from .dragon_mission_quality import rank_query_passages, scan_untrusted_instructions
 from .evidence_selection import select_diverse_evidence
+from .duplicate_custody import alias_summary, make_alias, validate_aliases
 from .structured_discovery import (
     DiscoveryError, UnsupportedDiscoveryRoot, SUPPORTED_MEDIA,
     parse_structured_discovery, parse_plaintext_sitemap,
@@ -98,6 +99,7 @@ def implementation_digest():
                 "research.py",
                 "dragon_mission_quality.py",
                 "evidence_selection.py",
+                "duplicate_custody.py",
                 "source_instruction_guard.py",
                 "structured_discovery.py",
                 "document_formats.py",
@@ -355,6 +357,7 @@ class CrawlRun:
             "sources": {},
             "events": [],
             "instruction_incidents": [],
+            "source_aliases": [],
             "stop_reason": None,
             "pending_dispatch": None,
         }
@@ -418,6 +421,7 @@ class CrawlRun:
             "sources",
             "events",
             "instruction_incidents",
+            "source_aliases",
             "stop_reason",
             "pending_dispatch",
         }:
@@ -640,6 +644,12 @@ class CrawlRun:
                                sequence=state["sequence"], requests=usage["requests"])
         except ValueError as exc:
             raise CrawlOperationError("instruction incident custody invalid") from exc
+        try:
+            validate_aliases(state.get("source_aliases"), sources=sources,
+                             seen=state["seen"], requests=usage["requests"],
+                             sequence=state["sequence"], admit=run._admit)
+        except (ValueError, TypeError, KeyError) as exc:
+            raise CrawlOperationError("duplicate acquisition custody invalid") from exc
         events = state.get("events")
         if not isinstance(events, list) or len(events) > 64:
             raise CrawlOperationError("event history bound exceeded")
@@ -725,6 +735,7 @@ class CrawlRun:
             "next_ready_at": min(ready) if ready else None,
             "source_count": len(state["sources"]),
             "instruction_security": incident_summary(state["instruction_incidents"]),
+            "duplicate_evidence": alias_summary(state["source_aliases"]),
             "adaptive_origin_health": {
                 host: asdict(origin_health(state["events"], host))
                 for host in self.request.allowed_hosts
@@ -746,6 +757,13 @@ class CrawlRun:
 
     def sources(self):
         return [copy.deepcopy(row) for row in self._state["sources"].values()]
+
+    def source_aliases(self, source_id):
+        """Return exact-content observations, never independent knowledge."""
+        if source_id not in self._state["sources"]:
+            raise CrawlOperationError("captured source not found")
+        return copy.deepcopy([row for row in self._state["source_aliases"]
+                              if row["source_id"] == source_id])
 
     def source_read(self, source_id):
         row = self._state["sources"].get(source_id)
@@ -1382,10 +1400,19 @@ class CrawlRun:
                 "source_rights_restricted", now=now, url=url,
                 reason="source_noindex_or_noarchive",
             )
-        if any(source["content_hash"] == doc.content_hash for source in state["sources"].values()):
+        primary = next((source for source in state["sources"].values()
+                        if source["content_hash"] == doc.content_hash), None)
+        if primary is not None:
             for link in dict.fromkeys((*(doc.links if rights.follow else ()), *header_links)):
                 self._enqueue(link, depth=item["depth"] + 1, parent_url=url)
-            return self._event("duplicate", now=now, url=url, reason=doc.content_hash)
+            event = self._event("duplicate", now=now, url=url, reason=doc.content_hash)
+            state["source_aliases"].append(make_alias(
+                source_id=primary["source_id"], canonical_url=doc.canonical_url,
+                fetched_url=doc.fetched_url, content_hash=doc.content_hash,
+                raw_body_hash=doc.provenance["raw_body_hash"],
+                captured_at=doc.fetched_at, sequence=event["sequence"],
+            ))
+            return event
         text_bytes = doc.text.encode("utf-8")
         text = text_bytes[:MAX_TEXT_BYTES].decode("utf-8", errors="ignore")
         source_id = _digest({"url": doc.canonical_url, "content_hash": doc.content_hash})
