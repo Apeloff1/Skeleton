@@ -1,7 +1,7 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,AppState,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {getAuthToken} from '../../auth/gameforgeAuth';
-import {getDragonVault,getDragonVaultQuota,discoverDragonVault,retireDragonSession,restoreDragonVaultPrimary,repairDragonVaultReplica,getDragonVaultRedundancy,getCrawl,crawlRequestKey,configureDragonArchive,
+import {getDragonVault,getDragonVaultQuota,discoverDragonVault,retireDragonSession,restoreDragonVaultPrimary,repairDragonVaultReplica,configureDragonVaultCare,getDragonVaultRedundancy,getCrawl,crawlRequestKey,configureDragonArchive,
  configureLegacyTreasuryArchive,eraseCrawl,type DragonVaultCatalog,type DragonVaultQuota,type DragonVaultDiscovery,type DragonVaultRedundancy,type DragonVaultEntry,type CrawlSession} from '../../product/crawlerClient';
 import s,{colors} from './CrawlerWorkspace.styles';
 import {scanArchiveChambers,bestHistoryWindow,type ChamberScan,SCAN_DEADLINE_MS} from './dragonVaultScan';
@@ -123,9 +123,9 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   }catch(e){if(valid(ctrl,attempt,token))setError(e instanceof Error?e.message:'Historical copy verification unavailable.');}
   finally{if(epoch.current===attempt){pending.current=null;setBusy(false);}}
  }
- async function mutate(action:'retire'|'restore'|'replica'|'grant'|'revoke'|'erase',id:string,version:number,legacy=false){
-  if(busy||disabled||owner.current!==getAuthToken()||action!=='revoke'&&!canWrite)return;
-  if((action==='retire'||action==='restore'||action==='replica')&&!retention||action==='grant'&&!rights||action==='erase'&&eraseText!=='ERASE')return;
+ async function mutate(action:'retire'|'restore'|'replica'|'care'|'uncare'|'grant'|'revoke'|'erase',id:string,version:number,legacy=false){
+  if(busy||disabled||owner.current!==getAuthToken()||action!=='revoke'&&action!=='uncare'&&!canWrite)return;
+  if((action==='retire'||action==='restore'||action==='replica'||action==='care')&&!retention||action==='grant'&&!rights||action==='erase'&&eraseText!=='ERASE')return;
   const n=action==='grant'?Number(days):30;
   if(!Number.isInteger(n)||n<1||n>30){setError('Historical-use duration must be 1–30 days.');return;}
   clearDiscovery();invalidate();const token=getAuthToken(),attempt=epoch.current,ctrl=new AbortController();pending.current=ctrl;
@@ -148,6 +148,10 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
    }else if(action==='replica'){
     const receipt=await repairDragonVaultReplica(id,{...command,retention_acknowledged:true},ctrl.signal);
     message=receipt.outcome==='repaired'?'Exact retained duplicate repaired; original primary and witness unchanged.':'Retained duplicate already intact.';
+   }else if(action==='care'||action==='uncare'){
+    const result=await configureDragonVaultCare(id,{...command,enabled:action==='care',days:7,repairs:2,
+      retention_acknowledged:action==='care'&&retention},ctrl.signal);
+    message=result.care.enabled?'Seven-day care grant recorded; at most two exact-copy repairs.':'Automatic custody repair permission withdrawn.';
    }else if(action==='erase'){
     await eraseCrawl(id,command,ctrl.signal);message='Original retained session erased; exported copies remain outside the app.';
    }else{
@@ -236,6 +240,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
       <Text selectable style={s.label}>{row.session_id}</Text>
       <Text style={s.small}>{row.integrity_held?'Held metadata · repair or explicitly erase':row.vault?.state==='pending'?'Retirement pending':row.vault?.active_slot_released?'Retired · active slot released':'Retired · active slot release pending'}</Text>
       {row.vault&&<Text style={s.small}>Accepted {stamp(row.vault.accepted_at)} · {row.legacy_runtime===null?'primary runtime unknown; verify copies':row.legacy_runtime?'older-runtime witness':'current-runtime witness'}</Text>}
+      {row.care&&<Text style={s.small}>Care: {row.care.active?'recorded active':'inactive'} · {row.care.remaining}/{row.care.budget} repairs remaining · expires {stamp(row.care.expires_at)}{row.care.last_repair?' · last '+row.care.last_repair.side+' repair '+stamp(row.care.last_repair.at):''}</Text>}
       {row.last_scrub&&<Text style={s.small}>Last integrity patrol: {row.last_scrub.state.replaceAll('_',' ')} · {stamp(row.last_scrub.checked_at)}. Past observation, not live verification.</Text>}
       {row.archive_expires_at!==null&&<Text style={s.small}>Recorded archive grant expires {stamp(row.archive_expires_at)}. Individual source permission is checked at read time.</Text>}
       <Button label={selected.includes(row.session_id)?'Remove from selected history':'Select for historical window'} disabled={busy||disabled||row.integrity_held||row.vault?.state!=='vaulted'||selected.length>=32&&!selected.includes(row.session_id)} action={()=>toggle(row)}/>
@@ -263,7 +268,10 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
         <View style={s.row}><Switch value={retention} onValueChange={setRetention} disabled={busy||disabled} accessibilityLabel="Confirm rights to restore original retained custody"/><Text style={[s.small,s.grow]}>I have rights to maintain this retained record.</Text></View>
         <Button label="Verify or repair original primary" disabled={busy||disabled||!retention} action={()=>void mutate('restore',row.session_id,row.version)}/>
         <Button label="Verify or repair retained duplicate" disabled={busy||disabled||!retention} action={()=>void mutate('replica',row.session_id,row.version)}/>
+        <Text style={s.small}>Optional care grant: seven days, at most two repairs, only from a surviving exact copy. No crawling, source-use permission or independent backup.</Text>
+        <Button label="Authorize seven-day automatic care" disabled={busy||disabled||!retention} action={()=>void mutate('care',row.session_id,row.version)}/>
        </>}
+       {row.vault?.state==='vaulted'&&<Button label="Withdraw automatic care permission" disabled={busy||disabled} action={()=>void mutate('uncare',row.session_id,row.version)}/>}
        {canWrite&&<><Text style={s.small}>Permanent owner erasure removes the original record, its indexes and both quota IDs. Type ERASE to confirm.</Text>
         <TextInput style={field} value={eraseText} onChangeText={setEraseText} autoCapitalize="characters" maxLength={5} accessibilityLabel="Type ERASE to confirm permanent deletion"/>
         <Button label="Erase this retained expedition" disabled={busy||disabled||eraseText!=='ERASE'} action={()=>void mutate('erase',row.session_id,row.version)}/></>}

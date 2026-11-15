@@ -627,5 +627,66 @@ class VaultScrubTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(item["last_scrub"])
 
 
+class VaultCareTests(unittest.IsolatedAsyncioTestCase):
+    def harness(self,damaged=True,enabled=True):
+        from skeleton.ai.webcrawler.dragon_vault_care import issue_care
+        app,row,now=VaultScrubTests().harness(damaged=damaged)
+        row["treasury_vault_care"]=issue_care(operation="a"*64,request_digest="b"*64,
+            snapshot_digest=row["treasury_vault"]["snapshot_digest"],now=now.timestamp()-10,days=7,budget=2,enabled=enabled)
+        if not damaged:
+            row["checkpoint_replica"]="bad"
+        return app,row,now
+
+    async def test_patrol_consumes_grant_in_same_cas_as_repair(self):
+        for damaged,side,field in ((True,"primary","snapshot"),(False,"replica","checkpoint_replica")):
+            app,row,now=self.harness(damaged=damaged)
+            with patch("core.dragon_crawler._now",return_value=now):
+                result=await app.scrub_treasury_vault()
+            self.assertEqual(result["auto_"+side+"_repaired"],1)
+            fence,mutation=app.sessions.update_one.await_args.args
+            self.assertEqual(fence["treasury_vault_care"],row["treasury_vault_care"])
+            self.assertEqual(mutation["$set"]["treasury_vault_care"]["used"],1)
+            self.assertEqual(mutation["$set"]["treasury_vault_care"]["last_repair"]["side"],side)
+            self.assertIn(field,mutation["$set"])
+            self.assertEqual(mutation["$inc"],{"version":1})
+            self.assertNotIn("archive_grant",mutation["$set"])
+            self.assertNotIn("checkpoint_identity",mutation["$set"])
+            self.assertIn({"$gt":["$treasury_vault_care.expires_at",{"$divide":[{"$toLong":"$$NOW"},1000]}]},fence["$expr"]["$and"])
+
+    async def test_revoked_care_remains_observation_only(self):
+        app,row,now=self.harness(enabled=False)
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.scrub_treasury_vault()
+        self.assertEqual(result["repairable_primary"],1)
+        self.assertEqual(result["auto_primary_repaired"],0)
+        self.assertNotIn("snapshot",app.sessions.update_one.await_args.args[1]["$set"])
+
+    async def test_revocation_or_concurrent_version_wins_publication(self):
+        app,row,now=self.harness()
+        app.sessions.update_one.side_effect=[Mock(modified_count=1),Mock(modified_count=0)]
+        with patch("core.dragon_crawler._now",return_value=now):
+            result=await app.scrub_treasury_vault()
+        self.assertEqual(result["superseded"],1)
+        self.assertEqual(result["auto_primary_repaired"],0)
+
+    async def test_owner_issue_and_viewer_withdraw_without_source_read(self):
+        app,row,now=self.harness()
+        body={"expected_version":row["version"],"idempotency_key":"care-test","enabled":True,
+              "days":7,"repairs":2,"retention_acknowledged":True}
+        with patch("core.dragon_crawler._now",return_value=now),patch(
+                "core.dragon_crawler.authenticated_scope",return_value=SCOPE):
+            with self.assertRaises(CrawlerError):
+                await app.configure_vault_care(SCOPE,row["_id"],body,principal={"role":"viewer"})
+            receipt=await app.configure_vault_care(SCOPE,row["_id"],body,principal={"role":"editor"})
+            self.assertTrue(receipt["care"]["active"])
+            with patch.object(app,"_inspect_vault_redundancy") as inspect:
+                revoked=await app.configure_vault_care(SCOPE,row["_id"],{**body,"enabled":False,
+                    "idempotency_key":"withdraw-care","retention_acknowledged":False},principal={"role":"viewer"})
+                inspect.assert_not_called()
+        self.assertFalse(revoked["care"]["active"])
+        self.assertFalse(revoked["care"]["network_authorized"])
+        app._admit.assert_awaited_once()
+
+
 if __name__=="__main__":
     unittest.main()

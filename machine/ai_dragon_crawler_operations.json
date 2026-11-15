@@ -39,7 +39,8 @@
     "skeleton/ai/webcrawler/dragon_treasury_vault.py",
     "backend/core/dragon_vault.py",
     "skeleton/ai/webcrawler/dragon_vault_quota.py",
-    "skeleton/ai/webcrawler/dragon_vault_discovery.py"
+    "skeleton/ai/webcrawler/dragon_vault_discovery.py",
+    "skeleton/ai/webcrawler/dragon_vault_care.py"
   ],
   "state_authority": "Existing CORE_DB Mongo application custody; pure snapshots have no independent storage authority",
   "public_api": {
@@ -141,7 +142,8 @@
     "treasury_temporal_selection": "32-session owner catalogue, 2048 observations and 256 retained-text candidates. Selected-family and cutoff-first reservation, fair chronological version representatives, partition-bound pagination, past-cutoff historic-only results; held newest revisions cannot promote older different material.",
     "treasury_vault": "Owner-explicit expired terminal retirement; reserve existing owner quota vault ID before row publication and active slot release. Metadata-only catalog, bounded selected history-only windows; no new permission, backup or physical storage. Exact owner erase removes both quota IDs.",
     "treasury_quota_audit": "Metadata-only owner quota reconciliation, exact arrays and immutable erased tombstones; missing reservations and malformed records held, never guessed deleted.",
-    "treasury_vault_discovery": "Query-guided page-local discovery over up to 128 retired records, eight exact witnessed sessions per request; live archive membership, no source text, no context or network permission; catalogue/version/active-grant cursor binding."
+    "treasury_vault_discovery": "Query-guided page-local discovery over up to 128 retired records, eight exact witnessed sessions per request; live archive membership, no source text, no context or network permission; catalogue/version/active-grant cursor binding.",
+    "treasury_vault_care": "Explicit maintenance grant, at most seven days/three exact-copy repairs; atomic grant/version/lease consumption and repair; no acquisition or source-use authority."
   },
   "network": {
     "direct": "Validated public DNS addresses pinned to socket with original TLS SNI/hostname verification",

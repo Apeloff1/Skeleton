@@ -3755,6 +3755,7 @@ class DragonCrawlerApplication(DragonVaultMixin):
                     "treasury_vault_replica_repair": "",
                     "treasury_vault_scrub_due": "",
                     "treasury_vault_scrub": "",
+                    "treasury_vault_care": "",
                 },
             },
         )

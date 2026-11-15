@@ -140,8 +140,34 @@ export type DragonVaultState = {
 };
 export type DragonVaultScrub = {checked_at:number;state:'redundant'|'primary_only'|'repairable_primary'|'held';
   primary:'exact'|'held';replica:'exact'|'held'|'unavailable';live_verified:false};
+export type DragonVaultCare = {enabled:boolean;active:boolean;issued_at:number;expires_at:number;budget:number;used:number;remaining:number;
+  last_repair:{side:'primary'|'replica';at:number;version:number}|null;source_use_authorized:false;network_authorized:false};
+export type DragonVaultCareCommand = {schema:'skeleton.dragon.vault-care-command.v1';session_id:string;version:number;
+  care:DragonVaultCare;network_executed:false};
+function validVaultCare(p:DragonVaultCare,version:number,asOf?:number):boolean{
+  return !!p&&typeof p.enabled==='boolean'&&typeof p.active==='boolean'
+    &&Number.isFinite(p.issued_at)&&p.issued_at>=0&&Number.isFinite(p.expires_at)
+    &&p.expires_at>p.issued_at&&p.expires_at-p.issued_at<=7*86400
+    &&integer(p.budget,3)&&p.budget>=1&&integer(p.used,p.budget)&&p.remaining===p.budget-p.used
+    &&(!p.active||p.enabled&&p.remaining>0)&&(asOf===undefined||p.active===(p.enabled&&p.remaining>0&&p.issued_at<=asOf&&asOf<p.expires_at))
+    &&(p.used===0?p.last_repair===null:!!p.last_repair&&['primary','replica'].includes(p.last_repair.side)
+      &&Number.isFinite(p.last_repair.at)&&p.last_repair.at>=p.issued_at&&p.last_repair.at<p.expires_at
+      &&integer(p.last_repair.version,version)&&p.last_repair.version>=2)
+    &&p.source_use_authorized===false&&p.network_authorized===false;
+}
+export async function configureDragonVaultCare(id:string,body:CrawlCommand&{enabled:boolean;days:number;repairs:number;retention_acknowledged:boolean},
+  signal?:AbortSignal):Promise<DragonVaultCareCommand>{
+  if(typeof body.enabled!=='boolean'||!integer(body.days,7)||body.days<1||!integer(body.repairs,3)||body.repairs<1
+      ||typeof body.retention_acknowledged!=='boolean'||body.enabled&&!body.retention_acknowledged)invalid('Invalid finite maintenance consent.');
+  const p=await read(api.post<DragonVaultCareCommand>(ROOT+'/sessions/'+identifier(id)+'/vault-care',body,options(signal)),
+    getAuthToken(),'Maintenance consent unconfirmed. Reload before retrying.');
+  if(!p||p.schema!=='skeleton.dragon.vault-care-command.v1'||p.session_id!==id||!integer(p.version)||p.version<=body.expected_version
+    ||!validVaultCare(p.care,p.version)||p.care.enabled!==body.enabled||p.care.budget!==body.repairs
+    ||Math.abs(p.care.expires_at-p.care.issued_at-body.days*86400)>0.001||p.network_executed!==false)invalid('Invalid maintenance consent receipt.');
+  return p;
+}
 export type DragonVaultEntry = {session_id:string;version:number;vault:DragonVaultState|null;
-  archive_expires_at:number|null;legacy_runtime:boolean|null;integrity_held:boolean;last_scrub?:DragonVaultScrub|null};
+  archive_expires_at:number|null;legacy_runtime:boolean|null;integrity_held:boolean;last_scrub?:DragonVaultScrub|null;care?:DragonVaultCare|null};
 export type DragonVaultCatalog = {schema:'skeleton.dragon.vault-catalog.v1';sessions:DragonVaultEntry[];
   next_cursor:string|null;capacity:128;as_of_unix:number;archive_use_verified:false;network_executed:false};
 export type DragonVaultCommand = {schema:'skeleton.dragon.vault-command.v1';session_id:string;version:number;
@@ -599,7 +625,8 @@ export async function getDragonVault(cursor?:string,signal?:AbortSignal):Promise
     ||p.sessions.some((row,i)=>!row||typeof row.session_id!=='string'||!ID.test(row.session_id)||!integer(row.version)||row.version<1
       ||(i>0&&p.sessions[i-1].session_id<=row.session_id)||(cursor!==undefined&&row.session_id>=cursor)
       ||typeof row.integrity_held!=='boolean'
-      ||row.integrity_held&&(row.vault!==null||row.archive_expires_at!==null||row.legacy_runtime!==null||row.last_scrub!=null)
+      ||row.integrity_held&&(row.vault!==null||row.archive_expires_at!==null||row.legacy_runtime!==null||row.last_scrub!=null||row.care!=null)
+      ||row.care!=null&&!validVaultCare(row.care,row.version,p.as_of_unix)
       ||row.last_scrub!=null&&(!Number.isFinite(row.last_scrub.checked_at)||row.last_scrub.checked_at<0||row.last_scrub.checked_at>p.as_of_unix
           ||row.last_scrub.live_verified!==false||!['exact','held'].includes(row.last_scrub.primary)
           ||!['exact','held','unavailable'].includes(row.last_scrub.replica)

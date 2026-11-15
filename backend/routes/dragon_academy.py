@@ -2677,6 +2677,13 @@ class CrawlerTreasuryWatchRequest(CrawlerWriteRequest):
     archive_rights_acknowledged: bool = Field(strict=True)
 
 
+class CrawlerVaultCareRequest(CrawlerWriteRequest):
+    enabled: bool = Field(strict=True)
+    days: int = Field(default=7,ge=1,le=7,strict=True)
+    repairs: int = Field(default=2,ge=1,le=3,strict=True)
+    retention_acknowledged: bool = Field(strict=True)
+
+
 class CrawlerVaultRetireRequest(CrawlerWriteRequest):
     retention_acknowledged: bool = Field(strict=True)
 
@@ -2850,6 +2857,17 @@ async def crawler_treasury_vault(
     scope: dict = Depends(_crawler_scope),
 ) -> dict:
     return await _crawler_result(crawler_application.treasury_vault_catalog(scope,cursor=cursor,limit=limit))
+
+
+@router.post("/crawler/sessions/{session_id}/vault-care")
+async def crawler_vault_care(
+    body: CrawlerVaultCareRequest,
+    session_id: str = URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    return await _crawler_result(crawler_application.configure_vault_care(
+        scope,session_id,body.model_dump(),principal=user))
 
 
 @router.get("/crawler/sessions/{session_id}/vault-redundancy")

@@ -38,7 +38,7 @@ function client(initial){
   });
   return {requests,read:modules.getDragonTreasury,readVault:modules.getDragonVault,
     quota:modules.getDragonVaultQuota,discover:modules.discoverDragonVault,
-    retire:modules.retireDragonSession,restore:modules.restoreDragonVaultPrimary,redundancy:modules.getDragonVaultRedundancy,repairReplica:modules.repairDragonVaultReplica,set:value=>{payload=value;}};
+    retire:modules.retireDragonSession,restore:modules.restoreDragonVaultPrimary,redundancy:modules.getDragonVaultRedundancy,repairReplica:modules.repairDragonVaultReplica,care:modules.configureDragonVaultCare,set:value=>{payload=value;}};
 }
 
 async function main(){
@@ -166,6 +166,14 @@ async function main(){
   for(const patch of [{primary_rewritten:true},{witness_rewritten:true},{historical_grant_extended:true},{version:1}]){
     vc.set({...duplicate,...patch});await assert.rejects(vc.repairReplica('vaulted-fixture',command),e=>e.kind==='protocol');
   }
-  console.log('Treasury and cold custody: canonical wire parity, archive windows, quota, discovery and bidirectional exact-copy repair.');
+  const care={schema:'skeleton.dragon.vault-care-command.v1',session_id:'vaulted-fixture',version:2,network_executed:false,
+    care:{enabled:true,active:true,issued_at:1800000000,expires_at:1800000000+7*86400,budget:2,used:0,remaining:2,
+      last_repair:null,source_use_authorized:false,network_authorized:false}};
+  const careCommand={...command,enabled:true,days:7,repairs:2};
+  vc.set(care);assert.deepEqual(await vc.care('vaulted-fixture',careCommand),care);
+  for(const patch of [{network_authorized:true},{remaining:1},{budget:4},{source_use_authorized:true}]){
+    vc.set({...care,care:{...care.care,...patch}});await assert.rejects(vc.care('vaulted-fixture',careCommand),e=>e.kind==='protocol');
+  }
+  console.log('Treasury and cold custody: canonical wire parity, archives, discovery, exact-copy repair and finite care consent.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

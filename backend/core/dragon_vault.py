@@ -219,7 +219,7 @@ class DragonVaultMixin:
             query["_id"]={"$lt":cursor}
         projection={"_id":1,"version":1,"treasury_vault":1,"archive_grant":1,
                     "snapshot.binding.code_digest":1,"checkpoint_identity.snapshot_digest":1,
-                    "treasury_vault_scrub":1}
+                    "treasury_vault_scrub":1,"treasury_vault_care":1}
         async def page():
             return await self.sessions.find(query,projection).sort("_id",DESCENDING).limit(limit+1).max_time_ms(2000).to_list(limit+1)
         rows=await page()
@@ -248,16 +248,18 @@ class DragonVaultMixin:
                 audit=self._public_vault_scrub(row,now,witness)
                 result.append({"session_id":row["_id"],"version":int(row["version"]),
                     "vault":public_marker(marker),"archive_expires_at":expiry,
-                    "legacy_runtime":legacy,"integrity_held":False,"last_scrub":audit})
+                    "legacy_runtime":legacy,"integrity_held":False,"last_scrub":audit,
+                    "care":self._public_care(row,now,witness)})
             except (ValueError,TypeError,KeyError,RecursionError):
                 result.append({"session_id":row["_id"],"version":int(row["version"]),
                     "vault":None,"archive_expires_at":None,"legacy_runtime":None,"integrity_held":True,
-                    "last_scrub":None})
+                    "last_scrub":None,"care":None})
         final=await page()
         if any(item["archive_expires_at"] is not None and item["archive_expires_at"]<=_now().timestamp()
                for item in result):
             raise CrawlerError("crawler_vault_changed","Historical grant expired during catalogue read.",409)
-        if rows!=final:
+        if rows!=final or any(item.get("care") and item["care"]["active"]
+                and item["care"]["expires_at"]<=_now().timestamp() for item in result):
             raise CrawlerError("crawler_vault_changed","Vault catalogue changed; reload.",409)
         return {"ok":True,"schema":"skeleton.dragon.vault-catalog.v1","sessions":result,
                 "next_cursor":rows[limit-1]["_id"] if len(rows)>limit else None,
@@ -757,7 +759,8 @@ class DragonVaultMixin:
         rows=await self.sessions.find(eligible,metadata).sort(
             [("treasury_vault_scrub_due",ASCENDING),("_id",ASCENDING)]).limit(8).max_time_ms(2000).to_list(8)
         totals={"scanned":len(rows),"selected":0,"redundant":0,"primary_only":0,
-                "repairable_primary":0,"held":0,"superseded":0,"busy":0,"failed":0}
+                "repairable_primary":0,"held":0,"superseded":0,"busy":0,"failed":0,
+                "auto_primary_repaired":0,"auto_replica_repaired":0}
         owners=set()
         for item in rows:
             scope={k:item[k] for k in ("tenant_id","owner_id")}
@@ -771,6 +774,8 @@ class DragonVaultMixin:
             fence={"_id":item["_id"],**scope,"version":item["version"],
                    "status":{"$in":sorted(TERMINAL)},"treasury_vault.state":"vaulted",
                    "treasury_vault_scrub_due":item.get("treasury_vault_scrub_due",{"$exists":False})}
+            clock={"$divide":[{"$toLong":"$$NOW"},1000]}
+            fence["$expr"]={"$lte":[{"$ifNull":["$treasury_vault_scrub_due",0]},clock]}
             claim=await self.sessions.update_one(fence,{"$set":{"treasury_vault_scrub_due":claim_until}})
             if not claim.modified_count:
                 totals["superseded"]+=1
@@ -804,6 +809,15 @@ class DragonVaultMixin:
             fence={**fence,"checkpoint_identity":witness if "checkpoint_identity" in row else {"$exists":False},
                    "treasury_vault":row["treasury_vault"]}
             due=checked+(24*3600 if state=="redundant" else 6*3600)
+            if hash_identity(digest) and state in {"repairable_primary","primary_only"}:
+                try:
+                    automatic=await self._apply_vault_care(scope,row,fence,state,replica,digest,claim_until)
+                except CrawlerError as exc:
+                    totals["busy" if exc.code=="crawler_vault_busy" else "failed"]+=1
+                    continue
+                if automatic is not None:
+                    totals[automatic]+=1
+                    continue
             if not hash_identity(digest):
                 changed=await self.sessions.update_one(fence,{"$set":{"treasury_vault_scrub_due":due},
                     "$unset":{"treasury_vault_scrub":""}})
@@ -824,3 +838,121 @@ class DragonVaultMixin:
             else:
                 totals["superseded"]+=1
         return totals
+
+
+    @staticmethod
+    def _public_care(row,now,witness):
+        from skeleton.ai.webcrawler.dragon_vault_care import public_care
+        if row.get("treasury_vault_care") is None:
+            return None
+        try:
+            return public_care(row["treasury_vault_care"],now=now,version=row["version"],witness=witness)
+        except (ValueError,TypeError,KeyError):
+            return None
+
+    async def configure_vault_care(self,scope,identifier,body,*,principal):
+        """Explicit owner grant. Viewer withdrawal needs no source inspection."""
+        from core.dragon_crawler import CrawlerError,authenticated_scope,_operation,_digest,_plain,_now
+        from skeleton.ai.webcrawler.dragon_vault_care import issue_care,validate_care,public_care
+        if authenticated_scope(principal)!=scope or body.get("enabled") is True and principal.get("role") not in {"editor","admin"}:
+            raise CrawlerError("crawler_vault_denied","Current owner authority required.",403)
+        if (not identity(identifier) or set(body)!={"expected_version","idempotency_key","enabled","days","repairs","retention_acknowledged"}
+                or type(body["expected_version"]) is not int or body["expected_version"]<1
+                or type(body["enabled"]) is not bool or type(body["retention_acknowledged"]) is not bool
+                or type(body["days"]) is not int or not 1<=body["days"]<=7
+                or type(body["repairs"]) is not int or not 1<=body["repairs"]<=3
+                or body["enabled"] and not body["retention_acknowledged"]):
+            raise CrawlerError("crawler_vault_care_invalid","Explicit bounded maintenance consent required.")
+        operation=_operation(body["idempotency_key"])
+        request_digest=_digest({"action":"configure_vault_care",**body})
+        query={"_id":identifier,**scope,"status":{"$in":sorted(TERMINAL)},"treasury_vault.state":"vaulted"}
+        row=await self.sessions.find_one(query,max_time_ms=2000)
+        if row is None:
+            raise CrawlerError("crawler_not_found","Retired expedition not found.",404)
+        prior=row.get("treasury_vault_care")
+        try:
+            marker=validate_marker(_plain(row["treasury_vault"]))
+            witness=marker["snapshot_digest"]
+        except (ValueError,KeyError,TypeError) as exc:
+            raise CrawlerError("crawler_vault_care_held","Retirement witness unavailable.",409) from exc
+        previous=None
+        try:
+            previous=validate_care(_plain(prior)) if prior is not None else None
+        except (ValueError,KeyError,TypeError,CrawlerError):
+            if body["enabled"]:
+                raise CrawlerError("crawler_vault_care_held","Maintenance consent integrity held; withdraw first.",409)
+        if previous is not None and previous["operation"]==operation:
+            if previous["request_digest"]!=request_digest:
+                raise CrawlerError("crawler_idempotency_conflict","Care key names a different command.",409)
+            return {"ok":True,"schema":"skeleton.dragon.vault-care-command.v1","session_id":identifier,
+                    "version":row["version"],"care":public_care(previous,now=_now().timestamp(),
+                    version=row["version"],witness=witness),"network_executed":False}
+        if row["version"]!=body["expected_version"]:
+            raise CrawlerError("crawler_conflict","Reload before changing maintenance consent.",409)
+        if body["enabled"]:
+            try:
+                primary,replica,digest=await _bounded_discovery_cpu(self._inspect_vault_redundancy,scope,row)
+                if digest!=witness or "exact" not in (primary,replica):
+                    raise ValueError("no surviving exact copy")
+            except (ValueError,TypeError,KeyError,RecursionError,CheckpointReplicaError) as exc:
+                raise CrawlerError("crawler_vault_care_held","At least one exact original copy must qualify.",409) from exc
+        now=_now().timestamp()
+        grant=issue_care(operation=operation,request_digest=request_digest,snapshot_digest=witness,
+                        now=now,days=body["days"],budget=body["repairs"],enabled=body["enabled"])
+        fence={**query,"version":row["version"],"treasury_vault":row["treasury_vault"],
+               "treasury_vault_care":prior if "treasury_vault_care" in row else {"$exists":False}}
+        fields={"treasury_vault_care":grant,"treasury_vault_scrub_due":now}
+        if body["enabled"]:
+            fence.update({"checkpoint_identity":row["checkpoint_identity"],"worker_token":None,
+                "lease_until":None,"last_worker_exit_confirmed":{"$ne":False},
+                "$expr":{"$lte":["$consent_expires_at","$$NOW"]}})
+            fields["storage_receipt"]=await self._admit(scope,identifier,{"treasury_vault_care":grant})
+        # Withdrawal must remain available during storage-attester outages.
+        # The small disabled receipt replaces the prior bounded grant.
+        changed=await self.sessions.update_one(fence,{"$set":fields,"$inc":{"version":1}})
+        if not changed.modified_count:
+            raise CrawlerError("crawler_conflict","Maintenance consent changed before publication.",409)
+        return {"ok":True,"schema":"skeleton.dragon.vault-care-command.v1","session_id":identifier,
+                "version":row["version"]+1,"care":public_care(grant,now=now,version=row["version"]+1,
+                witness=witness),"network_executed":False}
+
+    async def _apply_vault_care(self,scope,row,fence,state,replica,digest,claim_until):
+        """Consume grant and repair in one row CAS; never impersonate owner."""
+        from core.dragon_crawler import _now
+        from skeleton.ai.webcrawler.dragon_vault_care import consume_care
+        grant=row.get("treasury_vault_care")
+        public=self._public_care(row,_now().timestamp(),digest)
+        if not public or not public["active"]:
+            return None
+        if state=="repairable_primary":
+            side,field,prepare="primary","snapshot",self._prepare_vault_restore
+        elif state=="primary_only" and replica=="held":
+            side,field,prepare="replica","checkpoint_replica",self._prepare_vault_replica
+        else:
+            return None
+        try:
+            replacement=await _bounded_discovery_cpu(prepare,scope,row)
+            if replacement is None:
+                return None
+            now=_now().timestamp()
+            if now>=claim_until:
+                return "superseded"
+            consumed=consume_care(grant,now=now,version=row["version"],witness=digest,side=side)
+        except (ValueError,TypeError,KeyError,RecursionError,CheckpointReplicaError):
+            return None
+        payload={field:replacement,"treasury_vault_care":consumed}
+        receipt=await self._admit(scope,row["_id"],payload)
+        clock={"$divide":[{"$toLong":"$$NOW"},1000]}
+        fenced={**fence,"treasury_vault_care":grant,"worker_token":None,"lease_until":None,
+                "last_worker_exit_confirmed":{"$ne":False},
+                "$expr":{"$and":[{"$gt":["$treasury_vault_scrub_due",clock]},
+                    {"$gt":["$treasury_vault_care.expires_at",clock]},
+                    {"$lte":["$treasury_vault_care.issued_at",clock]},
+                    {"$lte":["$consent_expires_at","$$NOW"]}]}}
+        update={"$set":{**payload,"storage_receipt":receipt,"treasury_vault_scrub_due":now+300},
+                "$unset":{"treasury_vault_scrub":""},"$inc":{"version":1}}
+        if side=="primary":
+            update["$unset"]["treasury_index"]=""
+            update["$set"]["treasury_repair_due"]=now
+        changed=await self.sessions.update_one(fenced,update)
+        return "auto_"+side+"_repaired" if changed.modified_count else "superseded"
