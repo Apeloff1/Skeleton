@@ -133,5 +133,27 @@ def test_export_receipt_contains_boot_failure_instead_of_raising(tmp_path, monke
     assert receipt["device_qualified"] is False
 
 
+def test_pack_mutation_after_artifact_hash_cannot_pass(tmp_path, monkeypatch):
+    files = emit_godot(compile_era("extraction_now"), title="pack custody")
+    monkeypatch.setattr(ex, "resolve_binary", lambda binary=None: ("/bin/true", "test", False))
+
+    def runner(cmd, cwd, timeout):
+        if "--import" in cmd:
+            return 0, "", False
+        if "--export-release" in cmd:
+            target = Path(cmd[-1])
+            target.write_bytes(b"\x7fELF" + b"fake" * 100)
+            target.with_suffix(".pck").write_bytes(b"original")
+            return 0, "", False
+        Path(cmd[0]).with_suffix(".pck").write_bytes(b"modified")
+        return 0, "", False
+
+    monkeypatch.setattr(ex, "_run", runner)
+    report = ex.export_build(files, tmp_path / "output")
+    assert report["passed"] is False
+    assert report["presets"]["Linux"]["reason"] == "boot-failed"
+    assert "inventory changed" in report["presets"]["Linux"]["boot"]["errors"][0]
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
