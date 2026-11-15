@@ -131,6 +131,7 @@ async def gameforge_rooms(limit: int = 20):
     return {
         "total": len(rooms),
         "concurrent_query_capable": concurrent,
+        "capability_basis": "registry_declaration",
         "sample": sample,
     }
 
@@ -187,71 +188,35 @@ async def gameforge_broadcast(body: BroadcastQuery):
     }
 
 
-def _trim(out):
-    """Keep activation responses small + JSON-safe."""
-    if isinstance(out, (dict, list)):
-        s = str(out)
-        return out if len(s) < 1500 else {"summary": s[:1500] + "…"}
-    return str(out)[:800]
-
-
-# Static activation dispatch. Each callable contains a fixed import path so request
-# data can never select a Python module or attribute to execute.
-def _run_cns_execution_cycle() -> Any:
-    from gameforge.cns_execution_orchestrator import run_full_cns_cycle
-
-    return run_full_cns_cycle()
-
-
-def _run_full_cns_activation() -> Any:
-    from gameforge.integration.full_cns_integration_layer import FullCNSIntegrationLayer
-
-    return FullCNSIntegrationLayer().activate_full_cns()
-
-
-def _run_system_health_check() -> Any:
-    from gameforge.cns_full_integration_layer import CNSFullIntegrationLayer
-
-    return CNSFullIntegrationLayer().run_full_system_health_check()
-
-
-def _run_begin_cns_activation() -> Any:
-    from gameforge.bootstrap.begin_cns_activation import BeginCNSActivation
-
-    return BeginCNSActivation().run()
-
-
-_ACTIVATION_STEPS: list[tuple[str, Callable[[], Any]]] = [
-    ("cns_execution_cycle", _run_cns_execution_cycle),
-    ("full_cns_activation", _run_full_cns_activation),
-    ("system_health_check", _run_system_health_check),
-    ("begin_cns_activation", _run_begin_cns_activation),
-]
-
-
+# The process-owned topology is the only activation state published here.
+# Historical scripts generate reports or declare component readiness without
+# operational evidence; they are not invoked by this HTTP boundary.
 @router.post("/activate")
 async def gameforge_activate():
-    """Activate the explicitly approved CNS execution + bootstrap engines.
+    """Materialize canonical room/seat topology without claiming inference readiness."""
+    from gameforge.bootstrap.begin_cns_activation import get_activation
 
-    Each step runs in a worker thread and is fully guarded — a failing engine is
-    reported, never crashes the request. Import targets are static and reviewable.
-    """
-    import asyncio as _aio
-
-    results: dict = {}
-    for name, runner in _ACTIVATION_STEPS:
-        try:
-            out = await _aio.wait_for(_aio.to_thread(runner), timeout=25)
-            results[name] = {"ok": True, "result": _trim(out)}
-        except Exception:  # noqa: BLE001
-            results[name] = {"ok": False, "error": "activation_failed"}
-    activated = sum(1 for r in results.values() if r["ok"])
+    try:
+        result = await asyncio.to_thread(get_activation().run)
+    except Exception:  # noqa: BLE001
+        return JSONResponse({"activated": 0, "total": 1, "status": "degraded",
+                             "runtime_qualified": False,
+                             "error": "activation_failed"}, status_code=503)
+    ready = result["overall_status"] == "TOPOLOGY_READY"
     return {
-        "activated": activated,
-        "total": len(_ACTIVATION_STEPS),
-        "status": "live" if activated else "degraded",
-        "engines": results,
+        "activated": int(ready), "total": 1,
+        "status": "topology_ready" if ready else "degraded",
+        "runtime_qualified": False,
+        "engines": {"begin_cns_activation": {"ok": ready, "result": result}},
     }
+
+
+@router.get("/activation/status")
+async def gameforge_activation_status():
+    """Read the current process topology receipt; never trigger activation."""
+    from gameforge.bootstrap.begin_cns_activation import get_activation
+
+    return get_activation().status_report()
 
 
 # Static architecture probes. Returning the imported module makes each import a
@@ -330,11 +295,12 @@ async def gameforge_architecture():
     for name, probe in _ARCHITECTURE_PROBES.items():
         try:
             probe()
-            report[name] = "live"
+            report[name] = "importable"
         except Exception:  # noqa: BLE001
             report[name] = "unavailable"
-    live = sum(1 for v in report.values() if v == "live")
-    return {"live": live, "total": len(_ARCHITECTURE_PROBES), "modules": report}
+    importable = sum(1 for v in report.values() if v == "importable")
+    return {"live": 0, "importable": importable, "runtime_qualified": False,
+            "total": len(_ARCHITECTURE_PROBES), "modules": report}
 
 
 @router.get("/status")
@@ -371,6 +337,10 @@ async def gameforge_health():
         from gameforge.rooms.full_room_registry import all_rooms
 
         report["rooms"] = len(all_rooms())
+        from gameforge.bootstrap.begin_cns_activation import get_activation
+
+        report["activation"] = get_activation().status_report()
+        report["runtime_qualified"] = False
     except Exception:  # noqa: BLE001
         report["ok"] = False
         report["rooms_error"] = "rooms_unavailable"
