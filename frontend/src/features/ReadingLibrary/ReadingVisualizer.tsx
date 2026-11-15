@@ -56,7 +56,10 @@ interface ChapterContent {
   is_open_license?: boolean;
   license?: string;
   official_url?: string;
+  license_scope?: string;
+  source_text_verified?: boolean;
   content: {
+    source_sha256?: string | null;
     body_md: string;
     word_count: number;
     reading_minutes: number;
@@ -65,6 +68,20 @@ interface ChapterContent {
     comprehension_questions?: string[];
     key_takeaways?: string[];
   };
+}
+
+type StudyQuestion = { id: string; q: string; options: string[]; answer_idx: number;
+  explanation?: string; hint?: string; evidence?: { label: string; excerpt: string; source_sha256: string } };
+type StudyReceipt = { assessment_sha256: string; source_sha256: string; questions: StudyQuestion[] };
+
+function isStudyReceipt(value: any, source: string): value is StudyReceipt {
+  return value?.source_sha256 === source && /^[a-f0-9]{64}$/.test(value?.assessment_sha256 || '') &&
+    value?.assessment_kind === 'self_study' && Array.isArray(value.questions) &&
+    value.questions.length >= 5 && value.questions.length <= 10 &&
+    value.questions.every((q: any) => typeof q.id === 'string' && typeof q.q === 'string' &&
+      Array.isArray(q.options) && q.options.length === 4 && q.options.every((o: any) => typeof o === 'string') &&
+      new Set(q.options).size === 4 && Number.isInteger(q.answer_idx) && q.answer_idx >= 0 && q.answer_idx <= 3 &&
+      q.evidence?.source_sha256 === source && typeof q.evidence?.excerpt === 'string');
 }
 
 type Block = { kind: 'h1' | 'h2' | 'h3' | 'p' | 'code' | 'list' | 'sep'; text: string };
@@ -196,12 +213,23 @@ export const ReadingVisualizer: React.FC<ReadingVisualizerProps> = ({
   const [fontScale, setFontScale] = useState<number>(1.0);
   // Quiz overlay state
   const [quizVisible, setQuizVisible] = useState(false);
-  const [quiz, setQuiz] = useState<{ q: string; options: string[]; answer_idx: number; explanation?: string }[] | null>(null);
+  const [quiz, setQuiz] = useState<StudyQuestion[] | null>(null);
+  const [quizReceipt, setQuizReceipt] = useState<StudyReceipt | null>(null);
+  const [quizError, setQuizError] = useState('');
+  const [gradeMessage, setGradeMessage] = useState('');
+  const [grading, setGrading] = useState(false);
+  const quizRequest = useRef(0);
   const [quizLoading, setQuizLoading] = useState(false);
   // NEW: per-row expansion state for glossary + comprehension Qs.
   const [glossOpen, setGlossOpen] = useState<Record<number, boolean>>({});
   const [compOpen, setCompOpen] = useState<Record<number, boolean>>({});
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
+  const sourceReceipt = content?.content?.source_sha256;
+  useEffect(() => {
+    quizRequest.current += 1;
+    setQuiz(null); setQuizReceipt(null); setQuizAnswers({}); setQuizError('');
+    setGradeMessage(''); setGrading(false); setQuizLoading(false); setQuizVisible(false);
+  }, [visible, itemType, itemId, chapterIdx, sourceReceipt]);
 
   // Offline cache state for the current chapter
   const [downloaded, setDownloaded] = useState(false);
@@ -452,26 +480,65 @@ export const ReadingVisualizer: React.FC<ReadingVisualizerProps> = ({
 
   const handleQuiz = useCallback(async () => {
     setQuizVisible(true);
-    if (quiz) return;
-    setQuizLoading(true);
+    if (quiz && quizReceipt?.source_sha256 === sourceReceipt) return;
+    if (quizLoading || loading) return;
+    if (!sourceReceipt || !/^[a-f0-9]{64}$/.test(sourceReceipt) ||
+        content?.chapter_idx !== chapterIdx || (content?.book_id && content.book_id !== itemId)) {
+      setQuizError('The displayed chapter has no current source receipt. Reload or refresh this chapter before starting a quiz.');
+      return;
+    }
+    const request = ++quizRequest.current;
+    setQuizLoading(true); setQuizError(''); setGradeMessage('');
+    setQuiz(null); setQuizReceipt(null); setQuizAnswers({});
     try {
       const res = await apiFetch(`${API_URL}/api/academy/reading-library/quiz`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          item_type: itemType,
-          item_id: itemId,
-          chapter_idx: chapterIdx,
-        }),
+        body: JSON.stringify({ item_type: itemType, item_id: itemId, chapter_idx: chapterIdx,
+          expected_source_sha256: sourceReceipt }),
       });
+      if (request !== quizRequest.current) return;
+      if (res.status === 409) throw new Error('Chapter changed. Reload the current chapter before retrying.');
+      if (!res.ok) throw new Error('Not enough verified chapter evidence or the quiz service is unavailable.');
       const data = await res.json();
-      if (data.questions) setQuiz(data.questions);
-    } catch {
-      // ignore
+      if (request !== quizRequest.current) return;
+      if (!isStudyReceipt(data, sourceReceipt)) throw new Error('Quiz source could not be verified.');
+      setQuiz(data.questions); setQuizReceipt(data);
+    } catch (e) {
+      if (request === quizRequest.current) setQuizError(e instanceof Error ? e.message : 'Quiz unavailable.');
     } finally {
-      setQuizLoading(false);
+      if (request === quizRequest.current) setQuizLoading(false);
     }
-  }, [itemType, itemId, chapterIdx, quiz]);
+  }, [itemType, itemId, chapterIdx, sourceReceipt, content, quiz, quizReceipt, quizLoading, loading]);
+
+  const verifyStudyScore = useCallback(async () => {
+    if (!quiz || !quizReceipt || grading || quiz.some((_, idx) => quizAnswers[idx] === undefined)) return;
+    const request = quizRequest.current;
+    setGrading(true); setGradeMessage('');
+    try {
+      const response = await apiFetch(`${API_URL}/api/academy/reading-library/quiz/grade`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_type: itemType, item_id: itemId, chapter_idx: chapterIdx,
+          expected_source_sha256: quizReceipt.source_sha256, assessment_sha256: quizReceipt.assessment_sha256,
+          answers: quiz.map((_, idx) => quizAnswers[idx]) }),
+      });
+      if (request !== quizRequest.current) return;
+      if (!response.ok) throw new Error(response.status === 409
+        ? 'Source changed; this score cannot be verified.' : 'Score verification unavailable.');
+      const data = await response.json();
+      if (request !== quizRequest.current) return;
+      if (data.assessment_sha256 !== quizReceipt.assessment_sha256 ||
+          data.source_sha256 !== quizReceipt.source_sha256 || data.total !== quiz.length ||
+          !Number.isInteger(data.correct) || data.correct < 0 || data.correct > quiz.length) {
+        throw new Error('Score receipt mismatch.');
+      }
+      setGradeMessage(`Verified self-study score: ${data.correct}/${data.total}. Not a certification.`);
+    } catch (e) {
+      if (request === quizRequest.current) setGradeMessage(e instanceof Error ? e.message : 'Score unavailable.');
+    } finally {
+      if (request === quizRequest.current) setGrading(false);
+    }
+  }, [quiz, quizReceipt, grading, quizAnswers, itemType, itemId, chapterIdx]);
 
   const openOfficialUrl = useCallback(() => {
     const url = (content as any)?.official_url;
@@ -631,7 +698,7 @@ export const ReadingVisualizer: React.FC<ReadingVisualizerProps> = ({
               </TouchableOpacity>
             )}
             {(content as any).license && (
-              <Text style={styles.toolbarLicense}>{(content as any).license}</Text>
+              <Text style={styles.toolbarLicense}>{(content as any).license} · catalog reference</Text>
             )}
             <TouchableOpacity testID="rv-quiz" style={styles.toolbarBtn} onPress={handleQuiz}>
               <Ionicons name="help-circle-outline" size={16} color="#F59E0B" />
@@ -835,7 +902,7 @@ export const ReadingVisualizer: React.FC<ReadingVisualizerProps> = ({
         {quizVisible && (
           <View style={styles.quizOverlay}>
             <View style={styles.quizHeader}>
-              <Text style={styles.quizTitle}>Chapter Quiz</Text>
+              <Text style={styles.quizTitle}>Source-bound chapter quiz</Text>
               <TouchableOpacity testID="quiz-close" onPress={() => setQuizVisible(false)}>
                 <Ionicons name="close" size={26} color="#F8FAFC" />
               </TouchableOpacity>
@@ -846,9 +913,12 @@ export const ReadingVisualizer: React.FC<ReadingVisualizerProps> = ({
                 <Text style={{ color: '#94A3B8', marginTop: 10 }}>Generating quiz…</Text>
               </View>
             )}
+            {!!quizError && <Text style={styles.quizExplain}>{quizError}</Text>}
+            {!!quizError && !quizLoading && <TouchableOpacity onPress={handleQuiz}><Text style={styles.quizOptText}>Retry quiz</Text></TouchableOpacity>}
+            {quizReceipt && <Text selectable style={styles.quizExplain}>Self-study · source {quizReceipt.source_sha256.slice(0, 12)}</Text>}
             <ScrollView>
               {quiz?.map((q, qi) => (
-                <View key={qi} style={{ marginBottom: 20 }}>
+                <View key={q.id} style={{ marginBottom: 20 }}>
                   <Text style={styles.quizQ}>{qi + 1}. {q.q}</Text>
                   {q.options?.map((opt, oi) => {
                     const picked = quizAnswers[qi];
@@ -876,11 +946,22 @@ export const ReadingVisualizer: React.FC<ReadingVisualizerProps> = ({
                       </TouchableOpacity>
                     );
                   })}
+                  {quizAnswers[qi] === undefined && q.hint && <Text style={styles.quizExplain}>{q.hint}</Text>}
                   {quizAnswers[qi] !== undefined && q.explanation && (
                     <Text style={styles.quizExplain}>↳ {q.explanation}</Text>
                   )}
+                  {quizAnswers[qi] !== undefined && q.evidence && <Text selectable style={styles.quizExplain}>{q.evidence.label}: {q.evidence.excerpt}</Text>}
                 </View>
               ))}
+              {quiz && quizReceipt && quiz.every((_, idx) => quizAnswers[idx] !== undefined) && (
+                <View style={{ marginVertical: 16 }}>
+                  <Text style={styles.quizQ}>Practice result: {quiz.filter((q, idx) => quizAnswers[idx] === q.answer_idx).length}/{quiz.length}</Text>
+                  <TouchableOpacity disabled={grading} style={styles.quizOpt} onPress={verifyStudyScore}>
+                    <Text style={styles.quizOptText}>{grading ? "Verifying…" : "Verify self-study score"}</Text>
+                  </TouchableOpacity>
+                  {!!gradeMessage && <Text style={styles.quizExplain}>{gradeMessage}</Text>}
+                </View>
+              )}
             </ScrollView>
           </View>
         )}

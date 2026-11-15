@@ -216,12 +216,15 @@ def build_quiz(source: ChapterSource, item_type: str, item_id: str, chapter_idx:
     for term, definition in source.glossary:
         emit("term_definition", "Glossary: " + term, f"Which definition is paired with {term} in this chapter?",
              definition, defs, definition)
-        emit("definition_term", "Glossary: " + term, f"Which term matches this definition: {definition}",
-             term, terms, term)
+        if sum(value.strip().casefold() == definition.strip().casefold() for value in defs) == 1:
+            emit("definition_term", "Glossary: " + term, f"Which term matches this definition: {definition}",
+                 term, terms, definition)
 
     excerpts = [(title, excerpt) for title, text in source.sections if (excerpt := _excerpt(text))]
     excerpt_pool = [excerpt for _, excerpt in excerpts]
     for title, excerpt in excerpts:
+        if sum(excerpt in text for _, text in source.sections) != 1:
+            continue
         # All distractors are excerpts from other sections; the location
         # question avoids asserting that any alternative is factually false.
         emit("section_evidence", title,
