@@ -1,7 +1,7 @@
 """Deterministic time source for replay and performance gates (#807 B071).
 
-Replaces wall-clock ``time.monotonic`` in quality harnesses so that replay
-evidence and perf budgets are reproducible across machines and runs.
+Provides explicit logical time for deterministic replay. It must not
+replace real monotonic deadlines in production resource admission.
 """
 from __future__ import annotations
 
@@ -10,6 +10,18 @@ from typing import Callable
 
 SCHEMA_ID = "quality.deterministic_time.v1"
 DEFAULT_TICK_MS = 16.667
+
+
+def _finite_nonnegative(value: object, name: str) -> float:
+    if type(value) not in (int, float):
+        raise ValueError(f"{name} must be a finite non-negative number")
+    try:
+        number = float(value)
+    except OverflowError as exc:
+        raise ValueError(f"{name} is outside the numeric range") from exc
+    if not math.isfinite(number) or number < 0:
+        raise ValueError(f"{name} must be a finite non-negative number")
+    return number
 
 
 class DeterministicClock:
@@ -22,14 +34,12 @@ class DeterministicClock:
     __slots__ = ("_now_ms", "_tick_ms", "_frozen", "_start_ms")
 
     def __init__(self, tick_ms: float = DEFAULT_TICK_MS, *, start_ms: float = 0.0, frozen: bool = False) -> None:
-        if not math.isfinite(tick_ms) or tick_ms < 0:
-            raise ValueError("tick_ms must be a finite non-negative number")
-        if not math.isfinite(start_ms) or start_ms < 0:
-            raise ValueError("start_ms must be a finite non-negative number")
-        self._tick_ms = float(tick_ms)
-        self._now_ms = float(start_ms)
-        self._start_ms = float(start_ms)
-        self._frozen = bool(frozen)
+        if type(frozen) is not bool:
+            raise ValueError("frozen must be a boolean")
+        self._tick_ms = _finite_nonnegative(tick_ms, "tick_ms")
+        self._start_ms = _finite_nonnegative(start_ms, "start_ms")
+        self._now_ms = self._start_ms
+        self._frozen = frozen
 
     @property
     def tick_ms(self) -> float:
@@ -51,10 +61,13 @@ class DeterministicClock:
         return self
 
     def advance(self, ms: float | None = None) -> float:
-        step = self._tick_ms if ms is None else float(ms)
-        if not math.isfinite(step) or step < 0:
-            raise ValueError("advance requires a finite non-negative step")
-        self._now_ms += step
+        step = self._tick_ms if ms is None else _finite_nonnegative(ms, "advance")
+        next_ms = self._now_ms + step
+        if not math.isfinite(next_ms):
+            raise ValueError("logical clock overflow")
+        if step > 0 and next_ms == self._now_ms:
+            raise ValueError("logical clock precision exhausted")
+        self._now_ms = next_ms
         return self._now_ms
 
     def elapsed_ms(self) -> float:
@@ -63,7 +76,7 @@ class DeterministicClock:
     def __call__(self) -> float:
         value = self._now_ms / 1000.0
         if not self._frozen:
-            self._now_ms += self._tick_ms
+            self.advance()
         return value
 
     def to_mapping(self) -> dict[str, object]:
@@ -78,14 +91,12 @@ class DeterministicClock:
 
 def budget_within(observed_ms: float, budget_ms: float | None) -> bool:
     """Fail closed: non-finite or negative observations never fit a budget."""
-    if budget_ms is None:
-        return True
     try:
-        observed = float(observed_ms)
-        budget = float(budget_ms)
-    except (TypeError, ValueError):
-        return False
-    if not (math.isfinite(observed) and math.isfinite(budget)) or observed < 0 or budget < 0:
+        observed = _finite_nonnegative(observed_ms, "observed_ms")
+        if budget_ms is None:
+            return True
+        budget = _finite_nonnegative(budget_ms, "budget_ms")
+    except ValueError:
         return False
     return observed <= budget
 
