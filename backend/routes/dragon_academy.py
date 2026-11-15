@@ -2666,6 +2666,17 @@ class CrawlerAutomationRequest(CrawlerWriteRequest):
     max_seconds: int = Field(default=900, ge=15, le=3600, strict=True)
 
 
+class CrawlerTreasuryWatchRequest(CrawlerWriteRequest):
+    enabled: bool = Field(strict=True)
+    source_id: str = Field(pattern=r"^[a-f0-9]{64}$")
+    days: int = Field(default=7,ge=1,le=7,strict=True)
+    cycles: int = Field(default=3,ge=1,le=6,strict=True)
+    minimum_interval: int = Field(default=86400,ge=21600,le=604800,strict=True)
+    retention_days: int = Field(default=30,ge=1,le=30,strict=True)
+    capture_rights_acknowledged: bool = Field(strict=True)
+    archive_rights_acknowledged: bool = Field(strict=True)
+
+
 class CrawlerArchiveGrantRequest(CrawlerWriteRequest):
     enabled: bool = Field(strict=True)
     days: int = Field(default=30, ge=1, le=30, strict=True)
@@ -3009,6 +3020,19 @@ async def crawler_source_text(
             expected_content_digest=expected_content_digest,
         )
     )
+
+
+@router.post("/crawler/sessions/{session_id}/treasury-watch")
+async def crawler_treasury_watch(
+    body: CrawlerTreasuryWatchRequest,
+    session_id: str = URLPath(min_length=1,max_length=128),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Explicit finite owner grant for automatic recurring exact-source observation."""
+    return await _crawler_result(crawler_application.configure_treasury_watch(
+        scope,session_id,body.model_dump(),principal=user,
+    ))
 
 
 @router.post("/crawler/sessions/{session_id}/archive-grant")
