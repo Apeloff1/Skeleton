@@ -9,6 +9,7 @@ export default function CrawlerInstructionSecurityPanel({ session }: { session: 
   const origins = session.adaptive_origin_health;
   const duplicates = session.duplicate_evidence;
   const recovery = session.checkpoint_recovery;
+  const economics = session.acquisition_economics;
   return <View style={s.card}>
     <Text style={s.heading}>Adaptive resilience and source quarantine</Text>
     {recovery && <View style={s.check}>
@@ -45,6 +46,16 @@ export default function CrawlerInstructionSecurityPanel({ session }: { session: 
           <Text style={s.small}>{health.successes} useful outcomes · {health.failures} failures · {health.rejections} rejections</Text>
           <Text style={s.small}>{health.evidence_count ? 'Smoothed success estimate: ' + Math.round(health.posterior_success * 100) + '%' : 'No observed dispatch outcomes yet'}. {health.failure_streak ? 'Consecutive recent failures: ' + health.failure_streak + '.' : ''}</Text>
         </View>)}
+    {economics && <View style={s.check}>
+      <Text style={s.label}>Acquisition efficiency and pacing</Text>
+      <Text style={s.small}>{economics.settled_requests} settled requests · {Math.round(economics.charged_bytes / 1024)} KiB observed · {Math.round(economics.uncertain_bytes / 1024)} KiB conservatively reserved</Text>
+      {Object.values(economics.hosts).map(host => <View key={host.host} style={s.check}>
+        <Text style={s.label}>{host.host}</Text>
+        <Text style={s.small}>{host.observations} observations · estimated transport reliability {Math.round(host.reliability * 100)}% · expected novel yield {Math.round(host.novelty_probability * 100)}%</Text>
+        <Text style={s.small}>Smoothed transport {host.mean_latency_seconds.toFixed(2)}s · observed upper-tail {host.tail_latency_seconds.toFixed(2)}s · additive pacing {host.conservative_delay.toFixed(2)}s</Text>
+      </View>)}
+      <Text style={s.small}>Estimates are operational measurements, not probability that a captured claim is true.</Text>
+    </View>}
     <Text style={s.small}>Health estimates rank already-admitted work only; they do not override consent, site denials, budgets, or robots policy.</Text>
   </View>;
 }
