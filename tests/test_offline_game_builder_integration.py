@@ -505,3 +505,76 @@ def test_worker_start_failure_does_not_poison_future_admission(tmp_path, pipelin
         assert len(pipeline.calls) == 1
     finally:
         manager.close()
+
+
+@pytest.mark.parametrize("field,value", [
+    ("result_json", "x" * (262144 + 1)),
+    ("result_json", b'{"schema":"wrong"}'),
+    ("brief", "x" * 4001),
+    ("request_digest", "not-a-digest"),
+    ("receipt_sha256", "f" * 65),
+    ("archive_bytes", 16 * 1024 * 1024 + 1),
+    ("file_count", 0),
+    ("artifact_id", "game-" + "f" * 64),
+])
+def test_corrupt_saved_build_does_not_become_absent_or_replay(tmp_path, pipeline, field, value):
+    database = tmp_path / "workspace.sqlite3"
+    manager = LocalGameBuilder(model(), database)
+    try:
+        manager.submit("bounded-row", BRIEF)
+        assert terminal(manager, "bounded-row")["state"] == "complete"
+        mutate_row(database, "bounded-row", **{field: value})
+        for operation in (
+            lambda: manager.get("bounded-row"),
+            manager.list_jobs,
+            lambda: manager.submit("bounded-row", BRIEF),
+            lambda: manager.archive("bounded-row"),
+        ):
+            with pytest.raises(GameBuildRejected) as denied:
+                operation()
+            assert denied.value.status == 503
+            assert denied.value.code == "invalid_build_record"
+        assert len(pipeline.calls) == 1
+    finally:
+        manager.close()
+
+
+def test_archive_readback_rejects_journal_change_after_verification(tmp_path, pipeline, monkeypatch):
+    database = tmp_path / "workspace.sqlite3"
+    manager = LocalGameBuilder(model(), database)
+    try:
+        manager.submit("archive-race", BRIEF)
+        assert terminal(manager, "archive-race")["state"] == "complete"
+        original = manager._verify
+        def changed(row):
+            payload = original(row)
+            mutate_row(database, "archive-race", updated_at=row["updated_at"] + 1)
+            return payload
+        monkeypatch.setattr(manager, "_verify", changed)
+        with pytest.raises(GameBuildRejected) as denied:
+            manager.archive("archive-race")
+        assert denied.value.code == "game_archive_changed"
+        assert len(pipeline.calls) == 1
+    finally:
+        manager.close()
+
+
+def test_corrupt_interrupted_row_blocks_recovery_without_reexecution(tmp_path, pipeline):
+    database = tmp_path / "workspace.sqlite3"
+    backend = model()
+    manager = LocalGameBuilder(backend, database)
+    try:
+        manager.submit("interrupted-corrupt", BRIEF)
+        assert terminal(manager, "interrupted-corrupt")["state"] == "complete"
+    finally:
+        manager.close()
+    mutate_row(database, "interrupted-corrupt", state="verifying", stage="publishing",
+               result_json="x" * (262144 + 1))
+    with pytest.raises(GameBuildRejected) as denied:
+        LocalGameBuilder(backend, database)
+    assert denied.value.code == "invalid_build_record"
+    assert len(pipeline.calls) == 1
+    with sqlite3.connect(database) as connection:
+        assert connection.execute(
+            "SELECT state FROM offline_game_builds WHERE request_id=?", ("interrupted-corrupt",)
+        ).fetchone() == ("verifying",)

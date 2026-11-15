@@ -402,6 +402,79 @@ def validate_game_build_request(request_id: object, brief: object) -> str:
     return rid
 
 
+# Only these static, schema-owned column names enter the SQL projection.
+# CASE bounds values inside SQLite rather than transferring a forged large
+# BLOB/TEXT to Python. A separate validity bit distinguishes corrupt rows
+# from absent rows; a corrupt request ID must never authorize a replay.
+_RECORD_TEXT_LIMITS = (
+    ("model_digest", 64, False), ("tokenizer_digest", 64, False),
+    ("request_id", 128, False), ("request_digest", 64, False),
+    ("runtime_digest", 64, False), ("model_id", 128, False),
+    ("brief", 4000, False), ("brief_sha256", 64, False),
+    ("state", 16, False), ("stage", 16, False),
+    ("artifact_id", 69, False), ("result_json", MAX_RECORD_BYTES, True),
+    ("error_code", 128, True), ("archive_sha256", 64, True),
+    ("receipt_sha256", 64, True),
+)
+
+
+def _record_projection() -> str:
+    expressions = []
+    valid = []
+    for name, limit, nullable in _RECORD_TEXT_LIMITS:
+        check = f"(typeof({name})='text' AND length(CAST({name} AS BLOB)) BETWEEN 1 AND {limit})"
+        condition = f"({name} IS NULL OR {check})" if nullable else check
+        valid.append(condition)
+        expressions.append(f"CASE WHEN {check} THEN {name} ELSE NULL END AS {name}")
+    for name, check in (
+        ("created_at", "typeof(created_at) IN ('integer','real') AND created_at>=0"),
+        ("updated_at", "typeof(updated_at) IN ('integer','real') AND updated_at>=0"),
+        ("archive_bytes", f"archive_bytes IS NULL OR (typeof(archive_bytes)='integer' AND archive_bytes BETWEEN 1 AND {MAX_ARCHIVE_BYTES})"),
+        ("file_count", f"file_count IS NULL OR (typeof(file_count)='integer' AND file_count BETWEEN 1 AND {MAX_FILES})"),
+    ):
+        valid.append(f"({check})")
+        expressions.append(f"CASE WHEN {check} THEN {name} ELSE NULL END AS {name}")
+    expressions.append("CASE WHEN " + " AND ".join(valid) + " THEN 1 ELSE 0 END AS record_valid")
+    return ", ".join(expressions)
+
+
+_RECORD_SELECT = "SELECT " + _record_projection() + " FROM offline_game_builds"
+
+
+def _invalid_record() -> GameBuildRejected:
+    return GameBuildRejected(503, "invalid_build_record", "The saved game build record is unavailable.")
+
+
+def _validated_record(cursor: sqlite3.Cursor, raw: tuple) -> dict[str, Any]:
+    row = dict(zip((column[0] for column in cursor.description), raw))
+    if row.pop("record_valid", None) != 1:
+        raise _invalid_record()
+    try:
+        _identifier("game request id", row["request_id"])
+        for key in ("model_digest", "tokenizer_digest", "runtime_digest",
+                    "request_digest", "brief_sha256", "archive_sha256", "receipt_sha256"):
+            value = row[key]
+            if value is not None and re.fullmatch(r"[0-9a-f]{64}", value) is None:
+                raise ValueError("invalid record digest")
+        if (not math.isfinite(row["created_at"]) or not math.isfinite(row["updated_at"])
+                or row["state"] not in JOB_STATES
+                or row["stage"] not in (*JOB_STATES, "packaging", "publishing")
+                or sha256(row["brief"].encode("utf-8", errors="strict")).hexdigest() != row["brief_sha256"]
+                or row["artifact_id"] != "game-" + sha256(_encoded([
+                    row["model_digest"], row["tokenizer_digest"], row["request_id"]
+                ])).hexdigest()):
+            raise ValueError("invalid record identity")
+        if row["state"] == "complete" or row["stage"] == "publishing":
+            if any(row[key] is None for key in ("result_json", "archive_sha256",
+                                               "archive_bytes", "file_count", "receipt_sha256")):
+                raise ValueError("incomplete artifact identity")
+        if row["error_code"] is not None and re.fullmatch(r"[a-z0-9_]{1,128}", row["error_code"]) is None:
+            raise ValueError("invalid error code")
+    except (ValueError, TypeError, UnicodeError, OverflowError):
+        raise _invalid_record() from None
+    return row
+
+
 def _encoded(value: object) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True,
                       separators=(",", ":"), allow_nan=False).encode("utf-8", errors="strict")
@@ -686,16 +759,23 @@ class LocalGameBuilder:
     def _row(self, request_id: str) -> dict[str, Any] | None:
         with self._store._lock:
             cursor = self._store._db.execute(
-                "SELECT * FROM offline_game_builds WHERE model_digest=? AND tokenizer_digest=? AND request_id=?",
+                _RECORD_SELECT + " WHERE model_digest=? AND tokenizer_digest=? AND request_id=?",
                 (self.model_digest, self.tokenizer_digest, request_id))
             row = cursor.fetchone()
-            return None if row is None else dict(zip((x[0] for x in cursor.description), row))
+            return None if row is None else _validated_record(cursor, row)
 
     def _public(self, row: Mapping[str, Any]) -> dict[str, Any]:
         state = row["state"]
         if state not in JOB_STATES:
             raise GameBuildRejected(503, "invalid_build_record", "The saved game build record is unavailable.")
-        result = None if row["result_json"] is None else _object(row["result_json"].encode("utf-8"))
+        try:
+            encoded = None if row["result_json"] is None else row["result_json"].encode("utf-8", errors="strict")
+            result = None if encoded is None else _object(encoded)
+            if result is not None and (_encoded(result) != encoded or result.get("schema") != SCHEMA
+                                       or result.get("general_model_quality_qualified") is not False):
+                raise ValueError("invalid stored public result")
+        except (ValueError, TypeError, UnicodeError, RecursionError, OverflowError):
+            raise _invalid_record() from None
         archive = None if state != "complete" else {
             "sha256": row["archive_sha256"], "bytes": row["archive_bytes"], "file_count": row["file_count"]}
         error = None if row["error_code"] is None else {
@@ -721,8 +801,13 @@ class LocalGameBuilder:
             self._require_open()
             with self._store._lock:
                 rows = self._store._db.execute(
-                    "SELECT request_id FROM offline_game_builds WHERE model_digest=? AND tokenizer_digest=? "
-                    "ORDER BY created_at DESC, request_id LIMIT 100", (self.model_digest, self.tokenizer_digest)).fetchall()
+                    "SELECT CASE WHEN typeof(request_id)='text' AND "
+                    "length(CAST(request_id AS BLOB)) BETWEEN 1 AND 128 THEN request_id ELSE NULL END "
+                    "FROM offline_game_builds WHERE model_digest=? AND tokenizer_digest=? "
+                    "ORDER BY created_at DESC, request_id LIMIT ?",
+                    (self.model_digest, self.tokenizer_digest, MAX_HISTORY_JOBS + 1)).fetchall()
+            if len(rows) > MAX_HISTORY_JOBS or any(row[0] is None for row in rows):
+                raise _invalid_record()
             return [self.get(row[0]) for row in rows]
 
     def submit(self, request_id: str, brief: str) -> dict[str, Any]:
@@ -999,7 +1084,7 @@ class LocalGameBuilder:
         receipt = _object(encoded_receipt)
         for key in ("request_id", "request_digest", "model_digest", "tokenizer_digest", "runtime_digest", "artifact_id",
                     "archive_sha256", "archive_bytes", "file_count"):
-            if receipt.get(key) != row[key]:
+            if type(receipt.get(key)) is not type(row[key]) or receipt.get(key) != row[key]:
                 raise ValueError("artifact receipt scope mismatch")
         if (receipt.get("schema") != RECEIPT_SCHEMA
                 or _encoded(receipt.get("result")) != row["result_json"].encode("utf-8")):
@@ -1042,10 +1127,12 @@ class LocalGameBuilder:
             self._require_open()
             self.get(request_id)
             row = self._row(request_id)
-            if row["state"] != "complete":
+            if row is None or row["state"] != "complete":
                 raise GameBuildRejected(409, "game_archive_not_ready", "A verified source archive is available only after the build completes.")
             try:
                 raw = self._verify(row)
+                if self._row(request_id) != row:
+                    raise ValueError("game archive journal changed")
             except Exception:
                 raise GameBuildRejected(409, "game_archive_changed", "The saved source archive failed its integrity check; no bytes were exported.") from None
             self._require_open()
@@ -1055,8 +1142,12 @@ class LocalGameBuilder:
         # Caller owns the distinct work lease. A live peer can therefore never
         # be mistaken for an interrupted job, including before first inference.
         with self._store._lock:
-            cursor = self._store._db.execute("SELECT * FROM offline_game_builds WHERE state IN ('queued','planning','building','verifying')")
-            rows = [dict(zip((x[0] for x in cursor.description), row)) for row in cursor.fetchall()]
+            cursor = self._store._db.execute(
+                _RECORD_SELECT + " WHERE state IN ('queued','planning','building','verifying') LIMIT 2")
+            raw_rows = cursor.fetchall()
+            if len(raw_rows) > 1:
+                raise _invalid_record()
+            rows = [_validated_record(cursor, row) for row in raw_rows]
         for row in rows:
             completed = False
             if row["stage"] == "publishing":
