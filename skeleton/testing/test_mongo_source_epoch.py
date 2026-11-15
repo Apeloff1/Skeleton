@@ -84,7 +84,7 @@ async def _unit_test_migration_authorizer(**scope):
         scope.get("database_name") == "unit_test_canonical"
         and scope.get("purpose") == "quiescent-initial-epoch-v1"
         and (scope.get("tenant_id"), scope.get("actor_id")) in {
-            ("tenant", "actor"), ("tenant-a", "user-a"),
+            ("tenant", "actor"), ("tenant-a", "user-a"), ("tenant", "owner"),
         }
     )
 

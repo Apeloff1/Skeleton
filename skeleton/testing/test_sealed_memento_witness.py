@@ -528,11 +528,11 @@ def test_witnessed_publication_and_retirement_hold_source_epoch_until_acknowledg
     from skeleton.persistence.mongo_source_epoch import (
         MongoCanonicalSourceEpoch, MongoSourceEpochError,
     )
-    from skeleton.testing.test_mongo_source_epoch import Database
+    from skeleton.testing.test_mongo_source_epoch import Database, _unit_test_migration_authorizer
 
     async def scenario():
         archive, mongo, witness, guard = setup()
-        epoch = MongoCanonicalSourceEpoch(Database())
+        epoch = MongoCanonicalSourceEpoch(Database(), migration_authorizer=_unit_test_migration_authorizer)
         mongo.conversation = SimpleNamespace(canonical_source_epoch=epoch, memento_witness=witness)
         await epoch.provision_migration_epoch(tenant_id="tenant", actor_id="owner")
         original_cas = witness.compare_and_set
@@ -567,11 +567,11 @@ def test_unacknowledged_witness_commit_quarantines_canonical_source_epoch():
     from skeleton.persistence.mongo_source_epoch import (
         MongoCanonicalSourceEpoch, MongoSourceEpochError,
     )
-    from skeleton.testing.test_mongo_source_epoch import Database
+    from skeleton.testing.test_mongo_source_epoch import Database, _unit_test_migration_authorizer
 
     async def scenario():
         archive, mongo, witness, guard = setup()
-        epoch = MongoCanonicalSourceEpoch(Database())
+        epoch = MongoCanonicalSourceEpoch(Database(), migration_authorizer=_unit_test_migration_authorizer)
         mongo.conversation = SimpleNamespace(canonical_source_epoch=epoch, memento_witness=witness)
         await epoch.provision_migration_epoch(tenant_id="tenant", actor_id="owner")
         witness.reject = True
