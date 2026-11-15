@@ -20,10 +20,10 @@ from .dragon_companion import _lexemes, _signature, _similarity
 from .dragon_revisit_model import ChangeSample, infer_revisit
 
 SCHEMA = "skeleton.dragon.treasury.v1"
-PARSER = "retained-text-sections-v2"
-MAX_SESSIONS = 8
-MAX_OBSERVATIONS = 512
-MAX_INDEXED = 128
+PARSER = "retained-text-sections-v3"
+MAX_SESSIONS = 32
+MAX_OBSERVATIONS = 2048
+MAX_INDEXED = 256
 MAX_SECTIONS = 32
 MAX_TERMS = 2048
 MAX_RESULTS = 24
@@ -64,6 +64,17 @@ class ParsedVersion:
     digest: str
 
 
+def term_key(token: str) -> str:
+    """Fixed-width lexical fingerprint, not encryption or anonymization."""
+    return hashlib.blake2b(token.encode("utf-8"),digest_size=16,person=b"dragon-term-v3").hexdigest()
+
+
+def materialized_digest(*, text_hash: str, terms: Counter, sections: tuple,
+                        signature: frozenset, numbers: tuple) -> str:
+    return _digest({"parser":PARSER,"text_sha256":text_hash,"terms":sorted(terms.items()),
+                    "section_hashes":sections,"signature":sorted(signature),"numeric_hashes":numbers})
+
+
 def parse_retained_text(text: str) -> ParsedVersion:
     """Independent bounded lexical reparse, never a raw HTML/network reparse."""
     if not isinstance(text, str) or len(text.encode("utf-8")) > 24000:
@@ -87,9 +98,12 @@ def parse_retained_text(text: str) -> ParsedVersion:
     # Ordered signed/decimal/percentage tokens preserve swaps and repeats.
     # Do not publish numbers or context in the archive projection.
     numbers = tuple(m.group() for m in re.finditer(r"(?<!\w)[+-]?\d+(?:[.,]\d+)*(?:%|‰)?",text[:24000]))[:MAX_TERMS]
-    return ParsedVersion(Counter(words), hashes, _signature(text), numbers,
-                         _digest({"parser": PARSER, "text_sha256": hashlib.sha256(text.encode()).hexdigest(),
-                                  "section_hashes": hashes}))
+    terms = Counter(term_key(word) for word in words)
+    signature = _signature(text)
+    numeric_hashes = tuple(term_key(number) for number in numbers)
+    digest = materialized_digest(text_hash=hashlib.sha256(text.encode()).hexdigest(),terms=terms,
+                                  sections=hashes,signature=signature,numbers=numeric_hashes)
+    return ParsedVersion(terms,hashes,signature,numeric_hashes,digest)
 
 
 def _validate(row: Observation, *, now: float) -> None:
@@ -177,7 +191,8 @@ def progression(growth: int, stewardship: int, *, qualified: bool) -> dict:
 def build_treasury(observations: list[Observation], *, as_of: float, growth: int,
                    mode: str = "current_only", query: str = "", family: str | None = None,
                    candidate_limit_reached: bool = False, excluded_sessions: int = 0,
-                   alias_blockers: list[dict] | None = None) -> dict:
+                   alias_blockers: list[dict] | None = None,
+                   materialized: dict[tuple[str,str],ParsedVersion] | None = None) -> dict:
     if (not isinstance(observations,list) or len(observations)>MAX_OBSERVATIONS
             or type(as_of) not in (int,float) or not math.isfinite(as_of)
             or mode not in _MODES or not isinstance(query,str) or len(query.encode())>1024
@@ -186,7 +201,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
             or type(excluded_sessions) is not int or not 0<=excluded_sessions<=MAX_SESSIONS):
         raise ValueError("invalid treasury query envelope")
     aliases = alias_blockers if alias_blockers is not None else []
-    if not isinstance(aliases,list) or len(aliases)>1024:
+    if not isinstance(aliases,list) or len(aliases)>4096:
         raise ValueError("archive alias blocker capacity exceeded")
     blockers = defaultdict(list)
     for alias in aliases:
@@ -217,10 +232,21 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
     # Exact retained-text memoization; full-source hash alone is not a
     # sufficient key when a source was truncated. No cross-request cache.
     index, memo = {}, {}
+    cache = materialized or {}
+    if not isinstance(cache,dict) or len(cache)>MAX_OBSERVATIONS:
+        raise ValueError("materialized index exceeds owner envelope")
+    materialized_hits=0
     for row in indexed:
         key = hashlib.sha256(row.text.encode("utf-8")).hexdigest()
         if key not in memo:
-            memo[key] = parse_retained_text(row.text)
+            saved=cache.get((row.session_id,row.source_id))
+            if isinstance(saved,ParsedVersion) and saved.digest==materialized_digest(
+                    text_hash=key,terms=saved.terms,sections=saved.section_hashes,
+                    signature=saved.signature,numbers=saved.numbers):
+                memo[key]=saved
+                materialized_hits+=1
+            else:
+                memo[key] = parse_retained_text(row.text)
         index[row.session_id,row.source_id] = memo[key]
     capped = candidate_limit_reached or len(ordered)>MAX_INDEXED
     families, revisions, parse_rows = [], [], {}
@@ -341,7 +367,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
     allowed = [v for v in revisions if v["indexed"] and (family is None or v["family_id"]==family)
                and (mode in {"all_revisions","timeline","compare"} or
                     v["plane"]==("current" if mode=="current_only" else "historic"))]
-    terms = list(dict.fromkeys(_lexemes(query)))[:32]
+    terms = list(dict.fromkeys(term_key(token) for token in _lexemes(query)))[:32]
     frequency = Counter(term for v in allowed for term in terms if term in parse_rows[v["revision_id"]].terms)
     average = sum(sum(parse_rows[v["revision_id"]].terms.values()) for v in allowed)/max(1,len(allowed))
     def score(v):
@@ -400,7 +426,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
             "rollbacks":rollbacks,"current_indexed":current_count,"historic_indexed":historic_count,
             "metadata_only":len(revisions)-current_count-historic_count,
             "blocked_current":blocked_current,"alias_held_families":alias_held,"changes":changes,"revalidated_revisions":revalidated,
-            "revisit_plan":plan,"parsed_unique_payloads":len(memo),
+            "revisit_plan":plan,"parsed_unique_payloads":len(memo),"materialized_payload_hits":materialized_hits,
             "verified_historic_transitions":verified_transitions,"verified_changed_families":verified_families,
             "evolution":progression(growth,stewardship,qualified=qualified),
             "family_rows":family_rows[:MAX_RESULTS],"hits":hits[:MAX_RESULTS],
