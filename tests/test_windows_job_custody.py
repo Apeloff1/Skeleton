@@ -264,3 +264,34 @@ def test_windows_workspace_recovery_uses_same_exclusive_lock(tmp_path):
     peer.recover_windows_crash_marker(approval=approval, operator_key=key)
     with peer.hold():
         pass
+
+
+def test_recovery_rejects_noncanonical_approval_without_clearing(tmp_path):
+    marker = tmp_path / "authority.lock"
+    marker.write_bytes(bytes((1,)) + b"a" * 32)
+    fd = os.open(marker, os.O_RDWR | os.O_BINARY)
+    class Hostile(str):
+        def __eq__(self, other):
+            raise AssertionError("untrusted equality")
+    class HostileMapping(dict):
+        def __eq__(self, other):
+            raise AssertionError("untrusted mapping equality")
+    try:
+        key = b"k" * 32
+        candidate = lease_custody.windows_recovery_candidate(fd)
+        approval = lease_custody.issue_windows_drain_approval(
+            candidate, drain_evidence_sha256="e" * 64, operator_key=key,
+        )
+        dirty = marker.read_bytes()
+        for invalid in (
+            {**approval, "candidate": HostileMapping(candidate)},
+            {**approval, "candidate": {**candidate, "schema": Hostile(candidate["schema"])}},
+            {**approval, "mac": "界" * 64},
+        ):
+            with pytest.raises((RuntimeError, ValueError)):
+                lease_custody.recover_windows_dirty_record(fd, approval=invalid, operator_key=key)
+            assert marker.read_bytes() == dirty
+        lease_custody.recover_windows_dirty_record(fd, approval=approval, operator_key=key)
+        assert marker.read_bytes() == bytes((0,))
+    finally:
+        os.close(fd)

@@ -90,3 +90,30 @@ def test_permission_change_after_os_lock_cannot_authorize_generation(tmp_path, m
         with lease.hold():
             pytest.fail("unsafe marker admitted after mode change")
     assert lease.inspect()["state"] == "unavailable"
+
+
+def test_marker_initializes_only_under_kernel_lock(tmp_path, monkeypatch):
+    lease = LocalInferenceLease(tmp_path / "initialization.sqlite3")
+    lease.path.touch(mode=0o600)
+    original = lease._lock_fd
+
+    def checked(fd):
+        assert os.fstat(fd).st_size == 0
+        original(fd)
+
+    monkeypatch.setattr(lease, "_lock_fd", checked)
+    with lease.hold():
+        assert os.fstat(custody._current_local_inference_lease.get().fd).st_size == 1
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX descriptor owner permissions")
+def test_native_launch_rechecks_marker_permissions(tmp_path):
+    lease = LocalInferenceLease(tmp_path / "launch-mode.sqlite3")
+    with lease.hold():
+        lease.path.chmod(0o644)
+        try:
+            with pytest.raises(RuntimeError, match="identity changed"):
+                with custody.gguf_child_fd_scope():
+                    pytest.fail("native launch admitted unsafe permissions")
+        finally:
+            lease.path.chmod(0o600)

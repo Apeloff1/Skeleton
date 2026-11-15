@@ -42,7 +42,8 @@ def enter_local_lease(fd: int) -> Token[_LeaseBinding | None]:
     if type(fd) is not int or fd < 0:
         raise ValueError("invalid local inference lease descriptor")
     meta = os.fstat(fd)
-    if not stat.S_ISREG(meta.st_mode) or meta.st_nlink != 1:
+    if (not stat.S_ISREG(meta.st_mode) or meta.st_nlink != 1
+            or (os.name == "posix" and (meta.st_uid != os.getuid() or meta.st_mode & 0o077))):
         raise ValueError("invalid local inference lease identity")
     binding = _LeaseBinding(fd, meta.st_dev, meta.st_ino, os.getpid())
     token = _current_local_inference_lease.set(binding)
@@ -79,7 +80,8 @@ def _verified_fds(binding: _LeaseBinding) -> tuple[int, ...]:
         raise RuntimeError("local inference lease context revoked")
     meta = os.fstat(binding.fd)
     if (not stat.S_ISREG(meta.st_mode) or meta.st_nlink != 1
-            or (meta.st_dev, meta.st_ino) != (binding.device, binding.inode)):
+            or (meta.st_dev, meta.st_ino) != (binding.device, binding.inode)
+            or (os.name == "posix" and (meta.st_uid != os.getuid() or meta.st_mode & 0o077))):
         raise RuntimeError("local inference lease descriptor identity changed")
     return (binding.fd,)
 
@@ -148,6 +150,9 @@ def windows_recovery_candidate(fd: int, *, prepare_legacy: bool = False) -> dict
     """
     if os.name != "nt" or type(prepare_legacy) is not bool:
         raise RuntimeError("explicit Windows recovery required")
+    meta = os.fstat(fd)
+    if not stat.S_ISREG(meta.st_mode) or meta.st_nlink != 1:
+        raise RuntimeError("untrusted recovery descriptor")
     record = _read_marker(fd)
     if not record.startswith(b"\x01") or len(record) > WINDOWS_DIRTY_RECORD_BYTES:
         raise RuntimeError("no recoverable dirty Windows execution marker")
@@ -159,8 +164,9 @@ def windows_recovery_candidate(fd: int, *, prepare_legacy: bool = False) -> dict
         os.ftruncate(fd, 1)
         os.fsync(fd)
         record = _write_dirty_record(fd)
-    meta = os.fstat(fd)
-    if not stat.S_ISREG(meta.st_mode) or meta.st_nlink != 1:
+    after = os.fstat(fd)
+    if (not stat.S_ISREG(after.st_mode) or after.st_nlink != 1
+            or (after.st_dev, after.st_ino) != (meta.st_dev, meta.st_ino)):
         raise RuntimeError("untrusted recovery descriptor")
     return {
         "schema": _WINDOWS_RECOVERY_SCHEMA,
@@ -171,9 +177,11 @@ def windows_recovery_candidate(fd: int, *, prepare_legacy: bool = False) -> dict
 
 
 def _approval_bytes(candidate: dict[str, str], evidence_digest: str) -> bytes:
-    if type(candidate) is not dict or set(candidate) != {
-        "schema", "device", "inode", "launch_identity",
-    } or candidate["schema"] != _WINDOWS_RECOVERY_SCHEMA:
+    if (type(candidate) is not dict or len(candidate) != 4
+            or any(type(key) is not str for key in candidate)
+            or set(candidate) != {"schema", "device", "inode", "launch_identity"}
+            or type(candidate["schema"]) is not str
+            or candidate["schema"] != _WINDOWS_RECOVERY_SCHEMA):
         raise ValueError("invalid Windows recovery candidate")
     for key in ("device", "inode"):
         value = candidate[key]
@@ -203,9 +211,13 @@ def issue_windows_drain_approval(
     The digest identifies the reviewed evidence; it does not itself prove
     drainage. This signer is not an authentication service or public route.
     """
+    # Validate then sign the same detached plain object returned to callers.
+    if type(candidate) is not dict or len(candidate) != 4:
+        raise ValueError("invalid Windows recovery candidate")
+    candidate = dict(candidate)
     body = _approval_bytes(candidate, drain_evidence_sha256)
     return {
-        "candidate": dict(candidate), "drain_evidence_sha256": drain_evidence_sha256,
+        "candidate": candidate, "drain_evidence_sha256": drain_evidence_sha256,
         "mac": hmac.new(_recovery_key(operator_key), body, hashlib.sha256).hexdigest(),
     }
 
@@ -214,18 +226,25 @@ def recover_windows_dirty_record(
     fd: int, *, approval: dict[str, object], operator_key: bytes,
 ) -> None:
     """Clear only the exact currently locked marker with independent approval."""
-    if type(approval) is not dict or set(approval) != {
-        "candidate", "drain_evidence_sha256", "mac",
-    }:
+    if (type(approval) is not dict or len(approval) != 3
+            or any(type(key) is not str for key in approval)
+            or set(approval) != {"candidate", "drain_evidence_sha256", "mac"}):
         raise ValueError("canonical Windows drain approval required")
+    approval = dict(approval)
+    offered = approval["candidate"]
+    evidence = approval["drain_evidence_sha256"]
+    if type(offered) is not dict or len(offered) != 4:
+        raise ValueError("invalid Windows recovery candidate")
+    offered = dict(offered)
+    body = _approval_bytes(offered, evidence)
     current = windows_recovery_candidate(fd)
-    if approval["candidate"] != current:
+    if offered != current:
         raise RuntimeError("Windows drain approval does not bind current launch")
-    body = _approval_bytes(current, approval["drain_evidence_sha256"])
     mac = approval["mac"]
-    if type(mac) is not str or len(mac) != 64 or not hmac.compare_digest(
+    if (type(mac) is not str or len(mac) != 64 or any(c not in "0123456789abcdef" for c in mac)
+            or not hmac.compare_digest(
         hmac.new(_recovery_key(operator_key), body, hashlib.sha256).hexdigest(), mac
-    ):
+    )):
         raise RuntimeError("Windows drain approval authentication failed")
     _clear_dirty_record(fd, b"\x01" + bytes.fromhex(current["launch_identity"]))
 
