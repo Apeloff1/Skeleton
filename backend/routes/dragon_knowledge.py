@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Literal
 import os
 
-from fastapi import Depends, HTTPException, Query, Response
+from fastapi import Depends, HTTPException, Query, Response, Request as HttpRequest
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from core import dragon_runtime as runtime
@@ -112,6 +113,18 @@ class DiscoverySubscriptionRequest(Request):
     interval_seconds: int = Field(default=3600,ge=900,le=604800,strict=True)
     grant_seconds: int = Field(default=86400,ge=900,le=2592000,strict=True)
     rights_acknowledged: StrictBool
+
+
+class MediaBeginRequest(Request):
+    game: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source: str = Field(pattern=r"^[0-9a-f]{64}$")
+    observation_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    operation: str = Field(min_length=1,max_length=128)
+    mime: Literal["video/mp4","video/webm","audio/mpeg","audio/ogg","audio/wav","image/png","image/jpeg","image/webp"]
+    total_bytes: int = Field(ge=1,le=1073741824,strict=True)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    rights_acknowledged: StrictBool
+    grant_seconds: int = Field(ge=300,le=2592000,strict=True)
 
 
 def register_knowledge_routes(router):
@@ -416,3 +429,81 @@ def register_knowledge_routes(router):
     async def discovery_revoke(subscription_id:str,user:dict=Depends(get_current_user)):
         from core.dragon_corpus_runtime import world_discovery_call
         return await corpus_runtime_call(world_discovery_call(editor(user),"revoke",subscription_id))
+
+
+    async def media_call(owner,op,*args,**kwargs):
+        from core.dragon_media_archive import MediaArchive
+        from core.dragon_hoarder_copy import _io
+        from core.dragon_hoarder_bulk import StorageHeld
+        if op not in {"begin","append","seal","list","metadata","part","revoke"}:
+            raise HTTPException(422,detail={"code":"dragon_media_operation"})
+        try:
+            return await _io(lambda:getattr(MediaArchive(),op)(owner,*args,**kwargs))
+        except StorageHeld as exc:
+            raise HTTPException(409,detail={"code":"dragon_media_storage_held"}) from exc
+        except LookupError as exc:
+            raise HTTPException(404,detail={"code":"dragon_media_unavailable"}) from exc
+        except (ValueError,TypeError,KeyError) as exc:
+            raise HTTPException(422,detail={"code":"dragon_media_invalid"}) from exc
+        except (OSError,TimeoutError,runtime.sqlite3.Error,GameLearningError) as exc:
+            raise HTTPException(503,detail={"code":"dragon_media_unconfigured"}) from exc
+
+    @router.post("/knowledge/media")
+    async def media_begin(body:MediaBeginRequest,user:dict=Depends(get_current_user)):
+        return await media_call(editor(user),"begin",**body.model_dump())
+
+    @router.put("/knowledge/media/{media_id}/chunks/{ordinal}")
+    async def media_append(media_id:str,ordinal:int,request:HttpRequest,user:dict=Depends(get_current_user)):
+        from core.dragon_hoarder_manifests import BLOCK
+        owner=editor(user)
+        if request.headers.get("content-type","").lower()!="application/octet-stream":
+            raise HTTPException(415,detail={"code":"dragon_media_binary_required"})
+        raw=bytearray()
+        async for piece in request.stream():
+            if len(raw)+len(piece)>BLOCK:
+                raise HTTPException(413,detail={"code":"dragon_media_chunk_bound"})
+            raw.extend(piece)
+        return await media_call(owner,"append",media_id,ordinal,bytes(raw))
+
+    @router.post("/knowledge/media/{media_id}/seal")
+    async def media_seal(media_id:str,user:dict=Depends(get_current_user)):
+        return await media_call(editor(user),"seal",media_id)
+
+    @router.get("/knowledge/game-corpus/{game_id}/sources/{source_id}/media")
+    async def media_list(game_id:str,source_id:str,after:str|None=Query(None,max_length=64),
+                         user:dict=Depends(get_current_user)):
+        return await media_call(scope(user),"list",game_id,source_id,after=after)
+
+    @router.delete("/knowledge/media/{media_id}")
+    async def media_revoke(media_id:str,user:dict=Depends(get_current_user)):
+        return await media_call(editor(user),"revoke",media_id)
+
+    @router.get("/knowledge/media/{media_id}/content")
+    async def media_content(media_id:str,request:HttpRequest,user:dict=Depends(get_current_user)):
+        from core.dragon_media_archive import byte_range
+        from core.dragon_hoarder_manifests import BLOCK
+        owner=scope(user)
+        meta=await media_call(owner,"metadata",media_id)
+        total=meta["total_bytes"]
+        try:
+            start,end,partial=byte_range(request.headers.get("range"),total)
+        except ValueError as exc:
+            raise HTTPException(416,headers={"Content-Range":f"bytes */{total}"},
+                                detail={"code":"dragon_media_range_invalid"}) from exc
+        # First block must qualify before response headers are committed.
+        first=start//BLOCK
+        first_data=await media_call(owner,"part",media_id,first)
+        async def stream():
+            for ordinal in range(first,end//BLOCK+1):
+                if await request.is_disconnected():return
+                raw=first_data if ordinal==first else await media_call(owner,"part",media_id,ordinal)
+                lo=max(0,start-ordinal*BLOCK)
+                hi=min(len(raw),end-ordinal*BLOCK+1)
+                yield raw[lo:hi]
+        headers={"Accept-Ranges":"bytes","Content-Length":str(end-start+1),
+            "Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff",
+            "Content-Security-Policy":"default-src 'none'; sandbox",
+            "Content-Disposition":"inline","Referrer-Policy":"no-referrer"}
+        if partial:headers["Content-Range"]=f"bytes {start}-{end}/{total}"
+        return StreamingResponse(stream(),status_code=206 if partial else 200,
+                                 media_type=meta["mime"],headers=headers)
