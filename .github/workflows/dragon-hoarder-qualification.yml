@@ -9,6 +9,8 @@ on:
       - 'backend/tests/test_dragon_treasury_boundary.py'
       - 'tests/test_ai_webcrawler_dragon_treasury.py'
       - 'tests/test_ai_webcrawler_dragon_archive_grant.py'
+      - 'tests/test_ai_webcrawler_dragon_temporal_expansion.py'
+      - 'tests/test_ai_webcrawler_dragon_legacy_archive.py'
       - 'scripts/benchmark_dragon_revisit.py'
       - 'frontend/src/features/Jeeves/**'
       - 'frontend/src/product/crawlerClient.ts'
@@ -48,6 +50,8 @@ jobs:
           python -m py_compile skeleton/ai/webcrawler/dragon_treasury.py skeleton/ai/webcrawler/dragon_archive_grant.py skeleton/ai/webcrawler/dragon_revisit_model.py scripts/benchmark_dragon_revisit.py
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_treasury.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_grant.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_temporal_expansion.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_legacy_archive.py' -v
           python -m scripts.benchmark_dragon_revisit
   hoarder_backend:
     name: Actual canonical capture and historical passage boundary
