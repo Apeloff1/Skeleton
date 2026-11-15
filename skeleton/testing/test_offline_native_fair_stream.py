@@ -876,3 +876,75 @@ def test_queued_cleanup_failure_preserves_item_for_explicit_cancellation(private
     assert service.cancel("cleanup-native", tenant_id="alice").pending_leases == 0
     assert session.verify()["checkpoint"]["requests"] == []
     assert not journal.request_exists("cleanup-native")
+
+@pytest.mark.parametrize("target", ["journal", "result", "independent"])
+def test_unpinned_disk_session_refused_before_native_binding(private_files, tmp_path, target):
+    runtime, registry, journal, _, result_handle = build(private_files)
+    if target == "independent":
+        path = tmp_path / "unpinned.db"
+    else:
+        handle = private_files[1] if target == "journal" else result_handle
+        path = handle.connection.execute("PRAGMA database_list").fetchone()[2]
+    connection = sqlite3.connect(path)
+    try:
+        store = DurableFairStreamStore(
+            connection, custody_key=CUSTODY_KEY, execution_key=EXECUTION_KEY,
+            session_id=SESSION, whole_request=True,
+        )
+        session = DurableFairStreamSession.bootstrap(store, SimulatedCAS())
+        before = session.verify()
+        with pytest.raises(ValueError, match="exact private handle"):
+            bind_native_cpu_dispatch_service(
+                session=session, runtime=runtime, registry=registry,
+                result_handle=result_handle, journal_handle=private_files[1],
+                journal=journal, result_key=RESULT_KEY,
+                sampler=LiveStreamBudgetSampler(), storage_path=".",
+            )
+        assert journal._private_handle is None
+        assert session.verify() == before
+    finally:
+        connection.close()
+
+
+def test_invalid_native_sampler_does_not_stick_journal_binding(private_files):
+    from skeleton.app.offline_native_fair_stream import bind_native_cpu_result_owner
+
+    runtime, registry, journal, _, result_handle = build(private_files)
+    kwargs = dict(runtime=runtime, registry=registry, journal=journal,
+                  result_handle=result_handle, journal_handle=private_files[1],
+                  result_key=RESULT_KEY, storage_path=".")
+    with pytest.raises(ValueError, match="sampler"):
+        bind_native_cpu_result_owner(**kwargs, sampler=object())
+    assert journal._private_handle is None
+    owner, vault = bind_native_cpu_result_owner(**kwargs, sampler=LiveStreamBudgetSampler())
+    assert owner._journal is journal and owner._backend is vault
+    assert journal._private_handle is private_files[1]
+
+
+def test_existing_queued_replay_fence_blocks_new_admission_before_staging(private_files):
+    from skeleton.app.offline_native_fair_stream import submit_authenticated_native_cpu_prompt
+    from skeleton.ai.model_runtime.fair_stream_session import DispatchPermit
+    from skeleton.ai.model_runtime.fair_stream_execution_journal import ExecutionOutcomeUnknown
+
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    def submit(rid):
+        return submit_authenticated_native_cpu_prompt(
+            service=service, vault=vault, registry=registry, runtime=runtime,
+            authenticated_tenant_id="alice",
+            request=StreamRequest(rid, "alice", InferencePhase.PREFILL, 2, 16),
+            prompt="hello", max_output_tokens=2,
+        )
+    submit("earlier")
+    before = session.verify()
+    journal.begin(DispatchPermit("d" * 64, "earlier", 1, "c" * 64, 2, 32))
+    with pytest.raises(ExecutionOutcomeUnknown, match="already executed"):
+        submit("second")
+    assert session.verify() == before
+    assert registry.status()["staged"] == 1
+    assert "second" not in registry._staged and "second" not in registry._used

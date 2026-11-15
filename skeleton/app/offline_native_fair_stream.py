@@ -41,6 +41,10 @@ def bind_native_cpu_result_owner(
     """
     if type(journal) is not FairStreamExecutionJournal:
         raise ValueError("canonical signed execution journal required")
+    if type(registry) is not NativePromptRegistry or type(runtime) is not NativeLLMRuntime:
+        raise ValueError("canonical native runtime and prompt registry required")
+    journal._require_owner_process()
+    registry._require_owner_process()
     if type(result_key) is not bytes or len(result_key) != 32 or hmac.compare_digest(result_key, journal._key):
         raise ValueError("independent result encryption key required")
     if type(result_handle) is not PrivateSQLiteHandle or result_handle._closed:
@@ -64,7 +68,8 @@ def bind_native_cpu_result_owner(
         raise ValueError("result and execution journal must use different inodes")
     if registry.session_id != journal.session_id:
         raise ValueError("native prompt and execution journal session mismatch")
-    journal.bind_private_handle(journal_handle)
+    if journal._private_handle is not None:
+        raise ValueError("journal already bound to native owner")
     backend = NativeFairStreamBackend(
         runtime, registry,
         pressure_guard=NativeTokenPressureGuard(sampler, storage_path=storage_path),
@@ -75,6 +80,9 @@ def bind_native_cpu_result_owner(
         tokenizer_digest=backend.tokenizer_digest,
         result_key=result_key, backend=backend,
     )
+    # Bind only after all runtime, sampler and vault validation succeeds.
+    # An invalid composition must not leave the journal permanently bound.
+    journal.bind_private_handle(journal_handle)
     return JournaledExecutionOwner(journal, vault), vault
 
 
@@ -87,6 +95,9 @@ def stage_native_cpu_prompt(
     Register before submitting the matching StreamRequest. A failed submit
     must revoke this in-memory grant; never silently regenerate on restart.
     """
+    if type(registry) is not NativePromptRegistry:
+        raise ValueError("canonical native prompt registry required")
+    registry._require_owner_process()
     pinned = pin_native_prompt(
         runtime, session_id=registry.session_id, request_id=request_id,
         tenant_id=tenant_id, prompt=prompt,
@@ -113,6 +124,9 @@ def bind_native_cpu_dispatch_service(
     """
     if type(session) is not DurableFairStreamSession:
         raise ValueError("canonical authenticated dispatch session required")
+    if type(registry) is not NativePromptRegistry or type(runtime) is not NativeLLMRuntime:
+        raise ValueError("canonical native runtime and prompt registry required")
+    registry._require_owner_process()
     state = session.verify()
     if not session.whole_request:
         raise ValueError("native CPU dispatch requires an authenticated whole-request session")
@@ -128,7 +142,8 @@ def bind_native_cpu_dispatch_service(
     if not hmac.compare_digest(session_store._execution_key, journal._key):
         raise ValueError("journal execution authority differs from authenticated session")
     keys = (session_store._custody_key, session_store._execution_key, journal._key)
-    if type(result_key) is not bytes or any(hmac.compare_digest(result_key, key) for key in keys):
+    if (type(result_key) is not bytes or len(result_key) != 32
+            or any(hmac.compare_digest(result_key, key) for key in keys)):
         raise ValueError("independent result encryption key required")
     if operator_recovery_key is not None and (
         type(operator_recovery_key) is not bytes or not 32 <= len(operator_recovery_key) <= 128
@@ -139,7 +154,16 @@ def bind_native_cpu_dispatch_service(
             or session_store._connection is result_handle.connection
             or session_store._connection is journal_handle.connection):
         raise ValueError("session and execution custody must be separate connections")
-    if session_store._private_handle is not None:
+    if session_store._private_handle is None:
+        # The legacy in-memory test seam has no file identity. Disk-backed
+        # custody must retain a verified descriptor, not merely a different
+        # Python connection to a potentially identical SQLite file.
+        databases = session_store._connection.execute("PRAGMA database_list").fetchall()
+        main = [row for row in databases if row[1] == "main"]
+        if (len(main) != 1 or main[0][2] != ""
+                or any(row[1] not in {"main", "temp"} for row in databases)):
+            raise ValueError("disk session custody requires an exact private handle")
+    else:
         session_store._private_handle.assert_current()
         result_handle.assert_current()
         journal_handle.assert_current()
@@ -166,9 +190,12 @@ def bind_native_cpu_dispatch_service(
     def prepare_native_request(request: StreamRequest) -> StreamRequest:
         if journal.request_exists(request.request_id):
             raise ValueError("request already has durable execution custody")
-        queued_count = len(session.verify()["checkpoint"]["requests"])
-        journal.assert_request_admissible(request.request_id, queued_count=queued_count)
-        vault.assert_request_admissible(request.request_id, queued_count=queued_count)
+        snapshot = session.verify()
+        queued = snapshot["checkpoint"]["requests"]
+        registry.verify_queued(queued)
+        identities = tuple(row["request_id"] for row in queued) + (request.request_id,)
+        journal.assert_requests_admissible(identities)
+        vault.assert_requests_admissible(identities)
         return registry.bind_request(request)
 
     service = OfflineAdaptiveDispatchService(
@@ -241,9 +268,11 @@ def submit_authenticated_native_cpu_prompt(
                        for row in snapshot["checkpoint"]["requests"])
                 or owner._journal.request_exists(request.request_id)):
             raise ValueError("request already has durable admission or execution custody")
-        queued_count = len(snapshot["checkpoint"]["requests"])
-        owner._journal.assert_request_admissible(request.request_id, queued_count=queued_count)
-        vault.assert_request_admissible(request.request_id, queued_count=queued_count)
+        queued = snapshot["checkpoint"]["requests"]
+        registry.verify_queued(queued)
+        identities = tuple(row["request_id"] for row in queued) + (request.request_id,)
+        owner._journal.assert_requests_admissible(identities)
+        vault.assert_requests_admissible(identities)
         stage_native_cpu_prompt(
             runtime=runtime, registry=registry, request_id=request.request_id,
             tenant_id=authenticated_tenant_id, prompt=prompt,
