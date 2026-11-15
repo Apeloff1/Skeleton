@@ -56,8 +56,8 @@ def infer_revisit(samples: list[ChangeSample], *, now: float,
             # bursts of observations cannot farm confidence
             continue
         intervals.append((min(90.,elapsed/86400),by_time[a]!=by_time[b]))
-    # More recent intervals matter more, but repeated closely spaced
-    # unchanged samples do not dominate elapsed exposure.
+    # Unequal exposure intervals contribute their own likelihood; very
+    # closely spaced observations cannot dominate confidence.
     weights=[]
     for rate in _RATES:
         logw=-.5*((math.log(rate)-_PRIOR_CENTER)/_PRIOR_SIGMA)**2
