@@ -139,6 +139,10 @@ class DragonCrawlerApplication:
             await self.sessions.create_index(
                 [("automation.enabled", ASCENDING), ("automation.next_run_at", ASCENDING)]
             )
+            await self.sessions.create_index(
+                [("treasury_watch.enabled",ASCENDING),("treasury_watch.next_due",ASCENDING),
+                 ("treasury_watch.claim_until",ASCENDING)]
+            )
             self._indexes_ready = True
 
     async def readiness(self) -> dict[str, Any]:
@@ -560,6 +564,13 @@ class DragonCrawlerApplication:
             except (ValueError, KeyError, TypeError):
                 status["archive_grant"] = {"active":False,"expires_at":None,"granted_sources":0,
                     "usable_sources":0,"history_only":True,"network_authority_expanded":False}
+        if row.get("treasury_watch") is not None:
+            from skeleton.ai.webcrawler.dragon_treasury_watch import public_watch
+            try:
+                status["treasury_watch"]=public_watch(_plain(row["treasury_watch"]),now=_now().timestamp())
+            except (ValueError,TypeError,KeyError):
+                status["treasury_watch"]=None
+        status["watch_managed"]=row.get("treasury_watch_parent") is not None
         witness = row.get("checkpoint_identity") or {}
         repair = row.get("checkpoint_repair") or {}
         status["checkpoint_recovery"] = {
@@ -1529,6 +1540,231 @@ class DragonCrawlerApplication:
             "next_cursor": rows[limit - 1]["_id"] if len(rows) > limit else None,
         }
 
+    async def configure_treasury_watch(self, scope: dict[str,str], identifier: str, body: dict,
+                                       *, principal: dict) -> dict:
+        """Fresh bounded consent for a single previously captured public URL."""
+        from skeleton.ai.webcrawler.dragon_treasury_watch import (
+            create_watch, validate_watch, public_watch,
+        )
+        from skeleton.ai.webcrawler.dragon_archive_grant import eligible_source, archive_expiry
+        if authenticated_scope(principal)!=scope or body.get("enabled") is True and principal.get("role") not in {"editor","admin"}:
+            raise CrawlerError("crawler_watch_denied","Current editor authorization required.",403)
+        if (set(body)!={"expected_version","idempotency_key","enabled","source_id","days","cycles",
+                        "minimum_interval","retention_days","capture_rights_acknowledged","archive_rights_acknowledged"}
+                or type(body["expected_version"]) is not int or body["expected_version"]<1
+                or type(body["enabled"]) is not bool
+                or type(body["capture_rights_acknowledged"]) is not bool
+                or type(body["archive_rights_acknowledged"]) is not bool
+                or body["enabled"] and (not body["capture_rights_acknowledged"] or not body["archive_rights_acknowledged"])):
+            raise CrawlerError("crawler_watch_invalid","Explicit capture and historical retention rights required.")
+        # Revocation remains available even if the old runtime cannot load.
+        row=await self._owned(scope,identifier) if body["enabled"] else await self.sessions.find_one({"_id":identifier,**scope})
+        if row is None or row["status"]=="deleted":
+            raise CrawlerError("crawler_not_found","Crawler session not found.",404)
+        operation=_operation(body["idempotency_key"])
+        command_digest=_digest({"action":"treasury_watch",**body})
+        prior=self._prior(row,operation,command_digest,safety=not body["enabled"])
+        if prior is not None:
+            return {"ok":True,"watch":public_watch(_plain(row["treasury_watch"]),now=_now().timestamp()) if row.get("treasury_watch") else None,
+                    "version":int(row["version"])}
+        if row["version"]!=body["expected_version"]:
+            raise CrawlerError("crawler_conflict","Reload current expedition before updating its watch.",409)
+        now=_now().timestamp()
+        grant=None
+        if body["enabled"]:
+            if row["status"] not in {"completed","budget_exhausted"} or row.get("treasury_watch_parent"):
+                raise CrawlerError("crawler_watch_parent","Watch requires an independent finished expedition.",409)
+            if row.get("treasury_watch") and row["treasury_watch"].get("enabled") and row["treasury_watch"].get("expires_at",0)>now:
+                raise CrawlerError("crawler_watch_exists","Revoke the active watch before granting another.",409)
+            snapshot=_plain(row["snapshot"])
+            verify_primary(snapshot,_plain(row["checkpoint_identity"]))
+            source=snapshot["sources"].get(body["source_id"])
+            if source is None:
+                raise CrawlerError("crawler_source_not_found","Retained source not found.",404)
+            policy=self._capture_policy(row,source)
+            fresh=self._capture_freshness(row,source)
+            archive=archive_expiry(_plain(row["archive_grant"]) if row.get("archive_grant") else None,
+                snapshot_digest=snapshot["snapshot_digest"],source=source,policy=policy,now=now)
+            if (not eligible_source(source,policy) or not (fresh["usable"] or archive is not None)):
+                raise CrawlerError("crawler_watch_source","A currently authorized public captured source is required.",403)
+            try:
+                grant=create_watch(operation=operation,parent_id=identifier,scope=scope,
+                    principal_email=principal["email"].strip().lower(),snapshot_digest=snapshot["snapshot_digest"],
+                    source=source,policy_version=policy["version"],now=now,days=body["days"],cycles=body["cycles"],
+                    minimum_interval=body["minimum_interval"],retention_days=body["retention_days"])
+                validate_watch(grant)
+            except ValueError as exc:
+                raise CrawlerError("crawler_watch_bounds","The watch exceeds its finite scope or budget.") from exc
+            await self._grant_principal(scope,grant)
+        elif row.get("treasury_watch"):
+            # Remove every future network capability, retaining the finite
+            # receipt so an old child cannot become an independent crawler.
+            try:
+                grant=dict(validate_watch(_plain(row["treasury_watch"])))
+                grant.update(enabled=False,state="stopped",claim_token=None,claim_until=0.,
+                             stop_reason="operator_revoked")
+            except (ValueError,KeyError,TypeError):
+                grant=None
+        audit={"operation":operation,"request_digest":command_digest,"action":"treasury_watch",
+               "state":"completed","enabled":body["enabled"]}
+        receipt=await self._admit(scope,identifier,{"treasury_watch":grant,"audit":audit})
+        audit_path="safety_control" if len(row.get("operations",{}))>=MAX_OPERATIONS else "operations."+operation
+        changed=await self.sessions.update_one({"_id":identifier,**scope,"version":row["version"],"status":{"$ne":"deleted"}},
+            {"$set":{"treasury_watch":grant,"storage_receipt":receipt,"updated_at":_now(),audit_path:audit},
+             "$inc":{"version":1}})
+        if not changed.modified_count:
+            raise CrawlerError("crawler_conflict","Watch authorization changed before publication.",409)
+        return {"ok":True,"watch":public_watch(grant,now=now),"version":int(row["version"])+1}
+
+    async def _watch_authority(self, scope:dict[str,str], binding:dict, *, margin:float=0)->dict:
+        """Check live parent, source policy and principal before child IO."""
+        from skeleton.ai.webcrawler.dragon_treasury_watch import child_matches,validate_watch
+        denied=CrawlerError("crawler_watch_revoked","The parent treasury watch is no longer authorized.",403)
+        if not isinstance(binding,dict) or not isinstance(binding.get("parent_id"),str):
+            raise denied
+        parent=await self.sessions.find_one({"_id":binding["parent_id"],**scope,
+              "status":{"$in":["completed","budget_exhausted"]}},
+              {"_id":1,"snapshot":1,"checkpoint_identity":1,"treasury_watch":1,"source_use_policies":1},
+              max_time_ms=2000)
+        if parent is None:
+            raise denied
+        try:
+            watch=validate_watch(_plain(parent["treasury_watch"]))
+            if watch["scope"]!=scope or not child_matches(binding,watch,now=_now().timestamp(),margin=margin):
+                raise denied
+            snapshot=_plain(parent["snapshot"])
+            verify_primary(snapshot,_plain(parent["checkpoint_identity"]))
+            if snapshot["snapshot_digest"]!=watch["snapshot_digest"] or snapshot["binding"]["scope"]!=scope:
+                raise denied
+            source=snapshot["sources"][watch["source_id"]]
+            policy=self._capture_policy(parent,source)
+            if not policy["enabled"] or policy["version"]!=watch["policy_version"] or source["fetched_url"]!=watch["url"]:
+                raise denied
+        except (ValueError,KeyError,TypeError,CheckpointReplicaError) as exc:
+            raise denied from exc
+        await self._grant_principal(scope,watch)
+        return watch
+
+    async def recover_treasury_watches(self, *, limit:int=2)->dict:
+        """Finite crash-resumable watch pulses through the canonical crawler.
+
+        Each cycle reserves its identity before child creation. The canonical
+        child retains all robots, DNS, transport, physical lease and budget
+        checks; a fresh parent check gates every request. Revoke blocks new
+        admissions; it cannot undo an already transmitted request.
+        """
+        from skeleton.ai.webcrawler.dragon_treasury_watch import (
+            claim_watch,validate_watch,child_binding,settle_watch,MAX_SLICES,
+        )
+        if type(limit) is not int or not 1<=limit<=2:
+            raise ValueError("watch pulse limit is bounded")
+        await self.ensure_indexes()
+        now=_now().timestamp()
+        rows=await self.sessions.find({"treasury_watch.enabled":True,"treasury_watch.next_due":{"$lte":now},
+                 "treasury_watch.claim_until":{"$lte":now}},
+                 {"_id":1,"tenant_id":1,"owner_id":1,"version":1,"treasury_watch":1}).sort(
+                 [("treasury_watch.next_due",ASCENDING),("_id",ASCENDING)]).limit(8).max_time_ms(2000).to_list(8)
+        counts={"scanned":len(rows),"claimed":0,"completed":0,"waiting":0,"blocked":0,"superseded":0}
+        owners=set()
+        for item in rows:
+            scope={k:item[k] for k in ("tenant_id","owner_id")}
+            key=tuple(scope.values())
+            if key in owners or counts["claimed"]>=limit:
+                continue
+            owners.add(key)
+            token=str(uuid4())
+            identifier=item["_id"]
+            try:
+                old=validate_watch(_plain(item["treasury_watch"]))
+                watch=claim_watch(old,now=now,token=token)
+            except (ValueError,TypeError,KeyError):
+                updated=await self.sessions.update_one({"_id":identifier,**scope,"version":item["version"],
+                    "treasury_watch.enabled":True},{"$set":{"treasury_watch.enabled":False,"treasury_watch.state":"blocked",
+                    "treasury_watch.stop_reason":"expired_or_invalid"},"$inc":{"version":1}})
+                counts["blocked" if updated.modified_count else "superseded"]+=1
+                continue
+            changed=await self.sessions.update_one({"_id":identifier,**scope,"version":item["version"],
+                "treasury_watch.epoch":old["epoch"],"treasury_watch.enabled":True,
+                "treasury_watch.claim_until":{"$lte":now}},
+                {"$set":{"treasury_watch":watch},"$inc":{"version":1}})
+            if not changed.modified_count:
+                counts["superseded"]+=1
+                continue
+            counts["claimed"]+=1
+            fence={"_id":identifier,**scope,"treasury_watch.epoch":watch["epoch"],
+                   "treasury_watch.claim_token":token,"treasury_watch.enabled":True}
+            child_id=None
+            try:
+                binding=child_binding(watch)
+                await self._watch_authority(scope,binding,margin=60)
+                command={"idempotency_key":f"watch:{watch['epoch']}:{watch['active_cycle']}",
+                         "title":"Hoarder scheduled source observation","seeds":[watch["url"]],"topics":[],
+                         "max_requests":4,"max_documents":1,"max_bytes":2*1024*1024,"max_depth":0,
+                         "discover_sitemaps":False,"frontier_strategy":"companion_guardian",
+                         "consent":True,"rights_acknowledged":True}
+                created=await self.create(scope,command,watch_binding=binding)
+                child_id=created["session_id"]
+                child=await self._reconcile(scope,await self._owned(scope,child_id))
+                if child["status"] in {"queued","interrupted"}:
+                    if watch["slices_started"]>=MAX_SLICES:
+                        raise CrawlerError("crawler_watch_slice_budget","Reserved child exceeded its finite slice allowance.",429)
+                    # Charge the slice before use; a crash or lost reply does
+                    # not refund an uncertain attempt or mint another child.
+                    charged=await self.sessions.update_one(fence,
+                        {"$inc":{"treasury_watch.slices_started":1,"version":1}})
+                    if not charged.modified_count:
+                        counts["superseded"]+=1
+                        continue
+                    watch["slices_started"]+=1
+                    await self.run(scope,child_id,{"idempotency_key":f"watch-slice:{watch['epoch']}:{watch['active_cycle']}:{watch['slices_started']}",
+                         "expected_version":int(child["version"]),"max_steps":4})
+                    child=await self._reconcile(scope,await self._owned(scope,child_id))
+                if child["status"]=="running" or child["status"] in {"queued","interrupted"}:
+                    watch.update(state="waiting",claim_token=None,claim_until=0.,
+                                 next_due=min(watch["expires_at"],_now().timestamp()+60))
+                    outcome="waiting"
+                else:
+                    good=child["status"] in {"completed","budget_exhausted"}
+                    sample=None
+                    if good:
+                        await self._watch_authority(scope,binding,margin=0)
+                        from skeleton.ai.webcrawler.dragon_archive_grant import eligible_source
+                        sources=[s for s in child["snapshot"]["sources"].values()
+                                 if s["fetched_url"]==watch["url"] and eligible_source(s,self._capture_policy(child,s))]
+                        if sources:
+                            src=max(sources,key=lambda s:s["fetched_at"])
+                            principal=await self.database["gameforge_users"].find_one(
+                                {"email":watch["principal_email"],"disabled":{"$ne":True}})
+                            if principal is None:
+                                raise CrawlerError("crawler_watch_revoked","Watch owner authority was withdrawn.",403)
+                            # Separate retention grant explicitly authorized at
+                            # watch creation. Its exact operation is idempotent.
+                            await self.configure_archive_grant(scope,child_id,
+                                {"expected_version":int(child["version"]),"idempotency_key":f"watch-archive:{watch['epoch']}:{watch['active_cycle']}",
+                                 "enabled":True,"days":watch["retention_days"],"archive_rights_acknowledged":True},
+                                principal=principal)
+                            # Sample only the exact original resource. A
+                            # redirect or representation change never supplies
+                            # a transition estimate for another family.
+                            sample={"at":src["fetched_at"],"digest":src["content_hash"]}
+                    watch=settle_watch(watch,now=_now().timestamp(),child_id=child_id,sample=sample,completed=bool(good and sample))
+                    outcome="completed"
+                final=await self.sessions.update_one(fence,{"$set":{"treasury_watch":watch},"$inc":{"version":1}})
+                counts[outcome if final.modified_count else "superseded"]+=1
+            except (CrawlerError,ValueError,KeyError,TypeError,CheckpointReplicaError) as exc:
+                code=exc.code if isinstance(exc,CrawlerError) else "crawler_watch_integrity"
+                # A policy failure is terminal. Capacity conflicts retry the
+                # same already reserved child, never issue another cycle.
+                transient= isinstance(exc,CrawlerError) and exc.status in {409,429,503} and code not in {
+                    "crawler_watch_slice_budget","crawler_session_limit","crawler_integrity","crawler_checkpoint_unrecoverable"}
+                update={"treasury_watch.claim_token":None,"treasury_watch.claim_until":0.,
+                        "treasury_watch.next_due":min(watch["expires_at"],_now().timestamp()+120),
+                        "treasury_watch.state":"waiting" if transient else "blocked",
+                        "treasury_watch.enabled":transient,"treasury_watch.stop_reason":code}
+                final=await self.sessions.update_one(fence,{"$set":update,"$inc":{"version":1}})
+                counts[("waiting" if transient else "blocked") if final.modified_count else "superseded"]+=1
+        return counts
+
     async def configure_archive_grant(self, scope: dict[str, str], identifier: str,
                                       body: dict, *, principal: dict) -> dict:
         """Authorize or revoke bounded archive-only reparse of exact retained captures."""
@@ -1911,7 +2147,7 @@ class DragonCrawlerApplication:
                                "Source consent expired during collection. Refresh the sanctuary.", 409)
         return {"ok": True, **issued}
 
-    async def create(self, scope: dict[str, str], body: dict) -> dict:
+    async def create(self, scope: dict[str, str], body: dict, *, watch_binding: dict | None = None) -> dict:
         if body.get("consent") is not True or body.get("rights_acknowledged") is not True:
             raise CrawlerError(
                 "crawler_consent_required",
@@ -1920,11 +2156,19 @@ class DragonCrawlerApplication:
             )
         await self.ensure_indexes()
         op = _operation(body["idempotency_key"])
-        identifier = str(uuid5(NAMESPACE_URL, "dragon-crawler:" + _digest(scope) + ":" + op))
-        request_digest = _digest(body)
+        watch=None
+        if watch_binding is not None:
+            watch=await self._watch_authority(scope,watch_binding,margin=60)
+            if (body.get("seeds")!=[watch["url"]] or body.get("max_depth")!=0
+                    or body.get("max_requests")!=4 or body.get("max_documents")!=1
+                    or body.get("max_bytes")!=2*1024*1024 or body.get("discover_sitemaps") is not False):
+                raise CrawlerError("crawler_watch_binding","Watch child limits changed.",403)
+        namespace="dragon-crawler:" if watch_binding is None else "dragon-crawler-watch:"+_digest(watch_binding)+":"
+        identifier = str(uuid5(NAMESPACE_URL, namespace + _digest(scope) + ":" + op))
+        request_digest = _digest(body if watch_binding is None else {"body":body,"watch":watch_binding})
         prior = await self.sessions.find_one({"_id": identifier, **scope})
         if prior:
-            if prior["creation_digest"] != request_digest:
+            if prior["creation_digest"] != request_digest or prior.get("treasury_watch_parent")!=watch_binding:
                 raise CrawlerError(
                     "crawler_idempotency_conflict", "This operation key already names a different crawl.", 409
                 )
@@ -1951,6 +2195,8 @@ class DragonCrawlerApplication:
         )
         now = _now()
         expiry = now + timedelta(hours=24)
+        if watch is not None:
+            expiry=min(expiry,datetime.fromtimestamp(watch["expires_at"],timezone.utc))
         consent = {
             "consent_id": _digest([scope, identifier, request_digest]),
             "capture_acknowledged": True,
@@ -1977,9 +2223,14 @@ class DragonCrawlerApplication:
             "consent": consent,
             "operations": {},
         }
+        if watch_binding is not None:
+            row["treasury_watch_parent"]=watch_binding
         row["storage_receipt"] = await self._admit(
-            scope, identifier, {"request": row["request"], **checkpoint}
+            scope, identifier, {"request": row["request"], **checkpoint,
+                                **({"treasury_watch_parent":watch_binding} if watch_binding is not None else {})}
         )
+        if watch_binding is not None:
+            await self._watch_authority(scope,watch_binding,margin=60)
         quota_id = _digest(scope)
         await self.limits.update_one(
             {"_id": quota_id}, {"$setOnInsert": {**scope, "session_ids": []}}, upsert=True
@@ -2000,7 +2251,7 @@ class DragonCrawlerApplication:
             await self.sessions.insert_one(row)
         except DuplicateKeyError:
             prior = await self.sessions.find_one({"_id": identifier, **scope})
-            if prior is None or prior["creation_digest"] != request_digest:
+            if prior is None or prior["creation_digest"] != request_digest or prior.get("treasury_watch_parent")!=watch_binding:
                 raise CrawlerError(
                     "crawler_idempotency_conflict", "Concurrent crawler creation conflicted.", 409
                 ) from None
@@ -2061,6 +2312,8 @@ class DragonCrawlerApplication:
             )
         if row["status"] in TERMINAL_STATES:
             raise CrawlerError("crawler_terminal", "This capture has already stopped permanently.", 409)
+        if body["enabled"] and row.get("treasury_watch_parent") is not None:
+            raise CrawlerError("crawler_watch_managed","This expedition is managed by its finite treasury watch.",409)
         if body["enabled"] and self._worker_state(row)["active"]:
             raise CrawlerError(
                 "crawler_busy", "Drain the current worker before authorizing another run.", 409
@@ -2243,6 +2496,8 @@ class DragonCrawlerApplication:
             raise CrawlerError(
                 "crawler_worker_fenced", "Crawler worker lost its live session authority.", 409
             )
+        if row.get("treasury_watch_parent") is not None:
+            await self._watch_authority(scope,_plain(row["treasury_watch_parent"]),margin=15 if network_margin else 0)
         if row.get("worker_automation_epoch") is not None:
             grant = row.get("automation", {})
             margin = timedelta(seconds=15 if network_margin else 0)
@@ -2422,6 +2677,8 @@ class DragonCrawlerApplication:
             raise CrawlerError(
                 "crawler_consent_expired", "Capture consent expired; create a newly authorized crawl.", 403
             )
+        if row.get("treasury_watch_parent") is not None:
+            await self._watch_authority(scope,_plain(row["treasury_watch_parent"]),margin=15)
         grant = row.get("automation", {})
         if automation_epoch is None and grant.get("enabled"):
             raise CrawlerError(
@@ -3036,6 +3293,8 @@ class DragonCrawlerApplication:
                     "source_use_policies": "",
                     "archive_grant": "",
                     "treasury_index": "",
+                    "treasury_watch": "",
+                    "treasury_watch_parent": "",
                 },
             },
         )
@@ -3874,7 +4133,9 @@ crawler_application = DragonCrawlerApplication()
 
 
 async def recover_crawler_runs(*, limit: int = 16) -> dict:
-    return await crawler_application.recover(limit=limit)
+    result=await crawler_application.recover(limit=limit)
+    result["treasury_watches"]=await crawler_application.recover_treasury_watches()
+    return result
 
 
 async def read_crawler_context(user: dict, query: str, max_docs: int = 4, max_chars: int = 16000) -> dict:
