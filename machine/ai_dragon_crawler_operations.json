@@ -12,7 +12,9 @@
     "skeleton/ai/webcrawler/source_instruction_guard.py",
     "skeleton/ai/webcrawler/adaptive_navigation.py",
     "skeleton/ai/webcrawler/frontier_scheduler.py",
-    "skeleton/ai/webcrawler/frontier_circuit.py"
+    "skeleton/ai/webcrawler/frontier_circuit.py",
+    "skeleton/ai/webcrawler/robots_policy.py",
+    "skeleton/ai/webcrawler/frontier_coverage.py"
   ],
   "state_authority": "Existing CORE_DB Mongo application custody; pure snapshots have no independent storage authority",
   "public_api": {
@@ -53,7 +55,10 @@
     "accounting": "usage.bytes is measured accepted transport-body bytes; usage.reserved_bytes is conservative allowance for in-flight or unknown failed response bytes. Both consume total byte budget. Request count is reserved dispatch attempts, not independently attested remote server requests.",
     "instruction_boundary": "External text, titles, agent instruction artifacts, markup and arbitrary robots comments are inert; heuristic hits are held before discovery or retention. Owner-scoped incident receipts contain bounded pattern categories and permitted hashes, never raw instruction payloads. No-store/noindex/noarchive suppress retained fingerprints. Existing robots rules narrow admission and are not ignored. Ordinary retrieval and source-use controls cannot release quarantined material.",
     "adaptive_navigation": "Only already-admitted due frontier rows may be reordered by bounded operator relevance, URL coverage and committed origin outcomes. Host failure streak can extend cooldown but never shorten robots, Retry-After or grant bounds; explicit access denial stops host acquisition for current consent. FIFO remains compatible. Redirects and restored targets undergo structural trap checks; no new URL authority.",
-    "autonomous_application": "Application may consume explicit finite CORE_DB grants through the existing backend scheduler. Pure run_slice remains at most4steps/45seconds; no independent pure background loop, storage, scheduler or authority. Canonical code binding and pre-IO reservation remain unchanged."
+    "autonomous_application": "Application may consume explicit finite CORE_DB grants through the existing backend scheduler. Pure run_slice remains at most4steps/45seconds; no independent pure background loop, storage, scheduler or authority. Canonical code binding and pre-IO reservation remain unchanged.",
+    "protocol_matching": "Bounded merged exact product-group rules, wildcard/terminal matching, percent-octet normalization; strictest valid selected pacing, fail closed on invalid pacing or match work exhaustion. Runtime-only parser cache must match snapshot text and time; first-page and redirect Retry-After pacing enforced.",
+    "frontier_index": "Ephemeral query and source URL coverage projection built once per selection; no stored cross-owner index or authority.",
+    "offline_benchmark": "scripts/benchmark_dragon_crawler.py runs three real canonical strategies against three fixed offline workloads; no external competitor results claimed."
   },
   "network": {
     "direct": "Validated public DNS addresses pinned to socket with original TLS SNI/hostname verification",
