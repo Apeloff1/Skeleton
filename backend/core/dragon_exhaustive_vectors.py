@@ -38,6 +38,7 @@ class DragonExhaustiveVectorMixin:
         collection=self._full_vectors()
         await collection.create_index([("tenant_id",ASCENDING),("owner_id",ASCENDING),
             ("model",ASCENDING),("index.tokens",ASCENDING),("expires",ASCENDING)])
+        await collection.create_index([("tenant_id",1),("owner_id",1),("game_id",1),("model",1),("index.tokens",1),("expires",1)])
         await collection.create_index([("tenant_id",ASCENDING),("owner_id",ASCENDING),
             ("session",ASCENDING),("generation",ASCENDING),("ordinal",ASCENDING)],unique=True)
         await collection.create_index("expires",expireAfterSeconds=0)
@@ -92,6 +93,7 @@ class DragonExhaustiveVectorMixin:
                 # Derived rows never outlive their grant. Admit the exact batch
                 # before publication and use a deterministic unique identity.
                 posting={**scope,"session":row["_id"],"generation":gen,"model":encoder.identity,
+                         "game_id":(row.get("game_route") or {}).get("game_id"),
                          "ordinal":cursor,"index":index,"expires":datetime.fromtimestamp(expiry,timezone.utc)}
                 await self._admit(scope,row["_id"],{"full_vector":{**posting,"expires":expiry}})
                 await self._full_vectors().replace_one({**scope,"session":row["_id"],"generation":gen,
@@ -118,14 +120,16 @@ class DragonExhaustiveVectorMixin:
             log.warning("Full vector batch held")
             return {"configured":True,"held":True}
 
-    async def full_vector_candidates(self,scope,query,*,session_ids=None):
+    async def full_vector_candidates(self,scope,query,*,session_ids=None,game_id=None):
         from core.dragon_crawler import _now,CrawlerError
         if not local.configured():return []
         await self.ensure_full_vector_indexes()
         q=await _cpu(lambda:dense.query(scope,query,local.encoder()))
         predicate={**scope,"model":q["model_identity"],"index.tokens":{"$in":q["tokens"]},
                    "expires":{"$gt":_now()}}
-        if session_ids is not None:predicate["session"]={"$in":session_ids}
+        if game_id is not None:
+            predicate["$or"]=[{"game_id":game_id},{"session":{"$in":session_ids or []}}]
+        elif session_ids is not None:predicate["session"]={"$in":session_ids}
         postings=await self._full_vectors().find(predicate).sort(
             [("session",ASCENDING),("ordinal",ASCENDING)]).limit(MAX_CANDIDATE_BATCHES).max_time_ms(2000).to_list(MAX_CANDIDATE_BATCHES)
         hits=[]
