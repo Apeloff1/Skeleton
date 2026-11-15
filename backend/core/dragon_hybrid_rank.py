@@ -164,3 +164,61 @@ def select_passage(query, text, width):
         raise ValueError("no exact query token in passage")
     start=-max(scored)[2]
     return start,start+width
+
+
+MAX_ROUTE_KEYS=8192
+MAX_WORDS_PER_SOURCE=128
+ROUTE_SCHEMA="skeleton.dragon.hybrid-route.v1"
+
+
+def _route_token(scope,kind,term):
+    from skeleton.ai.webcrawler.dragon_archive_scale import digest
+    return digest({"scope":scope,"domain":ROUTE_SCHEMA,"kind":kind,"term":term})
+
+
+def build_route(scope,snapshot,grant,policies,now,allowed):
+    """Bounded per-source rare term/title index, derived only from eligible text."""
+    from skeleton.ai.webcrawler.dragon_archive_scale import digest
+    from skeleton.ai.webcrawler.dragon_archive_grant import archive_expiry
+    chosen=set()
+    counts=0
+    for sid in sorted(allowed):
+        s=snapshot["sources"][sid]
+        expiry=archive_expiry(grant,snapshot_digest=snapshot["snapshot_digest"],source=s,
+                              policy=policies.get(sid,{"enabled":True,"version":0}),now=now)
+        if expiry is None:
+            continue
+        title=tuple(dict.fromkeys(words(s["title"])))
+        body=Counter(words(s["text"]))
+        body_terms=sorted((w for w in body if w not in STOP and len(w)>2),
+                          key=lambda w:(body[w],-len(w),w))
+        lexical=tuple(dict.fromkeys(title[:32]+tuple(body_terms)))[:MAX_WORDS_PER_SOURCE]
+        chosen.update(_route_token(scope,"word",w) for w in lexical)
+        counts+=1
+    if len(chosen)>MAX_ROUTE_KEYS:
+        raise ValueError("route bound")
+    value={"schema":ROUTE_SCHEMA,"snapshot_digest":snapshot["snapshot_digest"],
+           "grant_digest":digest(grant),"policy_digest":digest(policies),
+           "expires_at":grant["expires_at"],"tokens":sorted(chosen),"sources":counts}
+    return {**value,"digest":digest(value)}
+
+
+def route_terms(scope,query):
+    return sorted({_route_token(scope,"word",w) for w in query_words(query)})
+
+
+def validate_route(value,snapshot,grant,policies,now):
+    from skeleton.ai.webcrawler.dragon_archive_scale import digest
+    from skeleton.ai.webcrawler.dragon_treasury_vault import hash_identity
+    if (not isinstance(value,dict) or set(value)!={"schema","snapshot_digest","grant_digest","policy_digest",
+            "expires_at","tokens","sources","digest"} or value["schema"]!=ROUTE_SCHEMA
+            or value["snapshot_digest"]!=snapshot["snapshot_digest"]
+            or value["grant_digest"]!=digest(grant) or value["policy_digest"]!=digest(policies)
+            or value["expires_at"]!=grant["expires_at"] or value["expires_at"]<=now
+            or not isinstance(value["tokens"],list) or len(value["tokens"])>MAX_ROUTE_KEYS
+            or not all(hash_identity(x) for x in value["tokens"])
+            or value["tokens"]!=sorted(set(value["tokens"]))
+            or type(value["sources"]) is not int or not 0<=value["sources"]<=MAX_DOCS
+            or value["digest"]!=digest({k:v for k,v in value.items() if k!="digest"})):
+        raise ValueError("hybrid route invalid or expired")
+    return value
