@@ -74,7 +74,7 @@ def test_repeated_unhealthy_samples_do_not_reset_original_hold_deadline():
 
 
 def test_successful_hysteresis_clears_hold_deadline():
-    ticks = iter((100, 150, 175, 180))
+    ticks = iter((100, 150, 175, 180, 190))
     calls = 0
 
     def resource(_):
@@ -102,3 +102,50 @@ def test_clock_regression_during_hold_aborts_without_replay():
 def test_invalid_hold_policy_denied(invalid):
     with pytest.raises(ValueError, match="bounded token or hysteresis"):
         replace(policy(), max_hold_duration_ns=invalid)
+
+
+def test_final_healthy_probe_cannot_revive_expired_hold():
+    now = 100
+    calls = 0
+
+    def resource(_):
+        nonlocal calls, now
+        calls += 1
+        if calls == 1:
+            return resources(available=1)
+        if calls == 3:
+            now = 201
+        return resources()
+
+    guard = make(lambda: now, resource)
+    assert guard.start().state == "hold"
+    now = 150
+    assert guard.resume().state == "hold"
+    now = 180
+    with pytest.raises(InFlightPressureDenied, match="hold_deadline_exceeded"):
+        guard.resume()
+    assert guard.status().state == "aborted"
+
+
+def test_expired_quantum_with_late_bad_sample_cannot_become_hold():
+    now = 100
+    calls = 0
+
+    def resource(_):
+        nonlocal calls, now
+        calls += 1
+        if calls == 3:
+            now = 151
+            return resources(available=1)
+        return resources()
+
+    guard = InFlightCPUResourceGuard(
+        replace(policy(), max_quantum_duration_ns=50),
+        storage_path=".", simulated=True, resource_probe=resource,
+        thermal_probe=thermal, clock=lambda: now,
+    )
+    guard.start()
+    lease = guard.admit_quantum(requested_tokens=4)
+    with pytest.raises(InFlightPressureDenied, match="quantum_deadline_exceeded"):
+        guard.validate_quantum_lease(generation=lease.generation)
+    assert guard.status().state == "aborted"
