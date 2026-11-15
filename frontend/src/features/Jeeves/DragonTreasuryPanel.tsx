@@ -21,7 +21,7 @@ function Revision({row}:{row:TreasuryRevision}){
   <Text style={s.small}>{stamp(row.first_seen)} → {stamp(row.last_seen)} · {row.reobservations} subsequent observations</Text>
   <Text style={s.small}>{row.indexed?(row.archive_only?'Historical permission only':'Authorized retained text'):'Metadata only · no searchable text'}{row.latest_observed?' · latest observed':''}</Text>
   {row.delta.similarity!==null&&<Text style={s.small}>Lexical similarity {Math.round(row.delta.similarity*100)}% · {row.delta.added_terms} added terms · {row.delta.removed_terms} removed · numeric change {row.delta.numeric_change?'observed':'not observed'}</Text>}
-  {row.source_id&&<Text selectable style={s.small}>Source {row.source_id}</Text>}
+  {row.source_id&&<Text selectable style={s.small}>Source {row.source_id}{row.indexed_capture_at!==null?' · indexed observation '+stamp(row.indexed_capture_at):''}</Text>}
  </View>;
 }
 export default function DragonTreasuryPanel({revision,session,canWrite=false,onSession,onRevisit,disabled=false}:{revision:string;session?:CrawlSession|null;canWrite?:boolean;onSession?:(s:CrawlSession)=>void;onRevisit?:(url:string)=>void;disabled?:boolean}){
@@ -110,7 +110,7 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
     <Text style={s.small}>{visible.families} families · {visible.revisions} versions · {visible.rollbacks} rollbacks · {visible.blocked_current} current families unavailable · {visible.alias_held_families} alias conflicts</Text>
     {(visible.candidate_limit_reached||visible.excluded_sessions>0)&&<Text style={s.small}>Bounded or unqualified corpus: this observation cannot establish complete archive coverage.</Text>}
     <Text style={s.heading}>Revision families and revisit recommendations</Text>
-    <Text style={s.small}>{visible.parsed_unique_payloads} distinct retained payloads reparsed · {visible.revisit_plan.length} prioritized suggestions, interleaved across origins.</Text>
+    <Text style={s.small}>{visible.parsed_unique_payloads} distinct retained payloads reparsed · {visible.verified_historic_transitions} distinct verified version transitions · {visible.revisit_plan.length} prioritized suggestions, interleaved across origins.</Text>
     {visible.family_rows.map(f=><View key={f.family_id} style={s.check}>
      <Text style={s.label}>{short(f.family_id)} · {f.revision_count} versions{f.simultaneous_conflict?' · conflicting observations':''}{f.alias_conflict?' · newer ambiguous alias':''}</Text>
      <Text style={s.small}>{f.current_indexed?'Current indexed':'Current unavailable'} · last seen {stamp(f.last_seen)}</Text>
