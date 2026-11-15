@@ -10,6 +10,7 @@ import json
 from core.dragon_game_corpus import MAX_SOURCES,MAX_GAMES,MAX_REVISIONS
 from core.dragon_game_taxonomy import SOURCE_CLASSES,FAMILIES
 from core.dragon_hoarder_manifests import MAX_MANIFESTS
+from core.dragon_hoarder_bulk import MAX_VOLUMES
 from core.dragon_release_queue import MAX_PENDING
 
 PROFILES={
@@ -50,7 +51,7 @@ def public_profiles():
             "architectural_limits":{"source_classes":len(SOURCE_CLASSES),"families":len(FAMILIES),
                 "sources_per_game":MAX_SOURCES,"games_per_owner":MAX_GAMES,
                 "observations_per_owner":MAX_REVISIONS,"manifest_ids_per_owner":MAX_MANIFESTS,
-                "retained_queue_rows_per_owner":MAX_PENDING},
+                "retained_queue_rows_per_owner":MAX_PENDING,"volumes_per_lane":MAX_VOLUMES},
             "populated":False,"production_capacity_verified":False}
 
 
