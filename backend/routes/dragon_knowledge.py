@@ -63,6 +63,25 @@ class GameObservationRequest(Request):
     released_on: str | None = Field(default=None, min_length=10, max_length=10)
 
 
+class ReleaseImportRequest(Request):
+    adapter: Literal["manifest","steam","rss_atom"]
+    payload: str = Field(min_length=1,max_length=2*1024*1024)
+    operation: str = Field(min_length=1,max_length=128)
+    provider: str | None = Field(default=None,max_length=32)
+    external_id: str | None = Field(default=None,max_length=128)
+    title: str | None = Field(default=None,max_length=256)
+
+
+class GameCaptureRequest(Request):
+    game: str = Field(min_length=64,max_length=64,pattern=r"^[0-9a-f]{64}$")
+    source: str = Field(min_length=64,max_length=64,pattern=r"^[0-9a-f]{64}$")
+    observation_digest: str = Field(min_length=64,max_length=64,pattern=r"^[0-9a-f]{64}$")
+    operation: str = Field(min_length=1,max_length=128)
+    capture_rights_acknowledged: StrictBool
+    consent: StrictBool
+    autonomous: StrictBool = False
+
+
 def register_knowledge_routes(router):
     def scope(user):
         try:
@@ -236,3 +255,38 @@ def register_knowledge_routes(router):
             raise HTTPException(422, detail={"code": "dragon_game_history_cursor_invalid"})
         return await corpus_call(scope(user), "history", game_id, limit=limit,
                                  before=cursor if stamp is not None else None)
+
+
+    async def corpus_runtime_call(operation):
+        from core.dragon_game_corpus import CatalogueHeld
+        from core.dragon_crawler import CrawlerError
+        try:
+            return await operation
+        except (CrawlerError, GameLearningError) as exc:
+            raise HTTPException(exc.status,detail={"code":exc.code,"message":exc.message}) from exc
+        except CatalogueHeld as exc:
+            raise HTTPException(409,detail={"code":"dragon_game_catalogue_held"}) from exc
+        except LookupError as exc:
+            raise HTTPException(404,detail={"code":"dragon_release_import_missing"}) from exc
+        except (ValueError,TypeError,OverflowError) as exc:
+            raise HTTPException(422,detail={"code":"dragon_release_invalid"}) from exc
+        except (OSError,TimeoutError,runtime.sqlite3.Error) as exc:
+            raise HTTPException(503,detail={"code":"dragon_release_unavailable"}) from exc
+
+    @router.post("/knowledge/game-corpus/release-imports")
+    async def release_import(body: ReleaseImportRequest,user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import release_call
+        owner=editor(user)
+        data=body.model_dump(exclude={"payload"})
+        return await corpus_runtime_call(release_call(owner,"enqueue",raw=body.payload.encode("utf-8"),**data))
+
+    @router.get("/knowledge/game-corpus/release-imports/{batch}")
+    async def release_status(batch:str,user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import release_call
+        return await corpus_runtime_call(release_call(scope(user),"status",batch))
+
+    @router.post("/knowledge/game-corpus/capture")
+    async def game_capture(body: GameCaptureRequest,user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import dispatch_capture
+        owner=editor(user)
+        return await corpus_runtime_call(dispatch_capture(owner,user,**body.model_dump()))
