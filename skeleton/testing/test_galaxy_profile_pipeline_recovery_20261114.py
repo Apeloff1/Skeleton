@@ -93,3 +93,20 @@ def test_profile_preserves_extra_nested_controls_and_canonical_digest():
     original = canonical_profile_bytes(detached)
     full["config"]["extra_params"]["production"]["physics"] = 99
     assert canonical_profile_bytes(detached) == original
+
+
+@pytest.mark.parametrize("value", [float(2**53), -float(2**53), 1e100, -1e100])
+def test_profile_rejects_float_outside_client_safe_numeric_range(value):
+    full = profile()
+    full["config"]["extra_params"]["numeric"] = value
+    with pytest.raises(ValueError, match="unsafe Galaxy number"):
+        normalise_galaxy_profile(full)
+    from skeleton.ai.runtime.context.galaxy_profile import normalise_galaxy_profile as mirrored
+    with pytest.raises(ValueError, match="unsafe Galaxy number"):
+        mirrored(full)
+
+
+def test_profile_accepts_safe_fractional_and_boundary_numbers():
+    full = profile()
+    full["config"]["extra_params"].update({"fractional": 0.125, "boundary": float(2**53 - 1)})
+    assert normalise_galaxy_profile(full) == full

@@ -8,6 +8,9 @@ const { load } = require('./harness.cjs');
 const stored = new Map();
 const auth = { token: 'account-A', epoch: 1 };
 let rotateDuringWrite = false;
+let rotateDuringRemove = false;
+let replacementDuringWrite = null;
+let replacementDuringRemove = null;
 const nativeStorage = {
   getItem: async key => stored.has(key) ? stored.get(key) : null,
   setItem: async (key, value) => {
@@ -16,9 +19,24 @@ const nativeStorage = {
       rotateDuringWrite = false;
       auth.token = 'account-C';
       auth.epoch++;
+      if (replacementDuringWrite !== null) {
+        stored.set(key, replacementDuringWrite);
+        replacementDuringWrite = null;
+      }
     }
   },
-  removeItem: async key => { stored.delete(key); },
+  removeItem: async key => {
+    stored.delete(key);
+    if (rotateDuringRemove) {
+      rotateDuringRemove = false;
+      auth.token = 'account-C';
+      auth.epoch++;
+      if (replacementDuringRemove !== null) {
+        stored.set(key, replacementDuringRemove);
+        replacementDuringRemove = null;
+      }
+    }
+  },
 };
 const original = Module._load;
 Module._load = function(request, parent, isMain) {
@@ -98,4 +116,31 @@ test('rotating mid-save restores the previous profile without leaking to the nex
   auth.token = 'account-A';
   auth.epoch++;
   assert.equal((await custody.loadGalaxyProfile()).config.title, 'Preserved design');
+});
+
+
+test('account rotation during clear restores the prior snapshot', async () => {
+  auth.token = 'account-A'; auth.epoch++;
+  await custody.saveGalaxyProfile({ ...complete(), title: 'Keep this design' });
+  rotateDuringRemove = true;
+  await assert.rejects(custody.clearSavedGalaxyProfile(), /Account changed/);
+  assert.equal(await custody.loadGalaxyProfile(), null);
+  auth.token = 'account-A'; auth.epoch++;
+  assert.equal((await custody.loadGalaxyProfile()).config.title, 'Keep this design');
+});
+
+test('stale save or clear cannot overwrite a replacement already observed in storage', async () => {
+  const snapshots = load('src/skeletonForge/galaxyProfileSnapshot.ts');
+  auth.token = 'account-A'; auth.epoch++;
+  await custody.saveGalaxyProfile({ ...complete(), title: 'Before' });
+  replacementDuringWrite = JSON.stringify(snapshots.makeSavedGalaxyProfile({ ...complete(), title: 'Concurrent save' }));
+  rotateDuringWrite = true;
+  await assert.rejects(custody.saveGalaxyProfile({ ...complete(), title: 'Stale save' }), /Account changed/);
+  auth.token = 'account-A'; auth.epoch++;
+  assert.equal((await custody.loadGalaxyProfile()).config.title, 'Concurrent save');
+  replacementDuringRemove = JSON.stringify(snapshots.makeSavedGalaxyProfile({ ...complete(), title: 'Concurrent replacement' }));
+  rotateDuringRemove = true;
+  await assert.rejects(custody.clearSavedGalaxyProfile(), /Account changed/);
+  auth.token = 'account-A'; auth.epoch++;
+  assert.equal((await custody.loadGalaxyProfile()).config.title, 'Concurrent replacement');
 });

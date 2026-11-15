@@ -184,6 +184,8 @@ export function decodeDesignPresets(raw: string | null): DesignPreset[] {
   if (!plain(document) || document.schema !== DESIGN_PRESET_SCHEMA || !Array.isArray(document.entries)) {
     reject('unsupported local library');
   }
+  // Bound the record count before normalizing full matrix payloads.
+  if (document.entries.length > MAX_SAVED_PRESETS) reject('too many saved designs');
   const entries = document.entries.map(normalisePreset);
   // Re-encode to validate aggregate budget, duplicate names and schema.
   encodeDesignPresets(entries);
