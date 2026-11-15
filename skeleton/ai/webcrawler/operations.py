@@ -1118,7 +1118,8 @@ class CrawlRun:
                 # access. Refuse this origin if the bounded cache cannot fit.
                 robots["text"] = (
                     text
-                    if len(text.encode()) <= MAX_ROBOTS_BYTES and retained + len(text.encode()) <= MAX_ROBOTS_CACHE_BYTES
+                    if len(text.encode()) <= MAX_ROBOTS_BYTES
+                    and retained + len(text.encode()) <= MAX_ROBOTS_CACHE_BYTES - 1024
                     else "User-agent: *\nDisallow: /"
                 )
             else:
