@@ -122,6 +122,7 @@ def implementation_digest():
                 "pdf_worker.py",
                 "office_suites.py",
                 "robots_rate.py",
+                "robots_policy.py",
                 "research_projection.py",
                 "research_artifacts.py",
                 "timed_media.py",
@@ -856,8 +857,18 @@ class CrawlRun:
         row = self._state["robots"].get(origin)
         if row is None or row["text"] is None:
             return None
+        # Runtime-only derived parser cache. Exact policy bytes and timestamp
+        # must match the current snapshot, including after checkpoint rollback.
+        if not hasattr(self, "_parsed_robots"):
+            self._parsed_robots = {}
+        existing = self._parsed_robots.get(origin)
+        if existing is not None and existing[:2] == (row["text"], row["fetched_at"]):
+            return existing[2]
+        if len(self._parsed_robots) >= 32:
+            self._parsed_robots.clear()
         cache = RobotsCache(self.policy.user_agent)
         cache.install(origin, row["text"], fetched_at=row["fetched_at"])
+        self._parsed_robots[origin] = (row["text"], row["fetched_at"], cache)
         return cache
 
     def _finish_item(self, item):
