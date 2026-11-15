@@ -313,9 +313,14 @@ class DragonDeepArchiveMixin:
                 raise CrawlerError("crawler_deep_changed","Archive index changed.",409)
             try:
                 def rank():
+                    from core.dragon_hybrid_rank import Candidate,rank as hybrid_rank
                     snap,grant,policies,allowed=self._deep_material(scope,row,now)
                     a.validate_index(row["deep_index"],snap,grant,policies,now)
-                    return a.rank_exact(scope,snap,grant,policies,now,terms,allowed)
+                    exact=a.rank_exact(scope,snap,grant,policies,now,terms,allowed)
+                    ranks=hybrid_rank(query,[Candidate(h["source_id"],snap["sources"][h["source_id"]]["title"],
+                        snap["sources"][h["source_id"]]["text"]) for h in exact])
+                    scored={h["key"]:h for h in ranks}
+                    return [{**h,"hybrid_score":scored.get(h["source_id"],{}).get("score",0.0)} for h in exact]
                 matches=await _bounded_discovery_cpu(rank)
             except CrawlerError as exc:
                 if exc.code=="crawler_vault_busy":
@@ -333,7 +338,7 @@ class DragonDeepArchiveMixin:
             raise CrawlerError("crawler_deep_changed","Archive authority changed during search.",409)
         # Bounded candidate rank, not global BM25. Preserve duplicate evidence
         # separately from source count; never present duplicates as corroboration.
-        hits.sort(key=lambda h:(-h["matched_terms"],-h["term_frequency"],-h["captured_at"],h["session_id"],h["source_id"]))
+        hits.sort(key=lambda h:(-h.get("hybrid_score",0),-h["matched_terms"],-h["term_frequency"],-h["captured_at"],h["session_id"],h["source_id"]))
         unique={}
         for h in hits:
             unique.setdefault(h["preserved_text_hash"],h)
@@ -341,7 +346,7 @@ class DragonDeepArchiveMixin:
             "held":held,"matches":list(unique.values())[:32],"matching_payloads":len(unique),
             "next_cursor":a.cursor(scope,query,rows[a.PAGE-1]["_id"]) if len(rows)>a.PAGE else None,
             "as_of_unix":now,"earliest_expiry":min(expiries) if expiries else None,
-            "approximate_routing":True,"page_local_ranking":True,"history_only":True,
+            "approximate_routing":True,"page_local_ranking":True,"ranking":"candidate_local_bm25_subword_v1","history_only":True,
             "source_text_returned":False,"model_context_permission":False,"wiki_approval":False}
 
 
@@ -391,10 +396,35 @@ class DragonDeepArchiveMixin:
             raise CrawlerError("crawler_deep_context_bounds","Invalid historical context budget.",422)
         terms,_=a.query_terms(scope,query)
         page=await self.deep_archive_search(scope,query=query)
+        from core.dragon_hybrid_rank import fuse_ranked
+        pages=[page]
+        for _ in range(2):
+            cursor=pages[-1].get("next_cursor")
+            if not cursor:
+                break
+            pages.append(await self.deep_archive_search(scope,query=query,cursor=cursor))
+        by_key={}
+        lanes=[]
+        for result in pages:
+            lane=[]
+            for hit in result["matches"]:
+                key=hit["session_id"]+":"+hit["source_id"]
+                by_key[key]=hit
+                lane.append(key)
+            lanes.append(lane)
+        ordered=fuse_ranked(lanes,limit=32)
+        selected=[]
+        seen_payloads=set()
+        for key in ordered:
+            hit=by_key[key]
+            payload=hit.get("preserved_text_hash",key)
+            if payload not in seen_payloads:
+                selected.append(hit)
+                seen_payloads.add(payload)
         docs=[]
         refs=[]
         remaining=max_chars
-        for hit in page["matches"]:
+        for hit in selected:
             if len(docs)>=max_docs or remaining<=0:
                 break
             row=await self.sessions.find_one({**scope,"_id":hit["session_id"],"version":hit["version"],
