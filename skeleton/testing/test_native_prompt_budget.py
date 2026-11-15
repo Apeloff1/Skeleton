@@ -243,3 +243,65 @@ def test_surrogate_tenant_or_request_is_typed_denial():
         registry.revoke("\ud800")
     with pytest.raises(NativeFairStreamDenied):
         grant(model, "\ud800", "one")
+
+def test_release_must_match_an_actual_reservation():
+    ledger = PromptBudgetLedger(NativePromptBudget())
+    ledger.reserve("alice", 2)
+    ledger.reserve("alice", 7)
+    before = ledger.snapshot()
+    for false_size in (1, 3, 8):
+        with pytest.raises(PromptBudgetDenied, match="unowned"):
+            ledger.release("alice", false_size)
+        assert ledger.snapshot() == before
+    ledger.release("alice", 2)
+    with pytest.raises(PromptBudgetDenied, match="unowned"):
+        ledger.release("alice", 2)
+    ledger.release("alice", 7)
+    assert ledger.snapshot()["staged_grants"] == 0
+
+
+def test_prompt_accounting_global_count_bounds_tiny_cross_tenant_grants(monkeypatch):
+    from skeleton.ai.model_runtime import native_prompt_budget as module
+
+    monkeypatch.setattr(module, "MAX_TOTAL_PROMPT_COUNT", 3)
+    ledger = PromptBudgetLedger(NativePromptBudget())
+    for tenant in ("a", "b", "c"):
+        ledger.reserve(tenant, 1)
+    before = ledger.snapshot()
+    with pytest.raises(PromptBudgetDenied, match="admission"):
+        ledger.reserve("d", 1)
+    assert ledger.snapshot() == before
+    ledger.release("b", 1)
+    ledger.reserve("d", 1)
+    assert ledger.snapshot()["staged_grants"] == 3
+
+
+def test_prompt_size_inventory_corruption_fails_closed():
+    ledger = PromptBudgetLedger(NativePromptBudget())
+    ledger.reserve("alice", 2)
+    ledger.reserve("alice", 7)
+    ledger._sizes["alice"] = {3: 1, 7: 1}
+    with pytest.raises(PromptBudgetDenied, match="invariant"):
+        ledger.release("alice", 7)
+    with pytest.raises(PromptBudgetDenied, match="invariant"):
+        ledger.snapshot()
+    assert ledger._bytes == 9
+
+
+def test_inherited_prompt_ledger_denies_before_lock(monkeypatch):
+    import os
+
+    ledger = PromptBudgetLedger(NativePromptBudget())
+    ledger.reserve("alice", 1)
+
+    class Forbidden:
+        def __enter__(self):
+            pytest.fail("inherited prompt ledger reached lock")
+
+    ledger._lock = Forbidden()
+    parent = os.getpid()
+    monkeypatch.setattr(os, "getpid", lambda: parent + 1)
+    for operation in (ledger.snapshot, lambda: ledger.reserve("alice", 1),
+                      lambda: ledger.release("alice", 1)):
+        with pytest.raises(PromptBudgetDenied, match="inherited"):
+            operation()
