@@ -1,0 +1,142 @@
+{
+  "schema": "dragon.steam-identity-snapshot.v1",
+  "source_repository": "jsnli/steamappidlist",
+  "source_path": "data/games_appid.json",
+  "source_blob": "c44a5fcbd6f9260ceddc6005917812eaaf620137",
+  "source_records": 200724,
+  "accepted": 200704,
+  "excluded": 20,
+  "identity_status": "provider-mirror candidate; not independently confirmed, not a release or capture grant",
+  "fields": [
+    "appid",
+    "name"
+  ],
+  "shards": [
+    {
+      "file": "steam-games-000.jsonl",
+      "count": 10000,
+      "first": 10,
+      "last": 508600
+    },
+    {
+      "file": "steam-games-001.jsonl",
+      "count": 10000,
+      "first": 508610,
+      "last": 780190
+    },
+    {
+      "file": "steam-games-002.jsonl",
+      "count": 10000,
+      "first": 780210,
+      "last": 1047430
+    },
+    {
+      "file": "steam-games-003.jsonl",
+      "count": 10000,
+      "first": 1047440,
+      "last": 1290620
+    },
+    {
+      "file": "steam-games-004.jsonl",
+      "count": 10000,
+      "first": 1290650,
+      "last": 1538340
+    },
+    {
+      "file": "steam-games-005.jsonl",
+      "count": 10000,
+      "first": 1538350,
+      "last": 1783060
+    },
+    {
+      "file": "steam-games-006.jsonl",
+      "count": 10000,
+      "first": 1783080,
+      "last": 2027970
+    },
+    {
+      "file": "steam-games-007.jsonl",
+      "count": 10000,
+      "first": 2028270,
+      "last": 2293620
+    },
+    {
+      "file": "steam-games-008.jsonl",
+      "count": 10000,
+      "first": 2293640,
+      "last": 2537560
+    },
+    {
+      "file": "steam-games-009.jsonl",
+      "count": 10000,
+      "first": 2537590,
+      "last": 2799560
+    },
+    {
+      "file": "steam-games-010.jsonl",
+      "count": 10000,
+      "first": 2799570,
+      "last": 3054540
+    },
+    {
+      "file": "steam-games-011.jsonl",
+      "count": 10000,
+      "first": 3054550,
+      "last": 3310100
+    },
+    {
+      "file": "steam-games-012.jsonl",
+      "count": 10000,
+      "first": 3310110,
+      "last": 3571840
+    },
+    {
+      "file": "steam-games-013.jsonl",
+      "count": 10000,
+      "first": 3571850,
+      "last": 3838860
+    },
+    {
+      "file": "steam-games-014.jsonl",
+      "count": 10000,
+      "first": 3838900,
+      "last": 4101570
+    },
+    {
+      "file": "steam-games-015.jsonl",
+      "count": 10000,
+      "first": 4101590,
+      "last": 4365610
+    },
+    {
+      "file": "steam-games-016.jsonl",
+      "count": 10000,
+      "first": 4365620,
+      "last": 4645670
+    },
+    {
+      "file": "steam-games-017.jsonl",
+      "count": 10000,
+      "first": 4645680,
+      "last": 4932480
+    },
+    {
+      "file": "steam-games-018.jsonl",
+      "count": 10000,
+      "first": 4932500,
+      "last": 5205460
+    },
+    {
+      "file": "steam-games-019.jsonl",
+      "count": 10000,
+      "first": 5205490,
+      "last": 5547990
+    },
+    {
+      "file": "steam-games-020.jsonl",
+      "count": 704,
+      "first": 5548000,
+      "last": 5598680
+    }
+  ]
+}
