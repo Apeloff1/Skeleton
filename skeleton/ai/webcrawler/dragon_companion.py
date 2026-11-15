@@ -24,6 +24,7 @@ MAX_REQUESTS = 128
 MAX_SIGNATURES = 96
 MAX_WORDS = 2048
 _WORD = re.compile(r"[^\W_]+", re.UNICODE)
+_CONTINUOUS = re.compile(r"[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af\u0e00-\u0e7f]+")
 _AXES = ("discovery", "understanding", "diversity", "discipline", "resilience")
 _FORMS = ("hatchling", "scout", "scholar", "pathfinder", "archivist")
 _QUESTS = ("explore", "synthesize", "diversify", "conserve", "recover", "rest")
@@ -46,12 +47,28 @@ def _host(url: str) -> str:
     return host
 
 
+def _lexemes(text: str) -> list[str]:
+    """Bounded language-neutral lexical projection, with continuous scripts."""
+    words = []
+    normalized = unicodedata.normalize("NFKC", text).casefold()
+    for match in _WORD.finditer(normalized):
+        for token in re.split(r"([\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af\u0e00-\u0e7f]+)", match.group()):
+            if not token:
+                continue
+            if _CONTINUOUS.fullmatch(token) and len(token) > 1:
+                words.extend(token[i:i+2] for i in range(min(len(token)-1, MAX_WORDS-len(words))))
+            else:
+                words.append(token[:96])
+            if len(words) >= MAX_WORDS:
+                return words[:MAX_WORDS]
+    return words
+
+
 def _signature(text: str) -> frozenset[int]:
     """Bottom-k trigram hashes; no source words in the derived memory."""
     if not isinstance(text, str) or len(text.encode("utf-8")) > 24000:
         raise ValueError("companion evidence outside preserved text bound")
-    words = [match.group()[:96] for match in _WORD.finditer(
-        unicodedata.normalize("NFKC", text).casefold())][:MAX_WORDS]
+    words = _lexemes(text)
     if len(words) < 5:
         return frozenset()
     hashes = {int.from_bytes(hashlib.blake2b(
@@ -62,7 +79,7 @@ def _signature(text: str) -> frozenset[int]:
 
 def _lexical_quality(text: str) -> float:
     """Saturating lexical density; repetition/keyword padding earns little."""
-    words = [m.group() for m in _WORD.finditer(unicodedata.normalize("NFKC", text).casefold())][:MAX_WORDS]
+    words = _lexemes(text)
     if len(words) < 8:
         return 0.
     counts = Counter(words)
@@ -101,6 +118,7 @@ class CompanionProfile:
     projection: dict
     host_progress: dict[str, float]
     host_novelty: dict[str, float]
+    host_trials: dict[str, int]
     term_support: dict[str, int]
     seen_hosts: frozenset[str]
     quest: str
@@ -139,7 +157,7 @@ def build_companion(*, sources: dict, measurements: list[dict], query: str,
             continue
         hashes.add(digest)
         text, url = row["text"], row["canonical_url"]
-        host = _host(url)
+        host = _host(row.get("fetched_url", url))
         signature = _signature(text)
         if not signature:
             # Very short distinct pages do not farm growth simply because
@@ -195,15 +213,19 @@ def build_companion(*, sources: dict, measurements: list[dict], query: str,
             )
     host_progress = {}
     host_novelty = {}
+    host_trials = {}
     for host, rewards in host_rewards.items():
         recent = rewards[-8:]
-        host_novelty[host] = _unit(sum(recent) / len(recent))
+        host_trials[host] = len(recent)
+        # Shrink low-sample observations to a conservative prior.
+        host_novelty[host] = _unit((.5 + sum(recent)) / (2 + len(recent)))
         # Learning progress is improvement, not raw prediction error. Failed
         # exploration, duplicated pages and declining yield give no bonus.
         if len(recent) >= 4:
             midpoint = len(recent) // 2
             earlier, later = recent[:midpoint], recent[midpoint:]
-            host_progress[host] = _unit(max(0., sum(later)/len(later)-sum(earlier)/len(earlier)))
+            difference = max(0., sum(later)/len(later)-sum(earlier)/len(earlier))
+            host_progress[host] = _unit(difference * len(recent)/(4 + len(recent)))
         else:
             host_progress[host] = 0.
     settled = len(measurements)
@@ -276,7 +298,7 @@ def build_companion(*, sources: dict, measurements: list[dict], query: str,
     }
     projection["questbook"] = derive_questbook(contributions, term_count=len(wanted),
         settled=settled, request_budget=limits["max_requests"], source_budget=limits["max_documents"])
-    return CompanionProfile(projection, host_progress, host_novelty,
+    return CompanionProfile(projection, host_progress, host_novelty, host_trials,
                             {k: len(v) for k,v in support.items()}, frozenset(hosts), quest)
 
 
@@ -289,7 +311,11 @@ def companion_priority(row: dict, *, profile: CompanionProfile, base: float,
     matches = _url_tokens(row["url"]) & frozenset(sorted(_unicode_terms(query))[:32])
     gap = sum(1/(1+profile.term_support.get(t,0))**2 for t in matches)/max(1,len(matches))
     progress = profile.host_progress.get(host, 0.)
-    novelty = profile.host_novelty.get(host, .5)
+    novelty = profile.host_novelty.get(host, .25)
+    trials = profile.host_trials.get(host, 0)
+    total_trials = sum(profile.host_trials.values())
+    tempered_exploration = min(.18, .07 * math.sqrt(math.log(2 + total_trials)/(1 + trials)))
+    novelty = min(1., novelty + tempered_exploration * max(.25, gap))
     diversity = float(host not in profile.seen_hosts)
     quest = profile.quest
     if quest == "rest":
@@ -302,4 +328,9 @@ def companion_priority(row: dict, *, profile: CompanionProfile, base: float,
             "synthesize": .70*gap+.30*progress,
             "diversify": .55*diversity+.30*gap+.15*progress}[quest]
     # Limit influence to 12%; no bonus can overpower hard policy.
-    return _unit(.88*base+.12*need)
+    # Anneal influence as acquisition budget falls; guardian is always
+    # more conservative. This changes ordering only, not pacing or quota.
+    weight = min(.12, .04 + .08 * profile.projection["energy"])
+    if profile.projection["style"] == "guardian":
+        weight *= .5
+    return _unit((1-weight)*base+weight*need)
