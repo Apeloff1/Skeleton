@@ -83,3 +83,17 @@ export async function registerDatasetCandidate(lead:string,projection:Projection
  const x=await request<TargetRegistration>(GRAPH+'/dataset-candidates/'+lead,signal,{projection,rights_ref:rights,grant_seconds:7*86400,enabled,acknowledged:true});
  if(!flag(x)||x.source_verified!==false||x.lead_id!==lead||!slug(x.target_id)||!h(x.revision)||x.enabled!==enabled||!n(x.expires_at))return bad();return x;
 }
+
+export type BundleStatus={bundle_revision:string;source_blob:string;title_identity_candidates:number;store_locator_floor:number;gross_optional_route_candidates:number;shards:number;source_rights_verified:false;source_verified:false;network_authorized:false;source_url:string;snapshot:{id:string;rows:number;expected_rows:number;next_page:number;state:'open'|'sealed'|'revoked';expires_at:number}|null;snapshot_identity_candidates_ingested:number;growth_floor_met:boolean};
+function checkBundle(x:BundleStatus){
+ if(!flag(x)||!h(x.bundle_revision)||!(/^[a-f0-9]{40}$/.test(x.source_blob))||!n(x.title_identity_candidates,20000000)||!n(x.store_locator_floor)||x.store_locator_floor!==x.title_identity_candidates||x.gross_optional_route_candidates!==17*x.title_identity_candidates||!n(x.shards,4096)||!x.shards||!url(x.source_url)||x.source_rights_verified!==false||x.source_verified!==false||typeof x.growth_floor_met!=='boolean'||!n(x.snapshot_identity_candidates_ingested,x.title_identity_candidates))return bad();
+ const s=x.snapshot;
+ if(s!==null&&(!s||!h(s.id)||s.expected_rows!==x.title_identity_candidates||!n(s.rows,s.expected_rows)||!n(s.next_page)||!n(s.expires_at)||!['open','sealed','revoked'].includes(s.state)))return bad();
+ if(x.snapshot_identity_candidates_ingested!==(s?.rows??0))return bad();
+ return x;
+}
+export async function leadBundleStatus(signal?:AbortSignal){return checkBundle(await request<BundleStatus>(GRAPH+'/bundle',signal));}
+export async function enableLeadBundle(rights_ref:string,signal?:AbortSignal){
+ if(!t(rights_ref.trim(),128))return bad();
+ return checkBundle(await request<BundleStatus>(GRAPH+'/bundle/enable',signal,{rights_ref:rights_ref.trim(),grant_seconds:2592000,acknowledged:true}));
+}
