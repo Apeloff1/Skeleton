@@ -17,11 +17,11 @@ export default function DragonLeadGraphPanel({visible,disabled,canWrite}:Props){
  const [tab,setTab]=useState<Tab>('library'),[q,setQ]=useState(''),[domain,setDomain]=useState(''),[state,setState]=useState<LeadState>('candidate'),[due,setDue]=useState(false);
  const [targets,setTargets]=useState<DatasetTarget[]>([]),[leads,setLeads]=useState<Lead[]>([]),[datasets,setDatasets]=useState<DatasetCandidate[]>([]),[cursor,setCursor]=useState<string|null>(null),[total,setTotal]=useState(0);
  const [selected,setSelected]=useState<Lead|null>(null),[edges,setEdges]=useState<Edge[]>([]),[edgeCursor,setEdgeCursor]=useState<string|null>(null),[direction,setDirection]=useState<'parents'|'children'>('children');
- const [candidate,setCandidate]=useState<DatasetCandidate|null>(null),[projection,setProjection]=useState<Projection>('locator'),[rights,setRights]=useState(''),[reason,setReason]=useState(''),[ack,setAck]=useState(false),[registration,setRegistration]=useState<TargetRegistration|null>(null),[outbound,setOutbound]=useState<string|null>(null);
+ const [candidate,setCandidate]=useState<DatasetCandidate|null>(null),[projection,setProjection]=useState<Projection>('locator'),[rights,setRights]=useState(''),[reason,setReason]=useState(''),[ack,setAck]=useState(false),[configAck,setConfigAck]=useState(false),[registration,setRegistration]=useState<TargetRegistration|null>(null),[outbound,setOutbound]=useState<string|null>(null);
  const active=useRef<AbortController|null>(null),epoch=useRef(0),reviewOp=useRef<{identity:string;key:string}|null>(null);
  function clearResults(){setTargets([]);setLeads([]);setDatasets([]);setCursor(null);setSelected(null);setEdges([]);setEdgeCursor(null);setCandidate(null);setRegistration(null);setOutbound(null);setAck(false);setRights('');setReason('');reviewOp.current=null;}
  function reset(){
-  epoch.current++;active.current?.abort();active.current=null;setOpen(false);setBusy(false);setError('');setStatus(null);setTab('library');setQ('');setDomain('');setState('candidate');setDue(false);setTotal(0);clearResults();
+  epoch.current++;active.current?.abort();active.current=null;setOpen(false);setBusy(false);setError('');setStatus(null);setTab('library');setQ('');setDomain('');setState('candidate');setDue(false);setTotal(0);setConfigAck(false);clearResults();
  }
  useEffect(()=>{
   const token=getAuthToken();if(!visible)reset();
@@ -38,8 +38,8 @@ export default function DragonLeadGraphPanel({visible,disabled,canWrite}:Props){
  }
  function loadStatus(){run(async(signal,current)=>{const x=await leadStatus(signal);if(current())setStatus(x);});}
  function configure(value:boolean){
-  if(!canWrite||!ack)return;
-  run(async(signal,current)=>{const x=await configureLeadGraph(value,signal);if(current()){setStatus(x);setAck(false);}});
+  if(!canWrite||!configAck)return;
+  run(async(signal,current)=>{const x=await configureLeadGraph(value,signal);if(current()){setStatus(x);setConfigAck(false);}});
  }
  function browse(after?:string){
   run(async(signal,current)=>{
@@ -56,7 +56,7 @@ export default function DragonLeadGraphPanel({visible,disabled,canWrite}:Props){
   });
  }
  function showEdges(lead:Lead,dir:'parents'|'children',after?:string){
-  run(async(signal,current)=>{const x=await leadEdges(lead.id,dir,after,signal);if(current()){setSelected(lead);setDirection(dir);setEdges(x.edges);setEdgeCursor(x.next_cursor);}});
+  run(async(signal,current)=>{const x=await leadEdges(lead.id,dir,after,signal);if(current()){setSelected(lead);setDirection(dir);setEdges(x.edges);setEdgeCursor(x.next_cursor);setAck(false);setReason('');}});
  }
  function review(decision:LeadState){
   if(!selected||!canWrite||!reason.trim()||!ack)return;
@@ -85,8 +85,10 @@ export default function DragonLeadGraphPanel({visible,disabled,canWrite}:Props){
     <Text style={s.small}>{number(status.bootstrap_cursor)} / {number(status.bootstrap_target_rows)} bootstrap input records processed · {status.bootstrapped?'complete':'in progress or disabled'}</Text>
     <Text style={s.small}>Growth floor: {number(status.growth_floor)} · {status.growth_floor_met?'met':'not yet met'} · {number(status.snapshots)} dataset snapshots</Text>
     <Text style={s.small}>Logical cap: {number(status.architecture_node_cap)} nodes, {number(status.architecture_evidence_cap)} evidence edges. Not physically qualified.</Text>
-    {canWrite&&<>{button(ack?'Metadata-only expansion acknowledged':'Acknowledge metadata-only expansion',()=>setAck(v=>!v))}
-     {button(status.enabled?'Suspend lead growth':'Enable recurring lead growth',()=>configure(!status.enabled),!ack)}</>}
+   </View>}
+   {canWrite&&<View style={s.check}>
+    {button(configAck?'Metadata-only expansion acknowledged':'Acknowledge metadata-only expansion',()=>setConfigAck(v=>!v))}
+    {button(status?.enabled?'Suspend lead growth':'Enable recurring lead growth',()=>configure(!status?.enabled),!configAck)}
    </View>}
    {(['library','leads','datasets'] as Tab[]).map(value=><React.Fragment key={value}>{button((tab===value?'Selected: ':'')+(value==='library'?'Public dataset library':value==='leads'?'Lead index':'Discovered dataset candidates'),()=>changeTab(value))}</React.Fragment>)}
    {tab!=='datasets'&&<TextInput style={field} accessibilityLabel="Search lead graph" placeholder="Game, dataset, source…" placeholderTextColor={C.muted} value={q} maxLength={256} editable={enabled} onChangeText={v=>{setQ(v);clearResults();}}/>}
