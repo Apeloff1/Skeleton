@@ -433,7 +433,7 @@ class DragonCrawlerApplication(DragonVaultMixin):
              "worker_token": None, "lease_until": None,
              "checkpoint_identity": identity,
              "consent_expires_at": row["consent_expires_at"],
-             "$expr": {"$gt": ["$consent_expires_at", "$NOW"]}},
+             "$expr": {"$gt": ["$consent_expires_at", "$$NOW"]}},
             {"$set": {"snapshot": restored, "checkpoint_repair": repair,
                       "storage_receipt": receipt, "updated_at": repaired_at},
              "$inc": {"version": 1}},
@@ -3746,6 +3746,7 @@ class DragonCrawlerApplication(DragonVaultMixin):
                     "treasury_watch": "",
                     "treasury_watch_parent": "",
                     "treasury_vault": "",
+                    "treasury_vault_restore": "",
                 },
             },
         )

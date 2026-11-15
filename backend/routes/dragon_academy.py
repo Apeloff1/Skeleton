@@ -2852,6 +2852,17 @@ async def crawler_treasury_vault(
     return await _crawler_result(crawler_application.treasury_vault_catalog(scope,cursor=cursor,limit=limit))
 
 
+@router.post("/crawler/sessions/{session_id}/restore-vault-primary")
+async def crawler_restore_vault_primary(
+    body: CrawlerVaultRetireRequest,
+    session_id: str = URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    return await _crawler_result(crawler_application.restore_treasury_vault(
+        scope,session_id,body.model_dump(),principal=user))
+
+
 @router.post("/crawler/sessions/{session_id}/retire-to-vault")
 async def crawler_retire_to_vault(
     body: CrawlerVaultRetireRequest,

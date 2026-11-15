@@ -603,6 +603,24 @@ export async function getDragonVault(cursor?:string,signal?:AbortSignal):Promise
     ||p.next_cursor!==null&&(p.sessions.length!==32||p.next_cursor!==p.sessions[p.sessions.length-1].session_id))invalid('Invalid vault catalogue custody.');
   return p;
 }
+export type DragonVaultRestore = {
+  schema:'skeleton.dragon.vault-restore.v1';session_id:string;version:number;outcome:'restored'|'already_intact';
+  snapshot_digest:string;ancestor_rollback:false;capture_consent_extended:false;historical_grant_extended:false;
+  network_executed:false;model_context_permission:false;
+};
+export async function restoreDragonVaultPrimary(id:string,body:CrawlCommand&{retention_acknowledged:true},
+  signal?:AbortSignal):Promise<DragonVaultRestore>{
+  if(body.retention_acknowledged!==true||!integer(body.expected_version)||body.expected_version<1)
+    invalid('Explicit cold-custody repair acknowledgement required.');
+  const p=await read(api.post<DragonVaultRestore>(ROOT+'/sessions/'+identifier(id)+'/restore-vault-primary',body,options(signal)),
+    getAuthToken(),'Historical primary repair unconfirmed. Refresh before retrying.');
+  if(!p||p.schema!=='skeleton.dragon.vault-restore.v1'||p.session_id!==id||!integer(p.version)||p.version<body.expected_version
+    ||!['restored','already_intact'].includes(p.outcome)||p.outcome==='restored'&&p.version<=body.expected_version
+    ||!HASH.test(p.snapshot_digest)||p.ancestor_rollback!==false||p.capture_consent_extended!==false
+    ||p.historical_grant_extended!==false||p.network_executed!==false||p.model_context_permission!==false)
+    invalid('Invalid historical primary repair receipt.');
+  return p;
+}
 export async function retireDragonSession(id:string,body:CrawlCommand&{retention_acknowledged:true},signal?:AbortSignal):Promise<DragonVaultCommand>{
   if(body.retention_acknowledged!==true||!integer(body.expected_version)||body.expected_version<1)invalid('Explicit retirement acknowledgement required.');
   const p=await read(api.post<DragonVaultCommand>(ROOT+'/sessions/'+identifier(id)+'/retire-to-vault',body,options(signal)),getAuthToken(),'Vault retirement unconfirmed. Refresh before retrying.');

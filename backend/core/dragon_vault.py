@@ -15,7 +15,7 @@ from skeleton.ai.webcrawler.dragon_treasury_vault import (
     MAX_VAULT_SESSIONS,TERMINAL,identity,make_marker,validate_marker,
     public_marker,reserve_filter,release_active_filter,
 )
-from core.dragon_checkpoint_replica import verify_primary,CheckpointReplicaError
+from core.dragon_checkpoint_replica import verify_primary,decode_exact_replica,CheckpointReplicaError
 
 
 # Separate process-wide CPU admission. Keep the permit until the real thread
@@ -444,3 +444,98 @@ class DragonVaultMixin:
                 "next_cursor":bound+":"+str(next_offset) if next_offset<len(rows) else None,
                 "page_local_ranking":True,"source_text_returned":False,"network_executed":False,
                 "model_context_permission":False}
+
+
+    def _prepare_vault_restore(self,scope,row):
+        """Validate identical current witness bytes, never execute old runtime."""
+        from core.dragon_crawler import _plain
+        marker=validate_marker(_plain(row["treasury_vault"]))
+        if marker["state"]!="vaulted" or row.get("last_worker_exit_confirmed") is False:
+            raise ValueError("cold custody or physical quiescence not established")
+        witness=_plain(row["checkpoint_identity"])
+        if witness["snapshot_digest"]!=marker["snapshot_digest"]:
+            raise ValueError("retirement marker and original witness disagree")
+        # A valid primary needs no write. Do not overwrite healthy bytes
+        # just because the duplicate is missing, corrupt or unavailable.
+        try:
+            self._vault_primary(scope,row)
+        except (ValueError,TypeError,KeyError,RecursionError,CheckpointReplicaError):
+            candidate=decode_exact_replica(row.get("checkpoint_replica"),witness)
+            self._vault_primary(scope,{**row,"snapshot":candidate})
+            if candidate.get("pending_dispatch") is not None:
+                raise ValueError("pending network dispatch cannot be archived as quiescent")
+            return candidate
+        return None
+
+    async def restore_treasury_vault(self,scope,identifier,body,*,principal):
+        """Explicit repair of only a retired, witnessed original primary.
+
+        Expired source-use permission is not restored or extended. A
+        missing witness, absent replica, changed row, old ancestor or
+        uncertain physical worker is held. No snapshot leaves this method.
+        """
+        from core.dragon_crawler import CrawlerError,authenticated_scope,_operation,_digest,_plain,_now
+        if authenticated_scope(principal)!=scope or principal.get("role") not in {"editor","admin"}:
+            raise CrawlerError("crawler_vault_denied","Owner editor authority required.",403)
+        if (not identity(identifier) or set(body)!={"expected_version","idempotency_key","retention_acknowledged"}
+                or type(body["expected_version"]) is not int or body["expected_version"]<1
+                or body["retention_acknowledged"] is not True):
+            raise CrawlerError("crawler_vault_invalid","Explicit custody acknowledgement required.")
+        operation=_operation(body["idempotency_key"])
+        digest=_digest({"action":"restore_treasury_vault",**body})
+        query={"_id":identifier,**scope,"status":{"$in":sorted(TERMINAL)},"treasury_vault.state":"vaulted"}
+        row=await self.sessions.find_one(query,max_time_ms=2000)
+        if row is None:
+            raise CrawlerError("crawler_not_found","Retired expedition not found.",404)
+        unavailable=CrawlerError("crawler_vault_restore_held","Exact original custody cannot be restored safely.",409)
+        previous=row.get("treasury_vault_restore")
+        replay=isinstance(previous,dict) and previous.get("operation")==operation
+        if replay and previous.get("request_digest")!=digest:
+            raise CrawlerError("crawler_idempotency_conflict","Restore key names a different command.",409)
+        if not replay and row["version"]!=body["expected_version"]:
+            raise CrawlerError("crawler_conflict","Reload before repairing the retained record.",409)
+        try:
+            marker=validate_marker(_plain(row["treasury_vault"]))
+            witness=_plain(row["checkpoint_identity"])
+            candidate=await _bounded_discovery_cpu(self._prepare_vault_restore,scope,row)
+        except (ValueError,TypeError,KeyError,RecursionError,CheckpointReplicaError) as exc:
+            raise unavailable from exc
+        fence={**query,"version":row["version"],"checkpoint_identity":row["checkpoint_identity"],
+               "treasury_vault.operation":marker["operation"],"treasury_vault.snapshot_digest":marker["snapshot_digest"],
+               "worker_token":None,"lease_until":None,"last_worker_exit_confirmed":{"$ne":False},
+               "consent_expires_at":row["consent_expires_at"],
+               "$expr":{"$lte":["$consent_expires_at","$$NOW"]}}
+        if replay:
+            if (candidate is not None or previous.get("snapshot_digest")!=marker["snapshot_digest"]
+                    or previous.get("published_version")>row["version"]):
+                raise unavailable
+            outcome="restored"
+        elif candidate is None:
+            outcome="already_intact"
+        else:
+            # Publish only the original exact primary, not an updated/rebound
+            # checkpoint, new replica, policy, authority or grant. Derived
+            # postings are invalidated and must pass normal maintenance.
+            repair={"operation":operation,"request_digest":digest,
+                    "snapshot_digest":witness["snapshot_digest"],"published_version":row["version"]+1,
+                    "repaired_at":_now().isoformat()}
+            receipt=await self._admit(scope,identifier,{"snapshot":candidate,"treasury_vault_restore":repair})
+            result=await self.sessions.update_one(fence,{"$set":{"snapshot":candidate,
+                 "treasury_vault_restore":repair,"storage_receipt":receipt,"treasury_repair_due":_now().timestamp()},
+                 "$unset":{"treasury_index":""},"$inc":{"version":1}})
+            if not result.modified_count:
+                raise CrawlerError("crawler_conflict","Retained record changed before repair publication.",409)
+            fence={**fence,"version":row["version"]+1}
+            outcome="restored"
+        current=await self.sessions.find_one(fence,max_time_ms=2000)
+        if current is None:
+            raise CrawlerError("crawler_conflict","Retained record changed before repair confirmation.",409)
+        try:
+            if await _bounded_discovery_cpu(self._prepare_vault_restore,scope,current) is not None:
+                raise ValueError("restored primary did not qualify")
+        except (ValueError,TypeError,KeyError,RecursionError,CheckpointReplicaError) as exc:
+            raise unavailable from exc
+        return {"ok":True,"schema":"skeleton.dragon.vault-restore.v1","session_id":identifier,
+                "version":current["version"],"outcome":outcome,"snapshot_digest":marker["snapshot_digest"],
+                "ancestor_rollback":False,"capture_consent_extended":False,"historical_grant_extended":False,
+                "network_executed":False,"model_context_permission":False}

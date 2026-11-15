@@ -392,5 +392,93 @@ class PhysicalDiscoveryAdmissionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(failure.exception.code,"crawler_vault_busy")
 
 
+class VaultRestoreTests(unittest.IsolatedAsyncioTestCase):
+    def harness(self,damaged=True):
+        from core.dragon_checkpoint_replica import checkpoint_fields
+        row,now=VaultBoundaryTests().expired(stage="vaulted",released=True)
+        row.update(checkpoint_fields(row["snapshot"]))
+        original=copy.deepcopy(row["snapshot"])
+        if damaged:
+            row["snapshot"]={"damaged":True}
+        row["archive_grant"]=create_grant(snapshot=original,policies={},now=now.timestamp()-4*86400,days=1)
+        app,events=VaultBoundaryTests().app(row)
+        app._admit=AsyncMock(return_value={"receipt":"admitted"})
+        async def mutation(query,update):
+            row.update(update["$set"])
+            for key in update.get("$unset",{}):
+                row.pop(key,None)
+            row["version"]+=update["$inc"]["version"]
+            return Mock(modified_count=1)
+        app.sessions.update_one=AsyncMock(side_effect=mutation)
+        command={"expected_version":row["version"],"idempotency_key":"restore-test","retention_acknowledged":True}
+        return app,row,original,now,command
+
+    async def test_exact_replica_restores_primary_without_renewing_expired_grant(self):
+        app,row,original,now,command=self.harness()
+        grant=copy.deepcopy(row["archive_grant"])
+        row["treasury_index"]={"old":True}
+        with patch("core.dragon_crawler._now",return_value=now),patch(
+                "core.dragon_crawler.authenticated_scope",return_value=SCOPE):
+            receipt=await app.restore_treasury_vault(SCOPE,row["_id"],command,principal={"role":"editor"})
+            replay=await app.restore_treasury_vault(SCOPE,row["_id"],command,principal={"role":"editor"})
+        self.assertEqual(receipt,replay)
+        self.assertEqual(receipt["outcome"],"restored")
+        self.assertEqual(row["snapshot"],original)
+        self.assertEqual(row["archive_grant"],grant)
+        self.assertNotIn("treasury_index",row)
+        self.assertFalse(receipt["capture_consent_extended"])
+        self.assertFalse(receipt["historical_grant_extended"])
+        app._admit.assert_awaited_once()
+        app.sessions.update_one.assert_awaited_once()
+        fence,mutation=app.sessions.update_one.await_args.args
+        self.assertEqual(fence["version"],command["expected_version"])
+        self.assertEqual(fence["$expr"],{"$lte":["$consent_expires_at","$$NOW"]})
+        self.assertEqual(fence["treasury_vault.snapshot_digest"],original["snapshot_digest"])
+        self.assertNotIn("archive_grant",mutation["$set"])
+        self.assertNotIn("consent",mutation["$set"])
+        self.assertNotIn("checkpoint_identity",mutation["$set"])
+
+    async def test_healthy_primary_is_noop_even_when_replica_is_damaged(self):
+        app,row,original,now,command=self.harness(damaged=False)
+        row["checkpoint_replica"]="corrupt"
+        with patch("core.dragon_crawler._now",return_value=now),patch(
+                "core.dragon_crawler.authenticated_scope",return_value=SCOPE):
+            receipt=await app.restore_treasury_vault(SCOPE,row["_id"],command,principal={"role":"editor"})
+        self.assertEqual(receipt["outcome"],"already_intact")
+        app._admit.assert_not_awaited()
+        app.sessions.update_one.assert_not_awaited()
+
+    async def test_wrong_replica_witness_and_uncertain_worker_fail_closed(self):
+        for field,value in (("checkpoint_replica","AAAA"),("checkpoint_identity",{}),
+                            ("last_worker_exit_confirmed",False),("worker_token","inflight")):
+            app,row,original,now,command=self.harness()
+            row[field]=value
+            with patch("core.dragon_crawler._now",return_value=now),patch(
+                    "core.dragon_crawler.authenticated_scope",return_value=SCOPE):
+                with self.assertRaises(CrawlerError) as error:
+                    await app.restore_treasury_vault(SCOPE,row["_id"],command,principal={"role":"editor"})
+            self.assertEqual(error.exception.code,"crawler_vault_restore_held")
+            app._admit.assert_not_awaited()
+            app.sessions.update_one.assert_not_awaited()
+
+    async def test_concurrent_erasure_or_grant_change_wins(self):
+        app,row,original,now,command=self.harness()
+        app.sessions.update_one=AsyncMock(return_value=Mock(modified_count=0))
+        with patch("core.dragon_crawler._now",return_value=now),patch(
+                "core.dragon_crawler.authenticated_scope",return_value=SCOPE):
+            with self.assertRaises(CrawlerError) as error:
+                await app.restore_treasury_vault(SCOPE,row["_id"],command,principal={"role":"editor"})
+        self.assertEqual(error.exception.code,"crawler_conflict")
+        self.assertEqual(row["snapshot"],{"damaged":True})
+
+    async def test_viewer_cannot_restore(self):
+        app,row,original,now,command=self.harness()
+        with patch("core.dragon_crawler.authenticated_scope",return_value=SCOPE):
+            with self.assertRaises(CrawlerError) as error:
+                await app.restore_treasury_vault(SCOPE,row["_id"],command,principal={"role":"viewer"})
+        self.assertEqual(error.exception.status,403)
+        app.sessions.find_one.assert_not_awaited()
+
+
 if __name__=="__main__":
     unittest.main()
