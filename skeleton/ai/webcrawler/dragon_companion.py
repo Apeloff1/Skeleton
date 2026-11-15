@@ -1,0 +1,244 @@
+"""Evidence-fed virtual companion and bounded curiosity controller.
+
+The pet is a reversible projection of the owner-scoped crawl, not a second
+agent, credential store, model trainer or scheduler. It has no independent
+network, clock-decay, payment, notification or background-work authority.
+Growth is recomputed from actual retained evidence and conserved outcomes.
+"""
+from __future__ import annotations
+
+from collections import Counter, defaultdict
+from dataclasses import dataclass
+import hashlib
+import math
+import re
+import unicodedata
+from urllib.parse import urlsplit
+
+from .frontier_coverage import _unicode_terms, _url_tokens
+
+SCHEMA = "skeleton.dragon.companion.v1"
+MAX_SOURCES = 64
+MAX_REQUESTS = 128
+MAX_SIGNATURES = 96
+MAX_WORDS = 2048
+_WORD = re.compile(r"[^\W_]+", re.UNICODE)
+_AXES = ("discovery", "understanding", "diversity", "discipline", "resilience")
+_FORMS = ("hatchling", "scout", "scholar", "pathfinder", "archivist")
+_QUESTS = ("explore", "synthesize", "diversify", "conserve", "recover", "rest")
+_STYLES = ("balanced", "curious", "scholarly", "guardian")
+
+
+def _unit(value: float) -> float:
+    return round(max(0., min(1., value)), 6)
+
+
+def _host(url: str) -> str:
+    host = urlsplit(url).hostname
+    if not host:
+        raise ValueError("companion requires canonical source origin")
+    return host
+
+
+def _signature(text: str) -> frozenset[int]:
+    """Bottom-k trigram hashes; no source words in the derived memory."""
+    if not isinstance(text, str) or len(text.encode("utf-8")) > 24000:
+        raise ValueError("companion evidence outside preserved text bound")
+    words = [match.group()[:96] for match in _WORD.finditer(
+        unicodedata.normalize("NFKC", text).casefold())][:MAX_WORDS]
+    if len(words) < 5:
+        return frozenset()
+    hashes = {int.from_bytes(hashlib.blake2b(
+        "\x1f".join(words[i:i+3]).encode("utf-8"), digest_size=8,
+        person=b"dragon-pet").digest(), "big") for i in range(len(words)-2)}
+    return frozenset(sorted(hashes)[:MAX_SIGNATURES])
+
+
+def _similarity(a: frozenset[int], b: frozenset[int]) -> float:
+    if not a or not b:
+        return 0.
+    # Shared bottom-k sample of the union avoids bias from separately
+    # truncated sets. Approximate lexical overlap, not semantic equivalence.
+    sample = sorted(a | b)[:MAX_SIGNATURES]
+    return sum(x in a and x in b for x in sample) / len(sample)
+
+
+def _medium(ctype: str) -> str:
+    if ctype in {"text/html", "application/xhtml+xml"}:
+        return "web"
+    if ctype == "application/pdf":
+        return "document"
+    if "json" in ctype or "xml" in ctype or "csv" in ctype:
+        return "structured"
+    if ctype.startswith(("audio/", "video/", "image/", "model/")):
+        return "media"
+    if ctype.startswith("text/"):
+        return "text"
+    return "artifact"
+
+
+@dataclass(frozen=True)
+class CompanionProfile:
+    projection: dict
+    host_progress: dict[str, float]
+    host_novelty: dict[str, float]
+    term_support: dict[str, int]
+    seen_hosts: frozenset[str]
+    quest: str
+
+
+def build_companion(*, sources: dict, measurements: list[dict], query: str,
+                    usage: dict, limits: dict, state: str, frontier_count: int,
+                    consent_current: bool, due: bool, incidents: int = 0,
+                    style: str = "balanced") -> CompanionProfile:
+    if (not isinstance(sources, dict) or len(sources) > MAX_SOURCES
+            or not isinstance(measurements, list) or len(measurements) > MAX_REQUESTS
+            or not isinstance(query, str) or len(query) > 1024
+            or style not in _STYLES or type(frontier_count) is not int
+            or not 0 <= frontier_count <= 512 or type(incidents) is not int
+            or not 0 <= incidents <= 128 or type(consent_current) is not bool
+            or type(due) is not bool):
+        raise ValueError("invalid companion projection input")
+    wanted = frozenset(sorted(_unicode_terms(query))[:32])
+    support = defaultdict(set)
+    archive: list[frozenset[int]] = []
+    hashes = set()
+    hosts = set()
+    niches = Counter()
+    host_rewards: dict[str, list[float]] = defaultdict(list)
+    novelty_mass = relevance_mass = 0.
+    ordered = sorted(sources.values(), key=lambda s: (
+        s.get("provenance", {}).get("capture_sequence", 10001),
+        s.get("fetched_at", 0), s.get("source_id", "")))
+    for row in ordered:
+        digest = row["content_hash"]
+        if digest in hashes:
+            continue
+        hashes.add(digest)
+        text, url = row["text"], row["canonical_url"]
+        host = _host(url)
+        signature = _signature(text)
+        if not signature:
+            # Very short distinct pages do not farm growth simply because
+            # no signal is available to measure similarity.
+            novelty = 0.
+        else:
+            novelty = 1 - max((_similarity(signature, old) for old in archive), default=0.)
+            archive.append(signature)
+        matches = _unicode_terms(text) & wanted
+        relevance = len(matches) / len(wanted) if wanted else .5
+        # An extra hostname is only lexical diversity, not verified
+        # independence. Near-identical text cannot award a new niche.
+        novel_enough = novelty >= .25 and len(text) >= 80
+        if novel_enough:
+            hosts.add(host)
+            niches[_medium(row["content_type"])] += 1
+            for term in matches:
+                support[term].add(host)
+        novelty_mass += novelty * relevance
+        relevance_mass += relevance * int(novel_enough)
+        host_rewards[host].append(novelty * relevance)
+    host_progress = {}
+    host_novelty = {}
+    for host, rewards in host_rewards.items():
+        recent = rewards[-8:]
+        host_novelty[host] = _unit(sum(recent) / len(recent))
+        # Learning progress is improvement, not raw prediction error. Failed
+        # exploration, duplicated pages and declining yield give no bonus.
+        if len(recent) >= 4:
+            midpoint = len(recent) // 2
+            earlier, later = recent[:midpoint], recent[midpoint:]
+            host_progress[host] = _unit(max(0., sum(later)/len(later)-sum(earlier)/len(earlier)))
+        else:
+            host_progress[host] = 0.
+    settled = len(measurements)
+    productive = sum(row["kind"] == "captured" for row in measurements)
+    negatives = sum(row["kind"] in {"error", "retry", "interrupted_dispatch", "rejected"}
+                    for row in measurements)
+    unknown = sum(row["uncertain_bytes"] for row in measurements)
+    covered = sum(bool(support[term]) for term in wanted)
+    multi = sum(len(support[term]) >= 2 for term in wanted)
+    requests_left = max(0, limits["max_requests"] - usage["requests"])
+    bytes_left = max(0, limits["max_total_bytes"] - usage["bytes"] - usage["reserved_bytes"])
+    energy = min(requests_left / max(1, limits["max_requests"]),
+                 bytes_left / max(1, limits["max_total_bytes"]))
+    recovery_pairs = 0
+    prior_failure = set()
+    for row in measurements:
+        host = row["host"]
+        if row["kind"] in {"error", "retry", "interrupted_dispatch"}:
+            prior_failure.add(host)
+        elif row["kind"] == "captured" and host in prior_failure:
+            recovery_pairs += 1
+            prior_failure.remove(host)
+    unique = len(hashes)
+    skills = {
+        "discovery": _unit(novelty_mass / 8),
+        "understanding": _unit((covered + .5 * multi) / max(1, 1.5 * len(wanted))
+                               if wanted else relevance_mass / 8),
+        "diversity": _unit((min(4, len(hosts))/4 + min(4, len(niches))/4)/2),
+        "discipline": _unit(productive / max(1, settled) * min(1., unique/4)),
+        # No points for generating failures/incidents. This is an operational
+        # readiness meter, not an experience currency.
+        "resilience": _unit((2 + productive)/(2 + settled + negatives)),
+    }
+    # No reward for raw volume, denial encounters, or repeated recovery.
+    growth = int(round(1000 * (.35*skills["discovery"] + .35*skills["understanding"]
+                               + .20*skills["diversity"] + .10*skills["discipline"])))
+    stage = sum(growth >= t for t in (120, 300, 550, 800))
+    dormant = not consent_current or state in {"paused", "cancelled", "completed", "budget_exhausted", "failed"}
+    if dormant or not due or not frontier_count:
+        quest = "rest"
+    elif energy < .15:
+        quest = "conserve"
+    elif negatives >= 2 and negatives / max(1, settled) >= .45:
+        quest = "recover"
+    else:
+        deficits = {
+            "explore": (1-skills["discovery"]) * (.9 if style == "scholarly" else 1.),
+            "synthesize": (1-skills["understanding"]) * (1.2 if style == "scholarly" else 1.),
+            "diversify": (1-skills["diversity"]) * (1.2 if style == "curious" else .85),
+            "conserve": (1-energy) * (1.2 if style == "guardian" else .6),
+        }
+        quest = max(deficits, key=lambda key: (deficits[key], -_QUESTS.index(key)))
+    # The visual state never punishes inactivity or implies suffering.
+    posture = "resting" if dormant or not due else "recovering" if quest == "recover" else (
+        "studying" if quest == "synthesize" else "roaming")
+    projection = {
+        "schema": SCHEMA, "form": _FORMS[stage], "stage": stage, "growth": growth,
+        "skills": skills, "energy": _unit(energy), "quest": quest, "posture": posture,
+        "style": style, "captured_sources": unique, "novel_origins": len(hosts),
+        "habitats": dict(sorted(niches.items())), "covered_terms": covered,
+        "term_count": len(wanted), "multi_origin_terms": multi,
+        "recovery_observations": recovery_pairs, "quarantines": incidents,
+        "uncertain_bytes": unknown, "unreviewed_evidence_only": True,
+        "network_authority_expanded": False, "training_permission": False,
+        "inactivity_penalty": False,
+    }
+    return CompanionProfile(projection, host_progress, host_novelty,
+                            {k: len(v) for k,v in support.items()}, frozenset(hosts), quest)
+
+
+def companion_priority(row: dict, *, profile: CompanionProfile, base: float,
+                       query: str) -> float:
+    """Bounded relative adjustment after due eligibility, never an admission."""
+    if not math.isfinite(base) or not 0 <= base <= 1:
+        raise ValueError("invalid companion base priority")
+    host = _host(row["url"])
+    matches = _url_tokens(row["url"]) & frozenset(sorted(_unicode_terms(query))[:32])
+    gap = sum(1/(1+profile.term_support.get(t,0))**2 for t in matches)/max(1,len(matches))
+    progress = profile.host_progress.get(host, 0.)
+    novelty = profile.host_novelty.get(host, .5)
+    diversity = float(host not in profile.seen_hosts)
+    quest = profile.quest
+    if quest == "rest":
+        return base
+    if quest == "recover" or quest == "conserve":
+        # No extra exploration when scarce or degraded; core reliability,
+        # cost and existing cooldowns remain decisive.
+        return base
+    need = {"explore": .50*novelty+.30*progress+.20*gap,
+            "synthesize": .70*gap+.30*progress,
+            "diversify": .55*diversity+.30*gap+.15*progress}[quest]
+    # Limit influence to 12%; no bonus can overpower hard policy.
+    return _unit(.88*base+.12*need)
