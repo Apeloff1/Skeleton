@@ -550,6 +550,71 @@ def _source_index(manifest: Mapping[str, Any]) -> tuple[list[str], dict[str, str
     return names, hashes
 
 
+def _reconcile_build_source(
+    manifest: Mapping[str, Any], sources: Mapping[str, str], result: Mapping[str, Any],
+    *, expected_brief: str | None = None,
+) -> None:
+    """Bind the accepted authored specification and public report to exact source.
+
+    Content hashes alone cannot authorize a different project, a stale build
+    report, or contradictory design metadata. Validate both identities before
+    packaging and again when the archived result is recovered or downloaded.
+    """
+    from skeleton.forge.game_design_spec import SCHEMA_VERSION
+    from skeleton.forge.genre_project import DESIGN_SPEC_PATH
+    from skeleton.forge.source_manifest import source_manifest
+
+    names, hashes = _source_index(manifest)
+    actual = source_manifest(sources)
+    if set(names) != set(sources) or hashes != actual["files"] or manifest["source_sha256"] != actual["sha256"]:
+        raise ValueError("game source identity mismatch")
+    build = result.get("build")
+    if not isinstance(build, Mapping) or build.get("ok") is not True:
+        raise ValueError("missing successful game source report")
+    project = build.get("project")
+    if not isinstance(project, Mapping):
+        raise ValueError("missing reported game source manifest")
+    reported_names, reported_hashes = _source_index(project)
+    if (set(reported_names) != set(names) or reported_hashes != hashes
+            or project["source_sha256"] != manifest["source_sha256"]):
+        raise ValueError("reported game source differs from packaged source")
+    reported_files = build.get("file_names")
+    if type(reported_files) is not list:
+        raise ValueError("missing reported source inventory")
+    _archive_names(reported_files, source_only=True)
+    if set(reported_files) != set(names):
+        raise ValueError("reported source inventory mismatch")
+    spec = build.get("spec")
+    if not isinstance(spec, Mapping) or spec.get("schema_version") != SCHEMA_VERSION:
+        raise ValueError("invalid authored design report")
+    raw = sources.get(DESIGN_SPEC_PATH)
+    if type(raw) is not str or len(raw) > MAX_RECORD_BYTES:
+        raise ValueError("missing authored design source")
+    source_spec = _object(raw.encode("utf-8", errors="strict"))
+    if _encoded(source_spec) != _encoded(spec):
+        raise ValueError("authored design differs from packaged source")
+    brief, era = spec.get("brief"), spec.get("era")
+    if type(brief) is not str or type(era) is not str:
+        raise ValueError("invalid authored design identity")
+    canonical = compile_brief(expected_brief if expected_brief is not None else brief, era=era)
+    # Only the same four data fields granted to the local model may differ.
+    proposal = {key: spec[key] for key in ("title", "fantasy", "core_loop", "gameplay") if key in spec}
+    admitted, violations = guard_proposal(canonical, proposal)
+    if violations or _encoded(admitted) != _encoded(spec):
+        raise ValueError("authored design violates committed brief or specification")
+    meta = manifest.get("meta")
+    report_meta = project.get("meta")
+    if not isinstance(meta, Mapping) or not isinstance(report_meta, Mapping):
+        raise ValueError("missing authored source metadata")
+    for item in (meta, report_meta):
+        if (item.get("spec_id") != spec["spec_id"]
+                or ("genre" in item and item["genre"] != spec["genre"])
+                or ("planning_status" in item and item["planning_status"] != "accepted")):
+            raise ValueError("authored source metadata mismatch")
+    if {key: meta[key] for key in ("spec_id", "genre", "planning_status") if key in meta} != dict(report_meta):
+        raise ValueError("reported authored metadata differs from source")
+
+
 def _read_regular(path: Path, maximum: int, *, private: bool = False) -> bytes:
     before = path.lstat()
     if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
@@ -1007,7 +1072,7 @@ class LocalGameBuilder:
                         self._fail(rid, "total_deadline_exceeded")
                         return
                     self._set_state(rid, "verifying", stage="packaging")
-                    archive, count = self._package(bundle / "project", result)
+                    archive, count = self._package(bundle / "project", result, expected_brief=brief)
                     row = self._row(rid)
                     receipt = {"schema": RECEIPT_SCHEMA,
                         **{key: row[key] for key in ("request_id", "request_digest", "model_digest", "tokenizer_digest", "runtime_digest", "artifact_id")},
@@ -1093,8 +1158,8 @@ class LocalGameBuilder:
             if cursor.rowcount != 1:
                 raise ValueError("game build terminal conflict")
 
-    def _package(self, project: Path, result: dict[str, Any]) -> tuple[bytes, int]:
-        from skeleton.forge.source_manifest import source_manifest
+    def _package(self, project: Path, result: dict[str, Any], *,
+                 expected_brief: str | None = None) -> tuple[bytes, int]:
         manifest_path = project / "FORGE_MANIFEST.json"
         if project.resolve() != project or not project.is_dir():
             raise ValueError("unsafe source project directory")
@@ -1113,10 +1178,15 @@ class LocalGameBuilder:
             if sha256(raw).hexdigest() != hashes[name]:
                 raise ValueError("canonical source changed")
             files[name] = raw.decode("utf-8", errors="strict")
-        if source_manifest(files)["sha256"] != manifest.get("source_sha256"):
-            raise ValueError("canonical source manifest digest mismatch")
-        manifest["root"] = "project"
-        sanitized_manifest = _encoded(manifest)
+        _reconcile_build_source(manifest, files, result, expected_brief=expected_brief)
+        # The original projector metadata may include host-private adapter
+        # or diagnostic fields. Archive only canonical source identity and
+        # the same bounded metadata exposed by the successful public result.
+        sanitized_manifest = _encoded({
+            "root": "project", "files": sorted(names), "count": len(names),
+            "sha256": hashes, "source_sha256": manifest["source_sha256"],
+            "meta": result["build"]["project"]["meta"],
+        })
         if _read_regular(manifest_path, MAX_RECORD_BYTES) != original_manifest:
             raise ValueError("source manifest changed during packaging")
         bodies = {name: text.encode("utf-8") for name, text in files.items()}
@@ -1194,17 +1264,15 @@ class LocalGameBuilder:
                 content[name] = archive.read(member)
                 if len(content[name]) != member.file_size:
                     raise ValueError("archive content length mismatch")
-            from skeleton.forge.source_manifest import source_manifest
             manifest = _object(content["FORGE_MANIFEST.json"])
             _source_index(manifest)
             sources = {name: body.decode("utf-8", errors="strict") for name, body in content.items()
                        if name not in {"FORGE_MANIFEST.json", "JEEVES_BUILD.json"}}
-            source = source_manifest(sources)
-            if (manifest.get("root") != "project" or set(manifest.get("files", [])) != set(sources)
-                    or manifest.get("sha256") != source["files"]
-                    or manifest.get("source_sha256") != source["sha256"]
-                    or _encoded(_object(content["JEEVES_BUILD.json"])) != row["result_json"].encode("utf-8")):
+            result = _object(content["JEEVES_BUILD.json"])
+            if (manifest.get("root") != "project"
+                    or _encoded(result) != row["result_json"].encode("utf-8")):
                 raise ValueError("archive source provenance mismatch")
+            _reconcile_build_source(manifest, sources, result, expected_brief=row["brief"])
         return raw
 
     def archive(self, request_id: str) -> bytes:
