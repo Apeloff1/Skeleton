@@ -137,6 +137,17 @@ class ColdRestoreRequest(Request):
     expected_version: int = Field(ge=1,strict=True)
 
 
+class DatasetBeginRequest(Request):
+    dataset: str = Field(min_length=1,max_length=128)
+    source: str = Field(pattern=r"^[0-9a-f]{64}$")
+    observation_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    label: str = Field(min_length=1,max_length=128)
+    expected_rows: int = Field(ge=1,le=100000000,strict=True)
+    expected_chain: str = Field(pattern=r"^[0-9a-f]{64}$")
+    grant_seconds: int = Field(ge=300,le=2592000,strict=True)
+    rights_acknowledged: StrictBool
+
+
 def register_knowledge_routes(router):
     def scope(user):
         try:
@@ -539,3 +550,55 @@ def register_knowledge_routes(router):
                 editor(user),session_id,expected_version=body.expected_version))
         except StorageHeld as exc:
             raise HTTPException(409,detail={"code":"dragon_cold_restore_held"}) from exc
+
+
+    async def dataset_call(owner,game,operation,*args,**kwargs):
+        from core.dragon_game_datasets import DatasetShard
+        from core.dragon_corpus_runtime import _bounded
+        if operation not in {"begin","append","seal","query","edges","versions","revoke"}:
+            raise HTTPException(422,detail={"code":"dragon_dataset_invalid"})
+        return await corpus_runtime_call(_bounded(lambda:getattr(DatasetShard(owner,game,
+            create=operation=="begin" and os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1"),operation)(*args,**kwargs)))
+
+    @router.post("/knowledge/game-corpus/{game_id}/datasets")
+    async def dataset_begin(game_id:str,body:DatasetBeginRequest,user:dict=Depends(get_current_user)):
+        return await dataset_call(editor(user),game_id,"begin",**body.model_dump())
+
+    @router.put("/knowledge/game-corpus/{game_id}/datasets/{version}/pages/{ordinal}")
+    async def dataset_append(game_id:str,version:str,ordinal:int,request:HttpRequest,user:dict=Depends(get_current_user)):
+        from core.dragon_game_datasets import MAX_PAGE
+        owner=editor(user)
+        if request.headers.get("content-type","").lower() not in {"application/x-ndjson","application/jsonl"}:
+            raise HTTPException(415,detail={"code":"dragon_dataset_jsonl_required"})
+        content=bytearray()
+        async for piece in request.stream():
+            if len(content)+len(piece)>MAX_PAGE:raise HTTPException(413,detail={"code":"dragon_dataset_page_bound"})
+            content.extend(piece)
+        return await dataset_call(owner,game_id,"append",version,ordinal,bytes(content))
+
+    @router.post("/knowledge/game-corpus/{game_id}/datasets/{version}/seal")
+    async def dataset_seal(game_id:str,version:str,user:dict=Depends(get_current_user)):
+        return await dataset_call(editor(user),game_id,"seal",version)
+
+    @router.get("/knowledge/game-corpus/{game_id}/datasets")
+    async def dataset_versions(game_id:str,response:Response,after:str|None=Query(None,max_length=64),
+                                user:dict=Depends(get_current_user)):
+        response.headers["Cache-Control"]="no-store"
+        return await dataset_call(scope(user),game_id,"versions",after=after)
+
+    @router.get("/knowledge/game-corpus/{game_id}/datasets/{version}/records")
+    async def dataset_records(game_id:str,version:str,response:Response,q:str|None=Query(None,max_length=256),
+                              after:str|None=Query(None,max_length=128),limit:int=Query(16,ge=1,le=32),
+                              user:dict=Depends(get_current_user)):
+        response.headers["Cache-Control"]="no-store"
+        return await dataset_call(scope(user),game_id,"query",version,q=q,after=after,limit=limit)
+
+    @router.get("/knowledge/game-corpus/{game_id}/datasets/{version}/relations/{record}")
+    async def dataset_relations(game_id:str,version:str,record:str,response:Response,reverse:bool=Query(False),
+                                user:dict=Depends(get_current_user)):
+        response.headers["Cache-Control"]="no-store"
+        return await dataset_call(scope(user),game_id,"edges",version,record,reverse=reverse)
+
+    @router.delete("/knowledge/game-corpus/{game_id}/datasets/{version}")
+    async def dataset_revoke(game_id:str,version:str,user:dict=Depends(get_current_user)):
+        return await dataset_call(editor(user),game_id,"revoke",version)
