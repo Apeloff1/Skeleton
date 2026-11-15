@@ -356,7 +356,8 @@ class DragonCrawlerApplication:
             snapshot = _plain(row["snapshot"])
         binding = snapshot.get("binding", {})
         if (
-            binding.get("scope") != scope
+            _digest(_plain(row["request"])) != row["request_digest"]
+            or binding.get("scope") != scope
             or binding.get("request_digest") != row["request_digest"]
             or binding.get("consent") != _plain(row["consent"])
         ):
@@ -510,6 +511,17 @@ class DragonCrawlerApplication:
             counters=status.get("usage", {}),
             limits=row["request"],
         )
+        witness = row.get("checkpoint_identity") or {}
+        repair = row.get("checkpoint_repair") or {}
+        status["checkpoint_recovery"] = {
+            "replica_present": bool(witness.get("replica_available") is True
+                                    and isinstance(row.get("checkpoint_replica"), str)),
+            "replica_verified": False,
+            "reason": witness.get("reason", "legacy_unwitnessed"),
+            "last_repair_at": repair.get("repaired_at"),
+            "last_repair_sequence": repair.get("sequence"),
+            "ancestor_rollback": False,
+        }
         worker = self._worker_state(row)
         grant = row.get("automation")
         status["worker"] = worker
