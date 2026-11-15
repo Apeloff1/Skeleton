@@ -157,6 +157,22 @@ class SourceDirectoryImportRequest(Request):
     acknowledged: StrictBool
 
 
+class ModSeedApplicationsRequest(Request):
+    revision: str = Field(pattern=r"^[0-9a-f]{64}$")
+    operation: str = Field(min_length=1,max_length=128)
+    appids: list[str] = Field(min_length=1,max_length=128)
+    mod_only: StrictBool = False
+    acknowledged: StrictBool
+
+
+class ModSeedSpecialistsRequest(Request):
+    revision: str = Field(pattern=r"^[0-9a-f]{64}$")
+    operation: str = Field(min_length=1,max_length=128)
+    game: str = Field(pattern=r"^[0-9a-f]{64}$")
+    seed_ids: list[str] = Field(min_length=1,max_length=256)
+    acknowledged: StrictBool
+
+
 def register_knowledge_routes(router):
     def scope(user):
         try:
@@ -664,3 +680,49 @@ def register_knowledge_routes(router):
         owner=editor(user)
         return await corpus_runtime_call(_bounded(lambda:enqueue(
             _path(create=os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1"),owner,**body.model_dump())))
+
+
+    @router.get("/knowledge/game-corpus/mod-seeds")
+    async def mod_seed_summary(user:dict=Depends(get_current_user)):
+        from core.dragon_mod_seed_catalogue import summary
+        from core.dragon_corpus_runtime import _bounded
+        scope(user)
+        return await corpus_runtime_call(_bounded(summary))
+
+    @router.get("/knowledge/game-corpus/mod-seeds/locators")
+    async def mod_seed_locators(response:Response,lane:str|None=Query(None,max_length=32),
+            group:str|None=Query(None,max_length=64),provider:str|None=Query(None,max_length=32),
+            family:str|None=Query(None,max_length=32),kind:str|None=Query(None,max_length=32),
+            appid:str|None=Query(None,max_length=12),q:str|None=Query(None,max_length=256),
+            mod_only:bool=False,after:str|None=Query(None,max_length=129),limit:int=Query(32,ge=1,le=100),
+            user:dict=Depends(get_current_user)):
+        from core.dragon_mod_seed_catalogue import page
+        from core.dragon_corpus_runtime import _bounded
+        scope(user);response.headers["Cache-Control"]="private, no-store"
+        return await corpus_runtime_call(_bounded(lambda:page(lane=lane,group=group,provider=provider,
+            family=family,kind=kind,appid=appid,q=q,mod_only=mod_only,after=after,limit=limit)))
+
+    @router.get("/knowledge/game-corpus/mod-seeds/applications")
+    async def mod_seed_applications(response:Response,group:str|None=Query(None,max_length=64),
+            q:str|None=Query(None,max_length=256),after:str|None=Query(None,max_length=129),
+            limit:int=Query(32,ge=1,le=100),user:dict=Depends(get_current_user)):
+        from core.dragon_mod_seed_catalogue import applications
+        from core.dragon_corpus_runtime import _bounded
+        scope(user);response.headers["Cache-Control"]="private, no-store"
+        return await corpus_runtime_call(_bounded(lambda:applications(group=group,q=q,after=after,limit=limit)))
+
+    @router.post("/knowledge/game-corpus/mod-seeds/import-applications")
+    async def mod_seed_import_apps(body:ModSeedApplicationsRequest,user:dict=Depends(get_current_user)):
+        from core.dragon_mod_seed_catalogue import import_applications
+        from core.dragon_corpus_runtime import _bounded,_path
+        owner=editor(user)
+        return await corpus_runtime_call(_bounded(lambda:import_applications(
+            _path(create=os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1"),owner,**body.model_dump())))
+
+    @router.post("/knowledge/game-corpus/mod-seeds/attach")
+    async def mod_seed_attach(body:ModSeedSpecialistsRequest,user:dict=Depends(get_current_user)):
+        from core.dragon_mod_seed_catalogue import attach_specialists
+        from core.dragon_corpus_runtime import _bounded,_path
+        owner=editor(user)
+        return await corpus_runtime_call(_bounded(lambda:attach_specialists(
+            _path(create=False),owner,**body.model_dump())))
