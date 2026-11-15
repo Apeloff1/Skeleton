@@ -95,8 +95,34 @@ class ManifestArchive:
             del meta
             volume_names=json.dumps(sorted(self.bulk.volumes))
             db.execute("INSERT OR IGNORE INTO manifest_configuration VALUES(1,?)",(volume_names,))
-            if db.execute("SELECT volumes FROM manifest_configuration").fetchone()[0]!=volume_names:
-                raise StorageHeld("volume topology changed; explicit relocation required")
+            configured=db.execute("SELECT volumes FROM manifest_configuration WHERE singleton=1").fetchone()[0]
+            if configured!=volume_names:
+                # Placement identities are persisted per chunk. Additive topology
+                # may distribute NEW chunks without remapping any existing bytes.
+                # Never permit a removal/rename or implicit relocation.
+                try:
+                    before=json.loads(configured)
+                    after=json.loads(volume_names)
+                    additive=(isinstance(before,list) and all(isinstance(x,str) for x in before)
+                              and len(before)==len(set(before)) and set(before)<set(after))
+                except (ValueError,TypeError):
+                    additive=False
+                if os.getenv("SKL_DRAGON_HOARDER_ALLOW_VOLUME_EXPANSION")!="1" or not additive:
+                    raise StorageHeld("volume topology changed; explicit additive expansion or relocation required")
+                db.execute("BEGIN IMMEDIATE")
+                try:
+                    latest=db.execute("SELECT volumes FROM manifest_configuration WHERE singleton=1").fetchone()[0]
+                    if latest!=configured:
+                        raise StorageHeld("volume topology changed during expansion")
+                    # Every already-admitted placement must remain addressable.
+                    known=set(after)
+                    if any(row[0] not in known for row in db.execute("SELECT DISTINCT volume FROM chunks")):
+                        raise StorageHeld("existing chunk placement unavailable")
+                    db.execute("UPDATE manifest_configuration SET volumes=? WHERE singleton=1",(volume_names,))
+                    db.execute("COMMIT")
+                except BaseException:
+                    if db.in_transaction:db.execute("ROLLBACK")
+                    raise
 
     @contextmanager
     def _db(self):
