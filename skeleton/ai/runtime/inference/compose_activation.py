@@ -204,14 +204,14 @@ class MongoGuardedActivation:
         except Exception:
             raise ActivationBlocked("native model/tokenizer identity unavailable") from None
 
-    async def _probe(self) -> tuple[int, tuple[tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]]]: 
+    async def _probe(self) -> tuple[int, tuple[tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]]]:
         try:
             async with asyncio.timeout(_MAX_TOTAL_AUTHORITY_SECONDS):
                 return await self._probe_bounded()
         except TimeoutError:
             raise ActivationBlocked("guarded activation authority timed out") from None
 
-    async def _probe_bounded(self) -> tuple[int, tuple[tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]]]: 
+    async def _probe_bounded(self) -> tuple[int, tuple[tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]]]:
         try:
             async with asyncio.timeout(_MAX_PROBE_SECONDS):
                 hello = await self._database.command("hello")

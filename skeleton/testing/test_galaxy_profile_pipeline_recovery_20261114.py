@@ -134,7 +134,7 @@ def test_galaxy_controls_change_real_native_source(mode, matrix, phase, dial, ax
     generated = archetype_files(mode, operator_axes=effective)
     assert generated != baseline
     assert verify_archetype_content(generated, mode, operator_axes=effective)
-    sealed, doc = seal_galaxy_playable_controls(generated, receipt)
+    sealed, doc = seal_galaxy_playable_controls(attach_galaxy_profile(generated, admitted), receipt)
     assert doc["axes"][0]["authority"] == "galaxy_matrix"
     assert doc["native_execution_qualified"] is False
     for path, digest in doc["native_sources"].items():
@@ -250,3 +250,51 @@ def test_crafting_galaxy_material_budget_is_real_not_metadata():
     files = archetype_files("crafting", operator_axes=axes)
     assert "crafted = collected == 6" in files["scripts/archetypes/crafting/core_loop.gd"]
     assert receipt["mapped_matrix_dials"] == 2
+
+
+@pytest.mark.parametrize("damage", ["digest", "counts", "vote", "authority", "operator", "extra", "profile", "noncanonical", "missing"])
+def test_galaxy_seal_rejects_unbound_authored_control_receipts(damage):
+    from skeleton.context.galaxy_profile import compile_galaxy_playable_axes, seal_galaxy_playable_controls
+    from skeleton.forge.archetype_content import archetype_files
+    raw = profile()
+    raw["config"]["mechanics_matrix"]["driving"] = {"count": 1000}
+    admitted = normalise_galaxy_profile(raw)
+    overrides = {"grind": 0.0}
+    axes, receipt = compile_galaxy_playable_axes(admitted, "racing", overrides)
+    files = attach_galaxy_profile(archetype_files("racing", operator_axes=axes), admitted)
+    if damage == "digest":
+        receipt["profile_sha256"] = "f" * 64
+    elif damage == "counts":
+        receipt["active_matrix_dials"] += 1
+    elif damage == "vote":
+        row = next(row for row in receipt["axes"] if row["axis"] == "grind")
+        row["sources"][0]["value"] = 500
+    elif damage == "authority":
+        row = next(row for row in receipt["axes"] if row["axis"] == "grind")
+        row["authority"] = "galaxy_matrix"
+    elif damage == "operator":
+        overrides = {"grind": 1.0}
+    elif damage == "extra":
+        receipt["source_verified"] = True
+    elif damage == "profile":
+        alternate = copy.deepcopy(admitted)
+        alternate["config"]["title"] = "Different project"
+        files = attach_galaxy_profile({key: value for key, value in files.items() if key != ARTIFACT_PATH}, alternate)
+    elif damage == "noncanonical":
+        files[ARTIFACT_PATH] = " " + files[ARTIFACT_PATH]
+    elif damage == "missing":
+        del files[ARTIFACT_PATH]
+    with pytest.raises(ValueError, match="profile|receipt"):
+        seal_galaxy_playable_controls(files, receipt, operator_axes=overrides)
+
+
+def test_galaxy_seal_reconstructs_consistent_offline_override_receipt():
+    from skeleton.context.galaxy_profile import compile_galaxy_playable_axes, seal_galaxy_playable_controls
+    from skeleton.forge.archetype_content import archetype_files
+    raw = profile()
+    raw["config"]["mechanics_matrix"]["driving"] = {"count": 900}
+    admitted = normalise_galaxy_profile(raw)
+    overrides = {"grind": 0.0, "tempo": 0.37}
+    axes, receipt = compile_galaxy_playable_axes(admitted, "racing", overrides)
+    files = attach_galaxy_profile(archetype_files("racing", operator_axes=axes), admitted)
+    assert seal_galaxy_playable_controls(files, receipt, operator_axes=overrides) == seal_galaxy_playable_controls(files, receipt)

@@ -607,6 +607,7 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
     if ctx.get("pending_galaxy_playable_controls") is not None:
         files, galaxy_playable = seal_galaxy_playable_controls(
             files, ctx["pending_galaxy_playable_controls"],
+            operator_axes=normalise_operator_axes(ctx.get("operator_axes")),
         )
         ctx["galaxy_playable_controls"] = galaxy_playable
         ctx["files"] = files

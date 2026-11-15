@@ -1,6 +1,6 @@
 # Full regression gate
 
-Workflow: `.github/workflows/full-regression-gate.yml`  
+Workflow: `.github/workflows/full-regression-gate.yml`
 Branch that introduced it: `qa/full-regression-gate-20261114`
 
 This is an additive QA gate. It does not edit Grenn's CI lane (`merge-readiness.yml`, `ci.yml`, `backend-quality.yml`, `queue-drain.yml`).

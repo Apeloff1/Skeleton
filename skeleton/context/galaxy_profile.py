@@ -338,8 +338,14 @@ def compile_galaxy_playable_axes(
 
 def seal_galaxy_playable_controls(
     files: Mapping[str, str], receipt: Mapping[str, Any],
+    *, operator_axes: Optional[Mapping[str, float]] = None,
 ) -> tuple[dict[str, str], dict[str, Any]]:
-    """Bind actual generated native source to the resolved authoring receipt."""
+    """Bind exact native source, canonical profile and resolved authoring controls.
+
+    Live compilation supplies the original operator axes. Independent archive
+    inspection may reconstruct explicit overrides from the detached receipt;
+    that verifies consistency, not an external author identity.
+    """
     from skeleton.forge.archetype_content import verify_archetype_content
     from skeleton.forge.playable_tuning import SOURCE_PATH
     if receipt.get("schema") != PLAYABLE_RECEIPT_SCHEMA or receipt.get("mode") not in _PLAYABLE_RULES:
@@ -354,7 +360,31 @@ def seal_galaxy_playable_controls(
     )
     if any(path not in files or type(files[path]) is not str for path in native_paths):
         raise ValueError("Galaxy playable generated source missing")
-    if not verify_archetype_content(files, mode, operator_axes=receipt["effective_axes"]):
+    raw = files.get(ARTIFACT_PATH)
+    if (type(raw) is not str or len(raw) > _MAX_BYTES + 1
+            or sum(name.casefold() == ARTIFACT_PATH.casefold() for name in files) != 1):
+        raise ValueError("Galaxy playable profile source missing or ambiguous")
+    try:
+        profile = normalise_galaxy_profile(json.loads(raw))
+        if profile is None or canonical_profile_bytes(profile).decode("ascii") + "\n" != raw:
+            raise ValueError("noncanonical Galaxy profile source")
+        if operator_axes is None:
+            effective = receipt["effective_axes"]
+            rows = receipt["axes"]
+            if type(effective) is not dict or type(rows) is not list or len(rows) > 10:
+                raise ValueError("invalid Galaxy control inventory")
+            inherited = {row["axis"] for row in rows if row["authority"] == "galaxy_matrix"}
+            operator_axes = {key: value for key, value in effective.items() if key not in inherited}
+        resolved, expected = compile_galaxy_playable_axes(profile, mode, operator_axes)
+        # Serialized comparison also rejects boolean/numeric equivalence,
+        # duplicate/extra receipt fields and nonfinite numeric data.
+        def canonical(value: Any) -> str:
+            return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
+        if canonical(expected) != canonical(dict(receipt)):
+            raise ValueError("Galaxy control receipt differs from canonical profile")
+    except (ValueError, TypeError, KeyError, AttributeError, RecursionError, OverflowError) as exc:
+        raise ValueError("Galaxy playable profile or control receipt mismatch") from exc
+    if not verify_archetype_content(files, mode, operator_axes=resolved):
         raise ValueError("Galaxy playable source does not match resolved controls")
     document = {**receipt, "native_sources": {
         path: hashlib.sha256(files[path].encode("utf-8", errors="strict")).hexdigest()

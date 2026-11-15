@@ -621,7 +621,7 @@ def test_rejects_invalid_source_child_workflow(repo_copy: Path, defect: str) -> 
         elif defect == "missing_proof":
             updated = text.replace("git rev-parse HEAD", "printf bypass", 1)
         elif defect == "conditional_proof":
-            updated = text.replace("        run: test \"$(git rev-parse HEAD)\"", 
+            updated = text.replace("        run: test \"$(git rev-parse HEAD)\"",
                                    "        if: false\n        run: test \"$(git rev-parse HEAD)\"", 1)
         elif defect == "forged_proof":
             updated = text.replace("EXPECTED_SHA: " + guard._SOURCE_REF, "EXPECTED_SHA: main", 1)
