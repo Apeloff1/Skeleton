@@ -255,3 +255,71 @@ def test_private_handle_rejects_file_backed_temp_policy(private_dir):
             handle.assert_current()
         conn.execute("PRAGMA temp_store=MEMORY")
         handle.assert_current()
+
+@pytest.mark.parametrize("suffix", ["-journal", "-wal", "-shm"])
+def test_create_denies_preexisting_sidecar_without_creating_main(private_dir, suffix):
+    sidecar = private_dir / ("fair-stream.db" + suffix)
+    sidecar.write_bytes(b"untrusted sidecar")
+    sidecar.chmod(0o600)
+    with pytest.raises(PrivateSQLiteUnavailable, match="sidecar"):
+        open_private_sqlite(private_dir, create=True)
+    assert not (private_dir / "fair-stream.db").exists()
+    assert sidecar.read_bytes() == b"untrusted sidecar"
+
+
+@pytest.mark.parametrize("kind", ["symlink", "hardlink", "permissions", "fifo", "oversize"])
+def test_unsafe_rollback_journal_denied_before_sqlite_open(private_dir, tmp_path, kind, monkeypatch):
+    from skeleton.ai.model_runtime import private_sqlite as module
+
+    with open_private_sqlite(private_dir, create=True):
+        pass
+    target = tmp_path / "outside"
+    target.write_bytes(b"unchanged")
+    target.chmod(0o600)
+    journal = private_dir / "fair-stream.db-journal"
+    if kind == "symlink":
+        journal.symlink_to(target)
+    elif kind == "hardlink":
+        os.link(target, journal)
+    elif kind == "fifo":
+        os.mkfifo(journal, 0o600)
+    else:
+        journal.write_bytes(b"unsafe")
+        journal.chmod(0o644 if kind == "permissions" else 0o600)
+        if kind == "oversize":
+            with journal.open("r+b") as stream:
+                stream.truncate((3 << 20) + 1)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("SQLite opened unsafe rollback journal")
+
+    monkeypatch.setattr(module.sqlite3, "connect", forbidden)
+    with pytest.raises(PrivateSQLiteUnavailable, match="sidecar"):
+        open_private_sqlite(private_dir, max_database_bytes=1 << 20)
+    assert target.read_bytes() == b"unchanged"
+
+
+def test_live_transaction_allows_owned_rollback_journal(private_dir):
+    with open_private_sqlite(private_dir, create=True) as handle:
+        connection = handle.connection
+        connection.execute("CREATE TABLE demo(value TEXT)")
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute("INSERT INTO demo VALUES ('pending')")
+        try:
+            handle.assert_current()
+            assert (private_dir / "fair-stream.db-journal").exists()
+        finally:
+            connection.rollback()
+        handle.assert_current()
+        assert connection.execute("SELECT COUNT(*) FROM demo").fetchone() == (0,)
+
+
+def test_live_handle_refuses_unexpected_wal_sidecar(private_dir):
+    with open_private_sqlite(private_dir, create=True) as handle:
+        path = private_dir / "fair-stream.db-wal"
+        path.write_bytes(b"unexpected")
+        path.chmod(0o600)
+        with pytest.raises(PrivateSQLiteUnavailable, match="sidecar"):
+            handle.assert_current()
+        path.unlink()
+        handle.assert_current()
