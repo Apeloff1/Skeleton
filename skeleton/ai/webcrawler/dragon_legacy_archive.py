@@ -87,29 +87,46 @@ def inspect_terminal(snapshot:dict,*,scope:dict,request_digest:str,consent:dict,
     if not isinstance(events,list) or len(events)>64:
         raise ValueError("legacy event receipt unavailable")
     captured={}
+    event_by_sequence={}
+    last_sequence=0
     for event in events:
         if (not isinstance(event,dict) or type(event.get("sequence")) is not int
-                or not 1<=event["sequence"]<=sequence
+                or not last_sequence<event["sequence"]<=sequence
                 or not _hex(event.get("event_digest")) or digest({k:v for k,v in event.items() if k!="event_digest"})!=event["event_digest"]):
             raise ValueError("legacy event integrity mismatch")
-        if event.get("kind")=="captured" and _hex(event.get("source_id")):
-            captured[event["source_id"]]=event["sequence"]
+        last_sequence=event["sequence"]
+        event_by_sequence[last_sequence]=event
+        if event.get("kind")=="captured":
+            sid=event.get("source_id")
+            if not _hex(sid) or sid not in sources or sid in captured:
+                raise ValueError("legacy capture event identity mismatch")
+            captured[sid]=(event["sequence"],admit(event.get("url")),None)
     # Older ring entries may have been compacted. Require a second exact
     # acquisition receipt when present; no guessed event restoration.
     measures=snapshot.get("acquisition_measurements",[])
     if not isinstance(measures,list) or len(measures)>128:
         raise ValueError("legacy acquisition receipt bound")
+    measured=set()
     for item in measures:
         if not isinstance(item,dict):
             raise ValueError("malformed legacy acquisition observation")
         sid=item.get("source_id")
         seq=item.get("event_sequence")
-        if _hex(sid) and type(seq) is int and 1<=seq<=sequence:
-            if sid in captured and captured[sid]!=seq:
+        if sid is not None:
+            if (not _hex(sid) or sid not in sources or sid in measured or item.get("kind")!="captured"
+                    or type(seq) is not int or not 1<=seq<=sequence
+                    or type(item.get("status")) is not int or not 200<=item["status"]<300
+                    or item.get("host")!=urlsplit(sources[sid]["fetched_url"]).hostname):
+                raise ValueError("legacy measurement does not prove a capture")
+            measured.add(sid)
+            event=event_by_sequence.get(seq)
+            if event is not None and (event.get("kind")!="captured" or event.get("source_id")!=sid):
+                raise ValueError("legacy measurement contradicts witnessed event")
+            if sid in captured and captured[sid][0]!=seq:
                 raise ValueError("legacy capture sequence conflicts")
-            # Measurements are part of the exact witnessed snapshot but are
-            # not individually trusted as modern controller qualification.
-            captured[sid]=seq
+            # An older compacted event may be joined to its exact witnessed
+            # acquisition receipt, never to an arbitrary status observation.
+            captured.setdefault(sid,(seq,None,item["host"]))
     verified={}
     for sid,source in sources.items():
         if not _hex(sid) or not isinstance(source,dict) or sid!=source.get("source_id"):
@@ -142,8 +159,11 @@ def inspect_terminal(snapshot:dict,*,scope:dict,request_digest:str,consent:dict,
         for key in ("canonical_url","fetched_url"):
             admit(source[key])
         capture=provenance.get("capture_sequence")
-        if type(capture) is not int or captured.get(sid)!=capture:
-            raise ValueError("legacy exact capture event absent")
+        evidence=captured.get(sid)
+        if (type(capture) is not int or evidence is None or evidence[0]!=capture
+                or evidence[1] is not None and evidence[1]!=source["fetched_url"]
+                or evidence[2] is not None and evidence[2]!=urlsplit(source["fetched_url"]).hostname):
+            raise ValueError("legacy exact capture event absent or conflicting")
         receipt=provenance.get("http_freshness")
         if receipt is not None and not verify_freshness_receipt(receipt,observed_at=stamp):
             raise ValueError("legacy HTTP metadata malformed")
