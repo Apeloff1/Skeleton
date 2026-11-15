@@ -59,7 +59,7 @@ class DragonVaultMixin:
         if watch is not None and (not isinstance(watch,dict) or (
                 watch.get("enabled") is True and watch.get("expires_at",now+1)>now)):
             raise ValueError("active or invalid watch blocks retirement")
-        snapshot=_plain(row["snapshot"])
+        snapshot=_plain(self._custody_snapshot(row))
         verify_primary(snapshot,_plain(row["checkpoint_identity"]))
         binding=snapshot["binding"]
         if (snapshot["state"]!=row["status"] or binding["scope"]!=scope
