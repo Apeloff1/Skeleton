@@ -388,6 +388,93 @@ class GameBuildRejected(ValueError):
         super().__init__(message)
 
 
+def validate_game_build_request(request_id: object, brief: object) -> str:
+    """Pure admission shared by HTTP and direct callers; no store or model I/O."""
+    try:
+        rid = _identifier("game request id", request_id)
+        # Reject oversized character counts before allocating UTF-8 bytes.
+        if (type(brief) is not str or not 1 <= len(brief) <= 4000
+                or not brief.strip() or not 1 <= len(brief.encode("utf-8", errors="strict")) <= 4000):
+            raise ValueError("brief budget")
+        compile_brief(brief)
+    except (ValueError, UnicodeError, TypeError):
+        raise GameBuildRejected(400, "invalid_game_brief", "Use a valid game brief of 1..4000 UTF-8 bytes and supported gameplay choices.") from None
+    return rid
+
+
+# Only these static, schema-owned column names enter the SQL projection.
+# CASE bounds values inside SQLite rather than transferring a forged large
+# BLOB/TEXT to Python. A separate validity bit distinguishes corrupt rows
+# from absent rows; a corrupt request ID must never authorize a replay.
+_RECORD_TEXT_LIMITS = (
+    ("model_digest", 64, False), ("tokenizer_digest", 64, False),
+    ("request_id", 128, False), ("request_digest", 64, False),
+    ("runtime_digest", 64, False), ("model_id", 128, False),
+    ("brief", 4000, False), ("brief_sha256", 64, False),
+    ("state", 16, False), ("stage", 16, False),
+    ("artifact_id", 69, False), ("result_json", MAX_RECORD_BYTES, True),
+    ("error_code", 128, True), ("archive_sha256", 64, True),
+    ("receipt_sha256", 64, True),
+)
+
+
+def _record_projection() -> str:
+    expressions = []
+    valid = []
+    for name, limit, nullable in _RECORD_TEXT_LIMITS:
+        check = f"(typeof({name})='text' AND length(CAST({name} AS BLOB)) BETWEEN 1 AND {limit})"
+        condition = f"({name} IS NULL OR {check})" if nullable else check
+        valid.append(condition)
+        expressions.append(f"CASE WHEN {check} THEN {name} ELSE NULL END AS {name}")
+    for name, check in (
+        ("created_at", "typeof(created_at) IN ('integer','real') AND created_at>=0"),
+        ("updated_at", "typeof(updated_at) IN ('integer','real') AND updated_at>=0"),
+        ("archive_bytes", f"archive_bytes IS NULL OR (typeof(archive_bytes)='integer' AND archive_bytes BETWEEN 1 AND {MAX_ARCHIVE_BYTES})"),
+        ("file_count", f"file_count IS NULL OR (typeof(file_count)='integer' AND file_count BETWEEN 1 AND {MAX_FILES})"),
+    ):
+        valid.append(f"({check})")
+        expressions.append(f"CASE WHEN {check} THEN {name} ELSE NULL END AS {name}")
+    expressions.append("CASE WHEN " + " AND ".join(valid) + " THEN 1 ELSE 0 END AS record_valid")
+    return ", ".join(expressions)
+
+
+_RECORD_SELECT = "SELECT " + _record_projection() + " FROM offline_game_builds"
+
+
+def _invalid_record() -> GameBuildRejected:
+    return GameBuildRejected(503, "invalid_build_record", "The saved game build record is unavailable.")
+
+
+def _validated_record(cursor: sqlite3.Cursor, raw: tuple) -> dict[str, Any]:
+    row = dict(zip((column[0] for column in cursor.description), raw))
+    if row.pop("record_valid", None) != 1:
+        raise _invalid_record()
+    try:
+        _identifier("game request id", row["request_id"])
+        for key in ("model_digest", "tokenizer_digest", "runtime_digest",
+                    "request_digest", "brief_sha256", "archive_sha256", "receipt_sha256"):
+            value = row[key]
+            if value is not None and re.fullmatch(r"[0-9a-f]{64}", value) is None:
+                raise ValueError("invalid record digest")
+        if (not math.isfinite(row["created_at"]) or not math.isfinite(row["updated_at"])
+                or row["state"] not in JOB_STATES
+                or row["stage"] not in (*JOB_STATES, "packaging", "publishing")
+                or sha256(row["brief"].encode("utf-8", errors="strict")).hexdigest() != row["brief_sha256"]
+                or row["artifact_id"] != "game-" + sha256(_encoded([
+                    row["model_digest"], row["tokenizer_digest"], row["request_id"]
+                ])).hexdigest()):
+            raise ValueError("invalid record identity")
+        if row["state"] == "complete" or row["stage"] == "publishing":
+            if any(row[key] is None for key in ("result_json", "archive_sha256",
+                                               "archive_bytes", "file_count", "receipt_sha256")):
+                raise ValueError("incomplete artifact identity")
+        if row["error_code"] is not None and re.fullmatch(r"[a-z0-9_]{1,128}", row["error_code"]) is None:
+            raise ValueError("invalid error code")
+    except (ValueError, TypeError, UnicodeError, OverflowError):
+        raise _invalid_record() from None
+    return row
+
+
 def _encoded(value: object) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True,
                       separators=(",", ":"), allow_nan=False).encode("utf-8", errors="strict")
@@ -463,6 +550,71 @@ def _source_index(manifest: Mapping[str, Any]) -> tuple[list[str], dict[str, str
     return names, hashes
 
 
+def _reconcile_build_source(
+    manifest: Mapping[str, Any], sources: Mapping[str, str], result: Mapping[str, Any],
+    *, expected_brief: str | None = None,
+) -> None:
+    """Bind the accepted authored specification and public report to exact source.
+
+    Content hashes alone cannot authorize a different project, a stale build
+    report, or contradictory design metadata. Validate both identities before
+    packaging and again when the archived result is recovered or downloaded.
+    """
+    from skeleton.forge.game_design_spec import SCHEMA_VERSION
+    from skeleton.forge.genre_project import DESIGN_SPEC_PATH
+    from skeleton.forge.source_manifest import source_manifest
+
+    names, hashes = _source_index(manifest)
+    actual = source_manifest(sources)
+    if set(names) != set(sources) or hashes != actual["files"] or manifest["source_sha256"] != actual["sha256"]:
+        raise ValueError("game source identity mismatch")
+    build = result.get("build")
+    if not isinstance(build, Mapping) or build.get("ok") is not True:
+        raise ValueError("missing successful game source report")
+    project = build.get("project")
+    if not isinstance(project, Mapping):
+        raise ValueError("missing reported game source manifest")
+    reported_names, reported_hashes = _source_index(project)
+    if (set(reported_names) != set(names) or reported_hashes != hashes
+            or project["source_sha256"] != manifest["source_sha256"]):
+        raise ValueError("reported game source differs from packaged source")
+    reported_files = build.get("file_names")
+    if type(reported_files) is not list:
+        raise ValueError("missing reported source inventory")
+    _archive_names(reported_files, source_only=True)
+    if set(reported_files) != set(names):
+        raise ValueError("reported source inventory mismatch")
+    spec = build.get("spec")
+    if not isinstance(spec, Mapping) or spec.get("schema_version") != SCHEMA_VERSION:
+        raise ValueError("invalid authored design report")
+    raw = sources.get(DESIGN_SPEC_PATH)
+    if type(raw) is not str or len(raw) > MAX_RECORD_BYTES:
+        raise ValueError("missing authored design source")
+    source_spec = _object(raw.encode("utf-8", errors="strict"))
+    if _encoded(source_spec) != _encoded(spec):
+        raise ValueError("authored design differs from packaged source")
+    brief, era = spec.get("brief"), spec.get("era")
+    if type(brief) is not str or type(era) is not str:
+        raise ValueError("invalid authored design identity")
+    canonical = compile_brief(expected_brief if expected_brief is not None else brief, era=era)
+    # Only the same four data fields granted to the local model may differ.
+    proposal = {key: spec[key] for key in ("title", "fantasy", "core_loop", "gameplay") if key in spec}
+    admitted, violations = guard_proposal(canonical, proposal)
+    if violations or _encoded(admitted) != _encoded(spec):
+        raise ValueError("authored design violates committed brief or specification")
+    meta = manifest.get("meta")
+    report_meta = project.get("meta")
+    if not isinstance(meta, Mapping) or not isinstance(report_meta, Mapping):
+        raise ValueError("missing authored source metadata")
+    for item in (meta, report_meta):
+        if (item.get("spec_id") != spec["spec_id"]
+                or ("genre" in item and item["genre"] != spec["genre"])
+                or ("planning_status" in item and item["planning_status"] != "accepted")):
+            raise ValueError("authored source metadata mismatch")
+    if {key: meta[key] for key in ("spec_id", "genre", "planning_status") if key in meta} != dict(report_meta):
+        raise ValueError("reported authored metadata differs from source")
+
+
 def _read_regular(path: Path, maximum: int, *, private: bool = False) -> bytes:
     before = path.lstat()
     if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
@@ -524,6 +676,74 @@ def _fsync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
+_PUBLIC_PLANNING_VIOLATIONS = frozenset({
+    "json_object_required", "complete_design_required", "invalid_json_or_schema", "no_change",
+    "invalid:gameplay", "unknown:gameplay", "invalid:systems", "unknown:systems",
+    *(f"{prefix}:{field}" for prefix in ("invalid", "too_long")
+      for field in ("title", "fantasy", "core_loop")),
+    *(f"{prefix}:gameplay.{field}" for prefix in ("invalid", "missing", "constraints", "conflicting")
+      for field in ("difficulty", "theme", "objective_label", "player_speed", "encounter_style")),
+})
+
+
+def _public_planning(value: object) -> dict[str, Any] | None:
+    """Project only typed planning evidence, never arbitrary backend diagnostics."""
+    if value is None:
+        return None
+    if not isinstance(value, Mapping) or type(value.get("status")) is not str or value["status"] not in {
+        "accepted", "rejected", "timed_out", "unavailable",
+    }:
+        raise ValueError("invalid planning receipt")
+    attempts = value.get("attempts")
+    if type(attempts) is not list or len(attempts) > 2:
+        raise ValueError("invalid planning attempt inventory")
+    clean: dict[str, Any] = {"status": value["status"], "attempts": [], "quality_qualified": False}
+    for key in ("model_digest", "runtime_digest", "instruction_sha256"):
+        if key in value:
+            field = value[key]
+            if type(field) is not str or re.fullmatch(r"[0-9a-f]{64}", field) is None:
+                raise ValueError("invalid planning digest")
+            clean[key] = field
+    for key, expected in (("proposal_schema", PLAN_SCHEMA), ("instruction_policy", POLICY_ID)):
+        if key in value:
+            if value[key] != expected:
+                raise ValueError("invalid planning policy")
+            clean[key] = expected
+    for key in ("network_provider_used", "generated_source_admitted", "quality_qualified"):
+        if key in value and value[key] is not False:
+            raise ValueError("unsupported planning authority")
+        if key in value:
+            clean[key] = False
+    if value.get("fixture_only") is True:
+        clean["fixture_only"] = True
+    if value.get("reason") == "local_model_or_lease_unavailable":
+        clean["reason"] = "local_model_or_lease_unavailable"
+    for index, attempt in enumerate(attempts, 1):
+        if not isinstance(attempt, Mapping) or type(attempt.get("attempt")) is not int or attempt["attempt"] != index:
+            raise ValueError("invalid planning attempt identity")
+        elapsed, tokens = attempt.get("elapsed_seconds"), attempt.get("output_tokens")
+        if (type(elapsed) not in (int, float) or not 0 <= elapsed <= 600
+                or type(tokens) is not int or not 0 <= tokens <= 1024):
+            raise ValueError("invalid planning attempt counters")
+        evidence: dict[str, Any] = {"attempt": index, "elapsed_seconds": elapsed, "output_tokens": tokens}
+        for key in ("response_sha256", "execution_receipt_sha256"):
+            digest = attempt.get(key)
+            if type(digest) is not str or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+                raise ValueError("invalid planning attempt digest")
+            evidence[key] = digest
+        violations = attempt.get("violations")
+        if type(violations) is not list or len(violations) > 32 or any(type(item) is not str for item in violations):
+            raise ValueError("invalid planning violation inventory")
+        # Unknown codes may contain arbitrary backend data. Retain a generic
+        # rejection marker without propagating its text or path.
+        evidence["violations"] = [item if item in _PUBLIC_PLANNING_VIOLATIONS else "unclassified_rejection"
+                                  for item in violations]
+        clean["attempts"].append(evidence)
+    if clean["status"] == "accepted" and clean["attempts"] and clean["attempts"][-1]["violations"]:
+        raise ValueError("accepted planning attempt contains violations")
+    return clean
+
+
 def _public_result(report: Mapping[str, Any]) -> dict[str, Any]:
     """Project maintained receipts, excluding host commands, paths and logs."""
     build = report.get("build")
@@ -552,11 +772,13 @@ def _public_result(report: Mapping[str, Any]) -> dict[str, Any]:
                 clean_build["project"]["meta"] = {name: item["meta"][name] for name in
                     ("spec_id", "genre", "planning_status") if name in item["meta"]}
     result = {"schema": SCHEMA, "ok": report.get("ok") is True,
-              "planning": report.get("planning"), "build": clean_build,
+              "planning": _public_planning(report.get("planning")), "build": clean_build,
               "general_model_quality_qualified": False}
-    for key in ("reason", "elapsed_seconds"):
-        if key in report:
-            result[key] = report[key]
+    if report.get("reason") == "accepted_model_proposal_required":
+        result["reason"] = "accepted_model_proposal_required"
+    elapsed = report.get("elapsed_seconds")
+    if type(elapsed) in (int, float) and 0 <= elapsed <= 600:
+        result["elapsed_seconds"] = elapsed
     if len(_encoded(result)) > MAX_RECORD_BYTES:
         raise ValueError("game result exceeds record budget")
     return result
@@ -592,6 +814,7 @@ class LocalGameBuilder:
         self._cancel = threading.Event()
         self._closing = False
         self._closed = False
+        self._admitting = False
         self._store = OfflineChatStore(self.database)
         try:
             self._store._db.execute("""CREATE TABLE IF NOT EXISTS offline_game_builds (
@@ -664,19 +887,33 @@ class LocalGameBuilder:
             return {"ready": False, "code": "local_model_or_storage_unavailable"}
         return {"ready": True, "code": "ready"}
 
-    def _row(self, request_id: str) -> dict[str, Any] | None:
+    def _require_open(self) -> None:
+        if self._closing or self._closed:
+            raise GameBuildRejected(503, "local_service_shutting_down", "The local service is shutting down.")
+
+    def _scoped_row(self, model_digest: str, tokenizer_digest: str, request_id: str) -> dict[str, Any] | None:
         with self._store._lock:
             cursor = self._store._db.execute(
-                "SELECT * FROM offline_game_builds WHERE model_digest=? AND tokenizer_digest=? AND request_id=?",
-                (self.model_digest, self.tokenizer_digest, request_id))
+                _RECORD_SELECT + " WHERE model_digest=? AND tokenizer_digest=? AND request_id=?",
+                (model_digest, tokenizer_digest, request_id))
             row = cursor.fetchone()
-            return None if row is None else dict(zip((x[0] for x in cursor.description), row))
+            return None if row is None else _validated_record(cursor, row)
+
+    def _row(self, request_id: str) -> dict[str, Any] | None:
+        return self._scoped_row(self.model_digest, self.tokenizer_digest, request_id)
 
     def _public(self, row: Mapping[str, Any]) -> dict[str, Any]:
         state = row["state"]
         if state not in JOB_STATES:
             raise GameBuildRejected(503, "invalid_build_record", "The saved game build record is unavailable.")
-        result = None if row["result_json"] is None else _object(row["result_json"].encode("utf-8"))
+        try:
+            encoded = None if row["result_json"] is None else row["result_json"].encode("utf-8", errors="strict")
+            result = None if encoded is None else _object(encoded)
+            if result is not None and (_encoded(result) != encoded or result.get("schema") != SCHEMA
+                                       or result.get("general_model_quality_qualified") is not False):
+                raise ValueError("invalid stored public result")
+        except (ValueError, TypeError, UnicodeError, RecursionError, OverflowError):
+            raise _invalid_record() from None
         archive = None if state != "complete" else {
             "sha256": row["archive_sha256"], "bytes": row["archive_bytes"], "file_count": row["file_count"]}
         error = None if row["error_code"] is None else {
@@ -690,33 +927,38 @@ class LocalGameBuilder:
             rid = _identifier("game request id", request_id)
         except ValueError:
             raise GameBuildRejected(400, "invalid_request_id", "Use a bounded game request identifier.") from None
-        row = self._row(rid)
-        if row is None:
-            raise GameBuildRejected(404, "unknown_game_build", "This local model has no saved build with that identifier.")
-        return self._public(row)
+        with self._lock:
+            self._require_open()
+            row = self._row(rid)
+            if row is None:
+                raise GameBuildRejected(404, "unknown_game_build", "This local model has no saved build with that identifier.")
+            return self._public(row)
 
     def list_jobs(self) -> list[dict[str, Any]]:
-        with self._store._lock:
-            rows = self._store._db.execute(
-                "SELECT request_id FROM offline_game_builds WHERE model_digest=? AND tokenizer_digest=? "
-                "ORDER BY created_at DESC, request_id LIMIT 100", (self.model_digest, self.tokenizer_digest)).fetchall()
-        return [self.get(row[0]) for row in rows]
+        with self._lock:
+            self._require_open()
+            with self._store._lock:
+                rows = self._store._db.execute(
+                    "SELECT CASE WHEN typeof(request_id)='text' AND "
+                    "length(CAST(request_id AS BLOB)) BETWEEN 1 AND 128 THEN request_id ELSE NULL END "
+                    "FROM offline_game_builds WHERE model_digest=? AND tokenizer_digest=? "
+                    "ORDER BY created_at DESC, request_id LIMIT ?",
+                    (self.model_digest, self.tokenizer_digest, MAX_HISTORY_JOBS + 1)).fetchall()
+            if len(rows) > MAX_HISTORY_JOBS or any(row[0] is None for row in rows):
+                raise _invalid_record()
+            return [self.get(row[0]) for row in rows]
 
     def submit(self, request_id: str, brief: str) -> dict[str, Any]:
-        try:
-            rid = _identifier("game request id", request_id)
-            if (not isinstance(brief, str) or not brief.strip()
-                    or not 1 <= len(brief.encode("utf-8", errors="strict")) <= 4000):
-                raise ValueError("brief budget")
-            compile_brief(brief)
-        except (ValueError, UnicodeError, TypeError):
-            raise GameBuildRejected(400, "invalid_game_brief", "Use a valid game brief of 1..4000 UTF-8 bytes and supported gameplay choices.") from None
+        rid = validate_game_build_request(request_id, brief)
         digest = sha256(_encoded({"brief": brief, "model": self.model_digest,
             "tokenizer": self.tokenizer_digest, "runtime": self.runtime_digest,
             "policy": POLICY_ID, "instruction_sha256": sha256(SYSTEM.encode("utf-8")).hexdigest(),
             "proposal_schema_sha256": sha256(_encoded(PROPOSAL_SCHEMA)).hexdigest(),
             "limits": self.limits()})).hexdigest()
         with self._lock:
+            self._require_open()
+            if self._admitting:
+                raise GameBuildRejected(423, "local_game_build_busy", "Another local game build is already active.")
             existing = self._row(rid)
             if existing is not None:
                 if existing["request_digest"] != digest:
@@ -724,7 +966,14 @@ class LocalGameBuilder:
                 return self._public(existing)
             if self._worker is not None and self._worker.is_alive():
                 raise GameBuildRejected(423, "local_game_build_busy", "Another local game build is already active.")
-            readiness = self.availability()
+            self._admitting = True
+            try:
+                readiness = self.availability()
+            finally:
+                self._admitting = False
+            # The readiness provider can reenter on this thread. A shutdown
+            # during the callback must not be followed by new worker admission.
+            self._require_open()
             if not readiness["ready"]:
                 raise GameBuildRejected(423 if readiness["code"] in {"local_game_build_busy", "local_inference_busy"} else 503,
                     readiness["code"], "A ready local Jeeves model and native Godot are required for a new build.")
@@ -735,16 +984,23 @@ class LocalGameBuilder:
             worker = threading.Thread(target=self._run, args=(rid, brief, digest, admitted, failures, cancel),
                                       name="jeeves-local-game", daemon=False)
             self._worker = worker
-            worker.start()
+            try:
+                worker.start()
+            except Exception:
+                self._worker = None
+                cancel.set()
+                raise GameBuildRejected(503, "game_admission_unavailable", "Local game build admission failed.") from None
         if not admitted.wait(12):
             cancel.set()
             raise GameBuildRejected(503, "game_admission_unavailable", "Local build admission did not settle; check this request before submitting a new one.")
-        if failures:
-            existing = self._row(rid)
-            if existing is not None and existing["request_digest"] == digest:
-                return self._public(existing)
-            raise failures[0]
-        return self.get(rid)
+        with self._lock:
+            self._require_open()
+            if failures:
+                existing = self._row(rid)
+                if existing is not None and existing["request_digest"] == digest:
+                    return self._public(existing)
+                raise failures[0]
+            return self.get(rid)
 
     def _set_state(self, rid: str, state: str, *, stage: str | None = None) -> None:
         if state not in ACTIVE_STATES:
@@ -757,8 +1013,11 @@ class LocalGameBuilder:
             if cursor.rowcount != 1:
                 raise ValueError("game build finality conflict")
 
-    def _fail(self, rid: str, code: str, result: dict[str, Any] | None = None) -> None:
+    def _fail(self, rid: str, code: str, result: dict[str, Any] | None = None,
+              *, expected: Mapping[str, Any] | None = None) -> None:
         with self._store._transaction():
+            if expected is not None and self._row(rid) != expected:
+                return  # Publication changed; leave recovery authority intact.
             self._store._db.execute(
                 "UPDATE offline_game_builds SET state='failed',stage='failed',updated_at=?,error_code=?,result_json=? "
                 "WHERE model_digest=? AND tokenizer_digest=? AND request_id=? AND state IN ('queued','planning','building','verifying')",
@@ -813,7 +1072,7 @@ class LocalGameBuilder:
                         self._fail(rid, "total_deadline_exceeded")
                         return
                     self._set_state(rid, "verifying", stage="packaging")
-                    archive, count = self._package(bundle / "project", result)
+                    archive, count = self._package(bundle / "project", result, expected_brief=brief)
                     row = self._row(rid)
                     receipt = {"schema": RECEIPT_SCHEMA,
                         **{key: row[key] for key in ("request_id", "request_digest", "model_digest", "tokenizer_digest", "runtime_digest", "artifact_id")},
@@ -840,25 +1099,30 @@ class LocalGameBuilder:
                     if time.monotonic() >= deadline_at:
                         self._fail(rid, "total_deadline_exceeded")
                         return
+                    publication_row = self._row(rid)
+                    if publication_row is None or publication_row["stage"] != "publishing":
+                        raise ValueError("missing game publication identity")
                     try:
                         _fsync_directory(bundle)
                         publish_create_only(bundle, self.artifact_root / artifact_id)
                         # A crash here is reconciled only from the previously
                         # recorded exact identities, never a model rerun.
-                        self._verify(self._row(rid))
+                        self._verify(publication_row)
                         _fsync_directory(self.artifact_root)
-                        self._complete(rid)
+                        self._complete(rid, publication_row)
                     except Exception:
                         # Ordinary publication failures settle while this
                         # worker still owns the work lease. Hard process death
                         # alone leaves the row for startup reconciliation.
                         try:
-                            self._verify(self._row(rid))
+                            # Do not adopt a different journal identity during
+                            # the retry. Startup may independently recover it.
+                            self._verify(publication_row)
                             _fsync_directory(self.artifact_root / artifact_id)
                             _fsync_directory(self.artifact_root)
-                            self._complete(rid)
+                            self._complete(rid, publication_row)
                         except Exception:
-                            self._fail(rid, "artifact_publication_failed")
+                            self._fail(rid, "artifact_publication_failed", expected=publication_row)
         except LocalInferenceLeaseBusy:
             if inserted:
                 self._fail(rid, "local_game_build_busy")
@@ -881,8 +1145,12 @@ class LocalGameBuilder:
         finally:
             admitted.set()
 
-    def _complete(self, rid: str) -> None:
+    def _complete(self, rid: str, expected: Mapping[str, Any]) -> None:
         with self._store._transaction():
+            # Compare under the SQLite writer reservation. Verification of
+            # a previous row cannot authorize publication of a changed row.
+            if self._row(rid) != expected:
+                raise ValueError("game publication journal changed")
             cursor = self._store._db.execute(
                 "UPDATE offline_game_builds SET state='complete',stage='complete',updated_at=?,error_code=NULL "
                 "WHERE model_digest=? AND tokenizer_digest=? AND request_id=? AND state='verifying' AND stage='publishing'",
@@ -890,8 +1158,8 @@ class LocalGameBuilder:
             if cursor.rowcount != 1:
                 raise ValueError("game build terminal conflict")
 
-    def _package(self, project: Path, result: dict[str, Any]) -> tuple[bytes, int]:
-        from skeleton.forge.source_manifest import source_manifest
+    def _package(self, project: Path, result: dict[str, Any], *,
+                 expected_brief: str | None = None) -> tuple[bytes, int]:
         manifest_path = project / "FORGE_MANIFEST.json"
         if project.resolve() != project or not project.is_dir():
             raise ValueError("unsafe source project directory")
@@ -910,10 +1178,15 @@ class LocalGameBuilder:
             if sha256(raw).hexdigest() != hashes[name]:
                 raise ValueError("canonical source changed")
             files[name] = raw.decode("utf-8", errors="strict")
-        if source_manifest(files)["sha256"] != manifest.get("source_sha256"):
-            raise ValueError("canonical source manifest digest mismatch")
-        manifest["root"] = "project"
-        sanitized_manifest = _encoded(manifest)
+        _reconcile_build_source(manifest, files, result, expected_brief=expected_brief)
+        # The original projector metadata may include host-private adapter
+        # or diagnostic fields. Archive only canonical source identity and
+        # the same bounded metadata exposed by the successful public result.
+        sanitized_manifest = _encoded({
+            "root": "project", "files": sorted(names), "count": len(names),
+            "sha256": hashes, "source_sha256": manifest["source_sha256"],
+            "meta": result["build"]["project"]["meta"],
+        })
         if _read_regular(manifest_path, MAX_RECORD_BYTES) != original_manifest:
             raise ValueError("source manifest changed during packaging")
         bodies = {name: text.encode("utf-8") for name, text in files.items()}
@@ -966,7 +1239,7 @@ class LocalGameBuilder:
         receipt = _object(encoded_receipt)
         for key in ("request_id", "request_digest", "model_digest", "tokenizer_digest", "runtime_digest", "artifact_id",
                     "archive_sha256", "archive_bytes", "file_count"):
-            if receipt.get(key) != row[key]:
+            if type(receipt.get(key)) is not type(row[key]) or receipt.get(key) != row[key]:
                 raise ValueError("artifact receipt scope mismatch")
         if (receipt.get("schema") != RECEIPT_SCHEMA
                 or _encoded(receipt.get("result")) != row["result_json"].encode("utf-8")):
@@ -991,35 +1264,43 @@ class LocalGameBuilder:
                 content[name] = archive.read(member)
                 if len(content[name]) != member.file_size:
                     raise ValueError("archive content length mismatch")
-            from skeleton.forge.source_manifest import source_manifest
             manifest = _object(content["FORGE_MANIFEST.json"])
             _source_index(manifest)
             sources = {name: body.decode("utf-8", errors="strict") for name, body in content.items()
                        if name not in {"FORGE_MANIFEST.json", "JEEVES_BUILD.json"}}
-            source = source_manifest(sources)
-            if (manifest.get("root") != "project" or set(manifest.get("files", [])) != set(sources)
-                    or manifest.get("sha256") != source["files"]
-                    or manifest.get("source_sha256") != source["sha256"]
-                    or _encoded(_object(content["JEEVES_BUILD.json"])) != row["result_json"].encode("utf-8")):
+            result = _object(content["JEEVES_BUILD.json"])
+            if (manifest.get("root") != "project"
+                    or _encoded(result) != row["result_json"].encode("utf-8")):
                 raise ValueError("archive source provenance mismatch")
+            _reconcile_build_source(manifest, sources, result, expected_brief=row["brief"])
         return raw
 
     def archive(self, request_id: str) -> bytes:
-        self.get(request_id)
-        row = self._row(request_id)
-        if row["state"] != "complete":
-            raise GameBuildRejected(409, "game_archive_not_ready", "A verified source archive is available only after the build completes.")
-        try:
-            return self._verify(row)
-        except Exception:
-            raise GameBuildRejected(409, "game_archive_changed", "The saved source archive failed its integrity check; no bytes were exported.") from None
+        with self._lock:
+            self._require_open()
+            self.get(request_id)
+            row = self._row(request_id)
+            if row is None or row["state"] != "complete":
+                raise GameBuildRejected(409, "game_archive_not_ready", "A verified source archive is available only after the build completes.")
+            try:
+                raw = self._verify(row)
+                if self._row(request_id) != row:
+                    raise ValueError("game archive journal changed")
+            except Exception:
+                raise GameBuildRejected(409, "game_archive_changed", "The saved source archive failed its integrity check; no bytes were exported.") from None
+            self._require_open()
+            return raw
 
     def _recover(self) -> None:
         # Caller owns the distinct work lease. A live peer can therefore never
         # be mistaken for an interrupted job, including before first inference.
         with self._store._lock:
-            cursor = self._store._db.execute("SELECT * FROM offline_game_builds WHERE state IN ('queued','planning','building','verifying')")
-            rows = [dict(zip((x[0] for x in cursor.description), row)) for row in cursor.fetchall()]
+            cursor = self._store._db.execute(
+                _RECORD_SELECT + " WHERE state IN ('queued','planning','building','verifying') LIMIT 2")
+            raw_rows = cursor.fetchall()
+            if len(raw_rows) > 1:
+                raise _invalid_record()
+            rows = [_validated_record(cursor, row) for row in raw_rows]
         for row in rows:
             completed = False
             if row["stage"] == "publishing":
@@ -1031,11 +1312,16 @@ class LocalGameBuilder:
                 except Exception:
                     pass
             with self._store._transaction():
-                self._store._db.execute(
+                current = self._scoped_row(row["model_digest"], row["tokenizer_digest"], row["request_id"])
+                if current != row:
+                    raise _invalid_record()
+                cursor = self._store._db.execute(
                     "UPDATE offline_game_builds SET state=?,stage=?,updated_at=?,error_code=? WHERE model_digest=? "
                     "AND tokenizer_digest=? AND request_id=? AND state IN ('queued','planning','building','verifying')",
                     ("complete" if completed else "failed", "complete" if completed else "failed", time.time(),
                      None if completed else "interrupted_build", row["model_digest"], row["tokenizer_digest"], row["request_id"]))
+                if cursor.rowcount != 1:
+                    raise _invalid_record()
 
     def close(self) -> None:
         with self._lock:
@@ -1044,7 +1330,11 @@ class LocalGameBuilder:
             self._closing = True
             self._cancel.set()
             worker = self._worker
-        if worker is not None and worker is not threading.current_thread():
+        if worker is threading.current_thread():
+            # Cancellation is now fenced, but the worker still owns journal
+            # authority. Only an external caller may drain and close it.
+            raise GameBuildRejected(503, "game_worker_draining", "The local build worker is still settling.")
+        if worker is not None:
             worker.join(timeout=190)
             if worker.is_alive():
                 # Keep the authority open while an owned worker drains. The

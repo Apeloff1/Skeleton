@@ -52,7 +52,8 @@ def operation(backend, brief, out, **kwargs):
         kwargs["on_stage"](stage)
     spec = compile_brief(brief)
     manifest = write_project(out, {"project.godot": "config_version=5\n",
-        "scripts/main.gd": "extends Node\n"}, meta={"spec_id": spec["spec_id"]})
+        "scripts/main.gd": "extends Node\n",
+        "data/design_spec.json": json.dumps(spec)}, meta={"spec_id": spec["spec_id"]})
     return {"schema": builder.SCHEMA, "ok": True,
         "planning": {"status": "accepted", "model_digest": backend.model_digest,
                      "runtime_digest": backend.runtime_digest, "attempts": []},
