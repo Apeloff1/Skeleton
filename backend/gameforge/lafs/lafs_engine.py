@@ -16,6 +16,7 @@ graph belief propagation and contextual acquisition are preserved.
 from __future__ import annotations
 
 import json
+import hashlib
 import math
 import uuid
 import threading
@@ -283,12 +284,28 @@ class Sheet:
         d.pop("simulation_tick", None)
         return cls(prob=prob, **d)
 
+    @property
+    def evidence_status(self) -> str:
+        if self.provenance.get("kind") == "external_wikipedia":
+            return self.provenance.get("review_status", "pending")
+        # Existing records that claimed online provenance have not been
+        # reviewed against immutable source bytes.
+        if (self.author in {"Jeeves-Online", "Jeeves-Sweep"}
+                or self.payload.get("provenance") == "wikipedia_rest_v1"):
+            return "legacy_unverified"
+        return "internal"
+
+    @property
+    def retrievable(self) -> bool:
+        return self.evidence_status in {"internal", "approved"}
+
     def brief(self) -> Dict:
         p = self.prob
         return {"id": self.id, "path": self.path, "log_type": self.log_type,
                 "author": self.author, "tags": self.tags,
                 "posterior": round(p.posterior_mean, 4), "entropy": round(p.entropy, 3),
-                "efe": round(p.expected_free_energy, 4), "payload": self.payload}
+                "efe": round(p.expected_free_energy, 4), "payload": self.payload,
+                "evidence_status": self.evidence_status, "provenance": deepcopy(self.provenance)}
 
 
 # ── LAFS core (Mongo-persisted) ──────────────────────────────────────
@@ -380,12 +397,13 @@ class LeverArchFileSystem:
         self._existed, self._legacy_revision = True, False
 
     def _update_hyperpriors(self):
-        if not self.sheets:
+        eligible = [s for s in self.sheets.values() if s.retrievable]
+        if not eligible:
             return
-        self.global_alpha = float(np.mean([s.prob.alpha for s in self.sheets.values()]))
-        self.global_beta = float(np.mean([s.prob.beta for s in self.sheets.values()]))
+        self.global_alpha = float(np.mean([s.prob.alpha for s in eligible]))
+        self.global_beta = float(np.mean([s.prob.beta for s in eligible]))
         dom_stats, lt_stats = defaultdict(lambda: [[], []]), defaultdict(lambda: [[], []])
-        for s in self.sheets.values():
+        for s in eligible:
             parts = s.path.split("/")
             dom, lt = parts[0], parts[1] if len(parts) > 1 else parts[0]
             dom_stats[dom][0].append(s.prob.alpha); dom_stats[dom][1].append(s.prob.beta)
@@ -412,7 +430,7 @@ class LeverArchFileSystem:
         refs, labels = list(cross_refs or []), list(tags or [])
         if len(refs) > 128 or len(labels) > 64 or any(type(t) is not str or len(t) > 128 for t in labels):
             raise ValueError("invalid sheet links or tags")
-        if any(type(ref) is not str or ref not in self.sheets for ref in refs):
+        if any(type(ref) is not str or ref not in self.sheets or not self.sheets[ref].retrievable for ref in refs):
             raise ValueError("unknown cross-reference")
         if len(self.sheets) >= 10000:
             raise ValueError("cabinet capacity reached")
@@ -440,12 +458,77 @@ class LeverArchFileSystem:
         self._save()
         return sheet
 
+    @_fresh_command
+    def ingest_external(self, domain: str, log_type: str, evidence: Dict) -> Dict:
+        """Admit bounded source evidence once without treating it as true."""
+        from gameforge.lafs.source_evidence import validate_evidence
+        evidence = validate_evidence(evidence)
+        if any(type(v) is not str or not 1 <= len(v) <= 128
+               or any(c in v for c in "/.$") for v in (domain, log_type)):
+            raise ValueError("invalid destination")
+        self._load()
+        # Same revision and exact canonical extract are one identity regardless
+        # of sweep, alias, request retry or destination.
+        fingerprint = evidence["evidence_sha256"]
+        sid = str(uuid.uuid5(uuid.NAMESPACE_URL, "lafs:wikipedia:" + fingerprint))
+        if sid in self.sheets:
+            old = self.sheets[sid]
+            if old.provenance.get("evidence_sha256") != fingerprint:
+                raise ValueError("source identity collision")
+            return {"created": False, "sheet": old.brief()}
+        if len(self.sheets) >= 10000:
+            raise ValueError("cabinet capacity reached")
+        provenance = {**evidence, "kind": "external_wikipedia", "review_status": "pending"}
+        payload = {k: evidence[k] for k in ("title", "extract", "source_url", "revision")}
+        sheet = Sheet(id=sid, path=f"{domain}/{log_type}", log_type=log_type,
+                      payload=payload, author="Jeeves-Online", timestamp=_now(),
+                      provenance=provenance, tags=["online", "wikipedia", "untrusted"])
+        self.sheets[sid] = sheet
+        self.path_index[sheet.path].add(sid)
+        # Quarantined content cannot influence graph, priors or calibration.
+        self._save()
+        return {"created": True, "sheet": sheet.brief()}
+
+    @_fresh_command
+    def external_review(self, sheet_id: str, digest: str, decision: str,
+                        reviewer: str, note: str) -> Dict:
+        from gameforge.lafs.source_evidence import validate_evidence
+        self._load()
+        sheet = self.sheets.get(sheet_id)
+        if sheet is None or sheet.provenance.get("kind") != "external_wikipedia":
+            raise KeyError("external source not found")
+        if (decision not in {"approved", "rejected"} or not isinstance(reviewer, str)
+                or not 1 <= len(reviewer) <= 320 or not isinstance(note, str)
+                or not 1 <= len(note.strip()) <= 1024):
+            raise ValueError("invalid review")
+        source = validate_evidence(sheet.provenance)
+        if source["evidence_sha256"] != digest:
+            raise CabinetConflict("reviewed evidence digest changed")
+        if any(sheet.payload.get(k) != source[k] for k in ("title", "extract", "source_url", "revision")):
+            raise CabinetConflict("source payload no longer matches evidence")
+        if sheet.evidence_status != "pending":
+            raise CabinetConflict("source review already finalized")
+        sheet.provenance.update(review_status=decision, reviewer=reviewer,
+                                reviewed_at=_now(), review_note=note.strip())
+        sheet.version += 1
+        self._save()
+        return sheet.brief()
+
+    @_fresh_command
+    def external_queue(self, limit: int = 50) -> List[Dict]:
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise ValueError("invalid queue limit")
+        self._load()
+        return [sheet.brief() for sheet in sorted(
+            (s for s in self.sheets.values() if s.evidence_status in {"pending", "legacy_unverified"}),
+            key=lambda s: (s.timestamp, s.id))[:limit]]
+
     def _propagate_belief(self, sheet_id: str, strength: float = 0.08):
-        if sheet_id not in self.sheets:
+        if sheet_id not in self.sheets or not self.sheets[sheet_id].retrievable:
             return
         src = self.sheets[sheet_id].prob
         for neigh in self.graph.get(sheet_id, []):
-            if neigh in self.sheets:
+            if neigh in self.sheets and self.sheets[neigh].retrievable:
                 tgt = self.sheets[neigh].prob
                 tgt.alpha = (1 - strength) * tgt.alpha + strength * src.alpha
                 tgt.beta = (1 - strength) * tgt.beta + strength * src.beta
@@ -460,7 +543,7 @@ class LeverArchFileSystem:
             nxt = set()
             for sid in frontier:
                 for n in self.graph.get(sid, []):
-                    if n not in visited and n in self.sheets:
+                    if n not in visited and n in self.sheets and self.sheets[n].retrievable:
                         visited.add(n); result.append(self.sheets[n]); nxt.add(n)
             frontier = nxt
         return result
@@ -483,6 +566,8 @@ class LeverArchFileSystem:
                 context_set |= self.graph.get(cid, set())
         out = []
         for sid, sheet in self.sheets.items():
+            if not sheet.retrievable:
+                continue
             if domain_filter and not sheet.path.startswith(domain_filter + "/"):
                 continue
             if log_type_filter and sheet.log_type != log_type_filter:
@@ -522,7 +607,7 @@ class LeverArchFileSystem:
     def reinforce(self, sheet_id: str, success: bool, weight: float = 1.0,
                   tag: Optional[str] = None, deep: bool = False):
         self._load()
-        if sheet_id not in self.sheets:
+        if sheet_id not in self.sheets or not self.sheets[sheet_id].retrievable:
             return None
         self.sheets[sheet_id].prob.update(0.95 if success else 0.10, weight, tag=tag, deep=deep)
         self._propagate_belief(sheet_id)
@@ -537,7 +622,7 @@ class LeverArchFileSystem:
         geometric decay, returning a full trace of updated neighbors. This is
         the multi-hop generalisation of ``_propagate_belief`` (1-hop)."""
         self._load()
-        if sheet_id not in self.sheets:
+        if sheet_id not in self.sheets or not self.sheets[sheet_id].retrievable:
             return {"ok": False, "error": "sheet_not_found"}
         if type(hops) is not int or not 0 <= hops <= 8 or not math.isfinite(strength) or not 0 <= strength <= 1:
             raise ValueError("invalid propagation bounds")
@@ -550,7 +635,7 @@ class LeverArchFileSystem:
             nxt: Set[str] = set()
             for sid in frontier:
                 for neigh in self.graph.get(sid, []):
-                    if neigh in visited or neigh not in self.sheets:
+                    if neigh in visited or neigh not in self.sheets or not self.sheets[neigh].retrievable:
                         continue
                     tgt = self.sheets[neigh].prob
                     before = tgt.posterior_mean
@@ -602,7 +687,7 @@ class LeverArchFileSystem:
         """Top-k sheets by Expected Free Energy — 'what Jeeves knows best'."""
         self._load()
         rows = [s for s in self.sheets.values()
-                if not domain_filter or s.path.startswith(domain_filter + "/")]
+                if s.retrievable and (not domain_filter or s.path.startswith(domain_filter + "/"))]
         rows.sort(key=lambda s: s.prob.expected_free_energy, reverse=True)
         return [{**s.brief(), "efe": round(s.prob.expected_free_energy, 4),
                  "posterior": round(s.prob.posterior_mean, 4)} for s in rows[:k]]
