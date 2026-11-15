@@ -19,6 +19,7 @@ import {
   type CrawlCreate, type CrawlerReadiness, type CrawlSession,
 } from '../../product/crawlerClient';
 import { saveCrawlerExport } from '../../product/crawlerExport';
+import CrawlerInstructionSecurityPanel from './CrawlerInstructionSecurityPanel';
 import { buildCrawlerEvidenceBundle } from '../../product/crawlerEvidenceBundle';
 import {
   DRAGON_BUNDLE_MAX_SOURCES, eligibleForEvidenceBundle,
@@ -669,6 +670,7 @@ function PilotContent() {
                 detail={'Budget ' + (session.limits.max_total_bytes / 1048576).toFixed(1)} />
               <Metric name="Frontier queue" value={String(session.frontier_count)} detail="Pending eligible URLs" />
             </View>
+            <CrawlerInstructionSecurityPanel session={session} />
             {typeof session.counters.reserved_bytes === 'number'
               && session.counters.reserved_bytes > 0
               && <Text style={s.error}>Uncertain dispatch capacity retained: {session.counters.reserved_bytes} bytes. Refresh before new commands; never silently refund.</Text>}
