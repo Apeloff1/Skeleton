@@ -92,7 +92,7 @@ class SourceDirectoryTests(TestCase):
 
     def test_transactional_source_count_legacy_initialization_and_quota(self):
         first=self.observe()
-        self.assertEqual(MAX_SOURCES,250_000)
+        self.assertEqual(MAX_SOURCES,20_000_000)
         # Simulate the first write following an older catalogue migration.
         with sqlite3.connect(self.path) as db:
             db.execute("DELETE FROM game_source_counts")
