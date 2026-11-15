@@ -548,6 +548,18 @@ class DragonCrawlerApplication:
                     sid = decision.get("source_id")
                     if sid is not None and sid not in permitted:
                         decision["source_id"] = None
+        if row.get("archive_grant") is not None:
+            from skeleton.ai.webcrawler.dragon_archive_grant import public_grant
+            try:
+                snapshot = runtime.snapshot()
+                status["archive_grant"] = public_grant(_plain(row["archive_grant"]),
+                    now=_now().timestamp(), snapshot_digest=snapshot["snapshot_digest"],
+                    sources=snapshot["sources"], policies=self._source_policies(row))
+                if row["status"] not in {"completed","budget_exhausted"}:
+                    status["archive_grant"].update(active=False, usable_sources=0)
+            except (ValueError, KeyError, TypeError):
+                status["archive_grant"] = {"active":False,"expires_at":None,"granted_sources":0,
+                    "usable_sources":0,"history_only":True,"network_authority_expanded":False}
         witness = row.get("checkpoint_identity") or {}
         repair = row.get("checkpoint_repair") or {}
         status["checkpoint_recovery"] = {
@@ -1517,6 +1529,53 @@ class DragonCrawlerApplication:
             "next_cursor": rows[limit - 1]["_id"] if len(rows) > limit else None,
         }
 
+    async def configure_archive_grant(self, scope: dict[str, str], identifier: str,
+                                      body: dict, *, principal: dict) -> dict:
+        """Authorize or revoke bounded archive-only reparse of exact retained captures."""
+        from skeleton.ai.webcrawler.dragon_archive_grant import create_grant
+        if authenticated_scope(principal) != scope or (
+            body.get("enabled") is True and principal.get("role") not in {"editor","admin"}
+        ):
+            raise CrawlerError("crawler_archive_denied", "Current owner authorization required.", 403)
+        if (set(body) != {"expected_version","idempotency_key","enabled","days","archive_rights_acknowledged"}
+                or type(body["expected_version"]) is not int or body["expected_version"] < 1
+                or type(body["enabled"]) is not bool or type(body["days"]) is not int
+                or not 1 <= body["days"] <= 30 or type(body["archive_rights_acknowledged"]) is not bool
+                or body["enabled"] and body["archive_rights_acknowledged"] is not True):
+            raise CrawlerError("crawler_archive_invalid", "Explicit bounded historical source rights required.")
+        row = await self._owned(scope,identifier)
+        operation = _operation(body["idempotency_key"])
+        digest = _digest({"action":"archive_grant", **body})
+        prior = self._prior(row,operation,digest,safety=not body["enabled"])
+        if prior is not None:
+            return {"ok":True,"session":self._projection(row)}
+        if row["version"] != body["expected_version"]:
+            raise CrawlerError("crawler_conflict", "Reload the expedition before changing archive permission.",409)
+        snapshot = _plain(row["snapshot"])
+        now = _now()
+        grant = None
+        if body["enabled"]:
+            if row["status"] not in {"completed","budget_exhausted"} or not row.get("checkpoint_identity"):
+                raise CrawlerError("crawler_archive_not_terminal", "Archive permission requires a finished witnessed expedition.",409)
+            verify_primary(snapshot,_plain(row["checkpoint_identity"]))
+            try:
+                grant = create_grant(snapshot=snapshot,policies=self._source_policies(row),
+                                     now=now.timestamp(),days=body["days"])
+            except ValueError as exc:
+                raise CrawlerError("crawler_archive_unavailable","No qualified retained sources available.",403) from exc
+        audit = {"operation":operation,"request_digest":digest,"action":"archive_grant","state":"completed",
+                 "enabled":body["enabled"],"snapshot_digest":snapshot["snapshot_digest"]}
+        receipt = await self._admit(scope,identifier,{"archive_grant":grant,"audit":audit})
+        audit_path = "safety_control" if len(row.get("operations",{})) >= MAX_OPERATIONS else "operations."+operation
+        result = await self.sessions.update_one(
+            {"_id":identifier,**scope,"version":row["version"],"status":{"$ne":"deleted"}},
+            {"$set":{"archive_grant":grant,"updated_at":now,"storage_receipt":receipt,audit_path:audit},
+             "$inc":{"version":1}},
+        )
+        if not result.modified_count:
+            raise CrawlerError("crawler_conflict","Expedition changed before archive permission committed.",409)
+        return {"ok":True,"session":self._projection(await self._owned(scope,identifier))}
+
     async def companion_treasury(self, scope: dict[str, str], *, mode: str,
                                  query: str = "", family: str | None = None) -> dict:
         """Read and reparse only qualified retained text; preserve metadata-only lineage.
@@ -1526,6 +1585,7 @@ class DragonCrawlerApplication:
         fenced. No network, migration, write or grant extension occurs.
         """
         from skeleton.ai.webcrawler.dragon_sanctuary import SanctuarySource, project_sanctuary
+        from skeleton.ai.webcrawler.dragon_archive_grant import archive_expiry, validate_grant
         from skeleton.ai.webcrawler.dragon_treasury import MAX_SESSIONS, Observation, build_treasury
 
         at = _now()
@@ -1548,8 +1608,8 @@ class DragonCrawlerApplication:
                 {"_id": identifier, **scope, "version": version},
                 {"_id": 1, "tenant_id": 1, "owner_id": 1, "status": 1, "version": 1,
                  "consent_expires_at": 1, "request": 1, "request_digest": 1, "consent": 1,
-                 "snapshot": 1, "checkpoint_identity": 1, "source_use_policies": 1},
-                max_time_ms=2000,
+                 "snapshot": 1, "checkpoint_identity": 1, "source_use_policies": 1,
+                 "archive_grant": 1}, max_time_ms=2000,
             )
             if row is None:
                 raise CrawlerError("crawler_treasury_changed", "Treasury changed during reparse.", 409)
@@ -1571,6 +1631,9 @@ class DragonCrawlerApplication:
                 policies = self._source_policies(row)
                 if set(policies) - set(snapshot["sources"]):
                     raise ValueError("orphaned source policy")
+                grant = row.get("archive_grant") if row["status"] in {"completed","budget_exhausted"} else None
+                if grant is not None:
+                    validate_grant(grant)
                 usable = []
                 local = []
                 # Metadata-only history may be retained by the existing
@@ -1591,6 +1654,12 @@ class DragonCrawlerApplication:
                     expiry = datetime.fromisoformat(fresh["valid_until"]).timestamp() if allowed else None
                     if expiry is not None and expiry <= when:
                         allowed, expiry = False, None
+                    archive_only = False
+                    if not allowed and grant is not None:
+                        expiry = archive_expiry(grant, snapshot_digest=snapshot["snapshot_digest"],
+                            source=source, policy={**{"version":0}, **policy}, now=when)
+                        allowed = expiry is not None
+                        archive_only = allowed
                     freshness = source["provenance"].get("http_freshness", {}) or {}
                     # Different declared language/representation and sensitive
                     # Vary boundaries must not be collapsed by a fuzzy title.
@@ -1611,7 +1680,7 @@ class DragonCrawlerApplication:
                         source["content_hash"], stamp, source["text"] if allowed else None,
                         expiry, source["content_type"], variant,
                         freshness.get("advisory_due_unix"),
-                        not source["text_truncated"], refresh_allowed,
+                        not source["text_truncated"], refresh_allowed, archive_only,
                     ))
                     if allowed:
                         usable.append(SanctuarySource(
@@ -2873,6 +2942,7 @@ class DragonCrawlerApplication:
                     "worker_automation_epoch": "",
                     "safety_control": "",
                     "source_use_policies": "",
+                    "archive_grant": "",
                 },
             },
         )
