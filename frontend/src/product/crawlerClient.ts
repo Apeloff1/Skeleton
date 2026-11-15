@@ -103,7 +103,7 @@ export type TreasuryDelta = { kind: 'initial' | 'minor_update' | 'substantive_up
 export type TreasuryRevision = {
   revision_id: string; family_id: string; previous_revision_id: string | null;
   session_id: string | null; source_id: string | null; first_seen: number; last_seen: number;
-  reobservations: number; indexed: boolean; metadata_only: boolean; archive_only: boolean;
+  reobservations: number; indexed: boolean; metadata_only: boolean; archive_only: boolean; indexed_capture_at: number | null;
   latest_observed: boolean; plane: 'current' | 'historic'; projection_digest: string | null;
   delta: TreasuryDelta; score?: number;
 };
@@ -116,11 +116,11 @@ export type TreasuryFamily = {
     fresh_consent_required: true; network_executed: false };
 };
 export type DragonTreasury = {
-  schema: 'skeleton.dragon.treasury.v1'; parser: 'retained-text-sections-v1'; mode: TreasuryMode;
+  schema: 'skeleton.dragon.treasury.v1'; parser: 'retained-text-sections-v2'; mode: TreasuryMode;
   family: string | null; as_of_unix: number; partition_digest: string; candidate_limit_reached: boolean; excluded_sessions: number;
   observations: number; families: number; revisions: number; changed_families: number; rollbacks: number;
   current_indexed: number; historic_indexed: number; metadata_only: number; blocked_current: number; changes: number; revalidated_revisions: number;
-  verified_historic_transitions: number; alias_held_families: number; revisit_plan: string[]; parsed_unique_payloads: number;
+  verified_historic_transitions: number; verified_changed_families: number; alias_held_families: number; revisit_plan: string[]; parsed_unique_payloads: number;
   evolution: DragonEvolution; family_rows: TreasuryFamily[]; hits: TreasuryRevision[];
   timeline: TreasuryRevision[]; comparison: { current: TreasuryRevision; previous: TreasuryRevision; delta: TreasuryDelta } | null;
   earliest_source_expiry: number | null; latest_observed_only: true; source_text_returned: false;
@@ -423,7 +423,7 @@ function validEvolution(v: DragonEvolution): boolean {
   const stage=thresholds.slice(1,-1).filter(t=>effective>=t).length;
   const fraction=Math.min(1,Math.max(0,(effective-thresholds[stage])/(thresholds[stage+1]-thresholds[stage])));
   return v.effective_evolution===effective && v.stage===stage && v.form===forms[stage]
-    && v.level===Math.min(60,stage*10+1+Math.floor(fraction*10))
+    && v.level===Math.min(stage*10+10,stage*10+1+Math.floor(fraction*10))
     && Number.isFinite(v.stage_progress) && Math.abs(v.stage_progress-fraction)<=.000001
     && v.next_threshold===(stage===5?null:thresholds[stage+1]);
 }
@@ -443,6 +443,8 @@ function validRevision(v: TreasuryRevision): boolean {
     && (v.plane!=='current'||v.latest_observed&&!v.archive_only)
     && (v.indexed ? typeof v.session_id==='string'&&ID.test(v.session_id)&&typeof v.source_id==='string'&&HASH.test(v.source_id)&&typeof v.projection_digest==='string'&&HASH.test(v.projection_digest)
                   : v.session_id===null&&v.source_id===null&&v.projection_digest===null)
+    && (v.indexed ? typeof v.indexed_capture_at==='number'&&Number.isFinite(v.indexed_capture_at)&&v.indexed_capture_at>=v.first_seen&&v.indexed_capture_at<=v.last_seen : v.indexed_capture_at===null)
+    && (!v.indexed||v.plane!=='current'||v.indexed_capture_at===v.last_seen)
     && validDelta(v.delta) && (v.score===undefined||Number.isFinite(v.score)&&v.score>=0);
 }
 function validFamily(f: TreasuryFamily): boolean {
@@ -463,7 +465,7 @@ function validFamily(f: TreasuryFamily): boolean {
 export async function getDragonTreasury(mode: TreasuryMode, query='', family?: string, signal?: AbortSignal): Promise<DragonTreasury> {
   if (!['current_only','historic_only','all_revisions','timeline','compare'].includes(mode)||query.length>256||family!==undefined&&!HASH.test(family)) invalid('Invalid treasury search.');
   const p=await read(api.get<DragonTreasury>(ROOT+'/companion/treasury?mode='+mode+'&query='+encodeURIComponent(query)+(family?'&family='+family:''),options(signal)),getAuthToken(),'Treasury reparse failed.');
-  if(!p||p.schema!=='skeleton.dragon.treasury.v1'||p.parser!=='retained-text-sections-v1'||p.mode!==mode||p.family!==(family??null)
+  if(!p||p.schema!=='skeleton.dragon.treasury.v1'||p.parser!=='retained-text-sections-v2'||p.mode!==mode||p.family!==(family??null)
     ||!Number.isFinite(p.as_of_unix)||!HASH.test(p.partition_digest)||typeof p.candidate_limit_reached!=='boolean'||!integer(p.excluded_sessions,8)
     ||!integer(p.observations,512)||!integer(p.families,p.observations)||!integer(p.revisions,p.observations)
     ||!integer(p.current_indexed,p.families)||!integer(p.historic_indexed,p.revisions)||!integer(p.metadata_only,p.revisions)
@@ -471,7 +473,7 @@ export async function getDragonTreasury(mode: TreasuryMode, query='', family?: s
     ||!integer(p.blocked_current,p.families)||p.blocked_current+p.current_indexed!==p.families
     ||!integer(p.changed_families,p.families)||!integer(p.rollbacks,p.revisions)||!integer(p.changes,p.revisions)
     ||!integer(p.revalidated_revisions,p.observations)||!integer(p.verified_historic_transitions,p.historic_indexed)
-    ||!integer(p.alias_held_families,p.blocked_current)||!integer(p.parsed_unique_payloads,Math.min(128,p.observations))
+    ||!integer(p.verified_changed_families,p.changed_families)||!integer(p.alias_held_families,p.blocked_current)||!integer(p.parsed_unique_payloads,Math.min(128,p.observations))
     ||!Array.isArray(p.revisit_plan)||p.revisit_plan.length>24||p.revisit_plan.length>p.families
     ||p.revisit_plan.some(id=>typeof id!=='string'||!HASH.test(id))||new Set(p.revisit_plan).size!==p.revisit_plan.length
     ||!validEvolution(p.evolution)||!Array.isArray(p.family_rows)||p.family_rows.length>24||!p.family_rows.every(validFamily)
