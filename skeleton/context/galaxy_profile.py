@@ -276,6 +276,7 @@ _PLAYABLE_RULES = {
         "agency": ((_M, "hacking", "complexity"),),
     },
     "crafting": {
+        "risk": ((_M, "crafting", "complexity"), (_M, "forging", "complexity")),
         "grind": ((_M, "crafting", "count"), (_M, "forging", "count"), (_M, "alchemy", "count")),
         "agency": ((_M, "crafting", "intricacy"), (_M, "forging", "intricacy")),
     },

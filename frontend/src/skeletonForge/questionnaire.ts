@@ -80,7 +80,7 @@ export const PLAYABLE_TUNING_EFFECTS: Record<string, readonly string[]> = {
   racing: ['Tempo: movement', 'Risk: time limit', 'Progression depth: laps', 'Agency: checkpoint range'],
   survival: ['Tempo: movement', 'Scarcity: hydration', 'Agency: pickup range', 'Progression depth: supplies'],
   stealth: ['Tempo: movement', 'Risk: guard radius', 'Mystery: guard visibility', 'Agency: interaction range'],
-  crafting: ['Tempo: movement', 'Progression depth: materials', 'Agency: work range'],
+  crafting: ['Tempo: movement', 'Progression depth: materials', 'Agency: work range', 'Risk: assembly duration'],
 };
 
 export const VISION_MAX = 4000;

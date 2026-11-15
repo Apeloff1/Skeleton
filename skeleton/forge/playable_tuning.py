@@ -161,6 +161,13 @@ def compile_playable_tuning(
         effects["stealth.detection_radius"] = effective
         used.add("risk")
 
+    if "risk" in axes and name == "crafting":
+        duration = _fixed(0.6 + 1.2 * axes["risk"])
+        loop = _replace_exact(loop, "const ASSEMBLY_SECONDS := 1.2",
+                              f"const ASSEMBLY_SECONDS := {duration:.2f}")
+        effects["crafting.assembly_seconds"] = duration
+        used.add("risk")
+
     if "scarcity" in axes and name == "survival":
         effective = _fixed(2.0 * (0.5 + axes["scarcity"]))
         loop = _replace_exact(

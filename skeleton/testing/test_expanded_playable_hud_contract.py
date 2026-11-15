@@ -66,3 +66,56 @@ def test_hidden_puzzle_has_temporal_clues_error_budget_and_real_selection():
     assert "mistakes += 1" in loop
     assert 'if mistakes >= MAX_MISTAKES:' in loop
     assert '_finish(false, "too many incorrect switches")' in loop
+
+
+@pytest.mark.parametrize("mode,targets", [
+    ("extraction", "loot"), ("survival", "supplies"),
+    ("stealth", "objectives"), ("crafting", "materials"),
+])
+def test_collectible_routes_allow_player_selected_order(mode, targets):
+    loop = archetype_files(mode)[f"scripts/archetypes/{mode}/core_loop.gd"]
+    assert f"_nearest_point({targets}," in loop
+    assert f"{targets}.remove_at(selected)" in loop
+    assert f"{targets}.remove_at(0)" not in loop
+    assert "distance_squared_to(points[index])" in loop
+
+
+def test_pipeline_cannot_refine_while_outside_station():
+    loop = archetype_files("pipeline")["scripts/archetypes/pipeline/core_loop.gd"]
+    refining = loop.split('"refining":', 1)[1].split('"to_depot":', 1)[0]
+    assert 'player.autopilot_target = refinery' in refining
+    assert "distance_to(refinery) > RADIUS" in refining
+    assert 'stage = "to_refinery"' in refining
+    assert "refine_timer = 0.0" in refining
+    assert "refine_timer = maxf(0.0, refine_timer - delta)" in refining
+
+
+@pytest.mark.parametrize("risk,duration", [(0.0, 0.60), (0.5, 1.20), (1.0, 1.80)])
+def test_crafting_timed_assembly_is_bound_to_location_input_and_inventory(risk, duration):
+    import json
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+    files = archetype_files("crafting", operator_axes={"risk": risk, "grind": 1.0})
+    loop = files["scripts/archetypes/crafting/core_loop.gd"]
+    assert f"const ASSEMBLY_SECONDS := {duration:.2f}" in loop
+    assert "distance_to(workshop) > USE_RADIUS" in loop
+    assert "assembly_progress = 0.0" in loop
+    assert 'elif autopilot or Input.is_action_pressed("ui_accept"):' in loop
+    assert "assembly_progress = minf(ASSEMBLY_SECONDS, assembly_progress + delta)" in loop
+    assert "if assembly_progress >= ASSEMBLY_SECONDS:" in loop
+    assert "crafted = collected == 6" in loop
+    assert "Materials %d/6" in loop and "Assembly %d%%" in loop
+    receipt = json.loads(files[SOURCE_PATH])
+    assert receipt["applied"]["crafting.assembly_seconds"] == duration
+
+
+def test_galaxy_crafting_complexity_drives_native_assembly_duration():
+    from skeleton.context.galaxy_profile import MATRIX_FIELDS, SCHEMA, compile_galaxy_playable_axes
+    config = {field: {} for field in MATRIX_FIELDS}
+    config.update(title="Workshop", genre="crafting", narrative_phases={}, extra_params={}, style_params={})
+    config["mechanics_matrix"]["crafting"] = {"complexity": 1000, "count": 750}
+    axes, receipt = compile_galaxy_playable_axes({"schema": SCHEMA, "config": config}, "crafting", {})
+    assert axes == {"risk": 1.0, "grind": 0.75}
+    loop = archetype_files("crafting", operator_axes=axes)["scripts/archetypes/crafting/core_loop.gd"]
+    assert "const ASSEMBLY_SECONDS := 1.80" in loop
+    assert "crafted = collected == 5" in loop
+    assert receipt["mapped_matrix_dials"] == 2

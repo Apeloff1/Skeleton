@@ -167,6 +167,17 @@ func _exit_tree() -> void:
 \t_release_controls()
 
 
+func _nearest_point(points: Array[Vector2], radius: float) -> int:
+\tvar selected: int = -1
+\tvar best: float = radius * radius
+\tfor index in range(points.size()):
+\t\tvar distance := player.global_position.distance_squared_to(points[index])
+\t\tif distance <= best and (selected < 0 or distance < best):
+\t\t\tselected = index
+\t\t\tbest = distance
+\treturn selected
+
+
 func _draw() -> void:
 \tdraw_rect(Rect2(Vector2(-960.0, -720.0), Vector2(1920.0, 1440.0)), FLOOR)
 \tfor i in range(-12, 13):
@@ -231,8 +242,9 @@ func _tick(delta: float) -> void:
 \t\treturn
 \tif loot.size() > 0:
 \t\tplayer.autopilot_target = loot[0]
-\t\tif player.global_position.distance_to(loot[0]) <= PICKUP_RADIUS:
-\t\t\tloot.remove_at(0)
+\t\tvar selected := _nearest_point(loot, PICKUP_RADIUS)
+\t\tif selected >= 0:
+\t\t\tloot.remove_at(selected)
 \t\t\tcarried += 1
 \telse:
 \t\tplayer.autopilot_target = extract_point
@@ -373,9 +385,14 @@ func _tick(delta: float) -> void:
 \t\t\t\tstage = "refining"
 \t\t\t\trefine_timer = 0.25
 \t\t"refining":
-\t\t\trefine_timer -= delta
-\t\t\tif refine_timer <= 0.0:
-\t\t\t\tstage = "to_depot"
+\t\t\tplayer.autopilot_target = refinery
+\t\t\tif player.global_position.distance_to(refinery) > RADIUS:
+\t\t\t\tstage = "to_refinery"
+\t\t\t\trefine_timer = 0.0
+\t\t\telse:
+\t\t\t\trefine_timer = maxf(0.0, refine_timer - delta)
+\t\t\t\tif refine_timer <= 0.0:
+\t\t\t\t\tstage = "to_depot"
 \t\t"to_depot":
 \t\t\tplayer.autopilot_target = depot
 \t\t\tif player.global_position.distance_to(depot) <= RADIUS:
@@ -566,9 +583,10 @@ func _tick(delta: float) -> void:
 		return
 	if supplies.size() > 0:
 		player.set("autopilot_target", supplies[0])
-		if player.global_position.distance_to(supplies[0]) <= PICKUP_RADIUS:
+		var selected := _nearest_point(supplies, PICKUP_RADIUS)
+		if selected >= 0:
 			if bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
-				supplies.remove_at(0)
+				supplies.remove_at(selected)
 				collected += 1
 				hydration = min(100.0, hydration + 12.0)
 				queue_redraw()
@@ -613,9 +631,10 @@ func _tick(_delta: float) -> void:
 			return
 	if objectives.size() > 0:
 		player.set("autopilot_target", objectives[0])
-		if player.global_position.distance_to(objectives[0]) <= USE_RADIUS:
+		var selected := _nearest_point(objectives, USE_RADIUS)
+		if selected >= 0:
 			if bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
-				objectives.remove_at(0)
+				objectives.remove_at(selected)
 				intel += 1
 				queue_redraw()
 	else:
@@ -637,6 +656,8 @@ var workshop := Vector2(-170, 130)
 var delivery := Vector2(-180, -140)
 var collected: int = 0
 var crafted: bool = false
+var assembly_progress: float = 0.0
+const ASSEMBLY_SECONDS := 1.2
 const USE_RADIUS := 19.0
 
 func _draw_objectives() -> void:
@@ -645,21 +666,26 @@ func _draw_objectives() -> void:
 	draw_circle(workshop, 22.0, Color(0.98, 0.68, 0.27))
 	draw_circle(delivery, 23.0, Color(0.33, 0.9, 0.48))
 
-func _tick(_delta: float) -> void:
+func _tick(delta: float) -> void:
+	var autopilot := bool(player.get("autopilot"))
 	if materials.size() > 0:
 		player.set("autopilot_target", materials[0])
-		if player.global_position.distance_to(materials[0]) <= USE_RADIUS:
-			if bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
-				materials.remove_at(0)
-				collected += 1
-				queue_redraw()
+		var selected := _nearest_point(materials, USE_RADIUS)
+		if selected >= 0 and (autopilot or Input.is_action_just_pressed("ui_accept")):
+			materials.remove_at(selected)
+			collected += 1
 	elif not crafted:
 		player.set("autopilot_target", workshop)
-		if player.global_position.distance_to(workshop) <= USE_RADIUS:
-			if bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
+		if player.global_position.distance_to(workshop) > USE_RADIUS:
+			assembly_progress = 0.0
+		elif autopilot or Input.is_action_pressed("ui_accept"):
+			assembly_progress = minf(ASSEMBLY_SECONDS, assembly_progress + delta)
+			if assembly_progress >= ASSEMBLY_SECONDS:
 				crafted = collected == 3
 				if not crafted:
 					_finish(false, "missing crafting materials")
+		else:
+			assembly_progress = maxf(0.0, assembly_progress - delta)
 	else:
 		player.set("autopilot_target", delivery)
 		if player.global_position.distance_to(delivery) <= USE_RADIUS:
@@ -667,7 +693,7 @@ func _tick(_delta: float) -> void:
 
 
 func _hud_status() -> String:
-	return "Materials %d/3 | Crafted %s | Press Enter to work" % [collected, "yes" if crafted else "no"]
+	return "Materials %d/3 | Assembly %d%% | %s" % [collected, int(100.0 * assembly_progress / ASSEMBLY_SECONDS), "Deliver to green" if crafted else "Hold Enter or USE at workshop"]
 '''
 
 # Historical extra modes use their original interaction-aware controller
