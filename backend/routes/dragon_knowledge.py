@@ -82,6 +82,12 @@ class GameCaptureRequest(Request):
     autonomous: StrictBool = False
 
 
+class HoarderCopyRequest(Request):
+    expected_version: int = Field(ge=1,strict=True)
+    idempotency_key: str = Field(min_length=1,max_length=128)
+    retention_acknowledged: StrictBool
+
+
 def register_knowledge_routes(router):
     def scope(user):
         try:
@@ -315,3 +321,10 @@ def register_knowledge_routes(router):
         return await corpus_call(scope(user),"release_timeline",stage=stage,kind=kind,
                                  language=language,current_only=current_only,limit=limit,
                                  before=cursor if stamp is not None else None)
+
+
+    @router.post("/knowledge/hoarder-copy/{session_id}")
+    async def hoarder_copy(session_id:str,body:HoarderCopyRequest,user:dict=Depends(get_current_user)):
+        owner=editor(user)
+        return await corpus_runtime_call(runtime.crawler_application.stage_bulk_copy(
+            owner,session_id,body.model_dump(),principal=user))
