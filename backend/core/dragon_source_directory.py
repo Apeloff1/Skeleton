@@ -168,9 +168,10 @@ def enqueue(path,scope,*,operation,group,lead_ids,game=None,use_preset=False,ack
     entries=[{"id":external,"title":title,"stage":"unknown","links":links[i:i+8]} for i in range(0,len(links),8)]
     raw=json.dumps({"schema":"dragon.game-feed.v1","provider":namespace,"entries":entries},
         ensure_ascii=False,sort_keys=True,separators=(",",":")).encode()
-    # Bind the operation to the exact selected directory revision/source IDs;
-    # an import does not execute the locators or confer capture authority.
-    stable_operation="directory:"+digest([operation,revision,group,ids,namespace,external])
+    # Keep the operation key stable across retries, letting the queue reject
+    # an attempt to reuse it with different normalized observations. Sorting
+    # selection makes reordering the same IDs idempotent.
+    stable_operation="directory:"+digest(operation)
     receipt=ReleaseQueue(path).enqueue(scope,raw=raw,adapter="manifest",operation=stable_operation)
     return {**receipt,"game_id":game_id(namespace,external),"directory_revision":revision,
             "selected":len(ids),"capture_granted":False,"source_verified":False,"training_allowed":False}
