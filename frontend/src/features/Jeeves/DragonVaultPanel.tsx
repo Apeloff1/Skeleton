@@ -4,6 +4,7 @@ import {getAuthToken} from '../../auth/gameforgeAuth';
 import {getDragonVault,getDragonVaultQuota,discoverDragonVault,retireDragonSession,getCrawl,crawlRequestKey,configureDragonArchive,
  configureLegacyTreasuryArchive,eraseCrawl,type DragonVaultCatalog,type DragonVaultQuota,type DragonVaultDiscovery,type DragonVaultEntry,type CrawlSession} from '../../product/crawlerClient';
 import s,{colors} from './CrawlerWorkspace.styles';
+import {scanArchiveChambers,bestHistoryWindow,type ChamberScan,SCAN_DEADLINE_MS} from './dragonVaultScan';
 
 type Props={revision:string;session?:CrawlSession|null;canWrite:boolean;disabled:boolean;
  onWindow:(ids?:string[],query?:string)=>void;onSession?:(s:CrawlSession)=>void;onChanged:()=>void};
@@ -20,6 +21,8 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
  const [discoveryQuery,setDiscoveryQuery]=useState('');
  const [discovery,setDiscovery]=useState<DragonVaultDiscovery|null>(null);
  const [discoveryBusy,setDiscoveryBusy]=useState(false);
+ const [archiveScan,setArchiveScan]=useState<ChamberScan|null>(null);
+ const [scanProgress,setScanProgress]=useState<{scanned:number;total:number}|null>(null);
  const scanAbort=useRef<AbortController|null>(null),scanEpoch=useRef(0),scanTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const [history,setHistory]=useState<string[]>([]),[cursor,setCursor]=useState<string|undefined>();
  const [selected,setSelected]=useState<string[]>([]),[retention,setRetention]=useState(false);
@@ -35,7 +38,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
  const clearDiscovery=useCallback(()=>{
   scanEpoch.current++;scanAbort.current?.abort();scanAbort.current=null;
   if(scanTimer.current!==null)clearTimeout(scanTimer.current);scanTimer.current=null;
-  setDiscovery(null);setDiscoveryBusy(false);
+  setDiscovery(null);setArchiveScan(null);setScanProgress(null);setDiscoveryBusy(false);
  },[]);
  const reset=useCallback(()=>{
   invalidate();clearDiscovery();setDiscoveryQuery('');setCatalog(null);setQuota(null);setSelected([]);setHistory([]);setCursor(undefined);setBusy(false);
@@ -78,6 +81,34 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
    scanTimer.current=setTimeout(()=>{if(attempt===scanEpoch.current)setDiscovery(null);},ttl);
   }catch(e){if(!ctrl.signal.aborted&&attempt===scanEpoch.current&&token===getAuthToken())setError(e instanceof Error?e.message:'Chamber discovery unavailable.');}
   finally{if(attempt===scanEpoch.current){scanAbort.current=null;setDiscoveryBusy(false);}}
+ }
+ async function scanAll(){
+  if(discoveryBusy||busy||disabled||!discoveryQuery.trim())return;
+  clearDiscovery();const token=getAuthToken(),attempt=scanEpoch.current,ctrl=new AbortController();
+  scanAbort.current=ctrl;setDiscoveryBusy(true);setError('');
+  const active=()=>attempt===scanEpoch.current&&token===getAuthToken()&&!ctrl.signal.aborted;
+  const cutoff=setTimeout(()=>ctrl.abort(),SCAN_DEADLINE_MS);
+  try{
+   const result=await scanArchiveChambers(discoverDragonVault,discoveryQuery,{
+    signal:ctrl.signal,ownerCurrent:active,now:()=>performance.now(),
+    onProgress:(scanned,total)=>{if(active())setScanProgress({scanned,total});}
+   });
+   if(!active())return;
+   const ttl=result.expiresMonotonic-performance.now();
+   if(ttl<=0){setError('Historical-use permission expired. Restart discovery.');return;}
+   setArchiveScan(result);
+   scanTimer.current=setTimeout(()=>{if(attempt===scanEpoch.current){setArchiveScan(null);setScanProgress(null);}},ttl);
+  }catch(e){
+   if(attempt===scanEpoch.current&&token===getAuthToken()){
+    setArchiveScan(null);setScanProgress(null);
+    setError(ctrl.signal.aborted?'Archive scan reached its time limit. Try a bounded discovery batch.':e instanceof Error?e.message:'Archive-wide discovery unavailable.');
+   }
+  }finally{clearTimeout(cutoff);if(attempt===scanEpoch.current){scanAbort.current=null;setDiscoveryBusy(false);}}
+ }
+ function openBest(){
+  if(!archiveScan||owner.current!==getAuthToken())return;
+  try{const ids=bestHistoryWindow(archiveScan,performance.now());if(ids.length)onWindow(ids,discoveryQuery);}
+  catch(e){clearDiscovery();setError(e instanceof Error?e.message:'Archive ranking expired.');}
  }
  async function mutate(action:'retire'|'grant'|'revoke'|'erase',id:string,version:number,legacy=false){
   if(busy||disabled||owner.current!==getAuthToken()||action!=='revoke'&&!canWrite)return;
@@ -134,12 +165,25 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
    </View>}
    <View style={s.check}>
     <Text style={s.label}>Discover matching historical chambers</Text>
-    <Text style={s.small}>Scans eight historical records at a time, only under current archive-use permission. Matching counts are page-local lexical advice, not independent evidence or global rank.</Text>
+    <Text style={s.small}>Scan eight records at a time, or all bounded chambers sequentially. Archive-wide ranking compares chamber coverage, not document relevance or independent corroboration.</Text>
     <TextInput value={discoveryQuery} onChangeText={value=>{clearDiscovery();setDiscoveryQuery(value);}} maxLength={256}
       editable={!busy&&!disabled} style={field} placeholder="Find retained subject or phrase" placeholderTextColor={colors.muted} accessibilityLabel="Historical chamber discovery query"/>
     <View style={s.row}><Button label={discoveryBusy?'Scanning…':'Scan first chambers'} disabled={busy||disabled||discoveryBusy||!discoveryQuery.trim()} action={()=>void scan()}/>
      <Button label="Next discovery batch" disabled={busy||disabled||discoveryBusy||!discovery?.next_cursor} action={()=>void scan(discovery?.next_cursor??undefined)}/></View>
-    {discoveryBusy&&<ActivityIndicator color={colors.accent}/>}
+    <View style={s.row}><Button label="Scan entire cold-custody catalogue" disabled={busy||disabled||discoveryBusy||!discoveryQuery.trim()} action={()=>void scanAll()}/>
+     <Button label="Stop discovery" disabled={!discoveryBusy} action={clearDiscovery}/></View>
+    {discoveryBusy&&<><ActivityIndicator color={colors.accent}/>{scanProgress&&<Text style={s.small} accessibilityLiveRegion="polite">{scanProgress.scanned}/{scanProgress.total} chambers checked. No partial ranking published.</Text>}</>}
+    {archiveScan&&owner.current===getAuthToken()&&<>
+      <Text style={s.label}>Archive-wide coverage ranking</Text>
+      <Text style={s.small}>{archiveScan.scanned}/{archiveScan.catalogueSize} catalogue positions · {archiveScan.qualified} qualified · {archiveScan.held} integrity holds · {archiveScan.noGrant} without usable grant</Text>
+      <Text style={s.small}>{archiveScan.matches.length} matching chambers across {archiveScan.pages} verified batches. Ranking is a transient advisory; held or ungranted records were not searched.</Text>
+      <Button label={'Open best '+Math.min(32,archiveScan.matches.length)+' historical chambers'} disabled={busy||disabled||!archiveScan.matches.length} action={openBest}/>
+      {archiveScan.matches.slice(0,32).map(row=><View key={row.session_id} style={s.check}>
+        <Text selectable style={s.label}>{row.session_id}</Text>
+        <Text style={s.small}>{row.matched_terms}/{archiveScan.queryTerms} terms covered · {row.best_source_terms} in best capture · {row.distinct_matching_payloads} distinct matching payloads</Text>
+      </View>)}
+      {archiveScan.matches.length>32&&<Text style={s.small}>Showing the best 32 chambers; other matches remain outside this detailed reparse window.</Text>}
+    </>}
     {discovery&&owner.current===getAuthToken()&&<>
       <Text style={s.small}>{discovery.page_offset+discovery.scanned_sessions}/{discovery.catalogue_size} catalogue positions · {discovery.qualified} qualified · {discovery.no_grant} without usable permission · {discovery.held} held</Text>
       {!discovery.matches.length&&<Text style={s.small}>No qualified lexical match in this batch.</Text>}

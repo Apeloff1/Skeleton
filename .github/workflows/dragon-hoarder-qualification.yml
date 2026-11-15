@@ -112,6 +112,8 @@ jobs:
         run: npm install --prefix "$RUNNER_TEMP/dragon-ts" --no-save --ignore-scripts --no-audit --no-fund typescript@5.9.3
       - name: Verify all completed 60-level motion profiles and 10 phases
         run: NODE_PATH="$RUNNER_TEMP/dragon-ts/node_modules" node frontend/scripts/test-dragon-hoarder-motion.cjs
+      - name: Verify bounded archive-wide discovery aggregation and cancellation
+        run: NODE_PATH="$RUNNER_TEMP/dragon-ts/node_modules" node frontend/scripts/test-dragon-vault-scan.cjs
       - name: Exercise actual Python treasury projections against real client parser
         env:
           PYTHONDONTWRITEBYTECODE: "1"
