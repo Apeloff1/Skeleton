@@ -2661,7 +2661,7 @@ export default function GalaxyStudioFactoryModal
               <Text style={{ color: '#FBBF24', marginTop: 6 }} testID="galaxy-handoff-error">{draftSaveError || handoffError}</Text>
             ) : null}
             <Text style={{ color: T.textMuted, marginTop: 6, fontSize: 11 }}>
-              Transfers the authored vision and primary genre. Prior Forge knobs, beats, and quest settings are retained. Galaxy's fourteen matrices, narrative phases, and extended sliders are preserved as a separate device-local Galaxy draft, never silently reinterpreted as ten Forge axes.
+              Transfers the authored vision and primary genre. Prior Forge knobs, beats, and quest settings are retained. Galaxy&apos;s fourteen matrices, narrative phases, and extended sliders are preserved as a separate device-local Galaxy draft, never silently reinterpreted as ten Forge axes.
             </Text>
           </View>
         ) : null}
