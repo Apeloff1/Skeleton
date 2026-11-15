@@ -91,6 +91,38 @@ export type DragonCompanion = {
   learning_progress: number; novelty_yield: number;
   questbook?: DragonQuestbook;
 };
+export type DragonEvolution = {
+  form: 'hatchling' | 'scout' | 'scholar' | 'pathfinder' | 'archivist' | 'hoarder';
+  stage: number; level: number; expedition_growth: number; treasury_growth: number;
+  total_evolution: number; effective_evolution: number; stage_progress: number;
+  hoarder_qualified: boolean; next_threshold: number | null;
+};
+export type DragonArchiveGrant = { active: boolean; expires_at: number | null; granted_sources: number; usable_sources: number; history_only: true; network_authority_expanded: false };
+export type TreasuryMode = 'current_only' | 'historic_only' | 'all_revisions' | 'timeline' | 'compare';
+export type TreasuryDelta = { kind: 'initial' | 'minor_update' | 'substantive_update' | 'major_rewrite' | 'changed_unclassified' | 'rollback'; similarity: number | null; added_terms: number | null; removed_terms: number | null; changed_sections: number | null; numeric_change: boolean | null };
+export type TreasuryRevision = {
+  revision_id: string; family_id: string; previous_revision_id: string | null;
+  session_id: string | null; source_id: string | null; first_seen: number; last_seen: number;
+  reobservations: number; indexed: boolean; metadata_only: boolean; archive_only: boolean;
+  latest_observed: boolean; plane: 'current' | 'historic'; projection_digest: string | null;
+  delta: TreasuryDelta; score?: number;
+};
+export type TreasuryFamily = {
+  family_id: string; revision_count: number; current_revision: string; first_seen: number; last_seen: number;
+  current_indexed: boolean; simultaneous_conflict: boolean; refresh_url: string | null;
+  revisit: { due_at: number; change_probability_estimate: number; observed_changes: number; interval_seconds: number;
+    ready_for_review: boolean; fresh_consent_required: true; network_executed: false };
+};
+export type DragonTreasury = {
+  schema: 'skeleton.dragon.treasury.v1'; parser: 'retained-text-sections-v1'; mode: TreasuryMode;
+  family: string | null; as_of_unix: number; partition_digest: string; candidate_limit_reached: boolean; excluded_sessions: number;
+  observations: number; families: number; revisions: number; changed_families: number; rollbacks: number;
+  current_indexed: number; historic_indexed: number; metadata_only: number; blocked_current: number; changes: number; revalidated_revisions: number;
+  verified_historic_transitions: number; evolution: DragonEvolution; family_rows: TreasuryFamily[]; hits: TreasuryRevision[];
+  timeline: TreasuryRevision[]; comparison: { current: TreasuryRevision; previous: TreasuryRevision; delta: TreasuryDelta } | null;
+  earliest_source_expiry: number | null; latest_observed_only: true; source_text_returned: false;
+  network_executed: false; training_permission: false; fresh_consent_required: true;
+};
 export type CrawlSession = {
   session_id: string; title: string; status: 'queued' | 'ready' | 'running' | 'paused' | 'completed' | 'cancelled' | 'budget_exhausted' | 'failed' | 'interrupted';
   state?: string; version: number; created_at: string; updated_at: string; seeds: string[];
@@ -103,6 +135,7 @@ export type CrawlSession = {
   acquisition_economics?: CrawlAcquisitionEconomics;
   companion?: DragonCompanion;
   curriculum_trace?: DragonCurriculumTrace;
+  archive_grant?: DragonArchiveGrant;
   queue: { url: string; depth: number; attempts: number; ready_at: number }[];
 };
 export type SourceUsePolicy = { version: number; enabled: boolean; max_age_seconds: number; changed_at: string | null };
@@ -299,6 +332,7 @@ function session(value: CrawlSession, expectedId?: string): CrawlSession {
     }
     if (counted !== e.settled_requests) invalid('Acquisition economics request accounting is incomplete.');
   }
+  if (value.archive_grant !== undefined && !validArchiveGrant(value.archive_grant, value.source_count)) invalid('Invalid historical grant projection.');
   if (value.companion !== undefined) {
     const p = value.companion;
     const unit = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1;
@@ -371,6 +405,80 @@ function source(value: CapturedSource, id?: string): CapturedSource {
   }
   return value;
 }
+function validArchiveGrant(p: DragonArchiveGrant, count: number): boolean {
+  return !!p && typeof p.active === 'boolean' && integer(p.granted_sources,count)
+    && integer(p.usable_sources,p.granted_sources) && p.active === (p.usable_sources>0)
+    && (p.expires_at===null || Number.isFinite(p.expires_at) && p.expires_at>0)
+    && (!p.active || p.expires_at!==null) && p.history_only===true && p.network_authority_expanded===false;
+}
+function validEvolution(v: DragonEvolution): boolean {
+  const thresholds=[0,120,300,550,800,1150,1500];
+  const forms=['hatchling','scout','scholar','pathfinder','archivist','hoarder'];
+  if (!v || !integer(v.expedition_growth,1000) || !integer(v.treasury_growth,500)
+    || v.total_evolution!==v.expedition_growth+v.treasury_growth || typeof v.hoarder_qualified!=='boolean') return false;
+  const effective=v.expedition_growth>=800&&v.hoarder_qualified?v.total_evolution:v.expedition_growth;
+  const stage=thresholds.slice(1,-1).filter(t=>effective>=t).length;
+  const fraction=Math.min(1,Math.max(0,(effective-thresholds[stage])/(thresholds[stage+1]-thresholds[stage])));
+  return v.effective_evolution===effective && v.stage===stage && v.form===forms[stage]
+    && v.level===Math.min(60,stage*10+1+Math.floor(fraction*10))
+    && Number.isFinite(v.stage_progress) && Math.abs(v.stage_progress-fraction)<=.000001
+    && v.next_threshold===(stage===5?null:thresholds[stage+1]);
+}
+function validDelta(d: TreasuryDelta): boolean {
+  return !!d && ['initial','minor_update','substantive_update','major_rewrite','changed_unclassified','rollback'].includes(d.kind)
+    && (d.similarity===null || Number.isFinite(d.similarity) && d.similarity>=0 && d.similarity<=1)
+    && (d.added_terms===null || integer(d.added_terms,2048)) && (d.removed_terms===null || integer(d.removed_terms,2048))
+    && (d.changed_sections===null || integer(d.changed_sections,64))
+    && (d.numeric_change===null || typeof d.numeric_change==='boolean');
+}
+function validRevision(v: TreasuryRevision): boolean {
+  return !!v && HASH.test(v.revision_id) && HASH.test(v.family_id)
+    && (v.previous_revision_id===null||HASH.test(v.previous_revision_id))
+    && Number.isFinite(v.first_seen) && v.first_seen>=0 && Number.isFinite(v.last_seen) && v.last_seen>=v.first_seen
+    && integer(v.reobservations,512) && typeof v.indexed==='boolean' && v.metadata_only===!v.indexed
+    && typeof v.archive_only==='boolean' && typeof v.latest_observed==='boolean' && ['historic','current'].includes(v.plane)
+    && (v.plane!=='current'||v.latest_observed&&!v.archive_only)
+    && (v.indexed ? typeof v.session_id==='string'&&ID.test(v.session_id)&&typeof v.source_id==='string'&&HASH.test(v.source_id)&&typeof v.projection_digest==='string'&&HASH.test(v.projection_digest)
+                  : v.session_id===null&&v.source_id===null&&v.projection_digest===null)
+    && validDelta(v.delta) && (v.score===undefined||Number.isFinite(v.score)&&v.score>=0);
+}
+function validFamily(f: TreasuryFamily): boolean {
+  if(!f||!HASH.test(f.family_id)||!HASH.test(f.current_revision)||!integer(f.revision_count,512)||f.revision_count===0
+    ||!Number.isFinite(f.first_seen)||!Number.isFinite(f.last_seen)||f.last_seen<f.first_seen
+    ||typeof f.current_indexed!=='boolean'||typeof f.simultaneous_conflict!=='boolean'||(f.simultaneous_conflict&&f.current_indexed))return false;
+  if(f.refresh_url!==null){try{const u=new URL(f.refresh_url);if(f.refresh_url.length>2048||!['http:','https:'].includes(u.protocol)||u.username||u.password)return false;}catch{return false;}}
+  const r=f.revisit;
+  return !!r&&Number.isFinite(r.due_at)&&r.due_at>=f.last_seen&&Number.isFinite(r.interval_seconds)&&r.interval_seconds>=3600
+    &&Number.isFinite(r.change_probability_estimate)&&r.change_probability_estimate>=0&&r.change_probability_estimate<=1
+    &&integer(r.observed_changes,511)&&typeof r.ready_for_review==='boolean'&&r.fresh_consent_required===true&&r.network_executed===false;
+}
+export async function getDragonTreasury(mode: TreasuryMode, query='', family?: string, signal?: AbortSignal): Promise<DragonTreasury> {
+  if (!['current_only','historic_only','all_revisions','timeline','compare'].includes(mode)||query.length>256||family!==undefined&&!HASH.test(family)) invalid('Invalid treasury search.');
+  const p=await read(api.get<DragonTreasury>(ROOT+'/companion/treasury?mode='+mode+'&query='+encodeURIComponent(query)+(family?'&family='+family:''),options(signal)),getAuthToken(),'Treasury reparse failed.');
+  if(!p||p.schema!=='skeleton.dragon.treasury.v1'||p.parser!=='retained-text-sections-v1'||p.mode!==mode||p.family!==(family??null)
+    ||!Number.isFinite(p.as_of_unix)||!HASH.test(p.partition_digest)||typeof p.candidate_limit_reached!=='boolean'||!integer(p.excluded_sessions,8)
+    ||!integer(p.observations,512)||!integer(p.families,p.observations)||!integer(p.revisions,p.observations)
+    ||!integer(p.current_indexed,p.families)||!integer(p.historic_indexed,p.revisions)||!integer(p.metadata_only,p.revisions)
+    ||p.current_indexed+p.historic_indexed+p.metadata_only!==p.revisions
+    ||!integer(p.blocked_current,p.families)||p.blocked_current+p.current_indexed!==p.families
+    ||!integer(p.changed_families,p.families)||!integer(p.rollbacks,p.revisions)||!integer(p.changes,p.revisions)
+    ||!integer(p.revalidated_revisions,p.observations)||!integer(p.verified_historic_transitions,p.historic_indexed)
+    ||!validEvolution(p.evolution)||!Array.isArray(p.family_rows)||p.family_rows.length>24||!p.family_rows.every(validFamily)
+    ||new Set(p.family_rows.map(f=>f.family_id)).size!==p.family_rows.length
+    ||![p.hits,p.timeline].every(rows=>Array.isArray(rows)&&rows.length<=24&&rows.every(validRevision)&&new Set(rows.map(v=>v.revision_id)).size===rows.length)
+    ||p.hits.some(v=>!v.indexed||mode==='current_only'&&v.plane!=='current'||mode==='historic_only'&&v.plane!=='historic'||family&&v.family_id!==family)
+    ||p.comparison!==null&&(!validRevision(p.comparison.current)||!validRevision(p.comparison.previous)||!validDelta(p.comparison.delta)
+      ||p.comparison.current.family_id!==family||p.comparison.previous.family_id!==family
+      ||p.comparison.current.previous_revision_id!==p.comparison.previous.revision_id)
+    ||p.earliest_source_expiry!==null&&(!Number.isFinite(p.earliest_source_expiry)||p.earliest_source_expiry<=p.as_of_unix)
+    ||p.latest_observed_only!==true||p.source_text_returned!==false||p.network_executed!==false||p.training_permission!==false||p.fresh_consent_required!==true)invalid('Invalid version-separated treasury projection.');
+  return p;
+}
+export async function configureDragonArchive(id: string, body: CrawlCommand & { enabled: boolean; days: number; archive_rights_acknowledged: boolean }, signal?: AbortSignal): Promise<CrawlSession> {
+  if(!integer(body.days,30)||body.days<1||typeof body.enabled!=='boolean'||typeof body.archive_rights_acknowledged!=='boolean'||body.enabled&&!body.archive_rights_acknowledged)invalid('Explicit historical retention rights required.');
+  const p=await read(api.post<{session:CrawlSession}>(ROOT+'/sessions/'+identifier(id)+'/archive-grant',body,options(signal)),getAuthToken(),'Archive permission could not be confirmed. Refresh current session state.');
+  return session(p.session,id);
+}
 export async function getDragonSanctuary(signal?: AbortSignal): Promise<DragonSanctuary> {
   const p = await read(api.get<DragonSanctuary>(ROOT + '/companion/sanctuary', options(signal)), getAuthToken(), 'The companion sanctuary could not be refreshed.');
   const forms = ['hatchling','scout','scholar','pathfinder','archivist'];
@@ -414,7 +522,7 @@ export async function getCrawl(id: string, signal?: AbortSignal): Promise<CrawlS
   const value = await read(api.get<{ session: CrawlSession }>(ROOT + '/sessions/' + identifier(id), options(signal)), getAuthToken(), 'The crawler session could not be refreshed.'); return session(value.session, id);
 }
 export async function createCrawl(body: CrawlCreate, signal?: AbortSignal): Promise<CrawlSession> {
-  if (body.frontier_strategy !== undefined && !['fifo', 'balanced', 'coverage'].includes(body.frontier_strategy)) throw new ChatClientError('Choose a canonical bounded frontier scheduling strategy.', { kind: 'validation' });
+  if (body.frontier_strategy !== undefined && !['fifo', 'balanced', 'coverage', 'companion', 'companion_curiosity', 'companion_scholar', 'companion_guardian'].includes(body.frontier_strategy)) throw new ChatClientError('Choose a canonical bounded frontier scheduling strategy.', { kind: 'validation' });
   if (body.discover_sitemaps !== undefined && typeof body.discover_sitemaps !== 'boolean') throw new ChatClientError('Sitemap discovery must be explicitly enabled or disabled.', { kind: 'validation' });
   if (body.seeds.length < 1 || body.seeds.length > 16 || new Set(body.seeds).size !== body.seeds.length || body.consent !== true || body.rights_acknowledged !== true) throw new ChatClientError('Provide distinct seed URLs and acknowledge capture rights.', { kind: 'validation' });
   for (const seed of body.seeds) { let url: URL; try { url = new URL(seed); } catch { throw new ChatClientError('Enter complete http or https seed URLs, one per line.', { kind: 'validation' }); } if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || seed.length > 2048) throw new ChatClientError('Use http or https URLs without embedded credentials.', { kind: 'validation' }); }
