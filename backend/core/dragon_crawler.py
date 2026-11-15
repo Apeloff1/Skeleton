@@ -27,6 +27,7 @@ from core.dragon_deep_archive import DragonDeepArchiveMixin
 from core.dragon_dense_runtime import DragonDenseArchiveMixin
 from core.dragon_exhaustive_vectors import DragonExhaustiveVectorMixin
 from core.dragon_hoarder_copy import DragonHoarderCopyMixin
+from core.dragon_cold_primary import DragonColdPrimaryMixin
 from core.dragon_checkpoint_replica import (
     CheckpointReplicaError, checkpoint_fields, decode_exact_replica, verify_primary,
 )
@@ -121,7 +122,7 @@ def _safe_error(exc: BaseException) -> str:
     return "crawler_slice_interrupted"
 
 
-class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixin,DragonDenseArchiveMixin,DragonDeepArchiveMixin,DragonVaultMixin):
+class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,DragonExhaustiveVectorMixin,DragonDenseArchiveMixin,DragonDeepArchiveMixin,DragonVaultMixin):
     def __init__(self, database=core_db):
         self.database = database
         self.sessions = database["dragon_crawler_sessions"]
@@ -382,16 +383,21 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
             raise CrawlerError("crawler_integrity", "Crawler request integrity check failed.", 503)
         _, run_type = _core()
         identity = row.get("checkpoint_identity")
+        if row.get("cold_primary") and not isinstance(row.get("snapshot"),dict):
+            from core.dragon_hoarder_copy import _io
+            row={**row,"snapshot":await _io(lambda:self._custody_snapshot(row))}
         try:
-            snapshot = _plain(row["snapshot"])
+            snapshot = _plain(self._custody_snapshot(row))
             if identity is not None:
                 verify_primary(snapshot, _plain(identity))
             elif row.get("checkpoint_replica") is not None:
                 raise CheckpointReplicaError("replica has no current witness")
             snapshot = run_type.from_snapshot(snapshot).snapshot()
         except (CrawlerError, CheckpointReplicaError, ValueError, TypeError, KeyError, RecursionError):
+            if row.get("cold_primary"):
+                raise CrawlerError("crawler_cold_primary_held","Relocated checkpoint requires exact archive inspection.",503)
             row = await self._repair_exact_checkpoint(scope, row, run_type)
-            snapshot = _plain(row["snapshot"])
+            snapshot = _plain(self._custody_snapshot(row))
         binding = snapshot.get("binding", {})
         if (
             _digest(_plain(row["request"])) != row["request_digest"]
@@ -530,7 +536,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
 
     def _projection(self, row: dict) -> dict:
         _, run_type = _core()
-        runtime = run_type.from_snapshot(_plain(row["snapshot"]))
+        runtime = run_type.from_snapshot(_plain(self._custody_snapshot(row)))
         status = dict(runtime.status())
         # Operational state is authoritative in Mongo while a pure snapshot
         # is paused at its last accepted checkpoint.
@@ -652,7 +658,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
         worker = self._worker_state(row)
         if row["status"] == "running" and (lease is None or _utc(lease) <= _now()) and not worker["active"]:
             _, run_type = _core()
-            checkpoint_state = run_type.from_snapshot(_plain(row["snapshot"])).status()["state"]
+            checkpoint_state = run_type.from_snapshot(_plain(self._custody_snapshot(row))).status()["state"]
             restored = (
                 checkpoint_state
                 if checkpoint_state in {"completed", "budget_exhausted", "cancelled"}
@@ -730,7 +736,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
     def _campaign_authority(self, row: dict) -> tuple[dict, tuple[str, ...]]:
         """Return only the bound snapshot and source-policy-disallowed IDs."""
         self._source_use(row)
-        snapshot = _plain(row["snapshot"])
+        snapshot = _plain(self._custody_snapshot(row))
         _, run_type = _core()
         runtime = run_type.from_snapshot(snapshot)
         revoked = tuple(sorted(
@@ -1615,7 +1621,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
                 raise CrawlerError("crawler_watch_parent","Watch requires an independent finished expedition.",409)
             if row.get("treasury_watch") and row["treasury_watch"].get("enabled") and row["treasury_watch"].get("expires_at",0)>now:
                 raise CrawlerError("crawler_watch_exists","Revoke the active watch before granting another.",409)
-            snapshot=_plain(row["snapshot"])
+            snapshot=_plain(self._custody_snapshot(row))
             verify_primary(snapshot,_plain(row["checkpoint_identity"]))
             source=snapshot["sources"].get(body["source_id"])
             if source is None:
@@ -1779,7 +1785,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
                 if not grant["issued_at"]<=stamp<grant["expires_at"]:
                     counts["expired"]+=1
                     continue
-                snapshot=_plain(row["snapshot"])
+                snapshot=_plain(self._custody_snapshot(row))
                 verify_primary(snapshot,_plain(row["checkpoint_identity"]))
                 binding=snapshot["binding"]
                 if (binding["scope"]!=scope or binding["consent"]!=_plain(row["consent"])
@@ -2045,7 +2051,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
             return {"ok":True,"session":self._projection(row)}
         if row["version"] != body["expected_version"]:
             raise CrawlerError("crawler_conflict", "Reload the expedition before changing archive permission.",409)
-        snapshot = _plain(row["snapshot"])
+        snapshot = _plain(self._custody_snapshot(row))
         now = _now()
         grant = None
         index_manifest = None
@@ -2070,7 +2076,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
             {"_id":identifier,**scope,"version":row["version"],"status":{"$ne":"deleted"}},
             {"$set":{"archive_grant":grant,"treasury_index":index_manifest,"treasury_archive_route":routing,
                      "treasury_repair_due":min(grant["expires_at"],now.timestamp()+6*3600) if grant else None,
-                     "updated_at":now,"storage_receipt":receipt,audit_path:audit,"deep_index_due":now.timestamp(),"bulk_copy_invalidated":True},
+                     "updated_at":now,"storage_receipt":receipt,audit_path:audit,"deep_index_due":now.timestamp(),"bulk_copy_invalidated":True,"cold_primary_invalidated":True},
              "$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":"","deep_dense_route":"","deep_dense_due":"","deep_full_state":"","deep_full_due":""},"$inc":{"version":1}},
         )
         if not result.modified_count:
@@ -2104,7 +2110,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
             if row is None:
                 raise CrawlerError("crawler_treasury_changed","Historical catalogue changed. Refresh.",409)
             try:
-                snapshot=_plain(row["snapshot"])
+                snapshot=_plain(self._custody_snapshot(row))
                 proof=self._legacy_inspection(scope,row,snapshot)
                 from skeleton.ai.webcrawler.dragon_archive_grant import eligible_source,public_grant
                 eligible=sum(eligible_source(snapshot["sources"][sid],self._capture_policy(row,snapshot["sources"][sid]))
@@ -2155,7 +2161,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
         grant,segment,proof=None,None,None
         if body["enabled"]:
             try:
-                snapshot=_plain(row["snapshot"])
+                snapshot=_plain(self._custody_snapshot(row))
                 proof=self._legacy_inspection(scope,row,snapshot)
                 filtered={**snapshot,"sources":{sid:snapshot["sources"][sid] for sid in proof["verified_source_ids"]}}
                 now=_now().timestamp()
@@ -2174,7 +2180,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
             "status":{"$in":["completed","budget_exhausted"]}},
             {"$set":{"archive_grant":grant,"treasury_index":segment,"treasury_archive_route":routing,"legacy_archive_receipt":proof,
                       "treasury_repair_due":min(grant["expires_at"],now+6*3600) if grant else None,
-                      "storage_receipt":receipt,"updated_at":_now(),path:audit,"deep_index_due":_now().timestamp(),"bulk_copy_invalidated":True},
+                      "storage_receipt":receipt,"updated_at":_now(),path:audit,"deep_index_due":_now().timestamp(),"bulk_copy_invalidated":True,"cold_primary_invalidated":True},
              "$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":"","deep_dense_route":"","deep_dense_due":"","deep_full_state":"","deep_full_due":""},"$inc":{"version":1}})
         if not changed.modified_count:
             raise CrawlerError("crawler_conflict","Historical session changed before archive admission.",409)
@@ -2192,7 +2198,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
         legacy=False
         try:
             row = await self._owned(scope,identifier)
-            snapshot = _plain(row["snapshot"])
+            snapshot = _plain(self._custody_snapshot(row))
         except CrawlerError as exc:
             if exc.code not in {"crawler_integrity","crawler_checkpoint_unrecoverable"}:
                 raise
@@ -2200,7 +2206,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
             if row is None:
                 raise exc
             try:
-                snapshot=_plain(row["snapshot"])
+                snapshot=_plain(self._custody_snapshot(row))
                 proof=self._legacy_inspection(scope,row,snapshot)
                 if row.get("legacy_archive_receipt")!=proof or source_id not in proof["verified_source_ids"]:
                     raise ValueError("legacy source not admitted")
@@ -2317,7 +2323,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
                 raise CrawlerError("crawler_treasury_changed", "Treasury changed during reparse.", 409)
             fence.append((identifier, version))
             try:
-                snapshot = _plain(row["snapshot"])
+                snapshot = _plain(self._custody_snapshot(row))
                 witness = row.get("checkpoint_identity")
                 if witness is None:
                     raise ValueError("missing exact primary witness")
@@ -2542,7 +2548,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
                                    "Expeditions changed during collection. Refresh the sanctuary.", 409)
             fence.append((identifier, version))
             try:
-                snapshot = _plain(row["snapshot"])
+                snapshot = _plain(self._custody_snapshot(row))
                 identity = row.get("checkpoint_identity")
                 if identity is None:
                     raise ValueError("unwitnessed revision")
@@ -2771,6 +2777,8 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
         ):
             raise CrawlerError("crawler_grant_bounds", "Autonomous execution exceeds its finite bounds.")
         row = await self._reconcile(scope, await self._owned(scope, identifier))
+        if row.get("cold_primary"):
+            raise CrawlerError("crawler_cold_primary_held","Restore cold custody before runtime mutation.",409)
         operation, digest = _operation(body["idempotency_key"]), _digest(body)
         if self._prior(row, operation, digest, safety=body["enabled"] is False):
             return self._projection(row)
@@ -2812,7 +2820,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
         if body["enabled"]:
             await self._grant_principal(scope, grant)
         _, run_type = _core()
-        runtime = run_type.from_snapshot(_plain(row["snapshot"]))
+        runtime = run_type.from_snapshot(_plain(self._custody_snapshot(row)))
         if body["enabled"]:
             if runtime.status()["state"] == "running":
                 runtime.pause()
@@ -2860,6 +2868,8 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
 
     async def control(self, scope: dict[str, str], identifier: str, body: dict) -> dict:
         row = await self._reconcile(scope, await self._owned(scope, identifier))
+        if row.get("cold_primary"):
+            raise CrawlerError("crawler_cold_primary_held","Restore cold custody before runtime mutation.",409)
         operation, digest = _operation(body["idempotency_key"]), _digest(body)
         action = body["action"]
         if self._prior(row, operation, digest, safety=action in {"pause", "cancel"}):
@@ -2869,7 +2879,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
         if action == "resume" and self._worker_state(row)["active"]:
             raise CrawlerError("crawler_busy", "The current worker must drain before resuming.", 409)
         _, run_type = _core()
-        runtime = run_type.from_snapshot(_plain(row["snapshot"]))
+        runtime = run_type.from_snapshot(_plain(self._custody_snapshot(row)))
         if (
             action == "resume"
             and row["status"] == "interrupted"
@@ -3134,6 +3144,8 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
         watch_claim: str | None = None
     ) -> dict:
         row = await self._reconcile(scope, await self._owned(scope, identifier))
+        if row.get("cold_primary"):
+            raise CrawlerError("crawler_cold_primary_held","Restore cold custody before runtime mutation.",409)
         operation, digest = _operation(body["idempotency_key"]), _digest(body)
         previous = self._prior(row, operation, digest)
         if previous:
@@ -3372,7 +3384,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
 
         def work():
             _, run_type = _core()
-            runtime = run_type.from_snapshot(_plain(row["snapshot"]))
+            runtime = run_type.from_snapshot(_plain(self._custody_snapshot(row)))
             summary = runtime.run_slice(
                 max_steps=body.get("max_steps", 4),
                 max_seconds=40,
@@ -3760,7 +3772,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
                     "updated_at": _now(),
                     "deletion": {"operation": operation, "request_digest": digest},
                     "deep_slot_cleanup":bool(row.get("deep_archive")),
-                    "bulk_copy_invalidated":True,
+                    "bulk_copy_invalidated":True,"cold_primary_invalidated":True,
                 },
                 "$inc": {"version": 1},
                 "$unset": {
@@ -3825,7 +3837,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
     ) -> dict:
         row = await self._owned(scope, identifier)
         _, run_type = _core()
-        events = run_type.from_snapshot(_plain(row["snapshot"])).snapshot()["events"]
+        events = run_type.from_snapshot(_plain(self._custody_snapshot(row))).snapshot()["events"]
         available = [event for event in events if event["sequence"] > after_sequence]
         page = available[:limit]
         return {
@@ -3875,7 +3887,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
         try:
             _, run_type = _core()
             row = await self._owned(scope, row["_id"])
-            snapshot = run_type.from_snapshot(_plain(row["snapshot"])).snapshot()
+            snapshot = run_type.from_snapshot(_plain(self._custody_snapshot(row))).snapshot()
             request = row.get("request")
             seeds = request.get("seed_urls") if isinstance(request, dict) else ()
             fallback = seeds[0] if isinstance(seeds, (list, tuple)) and seeds else None
@@ -4035,7 +4047,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
         row = await self._owned(scope, identifier)
         _, run_type = _core()
         try:
-            source = run_type.from_snapshot(_plain(row["snapshot"])).source_read(source_id)
+            source = run_type.from_snapshot(_plain(self._custody_snapshot(row))).source_read(source_id)
         except ValueError:
             raise CrawlerError("crawler_source_not_found", "Captured source not found.", 404) from None
         current = self._capture_policy(row, source)
@@ -4092,7 +4104,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
                         "treasury_index": None,
                         "treasury_archive_route": None,
                         "deep_index":None,"deep_hybrid_route":None,"deep_passage_route":None,"deep_dense_route":None,"deep_dense_due":now.timestamp(),"deep_index_due":now.timestamp(),
-                        "bulk_copy_invalidated":True,
+                        "bulk_copy_invalidated":True,"cold_primary_invalidated":True,
                         "treasury_repair_due":now.timestamp() if row.get("archive_grant") else None,
                         "updated_at": now,
                         "storage_receipt": receipt,
@@ -4162,7 +4174,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
         row = await self._owned(scope, identifier)
         self._source_use(row)
         _, run_type = _core()
-        runtime = run_type.from_snapshot(_plain(row["snapshot"]))
+        runtime = run_type.from_snapshot(_plain(self._custody_snapshot(row)))
         sources = runtime.sources()
         snapshot = runtime.snapshot()
         if after_sequence is not None and (
@@ -4205,7 +4217,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
         self._source_use(row)
         _, run_type = _core()
         try:
-            source = run_type.from_snapshot(_plain(row["snapshot"])).source_read(source_id)
+            source = run_type.from_snapshot(_plain(self._custody_snapshot(row))).source_read(source_id)
         except ValueError:
             raise CrawlerError("crawler_source_not_found", "Captured source not found.", 404) from None
         reference = self._source_reference(row, source)
@@ -4322,7 +4334,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
     async def search(self, scope: dict[str, str], identifier: str, query: str, *, limit: int = 8) -> dict:
         row = await self._owned(scope, identifier)
         _, run_type = _core()
-        runtime = run_type.from_snapshot(_plain(row["snapshot"]))
+        runtime = run_type.from_snapshot(_plain(self._custody_snapshot(row)))
         evidence = self._search_current(row, runtime, query, limit=limit)
         references = []
         for source_id in dict.fromkeys(hit["source_id"] for hit in evidence["hits"]):
@@ -4364,7 +4376,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
         search_query = " ".join(terms)[:512]
         async for row in rows:
             row = await self._owned(scope, row["_id"])
-            runtime = run_type.from_snapshot(_plain(row["snapshot"]))
+            runtime = run_type.from_snapshot(_plain(self._custody_snapshot(row)))
             for hit in self._search_current(row, runtime, search_query, limit=8, distinct_sources=True)[
                 "hits"
             ]:
@@ -4470,7 +4482,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
                     "crawler_context_revoked", "Captured source consent or identity changed.", 403
                 )
             try:
-                source = run_type.from_snapshot(_plain(row["snapshot"])).source_read(reference["source_id"])
+                source = run_type.from_snapshot(_plain(self._custody_snapshot(row))).source_read(reference["source_id"])
             except ValueError:
                 raise CrawlerError(
                     "crawler_context_revoked", "The exact captured source is no longer available.", 403
@@ -4569,7 +4581,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixi
                     return "waiting"
                 await self._grant_principal(scope, grant)
                 _, run_type = _core()
-                ready = run_type.from_snapshot(_plain(row["snapshot"])).status()["next_ready_at"]
+                ready = run_type.from_snapshot(_plain(self._custody_snapshot(row))).status()["next_ready_at"]
                 if ready is not None and ready > _now().timestamp():
                     changed = await self.sessions.update_one(
                         {"_id": identifier, **scope, "version": row["version"],
@@ -4670,6 +4682,7 @@ async def recover_crawler_runs(*, limit: int = 16) -> dict:
         ("deep_archive_erasure",crawler_application.recover_deep_erasure),
         ("hoarder_copy_cleanup",crawler_application.cleanup_bulk_copies),
         ("hoarder_copy_recovery",crawler_application.recover_bulk_copies),
+        ("hoarder_cold_primary",crawler_application.reconcile_cold_primaries),
     ):
         try:
             result[name]=await operation()
