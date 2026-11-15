@@ -362,6 +362,13 @@ def test_source_manifest_path_escape_is_rejected_before_archive_publication(tmp_
     ("GET", "/v1/game-builds/bad%20id", None, 400),
     ("POST", "/v1/game-builds", {"request_id": "missing-brief"}, 400),
     ("POST", "/v1/game-builds", {"request_id": "bad id", "brief": BRIEF}, 400),
+    ("POST", "/v1/game-builds", {"request_id": "blank", "brief": "  "}, 400),
+    ("POST", "/v1/game-builds", {"request_id": "null", "brief": None}, 400),
+    ("POST", "/v1/game-builds", {"request_id": "boolean", "brief": True}, 400),
+    ("POST", "/v1/game-builds", {"request_id": "object", "brief": {"genre": "shooter"}}, 400),
+    ("POST", "/v1/game-builds", {"request_id": "long", "brief": "x" * 4001}, 400),
+    ("POST", "/v1/game-builds", {"request_id": "utf8", "brief": "界" * 1334}, 400),
+    ("POST", "/v1/game-builds", {"request_id": "surrogate", "brief": "\ud800"}, 400),
     ("POST", "/v1/game-builds", {"request_id": "unexpected", "brief": BRIEF, "out": "/private/path"}, 400),
 ])
 def test_invalid_http_game_build_envelopes_do_not_initialize_store(
@@ -380,3 +387,260 @@ def test_invalid_http_game_build_envelopes_do_not_initialize_store(
         assert status == 200 and json.loads(listing)["jobs"] == []
         assert app._game_builder is not None
         assert not pipeline.calls
+
+
+@pytest.mark.parametrize("brief", [None, True, "", " " * 4000, "x" * 4001, "界" * 1334, "\ud800"])
+def test_pure_game_build_admission_rejects_invalid_briefs(brief):
+    from skeleton.app.offline_game_builder import validate_game_build_request
+    with pytest.raises(GameBuildRejected) as denied:
+        validate_game_build_request("valid-id", brief)
+    assert denied.value.status == 400
+    assert denied.value.code == "invalid_game_brief"
+
+
+def test_pure_game_build_admission_preserves_request_identity():
+    from skeleton.app.offline_game_builder import validate_game_build_request
+    assert validate_game_build_request("local-build_17", BRIEF) == "local-build_17"
+
+
+def test_closed_game_builder_refuses_public_operations_with_typed_errors(tmp_path, pipeline):
+    manager = LocalGameBuilder(model(), tmp_path / "workspace.sqlite3")
+    manager.close()
+    manager.close()
+    assert manager.availability()["ready"] is False
+    for operation in (
+        lambda: manager.submit("after-close", BRIEF),
+        lambda: manager.get("after-close"),
+        manager.list_jobs,
+        lambda: manager.archive("after-close"),
+    ):
+        with pytest.raises(GameBuildRejected) as denied:
+            operation()
+        assert denied.value.status == 503
+        assert denied.value.code == "local_service_shutting_down"
+    assert not pipeline.calls
+
+
+def test_readiness_callback_cannot_submit_recursively(tmp_path, pipeline, monkeypatch):
+    manager = LocalGameBuilder(model(), tmp_path / "workspace.sqlite3")
+    original = manager.availability
+    def reenter():
+        with pytest.raises(GameBuildRejected) as denied:
+            manager.submit("recursive", BRIEF)
+        assert denied.value.status == 423
+        return original()
+    monkeypatch.setattr(manager, "availability", reenter)
+    try:
+        manager.submit("outer", BRIEF)
+        assert terminal(manager, "outer")["state"] == "complete"
+        assert len(pipeline.calls) == 1
+        assert [job["request_id"] for job in manager.list_jobs()] == ["outer"]
+    finally:
+        manager.close()
+
+
+def test_readiness_callback_shutdown_cannot_start_worker(tmp_path, pipeline, monkeypatch):
+    manager = LocalGameBuilder(model(), tmp_path / "workspace.sqlite3")
+    def shutdown():
+        manager.close()
+        return {"ready": True, "code": "ready"}
+    monkeypatch.setattr(manager, "availability", shutdown)
+    try:
+        with pytest.raises(GameBuildRejected) as denied:
+            manager.submit("stale-readiness", BRIEF)
+        assert denied.value.code == "local_service_shutting_down"
+        assert manager._worker is None
+        assert not pipeline.calls
+    finally:
+        manager.close()
+
+
+def test_worker_reentrant_close_preserves_journal_until_external_drain(tmp_path, pipeline):
+    database = tmp_path / "workspace.sqlite3"
+    backend = model()
+    manager = LocalGameBuilder(backend, database)
+    observed = []
+    pipeline.release.clear()
+    def request_close(_report, _project):
+        try:
+            manager.close()
+        except GameBuildRejected as denied:
+            observed.append((denied.code, manager._closed))
+    pipeline.mutate = request_close
+    try:
+        manager.submit("worker-close", BRIEF)
+        assert pipeline.entered.wait(3)
+        pipeline.release.set()
+        worker = manager._worker
+        assert worker is not None
+        worker.join(timeout=5)
+        assert not worker.is_alive()
+        assert observed == [("game_worker_draining", False)]
+        assert manager._closed is False
+    finally:
+        pipeline.release.set()
+        manager.close()
+    reopened = LocalGameBuilder(backend, database)
+    try:
+        assert reopened.get("worker-close")["state"] == "failed"
+        assert len(pipeline.calls) == 1
+    finally:
+        reopened.close()
+
+
+def test_worker_start_failure_does_not_poison_future_admission(tmp_path, pipeline, monkeypatch):
+    manager = LocalGameBuilder(model(), tmp_path / "workspace.sqlite3")
+    def unavailable(_worker):
+        raise RuntimeError("fixture thread startup failure")
+    try:
+        with monkeypatch.context() as scoped:
+            scoped.setattr(threading.Thread, "start", unavailable)
+            with pytest.raises(GameBuildRejected) as denied:
+                manager.submit("failed-start", BRIEF)
+        assert denied.value.code == "game_admission_unavailable"
+        assert manager._worker is None
+        assert manager.list_jobs() == []
+        manager.submit("valid-retry", BRIEF)
+        assert terminal(manager, "valid-retry")["state"] == "complete"
+        assert len(pipeline.calls) == 1
+    finally:
+        manager.close()
+
+
+@pytest.mark.parametrize("field,value", [
+    ("result_json", "x" * (262144 + 1)),
+    ("result_json", b'{"schema":"wrong"}'),
+    ("brief", "x" * 4001),
+    ("request_digest", "not-a-digest"),
+    ("receipt_sha256", "f" * 65),
+    ("archive_bytes", 16 * 1024 * 1024 + 1),
+    ("file_count", 0),
+    ("artifact_id", "game-" + "f" * 64),
+])
+def test_corrupt_saved_build_does_not_become_absent_or_replay(tmp_path, pipeline, field, value):
+    database = tmp_path / "workspace.sqlite3"
+    manager = LocalGameBuilder(model(), database)
+    try:
+        manager.submit("bounded-row", BRIEF)
+        assert terminal(manager, "bounded-row")["state"] == "complete"
+        mutate_row(database, "bounded-row", **{field: value})
+        for operation in (
+            lambda: manager.get("bounded-row"),
+            manager.list_jobs,
+            lambda: manager.submit("bounded-row", BRIEF),
+            lambda: manager.archive("bounded-row"),
+        ):
+            with pytest.raises(GameBuildRejected) as denied:
+                operation()
+            assert denied.value.status == 503
+            assert denied.value.code == "invalid_build_record"
+        assert len(pipeline.calls) == 1
+    finally:
+        manager.close()
+
+
+def test_archive_readback_rejects_journal_change_after_verification(tmp_path, pipeline, monkeypatch):
+    database = tmp_path / "workspace.sqlite3"
+    manager = LocalGameBuilder(model(), database)
+    try:
+        manager.submit("archive-race", BRIEF)
+        assert terminal(manager, "archive-race")["state"] == "complete"
+        original = manager._verify
+        def changed(row):
+            payload = original(row)
+            mutate_row(database, "archive-race", updated_at=row["updated_at"] + 1)
+            return payload
+        monkeypatch.setattr(manager, "_verify", changed)
+        with pytest.raises(GameBuildRejected) as denied:
+            manager.archive("archive-race")
+        assert denied.value.code == "game_archive_changed"
+        assert len(pipeline.calls) == 1
+    finally:
+        manager.close()
+
+
+def test_corrupt_interrupted_row_blocks_recovery_without_reexecution(tmp_path, pipeline):
+    database = tmp_path / "workspace.sqlite3"
+    backend = model()
+    manager = LocalGameBuilder(backend, database)
+    try:
+        manager.submit("interrupted-corrupt", BRIEF)
+        assert terminal(manager, "interrupted-corrupt")["state"] == "complete"
+    finally:
+        manager.close()
+    mutate_row(database, "interrupted-corrupt", state="verifying", stage="publishing",
+               result_json="x" * (262144 + 1))
+    with pytest.raises(GameBuildRejected) as denied:
+        LocalGameBuilder(backend, database)
+    assert denied.value.code == "invalid_build_record"
+    assert len(pipeline.calls) == 1
+    with sqlite3.connect(database) as connection:
+        assert connection.execute(
+            "SELECT state FROM offline_game_builds WHERE request_id=?", ("interrupted-corrupt",)
+        ).fetchone() == ("verifying",)
+
+
+def test_recovery_refuses_changed_record_between_proof_and_writer_reservation(tmp_path, pipeline, monkeypatch):
+    database = tmp_path / "workspace.sqlite3"
+    backend = model()
+    manager = LocalGameBuilder(backend, database)
+    try:
+        manager.submit("recovery-race", BRIEF)
+        assert terminal(manager, "recovery-race")["state"] == "complete"
+    finally:
+        manager.close()
+    mutate_row(database, "recovery-race", state="verifying", stage="publishing")
+    original = LocalGameBuilder._verify
+    def mutate_after_proof(owner, row):
+        raw = original(owner, row)
+        mutate_row(database, "recovery-race", updated_at=row["updated_at"] + 1)
+        return raw
+    with monkeypatch.context() as scoped:
+        scoped.setattr(LocalGameBuilder, "_verify", mutate_after_proof)
+        with pytest.raises(GameBuildRejected) as denied:
+            LocalGameBuilder(backend, database)
+        assert denied.value.code == "invalid_build_record"
+    with sqlite3.connect(database) as connection:
+        assert connection.execute(
+            "SELECT state,stage FROM offline_game_builds WHERE request_id=?", ("recovery-race",)
+        ).fetchone() == ("verifying", "publishing")
+    reopened = LocalGameBuilder(backend, database)
+    try:
+        assert reopened.get("recovery-race")["state"] == "complete"
+        assert len(pipeline.calls) == 1
+    finally:
+        reopened.close()
+
+
+def test_publication_retry_cannot_adopt_a_changed_pending_journal(tmp_path, pipeline, monkeypatch):
+    database = tmp_path / "workspace.sqlite3"
+    backend = model()
+    manager = LocalGameBuilder(backend, database)
+    original = manager._verify
+    observed = []
+    def changed(row):
+        raw = original(row)
+        observed.append(row["updated_at"])
+        if len(observed) == 1:
+            mutate_row(database, "publish-race", updated_at=row["updated_at"] + 1)
+        return raw
+    monkeypatch.setattr(manager, "_verify", changed)
+    try:
+        manager.submit("publish-race", BRIEF)
+        worker = manager._worker
+        assert worker is not None
+        worker.join(timeout=5)
+        assert not worker.is_alive()
+        assert len(observed) == 2 and observed[0] == observed[1]
+        assert manager.get("publish-race")["state"] == "verifying"
+        with pytest.raises(GameBuildRejected) as denied:
+            manager.archive("publish-race")
+        assert denied.value.code == "game_archive_not_ready"
+    finally:
+        manager.close()
+    reopened = LocalGameBuilder(backend, database)
+    try:
+        assert reopened.get("publish-race")["state"] == "complete"
+        assert len(pipeline.calls) == 1
+    finally:
+        reopened.close()
