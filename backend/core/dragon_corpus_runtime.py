@@ -161,3 +161,13 @@ async def pulse_media_archive():
         return await _io(lambda:MediaArchive().cleanup())
     except (OSError,TimeoutError,ValueError,RuntimeError,sqlite3.Error,GameLearningError):
         return {"configured":True,"held":True}
+
+
+async def pulse_game_datasets():
+    if not os.getenv("SKL_DRAGON_DATASET_ROOT","").strip():
+        return {"configured":False}
+    from core.dragon_game_datasets import sweep_dataset_shard
+    try:
+        return await _bounded(lambda:sweep_dataset_shard(_path()))
+    except (GameLearningError,sqlite3.Error,OSError,TimeoutError,ValueError,RuntimeError):
+        return {"configured":True,"held":True}
