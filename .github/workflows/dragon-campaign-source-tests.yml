@@ -273,3 +273,9 @@ jobs:
           python -m py_compile skeleton/ai/webcrawler/robots_policy.py scripts/benchmark_dragon_crawler.py
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_protocol_and_scale.py' -v
           python -m scripts.benchmark_dragon_crawler --repetitions 3
+      - name: Disposable parser supervision and evidence custody regressions
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m py_compile skeleton/ai/webcrawler/parser_isolation.py skeleton/ai/webcrawler/parser_worker.py skeleton/ai/webcrawler/evidence_selection.py skeleton/ai/webcrawler/duplicate_custody.py
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_isolation_and_evidence.py' -v
