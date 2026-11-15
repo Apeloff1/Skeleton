@@ -9,12 +9,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 
-from skeleton.frontier.durable_work import DurableWorkJournal, WorkConflict, WorkOrder
+from skeleton.frontier.durable_work import DurableWorkJournal, WorkConflict
 from skeleton.frontier.worker_results import WorkerResultStore, encode_result
 from skeleton.prood.admission import ProodAdmission, build_orders
-from skeleton.prood.design_contract import DesignRequest, PHASES, SCHEMA, digest, validate_context
+from skeleton.prood.design_contract import DesignRequest, PHASES, digest, validate_context
 from skeleton.prood.local_executor import (
-    ComputedResult, LocalWorkerExecutor, WorkerInput, verified_predecessors, worker_input_digest,
+    ComputedResult, LocalWorkerExecutor, WorkerInput, worker_input_digest,
 )
 from skeleton.prood.mechanics_design import build_economy, build_maze, maze_distance, validate_economy
 from skeleton.prood.supervisor import ProodSupervisor
@@ -71,8 +71,7 @@ def _fragment(worker: WorkerInput, ctx: dict):
         bundle["tiles"]=build_tiles(ctx,seat,bundle["maze"])
     else:
         bundle["assets"]=build_assets(bundle["tiles"])
-    if index>=0:
-        validate_world(bundle["world"])
+    validate_world(bundle["world"])
     if index>=1:
         validate_quest(bundle["quest"],bundle["world"])
     if index>=2:

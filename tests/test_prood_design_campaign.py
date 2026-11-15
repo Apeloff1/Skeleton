@@ -117,3 +117,34 @@ async def test_foreign_context_is_not_claimed(tmp_path):
     assert progress(journal,a).pending==6
     db.close()
     rd.close()
+
+
+@pytest.mark.asyncio
+async def test_native_source_is_bound_to_verified_campaign(tmp_path):
+    from skeleton.prood.native_maze import export_native_maze
+    from skeleton.forge.source_manifest import source_manifest
+    db,rd,journal,results=owners(tmp_path)
+    request=DesignRequest("native","Original maze adventure",variants=1,grid_size=13)
+    admit_design(journal,request)
+    with pytest.raises(WorkConflict):
+        export_native_maze(journal,results,request,variant=1)
+    supervisor=design_supervisor(journal,results,request,admission=Permit(),owner="operator")
+    for _ in range(6):
+        assert len((await supervisor.dispatch()).completed)==1
+    native=export_native_maze(journal,results,request,variant=1)
+    assert native.manifest==source_manifest(native.files)
+    assert not native.native_verified
+    data=json.loads(native.files["design.json"])
+    assert data["package_digest"]==native.package_digest
+    assert maze_distance(data["maze"])==data["maze"]["path_length"]
+    assert data["objectives"]
+    assert len({tuple(row["position"]) for row in data["objectives"]})==len(data["objectives"])
+    for row in data["objectives"]:
+        x,y=row["position"]
+        assert data["maze"]["rows"][y][x]=="."
+    assert "func _move(" in native.files["main.gd"]
+    assert "func _selftest(" in native.files["main.gd"]
+    with pytest.raises(ValueError):
+        export_native_maze(journal,results,request,variant=2)
+    db.close()
+    rd.close()

@@ -70,7 +70,7 @@ def maze_distance(maze):
     if (type(width) is not int or type(height) is not int or not 5<=width<=31 or not 5<=height<=31
             or len(rows)!=height or any(type(row) is not str or len(row)!=width or set(row)-{"#","."} for row in rows)):
         raise ValueError("invalid bounded maze")
-    if any(c!=" " and c!="#" for c in rows[0]+rows[-1]) or any(row[0]!="#" or row[-1]!="#" for row in rows):
+    if any(c!="#" for c in rows[0]+rows[-1]) or any(row[0]!="#" or row[-1]!="#" for row in rows):
         raise ValueError("maze boundary is open")
     entry,goal=tuple(maze["entry"]),tuple(maze["exit"])
     for point in (entry,goal):
