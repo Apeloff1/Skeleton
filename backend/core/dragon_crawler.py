@@ -1824,6 +1824,103 @@ class DragonCrawlerApplication:
             raise CrawlerError("crawler_conflict","Expedition changed before archive permission committed.",409)
         return {"ok":True,"session":self._projection(await self._owned(scope,identifier))}
 
+    def _legacy_inspection(self, scope:dict[str,str], row:dict, snapshot:dict)->dict:
+        from skeleton.ai.webcrawler.dragon_legacy_archive import inspect_terminal
+        from skeleton.ai.webcrawler.operations import implementation_digest
+        if (row["status"] not in {"completed","budget_exhausted"} or not row.get("checkpoint_identity")
+                or snapshot["binding"]["code_digest"]==implementation_digest()
+                or _digest(_plain(row["request"]))!=row["request_digest"]
+                or abs(_utc(row["consent_expires_at"]).timestamp()-row["consent"]["expires_at"])>=.002):
+            raise ValueError("not a witnessed historical-runtime record")
+        verify_primary(snapshot,_plain(row["checkpoint_identity"]))
+        if set(self._source_policies(row))-set(snapshot["sources"]):
+            raise ValueError("orphaned historical source policy")
+        return inspect_terminal(snapshot,scope=scope,request_digest=row["request_digest"],
+                                consent=_plain(row["consent"]),now=_now().timestamp())
+
+    async def legacy_treasury_catalog(self,scope:dict[str,str])->dict:
+        """Discover exactly witnessed legacy terminal rows, never resume them."""
+        from skeleton.ai.webcrawler.operations import implementation_digest
+        metadata=await self.sessions.find({**scope,"status":{"$in":["completed","budget_exhausted"]},
+                  "snapshot.binding.code_digest":{"$ne":implementation_digest()}},
+                  {"_id":1,"version":1}).sort("_id",DESCENDING).limit(MAX_SESSIONS+1).max_time_ms(2000).to_list(MAX_SESSIONS+1)
+        items=[]
+        for item in metadata[:MAX_SESSIONS]:
+            row=await self.sessions.find_one({"_id":item["_id"],**scope,"version":item["version"]},max_time_ms=2000)
+            if row is None:
+                raise CrawlerError("crawler_treasury_changed","Historical catalogue changed. Refresh.",409)
+            try:
+                snapshot=_plain(row["snapshot"])
+                proof=self._legacy_inspection(scope,row,snapshot)
+                from skeleton.ai.webcrawler.dragon_archive_grant import eligible_source,public_grant
+                eligible=sum(eligible_source(snapshot["sources"][sid],self._capture_policy(row,snapshot["sources"][sid]))
+                             for sid in proof["verified_source_ids"])
+                grant=public_grant(_plain(row["archive_grant"]) if row.get("archive_grant") else None,
+                    now=_now().timestamp(),snapshot_digest=snapshot["snapshot_digest"],sources=snapshot["sources"],
+                    policies=self._source_policies(row))
+                detail={"qualified":True,"eligible_sources":eligible,"archive_grant":grant,
+                        "snapshot_digest":snapshot["snapshot_digest"],"historical_runtime_digest":proof["historical_runtime_digest"]}
+            except (ValueError,TypeError,KeyError,CrawlerError,CheckpointReplicaError):
+                detail={"qualified":False,"eligible_sources":0,"archive_grant":None,
+                        "snapshot_digest":None,"historical_runtime_digest":None}
+            items.append({"session_id":item["_id"],"version":int(item["version"]),**detail})
+        # Recheck the set as well as individual versions; a changed catalogue
+        # must not hand out a stale migration candidate.
+        final=await self.sessions.find({**scope,"status":{"$in":["completed","budget_exhausted"]},
+                  "snapshot.binding.code_digest":{"$ne":implementation_digest()}},
+                  {"_id":1,"version":1}).sort("_id",DESCENDING).limit(MAX_SESSIONS+1).max_time_ms(2000).to_list(MAX_SESSIONS+1)
+        if final!=metadata:
+            raise CrawlerError("crawler_treasury_changed","Historical catalogue changed. Refresh.",409)
+        return {"ok":True,"schema":"skeleton.dragon.legacy-catalog.v1","sessions":items,
+                "capacity_reached":len(metadata)>MAX_SESSIONS,"execution_authorized":False}
+
+    async def configure_legacy_archive(self,scope:dict[str,str],identifier:str,body:dict,*,principal:dict)->dict:
+        """Explicit archive-only compatibility grant, leaving old bytes intact."""
+        from skeleton.ai.webcrawler.dragon_archive_grant import create_grant,public_grant
+        from skeleton.ai.webcrawler.dragon_index_manifest import build_manifest
+        if authenticated_scope(principal)!=scope or body.get("enabled") is True and principal.get("role") not in {"editor","admin"}:
+            raise CrawlerError("crawler_archive_denied","Current owner authorization required.",403)
+        if (set(body)!={"expected_version","idempotency_key","enabled","days","archive_rights_acknowledged"}
+                or type(body["enabled"]) is not bool or type(body["days"]) is not int or not 1<=body["days"]<=30
+                or type(body["expected_version"]) is not int or body["expected_version"]<1
+                or type(body["archive_rights_acknowledged"]) is not bool
+                or body["enabled"] and body["archive_rights_acknowledged"] is not True):
+            raise CrawlerError("crawler_archive_invalid","Explicit historical retention rights required.")
+        row=await self.sessions.find_one({"_id":identifier,**scope,"status":{"$in":["completed","budget_exhausted"]}},max_time_ms=2000)
+        if row is None:
+            raise CrawlerError("crawler_not_found","Historical session not found.",404)
+        operation=_operation(body["idempotency_key"])
+        digest=_digest({"action":"legacy_archive",**body})
+        prior=self._prior(row,operation,digest,safety=not body["enabled"])
+        if prior is not None:
+            return {"ok":True,"version":int(row["version"]),"enabled":row.get("archive_grant") is not None,
+                    "execution_authorized":False}
+        if row["version"]!=body["expected_version"]:
+            raise CrawlerError("crawler_conflict","Refresh historical session before migration.",409)
+        grant,segment,proof=None,None,None
+        if body["enabled"]:
+            try:
+                snapshot=_plain(row["snapshot"])
+                proof=self._legacy_inspection(scope,row,snapshot)
+                filtered={**snapshot,"sources":{sid:snapshot["sources"][sid] for sid in proof["verified_source_ids"]}}
+                now=_now().timestamp()
+                grant=create_grant(snapshot=filtered,policies=self._source_policies(row),now=now,days=body["days"])
+                segment=await asyncio.to_thread(build_manifest,filtered,grant,now=now)
+            except (ValueError,TypeError,KeyError,CheckpointReplicaError) as exc:
+                raise CrawlerError("crawler_legacy_hold","Historical bytes did not qualify for read-only migration.",403) from exc
+        audit={"operation":operation,"request_digest":digest,"action":"legacy_archive","state":"completed",
+               "enabled":body["enabled"]}
+        receipt=await self._admit(scope,identifier,{"archive_grant":grant,"treasury_index":segment,
+                                                  "legacy_archive_receipt":proof,"audit":audit})
+        path="safety_control" if len(row.get("operations",{}))>=MAX_OPERATIONS else "operations."+operation
+        changed=await self.sessions.update_one({"_id":identifier,**scope,"version":row["version"],
+            "status":{"$in":["completed","budget_exhausted"]}},
+            {"$set":{"archive_grant":grant,"treasury_index":segment,"legacy_archive_receipt":proof,
+                      "storage_receipt":receipt,"updated_at":_now(),path:audit},"$inc":{"version":1}})
+        if not changed.modified_count:
+            raise CrawlerError("crawler_conflict","Historical session changed before archive admission.",409)
+        return {"ok":True,"version":int(row["version"])+1,"enabled":grant is not None,"execution_authorized":False}
+
     async def treasury_passage(self, scope: dict[str, str], identifier: str,
                                source_id: str, *, offset: int = 0, length: int = 1600) -> dict:
         """Read an exact retained-text span for owner inspection, never model context."""
@@ -1833,8 +1930,24 @@ class DragonCrawlerApplication:
                 or type(offset) is not int or not 0<=offset<=24000
                 or type(length) is not int or not 1<=length<=4000):
             raise CrawlerError("crawler_treasury_span_invalid","Invalid historical passage coordinates.")
-        row = await self._owned(scope,identifier)
-        snapshot = _plain(row["snapshot"])
+        legacy=False
+        try:
+            row = await self._owned(scope,identifier)
+            snapshot = _plain(row["snapshot"])
+        except CrawlerError as exc:
+            if exc.code not in {"crawler_integrity","crawler_checkpoint_unrecoverable"}:
+                raise
+            row=await self.sessions.find_one({"_id":identifier,**scope},max_time_ms=2000)
+            if row is None:
+                raise exc
+            try:
+                snapshot=_plain(row["snapshot"])
+                proof=self._legacy_inspection(scope,row,snapshot)
+                if row.get("legacy_archive_receipt")!=proof or source_id not in proof["verified_source_ids"]:
+                    raise ValueError("legacy source not admitted")
+                legacy=True
+            except (ValueError,TypeError,KeyError,CheckpointReplicaError) as invalid:
+                raise CrawlerError("crawler_legacy_hold","Historical source is not qualified.",403) from invalid
         source = snapshot["sources"].get(source_id)
         if source is None:
             raise CrawlerError("crawler_source_not_found","Retained source not found.",404)
@@ -1845,7 +1958,7 @@ class DragonCrawlerApplication:
         policy = self._capture_policy(row,source)
         expiry = None
         history_only = False
-        if policy["enabled"] and _utc(row["consent_expires_at"]).timestamp()>now:
+        if not legacy and policy["enabled"] and _utc(row["consent_expires_at"]).timestamp()>now:
             fresh = self._capture_freshness(row,source)
             if fresh["usable"]:
                 expiry = datetime.fromisoformat(fresh["valid_until"]).timestamp()
@@ -1877,7 +1990,7 @@ class DragonCrawlerApplication:
                 "offset":offset,"end":end,"total_chars":len(text),
                 "text":span,"span_sha256":hashlib.sha256(span.encode("utf-8")).hexdigest(),
                 "next_offset":end if end<len(text) else None,"history_only":history_only,
-                "review_state":"unreviewed","model_context_permission":False,
+                "review_state":"unreviewed","legacy_history_only":legacy,"model_context_permission":False,
                 "training_permission":False,"network_executed":False}
 
     async def companion_treasury(self, scope: dict[str, str], *, mode: str,
@@ -1909,6 +2022,7 @@ class DragonCrawlerApplication:
         observations = []
         materialized = {}
         invalid_segments = 0
+        legacy_sessions = 0
         alias_blockers = []
         eligible = []
         revisions = []
@@ -1919,7 +2033,7 @@ class DragonCrawlerApplication:
                 {"_id": 1, "tenant_id": 1, "owner_id": 1, "status": 1, "version": 1,
                  "consent_expires_at": 1, "request": 1, "request_digest": 1, "consent": 1,
                  "snapshot": 1, "checkpoint_identity": 1, "source_use_policies": 1,
-                 "archive_grant": 1, "treasury_index": 1}, max_time_ms=2000,
+                 "archive_grant": 1, "treasury_index": 1,"legacy_archive_receipt":1}, max_time_ms=2000,
             )
             if row is None:
                 raise CrawlerError("crawler_treasury_changed", "Treasury changed during reparse.", 409)
@@ -1930,7 +2044,16 @@ class DragonCrawlerApplication:
                 if witness is None:
                     raise ValueError("missing exact primary witness")
                 verify_primary(snapshot, _plain(witness))
-                runtime = run_type.from_snapshot(snapshot)
+                legacy=False
+                try:
+                    runtime=run_type.from_snapshot(snapshot)
+                    sources=runtime.sources()
+                except (ValueError,TypeError,KeyError):
+                    proof=self._legacy_inspection(scope,row,snapshot)
+                    legacy=True
+                    sources=list(snapshot["sources"].values())
+                    legacy_ids=set(proof["verified_source_ids"]) if row.get("legacy_archive_receipt")==proof else set()
+                    legacy_sessions+=1
                 binding = snapshot["binding"]
                 if (row["status"] == "deleted" or binding["scope"] != scope
                         or binding["consent"] != _plain(row["consent"])
@@ -1957,7 +2080,7 @@ class DragonCrawlerApplication:
                 local_materialized = {}
                 # Metadata-only history may be retained by the existing
                 # owner checkpoint; no expired source text enters the index.
-                for source in sorted(runtime.sources(), key=lambda val: (
+                for source in sorted(sources, key=lambda val: (
                     val["fetched_at"], val["source_id"]), reverse=True):
                     stamp = source["fetched_at"]
                     if stamp > when + 300:
@@ -1965,7 +2088,7 @@ class DragonCrawlerApplication:
                     policy = policies.get(source["source_id"], {"enabled": True,
                                           "max_age_seconds": MAX_SOURCE_AGE_SECONDS})
                     fresh = None
-                    if (row["status"] != "cancelled" and policy["enabled"]
+                    if (not legacy and row["status"] != "cancelled" and policy["enabled"]
                             and _utc(row["consent_expires_at"]) > at
                             and stamp + policy["max_age_seconds"] > when):
                         fresh = self._capture_freshness(row, source)
@@ -1974,7 +2097,7 @@ class DragonCrawlerApplication:
                     if expiry is not None and expiry <= when:
                         allowed, expiry = False, None
                     archive_only = False
-                    if not allowed and grant is not None:
+                    if not allowed and grant is not None and (not legacy or source["source_id"] in legacy_ids):
                         expiry = archive_expiry(grant, snapshot_digest=snapshot["snapshot_digest"],
                             source=source, policy={**{"version":0}, **policy}, now=when)
                         allowed = expiry is not None
@@ -1988,7 +2111,7 @@ class DragonCrawlerApplication:
                         "sensitive": (str(identifier) + ":" + source["source_id"])
                                      if freshness.get("sensitive_vary") or freshness.get("private") else None,
                     })
-                    refresh_allowed = (row["status"] != "cancelled" and policy["enabled"]
+                    refresh_allowed = (not legacy and row["status"] != "cancelled" and policy["enabled"]
                                        and not freshness.get("private") and not freshness.get("sensitive_vary")
                                        and not freshness.get("no_store"))
                     # Stale source text remains unavailable. A fresh grant
@@ -2005,7 +2128,8 @@ class DragonCrawlerApplication:
                         posting=usable_posting(segment,source,{**{"version":0},**policy})
                         if posting is not None:
                             local_materialized[str(identifier),source["source_id"]]=posting
-                        usable.append(SanctuarySource(
+                        if not legacy:
+                            usable.append(SanctuarySource(
                             str(identifier), source["source_id"], source["content_hash"],
                             source["fetched_url"], source["content_type"], source["text"],
                             row["request"].get("query", ""), stamp, expiry,
@@ -2024,7 +2148,7 @@ class DragonCrawlerApplication:
                                   key=lambda x:(-x.captured_at,x.session_id,x.source_id))[:256]
                     materialized={(x.session_id,x.source_id):materialized[x.session_id,x.source_id] for x in newest}
                 alias_blockers.extend(local_aliases)
-                if len(revisions)<MAX_EXPEDITIONS:
+                if not legacy and len(revisions)<MAX_EXPEDITIONS:
                     eligible.extend(usable[:16])
                     revisions.append({"session_id": str(identifier), "version": int(version),
                                       "snapshot_digest": snapshot["snapshot_digest"]})
@@ -2039,6 +2163,7 @@ class DragonCrawlerApplication:
                                     alias_blockers=alias_blockers,materialized=materialized,cursor=cursor,
                                     observed_before=observed_before,left=left,right=right)
             result["invalid_materialized_segments"]=invalid_segments
+            result["legacy_history_sessions"]=legacy_sessions
         except ValueError as exc:
             raise CrawlerError("crawler_treasury_invalid", "Treasury reparse could not be qualified.", 422) from exc
         for identifier, version in fence:
@@ -3308,6 +3433,7 @@ class DragonCrawlerApplication:
                     "source_use_policies": "",
                     "archive_grant": "",
                     "treasury_index": "",
+                    "legacy_archive_receipt": "",
                     "treasury_watch": "",
                     "treasury_watch_parent": "",
                 },
