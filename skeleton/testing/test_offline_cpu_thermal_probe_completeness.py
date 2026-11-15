@@ -209,3 +209,67 @@ def test_unknown_trip_temperature_suffix_blocks_whole_sample(tmp_path):
     first = zone(tmp_path, "thermal_zone0")
     (first / "trip_point_1_temp_backup").write_text("60000", encoding="ascii")
     assert probe_cpu_thermal(tmp_path) == ()
+
+
+@pytest.mark.parametrize("value", [None, True, 10**400, float("nan"), float("inf"), "50"])
+def test_sensor_requires_bounded_numeric_temperature(value):
+    from skeleton.app.offline_cpu_thermal import CPUThermalSensor
+    with pytest.raises(ValueError):
+        CPUThermalSensor("thermal_zone0", "cpu", value, 90.0)
+
+
+def test_duplicate_zone_identity_latches_hold():
+    from skeleton.app.offline_cpu_thermal import CPUThermalSensor
+    controller = CPUThermalController()
+    controller.observe((
+        CPUThermalSensor("thermal_zone0", "cpu", 40.0, 90.0),
+        CPUThermalSensor("thermal_zone0", "soc", 40.0, 90.0),
+    ))
+    snapshot = controller.snapshot()
+    assert snapshot["sensor_identity_drift"] and snapshot["thermal_backpressure"]
+
+
+def test_zone_replaced_during_attribute_read_is_not_authoritative(tmp_path, monkeypatch):
+    from skeleton.app import offline_cpu_thermal as thermal
+    first = zone(tmp_path, "thermal_zone0")
+    original = thermal._read_pinned_ascii
+    replaced = False
+
+    def read(fd, name, limit):
+        nonlocal replaced
+        result = original(fd, name, limit)
+        if name == "temp" and not replaced:
+            replaced = True
+            first.rename(tmp_path / "retired")
+            zone(tmp_path, "thermal_zone0", temp="100000")
+        return result
+
+    monkeypatch.setattr(thermal, "_read_pinned_ascii", read)
+    assert probe_cpu_thermal(tmp_path) == ()
+    assert replaced
+
+
+def test_new_zone_during_observation_invalidates_inventory(tmp_path, monkeypatch):
+    from skeleton.app import offline_cpu_thermal as thermal
+    zone(tmp_path, "thermal_zone0")
+    original = thermal._read_pinned_ascii
+    added = False
+
+    def read(fd, name, limit):
+        nonlocal added
+        result = original(fd, name, limit)
+        if name == "temp" and not added:
+            added = True
+            zone(tmp_path, "thermal_zone1", temp="100000")
+        return result
+
+    monkeypatch.setattr(thermal, "_read_pinned_ascii", read)
+    assert probe_cpu_thermal(tmp_path) == ()
+    assert added
+
+
+def test_noncanonical_trip_identity_is_rejected(tmp_path):
+    first = zone(tmp_path, "thermal_zone0")
+    (first / "trip_point_00_temp").write_text("80000", encoding="ascii")
+    (first / "trip_point_00_type").write_text("critical", encoding="ascii")
+    assert probe_cpu_thermal(tmp_path) == ()
