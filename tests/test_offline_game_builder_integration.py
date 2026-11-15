@@ -644,3 +644,58 @@ def test_publication_retry_cannot_adopt_a_changed_pending_journal(tmp_path, pipe
         assert len(pipeline.calls) == 1
     finally:
         reopened.close()
+
+
+def test_public_planning_projection_redacts_backend_diagnostics_at_every_attempt(tmp_path, pipeline):
+    sentinel = "/private/operator/planning-diagnostics"
+    def mutate(report, _out):
+        report["planning"].update(
+            raw_output=sentinel, command=sentinel,
+            attempts=[
+                {"attempt": 1, "elapsed_seconds": 0.1, "output_tokens": 42,
+                 "response_sha256": "a" * 64, "execution_receipt_sha256": "b" * 64,
+                 "violations": ["invalid:gameplay.theme", sentinel], "log": sentinel},
+                {"attempt": 2, "elapsed_seconds": 0.2, "output_tokens": 43,
+                 "response_sha256": "c" * 64, "execution_receipt_sha256": "d" * 64,
+                 "violations": [], "raw_prompt": sentinel},
+            ],
+        )
+        report["reason"] = sentinel
+    pipeline.mutate = mutate
+    manager = LocalGameBuilder(model(), tmp_path / "workspace.sqlite3")
+    try:
+        manager.submit("private-planning", BRIEF)
+        job = terminal(manager, "private-planning")
+        assert job["state"] == "complete"
+        assert sentinel not in json.dumps(job)
+        assert job["result"]["planning"]["attempts"][0]["violations"] == [
+            "invalid:gameplay.theme", "unclassified_rejection"]
+        assert job["result"]["planning"]["attempts"][1]["execution_receipt_sha256"] == "d" * 64
+        with zipfile.ZipFile(io.BytesIO(manager.archive("private-planning"))) as archive:
+            assert sentinel.encode() not in archive.read("JEEVES_BUILD.json")
+        assert len(pipeline.calls) == 1
+    finally:
+        manager.close()
+
+
+@pytest.mark.parametrize("damage", [
+    {"status": "foreign-status"},
+    {"attempts": [{}, {}, {}]},
+    {"network_provider_used": True},
+    {"quality_qualified": True},
+    {"generated_source_admitted": 0},
+    {"runtime_digest": "not-a-digest"},
+    {"instruction_policy": "foreign-policy"},
+])
+def test_invalid_public_planning_receipt_never_publishes_source(tmp_path, pipeline, damage):
+    pipeline.mutate = lambda report, _out: report["planning"].update(damage)
+    manager = LocalGameBuilder(model(), tmp_path / "workspace.sqlite3")
+    try:
+        manager.submit("invalid-planning", BRIEF)
+        assert terminal(manager, "invalid-planning")["state"] == "failed"
+        with pytest.raises(GameBuildRejected) as denied:
+            manager.archive("invalid-planning")
+        assert denied.value.status == 409
+        assert len(pipeline.calls) == 1
+    finally:
+        manager.close()
