@@ -45,10 +45,15 @@ CREATE TABLE IF NOT EXISTS games(
 CREATE VIRTUAL TABLE IF NOT EXISTS game_search USING fts5(
  owner, game_id UNINDEXED, title, tokenize='unicode61'
 );
+CREATE TABLE IF NOT EXISTS aliases(
+ owner TEXT NOT NULL, game TEXT NOT NULL, title TEXT NOT NULL,
+ PRIMARY KEY(owner,game,title), FOREIGN KEY(owner,game) REFERENCES games(owner,id)
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS sources(
  owner TEXT NOT NULL, game TEXT NOT NULL, id TEXT NOT NULL,
  url TEXT NOT NULL, kind TEXT NOT NULL, language TEXT NOT NULL,
  last_observed INTEGER NOT NULL, next_review INTEGER NOT NULL,
+ latest_event TEXT NOT NULL,
  PRIMARY KEY(owner,game,id),
  FOREIGN KEY(owner,game) REFERENCES games(owner,id)
 ) WITHOUT ROWID;
@@ -60,7 +65,7 @@ CREATE TABLE IF NOT EXISTS observations(
  FOREIGN KEY(owner,game,source) REFERENCES sources(owner,game,id)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS observation_history
- ON observations(owner,game,recorded_at DESC,source,event_key);
+ ON observations(owner,game,recorded_at DESC,source DESC,event_key DESC);
 """
 
 
@@ -183,11 +188,13 @@ class GameCorpus:
                     db.execute("INSERT INTO games VALUES(?,?,?,?,?,?,?)",
                                (owner,gid,namespace,external_id,title,stage,now))
                     db.execute("UPDATE counters SET games=games+1 WHERE owner=?",(owner,))
-                    db.execute("INSERT INTO game_search(owner,game_id,title) VALUES(?,?,?)",(owner,gid,title))
                 else:
                     # Keep first-seen title/stage as identity hints, NOT a consensus
                     # current version; conflicting source observations remain separate.
                     db.execute("UPDATE games SET updated_at=? WHERE owner=? AND id=?",(now,owner,gid))
+                alias = db.execute("INSERT OR IGNORE INTO aliases VALUES(?,?,?)",(owner,gid,title))
+                if alias.rowcount:
+                    db.execute("INSERT INTO game_search(owner,game_id,title) VALUES(?,?,?)",(owner,gid,title))
                 old_source = db.execute("SELECT 1 FROM sources WHERE owner=? AND game=? AND id=?",
                                         (owner,gid,sid)).fetchone()
                 if not old_source:
@@ -197,9 +204,9 @@ class GameCorpus:
                 next_review = now + KINDS[kind]
                 if stage in {"announced","early_access","updated"}:
                     next_review = now + min(21600,KINDS[kind])
-                db.execute("""INSERT INTO sources VALUES(?,?,?,?,?,?,?,?)
+                db.execute("""INSERT INTO sources VALUES(?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(owner,game,id) DO UPDATE SET last_observed=excluded.last_observed,
-                    next_review=excluded.next_review""",(owner,gid,sid,url,kind,language,now,next_review))
+                    next_review=excluded.next_review,latest_event=excluded.latest_event""",(owner,gid,sid,url,kind,language,now,next_review,event_key))
                 db.execute("INSERT INTO observations VALUES(?,?,?,?,?,?,?)",
                            (owner,gid,sid,event_key,fingerprint,json.dumps(payload,ensure_ascii=False,sort_keys=True),now))
                 db.execute("UPDATE counters SET revisions=revisions+1 WHERE owner=?",(owner,))
@@ -224,7 +231,7 @@ class GameCorpus:
             raise ValueError("search requires title terms")
         fts = 'owner : "' + owner + '" AND title : (' + " AND ".join('"'+word+'"' for word in words) + ")"
         with self._db() as db:
-            rows = db.execute("""SELECT g.id AS game_id,g.namespace,g.external_id,g.title AS first_title,
+            rows = db.execute("""SELECT DISTINCT g.id AS game_id,g.namespace,g.external_id,g.title AS first_title,
                 g.stage AS first_stage,g.updated_at FROM game_search f JOIN games g
                 ON g.owner=f.owner AND g.id=f.game_id
                 WHERE game_search MATCH ? AND g.owner=?
@@ -267,9 +274,13 @@ class GameCorpus:
         limit = _limit(limit)
         after = _id(after) if after is not None else ""
         with self._db() as db:
-            rows = db.execute("""SELECT id AS source_id,url,kind,language,last_observed,next_review
-                FROM sources WHERE owner=? AND game=? AND id>? ORDER BY id LIMIT ?""",
+            rows = db.execute("""SELECT s.id AS source_id,s.url,s.kind,s.language,s.last_observed,s.next_review,
+                o.payload AS latest_observation,o.digest AS observation_digest
+                FROM sources s JOIN observations o ON o.owner=s.owner AND o.game=s.game
+                AND o.source=s.id AND o.event_key=s.latest_event
+                WHERE s.owner=? AND s.game=? AND s.id>? ORDER BY s.id LIMIT ?""",
                 (owner,game,after,limit+1)).fetchall()
-        return {"sources":[dict(row) for row in rows[:limit]],
+        return {"sources":[{**dict(row),"latest_observation":json.loads(row["latest_observation"]),
+                            "verified":False} for row in rows[:limit]],
                 "next_cursor":rows[limit-1]["source_id"] if len(rows)>limit else None,
                 "crawl_authorized":False,"source_use_authorized":False}
