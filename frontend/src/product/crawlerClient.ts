@@ -116,11 +116,12 @@ export type TreasuryFamily = {
     fresh_consent_required: true; network_executed: false };
 };
 export type DragonTreasury = {
-  schema: 'skeleton.dragon.treasury.v1'; parser: 'retained-text-sections-v2'; mode: TreasuryMode;
+  schema: 'skeleton.dragon.treasury.v1'; parser: 'retained-text-sections-v3'; mode: TreasuryMode;
   family: string | null; as_of_unix: number; partition_digest: string; candidate_limit_reached: boolean; excluded_sessions: number;
   observations: number; families: number; revisions: number; changed_families: number; rollbacks: number;
   current_indexed: number; historic_indexed: number; metadata_only: number; blocked_current: number; changes: number; revalidated_revisions: number;
   verified_historic_transitions: number; verified_changed_families: number; alias_held_families: number; revisit_plan: string[]; parsed_unique_payloads: number;
+  materialized_payload_hits: number; invalid_materialized_segments: number;
   evolution: DragonEvolution; family_rows: TreasuryFamily[]; hits: TreasuryRevision[];
   timeline: TreasuryRevision[]; comparison: { current: TreasuryRevision; previous: TreasuryRevision; delta: TreasuryDelta } | null;
   earliest_source_expiry: number | null; latest_observed_only: true; source_text_returned: false;
@@ -438,7 +439,7 @@ function validRevision(v: TreasuryRevision): boolean {
   return !!v && HASH.test(v.revision_id) && HASH.test(v.family_id)
     && (v.previous_revision_id===null||HASH.test(v.previous_revision_id))
     && Number.isFinite(v.first_seen) && v.first_seen>=0 && Number.isFinite(v.last_seen) && v.last_seen>=v.first_seen
-    && integer(v.reobservations,512) && typeof v.indexed==='boolean' && v.metadata_only===!v.indexed
+    && integer(v.reobservations,2048) && typeof v.indexed==='boolean' && v.metadata_only===!v.indexed
     && typeof v.archive_only==='boolean' && typeof v.latest_observed==='boolean' && ['historic','current'].includes(v.plane)
     && (v.plane!=='current'||v.latest_observed&&!v.archive_only)
     && (v.indexed ? typeof v.session_id==='string'&&ID.test(v.session_id)&&typeof v.source_id==='string'&&HASH.test(v.source_id)&&typeof v.projection_digest==='string'&&HASH.test(v.projection_digest)
@@ -448,7 +449,7 @@ function validRevision(v: TreasuryRevision): boolean {
     && validDelta(v.delta) && (v.score===undefined||Number.isFinite(v.score)&&v.score>=0);
 }
 function validFamily(f: TreasuryFamily): boolean {
-  if(!f||!HASH.test(f.family_id)||!HASH.test(f.current_revision)||!integer(f.revision_count,512)||f.revision_count===0
+  if(!f||!HASH.test(f.family_id)||!HASH.test(f.current_revision)||!integer(f.revision_count,2048)||f.revision_count===0
     ||!Number.isFinite(f.first_seen)||!Number.isFinite(f.last_seen)||f.last_seen<f.first_seen
     ||typeof f.current_indexed!=='boolean'||typeof f.simultaneous_conflict!=='boolean'||typeof f.alias_conflict!=='boolean'||((f.simultaneous_conflict||f.alias_conflict)&&f.current_indexed))return false;
   if(f.refresh_url!==null){try{const u=new URL(f.refresh_url);if(f.refresh_url.length>4096||!['http:','https:'].includes(u.protocol)||u.username||u.password)return false;}catch{return false;}}
@@ -483,15 +484,16 @@ export async function getTreasuryPassage(sessionId: string, sourceId: string, of
 export async function getDragonTreasury(mode: TreasuryMode, query='', family?: string, signal?: AbortSignal): Promise<DragonTreasury> {
   if (!['current_only','historic_only','all_revisions','timeline','compare'].includes(mode)||query.length>256||family!==undefined&&!HASH.test(family)) invalid('Invalid treasury search.');
   const p=await read(api.get<DragonTreasury>(ROOT+'/companion/treasury?mode='+mode+'&query='+encodeURIComponent(query)+(family?'&family='+family:''),options(signal)),getAuthToken(),'Treasury reparse failed.');
-  if(!p||p.schema!=='skeleton.dragon.treasury.v1'||p.parser!=='retained-text-sections-v2'||p.mode!==mode||p.family!==(family??null)
-    ||!Number.isFinite(p.as_of_unix)||!HASH.test(p.partition_digest)||typeof p.candidate_limit_reached!=='boolean'||!integer(p.excluded_sessions,8)
-    ||!integer(p.observations,512)||!integer(p.families,p.observations)||!integer(p.revisions,p.observations)
+  if(!p||p.schema!=='skeleton.dragon.treasury.v1'||p.parser!=='retained-text-sections-v3'||p.mode!==mode||p.family!==(family??null)
+    ||!Number.isFinite(p.as_of_unix)||!HASH.test(p.partition_digest)||typeof p.candidate_limit_reached!=='boolean'||!integer(p.excluded_sessions,32)
+    ||!integer(p.observations,2048)||!integer(p.families,p.observations)||!integer(p.revisions,p.observations)
     ||!integer(p.current_indexed,p.families)||!integer(p.historic_indexed,p.revisions)||!integer(p.metadata_only,p.revisions)
     ||p.current_indexed+p.historic_indexed+p.metadata_only!==p.revisions
     ||!integer(p.blocked_current,p.families)||p.blocked_current+p.current_indexed!==p.families
     ||!integer(p.changed_families,p.families)||!integer(p.rollbacks,p.revisions)||!integer(p.changes,p.revisions)
     ||!integer(p.revalidated_revisions,p.observations)||!integer(p.verified_historic_transitions,p.historic_indexed)
-    ||!integer(p.verified_changed_families,p.changed_families)||!integer(p.alias_held_families,p.blocked_current)||!integer(p.parsed_unique_payloads,Math.min(128,p.observations))
+    ||!integer(p.verified_changed_families,p.changed_families)||!integer(p.alias_held_families,p.blocked_current)||!integer(p.parsed_unique_payloads,Math.min(256,p.observations))
+    ||!integer(p.materialized_payload_hits,p.parsed_unique_payloads)||!integer(p.invalid_materialized_segments,32)
     ||!Array.isArray(p.revisit_plan)||p.revisit_plan.length>24||p.revisit_plan.length>p.families
     ||p.revisit_plan.some(id=>typeof id!=='string'||!HASH.test(id))||new Set(p.revisit_plan).size!==p.revisit_plan.length
     ||!validEvolution(p.evolution)||!Array.isArray(p.family_rows)||p.family_rows.length>24||!p.family_rows.every(validFamily)
