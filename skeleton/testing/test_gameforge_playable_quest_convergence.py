@@ -415,3 +415,70 @@ def test_portable_zip_refuses_symlink_and_nonregular_input(tmp_path):
         reopen_archive(alias, source_manifest(files)["sha256"])
     with pytest.raises(PortableSourceError, match="not a file"):
         reopen_archive(tmp_path, source_manifest(files)["sha256"])
+
+
+@pytest.mark.parametrize("mode", content_archetypes())
+def test_portable_project_inspection_reconciles_native_template(mode):
+    from scripts.verify_gameforge_source_zip import inspect_archive
+    files = attach_archetype_content(base(), mode, operator_axes={"tempo": 0.5, "grind": 0.75})
+    _, receipt = inspect_archive(_portable_zip(sorted(files.items())), source_manifest(files)["sha256"])
+    inspection = receipt["project_inspection"]
+    assert inspection["native_template"] == "verified"
+    assert inspection["tuning"] == "verified"
+    assert inspection["current_template_compatible"]
+    assert not inspection["native_execution_qualified"]
+    assert inspection["playable_modes"] == [mode]
+
+
+def test_portable_project_verifies_galaxy_override_and_profile_without_execution():
+    from scripts.verify_gameforge_source_zip import inspect_archive
+    from skeleton.context.galaxy_profile import (
+        MATRIX_FIELDS, SCHEMA, attach_galaxy_profile, compile_galaxy_playable_axes,
+        seal_galaxy_playable_controls,
+    )
+    from skeleton.forge.playable_portal import attach_playable_portal
+    config = {name: {} for name in MATRIX_FIELDS}
+    config.update(title="Recovered factory", genre="simulation", narrative_phases={},
+                  extra_params={}, style_params={})
+    config["mechanics_matrix"]["building"] = {"count": 1000}
+    profile = {"schema": SCHEMA, "config": config}
+    axes, pending = compile_galaxy_playable_axes(profile, "pipeline", {"grind": 0.0})
+    files = attach_archetype_content(base(), "pipeline", operator_axes=axes)
+    files = attach_galaxy_profile(files, profile)
+    files, _ = seal_galaxy_playable_controls(files, pending)
+    _, receipt = inspect_archive(_portable_zip(sorted(files.items())), source_manifest(files)["sha256"])
+    inspection = receipt["project_inspection"]
+    assert inspection["galaxy_profile"] == "verified"
+    assert inspection["galaxy_controls"] == "verified"
+    assert inspection["mapped_matrix_dials"] == 1
+    assert inspection["applied"]["pipeline.shipment_quota"] == 2
+    assert inspection["current_template_compatible"]
+
+
+@pytest.mark.parametrize("mutation", ["script", "duplicate_json", "foreign_mode", "invented_effect"])
+def test_portable_project_preserves_historical_source_but_strict_mode_refuses(tmp_path, mutation):
+    import json
+    from scripts.verify_gameforge_source_zip import PortableSourceError, reopen_archive
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+    files = attach_archetype_content(base(), "pipeline", operator_axes={"grind": 1.0})
+    if mutation == "script":
+        files["scripts/archetypes/pipeline/core_loop.gd"] += "\n# historical"
+    elif mutation == "duplicate_json":
+        files[SOURCE_PATH] = files[SOURCE_PATH].replace('"mode":"pipeline"', '"mode":"pipeline","mode":"pipeline"')
+    else:
+        receipt = json.loads(files[SOURCE_PATH])
+        if mutation == "foreign_mode":
+            receipt["mode"] = "racing"
+        else:
+            receipt["applied"]["pipeline.shipment_quota"] = 999
+        files[SOURCE_PATH] = json.dumps(receipt)
+    archive = tmp_path / "source.zip"
+    archive.write_bytes(_portable_zip(sorted(files.items())))
+    digest = source_manifest(files)["sha256"]
+    report = reopen_archive(archive, digest)
+    assert report["source_verified"]
+    assert not report["project_inspection"]["current_template_compatible"]
+    output = tmp_path / "strict"
+    with pytest.raises(PortableSourceError, match="current native template"):
+        reopen_archive(archive, digest, output, require_current_template=True)
+    assert not output.exists()

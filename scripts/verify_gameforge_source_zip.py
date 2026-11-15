@@ -81,7 +81,7 @@ def _validate_zip_layout(raw: bytes, members: list[zipfile.ZipInfo]) -> None:
     signature, disk, central_disk, count_disk, count, size, offset, comment = struct.unpack_from(
         "<4s4H2IH", raw, end,
     )
-    if (signature != b"PK\\x05\\x06" or disk or central_disk or comment
+    if (signature != b"PK\x05\x06" or disk or central_disk or comment
             or count != count_disk or count != len(members)
             or offset + size != end or offset > end):
         raise PortableSourceError("invalid or noncanonical ZIP end record")
@@ -92,7 +92,7 @@ def _validate_zip_layout(raw: bytes, members: list[zipfile.ZipInfo]) -> None:
             raise PortableSourceError("unindexed or overlapping ZIP source data")
         local = struct.unpack_from("<4s5H3I2H", raw, cursor)
         signature, version, flags, method, _, _, crc, packed, unpacked, name_len, extra_len = local
-        if (signature != b"PK\\x03\\x04" or version > 20 or flags != member.flag_bits
+        if (signature != b"PK\x03\x04" or version > 20 or flags != member.flag_bits
                 or method != member.compress_type or crc != member.CRC
                 or packed != member.compress_size or unpacked != member.file_size
                 or extra_len or name_len != len(member.filename)):
@@ -107,7 +107,7 @@ def _validate_zip_layout(raw: bytes, members: list[zipfile.ZipInfo]) -> None:
         fields = struct.unpack_from("<4s6H3I5H2I", raw, central_cursor)
         (signature, _, version, flags, method, _, _, crc, packed, unpacked,
          name_len, extra_len, comment_len, disk, _, _, local_offset) = fields
-        if (signature != b"PK\\x01\\x02" or version > 20 or flags != member.flag_bits
+        if (signature != b"PK\x01\x02" or version > 20 or flags != member.flag_bits
                 or method != member.compress_type or crc != member.CRC
                 or packed != member.compress_size or unpacked != member.file_size
                 or disk or extra_len or comment_len or local_offset != member.header_offset
@@ -119,6 +119,151 @@ def _validate_zip_layout(raw: bytes, members: list[zipfile.ZipInfo]) -> None:
             raise PortableSourceError("ZIP central name or bounds mismatch")
     if cursor != offset or central_cursor != end:
         raise PortableSourceError("unindexed ZIP content is not portable source")
+
+
+def _strict_document(value: str, byte_limit: int) -> dict[str, Any]:
+    """Decode bounded inert JSON; repeated names and nonfinite values are invalid."""
+    if len(value) > byte_limit or len(value.encode("utf-8")) > byte_limit:
+        raise ValueError("design document exceeds budget")
+
+    def unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result = {}
+        for key, item in pairs:
+            if key in result:
+                raise ValueError("duplicate design document key")
+            result[key] = item
+        return result
+
+    def no_constant(_: str) -> Any:
+        raise ValueError("nonfinite design document value")
+
+    document = json.loads(value, object_pairs_hook=unique, parse_constant=no_constant)
+    if type(document) is not dict:
+        raise ValueError("design document must be an object")
+    return document
+
+
+def inspect_project(files: dict[str, str]) -> dict[str, Any]:
+    """Reconcile source-bound design artifacts against this installed compiler.
+
+    A historical project may have a valid full digest yet no longer match the
+    current templates. Report that distinction, never silently regenerate it.
+    """
+    from skeleton.context.galaxy_profile import (
+        ARTIFACT_PATH, PLAYABLE_RECEIPT_PATH, attach_galaxy_profile,
+        compile_galaxy_playable_axes, galaxy_profile_receipt,
+        normalise_galaxy_profile, seal_galaxy_playable_controls,
+    )
+    from skeleton.forge.archetype_content import content_archetypes, verify_archetype_content
+    from skeleton.forge.playable_portal import SCRIPT_PATH, verify_playable_portal
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+
+    modes = [name for name in content_archetypes()
+             if any(path in files for path in (
+                 f"scenes/archetypes/{name}/main.tscn",
+                 f"scripts/archetypes/{name}/player_controller.gd",
+                 f"scripts/archetypes/{name}/core_loop.gd",
+             ))]
+    report: dict[str, Any] = {
+        "schema": "skeleton.gameforge.portable_project_inspection.v1",
+        "playable_modes": modes,
+        "native_template": "absent",
+        "tuning": "absent",
+        "galaxy_profile": "absent",
+        "galaxy_controls": "absent",
+        "playable_portal": "absent",
+        "native_execution_qualified": False,
+    }
+    errors: list[str] = []
+    profile = None
+    if ARTIFACT_PATH in files:
+        try:
+            profile = normalise_galaxy_profile(_strict_document(files[ARTIFACT_PATH], 600_001))
+            if profile is None or attach_galaxy_profile({}, profile)[ARTIFACT_PATH] != files[ARTIFACT_PATH]:
+                raise ValueError("noncanonical authoring profile")
+            report["galaxy_profile"] = "verified"
+            report["profile_sha256"] = galaxy_profile_receipt(profile)["sha256"]
+        except (ValueError, TypeError, KeyError, RecursionError, OverflowError):
+            profile = None
+            report["galaxy_profile"] = "invalid"
+            errors.append("galaxy_profile")
+    tuning: dict[str, Any] = {}
+    axes: dict[str, float] = {}
+    if SOURCE_PATH in files:
+        try:
+            tuning = _strict_document(files[SOURCE_PATH], 32 * 1024)
+            if (tuning.get("schema") != "skeleton.gameforge.playable_tuning.v1"
+                    or type(tuning.get("axes")) is not dict or len(modes) != 1
+                    or tuning.get("mode") != modes[0]):
+                raise ValueError("tuning mode or schema mismatch")
+            axes = dict(tuning["axes"])
+            report["tuning"] = "unmatched"
+        except (ValueError, TypeError, KeyError, RecursionError, OverflowError):
+            report["tuning"] = "invalid"
+            errors.append("tuning")
+    galaxy_receipt = None
+    effective_axes = axes
+    if PLAYABLE_RECEIPT_PATH in files:
+        try:
+            galaxy_receipt = _strict_document(files[PLAYABLE_RECEIPT_PATH], 64 * 1024)
+            effective_axes = galaxy_receipt["effective_axes"]
+            if (profile is None or len(modes) != 1 or galaxy_receipt.get("mode") != modes[0]
+                    or type(effective_axes) is not dict or type(galaxy_receipt.get("axes")) is not list
+                    or len(galaxy_receipt["axes"]) > 10):
+                raise ValueError("unbound Galaxy control receipt")
+            report["galaxy_controls"] = "unmatched"
+        except (ValueError, TypeError, KeyError, RecursionError, OverflowError):
+            report["galaxy_controls"] = "invalid"
+            errors.append("galaxy_controls")
+            galaxy_receipt = None
+            effective_axes = axes
+    if len(modes) == 1:
+        mode = modes[0]
+        try:
+            exact = verify_archetype_content(files, mode, operator_axes=effective_axes)
+        except (ValueError, TypeError, KeyError, RuntimeError, OverflowError):
+            exact = False
+        report["native_template"] = "verified" if exact else "historical_or_modified"
+        if not exact:
+            errors.append("native_template")
+        if exact and SOURCE_PATH in files and report["tuning"] != "invalid":
+            report["tuning"] = "verified"
+            report["mapped_axes"] = tuning["mapped_axes"]
+            report["unmapped_axes"] = tuning["unmapped_axes"]
+            report["applied"] = tuning["applied"]
+        if galaxy_receipt is not None:
+            try:
+                inherited = {
+                    row["axis"] for row in galaxy_receipt["axes"]
+                    if row["authority"] == "galaxy_matrix"
+                }
+                overrides = {key: value for key, value in effective_axes.items() if key not in inherited}
+                resolved, pending = compile_galaxy_playable_axes(profile, mode, overrides)
+                baseline = {key: value for key, value in files.items() if key != PLAYABLE_RECEIPT_PATH}
+                sealed, _ = seal_galaxy_playable_controls(baseline, pending)
+                if resolved != effective_axes or sealed[PLAYABLE_RECEIPT_PATH] != files[PLAYABLE_RECEIPT_PATH]:
+                    raise ValueError("Galaxy authoring receipt differs from source")
+                report["galaxy_controls"] = "verified"
+                report["mapped_matrix_dials"] = galaxy_receipt["mapped_matrix_dials"]
+                report["unmapped_matrix_dials"] = galaxy_receipt["unmapped_matrix_dials"]
+            except (ValueError, TypeError, KeyError, AttributeError, RuntimeError, RecursionError, OverflowError):
+                errors.append("galaxy_controls")
+        if SCRIPT_PATH in files:
+            start_native = verify_playable_portal(files, mode, start_in_prototype=True)
+            start_world = verify_playable_portal(files, mode, start_in_prototype=False)
+            report["playable_portal"] = "verified" if start_native or start_world else "historical_or_modified"
+            if start_native or start_world:
+                report["startup"] = "prototype" if start_native else "world"
+            else:
+                errors.append("playable_portal")
+    elif modes:
+        report["native_template"] = "multiple_modes"
+        errors.append("native_template")
+    elif SOURCE_PATH in files or PLAYABLE_RECEIPT_PATH in files or SCRIPT_PATH in files:
+        errors.append("orphaned_playable_artifact")
+    report["current_template_compatible"] = not errors and report["native_template"] == "verified"
+    report["findings"] = sorted(set(errors))
+    return report
 
 
 def inspect_archive(raw: bytes, expected_sha256: str) -> tuple[dict[str, str], dict[str, Any]]:
@@ -188,11 +333,15 @@ def inspect_archive(raw: bytes, expected_sha256: str) -> tuple[dict[str, str], d
         "archive_bytes": len(raw),
         "source_verified": True,
         "native_execution_qualified": False,
+        "project_inspection": inspect_project(files),
     }
 
 
-def reopen_archive(path: Path, expected_sha256: str, output: Path | None = None) -> dict[str, Any]:
+def reopen_archive(path: Path, expected_sha256: str, output: Path | None = None,
+                   *, require_current_template: bool = False) -> dict[str, Any]:
     files, receipt = inspect_archive(_read_zip(path), expected_sha256)
+    if require_current_template and not receipt["project_inspection"]["current_template_compatible"]:
+        raise PortableSourceError("project does not match the current native template")
     if output is not None:
         # Deliberately require an absent named directory below an existing,
         # trusted local parent. Never merge with or overwrite existing sources.
@@ -222,9 +371,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("archive", type=Path)
     parser.add_argument("--expected-sha256", required=True)
     parser.add_argument("--output", type=Path, help="New directory under a trusted local parent")
+    parser.add_argument("--require-current-template", action="store_true",
+                        help="Refuse historical or inconsistent native projects before reopening")
     args = parser.parse_args(argv)
     try:
-        result = reopen_archive(args.archive, args.expected_sha256, args.output)
+        result = reopen_archive(args.archive, args.expected_sha256, args.output,
+                                require_current_template=args.require_current_template)
     except PortableSourceError as exc:
         print(f"Portable source refused: {exc}", file=sys.stderr)
         return 2
