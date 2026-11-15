@@ -7,8 +7,19 @@ import s from './CrawlerWorkspace.styles';
 export default function CrawlerInstructionSecurityPanel({ session }: { session: CrawlSession }) {
   const security = session.instruction_security;
   const origins = session.adaptive_origin_health;
+  const duplicates = session.duplicate_evidence;
+  const recovery = session.checkpoint_recovery;
   return <View style={s.card}>
     <Text style={s.heading}>Adaptive resilience and source quarantine</Text>
+    {recovery && <View style={s.check}>
+      <Text style={s.label}>Checkpoint redundancy</Text>
+      <Text style={s.small}>{recovery.replica_present ? 'Exact-current recovery copy recorded; not independently verified.' : 'No available exact-current recovery copy: ' + recovery.reason.replaceAll('_', ' ')} No ancestor rollback is permitted.</Text>
+      {recovery.last_repair_at !== null && <Text style={s.small}>Last committed repair: {recovery.last_repair_at} · sequence {recovery.last_repair_sequence}</Text>}
+    </View>}
+    {duplicates && <View style={s.check}>
+      <Text style={s.label}>Duplicate acquisition custody</Text>
+      <Text style={s.small}>{duplicates.count} duplicate observations across {duplicates.observed_origins} origins; {duplicates.represented_sources} retained primary sources. Mirrored text is not counted as independent corroboration.</Text>
+    </View>}
     {!security ? <Text style={s.small}>Instruction inspection evidence is not available from this backend.</Text> :
       <>
         <Text accessibilityLiveRegion="polite" style={security.count ? s.error : s.message}>
