@@ -65,8 +65,7 @@ def validate_arcs(source: Any, world: Any, cast: Any) -> dict[str, Any]:
         for key in ("desire", "starting_belief", "resolved_belief"):
             _text(arc[key], key, 1000)
         beats = _list(arc["beats"], "beats", MAX_BEATS)
-        if not beats or not any(
-                type(b) is dict and b.get("stage") == "resolution" for b in beats):
+        if not beats:
             raise CanonError("arcs_missing_resolution", actor)
         for beat in beats:
             _keys(beat, {"id", "choice", "stage", "text"})
@@ -83,6 +82,8 @@ def validate_arcs(source: Any, world: Any, cast: Any) -> dict[str, Any]:
             if type(beat["stage"]) is not str or beat["stage"] not in STAGES:
                 raise CanonError("arcs_invalid_stage", bid)
             _text(beat["text"], "beat.text", 4096)
+        if not any(beat["stage"] == "resolution" for beat in beats):
+            raise CanonError("arcs_missing_resolution", actor)
         if beats != sorted(beats, key=lambda b: b["id"]):
             raise CanonError("arcs_beat_order", actor)
     if arcs != sorted(arcs, key=lambda a: a["actor"]):
