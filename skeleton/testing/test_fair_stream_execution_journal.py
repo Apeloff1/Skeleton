@@ -452,3 +452,27 @@ def test_batched_admission_uses_one_capacity_snapshot(monkeypatch):
             db.assert_requests_admissible(invalid)
     assert not db._connection.in_transaction
     assert db._connection.execute("SELECT COUNT(*) FROM local_fair_stream_cancelled_intents").fetchone() == (1,)
+
+def test_recursive_owner_cannot_commit_outer_or_create_inner_intent(monkeypatch):
+    j = journal()
+    backend = Backend()
+    owner = JournaledExecutionOwner(j, backend)
+    second = DispatchPermit("f" * 64, "second", 3, CHECKPOINT, 16, 1024)
+    nested = state()
+    nested["generation"] = second.generation
+    nested["checkpoint"]["pending"][0].update(
+        lease_id=second.lease_id, request_id=second.request_id,
+    )
+
+    def recursive(p, s):
+        with pytest.raises(ExecutionOutcomeUnknown, match="recursive execution"):
+            owner.execute_and_commit(second, nested)
+        return 8, "d" * 64
+
+    monkeypatch.setattr(backend, "run_and_commit", recursive)
+    with pytest.raises(ExecutionOutcomeUnknown, match="invalidated"):
+        owner.execute_and_commit(permit(), state())
+    assert j._connection.execute(
+        "SELECT lease_id,state FROM local_fair_stream_execution_journal",
+    ).fetchall() == [(LEASE, "running")]
+    assert not j.request_exists(second.request_id)

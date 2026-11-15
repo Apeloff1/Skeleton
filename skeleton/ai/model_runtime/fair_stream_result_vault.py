@@ -9,6 +9,7 @@ This is CPU-only plumbing; it is not hardware or provider qualification.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from hashlib import sha256
 import hmac
 import json
@@ -20,7 +21,7 @@ from typing import Mapping, Protocol
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from .fair_stream_admission import validate_admission_batch
+from .fair_stream_admission import validate_admission_batch, validate_request_identity
 from .fair_stream_session import DispatchPermit
 from .private_sqlite import PrivateSQLiteHandle, PrivateSQLiteUnavailable
 from .sqlite_custody_schema import CustodySchemaError, assert_custody_schema
@@ -61,15 +62,13 @@ def _hex(value: object, length: int, label: str) -> str:
 
 
 def _identity(permit: DispatchPermit) -> None:
-    if type(permit) is not DispatchPermit or permit.device_qualified:
+    if type(permit) is not DispatchPermit or permit.device_qualified is not False:
         raise ValueError("canonical CPU-only permit required")
     _hex(permit.lease_id, 64, "lease")
     _hex(permit.checkpoint_digest, 64, "checkpoint")
+    validate_request_identity(permit.request_id)
     if (
-        type(permit.request_id) is not str
-        or not permit.request_id
-        or len(permit.request_id.encode("utf-8")) > 128
-        or type(permit.generation) is not int
+        type(permit.generation) is not int
         or not 0 <= permit.generation < (1 << 63)
         or type(permit.tokens) is not int
         or not 1 <= permit.tokens <= MAX_TOKENS
@@ -133,6 +132,8 @@ class SealedFairStreamResultVault:
         self._cipher = AESGCM(result_key)
         self._backend = backend
         self._lock = RLock()
+        self._publishing = False
+        self._publication_invalidated = False
         if self._connection.in_transaction:
             raise ValueError("exclusive idle SQLite result connection required")
         self._connection.execute(
@@ -234,6 +235,7 @@ class SealedFairStreamResultVault:
         if (
             not isinstance(state, Mapping)
             or state.get("session_id") != self.session_id
+            or type(state.get("generation")) is not int
             or state.get("generation") != permit.generation
             or state.get("checkpoint_digest") != permit.checkpoint_digest
         ):
@@ -277,6 +279,20 @@ class SealedFairStreamResultVault:
         ):
             raise SealedResultUnavailable("request tenant or memory binding mismatch")
 
+    @contextmanager
+    def _publication(self):
+        self._require_owner()
+        with self._lock:
+            if self._publishing:
+                self._publication_invalidated = True
+                raise SealedResultUnavailable("recursive result publication denied")
+            self._publishing = True
+            self._publication_invalidated = False
+            try:
+                yield
+            finally:
+                self._publishing = False
+
     def run_and_commit(
         self, permit: DispatchPermit, state: Mapping[str, object],
     ) -> tuple[int, str]:
@@ -286,9 +302,8 @@ class SealedFairStreamResultVault:
         Any exception, including SQLite commit uncertainty, propagates and must
         leave the execution journal in RUNNING. No replay is authorized.
         """
-        self._validate_state(permit, state)
-        self._require_owner()
-        with self._lock:
+        with self._publication():
+            self._validate_state(permit, state)
             self._require_open()
             if self._row(permit.lease_id) is not None:
                 raise SealedResultUnavailable("result lease already published")
@@ -309,6 +324,9 @@ class SealedFairStreamResultVault:
             # No database transaction spans inference; other SQLite readers
             # are not blocked by potentially long CPU inference.
             consumed, plaintext = self._backend.generate(permit, state)
+            if self._publication_invalidated:
+                raise SealedResultUnavailable("recursive result publication invalidated execution")
+            self._validate_state(permit, state)
             if (
                 type(consumed) is not int
                 or not 0 <= consumed <= permit.tokens
@@ -323,8 +341,8 @@ class SealedFairStreamResultVault:
                 tokenizer_digest=self.tokenizer_digest,
                 consumed_tokens=consumed, plaintext_bytes=len(plaintext),
             )
-            ciphertext = self._cipher.encrypt(nonce, plaintext, aad)
-            digest = sha256(ciphertext).hexdigest()
+            if type(nonce) is not bytes or len(nonce) != 12:
+                raise SealedResultUnavailable("invalid encryption nonce")
             self._require_open()
             self._connection.execute("BEGIN IMMEDIATE")
             try:
@@ -333,6 +351,15 @@ class SealedFairStreamResultVault:
                     raise SealedResultUnavailable("result lease already published")
                 if self._request_seen(permit.request_id):
                     raise SealedResultUnavailable("result request already published")
+                # Never publish a duplicated AES-GCM nonce in the same
+                # bounded vault. This check and encryption share the writer
+                # reservation. Key uniqueness across vaults is operator-owned.
+                if self._connection.execute(
+                    "SELECT 1 FROM " + _TABLE + " WHERE nonce=? LIMIT 1", (nonce,),
+                ).fetchone() is not None:
+                    raise SealedResultUnavailable("encryption nonce already used")
+                ciphertext = self._cipher.encrypt(nonce, plaintext, aad)
+                digest = sha256(ciphertext).hexdigest()
                 rows, total = self._connection.execute(
                     "SELECT COUNT(*), COALESCE(SUM(LENGTH(ciphertext)), 0)"
                     " FROM " + _TABLE

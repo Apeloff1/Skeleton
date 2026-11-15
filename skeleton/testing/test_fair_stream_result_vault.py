@@ -483,3 +483,74 @@ def test_batch_vault_admission_has_one_aggregate_scan_and_no_writes(vault_dir, m
     finally:
         handle.connection.set_trace_callback(None)
         handle.close()
+
+@pytest.mark.parametrize("overrides", [
+    {"device_qualified": 0}, {"request_id": "bad\x00identity"},
+    {"request_id": "\ud800"}, {"generation": True},
+])
+def test_vault_refuses_noncanonical_permit_before_backend(vault_dir, overrides):
+    from dataclasses import replace
+    backend = Backend()
+    handle, vault = open_vault(vault_dir, backend)
+    try:
+        forged = replace(permit(), **overrides)
+        with pytest.raises(ValueError):
+            vault.run_and_commit(forged, state(forged))
+        assert backend.calls == 0
+    finally:
+        handle.close()
+
+
+def test_recursive_publication_invalidates_outer_result(vault_dir, monkeypatch):
+    backend = Backend()
+    handle, vault = open_vault(vault_dir, backend)
+    second = DispatchPermit("f" * 64, "second", 3, CHECKPOINT, 16, 4096)
+    calls = []
+
+    def recursive(p, s):
+        calls.append(p.lease_id)
+        with pytest.raises(SealedResultUnavailable, match="recursive"):
+            vault.run_and_commit(second, state(second))
+        return 8, b"must not publish"
+
+    try:
+        monkeypatch.setattr(backend, "generate", recursive)
+        with pytest.raises(SealedResultUnavailable, match="invalidated"):
+            vault.run_and_commit(permit(), state())
+        assert calls == [LEASE]
+        assert handle.connection.execute("SELECT COUNT(*) FROM local_fair_stream_sealed_results").fetchone() == (0,)
+    finally:
+        handle.close()
+
+
+def test_duplicate_encryption_nonce_rejected_across_restart(vault_dir, monkeypatch):
+    import skeleton.ai.model_runtime.fair_stream_result_vault as module
+    monkeypatch.setattr(module.secrets, "token_bytes", lambda length: b"n" * length)
+    handle, vault = open_vault(vault_dir)
+    _, digest = vault.run_and_commit(permit(), state())
+    handle.close()
+    handle, vault = open_vault(vault_dir, create=False)
+    try:
+        second = DispatchPermit("f" * 64, "second", 3, CHECKPOINT, 16, 4096)
+        with pytest.raises(SealedResultUnavailable, match="nonce already used"):
+            vault.run_and_commit(second, state(second))
+        assert vault.read_committed(permit(), expected_result_digest=digest) == b"private offline output"
+        assert handle.connection.execute("SELECT COUNT(*) FROM local_fair_stream_sealed_results").fetchone() == (1,)
+        assert not handle.connection.in_transaction
+    finally:
+        handle.close()
+
+
+def test_backend_mutated_pending_state_cannot_publish(vault_dir, monkeypatch):
+    backend = Backend()
+    handle, vault = open_vault(vault_dir, backend)
+    def changed(p, s):
+        s["checkpoint"]["pending"][0]["tokens"] = 1
+        return 1, b"invalid"
+    try:
+        monkeypatch.setattr(backend, "generate", changed)
+        with pytest.raises(SealedResultUnavailable, match="pending lease"):
+            vault.run_and_commit(permit(), state())
+        assert handle.connection.execute("SELECT COUNT(*) FROM local_fair_stream_sealed_results").fetchone() == (0,)
+    finally:
+        handle.close()

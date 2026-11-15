@@ -583,6 +583,8 @@ class JournaledExecutionOwner:
         self._journal = journal
         self._backend = backend
         self._lock = RLock()
+        self._active = False
+        self._invalidated = False
 
     def execute_and_commit(
         self, permit: DispatchPermit, state: Mapping[str, object],
@@ -614,10 +616,20 @@ class JournaledExecutionOwner:
             raise ExecutionOutcomeUnknown("pending lease differs from execution permit")
         self._journal._require_owner_process()
         with self._lock:
-            self._journal.begin(permit)
-            # Any backend error leaves RUNNING intent durable. No automatic
-            # retry, even if the backend committed before its response failed.
-            consumed, digest = self._backend.run_and_commit(permit, state)
-            return self._journal.commit(
-                permit, consumed_tokens=consumed, result_digest=digest,
-            )
+            if self._active:
+                self._invalidated = True
+                raise ExecutionOutcomeUnknown("recursive execution owner invocation denied")
+            self._active = True
+            self._invalidated = False
+            try:
+                self._journal.begin(permit)
+                # Any backend error leaves RUNNING intent durable. No automatic
+                # retry, even if the backend committed before its response failed.
+                consumed, digest = self._backend.run_and_commit(permit, state)
+                if self._invalidated:
+                    raise ExecutionOutcomeUnknown("recursive execution invalidated owner")
+                return self._journal.commit(
+                    permit, consumed_tokens=consumed, result_digest=digest,
+                )
+            finally:
+                self._active = False
