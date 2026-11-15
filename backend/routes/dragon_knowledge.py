@@ -290,3 +290,28 @@ def register_knowledge_routes(router):
         from core.dragon_corpus_runtime import dispatch_capture
         owner=editor(user)
         return await corpus_runtime_call(dispatch_capture(owner,user,**body.model_dump()))
+
+
+    @router.get("/knowledge/game-corpus/taxonomy")
+    async def game_taxonomy(user:dict=Depends(get_current_user)):
+        from core.dragon_game_taxonomy import public_taxonomy
+        scope(user)
+        return public_taxonomy()
+
+    @router.get("/knowledge/game-corpus/timeline")
+    async def game_timeline(stage:str|None=Query(None,max_length=32),
+                            kind:str|None=Query(None,max_length=32),
+                            language:str|None=Query(None,max_length=32),
+                            current_only:bool=Query(False),
+                            stamp:int|None=Query(None,ge=0),
+                            game:str|None=Query(None,max_length=64),
+                            source:str|None=Query(None,max_length=64),
+                            event:str|None=Query(None,max_length=128),
+                            limit:int=Query(32,ge=1,le=100),
+                            user:dict=Depends(get_current_user)):
+        cursor=(stamp,game,source,event)
+        if any(x is not None for x in cursor) and any(x is None for x in cursor):
+            raise HTTPException(422,detail={"code":"dragon_game_timeline_cursor_invalid"})
+        return await corpus_call(scope(user),"release_timeline",stage=stage,kind=kind,
+                                 language=language,current_only=current_only,limit=limit,
+                                 before=cursor if stamp is not None else None)
