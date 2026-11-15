@@ -1600,6 +1600,7 @@ class DragonCrawlerApplication:
         excluded = 0
         fence = []
         observations = []
+        alias_blockers = []
         eligible = []
         revisions = []
         for item in metadata[:MAX_SESSIONS]:
@@ -1688,7 +1689,14 @@ class DragonCrawlerApplication:
                             source["fetched_url"], source["content_type"], source["text"],
                             row["request"].get("query", ""), stamp, expiry,
                         ))
+                # Exact-content aliases have no independent use permission or
+                # representation receipt. They may block a stale current view,
+                # never furnish searchable text or stewardship credit.
+                local_aliases = [{"url": alias["fetched_url"], "captured_at": alias["captured_at"],
+                                  "content_hash": alias["content_hash"]}
+                                 for alias in snapshot["source_aliases"]]
                 observations.extend(local)
+                alias_blockers.extend(local_aliases)
                 if len(usable) > 16:
                     capped = True
                 eligible.extend(usable[:16])
@@ -1701,7 +1709,8 @@ class DragonCrawlerApplication:
                                        excluded_sessions=excluded,
                                        candidate_limit_reached=capped)["collection_index"]
             result = build_treasury(observations, as_of=when, growth=growth, mode=mode, query=query,
-                                    family=family, candidate_limit_reached=capped, excluded_sessions=excluded)
+                                    family=family, candidate_limit_reached=capped, excluded_sessions=excluded,
+                                    alias_blockers=alias_blockers)
         except ValueError as exc:
             raise CrawlerError("crawler_treasury_invalid", "Treasury reparse could not be qualified.", 422) from exc
         for identifier, version in fence:
