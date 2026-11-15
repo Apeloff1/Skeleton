@@ -276,3 +276,64 @@ def test_noncanonical_anchor_container_is_denied(monkeypatch):
     monkeypatch.setattr(anchor, "read", lambda: list(original()))
     with pytest.raises(CustodyQuarantined, match="high-watermark"):
         session.verify()
+
+@pytest.mark.parametrize("nested", ["verify", "pending", "submit"])
+def test_anchor_reader_reentry_quarantines_without_mutating_queue(monkeypatch, nested):
+    anchor = SimulatedIndependentWatermark()
+    db = store()
+    session = DurableFairStreamSession.bootstrap(db, anchor)
+    before = anchor.state
+    original = anchor.read
+
+    def read():
+        with pytest.raises(CustodyQuarantined, match="recursive custody"):
+            if nested == "verify":
+                session.verify()
+            elif nested == "pending":
+                session.pending_ids()
+            else:
+                session.submit(request())
+        return original()
+
+    monkeypatch.setattr(anchor, "read", read)
+    with pytest.raises(CustodyQuarantined):
+        session.submit(request())
+    assert session.quarantined
+    assert anchor.state == before
+    assert db.load(expected_generation=before[0], expected_digest=before[1]).export()["checkpoint"]["requests"] == []
+
+
+def test_reentrant_anchor_advance_never_emits_permits(monkeypatch):
+    anchor = SimulatedIndependentWatermark()
+    db = store()
+    session = DurableFairStreamSession.bootstrap(db, anchor)
+    session.submit(request())
+    advance = anchor.advance
+
+    def callback(**kwargs):
+        advance(**kwargs)
+        with pytest.raises(CustodyQuarantined, match="recursive custody"):
+            session.plan(budget())
+
+    monkeypatch.setattr(anchor, "advance", callback)
+    with pytest.raises(CustodyQuarantined, match="reconciliation"):
+        session.plan(budget())
+    assert session.quarantined
+    reopened = DurableFairStreamSession(db, anchor)
+    assert len(reopened.pending_ids()) == 1
+
+
+def test_invalid_anchor_adapter_cannot_initialize_database():
+    db = store()
+    with pytest.raises(ValueError, match="high-watermark"):
+        DurableFairStreamSession.bootstrap(db, object())
+    assert db._connection.execute("SELECT COUNT(*) FROM local_fair_stream_custody").fetchone() == (0,)
+
+
+def test_expected_anchor_generation_requires_canonical_integer():
+    anchor = SimulatedIndependentWatermark()
+    session = DurableFairStreamSession.bootstrap(store(), anchor)
+    before = session.verify()
+    with pytest.raises(ValueError, match="queue changed"):
+        session.submit(request(), expected_anchor=(False, before["digest"]))
+    assert session.verify() == before

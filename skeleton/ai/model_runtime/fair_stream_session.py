@@ -6,6 +6,7 @@ SQLite connection, real OS probes, and an execution owner.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from threading import RLock
 from typing import Mapping, Protocol
@@ -67,6 +68,7 @@ class DurableFairStreamSession:
         self._watermark = watermark
         self._lock = RLock()
         self._quarantined = False
+        self._active_operation = False
         self.verify()
 
     @classmethod
@@ -75,6 +77,13 @@ class DurableFairStreamSession:
         watermark: TrustedHighWatermark,
     ) -> "DurableFairStreamSession":
         """One-time initialization; a failed external CAS is never retried."""
+        if type(store) is not DurableFairStreamStore:
+            raise ValueError("canonical durable fair-stream store required")
+        if not all(callable(getattr(watermark, name, None)) for name in (
+            "initialize", "read", "advance",
+        )):
+            raise ValueError("trusted high-watermark CAS required")
+        store._require_owner_process()
         envelope = store.initialize()
         watermark.initialize(
             generation=envelope["generation"], digest=envelope["digest"],
@@ -98,11 +107,28 @@ class DurableFairStreamSession:
     def _require_owner_process(self) -> None:
         self._store._require_owner_process()
 
+    @contextmanager
+    def _operation(self):
+        self._require_owner_process()
+        with self._lock:
+            if self._active_operation:
+                self._quarantined = True
+                raise CustodyQuarantined("recursive custody operation denied")
+            self._active_operation = True
+            try:
+                yield
+                if self._quarantined:
+                    raise CustodyQuarantined("custody operation invalidated")
+            finally:
+                self._active_operation = False
+
     def _trusted(self) -> tuple[int, str]:
         if self._quarantined:
             raise CustodyQuarantined("session quarantined; explicit recovery required")
         try:
             observation = self._watermark.read()
+            if self._quarantined:
+                raise CustodyQuarantined("anchor callback invalidated custody")
             if type(observation) is not tuple or len(observation) != 2:
                 raise ValueError("invalid trusted anchor shape")
             generation, digest = observation
@@ -128,8 +154,7 @@ class DurableFairStreamSession:
         return envelope
 
     def verify(self) -> dict[str, object]:
-        self._require_owner_process()
-        with self._lock:
+        with self._operation():
             generation, digest = self._trusted()
             try:
                 return self._confirmed_state(generation, digest)
@@ -143,10 +168,13 @@ class DurableFairStreamSession:
         self, *, action: str, expected_anchor: tuple[int, str] | None = None,
         **kwargs: object,
     ) -> tuple[object | None, dict[str, object]]:
-        self._require_owner_process()
-        with self._lock:
+        with self._operation():
             generation, digest = self._trusted()
-            if expected_anchor is not None and expected_anchor != (generation, digest):
+            if expected_anchor is not None and (
+                type(expected_anchor) is not tuple or len(expected_anchor) != 2
+                or type(expected_anchor[0]) is not int or type(expected_anchor[1]) is not str
+                or expected_anchor != (generation, digest)
+            ):
                 raise ValueError("verified queue changed before transition")
             try:
                 plan, envelope = self._store.transition(
@@ -175,7 +203,7 @@ class DurableFairStreamSession:
 
     def submit(self, request: StreamRequest, *,
                expected_anchor: tuple[int, str] | None = None) -> dict[str, object]:
-        if not isinstance(request, StreamRequest):
+        if type(request) is not StreamRequest:
             raise ValueError("canonical stream request required")
         if self.whole_request != (request.authorization_digest is not None):
             raise ValueError("request authorization must match execution policy")
@@ -204,7 +232,7 @@ class DurableFairStreamSession:
         expected_anchor: tuple[int, str] | None = None,
     ) -> tuple[tuple[DispatchPermit, ...], dict[str, object]]:
         """Require a fresh trusted OS probe; never dispatch simulated inputs."""
-        if not isinstance(budget, MeasuredStreamBudget):
+        if type(budget) is not MeasuredStreamBudget:
             raise ValueError("canonical measured stream budget required")
         if budget.measurement != "os_probe":
             raise ValueError("trusted live OS measurement required for dispatch")
@@ -244,8 +272,7 @@ class DurableFairStreamSession:
         return state
 
     def pending_ids(self) -> tuple[str, ...]:
-        self._require_owner_process()
-        with self._lock:
+        with self._operation():
             generation, digest = self._trusted()
             try:
                 state = self._confirmed_state(generation, digest)
