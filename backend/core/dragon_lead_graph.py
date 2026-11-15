@@ -197,7 +197,9 @@ def parse_page(raw,projection):
     return rows
 
 def project(item,projection):
-    if projection=="steam":
+    if projection=="steam_seed":
+        yield _schema_row("https://store.steampowered.com/app/"+item["appid"]+"/",item["title"],"storefront","steam:"+item["appid"])
+    elif projection=="steam":
         # Exactly existing provider route families; no fabricated AppIDs.
         for provider,kind,label,route,_ in STEAM_ROUTES:
             yield _schema_row(route.format(id=item["appid"]),(item["title"]+" · "+label)[:256],kind,"steam:"+item["appid"])
