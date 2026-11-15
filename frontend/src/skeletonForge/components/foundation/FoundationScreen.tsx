@@ -110,10 +110,11 @@ function FoundationScreenSession({ onSetup, onOpenCockpit, sessionEpoch }: {
       setExportBusy(false);
     });
   }, [ownerId, run.phase, run.payload]);
-  const store = React.useMemo(() => asyncStorageKv(), []);
+  const store = React.useMemo(() => asyncStorageKv(sessionEpoch), [sessionEpoch]);
   const auth = React.useMemo(() => gameforgeAuthPort(), []);
   const load = React.useCallback(async () => {
-    const epoch = getAuthEpoch();
+    const epoch = sessionEpoch;
+    if (getAuthEpoch() !== epoch) throw new Error('Stale Studio session');
     const result = await loadFoundation(store);
     if (result.holdSaves) return result;
     if (epoch !== getAuthEpoch()) throw new Error('Account changed while loading Studio projects');
@@ -151,8 +152,11 @@ function FoundationScreenSession({ onSetup, onOpenCockpit, sessionEpoch }: {
         : 'The original project changed or was deleted. Your Forge edits were preserved as a separate project copy.');
       return committed.loaded;
     });
-    return transferred ?? result;
-  }, [store]);
+    if (epoch !== getAuthEpoch()) throw new Error('Account changed before publishing Studio projects');
+    // A no-handoff path may have waited for another adapter; reload under
+    // the namespace queue rather than exposing a stale initial observation.
+    return transferred ?? await loadFoundation(store);
+  }, [store, sessionEpoch]);
   const save = React.useCallback((snap: PersistSnapshot) => saveFoundation(store, snap), [store]);
   const openAdvancedCockpit = React.useCallback((project?: StudioProject, snapshot?: PersistSnapshot) => {
     if (cockpitTransferLock.current || sessionEpoch !== getAuthEpoch()) return;
