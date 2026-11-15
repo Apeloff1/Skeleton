@@ -76,11 +76,11 @@ export const PLAYABLE_TUNING_EFFECTS: Record<string, readonly string[]> = {
   extraction: ['Tempo: movement', 'Risk: heat', 'Scarcity: heat budget', 'Agency: pickup range'],
   combat_loop: ['Tempo: movement', 'Lethality: contact damage', 'Agency: attack range', 'Progression depth: waves'],
   pipeline: ['Tempo: movement', 'Risk: frame budget', 'Agency: interaction range', 'Progression depth: deliveries'],
-  puzzle: ['Tempo: movement', 'Mystery: switch hints'],
-  racing: ['Tempo: movement', 'Risk: time limit', 'Progression depth: laps'],
-  survival: ['Tempo: movement', 'Scarcity: hydration'],
-  stealth: ['Tempo: movement', 'Risk: guard radius', 'Mystery: guard visibility'],
-  crafting: ['Tempo: movement'],
+  puzzle: ['Tempo: movement', 'Mystery: switch hints', 'Agency: switch range', 'Progression depth: switches'],
+  racing: ['Tempo: movement', 'Risk: time limit', 'Progression depth: laps', 'Agency: checkpoint range'],
+  survival: ['Tempo: movement', 'Scarcity: hydration', 'Agency: pickup range', 'Progression depth: supplies'],
+  stealth: ['Tempo: movement', 'Risk: guard radius', 'Mystery: guard visibility', 'Agency: interaction range'],
+  crafting: ['Tempo: movement', 'Progression depth: materials', 'Agency: work range'],
 };
 
 export const VISION_MAX = 4000;

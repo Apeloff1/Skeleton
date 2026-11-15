@@ -12,6 +12,9 @@ Supported direct effects:
   grind -> racing lap count, arena waves, factory shipment quota
   opacity -> puzzle switch hints and stealth danger-zone visibility
 
+  agency -> interaction/checkpoint radius (five expanded modes)
+  grind -> puzzle switch count, survival supply count, crafting material count
+
 Other axes remain in the canonical tensor and are explicitly identified as
 not yet connected to a native mini-game mechanic; they are never silently
 reinterpreted as a different kind of player control.
@@ -41,6 +44,39 @@ def _replace_exact(source: str, old: str, new: str) -> str:
     if source.count(old) != 1:
         raise ValueError("Godot playable tuning template contract changed")
     return source.replace(old, new, 1)
+
+
+# Fixed, original bounded routes. These coordinates are compiler data,
+# never arbitrary Galaxy-provided GDScript. Retain the original first points.
+_ROUTE_POINTS = {
+    "puzzle": ("switches", ((180, 0), (180, 150), (-40, 150), (-180, -20),
+                               (-170, -150), (40, -165))),
+    "survival": ("supplies", ((160, 80), (90, 220), (-160, 180),
+                                 (-210, 80), (-80, -60), (65, -130))),
+    "crafting": ("materials", ((160, -80), (240, 170), (-80, 210),
+                                  (-230, 40), (-30, -150), (125, 40))),
+}
+_ORIGINAL_ROUTE = {
+    "puzzle": "Vector2(180, 0), Vector2(180, 150),\n\tVector2(-40, 150), Vector2(-180, -20)",
+    "survival": "Vector2(160, 80), Vector2(90, 220), Vector2(-160, 180)",
+    "crafting": "Vector2(160, -80), Vector2(240, 170), Vector2(-80, 210)",
+}
+
+
+def _tune_objectives(loop: str, name: str, value: float) -> tuple[str, int]:
+    # Always supply exactly the number of required, accessible targets.
+    # No expansion of engine work beyond six bounded route points.
+    count = 2 + int(round(4 * value))
+    _, points = _ROUTE_POINTS[name]
+    replacement = ", ".join(f"Vector2({x}, {y})" for x, y in points[:count])
+    loop = _replace_exact(loop, _ORIGINAL_ROUTE[name], replacement)
+    if name == "survival":
+        loop = _replace_exact(loop, "Supplies %d/3 |", f"Supplies %d/{count} |")
+    elif name == "crafting":
+        loop = _replace_exact(loop, "crafted = collected == 3", f"crafted = collected == {count}")
+        loop = _replace_exact(loop, "Materials %d/3 |", f"Materials %d/{count} |")
+    # Puzzle completion and HUD already use switches.size().
+    return loop, count
 
 
 def compile_playable_tuning(
@@ -84,6 +120,19 @@ def compile_playable_tuning(
         )
         effects["player.speed"] = effective
         used.add("tempo")
+
+    if "agency" in axes and name in {"puzzle", "racing", "survival", "stealth", "crafting"}:
+        constants = {
+            "puzzle": ("USE_RADIUS", 18.0), "racing": ("LAP_RADIUS", 24.0),
+            "survival": ("PICKUP_RADIUS", 19.0), "stealth": ("USE_RADIUS", 18.0),
+            "crafting": ("USE_RADIUS", 19.0),
+        }
+        constant, base = constants[name]
+        radius = _fixed(base * (0.75 + 0.5 * axes["agency"]))
+        loop = _replace_exact(loop, f"const {constant} := {base:.1f}",
+                              f"const {constant} := {radius:.2f}")
+        effects[f"{name}.interaction_radius"] = radius
+        used.add("agency")
 
     if "risk" in axes and name == "extraction":
         # Risk 0.5 is neutral, 0 lowers heat pressure, 1 raises it.
@@ -147,6 +196,10 @@ def compile_playable_tuning(
             quota = 2 + round(4 * axes["grind"])
             loop = _replace_exact(loop, "const QUOTA := 4", f"const QUOTA := {quota}")
             effects["pipeline.shipment_quota"] = float(quota)
+            used.add("grind")
+        elif name in _ROUTE_POINTS:
+            loop, count = _tune_objectives(loop, name, axes["grind"])
+            effects[f"{name}.{_ROUTE_POINTS[name][0]}_required"] = float(count)
             used.add("grind")
 
     if "opacity" in axes:

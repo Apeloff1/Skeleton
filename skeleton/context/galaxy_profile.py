@@ -255,17 +255,30 @@ _PLAYABLE_RULES = {
         "grind": ((_M, "building", "count"), (_M, "crafting", "count"), (_M, "forging", "count")),
         "agency": ((_M, "building", "intricacy"), (_M, "crafting", "intricacy")),
     },
-    "puzzle": {"opacity": ((_M, "puzzle", "complexity"), (_M, "investigation", "complexity"))},
+    "puzzle": {
+        "opacity": ((_M, "puzzle", "complexity"), (_M, "investigation", "complexity")),
+        "grind": ((_M, "puzzle", "count"),),
+        "agency": ((_M, "puzzle", "intricacy"),),
+    },
     "racing": {
         "risk": ((_M, "driving", "complexity"),),
         "grind": ((_M, "driving", "count"),),
+        "agency": ((_M, "driving", "intricacy"),),
     },
-    "survival": {"scarcity": ((_W, "desert", "complexity"), (_W, "tundra", "complexity"), (_W, "wasteland", "complexity"))},
+    "survival": {
+        "scarcity": ((_W, "desert", "complexity"), (_W, "tundra", "complexity"), (_W, "wasteland", "complexity")),
+        "grind": ((_M, "cooking", "count"), (_M, "farming", "count")),
+        "agency": ((_M, "farming", "intricacy"),),
+    },
     "stealth": {
         "risk": ((_M, "stealth", "complexity"),),
         "opacity": ((_M, "stealth", "intricacy"), (_M, "hacking", "intricacy")),
+        "agency": ((_M, "hacking", "complexity"),),
     },
-    "crafting": {},
+    "crafting": {
+        "grind": ((_M, "crafting", "count"), (_M, "forging", "count"), (_M, "alchemy", "count")),
+        "agency": ((_M, "crafting", "intricacy"), (_M, "forging", "intricacy")),
+    },
 }
 
 
@@ -285,8 +298,6 @@ def compile_galaxy_playable_axes(
         return axes, None
     config = profile["config"]
     rules = {"tempo": ((_M, "parkour", "complexity"),), **_PLAYABLE_RULES[mode]}
-    if mode == "racing":
-        rules["tempo"] = (*rules["tempo"], (_M, "driving", "intricacy"))
     rows = []
     for axis, sources in sorted(rules.items()):
         votes = []

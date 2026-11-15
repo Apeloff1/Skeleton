@@ -201,3 +201,52 @@ def test_galaxy_playable_receipt_refuses_collision_or_missing_native_source():
     files.pop("scripts/archetypes/racing/core_loop.gd")
     with pytest.raises(ValueError, match="missing"):
         seal_galaxy_playable_controls(files, receipt)
+
+
+@pytest.mark.parametrize("mode,constant,original", [
+    ("puzzle", "USE_RADIUS", 18.0), ("racing", "LAP_RADIUS", 24.0),
+    ("survival", "PICKUP_RADIUS", 19.0), ("stealth", "USE_RADIUS", 18.0),
+    ("crafting", "USE_RADIUS", 19.0),
+])
+def test_expanded_prototype_interaction_range_is_effective(mode, constant, original):
+    from skeleton.forge.archetype_content import archetype_files, verify_archetype_content
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+    baseline = archetype_files(mode)
+    for value, scale in ((0.0, 0.75), (1.0, 1.25)):
+        axes = {"agency": value}
+        result = archetype_files(mode, operator_axes=axes)
+        loop = result[f"scripts/archetypes/{mode}/core_loop.gd"]
+        assert f"const {constant} := {original * scale:.2f}" in loop
+        assert json.loads(result[SOURCE_PATH])["applied"][f"{mode}.interaction_radius"] == round(original * scale, 2)
+        assert verify_archetype_content(result, mode, operator_axes=axes)
+        assert result != baseline
+
+
+@pytest.mark.parametrize("mode,name", [("puzzle", "switches"), ("survival", "supplies"), ("crafting", "materials")])
+@pytest.mark.parametrize("value,count", [(0.0, 2), (0.5, 4), (1.0, 6)])
+def test_expanded_objective_routes_have_exact_bounded_cardinality(mode, name, value, count):
+    import re
+    from skeleton.forge.archetype_content import archetype_files
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+    result = archetype_files(mode, operator_axes={"grind": value})
+    loop = result[f"scripts/archetypes/{mode}/core_loop.gd"]
+    points = re.search(r"var " + name + r": Array\[Vector2\] = \[(.*?)\]", loop, re.S).group(1)
+    assert points.count("Vector2(") == count
+    assert json.loads(result[SOURCE_PATH])["applied"][f"{mode}.{name}_required"] == count
+    if mode == "crafting":
+        assert f"crafted = collected == {count}" in loop
+        assert f"Materials %d/{count}" in loop
+    elif mode == "survival":
+        assert f"Supplies %d/{count}" in loop
+
+
+def test_crafting_galaxy_material_budget_is_real_not_metadata():
+    from skeleton.context.galaxy_profile import compile_galaxy_playable_axes
+    from skeleton.forge.archetype_content import archetype_files
+    raw = profile()
+    raw["config"]["mechanics_matrix"]["crafting"] = {"count": 1000, "intricacy": 800}
+    axes, receipt = compile_galaxy_playable_axes(raw, "crafting", {})
+    assert axes == {"agency": 0.8, "grind": 1.0}
+    files = archetype_files("crafting", operator_axes=axes)
+    assert "crafted = collected == 6" in files["scripts/archetypes/crafting/core_loop.gd"]
+    assert receipt["mapped_matrix_dials"] == 2
