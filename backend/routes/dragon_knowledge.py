@@ -6,7 +6,7 @@ from typing import Literal
 import asyncio
 import os
 
-from fastapi import Depends, HTTPException, Query
+from fastapi import Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from core import dragon_runtime as runtime
@@ -235,14 +235,15 @@ def register_knowledge_routes(router):
             return getattr(GameCorpus(path), operation)(owner, *args, **kwargs)
 
         try:
-            return await asyncio.to_thread(work)
+            from core.dragon_corpus_runtime import _bounded
+            return await _bounded(work)
         except (ValueError, OverflowError) as exc:
             raise HTTPException(422, detail={"code": "dragon_game_catalogue_invalid"}) from exc
         except CatalogueHeld as exc:
             raise HTTPException(409, detail={"code": "dragon_game_catalogue_held"}) from exc
         except GameLearningError as exc:
             raise HTTPException(exc.status, detail={"code": exc.code, "message": exc.message}) from exc
-        except (OSError, runtime.sqlite3.Error) as exc:
+        except (OSError, TimeoutError, runtime.sqlite3.Error) as exc:
             raise HTTPException(503, detail={"code": "dragon_game_catalogue_unavailable"}) from exc
 
     @router.post("/knowledge/game-corpus/observations")
@@ -360,18 +361,31 @@ def register_knowledge_routes(router):
                     before=(stamp,session) if stamp is not None else None,limit=limit))
 
     @router.get("/knowledge/game-corpus/{game_id}/sources/{source_id}/captures/{session}/documents")
-    async def source_documents(game_id:str,source_id:str,session:str,after:str|None=Query(None,max_length=64),
+    async def source_documents(game_id:str,source_id:str,session:str,response:Response,after:str|None=Query(None,max_length=64),
                                limit:int=Query(8,ge=1,le=8),user:dict=Depends(get_current_user)):
         from core.dragon_source_library import capture_documents
+        response.headers['Cache-Control']='no-store'
         return await corpus_runtime_call(capture_documents(scope(user),game_id,source_id,session,after=after,limit=limit))
 
     @router.post("/knowledge/game-corpus/{game_id}/sources/{source_id}/view")
-    async def source_view(game_id:str,source_id:str,body:SourceViewPin,user:dict=Depends(get_current_user)):
+    async def source_view(game_id:str,source_id:str,body:SourceViewPin,response:Response,user:dict=Depends(get_current_user)):
         from core.dragon_source_library import read_document
+        response.headers['Cache-Control']='no-store'
         return await corpus_runtime_call(read_document(scope(user),game_id,source_id,**body.model_dump()))
 
     @router.post("/knowledge/game-corpus/{game_id}/sources/{source_id}/compare")
-    async def source_compare(game_id:str,source_id:str,body:SourceComparisonRequest,user:dict=Depends(get_current_user)):
+    async def source_compare(game_id:str,source_id:str,body:SourceComparisonRequest,response:Response,user:dict=Depends(get_current_user)):
         from core.dragon_source_library import compare_documents
+        response.headers['Cache-Control']='no-store'
         return await corpus_runtime_call(compare_documents(scope(user),game_id,source_id,
                     body.left.model_dump(),body.right.model_dump()))
+
+    @router.get("/knowledge/game-corpus/source-search")
+    async def source_search(q:str=Query(min_length=1,max_length=256),
+                            kind:str|None=Query(None,max_length=32),
+                            family:str|None=Query(None,max_length=32),
+                            language:str|None=Query(None,max_length=32),
+                            limit:int=Query(32,ge=1,le=100),
+                            user:dict=Depends(get_current_user)):
+        return await corpus_call(scope(user),"search_source_library",q,kind=kind,family=family,
+                                 language=language,limit=limit)
