@@ -813,7 +813,9 @@ class OfflineHTTPApplication:
         if body is None:
             body = {}
         if path == "/v1/game-builds" or path.startswith("/v1/game-builds/"):
-            from skeleton.app.offline_game_builder import GameBuildRejected
+            from skeleton.app.offline_game_builder import (
+                GameBuildRejected, validate_game_build_request,
+            )
 
             # Validate the envelope before opening the durable game-build
             # store: its startup can recover interrupted jobs.
@@ -824,9 +826,9 @@ class OfflineHTTPApplication:
                 if method == "POST":
                     _fields(body, {"request_id", "brief"}, {"request_id", "brief"})
                     try:
-                        _identifier("game request id", body["request_id"])
-                    except ValueError:
-                        raise OfflineHTTPError(400, "Use a valid game brief of 1..4000 UTF-8 bytes and supported gameplay choices.") from None
+                        validate_game_build_request(body["request_id"], body["brief"])
+                    except GameBuildRejected as exc:
+                        raise OfflineHTTPError(exc.status, exc.message) from None
             else:
                 if method != "GET":
                     raise OfflineHTTPError(405, "unsupported local game-build method")

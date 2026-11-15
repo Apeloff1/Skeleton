@@ -388,6 +388,20 @@ class GameBuildRejected(ValueError):
         super().__init__(message)
 
 
+def validate_game_build_request(request_id: object, brief: object) -> str:
+    """Pure admission shared by HTTP and direct callers; no store or model I/O."""
+    try:
+        rid = _identifier("game request id", request_id)
+        # Reject oversized character counts before allocating UTF-8 bytes.
+        if (type(brief) is not str or not 1 <= len(brief) <= 4000
+                or not brief.strip() or not 1 <= len(brief.encode("utf-8", errors="strict")) <= 4000):
+            raise ValueError("brief budget")
+        compile_brief(brief)
+    except (ValueError, UnicodeError, TypeError):
+        raise GameBuildRejected(400, "invalid_game_brief", "Use a valid game brief of 1..4000 UTF-8 bytes and supported gameplay choices.") from None
+    return rid
+
+
 def _encoded(value: object) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True,
                       separators=(",", ":"), allow_nan=False).encode("utf-8", errors="strict")
@@ -703,14 +717,7 @@ class LocalGameBuilder:
         return [self.get(row[0]) for row in rows]
 
     def submit(self, request_id: str, brief: str) -> dict[str, Any]:
-        try:
-            rid = _identifier("game request id", request_id)
-            if (not isinstance(brief, str) or not brief.strip()
-                    or not 1 <= len(brief.encode("utf-8", errors="strict")) <= 4000):
-                raise ValueError("brief budget")
-            compile_brief(brief)
-        except (ValueError, UnicodeError, TypeError):
-            raise GameBuildRejected(400, "invalid_game_brief", "Use a valid game brief of 1..4000 UTF-8 bytes and supported gameplay choices.") from None
+        rid = validate_game_build_request(request_id, brief)
         digest = sha256(_encoded({"brief": brief, "model": self.model_digest,
             "tokenizer": self.tokenizer_digest, "runtime": self.runtime_digest,
             "policy": POLICY_ID, "instruction_sha256": sha256(SYSTEM.encode("utf-8")).hexdigest(),

@@ -362,6 +362,13 @@ def test_source_manifest_path_escape_is_rejected_before_archive_publication(tmp_
     ("GET", "/v1/game-builds/bad%20id", None, 400),
     ("POST", "/v1/game-builds", {"request_id": "missing-brief"}, 400),
     ("POST", "/v1/game-builds", {"request_id": "bad id", "brief": BRIEF}, 400),
+    ("POST", "/v1/game-builds", {"request_id": "blank", "brief": "  "}, 400),
+    ("POST", "/v1/game-builds", {"request_id": "null", "brief": None}, 400),
+    ("POST", "/v1/game-builds", {"request_id": "boolean", "brief": True}, 400),
+    ("POST", "/v1/game-builds", {"request_id": "object", "brief": {"genre": "shooter"}}, 400),
+    ("POST", "/v1/game-builds", {"request_id": "long", "brief": "x" * 4001}, 400),
+    ("POST", "/v1/game-builds", {"request_id": "utf8", "brief": "界" * 1334}, 400),
+    ("POST", "/v1/game-builds", {"request_id": "surrogate", "brief": "\ud800"}, 400),
     ("POST", "/v1/game-builds", {"request_id": "unexpected", "brief": BRIEF, "out": "/private/path"}, 400),
 ])
 def test_invalid_http_game_build_envelopes_do_not_initialize_store(
@@ -380,3 +387,17 @@ def test_invalid_http_game_build_envelopes_do_not_initialize_store(
         assert status == 200 and json.loads(listing)["jobs"] == []
         assert app._game_builder is not None
         assert not pipeline.calls
+
+
+@pytest.mark.parametrize("brief", [None, True, "", " " * 4000, "x" * 4001, "界" * 1334, "\ud800"])
+def test_pure_game_build_admission_rejects_invalid_briefs(brief):
+    from skeleton.app.offline_game_builder import validate_game_build_request
+    with pytest.raises(GameBuildRejected) as denied:
+        validate_game_build_request("valid-id", brief)
+    assert denied.value.status == 400
+    assert denied.value.code == "invalid_game_brief"
+
+
+def test_pure_game_build_admission_preserves_request_identity():
+    from skeleton.app.offline_game_builder import validate_game_build_request
+    assert validate_game_build_request("local-build_17", BRIEF) == "local-build_17"
