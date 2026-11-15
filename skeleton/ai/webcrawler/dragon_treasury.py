@@ -201,7 +201,6 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
         prior = None
         observed_hashes = set()
         previous_hash = None
-        current_conflict = False
         for row in rows:
             key = row.session_id,row.source_id
             parsed = index.get(key)
@@ -218,10 +217,6 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
                 parse_rows[latest["revision_id"]] = parsed
                 prior = row
                 continue
-            if prior is not None and row.captured_at == prior.captured_at:
-                current_conflict = True
-            else:
-                current_conflict = False
             delta = ({"kind":"initial","similarity":None,"added_terms":None,"removed_terms":None,
                       "changed_sections":None,"numeric_change":None} if prior is None else
                      _delta(index.get((prior.session_id,prior.source_id)),parsed,
@@ -305,7 +300,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
                    key=lambda v:(-v["last_seen"],v["revision_id"]))
     # The receipt binds exact observations, parser identity, index partition
     # and projection content without emitting old source text.
-    partition_digest=_digest({"parser":PARSER,"families":sorted(families,key=lambda f:f["family_id"]),
+    partition_digest=_digest({"parser":PARSER,"families":sorted(({k:v for k,v in f.items() if k not in {"revisit","refresh_url"}} for f in families),key=lambda f:f["family_id"]),
                              "revisions":revisions})
     return {"schema":SCHEMA,"parser":PARSER,"mode":mode,"family":family,
             "as_of_unix":as_of,"partition_digest":partition_digest,"candidate_limit_reached":capped,
