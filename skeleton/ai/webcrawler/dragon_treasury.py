@@ -262,6 +262,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
     changed_families = changes = rollbacks = revalidated = blocked_current = alias_held = 0
     verified_transitions = verified_families = 0
     family_origins = {}
+    version_content = {}
     for fid, rows in sorted(grouped.items()):
         rows.sort(key=lambda x:(x.captured_at,x.session_id,x.source_id))
         family_origins[fid] = urlsplit(rows[0].url).hostname
@@ -314,6 +315,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
                        "indexed_capture_at":row.captured_at if parsed is not None else None,
                        "delta":delta}
             versions.append(version)
+            version_content[rid]=row.content_hash
             version_hashes.append(row.content_hash)
             parse_rows[rid]=parsed
             prior=row
@@ -385,7 +387,10 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
                 elif v["first_seen"]==previous["first_seen"]:
                     cutoffs[v["family_id"]]={**v,"indexed":False}
         allowed=[v for fid,v in cutoffs.items() if v["indexed"] and (family is None or family==fid)
-                 and v["indexed_capture_at"]<=observed_before]
+                 and v["indexed_capture_at"]<=observed_before
+                 and not any(v["indexed_capture_at"]<=a["captured_at"]<=observed_before
+                             and a["content_hash"]!=version_content[v["revision_id"]]
+                             for a in blockers.get(grouped[fid][-1].url,()))]
     else:
         allowed = [v for v in revisions if v["indexed"] and (family is None or v["family_id"]==family)
                    and (mode in {"all_revisions","timeline","compare"} or
@@ -433,9 +438,11 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
             plan.append(f["family_id"])
             if not due[host]:
                 del due[host]
-    rank={fid:i for i,fid in enumerate(plan)}
-    families.sort(key=lambda f:(rank.get(f["family_id"],MAX_RESULTS),-f["revisit"]["utility_per_cost"],-f["last_seen"],f["family_id"]))
-    family_rows=[f for f in families if family is None or f["family_id"]==family]
+    families.sort(key=lambda f:f["family_id"])
+    # Paging uses time-independent keys. Dynamic scheduler priority is a
+    # separate plan so a due-time crossing cannot move rows across pages.
+    family_rows=sorted((f for f in families if family is None or f["family_id"]==family),
+                       key=lambda f:(-f["last_seen"],f["family_id"]))
     history=sorted((v for v in revisions if family is None or v["family_id"]==family),
                    key=lambda v:(-v["last_seen"],v["revision_id"]))
     # The receipt binds exact observations, parser identity, index partition
@@ -449,9 +456,9 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
         if before is None or after is None or not before["indexed"] or not after["indexed"]:
             raise ValueError("selected historic comparison is not currently indexable")
         # Nonadjacent comparisons are observations, never inferred causality.
-        chosen={"current":after,"previous":before,"delta":_delta(parse_rows[left],parse_rows[right],complete=False)}
-        chosen["delta"]=_delta(parse_rows[left],parse_rows[right],complete=all(
-            row.complete_text for row in grouped[family] if row.source_id in {before["source_id"],after["source_id"]}))
+        exact={(row.session_id,row.source_id):row for row in grouped[family]}
+        complete=all(exact[(v["session_id"],v["source_id"])].complete_text for v in (before,after))
+        chosen={"current":after,"previous":before,"delta":_delta(parse_rows[left],parse_rows[right],complete=complete)}
     scope_digest=_digest({"partition":partition_digest,"mode":mode,"family":family,"query":query,
                          "observed_before":observed_before,"left":left,"right":right})
     offset=0
