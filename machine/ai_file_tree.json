@@ -6338,7 +6338,7 @@
     "signed_at_utc": null,
     "git_sha": null,
     "evidence_refs": [],
-    "statement": "Pending fresh implementation signoff for the reconciled 182-mapping current-main payload after exact-head CI and full object/parity audit.",
+    "statement": "Pending fresh implementation signoff for the reconciled 183-mapping current-main payload after exact-head CI and full object/parity audit.",
     "signature_method": null
   },
   "verification_signoff": {
@@ -6773,6 +6773,11 @@
       "path": "skeleton/__main__.py",
       "owner": "package CLI shell",
       "reason": "top-level CLI dispatch remains a shell/compatibility entrypoint around canonical subsystems"
+    },
+    {
+      "path": "skeleton/admission",
+      "owner": "automation-control-plane",
+      "reason": "Local transactional repository admission ledger; retained outside the credential-provider AI tree. Remote ref compare-and-swap remains mandatory."
     },
     {
       "path": "skeleton/acquired",
