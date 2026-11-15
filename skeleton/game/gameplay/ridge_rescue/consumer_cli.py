@@ -159,7 +159,15 @@ def play(store: SlotStore, slot: str, *, read=input, write=print, ascii_mode: bo
             continue
         if answer in ("s", "sync"):
             try:
-                # Sync is an explicit trust boundary: a valid session alone does not\n                # prove the durable action ledger survived concurrent damage.\n                audited = store.audit(slot)\n                refreshed = store.load(slot)\n                if (refreshed["head"] != audited["head"] or\n                        refreshed["revision"] != audited["revision"]):\n                    raise StoreError("save changed during sync audit; retry sync")\n                current = refreshed\n                write("Authoritative save refreshed; no turn was consumed.")
+                # Sync is an explicit trust boundary: a valid session alone does not
+                # prove the durable action ledger survived concurrent damage.
+                audited = store.audit(slot)
+                refreshed = store.load(slot)
+                if (refreshed["head"] != audited["head"] or
+                        refreshed["revision"] != audited["revision"]):
+                    raise StoreError("save changed during sync audit; retry sync")
+                current = refreshed
+                write("Authoritative save refreshed; no turn was consumed.")
             except (StoreError, CampaignError, OSError) as exc:
                 write("Save refresh unavailable; no turn was consumed: " + str(exc))
             continue

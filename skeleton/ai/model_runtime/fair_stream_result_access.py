@@ -233,6 +233,10 @@ class AuthorizedSealedResultReader:
         The caller must enforce app user authorization before invoking this
         method. A consumed grant remains consumed if decryption later fails.
         """
+        try:
+            self._handle.require_owner_process()
+        except PrivateSQLiteUnavailable as exc:
+            raise ResultReadDenied("grant ledger unavailable: owner process changed") from exc
         with self._lock:
             try:
                 self._handle.assert_current()

@@ -7,7 +7,6 @@ and fail-closed CLI contracts.
 from __future__ import annotations
 
 import argparse
-import importlib
 import json
 from typing import Callable
 
@@ -46,10 +45,37 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if parsed.system not in COMMANDS:
         parser.error("unknown Cinder Ridge subsystem")
-    module_name = COMMANDS[parsed.system][0]
-    # Only the closed, statically defined package namespace may be imported.
-    module = importlib.import_module("." + module_name, package=__package__)
-    entrypoint: Callable[[list[str] | None], int] = getattr(module, "main")
+    # Closed lazy imports preserve optional subsystem isolation without
+    # passing even allowlisted variable strings into importlib.
+    entrypoint: Callable[[list[str] | None], int]
+    if parsed.system == "rescue":
+        from .cli import main as entrypoint
+    elif parsed.system == "consumer":
+        from .consumer_cli import main as entrypoint
+    elif parsed.system == "campaign":
+        from .campaign_cli import main as entrypoint
+    elif parsed.system == "missions":
+        from .missions_cli import main as entrypoint
+    elif parsed.system == "journal":
+        from .journal_cli import main as entrypoint
+    elif parsed.system == "package":
+        from .package_cli import main as entrypoint
+    elif parsed.system == "routebook":
+        from .routebook_cli import main as entrypoint
+    elif parsed.system == "tactics":
+        from .tactics_cli import main as entrypoint
+    elif parsed.system == "workbench":
+        from .workbench_cli import main as entrypoint
+    elif parsed.system == "league":
+        from .league_cli import main as entrypoint
+    elif parsed.system == "league-demo":
+        from .league_acceptance import main as entrypoint
+    elif parsed.system == "acceptance":
+        from .qualification_cli import main as entrypoint
+    elif parsed.system == "challenges":
+        from .challenges_cli import main as entrypoint
+    else:
+        raise RuntimeError("launcher inventory and dispatch differ")
     return entrypoint(parsed.args)
 
 
