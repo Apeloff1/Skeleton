@@ -2797,14 +2797,19 @@ async def crawler_treasury_passage(
 
 @router.get("/crawler/companion/treasury")
 async def crawler_companion_treasury(
-    mode: str = Query(default="current_only", pattern=r"^(current_only|historic_only|all_revisions|timeline|compare)$"),
+    mode: str = Query(default="current_only", pattern=r"^(current_only|historic_only|all_revisions|timeline|compare|at_time)$"),
     query: str = Query(default="", max_length=256),
     family: str | None = Query(default=None, pattern=r"^[a-f0-9]{64}$"),
+    cursor: str | None = Query(default=None,pattern=r"^[a-f0-9]{64}:[0-9]{1,4}$"),
+    observed_before: float | None = Query(default=None,ge=0),
+    left: str | None = Query(default=None,pattern=r"^[a-f0-9]{64}$"),
+    right: str | None = Query(default=None,pattern=r"^[a-f0-9]{64}$"),
     scope: dict = Depends(_crawler_scope),
 ) -> dict:
     """Read-only current/history reparse; every source remains policy-bound."""
     return await _crawler_result(crawler_application.companion_treasury(
-        scope, mode=mode, query=query, family=family,
+        scope, mode=mode, query=query, family=family,cursor=cursor,
+        observed_before=observed_before,left=left,right=right,
     ))
 
 
