@@ -40,7 +40,10 @@ let scope, bridgeStorage, galaxyStorage, studioStorage;
 try {
   Module._load = function isolatedAuthAndStorage(request, parent, isMain) {
     if (request === 'expo-crypto') return mockCrypto;
-    if (request === '../auth/gameforgeAuth') return mockAuth;
+    // Resolve only the exact app auth module from both skeletonForge and nested callers.
+    if (request.startsWith('.') && parent?.filename &&
+        path.resolve(path.dirname(parent.filename), request) ===
+          path.resolve(__dirname, '../../src/auth/gameforgeAuth')) return mockAuth;
     if (request === '@react-native-async-storage/async-storage') return {
       __esModule: true, default: mockStorage,
     };
@@ -157,7 +160,8 @@ test('both routes unmount old editor state as soon as authentication epoch chang
     assert.match(source, /subscribeAuthChanges\(\(\) => setAuthEpoch\(getAuthEpoch\(\)\)\)/);
     assert.match(source, /loadedAuthEpoch === authEpoch/);
     assert.match(source, /consumeCreatorBridge\(/);
-    assert.match(source, /loadGalaxyDraft\(/);
+    assert.match(source, /recoverCreatorRoute\(loadGalaxyDraft, \(\) => consumeCreatorBridge/);
+    assert.match(source, /accessibilityLabel="Retry creator draft recovery"/);
   }
 });
 
