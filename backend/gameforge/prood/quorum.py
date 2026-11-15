@@ -15,13 +15,17 @@ reaches consensus — or fails safely when the fault budget is exceeded.
 from __future__ import annotations
 
 import hashlib
+import json
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
 
 def _digest(value: Any) -> str:
-    return hashlib.sha256(repr(value).encode("utf-8")).hexdigest()[:16]
+    canonical = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    if len(canonical.encode("utf-8")) > 256 * 1024:
+        raise ValueError("quorum payload exceeds budget")
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 @dataclass
@@ -58,6 +62,7 @@ class QuorumResult:
     def to_dict(self) -> Dict:
         return {
             "decided": self.decided, "value": self.value, "digest": self.digest,
+            "scope": "in_process_simulation",
             "n": self.n, "f": self.f, "quorum_needed": self.quorum_needed,
             "commit_count": self.commit_count, "phases": self.phases,
             "view": self.view, "seq": self.seq, "ms": self.ms,
@@ -68,22 +73,26 @@ class QuorumConsensus:
     """N-replica PBFT quorum. ``n >= 3f + 1`` for safety under ``f`` faults."""
 
     def __init__(self, n: int = 7, f: int = 2):
+        if type(n) is not int or type(f) is not int or not 1 <= n <= 64 or not 0 <= f < n:
+            raise ValueError("invalid replica or fault budget")
         if n < 3 * f + 1:
             raise ValueError(f"BFT requires n >= 3f+1 (got n={n}, f={f})")
         self.n = n
         self.f = f
-        self.quorum_needed = 2 * f + 1
+        self.quorum_needed = (n + f) // 2 + 1
         self.view = 0
         self.seq = 0
 
     def agree(self, value: Any, proof: str = "", faulty: Optional[Set[int]] = None) -> QuorumResult:
         """Run one consensus round. ``faulty`` = replica ids that will
         equivocate (defaults to none → all honest)."""
-        t0 = time.time()
-        self.seq += 1
+        t0 = time.monotonic()
         faulty = faulty or set()
-        replicas = [Replica(i, byzantine=(i in faulty)) for i in range(self.n)]
+        if any(type(replica) is not int or not 0 <= replica < self.n for replica in faulty):
+            raise ValueError("invalid faulty replica identity")
         truth = _digest(value)
+        self.seq += 1
+        replicas = [Replica(i, byzantine=(i in faulty)) for i in range(self.n)]
 
         # ── pre-prepare (primary proposes) ──
         pre_prepare = {"replica": 0, "digest": truth, "proof": proof}
@@ -109,7 +118,7 @@ class QuorumConsensus:
                                    "digest": _digest(f"c:{r.replica_id}"), "commit": False})
 
         commit_count = sum(1 for c in commit if c["commit"] and c["digest"] == truth)
-        decided = commit_count >= self.quorum_needed
+        decided = len(faulty) <= self.f and commit_count >= self.quorum_needed
 
         return QuorumResult(
             decided=decided,
@@ -119,7 +128,7 @@ class QuorumConsensus:
             commit_count=commit_count,
             phases={"pre_prepare": [pre_prepare], "prepare": prepare, "commit": commit},
             view=self.view, seq=self.seq,
-            ms=round((time.time() - t0) * 1000, 3),
+            ms=round((time.monotonic() - t0) * 1000, 3),
         )
 
 
