@@ -57,7 +57,7 @@ export default function DragonGameCorpusPanel({visible,canWrite}:{visible:boolea
  const refresh=()=>{if(!batch)return;run(async(signal,valid)=>{const p=await importStatus(batch.batch_id,signal);if(valid())setStatus(p);});};
  return <View style={s.check}>
   <Text style={s.label}>Game corpus · release intelligence</Text>
-  <Text style={s.small}>533 source classes spanning text, artwork, maps, video, audio, documents and development. Catalogue observations are not reviewed evidence or automatic network authorization.</Text>
+  <Text style={s.small}>Expanded source classes spanning text, artwork, maps, video, audio, documents and development. Catalogue observations are not reviewed evidence or automatic network authorization.</Text>
   <Button label={open?'Close game corpus':'Open game corpus'} disabled={!visible||busy} press={()=>{if(open)clear();setOpen(!open);}}/>
   {open&&<>
    <TextInput value={query} onChangeText={v=>{setQuery(v);setGames([]);setGame(null);setViewer(null);setSources([]);setSelected(null);setConsent(false);setCapture(null);}} editable={enabled} maxLength={256} accessibilityLabel="Game title search" style={field} placeholder="Game name or alternate title" placeholderTextColor={C.muted}/>
@@ -91,7 +91,7 @@ export default function DragonGameCorpusPanel({visible,canWrite}:{visible:boolea
    {game&&<><Text style={s.label}>Sources for {game.first_title}</Text><Button label="Refresh filtered sources" disabled={!enabled} press={()=>choose(game)}/></>}
    {sources.map(x=><View key={x.source_id} style={s.check}><Text selectable style={s.small}>{x.url}</Text><Text style={s.small}>{human(x.family||"source")} · {human(x.kind)} · {x.view_mode||"text"} · {x.language} · {human(x.latest_observation.stage)} · {x.latest_observation.version||'version not supplied'}</Text><Text style={s.small}>Observed {day(x.last_observed)} · review due {day(x.next_review)}</Text><Button label="Open source viewer" disabled={!enabled} press={()=>setViewer(x)}/><Button label="Select exact source observation" disabled={!enabled||!canWrite} press={()=>{setSelected(x);setConsent(false);setCapture(null);}}/></View>)}
    <Button label="Next source page" disabled={!enabled||!game||!sourceCursor} press={()=>{if(game&&sourceCursor)choose(game,sourceCursor)}}/>
-   {game&&viewer&&<View style={s.check}><Button label="Close source viewer" disabled={busy} press={()=>setViewer(null)}/><DragonSourceViewer key={game.game_id+":"+viewer.source_id} game={game.game_id} source={viewer} visible={visible&&open} disabled={busy}/></View>}
+   {game&&viewer&&<View style={s.check}><Button label="Close source viewer" disabled={busy} press={()=>setViewer(null)}/><DragonSourceViewer key={game.game_id+":"+viewer.source_id} game={game.game_id} source={viewer} visible={visible&&open} disabled={busy} canWrite={canWrite}/></View>}
    {selected&&canWrite&&<View style={s.check}><Text selectable style={s.small}>{selected.url}</Text>
     <View style={s.row}><Switch disabled={!enabled} value={consent} onValueChange={setConsent} accessibilityLabel="Explicit capture and source rights consent"/><Text style={s.small}>I authorize capture and acknowledge source rights for this exact URL.</Text></View>
     <View style={s.row}><Switch disabled={!enabled} value={auto} onValueChange={setAuto} accessibilityLabel="Finite autonomous grant"/><Text style={s.small}>Allow existing crawler scheduler a finite run, up to 8 slices / 15 minutes.</Text></View>
