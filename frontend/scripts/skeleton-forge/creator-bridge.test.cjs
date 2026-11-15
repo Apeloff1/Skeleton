@@ -312,3 +312,51 @@ test('Studio origin survives a Galaxy detour and cannot be forged from unrelated
     ...studio, target: 'studio', studioProjectUpdatedAt: 'not-an-ISO-date',
   }, 1700000000001), null);
 });
+
+test('creator route recovery reads the saved draft before consuming a one-time handoff', async () => {
+  const { recoverCreatorRoute } = load('src/skeletonForge/creatorRouteRecovery.ts');
+  const events = [];
+  const result = await recoverCreatorRoute(
+    async () => { events.push('draft'); return { title: 'saved' }; },
+    async () => { events.push('handoff'); return { title: 'transferred' }; },
+    () => true,
+  );
+  assert.deepEqual(events, ['draft', 'handoff']);
+  assert.deepEqual(result, { draft: { title: 'saved' }, handoff: { title: 'transferred' } });
+  await assert.rejects(recoverCreatorRoute(
+    async () => { throw new Error('storage unavailable'); },
+    async () => { assert.fail('must not consume on failed draft read'); },
+    () => true,
+  ), /storage unavailable/);
+});
+
+test('creator route recovery rejects account rotation and failed handoff reads', async () => {
+  const { recoverCreatorRoute } = load('src/skeletonForge/creatorRouteRecovery.ts');
+  let current = true;
+  await assert.rejects(recoverCreatorRoute(
+    async () => { current = false; return null; },
+    async () => { assert.fail('stale route must not consume'); },
+    () => current,
+  ), /superseded/);
+  current = true;
+  await assert.rejects(recoverCreatorRoute(
+    async () => null,
+    async () => { current = false; return { private: true }; },
+    () => current,
+  ), /superseded/);
+  await assert.rejects(recoverCreatorRoute(
+    async () => null,
+    async () => { throw new Error('handoff unavailable'); },
+    () => true,
+  ), /handoff unavailable/);
+});
+
+test('Galaxy and Forge block editor mount on failed recovery and expose retry', () => {
+  for (const route of ['galaxy', 'skeleton-forge']) {
+    const source = fs.readFileSync(path.resolve(__dirname, '../../app', route + '.tsx'), 'utf8');
+    assert.match(source, /recoverCreatorRoute\(loadGalaxyDraft, \(\) => consumeCreatorBridge/);
+    assert.doesNotMatch(source, /loadGalaxyDraft\(\)\.catch\(\(\) => null\)/);
+    assert.match(source, /accessibilityLabel="Retry creator draft recovery"/);
+    assert.match(source, /ready && loadedAuthEpoch === authEpoch/);
+  }
+});

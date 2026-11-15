@@ -4191,18 +4191,18 @@
       "kind": "expo_route",
       "source": "frontend/app/galaxy.tsx",
       "owner": "frontend/product-shell",
-      "maturity": "informational",
+      "maturity": "operational_candidate",
       "runtime_ready_claim": false,
-      "action_mode": "informational",
+      "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "56b987228ed356b775b7fa29a9356f92bc943f304a2aecf454ebd13625d83ea7",
-      "interaction_count": 0,
+      "source_sha256": "d78a2df004d03caed5413abc4355bd1986843049ea48313de8e4f9eb31540efd",
+      "interaction_count": 1,
       "backend_surfaces": [],
       "navigation_targets": [
         "/menu",
         "/skeleton-forge"
       ],
-      "accessibility_signal_count": 2,
+      "accessibility_signal_count": 5,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -4213,7 +4213,9 @@
       },
       "validation_evidence": [
         "frontend/app/galaxy.tsx",
-        "scripts/check_product_surface_specification.py"
+        "scripts/check_product_surface_specification.py",
+        "frontend/src/skeletonForge/creatorRouteRecovery.ts",
+        "frontend/scripts/skeleton-forge/creator-bridge.test.cjs"
       ]
     },
     {
@@ -6850,18 +6852,18 @@
       "kind": "expo_route",
       "source": "frontend/app/skeleton-forge.tsx",
       "owner": "frontend/product-shell",
-      "maturity": "informational",
+      "maturity": "operational_candidate",
       "runtime_ready_claim": false,
-      "action_mode": "informational",
+      "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "f1571106b243f7c54dbb011f022bb22a384cd49ba0f666bfc7b937a934c3550e",
-      "interaction_count": 0,
+      "source_sha256": "720ed9fd1feb8d3ab4f5fd21edbf81ba8263cba29acca78700c821939e769cee",
+      "interaction_count": 1,
       "backend_surfaces": [],
       "navigation_targets": [
         "/galaxy",
         "/skeleton-studio"
       ],
-      "accessibility_signal_count": 2,
+      "accessibility_signal_count": 5,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -6872,7 +6874,9 @@
       },
       "validation_evidence": [
         "frontend/app/skeleton-forge.tsx",
-        "scripts/check_product_surface_specification.py"
+        "scripts/check_product_surface_specification.py",
+        "frontend/src/skeletonForge/creatorRouteRecovery.ts",
+        "frontend/scripts/skeleton-forge/creator-bridge.test.cjs"
       ]
     },
     {
