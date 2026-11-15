@@ -97,6 +97,25 @@ export type DragonEvolution = {
   total_evolution: number; effective_evolution: number; stage_progress: number;
   hoarder_qualified: boolean; next_threshold: number | null;
 };
+export type DragonTreasuryWatch = {
+  schema:'skeleton.dragon.treasury-watch.v1'; source_id:string; enabled:boolean;
+  state:'waiting'|'working'|'stopped'|'blocked'; expires_at:number; max_cycles:number;
+  cycles_started:number; cycles_completed:number; next_due:number; retention_days:number;
+  minimum_interval:number; last_child_id:string|null; stop_reason:string|null;
+  network_scope:'exact_public_seed_canonical_policy'; owner_revocable:true;
+};
+export type TreasuryWatchCommand = CrawlCommand & { enabled:boolean;source_id:string;days:number;cycles:number;
+  minimum_interval:number;retention_days:number;capture_rights_acknowledged:boolean;archive_rights_acknowledged:boolean };
+function validWatch(w:DragonTreasuryWatch):boolean {
+  return !!w&&w.schema==='skeleton.dragon.treasury-watch.v1'&&HASH.test(w.source_id)
+    &&typeof w.enabled==='boolean'&&['waiting','working','stopped','blocked'].includes(w.state)
+    &&Number.isFinite(w.expires_at)&&Number.isFinite(w.next_due)&&w.next_due<=w.expires_at
+    &&integer(w.max_cycles,6)&&w.max_cycles>0&&integer(w.cycles_started,w.max_cycles)&&integer(w.cycles_completed,w.cycles_started)
+    &&integer(w.retention_days,30)&&w.retention_days>=1&&integer(w.minimum_interval,604800)&&w.minimum_interval>=21600
+    &&(w.last_child_id===null||ID.test(w.last_child_id))
+    &&(w.stop_reason===null||typeof w.stop_reason==='string'&&w.stop_reason.length<=64)
+    &&w.network_scope==='exact_public_seed_canonical_policy'&&w.owner_revocable===true;
+}
 export type DragonArchiveGrant = { active: boolean; expires_at: number | null; granted_sources: number; usable_sources: number; history_only: true; network_authority_expanded: false };
 export type TreasuryMode = 'current_only' | 'historic_only' | 'all_revisions' | 'timeline' | 'compare' | 'at_time';
 export type TreasuryDelta = { kind: 'initial' | 'minor_update' | 'substantive_update' | 'major_rewrite' | 'changed_unclassified' | 'rollback'; similarity: number | null; added_terms: number | null; removed_terms: number | null; changed_sections: number | null; numeric_change: boolean | null };
@@ -141,7 +160,7 @@ export type CrawlSession = {
   acquisition_economics?: CrawlAcquisitionEconomics;
   companion?: DragonCompanion;
   curriculum_trace?: DragonCurriculumTrace;
-  archive_grant?: DragonArchiveGrant;
+  archive_grant?: DragonArchiveGrant; treasury_watch?: DragonTreasuryWatch|null; watch_managed?: boolean;
   queue: { url: string; depth: number; attempts: number; ready_at: number }[];
 };
 export type SourceUsePolicy = { version: number; enabled: boolean; max_age_seconds: number; changed_at: string | null };
@@ -339,6 +358,7 @@ function session(value: CrawlSession, expectedId?: string): CrawlSession {
     if (counted !== e.settled_requests) invalid('Acquisition economics request accounting is incomplete.');
   }
   if (value.archive_grant !== undefined && !validArchiveGrant(value.archive_grant, value.source_count)) invalid('Invalid historical grant projection.');
+  if (value.treasury_watch!==undefined&&value.treasury_watch!==null&&!validWatch(value.treasury_watch)||value.watch_managed!==undefined&&typeof value.watch_managed!=='boolean') invalid('Invalid treasury watch projection.');
   if (value.companion !== undefined) {
     const p = value.companion;
     const unit = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1;
@@ -521,6 +541,15 @@ export async function getDragonTreasury(mode: TreasuryMode, query='', family?: s
       ||left!==undefined&&(p.comparison.previous.revision_id!==left||p.comparison.current.revision_id!==right))
     ||p.earliest_source_expiry!==null&&(!Number.isFinite(p.earliest_source_expiry)||p.earliest_source_expiry<=p.as_of_unix)
     ||p.latest_observed_only!==true||p.source_text_returned!==false||p.network_executed!==false||p.training_permission!==false||p.fresh_consent_required!==true)invalid('Invalid version-separated treasury projection.');
+  return p;
+}
+export async function configureTreasuryWatch(id:string,body:TreasuryWatchCommand,signal?:AbortSignal):Promise<{watch:DragonTreasuryWatch|null;version:number}> {
+  if(typeof body.enabled!=='boolean'||!HASH.test(body.source_id)||!integer(body.days,7)||body.days<1
+    ||!integer(body.cycles,6)||body.cycles<1||!integer(body.minimum_interval,604800)||body.minimum_interval<21600
+    ||!integer(body.retention_days,30)||body.retention_days<1||typeof body.capture_rights_acknowledged!=='boolean'
+    ||typeof body.archive_rights_acknowledged!=='boolean'||body.enabled&&(!body.capture_rights_acknowledged||!body.archive_rights_acknowledged)) invalid('Explicit finite source-watch authority is required.');
+  const p=await read(api.post<{watch:DragonTreasuryWatch|null;version:number}>(ROOT+'/sessions/'+identifier(id)+'/treasury-watch',body,options(signal)),getAuthToken(),'Treasury watch command not confirmed.');
+  if(!p||!Number.isSafeInteger(p.version)||p.version<body.expected_version||p.watch!==null&&!validWatch(p.watch)) invalid('Invalid treasury watch command receipt.');
   return p;
 }
 export async function configureDragonArchive(id: string, body: CrawlCommand & { enabled: boolean; days: number; archive_rights_acknowledged: boolean }, signal?: AbortSignal): Promise<CrawlSession> {
