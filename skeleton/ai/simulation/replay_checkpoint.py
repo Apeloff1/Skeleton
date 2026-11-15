@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 
 from skeleton.simulation.fixed_tick import (
-    FixedTickReplay, InputEvent, ReplayError, ReplayFrame, MAX_EVENTS,
+    FixedTickReplay, InputEvent, ReplayError, ReplayFrame, MAX_EVENTS, MAX_TICKS,
 )
 
 SCHEMA = "skeleton.game.replay-checkpoint.v1"
@@ -38,6 +38,20 @@ def _reject_nonfinite(_token: str) -> object:
     raise ReplayError("non-finite checkpoint JSON constant")
 
 
+def _parse_integer(token: str) -> int:
+    # All integer fields are nonnegative and at most signed 64-bit.
+    if not 1 <= len(token) <= 19 or token.startswith("-"):
+        raise ReplayError("checkpoint integer exceeds bound")
+    value = int(token)
+    if value > 2**63 - 1:
+        raise ReplayError("checkpoint integer exceeds bound")
+    return value
+
+
+def _reject_float(_token: str) -> object:
+    raise ReplayError("floating-point checkpoint field")
+
+
 def _append_bounded(buffer: bytearray, piece: bytes) -> None:
     if len(piece) > MAX_CHECKPOINT_BYTES - len(buffer):
         raise ReplayError("checkpoint byte budget exhausted")
@@ -52,20 +66,28 @@ def encode(replay: FixedTickReplay) -> bytes:
     verified before serializing: an object with forged frame/head fields
     cannot mint an authoritative-looking checkpoint.
     """
-    if not isinstance(replay, FixedTickReplay):
+    if type(replay) is not FixedTickReplay:
         raise ReplayError("checkpoint requires canonical replay")
-    frames = replay.frames
-    if len(frames) > MAX_EVENTS:
+    hz, seed, tick, head = replay.hz, replay.seed, replay.tick, replay.digest
+    if not _int(tick, 0, MAX_TICKS) or not _hex_digest(head):
+        raise ReplayError("invalid checkpoint source identity")
+    if type(replay._frames) is not list or len(replay._frames) > MAX_EVENTS:
         raise ReplayError("checkpoint frame count exceeds bound")
-    verified = FixedTickReplay.verify(
-        hz=replay.hz, seed=replay.seed, frames=frames,
-    )
-    if verified.digest != replay.digest or verified.tick != replay.tick:
-        raise ReplayError("checkpoint source replay divergence")
-
+    frames = replay.frames
+    verified = FixedTickReplay(hz=hz, seed=seed)
     output = bytearray()
     _append_bounded(output, b'{"frames":[')
-    for index, frame in enumerate(frames):
+    for index, supplied in enumerate(frames):
+        if type(supplied) is not ReplayFrame:
+            raise ReplayError("invalid checkpoint source frame")
+        if (not _int(supplied.tick, 1, MAX_TICKS)
+                or not _hex_digest(supplied.prior_digest)
+                or not _hex_digest(supplied.digest)):
+            raise ReplayError("invalid checkpoint source frame identity")
+        frame = verified.advance(supplied.events)
+        if (frame.tick != supplied.tick or frame.prior_digest != supplied.prior_digest
+                or frame.digest != supplied.digest):
+            raise ReplayError("checkpoint source replay divergence")
         if index:
             _append_bounded(output, b",")
         record = {
@@ -85,14 +107,20 @@ def encode(replay: FixedTickReplay) -> bytes:
             raise ReplayError("invalid checkpoint frame encoding") from exc
         _append_bounded(output, encoded)
 
+    if verified.digest != head or verified.tick != tick:
+        raise ReplayError("checkpoint source replay divergence")
+    if (replay.digest != head or replay.tick != tick
+            or replay.hz != hz or replay.seed != seed or len(replay._frames) != len(frames)):
+        raise ReplayError("checkpoint source changed during encoding")
+
     # The canonical top-level key ordering is frames/head/hz/schema/seed.
     # Removing only the leading "{" of the remaining sorted keys produces
     # exactly the bytes of a monolithic sort_keys=True JSON dump.
     tail = json.dumps({
-        "head": replay.digest,
-        "hz": replay.hz,
+        "head": head,
+        "hz": hz,
         "schema": SCHEMA,
-        "seed": replay.seed,
+        "seed": seed,
     }, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("ascii")
     _append_bounded(output, b"]," + tail[1:])
     return bytes(output)
@@ -107,6 +135,8 @@ def decode(data: bytes) -> FixedTickReplay:
             data.decode("utf-8"),
             object_pairs_hook=_unique_keys,
             parse_constant=_reject_nonfinite,
+            parse_int=_parse_integer,
+            parse_float=_reject_float,
         )
     except ReplayError:
         raise
@@ -127,7 +157,7 @@ def decode(data: bytes) -> FixedTickReplay:
     for item in raw:
         if type(item) is not dict or set(item) != {"tick", "prior", "digest", "events"}:
             raise ReplayError("invalid frame schema")
-        if (not _int(item["tick"], 1, 10_000_000)
+        if (not _int(item["tick"], 1, MAX_TICKS)
                 or not _hex_digest(item["prior"])
                 or not _hex_digest(item["digest"])):
             raise ReplayError("invalid frame identity")

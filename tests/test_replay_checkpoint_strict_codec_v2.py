@@ -127,5 +127,61 @@ class StreamingCheckpointTests(unittest.TestCase):
             codec.encode(replay)
 
 
+    def test_integer_and_action_subclasses_cannot_cross_replay_boundary(self):
+        class HostileInt(int):
+            def __le__(self, other):
+                raise AssertionError("untrusted integer comparison")
+
+        class HostileAction(str):
+            def __hash__(self):
+                raise AssertionError("untrusted action hash")
+
+        with self.assertRaises(ReplayError):
+            InputEvent(HostileInt(1), "right", True)
+        with self.assertRaises(ReplayError):
+            InputEvent(1, HostileAction("right"), True)
+
+    def test_mutated_event_slots_do_not_enter_history(self):
+        replay = FixedTickReplay()
+        event = InputEvent(1, "right", True)
+        object.__setattr__(event, "pressed", 1)
+        with self.assertRaises(ReplayError):
+            replay.advance((event,))
+        self.assertEqual(replay.tick, 0)
+        self.assertEqual(replay.frames, ())
+        event = InputEvent(1, "right", True)
+        replay.advance((event,))
+        object.__setattr__(event, "action", "left")
+        self.assertEqual(replay.frames[0].events[0].action, "right")
+
+    def test_forged_frame_boolean_tick_and_digest_subclass_rejected(self):
+        for field, bad in (("tick", True), ("digest", type("Digest", (str,), {})("a" * 64))):
+            replay = sample()
+            object.__setattr__(replay._frames[0], field, bad)
+            with self.assertRaises(ReplayError):
+                codec.encode(replay)
+            with self.assertRaises(ReplayError):
+                FixedTickReplay.verify(hz=replay.hz, seed=replay.seed, frames=replay.frames)
+
+    def test_decoder_rejects_huge_numeric_token_before_integer_conversion(self):
+        canonical = codec.encode(sample())
+        payload = canonical.replace(b'"seed":91', b'"seed":' + b'9' * 5000, 1)
+        with self.assertRaisesRegex(ReplayError, "integer exceeds bound"):
+            codec.decode(payload)
+
+    def test_budget_stops_replay_verification_before_later_frames(self):
+        replay = sample()
+        original = FixedTickReplay.advance
+        observed = []
+        def advance(owner, events=()):
+            observed.append(owner.tick)
+            return original(owner, events)
+        with patch.object(codec, "MAX_CHECKPOINT_BYTES", 80):
+            with patch.object(FixedTickReplay, "advance", advance):
+                with self.assertRaisesRegex(ReplayError, "byte budget"):
+                    codec.encode(replay)
+        self.assertEqual(observed, [0])
+
+
 if __name__ == "__main__":
     unittest.main()
