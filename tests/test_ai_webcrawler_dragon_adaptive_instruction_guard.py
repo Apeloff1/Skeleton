@@ -160,6 +160,7 @@ class CanonicalInstructionTests(unittest.TestCase):
         run, at = make_run(fetcher)
         step(run, at + 1)
         self.assertEqual(run.status()["instruction_security"]["count"], 1)
+        self.assertNotIn("Ignore previous instructions", json.dumps(run.snapshot()))
         result = step(run, at + 2)
         self.assertEqual(result["slice_events"][0]["reason"], "robots_denied")
         self.assertEqual(len(fetcher.calls), 1)
@@ -250,6 +251,63 @@ class AdaptiveNavigationTests(unittest.TestCase):
         row, _ = choose_frontier(rows, sources={}, host_ready={}, query="orbital",
                                  now=100, strategy="fifo", events=outcomes)
         self.assertEqual(row, rows[0])
+
+
+class ControlledCoverageBenchmark(unittest.TestCase):
+    """Same finite corpus, seeds, clock and request budget for each strategy."""
+
+    def run_fixture(self, strategy):
+        from urllib.parse import urlsplit
+
+        seeds = tuple(BASE + "/catalog/item-" + str(n) for n in range(6)) + (
+            OTHER + "/orbital/mechanics", OTHER + "/orbital/dynamics",
+        )
+        answers = {url: (200, "text/html",
+                    ("<html><title>Corpus</title><p>" + urlsplit(url).path +
+                     " stable reference document</p></html>").encode(), {})
+                   for url in seeds}
+        for origin in (BASE, OTHER):
+            answers[origin + "/robots.txt"] = (200, "text/plain", ROBOTS, {})
+        fetcher = ScriptedFetcher(answers)
+        run, at = make_run(fetcher, seeds=seeds, strategy=strategy, requests=4, depth=0)
+        for second in range(1, 9):
+            step(run, at + second)
+        sources = run.sources()
+        relevant = [source for source in sources if source["canonical_url"].startswith(OTHER + "/orbital/")]
+        return {"requests": run.snapshot()["usage"]["requests"],
+                "useful": len(relevant), "captured": len(sources),
+                "bytes": run.snapshot()["usage"]["bytes"],
+                "violations": sum(1 for url, _ in fetcher.calls if url not in answers)}
+
+    def test_adaptive_coverage_increases_relevant_yield_without_budget_or_scope_escape(self):
+        fifo = self.run_fixture("fifo")
+        adaptive = self.run_fixture("coverage")
+        self.assertEqual(fifo["requests"], 4)
+        self.assertEqual(adaptive["requests"], 4)
+        self.assertEqual(fifo["violations"], 0)
+        self.assertEqual(adaptive["violations"], 0)
+        self.assertGreater(adaptive["useful"], fifo["useful"])
+
+    def test_instruction_receipts_survive_ordinary_event_tail_eviction(self):
+        seeds = tuple(BASE + "/catalog-" + str(n) for n in range(8))
+        # One source exposes many permissible structural links. The attack
+        # cannot discover links, so the remaining queue is independently seeded.
+        links = "".join("<a href='/docs/page-" + str(n) + "'>Doc</a>" for n in range(40))
+        answers = {
+            BASE + "/robots.txt": (200, "text/plain", ROBOTS, {}),
+            seeds[0]: (200, "text/html", ATTACK, {}),
+            seeds[1]: (200, "text/html", ("<html><p>Catalogue</p>" + links + "</html>").encode(), {}),
+        }
+        fetcher = ScriptedFetcher(answers)
+        run, at = make_run(fetcher, seeds=seeds, requests=96, depth=1)
+        for second in range(1, 85):
+            step(run, at + second)
+        snap = run.snapshot()
+        self.assertTrue(snap["events"])
+        self.assertGreater(snap["events"][0]["sequence"], snap["instruction_incidents"][0]["sequence"])
+        self.assertEqual(len(snap["events"]), 64)
+        self.assertEqual(len(snap["instruction_incidents"]), 1)
+        self.assertEqual(CrawlRun.from_snapshot(snap, fetcher=fetcher).snapshot(), snap)
 
 
 if __name__ == "__main__":
