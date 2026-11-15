@@ -686,3 +686,39 @@ def register_knowledge_routes(router):
     @router.delete("/knowledge/media/{media_id}/captions/{track_id}")
     async def caption_revoke(media_id:str,track_id:str,user:dict=Depends(get_current_user)):
         return await captions_call(editor(user),"revoke_track",media_id,track_id)
+
+
+    async def dataset_explorer_call(owner,game,operation,*args,**kwargs):
+        from core.dragon_dataset_explorer import DatasetExplorer
+        from core.dragon_corpus_runtime import _bounded
+        if operation not in {"record","graph","compare","compare_record"}:
+            raise HTTPException(422,detail={"code":"dragon_dataset_explorer_invalid"})
+        return await corpus_runtime_call(_bounded(lambda:getattr(DatasetExplorer(owner,game),operation)(*args,**kwargs)))
+
+    @router.get("/knowledge/game-corpus/{game_id}/datasets/{version}/record/{record}")
+    async def dataset_exact_record(game_id:str,version:str,record:str,response:Response,user:dict=Depends(get_current_user)):
+        response.headers["Cache-Control"]="private, no-store"
+        return await dataset_explorer_call(scope(user),game_id,"record",version,record)
+
+    @router.get("/knowledge/game-corpus/{game_id}/datasets/{version}/graph/{record}")
+    async def dataset_entity_graph(game_id:str,version:str,record:str,response:Response,
+            direction:Literal["in","out","both"]="both",relation:str|None=Query(None,max_length=128),
+            max_depth:int=Query(3,ge=0,le=6),node_limit:int=Query(128,ge=1,le=256),
+            edge_limit:int=Query(256,ge=1,le=512),user:dict=Depends(get_current_user)):
+        response.headers["Cache-Control"]="private, no-store"
+        return await dataset_explorer_call(scope(user),game_id,"graph",version,record,direction=direction,
+                   relation=relation,max_depth=max_depth,node_limit=node_limit,edge_limit=edge_limit)
+
+    @router.get("/knowledge/game-corpus/{game_id}/datasets/{version}/compare/{other_version}")
+    async def dataset_compare_versions(game_id:str,version:str,other_version:str,response:Response,
+            after:str|None=Query(None,max_length=128),limit:int=Query(32,ge=1,le=64),
+            changes_only:bool=True,user:dict=Depends(get_current_user)):
+        response.headers["Cache-Control"]="private, no-store"
+        return await dataset_explorer_call(scope(user),game_id,"compare",version,other_version,
+                   after=after,limit=limit,changes_only=changes_only)
+
+    @router.get("/knowledge/game-corpus/{game_id}/datasets/{version}/compare/{other_version}/record/{record}")
+    async def dataset_compare_exact_record(game_id:str,version:str,other_version:str,record:str,response:Response,
+            user:dict=Depends(get_current_user)):
+        response.headers["Cache-Control"]="private, no-store"
+        return await dataset_explorer_call(scope(user),game_id,"compare_record",version,other_version,record)
