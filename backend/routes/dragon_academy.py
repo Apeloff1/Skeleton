@@ -2845,6 +2845,11 @@ async def crawler_treasury_vault_discovery(
     return await _crawler_result(crawler_application.discover_treasury_vault(scope,query=query,cursor=cursor))
 
 
+@router.get("/crawler/companion/vault-health")
+async def crawler_treasury_vault_health(scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.treasury_vault_health(scope))
+
+
 @router.get("/crawler/companion/vault-quota")
 async def crawler_treasury_quota(scope:dict=Depends(_crawler_scope))->dict:
     return await _crawler_result(crawler_application.treasury_quota_status(scope))

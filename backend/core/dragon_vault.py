@@ -956,3 +956,80 @@ class DragonVaultMixin:
             update["$set"]["treasury_repair_due"]=now
         changed=await self.sessions.update_one(fenced,update)
         return "auto_"+side+"_repaired" if changed.modified_count else "superseded"
+
+
+    async def treasury_vault_health(self,scope):
+        """Exact owner-bounded metadata census, not a live byte verification.
+
+        Retirements can temporarily occupy both quotas. At most 160 distinct
+        records are possible across the 128 cold and 32 active reservations.
+        Invalid records remain visible as holds rather than disappearing.
+        """
+        from core.dragon_crawler import CrawlerError,_now,_plain
+        from skeleton.ai.webcrawler.dragon_treasury_vault import finite,hash_identity
+        from skeleton.ai.webcrawler.dragon_vault_quota import MAX_RESERVED
+        await self.ensure_indexes()
+        query={**scope,"status":{"$in":sorted(TERMINAL)},
+               "treasury_vault.state":{"$in":["pending","vaulted"]}}
+        fields={"_id":1,"version":1,"treasury_vault":1,"checkpoint_identity.snapshot_digest":1,
+                "treasury_vault_scrub":1,"treasury_vault_care":1,"treasury_vault_scrub_due":1}
+        async def census():
+            return await self.sessions.find(query,fields).sort("_id",ASCENDING).limit(
+                MAX_RESERVED+1).max_time_ms(2000).to_list(MAX_RESERVED+1)
+        rows=await census()
+        if len(rows)>MAX_RESERVED or len({row["_id"] for row in rows})!=len(rows):
+            raise CrawlerError("crawler_vault_health_held","Retained catalogue exceeds the custody census bound.",503)
+        now=_now().timestamp()
+        counts={"pending":0,"vaulted":0,"marker_held":0,"uninspected":0,"stale":0,"redundant":0,
+                "primary_only":0,"repairable_primary":0,"held":0,"care_active":0,"care_inactive":0,
+                "care_absent":0,"care_held":0,"remaining_repairs":0,"due":0}
+        transitions=[]
+        for row in rows:
+            try:
+                marker=validate_marker(_plain(row["treasury_vault"]))
+                witness=row["checkpoint_identity"]["snapshot_digest"]
+                if not hash_identity(witness) or witness!=marker["snapshot_digest"] or type(row["version"]) is not int:
+                    raise ValueError("marker identity mismatch")
+            except (ValueError,TypeError,KeyError,RecursionError,CrawlerError):
+                counts["marker_held"]+=1
+                continue
+            if marker["state"]=="pending":
+                counts["pending"]+=1
+                continue
+            counts["vaulted"]+=1
+            audit=self._public_vault_scrub(row,now,witness)
+            if audit is None:
+                counts["uninspected"]+=1
+            else:
+                # Use the observation's own service horizon, not its mutable
+                # scheduler marker. A retry lease must never make old data fresh.
+                expiry=audit["checked_at"]+(24*3600 if audit["state"]=="redundant" else 6*3600)
+                if expiry<=now:
+                    counts["stale"]+=1
+                else:
+                    counts[audit["state"]]+=1
+                    transitions.append(expiry)
+            due=row.get("treasury_vault_scrub_due",0)
+            if not finite(due) or due<=now:
+                counts["due"]+=1
+            else:
+                transitions.append(due)
+            grant=row.get("treasury_vault_care")
+            care=self._public_care(row,now,witness)
+            if grant is None:
+                counts["care_absent"]+=1
+            elif care is None:
+                counts["care_held"]+=1
+            elif care["active"]:
+                counts["care_active"]+=1
+                counts["remaining_repairs"]+=care["remaining"]
+                transitions.append(care["expires_at"])
+            else:
+                counts["care_inactive"]+=1
+                if care["enabled"] and care["remaining"] and care["issued_at"]>now:
+                    transitions.append(care["issued_at"])
+        if rows!=await census() or transitions and min(transitions)<=_now().timestamp():
+            raise CrawlerError("crawler_vault_changed","Custody census changed during inspection; refresh.",409)
+        return {"ok":True,"schema":"skeleton.dragon.vault-health.v1","as_of_unix":now,
+                "valid_until":min([now+60,*transitions]),"records":len(rows),**counts,
+                "live_verified":False,"source_text_returned":False,"independent_backup":False}

@@ -688,5 +688,53 @@ class VaultCareTests(unittest.IsolatedAsyncioTestCase):
         app._admit.assert_awaited_once()
 
 
+class VaultHealthTests(unittest.IsolatedAsyncioTestCase):
+    def harness(self):
+        from skeleton.ai.webcrawler.dragon_vault_care import issue_care
+        app,row,now=VaultScrubTests().harness()
+        from core.dragon_crawler import _plain
+        marker=row["treasury_vault"]
+        digest=marker["snapshot_digest"]
+        base={"version":7,"treasury_vault":marker,"checkpoint_identity":{"snapshot_digest":digest}}
+        def observation(state,primary,replica,age):
+            return {"schema":"skeleton.dragon.vault-scrub.v1","version":7,"snapshot_digest":digest,
+                    "checked_at":now.timestamp()-age,"state":state,"primary":primary,"replica":replica}
+        grant=issue_care(operation="a"*64,request_digest="b"*64,snapshot_digest=digest,now=now.timestamp()-1,days=7,budget=2)
+        rows=[
+            {"_id":"a",**base,"treasury_vault_scrub":observation("redundant","exact","exact",1),
+             "treasury_vault_care":grant,"treasury_vault_scrub_due":now.timestamp()+3600},
+            {"_id":"b",**base,"treasury_vault_scrub":observation("repairable_primary","held","exact",1)},
+            {"_id":"c",**base,"treasury_vault_scrub":observation("primary_only","exact","held",7*3600)},
+            {"_id":"d",**base,"treasury_vault_scrub":{**observation("redundant","exact","exact",1),"version":6}},
+            {"_id":"e",**base,"checkpoint_identity":{}},
+            {"_id":"f",**base,"treasury_vault":{**marker,"state":"pending","active_slot_released":False}},
+        ]
+        app.sessions.find.return_value.to_list=AsyncMock(return_value=_plain(rows))
+        return app,rows,now
+
+    async def test_census_conserves_counts_and_never_reads_content(self):
+        app,rows,now=self.harness()
+        with patch("core.dragon_crawler._now",return_value=now):
+            value=await app.treasury_vault_health(SCOPE)
+        self.assertEqual(value["records"],6)
+        self.assertEqual((value["pending"],value["vaulted"],value["marker_held"]),(1,4,1))
+        self.assertEqual((value["redundant"],value["repairable_primary"],value["stale"],value["uninspected"]),(1,1,1,1))
+        self.assertEqual((value["care_active"],value["remaining_repairs"],value["care_absent"]),(1,2,3))
+        self.assertFalse(value["live_verified"])
+        for call in app.sessions.find.call_args_list:
+            self.assertEqual(call.args[0]["owner_id"],SCOPE["owner_id"])
+            self.assertNotIn("snapshot",call.args[1])
+            self.assertNotIn("checkpoint_replica",call.args[1])
+        app.sessions.update_one.assert_not_awaited()
+
+    async def test_midread_metadata_mutation_rejects_entire_census(self):
+        app,rows,now=self.harness()
+        app.sessions.find.return_value.to_list.side_effect=[rows,rows[:-1]]
+        with patch("core.dragon_crawler._now",return_value=now):
+            with self.assertRaises(CrawlerError) as error:
+                await app.treasury_vault_health(SCOPE)
+        self.assertEqual(error.exception.code,"crawler_vault_changed")
+
+
 if __name__=="__main__":
     unittest.main()

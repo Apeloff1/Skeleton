@@ -38,7 +38,7 @@ function client(initial){
   });
   return {requests,read:modules.getDragonTreasury,readVault:modules.getDragonVault,
     quota:modules.getDragonVaultQuota,discover:modules.discoverDragonVault,
-    retire:modules.retireDragonSession,restore:modules.restoreDragonVaultPrimary,redundancy:modules.getDragonVaultRedundancy,repairReplica:modules.repairDragonVaultReplica,care:modules.configureDragonVaultCare,set:value=>{payload=value;}};
+    retire:modules.retireDragonSession,restore:modules.restoreDragonVaultPrimary,redundancy:modules.getDragonVaultRedundancy,repairReplica:modules.repairDragonVaultReplica,care:modules.configureDragonVaultCare,health:modules.getDragonVaultHealth,set:value=>{payload=value;}};
 }
 
 async function main(){
@@ -174,6 +174,14 @@ async function main(){
   for(const patch of [{network_authorized:true},{remaining:1},{budget:4},{source_use_authorized:true}]){
     vc.set({...care,care:{...care.care,...patch}});await assert.rejects(vc.care('vaulted-fixture',careCommand),e=>e.kind==='protocol');
   }
-  console.log('Treasury and cold custody: canonical wire parity, archives, discovery, exact-copy repair and finite care consent.');
+  const health={schema:'skeleton.dragon.vault-health.v1',as_of_unix:1800000000,valid_until:1800000060,
+    records:6,pending:1,vaulted:4,marker_held:1,uninspected:1,stale:1,redundant:1,primary_only:0,
+    repairable_primary:1,held:0,care_active:1,care_inactive:0,care_absent:3,care_held:0,remaining_repairs:2,due:3,
+    live_verified:false,source_text_returned:false,independent_backup:false};
+  vc.set(health);assert.deepEqual(await vc.health(),health);
+  for(const patch of [{records:7},{redundant:2},{remaining_repairs:4},{live_verified:true},{valid_until:1800000061}]){
+    vc.set({...health,...patch});await assert.rejects(vc.health(),e=>e.kind==='protocol');
+  }
+  console.log('Treasury and cold custody: canonical wire parity, archives, discovery, exact-copy repair, care consent and health census.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

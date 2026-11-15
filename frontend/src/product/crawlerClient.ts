@@ -597,6 +597,28 @@ export async function discoverDragonVault(query:string,cursor?:string,signal?:Ab
     invalid('Invalid chamber discovery receipt.');
   return p;
 }
+export type DragonVaultHealth = {
+  schema:'skeleton.dragon.vault-health.v1';as_of_unix:number;valid_until:number;records:number;
+  pending:number;vaulted:number;marker_held:number;uninspected:number;stale:number;
+  redundant:number;primary_only:number;repairable_primary:number;held:number;
+  care_active:number;care_inactive:number;care_absent:number;care_held:number;remaining_repairs:number;due:number;
+  live_verified:false;source_text_returned:false;independent_backup:false;
+};
+export async function getDragonVaultHealth(signal?:AbortSignal):Promise<DragonVaultHealth>{
+  const p=await read(api.get<DragonVaultHealth>(ROOT+'/companion/vault-health',options(signal)),getAuthToken(),'Custody health unavailable.');
+  if(!p||p.schema!=='skeleton.dragon.vault-health.v1'||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0
+    ||!Number.isFinite(p.valid_until)||p.valid_until<=p.as_of_unix||p.valid_until>p.as_of_unix+60
+    ||!integer(p.records,160)||![p.pending,p.vaulted,p.marker_held].every(x=>integer(x,p.records))
+    ||p.pending+p.vaulted+p.marker_held!==p.records
+    ||![p.uninspected,p.stale,p.redundant,p.primary_only,p.repairable_primary,p.held,p.due,
+         p.care_active,p.care_inactive,p.care_absent,p.care_held].every(x=>integer(x,p.vaulted))
+    ||p.uninspected+p.stale+p.redundant+p.primary_only+p.repairable_primary+p.held!==p.vaulted
+    ||p.care_active+p.care_inactive+p.care_absent+p.care_held!==p.vaulted
+    ||!integer(p.remaining_repairs,3*p.care_active)||p.remaining_repairs<p.care_active
+    ||p.live_verified!==false||p.source_text_returned!==false||p.independent_backup!==false)
+    invalid('Invalid retained custody health census.');
+  return p;
+}
 export type DragonVaultQuota = {
   schema:'skeleton.dragon.vault-quota.v1'; as_of_unix:number; active_reserved:number; vault_reserved:number;
   distinct_reserved:number;dual_reserved:number;active_capacity:32;vault_capacity:128;

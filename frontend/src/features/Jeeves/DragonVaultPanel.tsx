@@ -1,8 +1,8 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,AppState,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {getAuthToken} from '../../auth/gameforgeAuth';
-import {getDragonVault,getDragonVaultQuota,discoverDragonVault,retireDragonSession,restoreDragonVaultPrimary,repairDragonVaultReplica,configureDragonVaultCare,getDragonVaultRedundancy,getCrawl,crawlRequestKey,configureDragonArchive,
- configureLegacyTreasuryArchive,eraseCrawl,type DragonVaultCatalog,type DragonVaultQuota,type DragonVaultDiscovery,type DragonVaultRedundancy,type DragonVaultEntry,type CrawlSession} from '../../product/crawlerClient';
+import {getDragonVault,getDragonVaultQuota,getDragonVaultHealth,discoverDragonVault,retireDragonSession,restoreDragonVaultPrimary,repairDragonVaultReplica,configureDragonVaultCare,getDragonVaultRedundancy,getCrawl,crawlRequestKey,configureDragonArchive,
+ configureLegacyTreasuryArchive,eraseCrawl,type DragonVaultCatalog,type DragonVaultQuota,type DragonVaultHealth,type DragonVaultDiscovery,type DragonVaultRedundancy,type DragonVaultEntry,type CrawlSession} from '../../product/crawlerClient';
 import s,{colors} from './CrawlerWorkspace.styles';
 import {scanArchiveChambers,bestHistoryWindow,type ChamberScan,SCAN_DEADLINE_MS} from './dragonVaultScan';
 
@@ -18,6 +18,7 @@ const stamp=(n:number)=>new Date(n*1000).toLocaleString();
 export default function DragonVaultPanel({revision,session,canWrite,disabled,onWindow,onSession,onChanged}:Props){
  const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[catalog,setCatalog]=useState<DragonVaultCatalog|null>(null);
  const [quota,setQuota]=useState<DragonVaultQuota|null>(null);
+ const [vaultHealth,setVaultHealth]=useState<DragonVaultHealth|null>(null);
  const [redundancy,setRedundancy]=useState<DragonVaultRedundancy|null>(null);
  const [discoveryQuery,setDiscoveryQuery]=useState('');
  const [discovery,setDiscovery]=useState<DragonVaultDiscovery|null>(null);
@@ -42,7 +43,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   setDiscovery(null);setArchiveScan(null);setScanProgress(null);setDiscoveryBusy(false);
  },[]);
  const reset=useCallback(()=>{
-  invalidate();clearDiscovery();setDiscoveryQuery('');setCatalog(null);setQuota(null);setRedundancy(null);setSelected([]);setHistory([]);setCursor(undefined);setBusy(false);
+  invalidate();clearDiscovery();setDiscoveryQuery('');setCatalog(null);setQuota(null);setVaultHealth(null);setRedundancy(null);setSelected([]);setHistory([]);setCursor(undefined);setBusy(false);
   setRetention(false);setManaged(null);setRights(false);setEraseText('');operation.current=null;setNotice('');setError('');
  },[invalidate,clearDiscovery]);
  useEffect(()=>{reset();return()=>{invalidate();clearDiscovery();};},[revision,reset,invalidate,clearDiscovery]);
@@ -55,16 +56,19 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
 
  async function load(next?:string){
   invalidate();const attempt=epoch.current,token=getAuthToken(),ctrl=new AbortController();
-  owner.current=token;pending.current=ctrl;setBusy(true);setCatalog(null);setQuota(null);setRedundancy(null);setError('');
+  owner.current=token;pending.current=ctrl;setBusy(true);setCatalog(null);setQuota(null);setVaultHealth(null);setRedundancy(null);setError('');
   try{
-   const [result,health]=await Promise.allSettled([getDragonVault(next,ctrl.signal),getDragonVaultQuota(ctrl.signal)]);
+   const started=performance.now();
+   const [result,health,census]=await Promise.allSettled([getDragonVault(next,ctrl.signal),getDragonVaultQuota(ctrl.signal),getDragonVaultHealth(ctrl.signal)]);
    if(!valid(ctrl,attempt,token))return;
    if(result.status==='rejected')throw result.reason;
    if(health.status==='fulfilled')setQuota(health.value);
+   const censusTtl=census.status==='fulfilled'?Math.min(60000,1000*(census.value.valid_until-census.value.as_of_unix)-(performance.now()-started)):0;
+   if(census.status==='fulfilled'&&censusTtl>0)setVaultHealth(census.value);
    const page=result.value;
    if(!valid(ctrl,attempt,token))return;
    setCatalog(page);setCursor(next);setManaged(null);setRights(false);setEraseText('');setRetention(false);
-   timer.current=setTimeout(()=>{if(epoch.current===attempt){setCatalog(null);setQuota(null);setRedundancy(null);setSelected([]);setManaged(null);setRights(false);setEraseText('');}},60000);
+   timer.current=setTimeout(()=>{if(epoch.current===attempt){setCatalog(null);setQuota(null);setVaultHealth(null);setRedundancy(null);setSelected([]);setManaged(null);setRights(false);setEraseText('');}},censusTtl>0?censusTtl:60000);
   }catch(e){if(valid(ctrl,attempt,token))setError(e instanceof Error?e.message:'Vault catalogue unavailable.');}
   finally{if(epoch.current===attempt){pending.current=null;setBusy(false);}}
  }
@@ -129,7 +133,7 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   const n=action==='grant'?Number(days):30;
   if(!Number.isInteger(n)||n<1||n>30){setError('Historical-use duration must be 1–30 days.');return;}
   clearDiscovery();invalidate();const token=getAuthToken(),attempt=epoch.current,ctrl=new AbortController();pending.current=ctrl;
-  setBusy(true);setError('');setNotice('');setCatalog(null);setQuota(null);setRedundancy(null);
+  setBusy(true);setError('');setNotice('');setCatalog(null);setQuota(null);setVaultHealth(null);setRedundancy(null);
   const identity=[action,id,version,n].join(':');
   if(operation.current?.identity!==identity)operation.current={identity,key:crawlRequestKey('vault-'+action)};
   const command={expected_version:version,idempotency_key:operation.current.key};
@@ -180,6 +184,14 @@ export default function DragonVaultPanel({revision,session,canWrite,disabled,onW
   <Button label={open?'Close cold-custody catalogue':'Open cold-custody catalogue'} disabled={busy||disabled}
    action={()=>{if(open){reset();onWindow(undefined);}else void load();setOpen(!open);}}/>
   {open&&<>
+   {vaultHealth&&owner.current===getAuthToken()&&<View style={s.check}>
+    <Text style={s.heading}>Hoarder den health</Text>
+    <Text style={s.small}>{vaultHealth.vaulted} retired · {vaultHealth.pending} retiring · {vaultHealth.marker_held} metadata holds</Text>
+    <Text style={s.small}>{vaultHealth.redundant} redundant · {vaultHealth.primary_only} primary-only · {vaultHealth.repairable_primary} repairable primary · {vaultHealth.held} both held</Text>
+    <Text style={s.small}>{vaultHealth.uninspected} uninspected · {vaultHealth.stale} stale observations · {vaultHealth.due} due for patrol</Text>
+    <Text style={s.small}>{vaultHealth.care_active} active care grants · {vaultHealth.remaining_repairs} authorized repairs remaining · {vaultHealth.care_held} care integrity holds</Text>
+    <Text style={s.small}>Version-bound prior observations only; no independent backup or live verification is implied.</Text>
+   </View>}
    {quota&&owner.current===getAuthToken()&&<View style={s.check}>
     <Text style={s.label}>Den capacity and recovery</Text>
     <Text style={s.small}>{quota.active_reserved}/{quota.active_capacity} active reservations · {quota.vault_reserved}/{quota.vault_capacity} cold-custody reservations</Text>
