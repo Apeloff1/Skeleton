@@ -45,3 +45,30 @@ export function companionForConversation(text:string):DragonCompanionState{
  const topic=words.slice(0,8).join(' ');
  return state('listening','Ears perked up',`Interest signal: “${topic}${words.length>8?'…':''}”`,.04,{snuggly:true});
 }
+
+/** Real evidence growth and the last confirmed capture event share one actor.
+ * Decorative evolution never implies a burn, distillation or model training. */
+export function companionFromEvidence(session: import('../../../product/crawlerClient').CrawlSession, eventKind?: string): DragonCompanionState {
+ const profile=session.companion;
+ if(!profile)return eventKind?companionFromCapture(eventKind):INITIAL_DRAGON_STATE;
+ const evolved=profile.stage>=2, terminal=['paused','interrupted','cancelled','failed','completed','budget_exhausted'].includes(session.status);
+ if(!session.consent_current||terminal||profile.quest==='rest'){
+  return state('sleeping','Resting in the den','The expedition is resting. Evidence growth is retained; no new request or penalty is implied.',profile.growth/1000,{snuggly:true,wings:evolved});
+ }
+ if(profile.quest==='recover')return state('snuggle','Recovering safely','Waiting for the existing backpressure and recovery controls. No reward is given for failures.',profile.growth/1000,{snuggly:true,wings:evolved});
+ if(profile.quest==='conserve')return state('listening','Conserving resources','Remaining request, document and byte budgets constrain the expedition.',profile.growth/1000,{snuggly:true,wings:evolved});
+ if(session.worker?.active&&eventKind==='dispatch_reserved'){
+  const captured=companionFromCapture(eventKind);
+  return {...captured,progress:profile.growth/1000,wings:evolved||captured.wings};
+ }
+ if(profile.quest==='synthesize')return state('listening','Studying the mosaic','Looking for missing objective terms in admitted work. Captured material is still unreviewed.',profile.growth/1000,{wings:evolved,snuggly:true});
+ if(profile.quest==='diversify')return state('curious','Discovering habitats','Prioritizing distinct research origins and formats inside this expedition.',profile.growth/1000,{wings:evolved});
+ return state('curious','Following useful novelty','Learning from recorded acquisition yield, not request volume.',profile.growth/1000,{wings:evolved});
+}
+
+export function companionEvidenceCosmetics(session: import('../../../product/crawlerClient').CrawlSession): readonly string[] {
+ const d=session.companion;
+ if(!d)return [];
+ const earned=new Set(d.questbook?.quests.filter(q=>q.state==='completed').map(q=>q.code)??[]);
+ return [...(d.stage>=2?['winged_builder']:[]),...(earned.has('novel_trail')?['apprentice_forge']:[]),...(earned.has('cartographer')?['star_cartographer']:[])];
+}
