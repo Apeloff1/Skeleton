@@ -457,7 +457,7 @@ def extract_robots_sitemaps(
     requests must pass the canonical worker robots, DNS and budget checks.
     """
     if (not isinstance(robots_text, str)
-            or len(robots_text.encode("utf-8")) > 65536
+            or len(robots_text.encode("utf-8")) > 512 * 1024
             or not isinstance(policy, CrawlPolicy)
             or type(max_sitemaps) is not int
             or not 1 <= max_sitemaps <= 16):
