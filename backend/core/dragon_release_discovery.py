@@ -18,7 +18,13 @@ MAX_FEED_BYTES=2*1024*1024
 MAX_ENTRIES=500
 MAX_LINKS=8
 PROVIDERS={"steam","gog","itch","epic","xbox","playstation","nintendo",
-           "igdb","wikidata","independent","open_source","preservation"}
+           "igdb","wikidata","independent","open_source","preservation",
+           "fandom","mediawiki","wiki_gg","strategywiki","gamefaqs","mobygames",
+           "archive_org","github","gitlab","moddb","nexusmods","modrinth","curseforge",
+           "youtube","vimeo","twitch","peertube","gamebanana","speedrun",
+           "apple_app_store","google_play","humble","game_jolt","itch_jam",
+           "publisher","developer","museum","library","academic","press","esports",
+           "community","official_support","open_game_data"}
 HOSTS={
     "steam":"store.steampowered.com", "gog":"www.gog.com",
     "itch":"itch.io", "epic":"store.epicgames.com",
