@@ -10,6 +10,8 @@ from pathlib import Path
 import sys
 import threading
 
+from .offline_kernel_counters import MAX_KERNEL_COUNTER, parse_counter_table, read_kernel_ascii
+
 
 @dataclass(frozen=True, slots=True)
 class CPUThrottleSample:
@@ -19,7 +21,7 @@ class CPUThrottleSample:
 
     def __post_init__(self) -> None:
         for key in ("periods", "throttled_periods", "throttled_usec"):
-            if type(getattr(self, key)) is not int or getattr(self, key) < 0:
+            if type(getattr(self, key)) is not int or not 0 <= getattr(self, key) <= MAX_KERNEL_COUNTER:
                 raise ValueError("invalid cgroup CPU counter")
         if self.throttled_periods > self.periods:
             raise ValueError("throttled periods exceed total periods")
@@ -30,26 +32,12 @@ def probe_cpu_throttle(root: str | Path = "/sys/fs/cgroup") -> CPUThrottleSample
     if sys.platform != "linux":
         return None
     try:
-        raw = (Path(root) / "cpu.stat").read_text(encoding="ascii")
-    except (OSError, UnicodeError):
-        return None
-    if len(raw) > 4096:
-        return None
-    counters: dict[str, int] = {}
-    for line in raw.splitlines():
-        fields = line.split()
-        if (len(fields) != 2 or fields[0] in counters
-                or not fields[1].isascii() or not fields[1].isdecimal()):
-            return None
-        counters[fields[0]] = int(fields[1])
-    if not {"nr_periods", "nr_throttled", "throttled_usec"} <= counters.keys():
-        return None
-    try:
+        raw = read_kernel_ascii(Path(root) / "cpu.stat", maximum=4096)
+        counters = parse_counter_table(raw)
         return CPUThrottleSample(
-            counters["nr_periods"], counters["nr_throttled"],
-            counters["throttled_usec"],
+            counters["nr_periods"], counters["nr_throttled"], counters["throttled_usec"],
         )
-    except ValueError:
+    except (OSError, UnicodeError, ValueError, KeyError):
         return None
 
 
@@ -70,12 +58,14 @@ class CPUThrottleController:
         self._transitions = 0
 
     def observe(self, sample: CPUThrottleSample | None) -> None:
-        if sample is not None and not isinstance(sample, CPUThrottleSample):
+        if sample is not None and type(sample) is not CPUThrottleSample:
             raise TypeError("typed CPU throttling telemetry required")
         with self._lock:
             self._observations += 1
             self._last = sample
             if sample is None:
+                self._previous = None
+                self._ratio = None
                 return
             previous = self._previous
             self._previous = sample
@@ -84,10 +74,12 @@ class CPUThrottleController:
             if (sample.periods < previous.periods
                     or sample.throttled_periods < previous.throttled_periods
                     or sample.throttled_usec < previous.throttled_usec):
+                self._ratio = None
                 return
             periods = sample.periods - previous.periods
             throttled = sample.throttled_periods - previous.throttled_periods
             if periods <= 0 or throttled > periods:
+                self._ratio = None
                 return
             self._ratio = throttled / periods
             prior = self._throttled
