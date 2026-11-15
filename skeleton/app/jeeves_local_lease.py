@@ -49,7 +49,16 @@ class LocalInferenceLease:
         if not database_path.is_absolute():
             raise LocalInferenceLeaseUnavailable("local workspace must resolve to an absolute path")
         self.path = database_path.with_name(database_path.name + ".inference.lock")
+        self._owner_pid = os.getpid()
         self._thread_gate = threading.Lock()
+
+    def _require_owner_process(self) -> None:
+        try:
+            current = os.getpid()
+        except Exception as exc:
+            raise LocalInferenceLeaseUnavailable("local inference process identity unavailable") from exc
+        if type(current) is not int or current != self._owner_pid:
+            raise LocalInferenceLeaseUnavailable("local inference process identity changed")
 
     def _verify_parent_chain(self) -> None:
         # A private leaf below a writable ancestor can be renamed and replaced.
@@ -169,7 +178,10 @@ class LocalInferenceLease:
             "ownership_is_generation_proof": False,
         }
         try:
+            self._require_owner_process()
             self.path.lstat()
+        except LocalInferenceLeaseUnavailable:
+            return {**result, "state": "unavailable"}
         except FileNotFoundError:
             return result
         except OSError:
@@ -194,6 +206,7 @@ class LocalInferenceLease:
 
     @contextmanager
     def _hold(self, *, initialize: bool) -> Iterator[None]:
+        self._require_owner_process()
         if not self._thread_gate.acquire(blocking=False):
             raise LocalInferenceLeaseBusy("local inference is already running in this service")
         fd: int | None = None
@@ -213,6 +226,11 @@ class LocalInferenceLease:
                     or (observed.st_dev, observed.st_ino)
                     != (owned.st_dev, owned.st_ino)):
                 raise LocalInferenceLeaseUnavailable("local inference lock path changed after acquisition")
+            if os.name == "posix" and (
+                owned.st_uid != os.getuid() or observed.st_uid != os.getuid()
+                or (owned.st_mode | observed.st_mode) & 0o077
+            ):
+                raise LocalInferenceLeaseUnavailable("local inference lease permissions changed after acquisition")
             # Validate the exact marker under the OS lock. Reading before the
             # byte-range lock on Windows can misclassify contention as corruption.
             try:
