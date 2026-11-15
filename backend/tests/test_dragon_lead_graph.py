@@ -25,7 +25,7 @@ def encode(rows):
 class DatasetLibraryTests(TestCase):
     def test_registry_and_revision_cursors(self):
         stats=census()
-        self.assertGreaterEqual(stats["targets"],108)
+        self.assertGreaterEqual(stats["targets"],109)
         self.assertGreaterEqual(len(stats["domains"]),8)
         self.assertFalse(stats["network_authorized"])
         result=library(domain="mods",limit=2)
@@ -44,6 +44,20 @@ class DatasetLibraryTests(TestCase):
         self.assertEqual(seen,sorted(set(seen)))
         self.assertEqual(len(seen),stats["targets"])
         self.assertEqual(target("speedrun-archive")["access"],"noncommercial_only")
+
+    def test_exact_bundle_inventory(self):
+        from core.dragon_bundled_steam_leads import inventory, summary, _shard
+        revision,_,total,_,shards=inventory()
+        self.assertEqual(total,200704)
+        seen=0;previous=0
+        for i in range(len(shards)):
+            _,rows=_shard(revision,i)
+            for appid,title in rows:
+                self.assertGreater(int(appid),previous)
+                self.assertTrue(title)
+                previous=int(appid);seen+=1
+        self.assertEqual(seen,200704)
+        self.assertEqual(summary()["store_locator_floor"],seen)
 
     def test_projection_cannot_invent_ids_or_fetch(self):
         rows=parse_page(encode([{"appid":"10000001","title":"Synthetic qualification game"}]),"steam")
@@ -75,6 +89,25 @@ class LeadGraphTests(TestCase):
         raw=encode(rows)
         return self.graph.append(OWNER,snap["snapshot_id"],ordinal=ordinal,raw=raw,
             sha256=hashlib.sha256(raw).hexdigest(),previous_chain=previous)
+
+    def test_bundled_page_pulse_and_rights(self):
+        with self.assertRaises(ValueError):
+            self.graph.enable_bundle(OWNER,rights_ref="fixture",grant_seconds=86400,acknowledged=False)
+        started=self.graph.enable_bundle(OWNER,rights_ref="fixture",grant_seconds=86400,acknowledged=True)
+        self.assertEqual(started["snapshot_identity_candidates_ingested"],0)
+        self.assertEqual(started["title_identity_candidates"],200704)
+        sid=started["snapshot"]["id"]
+        bad=encode([{"appid":"10000001","title":"wrong pinned identity"}])
+        with self.assertRaises(CatalogueHeld):
+            self.graph.append(OWNER,sid,ordinal=0,raw=bad,sha256=hashlib.sha256(bad).hexdigest(),previous_chain=ZERO)
+        self.graph.bundle_pulse()
+        self.graph=LeadGraph(self.path)
+        self.assertEqual(self.graph.bundle_status(OWNER)["snapshot_identity_candidates_ingested"],512)
+        self.assertEqual(self.graph.bundle_status(OTHER)["snapshot_identity_candidates_ingested"],0)
+        self.graph.expansion_pulse()
+        self.graph.revoke(OWNER,sid)
+        self.graph.bundle_pulse()
+        self.assertEqual(self.graph.bundle_status(OWNER)["snapshot_identity_candidates_ingested"],512)
 
     def test_snapshot_replay_restart_and_owner_scope(self):
         snap=self.begin(2)
