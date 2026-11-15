@@ -25,6 +25,7 @@ from core.dragon_resource_governor import ResourceGovernor
 from core.dragon_vault import DragonVaultMixin
 from core.dragon_deep_archive import DragonDeepArchiveMixin
 from core.dragon_dense_runtime import DragonDenseArchiveMixin
+from core.dragon_exhaustive_vectors import DragonExhaustiveVectorMixin
 from core.dragon_hoarder_copy import DragonHoarderCopyMixin
 from core.dragon_checkpoint_replica import (
     CheckpointReplicaError, checkpoint_fields, decode_exact_replica, verify_primary,
@@ -120,7 +121,7 @@ def _safe_error(exc: BaseException) -> str:
     return "crawler_slice_interrupted"
 
 
-class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonDenseArchiveMixin,DragonDeepArchiveMixin,DragonVaultMixin):
+class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonExhaustiveVectorMixin,DragonDenseArchiveMixin,DragonDeepArchiveMixin,DragonVaultMixin):
     def __init__(self, database=core_db):
         self.database = database
         self.sessions = database["dragon_crawler_sessions"]
@@ -2070,7 +2071,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonDenseArchiveMixin,Dr
             {"$set":{"archive_grant":grant,"treasury_index":index_manifest,"treasury_archive_route":routing,
                      "treasury_repair_due":min(grant["expires_at"],now.timestamp()+6*3600) if grant else None,
                      "updated_at":now,"storage_receipt":receipt,audit_path:audit,"deep_index_due":now.timestamp(),"bulk_copy_invalidated":True},
-             "$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":"","deep_dense_route":"","deep_dense_due":""},"$inc":{"version":1}},
+             "$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":"","deep_dense_route":"","deep_dense_due":"","deep_full_state":"","deep_full_due":""},"$inc":{"version":1}},
         )
         if not result.modified_count:
             raise CrawlerError("crawler_conflict","Expedition changed before archive permission committed.",409)
@@ -2174,7 +2175,7 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonDenseArchiveMixin,Dr
             {"$set":{"archive_grant":grant,"treasury_index":segment,"treasury_archive_route":routing,"legacy_archive_receipt":proof,
                       "treasury_repair_due":min(grant["expires_at"],now+6*3600) if grant else None,
                       "storage_receipt":receipt,"updated_at":_now(),path:audit,"deep_index_due":_now().timestamp(),"bulk_copy_invalidated":True},
-             "$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":"","deep_dense_route":"","deep_dense_due":""},"$inc":{"version":1}})
+             "$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":"","deep_dense_route":"","deep_dense_due":"","deep_full_state":"","deep_full_due":""},"$inc":{"version":1}})
         if not changed.modified_count:
             raise CrawlerError("crawler_conflict","Historical session changed before archive admission.",409)
         return {"ok":True,"version":int(row["version"])+1,"enabled":grant is not None,"execution_authorized":False}
@@ -3796,6 +3797,8 @@ class DragonCrawlerApplication(DragonHoarderCopyMixin,DragonDenseArchiveMixin,Dr
                     "deep_passage_route": "",
                     "deep_dense_route": "",
                     "deep_dense_due": "",
+                    "deep_full_state": "",
+                    "deep_full_due": "",
                     "deep_index_due": "",
                     "treasury_vault_care_history": "",
                 },
@@ -4661,6 +4664,8 @@ async def recover_crawler_runs(*, limit: int = 16) -> dict:
         ("deep_archive_retirements",crawler_application.recover_deep_archive),
         ("deep_archive_index",crawler_application.build_deep_indexes),
         ("deep_archive_dense",crawler_application.build_deep_dense_indexes),
+        ("deep_archive_full_vectors",crawler_application.build_full_vector_batch),
+        ("deep_archive_full_vector_purge",crawler_application.purge_stale_full_vector_batches),
         ("deep_archive_expiry",crawler_application.purge_expired_deep_indexes),
         ("deep_archive_erasure",crawler_application.recover_deep_erasure),
         ("hoarder_copy_cleanup",crawler_application.cleanup_bulk_copies),
