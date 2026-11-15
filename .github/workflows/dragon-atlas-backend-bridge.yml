@@ -54,3 +54,8 @@ jobs:
           PYTHONPATH: ".:backend:tests"
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_mime_custody.py' -v
+      - name: Restorative recovery and source authority regressions
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -m unittest discover -s backend/tests -p 'test_dragon_restorative_recovery.py' -v
