@@ -295,3 +295,61 @@ def test_final_anchor_read_cannot_mutate_approved_payload(monkeypatch):
         recover_forward_anchor(db, anchor, approval=approval, operator_public_key=key)
     assert not db._connection.in_transaction
     assert DurableFairStreamSession(db, anchor).verify()["digest"] == approval.candidate.next_digest
+
+
+@pytest.mark.parametrize("mutation", ["row", "ddl"])
+def test_initial_anchor_read_cannot_mutate_candidate(monkeypatch, mutation):
+    db, anchor, _ = failed_transition()
+    original = anchor.read
+    calls = 0
+    before = db._connection.execute(
+        "SELECT payload FROM local_fair_stream_custody"
+    ).fetchone()
+
+    def read():
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            if mutation == "row":
+                db._connection.execute(
+                    "UPDATE local_fair_stream_custody SET payload=payload"
+                )
+            else:
+                db._connection.execute("CREATE TABLE unexpected_anchor_state (id INTEGER)")
+        return original()
+
+    monkeypatch.setattr(anchor, "read", read)
+    with pytest.raises((AnchorRecoveryDenied, ValueError)):
+        inspect_forward_candidate(db, anchor)
+    assert not db._connection.in_transaction
+    assert db._connection.execute(
+        "SELECT payload FROM local_fair_stream_custody"
+    ).fetchone() == before
+    assert db._connection.execute(
+        "SELECT name FROM sqlite_master WHERE name='unexpected_anchor_state'"
+    ).fetchone() is None
+
+
+def test_final_anchor_read_cannot_change_unrelated_schema(monkeypatch):
+    db, anchor, _ = failed_transition()
+    approval, key = approved(db, anchor)
+    original = anchor.read
+    confirmed = 0
+
+    def read():
+        nonlocal confirmed
+        current = original()
+        if current[0] == approval.candidate.next_generation:
+            confirmed += 1
+            if confirmed == 2:
+                db._connection.execute("CREATE TABLE unexpected_anchor_state (id INTEGER)")
+        return current
+
+    monkeypatch.setattr(anchor, "read", read)
+    with pytest.raises((AnchorRecoveryDenied, ValueError)):
+        recover_forward_anchor(db, anchor, approval=approval, operator_public_key=key)
+    assert not db._connection.in_transaction
+    assert db._connection.execute(
+        "SELECT name FROM sqlite_master WHERE name='unexpected_anchor_state'"
+    ).fetchone() is None
+    assert original() == (approval.candidate.next_generation, approval.candidate.next_digest)
