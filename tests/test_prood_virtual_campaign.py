@@ -98,3 +98,73 @@ async def test_earned_guardian_ending_and_replay(campaign_factory):
     with pytest.raises(ValueError,match="deterministic replay"):
         replay(campaign,[replace(events[0],after="a"*64),*events[1:]])
     assert not available_actions(campaign,state)
+
+
+@pytest.mark.asyncio
+async def test_campaign_save_cas_replay_and_restart(campaign_factory,tmp_path):
+    from skeleton.prood.campaign_save import CampaignSaveStore,SaveConflict,SaveIntegrityError
+    campaign=campaign_factory(CampaignScale(2,3,9))
+    path=tmp_path/"campaign.sqlite"
+    db=sqlite3.connect(path)
+    store=CampaignSaveStore(db,campaign=campaign,scope="player",key=b"s"*32)
+    initial=store.create("slot")
+    first=store.step("slot",Action("resolve","aid"),expected_head=initial.head,request_id="first")
+    assert first.saved.revision==1
+    duplicate=store.step("slot",Action("resolve","aid"),expected_head=initial.head,request_id="first")
+    assert duplicate.replayed and duplicate.saved==first.saved
+    with pytest.raises(SaveConflict):
+        store.step("slot",Action("resolve","force"),expected_head=initial.head,request_id="first")
+    with pytest.raises(SaveConflict):
+        store.step("slot",Action("advance"),expected_head=initial.head,request_id="stale")
+    second=store.step("slot",Action("advance"),expected_head=first.saved.head,request_id="next")
+    assert second.saved.state.ordinal==2
+    store.close()
+    db.close()
+    db=sqlite3.connect(path)
+    reopened=CampaignSaveStore(db,campaign=campaign,scope="player",key=b"s"*32,initialize=False)
+    assert reopened.audit("slot",trusted_head=second.saved.head)==second.saved
+    with pytest.raises(SaveConflict):
+        reopened.audit("slot",trusted_head=initial.head)
+    db.execute("DELETE FROM prood_campaign_event_v1 WHERE sequence=1")
+    db.commit()
+    with pytest.raises(SaveIntegrityError):
+        reopened.audit("slot")
+    db.close()
+
+
+@pytest.mark.asyncio
+async def test_campaign_save_scope_and_capacity(campaign_factory,tmp_path):
+    from skeleton.prood.campaign_save import CampaignSaveStore,SaveCapacity
+    campaign=campaign_factory(CampaignScale(1,1,3))
+    path=tmp_path/"capacity.sqlite"
+    connection=sqlite3.connect(path)
+    store=CampaignSaveStore(connection,campaign=campaign,scope="first",key=b"s"*32,max_events=1)
+    first=store.create("slot")
+    saved=store.step("slot",Action("resolve","aid"),expected_head=first.head,request_id="one").saved
+    with pytest.raises(SaveCapacity):
+        store.step("slot",Action("advance"),expected_head=saved.head,request_id="two")
+    assert store.audit("slot")==saved
+    second=sqlite3.connect(path)
+    foreign=CampaignSaveStore(second,campaign=campaign,scope="second",key=b"s"*32)
+    with pytest.raises(KeyError):
+        foreign.audit("slot")
+    second.close()
+    connection.close()
+
+
+@pytest.mark.asyncio
+async def test_private_save_reopen_requires_existing_schema(campaign_factory,tmp_path):
+    import os
+    if os.name!="posix":
+        pytest.skip("canonical private SQLite POSIX custody")
+    from skeleton.app.offline_design_runtime import open_campaign_save
+    campaign=campaign_factory(CampaignScale(1,1,3))
+    tmp_path.chmod(0o700)
+    args=dict(campaign=campaign,scope="player",key=b"s"*32)
+    with pytest.raises(OSError):
+        with open_campaign_save(tmp_path,create=False,**args):
+            pass
+    with open_campaign_save(tmp_path,create=True,**args) as saves:
+        created=saves.create("slot")
+    with open_campaign_save(tmp_path,create=False,**args) as saves:
+        assert saves.audit("slot",trusted_head=created.head)==created

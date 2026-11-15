@@ -69,3 +69,19 @@ def open_local_design_runtime(directory: str | PathLike[str], *, scope: str,
         results=stack.enter_context(open_worker_results(directory,scope=scope,key=result_key,create=False))
         supervisor=design_supervisor(journal,results,request,admission=admission,owner=owner)
         yield LocalDesignRuntime(journal,results,request,supervisor)
+
+
+@contextmanager
+def open_campaign_save(directory: str | PathLike[str], *, campaign, scope: str,
+                       key: bytes, create: bool, max_database_bytes: int = 192 << 20):
+    """Open distinct private save custody; explicit creation is never a restore."""
+    from skeleton.ai.model_runtime.private_sqlite import open_private_sqlite
+    from skeleton.prood.campaign_save import CampaignSaveStore
+    with open_private_sqlite(directory,filename="prood-campaign-save.db",create=create,
+                             max_database_bytes=max_database_bytes) as handle:
+        store=CampaignSaveStore(handle.connection,campaign=campaign,scope=scope,key=key,
+                                private_handle=handle,initialize=create)
+        try:
+            yield store
+        finally:
+            store.close()
