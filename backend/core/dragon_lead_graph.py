@@ -26,6 +26,7 @@ from core.dragon_mod_seed_catalogue import STEAM_ROUTES,APPID,_canonical_locator
 MAX_NODES=20_000_000
 MAX_EDGES=100_000_000
 MAX_SNAPSHOTS=100_000
+MAX_DYNAMIC_TARGETS=100_000
 MAX_SNAPSHOT_ROWS=100_000_000
 MAX_PAGE_ROWS=128
 MAX_PAGE_BYTES=1024*1024
@@ -68,6 +69,16 @@ CREATE INDEX IF NOT EXISTS lead_edges_child ON lead_edges(owner,child,id);
 CREATE INDEX IF NOT EXISTS lead_edges_subject ON lead_edges(owner,subject,id);
 CREATE VIRTUAL TABLE IF NOT EXISTS lead_fts USING fts5(owner,id UNINDEXED,title,url,kind,family,
  tokenize='unicode61 remove_diacritics 2');
+CREATE TABLE IF NOT EXISTS lead_dataset_candidates(
+ owner TEXT NOT NULL,lead TEXT NOT NULL,first_seen INTEGER NOT NULL,last_seen INTEGER NOT NULL,
+ PRIMARY KEY(owner,lead),FOREIGN KEY(owner,lead) REFERENCES lead_nodes(owner,id)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS lead_dynamic_targets(
+ owner TEXT NOT NULL,id TEXT NOT NULL,lead TEXT NOT NULL,projection TEXT NOT NULL,
+ revision TEXT NOT NULL,rights_ref TEXT NOT NULL,enabled INTEGER NOT NULL,
+ reviewed_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,
+ PRIMARY KEY(owner,id),UNIQUE(owner,lead),FOREIGN KEY(owner,lead) REFERENCES lead_nodes(owner,id)
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS lead_snapshots(
  owner TEXT NOT NULL,id TEXT NOT NULL,root TEXT NOT NULL,target_id TEXT NOT NULL,
  registry_revision TEXT NOT NULL,projection TEXT NOT NULL,source_sha TEXT NOT NULL,rights_ref TEXT NOT NULL,
@@ -98,6 +109,7 @@ CREATE TABLE IF NOT EXISTS lead_review_events(
 CREATE INDEX IF NOT EXISTS lead_review_history ON lead_review_events(owner,lead,created_at,id);
 """
 STATES={"candidate","held","retired"}
+DATASET_KINDS={"dataset_manifest","dataset_checksum_manifest","public_jsonl_dataset","public_csv_dataset","public_parquet_dataset","public_sqlite_dataset","public_data_export","static_data_export","static_data_schema","dataset_version_history","public_metadata_bulk_export","research_dataset_catalogue","public_data_endpoint"}
 RELATIONS={"seed","dataset_target","dataset_projection","feed_discovery","catalogue_observation"}
 
 def _quota_disk(path):
@@ -263,6 +275,10 @@ class LeadGraph:
         else:
             db.execute("UPDATE lead_edges SET last_seen=MAX(last_seen,?) WHERE owner=? AND id=?",(now,owner,eid))
             db.execute("UPDATE lead_nodes SET last_seen=MAX(last_seen,?) WHERE owner=? AND id=?",(now,owner,identifier))
+        if kind in DATASET_KINDS:
+            db.execute("""INSERT INTO lead_dataset_candidates VALUES(?,?,?,?)
+                ON CONFLICT(owner,lead) DO UPDATE SET last_seen=MAX(last_seen,excluded.last_seen)""",
+                (owner,identifier,now,now))
         return identifier
 
     def status(self,scope):
@@ -305,7 +321,23 @@ class LeadGraph:
                 raise
 
     def begin(self,scope,*,target_id,projection,source_sha,expected_rows,rights_ref,grant_seconds,acknowledged):
-        item=target(target_id);registry_revision,_=_library()
+        owner=owner_key(scope);now=int(time.time())
+        dynamic=None
+        if isinstance(target_id,str) and target_id.startswith("dynamic-"):
+            with self._db() as db:
+                dynamic=db.execute("""SELECT t.*,n.url,n.title FROM lead_dynamic_targets t
+                    JOIN lead_nodes n ON n.owner=t.owner AND n.id=t.lead
+                    WHERE t.owner=? AND t.id=? AND t.enabled=1 AND t.expires_at>?""",
+                    (owner,target_id,now)).fetchone()
+            if not dynamic:raise LookupError("dynamic dataset target not authorized for metadata import")
+            if projection!=dynamic["projection"] or rights_ref!=dynamic["rights_ref"]:
+                raise ValueError("dynamic target projection or rights changed")
+            registry_revision=dynamic["revision"]
+            item={"id":target_id,"url":dynamic["url"],"access":"policy_review",
+                  "adapter":"steam_csv" if projection=="steam" else "modrinth_json" if projection=="modrinth" else "directory"}
+            grant_seconds=min(_int(grant_seconds,900,MAX_GRANT),dynamic["expires_at"]-now)
+        else:
+            item=target(target_id);registry_revision,_=_library()
         if acknowledged is not True:raise ValueError("public dataset metadata rights acknowledgement")
         if item["access"] in {"credential_required","noncommercial_only","landing_only"}:
             raise ValueError("target requires separate source review or explicit export target")
@@ -321,6 +353,8 @@ class LeadGraph:
             db.execute("BEGIN IMMEDIATE")
             try:
                 caps=self._enabled(db,owner)
+                if dynamic and not db.execute("""SELECT 1 FROM lead_dynamic_targets WHERE owner=? AND id=? AND revision=? AND enabled=1 AND expires_at>?""",
+                    (owner,target_id,registry_revision,now+grant_seconds-1)).fetchone():raise CatalogueHeld("dynamic target superseded")
                 prior=db.execute("SELECT * FROM lead_snapshots WHERE owner=? AND id=?",(owner,sid)).fetchone()
                 if prior:
                     if prior["state"]=="revoked":raise CatalogueHeld("dataset snapshot revoked")
@@ -409,6 +443,56 @@ class LeadGraph:
         with self._db() as db:
             result=db.execute("UPDATE lead_snapshots SET state='revoked',expires_at=0 WHERE owner=? AND id=?",(owner,sid))
         return {"revoked":result.rowcount==1,"candidate_locators_retained":True,"network_authorized":False}
+
+    def dataset_candidates(self,scope,*,after=None,limit=32):
+        owner=owner_key(scope);_int(limit,1,100)
+        with self._db() as db:
+            rows=db.execute("""SELECT n.id,n.url,n.title,n.kind,c.first_seen,c.last_seen,
+                t.id AS target_id,t.projection,t.enabled,t.expires_at FROM lead_dataset_candidates c
+                JOIN lead_nodes n ON n.owner=c.owner AND n.id=c.lead
+                LEFT JOIN lead_dynamic_targets t ON t.owner=c.owner AND t.lead=c.lead
+                WHERE c.owner=? AND c.lead>? ORDER BY c.lead LIMIT ?""",
+                (owner,_id(after) if after else "",limit+1)).fetchall()
+        return {"candidates":[{**dict(r),"network_authorized":False,"source_verified":False} for r in rows[:limit]],
+            "next_cursor":rows[limit-1]["id"] if len(rows)>limit else None,
+            "network_authorized":False}
+
+    def register_target(self,scope,lead,*,projection,rights_ref,grant_seconds,enabled,acknowledged):
+        """An owner can add a newly found dataset to the live library.
+        Registration is a finite permission to import locator-only metadata,
+        never an authorization to fetch the URL or promote its contents.
+        """
+        if acknowledged is not True or type(enabled) is not bool:raise ValueError("explicit metadata acknowledgement")
+        if projection not in {"steam","modrinth","locator"}:raise ValueError("dataset projection")
+        owner=owner_key(scope);lead=_id(lead);rights_ref=clean(rights_ref,128)
+        grant_seconds=_int(grant_seconds,900,MAX_GRANT);now=int(time.time())
+        identifier="dynamic-"+digest([lead,"dataset"])[:56]
+        revision=digest([identifier,projection,rights_ref,now,enabled])
+        with self._db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                self._enabled(db,owner)
+                row=db.execute("""SELECT n.url,n.state FROM lead_dataset_candidates c JOIN lead_nodes n
+                    ON n.owner=c.owner AND n.id=c.lead WHERE c.owner=? AND c.lead=?""",(owner,lead)).fetchone()
+                if row is None:raise LookupError("dataset candidate missing")
+                if enabled and row["state"]!="candidate":raise CatalogueHeld("dataset lead not active")
+                previous=db.execute("SELECT lead,revision FROM lead_dynamic_targets WHERE owner=? AND id=?",(owner,identifier)).fetchone()
+                if previous and previous["lead"]!=lead:raise CatalogueHeld("dataset target collision")
+                if not previous and db.execute("SELECT COUNT(*) FROM lead_dynamic_targets WHERE owner=?",(owner,)).fetchone()[0]>=MAX_DYNAMIC_TARGETS:
+                    raise CatalogueHeld("dynamic target quota")
+                db.execute("""INSERT INTO lead_dynamic_targets VALUES(?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT(owner,id) DO UPDATE SET projection=excluded.projection,revision=excluded.revision,
+                    rights_ref=excluded.rights_ref,enabled=excluded.enabled,reviewed_at=excluded.reviewed_at,expires_at=excluded.expires_at""",
+                    (owner,identifier,lead,projection,revision,rights_ref,int(enabled),now,now+grant_seconds if enabled else 0))
+                # A changed or withdrawn grant never perpetuates open imports.
+                db.execute("""UPDATE lead_snapshots SET state='revoked',expires_at=0 WHERE owner=?
+                    AND target_id=? AND state='open' AND registry_revision<>?""",(owner,identifier,revision))
+                db.execute("COMMIT")
+            except BaseException:
+                if db.in_transaction:db.execute("ROLLBACK")
+                raise
+        return {"target_id":identifier,"lead_id":lead,"revision":revision,"enabled":enabled,
+                "expires_at":now+grant_seconds if enabled else 0,"network_authorized":False,"source_verified":False}
 
     def feed_page(self,scope,*,url,raw,adapter,options,subscription_id):
         """Mirror already-approved feed proposals into graph, no extra fetch."""
