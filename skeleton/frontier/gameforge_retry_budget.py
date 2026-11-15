@@ -1,34 +1,40 @@
-"""Bounded retry budget preventing unbounded recovery amplification."""
-
+"""Synchronized bounded process-local retry credits."""
 from threading import Lock
 
 
 class RetryBudget:
     def __init__(self, attempts):
-        if not isinstance(attempts, int) or isinstance(attempts, bool) or attempts < 0:
-            raise ValueError("attempts must be a non-negative integer")
-        self.capacity = attempts
-        self.remaining = attempts
+        if type(attempts) is not int or not 0 <= attempts <= (1 << 63) - 1:
+            raise ValueError("attempts must be a bounded non-negative integer")
+        self._capacity = attempts
+        self._remaining = attempts
         self._lock = Lock()
 
     @property
-    def exhausted(self):
+    def capacity(self):
+        return self._capacity
+
+    @property
+    def remaining(self):
         with self._lock:
-            return self.remaining == 0
+            return self._remaining
+
+    @property
+    def exhausted(self):
+        return self.remaining == 0
 
     @property
     def consumed(self):
-        with self._lock:
-            return self.capacity - self.remaining
+        return self._capacity - self.remaining
 
     def consume(self):
         with self._lock:
-            if self.remaining <= 0:
+            if self._remaining <= 0:
                 return False
-            self.remaining -= 1
+            self._remaining -= 1
             return True
 
     def reset(self):
         with self._lock:
-            self.remaining = self.capacity
-            return self.remaining
+            self._remaining = self._capacity
+            return self._remaining

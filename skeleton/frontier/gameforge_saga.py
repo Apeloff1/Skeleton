@@ -1,9 +1,6 @@
-"""Small saga state contract distilled from gameforge-rs service architecture."""
-
-from __future__ import annotations
-
-from dataclasses import dataclass
+"""Serialized local saga state machine; durable compensation requires a journal."""
 from enum import Enum
+from threading import Lock
 
 
 class SagaState(str, Enum):
@@ -14,28 +11,35 @@ class SagaState(str, Enum):
     FAILED = "failed"
 
 
-@dataclass
 class Saga:
-    """Fail-safe state machine: terminal states cannot be advanced."""
+    def __init__(self, state: SagaState = SagaState.PENDING):
+        if type(state) is not SagaState:
+            raise ValueError("canonical saga state required")
+        self._state = state
+        self._lock = Lock()
 
-    state: SagaState = SagaState.PENDING
+    @property
+    def state(self):
+        with self._lock:
+            return self._state
 
-    def commit(self) -> None:
-        if self.state is not SagaState.PENDING:
-            raise RuntimeError("only pending sagas may commit")
-        self.state = SagaState.COMMITTED
+    def _transition(self, expected, target):
+        with self._lock:
+            if self._state not in expected:
+                raise RuntimeError("invalid saga transition")
+            self._state = target
 
-    def compensate(self) -> None:
-        if self.state is not SagaState.COMMITTED:
-            raise RuntimeError("only committed sagas may compensate")
-        self.state = SagaState.COMPENSATING
+    def commit(self):
+        self._transition({SagaState.PENDING}, SagaState.COMMITTED)
 
-    def finish_compensation(self) -> None:
-        if self.state is not SagaState.COMPENSATING:
-            raise RuntimeError("compensation is not active")
-        self.state = SagaState.COMPENSATED
+    def compensate(self):
+        self._transition({SagaState.COMMITTED}, SagaState.COMPENSATING)
 
-    def fail(self) -> None:
-        if self.state in {SagaState.COMPENSATED, SagaState.FAILED}:
-            raise RuntimeError("terminal saga cannot fail again")
-        self.state = SagaState.FAILED
+    def finish_compensation(self):
+        self._transition({SagaState.COMPENSATING}, SagaState.COMPENSATED)
+
+    def fail(self):
+        self._transition(
+            {SagaState.PENDING, SagaState.COMMITTED, SagaState.COMPENSATING},
+            SagaState.FAILED,
+        )

@@ -1,15 +1,12 @@
-"""Small deterministic quorum contract."""
-
-from __future__ import annotations
-
-
+"""Integer threshold arithmetic; not an authenticated consensus protocol."""
 def quorum(total: int) -> int:
-    if total <= 0:
-        raise ValueError("total must be positive")
+    if type(total) is not int or not 1 <= total <= (1 << 63) - 1:
+        raise ValueError("total must be a bounded positive integer")
     return total // 2 + 1
 
 
 def reached(total: int, votes: int) -> bool:
-    if votes < 0 or votes > total:
+    threshold = quorum(total)
+    if type(votes) is not int or not 0 <= votes <= total:
         raise ValueError("votes out of range")
-    return votes >= quorum(total)
+    return votes >= threshold

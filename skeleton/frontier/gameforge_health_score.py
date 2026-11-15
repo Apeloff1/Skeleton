@@ -1,31 +1,44 @@
-"""Bounded health score derived from success/failure samples."""
+"""Bounded synchronized health observations; explicit readiness is available."""
+from collections import deque
+from threading import RLock
 
 
 class HealthScore:
-    def __init__(self, window=16):
-        if not isinstance(window, int) or isinstance(window, bool) or window <= 0:
-            raise ValueError("window must be a positive integer")
-        self.window = window
-        self._samples = []
+    def __init__(self, window=16, *, minimum_samples=0):
+        if type(window) is not int or not 1 <= window <= 65_536:
+            raise ValueError("bounded positive window required")
+        if type(minimum_samples) is not int or not 0 <= minimum_samples <= window:
+            raise ValueError("invalid minimum sample count")
+        self._window = window
+        self._minimum_samples = minimum_samples
+        self._samples = deque(maxlen=window)
+        self._lock = RLock()
+
+    @property
+    def window(self):
+        return self._window
 
     def record(self, ok):
-        if not isinstance(ok, bool):
+        if type(ok) is not bool:
             raise TypeError("ok must be bool")
-        self._samples.append(ok)
-        self._samples = self._samples[-self.window :]
-        return self.value
+        with self._lock:
+            self._samples.append(ok)
+            return self.value
 
     @property
     def value(self):
-        return 1.0 if not self._samples else sum(self._samples) / len(self._samples)
+        with self._lock:
+            return 1.0 if not self._samples else sum(self._samples) / len(self._samples)
 
     @property
     def healthy(self):
-        return self.value >= 0.5
+        with self._lock:
+            return len(self._samples) >= self._minimum_samples and self.value >= 0.5
 
     @property
     def sample_count(self):
-        return len(self._samples)
+        with self._lock:
+            return len(self._samples)
 
     @property
     def degraded(self):

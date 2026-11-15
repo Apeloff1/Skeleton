@@ -1,26 +1,48 @@
-"""Bounded weighted work scheduler with deterministic weighted round-robin."""
+"""Bounded deterministic weighted scheduling without expanding the weight vector."""
+from bisect import bisect_right
+from collections.abc import Mapping
+from threading import Lock
+
+MAX_TARGETS = 4096
+MAX_TOTAL_WEIGHT = 1 << 30
 
 
 class Scheduler:
     def __init__(self, weights):
-        if not weights or any(not isinstance(v, int) or v <= 0 for v in weights.values()):
-            raise ValueError("positive integer weights required")
-        self._schedule = tuple(name for name, weight in weights.items() for _ in range(weight))
+        if not isinstance(weights, Mapping) or not 1 <= len(weights) <= MAX_TARGETS:
+            raise ValueError("bounded scheduler targets required")
+        names = []
+        ends = []
+        total = 0
+        for name, weight in weights.items():
+            if type(name) is not str or not name.strip() or len(name) > 256:
+                raise ValueError("invalid scheduler target")
+            if type(weight) is not int or not 1 <= weight <= MAX_TOTAL_WEIGHT - total:
+                raise ValueError("positive integer weights within aggregate limit required")
+            names.append(name)
+            total += weight
+            ends.append(total)
+        self._names = tuple(names)
+        self._ends = tuple(ends)
+        self._size = total
         self._cursor = 0
-        self._weights = dict(weights)
+        self._lock = Lock()
 
     @property
     def size(self):
-        return len(self._schedule)
+        return self._size
 
     @property
     def cursor(self):
-        return self._cursor
+        with self._lock:
+            return self._cursor
 
     def next(self):
-        name = self._schedule[self._cursor]
-        self._cursor = (self._cursor + 1) % len(self._schedule)
-        return name
+        with self._lock:
+            name = self._names[bisect_right(self._ends, self._cursor)]
+            self._cursor = (self._cursor + 1) % self._size
+            return name
 
     def reset(self):
-        self._cursor = 0
+        with self._lock:
+            self._cursor = 0
