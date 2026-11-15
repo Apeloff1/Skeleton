@@ -233,6 +233,20 @@ class PayloadSecretGuard:
         def reject_constant(_value):
             raise RealtimeSecretError("non-finite embedded JSON value")
 
+        def bounded_integer(value: str) -> int:
+            if len(value.lstrip("-")) > 309:
+                raise RealtimeSecretError("embedded JSON integer exceeds budget")
+            number = int(value)
+            if number.bit_length() > 1024:
+                raise RealtimeSecretError("embedded JSON integer exceeds budget")
+            return number
+
+        def finite_float(value: str) -> float:
+            number = float(value)
+            if not math.isfinite(number):
+                raise RealtimeSecretError("non-finite embedded JSON value")
+            return number
+
         def scan_text(item: str, depth: int) -> str:
             nonlocal hits
             charge_text(item)
@@ -246,7 +260,10 @@ class PayloadSecretGuard:
                 return REDACTED
             if stripped[:1] in ("{", "[") and depth + 1 < _MAX_DEPTH:
                 try:
-                    embedded = json.loads(stripped, object_pairs_hook=unique_pairs, parse_constant=reject_constant)
+                    embedded = json.loads(
+                        stripped, object_pairs_hook=unique_pairs, parse_constant=reject_constant,
+                        parse_int=bounded_integer, parse_float=finite_float,
+                    )
                 except (RealtimeSecretError, RecursionError):
                     hits += 1
                     return REDACTED
@@ -296,12 +313,13 @@ class PayloadSecretGuard:
                 return REDACTED
             if item is None:
                 return None
-            if isinstance(item, str):
+            if type(item) is str:
                 return scan_text(item, depth)
-            if isinstance(item, bool):
+            if type(item) is bool:
                 return item
-            if isinstance(item, (int, float)):
-                if isinstance(item, float) and not math.isfinite(item):
+            if type(item) in (int, float):
+                if (type(item) is int and item.bit_length() > 1024
+                        or type(item) is float and not math.isfinite(item)):
                     hits += 1
                     return REDACTED
                 _, n = _patterns_hit(str(item))
@@ -310,13 +328,13 @@ class PayloadSecretGuard:
                     return REDACTED
                 return item
             if isinstance(item, Mapping):
-                if not isinstance(item, dict):
+                if type(item) is not dict:
                     raise RealtimeSecretError(
                         "payload mappings must be JSON-native dictionaries"
                     )
                 out = {}
                 for key, child in item.items():
-                    if not isinstance(key, str):
+                    if type(key) is not str:
                         raise RealtimeSecretError(
                             f"payload keys must be strings, got {type(key).__name__}"
                         )
@@ -327,19 +345,19 @@ class PayloadSecretGuard:
                         raise RealtimeSecretError("unsafe payload key")
                     if is_sensitive_key(key):
                         # Avoid invoking user-defined equality on untrusted values.
-                        if child is not None and not (isinstance(child, str) and child in ("", REDACTED)):
+                        if child is not None and not (type(child) is str and child in ("", REDACTED)):
                             hits += 1
                         out[key] = REDACTED
                     else:
                         out[key] = visit(child, depth + 1)
                 return out
-            if isinstance(item, list):
+            if type(item) is list:
                 return [visit(child, depth + 1) for child in item]
             raise RealtimeSecretError(
                 f"payload value of type {type(item).__name__} is not JSON-native; convert it before publishing"
             )
 
-        if not isinstance(payload, dict):
+        if type(payload) is not dict:
             raise RealtimeSecretError("realtime payload must be a JSON-native dictionary")
         clean = visit(payload, 0)
         if hits and self.mode == "reject":
