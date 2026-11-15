@@ -2872,6 +2872,25 @@ async def crawler_vault_care_history(
     return await _crawler_result(crawler_application.treasury_vault_care_history(scope,session_id))
 
 
+@router.get("/crawler/companion/deep-archive")
+async def crawler_deep_catalog(cursor:str|None=Query(default=None,max_length=128),
+    limit:int=Query(default=32,ge=1,le=64),scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.deep_archive_catalog(scope,cursor=cursor,limit=limit))
+
+
+@router.get("/crawler/companion/deep-search")
+async def crawler_deep_search(query:str=Query(min_length=1,max_length=512),
+    cursor:str|None=Query(default=None,max_length=193),scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.deep_archive_search(scope,query=query,cursor=cursor))
+
+
+@router.post("/crawler/sessions/{session_id}/deep-archive")
+async def crawler_archive_to_deep(body:CrawlerVaultRetireRequest,
+    session_id:str=URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope:dict=Depends(_crawler_scope),user:dict=Depends(get_current_user))->dict:
+    return await _crawler_result(crawler_application.archive_to_deep(scope,session_id,body.model_dump(),principal=user))
+
+
 @router.post("/crawler/sessions/{session_id}/vault-care")
 async def crawler_vault_care(
     body: CrawlerVaultCareRequest,

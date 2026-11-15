@@ -23,6 +23,7 @@ from pymongo.errors import DuplicateKeyError, PyMongoError
 from core.databases import core_db
 from core.dragon_resource_governor import ResourceGovernor
 from core.dragon_vault import DragonVaultMixin
+from core.dragon_deep_archive import DragonDeepArchiveMixin
 from core.dragon_checkpoint_replica import (
     CheckpointReplicaError, checkpoint_fields, decode_exact_replica, verify_primary,
 )
@@ -117,7 +118,7 @@ def _safe_error(exc: BaseException) -> str:
     return "crawler_slice_interrupted"
 
 
-class DragonCrawlerApplication(DragonVaultMixin):
+class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
     def __init__(self, database=core_db):
         self.database = database
         self.sessions = database["dragon_crawler_sessions"]
@@ -154,6 +155,12 @@ class DragonCrawlerApplication(DragonVaultMixin):
             await self.sessions.create_index([("treasury_vault.state",ASCENDING),
                 ("treasury_vault_scrub_due",ASCENDING),("_id",ASCENDING)])
             await self.limits.create_index([("treasury_quota_due",ASCENDING),("_id",ASCENDING)])
+            await self.sessions.create_index([("tenant_id",ASCENDING),("owner_id",ASCENDING),
+                ("deep_archive.state",ASCENDING),("_id",ASCENDING)])
+            await self.sessions.create_index([("deep_archive.released",ASCENDING),("deep_archive.retry_at",ASCENDING)])
+            await self.sessions.create_index([("tenant_id",ASCENDING),("owner_id",ASCENDING),
+                ("deep_index.tokens",ASCENDING),("deep_index.expires_at",ASCENDING)])
+            await self.sessions.create_index([("deep_index_due",ASCENDING),("archive_grant.expires_at",ASCENDING)])
             self._indexes_ready = True
 
     async def readiness(self) -> dict[str, Any]:
@@ -2045,8 +2052,8 @@ class DragonCrawlerApplication(DragonVaultMixin):
             {"_id":identifier,**scope,"version":row["version"],"status":{"$ne":"deleted"}},
             {"$set":{"archive_grant":grant,"treasury_index":index_manifest,
                      "treasury_repair_due":min(grant["expires_at"],now.timestamp()+6*3600) if grant else None,
-                     "updated_at":now,"storage_receipt":receipt,audit_path:audit},
-             "$inc":{"version":1}},
+                     "updated_at":now,"storage_receipt":receipt,audit_path:audit,"deep_index_due":now.timestamp()},
+             "$unset":{"deep_index":""},"$inc":{"version":1}},
         )
         if not result.modified_count:
             raise CrawlerError("crawler_conflict","Expedition changed before archive permission committed.",409)
@@ -2253,6 +2260,8 @@ class DragonCrawlerApplication(DragonVaultMixin):
             if mode not in {"historic_only","all_revisions","timeline","compare","at_time"}:
                 raise CrawlerError("crawler_vault_history_only","A selected vault window is history-only.")
             catalogue.update({"_id":{"$in":list(selection)},"treasury_vault.state":"vaulted"})
+        if selection is None:
+            catalogue["deep_archive.released"]={"$ne":True}
         sort=[("treasury_vault.state",ASCENDING),("updated_at",DESCENDING),("_id",DESCENDING)]
         async def catalogue_page():
             return await self.sessions.find(catalogue,{"_id":1,"version":1}).sort(sort).limit(
@@ -3708,6 +3717,8 @@ class DragonCrawlerApplication(DragonVaultMixin):
             await self.limits.update_one(
                 {"_id": _digest(scope), **scope}, {"$pull": {"session_ids": identifier,"vault_ids":identifier}}
             )
+            if row.get("deep_slot_cleanup") is True:
+                await self._release_deep_slot(scope,identifier)
             return {
                 "ok": True,
                 "session_id": identifier,
@@ -3727,6 +3738,7 @@ class DragonCrawlerApplication(DragonVaultMixin):
                     "title": "Deleted crawl",
                     "updated_at": _now(),
                     "deletion": {"operation": operation, "request_digest": digest},
+                    "deep_slot_cleanup":bool(row.get("deep_archive")),
                 },
                 "$inc": {"version": 1},
                 "$unset": {
@@ -3756,6 +3768,9 @@ class DragonCrawlerApplication(DragonVaultMixin):
                     "treasury_vault_scrub_due": "",
                     "treasury_vault_scrub": "",
                     "treasury_vault_care": "",
+                    "deep_archive": "",
+                    "deep_index": "",
+                    "deep_index_due": "",
                     "treasury_vault_care_history": "",
                 },
             },
@@ -3766,6 +3781,8 @@ class DragonCrawlerApplication(DragonVaultMixin):
         # actual thread drains; status='deleted' fences its final publication.
         await self.limits.update_one({"_id": _digest(scope), **scope},
             {"$pull": {"session_ids": identifier,"vault_ids":identifier}})
+        if row.get("deep_archive") is not None:
+            await self._release_deep_slot(scope,identifier)
         return {
             "ok": True,
             "session_id": identifier,
@@ -4608,6 +4625,8 @@ async def recover_crawler_runs(*, limit: int = 16) -> dict:
         ("treasury_retirements",crawler_application.recover_treasury_retirements),
         ("treasury_quota_repair",crawler_application.reconcile_treasury_quotas),
         ("treasury_vault_scrub",crawler_application.scrub_treasury_vault),
+        ("deep_archive_retirements",crawler_application.recover_deep_archive),
+        ("deep_archive_index",crawler_application.build_deep_indexes),
     ):
         try:
             result[name]=await operation()

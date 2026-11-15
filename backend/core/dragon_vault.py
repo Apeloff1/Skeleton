@@ -214,7 +214,7 @@ class DragonVaultMixin:
             raise CrawlerError("crawler_vault_bounds","Invalid vault catalogue page.")
         await self.ensure_indexes()
         query={**scope,"status":{"$in":sorted(TERMINAL)},
-               "treasury_vault.state":{"$in":["pending","vaulted"]}}
+               "treasury_vault.state":{"$in":["pending","vaulted"]},"deep_archive.released":{"$ne":True}}
         if cursor:
             query["_id"]={"$lt":cursor}
         projection={"_id":1,"version":1,"treasury_vault":1,"archive_grant":1,
@@ -405,7 +405,7 @@ class DragonVaultMixin:
         except (ValueError,UnicodeError) as exc:
             raise CrawlerError("crawler_vault_query","Enter a bounded lexical query.") from exc
         await self.ensure_indexes()
-        catalogue={**scope,"status":{"$in":sorted(TERMINAL)},"treasury_vault.state":"vaulted"}
+        catalogue={**scope,"status":{"$in":sorted(TERMINAL)},"treasury_vault.state":"vaulted","deep_archive.released":{"$ne":True}}
         projection={"_id":1,"version":1,"archive_grant.issued_at":1,"archive_grant.expires_at":1}
         async def metadata():
             return await self.sessions.find(catalogue,projection).sort("_id",DESCENDING).limit(
@@ -1008,7 +1008,7 @@ class DragonVaultMixin:
         from skeleton.ai.webcrawler.dragon_vault_quota import MAX_RESERVED
         await self.ensure_indexes()
         query={**scope,"status":{"$in":sorted(TERMINAL)},
-               "treasury_vault.state":{"$in":["pending","vaulted"]}}
+               "treasury_vault.state":{"$in":["pending","vaulted"]},"deep_archive.released":{"$ne":True}}
         fields={"_id":1,"version":1,"treasury_vault":1,"checkpoint_identity.snapshot_digest":1,
                 "treasury_vault_scrub":1,"treasury_vault_care":1,"treasury_vault_scrub_due":1,
                 "treasury_vault_care_history":1}

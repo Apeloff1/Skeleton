@@ -337,6 +337,8 @@ class RecoveryLaneTests(unittest.IsolatedAsyncioTestCase):
         app.recover_treasury_retirements=AsyncMock(return_value={"vaulted":1})
         app.reconcile_treasury_quotas=AsyncMock(return_value={"reclaimed":1})
         app.scrub_treasury_vault=AsyncMock(return_value={"redundant":1})
+        app.recover_deep_archive=AsyncMock(return_value={"archived":1})
+        app.build_deep_indexes=AsyncMock(return_value={"indexed":1})
         with patch("core.dragon_crawler.crawler_application",app):
             result=await recover_crawler_runs()
         self.assertTrue(result["treasury_watches"]["failed"])
@@ -345,6 +347,8 @@ class RecoveryLaneTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["treasury_retirements"],{"vaulted":1})
         self.assertEqual(result["treasury_quota_repair"],{"reclaimed":1})
         self.assertEqual(result["treasury_vault_scrub"],{"redundant":1})
+        self.assertEqual(result["deep_archive_retirements"],{"archived":1})
+        self.assertEqual(result["deep_archive_index"],{"indexed":1})
 
     async def test_ancillary_cancellation_propagates(self):
         import asyncio

@@ -122,6 +122,7 @@ _LOADERS = {
     'core.dragon_resource_governor': lambda: importlib.import_module('core.dragon_resource_governor'),
     'core.dragon_runtime': lambda: importlib.import_module('core.dragon_runtime'),
     'core.dragon_runtime_bridge': lambda: importlib.import_module('core.dragon_runtime_bridge'),
+    'core.dragon_deep_archive': lambda: importlib.import_module('core.dragon_deep_archive'),
     'core.dragon_vault': lambda: importlib.import_module('core.dragon_vault'),
     'core.durable_outbox': lambda: importlib.import_module('core.durable_outbox'),
     'core.economy_runtime': lambda: importlib.import_module('core.economy_runtime'),
