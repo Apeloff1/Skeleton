@@ -49,6 +49,11 @@ def checked_json(text: str, *, maximum: int = MAX_ARTIFACT_CHARS) -> Any:
         if type(item) is dict:
             if len(item) > MAX_ARTIFACT_NODES - count - len(pending):
                 raise ValueError("JSON document exceeds structural budget")
+            for key in item:
+                try:
+                    key.encode("utf-8")
+                except UnicodeError as exc:
+                    raise ValueError("invalid JSON key") from exc
             pending.extend((value, depth + 1) for value in item.values())
         elif type(item) is list:
             if len(item) > MAX_ARTIFACT_NODES - count - len(pending):
@@ -70,7 +75,7 @@ def artifact_text(value: Any) -> tuple[str, Any]:
         text = value
     elif type(value) in (dict, list):
         try:
-            text = json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+            text = json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False, sort_keys=True)
         except (TypeError, ValueError, OverflowError, RecursionError) as exc:
             raise ValueError("invalid artifact JSON") from exc
     else:
