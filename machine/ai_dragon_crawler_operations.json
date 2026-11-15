@@ -26,7 +26,8 @@
     "backend/core/dragon_resource_governor.py",
     "skeleton/ai/webcrawler/dragon_companion.py",
     "skeleton/ai/webcrawler/dragon_questbook.py",
-    "skeleton/ai/webcrawler/dragon_curriculum_trace.py"
+    "skeleton/ai/webcrawler/dragon_curriculum_trace.py",
+    "skeleton/ai/webcrawler/dragon_sanctuary.py"
   ],
   "state_authority": "Existing CORE_DB Mongo application custody; pure snapshots have no independent storage authority",
   "public_api": {
@@ -71,7 +72,10 @@
     "companion_quests": 12,
     "companion_lexemes": 2048,
     "companion_bottom_k": 96,
-    "companion_curriculum_trace": 128
+    "companion_curriculum_trace": 128,
+    "sanctuary_expeditions": 8,
+    "sanctuary_candidates": 128,
+    "sanctuary_sources_per_expedition": 16
   },
   "semantics": {
     "robots": "Fail closed on unavailable robots other than explicit 404/410; accept text/plain rules, not unexpected HTML; revalidation, TTL and every redirect target; delays checkpointed. Retry-After cannot reopen an origin before its valid remote deadline within the finite consent window. Denials and overload bodies never become discovery inputs.",
@@ -97,7 +101,9 @@
     "resource_governor": "Kernel-reported memory/cgroup/CPU/pressure headroom narrows existing physical slice credit ceiling with immediate downscale and gradual recovery. Unsupported metrics restrict local capacity to one; measured critical pressure may stop new admissions. Existing leases remain authoritative.",
     "companion_evolution": "Evidence-derived, reversible, lexical-quality-weighted source novelty, diminishing same-origin credit, bounded continuous-script tokenization, no XP for requests, denials, time elapsed, or inactivity. Five forms; four explicit temperament modes; no independent authority, training, or background work.",
     "companion_questbook": "Twelve prerequisite-constrained achievements across discovery, scholarship, ecology and stewardship. Exact source capture identity/sequence; quest progress derived, not independently persisted. Source references filtered by current owner policy.",
-    "companion_curriculum": "Confidence-shrunk host novelty/recent learning progress, bounded remaining-information and novelty exploration, maximum 12 percent priority contribution annealed by remaining budgets. Guardian weight halved. Policy, budget, DNS, robots, cooldown and owner lease gates remain canonical. Pre-dispatch choice receipt conserved through settled outcomes and uncertain recovery."
+    "companion_curriculum": "Confidence-shrunk host novelty/recent learning progress, bounded remaining-information and novelty exploration, maximum 12 percent priority contribution annealed by remaining budgets. Guardian weight halved. Policy, budget, DNS, robots, cooldown and owner lease gates remain canonical. Pre-dispatch choice receipt conserved through settled outcomes and uncertain recovery.",
+    "companion_sanctuary": "Explicit owner read derives current-consent collection across eight version-fenced witnessed expeditions and sixteen current captures each; exact/near duplication, lexical density and per-origin saturation. Source-use withdrawal and expiry exclude candidates. No source text, durable XP wallet, network authority, or snapshot mutation. Not an atomic transaction; concurrent revision changes detected by final version fence.",
+    "companion_visual": "Existing animated companion receives five evidence-derived evolution stages, shell morph and palette, completed-quest cosmetics, reduced motion, power-aware rendering and decorative pet interaction; no independent training or work."
   },
   "network": {
     "direct": "Validated public DNS addresses pinned to socket with original TLS SNI/hostname verification",
