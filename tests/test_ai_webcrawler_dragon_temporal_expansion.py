@@ -105,6 +105,17 @@ class TemporalSelectionTests(unittest.TestCase):
         self.assertEqual(result["comparison"]["current"]["source_id"],rows[1].source_id)
         self.assertTrue(result["comparison"]["delta"]["numeric_change"])
 
+    def test_unindexed_permitted_source_controls_final_expiry_fence(self):
+        rows=[obs("match",BASE+"/match",A+" magnetometer",NOW-1)]
+        rows.extend(obs("flood",BASE+"/noise/"+str(i),B,NOW-10-i) for i in range(20))
+        expiring=replace(obs("old",BASE+"/expiring",C,NOW-3*DAY),usable_until=NOW+1)
+        rows.append(expiring)
+        with patch("skeleton.ai.webcrawler.dragon_treasury.MAX_INDEXED",4):
+            result=build_treasury(rows,as_of=NOW,growth=1000,query="magnetometer")
+        self.assertEqual(result["earliest_source_expiry"],NOW+1)
+        self.assertLess(result["indexed_observations"],len(rows))
+        self.assertNotIn(expiring.source_id,{row["source_id"] for row in result["hits"]})
+
     def test_capped_bm25_retains_full_permitted_plane_statistics(self):
         url=BASE+"/ranked"
         rows=[obs("a",url+"/rare",A+" rare magnetometer",NOW-5000),

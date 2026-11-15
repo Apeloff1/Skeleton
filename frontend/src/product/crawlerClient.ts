@@ -143,6 +143,8 @@ export type DragonTreasury = {
   current_indexed: number; historic_indexed: number; metadata_only: number; blocked_current: number; changes: number; revalidated_revisions: number;
   verified_historic_transitions: number; verified_changed_families: number; alias_held_families: number; revisit_plan: string[]; parsed_unique_payloads: number;
   materialized_payload_hits: number; invalid_materialized_segments: number; legacy_history_sessions: number;
+  index_health?: {active_grants:number; qualified_segments:number; missing_segments:number;
+    stale_segments:number; invalid_segments:number; eligible_archive_members:number; materialized_archive_members:number};
   index_admission: 'temporal_diversity_v1'|'temporal_query_rerank_v2'; eligible_observations: number; indexed_observations: number;
   query_admission?: {eligible_representatives:number; scanned_representatives:number; scanned_bytes:number;
     matching_representatives:number; prioritized_representatives:number; full_structural_corpus:false;
@@ -532,6 +534,13 @@ export async function getDragonTreasury(mode: TreasuryMode, query='', family?: s
     ||!integer(p.revalidated_revisions,p.observations)||!integer(p.verified_historic_transitions,p.historic_indexed)
     ||!integer(p.verified_changed_families,p.changed_families)||!integer(p.alias_held_families,p.blocked_current)||!integer(p.parsed_unique_payloads,Math.min(256,p.observations))
     ||!integer(p.materialized_payload_hits,p.parsed_unique_payloads)||!integer(p.invalid_materialized_segments,32)||!integer(p.legacy_history_sessions,32)
+    ||p.index_health!==undefined&&(!p.index_health||!integer(p.index_health.active_grants,32)
+      ||![p.index_health.qualified_segments,p.index_health.missing_segments,p.index_health.stale_segments,p.index_health.invalid_segments]
+        .every(value=>integer(value,p.index_health!.active_grants))
+      ||p.index_health.qualified_segments+p.index_health.missing_segments+p.index_health.stale_segments+p.index_health.invalid_segments!==p.index_health.active_grants
+      ||p.index_health.invalid_segments+p.index_health.stale_segments!==p.invalid_materialized_segments
+      ||!integer(p.index_health.eligible_archive_members,2048)
+      ||!integer(p.index_health.materialized_archive_members,p.index_health.eligible_archive_members))
     ||!['temporal_diversity_v1','temporal_query_rerank_v2'].includes(p.index_admission)
     ||!integer(p.eligible_observations,p.observations)||!integer(p.indexed_observations,Math.min(256,p.eligible_observations))
     ||p.index_admission==='temporal_diversity_v1'&&p.query_admission!=null

@@ -2195,7 +2195,7 @@ class DragonCrawlerApplication:
         fenced. No network, migration, write or grant extension occurs.
         """
         from skeleton.ai.webcrawler.dragon_sanctuary import MAX_EXPEDITIONS, SanctuarySource, project_sanctuary
-        from skeleton.ai.webcrawler.dragon_index_manifest import load_manifest, usable_posting
+        from skeleton.ai.webcrawler.dragon_index_manifest import load_manifest, usable_posting, manifest_matches_grant
         from skeleton.ai.webcrawler.dragon_archive_grant import archive_expiry, validate_grant
         from skeleton.ai.webcrawler.dragon_treasury import MAX_SESSIONS, Observation, build_treasury
 
@@ -2213,6 +2213,9 @@ class DragonCrawlerApplication:
         observations = []
         materialized = {}
         invalid_segments = 0
+        index_health = {"active_grants":0,"qualified_segments":0,"missing_segments":0,
+                        "stale_segments":0,"invalid_segments":0,"eligible_archive_members":0,
+                        "materialized_archive_members":0}
         legacy_sessions = 0
         alias_blockers = []
         eligible = []
@@ -2258,14 +2261,29 @@ class DragonCrawlerApplication:
                 grant = row.get("archive_grant") if row["status"] in {"completed","budget_exhausted"} else None
                 if grant is not None:
                     validate_grant(grant)
-                try:
-                    segment = load_manifest(row.get("treasury_index"),grant,
-                        snapshot_digest=snapshot["snapshot_digest"],now=when)
-                except (ValueError,TypeError,KeyError,RecursionError):
-                    # Rebuild only in-memory from still-authorized exact text.
-                    # No corrupt derived cache can prevent source visibility.
-                    invalid_segments += 1
-                    segment = {}
+                local_health=dict.fromkeys(index_health,0)
+                active_grant=bool(grant is not None
+                    and grant["snapshot_digest"]==snapshot["snapshot_digest"]
+                    and grant["issued_at"]<=when<grant["expires_at"])
+                segment={}
+                if active_grant:
+                    local_health["active_grants"]=1
+                    manifest=row.get("treasury_index")
+                    if manifest is None:
+                        local_health["missing_segments"]=1
+                    elif not isinstance(manifest,dict):
+                        local_health["invalid_segments"]=1
+                    elif not manifest_matches_grant(manifest,grant,snapshot_digest=snapshot["snapshot_digest"]):
+                        local_health["stale_segments"]=1
+                    else:
+                        try:
+                            segment=load_manifest(manifest,grant,snapshot_digest=snapshot["snapshot_digest"],now=when)
+                            local_health["qualified_segments"]=1
+                        except (ValueError,TypeError,KeyError,RecursionError):
+                            # Corrupt derived material cannot suppress permitted
+                            # source text. Reads remain side-effect-free.
+                            segment={}
+                            local_health["invalid_segments"]=1
                 usable = []
                 local = []
                 local_materialized = {}
@@ -2288,11 +2306,15 @@ class DragonCrawlerApplication:
                     if expiry is not None and expiry <= when:
                         allowed, expiry = False, None
                     archive_only = False
-                    if not allowed and grant is not None and (not legacy or source["source_id"] in legacy_ids):
-                        expiry = archive_expiry(grant, snapshot_digest=snapshot["snapshot_digest"],
-                            source=source, policy={**{"version":0}, **policy}, now=when)
-                        allowed = expiry is not None
-                        archive_only = allowed
+                    archival_until=None
+                    if active_grant and (not legacy or source["source_id"] in legacy_ids):
+                        archival_until=archive_expiry(grant,snapshot_digest=snapshot["snapshot_digest"],
+                            source=source,policy={**{"version":0},**policy},now=when)
+                        local_health["eligible_archive_members"]+=int(archival_until is not None)
+                    if not allowed and archival_until is not None:
+                        expiry=archival_until
+                        allowed=True
+                        archive_only=True
                     freshness = source["provenance"].get("http_freshness", {}) or {}
                     # Different declared language/representation and sensitive
                     # Vary boundaries must not be collapsed by a fuzzy title.
@@ -2317,9 +2339,12 @@ class DragonCrawlerApplication:
                     ))
                     if allowed:
                         posting=usable_posting(segment,source,{**{"version":0},**policy})
-                        if posting is not None:
+                        if posting is not None and archival_until is not None:
                             local_materialized[str(identifier),source["source_id"]]=posting
-                        if not legacy:
+                            local_health["materialized_archive_members"]+=1
+                        # A history-only grant contributes stewardship, not
+                        # current-consent discovery or model-context credit.
+                        if not legacy and not archive_only:
                             usable.append(SanctuarySource(
                             str(identifier), source["source_id"], source["content_hash"],
                             source["fetched_url"], source["content_type"], source["text"],
@@ -2330,8 +2355,11 @@ class DragonCrawlerApplication:
                 # never furnish searchable text or stewardship credit.
                 local_aliases = [{"url": alias["fetched_url"], "captured_at": alias["captured_at"],
                                   "content_hash": alias["content_hash"]}
-                                 for alias in snapshot["source_aliases"]]
+                                 for alias in snapshot.get("source_aliases",[]) if legacy or "source_aliases" in snapshot]
                 observations.extend(local)
+                for key,count in local_health.items():
+                    index_health[key]+=count
+                invalid_segments+=local_health["invalid_segments"]+local_health["stale_segments"]
                 # Keep only the newest bounded candidate postings in memory.
                 materialized.update(local_materialized)
                 if len(materialized)>256:
@@ -2339,7 +2367,7 @@ class DragonCrawlerApplication:
                                   key=lambda x:(-x.captured_at,x.session_id,x.source_id))[:256]
                     materialized={(x.session_id,x.source_id):materialized[x.session_id,x.source_id] for x in newest}
                 alias_blockers.extend(local_aliases)
-                if not legacy and len(revisions)<MAX_EXPEDITIONS:
+                if not legacy and usable and len(revisions)<MAX_EXPEDITIONS:
                     eligible.extend(usable[:16])
                     revisions.append({"session_id": str(identifier), "version": int(version),
                                       "snapshot_digest": snapshot["snapshot_digest"]})
@@ -2355,6 +2383,13 @@ class DragonCrawlerApplication:
                                     observed_before=observed_before,left=left,right=right)
             result["invalid_materialized_segments"]=invalid_segments
             result["legacy_history_sessions"]=legacy_sessions
+            result["index_health"]=index_health
+            # Discovery uses currently permitted sources even when a search
+            # excludes their families. Its evidence must also survive until
+            # the final publication fence.
+            discovery_expiry=min((source.valid_until for source in eligible),default=None)
+            expiries=[value for value in (result["earliest_source_expiry"],discovery_expiry) if value is not None]
+            result["earliest_source_expiry"]=min(expiries) if expiries else None
         except ValueError as exc:
             raise CrawlerError("crawler_treasury_invalid", "Treasury reparse could not be qualified.", 422) from exc
         for identifier, version in fence:

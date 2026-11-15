@@ -204,7 +204,12 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
     <Text style={s.small}>{visible.families} families · {visible.revisions} versions · {visible.rollbacks} rollbacks · {visible.blocked_current} current families unavailable · {visible.alias_held_families} alias conflicts</Text>
     <Text style={s.small}>{visible.indexed_observations}/{visible.eligible_observations} permitted observations selected · {visible.legacy_history_sessions} older runtime sessions. Selected-family and historical-date queries reserve capacity for their requested evidence.</Text>
     {visible.query_admission&&<Text style={s.small}>Query-aware selection: {visible.query_admission.scanned_representatives} permitted versions scanned · {visible.query_admission.matching_representatives} lexical matches · {visible.query_admission.prioritized_representatives} prioritized for structural reparse. Not an exhaustive structural index.</Text>}
-    {visible.invalid_materialized_segments>0&&<Text style={s.small}>An invalid derived index was ignored. Scheduled maintenance can repair stored postings without renewing permission.</Text>}
+    {visible.index_health&&<View style={s.check}>
+      <Text style={s.label}>Hoarder den · archival index health</Text>
+      <Text style={s.small}>{visible.index_health.qualified_segments}/{visible.index_health.active_grants} active grant segments qualified · {visible.index_health.materialized_archive_members}/{visible.index_health.eligible_archive_members} permitted archive members materialized.</Text>
+      <Text style={s.small}>{visible.index_health.missing_segments} missing · {visible.index_health.stale_segments} stale · {visible.index_health.invalid_segments} damaged. The crawler can repair derived postings; older versions remain history-only.</Text>
+    </View>}
+    {visible.invalid_materialized_segments>0&&<Text style={s.small}>An invalid or stale derived index was ignored. Scheduled maintenance can repair stored postings without renewing permission.</Text>}
     {(visible.candidate_limit_reached||visible.excluded_sessions>0)&&<Text style={s.small}>Bounded or unqualified corpus: this observation cannot establish complete archive coverage.</Text>}
     <Text style={s.heading}>Revision families and revisit recommendations</Text>
     <Text style={s.small}>{visible.parsed_unique_payloads} distinct retained payload projections · {visible.materialized_payload_hits} reused from durable index · {visible.verified_historic_transitions} distinct verified version transitions · {visible.revisit_plan.length} prioritized suggestions, interleaved across origins.</Text>

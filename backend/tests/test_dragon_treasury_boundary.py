@@ -82,7 +82,48 @@ class TreasuryIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(value["current_indexed"],0)
         self.assertEqual(value["materialized_payload_hits"],1)
         self.assertEqual(value["invalid_materialized_segments"],0)
+        self.assertEqual(value["index_health"],{"active_grants":1,"qualified_segments":1,
+            "missing_segments":0,"stale_segments":0,"invalid_segments":0,
+            "eligible_archive_members":1,"materialized_archive_members":1})
+        self.assertEqual(value["evolution"]["expedition_growth"],0)
         app.sessions.update_one.assert_not_awaited()
+
+    async def test_missing_and_corrupt_index_health_does_not_grant_authority(self):
+        from test_dragon_sanctuary_boundary import application
+        row,captured=fixture()
+        now=captured+timedelta(days=2)
+        row["archive_grant"]=create_grant(snapshot=row["snapshot"],policies={},now=now.timestamp(),days=7)
+        for value,field in ((None,"missing_segments"),({"schema":"obsolete"},"stale_segments"),
+                            ("broken","invalid_segments")):
+            altered=copy.deepcopy(row)
+            altered["treasury_index"]=value
+            app=application(altered)
+            with patch("core.dragon_crawler._now",return_value=now):
+                result=await app.companion_treasury(SCOPE,mode="historic_only")
+            self.assertEqual(result["index_health"][field],1)
+            self.assertEqual(result["index_health"]["eligible_archive_members"],1)
+            self.assertEqual(result["index_health"]["materialized_archive_members"],0)
+            self.assertEqual(result["historic_indexed"],1)
+            self.assertEqual(result["current_indexed"],0)
+            self.assertEqual(result["evolution"]["expedition_growth"],0)
+            app.sessions.update_one.assert_not_awaited()
+
+    async def test_current_discovery_and_expired_historical_permissions_are_separate(self):
+        from test_dragon_sanctuary_boundary import application
+        row,now=fixture()
+        row["archive_grant"]=create_grant(snapshot=row["snapshot"],policies={},now=now.timestamp(),days=1)
+        app=application(row)
+        with patch("core.dragon_crawler._now",return_value=now):
+            current=await app.companion_treasury(SCOPE,mode="current_only")
+        self.assertGreater(current["evolution"]["expedition_growth"],0)
+        self.assertEqual(current["index_health"]["active_grants"],1)
+        expired=now+timedelta(days=2)
+        app=application(row)
+        with patch("core.dragon_crawler._now",return_value=expired):
+            history=await app.companion_treasury(SCOPE,mode="historic_only")
+        self.assertEqual(history["evolution"]["expedition_growth"],0)
+        self.assertEqual(history["index_health"]["active_grants"],0)
+        self.assertEqual(history["historic_indexed"],0)
 
     async def test_new_owner_session_invalidates_fenced_catalogue(self):
         from test_dragon_sanctuary_boundary import application

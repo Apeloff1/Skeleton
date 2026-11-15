@@ -220,3 +220,12 @@ def same_manifest_projection(previous:object, expected:dict, grant:dict, *, now:
             and all(previous.get(key)==expected[key] for key in
                     ("schema","parser","snapshot_digest","grant_digest","expires_at",
                      "source_count","eligible_count","raw_bytes","raw_sha256")))
+
+
+def manifest_matches_grant(manifest:object,grant:dict,*,snapshot_digest:str)->bool:
+    """Header identity check only; decoding and per-member checks still required."""
+    return (isinstance(manifest,dict) and manifest.get("schema")==SCHEMA
+            and manifest.get("parser")==PARSER
+            and manifest.get("snapshot_digest")==snapshot_digest==grant["snapshot_digest"]
+            and manifest.get("grant_digest")==_sha(_json(grant))
+            and manifest.get("expires_at")==grant["expires_at"])

@@ -507,7 +507,9 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
             "family_rows":family_rows[offset:offset+MAX_RESULTS],"hits":hits[offset:offset+MAX_RESULTS],
             "timeline":history[offset:offset+MAX_RESULTS] if mode in {"timeline","compare"} else [],
             "comparison":chosen,
-            "earliest_source_expiry":min((x.usable_until for x in indexed),default=None),
+            # Ranking statistics, lineage and evolution depend on all
+            # permitted observations, not just the structural winners.
+            "earliest_source_expiry":min((x.usable_until for x in ordered),default=None),
             "latest_observed_only":True,"source_text_returned":False,"network_executed":False,
             "index_admission":"temporal_query_rerank_v2" if admission is not None else "temporal_diversity_v1",
             "query_admission":None if admission is None else {
