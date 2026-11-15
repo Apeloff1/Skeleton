@@ -128,3 +128,25 @@ async def game_context(scope,query,max_docs,max_chars,*,game,historical):
         value=await crawler_application.context(scope,query,max_docs,max_chars,session_ids=session_ids)
     return {**value,"game_id":game,"game_capture_window_truncated":truncated,
             "partial_routing":True}
+
+async def world_discovery_call(scope,operation,*args,**kwargs):
+    from core.dragon_world_discovery import WorldDiscovery,DiscoveryHeld
+    if operation not in {"configure","revoke","status"}:
+        raise ValueError("discovery operation")
+    def work():
+        path=_path(create=operation=="configure" and os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1")
+        try:
+            return getattr(WorldDiscovery(path),operation)(scope,*args,**kwargs)
+        except DiscoveryHeld as exc:
+            raise CatalogueHeld("discovery subscription held") from exc
+    return await _bounded(work)
+
+
+async def pulse_world_discovery():
+    from core.dragon_world_discovery import WorldDiscovery
+    if os.getenv("SKL_DRAGON_WORLD_DISCOVERY")!="1":
+        return {"enabled":False,"network_executed":False}
+    try:
+        return await _bounded(lambda:WorldDiscovery(_path()).pulse())
+    except (GameLearningError,sqlite3.Error,OSError,TimeoutError,ValueError,RuntimeError):
+        return {"enabled":True,"outcome":"held"}
