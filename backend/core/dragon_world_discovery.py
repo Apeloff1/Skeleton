@@ -151,11 +151,49 @@ def steam_pages(raw):
         yield json.dumps({"applist":{"apps":values[i:i+500]}},ensure_ascii=False).encode()
 
 
+def eve_sde_manifest(raw):
+    """Read the official SDE latest-build JSONL pointer as discovery metadata.
+
+    The _key=sde record publishes buildNumber in an object. Accept only an
+    integral positive build identity, never a URL or path from the response.
+    Neither the ZIP nor authenticated ESI routes are automatically fetched.
+    """
+    if not isinstance(raw,bytes) or not 1<=len(raw)<=64*1024:
+        raise ValueError("SDE pointer size")
+    rows=raw.splitlines()
+    if not 1<=len(rows)<=64:raise ValueError("SDE pointer rows")
+    matches=[]
+    for line in rows:
+        if not line.strip():continue
+        row=json.loads(line)
+        if not isinstance(row,dict):raise ValueError("SDE record")
+        if row.get("_key")=="sde":
+            value=row.get("buildNumber")
+            if value is None and isinstance(row.get("_value"),dict):
+                value=row["_value"].get("buildNumber")
+            if type(value) is not int or not 1<=value<2**53:
+                raise ValueError("SDE build identity")
+            matches.append(value)
+    if len(matches)!=1:raise ValueError("SDE build pointer must be unique")
+    build=str(matches[0])
+    base="https://developers.eveonline.com/static-data/tranquility/"
+    entry={"id":"eve-online","title":"EVE Online","stage":"updated","version":build,
+        "links":[
+            {"url":base+"eve-online-static-data-"+build+"-jsonl.zip","kind":"static_data_export","language":"und"},
+            {"url":base+"eve-online-static-data-"+build+"-yaml.zip","kind":"static_data_export","language":"und"},
+            {"url":base+"changes/"+build+".jsonl","kind":"static_data_changelog","language":"und"},
+            {"url":base+"latest.jsonl","kind":"public_update_feed","language":"und"},
+            {"url":base+"schema-changelog.yaml","kind":"static_data_schema","language":"und"}]}
+    return json.dumps({"schema":"dragon.game-feed.v1","provider":"developer","entries":[entry]},
+                      sort_keys=True,separators=(",",":")).encode()
+
+
 def partition_feed(row,raw):
     adapter=row["adapter"]
     if adapter=="sitemap":
         return "manifest",sitemap_pages(raw,row["provider"],row["game_external_id"],row["title"]),{}
     if adapter=="steam":return "steam",steam_pages(raw),{}
+    if adapter=="eve_sde":return "manifest",iter([eve_sde_manifest(raw)]),{}
     options={"provider":row["provider"],"external_id":row["game_external_id"],"title":row["title"]} if adapter=="rss_atom" else {}
     return adapter,iter([raw]),options
 
@@ -183,10 +221,12 @@ class WorldDiscovery:
             from core.dragon_game_corpus import key
             external_id=key(external_id)
             title=clean(title,256)
-        elif adapter in {"manifest","steam"}:
+        elif adapter in {"manifest","steam","eve_sde"}:
             if any(x is not None for x in (provider,external_id,title)):
                 raise ValueError("unexpected adapter fields")
         else:raise ValueError("adapter")
+        if adapter=="eve_sde" and url!="https://developers.eveonline.com/static-data/tranquility/latest.jsonl":
+            raise ValueError("EVE SDE subscription requires the exact official public latest-build locator")
         owner=owner_key(scope)
         sid=digest([owner,url,adapter,provider,external_id,title])
         now=int(time.time())
@@ -310,7 +350,7 @@ class WorldDiscovery:
         row=self._claim()
         if row is None:return {"enabled":True,"outcome":"idle","network_executed":False}
         try:
-            raw=fetch_public_feed(row["url"],fetcher=fetcher,max_bytes=MAX_LARGE_FEED if row["adapter"] in {"steam","sitemap"} else MAX_FEED_BYTES)
+            raw=fetch_public_feed(row["url"],fetcher=fetcher,max_bytes=MAX_LARGE_FEED if row["adapter"] in {"steam","sitemap"} else 64*1024 if row["adapter"]=="eve_sde" else MAX_FEED_BYTES)
         except Exception:
             return {"enabled":True,"outcome":self._finish(row,None,"fetch_held"),"network_attempted":True}
         try:
