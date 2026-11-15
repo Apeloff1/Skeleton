@@ -351,3 +351,32 @@ def test_source_manifest_path_escape_is_rejected_before_archive_publication(tmp_
         assert not list(manager.artifact_root.glob("game-*"))
     finally:
         manager.close()
+
+
+@pytest.mark.parametrize(("method", "path", "body", "expected"), [
+    ("DELETE", "/v1/game-builds", None, 405),
+    ("POST", "/v1/game-builds/unknown/archive", {}, 405),
+    ("GET", "/v1/game-builds/", None, 404),
+    ("GET", "/v1/game-builds/job/not-an-archive", None, 404),
+    ("GET", "/v1/game-builds/job/archive/extra", None, 404),
+    ("GET", "/v1/game-builds/bad%20id", None, 400),
+    ("POST", "/v1/game-builds", {"request_id": "missing-brief"}, 400),
+    ("POST", "/v1/game-builds", {"request_id": "bad id", "brief": BRIEF}, 400),
+    ("POST", "/v1/game-builds", {"request_id": "unexpected", "brief": BRIEF, "out": "/private/path"}, 400),
+])
+def test_invalid_http_game_build_envelopes_do_not_initialize_store(
+        tmp_path, pipeline, method, path, body, expected):
+    database = tmp_path / "workspace.sqlite3"
+    with server(model(), database) as (app, port):
+        assert app._game_builder is None
+        assert http_request(port, method, path, body)[0] == expected
+        assert app._game_builder is None
+        assert not pipeline.calls
+        with sqlite3.connect(database) as connection:
+            assert connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='offline_game_builds'"
+            ).fetchone() is None
+        status, _, listing = http_request(port, "GET", "/v1/game-builds")
+        assert status == 200 and json.loads(listing)["jobs"] == []
+        assert app._game_builder is not None
+        assert not pipeline.calls

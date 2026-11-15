@@ -6,6 +6,7 @@
  * is carried through the next GameForge run and emitted as a project artifact.
  */
 import { galaxyGenre, mappedBriefGenre } from './galaxyGenres';
+import { GENRE_CHOICES } from './genreCatalog';
 
 export const GALAXY_PROFILE_SCHEMA = 'skeleton.gameforge.galaxy_profile.v1' as const;
 export const MATRIX_FIELDS = [
@@ -183,7 +184,11 @@ export function galaxyPrefill(input: GalaxyProfile): GalaxyPrefill {
   const config = profile.config;
   const genre = String(config.genre);
   const specialty = galaxyGenre(genre);
-  const mapped = mappedBriefGenre(genre);
+  const canonical = genre.toLowerCase().replace(/_/g, '-');
+  const mapped = mappedBriefGenre(genre) ?? (GENRE_CHOICES.includes(canonical) ? canonical : null);
+  // Direct profile import and the creator bridge must agree: do not retain
+  // a previous project's genre vote for an incompatible selected genre.
+  if (!mapped) fail('selected genre has no compatible GameForge mapping');
   const userVision = typeof config.game_vision === 'string' ? config.game_vision.trim() : '';
   const title = String(config.title).trim();
   const labels = [

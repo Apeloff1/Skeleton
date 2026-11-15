@@ -184,3 +184,19 @@ test('handoff cannot survive clock rollback or unsafe expiry arithmetic', () => 
   assert.equal(G.consumeGalaxyHandoff(id, 2999, 7), null);
   assert.equal(G.consumeGalaxyHandoff(id, 3001, 7), null);
 });
+
+
+test('direct complete-profile import maps backend-only genre consistently with creator handoff', () => {
+  const H = load('src/skeletonForge/creatorBridge.ts');
+  const profile = G.normaliseGalaxyProfile(payload({ genre: 'precision_platformer' }));
+  const prior = Q.questionnaireReducer(Q.INITIAL_STATE, { type: 'setBrief', facet: 'genre', value: 'rpg' });
+  const imported = Q.questionnaireReducer(prior, { type: 'importGalaxy', profile });
+  assert.equal(imported.galaxyGenre, null);
+  assert.equal(Q.buildRunRequest(imported).answers.genre, 'precision-platformer');
+  const outgoing = H.handoffFromGalaxy({ title: 'Precision', vision: '', genreId: 'precision_platformer', profile }, null, 1700000000000);
+  assert.equal(outgoing.brief.genre, imported.brief.genre);
+  assert.equal(imported.galaxyProfile.config.genre, 'precision_platformer');
+  const unknown = G.normaliseGalaxyProfile(payload({ genre: 'unknown_private_genre' }));
+  assert.throws(() => Q.questionnaireReducer(prior, { type: 'importGalaxy', profile: unknown }), /compatible GameForge mapping/);
+  assert.equal(prior.brief.genre, 'rpg');
+});

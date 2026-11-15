@@ -37,7 +37,7 @@ def _walk(value: Any, depth: int, count: list[int]) -> None:
         return
     if type(value) in (int, float):
         if (type(value) is int and value.bit_length() > 53) or (
-            type(value) is float and not math.isfinite(value)
+            type(value) is float and (not math.isfinite(value) or abs(value) > 2**53 - 1)
         ):
             raise ValueError("non-finite or unsafe Galaxy number")
         return

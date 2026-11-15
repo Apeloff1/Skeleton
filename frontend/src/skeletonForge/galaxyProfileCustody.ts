@@ -47,8 +47,13 @@ export async function saveGalaxyProfile(payload: unknown, expectedEpoch = getAut
     catch (error) {
       // Roll back this publication only; all same-runtime profile operations
       // for this exact owner namespace are serialized.
-      if (previous === null) await AsyncStorage.removeItem(scope.key);
-      else await AsyncStorage.setItem(scope.key, previous);
+      // Do not overwrite a newer publication from another storage owner.
+      // AsyncStorage has no cross-process compare-and-swap; this is a
+      // best-effort rollback constrained to the value just published.
+      if (await AsyncStorage.getItem(scope.key) === data && previous !== data) {
+        if (previous === null) await AsyncStorage.removeItem(scope.key);
+        else await AsyncStorage.setItem(scope.key, previous);
+      }
       throw error;
     }
   });
@@ -73,7 +78,17 @@ export async function clearSavedGalaxyProfile(expectedEpoch = getAuthEpoch()): P
   const scope = await ownerScope(expectedEpoch);
   await serialize(scope.key, async () => {
     scope.requireOwner();
-    await AsyncStorage.removeItem(scope.key);
+    const previous = await AsyncStorage.getItem(scope.key);
     scope.requireOwner();
+    await AsyncStorage.removeItem(scope.key);
+    try { scope.requireOwner(); }
+    catch (error) {
+      // A stale deletion must not silently erase that account's design.
+      // Only restore if no replacement has appeared since the deletion.
+      if (previous !== null && await AsyncStorage.getItem(scope.key) === null) {
+        await AsyncStorage.setItem(scope.key, previous);
+      }
+      throw error;
+    }
   });
 }

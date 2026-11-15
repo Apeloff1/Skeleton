@@ -815,25 +815,41 @@ class OfflineHTTPApplication:
         if path == "/v1/game-builds" or path.startswith("/v1/game-builds/"):
             from skeleton.app.offline_game_builder import GameBuildRejected
 
+            # Validate the envelope before opening the durable game-build
+            # store: its startup can recover interrupted jobs.
+            collection = path == "/v1/game-builds"
+            if collection:
+                if method not in {"GET", "POST"}:
+                    raise OfflineHTTPError(405, "unsupported local game-build method")
+                if method == "POST":
+                    _fields(body, {"request_id", "brief"}, {"request_id", "brief"})
+                    try:
+                        _identifier("game request id", body["request_id"])
+                    except ValueError:
+                        raise OfflineHTTPError(400, "Use a valid game brief of 1..4000 UTF-8 bytes and supported gameplay choices.") from None
+            else:
+                if method != "GET":
+                    raise OfflineHTTPError(405, "unsupported local game-build method")
+                parts = path[len("/v1/game-builds/"):].split("/")
+                if not (parts[0] and (len(parts) == 1 or
+                        (len(parts) == 2 and parts[1] == "archive"))):
+                    raise OfflineHTTPError(404, "unknown local game-build route")
+                try:
+                    _identifier("game request id", parts[0])
+                except ValueError:
+                    raise OfflineHTTPError(400, "Use a bounded game request identifier.") from None
+
             try:
                 manager = self._local_game_builder()
-                if path == "/v1/game-builds":
+                if collection:
                     if method == "GET":
                         return 200, {"jobs": manager.list_jobs(),
                                      "availability": manager.availability(),
                                      "limits": manager.limits()}
-                    if method == "POST":
-                        _fields(body, {"request_id", "brief"}, {"request_id", "brief"})
-                        return 202, manager.submit(body["request_id"], body["brief"])
-                    raise OfflineHTTPError(405, "unsupported local game-build method")
-                parts = path[len("/v1/game-builds/"):].split("/")
-                if method != "GET":
-                    raise OfflineHTTPError(405, "unsupported local game-build method")
-                if len(parts) == 1 and parts[0]:
+                    return 202, manager.submit(body["request_id"], body["brief"])
+                if len(parts) == 1:
                     return 200, manager.get(parts[0])
-                if len(parts) == 2 and parts[0] and parts[1] == "archive":
-                    return 200, manager.archive(parts[0])
-                raise OfflineHTTPError(404, "unknown local game-build route")
+                return 200, manager.archive(parts[0])
             except GameBuildRejected as exc:
                 raise OfflineHTTPError(exc.status, exc.message) from None
         if path == "/v1/resources" and method == "GET":
