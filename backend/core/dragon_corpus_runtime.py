@@ -59,7 +59,15 @@ async def pulse_release_imports():
     if not os.getenv("SKL_DRAGON_GAME_CORPUS_DB_PATH","").strip():
         return {"configured":False,"network_executed":False}
     try:
-        return await _bounded(lambda:ReleaseQueue(_path()).pulse(limit=16))
+        def pulse():
+            path=_path()
+            queue=ReleaseQueue(path).pulse(limit=16)
+            try:
+                index=GameCorpus(path).backfill_facets(limit=32)
+            except (CatalogueHeld,ValueError,TypeError,KeyError,sqlite3.Error):
+                index={"failed":True,"reason":"facet_index_held"}
+            return {**queue,"facet_backfill":index}
+        return await _bounded(pulse)
     except (GameLearningError,sqlite3.Error,OSError,TimeoutError):
         return {"failed":True,"reason":"release_store_held","network_executed":False}
 
