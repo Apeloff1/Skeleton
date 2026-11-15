@@ -54,7 +54,7 @@ _PATTERNS = {
         r"[\s\S]{0,64}\b(?:follow|obey|execute|override|mandatory)\b"
     ),
 }
-_CODES = frozenset((*_PATTERNS, "instruction_file", "inspection_limit", "active_markup"))
+_CODES = frozenset((*_PATTERNS, "instruction_file", "inspection_limit"))
 _INSTRUCTION_NAMES = frozenset({
     "agents.md", "agent.md", "llms.txt", "llms-full.txt",
     "crawler-instructions.txt", "crawler-instructions.md", "crawler-instructions.json",
@@ -80,6 +80,7 @@ class InstructionObservation:
     inspection_limited: bool
     input_digest: str
     inspected_bytes: int
+    match_fingerprints: tuple[tuple[str, str], ...]
 
     @property
     def held(self) -> bool:
@@ -108,6 +109,7 @@ def _inspect(raw: bytes, *, stage: str, instruction_file: bool = False,
     digest = _digest(raw)
     categories = {"instruction_file"} if instruction_file else set()
     count = 0
+    fingerprints = []
     limited = len(raw) > MAX_INPUT_BYTES
     if not limited:
         try:
@@ -121,21 +123,27 @@ def _inspect(raw: bytes, *, stage: str, instruction_file: bool = False,
             views = (decoded,) if flattened == decoded else (decoded, flattened)
             for name, pattern in _PATTERNS.items():
                 local_count = 0
+                first = None
                 for view in views:
-                    for _ in pattern.finditer(view):
-                        local_count += 1
-                        if local_count >= MAX_MATCHES:
+                    view_count = 0
+                    for match in pattern.finditer(view):
+                        if first is None:
+                            first = _digest(match.group().encode("utf-8"))
+                        view_count += 1
+                        if view_count >= MAX_MATCHES:
                             break
-                    if local_count >= MAX_MATCHES:
-                        break
+                    local_count = max(local_count, view_count)
                 if local_count:
                     categories.add(name)
+                    # Count pattern detections, not unique physical spans.
+                    # Two normalized views of the same match do not double count.
                     count = min(MAX_MATCHES, count + local_count)
+                    fingerprints.append((name, first))
     if limited:
         categories.add("inspection_limit")
     return InstructionObservation(
         stage, tuple(sorted(categories)), count, limited, digest,
-        min(len(raw), MAX_INPUT_BYTES),
+        min(len(raw), MAX_INPUT_BYTES), tuple(sorted(fingerprints)),
     )
 
 
@@ -183,6 +191,7 @@ def incident_receipt(
         "inspection_limited": observation.inspection_limited,
         "inspected_bytes": observation.inspected_bytes,
         "input_digest": observation.input_digest if retain_fingerprint else None,
+        "match_fingerprints": dict(observation.match_fingerprints) if retain_fingerprint else {},
         "payload_retained": False,
         "execution_authorized": False,
     }
@@ -194,7 +203,7 @@ def validate_incidents(rows: object, *, sequence: int, requests: int) -> None:
     previous = 0
     keys = {"sequence", "url_digest", "stage", "categories",
             "match_count_lower_bound", "inspection_limited", "inspected_bytes",
-            "input_digest", "payload_retained", "execution_authorized"}
+            "input_digest", "match_fingerprints", "payload_retained", "execution_authorized"}
     for row in rows:
         if not isinstance(row, dict) or set(row) != keys:
             raise ValueError("invalid incident receipt")
@@ -214,6 +223,13 @@ def validate_incidents(rows: object, *, sequence: int, requests: int) -> None:
                 or not 0 <= row["inspected_bytes"] <= MAX_INPUT_BYTES
                 or (row["input_digest"] is not None and
                     (not isinstance(row["input_digest"], str) or not _HEX.fullmatch(row["input_digest"])))
+                or not isinstance(row["match_fingerprints"], dict)
+                or any(code not in categories or code not in _PATTERNS
+                       or not isinstance(value, str) or not _HEX.fullmatch(value)
+                       for code, value in row["match_fingerprints"].items())
+                or (row["input_digest"] is None and row["match_fingerprints"])
+                or (row["input_digest"] is not None and set(row["match_fingerprints"]) !=
+                    set(categories).intersection(_PATTERNS))
                 or row["payload_retained"] is not False or row["execution_authorized"] is not False):
             raise ValueError("invalid incident custody")
         previous = n
@@ -222,5 +238,6 @@ def validate_incidents(rows: object, *, sequence: int, requests: int) -> None:
 def incident_summary(rows: list[dict]) -> dict:
     categories = Counter(code for row in rows for code in row["categories"])
     return {"count": len(rows), "categories": dict(sorted(categories.items())),
-            "records": [dict(row, categories=list(row["categories"])) for row in rows],
+            "records": [dict(row, categories=list(row["categories"]),
+                             match_fingerprints=dict(row["match_fingerprints"])) for row in rows],
             "payload_retained": False, "execution_authorized": False}
