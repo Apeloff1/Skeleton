@@ -15,7 +15,7 @@ def json_snapshot(value: Any, *, max_bytes: int = 1_048_576) -> Any:
     if max_bytes > _MAX_PAYLOAD:
         raise ValueError("payload limit exceeds hard ceiling")
     try:
-        normalized = normalize_state(value)
+        normalized = normalize_state(value, max_encoded_bytes=max_bytes)
         encoded = json.dumps(normalized, sort_keys=True, separators=(",", ":"), allow_nan=False)
         if len(encoded.encode("utf-8")) > max_bytes:
             raise ValueError("payload exceeds encoded byte budget")
