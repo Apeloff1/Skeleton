@@ -57,7 +57,7 @@ export type SourceFreshness = {
   capture_age_seconds: number; valid_until: string; remote_freshness_verified: false;
 };
 export type CapturedSource = { source_id: string; url: string; canonical_url?: string; title: string; text?: string; content_digest: string; fetched_at: string; review_state: string; provenance: Record<string, unknown>; text_truncated?: boolean; use_policy?: SourceUsePolicy; freshness?: SourceFreshness };
-export type CrawlCreate = { idempotency_key: string; seeds: string[]; title?: string; topics: string[]; max_requests: number; max_documents: number; max_bytes: number; max_depth: number; discover_sitemaps?: boolean; frontier_strategy?: 'fifo' | 'balanced' | 'coverage'; consent: true; rights_acknowledged: true };
+export type CrawlCreate = { idempotency_key: string; seeds: string[]; title?: string; topics: string[]; max_requests: number; max_documents: number; max_bytes: number; max_depth: number; discover_sitemaps?: boolean; frontier_strategy?: 'fifo' | 'balanced' | 'coverage' | 'companion' | 'companion_curiosity' | 'companion_scholar' | 'companion_guardian'; consent: true; rights_acknowledged: true };
 export type CrawlCommand = { idempotency_key: string; expected_version: number };
 export type SourceExport = { filename: string; media_type: string; content: string; content_digest: string; session_id: string; source_id: string };
 const ROOT = '/api/dragon-academy/crawler';
