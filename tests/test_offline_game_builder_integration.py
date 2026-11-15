@@ -699,3 +699,71 @@ def test_invalid_public_planning_receipt_never_publishes_source(tmp_path, pipeli
         assert len(pipeline.calls) == 1
     finally:
         manager.close()
+
+
+@pytest.mark.parametrize("damage", ["reported_digest", "reported_names", "reported_meta",
+                                    "source_design", "foreign_design", "source_meta"])
+def test_packaged_game_source_must_agree_with_accepted_design_and_report(tmp_path, pipeline, damage):
+    from skeleton.forge.source_manifest import source_manifest
+    def mutate(report, project):
+        build = report["build"]
+        if damage == "reported_digest":
+            build["project"]["source_sha256"] = "f" * 64
+        elif damage == "reported_names":
+            build["file_names"].remove("PLAY.md")
+        elif damage == "reported_meta":
+            build["project"]["meta"]["spec_id"] = "a" * 64
+        else:
+            path = project / "FORGE_MANIFEST.json"
+            manifest = json.loads(path.read_text(encoding="utf-8"))
+            if damage == "source_meta":
+                manifest["meta"]["genre"] = "platformer"
+            else:
+                spec = compile_brief("A small platformer.") if damage == "foreign_design" else dict(build["spec"])
+                if damage == "source_design":
+                    spec["title"] = "Unexpected design"
+                (project / "data/design_spec.json").write_text(json.dumps(spec), encoding="utf-8")
+                files = {name: (project / name).read_bytes().decode("utf-8") for name in manifest["files"]}
+                actual = source_manifest(files)
+                manifest["sha256"] = actual["files"]
+                manifest["source_sha256"] = actual["sha256"]
+                build["project"]["sha256"] = actual["files"]
+                build["project"]["source_sha256"] = actual["sha256"]
+                if damage == "foreign_design":
+                    build["spec"] = spec
+                    build["project"]["meta"]["spec_id"] = spec["spec_id"]
+                    manifest["meta"]["spec_id"] = spec["spec_id"]
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+    pipeline.mutate = mutate
+    manager = LocalGameBuilder(model(), tmp_path / "workspace.sqlite3")
+    try:
+        manager.submit("mismatch", BRIEF)
+        job = terminal(manager, "mismatch")
+        assert job["state"] == "failed" and job["archive"] is None
+        assert not list(manager.artifact_root.glob("game-*"))
+        assert len(pipeline.calls) == 1
+    finally:
+        manager.close()
+
+
+def test_archive_manifest_redacts_unadmitted_project_metadata(tmp_path, pipeline):
+    sentinel = "/private/local/project-diagnostics"
+    def mutate(report, project):
+        path = project / "FORGE_MANIFEST.json"
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        manifest["private_root"] = sentinel
+        manifest["meta"]["debug"] = {"path": sentinel}
+        path.write_text(json.dumps(manifest), encoding="utf-8")
+        report["build"]["project"]["meta"]["debug"] = sentinel
+    pipeline.mutate = mutate
+    manager = LocalGameBuilder(model(), tmp_path / "workspace.sqlite3")
+    try:
+        manager.submit("safe-meta", BRIEF)
+        assert terminal(manager, "safe-meta")["state"] == "complete"
+        with zipfile.ZipFile(io.BytesIO(manager.archive("safe-meta"))) as archive:
+            manifest = json.loads(archive.read("FORGE_MANIFEST.json"))
+            assert set(manifest) == {"root", "files", "count", "sha256", "source_sha256", "meta"}
+            assert set(manifest["meta"]) == {"spec_id"}
+            assert sentinel not in json.dumps(manifest)
+    finally:
+        manager.close()
