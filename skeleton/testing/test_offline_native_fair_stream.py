@@ -948,3 +948,74 @@ def test_existing_queued_replay_fence_blocks_new_admission_before_staging(privat
     assert session.verify() == before
     assert registry.status()["staged"] == 1
     assert "second" not in registry._staged and "second" not in registry._used
+
+def test_native_staging_callback_cannot_recursively_execute_or_submit(private_files, monkeypatch):
+    from skeleton.app import offline_native_fair_stream as module
+    from skeleton.ai.model_runtime.fair_stream_dispatch import DispatchUncertain
+
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    original = module.stage_native_cpu_prompt
+    request = StreamRequest("outer-stage", "alice", InferencePhase.PREFILL, 2, 16)
+    before = session.verify()
+
+    def callback(**kwargs):
+        with pytest.raises(DispatchUncertain):
+            service.execute_next(token_budget=2)
+        with pytest.raises(DispatchUncertain):
+            service.submit(StreamRequest("nested-stage", "alice", InferencePhase.PREFILL, 2, 16))
+        assert session._store._connection.execute(
+            "SELECT generation FROM local_fair_stream_custody",
+        ).fetchone() == (before["generation"],)
+        original(**kwargs)
+
+    monkeypatch.setattr(module, "stage_native_cpu_prompt", callback)
+    status = module.submit_authenticated_native_cpu_prompt(
+        service=service, vault=vault, runtime=runtime, registry=registry,
+        authenticated_tenant_id="alice", request=request,
+        prompt="hello", max_output_tokens=2,
+    )
+    after = session.verify()
+    assert status.generation == before["generation"] + 1
+    assert [row["request_id"] for row in after["checkpoint"]["requests"]] == ["outer-stage"]
+    assert registry.status()["staged"] == 1
+    assert not service._guard._executing
+    assert not journal.request_exists("nested-stage")
+
+
+def test_anchor_change_during_staging_burns_only_new_grant(private_files, monkeypatch):
+    from skeleton.app import offline_native_fair_stream as module
+
+    runtime, registry, journal, session, result_handle = build(private_files)
+    service, vault = bind_native_cpu_dispatch_service(
+        session=session, runtime=runtime, registry=registry,
+        result_handle=result_handle, journal_handle=private_files[1],
+        journal=journal, result_key=RESULT_KEY,
+        sampler=LiveStreamBudgetSampler(), storage_path=".",
+    )
+    original = module.stage_native_cpu_prompt
+
+    def moved(**kwargs):
+        original(**kwargs)
+        # Model a peer authenticated transition through a separate owner.
+        # Direct session calls are an explicitly trusted low-level seam.
+        session.plan(MeasuredStreamBudget(8192, 1024, 2, 1, 0, False, "os_probe"))
+
+    monkeypatch.setattr(module, "stage_native_cpu_prompt", moved)
+    with pytest.raises(ValueError, match="changed during prompt staging"):
+        module.submit_authenticated_native_cpu_prompt(
+            service=service, vault=vault, runtime=runtime, registry=registry,
+            authenticated_tenant_id="alice",
+            request=StreamRequest("moved-stage", "alice", InferencePhase.PREFILL, 2, 16),
+            prompt="hello", max_output_tokens=2,
+        )
+    assert session.verify()["checkpoint"]["requests"] == []
+    assert registry.status()["staged"] == 0
+    assert "moved-stage" in registry._used
+    assert not service._guard._executing
+    assert not journal.request_exists("moved-stage")

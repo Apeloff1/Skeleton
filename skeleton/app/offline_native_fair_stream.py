@@ -259,30 +259,44 @@ def submit_authenticated_native_cpu_prompt(
     # Serialize staging with planning/cancellation on this trusted service.
     # A peer CAS change is still fenced by the exact anchor during submit.
     with service._operation():
-        service._guard._require_no_pending()
-        snapshot = service._session.verify()
-        if snapshot.get("session_id") != registry.session_id:
-            raise ValueError("native app ownership binding mismatch")
-        if (request.authorization_digest is not None
-                or any(row["request_id"] == request.request_id
-                       for row in snapshot["checkpoint"]["requests"])
-                or owner._journal.request_exists(request.request_id)):
-            raise ValueError("request already has durable admission or execution custody")
-        queued = snapshot["checkpoint"]["requests"]
-        registry.verify_queued(queued)
-        identities = tuple(row["request_id"] for row in queued) + (request.request_id,)
-        owner._journal.assert_requests_admissible(identities)
-        vault.assert_requests_admissible(identities)
-        stage_native_cpu_prompt(
-            runtime=runtime, registry=registry, request_id=request.request_id,
-            tenant_id=authenticated_tenant_id, prompt=prompt,
-            max_output_tokens=max_output_tokens,
-        )
+        guard = service._guard
+        guard._require_no_pending()
+        # RLock is deliberately shared with service.submit, but a callback
+        # invoked during model admission must never recursively start work.
+        guard._executing = True
+        staged = False
         try:
+            try:
+                snapshot = service._session.verify()
+                if snapshot.get("session_id") != registry.session_id:
+                    raise ValueError("native app ownership binding mismatch")
+                if (request.authorization_digest is not None
+                        or any(row["request_id"] == request.request_id
+                               for row in snapshot["checkpoint"]["requests"])
+                        or owner._journal.request_exists(request.request_id)):
+                    raise ValueError("request already has durable admission or execution custody")
+                queued = snapshot["checkpoint"]["requests"]
+                registry.verify_queued(queued)
+                identities = tuple(row["request_id"] for row in queued) + (request.request_id,)
+                owner._journal.assert_requests_admissible(identities)
+                vault.assert_requests_admissible(identities)
+                stage_native_cpu_prompt(
+                    runtime=runtime, registry=registry, request_id=request.request_id,
+                    tenant_id=authenticated_tenant_id, prompt=prompt,
+                    max_output_tokens=max_output_tokens,
+                )
+                staged = True
+                if service._session.verify() != snapshot:
+                    raise ValueError("durable admission changed during prompt staging")
+            finally:
+                guard._executing = False
             return service.submit(request)
         except BaseException:
-            # Cleanup must not depend on a functioning expiration clock.
-            registry.discard_cancelled(request.request_id)
+            if staged:
+                # Do not burn a pre-existing grant when stage itself rejects
+                # a duplicate acquisition. Our own successful stage must be
+                # scrubbed even when the independent clock is unavailable.
+                registry.discard_cancelled(request.request_id)
             raise
 
 
