@@ -94,11 +94,12 @@ def sampled_spans(snapshot,grant,policies,now,allowed):
     return result
 
 
-def build(scope,snapshot,grant,policies,now,allowed,encoder):
+def build(scope,snapshot,grant,policies,now,allowed,encoder,*,explicit_spans=None):
     model=encoder.identity
     dim=encoder.dimensions
     projection=planes(model,dim)
-    spans=sampled_spans(snapshot,grant,policies,now,allowed)
+    spans=sampled_spans(snapshot,grant,policies,now,allowed) if explicit_spans is None else explicit_spans
+    if len(spans)>MAX_RECORDS:raise ValueError('dense batch limit')
     records=[]
     union=set()
     for offset in range(0,len(spans),8):
@@ -183,3 +184,26 @@ def rank(scope,snapshot,grant,policies,now,allowed,index,q):
     if sorted(union)!=index["tokens"]:
         raise ValueError("dense route union differs")
     return sorted(result,key=lambda h:(-h["score"],h["source_id"],h["start"]))[:16]
+
+
+def exhaustive_spans(snapshot,grant,policies,now,allowed):
+    """Full overlapping coverage of every independently eligible retained character.
+
+    Empty/whitespace-only windows are intentionally omitted. This is coverage
+    of retained extraction, not the original website's entire byte stream.
+    Batches are independently published by the durable corpus worker.
+    """
+    spans=[]
+    for sid in sorted(allowed):
+        source=snapshot["sources"][sid]
+        expiry=archive_expiry(grant,snapshot_digest=snapshot["snapshot_digest"],source=source,
+                              policy=policies.get(sid,{"enabled":True,"version":0}),now=now)
+        if expiry is None:continue
+        text=source["text"]
+        if len(text)>24000:raise ValueError("retained source bound")
+        for start in range(0,len(text),512):
+            end=min(len(text),start+768)
+            if text[start:end].strip():spans.append((sid,start,end,expiry))
+            if end==len(text):break
+    if len(spans)>64*47:raise ValueError("full coverage exceeds snapshot bounds")
+    return spans
