@@ -106,7 +106,11 @@ def navigation_hazard(url: str) -> str | None:
     """
     if not isinstance(url, str):
         raise ValueError("invalid navigation target")
-    return _hazard(url)
+    reason = _hazard(url)
+    if reason is not None:
+        return reason
+    decoded = vet_url_antichain(url, seen=[], frontier=[])
+    return None if decoded.allowed else decoded.reason
 
 
 def evaluate_frontier_candidate(
