@@ -148,6 +148,13 @@ class DatasetBeginRequest(Request):
     rights_acknowledged: StrictBool
 
 
+class CaptionTrackRequest(Request):
+    language: str = Field(min_length=2,max_length=32)
+    format: Literal["vtt","srt"]
+    payload: str = Field(min_length=1,max_length=4194304)
+    rights_acknowledged: StrictBool
+
+
 def register_knowledge_routes(router):
     def scope(user):
         try:
@@ -627,3 +634,43 @@ def register_knowledge_routes(router):
             raise HTTPException(422,detail={"code":"dragon_profile_unknown"}) from exc
         return await corpus_runtime_call(release_call(owner,"enqueue",raw=payload,
                     adapter="manifest",operation=operation))
+
+
+    async def captions_call(owner,operation,*args,**kwargs):
+        from core.dragon_media_captions import MediaCaptions
+        from core.dragon_corpus_runtime import _bounded
+        from core.dragon_hoarder_bulk import StorageHeld
+        if operation not in {"import_track","tracks","query","revoke_track"}:
+            raise HTTPException(422,detail={"code":"dragon_caption_invalid"})
+        try:
+            return await _bounded(lambda:getattr(MediaCaptions(),operation)(owner,*args,**kwargs))
+        except LookupError as exc:
+            raise HTTPException(404,detail={"code":"dragon_caption_unavailable"}) from exc
+        except StorageHeld as exc:
+            raise HTTPException(409,detail={"code":"dragon_caption_held"}) from exc
+        except (ValueError,TypeError,KeyError) as exc:
+            raise HTTPException(422,detail={"code":"dragon_caption_invalid"}) from exc
+        except (OSError,TimeoutError,runtime.sqlite3.Error,GameLearningError) as exc:
+            raise HTTPException(503,detail={"code":"dragon_caption_storage_unavailable"}) from exc
+
+    @router.post("/knowledge/media/{media_id}/captions")
+    async def caption_import(media_id:str,body:CaptionTrackRequest,response:Response,user:dict=Depends(get_current_user)):
+        response.headers["Cache-Control"]="private, no-store"
+        data=body.model_dump(exclude={"payload"})
+        return await captions_call(editor(user),"import_track",media_id,raw=body.payload.encode("utf-8"),**data)
+
+    @router.get("/knowledge/media/{media_id}/captions")
+    async def caption_tracks(media_id:str,response:Response,user:dict=Depends(get_current_user)):
+        response.headers["Cache-Control"]="private, no-store"
+        return await captions_call(scope(user),"tracks",media_id)
+
+    @router.get("/knowledge/media/{media_id}/captions/{track_id}")
+    async def caption_query(media_id:str,track_id:str,response:Response,q:str|None=Query(None,max_length=256),
+                            after:int|None=Query(None,ge=0,lt=20000),limit:int=Query(32,ge=1,le=64),
+                            user:dict=Depends(get_current_user)):
+        response.headers["Cache-Control"]="private, no-store"
+        return await captions_call(scope(user),"query",media_id,track_id,q=q,after=after,limit=limit)
+
+    @router.delete("/knowledge/media/{media_id}/captions/{track_id}")
+    async def caption_revoke(media_id:str,track_id:str,user:dict=Depends(get_current_user)):
+        return await captions_call(editor(user),"revoke_track",media_id,track_id)
