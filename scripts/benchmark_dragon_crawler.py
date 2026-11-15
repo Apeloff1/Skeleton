@@ -2,8 +2,8 @@
 
     python -m scripts.benchmark_dragon_crawler --output dragon-baseline.json
 
-This compares the real canonical runtime's three strategies, not third-party
-engines. Input corpus, request budgets and the admission policy are identical
+This compares the real canonical runtime's strategies and a URL-only ranking
+ablation, not third-party engines. Input corpus, request budgets and the admission policy are identical
 within each workload. No public websites, proxy, credentials or live access.
 """
 from __future__ import annotations
@@ -19,12 +19,13 @@ from unittest.mock import patch
 
 from skeleton.ai.webcrawler.core import FetchResponse
 from skeleton.ai.webcrawler.operations import CrawlRequest, CrawlRun, implementation_digest
+from skeleton.ai.webcrawler.frontier_scheduler import choose_frontier
 
 CLOCK = 1_800_000_000.0
 HOSTS = ("example.com", "example.org")
 A, B = ("https://" + host for host in HOSTS)
 ROBOTS = b"User-agent: *\nDisallow: /private\n"
-STRATEGIES = ("fifo", "balanced", "coverage")
+STRATEGIES = ("fifo", "balanced", "coverage_url_baseline", "coverage")
 
 
 @dataclass(frozen=True)
@@ -138,7 +139,7 @@ def run_case(corpus: Corpus, strategy: str) -> dict:
         seed_urls=corpus.seeds, allowed_hosts=HOSTS, query="orbital mechanics",
         max_depth=2, max_requests=corpus.request_budget, max_documents=32,
         max_response_bytes=4096, max_total_bytes=128 * 4096,
-        min_host_delay_seconds=.25, frontier_strategy=strategy,
+        min_host_delay_seconds=.25, frontier_strategy=("coverage" if strategy == "coverage_url_baseline" else strategy),
     )
     scope = {"tenant_id": "offline-benchmark", "owner_id": "offline-benchmark"}
     consent = {"consent_id": corpus_digest(corpus), "capture_acknowledged": True,
@@ -151,8 +152,16 @@ def run_case(corpus: Corpus, strategy: str) -> dict:
     first_fault_at = None
     unknown_calls = 0
     max_snapshot = 0
+    def ranking(*args, **kwargs):
+        if strategy == "coverage_url_baseline":
+            kwargs.pop("measurements", None)
+            kwargs.pop("robots", None)
+            kwargs.pop("remaining_requests", None)
+        return choose_frontier(*args, **kwargs)
+
     for second in range(1, 181):
-        with patch("skeleton.ai.webcrawler.operations.time.time", return_value=CLOCK + second):
+        with patch("skeleton.ai.webcrawler.operations.time.time", return_value=CLOCK + second), \
+                patch("skeleton.ai.webcrawler.operations.choose_frontier", side_effect=ranking):
             run.run_slice(max_steps=1, max_seconds=5)
             snapshot = run.snapshot()
             max_snapshot = max(max_snapshot, len(_canonical(snapshot)))
@@ -178,8 +187,12 @@ def run_case(corpus: Corpus, strategy: str) -> dict:
     requests = snapshot["usage"]["requests"]
     unique = len(seen)
     incidents = snapshot["instruction_incidents"]
+    measurements = snapshot["acquisition_measurements"]
     violation = (
         unknown_calls + excluded + int(requests > corpus.request_budget)
+        + int(len(measurements) != requests)
+        + int(sum(row["charged_bytes"] for row in measurements) != snapshot["usage"]["bytes"])
+        + int(sum(row["uncertain_bytes"] for row in measurements) != snapshot["usage"]["reserved_bytes"])
         + int(requests != len(transport.calls))
         + sum(row["execution_authorized"] is not False or row["payload_retained"] is not False
               for row in incidents)
@@ -199,6 +212,9 @@ def run_case(corpus: Corpus, strategy: str) -> dict:
         "recall": relevant_count / max(1, len(corpus.relevant)),
         "precision": relevant_count / max(1, unique),
         "relevant_per_request": relevant_count / max(1, requests),
+        "relevant_per_kib": relevant_count * 1024 / max(1, snapshot["usage"]["bytes"] + snapshot["usage"]["reserved_bytes"]),
+        "measured_duplicate_requests": sum(row["kind"] == "duplicate" for row in measurements),
+        "measured_policy_requests": sum(row["kind"] == "robots" for row in measurements),
         "security_incidents": len(incidents), "admission_violations": violation,
         "restarts": restart_count, "recovery_fixture_seconds": (
             recovered_at - first_fault_at if recovered_at is not None and first_fault_at is not None else None
@@ -217,10 +233,11 @@ def benchmark(repetitions: int = 3) -> dict:
     for corpus in corpus_set():
         for strategy in STRATEGIES:
             runs = [run_case(corpus, strategy) for _ in range(repetitions)]
-            anchor = {k: v for k, v in runs[0].items() if k != "elapsed_wall_seconds"}
-            if any({k: v for k, v in row.items() if k != "elapsed_wall_seconds"} != anchor for row in runs):
+            anchor = {k: v for k, v in runs[0].items() if k not in {"elapsed_wall_seconds", "peak_checkpoint_bytes"}}
+            if any({k: v for k, v in row.items() if k not in {"elapsed_wall_seconds", "peak_checkpoint_bytes"}} != anchor for row in runs):
                 raise AssertionError("deterministic fixture outcome changed between repetitions")
             results.append({**anchor, "repetitions": repetitions,
+                            "peak_checkpoint_bytes": max(row["peak_checkpoint_bytes"] for row in runs),
                             "median_wall_seconds": statistics.median(
                                 row["elapsed_wall_seconds"] for row in runs)})
     return {"schema": "skeleton.dragon.offline_baseline.v1",
