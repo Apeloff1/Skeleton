@@ -1,7 +1,7 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,AppState,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {getAuthToken} from '../../auth/gameforgeAuth';
-import {getDragonTreasury,getTreasuryPassage,configureDragonArchive,crawlRequestKey,type CrawlSession,type DragonTreasury,type TreasuryMode,type TreasuryRevision,type TreasuryPassage,type TreasurySearchOptions} from '../../product/crawlerClient';
+import {getDragonTreasury,getTreasuryPassage,configureDragonArchive,configureTreasuryWatch,getCrawl,crawlRequestKey,type CrawlSession,type DragonTreasury,type TreasuryMode,type TreasuryRevision,type TreasuryPassage,type TreasurySearchOptions} from '../../product/crawlerClient';
 import s,{colors} from './CrawlerWorkspace.styles';
 import AnimatedDragon from './companion/DragonCompanion';
 import {INITIAL_DRAGON_STATE} from './companion/dragonCompanionState';
@@ -15,7 +15,7 @@ const short=(s:string)=>s.slice(0,12);
 function Button({label,action,disabled=false}:{label:string;action:()=>void;disabled?:boolean}){
  return <TouchableOpacity style={[s.button,disabled&&s.disabled]} accessibilityRole="button" accessibilityState={{disabled}} disabled={disabled} onPress={action}><Text style={s.buttonText}>{label}</Text></TouchableOpacity>;
 }
-function Revision({row,inspect,select,disabled=false}:{row:TreasuryRevision;inspect?:(row:TreasuryRevision)=>void;select?:(row:TreasuryRevision)=>void;disabled?:boolean}){
+function Revision({row,inspect,select,watch,disabled=false}:{row:TreasuryRevision;inspect?:(row:TreasuryRevision)=>void;select?:(row:TreasuryRevision)=>void;watch?:(row:TreasuryRevision)=>void;disabled?:boolean}){
  return <View style={s.check}>
   <Text selectable style={s.label}>{row.plane==='current'?'Current':'Historic'} · {short(row.revision_id)} · {row.delta.kind.replaceAll('_',' ')}</Text>
   <Text style={s.small}>{stamp(row.first_seen)} → {stamp(row.last_seen)} · {row.reobservations} subsequent observations</Text>
@@ -24,6 +24,7 @@ function Revision({row,inspect,select,disabled=false}:{row:TreasuryRevision;insp
   {row.source_id&&<Text selectable style={s.small}>Source {row.source_id}{row.indexed_capture_at!==null?' · indexed observation '+stamp(row.indexed_capture_at):''}</Text>}
   {row.indexed&&inspect&&<Button label="Inspect exact retained text" disabled={disabled} action={()=>inspect(row)}/>}
   {row.indexed&&select&&<Button label="Select this revision for comparison" disabled={disabled} action={()=>select(row)}/>}
+  {row.indexed&&watch&&<Button label="Choose source for finite automatic watch" disabled={disabled} action={()=>watch(row)}/>}
  </View>;
 }
 export default function DragonTreasuryPanel({revision,session,canWrite=false,onSession,onRevisit,disabled=false}:{revision:string;session?:CrawlSession|null;canWrite?:boolean;onSession?:(s:CrawlSession)=>void;onRevisit?:(url:string)=>void;disabled?:boolean}){
@@ -38,6 +39,12 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
  const [error,setError]=useState('');
  const [days,setDays]=useState('30');
  const [rights,setRights]=useState(false);
+ const [watchSource,setWatchSource]=useState<string|null>(null);
+ const [watchDays,setWatchDays]=useState('7');
+ const [watchCycles,setWatchCycles]=useState('3');
+ const [watchHours,setWatchHours]=useState('24');
+ const [watchCapture,setWatchCapture]=useState(false),[watchArchive,setWatchArchive]=useState(false);
+ const watchKey=useRef<{identity:string;key:string}|null>(null);
  const [open,setOpen]=useState(false);
  const [passage,setPassage]=useState<TreasuryPassage|null>(null);
  const [passageBusy,setPassageBusy]=useState(false);
@@ -61,7 +68,7 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
   const sub=AppState.addEventListener('change',state=>{if(state!=='active'){invalidate();setResult(null);setBusy(false);}});
   return()=>sub.remove();
  },[invalidate]);
- useEffect(()=>{setRights(false);grantKey.current=null;},[session?.session_id,session?.version]);
+ useEffect(()=>{setRights(false);grantKey.current=null;setWatchSource(null);setWatchCapture(false);setWatchArchive(false);watchKey.current=null;},[session?.session_id,session?.version]);
  const visible=result&&observed.current===revision&&owner.current===getAuthToken()?result:null;
  async function observe(nextMode=mode,nextFamily=family,page?:string,comparison?:{left:string;right:string}){
   const search:TreasurySearchOptions={cursor:page,...comparison};
@@ -121,7 +128,32 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
   }catch(e){if(!ctrl.signal.aborted&&epoch===generation.current&&token===getAuthToken())setError(e instanceof Error?e.message:'Archive command was not confirmed.');}
   finally{if(epoch===generation.current){request.current=null;setBusy(false);}}
  }
+ async function configureWatch(enabled:boolean){
+  if(!session||!onSession||busy||disabled||enabled&&(!canWrite||!watchSource||!watchCapture||!watchArchive))return;
+  const sourceId=enabled?watchSource:session.treasury_watch?.source_id;
+  if(!sourceId)return;
+  const d=enabled?Number(watchDays):7,n=enabled?Number(watchCycles):3,h=enabled?Number(watchHours):24;
+  const retention=enabled?Number(days):30;
+  if(![d,n,h,retention].every(Number.isInteger)||d<1||d>7||n<1||n>6||h<6||h>168||retention<1||retention>30||enabled&&h>=24*d){
+   setError('Choose 1–7 watch days, 1–6 cycles, a 6–168 hour minimum interval shorter than the grant, and 1–30 retention days.');return;
+  }
+  invalidate();const ctrl=new AbortController(),epoch=generation.current,token=getAuthToken();
+  owner.current=token;request.current=ctrl;setBusy(true);setError('');setResult(null);
+  const identity=[session.session_id,session.version,enabled,sourceId,d,n,h,retention].join(':');
+  if(watchKey.current?.identity!==identity)watchKey.current={identity,key:crawlRequestKey('watch')};
+  try{
+   await configureTreasuryWatch(session.session_id,{expected_version:session.version,idempotency_key:watchKey.current.key,
+    enabled,source_id:sourceId,days:d,cycles:n,minimum_interval:h*3600,retention_days:retention,
+    capture_rights_acknowledged:enabled&&watchCapture,archive_rights_acknowledged:enabled&&watchArchive},ctrl.signal);
+   const updated=await getCrawl(session.session_id,ctrl.signal);
+   if(ctrl.signal.aborted||generation.current!==epoch||getAuthToken()!==token)return;
+   watchKey.current=null;setWatchCapture(false);setWatchArchive(false);onSession(updated);
+  }catch(e){if(!ctrl.signal.aborted&&generation.current===epoch&&getAuthToken()===token)setError(e instanceof Error?e.message:'Watch command unconfirmed. Refresh before retrying.');}
+  finally{if(generation.current===epoch){request.current=null;setBusy(false);}}
+ }
  const terminal=session&&['completed','budget_exhausted'].includes(session.status);
+ const activeWatch=session?.treasury_watch;
+ const pickWatch=(row:TreasuryRevision)=>{if(row.session_id===session?.session_id&&row.source_id){setWatchSource(row.source_id);setWatchCapture(false);setWatchArchive(false);}};
  const evolution=visible?.evolution;
  return <View style={s.card}>
   <Text style={s.eyebrow}>HOARDER · TREASURY AND VAULT</Text>
@@ -136,6 +168,22 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
      <View style={s.row}><Switch value={rights} disabled={busy||disabled} onValueChange={setRights} accessibilityLabel="Confirm historical archive rights"/><Text style={[s.small,s.grow]}>I have rights to retain and reparse eligible captured text for the selected period. This does not renew crawl or model-use consent.</Text></View>
      <Button label="Authorize historical use" disabled={!rights||busy||disabled} action={()=>void grant(true)}/></>}
     {session.archive_grant&&<Button label="Revoke historical use" disabled={busy||disabled} action={()=>void grant(false)}/>}
+   </View>}
+   {terminal&&onSession&&!session.watch_managed&&<View style={s.check}>
+    <Text style={s.heading}>Automatic source maintenance</Text>
+    <Text style={s.small}>Finite exact-source watch. Each cycle uses the existing crawler and a new bounded expedition; explicit robots refusals and quarantined instructions stop the watch. A revoke stops new requests but cannot undo a request already sent.</Text>
+    {activeWatch&&<><Text style={s.label}>{activeWatch.enabled?'Authorized':'Stopped'} · {activeWatch.state} · {activeWatch.cycles_completed}/{activeWatch.max_cycles} reserved cycles settled</Text>
+     <Text style={s.small}>Next review {stamp(activeWatch.next_due)} · grant ends {stamp(activeWatch.expires_at)}{activeWatch.stop_reason?' · '+activeWatch.stop_reason:''}</Text>
+     {activeWatch.last_child_id&&<Text selectable style={s.small}>Latest child expedition: {activeWatch.last_child_id}</Text>}
+     {activeWatch.enabled&&<Button label="Revoke automatic maintenance" disabled={busy||disabled} action={()=>void configureWatch(false)}/>}</>}
+    {canWrite&&!activeWatch?.enabled&&<>
+      <Text style={s.small}>{watchSource?'Selected exact source '+short(watchSource):'Reparse the treasury and choose an indexed source from this selected expedition below.'}</Text>
+      {[[watchDays,setWatchDays,'Watch duration (days)'],[watchCycles,setWatchCycles,'Maximum cycles'],[watchHours,setWatchHours,'Minimum interval (hours)']].map(([value,set,label])=><View key={String(label)}><Text style={s.label}>{String(label)}</Text><TextInput value={String(value)} onChangeText={set as (v:string)=>void} keyboardType="number-pad" maxLength={3} style={field} accessibilityLabel={String(label)} editable={!busy&&!disabled}/></View>)}
+      <Text style={s.small}>Each successful eligible child receives the historical retention period selected above ({days} days).</Text>
+      <View style={s.row}><Switch value={watchCapture} onValueChange={setWatchCapture} disabled={busy||disabled} accessibilityLabel="Authorize repeated public source capture"/><Text style={[s.small,s.grow]}>I authorize the specified recurring public capture, including the required robots request, within these limits.</Text></View>
+      <View style={s.row}><Switch value={watchArchive} onValueChange={setWatchArchive} disabled={busy||disabled} accessibilityLabel="Authorize retained history for watched captures"/><Text style={[s.small,s.grow]}>I have rights to retain and reparse eligible snapshots for the chosen period.</Text></View>
+      <Button label="Authorize finite automatic watch" disabled={!watchSource||!watchCapture||!watchArchive||busy||disabled} action={()=>void configureWatch(true)}/>
+    </>}
    </View>}
    <TextInput value={query} editable={!busy&&!disabled} onChangeText={v=>{setQuery(v);invalidate();setResult(null);setBusy(false);setSelectedChange(null);setPair(null);}} maxLength={256} placeholder="Search retained versions" placeholderTextColor={colors.muted} accessibilityLabel="Search treasury" style={field}/>
    <View style={s.row}>{MODES.map(([id,label])=><TouchableOpacity key={id} style={[s.button,mode===id&&{backgroundColor:'#52382d'}]} accessibilityRole="button" accessibilityState={{selected:mode===id,disabled:busy||disabled}} disabled={busy||disabled} onPress={()=>{setMode(id);invalidate();setResult(null);setBusy(false);setSelectedChange(null);setPair(null);}}><Text style={s.buttonText}>{label}</Text></TouchableOpacity>)}</View>
@@ -165,7 +213,7 @@ export default function DragonTreasuryPanel({revision,session,canWrite=false,onS
     </View>)}
     {visible.comparison&&<View style={s.check}><Text style={s.heading}>{visible.comparison_selection?'Selected historical observations':'Latest and preceding observation'}</Text><Revision row={visible.comparison.current} inspect={inspect} disabled={passageBusy}/><Revision row={visible.comparison.previous} inspect={inspect} disabled={passageBusy}/></View>}
     <Text style={s.heading}>{mode==='timeline'?'Revision timeline':'Matching indexed revisions'}</Text>
-    {(mode==='timeline'?visible.timeline:visible.hits).map(v=><Revision key={v.revision_id} row={v} inspect={inspect} select={selectRevision} disabled={passageBusy}/>)}
+    {(mode==='timeline'?visible.timeline:visible.hits).map(v=><Revision key={v.revision_id} row={v} inspect={inspect} select={selectRevision} watch={terminal&&canWrite&&!session?.watch_managed&&!activeWatch?.enabled&&v.session_id===session?.session_id?pickWatch:undefined} disabled={passageBusy}/>)}
     {passageBusy&&<ActivityIndicator color={colors.accent}/>}
     {passage&&<View style={s.check}>
       <Text style={s.heading}>Exact retained source · {passage.history_only?'history only':'current use permitted'}</Text>
