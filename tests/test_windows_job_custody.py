@@ -295,3 +295,47 @@ def test_recovery_rejects_noncanonical_approval_without_clearing(tmp_path):
         assert marker.read_bytes() == bytes((0,))
     finally:
         os.close(fd)
+
+
+@pytest.mark.parametrize("override", [
+    {"executable": "other.exe"}, {"startupinfo": object()},
+    {"creationflags": 0x01000000}, {"creationflags": True},
+    {"start_new_session": True}, {"pass_fds": (3,)},
+])
+def test_launch_options_cannot_replace_or_bypass_trusted_helper(monkeypatch, override):
+    def forbidden(*args, **kwargs):
+        pytest.fail("job created before validating trusted launch arguments")
+    monkeypatch.setattr(custody, "_WindowsJob", forbidden)
+    options = dict(stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                   stderr=subprocess.PIPE, shell=False, close_fds=True)
+    options.update(override)
+    with pytest.raises(custody.WindowsJobUnavailable, match="noncanonical"):
+        custody.spawn_windows_job([sys.executable, "-c", "pass"], **options)
+
+
+def test_successfully_drained_job_can_be_cleaned_up_twice():
+    process = start("print('done', flush=True)")
+    try:
+        assert process.wait(timeout=10) == 0
+        assert custody.terminate_windows_job(process)
+        assert custody.terminate_windows_job(process)
+        out, error = process.communicate(timeout=3)
+        assert out.strip() == b"done" and error == b""
+    finally:
+        if getattr(process, custody._JOB_ATTR).handle:
+            custody.terminate_windows_job(process)
+
+
+def test_incomplete_prior_drain_is_not_idempotent_success():
+    process = start("pass")
+    job = getattr(process, custody._JOB_ATTR)
+    try:
+        job.stop()
+        job.close()
+        process.wait(timeout=5)
+        with pytest.raises(custody.WindowsJobUnavailable, match="unverified"):
+            custody.terminate_windows_job(process)
+    finally:
+        if job.handle:
+            custody.terminate_windows_job(process)
+        process.communicate(timeout=3)

@@ -75,3 +75,42 @@ def test_already_reaped_process_is_never_signalled(monkeypatch):
         pytest.fail("attempted signal using already-reaped numeric process ID")
     monkeypatch.setattr(os, "killpg", forbidden)
     assert terminate_owned_process_group(process)
+
+
+def test_unowned_session_is_not_signalled(monkeypatch):
+    # A regular child in the test runner's own session must never cause
+    # a group signal. The actual signal function is also fenced in the test.
+    process = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(12)"],
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    def forbidden(*args):
+        pytest.fail("attempted signal without owned session proof")
+    monkeypatch.setattr(os, "killpg", forbidden)
+    try:
+        with pytest.raises(RuntimeError, match="owned session leader"):
+            terminate_owned_process_group(process)
+        assert process.poll() is None
+    finally:
+        process.kill()
+        process.wait(timeout=5)
+
+
+def test_session_identity_is_rechecked_at_each_signal(monkeypatch):
+    process = spawn("import time; time.sleep(12)")
+    real_getsid = os.getsid
+    observations = 0
+    def changed(pid):
+        nonlocal observations
+        observations += 1
+        return real_getsid(pid) if observations == 1 else pid + 1
+    def forbidden(*args):
+        pytest.fail("group signal followed a failed identity check")
+    monkeypatch.setattr(os, "getsid", changed)
+    monkeypatch.setattr(os, "killpg", forbidden)
+    try:
+        with pytest.raises(RuntimeError, match="owned session leader"):
+            terminate_owned_process_group(process)
+    finally:
+        process.kill()
+        process.communicate(timeout=5)

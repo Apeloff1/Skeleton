@@ -18,6 +18,11 @@ from typing import Any, Callable
 
 _JOB_ATTR = "_skeleton_native_job"
 _FENCE_ATTR = "_skeleton_native_fence_completion"
+_DRAINED_ATTR = "_skeleton_native_job_drained"
+_LAUNCH_OPTIONS = frozenset({
+    "stdin", "stdout", "stderr", "cwd", "env", "shell", "start_new_session",
+    "close_fds", "creationflags", "bufsize",
+})
 _JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
 _JOB_OBJECT_EXTENDED_LIMIT_INFORMATION = 9
 _JOB_OBJECT_BASIC_ACCOUNTING_INFORMATION = 1
@@ -164,8 +169,14 @@ def spawn_windows_job(
     if os.name != "nt" or sys.implementation.name != "cpython" or getattr(sys, "frozen", False):
         raise WindowsJobUnavailable("trusted Windows CPython helper unavailable")
     if (
-        not isinstance(command, (list, tuple)) or not command
-        or any(type(part) is not str or "\x00" in part for part in command)
+        type(command) not in (list, tuple) or not 1 <= len(command) <= 1024
+        or any(type(part) is not str or "\x00" in part or len(part) > 32767 for part in command)
+        or not command[0]
+        or sum(len(part) for part in command) > 32767
+        or not set(kwargs) <= _LAUNCH_OPTIONS
+        or kwargs.get("start_new_session", False) is not False
+        or type(kwargs.get("creationflags", 0)) is not int
+        or kwargs.get("creationflags", 0) not in (0, subprocess.CREATE_NO_WINDOW)
         or kwargs.get("stdin") != subprocess.DEVNULL
         or kwargs.get("shell", False) is not False
         or kwargs.get("close_fds") is not True
@@ -174,6 +185,8 @@ def spawn_windows_job(
         raise WindowsJobUnavailable("noncanonical native launch arguments")
     if begin_lease_fence is not None and not callable(begin_lease_fence):
         raise WindowsJobUnavailable("invalid workspace fence callback")
+    # Freeze argv before creating the job or invoking any caller callback.
+    command = tuple(command)
     job = _WindowsJob()
     process = None
     finish_fence = None
@@ -192,7 +205,8 @@ def spawn_windows_job(
         setattr(process, _JOB_ATTR, job)
         setattr(process, _FENCE_ATTR, finish_fence)
         # No GGUF command executes until assignment and membership checks succeed.
-        process.stdin.write(b"\xa5")
+        if process.stdin.write(b"\xa5") != 1:
+            raise WindowsJobUnavailable("private launch gate write incomplete")
         process.stdin.flush()
         process.stdin.close()
         process.stdin = None
@@ -230,6 +244,11 @@ def terminate_windows_job(process: subprocess.Popen[bytes]) -> bool:
     job = getattr(process, _JOB_ATTR, None)
     if type(job) is not _WindowsJob:
         raise WindowsJobUnavailable("Windows native process lacks job custody")
+    if getattr(process, _DRAINED_ATTR, False) is True:
+        return True
+    # A previous failed drain/close is not proof of successful cleanup.
+    if not job.handle:
+        raise WindowsJobUnavailable("native job drainage remains unverified")
     try:
         job.stop()
     finally:
@@ -239,4 +258,5 @@ def terminate_windows_job(process: subprocess.Popen[bytes]) -> bool:
     if finish_fence is not None:
         finish_fence()
         setattr(process, _FENCE_ATTR, None)
+    setattr(process, _DRAINED_ATTR, True)
     return True
