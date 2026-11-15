@@ -50,6 +50,7 @@ class Observation:
     advisory_due: float | None = None
     complete_text: bool = True
     refresh_allowed: bool = False
+    archive_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -85,6 +86,7 @@ def _validate(row: Observation, *, now: float) -> None:
             or not isinstance(row.media, str) or len(row.media) > 256
             or not isinstance(row.variant, str) or len(row.variant) > 128
             or type(row.complete_text) is not bool or type(row.refresh_allowed) is not bool
+            or type(row.archive_only) is not bool or (row.archive_only and row.text is None)
             or type(row.captured_at) not in (int,float) or not math.isfinite(row.captured_at)
             or not 0 <= row.captured_at <= now+300):
         raise ValueError("invalid archive observation")
@@ -213,7 +215,8 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
                 latest["last_seen"] = row.captured_at
                 latest["reobservations"] += 1
                 latest.update(session_id=row.session_id,source_id=row.source_id,
-                              indexed=parsed is not None,metadata_only=parsed is None)
+                              indexed=parsed is not None,metadata_only=parsed is None,
+                              archive_only=row.archive_only)
                 parse_rows[latest["revision_id"]] = parsed
                 prior = row
                 continue
@@ -232,6 +235,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
                        "session_id":row.session_id,"source_id":row.source_id,
                        "first_seen":row.captured_at,"last_seen":row.captured_at,
                        "reobservations":0,"indexed":parsed is not None,"metadata_only":parsed is None,
+                       "archive_only":row.archive_only,
                        "delta":delta}
             versions.append(version)
             parse_rows[rid]=parsed
@@ -248,16 +252,18 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
             latest["indexed"]=False
             latest["metadata_only"]=True
             parse_rows[latest["revision_id"]]=None
-        blocked_current+=int(not latest["indexed"])
+        current_available=latest["indexed"] and not latest["archive_only"]
+        blocked_current+=int(not current_available)
         for v in versions:
-            v["plane"]="current" if v is latest else "historic"
+            v["plane"]="current" if v is latest and not v["archive_only"] else "historic"
+            v["latest_observed"]=v is latest
             v["source_id"]=v["source_id"] if v["indexed"] else None
             v["session_id"]=v["session_id"] if v["indexed"] else None
             v["projection_digest"]=parse_rows[v["revision_id"]].digest if v["indexed"] else None
         revisions.extend(versions)
         families.append({"family_id":fid,"revision_count":len(versions),
                          "current_revision":latest["revision_id"],"first_seen":versions[0]["first_seen"],
-                         "last_seen":latest["last_seen"],"current_indexed":latest["indexed"],
+                         "last_seen":latest["last_seen"],"current_indexed":current_available,
                          "simultaneous_conflict":tied,"revisit":_revisit(versions,rows[-1],as_of),
                          "refresh_url":rows[-1].url if rows[-1].refresh_allowed and not tied else None})
         if len(versions)>1:
@@ -284,7 +290,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
     hits.sort(key=lambda v:(-v["score"],-v["last_seen"],v["revision_id"]))
     current_count=sum(v["plane"]=="current" and v["indexed"] for v in revisions)
     historic_count=sum(v["plane"]=="historic" and v["indexed"] for v in revisions)
-    verified_transitions=sum(v["plane"]=="historic" and v["indexed"] for v in revisions)
+    verified_transitions=sum(not v["latest_observed"] and v["indexed"] for v in revisions)
     current_ratio=current_count/max(1,len(families))
     # Reward preserved, currently indexable history, not repeated fetches or
     # unverifiable metadata. Coverage-incomplete views cannot unlock Hoarder.
@@ -292,8 +298,8 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
                     +.25*min(1.,changed_families/4)*min(1.,historic_count/4)
                     +.20*current_ratio*min(1.,historic_count/4)
                     +.15*min(1.,revalidated/4)*min(1.,historic_count/4))))
-    qualified=(not capped and not excluded_sessions and historic_count>=3 and changed_families>=2
-               and current_count>=2 and blocked_current==0)
+    qualified=(not capped and not excluded_sessions and verified_transitions>=3 and changed_families>=2
+               and current_count>=2)
     families.sort(key=lambda f:(not f["revisit"]["ready_for_review"],-f["last_seen"],f["family_id"]))
     family_rows=[f for f in families if family is None or f["family_id"]==family]
     history=sorted((v for v in revisions if family is None or v["family_id"]==family),
@@ -309,6 +315,7 @@ def build_treasury(observations: list[Observation], *, as_of: float, growth: int
             "rollbacks":rollbacks,"current_indexed":current_count,"historic_indexed":historic_count,
             "metadata_only":len(revisions)-current_count-historic_count,
             "blocked_current":blocked_current,"changes":changes,"revalidated_revisions":revalidated,
+            "verified_historic_transitions":verified_transitions,
             "evolution":progression(growth,stewardship,qualified=qualified),
             "family_rows":family_rows[:MAX_RESULTS],"hits":hits[:MAX_RESULTS],
             "timeline":history[:MAX_RESULTS] if mode in {"timeline","compare"} else [],
