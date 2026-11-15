@@ -154,7 +154,7 @@ class DragonDeepArchiveMixin:
             result=await self.sessions.update_one({"_id":row["_id"],"tenant_id":row["tenant_id"],"owner_id":row["owner_id"],
                 "version":row["version"],"deep_index.digest":index["digest"],"deep_index.expires_at":index["expires_at"],
                 "$expr":{"$lte":["$deep_index.expires_at",{"$divide":[{"$toLong":"$$NOW"},1000]}]}},
-                {"$unset":{"deep_index":"","deep_hybrid_route":"","deep_index_due":""}})
+                {"$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":"","deep_index_due":""}})
             purged+=result.modified_count
         return {"scanned":len(rows),"purged":purged}
 
@@ -267,22 +267,25 @@ class DragonDeepArchiveMixin:
                 def build():
                     snap,grant,policies,allowed=self._deep_material(scope,row,now)
                     from core.dragon_hybrid_rank import build_route
+                    from core.dragon_passage_index import build_passage_route
                     return (a.build_index(scope,snap,grant,policies,now,allowed),
-                            build_route(scope,snap,grant,policies,now,allowed))
-                index,hybrid=await _bounded_discovery_cpu(build)
-                await self._admit(scope,row["_id"],{"deep_index":index,"deep_hybrid_route":hybrid})
+                            build_route(scope,snap,grant,policies,now,allowed),
+                            build_passage_route(scope,snap,grant,policies,now,allowed))
+                index,hybrid,passages=await _bounded_discovery_cpu(build)
+                await self._admit(scope,row["_id"],{"deep_index":index,"deep_hybrid_route":hybrid,
+                    "deep_passage_route":passages})
             except CrawlerError:
                 await self.sessions.update_one(fence,{"$set":{"deep_index_due":_now().timestamp()+300}})
                 totals["held"]+=1
                 continue
             except (ValueError,TypeError,KeyError,CheckpointReplicaError):
-                await self.sessions.update_one(fence,{"$unset":{"deep_index":"","deep_hybrid_route":""},
+                await self.sessions.update_one(fence,{"$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":""},
                       "$set":{"deep_index_due":_now().timestamp()+3600}})
                 totals["held"]+=1
                 continue
             fence={**fence,"archive_grant":row["archive_grant"],"$expr":{"$and":[
                   {"$gt":["$deep_index_due",clock]},{"$gt":["$archive_grant.expires_at",clock]}]}}
-            changed=await self.sessions.update_one(fence,{"$set":{"deep_index":index,"deep_hybrid_route":hybrid,
+            changed=await self.sessions.update_one(fence,{"$set":{"deep_index":index,"deep_hybrid_route":hybrid,"deep_passage_route":passages,
                 "deep_index_due":min(index["expires_at"],_now().timestamp()+86400)}})
             totals["indexed" if changed.modified_count else "superseded"]+=1
         return totals
@@ -294,6 +297,8 @@ class DragonDeepArchiveMixin:
             terms,tokens=a.query_terms(scope,query)
             from core.dragon_hybrid_rank import route_terms
             rare_tokens=route_terms(scope,query)
+            from core.dragon_passage_index import query_keys
+            passage_tokens=query_keys(scope,query)
             after=a.decode_cursor(scope,query,cursor)
         except ValueError as exc:
             raise CrawlerError("crawler_deep_query","Invalid archive search or cursor.",422) from exc
@@ -301,11 +306,12 @@ class DragonDeepArchiveMixin:
         now=_now().timestamp()
         predicate={**scope,"status":{"$in":sorted(TERMINAL)},"deep_archive.released":True,
             "deep_index.expires_at":{"$gt":now},"$or":[{"deep_index.tokens":{"$in":tokens}},
-            {"deep_hybrid_route.tokens":{"$in":rare_tokens},"deep_hybrid_route.expires_at":{"$gt":now}}]}
+            {"deep_hybrid_route.tokens":{"$in":rare_tokens},"deep_hybrid_route.expires_at":{"$gt":now}},
+            {"deep_passage_route.tokens":{"$in":passage_tokens},"deep_passage_route.expires_at":{"$gt":now}}]}
         if after:
             predicate["_id"]={"$gt":after}
         async def page():
-            return await self.sessions.find(predicate,{"_id":1,"version":1,"deep_index.digest":1,"deep_hybrid_route.digest":1}
+            return await self.sessions.find(predicate,{"_id":1,"version":1,"deep_index.digest":1,"deep_hybrid_route.digest":1,"deep_passage_route.digest":1}
                 ).sort("_id",ASCENDING).limit(a.PAGE+1).max_time_ms(3000).to_list(a.PAGE+1)
         rows=await page()
         hits=[]
@@ -328,7 +334,13 @@ class DragonDeepArchiveMixin:
                     ranks=hybrid_rank(query,[Candidate(h["source_id"],snap["sources"][h["source_id"]]["title"],
                         snap["sources"][h["source_id"]]["text"]) for h in exact])
                     scored={h["key"]:h for h in ranks}
-                    return [{**h,"hybrid_score":scored.get(h["source_id"],{}).get("score",0.0)} for h in exact]
+                    passage_scores={}
+                    if row.get("deep_passage_route") is not None:
+                        from core.dragon_passage_index import rank_passage_offsets
+                        for hit in rank_passage_offsets(scope,query,snap,grant,policies,now,row["deep_passage_route"],allowed):
+                            passage_scores.setdefault(hit["source_id"],hit["score"])
+                    return [{**h,"hybrid_score":scored.get(h["source_id"],{}).get("score",0.0)
+                            +.25*passage_scores.get(h["source_id"],0.0)} for h in exact]
                 matches=await _bounded_discovery_cpu(rank)
             except CrawlerError as exc:
                 if exc.code=="crawler_vault_busy":
@@ -354,7 +366,7 @@ class DragonDeepArchiveMixin:
             "held":held,"matches":list(unique.values())[:32],"matching_payloads":len(unique),
             "next_cursor":a.cursor(scope,query,rows[a.PAGE-1]["_id"]) if len(rows)>a.PAGE else None,
             "as_of_unix":now,"earliest_expiry":min(expiries) if expiries else None,
-            "approximate_routing":True,"page_local_ranking":True,"ranking":"candidate_local_bm25_subword_v1","history_only":True,
+            "approximate_routing":True,"page_local_ranking":True,"ranking":"candidate_local_bm25_subword_passage_v2","history_only":True,
             "source_text_returned":False,"model_context_permission":False,"wiki_approval":False}
 
 
