@@ -22,6 +22,7 @@ from html.parser import HTMLParser
 from typing import Protocol
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 from .robots_policy import RobotsPolicy
+from .structural_extraction import StructuralExtractionError, extract_structural_text
 
 from .document_formats import (
     ADDITIONAL_TYPES, RESEARCH_ARTIFACT_TYPES,
@@ -578,12 +579,25 @@ def extract_document(
     title = ""
     links: list[str] = []
     parser_text_truncated = False
+    structural_receipt = None
     if ctype in {"text/html", "application/xhtml+xml"}:
         parser = _Extractor(max_links=max_links, max_text_chars=max_text_chars)
         parser.feed(raw)
+        parser.close()
         text = " ".join(parser.text)
         title = " ".join(parser.title)
         links = parser.links
+        # Recover a high-confidence article/main landmark projection from
+        # the already acquired body. Ambiguous layouts retain legacy text.
+        try:
+            structural = extract_structural_text(raw, max_chars=max_text_chars)
+        except StructuralExtractionError:
+            structural = None
+        if structural is not None:
+            structural_receipt = structural.receipt()
+            if not structural.fallback and structural.text:
+                text = structural.text
+                parser_text_truncated = structural.truncated
         try:
             semantics = extract_html_semantics(
                 raw, max_chars=min(max_text_chars, 24000),
@@ -595,7 +609,7 @@ def extract_document(
         else:
             if semantics.text:
                 text += "\n" + semantics.text
-            parser_text_truncated = semantics.truncated
+            parser_text_truncated |= semantics.truncated
         try:
             landmarks = extract_html_landmarks(
                 raw, max_chars=min(max_text_chars, 8192),
@@ -673,6 +687,8 @@ def extract_document(
         "content_encoding": response.content_encoding,
         "parser_text_truncated": parser_text_truncated,
     }
+    if structural_receipt is not None:
+        provenance["structural_projection"] = structural_receipt
     return CrawlDocument(
         canonical_url=canonical_url,
         fetched_url=response.url,
