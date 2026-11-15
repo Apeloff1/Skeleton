@@ -4704,10 +4704,11 @@ async def recover_crawler_runs(*, limit: int = 16) -> dict:
     # The release queue accepts only editor-submitted metadata. Network
     # permission remains in the canonical crawler, never in this worker.
     try:
-        from core.dragon_corpus_runtime import pulse_release_imports,pulse_world_discovery,pulse_media_archive
+        from core.dragon_corpus_runtime import pulse_release_imports,pulse_world_discovery,pulse_media_archive,pulse_game_datasets
         result["game_release_imports"]=await pulse_release_imports()
         result["world_discovery"]=await pulse_world_discovery()
         result["binary_media_cleanup"]=await pulse_media_archive()
+        result["dataset_cleanup"]=await pulse_game_datasets()
     except (OSError,TimeoutError,ValueError) as exc:
         log.warning("Dragon release import maintenance failed: %s",type(exc).__name__)
         result["game_release_imports"]={"failed":True,"reason":"bounded_maintenance_unavailable"}
