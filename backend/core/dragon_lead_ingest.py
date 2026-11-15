@@ -85,6 +85,60 @@ def steam_json(raw):
         if not isinstance(record,dict):raise ValueError("invalid Steam JSON record")
         yield _steam_row(appid,record.get("name"))
 
+def modrinth_json(raw):
+    """Read exported Modrinth search pages; never contact its paginated API."""
+    # The search endpoint returns a bounded page. No arbitrary large object
+    # allocation: callers with multiple pages use normalized JSONL.
+    data=raw.read(16*1024*1024+1)
+    if len(data)>16*1024*1024:raise ValueError("Modrinth search export cap")
+    doc=json.loads(data)
+    if not isinstance(doc,dict) or not isinstance(doc.get("hits"),list) or not 1<=len(doc["hits"])<=100:
+        raise ValueError("Modrinth search page schema")
+    for item in doc["hits"]:
+        if not isinstance(item,dict):raise ValueError("Modrinth project record")
+        row={"id":item.get("project_id"),"slug":item.get("slug"),"title":item.get("title"),
+             "project_type":item.get("project_type") or "project"}
+        yield parse_page(json.dumps(row,ensure_ascii=False).encode(),"modrinth")[0]
+
+def wikidata_csv(raw):
+    """Consume an explicitly game-filtered Wikidata CSV export.
+    The importer does NOT assert that arbitrary Wikidata items are games.
+    """
+    old=csv.field_size_limit(MAX_FIELD)
+    try:
+        text=io.TextIOWrapper(raw,encoding="utf-8-sig",newline="",errors="strict")
+        try:
+            reader=csv.DictReader(text)
+            fields=reader.fieldnames or []
+            if not {"item","itemLabel"}.issubset(fields) or len(fields)>MAX_COLUMNS or len(set(fields))!=len(fields):
+                raise ValueError("Wikidata filtered CSV header")
+            for item in reader:
+                value=item.get("item")
+                if not isinstance(value,str):raise ValueError("Wikidata entity")
+                match=re.fullmatch(r"(?:https?://www\.wikidata\.org/entity/)?(Q[1-9][0-9]{0,15})",value)
+                if not match:raise ValueError("Wikidata entity")
+                qid=match[1]
+                yield {"url":"https://www.wikidata.org/wiki/"+qid,
+                       "title":clean(item["itemLabel"],256),"kind":"cross_database_identifiers",
+                       "subject":"wikidata:"+qid}
+        finally:text.detach()
+    finally:csv.field_size_limit(old)
+
+def locator_csv(raw):
+    """Provider-neutral documented export: preserve only approved metadata."""
+    old=csv.field_size_limit(MAX_FIELD)
+    try:
+        text=io.TextIOWrapper(raw,encoding="utf-8-sig",newline="",errors="strict")
+        try:
+            reader=csv.DictReader(text);columns=reader.fieldnames or []
+            if not {"url","title","kind","subject"}.issubset(columns) or len(columns)>MAX_COLUMNS or len(set(columns))!=len(columns):
+                raise ValueError("locator CSV header")
+            for row in reader:
+                candidate={k:row[k] for k in ("url","title","kind","subject")}
+                yield parse_page(json.dumps(candidate,ensure_ascii=False).encode(),"locator")[0]
+        finally:text.detach()
+    finally:csv.field_size_limit(old)
+
 def normalized_jsonl(raw,projection):
     while True:
         line=raw.readline(8194)
@@ -97,6 +151,9 @@ def pages(path,witness,format,projection):
         if format=="steam-csv":rows=steam_csv(stream)
         elif format=="steam-parquet":rows=steam_parquet(stream)
         elif format=="steam-json":rows=steam_json(stream)
+        elif format=="modrinth-json":rows=modrinth_json(stream)
+        elif format=="wikidata-csv":rows=wikidata_csv(stream)
+        elif format=="locator-csv":rows=locator_csv(stream)
         else:rows=normalized_jsonl(stream,projection)
         while True:
             selected=list(itertools.islice(rows,MAX_PAGE_ROWS))
@@ -139,7 +196,7 @@ def ingest(graph,scope,*,path,format,projection,target,rights_reference,grant_se
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target",required=True)
-    parser.add_argument("--format",choices=["steam-csv","steam-parquet","steam-json","normalized-jsonl"],required=True)
+    parser.add_argument("--format",choices=["steam-csv","steam-parquet","steam-json","modrinth-json","wikidata-csv","locator-csv","normalized-jsonl"],required=True)
     parser.add_argument("--projection",choices=["steam","modrinth","locator"],default="steam")
     parser.add_argument("--input",type=Path,required=True)
     parser.add_argument("--expected-sha",default=None)
@@ -150,7 +207,8 @@ def main(argv=None):
     parser.add_argument("--acknowledge-metadata-rights",action="store_true")
     args=parser.parse_args(argv)
     if not args.acknowledge_metadata_rights:parser.error("explicit metadata rights acknowledgement required")
-    if args.format!="normalized-jsonl" and args.projection!="steam":parser.error("Steam file format requires Steam projection")
+    expected={"steam-csv":"steam","steam-parquet":"steam","steam-json":"steam","modrinth-json":"modrinth","wikidata-csv":"locator","locator-csv":"locator"}
+    if args.format in expected and args.projection!=expected[args.format]:parser.error("input format and projection differ")
     scope={"tenant_id":args.tenant,"owner_id":args.owner}
     graph=LeadGraph(_path(create=os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1"))
     # The graph must have been enabled by its owner/editor. No automatic
