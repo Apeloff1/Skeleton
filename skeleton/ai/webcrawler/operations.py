@@ -38,7 +38,7 @@ from .frontier_circuit import evaluate_frontier_candidate, navigation_hazard
 from .host_backpressure import consent_bounded_retry_after, origin_throttle
 from .source_instruction_guard import (
     incident_receipt, incident_summary, inspect_extracted, inspect_response,
-    inspect_robots_comments, validate_incidents,
+    inspect_robots_comments, retained_robots_policy, validate_incidents,
 )
 from .robots_rate import combine_robots_pacing
 from .capture_rights import source_capture_rights
@@ -1072,6 +1072,13 @@ class CrawlRun:
                 return self._event(
                     "rejected", now=now, url=fetch_url, reason="redirect_outside_scope_or_loop"
                 )
+            retry_after = consent_bounded_retry_after(
+                response.headers, now=now, expires_at=state["binding"]["consent"]["expires_at"],
+            )
+            if retry_after is not None:
+                # A redirect Retry-After defers *this* follow-up request. It
+                # cannot shorten existing item readiness or authorize a target.
+                item["ready_at"] = max(item["ready_at"], now + retry_after)
             chain.append(fetch_url)
             if needs_robots:
                 robots["pending_url"] = destination
@@ -1119,7 +1126,7 @@ class CrawlRun:
                     text = response.body.decode("utf-8-sig", errors="strict")
                     # REP comments are never policy and never need raw retention.
                     # Preserve group boundaries and all parseable rules.
-                    text = "\n".join(line.partition("#")[0] for line in text.splitlines())
+                    text = retained_robots_policy(text)
                     _text(text, MAX_ROBOTS_BYTES, "robots policy", empty=True)
                 except (ValueError, UnicodeError):
                     text = "User-agent: *\nDisallow: /"
