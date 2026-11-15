@@ -39,7 +39,7 @@ def _archive():
     global _store,_config
     raw=os.environ.get("SKL_DRAGON_HOARDER_VOLUMES_JSON","").strip()
     path=Path(os.environ.get("SKL_DRAGON_HOARDER_MANIFEST_DB_PATH",""))
-    if not raw or len(raw)>64*1024 or not path.is_absolute():
+    if not raw or len(raw)>256*1024 or not path.is_absolute():
         raise StorageHeld("bulk storage not configured")
     config=(raw,str(path))
     with _INIT_LOCK:
@@ -48,7 +48,7 @@ def _archive():
                 raise StorageHeld("bulk configuration changed")
             return _store
         specs=json.loads(raw)
-        if not isinstance(specs,list) or not 1<=len(specs)<=64:
+        if not isinstance(specs,list) or not 1<=len(specs)<=256:
             raise ValueError("volume configuration")
         volumes=[]
         bootstrap=os.getenv("SKL_DRAGON_HOARDER_BOOTSTRAP")=="1"
