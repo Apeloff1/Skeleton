@@ -1636,7 +1636,9 @@ class DragonCrawlerApplication:
                 "training_permission":False,"network_executed":False}
 
     async def companion_treasury(self, scope: dict[str, str], *, mode: str,
-                                 query: str = "", family: str | None = None) -> dict:
+                                 query: str = "", family: str | None = None, cursor: str | None = None,
+                                 observed_before: float | None = None, left: str | None = None,
+                                 right: str | None = None) -> dict:
         """Read and reparse only qualified retained text; preserve metadata-only lineage.
 
         Older, expired source rows are not opened as text. Their verified
@@ -1770,7 +1772,12 @@ class DragonCrawlerApplication:
                                   "content_hash": alias["content_hash"]}
                                  for alias in snapshot["source_aliases"]]
                 observations.extend(local)
+                # Keep only the newest bounded candidate postings in memory.
                 materialized.update(local_materialized)
+                if len(materialized)>256:
+                    newest=sorted((x for x in observations if (x.session_id,x.source_id) in materialized),
+                                  key=lambda x:(-x.captured_at,x.session_id,x.source_id))[:256]
+                    materialized={(x.session_id,x.source_id):materialized[x.session_id,x.source_id] for x in newest}
                 alias_blockers.extend(local_aliases)
                 if len(revisions)<MAX_EXPEDITIONS:
                     eligible.extend(usable[:16])
@@ -1784,7 +1791,8 @@ class DragonCrawlerApplication:
                                        candidate_limit_reached=capped)["collection_index"]
             result = build_treasury(observations, as_of=when, growth=growth, mode=mode, query=query,
                                     family=family, candidate_limit_reached=capped, excluded_sessions=excluded,
-                                    alias_blockers=alias_blockers,materialized=materialized)
+                                    alias_blockers=alias_blockers,materialized=materialized,cursor=cursor,
+                                    observed_before=observed_before,left=left,right=right)
             result["invalid_materialized_segments"]=invalid_segments
         except ValueError as exc:
             raise CrawlerError("crawler_treasury_invalid", "Treasury reparse could not be qualified.", 422) from exc
