@@ -177,19 +177,23 @@ class GuardedFairStreamDispatch:
         self._require_owner_process()
         with self._lock:
             self._require_no_pending()
-            anchor = None
-            if self._prepare_request is not None:
-                snapshot = self._session.verify()
-                if any(row["request_id"] == request.request_id
-                       for row in snapshot["checkpoint"]["requests"]):
-                    raise ValueError("duplicate durable stream request")
-                prepared = self._prepare_request(request)
-                if (type(prepared) is not StreamRequest
-                        or replace(prepared, authorization_digest=request.authorization_digest) != request):
-                    raise ValueError("trusted preparation changed request identity")
-                request = prepared
-                anchor = (snapshot["generation"], snapshot["digest"])
-            return self._session.submit(request, expected_anchor=anchor)
+            self._executing = True
+            try:
+                anchor = None
+                if self._prepare_request is not None:
+                    snapshot = self._session.verify()
+                    if any(row["request_id"] == request.request_id
+                           for row in snapshot["checkpoint"]["requests"]):
+                        raise ValueError("duplicate durable stream request")
+                    prepared = self._prepare_request(request)
+                    if (type(prepared) is not StreamRequest
+                            or replace(prepared, authorization_digest=request.authorization_digest) != request):
+                        raise ValueError("trusted preparation changed request identity")
+                    request = prepared
+                    anchor = (snapshot["generation"], snapshot["digest"])
+                return self._session.submit(request, expected_anchor=anchor)
+            finally:
+                self._executing = False
 
     def cancel(self, request_id: str, *, tenant_id: str | None = None) -> dict[str, object]:
         self._require_owner_process()
@@ -209,13 +213,21 @@ class GuardedFairStreamDispatch:
                            and r["tenant_id"] == tenant_id]
                 if len(matches) != 1:
                     raise ValueError("tenant does not own queued request")
-            changed = self._session.cancel(
-                request_id, tenant_id=tenant_id,
-                expected_anchor=(state["generation"], state["digest"]),
-            )
-            if self._cancel_cleanup is not None:
-                self._cancel_cleanup(request_id)
-            return changed
+            # Burn the grant before removal; cleanup failure leaves the
+            # exact queued item available for explicit cancellation.
+            self._executing = True
+            try:
+                if self._cancel_cleanup is not None:
+                    try:
+                        self._cancel_cleanup(request_id)
+                    except Exception as exc:
+                        raise DispatchDeferred("queued prompt cleanup unavailable") from exc
+                return self._session.cancel(
+                    request_id, tenant_id=tenant_id,
+                    expected_anchor=(state["generation"], state["digest"]),
+                )
+            finally:
+                self._executing = False
 
     def cancel_unstarted(self, request_id: str, *, tenant_id: str) -> dict[str, object]:
         """Cancel only a locally issued permit that has not entered execution."""
@@ -235,15 +247,22 @@ class GuardedFairStreamDispatch:
                 raise ValueError("tenant does not own pending request")
             self._executing = True
             try:
+                from .fair_stream_result_vault import SealedFairStreamResultVault
+
+                vault = self._owner._backend
+                if type(vault) is SealedFairStreamResultVault:
+                    vault.assert_no_published_result(permit)
                 receipt = self._owner._journal.fence_unstarted(permit)
+                if type(vault) is SealedFairStreamResultVault:
+                    vault.assert_no_published_result(permit)
+                if self._cancel_cleanup is not None:
+                    self._cancel_cleanup(request_id)
                 changed = self._session.cancel_unstarted(
                     receipt, tenant_id=tenant_id,
                     expected_anchor=(state["generation"], state["digest"]),
                 )
                 self._issued.clear()
                 self._issued_token_budget = None
-                if self._cancel_cleanup is not None:
-                    self._cancel_cleanup(request_id)
                 return changed
             except BaseException as exc:
                 # The fence may have committed even if the anchor did not.
@@ -584,15 +603,20 @@ class GuardedFairStreamDispatch:
             )
             self._executing = True
             try:
+                from .fair_stream_result_vault import SealedFairStreamResultVault
+
+                vault = self._owner._backend
                 receipt = self._owner._journal.recover_cancelled_receipt(permit)
+                if type(vault) is SealedFairStreamResultVault:
+                    vault.assert_no_published_result(permit)
+                if self._cancel_cleanup is not None:
+                    self._cancel_cleanup(permit.request_id)
                 updated = self._session.cancel_unstarted(
                     receipt, tenant_id=lease["tenant_id"],
                     expected_anchor=(state["generation"], state["digest"]),
                 )
                 self._issued.clear()
                 self._issued_token_budget = None
-                if self._cancel_cleanup is not None:
-                    self._cancel_cleanup(permit.request_id)
                 self._uncertain = False
                 return updated
             except BaseException as exc:
