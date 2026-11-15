@@ -602,3 +602,28 @@ def register_knowledge_routes(router):
     @router.delete("/knowledge/game-corpus/{game_id}/datasets/{version}")
     async def dataset_revoke(game_id:str,version:str,user:dict=Depends(get_current_user)):
         return await dataset_call(editor(user),game_id,"revoke",version)
+
+
+    @router.get("/knowledge/media/{media_id}/metadata")
+    async def media_metadata(media_id:str,response:Response,user:dict=Depends(get_current_user)):
+        response.headers["Cache-Control"]="private, no-store"
+        return await media_call(scope(user),"metadata",media_id)
+
+    @router.get("/knowledge/game-corpus/design-profiles")
+    async def design_profiles(user:dict=Depends(get_current_user)):
+        from core.dragon_ecosystem_profiles import public_profiles
+        scope(user)
+        return public_profiles()
+
+    @router.post("/knowledge/game-corpus/design-profiles/{profile}")
+    async def import_design_profile(profile:str,operation:str=Query(min_length=1,max_length=128),
+                                    user:dict=Depends(get_current_user)):
+        from core.dragon_ecosystem_profiles import manifest
+        from core.dragon_corpus_runtime import release_call
+        owner=editor(user)
+        try:
+            payload=manifest(profile)
+        except ValueError as exc:
+            raise HTTPException(422,detail={"code":"dragon_profile_unknown"}) from exc
+        return await corpus_runtime_call(release_call(owner,"enqueue",raw=payload,
+                    adapter="manifest",operation=operation))
