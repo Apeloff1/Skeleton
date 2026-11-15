@@ -1,0 +1,177 @@
+"""Owner-wide temporal admission, persisted posting custody and watch authority."""
+from __future__ import annotations
+import copy
+import hashlib
+import unittest
+from dataclasses import replace
+from unittest.mock import patch
+
+from skeleton.ai.webcrawler.dragon_archive_grant import create_grant
+from skeleton.ai.webcrawler.dragon_index_manifest import build_manifest,load_manifest,usable_posting
+from skeleton.ai.webcrawler.dragon_temporal_selection import family_identity,select_candidates
+from skeleton.ai.webcrawler.dragon_treasury import build_treasury
+from skeleton.ai.webcrawler.dragon_treasury_watch import (
+    create_watch,validate_watch,claim_watch,child_binding,child_matches,settle_watch,public_watch,
+)
+from test_ai_webcrawler_dragon_treasury import obs,A,B,C,NOW,DAY,BASE
+from test_ai_webcrawler_dragon_archive_grant import source,snapshot,CHECKPOINT,SID
+
+SCOPE={"tenant_id":"tenant","owner_id":"owner"}
+
+
+class TemporalSelectionTests(unittest.TestCase):
+    def test_old_explicit_family_survives_new_capture_flood(self):
+        old=[obs("old",BASE+"/important",A,NOW-3*DAY,archive=True),
+             obs("new",BASE+"/important",B,NOW-2*DAY)]
+        flood=[obs("recent",BASE+"/other-"+str(i),C,NOW-100-i) for i in range(40)]
+        fid=family_identity(old[0])
+        with patch("skeleton.ai.webcrawler.dragon_treasury.MAX_INDEXED",8):
+            result=build_treasury(old+flood,as_of=NOW,growth=1000,family=fid,mode="compare")
+        self.assertTrue(result["candidate_limit_reached"])
+        self.assertEqual(result["observations"],42)
+        self.assertEqual(result["indexed_observations"],8)
+        self.assertIsNotNone(result["comparison"])
+        self.assertEqual(result["comparison"]["previous"]["source_id"],old[0].source_id)
+        self.assertEqual(result["comparison"]["current"]["source_id"],old[1].source_id)
+        self.assertFalse(result["evolution"]["hoarder_qualified"])
+
+    def test_history_cutoff_excludes_future_same_content_and_alias(self):
+        early=obs("early",BASE+"/instrument",A,NOW-3*DAY,archive=True)
+        later=obs("later",early.url,A,NOW-100)
+        changed=obs("changed",early.url,B,NOW-50)
+        alias={"url":early.url,"captured_at":NOW-20,"content_hash":hashlib.sha256(C.encode()).hexdigest()}
+        cutoff=NOW-2*DAY
+        result=build_treasury([changed,later,early],as_of=NOW,growth=1000,
+                mode="at_time",observed_before=cutoff,query="legacy",alias_blockers=[alias])
+        self.assertEqual(result["observations"],1)
+        self.assertEqual(result["hits"][0]["source_id"],early.source_id)
+        self.assertEqual(result["hits"][0]["last_seen"],early.captured_at)
+        self.assertEqual(result["hits"][0]["plane"],"historic")
+        self.assertEqual(result["current_indexed"],0)
+        self.assertEqual(result["revisit_plan"],[])
+        self.assertIsNone(result["family_rows"][0]["refresh_url"])
+        self.assertEqual(result["alias_held_families"],0)
+        self.assertFalse(result["evolution"]["hoarder_qualified"])
+
+    def test_cutoff_does_not_fallback_to_older_different_payload(self):
+        early=obs("early",BASE+"/instrument",A,NOW-3*DAY,archive=True)
+        held=obs("held",early.url,B,NOW-2*DAY,permitted=False)
+        latest=obs("latest",early.url,C,NOW-100)
+        value=build_treasury([early,held,latest],as_of=NOW,growth=800,mode="at_time",
+                             observed_before=NOW-DAY)
+        self.assertEqual(value["hits"],[])
+        self.assertEqual(value["observations"],2)
+
+    def test_capacity_fairness_and_order_independence(self):
+        grouped={}
+        for i in range(10):
+            rows=[obs("s"+str(j),BASE+"/doc"+str(i),t,NOW-i*600-j*DAY)
+                  for j,t in enumerate((A,B,C))]
+            grouped[family_identity(rows[0])]=rows
+        first=select_candidates(grouped,budget=16,family=None,observed_before=None)
+        other=select_candidates(dict(reversed(list(grouped.items()))),budget=16,family=None,observed_before=None)
+        self.assertEqual([(x.session_id,x.source_id) for x in first],[(x.session_id,x.source_id) for x in other])
+        self.assertEqual(len(first),16)
+        self.assertGreaterEqual(len({family_identity(x) for x in first}),8)
+
+    def test_paging_bound_to_query_and_partition(self):
+        rows=[obs("a",BASE+"/doc"+str(i),A,NOW-i) for i in range(32)]
+        first=build_treasury(rows,as_of=NOW,growth=500,query="legacy")
+        second=build_treasury(rows,as_of=NOW,growth=500,query="legacy",cursor=first["next_cursor"])
+        self.assertEqual(len(first["hits"]),24)
+        self.assertEqual(len(second["hits"]),8)
+        self.assertFalse({x["revision_id"] for x in first["hits"]}&{x["revision_id"] for x in second["hits"]})
+        with self.assertRaises(ValueError):
+            build_treasury(rows,as_of=NOW,growth=500,query="different",cursor=first["next_cursor"])
+
+
+class PostingManifestTests(unittest.TestCase):
+    def test_cached_projection_equals_reparse_and_policy_change_fails_closed(self):
+        src=source(fetched_at=NOW-100)
+        snap=snapshot(src)
+        grant=create_grant(snapshot=snap,policies={},now=NOW,days=1)
+        manifest=build_manifest(snap,grant,now=NOW)
+        entries=load_manifest(manifest,grant,snapshot_digest=CHECKPOINT,now=NOW+1)
+        posting=usable_posting(entries,src,{"enabled":True,"version":0})
+        self.assertIsNotNone(posting)
+        self.assertIsNone(usable_posting(entries,src,{"enabled":True,"version":1}))
+        self.assertIsNone(usable_posting(entries,src,{"enabled":False,"version":0}))
+        self.assertEqual(load_manifest(manifest,grant,snapshot_digest=CHECKPOINT,now=NOW+DAY),{})
+        row=obs("a",BASE+"/doc",src["text"],NOW-100,archive=True)
+        raw=build_treasury([row],as_of=NOW+1,growth=500,mode="historic_only")
+        cached=build_treasury([row],as_of=NOW+1,growth=500,mode="historic_only",
+            materialized={(row.session_id,row.source_id):posting})
+        self.assertEqual(raw["hits"],cached["hits"])
+        self.assertEqual(raw["partition_digest"],cached["partition_digest"])
+        self.assertEqual(cached["materialized_payload_hits"],1)
+
+    def test_corrupt_or_expired_segment_never_returns_postings(self):
+        snap=snapshot(source(fetched_at=NOW-10))
+        grant=create_grant(snapshot=snap,policies={},now=NOW,days=1)
+        manifest=build_manifest(snap,grant,now=NOW)
+        for mutation in ({"raw_sha256":"f"*64},{"segment":"AAAA"},{"raw_bytes":2},
+                         {"source_count":65}):
+            with self.assertRaises(ValueError):
+                load_manifest({**manifest,**mutation},grant,snapshot_digest=CHECKPOINT,now=NOW+1)
+
+
+class WatchTests(unittest.TestCase):
+    def new_watch(self,**kwargs):
+        inputs={"operation":"d"*64,"parent_id":"parent","scope":SCOPE,"principal_email":"a@example.org",
+                "snapshot_digest":CHECKPOINT,"source":{"source_id":SID,"fetched_url":BASE+"/page",
+                "content_hash":"e"*64,"fetched_at":NOW-DAY},"policy_version":0,"now":NOW,
+                "days":7,"cycles":2,"minimum_interval":21600,"retention_days":30}
+        return create_watch(**{**inputs,**kwargs})
+
+    def test_claim_recovery_same_cycle_and_no_budget_refund(self):
+        watch=self.new_watch()
+        due=watch["next_due"]
+        first=claim_watch(watch,now=due,token="first")
+        self.assertEqual(first["cycles_started"],1)
+        self.assertEqual(first["active_cycle"],1)
+        with self.assertRaises(ValueError):
+            claim_watch(first,now=due+1,token="second")
+        second=claim_watch(first,now=due+181,token="second")
+        self.assertEqual(second["cycles_started"],1)
+        self.assertEqual(child_binding(first),child_binding(second))
+        self.assertNotEqual(first["claim_token"],second["claim_token"])
+        stopped={**second,"enabled":False,"state":"stopped","stop_reason":"operator_revoked"}
+        self.assertFalse(child_matches(child_binding(second),stopped,now=due+182))
+
+    def test_success_settles_only_exact_observed_sample(self):
+        watch=self.new_watch()
+        due=watch["next_due"]
+        active=claim_watch(watch,now=due,token="first")
+        captured={"at":due+2,"digest":"c"*64}
+        settled=settle_watch(active,now=due+3,child_id="child",sample=captured,completed=True)
+        self.assertEqual(settled["cycles_completed"],1)
+        self.assertEqual(settled["samples"][-1],captured)
+        self.assertIsNone(settled["active_cycle"])
+        self.assertGreaterEqual(settled["next_due"],due+3+watch["minimum_interval"])
+        self.assertFalse(child_matches(child_binding(active),settled,now=due+3))
+        public=public_watch(settled,now=due+3)
+        self.assertNotIn("principal_email",public)
+        self.assertNotIn("samples",public)
+
+    def test_failed_attempt_never_earns_change_sample(self):
+        watch=self.new_watch()
+        due=watch["next_due"]
+        active=claim_watch(watch,now=due,token="first")
+        failed=settle_watch(active,now=due+3,child_id="child",sample=None,completed=False)
+        self.assertEqual(failed["samples"],watch["samples"])
+        self.assertGreaterEqual(failed["next_due"],due+DAY)
+        self.assertEqual(failed["cycles_completed"],1)
+
+    def test_invalid_watch_scope_and_deadline_denied(self):
+        for url in ("https://example.org/a?token=x","https://user@example.org/a","file:///tmp/a"):
+            with self.assertRaises(ValueError):
+                self.new_watch(source={"source_id":SID,"fetched_url":url,"content_hash":"e"*64,"fetched_at":NOW-DAY})
+        w=self.new_watch()
+        with self.assertRaises(ValueError):
+            validate_watch({**w,"cycles_started":7})
+        with self.assertRaises(ValueError):
+            claim_watch(w,now=w["expires_at"],token="late")
+
+
+if __name__=="__main__":
+    unittest.main()
