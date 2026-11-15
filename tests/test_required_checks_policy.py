@@ -39,6 +39,7 @@ def repo_copy(tmp_path: Path) -> Path:
         "scripts/check_merge_readiness_contract.py",
         *POLICY["documentation"],
         *POLICY["name_references"],
+        *POLICY["source_qualification_workflows"].values(),
     ]
     for relative in files:
         target = tmp_path / relative
@@ -573,3 +574,62 @@ def test_pr_head_is_reread_after_collecting_checks() -> None:
     report = status.collect(POLICY, "o/r", pr=7, api_get=api, include_protection=False)
     assert report["verdict"] == "NOT_READY"
     assert any("historical" in item for item in report["blockers"])
+
+
+@pytest.mark.parametrize("defect", ["duplicate_job", "duplicate_property", "disabled_caller", "secrets"])
+def test_rejects_ambiguous_or_privileged_source_caller(repo_copy: Path, defect: str) -> None:
+    path = repo_copy / ".github/workflows/merge-readiness.yml"
+    original = path.read_text(encoding="utf-8")
+    target = POLICY["source_qualification_workflows"]["source_01"]
+    if defect == "duplicate_job":
+        block = original.split("  source_01:\n", 1)[1].split("  source_02:\n", 1)[0]
+        updated = original.replace("  source_02:\n", "  source_01:\n" + block + "  source_02:\n", 1)
+    elif defect == "duplicate_property":
+        updated = original.replace("    uses: ./" + target, "    uses: ./" + target + "\n    uses: ./" + target, 1)
+    elif defect == "disabled_caller":
+        updated = original.replace("  source_01:\n    if: " + guard._SOURCE_CALLER_IF.removeprefix("if: "),
+                                   "  source_01:\n    if: false", 1)
+    else:
+        updated = original.replace("    uses: ./" + target, "    uses: ./" + target + "\n    secrets: inherit", 1)
+    assert original != updated
+    path.write_text(updated, encoding="utf-8")
+    assert guard.run(repo_copy, guard.DEFAULT_POLICY)[0]
+
+
+@pytest.mark.parametrize("defect", [
+    "missing_file", "not_reusable", "permissions", "foreign_checkout", "mutable_ref",
+    "credentials", "missing_proof", "conditional_proof", "forged_proof", "dropped_child",
+    "suppressed_failure",
+])
+def test_rejects_invalid_source_child_workflow(repo_copy: Path, defect: str) -> None:
+    target = POLICY["source_qualification_workflows"]["source_03"]
+    path = repo_copy / target
+    text = path.read_text(encoding="utf-8")
+    if defect == "missing_file":
+        path.unlink()
+    else:
+        if defect == "not_reusable":
+            updated = text.replace("  workflow_call:", "  workflow_dispatch:", 1)
+        elif defect == "permissions":
+            updated = text.replace("contents: read", "contents: write", 1)
+        elif defect == "foreign_checkout":
+            updated = text.replace(guard._SOURCE_CHECKOUT, "actions/checkout@main", 1)
+        elif defect == "mutable_ref":
+            updated = text.replace("ref: " + guard._SOURCE_REF, "ref: main", 1)
+        elif defect == "credentials":
+            updated = text.replace("persist-credentials: false", "persist-credentials: true", 1)
+        elif defect == "missing_proof":
+            updated = text.replace("git rev-parse HEAD", "printf bypass", 1)
+        elif defect == "conditional_proof":
+            updated = text.replace("        run: test \"$(git rev-parse HEAD)\"", 
+                                   "        if: false\n        run: test \"$(git rev-parse HEAD)\"", 1)
+        elif defect == "forged_proof":
+            updated = text.replace("EXPECTED_SHA: " + guard._SOURCE_REF, "EXPECTED_SHA: main", 1)
+        elif defect == "dropped_child":
+            updated = text.split("\n  e2e_build_source:", 1)[0] + "\n"
+        else:
+            updated = text.replace("    runs-on: ubuntu-latest", "    runs-on: ubuntu-latest\n    continue-on-error: true", 1)
+        assert text != updated
+        path.write_text(updated, encoding="utf-8")
+    failures, _ = guard.run(repo_copy, guard.DEFAULT_POLICY)
+    assert any(target in failure for failure in failures)

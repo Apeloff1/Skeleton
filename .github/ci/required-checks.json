@@ -131,5 +131,87 @@
     "source_23": ".github/workflows/native-qualification-report-custody.yml",
     "source_24": ".github/workflows/operational-literal-dispatch-qualification.yml",
     "source_25": ".github/workflows/perf-profiler-literal-target-qualification.yml"
+  },
+  "source_qualification_jobs": {
+    "source_01": [
+      "literal_loader"
+    ],
+    "source_02": [
+      "source_contracts"
+    ],
+    "source_03": [
+      "discourse_receipt_identity",
+      "e2e_build_source"
+    ],
+    "source_04": [
+      "descriptor_custody_and_provenance"
+    ],
+    "source_05": [
+      "flat_runtime"
+    ],
+    "source_06": [
+      "export_content_evidence"
+    ],
+    "source_07": [
+      "installer_source_contracts"
+    ],
+    "source_08": [
+      "deterministic_frame_tiers"
+    ],
+    "source_09": [
+      "frontend_roundtrip_source"
+    ],
+    "source_10": [
+      "conductor_and_repair"
+    ],
+    "source_11": [
+      "python_source"
+    ],
+    "source_12": [
+      "python_source",
+      "frontend_source"
+    ],
+    "source_13": [
+      "source_qualification"
+    ],
+    "source_14": [
+      "source_boundary"
+    ],
+    "source_15": [
+      "canonical_evidence_preflight"
+    ],
+    "source_16": [
+      "source_quality",
+      "focused_frontend"
+    ],
+    "source_17": [
+      "canonical_parity_and_architecture",
+      "native_sqlite_ci_fixture_regressions"
+    ],
+    "source_18": [
+      "bounded_native_dispatcher"
+    ],
+    "source_19": [
+      "source_contracts"
+    ],
+    "source_20": [
+      "profiler_safety",
+      "historical_reds"
+    ],
+    "source_21": [
+      "validate-source-indexed-421-volumes"
+    ],
+    "source_22": [
+      "native_batch_admission"
+    ],
+    "source_23": [
+      "report_custody"
+    ],
+    "source_24": [
+      "source_qualification"
+    ],
+    "source_25": [
+      "literal_target_qualification"
+    ]
   }
 }

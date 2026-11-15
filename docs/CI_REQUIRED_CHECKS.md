@@ -43,6 +43,8 @@ checks keep detailed diagnostics.
   workflows triggered by `schedule`, `workflow_run`, `workflow_dispatch`, or
   release tags stay outside the fast merge summary.
 
+The source qualification registry binds all 25 reusable workflow files and their 30 child jobs. Its static guard requires immutable credential-free checkout, read-only workflow permissions, explicit checkout proof and the exact caller event scope. This is a source-contract check, not independent execution or branch-protection evidence.
+
 ## Concurrency
 
 Pull-request runs use per-PR concurrency and cancel an older in-progress run
