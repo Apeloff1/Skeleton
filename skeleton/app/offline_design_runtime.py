@@ -42,6 +42,11 @@ class LocalDesignRuntime:
     def native_source(self,*,variant=1):
         return export_native_maze(self.journal,self.results,self.request,variant=variant)
 
+    def virtual_campaign(self,*,variant=1,scale=None):
+        from skeleton.prood.campaign_world import CampaignScale,campaign_from_results
+        return campaign_from_results(self.journal,self.results,self.request,variant=variant,
+                                     scale=CampaignScale() if scale is None else scale)
+
     def review_claim(self,work_id):
         return review_worker_result(self.journal,self.results,work_id)
 
