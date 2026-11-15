@@ -159,6 +159,13 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
                   {payload.source_export.file_count} files · {payload.source_export.bytes} source bytes ·
                   manifest {payload.source_export.manifest_sha256?.slice(0, 16)}
                 </Text>
+                {typeof payload.source_export.manifest_sha256 === 'string'
+                    && /^[0-9a-f]{64}$/.test(payload.source_export.manifest_sha256) ? (
+                  <>
+                    <Text style={st.small}>Keep this full source manifest SHA-256 separately to verify or reopen the ZIP later.</Text>
+                    <Text selectable style={[st.small, st.mono]} testID="run-full-source-digest">{payload.source_export.manifest_sha256}</Text>
+                  </>
+                ) : null}
                 <Text style={st.small}>
                   A source-only ZIP that opens in Godot. This is not a compiled, signed or device-qualified game installer.
                 </Text>

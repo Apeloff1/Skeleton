@@ -187,3 +187,12 @@ test('export lifecycle fences unmount, account rotation and stale failure callba
   assert.match(code, /const current = \(\) => exportMounted.current && ownerEpoch === getAuthEpoch\(\)/);
   assert.match(code, /if \(!current\(\)\) return;\s+const message/);
 });
+
+
+test('portable export exposes its full independently retainable source identity', () => {
+  const p = fixture();
+  const html = render(h(Panel, { phase: 'done', payload: p }));
+  assert.match(html, /data-testid="run-full-source-digest"/);
+  assert.ok(text(html).includes(p.source_manifest.sha256));
+  assert.match(text(html), /verify or reopen the ZIP later/);
+});

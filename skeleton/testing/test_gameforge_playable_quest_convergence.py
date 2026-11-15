@@ -285,3 +285,87 @@ def test_portable_server_source_byte_count_is_bounded_and_unicode_exact(monkeypa
     assert route._portable_source_size({"project.godot": "a" * 8}) == 8
     monkeypatch.setattr(route, "_MAX_PORTABLE_ZIP_BYTES", 24)
     assert route._portable_source_size({"project.godot": "ok"}) is None
+
+
+def _portable_zip(files, *, compression=0):
+    import io
+    import zipfile
+    stream = io.BytesIO()
+    with zipfile.ZipFile(stream, "w", compression=compression) as archive:
+        for name, body in files:
+            archive.writestr(name, body)
+    return stream.getvalue()
+
+
+@pytest.mark.parametrize("mode", content_archetypes())
+def test_portable_zip_reopens_exact_native_source_without_execution(tmp_path, mode):
+    from scripts.verify_gameforge_source_zip import reopen_archive
+    files = attach_archetype_content(base(), mode, operator_axes={"tempo": 0.5, "grind": 0.75})
+    digest = source_manifest(files)["sha256"]
+    archive = tmp_path / "project.zip"
+    archive.write_bytes(_portable_zip(sorted(files.items())))
+    report = reopen_archive(archive, digest)
+    assert report["source_manifest"] == source_manifest(files)
+    assert report["source_verified"] and not report["native_execution_qualified"]
+    assert report["reopened"] is False
+    output = tmp_path / "reopened"
+    report = reopen_archive(archive, digest, output)
+    assert report["reopened"]
+    assert {p.relative_to(output).as_posix(): p.read_bytes().decode("utf-8")
+            for p in output.rglob("*") if p.is_file()} == files
+
+
+@pytest.mark.parametrize("damage", ["foreign_digest", "truncated_digest", "changed_source",
+                                    "duplicate", "traversal", "directory_alias", "file_directory",
+                                    "invalid_unicode", "compressed", "missing_project"])
+def test_portable_zip_rejects_invalid_source_without_creating_output(tmp_path, damage):
+    import zipfile
+    from scripts.verify_gameforge_source_zip import PortableSourceError, reopen_archive
+    files = {"project.godot": "config_version=5", "data/x.txt": "original"}
+    digest = source_manifest(files)["sha256"]
+    rows = list(files.items())
+    compression = zipfile.ZIP_STORED
+    if damage == "foreign_digest":
+        digest = "f" * 64
+    elif damage == "truncated_digest":
+        digest = digest[:16]
+    elif damage == "changed_source":
+        rows[-1] = ("data/x.txt", "modified")
+    elif damage == "duplicate":
+        rows.append(("data/x.txt", "duplicate"))
+    elif damage == "traversal":
+        rows.append(("../private.txt", "bad"))
+    elif damage == "directory_alias":
+        rows.append(("Data/y.txt", "alias"))
+    elif damage == "file_directory":
+        rows.append(("data", "leaf"))
+    elif damage == "invalid_unicode":
+        rows[-1] = ("data/x.txt", bytes([255]))
+    elif damage == "compressed":
+        compression = zipfile.ZIP_DEFLATED
+    elif damage == "missing_project":
+        rows = rows[1:]
+    archive = tmp_path / "bad.zip"
+    if damage == "duplicate":
+        with pytest.warns(UserWarning, match="Duplicate name"):
+            archive.write_bytes(_portable_zip(rows, compression=compression))
+    else:
+        archive.write_bytes(_portable_zip(rows, compression=compression))
+    output = tmp_path / "not-created"
+    with pytest.raises(PortableSourceError):
+        reopen_archive(archive, digest, output)
+    assert not output.exists()
+
+
+def test_portable_zip_does_not_replace_existing_project(tmp_path):
+    from scripts.verify_gameforge_source_zip import PortableSourceError, reopen_archive
+    files = {"project.godot": "config_version=5"}
+    archive = tmp_path / "source.zip"
+    archive.write_bytes(_portable_zip(files.items()))
+    destination = tmp_path / "existing"
+    destination.mkdir()
+    marker = destination / "project.godot"
+    marker.write_text("original", encoding="utf-8")
+    with pytest.raises(PortableSourceError, match="already exists"):
+        reopen_archive(archive, source_manifest(files)["sha256"], destination)
+    assert marker.read_text(encoding="utf-8") == "original"
