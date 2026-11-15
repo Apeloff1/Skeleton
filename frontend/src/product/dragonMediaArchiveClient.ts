@@ -95,3 +95,63 @@ export async function verifyMediaAuthority(record:MediaRecord,signal?:AbortSigna
  if(x.media_id!==record.media_id||x.sha256!==record.sha256||x.mime!==record.mime||x.total_bytes!==record.total_bytes||x.game_id!==record.game_id||x.source_id!==record.source_id||x.state!=='sealed'||x.expires_at*1000<=Date.now())throw Error('Media authority changed.');
  return x;
 }
+
+
+const BASE64='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+/** RN Blob implementations need not accept ArrayBuffer. This bounded wire lane
+ * produces strict canonical base64 without depending on browser globals. */
+export function encodeMediaBlock(data:Uint8Array){
+ if(data.length<1||data.length>BLOCK)throw Error('Media block bounds.');
+ const groups:string[]=[];
+ for(let i=0;i<data.length;i+=3){
+  const a=data[i],b=data[i+1]||0,c=data[i+2]||0,n=(a<<16)|(b<<8)|c;
+  groups.push(BASE64[(n>>18)&63]+BASE64[(n>>12)&63]+(i+1<data.length?BASE64[(n>>6)&63]:'=')+(i+2<data.length?BASE64[n&63]:'='));
+ }
+ return groups.join('');
+}
+export async function appendNativeMedia(media:string,ordinal:number,bytes:Uint8Array,sha256:string,signal?:AbortSignal){
+ if(!Number.isInteger(ordinal)||ordinal<0||ordinal>=512||!SHA.test(sha256))throw Error('Invalid media block.');
+ const {response,session}=await raw('/media/'+id(media)+'/chunks/'+ordinal,'PUT',signal,encodeMediaBlock(bytes),{'Content-Type':'application/base64'});
+ try{
+  const p=await response.json();
+  if(!session.current()||p.media_id!==media||p.ordinal!==ordinal||p.sha256!==sha256||p.stored!==true)throw Error('Media block witness differs.');
+ }finally{session.dispose();}
+}
+export type CaptionTrack={track_id:string;language:string;format:'vtt'|'srt';sha256:string;cues:number;created:number};
+export type CaptionCue={ordinal:number;start_ms:number;end_ms:number;text:string};
+const integer=(x:unknown,min:number,max:number):x is number=>typeof x==='number'&&Number.isSafeInteger(x)&&x>=min&&x<=max;
+const language=(x:unknown):x is string=>typeof x==='string'&&/^(?:[a-z]{2,8}(?:-[a-z0-9]{1,8}){0,3}|und)$/.test(x);
+const unix=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)&&x>0;
+const CAPTION_LIMIT=1024*1024;
+function captionPath(media:string,track?:string){return ROOT+'/media/'+id(media)+'/captions'+(track?'/'+id(track):'');}
+function validateCaptionTrack(x:CaptionTrack){return !!x&&SHA.test(x.track_id)&&language(x.language)&&['vtt','srt'].includes(x.format)&&SHA.test(x.sha256)&&integer(x.cues,1,20000)&&unix(x.created);}
+export async function importCaptionTrack(record:MediaRecord,lang:string,format:'vtt'|'srt',payload:string,signal?:AbortSignal){
+ if(!language(lang)||!['vtt','srt'].includes(format)||!payload.trim()||new TextEncoder().encode(payload).byteLength>CAPTION_LIMIT)throw Error('Caption input bounds.');
+ const token=getAuthToken();
+ const p=await api.post<{media_id:string;track_id:string;sha256:string;cues:number;replayed:boolean;user_supplied:true;training_allowed:false}>(captionPath(record.media_id),{language:lang,format,payload,rights_acknowledged:true},{signal,retries:0,timeoutMs:65000});
+ const x=p.data;
+ if(token!==getAuthToken()||!p.ok||!x||x.media_id!==record.media_id||!SHA.test(x.track_id)||!SHA.test(x.sha256)||!integer(x.cues,1,20000)||typeof x.replayed!=='boolean'||x.user_supplied!==true||x.training_allowed!==false)throw Error('Caption import unavailable.');
+ return x;
+}
+export async function captionTracks(record:MediaRecord,signal?:AbortSignal){
+ const token=getAuthToken();
+ const p=await api.get<{media_id:string;tracks:CaptionTrack[];valid_until:number;user_supplied:true;training_allowed:false}>(captionPath(record.media_id),{signal,retries:0});
+ const x=p.data;if(token!==getAuthToken()||!p.ok||!x||x.media_id!==record.media_id||!Array.isArray(x.tracks)||x.tracks.length>64||x.tracks.some(t=>!validateCaptionTrack(t))||!unix(x.valid_until)||x.valid_until!==record.expires_at||x.valid_until*1000<=Date.now()||x.user_supplied!==true||x.training_allowed!==false)throw Error('Caption tracks unavailable.');
+ return x;
+}
+export async function captionCues(record:MediaRecord,track:CaptionTrack,q:string,after?:number,signal?:AbortSignal){
+ if(!validateCaptionTrack(track)||q.length>256||after!==undefined&&!integer(after,0,19999))throw Error('Caption query bounds.');
+ const params=new URLSearchParams({limit:'32'});if(q.trim())params.set('q',q.trim());if(after!==undefined)params.set('after',String(after));
+ const token=getAuthToken();
+ const p=await api.get<{media_id:string;track_id:string;cues:CaptionCue[];next_cursor:number|null;valid_until:number;as_of_unix:number;user_supplied:true;source_verified:false;training_allowed:false}>(captionPath(record.media_id,track.track_id)+'?'+params,{signal,retries:0});
+ const x=p.data;
+ if(token!==getAuthToken()||!p.ok||!x||x.media_id!==record.media_id||x.track_id!==track.track_id||!Array.isArray(x.cues)||x.cues.length>32||
+ x.cues.some((c,i)=>!c||!integer(c.ordinal,0,track.cues-1)||i>0&&c.ordinal<=x.cues[i-1].ordinal||after!==undefined&&c.ordinal<=after||!integer(c.start_ms,0,604800000)||!integer(c.end_ms,c.start_ms+1,604800000)||typeof c.text!=='string'||Array.from(c.text).length>2048)||
+ x.next_cursor!==null&&(!integer(x.next_cursor,0,track.cues-1)||x.cues.length!==32||x.next_cursor!==x.cues[31].ordinal)||!unix(x.as_of_unix)||x.valid_until!==record.expires_at||x.valid_until<=x.as_of_unix||x.valid_until*1000<=Date.now()||x.user_supplied!==true||x.source_verified!==false||x.training_allowed!==false)throw Error('Caption cue response invalid.');
+ return x;
+}
+export async function revokeCaptionTrack(record:MediaRecord,track:CaptionTrack,signal?:AbortSignal){
+ const {response,session}=await raw('/media/'+id(record.media_id)+'/captions/'+id(track.track_id),'DELETE',signal);
+ try{const x=await response.json();if(!session.current()||x.revoked!==true||x.secure_erasure!==false)throw Error('Caption revocation not confirmed.');}
+ finally{session.dispose();}
+}
