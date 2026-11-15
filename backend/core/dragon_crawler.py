@@ -4317,7 +4317,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         await self.assert_context(scope, references)
         return {**evidence, "session_id": identifier, "version": int(row["version"])}
 
-    async def context(self, scope: dict[str, str], query: str, max_docs: int, max_chars: int) -> dict:
+    async def context(self, scope: dict[str, str], query: str, max_docs: int, max_chars: int, *, session_ids=None) -> dict:
         import re
         from skeleton.ai.webcrawler.evidence_selection import select_diverse_evidence
 
@@ -4335,10 +4335,14 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         terms = tuple(dict.fromkeys(re.findall(r"\w{2,}", query.lower())))[:24]
         if not terms:
             return {"documents": [], "references": []}
+        predicate={**scope, "status": {"$nin": ["deleted", "cancelled"]}, "consent_expires_at": {"$gt": _now()}}
+        if session_ids is not None:
+            from skeleton.ai.webcrawler.dragon_treasury_vault import identity
+            if not isinstance(session_ids,list) or len(session_ids)>100 or not all(identity(x) for x in session_ids):
+                raise CrawlerError("crawler_context_bounds","Game routing set exceeds bound.")
+            predicate["_id"]={"$in":session_ids}
         rows = (
-            self.sessions.find(
-                {**scope, "status": {"$nin": ["deleted", "cancelled"]}, "consent_expires_at": {"$gt": _now()}}
-            )
+            self.sessions.find(predicate)
             .sort("updated_at", DESCENDING)
             .limit(MAX_SESSIONS)
         )
