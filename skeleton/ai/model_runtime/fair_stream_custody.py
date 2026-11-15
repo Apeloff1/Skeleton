@@ -12,6 +12,7 @@ import json
 from threading import RLock
 from typing import Mapping
 
+from .fair_stream_admission import validate_request_identity
 from .fair_stream_queue import FairStreamScheduler, MeasuredStreamBudget, StreamRequest
 
 SCHEMA = "skeleton.ai.fair-stream-custody.v1"
@@ -26,7 +27,7 @@ def _canonical(value: object, limit: int = MAX_BYTES) -> bytes:
     try:
         raw = json.dumps(value, sort_keys=True, separators=(",", ":"),
                          ensure_ascii=True, allow_nan=False).encode("utf-8")
-    except (TypeError, ValueError, OverflowError) as exc:
+    except (TypeError, ValueError, OverflowError, RecursionError) as exc:
         raise ValueError("invalid custody encoding") from exc
     if len(raw) > limit:
         raise ValueError("custody byte budget exceeded")
@@ -90,9 +91,7 @@ def sign_unstarted_cancellation(
     _hex(session_id, "session", 32)
     _hex(checkpoint_digest, "checkpoint")
     _hex(lease_id, "lease")
-    if (type(request_id) is not str or not request_id
-            or len(request_id.encode("utf-8")) > 128):
-        raise ValueError("bounded request identity required")
+    validate_request_identity(request_id)
     body = {
         "schema": CANCELLATION_SCHEMA, "session_id": session_id,
         "generation": _generation(generation), "checkpoint_digest": checkpoint_digest,
@@ -135,9 +134,14 @@ class AuthenticatedFairStreamCustody:
         self.session_id = _hex(session_id, "session", 32)
         self.generation = _generation(generation)
         self.previous_digest = _hex(previous_digest, "previous digest")
-        self._scheduler = scheduler if scheduler is not None else FairStreamScheduler()
-        if not isinstance(self._scheduler, FairStreamScheduler):
+        if scheduler is not None and type(scheduler) is not FairStreamScheduler:
             raise ValueError("canonical scheduler required")
+        # Never sign mutable state owned by the caller. Adopt a detached,
+        # validated snapshot once, leaving all subsequent edits to transition.
+        self._scheduler = (
+            FairStreamScheduler.restore(scheduler.checkpoint())
+            if scheduler is not None else FairStreamScheduler()
+        )
         self._lock = RLock()
 
     @property
@@ -149,19 +153,26 @@ class AuthenticatedFairStreamCustody:
         with self._lock:
             return self._scheduler.pending_ids
 
+    def _envelope(self, scheduler: FairStreamScheduler, generation: int,
+                  previous_digest: str) -> dict[str, object]:
+        checkpoint = scheduler.checkpoint()
+        body: dict[str, object] = {
+            "schema": SCHEMA, "session_id": self.session_id,
+            "generation": _generation(generation),
+            "previous_digest": _hex(previous_digest, "previous digest"),
+            "checkpoint_digest": checkpoint["digest"],
+            "checkpoint": checkpoint,
+        }
+        digest = sha256(_canonical(body)).hexdigest()
+        signed = {**body, "digest": digest}
+        envelope = {**signed, "mac": _sign(self._custody_key, signed)}
+        # The final MAC itself counts against the durable byte ceiling.
+        _canonical(envelope)
+        return envelope
+
     def export(self) -> dict[str, object]:
         with self._lock:
-            checkpoint = self._scheduler.checkpoint()
-            body: dict[str, object] = {
-                "schema": SCHEMA, "session_id": self.session_id,
-                "generation": self.generation,
-                "previous_digest": self.previous_digest,
-                "checkpoint_digest": checkpoint["digest"],
-                "checkpoint": checkpoint,
-            }
-            digest = sha256(_canonical(body)).hexdigest()
-            signed = {**body, "digest": digest}
-            return {**signed, "mac": _sign(self._custody_key, signed)}
+            return self._envelope(self._scheduler, self.generation, self.previous_digest)
 
     @classmethod
     def restore(
@@ -175,9 +186,9 @@ class AuthenticatedFairStreamCustody:
             "schema", "session_id", "generation", "previous_digest",
             "checkpoint", "checkpoint_digest", "digest", "mac",
         }
-        if not isinstance(envelope, Mapping) or set(envelope) != fields:
+        if type(envelope) is not dict or set(envelope) != fields:
             raise ValueError("invalid custody envelope")
-        if envelope["schema"] != SCHEMA:
+        if type(envelope["schema"]) is not str or envelope["schema"] != SCHEMA:
             raise ValueError("unsupported custody schema")
         if _generation(envelope["generation"]) != _generation(expected_generation):
             raise ValueError("stale or rolled-back custody generation")
@@ -193,7 +204,7 @@ class AuthenticatedFairStreamCustody:
         if not hmac.compare_digest(digest, sha256(_canonical(body)).hexdigest()):
             raise ValueError("custody digest mismatch")
         checkpoint = envelope["checkpoint"]
-        if not isinstance(checkpoint, Mapping) or not hmac.compare_digest(
+        if type(checkpoint) is not dict or not hmac.compare_digest(
             _hex(envelope["checkpoint_digest"], "checkpoint digest"),
             _hex(checkpoint.get("digest"), "checkpoint binding"),
         ):
@@ -215,6 +226,19 @@ class AuthenticatedFairStreamCustody:
         receipt: Mapping[str, object] | None = None,
         whole_request: bool | None = None,
     ) -> tuple[object | None, dict[str, object]]:
+        allowed = {
+            "submit": {"request"}, "cancel": {"request_id", "tenant_id"},
+            "plan": {"budget"}, "cancel_unstarted": {"receipt", "tenant_id"},
+            "abandon": {"receipt"}, "acknowledge": {"receipt"},
+        }
+        if type(action) is not str or action not in allowed:
+            raise ValueError("unsupported custody transition")
+        supplied = {name for name, value in (
+            ("request", request), ("request_id", request_id), ("tenant_id", tenant_id),
+            ("budget", budget), ("receipt", receipt),
+        ) if value is not None}
+        if supplied - allowed[action]:
+            raise ValueError("irrelevant custody transition arguments")
         if whole_request is not None and (
             type(whole_request) is not bool or action not in {"plan", "acknowledge"}
             or whole_request != self.whole_request
@@ -229,7 +253,7 @@ class AuthenticatedFairStreamCustody:
             trial = FairStreamScheduler.restore(self._scheduler.checkpoint())
             plan = None
             if action == "submit":
-                if not isinstance(request, StreamRequest):
+                if type(request) is not StreamRequest:
                     raise ValueError("typed stream request required")
                 trial.submit(request)
             elif action == "cancel":
@@ -237,7 +261,7 @@ class AuthenticatedFairStreamCustody:
                     raise ValueError("request identity required")
                 trial.cancel(request_id, tenant_id=tenant_id)
             elif action == "plan":
-                if not isinstance(budget, MeasuredStreamBudget):
+                if type(budget) is not MeasuredStreamBudget:
                     raise ValueError("typed measured budget required")
                 plan = trial.plan(budget, whole_request=whole_request)
             elif action == "cancel_unstarted":
@@ -273,7 +297,7 @@ class AuthenticatedFairStreamCustody:
                     "schema", "session_id", "generation", "checkpoint_digest",
                     "lease_id", "consumed_tokens", "result_digest", "mac",
                 }
-                if not isinstance(receipt, Mapping) or set(receipt) != required:
+                if type(receipt) is not dict or set(receipt) != required:
                     raise ValueError("signed execution receipt required")
                 body = {k: receipt[k] for k in required if k != "mac"}
                 if body["schema"] != RECEIPT_SCHEMA or not hmac.compare_digest(
@@ -282,8 +306,8 @@ class AuthenticatedFairStreamCustody:
                 ):
                     raise ValueError("unauthenticated execution receipt")
                 checkpoint = self._scheduler.checkpoint()
-                if (receipt["session_id"] != self.session_id
-                        or receipt["generation"] != self.generation
+                if (_hex(receipt["session_id"], "session", 32) != self.session_id
+                        or _generation(receipt["generation"]) != self.generation
                         or receipt["checkpoint_digest"] != checkpoint["digest"]
                         or receipt["lease_id"] not in self._scheduler.pending_ids):
                     raise ValueError("stale or unbound execution receipt")
@@ -295,7 +319,10 @@ class AuthenticatedFairStreamCustody:
             else:
                 raise ValueError("unsupported custody transition")
             prior = self.export()["digest"]
+            successor = self._envelope(trial, self.generation + 1, prior)
+            # Every operation, including final encoding and MAC construction,
+            # must succeed before publishing any in-memory successor fields.
             self._scheduler = trial
             self.previous_digest = prior
             self.generation += 1
-            return plan, self.export()
+            return plan, successor

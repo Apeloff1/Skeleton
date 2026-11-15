@@ -123,3 +123,76 @@ def test_independent_keys_required():
         AuthenticatedFairStreamCustody(
             custody_key=C, execution_key=C, session_id=SESSION,
         )
+
+def test_constructor_detaches_caller_owned_scheduler():
+    from skeleton.ai.model_runtime.fair_stream_queue import FairStreamScheduler
+
+    scheduler = FairStreamScheduler()
+    scheduler.submit(request())
+    owner = AuthenticatedFairStreamCustody(
+        custody_key=C, execution_key=E, session_id=SESSION, scheduler=scheduler,
+    )
+    before = owner.export()
+    scheduler.cancel("request")
+    assert owner.export() == before
+
+
+def test_final_envelope_budget_failure_is_atomic(monkeypatch):
+    from skeleton.ai.model_runtime import fair_stream_custody as module
+
+    owner = make()
+    before = owner.export()
+    original = module._canonical
+
+    def limited(value, *args, **kwargs):
+        if isinstance(value, dict) and value.get("generation") == 1 and "mac" in value:
+            raise ValueError("custody byte budget exceeded")
+        return original(value, *args, **kwargs)
+
+    monkeypatch.setattr(module, "_canonical", limited)
+    with pytest.raises(ValueError, match="byte budget"):
+        owner.transition(expected_generation=0, action="submit", request=request())
+    assert owner.generation == 0
+    assert owner.export() == before
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"action": "submit", "request": request(), "budget": budget()},
+    {"action": "plan", "budget": budget(), "tenant_id": "tenant"},
+    {"action": "cancel", "request_id": "request", "receipt": {}},
+])
+def test_unused_action_arguments_are_never_silently_accepted(kwargs):
+    owner = make()
+    before = owner.export()
+    with pytest.raises(ValueError, match="irrelevant"):
+        owner.transition(expected_generation=0, **kwargs)
+    assert owner.export() == before
+
+
+def test_validly_signed_boolean_generation_is_not_custody_authority():
+    from skeleton.ai.model_runtime import fair_stream_custody as module
+
+    owner = make()
+    owner.transition(expected_generation=0, action="submit", request=request())
+    plan, state = owner.transition(expected_generation=1, action="plan", budget=budget())
+    receipt = sign_execution_result(
+        execution_key=E, session_id=SESSION, generation=2,
+        checkpoint_digest=state["checkpoint_digest"], lease_id=plan.leases[0].lease_id,
+        consumed_tokens=1, result_digest=RESULT,
+    )
+    receipt["generation"] = True
+    receipt["mac"] = module._sign(E, {k: v for k, v in receipt.items() if k != "mac"})
+    with pytest.raises(ValueError, match="generation"):
+        owner.transition(expected_generation=2, action="acknowledge", receipt=receipt)
+    assert owner.export() == state
+
+
+@pytest.mark.parametrize("identity", ["bad\x00id", "\ud800", "x" * 129])
+def test_cancellation_receipt_rejects_noncanonical_request_identity(identity):
+    from skeleton.ai.model_runtime.fair_stream_custody import sign_unstarted_cancellation
+
+    with pytest.raises(ValueError, match="request identity"):
+        sign_unstarted_cancellation(
+            execution_key=E, session_id=SESSION, generation=2,
+            checkpoint_digest="b" * 64, lease_id="d" * 64, request_id=identity,
+        )
