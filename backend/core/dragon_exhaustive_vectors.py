@@ -50,6 +50,7 @@ class DragonExhaustiveVectorMixin:
         try: encoder=await _cpu(local.encoder)
         except Exception:return {"configured":True,"held":True,"reason":"local_encoder_unavailable"}
         await self.ensure_indexes()
+        await self.ensure_full_vector_indexes()
         now=_now().timestamp()
         rows=await self.sessions.find({"status":{"$in":sorted(TERMINAL)},"deep_archive.released":True,
             "archive_grant.expires_at":{"$gt":now},"$or":[{"deep_full_due":{"$exists":False}},
