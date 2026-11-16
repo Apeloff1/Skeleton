@@ -88,6 +88,8 @@ on:
       - "tests/test_jeeves_advisory.py"
       - "tests/test_jeeves_live_local_advanced.py"
       - "tests/test_jeeves_context_window.py"
+      - "skeleton/app/jeeves_cognitive.py"
+      - "scripts/evaluate_jeeves_calibration.py"
       - "tests/test_jeeves_document_scope.py"
       - "skeleton/app/offline_knowledge.py"
       - "skeleton/app/offline_grounding.py"
