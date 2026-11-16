@@ -3172,6 +3172,18 @@ async def crawler_source(
     }
 
 
+@router.get("/crawler/sessions/{session_id}/sources/{source_id}/export-witness")
+async def crawler_publisher_export_witness(
+    session_id: str = URLPath(min_length=1, max_length=128),
+    source_id: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+    expected_version: int = Query(ge=1, le=2**53-1),
+    scope: dict = Depends(_crawler_write_scope),
+) -> dict:
+    """Return identity evidence only; never serve, reacquire, or import bytes."""
+    return await _crawler_result(crawler_application.publisher_export_witness(
+        scope, session_id, source_id, expected_version=expected_version))
+
+
 @router.get("/crawler/sessions/{session_id}/sources/{source_id}/text")
 async def crawler_source_text(
     session_id: str = URLPath(min_length=1, max_length=128),
