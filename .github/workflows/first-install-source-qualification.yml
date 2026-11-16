@@ -102,7 +102,8 @@ jobs:
             skeleton/testing/test_mongo_epoch_writer_result_scope.py \
             skeleton/testing/test_mongo_source_epoch.py \
             skeleton/testing/test_reviewer_custody.py \
-            skeleton/testing/test_signed_reviewer_client.py
+            skeleton/testing/test_signed_reviewer_client.py \
+            skeleton/testing/test_guard_preflight_operator_cli.py
       - name: Verify construction and provider-owner contracts
         run: |
           python scripts/check_architecture_map.py

@@ -49,7 +49,7 @@ def _database_name(value: object) -> bool:
 def _scope(value: object) -> bool:
     try:
         return (
-            type(value) is str and bool(value)
+            type(value) is str and 1 <= len(value) <= 512
             and value == value.strip()
             and len(value.encode("utf-8", errors="strict")) <= 512
             and all(ord(ch) >= 32 and ord(ch) != 127 for ch in value)
@@ -61,7 +61,7 @@ def _scope(value: object) -> bool:
 def _valid_principal_utf8(value: str) -> bool:
     """Reject unpaired surrogates and oversized identities before comparison."""
     try:
-        return len(value.encode("utf-8", errors="strict")) <= 256
+        return 1 <= len(value) <= 256 and len(value.encode("utf-8", errors="strict")) <= 256
     except UnicodeError:
         return False
 
