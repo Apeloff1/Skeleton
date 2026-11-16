@@ -43,13 +43,18 @@ def count(ledger, name):
     ledger["counts"][name] = min(1_000_000_000, ledger["counts"][name] + 1)
 
 
+def record_for(ledger, url):
+    return ledger["records"].get(hashlib.sha256(url.encode("utf-8")).hexdigest())
+
+
 def observe(ledger, *, url, parent, depth, kind):
     """Keep a unique target and bounded provenance; never imply authorization."""
     if kind not in KINDS:
         raise ValueError("unknown discovery relation")
     count(ledger, "observations")
     records = ledger["records"]
-    previous = records.get(url)
+    identity = hashlib.sha256(url.encode("utf-8")).hexdigest()
+    previous = records.get(identity)
     if previous is not None:
         previous["observations"] = min(1_000_000_000, previous["observations"] + 1)
         if depth < previous["depth"]:
@@ -58,32 +63,37 @@ def observe(ledger, *, url, parent, depth, kind):
             previous["kind"] = kind
         if kind not in previous["relations"]:
             previous["relations"] = sorted(set(previous["relations"]) | {kind})
-        if len(_encoded(ledger)) > MAX_BYTES:
+        if parent is not None and parent not in previous["parents"] and len(previous["parents"]) < 4:
+            previous["parents"].append(parent)
+        if len(_encoded(ledger)) > MAX_BYTES - 8192:
             previous["relations"] = [previous["kind"]]
+            previous["parents"] = [previous["parent_url"]] if previous["parent_url"] is not None else []
         return previous
     if len(records) >= MAX_RECORDS:
         count(ledger, "capacity_omissions")
         return None
-    row = {"depth": depth, "parent_url": parent, "kind": kind,
-           "relations": [kind], "observations": 1, "pending": False}
-    records[url] = row
+    row = {"url": url, "ordinal": ledger["counts"]["observations"],
+           "depth": depth, "parent_url": parent, "parents": [parent] if parent is not None else [],
+           "kind": kind, "relations": [kind], "observations": 1, "pending": False}
+    records[identity] = row
     # Reserve room for changing counts, provenance and the last decision.
     if len(_encoded(ledger)) > MAX_BYTES - 32768:
-        del records[url]
+        del records[identity]
         count(ledger, "capacity_omissions")
         return None
     return row
 
 
 def pending_rows(ledger):
-    return [{"url": u, "original_url": u, "depth": r["depth"],
+    return [{"url": r["url"], "original_url": r["url"], "depth": r["depth"],
              "parent_url": r["parent_url"], "attempts": 0,
              "ready_at": 0, "redirects": []}
-            for u, r in ledger["records"].items() if r["pending"]]
+            for r in sorted(ledger["records"].values(), key=lambda row: row["ordinal"])
+            if r["pending"]]
 
 
 def retire(ledger, url, *, promoted=False):
-    row = ledger["records"].get(url)
+    row = record_for(ledger, url)
     if row is not None and row["pending"]:
         row["pending"] = False
         count(ledger, "promoted" if promoted else "retired")
@@ -164,11 +174,21 @@ def validate(ledger, *, admit, max_depth):
             or len(_encoded(ledger)) > MAX_BYTES):
         raise ValueError("navigation ledger bounds")
     total = 0
-    for url, row in records.items():
-        admit(url)
+    ordinals = set()
+    for identity, row in records.items():
         if not isinstance(row, dict) or set(row) != {
-                "depth", "parent_url", "kind", "relations", "observations", "pending"}:
+                "url", "ordinal", "depth", "parent_url", "parents", "kind", "relations", "observations", "pending"}:
             raise ValueError("navigation row fields")
+        url = row["url"]
+        admit(url)
+        if (identity != hashlib.sha256(url.encode("utf-8")).hexdigest()
+                or type(row["ordinal"]) is not int or not 1 <= row["ordinal"] <= counters["observations"]
+                or row["ordinal"] in ordinals or not isinstance(row["parents"], list)
+                or len(row["parents"]) > 4 or len(set(row["parents"])) != len(row["parents"])):
+            raise ValueError("navigation identity or parent custody")
+        ordinals.add(row["ordinal"])
+        for parent in row["parents"]:
+            admit(parent)
         if row["parent_url"] is not None:
             admit(row["parent_url"])
         if (type(row["depth"]) is not int or not 0 <= row["depth"] <= max_depth + 1
