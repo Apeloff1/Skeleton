@@ -162,13 +162,7 @@ class SwarmDurableBridge:
                 return None
             tenant, task = selected
             try:
-                capture = self.capture(run_id, worker_id, manager, runtime,
-                                       tenant_broker=tenant_broker)
-                latest = self.store.resume_state(run_id).checkpoint
-                if (latest is None or latest.state_version != capture.checkpoint.state_version
-                        or manager._json_bytes(latest.state) != manager._json_bytes(capture.checkpoint.state)
-                        or manager._json_bytes(latest.state) != manager._json_bytes(manager.export_archive())):
-                    raise DurableSwarmError("durable attempt publication readback mismatch")
+                capture = self._capture_checked(run_id, worker_id, manager, tenant_broker)
             except Exception as exc:
                 resident = runtime.task(task.id)
                 if resident is not None and resident.state is TaskState.LEASED:
@@ -181,8 +175,16 @@ class SwarmDurableBridge:
                          broker: TenantSwarmBroker) -> DurableSwarmCapture:
         capture = self.capture(run_id, worker_id, manager, broker.broker.runtime,
                                tenant_broker=broker)
-        latest = self.store.resume_state(run_id).checkpoint
+        resume = self.store.resume_state(run_id)
+        latest = resume.checkpoint
+        committed_id = getattr(capture.checkpoint, "checkpoint_id", None)
+        run = getattr(resume, "run", None)
         if (latest is None or latest.state_version != capture.checkpoint.state_version
+                or (committed_id is not None
+                    and (getattr(latest, "checkpoint_id", None) != committed_id
+                         or getattr(latest, "revision", None) != capture.checkpoint.revision))
+                or (run is not None and (run.run_id != run_id or run.worker_id != worker_id
+                                        or run.status.value != "running"))
                 or manager._json_bytes(latest.state) != manager._json_bytes(capture.checkpoint.state)
                 or manager._json_bytes(latest.state) != manager._json_bytes(manager.export_archive())):
             raise DurableSwarmError("durable publication readback mismatch")
@@ -1592,3 +1594,166 @@ class LocalCommittedRecovery:
             worker_id=attempt.worker_id, lease_token=attempt.lease_token,
             outcome="committed", evidence_sha256=digest,
         )
+
+
+class ManagedHostDispatcher:
+    """Explicit startup/tick/shutdown for an exclusive local SQLite run owner.
+
+    The enclosing app calls tick with independently authorized candidates.
+    Each startup gets a fresh UUID writer identity, claims via run revision
+    CAS, restores tenant policy and durable state, and refuses unsafe empty
+    initialization. Every public mutation renews the real writer lease.
+    A stop retires this generation; takeover waits for the stored lease to
+    expire. No hidden thread, device activation or app-level auto-start.
+    """
+
+    def __init__(self, store, owner: HostWaitDriver, service: HostDispatchService,
+                 revision: int, lease_seconds: float) -> None:
+        from threading import RLock
+        self.store = store
+        self.owner = owner
+        self.service = service
+        self._revision = revision
+        self.lease_seconds = lease_seconds
+        self._lock = RLock()
+        self._stopped = False
+
+    @classmethod
+    def start(
+        cls, store, run_id: str, *,
+        ingress, authority: HostWorkerAuthority,
+        transport: LocalSubprocessTransport,
+        initial_runtime=None,
+        source_keys: dict[tuple[str, str], bytes] | None = None,
+        clock_ms: Callable[[], int] | None = None,
+        lease_seconds: float = 120.0,
+        max_checkpoints: int = 8,
+        max_terminal_records: int = 100000,
+    ) -> ManagedHostDispatcher:
+        import math
+        from uuid import uuid4
+        from skeleton.state import SQLiteRunStore
+        from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+        from skeleton.automation.agents.swarm_ingress import SwarmIngressGovernor
+        from skeleton.automation.agents.swarm_broker import SwarmBroker
+        _wait_identifier(run_id)
+        if (not isinstance(store, SQLiteRunStore)
+                or not isinstance(ingress, SwarmIngressGovernor)
+                or not isinstance(authority, HostWorkerAuthority) or authority.run_id != run_id
+                or not isinstance(transport, LocalSubprocessTransport)
+                or type(lease_seconds) not in (float, int)
+                or not math.isfinite(lease_seconds)
+                or not transport.timeout_seconds + 10 <= lease_seconds <= 3600
+                or type(max_checkpoints) is not int or not 1 <= max_checkpoints <= 64
+                or type(max_terminal_records) is not int or not 1 <= max_terminal_records <= 1_000_000):
+            raise DurableSwarmError("invalid managed host configuration")
+        prior = store.resume_state(run_id)
+        if prior.replay_steps:
+            raise DurableSwarmError("managed dispatcher requires a dedicated checkpoint run")
+        if prior.checkpoint is None:
+            if (not isinstance(initial_runtime, HardenedSwarmRuntime)
+                    or not initial_runtime.fenced or initial_runtime.tasks()):
+                raise DurableSwarmError("fresh initialization requires empty fenced runtime")
+        elif initial_runtime is not None:
+            raise DurableSwarmError("existing run cannot be replaced by fresh runtime")
+        owner_id = "dispatcher-" + uuid4().hex
+        claimed = store.claim_run(
+            run_id, owner_id, expected_revision=prior.run.revision, lease_seconds=lease_seconds,
+        )
+        bridge = SwarmDurableBridge(store)
+        broker = None
+        try:
+            loaded = bridge.load(run_id)
+            if loaded is None:
+                if prior.checkpoint is not None:
+                    raise DurableSwarmError("durable checkpoint disappeared during startup")
+                runtime = initial_runtime
+                manager = SwarmRecoveryManager(max_checkpoints=max_checkpoints, delta_archive=True)
+            else:
+                runtime = loaded.restore_runtime()
+                manager = loaded.manager
+                if runtime is None or not runtime.fenced:
+                    raise DurableSwarmError("managed dispatcher requires fenced recovered runtime")
+            broker = TenantSwarmBroker(
+                SwarmBroker(runtime, verify_worker=authority), ingress.fork_empty(),
+                max_terminal_records=max_terminal_records, verified_mode=True,
+            )
+            if loaded is not None and manager.restore_tenants(broker) is None:
+                raise DurableSwarmError("verified tenant recovery sidecar required")
+            owner = HostWaitDriver(
+                bridge, run_id, owner_id, manager, broker,
+                source_keys=source_keys if source_keys is not None else {}, clock_ms=clock_ms,
+            )
+            service = HostDispatchService(owner, transport=transport)
+            instance = cls(store, owner, service, claimed.revision, lease_seconds)
+            # Persist the initial run or the recovered uncertainty/rotated
+            # activations before admitting anything to the new generation.
+            bridge._capture_checked(run_id, owner_id, manager, broker)
+            instance.renew()
+            return instance
+        except BaseException:
+            if broker is not None:
+                broker.retire()
+            # Do not release the writer through an unverified state
+            # transition. A new owner can claim after actual lease expiry.
+            raise
+
+    def _ensure_active(self) -> None:
+        if self._stopped or self.owner.broker.is_retired():
+            raise DurableSwarmError("managed dispatcher generation stopped")
+
+    def renew(self) -> None:
+        with self._lock:
+            self._ensure_active()
+            try:
+                current = self.store.heartbeat(
+                    self.owner.run_id, self.owner.owner_id,
+                    lease_seconds=self.lease_seconds, expected_revision=self._revision,
+                )
+                self._revision = current.revision
+            except Exception as exc:
+                self.stop()
+                raise DurableSwarmError("managed writer lease lost") from exc
+
+    def submit(self, tenant: str, task: SwarmTask, *,
+               singleton_key: str | None = None) -> DurableSwarmCapture | None:
+        with self._lock:
+            self.renew()
+            return self.owner.bridge.submit_unique_verified(
+                self.owner.run_id, self.owner.owner_id, self.owner.manager, self.owner.broker,
+                tenant, task, singleton_key=singleton_key,
+            )
+
+    def submit_wait(self, intent: HostWaitIntent, task: SwarmTask, *,
+                    singleton_key: str | None = None) -> DurableSwarmCapture | None:
+        with self._lock:
+            self.renew()
+            return self.owner.submit(intent, task, singleton_key=singleton_key)
+
+    def deliver_event(self, tenant: str, task_id: str,
+                      receipt: HostEventReceipt) -> DurableSwarmCapture:
+        with self._lock:
+            self.renew()
+            return self.owner.deliver_event(tenant, task_id, receipt)
+
+    def tick(self, candidates: tuple, *, now_ms: int,
+             timer_limit: int = 64) -> HostDispatchCycle:
+        with self._lock:
+            self.renew()
+            result = self.service.cycle(candidates, now_ms=now_ms, timer_limit=timer_limit)
+            self.renew()
+            return result
+
+    def reconcile_committed(self, recovery: LocalCommittedRecovery,
+                            tenant: str, task_id: str) -> tuple[SwarmTask, DurableSwarmCapture]:
+        with self._lock:
+            self.renew()
+            result = recovery.reconcile(self.owner, tenant, task_id)
+            self.renew()
+            return result
+
+    def stop(self) -> None:
+        with self._lock:
+            if not self._stopped:
+                self._stopped = True
+                self.owner.broker.retire()

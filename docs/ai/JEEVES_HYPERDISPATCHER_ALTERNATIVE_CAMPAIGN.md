@@ -327,3 +327,25 @@ Pending or mismatched attempts remain uncertain. This establishes a
 recoverable local pure-job effect path, not a general external side-effect
 or physical-stop proof. Two regressions cover the lost owner checkpoint
 window and rejection of unproven attempts.
+
+## Wave A16: managed local dispatcher lifecycle and writer fencing
+
+A concrete managed host startup now claims the existing SQLite run using
+revision CAS and a fresh process-generation writer identity. It refuses
+nonempty or nonfenced fresh runtimes, unrelated run steps, missing tenant
+sidecars and fresh-runtime replacement of existing archives. Recovery
+preserves uncertain attempts and restores the sealed ingress policy;
+the new generation checkpoints before accepting work. The managed public
+submission, event, timer/dispatch tick and committed-recovery boundaries
+renew the real owner lease, and a failed renewal retires the stale owner.
+Transport timeout must leave a configured lease margin. Exact checkpoint
+readback now also compares the actual checkpoint identity/revision and
+owner when backed by the real run store. Stop retires locally without
+fabricating physical stop or early release; takeover waits for stored
+expiration. New tests exercise two-generation takeover, stale owner
+refusal, actual process execution on both generations and unsafe bootstrap.
+
+This is an opt-in host lifecycle API, not yet wired into the app's global
+startup or daemon. Automatic candidate authorization, heterogeneous
+resource adapters, independent device qualification and external worker
+transport remain open.

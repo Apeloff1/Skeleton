@@ -2407,3 +2407,75 @@ def test_local_committed_recovery_refuses_pending_or_modified_attempt(tmp_path):
         with pytest.raises(DurableSwarmError):
             validator.artifact(candidate)
     assert custody.usage()["reconciliations"] == 0
+
+
+def test_managed_dispatcher_start_tick_takeover_and_stale_owner_fencing(tmp_path):
+    from skeleton.automation.agents.swarm_durable import (
+        SQLiteWorkerCustody, LocalSubprocessTransport, LocalWorkerEvidenceValidator,
+        HostWorkerAuthority, ManagedHostDispatcher, DurableSwarmError,
+    )
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_ingress import SwarmIngressGovernor
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, TaskState
+    from skeleton.intelligence.dispatch_policy import DispatchCandidate
+    from skeleton.testing.test_durable_run_store import make_store, Clock
+    from skeleton.state import StateConflict
+    run_id = "managed"
+    clock = Clock()
+    store = make_store(tmp_path, clock)
+    store.create_run(run_id)
+    custody = SQLiteWorkerCustody(_private_worker_directory(tmp_path))
+    authority = HostWorkerAuthority(run_id, grants={
+        ("worker", "w"): (b"w" * 32, frozenset({"success"})),
+    }, resolve=custody.resolve, validate_evidence=LocalWorkerEvidenceValidator(custody))
+    transport = LocalSubprocessTransport(
+        custody, grants={("a", "w"): frozenset({"integer_sum"})},
+        worker_signers={"w": ("worker", b"w" * 32)}, timeout_seconds=1,
+    )
+    initial_runtime = HardenedSwarmRuntime(fenced=True)
+    initial_runtime.register_worker("w", capacity=1)
+    options = dict(ingress=SwarmIngressGovernor(), authority=authority,
+                   transport=transport, lease_seconds=20)
+    first = ManagedHostDispatcher.start(store, run_id, initial_runtime=initial_runtime, **options)
+    first.submit("a", SwarmTask("one", {"operation": "integer_sum", "input": [1, 2]}))
+    with pytest.raises(StateConflict):
+        ManagedHostDispatcher.start(store, run_id, **options)
+    assert first.tick((DispatchCandidate("one", "a", 100, 0),), now_ms=10000).disposition == "completed"
+    first.submit("a", SwarmTask("two", {"operation": "integer_sum", "input": [3, 4]}))
+    clock.advance(21)
+    second = ManagedHostDispatcher.start(make_store(tmp_path, clock), run_id, **options)
+    assert second.owner.owner_id != first.owner.owner_id
+    with pytest.raises(DurableSwarmError, match="lease lost"):
+        first.tick((DispatchCandidate("two", "a", 100, 0),), now_ms=10000)
+    assert first.owner.broker.is_retired()
+    assert second.tick((DispatchCandidate("two", "a", 100, 0),), now_ms=10000).disposition == "completed"
+    runtime = second.owner.broker.broker.runtime
+    assert runtime.task("one").state is TaskState.SUCCEEDED
+    assert runtime.task("two").state is TaskState.SUCCEEDED
+    assert custody.usage()["completed"] == 2
+    second.stop()
+    with pytest.raises(DurableSwarmError, match="stopped"):
+        second.tick((), now_ms=10000)
+
+
+def test_managed_dispatcher_requires_empty_new_fenced_runtime(tmp_path):
+    from skeleton.automation.agents.swarm_durable import (
+        SQLiteWorkerCustody, LocalSubprocessTransport, LocalWorkerEvidenceValidator,
+        HostWorkerAuthority, ManagedHostDispatcher, DurableSwarmError,
+    )
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_ingress import SwarmIngressGovernor
+    from skeleton.automation.agents.swarm_runtime import SwarmTask
+    from skeleton.testing.test_durable_run_store import make_store
+    store = make_store(tmp_path)
+    store.create_run("fresh")
+    custody = SQLiteWorkerCustody(_private_worker_directory(tmp_path))
+    authority = HostWorkerAuthority("fresh", grants={}, resolve=custody.resolve,
+                                   validate_evidence=LocalWorkerEvidenceValidator(custody))
+    transport = LocalSubprocessTransport(custody, grants={}, worker_signers={})
+    runtime = HardenedSwarmRuntime(fenced=True)
+    runtime.submit(SwarmTask("unowned", {}))
+    with pytest.raises(DurableSwarmError, match="empty fenced"):
+        ManagedHostDispatcher.start(store, "fresh", ingress=SwarmIngressGovernor(),
+                                    authority=authority, transport=transport, initial_runtime=runtime)
+    assert store.get_run("fresh").worker_id is None
