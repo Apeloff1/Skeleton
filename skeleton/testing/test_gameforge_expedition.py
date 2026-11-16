@@ -265,3 +265,161 @@ def test_cli_source_to_play_board_resume_export_and_module_dispatch():
     proc = subprocess.run([sys.executable, "-m", "skeleton", "gameforge-expedition", "build"],
                           input=canonical(source), capture_output=True, timeout=90, check=True)
     assert json.loads(proc.stdout) == design
+
+
+def mission_request():
+    source = request()
+    board = json.loads((Path(harbor.__file__).parent / "fixtures" /
+                        "harbor_lantern_quay_missions.json").read_text(encoding="utf-8"))
+    source["episodes"][0].update(mission_board=board, required_missions=["dispatch"])
+    return source
+
+
+def test_mission_gates_reuse_actual_harbor_mission_owner():
+    from skeleton.game.gameplay.harbor_crafting_missions import mission_report, verify_mission_report
+    source = mission_request()
+    design = build_expedition(source)
+    completed = play_expedition(source, design["witness"])
+    summary = completed["state"]["episodes"]["s0"]["missions"]
+    assert summary["completed"] == ["salvage", "workshop", "dispatch"]
+    assert summary["points"] == 60 and summary["required"] == ["dispatch"]
+    assert summary["satisfied"]
+    evidence = episode_evidence(source, completed, "s0")
+    expected = mission_report(evidence["bundle"], source["episodes"][0]["mission_board"], require_all=True)
+    assert evidence["mission_report"] == expected
+    assert verify_mission_report(expected, require_all=True)["points"] == 60
+    assert summary["report_digest"] == expected["report_digest"]
+    assert verify_evidence(source, completed, evidence)
+    board = expedition_board(source, completed)
+    assert board["episodes"][0]["missions"] == summary
+
+
+def test_required_mission_deadline_is_a_real_gate_even_with_earned_ending():
+    from skeleton.app.gameforge_expedition_recovery import plan_expedition
+    source = mission_request()
+    source["episodes"][0]["mission_board"]["missions"][0]["deadline"] = 5
+    # The unchanged authorized demo earns salvage at tick 5, so the
+    # request remains playable. One explicit wait forfeits that deadline.
+    design = build_expedition(source)
+    actions = design["witness"]
+    start, end = portal(actions), first_resolve(actions)
+    delayed = actions[:start] + [
+        {"type": "harbor", "objective": "s0", "action": {"op": "wait"}}
+    ] + actions[start:end]
+    # A moving merchant may affect traversability; the fixture's demo
+    # follows the west/south route that avoids the merchant tiles.
+    terminal = play_expedition(source, delayed)
+    mission = terminal["state"]["episodes"]["s0"]
+    assert mission["state"]["ending"] == "beacon"
+    assert not mission["gate_satisfied"] and not mission["missions"]["satisfied"]
+    assert terminal["state"]["blockers"][0]["reason"] == "required_missions_missing"
+    assert terminal["state"]["earned_rewards"] == []
+    with pytest.raises(ValueError, match="missions"):
+        resume_expedition(source, terminal, [actions[end]])
+    result = plan_expedition(source, terminal)
+    assert result["status"] == "local_required_missions_missing"
+    assert not result["additional"]
+
+
+def test_recovery_uses_actual_partial_local_inventory_and_explicit_wait_splice():
+    from skeleton.app.gameforge_expedition_recovery import plan_expedition, verify_plan
+    source = mission_request()
+    actions = build_expedition(source)["witness"]
+    start = portal(actions)
+    partial_actions = actions[:start + 3] + [
+        {"type": "harbor", "objective": "s0", "action": {"op": "wait"}}
+    ]
+    partial = play_expedition(source, partial_actions)
+    frozen = deepcopy(partial)
+    plan = plan_expedition(source, partial)
+    assert plan["status"] == "completion_witness"
+    local = plan["local_results"]["s0"]
+    assert local["strategy"] == "verified_wait_splice"
+    assert local["completion_missions"]["satisfied"]
+    assert verify_plan(source, partial, plan)
+    final = resume_expedition(source, partial, plan["additional"])
+    assert final["state"]["status"] == "completed"
+    assert final["session_digest"] == plan["completion_digest"]
+    assert final["state"]["episodes"]["s0"]["missions"]["points"] == 60
+    assert partial == frozen
+    assert plan_expedition(source, final)["status"] == "already_completed"
+
+
+def test_mission_deadline_prunes_recovery_without_guessing_grants():
+    from skeleton.app.gameforge_expedition_local_recovery import recover_local, verify_local_recovery
+    source = mission_request()["episodes"][0]
+    board = source["mission_board"]
+    board["missions"][0]["deadline"] = 5
+    prefix = [{"op": "wait"}] * 5
+    plan = recover_local(source["source"], prefix, "beacon", witness=source["witness"],
+                         mission_board=board, required_missions=["dispatch"])
+    assert plan["status"] == "mission_deadline_exhausted"
+    assert plan["additional"] == [] and plan["expanded"] == 0
+    assert verify_local_recovery(source["source"], prefix, plan, witness=source["witness"],
+                                 mission_board=board, required_missions=["dispatch"])
+
+
+def test_local_search_ceiling_is_not_proof_of_unreachability():
+    from skeleton.app.gameforge_expedition_local_recovery import recover_local
+    source = request()["episodes"][0]["source"]
+    result = recover_local(source, [], "beacon", max_states=1)
+    assert result["status"] == "budget_exhausted" and result["additional"] == []
+    assert result["expanded"] <= 1
+    with pytest.raises(ValueError):
+        recover_local(source, [], "beacon", max_states=True)
+
+
+def test_bounded_transition_search_completes_real_near_terminal_state():
+    from skeleton.app.gameforge_expedition_local_recovery import recover_local
+    ep = mission_request()["episodes"][0]
+    prefix = ep["witness"][:-1]
+    local = recover_local(ep["source"], prefix, "beacon", max_states=32,
+                          mission_board=ep["mission_board"], required_missions=["dispatch"])
+    assert local["status"] == "completion_witness"
+    assert local["additional"] == [{"op": "choose", "choice": "signal"}]
+    assert local["strategy"] == "bounded_transition_search"
+
+
+def test_recovery_comparison_and_forged_plan_are_source_fenced():
+    from skeleton.app.gameforge_expedition_recovery import compare_expeditions, verify_comparison, plan_expedition, verify_plan
+    source = mission_request()
+    actions = build_expedition(source)["witness"]
+    end = first_resolve(actions)
+    branch = deepcopy(actions[:end])
+    branch[-1]["action"]["choice"] = "shelter"
+    left = play_expedition(source, branch)
+    right = play_expedition(source, actions)
+    comparison = compare_expeditions(source, left, right)
+    assert comparison["common_prefix"] == end - 1
+    row = comparison["episodes"]["s0"]
+    assert row["left_ending"] == "safe_harbor" and row["right_ending"] == "beacon"
+    assert row["mission_outcomes"]["points_delta"] == 30
+    assert comparison["left_recovery"]["status"] == "local_alternate_ending"
+    assert comparison["right_recovery"]["status"] == "already_completed"
+    assert verify_comparison(source, left, right, comparison)
+    initial = play_expedition(source, [])
+    plan = plan_expedition(source, initial)
+    forged = deepcopy(plan)
+    forged["additional"] = []
+    rehash(forged, "recovery_digest")
+    assert not verify_plan(source, initial, forged)
+    altered = deepcopy(comparison)
+    altered["episodes"]["s0"]["coin_delta"] = 100
+    rehash(altered, "comparison_digest")
+    assert not verify_comparison(source, left, right, altered)
+
+
+def test_new_mission_bindings_are_strict_and_witness_must_earn_them():
+    source = mission_request()
+    bad = deepcopy(source)
+    bad["episodes"][0].pop("required_missions")
+    assert invoke("build", bad)[0] == 1
+    bad = deepcopy(source)
+    bad["episodes"][0]["required_missions"] = ["nonexistent"]
+    assert invoke("build", bad)[0] == 1
+    bad = deepcopy(source)
+    bad["episodes"][0]["mission_board"]["missions"][0]["deadline"] = 1
+    assert invoke("build", bad)[0] == 1
+    bad = deepcopy(source)
+    bad["episodes"][0]["mission_board"]["source_id"] = "foreign-world"
+    assert invoke("build", bad)[0] == 1
