@@ -81,7 +81,9 @@ def _do(domain:str,p:dict[str,Any])->dict:
         return {"state":view["state"]}
 
     if domain=="submission":
-        store=make_store()
+        # Exercise the intrinsic one-hour JobSpec ceiling; policy-specific
+        # deadline restrictions are covered independently by real store tests.
+        store=make_store(WorkLimits(deadline_ms=3600000))
         spec=make_spec(
             name=p["job_id"],request_id=p["request_id"],
             question=p["question"],created_ms=p["created_ms"],expires_ms=p["expires_ms"],

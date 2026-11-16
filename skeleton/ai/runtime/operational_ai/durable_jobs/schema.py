@@ -54,6 +54,10 @@ def ensure_schema(db: sqlite3.Connection) -> None:
        previous_sha TEXT NOT NULL,
        event_sha TEXT NOT NULL
     )""")
+    db.execute("""CREATE INDEX IF NOT EXISTS ai_job_audit_binding_idx
+       ON ai_job_audit(job_id,kind,seq)""")
+    db.execute("""CREATE INDEX IF NOT EXISTS ai_job_owner_state_idx
+       ON ai_durable_jobs(tenant,user_id,model_sha,tokenizer_sha,state,next_eligible_ms)""")
     db.execute("""CREATE TABLE IF NOT EXISTS ai_job_state(
        singleton INTEGER PRIMARY KEY CHECK(singleton=1),
        audit_sha TEXT NOT NULL,

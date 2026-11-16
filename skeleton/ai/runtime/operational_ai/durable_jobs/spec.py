@@ -91,12 +91,12 @@ class JobSpec:
         require_int(self.priority,0,3,"priority")
         if type(self.dependencies) is not tuple or len(self.dependencies)>32:
             deny("job-dependencies")
-        if len(set(self.dependencies)) != len(self.dependencies):
-            deny("job-duplicate-dependencies")
         for item in self.dependencies:
             require_id(item,"dependency")
             if item == self.job_id:
                 deny("job-self-dependency")
+        if len(set(self.dependencies)) != len(self.dependencies):
+            deny("job-duplicate-dependencies")
 
     @property
     def digest(self) -> str:
