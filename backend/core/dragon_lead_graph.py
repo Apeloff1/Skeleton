@@ -22,6 +22,7 @@ from core.dragon_game_taxonomy import SOURCE_CLASSES
 from core.dragon_hoarder_bulk import owner_key
 from core.dragon_dataset_library import target,_library
 from core.dragon_mod_seed_catalogue import STEAM_ROUTES,APPID,_canonical_locator
+from core.dragon_lead_index_shards import SOURCE_SCHEMA as INDEX_SCHEMA
 
 LEAD_LANES=10
 NODES_PER_LANE=20_000_000
@@ -115,7 +116,7 @@ CREATE TABLE IF NOT EXISTS lead_review_events(
  PRIMARY KEY(owner,id),FOREIGN KEY(owner,lead) REFERENCES lead_nodes(owner,id)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS lead_review_history ON lead_review_events(owner,lead,created_at,id);
-"""
+"""+INDEX_SCHEMA
 STATES={"candidate","held","retired"}
 DATASET_KINDS={"dataset_manifest","dataset_checksum_manifest","public_jsonl_dataset","public_csv_dataset","public_parquet_dataset","public_sqlite_dataset","public_data_export","static_data_export","static_data_schema","dataset_version_history","public_metadata_bulk_export","research_dataset_catalogue","public_data_endpoint"}
 RELATIONS={"seed","dataset_target","dataset_projection","feed_discovery","catalogue_observation"}
@@ -735,18 +736,32 @@ class LeadGraph:
         clauses=["n.owner=?","n.state=?","n.id>?"];values=[owner,state,lower]
         if family:clauses.append("n.family=?");values.append(family)
         if host:clauses.append("n.host=?");values.append(host)
-        if due_only:clauses.append("n.next_review<=?");values.append(int(time.time()))
+        cutoff=int(time.time()) if due_only else None
+        if due_only:clauses.append("n.next_review<=?");values.append(cutoff)
         sql="SELECT n.* FROM lead_nodes n"
         if terms:
             sql+=" JOIN lead_fts f ON f.owner=n.owner AND f.id=n.id"
             clauses.append("lead_fts MATCH ?")
             values.append('owner:"'+owner+'" AND '+' AND '.join('"'+term+'"' for term in terms))
         sql+=" WHERE "+" AND ".join(clauses)+" ORDER BY n.id LIMIT ?";values.append(limit+1)
+        physical=False
         with self._db() as db:
-            deadline=time.monotonic()+3
-            db.set_progress_handler(lambda:int(time.monotonic()>deadline),10000)
-            rows=db.execute(sql,values).fetchall()
+            import os
+            if terms and os.getenv("SKL_DRAGON_LEAD_INDEX_ROOT","").strip():
+                from core.dragon_lead_index_shards import lookup,IndexHeld
+                from core.dragon_owner_shards import ShardHeld
+                db.execute("BEGIN")
+                try:
+                    rows=lookup(db,owner,terms,state=state,family=family,host=host,lower=lower,cutoff=cutoff,limit=limit)
+                    db.execute("COMMIT");physical=True
+                except (IndexHeld,ShardHeld,sqlite3.Error,OSError,ValueError):
+                    if db.in_transaction:db.execute("ROLLBACK")
+            if not physical:
+                deadline=time.monotonic()+3
+                db.set_progress_handler(lambda:int(time.monotonic()>deadline),10000)
+                rows=db.execute(sql,values).fetchall()
         return {"leads":[{**dict(r),"verified":False,"network_authorized":False} for r in rows[:limit]],
+            "physical_search_shards_used":physical,
             "next_cursor":fingerprint+":"+rows[limit-1]["id"] if len(rows)>limit else None,
             "candidate_only":True,"network_authorized":False}
 
