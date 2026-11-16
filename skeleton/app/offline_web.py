@@ -222,14 +222,17 @@ HTML = r"""<!doctype html>
         <label for="budget">Output tokens <input id="budget" type="number" min="1" max="8192" value="32"></label>
       </div>
       <div class="inline">
-        <label for="adaptive-mode">Adaptive review <select id="adaptive-mode"><option value="off">Off — compare two candidates</option><option value="review">Budgeted reasoning</option><option value="arithmetic">Exact arithmetic</option><option value="table">Table artifact</option><option value="checklist">Checklist artifact</option><option value="series">Numeric series artifact</option></select></label>
+        <label for="adaptive-mode">Adaptive review <select id="adaptive-mode"><option value="off">Off — compare two candidates</option><option value="review">Budgeted reasoning</option><option value="arithmetic">Exact arithmetic</option><option value="source_quotes">Exact local source quotations</option><option value="table">Table artifact</option><option value="checklist">Checklist artifact</option><option value="series">Numeric series artifact</option></select></label>
         <label for="adaptive-attempts">Maximum attempts <input id="adaptive-attempts" type="number" min="1" max="4" value="4"></label>
         <label for="adaptive-total">Total reserved tokens <input id="adaptive-total" type="number" min="1" max="512" value="128"></label>
         <label for="adaptive-language">Response language <select id="adaptive-language"><option value="auto">Automatic</option><option value="en">English</option><option value="nb">Norwegian Bokmål</option><option value="nn">Norwegian Nynorsk</option><option value="de">German</option><option value="fr">French</option><option value="es">Spanish</option><option value="it">Italian</option><option value="pt">Portuguese</option><option value="pl">Polish</option><option value="ja">Japanese</option><option value="ko">Korean</option><option value="zh">Chinese</option><option value="ar">Arabic</option><option value="hi">Hindi</option></select></label>
       </div>
       <label for="adaptive-expression">Explicit arithmetic expression (only used in arithmetic mode)</label>
       <input id="adaptive-expression" type="text" maxlength="256" placeholder="(17 + 5) * 3 / 2">
-      <p class="minor">Only explicit arithmetic equality or artifact schema is checked independently. Artifact values, language quality and factual claims are not verified.</p>
+      <label for="review-history-policy">Review context selection <select id="review-history-policy"><option value="recent">Recent turns (default)</option><option value="relevance">Relevance packing (explicitly lossy)</option></select></label>
+      <label for="quote-minimum">Minimum exact quotes <input id="quote-minimum" type="number" min="1" max="4" value="1"></label>
+      <label for="quote-sources">Minimum distinct local source documents <input id="quote-sources" type="number" min="1" max="3" value="1"></label>
+      <p class="minor">Relevance packing requires disabling full-history preservation for review. Exact source quotes require local evidence; literal identity is not factual truth. Arithmetic equality and artifact structure are independently checked only within their contracts.</p>
       </details>
       <div class="composer-submit">
         <span class="hint keyboard-hint">Ctrl / ⌘ + Enter to send</span>
@@ -534,7 +537,7 @@ JAVASCRIPT = r"""'use strict';
     get('cognitive-preview').disabled = get('context-preview').disabled;
     get('deliberation-review').disabled = get('context-preview').disabled || foreignLease || state.health?.ready !== true;
     get('research-review').disabled = locked || working || !state.session;
-    ['adaptive-mode','adaptive-attempts','adaptive-total','adaptive-language','adaptive-expression',
+    ['adaptive-mode','adaptive-attempts','adaptive-total','adaptive-language','adaptive-expression','review-history-policy','quote-minimum','quote-sources',
       'campaign-id','campaign-plan','campaign-budget','campaign-create','campaign-inspect'].forEach(id => {
       get(id).disabled = locked || working || !state.session;
     });
@@ -639,6 +642,9 @@ JAVASCRIPT = r"""'use strict';
     get('adaptive-expression').value = '';
     get('adaptive-mode').value = 'off';
     get('adaptive-language').value = 'auto';
+    get('review-history-policy').value = 'recent';
+    get('quote-minimum').value = '1';
+    get('quote-sources').value = '1';
     get('context-preserve').checked = true;
     state.longformSourceId = null;
     state.longformWork = null;
@@ -1548,15 +1554,24 @@ JAVASCRIPT = r"""'use strict';
     const scopeVersion = state.knowledgeScopeVersion;
     const session = state.session, revision = state.revision, epoch = state.epoch;
     const mode = get('adaptive-mode').value;
+    const historyPolicy = get('review-history-policy').value;
+    const quoteMinimum = Number(get('quote-minimum').value);
+    const quoteSources = Number(get('quote-sources').value);
+    if (historyPolicy === 'relevance' && strict)
+      throw new Error('Disable full-history preservation before requesting explicitly lossy relevance packing.');
+    if (mode === 'source_quotes' && !grounded)
+      throw new Error('Enable local evidence before requesting exact source quotations.');
     const adaptive = mode === 'off' ? null : {
       max_attempts: Number(get('adaptive-attempts').value),
       maximum_reserved_tokens: Number(get('adaptive-total').value),
       language: get('adaptive-language').value,
       contract: mode === 'review' ? {kind: 'review'} : mode === 'arithmetic' ?
         {kind: 'arithmetic', expression: get('adaptive-expression').value.trim()} :
+        mode === 'source_quotes' ? {kind: 'source_quotes', minimum_quotes: quoteMinimum, minimum_distinct_sources: quoteSources} :
         {kind: 'artifact', artifact_kind: mode}
     };
-    const policyMatches = () => mode === get('adaptive-mode').value && (!adaptive ||
+    const policyMatches = () => mode === get('adaptive-mode').value && historyPolicy === get('review-history-policy').value &&
+      (mode !== 'source_quotes' || (quoteMinimum === Number(get('quote-minimum').value) && quoteSources === Number(get('quote-sources').value))) && (!adaptive ||
       (adaptive.max_attempts === Number(get('adaptive-attempts').value) &&
        adaptive.maximum_reserved_tokens === Number(get('adaptive-total').value) &&
        adaptive.language === get('adaptive-language').value &&
@@ -1570,14 +1585,14 @@ JAVASCRIPT = r"""'use strict';
     const report = await api('POST', '/v1/sessions/' + session + '/deliberation-review', {
       message, expected_revision: revision, approved: true, max_output_tokens: tokens,
       grounded, require_full_history: strict, ...(scope.length ? {document_ids: scope} : {}),
-      ...(adaptive ? {adaptive} : {})
+      history_policy: historyPolicy, ...(adaptive ? {adaptive} : {})
     });
     const sha = /^[0-9a-f]{64}$/;
     if (report.schema !== (adaptive ? 'skeleton.jeeves.adaptive-review.v1' : 'skeleton.jeeves.deliberation-review.v1') ||
         report.model_digest !== state.health?.model_digest ||
         report.tokenizer_digest !== state.health?.tokenizer_digest ||
         report.session_revision !== revision || report.question_sha256 !== await exactLocalSha256(message) ||
-        report.generation_performed !== true || report.transcript_committed !== false ||
+        report.history_policy !== historyPolicy || report.generation_performed !== true || report.transcript_committed !== false ||
         report.tool_execution_authorized !== false || report.memory_saved !== false ||
         report.comparison?.answer_selected !== false || report.comparison?.semantic_truth_verified !== false ||
         !Array.isArray(report.candidates) || report.candidates.length < 1 ||
@@ -1607,7 +1622,53 @@ JAVASCRIPT = r"""'use strict';
           !sha.test(candidate.verification?.verifier_sha256 || '')))
         throw new Error('Invalid scoped verifier evidence.');
       produced += candidate.output_tokens;
+      if (historyPolicy === 'relevance') {
+        const packing = candidate.history_packing;
+        if (!packing || packing.schema !== 'skeleton.jeeves.relevance-history.v1' ||
+            packing.question_sha256 !== report.question_sha256 || packing.history_modified !== false ||
+            packing.summarized !== false || packing.semantic_relevance_verified !== false ||
+            !Number.isSafeInteger(packing.total_turns) || !Number.isSafeInteger(packing.omitted_turns) ||
+            !Array.isArray(packing.selected_turns) || packing.selected_turns.length > 24 ||
+            packing.total_turns !== packing.omitted_turns + packing.selected_turns.length ||
+            !sha.test(packing.receipt_sha256))
+          throw new Error('Invalid relevance context receipt.');
+        let previous = -1;
+        const messages = state.messages.filter(row => row.role !== 'system');
+        if (messages.length !== packing.total_turns * 2) throw new Error('Conversation snapshot changed.');
+        for (const turn of packing.selected_turns) {
+          if (!Number.isSafeInteger(turn.turn_index) || turn.turn_index <= previous ||
+              turn.turn_index >= packing.total_turns || !sha.test(turn.pair_sha256))
+            throw new Error('Invalid selected conversation turn.');
+          previous = turn.turn_index;
+        }
+        lines.push('Context: ' + packing.selected_turns.length + ' original turns retained; ' +
+          packing.omitted_turns + ' omitted from inference only. No summary generated.');
+      }
       if (adaptive) lines.push('CONTRACT: ' + candidate.verification.code);
+      if (adaptive && adaptive.contract.kind === 'source_quotes' && candidate.verification.passed) {
+        const proof = candidate.verification.quote_verification;
+        if (!proof || proof.literal_identity_verified !== true || proof.source_truth_verified !== false ||
+            proof.answer_completeness_verified !== false || !Array.isArray(proof.quotes) ||
+            proof.quotes.length < quoteMinimum || proof.quotes.length > 4)
+          throw new Error('Invalid literal source proof.');
+        const originals = JSON.parse(candidate.text);
+        if (!Array.isArray(originals.quotes) || originals.quotes.length !== proof.quotes.length)
+          throw new Error('Quote proof count mismatch.');
+        const distinct = new Set();
+        for (const [index, item] of proof.quotes.entries()) {
+          if (!item || typeof item.quote !== 'string' || (scope.length && !scope.includes(item.document_id)) ||
+              !sha.test(item.document_sha256) || !Number.isSafeInteger(item.start) ||
+              !Number.isSafeInteger(item.end) || item.start < 0 ||
+              item.end - item.start !== Array.from(item.quote).length ||
+              item.quote_sha256 !== await exactLocalSha256(item.quote) ||
+              originals.quotes[index].quote !== item.quote || originals.quotes[index].citation !== item.citation)
+            throw new Error('Quote proof mismatch.');
+          distinct.add(item.document_id);
+          lines.push('Verified literal quote: ' + item.citation + ' [' + item.start + '–' + item.end + ']');
+        }
+        if (distinct.size < quoteSources || distinct.size !== proof.distinct_document_count)
+          throw new Error('Source diversity proof mismatch.');
+      }
       lines.push(candidate.strategy.toUpperCase() + ' — ' + candidate.output_tokens + ' tokens',
         candidate.text, 'Execution receipt: ' + candidate.execution_receipt_digest, '');
     }
