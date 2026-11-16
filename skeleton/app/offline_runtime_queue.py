@@ -110,6 +110,7 @@ class OfflineRequestQueue:
         self._poisoned = False
         self._closed = False
         self._sequence = 0
+        self._consumer = session.claim_consumer()
 
     def _open(self) -> None:
         require(not self._closed and not self._poisoned, "request queue unavailable")
@@ -220,9 +221,10 @@ class OfflineRequestQueue:
             require(not decision.evicted_kv and not decision.rejected,
                     "unexpected cache eviction or rejected canonical request")
             work = self._work()
-            observation = self._session.offer(work)
+            observation = self._session.offer(work, consumer=self._consumer)
             grant = observation["admission"]
-            slices = self._session.consume(grant) if grant["status"] == "candidate" else ()
+            slices = (self._session.consume(grant, consumer=self._consumer)
+                      if grant["status"] == "candidate" else ())
             self._sequence += 1
         progressed = []
         for item in slices:
@@ -233,7 +235,7 @@ class OfflineRequestQueue:
                 now = time.monotonic_ns()
                 if self._closed or row.cancel.is_set() or now >= row.deadline_ns:
                     continue
-                if now > grant["expires_ns"]:
+                if self._session.status()["closed"] or now >= grant["expires_ns"]:
                     break
                 phase = "prefill" if row.prompt_left else "decode"
                 remaining = row.prompt_left if row.prompt_left else row.decode_left
@@ -254,8 +256,9 @@ class OfflineRequestQueue:
                     row.decode_left -= result.processed_tokens
                 now = time.monotonic_ns()
                 # Never count a late or cancelled result as successful terminal output.
-                if row.cancel.is_set() or now >= row.deadline_ns or now > deadline:
-                    reason = "cancelled" if row.cancel.is_set() else "deadline"
+                if (self._session.status()["closed"] or row.cancel.is_set()
+                        or now >= row.deadline_ns or now >= deadline):
+                    reason = "cancelled" if row.cancel.is_set() or self._session.status()["closed"] else "deadline"
                     self._retire(key, completed=False)
                     retired.append({"request_id": key, "terminal": reason})
                     continue
