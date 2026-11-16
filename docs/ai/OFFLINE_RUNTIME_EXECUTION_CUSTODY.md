@@ -235,3 +235,39 @@ Added focused regression sources for malformed offer recovery, exact
 expiry, stalled resident slot release and source-bound deadline
 calculation. No new physical executor capability or qualification is
 claimed.
+
+
+## Noncreating model-store inspection and heterogeneous packing
+
+Read-only weight store opening now requires an existing root, objects
+directory and manifests directory. It does not invoke directory creation
+or permit staging. The inventory, selected-source preflight and sealed
+loader use this mode. A store instance binds the observed identities of
+its managed directories; it rejects changed layouts, symlink/reparse
+directories and observed object-bucket replacement during verified
+reading. Manifest declarations require an exact integer schema version,
+bounded list of shards and canonical shard fields. External ancestors
+remain the responsibility of the trusted store operator. These
+portable identity comparisons do not provide an adversarially immutable
+directory-descriptor traversal, filesystem isolation, or Windows ACL
+qualification.
+
+The canonical placement owner retains successful historical
+largest-free placement when no preference is supplied. Failure now
+tries bounded deterministic descending-size largest-free and best-fit
+packings, preserving the original shard indices in the final output.
+An optional device-kind preference may guide these attempts;
+neutral fallback is permitted by the generic packing owner, but
+hybrid preflight requires that at least one actual shard be placed on
+the CUDA device. Hybrid host capacity preserves a minimum worker
+allowance before model placement, and canonical worker/energy checks
+continue to tighten execution admission afterward. No single shard may
+consume combined capacity split across devices.
+
+The packing alternatives address order-dependent fragmentation, not
+arbitrary global bin-packing optimality. A rejected bounded packing is
+not a proof of impossibility. Placement receipts still do not perform
+native tensor allocation, migration, offload or physical GPU execution.
+Focused regressions are added for directory replacement, read-only
+inspection, malformed manifests, packable fragmentation cases and
+hybrid accelerator selection. Exact-head test execution is outstanding.
