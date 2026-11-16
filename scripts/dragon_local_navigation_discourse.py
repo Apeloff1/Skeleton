@@ -10,6 +10,7 @@ import argparse
 import http.client
 import json
 import os
+import re
 from pathlib import Path
 import stat
 import sys
@@ -44,7 +45,7 @@ def request_discourse(port, token, packet):
     ids = set(validate_packet(packet))
     if type(port) is not int or not 1 <= port <= 65535:
         raise ValueError("invalid loopback port")
-    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=300)
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=920)
     try:
         data = json.dumps({"packet":packet,"approved":True},ensure_ascii=True).encode()
         connection.request("POST","/v1/dragon/navigation-discourse",body=data,
@@ -64,8 +65,20 @@ def request_discourse(port, token, packet):
             if not isinstance(rank,list) or not rank or len(rank)!=len(set(rank)) or not set(rank)<=ids:
                 raise ValueError("local discourse returned an unknown target")
         receipts=result["role_receipts"]
-        if not isinstance(receipts,list) or [r["role"] for r in receipts]!=["jeeves","dragon"]:
+        if (result.get("candidate_count")!=len(ids) or not isinstance(receipts,list)
+                or not 2<=len(receipts)<=18 or len(receipts)%2
+                or [r["role"] for r in receipts]!=["jeeves","dragon"]*(len(receipts)//2)
+                or receipts[-1].get("stage")!="final"):
             raise ValueError("local role execution receipts missing")
+        for offset in range(0,len(receipts),2):
+            a,b=receipts[offset:offset+2]
+            if (a.get("stage")!=b.get("stage") or a.get("group_digest")!=b.get("group_digest")
+                    or a["session_id"]==b["session_id"]):
+                raise ValueError("local role match custody mismatch")
+        for row in receipts:
+            for key in ("group_digest","execution_receipt_digest","output_digest"):
+                if not re.fullmatch(r"[a-f0-9]{64}",row.get(key,"")):
+                    raise ValueError("local execution digest missing")
         return result
     finally:
         connection.close()
