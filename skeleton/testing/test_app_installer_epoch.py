@@ -39,6 +39,10 @@ def _prepare(monkeypatch, tmp_path: Path) -> Path:
         installer, "compose_command",
         lambda action, **kwargs: ("docker", "compose", action),
     )
+    # These tests use abbreviated fake Compose argv; command shape is
+    # independently tested with the actual shared recovery matcher.
+    monkeypatch.setattr("skeleton.app.compose_storage_binding.recovery_render_matches",
+                        lambda *a,**k: True)
     # Epoch tests isolate the existing daemon binding boundary. The real
     # binding protocol and install denial path have dedicated tests.
     from skeleton.app.compose_storage_binding import BindingReport
@@ -823,8 +827,11 @@ def test_recovered_frontend_never_probes_unqualified_runtime(tmp_path,monkeypatc
     monkeypatch.setattr("skeleton.app.compose_storage_binding.observe_binding",binding)
     monkeypatch.setattr("skeleton.app.health.probe_local_setup",
         lambda *a,**k:pytest.fail("unqualified frontend reached HTTP"))
+    calls=[]
     def runner(command,**kwargs):
-        return subprocess.CompletedProcess(command,1 if "up" in command and "--no-deps" not in command else 0)
+        if "up" in command:
+            calls.append(command)
+        return subprocess.CompletedProcess(command,1 if "up" in command and len(calls)==1 else 0)
     receipt=installer.install_application(tmp_path,start=True,install_python=False,runner=runner)
     assert not receipt.ok
     assert receipt.phases[-1].name=="setup-ui-recovery" and not receipt.phases[-1].ok

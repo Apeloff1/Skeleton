@@ -1231,3 +1231,14 @@ frontend image and ingress before probing /setup, and verifies that
 frontend's runtime identity again after the probe. Protected startup
 remains failed even if the diagnostic page answers. No Chroma migration
 or automatic data repair is authorized.
+
+
+Shutdown remains a non-destructive Compose stop including the legacy
+Chroma profile. Source CLI and Windows launcher now share a shutdown
+custody observer: identify the selected daemon and exact Compose project,
+require fixed-name container ownership, and check that previously observed
+container IDs and volume names still exist after stop. A successful exit
+does not alone certify shutdown. This is sampled metadata continuity,
+not backup or data-content validation. If project/configuration custody
+cannot be established, inspect Docker Desktop directly rather than
+removing persistent containers.

@@ -1420,11 +1420,11 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             with runtime_operation(root, "stop") as lease:
                 if not lease.current():
                     return 1
-                result = _run_compose(
-                    compose_command("down", manifest=manifest, install_env=True), root,
-                    lease=lease,
-                )
-                return result if lease.current() else 1
+                from skeleton.app.compose_stop_custody import stop_owned_runtime
+                report=stop_owned_runtime(root,command=compose_command("down",manifest=manifest,install_env=True),
+                    environ=dict(os.environ),lease=lease)
+                print(report.detail)
+                return 0 if report.ok and lease.current() else 1
         except RuntimeOperationDenied as exc:
             print("application stop blocked: " + str(exc))
             return 1

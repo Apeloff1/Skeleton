@@ -520,6 +520,7 @@ def test_open_app_uses_configured_frontend_port(monkeypatch, tmp_path):
 
 
 def test_docker_stop_failure_never_echoes_credentials(monkeypatch, tmp_path):
+    _mock_stop_observations(tmp_path,monkeypatch)
     from skeleton.app import windows_launcher as launcher
 
     secret = "sensitive-compose-secret"
@@ -536,6 +537,7 @@ def test_docker_stop_failure_never_echoes_credentials(monkeypatch, tmp_path):
 
 
 def test_windows_stop_preserves_containers_and_chroma_writable_data(monkeypatch, tmp_path):
+    _mock_stop_observations(tmp_path,monkeypatch)
     from skeleton.app import windows_launcher as launcher
 
     calls = []
@@ -618,6 +620,7 @@ def test_host_preloader_never_echoes_docker_daemon_credentials(monkeypatch, tmp_
 
 
 def test_windows_stop_command_raised_error_does_not_show_sensitive_text(monkeypatch, tmp_path):
+    _mock_stop_observations(tmp_path,monkeypatch)
     from skeleton.app import windows_launcher as launcher
 
     def runner(command, **kwargs):
@@ -761,6 +764,7 @@ def test_windowed_probe_acceptance_requires_public_mount_evidence(monkeypatch,tm
 
 @pytest.mark.parametrize("status",[False,True,None,"0",-9,2**40])
 def test_windows_stop_never_claims_uncertain_completion(tmp_path,monkeypatch,status):
+    _mock_stop_observations(tmp_path,monkeypatch)
     from skeleton.app import windows_launcher as launcher
     monkeypatch.setattr(launcher,"_hidden_runner",
                         lambda *a,**k: SimpleNamespace(returncode=status))
@@ -809,3 +813,17 @@ def test_windows_runtime_status_requires_backend_route_evidence(tmp_path,monkeyp
     ok,message=launcher.runtime_status(tmp_path)
     assert ok is registry_ready
     assert ("Critical API routers" in message) is (not registry_ready)
+
+
+
+def _mock_stop_observations(root,monkeypatch):
+    from skeleton.app.compose_stop_custody import StopSnapshot
+    (root/".env").write_text("FRONTEND_PORT=3000\n")
+    calls=[]
+    def observe(*a,**k):
+        calls.append(1)
+        running=len(calls)==1
+        return StopSnapshot("fixture-daemon","fixture",(
+            ("tutolage-backend","a"*64,"running" if running else "exited",running),
+        ),frozenset({"fixture_backend_data"}))
+    monkeypatch.setattr("skeleton.app.compose_stop_custody.observe_stop",observe)
