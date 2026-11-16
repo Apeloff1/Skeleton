@@ -15,6 +15,9 @@ from __future__ import annotations
 import math
 import threading
 import secrets
+import os
+import stat
+from pathlib import Path
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Iterable, List, Sequence
 
@@ -89,6 +92,7 @@ class TorchAccel:
         self._training_failed = False
         self._state_lock = threading.RLock()
         self._host_kv_pages: dict[str, dict[str, Any]] = {}
+        self._disk_kv_pages: dict[str, dict[str, Any]] = {}
         self.reset_decode_cache()
 
     @property
@@ -653,7 +657,7 @@ class TorchAccel:
                     or len(self._cached_keys) != self.lm.n_layers
                     or len(self._cached_values) != self.lm.n_layers):
                 raise RuntimeError("no complete resident decode cache to offload")
-            if len(self._host_kv_pages) >= 128:
+            if len(self._host_kv_pages) + len(self._disk_kv_pages) >= 128:
                 raise MemoryError("host KV slot limit reached")
             binding = self._kv_binding()
             banks = self._cached_keys + self._cached_values
@@ -721,6 +725,191 @@ class TorchAccel:
             if row is None or row["scope"] != scope:
                 raise PermissionError("unknown or foreign KV lease")
             del self._host_kv_pages[lease]
+
+    @staticmethod
+    def _open_kv_spill_root(root):
+        if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
+            raise OSError("private encrypted KV spill requires POSIX descriptor custody")
+        path = Path(os.path.abspath(os.fspath(root)))
+        if path.resolve(strict=True) != path:
+            raise PermissionError("symlinked spill ancestry denied")
+        fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        info = os.fstat(fd)
+        if info.st_uid != os.geteuid() or info.st_mode & 0o077:
+            os.close(fd)
+            raise PermissionError("spill root must be owner-private")
+        return fd, path, (info.st_dev, info.st_ino)
+
+    @property
+    def disk_kv_bytes(self) -> int:
+        with self._state_lock:
+            return sum(row["disk_bytes"] for row in self._disk_kv_pages.values())
+
+    def spill_host_kv(self, lease: str, scope: str, root, *, max_disk_bytes: int):
+        """Physically evict host KV into encrypted local filesystem storage.
+
+        One-time AES-GCM key remains solely in this accelerator instance.
+        Each <=1 MiB chunk is independently authenticated. No pickle, no
+        secret or raw token metadata is written to disk. Restart recovery
+        deliberately requires recompute; encrypted orphans need operator
+        cleanup. Caller chooses an authorized private local NVMe root.
+        """
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        if type(max_disk_bytes) is not int or not 1 <= max_disk_bytes <= 1024**4:
+            raise ValueError("disk KV byte ceiling outside bounds")
+        with self._state_lock:
+            row = self._host_kv_pages.get(lease) if isinstance(lease, str) else None
+            if row is None or row["scope"] != scope:
+                raise PermissionError("unknown or foreign host KV lease")
+            if row["binding"] != self._kv_binding():
+                raise RuntimeError("host KV weight revision changed")
+            chunk_size = 1024**2
+            sizes = [p.numel() * p.element_size() for p in row["banks"]]
+            sealed_bytes = sum(n + 28 * ((n + chunk_size - 1) // chunk_size) for n in sizes)
+            if self.disk_kv_bytes + sealed_bytes > max_disk_bytes:
+                raise MemoryError("encrypted KV spill exceeds disk budget")
+            fd, path, root_id = self._open_kv_spill_root(root)
+            filename = "kv-" + secrets.token_hex(24) + ".sealed"
+            key = AESGCM.generate_key(bit_length=256)
+            cipher = AESGCM(key)
+            file_id = None
+            created = False
+            try:
+                disk_free = os.fstatvfs(fd).f_bavail * os.fstatvfs(fd).f_frsize
+                if sealed_bytes > disk_free:
+                    raise OSError("insufficient spill filesystem capacity")
+                output_fd = os.open(filename, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                                    os.O_NOFOLLOW, 0o600, dir_fd=fd)
+                created = True
+                with os.fdopen(output_fd, "wb") as stream:
+                    for ordinal, bank in enumerate(row["banks"]):
+                        raw = bank.view(self.torch.uint8).reshape(-1).numpy()
+                        for offset in range(0, len(raw), chunk_size):
+                            plain = raw[offset:offset + chunk_size].tobytes()
+                            nonce = secrets.token_bytes(12)
+                            aad = f"{lease}:{ordinal}:{offset}:{len(plain)}".encode("ascii")
+                            stream.write(nonce + cipher.encrypt(nonce, plain, aad))
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                    info = os.fstat(stream.fileno())
+                    if info.st_size != sealed_bytes:
+                        raise OSError("unexpected encrypted spill size")
+                    file_id = (info.st_dev, info.st_ino)
+                os.fsync(fd)
+                check, _, current_id = self._open_kv_spill_root(path)
+                try:
+                    if current_id != root_id:
+                        raise OSError("spill root replaced")
+                finally:
+                    os.close(check)
+                descriptor = {k: v for k, v in row.items() if k != "banks"}
+                descriptor.update(root=path, root_id=root_id, filename=filename,
+                                  file_id=file_id, disk_bytes=sealed_bytes, key=key,
+                                  shapes=tuple(tuple(p.shape) for p in row["banks"]),
+                                  sizes=tuple(sizes))
+                self._disk_kv_pages[lease] = descriptor
+                del self._host_kv_pages[lease]
+                return {"lease": lease, "disk_bytes": sealed_bytes,
+                        "remaining_host_bytes": self.host_kv_bytes}
+            except BaseException:
+                if created:
+                    try:
+                        os.unlink(filename, dir_fd=fd)
+                    except FileNotFoundError:
+                        pass
+                raise
+            finally:
+                os.close(fd)
+
+    def _open_disk_kv(self, row):
+        directory, _, root_id = self._open_kv_spill_root(row["root"])
+        try:
+            if root_id != row["root_id"]:
+                raise OSError("spill directory identity changed")
+            file_fd = os.open(row["filename"], os.O_RDONLY | os.O_NOFOLLOW |
+                              getattr(os, "O_NONBLOCK", 0), dir_fd=directory)
+            info = os.fstat(file_fd)
+            if ((info.st_dev, info.st_ino) != row["file_id"] or
+                    not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or
+                    info.st_uid != os.geteuid() or info.st_mode & 0o077):
+                os.close(file_fd)
+                raise PermissionError("spill file custody changed")
+            return directory, file_fd, info
+        except BaseException:
+            os.close(directory)
+            raise
+
+    def reload_disk_kv(self, lease: str, scope: str, *, max_host_bytes: int):
+        """Authenticate entire spill and restore occupied CPU tensor banks."""
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        if type(max_host_bytes) is not int or not 1 <= max_host_bytes <= 1024**4:
+            raise ValueError("host KV byte ceiling outside bounds")
+        with self._state_lock, self.torch.inference_mode():
+            row = self._disk_kv_pages.get(lease) if isinstance(lease, str) else None
+            if row is None or row["scope"] != scope:
+                raise PermissionError("unknown or foreign disk KV lease")
+            if row["binding"] != self._kv_binding():
+                raise RuntimeError("disk KV weight revision changed; discard stale lease")
+            if self.host_kv_bytes + row["bytes"] > max_host_bytes:
+                raise MemoryError("disk restore exceeds host budget")
+            directory, file_fd, info = self._open_disk_kv(row)
+            cipher = AESGCM(row["key"])
+            banks = []
+            try:
+                with os.fdopen(file_fd, "rb") as stream:
+                    if info.st_size != row["disk_bytes"]:
+                        raise OSError("spill size changed")
+                    for ordinal, (shape, size) in enumerate(zip(row["shapes"], row["sizes"])):
+                        bank = self.torch.empty(shape, dtype=self.kv_dtype, device="cpu")
+                        byte_view = bank.view(self.torch.uint8).reshape(-1)
+                        if byte_view.numel() != size:
+                            raise RuntimeError("spill tensor layout changed")
+                        for offset in range(0, size, 1024**2):
+                            count = min(1024**2, size - offset)
+                            sealed = stream.read(count + 28)
+                            if len(sealed) != count + 28:
+                                raise OSError("truncated authenticated KV chunk")
+                            aad = f"{lease}:{ordinal}:{offset}:{count}".encode("ascii")
+                            plain = cipher.decrypt(sealed[:12], sealed[12:], aad)
+                            byte_view[offset:offset+count].copy_(
+                                self.torch.frombuffer(bytearray(plain), dtype=self.torch.uint8))
+                        banks.append(bank)
+                    if stream.read(1):
+                        raise OSError("unexpected spill trailing bytes")
+                    after = os.fstat(stream.fileno())
+                    if (info.st_size, info.st_mtime_ns, info.st_ctime_ns) != (
+                            after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+                        raise OSError("spill changed during read")
+                    current = os.stat(row["filename"], dir_fd=directory, follow_symlinks=False)
+                    if (current.st_dev, current.st_ino) != row["file_id"]:
+                        raise OSError("spill replaced before restore")
+                    os.unlink(row["filename"], dir_fd=directory)
+                # The destination is complete and authenticated before the
+                # source is retired. Keep the logical lease if moving fails.
+                descriptor = {k: row[k] for k in ("scope", "binding", "bytes", "ids", "pos", "logits")}
+                descriptor["banks"] = tuple(banks)
+                self._host_kv_pages[lease] = descriptor
+                del self._disk_kv_pages[lease]
+                return {"lease": lease, "host_bytes": row["bytes"],
+                        "remaining_disk_bytes": self.disk_kv_bytes}
+            finally:
+                os.close(directory)
+
+    def discard_disk_kv(self, lease: str, scope: str) -> None:
+        with self._state_lock:
+            row = self._disk_kv_pages.get(lease) if isinstance(lease, str) else None
+            if row is None or row["scope"] != scope:
+                raise PermissionError("unknown or foreign disk KV lease")
+            directory, file_fd, _ = self._open_disk_kv(row)
+            try:
+                current = os.stat(row["filename"], dir_fd=directory, follow_symlinks=False)
+                if (current.st_dev, current.st_ino) != row["file_id"]:
+                    raise OSError("spill replaced before discard")
+                os.unlink(row["filename"], dir_fd=directory)
+                del self._disk_kv_pages[lease]
+            finally:
+                os.close(file_fd)
+                os.close(directory)
 
     def logits_fused_batch(self, windows: Sequence[Sequence[int]], *,
                            max_workspace_bytes: int, require_gpu: bool = True,

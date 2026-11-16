@@ -70,3 +70,28 @@ def test_fused_generation_produces_canonical_results():
     assert [r.result.output_digest for r in fused] == [r.result.output_digest for r in serial]
     with pytest.raises(RuntimeContractError, match="cannot fall back"):
         rt.generate_fused_batch(reqs, max_workspace_bytes=1024**2)
+
+@pytest.mark.skipif(__import__("os").name != "posix", reason="POSIX encrypted spill custody")
+def test_encrypted_disk_spill_and_restore(tmp_path):
+    from cryptography.exceptions import InvalidTag
+    root = tmp_path / "private"
+    root.mkdir(mode=0o700)
+    accel = runtime().model._accel
+    original = accel.logits_window([1, 2, 3])
+    lease = accel.offload_decode_cache("scope", max_host_bytes=1024**2, require_gpu=False)["lease"]
+    with pytest.raises(MemoryError):
+        accel.spill_host_kv(lease, "scope", root, max_disk_bytes=1)
+    written = accel.spill_host_kv(lease, "scope", root, max_disk_bytes=1024**2)
+    assert written["remaining_host_bytes"] == 0 and accel.disk_kv_bytes > 0
+    path = next(root.iterdir())
+    assert path.stat().st_size == written["disk_bytes"]
+    encrypted = path.read_bytes()
+    path.write_bytes(encrypted[:-1] + bytes([encrypted[-1] ^ 1]))
+    with pytest.raises(InvalidTag):
+        accel.reload_disk_kv(lease, "scope", max_host_bytes=1024**2)
+    assert accel.host_kv_bytes == 0 and accel.disk_kv_bytes == written["disk_bytes"]
+    path.write_bytes(encrypted)
+    loaded = accel.reload_disk_kv(lease, "scope", max_host_bytes=1024**2)
+    assert loaded["remaining_disk_bytes"] == 0 and not list(root.iterdir())
+    accel.restore_decode_cache(lease, "scope", max_device_bytes=1024**2)
+    assert accel.logits_window([1, 2, 3]) == original
