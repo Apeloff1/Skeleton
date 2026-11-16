@@ -16,6 +16,7 @@ from skeleton.app.gameforge_campaign import (
 from skeleton.app.gameforge_quest_bridge import _route, _steps
 from skeleton.app.original_quest_cli import _encode, _integer, _require
 from skeleton.game.gameplay.dialogue_graph import replay as dialogue_replay
+from skeleton.gameforge.errors import GameForgeError
 
 SCHEMA = "skeleton.gameforge.campaign.assistance.v1"
 MAX_EXPANSIONS = 4096
@@ -34,13 +35,14 @@ def _find_ending(authored: dict, prior: dict, grants: set[str], budget: int) -> 
     if prior["terminal"]:
         return "unreachable", [], 0
     nodes = {node["id"]: node for node in authored["nodes"]}
-    queue = deque([(prior, [])])
+    queue = deque([[]])
     seen = {_state_key(prior)}
     used = 0
     while queue:
         if used >= budget:
             return "budget_exhausted", [], used
-        saved, suffix = queue.popleft()
+        suffix = queue.popleft()
+        saved = dialogue_replay(authored, [*prior["choices"], *suffix])
         used += 1
         state = saved["state"]
         if saved["terminal"]:
@@ -60,7 +62,7 @@ def _find_ending(authored: dict, prior: dict, grants: set[str], budget: int) -> 
                 if len(seen) >= budget + 1:
                     return "budget_exhausted", [], used
                 seen.add(key)
-                queue.append((following, [*suffix, choice["id"]]))
+                queue.append([*suffix, choice["id"]])
     return "unreachable", [], used
 
 
@@ -140,5 +142,5 @@ def verify_assistance(source: Any, checkpoint: Any, assistance: Any) -> bool:
     try:
         return _encode(assistance) == _encode(plan_completion(
             source, checkpoint, max_expansions=assistance["search_budget"]))
-    except (ValueError, TypeError, KeyError, OverflowError, RecursionError):
+    except (GameForgeError, ValueError, TypeError, KeyError, OverflowError, RecursionError):
         return False
