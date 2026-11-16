@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
+from collections.abc import Callable
 
 from skeleton.automation.agents.swarm_recovery import (
     SUPPORTED_RECOVERY_ARCHIVE_VERSIONS, SwarmRecoveryManager,
@@ -189,7 +190,8 @@ class SwarmDurableBridge:
 
     def submit_unique_verified(self, run_id: str, worker_id: str,
                                manager: SwarmRecoveryManager, broker: TenantSwarmBroker,
-                               tenant: str, task: SwarmTask) -> DurableSwarmCapture | None:
+                               tenant: str, task: SwarmTask, *,
+                               singleton_key: str | None = None) -> DurableSwarmCapture | None:
         """Persist an admitted unique job before returning acknowledgement.
 
         The existing tenant task identity is the idempotency key. Replay may
@@ -202,7 +204,7 @@ class SwarmDurableBridge:
         with broker._lock, runtime._lock, manager._lock:
             broker._assert_verified()
             try:
-                result = broker.submit_verified_queued(tenant, task)
+                result = broker.submit_verified_queued(tenant, task, singleton_key=singleton_key)
                 if not result.admitted:
                     return None
                 return self._capture_checked(run_id, worker_id, manager, broker)
@@ -211,6 +213,41 @@ class SwarmDurableBridge:
                 # mutation. Never continue dispatch from an ambiguous owner.
                 broker.retire()
                 raise DurableSwarmError("unique job publication stopped; restore durable custody") from exc
+
+    def wake_and_capture_verified(self, run_id: str, worker_id: str,
+                                  manager: SwarmRecoveryManager, broker: TenantSwarmBroker,
+                                  tenant: str, task_id: str, *, intent_sha256: str,
+                                  receipt_sha256: str,
+                                  verify_wake: Callable[[str, str, str, str], bool]) -> DurableSwarmCapture:
+        """Persist one verified event/timeout receipt before allowing a dependent lease.
+
+        The verifier independently authenticates the exact registered wait,
+        event or trusted clock evidence. External transport/timer delivery is
+        not provided here. The existing run writer must own the mutation.
+        """
+        tenant, task_id = broker._tenant(tenant), broker._task_id(task_id)
+        if not callable(verify_wake) or any(type(v) is not str or len(v) != 64
+                or any(c not in "0123456789abcdef" for c in v)
+                for v in (intent_sha256, receipt_sha256)):
+            raise DurableSwarmError("invalid wake evidence")
+        runtime = broker.broker.runtime
+        if verify_wake(tenant, task_id, intent_sha256, receipt_sha256) is not True:
+            raise DurableSwarmError("wake evidence refused")
+        with broker._lock, runtime._lock, manager._lock:
+            broker._assert_verified()
+            task = broker._verified_resident(tenant, task_id)
+            if task.wait_intent_sha256 != intent_sha256:
+                raise DurableSwarmError("wait identity changed")
+            if task.wake_receipt_sha256 not in (None, receipt_sha256):
+                raise DurableSwarmError("conflicting wake receipt")
+            if task.wake_receipt_sha256 is None and (task.state is not TaskState.QUEUED or task.attempts):
+                raise DurableSwarmError("wait is not eligible")
+            try:
+                runtime.open_wait(task_id, intent_sha256=intent_sha256, receipt_sha256=receipt_sha256)
+                return self._capture_checked(run_id, worker_id, manager, broker)
+            except Exception as exc:
+                broker.retire()
+                raise DurableSwarmError("wake publication stopped; restore durable custody") from exc
 
     def reconcile_and_enqueue_verified(self, run_id: str, worker_id: str,
                                        manager: SwarmRecoveryManager, broker: TenantSwarmBroker,
@@ -240,7 +277,9 @@ class SwarmDurableBridge:
             if (task.dependencies != (parent_id,) or task.id == parent_id
                     or task.state is not TaskState.QUEUED or task.attempts or task.effect_uncertain
                     or task.lease_token is not None or task.leased_to is not None
-                    or task.lease_deadline is not None or task.reconciliation_sha256 is not None):
+                    or task.lease_deadline is not None or task.reconciliation_sha256 is not None
+                    or task.wait_intent_sha256 is not None or task.wake_receipt_sha256 is not None
+                    or task.singleton_scope_sha256 is not None):
                 raise DurableSwarmError("follow-up must be fresh and depend only on parent")
             manifest.append([task.id, dict(task.payload), task.priority, task.max_attempts,
                              sorted(task.required_capabilities), task.dependencies])

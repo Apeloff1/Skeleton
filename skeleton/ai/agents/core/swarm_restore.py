@@ -29,13 +29,13 @@ def validate_restore_state(state: Mapping[str, object]) -> dict[str, object]:
     if not isinstance(state, Mapping):
         raise ValueError("runtime state must be a mapping")
     version = state.get("version", 1)
-    if type(version) is not int or version not in (1, 2):
+    if type(version) is not int or version not in (1, 2, 3):
         raise ValueError(f"unsupported runtime state version: {version}")
     config_raw = state.get("config", {})
     if not isinstance(config_raw, Mapping):
         raise ValueError("invalid runtime state config")
     fenced = config_raw.get("fenced", False)
-    if type(fenced) is not bool or fenced != (version == 2):
+    if type(fenced) is not bool or fenced != (version >= 2):
         raise ValueError("snapshot version and fenced mode disagree")
     max_tasks = int(config_raw.get("max_tasks", 100_000))
     max_workers = int(config_raw.get("max_workers", 10_000))

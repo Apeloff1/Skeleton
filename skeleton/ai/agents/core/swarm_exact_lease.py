@@ -46,8 +46,8 @@ def lease_exact(runtime: SwarmRuntime, worker_id: str, task_id: str) -> SwarmTas
             raise LeaseError(f"task is not queued: {task_id}")
         if task.attempts >= task.max_attempts:
             raise LeaseError("task attempt budget exhausted")
-        if runtime.blocked_dependencies(task_id):
-            raise LeaseError("task dependencies are not satisfied")
+        if runtime.dispatch_blocked(task_id):
+            raise LeaseError("task dispatch gate is blocked")
         if not task.required_capabilities.issubset(worker.capabilities):
             raise LeaseError(f"worker lacks required capabilities: {worker_id}")
 

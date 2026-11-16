@@ -1593,3 +1593,110 @@ def test_alternative_mixed_workload_recovery_with_real_sqlite_and_shared_quota(t
     assert final.task("urgent").state is TaskState.SUCCEEDED
     assert final.task("followup").state is TaskState.QUEUED and not final.blocked_dependencies("followup")
     assert final.task("normal").state is TaskState.QUEUED
+
+
+def test_alternative_wait_is_enforced_by_both_lease_paths_and_restore():
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, LeaseError, AdmissionError
+    from skeleton.automation.agents.swarm_exact_lease import lease_exact
+    from skeleton.automation.agents.swarm_invariants import audit
+    runtime=HardenedSwarmRuntime(fenced=True,clock=lambda:10.0)
+    runtime.register_worker("w",capacity=2)
+    task=SwarmTask("wait",{},wait_intent_sha256="a"*64)
+    runtime.submit(task)
+    assert not runtime.lease("w")
+    with pytest.raises(LeaseError):
+        lease_exact(runtime,"w","wait")
+    with pytest.raises(AdmissionError):
+        runtime.open_wait("wait",intent_sha256="b"*64,receipt_sha256="c"*64)
+    state=runtime.export_state()
+    assert state["version"]==3
+    with pytest.raises(ValueError):
+        HardenedSwarmRuntime.from_state(dict(state,version=2))
+    restored=HardenedSwarmRuntime.from_state(state,clock=lambda:10.0)
+    assert restored.dispatch_blocked("wait")
+    restored.open_wait("wait",intent_sha256="a"*64,receipt_sha256="b"*64)
+    assert not restored.dispatch_blocked("wait")
+    assert lease_exact(restored,"w","wait").wake_receipt_sha256=="b"*64
+    assert audit(restored).ok
+
+
+def test_alternative_singleton_remains_occupied_after_uncertain_restart():
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, AdmissionError
+    from skeleton.automation.agents.swarm_broker import SwarmBroker
+    from skeleton.automation.agents.swarm_tenant_broker import TenantSwarmBroker
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.automation.agents.swarm_invariants import audit
+    runtime=HardenedSwarmRuntime(fenced=True,clock=lambda:10.0)
+    runtime.register_worker("w",capacity=3)
+    broker=TenantSwarmBroker(SwarmBroker(runtime,verify_worker=lambda *args:True),verified_mode=True)
+    for tenant,task_id in (("t","a"),("t","b"),("u","c")):
+        assert broker.submit_verified_queued(tenant,SwarmTask(task_id,{}),singleton_key="same").admitted
+    assert broker.submit_verified_queued("t",SwarmTask("a",{}),singleton_key="same").duplicate
+    with pytest.raises(AdmissionError):
+        broker.submit_verified_queued("t",SwarmTask("a",{}),singleton_key="different")
+    a=broker.lease_verified("t","a")
+    assert broker.lease_verified("t","b") is None
+    assert broker.lease_verified("u","c").id=="c"
+    manager=SwarmRecoveryManager(delta_archive=True)
+    manager.checkpoint(runtime,broker)
+    loaded=SwarmRecoveryManager.from_archive(manager.export_archive())
+    recovered=loaded.restore_latest()
+    restored=TenantSwarmBroker(SwarmBroker(recovered,verify_worker=lambda *args:True),
+                               broker.ingress.fork_empty(),verified_mode=True)
+    loaded.restore_tenants(restored)
+    assert recovered.task("a").effect_uncertain and recovered.dispatch_blocked("b")
+    assert restored.lease_verified("t","b") is None
+    restored.reconcile_verified("t","w","a",lease_token=a.lease_token,
+                                 outcome="committed",evidence_sha256="a"*64)
+    assert restored.lease_verified("t","b").id=="b"
+    assert audit(recovered).ok
+
+
+def test_alternative_wake_commits_before_lease_and_survives_sqlite_reopen(tmp_path):
+    from skeleton.testing.test_durable_run_store import make_store
+    from skeleton.automation.agents.swarm_runtime import SwarmTask
+    from skeleton.automation.agents.swarm_durable import SwarmDurableBridge, DurableSwarmError
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.intelligence.dispatch_policy import DispatchCandidate
+    runtime,broker=_verified_dispatch_fixture()
+    store=make_store(tmp_path)
+    store.create_run("wait")
+    store.claim_run("wait","owner",lease_seconds=60)
+    manager=SwarmRecoveryManager(delta_archive=True)
+    bridge=SwarmDurableBridge(store)
+    assert bridge.submit_unique_verified("wait","owner",manager,broker,"a",
+                                        SwarmTask("deferred",{},wait_intent_sha256="a"*64))
+    candidate=(DispatchCandidate("deferred","a",100,0),)
+    assert bridge.lease_and_capture_verified("wait","owner",manager,broker,candidate,now_ms=10000) is None
+    with pytest.raises(DurableSwarmError):
+        bridge.wake_and_capture_verified("wait","owner",manager,broker,"a","deferred",
+                intent_sha256="a"*64,receipt_sha256="b"*64,verify_wake=lambda *args:False)
+    assert runtime.dispatch_blocked("deferred")
+    bridge.wake_and_capture_verified("wait","owner",manager,broker,"a","deferred",
+                intent_sha256="a"*64,receipt_sha256="b"*64",verify_wake=lambda *args:True)
+    restored=SwarmDurableBridge(make_store(tmp_path)).load("wait").restore_runtime()
+    assert not restored.dispatch_blocked("deferred")
+    assert restored.task("deferred").wake_receipt_sha256=="b"*64
+    assert bridge.lease_and_capture_verified("wait","owner",manager,broker,candidate,now_ms=10000)[1].id=="deferred"
+
+
+def test_alternative_ambiguous_wake_retires_generation_without_durable_open():
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, AdmissionError
+    from skeleton.automation.agents.swarm_durable import SwarmDurableBridge, DurableSwarmError
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    runtime,broker=_verified_dispatch_fixture()
+    store=_DispatcherCheckpointFixture()
+    bridge=SwarmDurableBridge(store)
+    manager=SwarmRecoveryManager(delta_archive=True)
+    bridge.submit_unique_verified("run","owner",manager,broker,"a",
+                                   SwarmTask("wait",{},wait_intent_sha256="a"*64))
+    store.fail=True
+    with pytest.raises(DurableSwarmError):
+        bridge.wake_and_capture_verified("run","owner",manager,broker,"a","wait",
+            intent_sha256="a"*64,receipt_sha256="b"*64,verify_wake=lambda *args:True)
+    assert broker.is_retired()
+    assert bridge.load("run").restore_runtime().dispatch_blocked("wait")
+    with pytest.raises(AdmissionError):
+        broker.lease_verified("a","wait")

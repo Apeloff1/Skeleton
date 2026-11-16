@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from hashlib import sha256
+import json
 from threading import RLock
 
 from skeleton.automation.agents.swarm_broker import CompletionResult, SwarmBroker
@@ -241,9 +243,12 @@ class TenantSwarmBroker:
         return (left.id == right.id and left.payload == right.payload
                 and left.priority == right.priority and left.max_attempts == right.max_attempts
                 and left.required_capabilities == right.required_capabilities
-                and left.dependencies == right.dependencies)
+                and left.dependencies == right.dependencies
+                and left.wait_intent_sha256 == right.wait_intent_sha256
+                and left.singleton_scope_sha256 == right.singleton_scope_sha256)
 
-    def submit_verified_queued(self, tenant: str, task: SwarmTask, *, cost: float = 1.0) -> TenantBrokerResult:
+    def submit_verified_queued(self, tenant: str, task: SwarmTask, *, cost: float = 1.0,
+                               singleton_key: str | None = None) -> TenantBrokerResult:
         """Admit a host-authorized task without dispatching it.
 
         Owner-supplied tenant, task and cost are trusted host inputs, not
@@ -252,6 +257,18 @@ class TenantSwarmBroker:
         admission, so verified tasks never silently evict replay tombstones.
         """
         tenant, task_id = self._tenant(tenant), self._task_id(task.id)
+        if task.wake_receipt_sha256 is not None:
+            raise AdmissionError("submission cannot assert its own wake receipt")
+        scope = None
+        if singleton_key is not None:
+            if (type(singleton_key) is not str or not singleton_key or len(singleton_key) > 256
+                    or singleton_key != singleton_key.strip() or any(ord(c) < 32 for c in singleton_key)):
+                raise AdmissionError("invalid singleton key")
+            scope = sha256(json.dumps(["singleton-v1", tenant, singleton_key],
+                                      separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()
+        if task.singleton_scope_sha256 not in (None, scope):
+            raise AdmissionError("singleton scope is assigned by tenant owner")
+        task = replace(task, singleton_scope_sha256=scope)
         if task.id != task_id:
             raise AdmissionError("verified task identifier must be canonical")
         runtime = self.broker.runtime
@@ -292,7 +309,7 @@ class TenantSwarmBroker:
             task = self._verified_resident(tenant, task_id)
             if task.state is not TaskState.QUEUED or self.ingress.phase(tenant, task_id) != "queued":
                 return None
-            if runtime.blocked_dependencies(task_id) or not self.ingress.try_start(tenant):
+            if runtime.dispatch_blocked(task_id) or not self.ingress.try_start(tenant):
                 return None
             self.ingress.mark_leased(tenant, task_id)
             try:
@@ -335,7 +352,7 @@ class TenantSwarmBroker:
                 task = runtime.task(candidate.ticket_id)
                 if task is None or task.priority != candidate.priority:
                     raise AdmissionError("dispatch observation identity mismatch")
-                if task.state is not TaskState.QUEUED or runtime.blocked_dependencies(task.id):
+                if task.state is not TaskState.QUEUED or runtime.dispatch_blocked(task.id):
                     continue
                 if self.ingress.phase(candidate.tenant_id, task.id) != "queued":
                     raise AdmissionError("queued tenant quota missing")

@@ -52,6 +52,9 @@ class SwarmTask:
     lease_token: str | None = None
     effect_uncertain: bool = False
     reconciliation_sha256: str | None = None
+    wait_intent_sha256: str | None = None
+    wake_receipt_sha256: str | None = None
+    singleton_scope_sha256: str | None = None
 
 
 @dataclass(slots=True)
@@ -118,6 +121,7 @@ class SwarmRuntime:
         self._sequence = count()
         self._queue: list[tuple[int, int, str]] = []
         self._tasks: dict[str, SwarmTask] = {}
+        self._singleton_holders: dict[str, str] = {}
         self._workers: dict[str, WorkerState] = {}
         self._state_counts: dict[TaskState, int] = defaultdict(int)
         self._events: Deque[tuple[float, str, str]] = deque(maxlen=10_000)
@@ -224,7 +228,48 @@ class SwarmRuntime:
         self._event("worker.unregistered", worker_id)
         return released
 
+    @staticmethod
+    def _validate_dispatch_metadata(task: SwarmTask, *, fenced: bool, restoring: bool = False) -> None:
+        fields = (task.wait_intent_sha256, task.wake_receipt_sha256, task.singleton_scope_sha256)
+        if any(value is not None for value in fields) and not fenced:
+            raise AdmissionError("dispatch gates require fenced execution")
+        if any(value is not None and (type(value) is not str or len(value) != 64
+               or any(c not in "0123456789abcdef" for c in value)) for value in fields):
+            raise AdmissionError("invalid dispatch metadata digest")
+        if task.wake_receipt_sha256 is not None and (not restoring or task.wait_intent_sha256 is None):
+            raise AdmissionError("wake receipt requires trusted gated transition")
+        if restoring and (task.state is TaskState.LEASED or task.effect_uncertain or task.attempts > 0):
+            if task.wait_intent_sha256 is not None and task.wake_receipt_sha256 is None:
+                raise AdmissionError("attempt without a verified wake receipt")
+
+    def dispatch_blocked(self, task_id: str) -> bool:
+        task = self._tasks.get(task_id)
+        if task is None:
+            raise AdmissionError("unknown dispatch task")
+        scope = task.singleton_scope_sha256
+        return ((task.wait_intent_sha256 is not None and task.wake_receipt_sha256 is None)
+                or (scope is not None and self._singleton_holders.get(scope) not in (None, task_id))
+                or bool(self.blocked_dependencies(task_id)))
+
+    def open_wait(self, task_id: str, *, intent_sha256: str, receipt_sha256: str) -> SwarmTask:
+        """Trusted owner only; the durable bridge independently verifies receipt evidence."""
+        task = self._tasks.get(task_id)
+        if (not self.fenced or task is None or task.wait_intent_sha256 != intent_sha256
+                or intent_sha256 is None or type(receipt_sha256) is not str
+                or len(receipt_sha256) != 64 or any(c not in "0123456789abcdef" for c in receipt_sha256)):
+            raise AdmissionError("wait identity or receipt mismatch")
+        if task.wake_receipt_sha256 is not None:
+            if task.wake_receipt_sha256 != receipt_sha256:
+                raise AdmissionError("wait receipt identity conflict")
+            return task
+        if task.state is not TaskState.QUEUED or task.effect_uncertain or task.attempts:
+            raise AdmissionError("wait no longer eligible")
+        updated = replace(task, wake_receipt_sha256=receipt_sha256)
+        self._replace(task, updated)
+        return updated
+
     def submit(self, task: SwarmTask) -> SwarmTask:
+        self._validate_dispatch_metadata(task, fenced=self.fenced)
         if len(self._tasks) >= self.max_tasks:
             raise AdmissionError("runtime task capacity exhausted")
         if type(task.id) is not str or not task.id.strip() or task.id != task.id.strip():
@@ -278,6 +323,7 @@ class SwarmRuntime:
                 raise AdmissionError("invalid graph predecessors")
             if type(task.priority) is not int or not 0 <= task.priority <= 1000:
                 raise AdmissionError("invalid graph priority")
+            self._validate_dispatch_metadata(task, fenced=self.fenced)
             by_id[task.id] = task
         if sum(len(t.dependencies) for t in tasks) > 65_536:
             raise AdmissionError("graph edge limit exceeded")
@@ -338,7 +384,7 @@ class SwarmRuntime:
                 self._queued_generation.pop(task_id, None)
                 self._transition(task, TaskState.DEAD)
                 continue
-            if self.blocked_dependencies(task_id) or not task.required_capabilities.issubset(worker.capabilities):
+            if self.dispatch_blocked(task_id) or not task.required_capabilities.issubset(worker.capabilities):
                 deferred.append(item)
                 continue
             updated = replace(
@@ -580,7 +626,8 @@ class SwarmRuntime:
 
     def export_state(self) -> dict[str, object]:
         return {
-            "version": 2 if self.fenced else 1,
+            "version": (3 if any(t.wait_intent_sha256 is not None or t.singleton_scope_sha256 is not None
+                                 for t in self._tasks.values()) else 2) if self.fenced else 1,
             "config": {"max_tasks": self.max_tasks, "default_lease_seconds": self.default_lease_seconds,
                        "fenced": self.fenced},
             "tasks": [self._task_record(task) for task in self._tasks.values()],
@@ -607,7 +654,8 @@ class SwarmRuntime:
         if not isinstance(config, Mapping):
             raise ValueError("invalid runtime state config")
         fenced = config.get("fenced", False)
-        if type(fenced) is not bool or state.get("version", 1) not in (1, 2) or (state.get("version", 1) == 2) != fenced:
+        version = state.get("version", 1)
+        if type(fenced) is not bool or type(version) is not int or version not in (1, 2, 3) or (version >= 2) != fenced:
             raise ValueError("unsupported runtime checkpoint")
         runtime = cls(
             fenced=fenced,
@@ -636,7 +684,17 @@ class SwarmRuntime:
                 lease_token=raw.get("lease_token"),
                 effect_uncertain=raw.get("effect_uncertain", False),
                 reconciliation_sha256=raw.get("reconciliation_sha256"),
+                wait_intent_sha256=raw.get("wait_intent_sha256"),
+                wake_receipt_sha256=raw.get("wake_receipt_sha256"),
+                singleton_scope_sha256=raw.get("singleton_scope_sha256"),
             )
+            try:
+                runtime._validate_dispatch_metadata(task, fenced=fenced, restoring=True)
+            except AdmissionError as exc:
+                raise ValueError("invalid dispatch metadata") from exc
+            if version < 3 and any(v is not None for v in (task.wait_intent_sha256,
+                    task.wake_receipt_sha256, task.singleton_scope_sha256)):
+                raise ValueError("dispatch metadata requires snapshot version 3")
             if task.id in runtime._tasks or type(task.effect_uncertain) is not bool:
                 raise ValueError("invalid or duplicate checkpoint task")
             if task.effect_uncertain and not fenced:
@@ -703,6 +761,10 @@ class SwarmRuntime:
                 dep not in all_tasks for dep in task.dependencies
             ):
                 raise ValueError("invalid restored dependencies")
+            if task.singleton_scope_sha256 is not None and (task.state is TaskState.LEASED or task.effect_uncertain):
+                if task.singleton_scope_sha256 in runtime._singleton_holders:
+                    raise ValueError("duplicate restored singleton custody")
+                runtime._singleton_holders[task.singleton_scope_sha256] = task.id
             if fenced and task.effect_uncertain:
                 worker = runtime._workers.get(task.leased_to or "")
                 if worker is None or worker.available < 1:
@@ -781,6 +843,17 @@ class SwarmRuntime:
         return updated
 
     def _replace(self, old: SwarmTask, new: SwarmTask) -> None:
+        scope = new.singleton_scope_sha256
+        if old.singleton_scope_sha256 != scope or old.wait_intent_sha256 != new.wait_intent_sha256:
+            raise LeaseError("dispatch identity is immutable")
+        if scope is not None:
+            holder = self._singleton_holders.get(scope)
+            if new.state is TaskState.LEASED or new.effect_uncertain:
+                if holder not in (None, new.id):
+                    raise LeaseError("singleton is already occupied")
+                self._singleton_holders[scope] = new.id
+            elif holder == old.id:
+                del self._singleton_holders[scope]
         if old.state is not new.state:
             if old.state is TaskState.QUEUED:
                 self._queued_generation.pop(old.id, None)
@@ -797,6 +870,9 @@ class SwarmRuntime:
         record["state"] = task.state.value
         record["required_capabilities"] = sorted(task.required_capabilities)
         record["payload"] = dict(task.payload)
+        for key in ("wait_intent_sha256", "wake_receipt_sha256", "singleton_scope_sha256"):
+            if record[key] is None:
+                del record[key]
         return record
 
     @staticmethod

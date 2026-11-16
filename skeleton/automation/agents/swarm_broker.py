@@ -76,7 +76,7 @@ class SwarmBroker:
             resident = self.runtime.task(task_id)
             if resident is None or resident.state is not TaskState.QUEUED:
                 return None
-            if self.runtime.blocked_dependencies(task_id):
+            if self.runtime.dispatch_blocked(task_id):
                 return None
             decision = self.supervisor.dispatch(self.runtime, resident)
             if not decision.accepted or decision.worker_id is None:

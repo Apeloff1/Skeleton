@@ -125,6 +125,14 @@ class HardenedSwarmRuntime(SwarmRuntime):
             return super().register_virtual_worker(worker_id, parent_id,
                                                    capabilities=capabilities, capacity=capacity)
 
+    def dispatch_blocked(self, task_id: str) -> bool:
+        with self._lock:
+            return super().dispatch_blocked(task_id)
+
+    def open_wait(self, task_id: str, *, intent_sha256: str, receipt_sha256: str) -> SwarmTask:
+        with self._lock:
+            return super().open_wait(task_id, intent_sha256=intent_sha256, receipt_sha256=receipt_sha256)
+
     def heartbeat(self, worker_id: str) -> WorkerState:
         with self._lock:
             return super().heartbeat(worker_id.strip())
@@ -366,6 +374,7 @@ class HardenedSwarmRuntime(SwarmRuntime):
         runtime._queue = base._queue
         runtime._queued_generation = base._queued_generation
         runtime._tasks = base._tasks
+        runtime._singleton_holders = base._singleton_holders
         runtime._workers = base._workers
         runtime._state_counts = base._state_counts
         runtime._events = base._events

@@ -707,7 +707,7 @@
       "source": "skeleton/automation/agents",
       "destination": "skeleton/ai/agents/core",
       "kind": "tree",
-      "source_git_object_sha": "8e91a55ac2d259d30eaa4746282ef474fd03b804",
+      "source_git_object_sha": "0384cd7216f873edbf282937e2f59356133451eb",
       "role": "canonical agent/swarm execution runtime under automation ownership",
       "work_package_refs": [
         "WP-W00",
@@ -766,7 +766,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "dc0aed85ab9cf5fc98744f7b938f82687caef4a9",
+      "source_git_object_sha": "a104f0b2b5afb7aa695e8c24bff360ce27d00990",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",

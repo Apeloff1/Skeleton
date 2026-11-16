@@ -166,7 +166,7 @@ def encode_checkpoint_journal(records: list[dict], sidecars: list[dict]) -> list
         if type(sequence) is not int or sequence <= previous_sequence or sequence not in owners_by_sequence:
             raise ValueError("journal sequence disorder")
         state = record["state"]
-        if (not isinstance(state, dict) or state.get("version") != 2
+        if (not isinstance(state, dict) or state.get("version") not in (2, 3)
                 or not isinstance(state.get("config"), dict) or state["config"].get("fenced") is not True):
             raise ValueError("journal requires verified fenced checkpoints")
         owners = _ownership(owners_by_sequence[sequence])

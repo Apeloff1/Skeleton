@@ -28,6 +28,7 @@ def audit(runtime: SwarmRuntime) -> InvariantReport:
         errors.append("duplicate worker ids")
 
     leased_ids: set[str] = set()
+    singletons: dict[str, str] = {}
     for task in tasks:
         if task.state is TaskState.LEASED:
             leased_ids.add(task.id)
@@ -36,6 +37,12 @@ def audit(runtime: SwarmRuntime) -> InvariantReport:
         if any(dep not in task_map for dep in task.dependencies):
             errors.append(f"unknown task dependency:{task.id}")
         if task.state is TaskState.LEASED or task.effect_uncertain:
+            if task.wait_intent_sha256 is not None and task.wake_receipt_sha256 is None:
+                errors.append(f"unopened wait owns a slot:{task.id}")
+            if task.singleton_scope_sha256 is not None:
+                if task.singleton_scope_sha256 in singletons:
+                    errors.append(f"duplicate singleton occupancy:{task.id}")
+                singletons[task.singleton_scope_sha256] = task.id
             if runtime.fenced and not task.lease_token:
                 errors.append(f"fenced task missing token:{task.id}")
             if not task.leased_to:
@@ -54,6 +61,8 @@ def audit(runtime: SwarmRuntime) -> InvariantReport:
             if task.lease_deadline is not None:
                 errors.append(f"non-leased task has deadline:{task.id}")
 
+    if singletons != runtime._singleton_holders:
+        errors.append("singleton occupancy index mismatch")
     delegated = {worker.id: 0 for worker in workers}
     for worker in workers:
         if worker.parent_id is not None:

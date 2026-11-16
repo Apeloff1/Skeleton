@@ -173,3 +173,23 @@ qualification harness. A35/A36 remain measurement and qualification
 work, not completed competitor benchmarks. Original 72-target source
 register remains unchanged. Combined 108/108 partial source coverage;
 independent competitive qualification remains 0/108.
+
+## Wave A9: authoritative event wait gates and singleton custody
+
+The existing verified tenant broker derives singleton scope from the tenant
+and host-provided key; both heap and exact leasing honor the gate, with
+one occupied slot per scope and unknown effects retaining ownership.
+The runtime reconstructs the singleton occupancy index on restore and
+rejects conflicting holders. A wait intent binds a digest; the durable
+bridge authenticates its receipt through a trusted verifier, opens only
+the exact wait, and checkpoints/readbacks before permitting dispatch.
+Ambiguous publication retires the owner. New gate-bearing runtime
+snapshots use version 3: older readers fail closed rather than silently
+ignore gates. Versions 1/2 remain readable and the existing delta archive
+can carry version-3 snapshots. The existing exclusive run-writer and
+authenticated event or clock receipt producer remain prerequisites; no
+external timer daemon, cluster-global singleton, or independent evidence
+transport is claimed. Regression fixtures cover both lease paths,
+tenant isolation, uncertain restart, real SQLite reopen, and failed wake.
+Prior wave A8 exact head passed 89 focused tests and 183 architecture
+mappings; that is not a substitute for A9 exact-head qualification.
