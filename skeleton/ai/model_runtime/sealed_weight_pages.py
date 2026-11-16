@@ -59,11 +59,13 @@ def open_sealed_weight_pages(
     model_identity: ModelIdentity,
     max_bytes: int,
     progress_check: Callable[[int, int], None] | None = None,
+    expected_manifest_sha256: str | None = None,
+    max_mappings: int = 256,
 ) -> Iterator[tuple[mmap.mmap, ...]]:
     """Copy verified shard bytes into F_SEAL_WRITE memfds, then map read-only.
 
-    Every copied byte is hashed again after the source stream is opened, closing
-    the verify/open race. No page is yielded until all shards are sealed.
+    Every copied byte is hashed directly from the owned source descriptor,
+    rather than trusting a separate pathname verification. No page is yielded until all shards are sealed.
     """
     if not isinstance(store, WeightShardStore):
         raise SealedWeightPagesError("canonical WeightShardStore required")
@@ -71,56 +73,73 @@ def open_sealed_weight_pages(
         raise SealedWeightPagesError("explicit canonical model identity required")
     if type(max_bytes) is not int or not 1 <= max_bytes < 1 << 63:
         raise SealedWeightPagesError("positive bounded shared-page budget required")
-    plan = store.load_plan(plan_digest)
-    if plan.model_identity_digest != model_identity.identity_digest:
-        raise SealedWeightPagesError("model identity differs from committed weight plan")
+    if type(max_mappings) is not int or not 1 <= max_mappings <= 4096:
+        raise SealedWeightPagesError("invalid sealed mapping ceiling")
+    try:
+        plan, manifest_sha, manifest_size = store.bound_model_manifest(
+            plan_digest, model_identity=model_identity,
+            expected_manifest_sha256=expected_manifest_sha256,
+        )
+    except WeightShardStoreError as exc:
+        raise SealedWeightPagesError("sealed source model or manifest identity unavailable") from exc
     if plan.expected_total_bytes > max_bytes:
         raise SealedWeightPagesError("shared-page request exceeds explicit memory budget")
+    if len(plan.shards) > max_mappings:
+        raise SealedWeightPagesError("shared-page request exceeds mapping ceiling")
     if progress_check is not None and not callable(progress_check):
         raise SealedWeightPagesError("invalid sealed copy progress callback")
     fcntl, flags, seals = _require_sealing()
-    fds: list[int] = []
     pages: list[mmap.mmap] = []
     copied = 0
-    last_check = -_PROGRESS_QUANTUM
+    last_check = 0
     try:
-        with store.open_verified(plan_digest, model_identity=model_identity) as streams:
-            if len(streams) != len(plan.shards):
-                raise SealedWeightPagesError("weight shard count mismatch")
-            if progress_check is not None:
-                progress_check(0, plan.expected_total_bytes)
-                last_check = 0
-            for shard, stream in zip(plan.shards, streams):
+        if progress_check is not None:
+            progress_check(0, plan.expected_total_bytes)
+        # Sequential source ownership avoids opening every shard at once or
+        # hashing it twice. The byte-for-byte copy itself is the verification.
+        # No mapping escapes until the entire plan and manifest are checked.
+        for shard in plan.shards:
+            with store._object_reader(shard) as stream:
                 fd = os.memfd_create("skeleton-local-weights", flags=flags)
-                fds.append(fd)
-                digest = sha256()
-                total = 0
-                while True:
-                    block = stream.read(min(_CHUNK, shard.bytes - total + 1))
-                    if not block:
-                        break
-                    total += len(block)
-                    if total > shard.bytes:
-                        raise SealedWeightPagesError("weight source exceeded committed shard size")
-                    if progress_check is not None and copied + len(block) - last_check > _PROGRESS_QUANTUM:
-                        progress_check(copied, plan.expected_total_bytes)
-                        last_check = copied
-                    digest.update(block)
-                    _write_all(fd, block)
-                    copied += len(block)
-                if total != shard.bytes or digest.hexdigest() != shard.digest:
-                    raise SealedWeightPagesError("weight bytes changed after verification")
-                if os.fstat(fd).st_size != shard.bytes:
-                    raise SealedWeightPagesError("memfd byte count mismatch")
-                fcntl.fcntl(fd, fcntl.F_ADD_SEALS, seals)
-                observed = fcntl.fcntl(fd, fcntl.F_GET_SEALS)
-                if observed & seals != seals:
-                    raise SealedWeightPagesError("kernel did not apply immutable page seals")
-                pages.append(mmap.mmap(fd, shard.bytes, access=mmap.ACCESS_READ))
+                try:
+                    digest = sha256()
+                    total = 0
+                    while True:
+                        if progress_check is not None and copied - last_check >= _PROGRESS_QUANTUM:
+                            progress_check(copied, plan.expected_total_bytes)
+                            last_check = copied
+                        block = stream.read(min(_CHUNK, shard.bytes - total + 1))
+                        if not block:
+                            break
+                        total += len(block)
+                        if total > shard.bytes:
+                            raise SealedWeightPagesError("weight source exceeded committed shard size")
+                        if progress_check is not None and copied + len(block) - last_check > _PROGRESS_QUANTUM:
+                            progress_check(copied, plan.expected_total_bytes)
+                            last_check = copied
+                        digest.update(block)
+                        _write_all(fd, block)
+                        copied += len(block)
+                    if total != shard.bytes or digest.hexdigest() != shard.digest:
+                        raise SealedWeightPagesError("weight bytes changed after verification")
+                    if os.fstat(fd).st_size != shard.bytes:
+                        raise SealedWeightPagesError("memfd byte count mismatch")
+                    fcntl.fcntl(fd, fcntl.F_ADD_SEALS, seals)
+                    observed = fcntl.fcntl(fd, fcntl.F_GET_SEALS)
+                    if observed & seals != seals:
+                        raise SealedWeightPagesError("kernel did not apply immutable page seals")
+                    pages.append(mmap.mmap(fd, shard.bytes, access=mmap.ACCESS_READ))
+                finally:
+                    # mmap owns its mapping lifetime independently of the
+                    # original memfd. Python may retain a duplicate handle.
+                    os.close(fd)
         if copied != plan.expected_total_bytes:
             raise SealedWeightPagesError("sealed copy total differs from plan")
-        if progress_check is not None:
+        if progress_check is not None and last_check != copied:
             progress_check(copied, plan.expected_total_bytes)
+        _, final_sha, final_size = store.manifest_evidence(plan_digest, maximum=manifest_size)
+        if final_sha != manifest_sha or final_size != manifest_size:
+            raise SealedWeightPagesError("weight manifest identity changed during sealed copy")
         yield tuple(pages)
     except OSError as exc:
         raise SealedWeightPagesError("OS-backed sealed memory unavailable") from exc
@@ -133,11 +152,6 @@ def open_sealed_weight_pages(
             try:
                 page.close()
             except (BufferError, OSError, ValueError) as exc:
-                failures.append(exc)
-        for fd in reversed(fds):
-            try:
-                os.close(fd)
-            except OSError as exc:
                 failures.append(exc)
         if failures:
             raise SealedWeightPagesError("sealed page cleanup remains incomplete") from failures[0]
