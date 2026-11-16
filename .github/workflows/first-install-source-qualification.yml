@@ -118,6 +118,8 @@ jobs:
         run: python -m pytest -q --maxfail=1 skeleton/testing/test_strict_install_qualification.py
       - name: Qualify Chroma isolated fixture ownership and persistence receipt boundaries
         run: python -m pytest -q --maxfail=1 skeleton/testing/test_chroma_persistence_qualification.py
+      - name: Qualify signed Chroma recovery staging and independent source custody
+        run: python -m pytest -q --maxfail=1 skeleton/testing/test_chroma_recovery_stage.py
       - name: Verify construction and provider-owner contracts
         run: |
           python scripts/check_architecture_map.py

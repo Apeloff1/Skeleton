@@ -938,3 +938,33 @@ Resource deletion is restricted to separately verified fixture ownership.
 The legacy full profile remains blocked until independently reviewed
 backup selection, restoration, real application integration and device
 qualification succeed. This fixture never starts or modifies legacy Chroma.
+
+### Recovery staging for the two historical Chroma stores
+
+After the complete legacy backup has been reviewed, observe both candidate
+inventories without selecting authority:
+
+    python scripts/stage_chroma_recovery.py --backup /private/backup --inspect-candidates
+
+An independent reviewer chooses exactly one store and signs StageApproval
+from the script, binding the full original manifest hash, selected inventory
+hash, exact reviewed source SHA, deployment, authority, selection and
+quiescence evidence hashes, and a validity window no longer than 30 minutes.
+Do not infer the authoritative store from file count, timestamps or size.
+The signer retains the private key outside the application.
+
+    python scripts/stage_chroma_recovery.py --backup /private/backup \
+      --output /private/staging/new-stage --plan /private/stage-plan.json \
+      --signature /private/stage-plan.sig --authority AUTHORITY --deployment DEPLOYMENT \
+      --source-head REVIEWED_SHA --operator-public-key-hex PUBLIC_KEY
+
+The stage parent must already be a private mode-0700 POSIX directory. The
+new stage holds only the selected store in data/ and a redacted receipt.
+Both original store copies are verified before and after the stage; every
+copied descriptor is checked against exact size and content pins. The
+staged SQLite is checked read-only for integrity, foreign keys and expected
+schema without repairing the original. An unresolved SQLite WAL/SHM/journal
+requires separate recovery; the tool intentionally refuses to ignore it.
+No replace, merge, live restore, graph integrity or full-profile acceptance
+is claimed. Use the isolated physical fixture for new-volume evidence and
+independently qualify a staged restore on the exact pinned Chroma image.

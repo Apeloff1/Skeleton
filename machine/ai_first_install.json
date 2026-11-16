@@ -28,7 +28,8 @@
     "skeleton/app/studio_readiness.py",
     "scripts/install_game_desktop_toolchains.py",
     "skeleton/app/strict_install_qualification.py",
-    "scripts/qualify_chroma_persistence.py"
+    "scripts/qualify_chroma_persistence.py",
+    "scripts/stage_chroma_recovery.py"
   ],
   "services": [
     "mongo",
@@ -69,7 +70,8 @@
     "Both uppercase and lowercase NO_PROXY explicitly include Compose service and loopback hosts while retaining operator bypass entries, so inherited proxy settings cannot intercept private authenticated backend-to-engine traffic. External proxy configuration remains available to its existing owners.",
     "The production Nginx loopback health probe explicitly disables wget proxy use; external proxy configuration cannot turn a healthy local listener into a false health failure.",
     "Strict checkout qualification binds multiple independent direct HTTP observations to the admitted host SHA and private environment identity; service observation never grants image, inference, restore, browser, device or release evidence.",
-    "The pinned isolated Chroma physical fixture uses /data, verifies logical mutations through restart and container replacement, and preserves the legacy full-profile hold."
+    "The pinned isolated Chroma physical fixture uses /data, verifies logical mutations through restart and container replacement, and preserves the legacy full-profile hold.",
+    "Historical Chroma recovery stages only an independently signed selected backup lane into a new private directory and never modifies or merges the legacy stores."
   ],
   "diagnostic_report": {
     "schema_version": "skeleton.application.first_install_report.v1",
