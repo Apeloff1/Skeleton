@@ -38,8 +38,9 @@ Do not derive the expected pins from an untrusted candidate at activation.
 The existing ProtectedLocalComponents must supply real independently trusted
 snapshot, reviewer, active tokenizer, sampler and projection authorities.
 This integration does not invent them or enable a mock attestor in production.
-The current ordinary startup does not automatically construct this new
-dependency; existing callers that omit it retain their original behavior.
+The default startup does not fabricate this dependency; existing callers
+that omit it retain their original behavior. The actual ASGI composition
+root now accepts it explicitly.
 
 Measured mode rejects hosted selection, legacy reference artifacts, catalogs,
 unguarded activation, configured caches, and concurrency greater than one.
@@ -80,8 +81,9 @@ The native owner invokes the callback both before prompt processing and
 again immediately before attempting to spawn the native child. Each callback
 obtains a local power/topology sample and intersects its available memory
 with the existing serving probe's scoped allocation headroom. The latter
-already accounts for nested cgroups/Windows commit and has its existing
-short collection cache. Critical canonical serving-pressure classification
+already accounts for nested cgroups/Windows commit. Both native launch
+checks request an uncached collection; ordinary serving maintenance retains
+its existing short collection cache. Critical canonical serving-pressure classification
 also denies the launch. Unavailable headroom denies activation for that
 request rather than counting host memory with unknown scoped availability.
 
@@ -112,9 +114,78 @@ Also run existing protected context, provider registry, native launcher,
 deployment, sealed-page and physical inference quality suites. The new
 regression uses a tiny framing-only artifact, a test-only tokenizer attestor,
 mocked resource probes and the actual native launch hooks. It does not
-launch real model inference and is not native device evidence. Actual
-production startup dependency injection, trusted tokenizer activation,
+launch real model inference and is not native device evidence. Actual deployer-owned production configuration, trusted tokenizer activation,
 full-size model execution, sustained pressure, process-death/cleanup,
 physical memory and device accounting, Windows/WSL2, security, release
 provenance and mandatory exact-head CI remain separate requirements.
 No merge or release authorization.
+
+
+## ASGI and engine startup
+
+The public application factory and the existing server runner accept an
+explicit trusted `measured_local_deployment` dependency:
+
+```python
+from skeleton.api.server import create_app
+
+app = create_app(
+    trusted_protected_bootstrap=install_real_protected_authorities,
+    measured_local_deployment=measured,
+)
+```
+
+The trusted bootstrap must install the canonical native guard and the real
+Mongo conversation and memory owners using their shared majority-backed
+writer epoch. The application may alternatively install the typed measured
+dependency once through
+`state.configure_engine_measured_deployment(measured)` inside that bootstrap.
+Do not supply it both ways. Neither HTTP nor an environment variable can
+construct this dependency or substitute a verifier. The engine's direct
+binding entrypoint validates these authorities before opening durable
+execution stores. The frozen dependency is forwarded when the exclusive
+execution coordinator activates its provider registry, with no alternate
+provider or independent chat route.
+
+An ordinary Docker factory invocation without a trusted bootstrap is not
+an activated measured deployment. It remains possible to boot application
+services with the AI provider unavailable. Real product commissioning must
+supply the independently administered authorities and pins; these example
+identifiers are not provided operator values. A selected measured activation
+cannot fall back to an unmeasured route on a pin or authority error.
+
+## Operator inspection before startup
+
+The installed offline runtime command now has a read-only deployment check:
+
+```sh
+python -m skeleton offline-runtime deployment-check \
+    --store /private/weights \
+    --plan-sha APPROVED_PLAN_SHA \
+    --model-identity-sha APPROVED_MODEL_SHA \
+    --deployment /private/deployment.json \
+    --manifest-sha256 APPROVED_RAW_SHA \
+    --manifest-digest APPROVED_CANONICAL_DIGEST \
+    --deployment-budget-mib 16384 \
+    --require-candidate
+```
+
+Choose the deployment budget to cover the independently approved manifest,
+model, executable and adjacent libraries, not just GGUF size. This command
+requires all four deployment-specific inputs and CPU GGUF framing. It
+reuses the actual deployment/source resolver and native profile validator,
+reads the artifacts, and performs one scoped local resource check without
+creating a provider, supplying a tokenizer attestor or starting inference.
+A first report of candidate status is not permission to dispatch. There is
+no transferable grant; protected authorities and native/release evidence
+remain unassessed. Exit 2 denotes invalid input/evidence/profile; exit 3
+with `--require-candidate` denotes a recorded blocked observation.
+
+If a later native evidence collector fails, the gate now replaces any
+previous candidate observation with a bounded denial receipt. A cached
+successful status cannot represent the last check after rejection. These
+records are diagnostic observations and do not attest execution results.
+
+The added server and CLI regressions exercise typed startup fences, actual
+registry activation, and fresh pressure collection. They are not production
+Mongo, native tokenizer, OS allocation or physical hardware qualification.
