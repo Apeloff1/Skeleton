@@ -162,10 +162,12 @@ def long_dialogue(seed: int,turns: int) -> Case:
     seed=_integer(seed,0,2**32-1);turns=_integer(turns,8,MAX_TURNS)
     specs=[]
     state={}
+    archive=sha256(f"immutable:{seed}:{turns}".encode()).hexdigest()[:12]
+    specs.append(_ack(f"Remember the immutable archive verification code {archive}. Never update this separate code."))
     # Fixed-slot revisions and disjoint distractors interleave actual recall
     # checks. The case requires the full transcript; no synthetic summaries
     # may be substituted for genuine context retention in the live runner.
-    for step in range(turns-1):
+    for step in range(1,turns-1):
         slot=f"slot-{step%19:02d}"
         if step%5==4 and state:
             keys=tuple(sorted(state))
@@ -175,8 +177,7 @@ def long_dialogue(seed: int,turns: int) -> Case:
             value=sha256(f"long:{seed}:{step}:{slot}".encode()).hexdigest()[:8]
             state[slot]=value
             specs.append(_ack(f"Record code {value} for {slot}, replacing its older value if present."))
-    oldest=next(iter(state))
-    specs.append(_exact(f"Return the latest code for {oldest}.",state[oldest]))
+    specs.append(_exact("Return the immutable archive verification code given at the beginning.",archive))
     return Case(f"generated.long.{seed:08x}.{turns:04d}","long_context",tuple(specs))
 
 
