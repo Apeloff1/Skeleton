@@ -124,8 +124,8 @@ def test_inventory_refuses_a_new_manifest_during_verification(tmp_path, monkeypa
     original = WeightShardStore.verified_paths
     observed = []
 
-    def changing(self, key):
-        paths = original(self, key)
+    def changing(self, key, **kwargs):
+        paths = original(self, key, **kwargs)
         if not observed:
             observed.append(True)
             _stage(tmp_path, payload=b"new concurrent model")
@@ -267,8 +267,8 @@ def test_inventory_refuses_managed_directory_replacement_with_same_names(tmp_pat
     _, root = _stage(tmp_path)
     original = WeightShardStore.verified_paths
 
-    def replacing(self, key):
-        verified = original(self, key)
+    def replacing(self, key, **kwargs):
+        verified = original(self, key, **kwargs)
         directory = root / "manifests"
         backup = root / "displaced"
         directory.rename(backup)
@@ -290,3 +290,53 @@ def test_manifest_boolean_schema_version_is_not_integer_schema(tmp_path):
     manifest.write_bytes(canonical_bytes(record))
     with pytest.raises(WeightShardStoreError, match="invalid weight manifest shard declaration"):
         WeightShardStore(root, read_only=True).load_plan(key)
+
+
+def test_inventory_metadata_and_reference_limits_apply_before_weight_verification(tmp_path, monkeypatch):
+    _, root = _stage(tmp_path, payload=b"first weight")
+    _stage(tmp_path, payload=b"second weight")
+    expected = sum(path.stat().st_size for path in (root / "manifests").glob("*.json"))
+
+    def refuse(*args, **kwargs):
+        pytest.fail("opened weight objects before metadata admission")
+
+    monkeypatch.setattr(WeightShardStore, "verified_paths", refuse)
+    with pytest.raises(OfflineInventoryError):
+        inventory_offline_weights(root, max_manifest_bytes=expected - 1)
+    with pytest.raises(OfflineInventoryError, match="shard reference budget"):
+        inventory_offline_weights(root, max_shard_references=1)
+
+
+def test_inventory_binds_non_plan_manifest_fields(tmp_path):
+    from skeleton.ai.model_runtime.flgb_model_runtime import canonical_bytes
+    key, root = _stage(tmp_path)
+    manifest = root / "manifests" / (key + ".json")
+    before = inventory_offline_weights(root)
+    assert before["models"][0]["manifest_sha256"] == sha256(manifest.read_bytes()).hexdigest()
+    record = json.loads(manifest.read_bytes())
+    record["weights_digest"] = "0" * 64
+    manifest.write_bytes(canonical_bytes(record))
+    after = inventory_offline_weights(root)
+    # The load-plan digest does not contain the independent weights field.
+    assert after["models"][0]["plan_digest"] == key
+    assert before["digest"] != after["digest"]
+
+
+def test_inventory_detects_earlier_manifest_mutation_during_later_verification(tmp_path, monkeypatch):
+    from skeleton.ai.model_runtime.flgb_model_runtime import canonical_bytes
+    _, root = _stage(tmp_path, payload=b"first weight")
+    _stage(tmp_path, payload=b"second weight")
+    manifests = sorted((root / "manifests").glob("*.json"))
+    original = WeightShardStore.verified_paths
+
+    def changing(self, key, **kwargs):
+        paths = original(self, key, **kwargs)
+        if key == manifests[1].stem:
+            record = json.loads(manifests[0].read_bytes())
+            record["weights_digest"] = "0" * 64
+            manifests[0].write_bytes(canonical_bytes(record))
+        return paths
+
+    monkeypatch.setattr(WeightShardStore, "verified_paths", changing)
+    with pytest.raises(OfflineInventoryError, match="manifest identity changed"):
+        inventory_offline_weights(root)
