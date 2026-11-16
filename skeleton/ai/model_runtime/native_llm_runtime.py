@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import math
 import hmac
 import random
+import sys
 from typing import Any, Callable, Iterator, Mapping, Sequence
 
 from skeleton.cortex.attn import sample_logits
@@ -674,6 +675,7 @@ class NativeLLMRuntime:
         prompt_sequence: TokenSequence,
         config: GenerationConfig,
         *, interrupt: Callable[[], None] | None = None,
+        _private_cpu_cache: KVCache | None = None,
     ) -> Iterator[RuntimeEvent]:
         if interrupt is not None:
             interrupt()
@@ -717,9 +719,22 @@ class NativeLLMRuntime:
         rng = random.Random(int(config.seed) & 0xFFFFFFFF)
         cache = (
             KVCache(self.model.n_layers, self.limits.max_context)
-            if config.use_cache
-            else None
+            if config.use_cache and _private_cpu_cache is None
+            else _private_cpu_cache
         )
+        if _private_cpu_cache is not None:
+            if (not config.use_cache or self.device.actual != "cpu"
+                    or self.device.resident or self.model._accel is not None
+                    or self.model.use_mod or type(cache) is not KVCache
+                    or cache.n_layers != self.model.n_layers
+                    or cache.ctx != self.limits.max_context
+                    or cache.next_position != len(cache.tokens)
+                    or tuple(cache.tokens) != prompt_sequence.token_ids[:len(cache.tokens)]
+                    or (cache.tokens and cache.owner is not self.model)
+                    or self.estimate_kv_bytes(len(cache.tokens)) > self.limits.max_kv_bytes):
+                raise RuntimeContractError("private CPU prefix cache is not compatible with admitted prompt")
+            # Usage counts resets for this generation, not the session lifetime.
+            cache.reset_count = 0
         output = list(prompt_sequence.token_ids)
         generated: list[int] = []
         stop_ids = set(config.stop_token_ids)
@@ -1073,9 +1088,16 @@ class NativeConversationSession:
     decoded and re-encoded, preserving the exact token trajectory.
     """
 
-    def __init__(self, runtime: NativeLLMRuntime) -> None:
+    def __init__(self, runtime: NativeLLMRuntime, *, prefix_cache_bytes: int = 0) -> None:
         if not isinstance(runtime, NativeLLMRuntime):
             raise RuntimeContractError("NativeLLMRuntime required")
+        if (type(prefix_cache_bytes) is not int
+                or not 0 <= prefix_cache_bytes <= min(256 * 1024**2, runtime.limits.max_kv_bytes)):
+            raise RuntimeContractError("private CPU prefix retention budget exceeds runtime ceiling")
+        self._prefix_cache_bytes = prefix_cache_bytes
+        self._prefix_cache: KVCache | None = None
+        self._prefix_binding: tuple | None = None
+        self._prefix_reused_tokens = 0
         self.runtime = runtime
         self._model_digest = runtime.model_digest
         self._tokenizer_digest = runtime.tokenizer.digest
@@ -1088,7 +1110,43 @@ class NativeConversationSession:
     def token_ids(self) -> tuple[int, ...]:
         return self._tokens
 
+    def _clear_prefix_cache(self) -> None:
+        self._prefix_cache = None
+        self._prefix_binding = None
+        self._prefix_reused_tokens = 0
+
+    def _cache_binding(self) -> tuple:
+        runtime = self.runtime
+        return (runtime.model_digest, runtime.tokenizer.digest,
+                runtime.architecture.digest, runtime.device.digest,
+                runtime.device_policy, runtime.limits)
+
+    @staticmethod
+    def _retained_prefix_size(cache: KVCache) -> int:
+        # Conservative Python object accounting (not process RSS or driver
+        # allocation); count each occurrence even when objects alias.
+        size = sys.getsizeof(cache) + sys.getsizeof(cache.__dict__)
+        size += sys.getsizeof(cache.tokens) + sum(sys.getsizeof(x) for x in cache.tokens)
+        if cache.last_logits is not None:
+            size += sys.getsizeof(cache.last_logits) + sum(sys.getsizeof(x) for x in cache.last_logits)
+        for bank in (cache.K, cache.V):
+            size += sys.getsizeof(bank)
+            for layer in bank:
+                size += sys.getsizeof(layer)
+                for row in layer:
+                    size += sys.getsizeof(row) + sum(sys.getsizeof(x) for x in row)
+        return size
+
+    @property
+    def prefix_cache_status(self) -> Mapping[str, int]:
+        cache = self._prefix_cache
+        return {"retention_budget_bytes": self._prefix_cache_bytes,
+                "retained_tokens": len(cache.tokens) if cache is not None else 0,
+                "estimated_retained_python_bytes": self._retained_prefix_size(cache) if cache is not None else 0,
+                "previous_turn_prefix_tokens": self._prefix_reused_tokens}
+
     def reset(self) -> None:
+        self._clear_prefix_cache()
         self._tokens = ()
         self.turns = 0
         self._revision += 1
@@ -1129,9 +1187,48 @@ class NativeConversationSession:
             prompt_ids,
             digest_json({"session_turn": self.turns, "token_ids": list(prompt_ids)}),
         )
-        result = self.runtime.generate_sequence(sequence, cfg)
+        binding = self._cache_binding()
+        cache = self._prefix_cache
+        cache_binding = self._prefix_binding
+        # Detach before execution; this private bank is never leased to two
+        # concurrent callers or copied into a child session.
+        self._clear_prefix_cache()
+        revision = self._revision
+        reused = 0
+        cpu = (self._prefix_cache_bytes and cfg.use_cache
+               and self.runtime.device.actual == "cpu"
+               and not self.runtime.device.resident
+               and self.runtime.model._accel is None
+               and not self.runtime.model.use_mod)
+        if cpu:
+            if (cache is None or cache_binding != binding
+                    or cache.next_position != len(cache.tokens)
+                    or tuple(cache.tokens) != prompt_ids[:len(cache.tokens)]
+                    or self._retained_prefix_size(cache) > self._prefix_cache_bytes):
+                cache = KVCache(self.runtime.model.n_layers, self.runtime.limits.max_context)
+            else:
+                reused = len(cache.tokens)
+            with GenerationStream(self.runtime._stream_sequence_impl(
+                    sequence, cfg, _private_cpu_cache=cache)) as stream:
+                for _event in stream:
+                    pass
+            result = stream.result
+            if result is None:
+                raise RuntimeContractError("private CPU prefix generation lacked terminal result")
+        else:
+            cache = None
+            result = self.runtime.generate_sequence(sequence, cfg)
         self._assert_identity()
+        if revision != self._revision:
+            raise RuntimeContractError("session changed during generation")
         self._tokens = (prompt_ids + result.generated_ids)[-self.runtime.limits.max_context:]
+        if (cache is not None and cache.tokens and binding == self._cache_binding()
+                and cache.next_position == len(cache.tokens)
+                and tuple(cache.tokens) == self._tokens[:len(cache.tokens)]
+                and self._retained_prefix_size(cache) <= self._prefix_cache_bytes):
+            self._prefix_cache = cache
+            self._prefix_binding = binding
+        self._prefix_reused_tokens = reused
         self.turns += 1
         self._revision += 1
         self._pending_streams.clear()
@@ -1183,6 +1280,7 @@ class NativeConversationSession:
         ids = tuple(token_ids)
         if any(type(i) is not int or i < 0 or i >= self.runtime.tokenizer.vocab_size for i in ids):
             raise RuntimeContractError("invalid appended token")
+        self._clear_prefix_cache()
         self._tokens = (self._tokens + ids)[-self.runtime.limits.max_context:]
         self._revision += 1
 
@@ -1193,6 +1291,7 @@ class NativeConversationSession:
         self._assert_identity()
         if type(keep_last) is not int or keep_last < 0:
             raise RuntimeContractError("invalid truncation length")
+        self._clear_prefix_cache()
         self._tokens = self._tokens[-keep_last:] if keep_last else ()
         self._revision += 1
 
@@ -1200,6 +1299,7 @@ class NativeConversationSession:
         self._assert_identity()
         if type(count) is not int or count < 0:
             raise RuntimeContractError("invalid prefix count")
+        self._clear_prefix_cache()
         self._tokens = self._tokens[count:]
         self._revision += 1
 
@@ -1218,6 +1318,7 @@ class NativeConversationSession:
             type(i) is not int or i < 0 or i >= self.runtime.tokenizer.vocab_size for i in ids
         ):
             raise RuntimeContractError("invalid replacement history")
+        self._clear_prefix_cache()
         self._tokens = ids
         self._revision += 1
 
@@ -1239,6 +1340,7 @@ class NativeConversationSession:
         tokens = self.preview_context(text)
         sequence = TokenSequence(self._tokenizer_digest, tokens,
                                  digest_json({"session_turn": self.turns, "token_ids": list(tokens)}))
+        self._clear_prefix_cache()
         stream = self.runtime.stream_sequence(sequence, config)
         self._pending_streams[id(stream)] = (self._revision, sequence.digest)
         return stream
@@ -1260,6 +1362,7 @@ class NativeConversationSession:
             history_len = min(len(self._tokens), len(prompt))
             if prompt[:history_len] != self._tokens[-history_len:]:
                 raise RuntimeContractError("stream history diverged")
+        self._clear_prefix_cache()
         self._tokens = (result.prompt_sequence.token_ids + result.generated_ids)[
             -self.runtime.limits.max_context:]
         self.turns += 1
