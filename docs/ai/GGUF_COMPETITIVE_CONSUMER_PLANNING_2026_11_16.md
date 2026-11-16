@@ -154,3 +154,53 @@ enrolled. Actual owner hardware and native upstream build qualification,
 model tensor compatibility, GPU throughput, installed guarded application
 integration, Windows/WSL2 and merge/release remain held. Local LoRA training,
 adaptive reasoning and full long-context reconstruction are separate work.
+
+## Competitive execution extension — paged kernels, reasoning, specialization
+
+- `PagedBatchSession` owns real per-layer page pools, per-sequence
+  page tables, suffix-only decoding, reclaimed page slots, overflow
+  rejection and fail-closed cancellation. CUDA dispatch uses a custom
+  Triton online-softmax page traversal kernel; the explicitly selected
+  CPU reference is not physical GPU qualification. Existing native
+  generation and replay event machinery is preserved. Paged storage
+  preallocates the configured backing pool; it is not an allocator-free
+  or cross-process shared paging system.
+- `scripts.qualify_native_paged_kernel` executes matched single/batch
+  native measurements and requires output parity, speed and latency
+  floors before the trusted startup can select a measured CUDA profile.
+  The profile is model, source, architecture, device and software bound.
+  It is not signed third-party evidence or a guarantee on other prompts.
+- The guarded native-transformer composition accepts that profile
+  explicitly. The private resident GGUF session also has a guarded
+  startup factory using the actual server tokenize/detokenize endpoints,
+  exact prepared input custody, independent snapshot/reviewer authority,
+  no unprepared inference, no operator batch bypass and no cache reuse.
+  Installed application bootstrap must explicitly construct the factory;
+  no default provider settings or existing installation are changed.
+- Guarded adaptive reasoning tries authorized variants under an aggregate
+  output-token reservation and wall deadline, then requires an independent
+  evaluator with response-bound evidence and a minimum quality score.
+  The existing canonical source must authorize each variant. No model
+  self-rating or answer-derived authority is used.
+- Native long-context reconstruction verifies immutable spool ancestry,
+  selects exact lexical token spans with coverage-aware ranking, frames
+  their provenance, executes the actual native model and revalidates
+  storage before delivery. This is a bounded operator path, not semantic
+  retrieval or proof of factual entailment.
+- `scripts.train_native_lora_specialization` performs actual frozen-base
+  Torch LoRA gradient training on selected native attention/FFN/output
+  projections. Dataset rights/content/revision and target configuration
+  are pinned; evaluation is held out, output candidate-only, base remains
+  unchanged. No GGUF adapter training or external-model weight modification
+  is claimed. The candidate can be merged into a separate native clone,
+  not promoted to production.
+- `scripts.benchmark_resident_gguf_holdout` runs distinct exact-pinned local
+  models on matched resident engine settings with rotated order, operator
+  holdout, output accuracy, end-to-end throughput and batch latency.
+  No competitive superiority is asserted without an executed comparison.
+
+The exact-head CPU fixture workflow includes real Torch gradient training,
+paged reference tests and kernel measurement; source-only tests cover the
+new guarded and reconstruction boundaries. CUDA/Triton device execution,
+operator GGUF benchmark, full installed guarded application activation,
+physical memory/throughput and Windows/WSL2 remain independent holds.

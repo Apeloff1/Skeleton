@@ -36,6 +36,21 @@ on:
       - "skeleton/cortex/torch_lm.py"
       - "skeleton/ai/runtime/cortex/torch_lm.py"
       - "tests/test_torch_physical_kv_fused_batch.py"
+      - "skeleton/ai/model_runtime/paged*.py"
+      - "skeleton/ai/model_runtime/kernel_qualification.py"
+      - "skeleton/ai/model_runtime/context_reconstruction.py"
+      - "skeleton/ai/training/native_lora_specialization.py"
+      - "skeleton/ai/runtime/inference/adaptive_reasoning.py"
+      - "skeleton/ai/runtime/inference/guarded_service.py"
+      - "skeleton/ai/runtime/inference/native_transformer.py"
+      - "skeleton/ai/runtime/inference/resident_guarded_gguf.py"
+      - "skeleton/ai/runtime/inference/competitive_holdout.py"
+      - "tests/test_native_paged_attention.py"
+      - "tests/test_native_lora_specialization.py"
+      - "tests/test_native_kernel_qualification.py"
+      - "tests/test_guarded_adaptive_reasoning.py"
+      - "tests/test_native_context_reconstruction.py"
+      - "tests/test_guarded_resident_competitive.py"
       - "tests/test_jeeves_local_lease.py"
       - "skeleton/ai/model_runtime/offline_chat.py"
       - "tests/test_jeeves_advisory.py"
@@ -141,6 +156,9 @@ jobs:
           skeleton/testing/test_local_model_deployment.py
           tests/flgb/test_flgb_02_native_runtime.py
           tests/test_resident_gguf_batch.py
+          tests/test_guarded_adaptive_reasoning.py
+          tests/test_native_context_reconstruction.py
+          tests/test_guarded_resident_competitive.py
       - name: Set up Node 24
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -220,5 +238,5 @@ jobs:
           python -c "import torch; assert hasattr(torch.nn.functional, 'scaled_dot_product_attention')"
       - name: Execute mandatory real CPU tensor regressions
         run: |
-          python -m pytest -q --noconftest tests/test_torch_physical_kv_fused_batch.py
+          python -m pytest -q --noconftest tests/test_torch_physical_kv_fused_batch.py tests/test_native_paged_attention.py tests/test_native_lora_specialization.py tests/test_native_kernel_qualification.py
           python scripts/check_ai_file_tree.py

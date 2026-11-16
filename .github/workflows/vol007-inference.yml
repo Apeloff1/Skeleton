@@ -65,6 +65,9 @@ jobs:
           tests/flgb/test_flgb_02_native_runtime.py
           tests/test_torch_physical_kv_fused_batch.py
           tests/test_resident_gguf_batch.py
+          tests/test_guarded_adaptive_reasoning.py
+          tests/test_native_context_reconstruction.py
+          tests/test_guarded_resident_competitive.py
 
       - name: Validate masterplan consistency
         run: python scripts/check_ai_master_plan.py
