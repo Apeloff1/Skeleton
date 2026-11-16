@@ -22,7 +22,7 @@ from skeleton.ai.training.shadow_weight_intake import ShadowKnowledge,ShadowKnow
 from skeleton.ai.training.shadow_weight_ledger import ShadowWeightLedger
 from skeleton.ai.training.shadow_weights import ShadowWeightError,SourceAttestation
 from skeleton.cortex.attn import softmax
-from skeleton.cortex.lora import LoRA
+from skeleton.cortex.lora import LoRA,LoRABank
 from skeleton.cortex.transformer import TinyTransformer
 
 
@@ -76,6 +76,39 @@ class AdapterMathTests(unittest.TestCase):
                     row[j]=old
                     self.assertAlmostEqual(gradient[idx],(a-b)/(2*eps),places=7)
                     idx+=1
+
+    def test_existing_lora_returns_gradient_from_preupdate_revision(self):
+        adapter=self.adapter()
+        y=[.5,-.2,.3,.1]
+        dy=[.7,.2,-.9]
+        original=adapter.snapshot()
+        eps=1e-6
+        expected=[]
+        for j in range(len(y)):
+            plus=y[:];minus=y[:]
+            plus[j]+=eps;minus[j]-=eps
+            a=sum(x*g for x,g in zip(adapter.delta(plus),dy))
+            b=sum(x*g for x,g in zip(adapter.delta(minus),dy))
+            expected.append((a-b)/(2*eps))
+        actual=adapter.step(y,dy,.1)
+        for observed,target in zip(actual,expected):
+            self.assertAlmostEqual(observed,target,places=7)
+        self.assertNotEqual(original,adapter.snapshot())
+
+    def test_existing_lora_uses_adapted_logits_for_training(self):
+        model=runtime().model
+        bank=LoRABank(rank=2,alpha=2.0,seed=4)
+        bank.attach(model,targets=("Wout",))
+        adapter=bank.adapters["Wout"]
+        adapter.B=[[float(i+1)*.1,-.15] for i in range(model.V)]
+        ids=model._ids("alpha beta")
+        hidden,_=model._forward(ids[:1])
+        y=hidden[-1]
+        p=softmax(adapter.apply(model._unembed(y),y))
+        expected=[prob-float(i==ids[1]) for i,prob in enumerate(p)]
+        with patch.object(adapter,"step",wraps=adapter.step) as actual:
+            self.assertEqual(bank.fit_output(model,("alpha beta",),lr=.01),1)
+        self.assertEqual(actual.call_args.args[1],expected)
 
     def test_retention_priority_projects_opposing_gradient(self):
         a=[-2.,1.]
