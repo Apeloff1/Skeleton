@@ -272,7 +272,7 @@ def nginx_ingress_errors(source: str) -> tuple[str, ...]:
         "add_header", "Permissions-Policy",
         "camera=(), microphone=(), geolocation=()", "always",
     )
-    expected_cache = ("add_header", "Cache-Control", "no-store")
+    expected_cache = ("add_header", "Cache-Control", "no-store", "always")
     for expected in (expected_permissions, expected_cache):
         relevant = [item for item in setup if item[0] == "add_header"
                     and len(item) > 1 and item[1].lower() == expected[1].lower()]
