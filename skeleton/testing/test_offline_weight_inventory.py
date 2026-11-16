@@ -340,3 +340,53 @@ def test_inventory_detects_earlier_manifest_mutation_during_later_verification(t
     monkeypatch.setattr(WeightShardStore, "verified_paths", changing)
     with pytest.raises(OfflineInventoryError, match="manifest identity changed"):
         inventory_offline_weights(root)
+
+
+def test_new_byte_budget_counts_distinct_absent_objects_before_ingestion(tmp_path):
+    from skeleton.ai.model_runtime.weight_shard_store import WeightShardStoreError
+    store = WeightShardStore(tmp_path / "store")
+    payload = b"deduplicated weight"
+    path = tmp_path / "input"
+    path.write_bytes(payload)
+    checksum = sha256(payload).hexdigest()
+    model = ModelIdentity("model", "r1", "tiny", checksum, checksum, checksum)
+    plan = WeightLoadPlan(model.identity_digest, (
+        WeightShard(0, checksum, len(payload), "local"),
+        WeightShard(1, checksum, len(payload), "local"),
+    ), len(payload) * 2)
+    with pytest.raises(WeightShardStoreError, match="operation budget"):
+        store.stage_plan(model, plan, {0: path, 1: path}, maximum_new_bytes=len(payload) - 1)
+    assert not list(store.objects.rglob("*"))
+    assert not list(store.manifests.iterdir())
+    key = store.stage_plan(model, plan, {0: path, 1: path}, maximum_new_bytes=len(payload))
+    assert store.stage_plan(model, plan, {0: path, 1: path}, maximum_new_bytes=0) == key
+    assert len(list(store.objects.glob("*/*"))) == 1
+    assert store.verified_paths(key)[0] == store.verified_paths(key)[1]
+
+
+def test_ingest_rejects_conflicting_duplicate_digest_before_writes(tmp_path):
+    from skeleton.ai.model_runtime.weight_shard_store import WeightShardStoreError
+    store = WeightShardStore(tmp_path / "store")
+    checksum = sha256(b"x").hexdigest()
+    model = ModelIdentity("model", "r1", "tiny", checksum, checksum, checksum)
+    plan = WeightLoadPlan(model.identity_digest, (
+        WeightShard(0, checksum, 1, "local"),
+        WeightShard(1, checksum, 2, "local"),
+    ), 3)
+    with pytest.raises(WeightShardStoreError, match="conflicting byte"):
+        store.stage_plan(model, plan, {0: tmp_path / "a", 1: tmp_path / "b"})
+    assert not list(store.objects.rglob("*"))
+
+
+def test_ingest_refuses_manifest_overflow_before_object_writes(tmp_path, monkeypatch):
+    from skeleton.ai.model_runtime import weight_shard_store as owner
+    store = WeightShardStore(tmp_path / "store")
+    checksum = sha256(b"x").hexdigest()
+    model = ModelIdentity("model", "r1", "tiny", checksum, checksum, checksum)
+    plan = WeightLoadPlan(model.identity_digest, (
+        WeightShard(0, checksum, 1, "local"),
+    ), 1)
+    monkeypatch.setattr(owner, "_MAX_MANIFEST_BYTES", 16)
+    monkeypatch.setattr(store, "_ingest", lambda *args: pytest.fail("ingest before manifest admission"))
+    with pytest.raises(owner.WeightShardStoreError, match="manifest exceeds"):
+        store.stage_plan(model, plan, {0: tmp_path / "absent"})
