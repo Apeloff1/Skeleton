@@ -20,6 +20,8 @@ from skeleton.ai.runtime.inference.llama_cpp import (
 )
 from skeleton.ai.runtime.inference.adaptive_serving import AdaptiveServingController
 from skeleton.app.offline_cpu_budget import MemoryTopology
+from skeleton.app.offline_cpu_budget import plan_cpu_workers
+from skeleton.app.offline_energy_budget import plan_energy_workers, EnergyPolicy
 from skeleton.app.offline_native_process_lease import NativeCpuLeaseOwner, NativeLeaseError
 from skeleton.ai.runtime.inference.local import LocalModelAdapter, sample_serving_resources
 from skeleton.app.offline_runtime_preflight import (
@@ -70,6 +72,7 @@ class MeasuredLlamaCpuGate:
         require(bool(estimates) and max(estimates) > 0, "native KV estimate unavailable")
         kv_reserve = config.context_size * max(estimates)
         scratch = config.runtime_scratch_bytes
+        self._base_policy = policy
         self._policy = replace(policy, host_reserve_bytes=policy.host_reserve_bytes + kv_reserve + scratch)
         self._source = source
         self._backend = backend
@@ -83,6 +86,8 @@ class MeasuredLlamaCpuGate:
         self._lock = threading.RLock()
         self._sequence = 0
         self._last = None
+        self._running_checks = 0
+        self._last_running = None
         self._closed = False
         self._lease_owner: NativeCpuLeaseOwner | None = None
 
@@ -120,7 +125,7 @@ class MeasuredLlamaCpuGate:
                     self._last = {**body, "gate_digest": digest(body)}
                 raise
 
-    def _check(self) -> None:
+    def _check_profile(self) -> None:
         require(not self._closed, "measured native gate closed")
         require(digest(self._source.snapshot()) == self._source_digest,
                 "runtime source evidence changed")
@@ -128,6 +133,9 @@ class MeasuredLlamaCpuGate:
                  self._backend.execution_profile_digest) ==
                 (self._model_digest, self._runtime_digest, self._profile),
                 "native execution profile changed")
+
+    def _collect(self):
+        self._check_profile()
         reading = sample_hardware()
         require(reading.origin == "local_probe", "real local probe required")
         # The canonical inference engine probe follows nested cgroups,
@@ -143,12 +151,18 @@ class MeasuredLlamaCpuGate:
         reading = replace(reading, memory=MemoryTopology(
             reading.memory.total_bytes, available, "intersection-with-serving-headroom"))
         now = time.monotonic_ns()
-        planned = plan_preflight(self._source, reading, self._policy, now_ns=now)
+        require(0 <= now - reading.started_ns <= self._policy.sample_age_ns
+                and reading.finished_ns <= now, "stale native resource observation")
         # Fresh classification per invocation: the canonical controller
         # throttles consecutive samples internally, which must not hide
         # a critical observation at the actual child-spawn boundary.
         pressure = AdaptiveServingController(1)
         pressure.update(serving, now=now / 1_000_000_000, queued=0)
+        return reading, serving, pressure, now
+
+    def _check(self) -> None:
+        reading, serving, pressure, now = self._collect()
+        planned = plan_preflight(self._source, reading, self._policy, now_ns=now)
         # Treat the canonical energy-reduced worker ceiling as a
         # conservative maximum for native threads. An already activated
         # runtime must not silently rewrite its pinned execution profile.
@@ -172,11 +186,71 @@ class MeasuredLlamaCpuGate:
         self._last = {**body, "gate_digest": digest(body)}
         require(admitted, "measured CPU native launch denied")
 
+    def monitor_running(self) -> None:
+        """Check live pressure without charging a second model allocation.
+
+        Launch admission reserves the full estimated model, KV and scratch.
+        After spawn, those pages can already be included in the OS usage
+        counters. Sustainment checks preserve the operator's free service
+        reserve plus CPU/energy limits, rather than requiring capacity for
+        another complete model. They neither credit measured residency nor
+        authorize an additional allocation. Unknown telemetry fails closed.
+        """
+        with self._lock:
+            self._running_checks += 1
+            body = {
+                "schema": "skeleton.offline.measured-running-cpu.v1",
+                "sequence": self._running_checks,
+                "source_digest": self._source_digest,
+                "execution_profile_digest": self._profile,
+                "status": "blocked", "blockers": ["native_running_evidence_failed"],
+                "allocation_authorized": False, "native_qualified": False,
+                "release_qualified": False,
+            }
+            try:
+                reading, serving, pressure, now = self._collect()
+                available = reading.memory.available_bytes
+                # CPU and energy budgets retain the original base policy.
+                # The per-thread budget itself is still additional headroom.
+                base = self._base_policy
+                cpu = plan_cpu_workers(
+                    reading.cpu, reading.memory,
+                    operator_max_workers=base.maximum_workers,
+                    bytes_per_worker=base.bytes_per_worker,
+                    memory_reserve_bytes=base.host_reserve_bytes,
+                    interactive_cpu_reserve=min(base.interactive_cpu_reserve, reading.cpu.logical_visible),
+                    thermal_state="normal",
+                )
+                energy = plan_energy_workers(cpu, reading.power, policy=EnergyPolicy())
+                blockers = []
+                if available is None or not reading.memory.total_bytes:
+                    blockers.append("running_memory_telemetry_unavailable")
+                if available is not None and available < base.host_reserve_bytes:
+                    blockers.append("running_host_reserve_exhausted")
+                if energy.allowed_workers < self._threads:
+                    blockers.append("running_thread_ceiling_exceeded")
+                if pressure.level == "critical":
+                    blockers.append("canonical_serving_" + pressure.reason)
+                if not self._backend.execution_snapshot()["active_processes"]:
+                    blockers.append("running_native_process_not_owned")
+                body.update(checked_ns=now, blockers=blockers,
+                            status="sustainment_candidate" if not blockers else "blocked",
+                            host_headroom_bytes=available, service_reserve_bytes=base.host_reserve_bytes,
+                            worker_ceiling=energy.allowed_workers, cpu_plan_digest=cpu.digest,
+                            energy_plan_digest=energy.digest, hardware_digest=digest(reading.snapshot()),
+                            serving_observation_digest=digest(serving.as_dict()),
+                            serving_pressure=pressure.level, serving_reason=pressure.reason)
+                require(not blockers, "measured CPU running sustainment denied")
+            finally:
+                self._last_running = {**body, "monitor_digest": digest(body)}
+
     def status(self) -> dict:
         with self._lock:
             import json
             result = {"closed": self._closed, "checks": self._sequence,
                       "last": json.loads(canonical(self._last)),
+                      "running_checks": self._running_checks,
+                      "last_running": json.loads(canonical(self._last_running)),
                       "native_qualified": False, "release_qualified": False}
             owner = self._lease_owner
         # acquire() takes the lease lock before calling this gate. Do not
@@ -241,6 +315,7 @@ def build_measured_guarded_deployment(
     # The native backend already calls this before prompt handling AND at
     # process spawn. It rejects hook replacement or late installation.
     adapter.engine.model.install_prelaunch_resource_guard(gate)
+    adapter.engine.model.install_running_resource_monitor(gate.monitor_running)
     if lease_directory is not None:
         gate.bind_native_lease(lease_directory)
     return adapter, gate
