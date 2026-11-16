@@ -304,8 +304,8 @@ def load_local_model_catalog(
     if type(require_guarded_inference) is not bool:
         raise LocalModelCatalogError("guard policy must be explicit")
     if require_guarded_inference:
-        from .guarded_composition import ProtectedLocalComponents
-        if not isinstance(guarded_components, ProtectedLocalComponents):
+        from .guarded_composition import is_protected_component_source
+        if not is_protected_component_source(guarded_components):
             raise LocalModelCatalogError("guard-required catalog lacks trusted dependencies")
     elif guarded_components is not None:
         raise LocalModelCatalogError("catalog guarded components require enforcement")

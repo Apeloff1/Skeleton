@@ -104,6 +104,11 @@ jobs:
             skeleton/testing/test_compose_revocation_window_regression.py \
             skeleton/testing/test_reviewer_custody.py \
             skeleton/testing/test_signed_reviewer_client.py
+      - name: Qualify exact loaded-backend guard factory
+        run: |
+          python -m pytest -q --maxfail=1 \
+            skeleton/testing/test_native_guard_binding.py \
+            skeleton/testing/test_guarded_backend_component_factory.py
       - name: Verify construction and provider-owner contracts
         run: |
           python scripts/check_architecture_map.py

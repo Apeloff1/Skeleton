@@ -3505,8 +3505,8 @@ class ProviderRegistry:
         if guarded_required and active != "local":
             raise ProviderUnavailableError("guarded local dependencies require AI_PROVIDER=local")
         if guarded_required:
-            from skeleton.ai.runtime.inference.guarded_composition import ProtectedLocalComponents
-            if not isinstance(guarded_components, ProtectedLocalComponents):
+            from skeleton.ai.runtime.inference.guarded_composition import is_protected_component_source
+            if not is_protected_component_source(guarded_components):
                 raise _LocalGuardUnavailable(
                     "guard-required local startup lacks trusted dependencies",
                     readiness_code="local_guard_unavailable",

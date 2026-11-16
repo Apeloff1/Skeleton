@@ -44,8 +44,50 @@ class ProtectedLocalComponents:
                 raise ProviderPolicyError("protected local deployment lacks " + name)
 
 
+@dataclass(frozen=True, slots=True)
+class ProtectedLocalComponentFactory:
+    """Deployer-owned per-backend guard constructor.
+
+    A registry must build components only after it has loaded the real model.
+    The snapshot reader is independently supplied and may be rebound by the
+    trusted server before loading any model; a result cannot replace it.
+    """
+
+    snapshots: TrustedSnapshotReader
+    build: Callable[[Any, TrustedSnapshotReader], ProtectedLocalComponents]
+
+    def __post_init__(self) -> None:
+        if not callable(getattr(self.snapshots, "resolve", None)) or not callable(self.build):
+            raise ProviderPolicyError("trusted local component factory is incomplete")
+
+    def for_backend(self, backend: Any) -> ProtectedLocalComponents:
+        try:
+            components = self.build(backend, self.snapshots)
+        except Exception:
+            raise ProviderPolicyError("trusted local component factory rejected backend") from None
+        if (type(components) is not ProtectedLocalComponents
+                or components.snapshots is not self.snapshots):
+            raise ProviderPolicyError("trusted local component factory changed snapshot authority")
+        return components
+
+
+def is_protected_component_source(value: object) -> bool:
+    return type(value) in (ProtectedLocalComponents, ProtectedLocalComponentFactory)
+
+
+def resolve_protected_components(
+    source: ProtectedLocalComponents | ProtectedLocalComponentFactory, backend: Any,
+) -> ProtectedLocalComponents:
+    if type(source) is ProtectedLocalComponentFactory:
+        return source.for_backend(backend)
+    if type(source) is not ProtectedLocalComponents:
+        raise ProviderPolicyError("trusted local protection dependencies are missing")
+    return source
+
+
 def compose_protected_local_adapter(
-    engine: LocalInferenceEngine, *, components: ProtectedLocalComponents,
+    engine: LocalInferenceEngine, *,
+    components: ProtectedLocalComponents | ProtectedLocalComponentFactory,
     default_seed: int = 0, artifact_status: dict[str, object] | None = None,
     activation_gate: Any | None = None,
 ) -> LocalModelAdapter:
@@ -57,8 +99,7 @@ def compose_protected_local_adapter(
     """
     if not isinstance(engine, LocalInferenceEngine) or not engine.require_guarded_context:
         raise ProviderPolicyError("protected deployment requires engine-level execution fencing")
-    if not isinstance(components, ProtectedLocalComponents):
-        raise ProviderPolicyError("trusted local protection dependencies are missing")
+    components = resolve_protected_components(components, engine.model)
     try:
         verified = components.verify_native_tokenizer(
             engine.model, components.tokenize, components.detokenize,

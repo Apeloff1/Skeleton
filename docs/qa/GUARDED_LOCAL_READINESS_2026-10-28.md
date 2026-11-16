@@ -133,3 +133,21 @@ commands deliberately return 2 even when an observation is complete; they are
 not an activation or service-readiness check. Existing database backup,
 authenticated replica configuration, quiescent migration, independent reviewer,
 pinned policy and exact active model/tokenizer custody remain mandatory.
+
+
+## Registry-owned native component factories (candidate)
+
+The trusted composition root may supply a ProtectedLocalComponentFactory
+instead of prebinding one backend instance. The provider registry, catalog and
+GGUF deployment loader preserve this source until the concrete backend exists.
+Canonical startup replaces the factory's snapshot reader with the durable
+per-execution reader before constructing the registry. Each loaded backend
+must acquire its own exact tokenizer binding; foreign or swapped component
+sources are rejected.
+
+make_pinned_native_guard_factory admits only NativeTransformerModel and
+NativeRuntimeLocalModel (checkpoint-backed), with independently supplied
+model ID, model/runtime/tokenizer SHA-256 pins and a signed reviewer. It
+does not admit the current llama.cpp CLI's UTF-8 estimate as an exact
+tokenizer. No production bootstrap or physical model qualification is
+implied by this composition seam.

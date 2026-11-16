@@ -675,9 +675,9 @@ class ServerState:
         application owner. Neither model output nor an API request can select
         these dependencies. Never replace a running guard after activation.
         """
-        from skeleton.ai.runtime.inference.guarded_composition import ProtectedLocalComponents
+        from skeleton.ai.runtime.inference.guarded_composition import is_protected_component_source
 
-        if not isinstance(components, ProtectedLocalComponents):
+        if not is_protected_component_source(components):
             raise TypeError("engine local guard requires trusted application components")
         if (self.engine_execution_coordinator is not None
                 or self.engine_execution_service is not None

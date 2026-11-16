@@ -8,12 +8,13 @@ Non-invertible tokenizer mappings still fail closed per prompt in preflight.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from skeleton.context.pre_delivery_guard import BoundedAdversarialReviewer
 from skeleton.provider_runtime import ProviderPolicyError
 
-from .guarded_composition import ProtectedLocalComponents
+from .guarded_composition import ProtectedLocalComponents, ProtectedLocalComponentFactory
 from .guarded_service import TrustedSnapshotReader
 from .native_transformer import NativeTransformerModel
 
@@ -30,6 +31,12 @@ def native_transformer_guard_components(
     """
     if type(backend) is not NativeTransformerModel:
         raise ProviderPolicyError("native guarded activation requires the exact transformer backend")
+    return _exact_native_components(backend, snapshots=snapshots, reviewer=reviewer)
+
+
+def _exact_native_components(
+    backend: Any, *, snapshots: TrustedSnapshotReader, reviewer: BoundedAdversarialReviewer,
+) -> ProtectedLocalComponents:
     if not callable(getattr(snapshots, "resolve", None)) or not callable(reviewer):
         raise ProviderPolicyError("native guarded activation requires application-owned authorities")
     try:
@@ -74,6 +81,83 @@ def native_transformer_guard_components(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class NativeGuardPins:
+    """Independently reviewed identity for one loaded native model."""
+    model_id: str
+    model_digest: str
+    runtime_digest: str
+    tokenizer_digest: str
+
+    def __post_init__(self) -> None:
+        if (type(self.model_id) is not str or not 1 <= len(self.model_id) <= 256
+                or self.model_id != self.model_id.strip()
+                or any(ord(ch) < 32 or ord(ch) == 127 for ch in self.model_id)):
+            raise ProviderPolicyError("native guard model pin invalid")
+        for digest in (self.model_digest, self.runtime_digest, self.tokenizer_digest):
+            if (type(digest) is not str or len(digest) != 64
+                    or any(ch not in "0123456789abcdef" for ch in digest)):
+                raise ProviderPolicyError("native guard artifact pin invalid")
+
+
+def make_pinned_native_guard_factory(
+    *, snapshots: TrustedSnapshotReader, reviewer: Any,
+    pins: tuple[NativeGuardPins, ...],
+) -> ProtectedLocalComponentFactory:
+    """Bind each eligible native backend created by the actual provider registry.
+
+    No generic tokenizer, GGUF CLI byte estimate or unsupported artifact is
+    treated as native evidence. Pins are independent deployment inputs;
+    they must not be derived from whatever model happened to load.
+    """
+    from .native_runtime import NativeRuntimeLocalModel
+    from .signed_reviewer_client import SignedReviewerClient
+    from .reviewer_custody import ReviewerTrustAnchor
+    if (type(reviewer) is not SignedReviewerClient
+            or type(getattr(reviewer, "_anchor", None)) is not ReviewerTrustAnchor):
+        raise ProviderPolicyError("pinned independent reviewer required")
+    anchor = reviewer._anchor
+    if (type(pins) is not tuple or not 1 <= len(pins) <= 32
+            or any(type(pin) is not NativeGuardPins for pin in pins)):
+        raise ProviderPolicyError("native guard pin inventory invalid")
+    by_id = {pin.model_id: pin for pin in pins}
+    if len(by_id) != len(pins):
+        raise ProviderPolicyError("duplicate native guard model pins")
+
+    def build(backend: Any, reader: TrustedSnapshotReader) -> ProtectedLocalComponents:
+        if type(backend) not in (NativeTransformerModel, NativeRuntimeLocalModel):
+            raise ProviderPolicyError("loaded backend lacks admitted exact native tokenizer")
+        if type(getattr(backend, "model_id", None)) is not str:
+            raise ProviderPolicyError("native guard model identity invalid")
+        pin = by_id.get(backend.model_id)
+        if pin is None or reviewer._anchor != anchor:
+            raise ProviderPolicyError("native guard model or reviewer pin unavailable")
+        components = _exact_native_components(backend, snapshots=reader, reviewer=reviewer)
+        expected = (pin.model_digest, pin.runtime_digest, pin.tokenizer_digest)
+        try:
+            observed = (backend.model_digest, backend.runtime_digest, backend.runtime.tokenizer.digest)
+            if observed != expected:
+                raise ProviderPolicyError("loaded native backend differs from operator pins")
+        except Exception:
+            raise ProviderPolicyError("loaded native backend differs from operator pins") from None
+        from dataclasses import replace
+        verify = components.verify_native_tokenizer
+
+        def pinned_verifier(active: Any, encoder: Any, decoder: Any) -> bool:
+            try:
+                return (reviewer._anchor == anchor
+                        and backend.model_id == pin.model_id
+                        and verify(active, encoder, decoder)
+                        and (backend.model_digest, backend.runtime_digest,
+                             backend.runtime.tokenizer.digest) == expected)
+            except Exception:
+                return False
+
+        return replace(components, verify_native_tokenizer=pinned_verifier)
+
+    return ProtectedLocalComponentFactory(snapshots=snapshots, build=build)
+
+
 def build_guarded_native_transformer_adapter(
     runtime: Any, *,
     snapshots: TrustedSnapshotReader,
@@ -99,4 +183,5 @@ def build_guarded_native_transformer_adapter(
     )
 
 
-__all__ = ["native_transformer_guard_components", "build_guarded_native_transformer_adapter"]
+__all__ = ["native_transformer_guard_components", "build_guarded_native_transformer_adapter",
+           "NativeGuardPins", "make_pinned_native_guard_factory"]
