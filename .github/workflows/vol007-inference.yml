@@ -61,6 +61,7 @@ jobs:
           tests/test_consumer_gguf_shard_audit.py
           tests/test_consumer_gguf_quantization.py
           skeleton/testing/test_local_model_deployment.py
+          tests/flgb/test_flgb_02_native_runtime.py
 
       - name: Validate masterplan consistency
         run: python scripts/check_ai_master_plan.py

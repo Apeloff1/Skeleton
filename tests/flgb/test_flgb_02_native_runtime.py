@@ -48,5 +48,57 @@ class NativeRuntimeRegressionTests(unittest.TestCase):
         runtime.generate("alpha", GenerationConfig(max_new_tokens=1))
 
 
+    def test_interleaved_native_batch_preserves_independent_replay(self):
+        from dataclasses import replace
+        from skeleton.ai.model_runtime.runtime_contracts import BatchGenerationRequest, RuntimeLimits
+        model = _model()
+        runtime = NativeLLMRuntime(model, limits=replace(RuntimeLimits.for_model(model), max_kv_bytes=16384))
+        config = GenerationConfig(max_new_tokens=3, seed=11, temperature=0.7)
+        requests = (
+            BatchGenerationRequest("first", "alpha beta", config),
+            BatchGenerationRequest("second", "gamma delta", config),
+            BatchGenerationRequest("third", "beta gamma", config),
+        )
+        serial = runtime.generate_batch(requests)
+        observed = []
+        interleaved = runtime.generate_interleaved_batch(
+            requests, max_active_slots=2, max_resident_kv_bytes=32768,
+            on_event=lambda name, event: observed.append(name),
+        )
+        self.assertEqual([row.request_id for row in interleaved], [row.request_id for row in serial])
+        self.assertEqual([row.result.generated_ids for row in interleaved],
+                         [row.result.generated_ids for row in serial])
+        self.assertEqual([row.result.output_digest for row in interleaved],
+                         [row.result.output_digest for row in serial])
+        self.assertEqual(observed[:4], ["first", "second", "first", "second"])
+
+    def test_interleaved_budget_rejects_before_stream_dispatch(self):
+        from dataclasses import replace
+        from skeleton.ai.model_runtime.runtime_contracts import BatchGenerationRequest, RuntimeLimits
+        model = _model()
+        runtime = NativeLLMRuntime(model, limits=replace(RuntimeLimits.for_model(model), max_kv_bytes=16384))
+        requests = (BatchGenerationRequest("first", "alpha", GenerationConfig(max_new_tokens=1)),)
+        events = []
+        with self.assertRaisesRegex(RuntimeContractError, "aggregate KV"):
+            runtime.generate_interleaved_batch(requests, max_active_slots=1,
+                max_resident_kv_bytes=8192, on_event=lambda *args: events.append(args))
+        self.assertEqual(events, [])
+
+    def test_interleaved_observer_failure_drains_pending_streams(self):
+        from dataclasses import replace
+        from skeleton.ai.model_runtime.runtime_contracts import BatchGenerationRequest, RuntimeLimits
+        model = _model()
+        runtime = NativeLLMRuntime(model, limits=replace(RuntimeLimits.for_model(model), max_kv_bytes=16384))
+        requests = (BatchGenerationRequest("first", "alpha", GenerationConfig(max_new_tokens=1)),
+                    BatchGenerationRequest("second", "beta", GenerationConfig(max_new_tokens=1)))
+        def reject(name, event):
+            if name == "second":
+                raise RuntimeError("observer stopped")
+        with self.assertRaisesRegex(RuntimeError, "observer stopped"):
+            runtime.generate_interleaved_batch(requests, max_active_slots=2,
+                max_resident_kv_bytes=32768, on_event=reject)
+        self.assertEqual(len(runtime.generate_batch(requests)), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

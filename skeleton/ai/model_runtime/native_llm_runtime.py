@@ -945,11 +945,10 @@ class NativeLLMRuntime:
             raise RuntimeContractError("generation terminated without result")
         return stream.result
 
-    def generate_batch(
-        self,
-        requests: Sequence[BatchGenerationRequest],
+    def _admit_batch(
+        self, requests: Sequence[BatchGenerationRequest],
         *, interrupt: Callable[[], None] | None = None,
-    ) -> tuple[BatchGenerationResult, ...]:
+    ) -> tuple[tuple[BatchGenerationRequest, TokenSequence], ...]:
         if not requests:
             return ()
         if len(requests) > self.limits.max_batch_size:
@@ -970,7 +969,13 @@ class NativeLLMRuntime:
             if aggregate > self.limits.max_batch_tokens:
                 raise RuntimeContractError("batch token budget exceeded")
             admitted.append((request, sequence))
+        return tuple(admitted)
 
+    def generate_batch(
+        self, requests: Sequence[BatchGenerationRequest],
+        *, interrupt: Callable[[], None] | None = None,
+    ) -> tuple[BatchGenerationResult, ...]:
+        admitted = self._admit_batch(requests, interrupt=interrupt)
         # Each admitted sequence is immutable and bound to the tokenizer
         # digest. Re-encoding a prompt here would create a second admission
         # boundary and allow a different token trajectory after preflight.
@@ -981,6 +986,74 @@ class NativeLLMRuntime:
             )
             for request, sequence in admitted
         )
+
+    def generate_interleaved_batch(
+        self, requests: Sequence[BatchGenerationRequest], *,
+        max_active_slots: int,
+        max_resident_kv_bytes: int,
+        on_event: Callable[[str, RuntimeEvent], None] | None = None,
+        interrupt: Callable[[], None] | None = None,
+    ) -> tuple[BatchGenerationResult, ...]:
+        """Interleave existing native streams and refill released slots.
+
+        Each admitted stream owns its RNG, cache, events and replay receipt.
+        This is cooperative scheduling, not fused GPU/llama.cpp batching.
+        The caller owns exclusive runtime access during this operation.
+        """
+        if (type(max_active_slots) is not int
+                or not 1 <= max_active_slots <= min(32, self.limits.max_batch_size)):
+            raise RuntimeContractError("invalid interleaved active slot limit")
+        if (type(max_resident_kv_bytes) is not int
+                or not 1 <= max_resident_kv_bytes <= 1024**4):
+            raise RuntimeContractError("invalid interleaved aggregate KV budget")
+        if on_event is not None and not callable(on_event):
+            raise RuntimeContractError("batch event observer must be callable")
+        admitted = self._admit_batch(requests, interrupt=interrupt)
+        # Charge the full configured per-stream ceiling, not optimistic
+        # prefix occupancy. This is logical capacity, not physical telemetry.
+        charges = tuple(self.limits.max_kv_bytes if request.config.use_cache else 0
+                        for request, _ in admitted)
+        if any(charge > max_resident_kv_bytes for charge in charges):
+            raise RuntimeContractError("one native stream exceeds aggregate KV budget")
+        active: dict[int, GenerationStream] = {}
+        completed: dict[int, BatchGenerationResult] = {}
+        position = reserved = 0
+        try:
+            while position < len(admitted) or active:
+                if interrupt is not None:
+                    interrupt()
+                while position < len(admitted) and len(active) < max_active_slots:
+                    charge = charges[position]
+                    if reserved + charge > max_resident_kv_bytes:
+                        break
+                    request, sequence = admitted[position]
+                    active[position] = self.stream_sequence(sequence, request.config,
+                                                            interrupt=interrupt)
+                    reserved += charge
+                    position += 1
+                if not active:
+                    raise RuntimeContractError("interleaved batch cannot make progress")
+                for index in tuple(active):
+                    if interrupt is not None:
+                        interrupt()
+                    stream = active[index]
+                    request, _ = admitted[index]
+                    try:
+                        event = next(stream)
+                    except StopIteration:
+                        if stream.result is None:
+                            raise RuntimeContractError("native batch stream ended without result")
+                        completed[index] = BatchGenerationResult(request.request_id, stream.result)
+                        stream.close()
+                        del active[index]
+                        reserved -= charges[index]
+                    else:
+                        if on_event is not None:
+                            on_event(request.request_id, event)
+            return tuple(completed[index] for index in range(len(admitted)))
+        finally:
+            for stream in active.values():
+                stream.close()
 
     def replay(
         self,
