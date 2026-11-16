@@ -27,6 +27,7 @@ class _LeaseBinding:
     fd: int
     identity: tuple[int, int, int]
     active: bool = True
+    token: Token | None = None
 
 
 # Shared binding state deliberately survives ContextVar copying into an
@@ -41,17 +42,22 @@ def enter_local_lease(fd: int) -> Token[_LeaseBinding | None]:
     if type(fd) is not int or fd < 0:
         raise ValueError("invalid local inference lease descriptor")
     with _lock:
-        return _current_local_inference_lease_fd.set(_LeaseBinding(fd, _identity(fd)))
+        binding = _LeaseBinding(fd, _identity(fd))
+        token = _current_local_inference_lease_fd.set(binding)
+        binding.token = token
+        return token
 
 
 def leave_local_lease(token: Token[_LeaseBinding | None]) -> None:
     with _lock:
         binding = _current_local_inference_lease_fd.get()
+        if binding is None or binding.token is not token or not binding.active:
+            raise ValueError("inference lease scopes must leave in owning LIFO order")
         # Reset first: an invalid/foreign/reused token cannot revoke the
         # currently valid binding. Correct callers leave in LIFO order.
         _current_local_inference_lease_fd.reset(token)
-        if binding is not None:
-            binding.active = False
+        binding.active = False
+        binding.token = None
 
 
 def gguf_child_pass_fds() -> tuple[int, ...]:
