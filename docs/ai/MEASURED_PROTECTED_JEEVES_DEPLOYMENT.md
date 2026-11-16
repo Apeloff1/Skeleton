@@ -189,3 +189,55 @@ records are diagnostic observations and do not attest execution results.
 The added server and CLI regressions exercise typed startup fences, actual
 registry activation, and fresh pressure collection. They are not production
 Mongo, native tokenizer, OS allocation or physical hardware qualification.
+
+
+## Optional shared native process lease
+
+The trusted measured deployment configuration may additionally supply
+`lease_directory=Path("/private/shared-native-slot")`. Provision that
+directory in advance, owned by the service principal with mode 0700.
+Every cooperating process on the host must use the same stable directory
+and lock inode. Do not delete, rotate, rename, or recreate its empty
+`native-cpu.lock` while any owner or child may remain alive. This option
+currently requires POSIX flock and descriptor-relative opens. A deployment
+without it retains the previous single-engine resource checks and does not
+claim cross-process exclusion. No automatic Windows fallback is provided.
+
+The native resource lease factory acquires an exclusive nonblocking lock,
+checks the private file and directory identities, then repeats measured
+resource admission while holding the slot. The llama.cpp launcher combines
+the resulting nonsecret descriptor with any existing outer HTTP lease
+rather than replacing that authority. Closing the parent reference never
+issues LOCK_UN on the shared open file description. A native child that
+retains the inherited descriptor can keep the kernel lock across parent
+death; arbitrary executables that close inherited descriptors are not
+qualified by this mechanism. It is cooperative process exclusion, not a
+physical memory reservation or host-wide quota. An operator-controlled
+private directory and stable lock inode remain a trust prerequisite.
+
+The canonical inherited-lease context also binds observed descriptor
+identity and revokes copied contexts when the owner leaves its scope.
+Numeric descriptor reuse for a different inode is rejected. The checks
+do not independently authenticate the advisory-lock acquisition or prove
+open-file-description identity when an inode is reopened.
+
+A failed native termination no longer automatically clears active process
+accounting or releases the native lease. The launcher keeps the process,
+pump and callback references for unconfirmed cleanup. Explicit
+`reap_unconfirmed_cleanup()` retires only children for which the retained
+handle confirms exit and all recorded pumps have stopped; release must
+succeed. It never signals a PID recovered from a receipt. The local engine
+calls it during shutdown, refusing physical-drain completion while native
+cleanup remains unconfirmed. The coordinator's existing retryable shutdown
+can retain its durable database ownership during that interval.
+
+```sh
+python -m pytest -q skeleton/testing/test_native_process_lease.py skeleton/testing/test_measured_jeeves_deployment.py
+```
+
+The new regressions include a real trivial child-process inheritance case,
+not a real llama.cpp model launch. Actual abrupt-supervisor-death testing
+with the approved runtime, native descriptor retention, complete child
+process-tree containment, sustained resource pressure, cross-process
+deployment qualification and Windows Job Object semantics remain independent
+holds. No merge or release authorization.
