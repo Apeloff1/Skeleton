@@ -84,7 +84,10 @@ class WeightStoreDiskOwner:
         try:
             flags = os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK
             if initialize:
-                flags |= os.O_CREAT
+                try:
+                    os.stat(_POLICY, dir_fd=directory_fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    flags |= os.O_CREAT
             fd = os.open(_LOCK, flags, 0o600, dir_fd=directory_fd)
             try:
                 self._lock_inode = self._inspect_lock(directory_fd, fd)
@@ -100,6 +103,8 @@ class WeightStoreDiskOwner:
 
     def _policy_bytes(self) -> bytes:
         return canonical_bytes({"schema": "skeleton.weight-disk-policy.v1",
+                                "lock_inode": list(self._lock_inode),
+                                "root_inode": list(self._root_inode),
                                 "policy": asdict(self._policy)})
 
     def _read_policy(self, directory_fd: int) -> tuple[bytes, tuple[int, int]]:
