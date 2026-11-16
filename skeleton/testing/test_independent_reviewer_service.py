@@ -243,3 +243,30 @@ def test_live_http_wire_denies_replay_duplicate_headers_and_unknown_paths(tmp_pa
             assert client.post(url+"/v1/unknown", content=b"x").status_code == 404
             assert client.post(url+"/v1/review", content=review(),
                 headers=[("Content-Type","application/json"),("Content-Type","application/json")]).status_code == 403
+
+
+@pytest.mark.skipif(not hasattr(__import__("os"), "memfd_create"), reason="Linux sealed TLS key descriptors")
+def test_operator_pinned_tls_client_connects_and_rejects_tampering(tmp_path):
+    from dataclasses import replace
+    from skeleton.app.reviewer_client_configuration import PinnedReviewerTLS, create_pinned_reviewer_client
+    with running_reviewer(tmp_path) as (url, anchor, ca, leaf, _):
+        pin = PinnedReviewerTLS(ca, digest(ca.read_bytes()), leaf[0],
+                                digest(leaf[0].read_bytes()), leaf[1])
+        async def call():
+            client = create_pinned_reviewer_client(endpoint=url, anchor=anchor, tls=pin)
+            try:
+                assert client(TEXT, digest(TEXT.encode())).allowed is True
+            finally:
+                await client.aclose()
+        asyncio.run(call())
+        for other in (replace(pin, ca_sha256="0"*64), replace(pin, client_cert_sha256="0"*64)):
+            with pytest.raises(ReviewerCustodyError):
+                other.context()
+        leaf[1].chmod(0o644)
+        with pytest.raises(ReviewerCustodyError):
+            pin.context()
+        leaf[1].chmod(0o600)
+        alias = tmp_path / "alias-key"
+        alias.symlink_to(leaf[1])
+        with pytest.raises(ReviewerCustodyError):
+            replace(pin, client_key_path=alias).context()

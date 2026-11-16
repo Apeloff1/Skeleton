@@ -78,3 +78,19 @@ The independent reviewer qualification workflow creates temporary CA, server
 and client certificates, exercises real loopback mTLS and the actual client,
 and tests scoped owner/epoch changes. Fixture proof does not attest production
 deployment. No credentials, user text or signer keys are published.
+
+
+## Pinned application TLS configuration
+
+Trusted Linux deployment code may construct PinnedReviewerTLS with absolute
+CA, client certificate and client private key files, and independent SHA-256
+pins of the exact CA and client certificate PEM bytes. Then call
+create_pinned_reviewer_client with the independently reviewed HTTPS endpoint
+and ReviewerTrustAnchor. The client uses only that CA inventory, hostname
+validation, TLS 1.2 or newer, no environment proxy trust and sealed ephemeral
+Linux descriptors for loading the cert/private key into OpenSSL. Unsupported
+hosts or missing descriptor sealing fail closed; no plaintext fallback and
+no temporary private key copy. Memory/swap inspection, filesystem ancestor
+trust and host administration remain independent controls. TLS private key
+ownership and mode must be verified; the signing private key belongs only
+to the separate reviewer host.

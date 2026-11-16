@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/independent-reviewer-qualification.yml'
       - 'scripts/independent_reviewer_policy.py'
+      - 'skeleton/app/reviewer_client_configuration.py'
       - 'scripts/serve_independent_reviewer.py'
       - 'skeleton/ai/runtime/inference/*reviewer*.py'
       - 'skeleton/ai/runtime/inference/engine_submission_snapshot.py'
