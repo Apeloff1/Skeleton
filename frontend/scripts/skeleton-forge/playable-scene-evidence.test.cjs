@@ -40,7 +40,7 @@ test('both status and passed flag are required before any runtime badge is green
   assert.equal(Run.playableSceneView(confirmed).state, 'passed');
   assert.equal(Run.playableSceneView(confirmed).tone, 'warn');
   assert.equal(Run.playtestView(payload(null, { status: 'passed', passed: true })).tone, 'warn');
-  assert.equal(Run.playableSceneView(payload({ status: 'passed', passed: true, verified: true })).tone, 'ok');
+  assert.equal(Run.playableSceneView(payload({ status: 'passed', passed: true, verified: true, scene: 'scenes/archetypes/pipeline/main.tscn' })).tone, 'ok');
   assert.equal(Run.playtestView(payload(null, { status: 'passed', passed: true, verified: true })).tone, 'ok');
 });
 
@@ -197,3 +197,9 @@ for (const [name, change] of [
     assert.doesNotMatch(screen, /Forge override/);
   });
 }
+
+test('wrong native scene never inherits a successful engine badge', () => {
+  const report = { status: 'passed', passed: true, verified: true, scene: 'scenes/archetypes/racing/main.tscn' };
+  assert.equal(Run.playableSceneView(payload(report)).state, 'failed');
+  assert.equal(Run.playableSceneView(payload({ ...report, scene: undefined })).tone, 'warn');
+});

@@ -6,7 +6,7 @@
  * manifest before opening an OS-level share sheet or browser download.
  */
 import type { RunPayload } from './types';
-import { buildGodotSourceArchive } from './sourceArchive';
+import { buildGodotSourceArchive, nativeSourceInventory } from './sourceArchive';
 
 export async function shareGodotSourceArchive(
   payload: RunPayload,
@@ -25,8 +25,13 @@ export async function shareGodotSourceArchive(
   }
   const files = Object.freeze({ ...payload.files! });
   const expected = Object.freeze({ ...payload.source_manifest!.files! });
+  const nativeInventory = nativeSourceInventory(payload);
+  const nativeDigest = payload.playable_source?.source_sha256;
   const snapshot: RunPayload = {
     succeeded: payload.succeeded,
+    forge: payload.forge ? { ...payload.forge } : undefined,
+    playable_source: payload.playable_source ? { ...payload.playable_source,
+      source_files: Object.freeze({ ...payload.playable_source.source_files }) } : undefined,
     files,
     source_manifest: { ...payload.source_manifest, files: expected },
     source_export: payload.source_export ? { ...payload.source_export } : undefined,
@@ -45,6 +50,9 @@ export async function shareGodotSourceArchive(
   const overall = await Crypto.digestStringAsync(digest, JSON.stringify(sortedChecksums));
   if (overall !== archive.manifestSha256) {
     throw new Error('Godot source manifest checksum mismatch');
+  }
+  if (nativeInventory && await Crypto.digestStringAsync(digest, JSON.stringify(nativeInventory)) !== nativeDigest) {
+    throw new Error('Godot playable source receipt checksum mismatch');
   }
   if (!stillCurrent()) throw new Error('Godot source export cancelled because the account changed');
 
