@@ -490,3 +490,192 @@ def test_paired_calibration_rejects_changed_bytes_duplicate_keys_and_nonfinite(t
     destination.write_bytes(b"{}")
     with pytest.raises(ValueError, match="identity"):
         load_pinned(destination, "a"*64)
+
+
+def _new_memory_session(app):
+    _, created = app.dispatch("POST", "/v1/sessions", {})
+    sid = created["session_id"]
+    prefix = f"/v1/sessions/{sid}"
+    text = "hello offline world"
+    _, answer = app.dispatch("POST", prefix + "/turn", {
+        "message": text, "request_id": "memory-original-turn",
+        "max_output_tokens": 2,
+    })
+    assert answer["revision"] == 1
+    selection = {"expected_revision": 1, "message_index": 0,
+                 "message_sha256": sha256(text.encode()).hexdigest(),
+                 "start": 0, "end": len(text), "kind": "procedure"}
+    return prefix, selection
+
+
+def test_reviewed_memory_exact_approval_duplicate_and_separate_deletion(tmp_path):
+    app = OfflineHTTPApplication(native_model(), tmp_path / "reviewed-memory.sqlite3",
+                                 token="t"*64)
+    try:
+        prefix, selection = _new_memory_session(app)
+        code, draft = app.dispatch("POST", prefix + "/memory-preview", {"selection": selection})
+        assert code == 200 and draft["excerpt"] == "hello offline world"
+        assert draft["saved"] is False and draft["auto_applied"] is False
+        assert draft["source_deletion_cascades"] is False
+        assert app.knowledge.list_documents() == []
+        body = {"selection": selection, "approval_sha256": draft["approval_sha256"],
+                "approved": True}
+        code, result = app.dispatch("POST", prefix + "/memory-save", body)
+        assert code == 201 and result["saved"]
+        code, repeated = app.dispatch("POST", prefix + "/memory-save", body)
+        assert code == 200 and repeated["reused"]
+        assert result["document_id"] == repeated["document_id"]
+        doc = app.knowledge.get_document(result["document_id"])
+        assert doc["text"] == draft["document_text"]
+        assert doc["sha256"] == draft["document_sha256"]
+        # Cross-session use goes through existing explicitly grounded sources.
+        hits = app.knowledge.search("hello offline", document_ids=[doc["document_id"]])
+        assert hits and all(hit["document_id"] == doc["document_id"] for hit in hits)
+        _, saved = app.dispatch("GET", prefix)
+        assert saved["revision"] == 1
+        app.dispatch("DELETE", prefix)
+        assert app.knowledge.get_document(doc["document_id"])["text"] == doc["text"]
+        app.dispatch("DELETE", "/v1/knowledge/documents/" + doc["document_id"])
+        assert app.knowledge.list_documents() == []
+    finally:
+        app.close()
+
+
+def test_reviewed_memory_rejects_unapproved_assistant_tampering_and_stale_revision(tmp_path):
+    app = OfflineHTTPApplication(native_model(), tmp_path / "memory-rejected.sqlite3",
+                                 token="t"*64)
+    try:
+        prefix, selection = _new_memory_session(app)
+        _, draft = app.dispatch("POST", prefix + "/memory-preview", {"selection": selection})
+        with pytest.raises(OfflineHTTPError) as exc:
+            app.dispatch("POST", prefix + "/memory-preview",
+                         {"selection": selection | {"message_index": 1}})
+        assert exc.value.status == 400
+        with pytest.raises(OfflineHTTPError) as exc:
+            app.dispatch("POST", prefix + "/memory-save", {"selection": selection,
+                         "approval_sha256": draft["approval_sha256"], "approved": False})
+        assert exc.value.status == 403
+        with pytest.raises(OfflineHTTPError) as exc:
+            app.dispatch("POST", prefix + "/memory-save", {"selection": selection | {"kind": "episode"},
+                         "approval_sha256": draft["approval_sha256"], "approved": True})
+        assert exc.value.status == 409
+        app.dispatch("POST", prefix + "/turn", {"message": "world", "max_output_tokens": 2,
+                                               "request_id": "memory-revision-next"})
+        with pytest.raises(OfflineHTTPError) as exc:
+            app.dispatch("POST", prefix + "/memory-save", {"selection": selection,
+                         "approval_sha256": draft["approval_sha256"], "approved": True})
+        assert exc.value.status == 409
+        assert app.knowledge.list_documents() == []
+    finally:
+        app.close()
+
+
+def test_reviewed_memory_source_fence_is_inside_write_transaction(tmp_path, monkeypatch):
+    from skeleton.app.jeeves_reviewed_memory import prepare_memory, save_memory, MemoryConflict
+    from skeleton.ai.model_runtime.offline_chat import OfflineChatStore
+    app = OfflineHTTPApplication(native_model(), tmp_path / "memory-fence.sqlite3",
+                                 token="t"*64)
+    try:
+        prefix, selection = _new_memory_session(app)
+        sid = prefix.rsplit("/", 1)[-1]
+        draft = prepare_memory(app.knowledge, sid, selection)
+        original = app.knowledge.add_text
+        observed = []
+        def intercept(title, content, *, _source_recheck):
+            def fenced():
+                observed.append(app._store._db.in_transaction)
+                _source_recheck()
+                raise MemoryConflict("independent qualification simulated source loss")
+            return original(title, content, _source_recheck=fenced)
+        monkeypatch.setattr(app.knowledge, "add_text", intercept)
+        with pytest.raises(MemoryConflict):
+            save_memory(app.knowledge, sid, selection, approved=True,
+                        approval_sha256=draft["approval_sha256"])
+        assert observed == [True]
+        assert not app._store._db.in_transaction
+        assert app.knowledge.list_documents() == []
+        with OfflineChatStore(app.database) as other:
+            assert other.load(sid, app.model_digest, app.tokenizer_digest).revision == 1
+    finally:
+        app.close()
+
+
+def test_real_dual_candidate_deliberation_uses_native_model_without_committing(tmp_path):
+    app = OfflineHTTPApplication(native_model(), tmp_path / "deliberation.sqlite3",
+                                 token="t"*64)
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        prefix = "/v1/sessions/" + created["session_id"]
+        _, before = app.dispatch("GET", prefix)
+        code, report = app.dispatch("POST", prefix + "/deliberation-review", {
+            "message": "hello", "expected_revision": 0, "approved": True,
+            "max_output_tokens": 4,
+        })
+        assert code == 200 and report["generation_performed"] is True
+        assert report["transcript_committed"] is False
+        assert report["reserved_total_output_tokens"] == 8
+        assert report["actual_total_output_tokens"] <= 8
+        assert report["comparison"]["answer_selected"] is False
+        assert report["comparison"]["independent_model_count"] == 1
+        candidates = report["candidates"]
+        assert [c["strategy"] for c in candidates] == ["direct", "counterpoint"]
+        assert len({c["question_variant_sha256"] for c in candidates}) == 2
+        for candidate in candidates:
+            assert candidate["text"].strip()
+            assert candidate["output_sha256"] == sha256(candidate["text"].encode()).hexdigest()
+            assert len(candidate["execution_receipt_digest"]) == 64
+        assert app.dispatch("GET", prefix)[1] == before
+        assert app._active_session is None
+    finally:
+        app.close()
+
+
+def test_deliberation_rejects_invalid_budget_approval_and_revision(tmp_path):
+    app = OfflineHTTPApplication(native_model(), tmp_path / "deliberation-rejected.sqlite3",
+                                 token="t"*64)
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        prefix = "/v1/sessions/" + created["session_id"]
+        endpoint = prefix + "/deliberation-review"
+        body = {"message": "hello", "expected_revision": 0, "approved": True,
+                "max_output_tokens": 2}
+        for changes, status in [
+            ({"approved": False}, 403), ({"approved": 1}, 403),
+            ({"max_output_tokens": 129}, 400), ({"expected_revision": True}, 400),
+            ({"expected_revision": 1}, 409), ({"grounded": "true"}, 400),
+            ({"message": "x"*1025}, 400), ({"tool": "write"}, 400),
+        ]:
+            with pytest.raises(OfflineHTTPError) as error:
+                app.dispatch("POST", endpoint, body | changes)
+            assert error.value.status == status
+            assert app._active_session is None
+        _, after = app.dispatch("GET", prefix)
+        assert after["revision"] == 0
+    finally:
+        app.close()
+
+
+def test_deliberation_refuses_source_loss_without_partial_report(tmp_path, monkeypatch):
+    import skeleton.app.jeeves_deliberation as module
+    app = OfflineHTTPApplication(native_model(), tmp_path / "deliberation-fenced.sqlite3",
+                                 token="t"*64)
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        prefix = "/v1/sessions/" + created["session_id"]
+        item = app.knowledge.add_text("Offline reference", "The hello world procedure starts offline.")
+        async def interrupted(_backend, _question, **params):
+            params["recheck"]()
+            app.knowledge.delete(item["document_id"])
+            params["recheck"]()
+            pytest.fail("source loss must prevent returning a report")
+        monkeypatch.setattr(module, "deliberate", interrupted)
+        with pytest.raises(OfflineHTTPError) as error:
+            app.dispatch("POST", prefix + "/deliberation-review", {
+                "message": "hello world", "expected_revision": 0, "approved": True,
+                "grounded": True, "document_ids": [item["document_id"]], "max_output_tokens": 2,
+            })
+        assert error.value.status == 409
+        assert app._active_session is None
+        assert app.dispatch("GET", prefix)[1]["revision"] == 0
+    finally:
+        app.close()
