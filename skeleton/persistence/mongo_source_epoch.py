@@ -402,7 +402,59 @@ def configured_canonical_epoch(owner: Any) -> Any:
     if required is not None and (type(required) is not MongoCanonicalSourceEpoch
                                  or epoch is not required):
         raise MongoSourceEpochError("protected canonical writer epoch binding changed")
+    if required is not None:
+        pins = getattr(owner, "_required_canonical_source_handles", None)
+        if pins is not None:
+            if (type(pins) is not tuple or not pins
+                    or any(getattr(owner, name, None) is not handle for name, handle in pins)):
+                raise MongoSourceEpochError("protected canonical source handle changed")
+            for _, handle in pins:
+                _assert_majority_handle(handle)
     return epoch
+
+
+def _assert_majority_handle(handle):
+    from pymongo.read_preferences import ReadPreference
+    concern = getattr(getattr(handle, "write_concern", None), "document", None)
+    if (type(concern) is not dict or concern.get("w") != "majority"
+            or concern.get("j") is not True or concern.get("wtimeout") != 10000
+            or getattr(getattr(handle, "read_concern", None), "level", None) != "majority"
+            or getattr(handle, "read_preference", None) != ReadPreference.PRIMARY):
+        raise MongoSourceEpochError("protected canonical source durability unavailable")
+
+
+def _majority_source_bindings(conversation, memory, epoch):
+    """Prepare real database/collection handles without any database writes."""
+    from pymongo.read_concern import ReadConcern
+    from pymongo.read_preferences import ReadPreference
+    from pymongo.write_concern import WriteConcern
+    database = epoch._database
+    options = dict(read_concern=ReadConcern("majority"), read_preference=ReadPreference.PRIMARY,
+                   write_concern=WriteConcern(w="majority", j=True, wtimeout=10000))
+    result = []
+    for owner, names in (
+        (conversation, (("database", None), ("threads","conversation_threads"),
+                        ("messages","conversation_messages"))),
+        (memory, (("records","canonical_memory_records"), ("idempotency","canonical_memory_idempotency"),
+                  ("revisions","canonical_memory_revisions"), ("projection_outbox","canonical_memory_projection_outbox"))),
+    ):
+        pinned = []
+        for attribute, collection_name in names:
+            original = getattr(owner, attribute, None)
+            actual_db = original if collection_name is None else getattr(original,"database",None)
+            if (getattr(actual_db,"client",None) is not database.client
+                    or getattr(actual_db,"name",None) != database.name
+                    or (collection_name is not None and getattr(original,"name",None) != collection_name)):
+                raise MongoSourceEpochError("protected canonical source collection ownership mismatch")
+            protected = original.with_options(**options)
+            _assert_majority_handle(protected)
+            observed_db = protected if collection_name is None else protected.database
+            if (observed_db.client is not database.client or observed_db.name != database.name
+                    or (collection_name is not None and protected.name != collection_name)):
+                raise MongoSourceEpochError("protected canonical source handle identity changed")
+            pinned.append((attribute,protected))
+        result.append((owner,tuple(pinned)))
+    return tuple(result)
 
 
 def bind_required_canonical_writers(*, conversation: Any, memory: Any, epoch: Any) -> None:
@@ -424,10 +476,15 @@ def bind_required_canonical_writers(*, conversation: Any, memory: Any, epoch: An
             raise MongoSourceEpochError("canonical writer already bound")
         if getattr(owner, "_required_canonical_source_epoch", None) is not None:
             raise MongoSourceEpochError("protected writer binding already installed")
-    # No await or user callback between these assignments: install the deny
-    # marker first on both actual owners, then the shared authority.
+    prepared = _majority_source_bindings(conversation, memory, epoch)
+    # No await between installing the deny marker, majority source handles
+    # and actual shared authority. Never restore optional legacy mode.
     conversation._required_canonical_source_epoch = epoch
     memory._required_canonical_source_epoch = epoch
+    for owner, handles in prepared:
+        for attribute, handle in handles:
+            setattr(owner, attribute, handle)
+        owner._required_canonical_source_handles = handles
     conversation.canonical_source_epoch = epoch
     memory.canonical_source_epoch = epoch
     verify_canonical_source_writer_inventory(conversation=conversation, memory=memory, epoch=epoch)
@@ -446,7 +503,10 @@ def fence_conversation_write(method):
         if not isinstance(tenant_id, str) or not isinstance(actor_id, str):
             raise MongoSourceEpochError("canonical conversation write actor missing")
         async with epoch.writer(tenant_id=tenant_id, actor_id=actor_id):
-            return await method(self, *args, **kwargs)
+            result = await method(self, *args, **kwargs)
+            if configured_canonical_epoch(self) is not epoch:
+                raise MongoSourceEpochError("canonical conversation authority changed during mutation")
+            return result
 
     guarded.__canonical_source_writer_fence__ = "conversation"
     return guarded
@@ -466,7 +526,10 @@ def fence_memory_commit(method):
         if not isinstance(proposal, MemoryWriteProposal):
             raise MongoSourceEpochError("canonical memory write proposal required")
         async with epoch.writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id):
-            return await method(self, proposal, *args, **kwargs)
+            result = await method(self, proposal, *args, **kwargs)
+            if configured_canonical_epoch(self) is not epoch:
+                raise MongoSourceEpochError("canonical memory authority changed during mutation")
+            return result
 
     guarded.__canonical_source_writer_fence__ = "memory_commit"
     return guarded
@@ -490,7 +553,10 @@ def fence_memory_tombstone(method):
         if current.tenant_id != tenant_id or current.namespace != namespace:
             raise MongoSourceEpochError("canonical memory tombstone scope changed")
         async with epoch.writer(tenant_id=tenant_id, actor_id=current.subject_id):
-            return await method(self, memory_id, *args, **kwargs)
+            result = await method(self, memory_id, *args, **kwargs)
+            if configured_canonical_epoch(self) is not epoch:
+                raise MongoSourceEpochError("canonical memory authority changed during retirement")
+            return result
 
     guarded.__canonical_source_writer_fence__ = "memory_tombstone"
     return guarded
@@ -581,7 +647,10 @@ def fence_memento_write(method):
                     "protected memento publication requires witnessed handoff"
                 )
         async with epoch.writer(tenant_id=tenant_id, actor_id=actor_id):
-            return await method(self, *args, **kwargs)
+            result = await method(self, *args, **kwargs)
+            if configured_canonical_epoch(conversation) is not epoch:
+                raise MongoSourceEpochError("canonical archive authority changed during mutation")
+            return result
 
     guarded.__canonical_source_writer_fence__ = "memento"
     return guarded

@@ -56,3 +56,11 @@ installer-to-inference success follows from this entrypoint. An actor without
 an already provisioned stable epoch is denied by the protected writer.
 
 No deployment is performed by source qualification.
+
+Protected startup now also rebinds the actual canonical conversation database,
+thread/message and four memory collection handles with primary majority reads
+and journaled majority writes, with a bounded write concern timeout. Protected
+write entrypoints check installed handle identity and concern, and recheck
+before the epoch can become stable after mutation. This does not make direct
+Mongo clients or unregistered collection writers safe; memento transactions
+and cross-owner deletion remain separate reviewed surfaces.
