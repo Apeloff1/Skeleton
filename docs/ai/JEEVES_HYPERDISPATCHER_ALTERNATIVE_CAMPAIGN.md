@@ -421,3 +421,20 @@ tools, distributed execution and physical device migration are not included.
 The five new tests cover actual CLI child execution, restart/admission replay,
 tenant result boundaries, stale ack refusal, credential-policy seal and
 competing service process lock. Exact-head qualification is still required.
+
+## Wave A20: concurrent physical workers and fenced heartbeat renewal
+
+The installed service now admits and executes up to the configured worker
+count (one to 32) in parallel. Each selected ranked task obtains its real
+worker/tenant grant and a durable exact lease before any thread starts.
+Immutable handoffs execute in a bounded pool without broker locks. A
+single owner settles signed results, renews the real writer lease and
+renews exact live worker attempts when their deadlines approach. Lost
+writer authority or expired attempt renewal retires the generation; it
+cannot publish further results or convert uncertainty into retry. Workers
+already started may finish durable evidence; recovery independently
+revalidates that evidence. One failed transport preserves its attempt
+custody while unrelated work may complete. The application exposes per-
+task and aggregate batch outcomes. Actual process-overlap, mixed failure
+and expiry regressions were added. The configured worker count is a
+physical local concurrency bound, not a claim of measured scaling speed.

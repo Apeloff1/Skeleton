@@ -409,6 +409,8 @@ class ApplicationTick:
     disposition: str
     task_id: str | None
     stop_requested: bool
+    tasks: tuple[str, ...] = ()
+    outcomes: tuple[tuple[str, str], ...] = ()
 
 
 class LocalDispatcherApplication:
@@ -784,9 +786,15 @@ class LocalDispatcherApplication:
         recovered = self._recover_committed()
         cancelled = managed.propagate_dependencies()
         now_ms = _wait_time(self.clock_ms())
-        result = managed.tick(self._candidates(now_ms), now_ms=now_ms, timer_limit=16)
+        batch = managed.tick_batch(
+            self._candidates(now_ms), now_ms=now_ms, limit=self.policy.workers, timer_limit=16,
+        )
         managed.prune_outer_checkpoints(keep=self.policy.outer_history)
-        return ApplicationTick(count, cancelled, recovered, result.disposition, result.task_id, False)
+        ids = tuple(row.task_id for row in batch.outcomes)
+        return ApplicationTick(
+            count, cancelled, recovered, batch.disposition, ids[0] if ids else None, False,
+            ids, tuple((row.task_id, row.disposition) for row in batch.outcomes),
+        )
 
     def close(self) -> None:
         if self.managed is not None:

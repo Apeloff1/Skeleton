@@ -381,6 +381,40 @@ class SwarmDurableBridge:
 
 
 
+    def renew_active_attempts_and_capture(
+        self, run_id: str, owner_id: str, manager: SwarmRecoveryManager,
+        broker: TenantSwarmBroker, attempts: tuple[tuple[str, str, str, str], ...],
+        *, force: bool = False,
+    ) -> DurableSwarmCapture | None:
+        """Renew exact live fenced attempts; uncertain or expired tokens cannot renew."""
+        if (type(attempts) is not tuple or len(attempts) > 32
+                or type(force) is not bool
+                or any(type(row) is not tuple or len(row) != 4 for row in attempts)
+                or len({row[1] for row in attempts}) != len(attempts)):
+            raise DurableSwarmError("invalid renewal inventory")
+        runtime = broker.broker.runtime
+        with broker._lock, runtime._lock, manager._lock:
+            broker._assert_verified()
+            try:
+                due = []
+                now = runtime._clock()
+                for tenant, task_id, worker, token in attempts:
+                    task = broker._verified_resident(tenant, task_id)
+                    if (task.state is not TaskState.LEASED or task.effect_uncertain
+                            or task.leased_to != worker or task.lease_token != token
+                            or task.lease_deadline is None or task.lease_deadline <= now):
+                        raise DurableSwarmError("active attempt lease cannot be renewed")
+                    if force or task.lease_deadline - now <= runtime.default_lease_seconds / 2:
+                        due.append((worker, task_id, token))
+                if not due:
+                    return None
+                for worker, task_id, token in due:
+                    runtime.renew(worker, task_id, lease_token=token)
+                return self._capture_checked(run_id, owner_id, manager, broker)
+            except Exception as exc:
+                broker.retire()
+                raise DurableSwarmError("active attempt renewal lost custody") from exc
+
     def cancel_queued_and_capture(
         self, run_id: str, owner_id: str, manager: SwarmRecoveryManager,
         broker: TenantSwarmBroker, tenant: str, task_id: str,
@@ -940,6 +974,19 @@ class HostDispatchCycle:
     evidence_sha256: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class HostDispatchBatch:
+    timers_woken: tuple[str, ...]
+    outcomes: tuple[HostDispatchCycle, ...]
+
+    @property
+    def disposition(self) -> str:
+        if not self.outcomes:
+            return "idle"
+        kinds = {row.disposition for row in self.outcomes}
+        return next(iter(kinds)) if len(kinds) == 1 else "mixed"
+
+
 class HostDispatchService:
     """Local trusted owner execution loop over the canonical dispatch path.
 
@@ -1021,6 +1068,126 @@ class HostDispatchService:
             )
         finally:
             self._cycle_lock.release()
+
+    def cycle_batch(
+        self, candidates: tuple, *, now_ms: int, limit: int,
+        heartbeat: Callable[[], None], timer_limit: int = 64,
+        heartbeat_interval: float = 0.25,
+    ) -> HostDispatchBatch:
+        """Execute a bounded set of independent durable leases concurrently.
+
+        The owner alone reserves and publishes leases and settles outcomes.
+        Pool threads receive immutable attempt envelopes and call the supplied
+        transport once. Actual execution holds no scheduler or broker lock.
+        If the host loses fencing, the pool joins without settling any further
+        results; already durable evidence remains available for recovery.
+        """
+        import math
+        from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+        from skeleton.intelligence.dispatch_policy import DispatchCandidate, bounded_int, MAX_CANDIDATES
+        if (type(limit) is not int or not 1 <= limit <= 32 or not callable(heartbeat)
+                or type(heartbeat_interval) not in (int, float)
+                or not math.isfinite(heartbeat_interval) or not 0.05 <= heartbeat_interval <= 2
+                or type(candidates) is not tuple or len(candidates) > MAX_CANDIDATES
+                or any(not isinstance(candidate, DispatchCandidate) for candidate in candidates)):
+            raise DurableSwarmError("invalid concurrent dispatch policy")
+        bounded_int(now_ms, "dispatch time")
+        if not self._cycle_lock.acquire(blocking=False):
+            raise DurableSwarmError("host dispatch cycle already active")
+        owner = self.wait_driver
+        reservations = []
+        outcomes = {}
+        attempts = {}
+        try:
+            heartbeat()
+            timers = owner.poll_due_timers(limit=timer_limit)
+            for _ in range(limit):
+                heartbeat()
+                selected = owner.bridge.lease_and_capture_verified(
+                    owner.run_id, owner.owner_id, owner.manager, owner.broker,
+                    candidates, now_ms=now_ms,
+                )
+                if selected is None:
+                    break
+                tenant, task, _capture = selected
+                if task.leased_to is None or task.lease_token is None:
+                    raise DurableSwarmError("durable batch attempt missing its identity")
+                index = len(reservations)
+                identity = (tenant, task.id, task.leased_to, task.lease_token)
+                reservations.append(identity)
+                try:
+                    payload = dict(task.payload)
+                    payload.pop(_HOST_WAIT_FIELD, None)
+                    payload.pop(_HOST_SCHEDULE_FIELD, None)
+                    attempts[index] = HostDispatchAttempt(
+                        owner.run_id, tenant, task.id, task.leased_to, task.lease_token,
+                        _wait_bytes(payload),
+                    )
+                except Exception:
+                    owner.bridge.hold_transport_unknown(
+                        owner.run_id, owner.owner_id, owner.manager, owner.broker,
+                        tenant, task.id, worker_id=task.leased_to, lease_token=task.lease_token,
+                    )
+                    outcomes[index] = HostDispatchCycle((), task.id, "transport-unknown")
+            if attempts:
+                heartbeat()
+                owner.bridge.renew_active_attempts_and_capture(
+                    owner.run_id, owner.owner_id, owner.manager, owner.broker,
+                    tuple(reservations[index] for index in attempts), force=True,
+                )
+                heartbeat()
+                with ThreadPoolExecutor(max_workers=len(attempts),
+                                        thread_name_prefix="jeeves-dispatch") as workers:
+                    pending = {workers.submit(self._transport, attempt): index
+                               for index, attempt in attempts.items()}
+                    while pending:
+                        completed, _ = wait(tuple(pending), timeout=heartbeat_interval,
+                                            return_when=FIRST_COMPLETED)
+                        heartbeat()
+                        # Renew before settling any exact lease; no expired
+                        # attempt can be extended by receipt arrival alone.
+                        owner.bridge.renew_active_attempts_and_capture(
+                            owner.run_id, owner.owner_id, owner.manager, owner.broker,
+                            tuple(reservations[index] for index in pending.values()),
+                        )
+                        for future in sorted(completed, key=pending.__getitem__):
+                            index = pending.pop(future)
+                            tenant, task_id, worker_id, lease_token = reservations[index]
+                            heartbeat()
+                            try:
+                                reply = future.result()
+                                if type(reply) is not HostTransportReply:
+                                    raise DurableSwarmError("transport omitted verified reply")
+                            except Exception:
+                                owner.bridge.hold_transport_unknown(
+                                    owner.run_id, owner.owner_id, owner.manager, owner.broker,
+                                    tenant, task_id, worker_id=worker_id,
+                                    lease_token=lease_token,
+                                )
+                                outcomes[index] = HostDispatchCycle(
+                                    (), task_id, "transport-unknown",
+                                )
+                                continue
+                            settled, _ = owner.bridge.finish_and_capture_verified(
+                                owner.run_id, owner.owner_id, owner.manager, owner.broker,
+                                tenant, task_id, worker_id=worker_id, lease_token=lease_token,
+                                outcome=reply.outcome, evidence_sha256=reply.evidence_sha256,
+                            )
+                            outcomes[index] = HostDispatchCycle(
+                                (), task_id, "uncertain" if settled.effect_uncertain else "completed",
+                                reply.evidence_sha256,
+                            )
+            return HostDispatchBatch(timers, tuple(outcomes[index]
+                                                   for index in range(len(reservations))))
+        except BaseException:
+            # Reservations were published before launch. Do not resurrect the
+            # old owner even if some transports had not yet started.
+            if reservations:
+                owner.broker.retire()
+            raise
+        finally:
+            self._cycle_lock.release()
+
 
 @dataclass(frozen=True, slots=True)
 class LocalAttemptRecord:
@@ -1984,6 +2151,19 @@ class ManagedHostDispatcher:
         with self._lock:
             self.renew()
             result = self.service.cycle(candidates, now_ms=now_ms, timer_limit=timer_limit)
+            self.renew()
+            return result
+
+    def tick_batch(
+        self, candidates: tuple, *, now_ms: int, limit: int,
+        timer_limit: int = 64, heartbeat_interval: float = 0.25,
+    ) -> HostDispatchBatch:
+        with self._lock:
+            self.renew()
+            result = self.service.cycle_batch(
+                candidates, now_ms=now_ms, limit=limit, heartbeat=self.renew,
+                timer_limit=timer_limit, heartbeat_interval=heartbeat_interval,
+            )
             self.renew()
             return result
 

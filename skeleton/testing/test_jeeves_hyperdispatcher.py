@@ -2739,3 +2739,116 @@ def test_dispatcher_real_foreground_cli_with_private_state(tmp_path):
     assert call("command", "--id", "req")["status"] == "accepted"
     assert call("result", "--tenant", "a", "--task", "job")["result"] == 42
     assert not call("status")["writer_present"]
+
+
+def test_dispatcher_parallel_physical_workers_overlap_and_bind_results(tmp_path, monkeypatch):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    import subprocess
+    from threading import Barrier, Lock
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "parallel", tenants=("alpha", "beta"),
+        operations=("integer_sum",), workers=2, max_jobs=8,
+    )
+    for tenant, values in (("alpha", [4, 8]), ("beta", [7, 9])):
+        app.enqueue("request-" + tenant, {"kind": "submit", "tenant": tenant,
+                    "task_id": "task-" + tenant, "operation": "integer_sum", "input": values})
+    app.start()
+    gate = Barrier(2, timeout=10)
+    original = subprocess.run
+    guard = Lock()
+    launched = []
+    def real_concurrent_run(*args, **kwargs):
+        # Both transport threads must reach the process invocation before
+        # either is allowed to run. Every invocation still executes Python.
+        with guard:
+            launched.append(kwargs["input"])
+        gate.wait()
+        return original(*args, **kwargs)
+    monkeypatch.setattr(subprocess, "run", real_concurrent_run)
+    report = app.tick()
+    assert report.disposition == "completed"
+    assert set(report.tasks) == {"task-alpha", "task-beta"}
+    assert len(launched) == 2
+    assert app.result("alpha", "task-alpha")["result"] == 12
+    assert app.result("beta", "task-beta")["result"] == 16
+    assert app.custody.usage()["completed"] == 2
+    assert app.tick().disposition == "idle"
+    app.close()
+
+
+def test_dispatcher_batch_holds_uncertain_transport_and_completes_independent_work(tmp_path, monkeypatch):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    import subprocess
+    import json
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "mixed", tenants=("alpha",), operations=("integer_sum",),
+        workers=2, max_jobs=8,
+    )
+    for identity, values in (("bad", [1]), ("good", [2])):
+        app.enqueue("request-" + identity, {"kind": "submit", "tenant": "alpha",
+                    "task_id": identity, "operation": "integer_sum", "input": values})
+    app.start()
+    original = subprocess.run
+    attempts = []
+    def fail_one(*args, **kwargs):
+        value = json.loads(kwargs["input"])["input"]
+        attempts.append(value[0])
+        if value == [1]:
+            raise subprocess.TimeoutExpired("approved worker", 1)
+        return original(*args, **kwargs)
+    monkeypatch.setattr(subprocess, "run", fail_one)
+    report = app.tick()
+    assert report.disposition == "mixed"
+    assert dict(report.outcomes) == {"bad": "transport-unknown", "good": "completed"}
+    assert app.result("alpha", "bad")["uncertain_on_restore"]
+    assert app.result("alpha", "good")["result"] == 2
+    assert app.tick().disposition == "idle"
+    assert sorted(attempts) == [1, 2]
+    app.close()
+    restored = LocalDispatcherApplication(app.directory)
+    restored.start()
+    assert restored.tick().disposition == "idle"
+    assert restored.result("alpha", "bad")["uncertain_on_restore"]
+    assert restored.result("alpha", "good")["result"] == 2
+    restored.close()
+
+
+def test_batch_refuses_expired_attempt_renewal_without_releasing_capacity(tmp_path):
+    from skeleton.automation.agents.swarm_durable import SwarmDurableBridge, DurableSwarmError
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, TaskState
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_tenant_broker import TenantSwarmBroker
+    from skeleton.automation.agents.swarm_broker import SwarmBroker
+    from skeleton.intelligence.dispatch_policy import DispatchCandidate
+    from skeleton.testing.test_durable_run_store import make_store
+    now = [1.0]
+    runtime = HardenedSwarmRuntime(fenced=True, clock=lambda: now[0], default_lease_seconds=2)
+    runtime.register_worker("w", capacity=1)
+    broker = TenantSwarmBroker(SwarmBroker(runtime, verify_worker=lambda *args: True),
+                               verified_mode=True)
+    store = make_store(tmp_path)
+    store.create_run("renewal")
+    store.claim_run("renewal", "owner", lease_seconds=60)
+    bridge, manager = SwarmDurableBridge(store), SwarmRecoveryManager(delta_archive=True)
+    bridge.submit_unique_verified("renewal", "owner", manager, broker, "a", SwarmTask("job", {}))
+    _, task, _ = bridge.lease_and_capture_verified(
+        "renewal", "owner", manager, broker, (DispatchCandidate("job", "a", 100, 0),),
+        now_ms=10000,
+    )
+    now[0] = 2.5
+    identity = (("a", "job", "w", task.lease_token),)
+    assert bridge.renew_active_attempts_and_capture("renewal", "owner", manager, broker, identity)
+    assert runtime.task("job").lease_deadline == 4.5
+    now[0] = 5.0
+    with pytest.raises(DurableSwarmError):
+        bridge.renew_active_attempts_and_capture("renewal", "owner", manager, broker, identity)
+    assert broker.is_retired()
+    recovered = bridge.load("renewal").restore_runtime().task("job")
+    assert recovered.effect_uncertain and recovered.lease_token == task.lease_token
