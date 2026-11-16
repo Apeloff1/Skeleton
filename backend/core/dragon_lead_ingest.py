@@ -175,7 +175,7 @@ def wikidata_csv(raw,*,delimiter=","):
         if not {"item","itemLabel"}.issubset(fields):
             raise ValueError("Wikidata filtered tabular header")
         for item in records:
-            match=re.fullmatch(r"(?:https?://www\\.wikidata\\.org/entity/)?(Q[1-9][0-9]{0,15})",item["item"])
+            match=re.fullmatch(r"(?:https?://www\.wikidata\.org/entity/)?(Q[1-9][0-9]{0,15})",item["item"])
             if not match:raise ValueError("Wikidata entity")
             qid=match[1]
             yield {"url":"https://www.wikidata.org/wiki/"+qid,
@@ -228,7 +228,7 @@ def wikidata_sparql_json(raw):
                 or not isinstance(label,dict) or label.get("type")!="literal"
                 or not isinstance(label.get("value"),str)):
             raise ValueError("SPARQL JSON item identity or label")
-        match=re.fullmatch(r"https?://www\\.wikidata\\.org/entity/(Q[1-9][0-9]{0,15})",item["value"])
+        match=re.fullmatch(r"https?://www\.wikidata\.org/entity/(Q[1-9][0-9]{0,15})",item["value"])
         if not match:raise ValueError("SPARQL JSON Wikidata entity")
         qid=match[1]
         yield {"url":"https://www.wikidata.org/wiki/"+qid,
