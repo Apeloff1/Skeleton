@@ -72,6 +72,8 @@ def text(raw):
     return struct.pack('<I', len(raw)) + raw
 if op == 'encode':
     reply = ids(raw[8:8+n])
+elif op == 'roundtrip':
+    reply = ids(raw[8:8+n]) + text(raw[8:8+n])
 elif op == 'decode':
     reply = text(bytes(struct.unpack_from('<'+'I'*n, raw, 8)))
 else:
@@ -164,3 +166,20 @@ def test_guard_rejects_alternate_prepared_token_vector_before_dispatch():
     with pytest.raises(SealedContextIntegrityError, match="prepared native IDs"):
         asyncio.run(guard.generate(request, snapshot=snapshot, tenant_scope_id="tenant"))
     assert engine.calls == 0
+
+
+def test_combined_roundtrip_is_one_native_launch(tmp_path):
+    model, _, _ = fixture(tmp_path)
+    before = model.execution_snapshot()["processes_started"]
+    ids, echo = model.roundtrip_ids("Å \U0001f680")
+    assert echo == "Å \U0001f680"
+    assert ids == tuple(echo.encode())
+    assert model.execution_snapshot()["processes_started"] == before + 1
+
+
+def test_roundtrip_denies_nonidentical_echo(tmp_path, monkeypatch):
+    model, _, _ = fixture(tmp_path)
+    monkeypatch.setattr(model, "_invoke", lambda *a, **kw: _Frame(
+        b"SKG1" + _pack_ids((1,)) + _text(b"foreign")))
+    with pytest.raises(LlamaCppRuntimeError, match="round-trip"):
+        model.roundtrip_ids("private")

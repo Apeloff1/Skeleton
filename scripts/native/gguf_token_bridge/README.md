@@ -23,3 +23,8 @@ The existing first-install reusable CI workflow includes a separate compile-only
 job pinned to the same upstream source SHA. It checks malformed invocations
 without downloading model weights. This receipt must not be represented as
 local inference or hardware qualification.
+
+The roundtrip operation returns both the exact token vector and detokenized text
+from one vocabulary load. Native output file size and core dumps are bounded
+with POSIX resource limits. The host still validates all frame lengths and echo
+bytes. No throughput improvement is claimed until a physical benchmark runs.

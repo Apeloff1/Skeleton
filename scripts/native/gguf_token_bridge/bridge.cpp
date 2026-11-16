@@ -11,11 +11,15 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#if defined(__unix__) || defined(__APPLE__)
+#include <sys/resource.h>
+#endif
 
 namespace {
 constexpr uint32_t max_text = 4u * 1024 * 1024;
 constexpr uint32_t max_tokens = 1048576;
 constexpr uint32_t max_output = 8192;
+constexpr uint64_t max_frame = 2ull * max_text + 4ull * max_output + 64;
 using Tokens = std::vector<llama_token>;
 
 [[noreturn]] void deny() { throw std::runtime_error("bridge denied input or execution"); }
@@ -122,7 +126,7 @@ using Sampler = std::unique_ptr<llama_sampler, decltype(&llama_sampler_free)>;
 void run(int argc, char ** argv) {
     if (argc != 9) deny();
     const std::string operation(argv[1]);
-    if (operation != "encode" && operation != "decode" && operation != "generate") deny();
+    if (operation != "encode" && operation != "decode" && operation != "roundtrip" && operation != "generate") deny();
     const auto context_size = number(argv[5], 128, max_tokens);
     const auto threads = number(argv[6], 1, 256);
     const auto batch_size = number(argv[7], 1, 8192);
@@ -142,10 +146,11 @@ void run(int argc, char ** argv) {
     Tokens input, output;
     std::string text;
     uint32_t finish = 0; // 0=eog, 1=length
-    if (operation == "encode") {
+    if (operation == "encode" || operation == "roundtrip") {
         text = read_text(in);
         eof(in);
         input = encode(vocab, text);
+        if (operation == "roundtrip") text = decode(vocab, input);
     } else if (operation == "decode") {
         input = read_tokens(in, vocab);
         eof(in);
@@ -190,7 +195,10 @@ void run(int argc, char ** argv) {
     if (!out || !out.write("SKG1", 4)) deny();
     if (operation == "encode") write_tokens(out, input);
     else if (operation == "decode") write_text(out, text);
-    else {
+    else if (operation == "roundtrip") {
+        write_tokens(out, input);
+        write_text(out, text);
+    } else {
         write_u32(out, finish);
         write_tokens(out, input); // exact physically evaluated prompt receipt
         write_tokens(out, output);
@@ -201,6 +209,20 @@ void run(int argc, char ** argv) {
 }
 }
 int main(int argc, char ** argv) {
-    try { run(argc, argv); return 0; }
+    try {
+#if defined(__unix__) || defined(__APPLE__)
+        // Bound accidental output growth in the native process, including
+        // diagnostics. The parent enforces its own smaller stderr limit.
+        struct rlimit limit {};
+        if (getrlimit(RLIMIT_FSIZE, &limit) != 0) deny();
+        const auto cap = static_cast<rlim_t>(max_frame);
+        limit.rlim_cur = std::min(limit.rlim_cur, cap);
+        limit.rlim_max = std::min(limit.rlim_max, cap);
+        if (setrlimit(RLIMIT_FSIZE, &limit) != 0) deny();
+        struct rlimit core {0, 0};
+        if (setrlimit(RLIMIT_CORE, &core) != 0) deny();
+#endif
+        run(argc, argv); return 0;
+    }
     catch (...) { std::cerr << "GGUF token bridge denied execution\n"; return 2; }
 }

@@ -169,7 +169,7 @@ class GgufTokenBridgeModel(LlamaCppModel):
         return raw
 
     def _invoke(self, operation, payload, *, completion=0, cancel=None):
-        if operation not in ("encode", "decode", "generate") or len(payload) > _MAX_FRAME:
+        if operation not in ("encode", "decode", "roundtrip", "generate") or len(payload) > _MAX_FRAME:
             raise _fail()
         cancel = cancel if cancel is not None else threading.Event()
         started = time.monotonic()
@@ -282,14 +282,25 @@ class GgufTokenBridgeModel(LlamaCppModel):
         frame.finish()
         return value
 
+    def roundtrip_ids(self, text):
+        """One vocabulary load for the exact token vector and byte echo."""
+        if type(text) is not str or len(text) > _MAX_TEXT:
+            raise _fail()
+        frame = self._invoke("roundtrip", _text(text.encode("utf-8", "strict")))
+        tokens, decoded = frame.ids(), frame.text()
+        frame.finish()
+        if decoded != text:
+            raise _fail("exact GGUF prompt does not round-trip")
+        return tokens, decoded
+
     def count_input_tokens(self, request):
         raw = self._request_bytes(request)
         return len(self.encode_ids(raw.decode("utf-8")))
 
     def prepare_input(self, request, *, scope_digest=None):
         raw = self._request_bytes(request)
-        ids = self.encode_ids(raw.decode("utf-8"))
-        if not ids or self.decode_ids(ids).encode("utf-8") != raw:
+        ids, decoded = self.roundtrip_ids(raw.decode("utf-8"))
+        if not ids or decoded.encode("utf-8") != raw:
             raise _fail("exact GGUF prompt does not round-trip")
         if len(ids) + request.max_output_tokens > self._effective_context():
             raise _fail("exact GGUF context capacity exceeded")
