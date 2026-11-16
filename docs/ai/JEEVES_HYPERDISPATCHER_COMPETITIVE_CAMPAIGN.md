@@ -86,9 +86,9 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 43 | Pressure relief | P |
 | 44 | Storage-aware dispatch | P |
 | 45 | Heterogeneous accelerators | P |
-| 46 | Event-sourced execution | Open |
+| 46 | Event-sourced execution | P |
 | 47 | Deterministic replay | P |
-| 48 | Partitioned journals | Open |
+| 48 | Partitioned journals | P |
 | 49 | Distributed lease fencing | P |
 | 50 | Idempotent side effects | P |
 | 51 | Transactional publication | P |
@@ -99,7 +99,7 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 56 | Retry budgets | P |
 | 57 | Failure prediction | P |
 | 58 | Split brain prevention | P |
-| 59 | Journal compaction | Open |
+| 59 | Journal compaction | P |
 | 60 | Version migration | P |
 | 61 | Shadow scheduling | P |
 | 62 | Counterfactual scheduling | P |
@@ -411,3 +411,27 @@ delegated capacity from exact parent relations and rejects cycles and
 over-allocation. Legacy unfenced mode does not admit virtual workers.
 Partial target 72. Physical worker processes, 100k+ fleet qualification,
 and authenticated transport remain explicitly unqualified.
+
+## Wave 17: partitioned checkpoint event journal and bounded compaction
+
+The existing recovery owner supports an opt-in version-2 archive with
+ordered, hash-chained, tenant-partitioned task upserts/deletions and global
+worker deltas. Each event represents a committed checkpoint, not every
+intermediate runtime mutation. Replay reconstructs exact normalized states,
+validates checkpoint hashes, tenant sidecar binding and canonical
+partition changes, and refuses lost or changed retained tenant identities.
+When the retention ring rolls forward, its first retained checkpoint becomes
+a full replay anchor. Existing v1 archives remain readable; v2 is restricted
+to paired fenced tenant custody. Expanded replay stays explicitly bounded.
+The existing durable bridge stores the versioned archive using its existing
+run-writer lease; no second durable store or tenant-facing data exposure.
+Regression source covers roundtrip, corrupt/resealed cross-tenant changes,
+anchor compaction and a reopened SQLite run store.
+
+Partial targets 46, 48, 59. Full transition-level event sourcing,
+physical partition throughput, independent authenticated archive pinning,
+and long-duration compaction benchmarks remain unqualified.
+
+Source register: 72/72 targets have partial source implementations; this is
+100% source coverage, not completion of each target. Actual execution
+integration and independent competitive qualification remain a separate phase.

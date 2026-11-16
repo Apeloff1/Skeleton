@@ -1113,3 +1113,72 @@ def test_virtual_worker_restore_rejects_forged_capacity_and_cycles():
     next(w for w in cycle["workers"] if w["id"]=="root")["parent_id"]="child"
     with pytest.raises(ValueError):
         HardenedSwarmRuntime.from_state(cycle)
+
+def test_partitioned_delta_archive_replays_exact_states_and_compacts_anchor():
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.automation.agents.swarm_durable import SwarmDurableBridge
+    from skeleton.intelligence.dispatch_policy import DispatchCandidate
+    runtime, broker = _verified_dispatch_fixture()
+    manager = SwarmRecoveryManager(max_checkpoints=2, delta_archive=True)
+    storage = _DispatcherCheckpointFixture()
+    bridge = SwarmDurableBridge(storage)
+    first = bridge.capture("run","owner",manager,runtime,tenant_broker=broker)
+    _, attempt, second = bridge.lease_and_capture_verified(
+        "run","owner",manager,broker,(DispatchCandidate("a","a",100,0),),now_ms=10000)
+    archive = manager.export_archive()
+    assert archive["version"] == 2
+    assert [p["tenant"] for p in archive["runtime"][0]["task_partitions"]] == ["a","b"]
+    assert [p["tenant"] for p in archive["runtime"][1]["task_partitions"]] == ["a"]
+    assert archive["runtime"][1]["previous_sha256"] == archive["runtime"][0]["event_sha256"]
+    loaded = bridge.load("run")
+    assert loaded.manager.delta_archive
+    assert loaded.manager.export_archive_bytes() == manager.export_archive_bytes()
+    assert loaded.restore_runtime().task("a").effect_uncertain
+    assert loaded.restore_runtime().task("a").lease_token == attempt.lease_token
+    bridge.capture("run","owner",manager,runtime,tenant_broker=broker)
+    compacted = manager.export_archive()
+    assert len(compacted["runtime"]) == 2
+    assert compacted["runtime"][0]["sequence"] == second.swarm_sequence
+    assert compacted["runtime"][0]["previous_sha256"] == "0"*64
+    assert first.swarm_sequence not in manager.store.sequences()
+    assert SwarmRecoveryManager.from_archive(compacted).restore_latest().task("a").effect_uncertain
+
+
+def test_partitioned_journal_rejects_resealed_cross_tenant_patch():
+    from copy import deepcopy
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.automation.agents.swarm_delta import _digest
+    runtime, broker = _verified_dispatch_fixture()
+    manager = SwarmRecoveryManager(delta_archive=True)
+    manager.checkpoint(runtime,broker)
+    attack = deepcopy(manager.export_archive())
+    event = attack["runtime"][0]
+    event["task_partitions"][0]["tenant"]="foreign"
+    event["event_sha256"]=_digest({k:v for k,v in event.items() if k!="event_sha256"})
+    attack["archive_checksum"]=manager._archive_checksum({k:v for k,v in attack.items() if k!="archive_checksum"})
+    with pytest.raises(ValueError,match="cross-tenant"):
+        SwarmRecoveryManager.from_archive(attack)
+
+
+def test_delta_archive_persists_through_existing_sqlite_run_store(tmp_path):
+    # Reuse the existing durable bridge's run-store contract and the existing
+    # qualification fixture rather than introducing a second database owner.
+    from skeleton.testing.test_durable_run_store import make_store
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.automation.agents.swarm_durable import SwarmDurableBridge
+    from skeleton.intelligence.dispatch_policy import DispatchCandidate
+    runtime,broker = _verified_dispatch_fixture()
+    store=make_store(tmp_path)
+    store.create_run("run")
+    store.claim_run("run","owner",lease_seconds=60)
+    manager=SwarmRecoveryManager(max_checkpoints=2,delta_archive=True)
+    bridge=SwarmDurableBridge(store)
+    bridge.capture("run","owner",manager,runtime,tenant_broker=broker)
+    _,attempt,_=bridge.lease_and_capture_verified("run","owner",manager,broker,
+        (DispatchCandidate("a","a",100,0),),now_ms=10000)
+    reopened=SwarmDurableBridge(make_store(tmp_path))
+    result=reopened.load("run")
+    assert result.checkpoint.state_version==2
+    recovered=result.restore_runtime()
+    assert recovered.task("a").lease_token==attempt.lease_token
+    assert recovered.task("a").effect_uncertain

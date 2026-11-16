@@ -11,7 +11,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
-from skeleton.automation.agents.swarm_recovery import RECOVERY_ARCHIVE_VERSION, SwarmRecoveryManager
+from skeleton.automation.agents.swarm_recovery import (
+    SUPPORTED_RECOVERY_ARCHIVE_VERSIONS, SwarmRecoveryManager,
+)
 from skeleton.automation.agents.swarm_runtime import SwarmRuntime, SwarmTask, TaskState
 from skeleton.automation.agents.swarm_tenant_broker import TenantSwarmBroker
 from skeleton.state import CheckpointRecord, ResumeState
@@ -80,7 +82,7 @@ class SwarmDurableBridge:
             raise TypeError("manager must be a SwarmRecoveryManager")
         archive = manager.export_archive()
         version = archive.get("version")
-        if version != RECOVERY_ARCHIVE_VERSION:
+        if type(version) is not int or version not in SUPPORTED_RECOVERY_ARCHIVE_VERSIONS:
             raise DurableSwarmError(
                 "swarm recovery archive version disagrees with the runtime contract"
             )
@@ -89,7 +91,7 @@ class SwarmDurableBridge:
             archive,
             worker_id=worker_id,
             after_step_id=after_step_id,
-            state_version=RECOVERY_ARCHIVE_VERSION,
+            state_version=version,
         )
 
     def capture(
@@ -162,7 +164,7 @@ class SwarmDurableBridge:
                 capture = self.capture(run_id, worker_id, manager, runtime,
                                        tenant_broker=tenant_broker)
                 latest = self.store.resume_state(run_id).checkpoint
-                if (latest is None or latest.state_version != RECOVERY_ARCHIVE_VERSION
+                if (latest is None or latest.state_version != capture.checkpoint.state_version
                         or manager._json_bytes(latest.state) != manager._json_bytes(capture.checkpoint.state)
                         or manager._json_bytes(latest.state) != manager._json_bytes(manager.export_archive())):
                     raise DurableSwarmError("durable attempt publication readback mismatch")
@@ -180,7 +182,7 @@ class SwarmDurableBridge:
         checkpoint = resume.checkpoint
         if checkpoint is None:
             return None
-        if checkpoint.state_version != RECOVERY_ARCHIVE_VERSION:
+        if checkpoint.state_version not in SUPPORTED_RECOVERY_ARCHIVE_VERSIONS:
             raise DurableSwarmError(
                 "unsupported durable swarm checkpoint state version: "
                 f"{checkpoint.state_version}"
