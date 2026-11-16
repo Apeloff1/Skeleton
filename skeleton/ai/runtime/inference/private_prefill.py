@@ -182,6 +182,9 @@ class PrivatePrefillPool:
             if (entry is None or entry.cache is not None or entry.epoch is not lease.epoch or profile!=lease.profile
                     or not self._compatible(cache,profile,entry)):
                 return False
+            if not NativeConversationSession._compact_retained_prefix(
+                    cache,width=self.runtime.model.dim,budget=self.capacity):
+                return False
             size=NativeConversationSession._retained_prefix_size(cache)
             if size>self.capacity:
                 return False
