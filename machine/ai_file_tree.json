@@ -2043,7 +2043,7 @@
       "source": "skeleton/kv",
       "destination": "skeleton/ai/runtime/inference/kv",
       "kind": "tree",
-      "source_git_object_sha": "b5ad1dfb05532f8f61059bd6fc14bdb8592be8f3",
+      "source_git_object_sha": "5500b032934c60257384447d75d1ba1a36cdd32b",
       "role": "Paged/tiered KV management is an inference/runtime optimization with integrity and resource implications.",
       "work_package_refs": [
         "WP-W05",
