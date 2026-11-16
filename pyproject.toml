@@ -62,6 +62,7 @@ jeeves-production-training = ["torch>=2.5,<3"]
 hosted-inference = ["openai>=2.54.0,<3", "httpx>=0.28.1,<1"]
 
 [project.scripts]
+skeleton-expedition-controller-journey = "skeleton.app.expedition_controller_cli:main"
 skeleton-frontier-wing-replay = "skeleton.app.frontier_wing_cli:main"
 skeleton-frontier-environment-replay = "skeleton.app.frontier_environment_cli:main"
 skeleton-emulator-lens-work-queue = "skeleton.app.emulator_lens_queue_cli:main"

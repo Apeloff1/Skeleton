@@ -70,6 +70,8 @@ on:
       - 'skeleton/app/orphan_source_graph*.py'
       - 'skeleton/app/orphan_graph_ownership.py'
       - 'skeleton/app/recovered_evidence.py'
+      - 'skeleton/app/expedition_controller_*.py'
+      - 'skeleton/testing/test_recovered_expedition_controller.py'
       - 'skeleton/app/frontier_wing_*.py'
       - 'skeleton/testing/test_recovered_frontier_wings.py'
       - 'skeleton/app/frontier_environment_*.py'
@@ -319,6 +321,11 @@ jobs:
         env:
           PYTHONPATH: '.:backend'
         run: python -m pytest -q skeleton/testing/test_recovered_frontier_wings.py
+
+      - name: Recovered expedition multi-layout gameplay and save custody
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_expedition_controller.py
 
       - name: Consumer share and Chroma custody regressions
         env:

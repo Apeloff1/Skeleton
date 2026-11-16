@@ -91,14 +91,17 @@ class ExpeditionSaveStore:
 
     def _history(self,key,row):
         history=self._db.execute(
-            "SELECT * FROM expedition_save_history WHERE run_id=? ORDER BY generation",
+            "SELECT * FROM expedition_save_history WHERE run_id=? ORDER BY generation LIMIT 4097",
             (key,),
         ).fetchall()
+        if len(history)>4096:
+            raise ExpeditionSaveError("save generation history ceiling")
         if (row is None)!=(len(history)==0):
             raise ExpeditionSaveError("save generation history incomplete")
         previous="0"*64
         for number,event in enumerate(history,1):
-            if event["generation"]!=number or event["previous_receipt"]!=previous:
+            if (event["generation"]!=number or event["previous_receipt"]!=previous
+                    or event["world_digest"]!=row["world_digest"]):
                 raise ExpeditionSaveError("save history was truncated or reordered")
             expected=_receipt(
                 key,number,event["world_digest"],
@@ -144,6 +147,8 @@ class ExpeditionSaveStore:
                     episode=ExpeditionEpisode.restore(world,traveler,snapshot)
                 except (ValueError,TypeError,UnicodeError,ExpeditionError) as exc:
                     raise ExpeditionSaveError("gameplay replay failed on restore") from exc
+                if episode.traveler_digest!=row["traveler_digest"]:
+                    raise ExpeditionSaveError("stored traveler identity differs from replay")
                 result=ExpeditionSave(
                     run_id,row["generation"],episode,row["payload_sha256"],
                     row["receipt_digest"],
@@ -167,6 +172,13 @@ class ExpeditionSaveStore:
         payload=_json(episode.snapshot(),2_000_000)
         source=episode.world.digest
         traveler=episode.traveler
+        try:
+            checked=ExpeditionEpisode.restore(episode.world,traveler,json.loads(payload))
+        except (ValueError,TypeError,KeyError) as exc:
+            raise ExpeditionSaveError("candidate gameplay save cannot replay") from exc
+        if checked.snapshot()!=episode.snapshot():
+            raise ExpeditionSaveError("candidate gameplay changed during validation")
+        episode=checked
         with self._lock:
             self._check(run_id)
             self._db.execute("BEGIN IMMEDIATE")
@@ -204,6 +216,8 @@ class ExpeditionSaveStore:
                         tuple(episode.receipts[:len(old_episode.receipts)])!=tuple(old_episode.receipts)):
                         raise ExpeditionSaveConflict("cannot rewind a committed game history")
                     generation=row["generation"]+1
+                    if generation>4096:
+                        raise ExpeditionSaveError("save generation history ceiling")
                 digest=sha256(payload).hexdigest()
                 receipt=_receipt(run_id,generation,source,digest,prior)
                 if row is None:
