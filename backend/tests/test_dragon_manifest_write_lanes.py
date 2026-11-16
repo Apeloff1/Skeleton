@@ -53,6 +53,57 @@ class ManifestWriteLanesTests(TestCase):
     def provision(self):
         return provision(self.path,SCOPE,offline_acknowledged=True)
 
+    def test_transient_sidecar_unlink_is_reobserved(self):
+        import os
+        from core.dragon_owner_shards import _private
+
+        side=Path(str(self.path)+"-wal")
+        original=Path.lstat
+        live=original(self.path)
+        removed=list(live)
+        removed[3]=0
+        observations=[]
+        def transient(candidate):
+            if candidate==side:
+                observations.append(candidate)
+                if len(observations)==1:
+                    return os.stat_result(removed)
+                raise FileNotFoundError(str(candidate))
+            return original(candidate)
+
+        with patch.object(Path,"lstat",transient):
+            self.assertEqual(_private(self.path)[1],(live.st_dev,live.st_ino))
+        self.assertEqual(len(observations),2)
+
+    def test_sidecar_symlink_and_live_hardlink_remain_denied(self):
+        import os
+        from core.dragon_owner_shards import _private
+
+        if os.name!="posix":
+            self.skipTest("POSIX private inode custody")
+        side=Path(str(self.path)+"-wal")
+        self.assertFalse(side.exists())
+        side.symlink_to(self.root/"nonexistent")
+        try:
+            with self.assertRaises(ShardHeld):
+                _private(self.path)
+        finally:
+            side.unlink()
+        os.link(self.path,side)
+        try:
+            with self.assertRaises(ShardHeld):
+                _private(self.path)
+        finally:
+            side.unlink()
+        side.touch(mode=0o600)
+        side.chmod(0o644)
+        try:
+            with self.assertRaises(ShardHeld):
+                _private(self.path)
+        finally:
+            side.unlink()
+        self.assertEqual(_private(self.path)[0],self.path)
+
     def test_legacy_id_and_tombstone_keep_legacy_lane(self):
         op=self.operation(7,"legacy")
         mid=self.put(op)
