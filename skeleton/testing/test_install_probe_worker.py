@@ -83,7 +83,7 @@ def test_frozen_worker_rejects_different_payload_root(tmp_path,monkeypatch):
 def test_source_worker_uses_isolated_interpreter(tmp_path,monkeypatch):
     monkeypatch.setattr(sys,"frozen",False,raising=False)
     command=worker.worker_command(tmp_path)
-    assert command[:4]==[sys.executable,"-I","-B","-c"]
+    assert command[:5]==[sys.executable,"-I","-S","-B","-c"]
     assert command[-1]==worker.FLAG
 
 
@@ -100,3 +100,10 @@ def test_frozen_parent_resolves_worker_root_from_installed_executable_not_meipas
     monkeypatch.setattr("skeleton.app.studio_readiness._bounded_server",bounded)
     assert first_install._bounded_json("http://127.0.0.1:32123/api/health/registry",timeout=1)=={"ok":True}
     assert observed==[(root,"http://127.0.0.1:32123",None,"/api/health/registry")]
+
+
+
+def test_worker_huge_integer_timeout_is_redacted_denial():
+    output=io.BytesIO()
+    assert worker.main([worker.FLAG],input_stream=io.BytesIO(packet(timeout=2**10000)),output_stream=output)==2
+    assert output.getvalue()==b""

@@ -1203,3 +1203,13 @@ match the post-start observation. An observed restart or replacement
 invalidates the earlier HTTP evidence. The stricter optional live
 qualification gets the same final continuity check. This is sampled
 continuity, not continuous monitoring or physical-device certification.
+
+
+The App Foundation E2E stack now uses the shipping pre-start and post-start
+binding observers in its isolated CI project. This is separate from
+developer/consumer installation and only runs when the existing E2E job is
+admitted; draft, queued or skipped jobs are not evidence. The strict source
+qualification worker disables site startup and uses a new private bytecode
+cache prefix, so a checkout's cached bytecode cannot replace tracked Python
+source. Source and configuration are rechecked after inter-round delay
+before the next HTTP round. Neither change supersedes physical qualification.

@@ -140,8 +140,9 @@ jobs:
           BUILDKIT_PROGRESS: plain
         run: docker compose -f docker-compose.yml build skeleton backend
 
-      - name: Start stack
-        run: docker compose -f docker-compose.yml up -d mongo skeleton backend frontend
+      - name: Start isolated stack with shipping runtime and storage qualification
+        timeout-minutes: 12
+        run: python scripts/ci_first_install_runtime_binding.py
 
       - name: Wait for backend /api/health and frontend /healthz
         timeout-minutes: 8

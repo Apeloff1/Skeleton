@@ -39,7 +39,7 @@ def worker_command(root: Path) -> list[str]:
             "from skeleton.app.install_probe_worker import main;"
             "raise SystemExit(main(sys.argv[1:]))"
         )
-        return [sys.executable, "-I", "-B", "-c", code, FLAG]
+        return [sys.executable, "-I", "-S", "-B", "-c", code, FLAG]
     executable = Path(sys.executable).absolute()
     expected_root = executable.parent.resolve(strict=True)
     if root != expected_root:
@@ -101,8 +101,8 @@ def decode_request(raw: bytes) -> dict:
         raise ValueError("worker origin must be an explicit loopback HTTP endpoint")
     timeout = data["timeout"]
     limit = data["max_response_bytes"]
-    if (type(timeout) not in (int, float) or not math.isfinite(timeout)
-            or not 0 < timeout <= 10 or type(limit) is not int or not 0 < limit <= MAX_OUTPUT):
+    if (type(timeout) not in (int, float) or not 0 < timeout <= 10
+            or not math.isfinite(timeout) or type(limit) is not int or not 0 < limit <= MAX_OUTPUT):
         raise ValueError("worker budget invalid")
     return data
 

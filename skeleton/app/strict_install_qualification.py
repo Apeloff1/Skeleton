@@ -36,7 +36,7 @@ _MAX_RECEIPT = 32 * 1024
 _MAX_PASSES = 4
 _MAX_INDEX_BYTES = 64 * 1024 * 1024
 _MAX_SOURCE_PATH_BYTES = 32768
-_WORKER_SOURCE_PATHS = ("skeleton/app", "skeleton/__init__.py", "skeleton.py",
+_WORKER_SOURCE_PATHS = ("skeleton", "skeleton.py",
                         "sitecustomize.py", "usercustomize.py")
 _PROVIDERS = frozenset(("local", "openai"))
 _LANES = ("frontend_setup", "frontend_product", "backend_bootstrap", "backend_health",
@@ -108,8 +108,8 @@ def _get(base, path, *, timeout, html=False):
     _require(type(path) is str and 1 <= len(path) <= 512
              and re.fullmatch(r"/[A-Za-z0-9_/-]+", path) is not None
              and "//" not in path)
-    _require(type(timeout) in (float, int) and math.isfinite(timeout)
-             and 0 < timeout <= 10 and type(html) is bool)
+    _require(type(timeout) in (float, int) and 0 < timeout <= 10
+             and math.isfinite(timeout) and type(html) is bool)
     connection = http.client.HTTPConnection(host, port=port, timeout=timeout)
     cap = 65536 if html else _MAX_PACKET
     try:
@@ -304,7 +304,7 @@ def _worker(args):
     for base in bases.values():
         _base(base)
     timeout = args["timeout"]
-    _require(type(timeout) in (int, float) and math.isfinite(timeout) and 0 < timeout <= 10)
+    _require(type(timeout) in (int, float) and 0 < timeout <= 10 and math.isfinite(timeout))
     backend = _component(expected, "backend", "/api")
     engine = _component(expected, "engine", "/api/v1")
     def bootstrap_check(value):
@@ -411,8 +411,13 @@ def _bounded_worker(root, args, timeout):
     env = {key: os.environ[key] for key in ("PATH","SYSTEMROOT","WINDIR","TEMP","TMP")
            if key in os.environ}
     try:
-        with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as error:
-            done = subprocess.run([sys.executable,"-I","-B","-c",code], cwd=root, env=env,
+        # -B only disables writing bytecode, not reading a poisoned cache.
+        # The empty private prefix prevents reuse of checkout pyc files;
+        # -S also prevents global site startup hooks and .pth execution.
+        with (tempfile.TemporaryDirectory(prefix="skeleton-strict-pyc-") as cache,
+              tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as error):
+            done = subprocess.run([sys.executable,"-I","-S","-B","-X",
+                                   "pycache_prefix="+cache,"-c",code], cwd=root, env=env,
                                   input=_canonical(args), stdout=output, stderr=error,
                                   timeout=timeout, check=False)
             if type(done.returncode) is not int or done.returncode != 0:
@@ -535,10 +540,10 @@ def qualify_live_install(root=None, *, source_head, passes=2, per_probe_timeout=
     evidence are independent gates, not inferred from this result.
     """
     _require(type(passes) is int and 2 <= passes <= _MAX_PASSES
-             and type(per_probe_timeout) in (int,float) and math.isfinite(per_probe_timeout)
-             and 0 < per_probe_timeout <= 10
-             and type(hard_timeout) in (int,float) and math.isfinite(hard_timeout)
-             and per_probe_timeout < hard_timeout <= 45
+             and type(per_probe_timeout) in (int,float) and 0 < per_probe_timeout <= 10
+             and math.isfinite(per_probe_timeout)
+             and type(hard_timeout) in (int,float) and per_probe_timeout < hard_timeout <= 45
+             and math.isfinite(hard_timeout)
              and type(require_protected) is bool and type(require_ai) is bool)
     root = (root or find_repo_root()).resolve()
     from skeleton.app.assembly import _runtime_env
@@ -573,6 +578,8 @@ def qualify_live_install(root=None, *, source_head, passes=2, per_probe_timeout=
         receipt["source_observed"]=True
         scopes=[]
         for index in range(passes):
+            if index:
+                unchanged()
             lanes = _validate_worker_result(
                 _bounded_worker(root, inputs, hard_timeout), selected=selected,
             )
@@ -584,6 +591,7 @@ def qualify_live_install(root=None, *, source_head, passes=2, per_probe_timeout=
             receipt["rounds"].append({"round":index+1,"lanes":lanes,"scope":scope})
             if index+1 < passes:
                 time.sleep(1.1)  # exceed existing aggregate one-second cache
+        unchanged()
         stable = all(scope == scopes[0] for scope in scopes)
         complete = stable and all(scope["services_observed"] for scope in scopes)
         receipt.update(service_observation_complete=bool(complete),

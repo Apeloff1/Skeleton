@@ -381,3 +381,46 @@ def test_strict_routes_rejects_summary_disagreeing_with_mount_evidence():
     registry=payload["/api/health/registry"]
     registry["mounted_paths"].pop("routes.marketplace")
     assert q._routes(registry)==("unqualified",{"missing_count":1})
+
+
+
+def test_round_sleep_epoch_change_stops_before_next_network_dispatch(monkeypatch,tmp_path):
+    rows=clean_rows()
+    patch_host(monkeypatch,tmp_path,[rows,rows])
+    current=["e"*64]
+    calls=[]
+    monkeypatch.setattr(q,"runtime_source_fingerprint",lambda root:current[0])
+    def worker(*args):
+        calls.append("worker")
+        return rows
+    monkeypatch.setattr(q,"_bounded_worker",worker)
+    monkeypatch.setattr(q.time,"sleep",lambda delay:current.__setitem__(0,"f"*64))
+    result=q.qualify_live_install(tmp_path,source_head="a"*40)
+    assert calls==["worker"]
+    assert not result["ok"] and not result["rounds"]
+
+
+@pytest.mark.parametrize("key",["per_probe_timeout","hard_timeout"])
+def test_huge_integer_budget_rejected_without_float_overflow(monkeypatch,tmp_path,key):
+    monkeypatch.setattr(q,"assert_source_head",lambda *a:pytest.fail("invalid budget reached checkout"))
+    with pytest.raises(q.QualificationDenied):
+        q.qualify_live_install(tmp_path,source_head="a"*40,**{key:2**10000})
+
+
+def test_worker_uses_empty_private_bytecode_cache_and_disables_site(monkeypatch,tmp_path):
+    import sys
+    import subprocess
+    rows=clean_rows()
+    paths=[]
+    def child(command,**kwargs):
+        assert command[:5]==[sys.executable,"-I","-S","-B","-X"]
+        cache=Path(command[5].split("=",1)[1])
+        assert cache.is_dir() and not list(cache.iterdir())
+        assert command[6]=="-c"
+        paths.append(cache)
+        kwargs["stdout"].write(json.dumps(rows).encode())
+        return subprocess.CompletedProcess(command,0)
+    monkeypatch.setattr(q.subprocess,"run",child)
+    result=q._bounded_worker(tmp_path,{"selected_provider":"local"},10)
+    assert all(row["ok"] for row in result)
+    assert all(not path.exists() for path in paths)
