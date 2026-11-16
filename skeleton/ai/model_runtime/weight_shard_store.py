@@ -488,7 +488,7 @@ class WeightShardStore:
                        maximum_manifest_bytes: int = _MAX_MANIFEST_BYTES,
                        _batch: _InventoryVerificationBatch | None = None) -> tuple[Path, ...]:
         """Return verified shard paths under an optionally exact manifest pin."""
-        plan, manifest_sha, _ = self.manifest_evidence(plan_digest, maximum=maximum_manifest_bytes)
+        plan, manifest_sha, manifest_size = self.manifest_evidence(plan_digest, maximum=maximum_manifest_bytes)
         if expected_manifest_sha256 is not None:
             require_digest(expected_manifest_sha256, "expected_manifest_sha256")
             if manifest_sha != expected_manifest_sha256:
@@ -510,6 +510,9 @@ class WeightShardStore:
             if digest != shard.digest or count != shard.bytes:
                 raise WeightShardStoreError("stored weight object changed since admission")
             paths.append(path)
+        _, final_sha, final_size = self.manifest_evidence(plan_digest, maximum=manifest_size)
+        if final_sha != manifest_sha or final_size != manifest_size:
+            raise WeightShardStoreError("weight manifest changed during object verification")
         self.assert_layout()
         return tuple(paths)
 
