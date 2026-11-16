@@ -25,6 +25,9 @@ from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 from skeleton.app.health import _http_error_status, _response_metadata
+from skeleton.app.install_http_transport import (
+    DirectHTTPHandler, DirectHTTPSHandler, FramingDenied, response_length, checked_body,
+)
 
 MAX_OUTPUT = 2 * 1024**2
 LOCAL_SECONDS = 20
@@ -197,6 +200,8 @@ def _finite_float(value):
 
 
 def _decode_json(raw):
+    if type(raw) is bytes:
+        raw=raw.decode("utf-8","strict")
     return json.loads(raw, object_pairs_hook=_unique_fields,
                       parse_constant=_nonfinite, parse_float=_finite_float)
 
@@ -212,7 +217,7 @@ def _contains_token(value, token):
         if depth > 64 or visited > 200_000:
             raise ValueError("readiness object exceeds traversal budget")
         if isinstance(item, str):
-            if token in item:
+            if token is not None and token in item:
                 return True
         elif isinstance(item, dict):
             pending.extend((entry, depth + 1) for entry in item)
@@ -313,14 +318,15 @@ def _server_snapshot(
         or not (parts.scheme == "https" or (parts.scheme == "http" and (loopback or token is None)))
     ):
         raise ValueError("authenticated readiness requires HTTPS or loopback HTTP without URL credentials")
-    headers = {"User-Agent": "skeleton-app-doctor/1"}
+    headers = {"User-Agent": "skeleton-app-doctor/1", "Accept":"application/json",
+               "Accept-Encoding":"identity","Connection":"close"}
     if token is not None:
         headers["Authorization"] = "Bearer " + token
     request = Request(base.rstrip("/") + endpoint, headers=headers)
     try:
         # Direct diagnostic requests do not inherit ambient proxies, even
         # when an operator deliberately selects an HTTPS external origin.
-        opener = build_opener(ProxyHandler({}), _NoRedirect())
+        opener = build_opener(ProxyHandler({}), _NoRedirect(),DirectHTTPHandler(),DirectHTTPSHandler())
         with opener.open(request, timeout=timeout) as response:
             metadata = _response_metadata(response)
             if metadata is None or not 200 <= metadata[0] < 300 or metadata[1] != request.full_url:
@@ -331,6 +337,10 @@ def _server_snapshot(
                     or not isinstance(values[0], str)
                     or headers.get_content_type() != "application/json"):
                 return {"observed": False, "code": "server_inventory_protocol_invalid"}
+            try:
+                expected_length=response_length(headers,limit=max_response_bytes)
+            except FramingDenied:
+                return {"observed":False,"code":"server_inventory_protocol_invalid"}
             raw = response.read(max_response_bytes + 1)
         if not isinstance(raw, bytes):
             return {"observed": False, "code": "server_inventory_protocol_invalid"}
@@ -339,8 +349,8 @@ def _server_snapshot(
         if token is not None and token.encode("ascii") in raw:
             return {"observed": False, "code": "server_inventory_returned_credential"}
         try:
-            result = _decode_json(raw)
-            if token is not None and _contains_token(result, token):
+            result = _decode_json(checked_body(raw,expected_length=expected_length,limit=max_response_bytes))
+            if _contains_token(result, token):
                 return {"observed": False, "code": "server_inventory_returned_credential"}
         except (ValueError, RecursionError, UnicodeError):
             return {"observed": False, "code": "server_inventory_protocol_invalid"}
@@ -368,6 +378,40 @@ def _server_snapshot(
         return {"observed": False, "code": "server_inventory_unavailable"}
 
 
+_SERVER_FAILURES=frozenset((
+    "server_inventory_protocol_invalid","server_inventory_exceeds_capacity",
+    "server_inventory_returned_credential","server_authorization_required",
+    "server_inventory_unavailable",
+))
+
+
+def _validate_server_receipt(value, *, token, schema):
+    """Re-admit private child output; never forward arbitrary envelope fields."""
+    invalid={"observed":False,"code":"server_inventory_protocol_invalid"}
+    if type(value) is not dict or type(value.get("observed")) is not bool:
+        return invalid
+    if value["observed"]:
+        if set(value)!={"observed","scope","report"} or type(value["report"]) is not dict:
+            return invalid
+        scope=("Authenticated backend runtime; separate from CLI host." if token is not None
+               else "Public backend readiness; no authentication or model execution.")
+        if value["scope"]!=scope or (schema is not None and value["report"].get("schema_version")!=schema):
+            return invalid
+        return {"observed":True,"scope":scope,"report":value["report"]}
+    if set(value) not in ({"observed","code"},{"observed","code","http_status"}):
+        return invalid
+    code=value.get("code")
+    if type(code) is not str or code not in _SERVER_FAILURES:
+        return invalid
+    result={"observed":False,"code":code}
+    if "http_status" in value:
+        status=value["http_status"]
+        if status is not None and (type(status) is not int or not 100<=status<=599):
+            return invalid
+        result["http_status"]=status
+    return result
+
+
 def _bounded_server(root, base, token, timeout, *, endpoint, schema, max_response_bytes=MAX_OUTPUT):
     """A slow HTTP peer cannot retain a caller thread beyond the probe budget."""
     if (type(timeout) not in (int,float) or not 0 < timeout <= 10
@@ -385,7 +429,7 @@ def _bounded_server(root, base, token, timeout, *, endpoint, schema, max_respons
     ):
         if key in os.environ:
             environment[key] = os.environ[key]
-    from skeleton.app.install_probe_worker import worker_command
+    from skeleton.app.install_probe_worker import worker_command, decode_request
     try:
         command = worker_command(root)
     except (OSError, ValueError):
@@ -414,7 +458,14 @@ def _bounded_server(root, base, token, timeout, *, endpoint, schema, max_respons
         }
     ).encode()
     try:
-        with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as error:
+        # Validate the same closed packet contract before launching a child,
+        # then isolate source imports from existing checkout bytecode.
+        decode_request(payload)
+        with (tempfile.TemporaryDirectory(prefix="skeleton-probe-pyc-") as cache,
+              tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as error):
+            if not getattr(sys,"frozen",False):
+                index=command.index("-c")
+                command[index:index]=["-X","pycache_prefix="+cache]
             child = subprocess.run(
                 command,
                 input=payload,
@@ -436,13 +487,9 @@ def _bounded_server(root, base, token, timeout, *, endpoint, schema, max_respons
         if len(raw) > MAX_OUTPUT:
             return {"observed": False, "code": "server_inventory_exceeds_capacity"}
         value = _decode_json(raw)
-        if token is not None and (token.encode("ascii") in raw or _contains_token(value, token)):
-            return {"observed": False, "code": "server_inventory_returned_credential"}
-        if not isinstance(value, dict) or type(value.get("observed")) is not bool:
-            return {"observed": False, "code": "server_inventory_protocol_invalid"}
-        if value["observed"] and not isinstance(value.get("report"), dict):
-            return {"observed": False, "code": "server_inventory_protocol_invalid"}
-        return value
+        if ((token is not None and token.encode("ascii") in raw) or _contains_token(value,token)):
+            return {"observed":False,"code":"server_inventory_returned_credential"}
+        return _validate_server_receipt(value,token=token,schema=schema)
     except subprocess.TimeoutExpired:
         return {"observed": False, "code": "server_inventory_deadline_exceeded"}
     except (OSError, ValueError, RecursionError):
@@ -464,8 +511,8 @@ def studio_readiness_report(
     if (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
-        or not math.isfinite(timeout)
         or not 0 < timeout <= 10
+        or not math.isfinite(timeout)
     ):
         raise ValueError("studio probe timeout must be finite and at most 10 seconds")
     if auth_token_file is not None and not live:

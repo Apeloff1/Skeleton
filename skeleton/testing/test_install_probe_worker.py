@@ -107,3 +107,41 @@ def test_worker_huge_integer_timeout_is_redacted_denial():
     output=io.BytesIO()
     assert worker.main([worker.FLAG],input_stream=io.BytesIO(packet(timeout=2**10000)),output_stream=output)==2
     assert output.getvalue()==b""
+
+
+
+@pytest.mark.parametrize("receipt",[
+    {"observed":True,"report":{}},
+    {"observed":True,"scope":"foreign","report":{}},
+    {"observed":False,"code":"private-reflected-value"},
+    {"observed":False,"code":"server_inventory_unavailable","http_status":True},
+    {"observed":False,"code":"server_inventory_unavailable","extra":"secret"},
+    {"observed":True,"scope":"Public backend readiness; no authentication or model execution.",
+     "report":{"schema_version":"incorrect"}},
+])
+def test_parent_rejects_untrusted_worker_receipt_envelopes(receipt):
+    from skeleton.app.studio_readiness import _validate_server_receipt
+    assert _validate_server_receipt(receipt,token=None,schema="expected")=={
+        "observed":False,"code":"server_inventory_protocol_invalid"}
+
+
+def test_source_parent_supplies_ephemeral_cache_prefix(tmp_path,monkeypatch):
+    import subprocess
+    from skeleton.app import studio_readiness as studio
+    paths=[]
+    monkeypatch.setattr(studio.platform,"system",lambda:"Windows")
+    monkeypatch.setattr(sys,"frozen",False,raising=False)
+    payload={"observed":True,"scope":"Public backend readiness; no authentication or model execution.",
+             "report":{"ok":True}}
+    def run(command,**kwargs):
+        index=command.index("-X")
+        prefix=Path(command[index+1].split("=",1)[1])
+        assert prefix.is_dir() and not list(prefix.iterdir())
+        assert "-I" in command and "-S" in command and "-B" in command
+        paths.append(prefix)
+        kwargs["stdout"].write(json.dumps(payload).encode())
+        return subprocess.CompletedProcess(command,0)
+    monkeypatch.setattr(studio.subprocess,"run",run)
+    assert studio._bounded_server(tmp_path,"http://localhost:12345",None,1,
+            endpoint="/api/health/registry",schema=None)==payload
+    assert len(paths)==1 and not paths[0].exists()

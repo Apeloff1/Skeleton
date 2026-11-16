@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 from skeleton.app.assembly import AssemblyManifest, ServiceSpec, load_manifest
+from skeleton.app.install_http_transport import DirectHTTPHandler, DirectHTTPSHandler
 
 
 @dataclass(frozen=True)
@@ -44,7 +45,8 @@ def _open_direct_health(request: Request, *, timeout: float):
         def redirect_request(self, request, fp, code, msg, headers, newurl):
             return None
 
-    return build_opener(ProxyHandler({}), RejectRedirect()).open(request, timeout=timeout)
+    return build_opener(ProxyHandler({}), RejectRedirect(),
+                        DirectHTTPHandler(), DirectHTTPSHandler()).open(request, timeout=timeout)
 
 
 def _response_metadata(response) -> tuple[int, str] | None:

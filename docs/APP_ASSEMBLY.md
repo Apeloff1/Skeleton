@@ -1300,3 +1300,16 @@ of previously authenticated bundled database URIs requires the same
 storage guard as new persistent credentials. Shell overrides may not
 substitute stored JWT or engine service identity. Permission repair
 does not authorize intervening content changes.
+
+
+Install health and readiness HTTP use explicit direct HTTP/HTTPS handlers.
+Literal loopback origins connect to a numeric socket without resolving
+localhost through host DNS; the declared Host and TLS hostname are
+retained. Authenticated and public JSON readiness reject duplicate or
+conflicting length/transfer headers, unsupported content encoding,
+incomplete declared bodies, non-UTF-8 JSON and overdeep projections.
+The parent revalidates the private worker's exact receipt schema and
+source workers get an empty private bytecode cache prefix. The install
+IPC remains restricted to its fixed loopback endpoint inventory; generic
+explicit remote HTTPS inspection is separate. These checks do not prove
+the identity of a local listening process or Windows device readiness.

@@ -397,3 +397,45 @@ def test_partial_success_round_does_not_end_retry_campaign(monkeypatch):
     monkeypatch.setattr(health,"probe_application",probe)
     result=health.wait_for_application(attempts=2,delay=0)
     assert len(calls)==2 and health.probes_ok(result)
+
+
+
+@pytest.mark.parametrize("host,family,address",[
+    ("localhost",2,("127.0.0.1",8765)),
+    ("127.0.0.1",2,("127.0.0.1",8765)),
+    ("::1",10,("::1",8765,0,0)),
+])
+def test_loopback_transport_never_calls_hostname_resolver(monkeypatch,host,family,address):
+    import socket
+    from skeleton.app import install_http_transport as transport
+    calls=[]
+    class Sock:
+        def settimeout(self,value):
+            calls.append(("timeout",value))
+        def connect(self,value):
+            calls.append(("connect",value))
+        def close(self):
+            calls.append(("close",))
+    def dial(af,kind):
+        assert af==(socket.AF_INET if family==2 else socket.AF_INET6)
+        assert kind==socket.SOCK_STREAM
+        return Sock()
+    monkeypatch.setattr(socket,"socket",dial)
+    monkeypatch.setattr(socket,"getaddrinfo",lambda *a,**k:pytest.fail("loopback consulted DNS"))
+    result=transport._direct_connection((host,8765),1)
+    assert isinstance(result,Sock)
+    assert calls==[("timeout",1),("connect",address)]
+
+
+def test_loopback_connection_failure_closes_socket(monkeypatch):
+    import socket
+    from skeleton.app import install_http_transport as transport
+    closed=[]
+    class Sock:
+        def settimeout(self,value): pass
+        def connect(self,value): raise OSError("fixture")
+        def close(self): closed.append(True)
+    monkeypatch.setattr(socket,"socket",lambda *a:Sock())
+    with pytest.raises(OSError):
+        transport._direct_connection(("localhost",8765),1)
+    assert closed==[True]

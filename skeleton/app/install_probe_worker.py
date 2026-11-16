@@ -88,7 +88,7 @@ def decode_request(raw: bytes) -> dict:
             raise ValueError("authenticated readiness requires a bounded token")
     base = data["base"]
     if (type(base) is not str or not 1 <= len(base) <= 4096
-            or any(ord(ch) <= 32 or ord(ch) == 127 for ch in base)
+            or any(ord(ch) <= 32 or ord(ch) >= 127 for ch in base)
             or any(ch in base for ch in ("?", "#", "%", chr(92)))):
         raise ValueError("worker origin invalid")
     parts = urlsplit(base)
@@ -128,6 +128,6 @@ def main(argv=None, *, input_stream=None, output_stream=None) -> int:
         target.write(output)
         target.flush()
         return 0
-    except (OSError, ValueError, TypeError, UnicodeError, RecursionError, AttributeError):
+    except (OSError, ValueError, TypeError, UnicodeError, RecursionError, AttributeError, OverflowError):
         # Never forward raw request text, credentials, URLs or exception text.
         return 2

@@ -57,7 +57,10 @@ class StudioReadinessProxyCustodyTests(unittest.TestCase):
                 self.assertEqual(report["report"]["status"], "ready")
                 factory.assert_called_once()
                 handlers = factory.call_args.args
-                self.assertEqual(len(handlers), 2)
+                from skeleton.app.install_http_transport import DirectHTTPHandler, DirectHTTPSHandler
+                self.assertEqual(len(handlers), 4)
+                self.assertIsInstance(handlers[2],DirectHTTPHandler)
+                self.assertIsInstance(handlers[3],DirectHTTPSHandler)
                 self.assertIsInstance(handlers[0], ProxyHandler)
                 self.assertEqual(handlers[0].proxies, {})
                 self.assertIsInstance(handlers[1], _NoRedirect)
@@ -267,3 +270,45 @@ def test_authenticated_studio_rechecks_epoch_before_reading_token(tmp_path,monke
     result=studio.studio_readiness_report(tmp_path,values={},backend_url=_BASE,live=True,
                                          auth_token_file=tmp_path/"absent",admit_live=lambda:False)
     assert result["server"]["observed"] is False
+
+
+
+@pytest.mark.parametrize("headers",[
+    [("Content-Length","5"),("Content-Length","5")],
+    [("Content-Length","5"),("Transfer-Encoding","chunked")],
+    [("Content-Encoding","gzip")],
+    [("Transfer-Encoding","gzip, chunked")],
+    [("Content-Length","0")],
+    [("Content-Length","999999999")],
+    [("Content-Length","+17")],
+])
+def test_json_probe_rejects_ambiguous_framing_before_body(headers):
+    response=_response(b"{}")
+    for key,value in headers:
+        response.headers[key]=value
+    with patch("skeleton.app.studio_readiness.build_opener") as factory:
+        factory.return_value.open.return_value=response
+        assert _server_snapshot(_BASE,_TOKEN,0.2)["code"]=="server_inventory_protocol_invalid"
+    response.read.assert_not_called()
+
+
+@pytest.mark.parametrize("body,length",[
+    (b'{"schema_version":"skeleton.game.studio_readiness.v1"}',1),
+    (b'{"schema_version":"skeleton.game.studio_readiness.v1"}',4096),
+    (b'{"schema_version":"skeleton.game.studio_readiness.v1"}'.decode().encode("utf-16"),None),
+])
+def test_json_probe_rejects_incomplete_or_non_utf8_body(body,length):
+    response=_response(body)
+    if length is not None:
+        response.headers["Content-Length"]=str(length)
+    with patch("skeleton.app.studio_readiness.build_opener") as factory:
+        factory.return_value.open.return_value=response
+        assert _server_snapshot(_BASE,_TOKEN,0.2)["code"]=="server_inventory_protocol_invalid"
+
+
+def test_public_json_also_enforces_object_depth_budget():
+    body=b'{"nested":'+b'['*70+b'0'+b']'*70+b'}'
+    response=_response(body,url=_BASE+"/api/health/registry")
+    with patch("skeleton.app.studio_readiness.build_opener") as factory:
+        factory.return_value.open.return_value=response
+        assert _server_snapshot(_BASE,None,0.2,endpoint="/api/health/registry",schema=None)["code"]=="server_inventory_protocol_invalid"
