@@ -187,7 +187,8 @@ def running_reviewer(tmp_path):
     key = Ed25519PrivateKey.generate()
     p = policy(client[2])
     signer = ReviewerPolicySigner(p, key)
-    tls = server_tls(cert=cert[0], key=cert[1], client_ca=ca)
+    tls = server_tls(cert=cert[0], key=cert[1], client_ca=ca,
+                     cert_sha256=digest(cert[0].read_bytes()), client_ca_sha256=digest(ca.read_bytes()))
     endpoint = BoundedTLSReviewer(("127.0.0.1", 0), signer=signer, tls=tls)
     thread = threading.Thread(target=endpoint.serve_forever, kwargs={"poll_interval":.05})
     thread.start()
@@ -272,3 +273,24 @@ def test_operator_pinned_tls_client_connects_and_rejects_tampering(tmp_path):
         alias.symlink_to(leaf[1])
         with pytest.raises(ReviewerCustodyError):
             replace(pin, client_key_path=alias).context()
+
+
+@pytest.mark.skipif(not hasattr(__import__("os"), "memfd_create"), reason="Linux sealed TLS descriptors")
+def test_pinned_server_cert_ca_and_signer_identity(tmp_path):
+    from scripts.serve_independent_reviewer import pinned_signer
+    ca, leaf, _, _ = _certificates(tmp_path)
+    options = dict(cert=leaf[0], key=leaf[1], client_ca=ca,
+                   cert_sha256=digest(leaf[0].read_bytes()), client_ca_sha256=digest(ca.read_bytes()))
+    assert server_tls(**options).verify_mode == ssl.CERT_REQUIRED
+    for name in ("cert_sha256", "client_ca_sha256"):
+        with pytest.raises(ValueError):
+            server_tls(**{**options, name:"0"*64})
+    key = Ed25519PrivateKey.generate()
+    key_path = tmp_path / "signer.raw"
+    key_path.write_bytes(key.private_bytes(serialization.Encoding.Raw,
+        serialization.PrivateFormat.Raw, serialization.NoEncryption()))
+    key_path.chmod(0o600)
+    public = key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    key.public_key().verify(pinned_signer(key_path,digest(public)).sign(b"fixture"),b"fixture")
+    with pytest.raises(ValueError,match="identity"):
+        pinned_signer(key_path,"0"*64)

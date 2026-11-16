@@ -7,6 +7,7 @@ provider, application DB, forward proxy or outbound HTTP. No request logs.
 from __future__ import annotations
 
 import argparse
+from contextlib import ExitStack
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import ipaddress
@@ -18,8 +19,12 @@ import sys
 from threading import BoundedSemaphore, Timer
 import time
 
+from cryptography import x509
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
 from scripts.independent_reviewer_policy import (
     MAX_ATTEST_BODY, MAX_REVIEW_BODY, PolicyDenied, ReviewPolicy, ReviewerPolicySigner, load_signer,
+    _read_regular, _hex,
 )
 
 _MAX_CONNECTIONS = 8
@@ -167,19 +172,58 @@ class BoundedTLSReviewer(ThreadingHTTPServer):
         return None
 
 
-def server_tls(*, cert, key, client_ca):
-    # Do not allow implicit system trust or env-provided CA roots.
-    for path in (cert, key, client_ca):
-        if not path.is_absolute() or path.is_symlink() or not path.is_file():
-            raise ValueError("reviewer TLS file invalid")
-    if key.stat().st_uid != os.geteuid() or key.stat().st_mode & 0o077:
-        raise ValueError("reviewer TLS key permissions invalid")
+def server_tls(*, cert, key, client_ca, cert_sha256, client_ca_sha256):
+    """Use only reviewed CA and server certificate bytes; Linux sealed loading."""
+    if not _hex(cert_sha256) or not _hex(client_ca_sha256):
+        raise ValueError("reviewer TLS pins invalid")
+    ca = _read_regular(client_ca, 256*1024)
+    chain = _read_regular(cert, 256*1024)
+    private = _read_regular(key, 64*1024, secret=True)
+    if (hashlib.sha256(ca).hexdigest() != client_ca_sha256
+            or hashlib.sha256(chain).hexdigest() != cert_sha256):
+        raise ValueError("reviewer TLS certificate pin mismatch")
+    roots = x509.load_pem_x509_certificates(ca)
+    leaves = x509.load_pem_x509_certificates(chain)
+    if (not 1 <= len(roots) <= 16 or not 1 <= len(leaves) <= 16
+            or any(not item.extensions.get_extension_for_class(x509.BasicConstraints).value.ca for item in roots)
+            or leaves[0].extensions.get_extension_for_class(x509.BasicConstraints).value.ca):
+        raise ValueError("reviewer TLS CA or leaf inventory invalid")
+    if not sys.platform.startswith("linux") or not hasattr(os, "memfd_create"):
+        raise ValueError("reviewer sealed TLS loading unavailable")
+    import fcntl
     tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     tls.minimum_version = ssl.TLSVersion.TLSv1_2
     tls.verify_mode = ssl.CERT_REQUIRED
-    tls.load_verify_locations(cafile=str(client_ca))
-    tls.load_cert_chain(certfile=str(cert), keyfile=str(key))
+    tls.load_verify_locations(cadata=ca.decode("ascii", "strict"))
+    with ExitStack() as stack:
+        def sealed(raw):
+            fd = os.memfd_create("independent-reviewer-tls", os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING)
+            stack.callback(os.close, fd)
+            os.fchmod(fd, 0o600)
+            view = memoryview(raw)
+            while view:
+                count = os.write(fd, view)
+                if count <= 0:
+                    raise ValueError("reviewer TLS descriptor write failed")
+                view = view[count:]
+            os.lseek(fd, 0, os.SEEK_SET)
+            seals = fcntl.F_SEAL_WRITE | fcntl.F_SEAL_GROW | fcntl.F_SEAL_SHRINK | fcntl.F_SEAL_SEAL
+            fcntl.fcntl(fd, fcntl.F_ADD_SEALS, seals)
+            if fcntl.fcntl(fd, fcntl.F_GET_SEALS) & seals != seals:
+                raise ValueError("reviewer TLS descriptor seal failed")
+            return "/proc/self/fd/" + str(fd)
+        tls.load_cert_chain(certfile=sealed(chain), keyfile=sealed(private), password=lambda: b"")
     return tls
+
+
+def pinned_signer(path, expected_public_key_sha256):
+    if not _hex(expected_public_key_sha256):
+        raise ValueError("reviewer signing pin invalid")
+    key = load_signer(path)
+    public = key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    if hashlib.sha256(public).hexdigest() != expected_public_key_sha256:
+        raise ValueError("reviewer signing identity mismatch")
+    return key
 
 
 def main(argv=None):
@@ -189,9 +233,13 @@ def main(argv=None):
     parser.add_argument("--policy", required=True, type=Path)
     parser.add_argument("--policy-sha256", required=True)
     parser.add_argument("--signing-key", required=True, type=Path)
+    parser.add_argument("--signer-public-key-sha256", required=True)
     parser.add_argument("--tls-cert", required=True, type=Path)
     parser.add_argument("--tls-key", required=True, type=Path)
     parser.add_argument("--client-ca", required=True, type=Path)
+    parser.add_argument("--tls-cert-sha256", required=True)
+    parser.add_argument("--client-ca-sha256", required=True)
+    parser.add_argument("--validate-only", action="store_true")
     parser.add_argument("--replay-database", required=True, type=Path)
     parser.add_argument("--replay-ledger-id", required=True)
     args = parser.parse_args(argv)
@@ -203,8 +251,13 @@ def main(argv=None):
         from scripts.independent_reviewer_replay import DurableReplayLedger
         ledger = DurableReplayLedger(args.replay_database, ledger_id=args.replay_ledger_id,
             authority=policy.authority_id, domain=policy.deployment_domain)
-        signer = ReviewerPolicySigner(policy, load_signer(args.signing_key), replay_ledger=ledger)
-        tls = server_tls(cert=args.tls_cert, key=args.tls_key, client_ca=args.client_ca)
+        key = pinned_signer(args.signing_key, args.signer_public_key_sha256)
+        signer = ReviewerPolicySigner(policy, key, replay_ledger=ledger)
+        tls = server_tls(cert=args.tls_cert, key=args.tls_key, client_ca=args.client_ca,
+                         cert_sha256=args.tls_cert_sha256, client_ca_sha256=args.client_ca_sha256)
+        if args.validate_only:
+            print("Independent reviewer files, policy and ledger validated; no listener started.")
+            return 0
         with BoundedTLSReviewer((str(address), args.port), signer=signer, tls=tls) as server:
             server.serve_forever(poll_interval=.25)
         return 0

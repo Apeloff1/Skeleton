@@ -11,6 +11,8 @@ on:
       - 'skeleton/testing/test_independent_reviewer_replay.py'
       - 'skeleton/app/reviewer_client_configuration.py'
       - 'scripts/serve_independent_reviewer.py'
+      - 'deploy/independent-reviewer/**'
+      - 'skeleton/testing/test_async_reviewer_guard.py'
       - 'skeleton/ai/runtime/inference/*reviewer*.py'
       - 'skeleton/ai/runtime/inference/engine_submission_snapshot.py'
       - 'skeleton/ai/runtime/inference/guarded_service.py'
@@ -51,6 +53,6 @@ jobs:
         run: python -m pip install --disable-pip-version-check --no-input -e . 'pytest>=8,<9' 'numpy>=2,<3' 'Pillow>=13.0.0,<14'
       - name: Syntax and focused independent reviewer qualification
         run: |
-          python -m py_compile scripts/independent_reviewer_policy.py scripts/serve_independent_reviewer.py
+          python -m py_compile scripts/independent_reviewer_policy.py scripts/serve_independent_reviewer.py scripts/independent_reviewer_replay.py
           python -m pytest -q --noconftest --maxfail=1 skeleton/testing/test_independent_reviewer_service.py skeleton/testing/test_scoped_reviewer_attestation.py skeleton/testing/test_signed_reviewer_client.py skeleton/testing/test_reviewer_custody.py skeleton/testing/test_independent_reviewer_replay.py skeleton/testing/test_async_reviewer_guard.py
           echo "Ephemeral loopback mutual TLS and source custody tests only; no production signer or data migration."

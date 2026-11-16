@@ -90,3 +90,25 @@ def test_schema_and_count_tampering_denied_on_open(tmp_path):
         conn.execute("DELETE FROM consumed_nonces")
     with pytest.raises(PolicyDenied):
         DurableReplayLedger(path, **OPTIONS)
+
+
+def test_actual_process_restart_preserves_committed_nonce(tmp_path):
+    import subprocess
+    import sys
+    path, _ = open_ledger(tmp_path)
+    code = """
+import sys
+from pathlib import Path
+from scripts.independent_reviewer_replay import DurableReplayLedger
+from scripts.independent_reviewer_policy import PolicyDenied
+try:
+    DurableReplayLedger(Path(sys.argv[1]), ledger_id="b"*64, authority="reviewer",
+                        domain="separate-domain").consume("4"*48)
+except PolicyDenied:
+    raise SystemExit(7)
+"""
+    command = [sys.executable,"-c",code,str(path)]
+    first = subprocess.run(command, capture_output=True, timeout=10)
+    second = subprocess.run(command, capture_output=True, timeout=10)
+    assert (first.returncode,second.returncode) == (0,7)
+    assert not first.stdout and not second.stdout

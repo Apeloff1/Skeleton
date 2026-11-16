@@ -52,9 +52,9 @@ Run only from the trusted deployment checkout:
     python -m scripts.serve_independent_reviewer \
       --bind 127.0.0.1 --port 8443 \
       --policy /private/reviewer/policy.json --policy-sha256 REVIEWED_SHA256 \
-      --signing-key /private/reviewer/signing.raw \
-      --tls-cert /private/reviewer/server.pem --tls-key /private/reviewer/server.key \
-      --client-ca /private/reviewer/client-ca.pem \
+      --signing-key /private/reviewer/signing.raw --signer-public-key-sha256 REVIEWED_SIGNER_PUBLIC_SHA256 \
+      --tls-cert /private/reviewer/server.pem --tls-cert-sha256 REVIEWED_SERVER_PEM_SHA256 --tls-key /private/reviewer/server.key \
+      --client-ca /private/reviewer/client-ca.pem --client-ca-sha256 REVIEWED_CA_PEM_SHA256 \
       --replay-database /private/reviewer/state/replay.sqlite3 \
       --replay-ledger-id INDEPENDENT_64_HEX_ID
 
@@ -111,3 +111,20 @@ or raw nonce stored. Keep the ledger on private persistent local storage,
 with independently reviewed backup and rollback prevention. Restoring an old
 copy can restore old nonce state; physical rollback protection and filesystem
 administration are not provided. No automatic pruning or reset is allowed.
+
+## Linux independent service candidate
+
+The unit and invalid-until-populated operator.env.example under deploy/independent-reviewer
+are opt-in installation inputs, not an installer that modifies the application or
+host. Install the reviewed scripts and separate cryptography environment under
+/opt/skeleton-reviewer, configure a dedicated service account, root-controlled
+public pins and narrowly readable owned private keys in /etc/skeleton-reviewer,
+and explicitly initialize the persistent 0700 state directory and replay ledger.
+The signer public pin hashes the raw 32-byte Ed25519 public key; TLS pins hash
+exact PEM bytes. --validate-only checks policy, ledger, signing key and TLS custody
+without opening a listener. Runtime startup repeats the checks. The unit denies
+core dumps and restricts process, resource and writable filesystem scope; network
+firewall and administrative separation must be independently configured. Unit
+compatibility on the target system and crash/backup recovery are unqualified.
+The signed async client now enforces a true coroutine total timeout on network
+review; legacy synchronous compatibility callers retain their older constraints.
