@@ -35,10 +35,13 @@ class NativeAdapterPolicy:
     maximum_steps: int = 8192
     maximum_prefix_tokens: int = 1024
     maximum_attention_work: int = 32_000_000
+    maximum_factor_work: int = 200_000_000
+    maximum_projection_parameters: int = 4_000_000
     learning_rate_ppm: int = 20000
     retention_weight_ppm: int = 200000
     gradient_clip_ppm: int = 1000000
     delta_radius_ppm: int = 50000
+    fisher_strength_ppm: int = 1000000
     plateau_window: int = 16
     plateau_min_gain_ppm: int = 10000
     seed: int = 41
@@ -49,8 +52,9 @@ class NativeAdapterPolicy:
             ("initial_rank",1,128),("maximum_rank",1,128),("rank_step",1,128),
             ("factor_budget",2,_MAX_FACTORS),("maximum_steps",1,_MAX_STEPS),
             ("maximum_prefix_tokens",2,8192),("maximum_attention_work",1,2_000_000_000),
+            ("maximum_factor_work",1,2_000_000_000),("maximum_projection_parameters",1,16_000_000),
             ("learning_rate_ppm",1,100000),("retention_weight_ppm",0,500000),
-            ("gradient_clip_ppm",1,5000000),("delta_radius_ppm",1,500000),
+            ("gradient_clip_ppm",1,5000000),("delta_radius_ppm",1,500000),("fisher_strength_ppm",0,8_000_000),
             ("plateau_window",4,256),("plateau_min_gain_ppm",0,1000000),
             ("seed",0,2**32-1),
         ):
@@ -79,6 +83,9 @@ class AdapterLearningReport:
     expansions: int
     trainable_parameters: int
     delta_norm_ppm: int
+    sensitivity_norm_ppm: int
+    sensitivity_projections: int
+    sensitivity_digest: str
     mean_hard_loss_micronats: int
     factor_digest: str
     merged_projection_digest: str
@@ -145,7 +152,7 @@ def _gradient_mix(hard, retention, *, weight, clip, project):
     return mixed,did_project
 
 
-def _delta_norm(adapter):
+def _delta_norm(adapter, row_weights=None, column_weights=None):
     """Frobenius norm of scale*B*A without materializing a dense delta.
 
     ||BA||_F^2 = trace((B^T B)(A A^T)). Gram storage is O(rank^2).
@@ -155,8 +162,10 @@ def _delta_norm(adapter):
     terms=[]
     for i in range(r):
         for j in range(r):
-            aa=_dot(adapter.A[i],adapter.A[j])
-            bb=math.fsum(row[i]*row[j] for row in adapter.B)
+            aa=(_dot(adapter.A[i],adapter.A[j]) if column_weights is None else
+                math.fsum(x*y*w for x,y,w in zip(adapter.A[i],adapter.A[j],column_weights)))
+            bb=(math.fsum(row[i]*row[j] for row in adapter.B) if row_weights is None else
+                math.fsum(row[i]*row[j]*w for row,w in zip(adapter.B,row_weights)))
             terms.append(aa*bb)
     squared=math.fsum(terms)
     if not math.isfinite(squared):
@@ -168,15 +177,60 @@ def _delta_norm(adapter):
     return abs(adapter.scale)*math.sqrt(max(0.0,squared))
 
 
-def _project_radius(adapter,radius):
-    norm=_delta_norm(adapter)
+def _project_radius(adapter,radius,row_weights=None,column_weights=None):
+    norm=_delta_norm(adapter,row_weights,column_weights)
     if norm<=radius:
         return False
     factor=radius/norm*(1.0-1e-12)
     adapter.B=[[x*factor for x in row] for row in adapter.B]
-    if _delta_norm(adapter)>radius*(1.0+1e-9):
+    if _delta_norm(adapter,row_weights,column_weights)>radius*(1.0+1e-9):
         raise ValueError("adapter trust radius projection failed")
     return True
+
+
+class _OnlineSensitivity:
+    """Factorized diagonal Fisher-inspired protection on admitted prefixes.
+
+    For a categorical output distribution the output-logit Fisher diagonal
+    is p*(1-p); the input factor uses squared frozen hidden activations.
+    Average those factors separately (diagonal Kronecker approximation).
+    Normalize each to its observed maximum and add a unit floor. This
+    creates a stricter ellipsoid for sensitive output parameters. It is not
+    a full Fisher matrix or an EWC measurement of independent old tasks.
+    """
+
+    def __init__(self,vocab,width,strength):
+        self.row=[0.0]*vocab
+        self.column=[0.0]*width
+        self.strength=strength
+        self.count=0
+
+    def observe(self,probabilities,hidden):
+        if (len(probabilities)!=len(self.row) or len(hidden)!=len(self.column)
+                or any(not math.isfinite(x) for x in hidden)
+                or any(not math.isfinite(p) or not 0<=p<=1 for p in probabilities)):
+            raise ValueError("invalid frozen sensitivity observation")
+        self.count+=1
+        n=self.count
+        for i,p in enumerate(probabilities):
+            self.row[i]+=(p*(1-p)-self.row[i])/n
+        for j,x in enumerate(hidden):
+            square=x*x
+            if not math.isfinite(square):
+                raise ValueError("unrepresentable hidden sensitivity")
+            self.column[j]+=(square-self.column[j])/n
+
+    def weights(self):
+        def normalized(values):
+            peak=max(values,default=0.0)
+            return ([1.0+self.strength*(x/peak) for x in values]
+                    if peak>0 and self.strength else [1.0]*len(values))
+        return normalized(self.row),normalized(self.column)
+
+    @property
+    def digest(self):
+        return digest_json({"observations":self.count,"row":self.row,
+                            "column":self.column,"strength":self.strength})
 
 
 def _update(adapter,gradient,lr):
@@ -238,6 +292,8 @@ def fit_native_output_adapter(
     if (policy.maximum_rank>min(width,vocab)
             or policy.maximum_rank*(width+vocab)>policy.factor_budget):
         raise ValueError("adapter rank exceeds admitted dimensions or factor budget")
+    if vocab*width>policy.maximum_projection_parameters:
+        raise ValueError("dense candidate folding exceeds projection allocation budget")
     window_ceiling=min(candidate.limits.max_context,model.ctx)
     if window_ceiling>policy.maximum_prefix_tokens:
         # Do not quietly shorten training context to satisfy a resource limit.
@@ -267,6 +323,12 @@ def fit_native_output_adapter(
         sequences.append(seq)
     if not steps:
         raise ValueError("adapter corpus has no supervised targets")
+    # Conservative factor arithmetic work units including multiple r^2 Gram
+    # contractions and final dense folding. This is not a time estimate.
+    factor_work=(steps*policy.maximum_rank**2*(width+vocab)*8
+                 + vocab*width*policy.maximum_rank)
+    if factor_work>policy.maximum_factor_work:
+        raise ValueError("adapter factor arithmetic budget exceeded")
     source_digest=digest_json([seq.digest for seq in sequences])
     # Initial alpha=rank, setting scale=1. Existing expand_rank keeps the
     # effective function by rescaling B when alpha/r changes.
@@ -278,7 +340,8 @@ def fit_native_output_adapter(
     radius=base_norm*policy.delta_radius_ppm/1_000_000
     hard_losses=[]
     loss_sum=0.0
-    n=conflicts=radius_hits=expansions=0
+    sensitivity=_OnlineSensitivity(vocab,width,policy.fisher_strength_ppm/1_000_000)
+    n=conflicts=radius_hits=expansions=sensitivity_hits=0
     for seq in sequences:
         for i in range(1,len(seq.token_ids)):
             interrupt()
@@ -290,6 +353,7 @@ def fit_native_output_adapter(
             y=hidden[-1]
             baseline=model._unembed(y)
             p0=_probabilities(baseline)
+            sensitivity.observe(p0,y)
             p=_probabilities(adapter.apply(baseline,y))
             loss=-math.log(max(p[target],1e-12))
             hard=[value-float(j==target) for j,value in enumerate(p)]
@@ -303,6 +367,9 @@ def fit_native_output_adapter(
             _update(adapter,dx,eta)
             conflicts+=int(conflict)
             radius_hits+=int(_project_radius(adapter,radius))
+            if sensitivity.strength:
+                rows,columns=sensitivity.weights()
+                sensitivity_hits+=int(_project_radius(adapter,radius,rows,columns))
             n+=1
             loss_sum+=loss
             hard_losses.append(loss)
@@ -322,6 +389,8 @@ def fit_native_output_adapter(
                            for a,b in zip(before,after)):
                         raise ValueError("adapter expansion failed function preservation")
                     radius_hits+=int(_project_radius(adapter,radius))
+                    if sensitivity.strength:
+                        sensitivity_hits+=int(_project_radius(adapter,radius,rows,columns))
                     expansions+=1
             interrupt()
     if n!=steps:
@@ -332,12 +401,17 @@ def fit_native_output_adapter(
         raise ValueError("frozen candidate identity changed during adaptation")
     factor_digest=digest_json(adapter.snapshot())
     delta_norm=_delta_norm(adapter)
+    sensitivity_rows,sensitivity_cols=sensitivity.weights()
+    sensitivity_norm=_delta_norm(adapter,sensitivity_rows,sensitivity_cols)
+    if sensitivity_norm>radius*(1+1e-9):
+        raise ValueError("retention sensitivity radius exceeded")
     if delta_norm<=0 or delta_norm>radius*(1+1e-9):
         raise ValueError("empty or out-of-trust-region adaptation")
     # Build merged output off to the side, verifying finite values and actual
     # dense delta. No other candidate array is touched.
     merged=[]
     actual_delta=0.0
+    actual_weighted_delta=0.0
     changed=False
     for i,row in enumerate(model.Wout):
         interrupt()
@@ -348,10 +422,13 @@ def fit_native_output_adapter(
             if not math.isfinite(value):
                 raise ValueError("nonfinite folded output projection")
             actual_delta=math.hypot(actual_delta,value-old)
+            actual_weighted_delta=math.hypot(actual_weighted_delta,
+                (value-old)*math.sqrt(sensitivity_rows[i]*sensitivity_cols[j]))
             changed=changed or value!=old
             updated.append(value)
         merged.append(updated)
-    if not changed or actual_delta>radius*(1+1e-8):
+    if (not changed or actual_delta>radius*(1+1e-8)
+            or actual_weighted_delta>radius*(1+1e-8)):
         raise ValueError("folded output is unchanged or exceeds trust radius")
     evidence={
         "base":expected_base_digest,"policy":policy.digest,"source":source_digest,
@@ -359,6 +436,9 @@ def fit_native_output_adapter(
         "conflicts":conflicts,"radius_projections":radius_hits,"expansions":expansions,
         "trainable_parameters":adapter.rank*(width+vocab),
         "delta_norm_ppm":round(actual_delta/base_norm*1_000_000),
+        "sensitivity_norm_ppm":round(actual_weighted_delta/base_norm*1_000_000),
+        "sensitivity_projections":sensitivity_hits,
+        "sensitivity_digest":sensitivity.digest,
         "mean_hard_loss_micronats":round(loss_sum/n*1_000_000),
         "factors":factor_digest,"merged_projection":digest_json(merged),
     }
@@ -372,6 +452,7 @@ def fit_native_output_adapter(
     return AdapterLearningReport(expected_base_digest,policy.digest,source_digest,
         policy.initial_rank,adapter.rank,n,conflicts,radius_hits,expansions,
         evidence["trainable_parameters"],evidence["delta_norm_ppm"],
+        evidence["sensitivity_norm_ppm"],sensitivity_hits,sensitivity.digest,
         evidence["mean_hard_loss_micronats"],factor_digest,evidence["merged_projection"],receipt)
 
 
