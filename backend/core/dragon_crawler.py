@@ -3579,6 +3579,8 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
             await self._grant_principal(scope, grant)
         if network_margin:
             await self._assert_acquisition_stripes(row, token)
+            from core.dragon_authorized_api import assert_no_api_restriction
+            await assert_no_api_restriction(self,scope,row["request"]["allowed_hosts"])
         return row
 
     async def _settle_unstarted(
@@ -3850,6 +3852,8 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                 )
             await self._claim_acquisition_stripes(row, token)
             await self._assert_acquisition_stripes(row, token)
+            from core.dragon_authorized_api import assert_no_api_restriction
+            await assert_no_api_restriction(self,scope,row["request"]["allowed_hosts"])
             claim = {"_id": identifier, **scope, "version": row["version"], "status": row["status"]}
             if automation_epoch is not None:
                 claim.update(
