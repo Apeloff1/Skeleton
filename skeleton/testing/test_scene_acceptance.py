@@ -75,6 +75,37 @@ def test_tampered_report_is_never_trusted(field, change) -> None:
         verify_acceptance(forged)
 
 
+@pytest.mark.parametrize("field,change", [
+    ("release_qualified", 0),
+    ("state_budget", 1024.0),
+    ("depth_budget", 64.0),
+])
+def test_numeric_aliases_do_not_verify_as_canonical_evidence(field, change) -> None:
+    world, _ = original_demo()
+    original = accept_scene(world)
+    forged = copy.deepcopy(original)
+    forged[field] = change
+    assert forged == original  # Python equality alone is insufficient.
+    with pytest.raises(SceneTravelError):
+        verify_acceptance(forged)
+
+
+def test_nested_boolean_alias_and_oversized_report_rejected() -> None:
+    from skeleton.game.gameplay.scene_acceptance import MAX_REPORT_BYTES
+
+    world, _ = original_demo()
+    original = accept_scene(world, max_states=1)
+    forged = copy.deepcopy(original)
+    forged["audit"]["budget_exhausted"] = 1
+    assert forged == original
+    with pytest.raises(SceneTravelError, match="proof mismatch"):
+        verify_acceptance(forged)
+    forged = copy.deepcopy(original)
+    forged["holds"] = ["x" * MAX_REPORT_BYTES]
+    with pytest.raises(SceneTravelError, match="budget"):
+        verify_acceptance(forged)
+
+
 def test_rejects_tampered_checkpoint_before_any_acceptance() -> None:
     world, actions = original_demo()
     partial = simulate(world, actions[:1])
