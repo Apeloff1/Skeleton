@@ -271,3 +271,51 @@ native tensor allocation, migration, offload or physical GPU execution.
 Focused regressions are added for directory replacement, read-only
 inspection, malformed manifests, packable fragmentation cases and
 hybrid accelerator selection. Exact-head test execution is outstanding.
+
+
+## Per-device pressure and exact inventory manifest evidence
+
+NVML captures each enumerated adapter's bounded total, free and used
+counters, including exhausted adapters excluded from placement. The
+receipt checks agreement between those observations, aggregate counters
+and available placement descriptors. Its ordinal identifiers are scoped
+to the probe, not persistent physical identifiers or verified CUDA
+runtime device mappings. No MIG, visibility, allocation or execution
+qualification is implied.
+
+For CUDA and hybrid candidates, projected occupancy is now the largest
+projected fraction among the GPUs actually assigned weight shards.
+Unrelated idle GPUs cannot hide congestion on a selected GPU; unrelated
+full GPUs are not themselves a reason to throttle a different selected
+adapter. Per-device free bytes must still preserve the separately
+configured reserve. Legacy aggregate-only fixtures can exercise pure
+planning, but aggregate-only live observations cannot authorize GPU work.
+Host and GPU pressure continue to be evaluated independently. The
+calculation does not measure runtime scratch, actual resident tensors or
+physical device allocation.
+
+Inventory also commits the SHA-256 and bounded byte length of every
+complete canonical manifest. These cover fields outside the load-plan
+digest, including the independently represented weights identity. The
+metadata digest records observed identity; it is not an authentication
+signature. An operator must independently pin trusted source identities.
+
+Before weight-object verification the inventory now admits separate
+aggregate metadata and shard-reference ceilings (defaults 64 MiB and
+262,144 references). The standalone inventory CLI exposes
+`--max-manifest-bytes` and `--max-shard-references` for explicit bounded
+operator configuration. Read-only verification uses each admitted
+manifest's exact SHA-256 and byte ceiling. A final pass compares all
+manifest identities, including earlier manifests while later models were
+being verified. Selected-source preflight also binds the exact manifest
+observed by the inventory, rechecking after the selected GGUF inspection.
+This is bounded observed consistency, not an atomic filesystem snapshot
+or a lock against hostile concurrent store writers.
+
+Regression sources cover exhausted device visibility, inconsistent
+per-device counters, maximum selected-device pressure, live aggregate-only
+denial, metadata/reference budget admission and same-plan manifest field
+changes. Existing inventory receipts change because the covered evidence
+has expanded; persisted prior inspection digests must be explicitly
+revalidated rather than silently accepted. Physical GPU execution,
+native device mapping and exact-head test results remain outstanding.
