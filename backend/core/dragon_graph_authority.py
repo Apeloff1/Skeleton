@@ -552,8 +552,8 @@ def main():
         from core.dragon_graph_structural import install
         receipt=install(a.root,offline_acknowledged=a.offline_writers_stopped)
     elif a.command=="recover-structural":
-        from core.dragon_graph_structural import pulse
-        receipt=pulse(a.root)
+        from core.dragon_graph_structural import recover
+        receipt=recover(a.root)
     elif a.command=="structural-status":
         from core.dragon_graph_structural import status
         receipt=status(a.root)

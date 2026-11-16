@@ -89,9 +89,10 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           set -euo pipefail
-          python -m py_compile backend/core/dragon_graph_authority.py backend/core/dragon_graph_direct_writer.py backend/core/dragon_lead_graph.py backend/core/dragon_corpus_runtime.py backend/routes/dragon_knowledge.py
+          python -m py_compile backend/core/dragon_graph_authority.py backend/core/dragon_graph_direct_writer.py backend/core/dragon_graph_structural.py backend/core/dragon_lead_graph.py backend/core/dragon_corpus_runtime.py backend/routes/dragon_knowledge.py
           python -m unittest discover -s backend/tests -p 'test_dragon_graph_direct_writer.py' -v
           python -m unittest discover -s backend/tests -p 'test_dragon_graph_authority.py' -v
+          python -m unittest discover -s backend/tests -p 'test_dragon_graph_structural.py' -v
       - name: Physical owner, manifest, search and evidence storage qualification
         timeout-minutes: 8
         env:

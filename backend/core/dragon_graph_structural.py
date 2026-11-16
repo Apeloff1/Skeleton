@@ -15,6 +15,7 @@ import hashlib
 import json
 from pathlib import Path
 import sqlite3
+import shutil
 import time
 from urllib.parse import urlsplit
 
@@ -184,7 +185,7 @@ def reserve(root,mode):
                 jobs=db.execute("""SELECT j.owner,j.id,j.payload,j.batch,o.scope_json FROM lead_release_outbox q
                   JOIN release_jobs j ON j.owner=q.owner AND j.id=q.id
                   JOIN lead_owner o ON o.owner=q.owner
-                  WHERE q.state='queued' AND o.enabled=1 ORDER BY q.created_at,q.owner,q.id LIMIT ?""",(MAX_JOBS,)).fetchall()
+                  WHERE q.state='queued' AND j.state='done' AND o.enabled=1 ORDER BY q.created_at,q.owner,q.id LIMIT ?""",(MAX_JOBS,)).fetchall()
             else:
                 # Grant-bearing jobs stay in the original atomic snapshot path.
                 jobs=db.execute("""SELECT j.* FROM lead_expand_jobs j JOIN lead_owner o ON o.owner=j.owner
@@ -268,6 +269,8 @@ def _write_lane(root,layout,index):
     path,identity=_private(Path(layout["paths"][index]))
     root_identity=_private(root)[1]
     if identity==root_identity:raise a.GraphHeld("lane aliases root")
+    if shutil.disk_usage(path.parent).free<512*1024**2+4*MAX_PLAN_BYTES:
+        raise a.GraphHeld("structural lane disk reserve")
     with _open(path) as db:
         if db.execute("PRAGMA journal_mode").fetchone()[0].lower()!="delete":raise a.GraphHeld("structural lane journal differs")
         db.execute("PRAGMA foreign_keys=ON")
@@ -292,6 +295,8 @@ def apply_lane(root,sequence,plan_sha,index):
             item=_pending(policy)
             if item is None or item[0]["sequence"]!=sequence or item[1]!=plan_sha:
                 raise a.GraphHeld("structural reservation superseded")
+            if policy.execute("PRAGMA journal_mode").fetchone()[0].lower()!="delete":
+                raise a.GraphHeld("structural policy journal differs")
             plan=item[0];part=plan["lanes"].get(str(index))
             if part is None:raise a.GraphHeld("unreserved lane")
             layout=a._layout(policy,root)
@@ -319,7 +324,7 @@ def _job_row(db,mode,owner,identifier):
     if mode=="catalogue":
         row=db.execute("""SELECT j.owner,j.id,j.payload,j.batch,o.scope_json FROM lead_release_outbox q
            JOIN release_jobs j ON j.owner=q.owner AND j.id=q.id JOIN lead_owner o ON o.owner=q.owner
-           WHERE q.owner=? AND q.id=? AND q.state='queued'""",(owner,identifier)).fetchone()
+           WHERE q.owner=? AND q.id=? AND q.state='queued' AND j.state='done'""",(owner,identifier)).fetchone()
     else:
         row=db.execute("SELECT * FROM lead_expand_jobs WHERE owner=? AND id=? AND state='queued' AND snapshot IS NULL",(owner,identifier)).fetchone()
     return dict(row) if row else None
@@ -377,18 +382,29 @@ def settle(root,sequence,plan_sha):
             "sequence":sequence,"physical_lanes":len(plan["lanes"]),"network_executed":False}
 
 
+def _run(root,item):
+    if item is None:return {"processed":0,"held":0,"network_executed":False}
+    plan,witness=item;seq=plan["sequence"]
+    with ThreadPoolExecutor(max_workers=WORKERS,thread_name_prefix="dragon-structural") as pool:
+        receipts=list(pool.map(lambda key:apply_lane(root,seq,witness,int(key)),plan["lanes"]))
+    result=settle(root,seq,witness)
+    return {**result,"lane_receipts":receipts,"independent_structural_writers":True}
+
+
 def pulse(root,mode="catalogue"):
     """Reserve once, apply independently, and publish only verified settlement."""
-    try:
-        item=reserve(root,mode)
-        if item is None:return {"processed":0,"held":0,"network_executed":False}
-        plan,witness=item;seq=plan["sequence"]
-        with ThreadPoolExecutor(max_workers=WORKERS,thread_name_prefix="dragon-structural") as pool:
-            receipts=list(pool.map(lambda key:apply_lane(root,seq,witness,int(key)),plan["lanes"]))
-        result=settle(root,seq,witness)
-        return {**result,"lane_receipts":receipts,"independent_structural_writers":True}
+    try:return _run(root,reserve(root,mode))
     except (a.GraphHeld,ShardHeld,sqlite3.Error,OSError) as exc:
         raise CatalogueHeld("structural batch held; retry durable plan") from exc
+
+
+def recover(root):
+    """Resume a committed reservation only; never create new work."""
+    try:
+        with _open(Path(root)) as db:item=_pending(db)
+        return _run(root,item)
+    except (a.GraphHeld,ShardHeld,sqlite3.Error,OSError) as exc:
+        raise CatalogueHeld("structural recovery held") from exc
 
 
 def status(root):

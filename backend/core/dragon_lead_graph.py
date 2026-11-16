@@ -516,6 +516,13 @@ class LeadGraph:
         # Locator-only leads are retained as historical candidate metadata.
         # Revocation stops future imports, and evidence browsing reports status.
         owner=owner_key(scope);sid=_id(sid)
+        # Pending independent batches contain only catalogue and unscoped
+        # expansion metadata. Revocation must remain available even during a
+        # held structural batch; it operates solely on the root grant ledger.
+        with self.corpus._db() as db:
+            if authority.active(db):
+                result=db.execute("UPDATE lead_snapshots SET state='revoked',expires_at=0 WHERE owner=? AND id=?",(owner,sid))
+                return {"revoked":result.rowcount==1,"candidate_locators_retained":True,"network_authorized":False}
         with self._db() as db:
             result=db.execute("UPDATE lead_snapshots SET state='revoked',expires_at=0 WHERE owner=? AND id=?",(owner,sid))
         return {"revoked":result.rowcount==1,"candidate_locators_retained":True,"network_authorized":False}
