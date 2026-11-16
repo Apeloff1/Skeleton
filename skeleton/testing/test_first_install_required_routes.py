@@ -12,7 +12,9 @@ from types import SimpleNamespace
 import pytest
 
 
-def _doctor(monkeypatch, tmp_path, critical, *, providers=None):
+def _doctor(monkeypatch, tmp_path, critical, *, providers=None, health_hook=None,
+            route_hook=None, provider_hook=None, studio_hook=None, environ=None,
+            manifest_hook=None):
     install = importlib.import_module("skeleton.app.first_install")
     health = importlib.import_module("skeleton.app.health")
 
@@ -28,20 +30,38 @@ def _doctor(monkeypatch, tmp_path, critical, *, providers=None):
         "AI_PROVIDER": "local", "AI_LOCAL_MODEL_PATH": "model.bin",
     })
     monkeypatch.setattr(install, "load_manifest", Manifest)
-    monkeypatch.setattr(install, "runtime_manifest", lambda manifest, **kw: manifest)
-    monkeypatch.setattr(health, "probe_application", lambda **kw: [])
+    def runtime_manifest(manifest, **kw):
+        if manifest_hook:
+            manifest_hook(kw)
+        return manifest
+
+    def probe_application(**kw):
+        if health_hook:
+            health_hook()
+        return []
+
+    monkeypatch.setattr(install, "runtime_manifest", runtime_manifest)
+    monkeypatch.setattr(health, "probe_application", probe_application)
     monkeypatch.setattr(health, "probes_ok", lambda probes: True)
 
     def bounded(url, *, timeout, max_response_bytes=65536):
         if url.endswith("/api/health/registry"):
+            if route_hook:
+                route_hook()
             return critical
+        if provider_hook:
+            provider_hook()
         return providers if providers is not None else {
             "engine": "skeleton-engine", "providers": [],
             "llm_available": False, "availability_observed": True,
         }
 
     monkeypatch.setattr(install, "_bounded_json", bounded)
-    return install.first_install_report(tmp_path, live=True)
+    if studio_hook:
+        from skeleton.app import studio_readiness
+        monkeypatch.setattr(studio_readiness, "studio_readiness_report", studio_hook)
+    return install.first_install_report(tmp_path, live=True, studio=bool(studio_hook),
+                                        environ=environ)
 
 
 def test_first_install_rejects_unobservable_route_registry(monkeypatch, tmp_path):
@@ -268,3 +288,101 @@ def test_first_install_override_is_lazy_and_canonical_url_is_fallback_only(
     )
     assert receipt.ok is True
     assert fallback == ["http://127.0.0.1:8099"]
+
+
+
+_READY_ROUTES = {"critical_routes": {"ok": True, "report_available": True, "missing": []}}
+_READY_AI = {"engine": "skeleton-engine", "active": "local", "providers": ["local"],
+             "llm_available": True, "availability_observed": True}
+
+
+@pytest.mark.parametrize("stage", ["health", "registry", "provider", "manifest"])
+def test_doctor_disowns_evidence_across_runtime_configuration_epoch_change(
+    monkeypatch, tmp_path, stage,
+):
+    config = tmp_path / ".env"
+    config.write_text("AI_PROVIDER=local\n", encoding="utf-8")
+    seen = []
+
+    def change(*_args):
+        seen.append(stage)
+        config.write_text("AI_PROVIDER=openai\n", encoding="utf-8")
+
+    def forbidden():
+        pytest.fail("further probe used a configuration epoch already rejected")
+
+    hooks = {
+        "health_hook": change if stage == "health" else forbidden if stage == "manifest" else None,
+        "route_hook": change if stage == "registry" else forbidden if stage in ("health", "manifest") else None,
+        "provider_hook": change if stage == "provider" else forbidden if stage in ("health", "registry", "manifest") else None,
+        "manifest_hook": change if stage == "manifest" else None,
+    }
+    result = _doctor(monkeypatch, tmp_path, _READY_ROUTES, providers=_READY_AI, **hooks)
+    assert seen == [stage]
+    assert result["configuration_ready"] is False
+    assert result["services_ready"] is None
+    assert result["ai_ready"] is False
+    assert result["ai"]["observed"] is False and result["ai"]["available"] is None
+    assert result["critical_routes"]["observed"] is False
+    assert result["checks"]["live"] == []
+
+
+def test_doctor_does_not_keep_authenticated_crawler_facts_after_config_change(monkeypatch, tmp_path):
+    config = tmp_path / ".env"
+    config.write_text("AI_PROVIDER=local\n", encoding="utf-8")
+
+    def studio(_root, **kw):
+        assert kw["live"] is True
+        config.write_text("AI_PROVIDER=openai\n", encoding="utf-8")
+        return {"local_host": {"observed": True}, "server": {
+            "observed": True,
+            "crawler": {"observed": True, "report": {
+                "available": True, "configured": True, "code": "ready",
+            }},
+        }}
+
+    result = _doctor(monkeypatch, tmp_path, _READY_ROUTES, providers=_READY_AI, studio_hook=studio)
+    assert result["ai_ready"] is False
+    assert result["crawler"]["observed"] is False
+    assert result["crawler"]["available"] is None
+    assert "code" not in result["crawler"]
+    assert result["studio"]["server"]["crawler"]["observed"] is False
+
+
+def test_doctor_stabilizes_process_environment_overrides(monkeypatch, tmp_path):
+    overrides = {"AI_PROVIDER": "local"}
+    seen = []
+
+    def inspect_manifest(kw):
+        overrides["AI_PROVIDER"] = "openai"
+        seen.append(kw["environ"]["AI_PROVIDER"])
+
+    result = _doctor(monkeypatch, tmp_path, _READY_ROUTES, providers=_READY_AI,
+                     environ=overrides, manifest_hook=inspect_manifest)
+    assert seen == ["local"]
+    assert result["ai_ready"] is True
+
+
+def test_doctor_refuses_new_env_appearing_during_probe(monkeypatch, tmp_path):
+    def create():
+        (tmp_path / ".env").write_text("AI_PROVIDER=local\n", encoding="utf-8")
+
+    result = _doctor(monkeypatch, tmp_path, _READY_ROUTES, providers=_READY_AI, health_hook=create)
+    assert result["configuration_ready"] is False
+    assert result["services_ready"] is None
+    assert result["ai_ready"] is False
+
+
+@pytest.mark.parametrize("url", [
+    "http://user:secret@localhost/api/health", "http://localhost:bad/api/health",
+    "http://localhost:0/api/health", "http://[::1/api/health",
+    "http://localhost/api/health?", "http://localhost/api/health#",
+    "http://local%68ost/api/health", "http://localhost/api/health\n",
+    "file:///etc/passwd", "",
+])
+def test_doctor_json_admission_rejects_invalid_urls_before_worker(monkeypatch, url):
+    install = importlib.import_module("skeleton.app.first_install")
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("invalid diagnostic origin reached worker")
+    monkeypatch.setattr("skeleton.app.studio_readiness._bounded_server", forbidden)
+    assert install._bounded_json(url, timeout=1) is None

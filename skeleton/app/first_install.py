@@ -8,6 +8,7 @@ loads model weights, starts a crawler or submits application work.
 from __future__ import annotations
 
 import math
+import os
 from collections.abc import Mapping
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -22,6 +23,16 @@ from skeleton.app.assembly import (
     runtime_manifest,
 )
 from skeleton.app.preloader import inspect_host
+from skeleton.app.setup_runtime import runtime_source_fingerprint
+
+
+def _configuration_epoch(root: Path) -> str | None:
+    """Distinguish an absent source from a linked, mutated or unreadable one."""
+    try:
+        (root / ".env").lstat()
+    except FileNotFoundError:
+        return None
+    return runtime_source_fingerprint(root)
 
 
 def _bounded_json(
@@ -29,8 +40,18 @@ def _bounded_json(
 ) -> dict[str, object] | None:
     from skeleton.app.studio_readiness import _bounded_server
 
-    parts = urlsplit(url)
-    if parts.query or parts.fragment:
+    try:
+        if (type(url) is not str or not 1 <= len(url) <= 4096
+                or any(ord(ch) <= 32 or ord(ch) == 127 for ch in url)
+                or any(ch in url for ch in ("?", "#", chr(92)))):
+            return None
+        parts = urlsplit(url)
+        if (parts.scheme not in {"http", "https"} or not parts.hostname
+                or parts.username is not None or parts.password is not None
+                or parts.query or parts.fragment or "%" in parts.netloc
+                or parts.port == 0):
+            return None
+    except ValueError:
         return None
     result = _bounded_server(
         Path(__file__).resolve().parents[2],
@@ -60,6 +81,8 @@ def critical_backend_route_report(backend_base: str, *, timeout: float = 3.0) ->
     # The registry includes the mounted route inventory, which exceeds 64 KiB
     # on a complete installation. Keep the larger allowance local to this
     # endpoint; ordinary readiness projections retain their smaller bound.
+    if type(backend_base) is not str or not backend_base:
+        return report
     status = _bounded_json(
         backend_base.rstrip("/") + "/api/health/registry",
         timeout=timeout, max_response_bytes=512 * 1024,
@@ -106,10 +129,32 @@ def first_install_report(
     if auth_token_file is not None and not (studio and live):
         raise ValueError("--auth-token-file requires --studio --live")
     root = (root or find_repo_root()).resolve()
+    # Freeze process overrides before the first read. A report must not
+    # combine one provider selection with another set of public ports.
+    captured = dict(os.environ if environ is None else environ)
     host = inspect_host(root)
-    checks = preflight(root, runtime=True, environ=environ)
     try:
-        values = _runtime_env(root, environ)
+        initial_epoch = _configuration_epoch(root)
+        epoch_admitted = True
+    except (OSError, ValueError, UnicodeError):
+        initial_epoch = None
+        epoch_admitted = False
+
+    def epoch_stable():
+        if not epoch_admitted:
+            return False
+        try:
+            return _configuration_epoch(root) == initial_epoch
+        except (OSError, ValueError, UnicodeError):
+            return False
+
+    checks = preflight(root, runtime=True, environ=captured)
+    try:
+        if not epoch_stable():
+            raise ValueError("runtime source not admitted")
+        values = _runtime_env(root, captured)
+        if not epoch_stable():
+            raise ValueError("runtime source changed")
     except (OSError, ValueError, UnicodeError):
         # An unsafe credential source is not readable configuration evidence.
         # Preserve the original in place for manual recovery, and do not make
@@ -120,12 +165,17 @@ def first_install_report(
     else:
         source_ok = True
     manifest = load_manifest()
+    manifest_ok = False
     if source_ok:
         try:
-            manifest = runtime_manifest(manifest, root=root, environ=values)
-        except ValueError:
-            # The port failure is already reported by runtime preflight.
+            manifest = runtime_manifest(manifest, root=root, environ=captured)
+            manifest_ok = True
+        except (OSError, ValueError, UnicodeError):
             live = False
+    if not epoch_stable():
+        source_ok = False
+        values = {}
+        live = False
     provider = values.get("AI_PROVIDER", "local").strip().lower() or "local"
     provider = provider if provider in {"local", "openai"} else "unsupported"
     local_paths = [values.get(key, "").strip() for key in (
@@ -165,17 +215,18 @@ def first_install_report(
         "scope": "Critical first-party route registration must be observed from the live backend.",
     }
     live_checks: list[dict[str, object]] = []
-    if live:
+    if live and source_ok and manifest_ok:
         from skeleton.app.health import probe_application, probes_ok
 
         probes = probe_application(manifest=manifest, timeout=timeout)
         services_ready = probes_ok(probes)
         live_checks = [probe.to_dict() for probe in probes]
         backend_base = manifest.service("backend").public_url.rstrip("/")
-        route_registry = critical_backend_route_report(backend_base, timeout=timeout)
+        if epoch_stable():
+            route_registry = critical_backend_route_report(backend_base, timeout=timeout)
         services_ready = bool(services_ready) and route_registry["ready"] is True
         status_url = backend_base + "/api/ai/providers"
-        status = _bounded_json(status_url, timeout=timeout)
+        status = _bounded_json(status_url, timeout=timeout) if epoch_stable() else None
         if (
             status is not None
             and status.get("engine") == "skeleton-engine"
@@ -209,6 +260,26 @@ def first_install_report(
                 "Canonical AI readiness could not be observed; configuration does not establish availability."
             )
 
+    def clear_epoch_observations():
+        # Do not leave a previously healthy provider or a mounted route list
+        # in a receipt whose admitted configuration no longer exists.
+        ai.update(provider="unsupported", configuration="unobserved",
+                  available=None, observed=False,
+                  scope="Runtime configuration changed or became unsafe; no live evidence retained.")
+        for key in ("readiness_code", "configuration_valid", "configuration_code",
+                    "catalog_configured"):
+            ai.pop(key, None)
+        route_registry.update(observed=False, ready=False, missing=[])
+        live_checks.clear()
+
+    if not epoch_stable():
+        source_ok = False
+        configured = False
+        live = False
+        services_ready = None
+        clear_epoch_observations()
+
+    configuration_ready = bool(source_ok and manifest_ok and checks_ok(checks))
     next_steps = []
     if not host.ready:
         next_steps.extend(
@@ -222,7 +293,7 @@ def first_install_report(
             "repair its file type, size, ownership or links before retrying setup. "
             "Do not replace stored database credentials automatically."
         )
-    elif not checks_ok(checks):
+    elif not configuration_ready:
         next_steps.append(
             "Run python -m skeleton app setup, then python -m skeleton app check --runtime; preserve the private .env file."
         )
@@ -256,7 +327,7 @@ def first_install_report(
         )
     # Service/route readiness is deliberately not AI readiness. A healthy
     # app shell may be useful while a guard is blocked, but never qualify AI.
-    ai_ready = (host.ready is True and checks_ok(checks) is True
+    ai_ready = (host.ready is True and configuration_ready
                 and services_ready is True and ai["observed"] is True
                 and ai["available"] is True and configured)
     report = {
@@ -264,7 +335,7 @@ def first_install_report(
         "ai_ready": ai_ready,
         "ai_ready_scope": "Observed provider availability only; not inference, quality, device or release qualification.",
         "platform_ready": host.ready,
-        "configuration_ready": checks_ok(checks),
+        "configuration_ready": configuration_ready,
         "services_ready": services_ready,
         "critical_routes": route_registry,
         "ai": ai,
@@ -290,16 +361,18 @@ def first_install_report(
     if studio:
         from skeleton.app.studio_readiness import studio_readiness_report
 
+        # Recheck immediately before a token can leave the process.
+        studio_live = live and epoch_stable()
         report["studio"] = studio_readiness_report(
             root,
             values=values,
             backend_url=manifest.service("backend").public_url,
-            live=live,
+            live=studio_live,
             timeout=timeout,
             # Unsafe .env or invalid port configuration disables live
             # inspection; never pass an authenticated token to a downgraded
             # diagnostics call that cannot bind its target.
-            auth_token_file=auth_token_file if live else None,
+            auth_token_file=auth_token_file if studio_live else None,
         )
         crawler = report["studio"]["server"]["crawler"]
         observed = crawler.get("report", {})
@@ -319,4 +392,23 @@ def first_install_report(
                 report["next_steps"].append(
                     "Inspect the authenticated crawler readiness report; configure its existing Mongo storage and canonical engine admission before starting capture."
                 )
+    if not epoch_stable():
+        # Covers mutations during authenticated studio/crawler probes as well
+        # as final report construction. Retain no stale runtime evidence.
+        clear_epoch_observations()
+        report.update(configuration_ready=False, services_ready=None, ai_ready=False)
+        report["checks"]["live"] = []
+        report["crawler"].update(available=None, observed=False,
+                                 scope="Runtime configuration changed; crawler not observed.")
+        report["crawler"].pop("configured", None)
+        report["crawler"].pop("code", None)
+        if studio:
+            denied = {"observed": False, "code": "runtime_configuration_changed"}
+            report["studio"]["server"] = {
+                **denied, "dragon_runtime": dict(denied), "crawler": dict(denied),
+            }
+        step = ("Runtime configuration changed or is unsafe; preserve the private .env "
+                "and rerun diagnostics before trusting any service observation.")
+        if step not in report["next_steps"]:
+            report["next_steps"].append(step)
     return report
