@@ -214,6 +214,15 @@ export type DragonTreasury = {
   earliest_source_expiry: number | null; latest_observed_only: true; source_text_returned: false;
   network_executed: false; training_permission: false; fresh_consent_required: true;
 };
+export type CrawlAcquisitionReadiness = {
+  schema: 'skeleton.dragon.acquisition-readiness.v1';
+  hosts: { host: string; state: 'consent_expired' | 'held_for_grant' | 'cooldown' | 'no_host_hold';
+    host_ready_at: number; settled: number; denial_statuses: number; throttle_statuses: number;
+    rejected_success_statuses: number; queued: number }[];
+  settled_requests: number; queued: number;
+  network_authority_expanded: false; reason_inferred: false;
+  independent_intake_requires_new_authorization: true;
+};
 export type CrawlSession = {
   session_id: string; title: string; status: 'queued' | 'ready' | 'running' | 'paused' | 'completed' | 'cancelled' | 'budget_exhausted' | 'failed' | 'interrupted';
   state?: string; version: number; created_at: string; updated_at: string; seeds: string[];
@@ -224,6 +233,7 @@ export type CrawlSession = {
   instruction_security?: CrawlInstructionSecurity; adaptive_origin_health?: Record<string, CrawlOriginHealth>;
   duplicate_evidence?: CrawlDuplicateEvidence; checkpoint_recovery?: CrawlCheckpointRecovery;
   acquisition_economics?: CrawlAcquisitionEconomics;
+  acquisition_readiness?: CrawlAcquisitionReadiness;
   companion?: DragonCompanion;
   curriculum_trace?: DragonCurriculumTrace;
   archive_grant?: DragonArchiveGrant; treasury_watch?: DragonTreasuryWatch|null; watch_managed?: boolean;
@@ -405,6 +415,29 @@ function session(value: CrawlSession, expectedId?: string): CrawlSession {
   for (const field of ['requests', 'bytes', 'documents', 'failures'] as const) if (!integer(value.counters[field], 33554432)) invalid('The crawler counters are incomplete.');
   if (value.instruction_security !== undefined && !validInstructionSecurity(value.instruction_security, value.counters.requests)) invalid('The crawler instruction incident custody is invalid.');
   if (value.adaptive_origin_health !== undefined && !validOriginHealth(value.adaptive_origin_health)) invalid('The crawler origin health projection is invalid.');
+  if (value.acquisition_readiness !== undefined) {
+    const r = value.acquisition_readiness;
+    if (!r || r.schema !== 'skeleton.dragon.acquisition-readiness.v1'
+      || r.network_authority_expanded !== false || r.reason_inferred !== false
+      || r.independent_intake_requires_new_authorization !== true
+      || !Array.isArray(r.hosts) || r.hosts.length > 16
+      || !integer(r.settled_requests, value.counters.requests)
+      || r.queued !== value.frontier_count) invalid('Invalid acquisition readiness receipt.');
+    let settled = 0, queued = 0;
+    const hosts = new Set<string>();
+    for (const h of r.hosts) {
+      if (!h || typeof h.host !== 'string' || !/^[a-z0-9][a-z0-9.-]{0,252}$/.test(h.host) || hosts.has(h.host)
+        || !['consent_expired','held_for_grant','cooldown','no_host_hold'].includes(h.state)
+        || typeof h.host_ready_at !== 'number' || !Number.isFinite(h.host_ready_at) || h.host_ready_at < 0 || h.host_ready_at > 1e12
+        || !integer(h.settled, r.settled_requests) || !integer(h.queued, r.queued)
+        || !integer(h.denial_statuses, h.settled) || !integer(h.throttle_statuses, h.settled)
+        || !integer(h.rejected_success_statuses, h.settled)
+        || h.denial_statuses + h.throttle_statuses + h.rejected_success_statuses > h.settled
+        || (h.state === 'consent_expired') === value.consent_current) invalid('Invalid host readiness receipt.');
+      hosts.add(h.host); settled += h.settled; queued += h.queued;
+    }
+    if (settled !== r.settled_requests || queued !== r.queued) invalid('Acquisition readiness accounting differs.');
+  }
   if (value.acquisition_economics !== undefined) {
     const e = value.acquisition_economics;
     const finite = (n: unknown, max: number) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= max;
