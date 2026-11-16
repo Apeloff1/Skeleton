@@ -20,6 +20,7 @@ from skeleton.ai.runtime.inference.llama_cpp import (
 )
 from skeleton.ai.runtime.inference.adaptive_serving import AdaptiveServingController
 from skeleton.app.offline_cpu_budget import MemoryTopology
+from skeleton.app.offline_native_process_lease import NativeCpuLeaseOwner, NativeLeaseError
 from skeleton.ai.runtime.inference.local import LocalModelAdapter, sample_serving_resources
 from skeleton.app.offline_runtime_preflight import (
     ModelSource, RuntimePolicy, RuntimePreflightError, canonical, digest, identity, inspect_source,
@@ -83,6 +84,19 @@ class MeasuredLlamaCpuGate:
         self._sequence = 0
         self._last = None
         self._closed = False
+        self._lease_owner: NativeCpuLeaseOwner | None = None
+
+    def bind_native_lease(self, directory: Path) -> None:
+        """Bind an optional shared local slot before any check or launch."""
+        with self._lock:
+            require(not self._closed and self._sequence == 0 and self._lease_owner is None,
+                    "native lease must be bound before admission")
+            try:
+                owner = NativeCpuLeaseOwner(directory, self)
+                self._backend.install_resource_lease_factory(owner.acquire)
+            except NativeLeaseError as exc:
+                raise RuntimePreflightError("shared native lease unavailable") from exc
+            self._lease_owner = owner
 
     def __call__(self) -> None:
         """Record the latest rejection even when an evidence collector fails."""
@@ -161,9 +175,14 @@ class MeasuredLlamaCpuGate:
     def status(self) -> dict:
         with self._lock:
             import json
-            return {"closed": self._closed, "checks": self._sequence,
-                    "last": json.loads(canonical(self._last)),
-                    "native_qualified": False, "release_qualified": False}
+            result = {"closed": self._closed, "checks": self._sequence,
+                      "last": json.loads(canonical(self._last)),
+                      "native_qualified": False, "release_qualified": False}
+            owner = self._lease_owner
+        # acquire() takes the lease lock before calling this gate. Do not
+        # reverse that order when reading diagnostics.
+        result["shared_native_lease"] = owner.status() if owner is not None else None
+        return result
 
     def close(self) -> None:
         with self._lock:
@@ -197,6 +216,7 @@ def build_measured_guarded_deployment(
     plan_digest: str, model_identity_digest: str,
     policy: RuntimePolicy, components: ProtectedLocalComponents,
     default_seed: int = 0, max_queue_size: int = 256, max_batch_size: int = 256,
+    lease_directory: Path | None = None,
 ) -> tuple[LocalModelAdapter, MeasuredLlamaCpuGate]:
     """Trusted startup composition; callers route through the protected adapter.
 
@@ -221,6 +241,8 @@ def build_measured_guarded_deployment(
     # The native backend already calls this before prompt handling AND at
     # process spawn. It rejects hook replacement or late installation.
     adapter.engine.model.install_prelaunch_resource_guard(gate)
+    if lease_directory is not None:
+        gate.bind_native_lease(lease_directory)
     return adapter, gate
 
 
@@ -235,6 +257,7 @@ class MeasuredLocalDeployment:
     plan_digest: str
     model_identity_digest: str
     policy: RuntimePolicy
+    lease_directory: Path | None = None
 
     def __post_init__(self) -> None:
         for name in ("manifest_digest", "manifest_sha256", "plan_digest", "model_identity_digest"):
@@ -244,6 +267,8 @@ class MeasuredLocalDeployment:
                 "explicit absolute weight store path required")
         require(isinstance(self.policy, RuntimePolicy) and self.policy.backend == "cpu"
                 and self.policy.verify_gguf_headers, "measured protected CPU policy required")
+        require(self.lease_directory is None or (isinstance(self.lease_directory, Path)
+                and self.lease_directory.is_absolute()), "absolute shared lease directory required")
 
     def activate(self, manifest_path: str | Path, *, components: ProtectedLocalComponents,
                  default_seed: int, max_queue_size: int, max_batch_size: int
@@ -255,6 +280,7 @@ class MeasuredLocalDeployment:
             model_identity_digest=self.model_identity_digest, policy=self.policy,
             components=components, default_seed=default_seed,
             max_queue_size=max_queue_size, max_batch_size=max_batch_size,
+            lease_directory=self.lease_directory,
         )
 
 
