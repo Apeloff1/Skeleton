@@ -229,5 +229,52 @@ class PublisherIntakeTests(unittest.IsolatedAsyncioTestCase):
             app.create.assert_not_awaited()
 
 
+class PeerAcquisitionGateTests(unittest.IsolatedAsyncioTestCase):
+    def fixture(self, *, holds=(), excluded=0, capped=False):
+        app = object.__new__(DragonCrawlerApplication)
+        app.acquisition_hold_catalog = AsyncMock(return_value={
+            "capacity_reached": capped, "excluded_sessions": excluded,
+            "holds": [{"host": host} for host in holds]})
+        return app, {"_id": "current", "request": {"allowed_hosts": ["example.com"]}}
+
+    async def test_overlapping_peer_hold_stops_dispatch(self):
+        app, row = self.fixture(holds=("example.com",))
+        with self.assertRaises(CrawlerError) as caught:
+            await app._guard_peer_acquisition(SCOPE, row)
+        self.assertEqual(caught.exception.code, "crawler_peer_acquisition_held")
+        app.acquisition_hold_catalog.assert_awaited_once_with(
+            SCOPE, peer_hosts=("example.com",), exclude_session="current")
+
+    async def test_independent_host_does_not_create_a_hold(self):
+        app, row = self.fixture(holds=("example.org",))
+        await app._guard_peer_acquisition(SCOPE, row)
+
+    async def test_incomplete_or_unavailable_peer_audit_fails_closed(self):
+        for options in ({"excluded": 1}, {"capped": True}):
+            app, row = self.fixture(**options)
+            with self.assertRaises(CrawlerError) as caught:
+                await app._guard_peer_acquisition(SCOPE, row)
+            self.assertEqual(caught.exception.code, "crawler_peer_acquisition_unavailable")
+        app, row = self.fixture()
+        app.acquisition_hold_catalog.side_effect = TimeoutError()
+        with self.assertRaises(CrawlerError) as caught:
+            await app._guard_peer_acquisition(SCOPE, row)
+        self.assertEqual(caught.exception.status, 503)
+
+    async def test_peer_catalogue_queries_are_owner_and_host_scoped(self):
+        fixture = AcquisitionHoldCatalogTests()
+        row, now = fixture.hold_fixture()
+        app = fixture.app_for([row])
+        with patch("core.dragon_crawler._now", return_value=now):
+            await app.acquisition_hold_catalog(SCOPE, peer_hosts=("example.com",),
+                                               exclude_session="current")
+        for call in app.sessions.find.call_args_list:
+            query = call.args[0]
+            self.assertEqual(query["tenant_id"], SCOPE["tenant_id"])
+            self.assertEqual(query["owner_id"], SCOPE["owner_id"])
+            self.assertEqual(query["request.allowed_hosts"], {"$in": ["example.com"]})
+            self.assertEqual(query["_id"], {"$ne": "current"})
+
+
 if __name__ == "__main__":
     unittest.main()
