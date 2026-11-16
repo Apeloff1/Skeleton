@@ -82,6 +82,17 @@ jobs:
           python -m unittest discover -s backend/tests -p 'test_dragon_sanctuary_boundary.py' -v
           python -m unittest discover -s backend/tests -p 'test_dragon_treasury_boundary.py' -v
 
+      - name: Shared Mongo acquisition coordination fixture discovery
+        timeout-minutes: 2
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+          # Ordinary source-only CI must not contact a configured database.
+          SKL_DRAGON_COORDINATION_TEST_MONGO_URL: ""
+        run: |
+          python -m py_compile backend/tests/test_dragon_acquisition_coordination_mongo.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_acquisition_coordination_mongo.py' -v
+
       - name: Offline dataset federation and signature custody
         timeout-minutes: 5
         env:
