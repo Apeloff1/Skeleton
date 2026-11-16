@@ -165,6 +165,7 @@ class OfflineHTTPApplication:
         self.database = Path(database)
         self.resource_fabric = AdaptiveResourceFabric(self.database)
         self.token = token
+        self._prefill_namespace = secrets.token_urlsafe(24)
         self.model_digest = backend.model_digest
         self.tokenizer_digest = _model_tokenizer_digest(backend)
         self._lock = threading.RLock()
@@ -247,6 +248,9 @@ class OfflineHTTPApplication:
                 worker.join()
         if self.longform is not None:
             self.longform.close()
+        forget = getattr(self.backend, "forget_private_prefill", None)
+        if callable(forget):
+            forget(self._prefill_namespace)
         self._store.close()
 
     def _request_cancel(self, turn: _LocalTurn) -> None:
@@ -578,7 +582,8 @@ class OfflineHTTPApplication:
                         return self._replayed_result(session_id, rid, digest)
                     self._session(session_id)
                     chat = DurableOfflineAISession(
-                        self.backend, database=self.database, session_id=session_id
+                        self.backend, database=self.database, session_id=session_id,
+                        prefill_owner=self._prefill_namespace,
                     )
                     try:
                         if grounded:
@@ -1011,6 +1016,9 @@ class OfflineHTTPApplication:
                         raise OfflineHTTPError(409, "cancel the active turn and wait for it to settle before deleting")
                     self._store.delete(sid, self.model_digest,
                                        self.tokenizer_digest)
+                    forget = getattr(self.backend, "forget_private_prefill", None)
+                    if callable(forget):
+                        forget(self._prefill_namespace, sid)
                     self._turns = {key: value for key, value in self._turns.items() if key[0] != sid}
                 return 200, {"deleted_session_id": sid}
         if tail == "metadata" and method == "POST":
