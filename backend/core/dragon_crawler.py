@@ -751,12 +751,20 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             {"tenant_id": row.get("tenant_id"), "owner_id": row.get("owner_id")}, row)
         if publisher is not None:
             status["publisher_intent"] = publisher
+            publisher_snapshot = runtime.snapshot()
+            publisher_now = _now().timestamp()
+            witnessed = False
+            if row.get("checkpoint_identity") is not None:
+                try:
+                    verify_primary(publisher_snapshot, _plain(row["checkpoint_identity"]))
+                    witnessed = True
+                except (CheckpointReplicaError, CrawlerError, ValueError, TypeError):
+                    pass
             status["publisher_capture_review"] = _publisher_capture_review(
-                publisher, runtime.snapshot(), now=_now().timestamp())
+                publisher, publisher_snapshot, now=publisher_now)
             status["publisher_archive_preflight"] = _publisher_archive_preflight(
-                publisher, runtime.snapshot(), self._source_policies(row),
-                status=row["status"], now=_now().timestamp(),
-                witnessed=row.get("checkpoint_identity") is not None)
+                publisher, publisher_snapshot, self._source_policies(row),
+                status=row["status"], now=publisher_now, witnessed=witnessed)
         # The companion is historical operational metadata. Current source-use
         # policy separately governs whether its evidence references are shown.
         # A session-level pause/cancel/lease interruption takes precedence
