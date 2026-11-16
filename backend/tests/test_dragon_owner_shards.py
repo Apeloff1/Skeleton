@@ -322,3 +322,47 @@ class IntraOwnerIndexTests(TestCase):
         self.assertFalse(self.graph.page(self.scope,q="Fixture")["physical_search_shards_used"])
         self.pulse_all()
         self.assertTrue(self.graph.page(self.scope,q="Fixture")["physical_search_shards_used"])
+
+
+class ParallelRootMaintenanceTests(TestCase):
+    def setUp(self):
+        temp=TemporaryDirectory();self.addCleanup(temp.cleanup)
+        self.root=Path(temp.name).resolve()
+        self.paths=tuple(self.root/("maintenance-"+str(i)+".sqlite") for i in range(LANES))
+        self.base=self.paths[0];self.base.touch(mode=0o600)
+
+    def test_rotating_pair_and_individual_missing_lane(self):
+        from core.dragon_owner_shards import next_paths
+        provision(self.base,"corpus",self.paths,offline_acknowledged=True)
+        self.assertEqual(next_paths(self.base,"corpus","leads"),(((0,self.paths[0]),(1,self.paths[1])),()))
+        self.paths[2].unlink()
+        ready,held=next_paths(self.base,"corpus","leads")
+        self.assertEqual(ready,((3,self.paths[3]),))
+        self.assertEqual(held,(2,))
+        self.assertFalse(self.paths[2].exists())
+        for i in (4,6,8,0):
+            ready,held=next_paths(self.base,"corpus","leads")
+            self.assertEqual(ready,((i,self.paths[i]),(i+1,self.paths[i+1])))
+            self.assertFalse(held)
+
+    def test_two_distinct_roots_progress_simultaneously(self):
+        from threading import Barrier
+        from core.dragon_corpus_runtime import _pulse_graph_roots
+        provision(self.base,"corpus",self.paths,offline_acknowledged=True)
+        barrier=Barrier(2,timeout=5)
+        def worker(path):
+            barrier.wait()
+            return {"catalogue":{"processed":1},"network_executed":False}
+        with patch("core.dragon_corpus_runtime._pulse_graph_root",side_effect=worker):
+            result=_pulse_graph_roots(self.base)
+        self.assertEqual(result["owner_root_batches"],2)
+        self.assertEqual([r["lane"] for r in result["roots"]],[0,1])
+        self.assertTrue(all(r["catalogue"]["processed"]==1 for r in result["roots"]))
+
+    def test_unsharded_pulse_does_not_duplicate_work(self):
+        from core.dragon_corpus_runtime import _pulse_graph_roots
+        with patch("core.dragon_corpus_runtime._pulse_graph_root",return_value={"bootstrap":{"processed":1},"network_executed":False}) as worker:
+            result=_pulse_graph_roots(self.base)
+        worker.assert_called_once_with(self.base)
+        self.assertEqual(result["owner_root_batches"],1)
+        self.assertEqual(result["bootstrap"]["processed"],1)

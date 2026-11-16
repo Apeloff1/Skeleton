@@ -283,5 +283,288 @@ class TransportIsolationTests(unittest.TestCase):
                 self.assertNotIn("Authorization", headers)
 
 
+
+class InterstitialTransportTests(unittest.TestCase):
+    def test_explicit_success_status_hold_does_not_decode_or_read_body(self):
+        from skeleton.ai.webcrawler.adaptive_navigation import access_interstitial_reason
+
+        for signal in (("CF-Mitigated", "challenge"), ("WWW-Authenticate", "Basic realm=restricted")):
+            with self.subTest(signal=signal[0]):
+                url = "https://example.com/first"
+                target = ResolvedTarget(url, "example.com", 443, ("93.184.216.34",))
+                connection, response = Mock(), Mock()
+                response.status = 200
+                response.getheaders.return_value = [
+                    signal, ("Content-Length", "99999999"), ("Content-Length", "1"),
+                    ("Content-Encoding", "unsupported"), ("Transfer-Encoding", "chunked"),
+                ]
+                response.read1.side_effect = AssertionError("held entity must stay unread")
+                connection.getresponse.return_value = response
+                with (
+                    patch("skeleton.ai.webcrawler.bound_http.resolve_target", return_value=target),
+                    patch("skeleton.ai.webcrawler.bound_http._PinnedHTTPSConnection", return_value=connection),
+                    patch("skeleton.ai.webcrawler.bound_http.threading.Timer"),
+                ):
+                    result = SocketBoundFetcher().fetch_once(
+                        url, user_agent="SkeletonAI-Crawler/1.0", max_bytes=4096,
+                    )
+                self.assertEqual(result.status, 200)
+                self.assertEqual(result.body, b"")
+                self.assertEqual(result.content_encoding, "identity")
+                self.assertIsNotNone(access_interstitial_reason(result.status, result.headers, result.body))
+                response.read1.assert_not_called()
+                connection.close.assert_called_once()
+
+    def test_repeated_headers_cannot_erase_explicit_denial(self):
+        from skeleton.ai.webcrawler.adaptive_navigation import access_interstitial_reason
+
+        url = "https://example.com/first"
+        target = ResolvedTarget(url, "example.com", 443, ("93.184.216.34",))
+        connection, response = Mock(), Mock()
+        response.status = 302
+        response.getheaders.return_value = [
+            ("Cf-Mitigated", "challenge"), ("CF-Mitigated", "normal"),
+            ("WWW-Authenticate", "Basic realm=restricted"), ("www-authenticate", ""),
+            ("Location", "https://example.com/other"),
+        ]
+        response.read1.side_effect = AssertionError("redirect body must remain unread")
+        connection.getresponse.return_value = response
+        with (
+            patch("skeleton.ai.webcrawler.bound_http.resolve_target", return_value=target),
+            patch("skeleton.ai.webcrawler.bound_http._PinnedHTTPSConnection", return_value=connection),
+            patch("skeleton.ai.webcrawler.bound_http.threading.Timer"),
+        ):
+            result = SocketBoundFetcher().fetch_once(
+                url, user_agent="SkeletonAI-Crawler/1.0", max_bytes=4096,
+            )
+        self.assertEqual(result.headers["cf-mitigated"], "challenge")
+        self.assertTrue(result.headers["www-authenticate"])
+        self.assertEqual(access_interstitial_reason(result.status, result.headers, result.body),
+                         "explicit_access_challenge")
+        response.read1.assert_not_called()
+
+
+class InterstitialClassifierTests(unittest.TestCase):
+    def test_only_fixed_reason_codes_are_returned(self):
+        from skeleton.ai.webcrawler.adaptive_navigation import access_interstitial_reason
+
+        cases = (
+            (200, {"Cf-Mitigated": "challenge"}, b"private token", "explicit_access_challenge"),
+            (503, {"cf-mitigated": "challenge"}, b"", "explicit_access_challenge"),
+            (302, {"WWW-Authenticate": "Basic realm=private"}, b"", "authentication_interstitial"),
+            (407, {}, b"", "proxy_authentication_required"),
+            (402, {}, b"", "payment_required"),
+            (200, {"content-type": "text/html"},
+             b"<html><head><title>Verify you are human!</title></head></html>",
+             "access_interstitial_title"),
+            (200, {"content-type": "text/plain"},
+             b"<!DOCTYPE html><html><title>Access &amp; denied</title></html>", None),
+            (200, {"content-type": "text/plain"},
+             b"<!DOCTYPE html><html><title>Access denied</title></html>",
+             "access_interstitial_title"),
+            (200, {"content-type": "text/html"},
+             b"<html><title>How to design a CAPTCHA</title><body>Access denied</body></html>", None),
+            (200, {"content-type": "text/html"},
+             b"<html><title>Game guide</title><body><title>Access denied</title></body></html>", None),
+            (200, {"content-type": "application/json"},
+             b'{"title":"Access denied"}', None),
+            (429, {}, b"", None),
+            (403, {}, b"", None),
+        )
+        for status, headers, body, expected in cases:
+            with self.subTest(status=status, expected=expected):
+                self.assertEqual(access_interstitial_reason(status, headers, body), expected)
+
+    def test_bounded_and_comment_safe(self):
+        from skeleton.ai.webcrawler.adaptive_navigation import access_interstitial_reason
+
+        for page in (
+            b"<html><!-- <title>Access denied</title> --><title>Guide</title></html>",
+            b"<html><title>" + b"x" * 300 + b"</title></html>",
+            b"<html>" + b" " * 33000 + b"<title>Access denied</title></html>",
+            b"<html><title>Access denied",
+        ):
+            with self.subTest(length=len(page)):
+                self.assertIsNone(access_interstitial_reason(200, {"content-type": "text/html"}, page))
+
+class CanonicalInterstitialTests(unittest.TestCase):
+    def test_challenge_quarantines_host_before_discovery_and_survives_restore(self):
+        class ChallengedFetcher(ThrottleFetcher):
+            def fetch_once(self, url, *, user_agent, max_bytes):
+                if url == "https://example.com/first":
+                    self.calls.append(url)
+                    return FetchResponse(url, 200, {
+                        "content-type": "text/html",
+                        "link": '<https://example.com/private>; rel="next"',
+                    }, b"<html><title>Access denied</title><body>private marker</body></html>", time.time())
+                return super().fetch_once(url, user_agent=user_agent, max_bytes=max_bytes)
+
+        fixture = CanonicalThrottleTests()
+        fetcher = ChallengedFetcher()
+        run, at = fixture.create(fetcher, hosts=("example.com", "example.org"))
+        fixture.tick(run, at + 1)
+        with patch("skeleton.ai.webcrawler.operations.inspect_download_media",
+                   side_effect=AssertionError("challenge must not enter MIME parser")):
+            event = fixture.tick(run, at + 2)["slice_events"][0]
+        self.assertEqual(event["reason"], "access_interstitial_title")
+        self.assertEqual(event["kind"], "rejected")
+        snap = run.snapshot()
+        self.assertGreaterEqual(snap["host_ready"]["example.com"], at + 3600)
+        self.assertEqual(snap["usage"]["requests"], 2)
+        self.assertEqual(run.status()["source_count"], 0)
+        self.assertNotIn("private marker", str(snap))
+        self.assertNotIn("https://example.com/private", str(snap))
+        resumed = CrawlRun.from_snapshot(snap, fetcher=fetcher)
+        fixture.tick(resumed, at + 3)
+        self.assertIn("https://example.org/robots.txt", fetcher.calls)
+        self.assertNotIn("https://example.com/second", fetcher.calls)
+
+    def test_explicit_challenge_precedes_retry_and_redirect(self):
+        for status in (302, 503):
+            with self.subTest(status=status):
+                class ChallengedFetcher(ThrottleFetcher):
+                    def fetch_once(self, url, *, user_agent, max_bytes):
+                        if url == "https://example.com/first":
+                            self.calls.append(url)
+                            return FetchResponse(url, status, {
+                                "cf-mitigated": "challenge",
+                                "location": "https://example.org/alternate",
+                                "retry-after": "1",
+                            }, b"", time.time())
+                        return super().fetch_once(url, user_agent=user_agent, max_bytes=max_bytes)
+
+                fixture = CanonicalThrottleTests()
+                fetcher = ChallengedFetcher()
+                run, at = fixture.create(fetcher, hosts=("example.com", "example.org"))
+                fixture.tick(run, at + 1)
+                event = fixture.tick(run, at + 2)["slice_events"][0]
+                self.assertEqual(event["reason"], "explicit_access_challenge")
+                snap = run.snapshot()
+                self.assertGreaterEqual(snap["host_ready"]["example.com"], at + 3600)
+                self.assertNotIn("https://example.org/alternate", str(snap))
+                self.assertFalse(any(row["url"].endswith("/first") for row in snap["frontier"]))
+                self.assertEqual(run.status()["source_count"], 0)
+
+    def test_robots_challenge_holds_original_and_redirected_host(self):
+        class ChallengedRobots(ThrottleFetcher):
+            def fetch_once(self, url, *, user_agent, max_bytes):
+                if url == "https://example.com/robots.txt":
+                    self.calls.append(url)
+                    return FetchResponse(url, 302,
+                        {"location": "https://example.org/robots.txt"}, b"", time.time())
+                if url == "https://example.org/robots.txt":
+                    self.calls.append(url)
+                    return FetchResponse(url, 200, {"cf-mitigated": "challenge"},
+                                         b"", time.time())
+                return super().fetch_once(url, user_agent=user_agent, max_bytes=max_bytes)
+
+        fixture = CanonicalThrottleTests()
+        fetcher = ChallengedRobots()
+        run, at = fixture.create(fetcher, hosts=("example.com", "example.org"))
+        fixture.tick(run, at + 1)
+        fixture.tick(run, at + 2)
+        snap = run.snapshot()
+        for host in ("example.com", "example.org"):
+            self.assertGreaterEqual(snap["host_ready"][host], at + 3600)
+        self.assertEqual(run.status()["source_count"], 0)
+        resumed = CrawlRun.from_snapshot(snap, fetcher=fetcher)
+        fixture.tick(resumed, at + 4)
+        self.assertEqual(len(fetcher.calls), 2)
+
+
+class AcquisitionReadinessTests(unittest.TestCase):
+    def test_checkpoint_derived_readiness_keeps_counts_and_distinguishes_unknown_causes(self):
+        from skeleton.ai.webcrawler.adaptive_navigation import acquisition_readiness
+
+        rows = [
+            {"host": "example.com", "status": 403, "kind": "rejected"},
+            {"host": "example.com", "status": 200, "kind": "rejected"},
+            {"host": "example.org", "status": 429, "kind": "retry"},
+            {"host": "example.org", "status": None, "kind": "error"},
+        ]
+        inputs = dict(measurements=rows, host_ready={"example.com": 200, "example.org": 120},
+                      allowed_hosts=("example.org", "example.com", "example.net"),
+                      frontier=[{"url": "https://example.com/item"}], expires_at=200)
+        r = acquisition_readiness(**inputs, now=100)
+        hosts = {h["host"]: h for h in r["hosts"]}
+        self.assertEqual(r["settled_requests"], 4)
+        self.assertEqual(r["queued"], 1)
+        self.assertEqual(hosts["example.com"]["state"], "held_for_grant")
+        self.assertEqual(hosts["example.com"]["denial_statuses"], 1)
+        self.assertEqual(hosts["example.com"]["rejected_success_statuses"], 1)
+        self.assertEqual(hosts["example.org"]["state"], "cooldown")
+        self.assertEqual(hosts["example.org"]["throttle_statuses"], 1)
+        self.assertEqual(hosts["example.net"]["state"], "no_host_hold")
+        self.assertFalse(r["reason_inferred"])
+        self.assertFalse(r["network_authority_expanded"])
+        self.assertTrue(r["independent_intake_requires_new_authorization"])
+        self.assertNotIn("/item", str(r))
+        self.assertTrue(all(h["state"] == "consent_expired"
+                            for h in acquisition_readiness(**inputs, now=200)["hosts"]))
+
+    def test_readiness_matches_restored_canonical_checkpoint(self):
+        fixture = CanonicalThrottleTests()
+        fetcher = ThrottleFetcher(failure=403)
+        run, at = fixture.create(fetcher)
+        fixture.tick(run, at + 1)
+        fixture.tick(run, at + 2)
+        snap = run.snapshot()
+        resumed = CrawlRun.from_snapshot(snap, fetcher=fetcher)
+        with patch("skeleton.ai.webcrawler.operations.time.time", return_value=at + 3):
+            r = run.status()["acquisition_readiness"]
+            self.assertEqual(resumed.status()["acquisition_readiness"], r)
+        self.assertEqual(r["settled_requests"], 2)
+        self.assertEqual(r["hosts"][0]["denial_statuses"], 1)
+        self.assertEqual(r["hosts"][0]["state"], "held_for_grant")
+
+
+class RedirectDenialConservationTests(unittest.TestCase):
+    def test_terminal_robots_denial_holds_original_and_redirected_authority(self):
+        for status, headers in ((403, {}), (451, {}), (200, {"cf-mitigated": "challenge"})):
+            with self.subTest(status=status):
+                class DeniedRobots(ThrottleFetcher):
+                    def fetch_once(self, url, *, user_agent, max_bytes):
+                        if url == "https://example.com/robots.txt":
+                            self.calls.append(url)
+                            return FetchResponse(url, 302, {
+                                "location": "https://example.org/robots.txt"}, b"", time.time())
+                        if url == "https://example.org/robots.txt":
+                            self.calls.append(url)
+                            return FetchResponse(url, status, headers, b"", time.time())
+                        return super().fetch_once(url, user_agent=user_agent, max_bytes=max_bytes)
+                fixture = CanonicalThrottleTests()
+                fetcher = DeniedRobots()
+                run, at = fixture.create(fetcher, hosts=("example.com", "example.org"))
+                fixture.tick(run, at + 1)
+                fixture.tick(run, at + 2)
+                snapshot = run.snapshot()
+                for host in ("example.com", "example.org"):
+                    self.assertGreaterEqual(snapshot["host_ready"][host], at + 3600)
+                resumed = CrawlRun.from_snapshot(snapshot, fetcher=fetcher)
+                fixture.tick(resumed, at + 300)
+                self.assertEqual(len(fetcher.calls), 2)
+                self.assertEqual(resumed.status()["source_count"], 0)
+
+
+class AccessOutcomeEconomicsTests(unittest.TestCase):
+    def test_rejected_success_http_status_cannot_improve_reliability_or_reduce_delay(self):
+        from skeleton.ai.webcrawler.acquisition_feedback import host_economics, settled_observation
+
+        def observation(kind, status):
+            return settled_observation(request=1, url="https://example.com/first",
+                kind=kind, status=status, latency_bucket=1, charged_bytes=0,
+                uncertain_bytes=0, event_sequence=1)
+
+        good = host_economics([observation("discovered", 200)], "example.com", floor=1)
+        for kind, status in (("rejected", 200), ("rejected", 302),
+                             ("source_rights_restricted", 200), ("rejected", 403)):
+            with self.subTest(kind=kind, status=status):
+                poor = host_economics([observation(kind, status)], "example.com", floor=1)
+                self.assertEqual(poor.successes, 0)
+                self.assertEqual(poor.failures, 1)
+                self.assertLess(poor.reliability, good.reliability)
+                self.assertGreaterEqual(poor.conservative_delay, good.conservative_delay)
+
+
 if __name__ == "__main__":
     unittest.main()
