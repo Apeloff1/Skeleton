@@ -274,6 +274,11 @@ function CrawlerContent() {
       </View>}
       {active && !creating && <><View style={s.card}><View style={s.row}><Text style={[s.heading, s.grow]}>{active.title}</Text><View style={s.badge}><Text style={s.badgeText}>{label(active.status)}</Text></View></View>
         {!!connectionError && <Text style={s.error}>Live refresh unavailable. Showing the last committed snapshot. {connectionError}</Text>}<Text style={s.small}>Last committed snapshot: {new Date(active.updated_at).toLocaleString()}</Text>
+        {active.publisher_intent && <View style={s.check}>
+          <Text style={s.label}>Publisher intake · {label(active.publisher_intent.method)}</Text>
+          <Text style={s.small}>Consent-bound operator intent recorded. Publisher identity, licensing and protocol compliance are not independently verified.</Text>
+          <Text selectable style={s.small}>Intent receipt: {active.publisher_intent.intent_digest}</Text>
+        </View>}
         <Text style={s.small}>{active.consent_current ? `Capture consent valid until ${new Date(active.consent_expires_at).toLocaleString()}` : 'Capture consent expired. Inspect retained records or create a new authorized crawl.'}</Text>
         <Text style={s.message}>Measured downloads: {bytes(active.counters.bytes)} / {bytes(active.limits.max_total_bytes)}</Text>
         {typeof active.counters.reserved_bytes === 'number' && active.counters.reserved_bytes > 0 && <Text style={s.small}>Unconfirmed transport allowance: {bytes(active.counters.reserved_bytes)} reserved separately from measured downloaded bytes.</Text>}
