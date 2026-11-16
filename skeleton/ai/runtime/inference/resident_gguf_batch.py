@@ -129,8 +129,11 @@ class ResidentGGUFBatch:
             raise ValueError("resident GPU request exceeds explicit model profile")
         if policy.context_per_slot > model.generation_limits()["context_window"]:
             raise ValueError("resident per-slot context exceeds model profile")
-        kv = model.serving_metadata.kv_bytes_per_token_upper_bound
-        if kv is None:
+        geometry = model.serving_metadata
+        kv = max(geometry.kv_bytes_per_token_upper_bound or 0, model.config.kv_bytes_per_token or 0)
+        if geometry.architecture not in {"llama", "qwen2", "qwen2moe"} and model.config.kv_bytes_per_token is None:
+            raise ValueError("nonuniform or unknown attention requires explicit reviewed KV byte ceiling")
+        if not kv:
             raise ValueError("resident batch requires known conservative KV geometry")
         self._estimate = model.total_model_bytes + model.config.runtime_scratch_bytes + (
             policy.slots * policy.context_per_slot * kv)
@@ -271,7 +274,8 @@ class ResidentGGUFBatch:
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=root,
                     env={"PATH": "/usr/bin:/bin", "HOME": str(root), "TMPDIR": str(root),
                          "LANG": "C", "LC_ALL": "C"},
-                    start_new_session=True, close_fds=True, pass_fds=gguf_child_pass_fds())
+                    start_new_session=True, close_fds=True, umask=0o077,
+                    pass_fds=gguf_child_pass_fds())
                 self._watchdog = threading.Timer(max(0, self._deadline-time.monotonic()),
                                                   LlamaCppModel._terminate, args=(self._proc,))
                 self._watchdog.daemon = True

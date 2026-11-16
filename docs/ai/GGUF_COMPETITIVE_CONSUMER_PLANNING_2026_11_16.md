@@ -72,12 +72,12 @@ OS sandbox or a signed measurement. Native device and exact-head CI remain held.
   local tier pressure rebalancing. The caller must authorize the namespace
   and drain pinned use before invalidation. Physical tier movement depends
   on a conforming storage adapter; no implicit remote spill.
-- Split GGUF metadata is parsed by the existing runtime reader. Single-file
+- Split GGUF metadata is parsed by the existing runtime reader. Unpinned single-file
   launch and planning deny split bundles. `python -m scripts.audit_consumer_gguf_shards`
   verifies 2–128 ordered SHA pins, actual file bytes, declared ordinal/count
   and tensor total with descriptor custody up to 1 TiB. This is a bundle
-  intake audit; zero-tensor first shards and multi-file native activation
-  remain unsupported.
+  intake audit; direct native activation now requires explicit ordered pins.
+  Zero-tensor first shards remain unsupported.
 - `python -m scripts.quantize_consumer_gguf` invokes an explicitly trusted
   SHA-pinned local llama-quantize executable with an optional pinned importance
   matrix, an allowlisted global encoding and exact anchored tensor overrides.
@@ -112,3 +112,45 @@ LoRA training, model promotion, full application routing, competitor quality,
 Windows/WSL2, and source/architecture gates require independent qualification.
 The source-only workflow adds all focused tests; green fixtures cannot validate
 commercial model quality or physical GPU/RAM capacity.
+
+## Executable multi-shard and physical accelerator continuation
+
+- Native GGUF accepts an explicit ordered `model_shard_sha256` manifest list,
+  retains the first shard path for llama.cpp, binds the whole ordered bundle
+  as the inference model digest, charges all bytes in catalog and memory
+  estimates, and rechecks descriptor-anchored SHA custody before and after
+  dispatch. Owner-private POSIX directory mandatory. Other processes running
+  as the same UID and system dynamic-loader closure remain trusted.
+- Prepare with `python -m scripts.prepare_consumer_split_gguf`; pass the first
+  shard, every ordered SHA pin, existing runtime, destination manifest,
+  explicit model ID, context, GPU layers and bundle byte limit.
+- `python -m scripts.serve_consumer_gguf_batch` launches one separately pinned
+  llama-server over an owner-private Linux Unix socket, authenticates the
+  child PID/UID before sending content, uses explicit GPU layers, context
+  per slot, Flash Attention setting and native continuous batching. Supply
+  pinned deployment/server, local prompt files and memory ceiling. Multiple
+  batches reuse the same bounded session. Native reported GPU layer offload
+  is required; it is not independent physical kernel/throughput proof.
+- Optional same-session native slot spill uses explicit private disk root and
+  byte ceiling, /dev/shm tmpfs for transient plaintext, chunk-authenticated
+  AES-GCM ciphertext on disk, native save/erase and restore receipts. No
+  cross-tenant or remote spill. tmpfs can swap; operators requiring no
+  plaintext swap must disable or encrypt swap. Erase reclaims sequence
+  capacity, not necessarily preallocated GPU memory.
+- Torch native cache offloads the occupied K/V tensors to CPU with blocking
+  transfer and releases active device references. It can then move the
+  actual CPU tensors to encrypted disk and restore to CPU/device under
+  exact scope, weight revision and byte ceilings. Allocator pools can retain
+  freed backing bytes. Per-instance ephemeral keys deliberately disallow
+  restart restoration of ciphertext.
+- Native Torch fused equal-length batches execute batched Q/K/V projections,
+  RoPE, SDPA and FFN tensor graphs with canonical independent decode/results.
+  It is explicitly stateless (cache-free), with no silent CPU fallback
+  in GPU mode. The native llama-server path delegates actual cached
+  multi-sequence scheduling to libllama. No custom paged CUDA kernel is claimed.
+
+Mandatory CPU Torch fixture job and private Unix child/process tests are
+enrolled. Actual owner hardware and native upstream build qualification,
+model tensor compatibility, GPU throughput, installed guarded application
+integration, Windows/WSL2 and merge/release remain held. Local LoRA training,
+adaptive reasoning and full long-context reconstruction are separate work.

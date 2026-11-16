@@ -975,6 +975,13 @@ class LlamaCppModel:
             or (self.config.reject_model_symlink and Path(self._model.path).is_symlink())
         ):
             raise LlamaCppRuntimeError("activated local runtime/model file changed or is unavailable")
+        if self.config.model_shard_sha256:
+            from .gguf_bundle import bundle_paths
+            paths = bundle_paths(Path(self._model.path), self.config.model_shard_sha256)
+            expected = self._bundle_receipt["shards"]
+            if any(p.is_symlink() or not p.is_file() or p.stat().st_size != row["bytes"]
+                   for p, row in zip(paths, expected)):
+                raise LlamaCppRuntimeError("split GGUF companion no longer ready")
         if self.config.runtime_libraries and (
             _runtime_library_names(Path(self._runtime.path).parent)
             != {name for name, _ in self.config.runtime_libraries}

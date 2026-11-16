@@ -140,7 +140,6 @@ jobs:
           tests/test_select_consumer_gguf.py
           skeleton/testing/test_local_model_deployment.py
           tests/flgb/test_flgb_02_native_runtime.py
-          tests/test_torch_physical_kv_fused_batch.py
           tests/test_resident_gguf_batch.py
       - name: Set up Node 24
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -192,3 +191,34 @@ jobs:
           path: ${{ runner.temp }}/jeeves-browser/
           retention-days: 7
           if-no-files-found: ignore
+
+  competitive-accelerator-cpu:
+    name: Exact-head real Torch CPU tensor migration and batch execution (not GPU)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify source identity
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11.16"
+      - name: Install canonical dependencies and explicit CPU Torch
+        run: |
+          python -m pip install --disable-pip-version-check --no-input -e ".[local-inference]" "pytest>=8,<9"
+          python -m pip install --disable-pip-version-check --no-input --index-url https://download.pytorch.org/whl/cpu "torch>=2.5,<3"
+          python -c "import torch; assert hasattr(torch.nn.functional, 'scaled_dot_product_attention')"
+      - name: Execute mandatory real CPU tensor regressions
+        run: |
+          python -m pytest -q --noconftest tests/test_torch_physical_kv_fused_batch.py
+          python scripts/check_ai_file_tree.py
