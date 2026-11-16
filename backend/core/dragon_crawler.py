@@ -2684,6 +2684,57 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                                "Source consent expired during collection. Refresh the sanctuary.", 409)
         return {"ok": True, **issued}
 
+    async def create_publisher_intake(self, scope: dict[str, str], body: dict) -> dict:
+        """Queue an independently approved public research resource.
+
+        This is not denial recovery. No credentials, denied-resource mapping,
+        challenge solving, discovery from a blocked response, or automatic
+        switching is available. Canonical consent, metering and robots checks
+        still apply when a separately authorized worker subsequently runs.
+        """
+        from urllib.parse import urlsplit
+        from skeleton.ai.webcrawler.core import canonicalize_url, destination_allowed
+
+        method = body.get("method")
+        if (method not in {"public_api", "publisher_feed", "open_dataset_manifest",
+                           "licensed_public_export"}
+                or body.get("publisher_permission_acknowledged") is not True
+                or body.get("independent_resource_acknowledged") is not True
+                or body.get("rights_acknowledged") is not True
+                or body.get("consent") is not True):
+            raise CrawlerError("crawler_publisher_intake_consent",
+                               "Independent publisher access and capture permission are required.", 403)
+        original = body.get("endpoint")
+        if not isinstance(original, str) or not 1 <= len(original) <= 2048:
+            raise ValueError("invalid publisher endpoint")
+        parsed = urlsplit(original)
+        if (parsed.scheme != "https" or not parsed.hostname or parsed.port not in {None, 443}
+                or parsed.username is not None or parsed.password is not None
+                or parsed.query or parsed.fragment or not destination_allowed(parsed.hostname)):
+            raise ValueError("only credential-free public HTTPS resources are accepted")
+        endpoint = canonicalize_url(original)
+        if endpoint != original:
+            raise ValueError("publisher endpoint must already be canonical")
+        # An explicit existing grant-wide hold also disallows using this
+        # convenience route to queue more activity against the held host.
+        report = await self.acquisition_hold_catalog(scope)
+        if (report["capacity_reached"] or report["excluded_sessions"]
+                or any(row["host"] == parsed.hostname for row in report["holds"])):
+            raise CrawlerError("crawler_publisher_intake_held",
+                               "Resolve acquisition restrictions before queuing publisher intake.", 409)
+        # Use the original session creator, never a second network engine.
+        # Method and acknowledgement enter the immutable creation digest.
+        request = {
+            "idempotency_key": body["idempotency_key"],
+            "seeds": [endpoint], "topics": [], "title": "Publisher intake: " + method,
+            "max_depth": 0, "max_requests": 8, "max_documents": 1,
+            "max_bytes": 2 * 1024 * 1024, "discover_sitemaps": False,
+            "frontier_strategy": "fifo", "consent": True, "rights_acknowledged": True,
+            "publisher_intake": {"method": method, "independent_resource_acknowledged": True,
+                                 "publisher_permission_acknowledged": True},
+        }
+        return await self.create(scope, request)
+
     async def create(self, scope: dict[str, str], body: dict, *, watch_binding: dict | None = None) -> dict:
         if body.get("consent") is not True or body.get("rights_acknowledged") is not True:
             raise CrawlerError(
