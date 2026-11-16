@@ -12,6 +12,7 @@ from pathlib import Path
 
 from core import dragon_graph_authority as a
 from core.dragon_game_corpus import CatalogueHeld
+from core import dragon_graph_owner_concurrency as same
 
 MAX_PENDING=4
 MAX_PENDING_BYTES=64*1024**2
@@ -91,6 +92,7 @@ def validate(db,row,plan):
             raise a.GraphHeld("multi-batch row owner differs")
     if any(delta[0] not in reserved for delta in plan["deltas"]) or any(c[0] not in reserved for c in plan["candidates"]) or any(e[0] not in reserved for e in plan["expansions"]) or any(g["owner"] not in reserved for g in plan.get("grants",[])):
         raise a.GraphHeld("multi-batch settlement owner differs")
+    if same.enabled(db):same.validate(db,plan)
 
 
 def fence(db):
@@ -117,13 +119,15 @@ def unlock_inside_transaction(db):
 
 def publish(db,seq,plan,raw,witness):
     existing=owners(db);planned={j["owner"] for j in plan["jobs"]}
-    if not planned or planned&existing:raise CatalogueHeld("owner already reserved")
+    parallel=same.enabled(db)
+    if not planned or not parallel and planned&existing:raise CatalogueHeld("owner already reserved")
     count,size=db.execute("SELECT COUNT(*),COALESCE(SUM(length(CAST(plan AS BLOB))),0) FROM main.structural_batches").fetchone()
     if count>=MAX_PENDING or size+len(raw.encode())>MAX_PENDING_BYTES:
         raise CatalogueHeld("parallel structural journal capacity")
     db.execute("INSERT INTO main.structural_batches VALUES(?,?,?,?,?)",
                (seq,plan["mode"],(plan.get("publication") or {}).get("request_sha"),raw,witness))
     db.executemany("INSERT INTO main.structural_batch_owners VALUES(?,?)",[(owner,seq) for owner in sorted(planned)])
+    if parallel:same.reserve(db,plan)
     change=db.execute("UPDATE main.dragon_graph_structural SET sequence=? WHERE singleton=1 AND sequence=?",(seq,seq-1))
     if change.rowcount!=1:raise a.GraphHeld("structural sequence changed")
     fence(db)
@@ -140,6 +144,7 @@ def finish(db,plan,witness,*,aborted=False):
     for key in plan["lanes"]:
         change=db.execute("DELETE FROM "+a._alias(int(key))+".structural_receipts WHERE sequence=?",(seq,))
         if not aborted and change.rowcount!=1:raise a.GraphHeld("settled lane receipt disappeared")
+    if same.enabled(db):same.release(db,plan)
     db.execute("DELETE FROM main.structural_batch_owners WHERE sequence=?",(seq,))
     if db.execute("DELETE FROM main.structural_batches WHERE sequence=? AND sha256=?",(seq,witness)).rowcount!=1:
         raise a.GraphHeld("multi-batch reservation disappeared")
@@ -158,6 +163,7 @@ def verify(db):
     assert_fence(db)
     if rows(db):raise a.GraphHeld("finish pending structural batches before full graph audit")
     if owners(db):raise a.GraphHeld("orphan structural owner reservations")
+    same.verify(db)
     if db.execute("SELECT COUNT(*) FROM main.structural_terminal").fetchone()[0]>TERMINAL_RETENTION:
         raise a.GraphHeld("terminal replay cache bound")
     seq=db.execute("SELECT sequence FROM main.dragon_graph_structural WHERE singleton=1").fetchone()[0]
