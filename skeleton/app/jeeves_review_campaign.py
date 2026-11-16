@@ -12,6 +12,8 @@ import json
 import re
 
 from skeleton.app.jeeves_constraints import normalize_policy
+from skeleton.app.offline_grounding import normalized_document_scope
+from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
 
 SCHEMA = "skeleton.jeeves.review-campaign.v1"
 MAX_NODES = 12
@@ -59,6 +61,22 @@ def _shape(value, keys):
         raise CampaignRejected("invalid campaign shape")
 
 
+def normalize_sources(value):
+    if type(value) is not list or not 1 <= len(value) <= 8:
+        raise CampaignRejected("one to eight explicit source pins required")
+    pins = []
+    for row in value:
+        _shape(row, ("document_id", "sha256"))
+        if type(row["sha256"]) is not str or re.fullmatch(r"[0-9a-f]{64}", row["sha256"]) is None:
+            raise CampaignRejected("invalid local document digest")
+        pins.append(dict(row))
+    try:
+        normalized_document_scope([row["document_id"] for row in pins])
+    except RuntimeContractError:
+        raise CampaignRejected("invalid explicit document scope") from None
+    return sorted(pins, key=lambda row: row["document_id"])
+
+
 def normalize_plan(steps, maximum_reserved_tokens):
     """Closed graph with no tool authority, hidden prompts or executable code."""
     ceiling = _int(maximum_reserved_tokens, 1, MAX_CAMPAIGN_TOKENS)
@@ -68,7 +86,9 @@ def normalize_plan(steps, maximum_reserved_tokens):
     seen = set()
     reserved = 0
     for row in steps:
-        _shape(row, ("id", "depends_on", "message", "max_output_tokens", "adaptive"))
+        required = {"id", "depends_on", "message", "max_output_tokens", "adaptive"}
+        if type(row) is not dict or not required <= set(row) <= required | {"sources", "history_policy"}:
+            raise CampaignRejected("invalid campaign step shape")
         node = _id(row["id"])
         if node in seen:
             raise CampaignRejected("duplicate workflow step")
@@ -95,9 +115,19 @@ def normalize_plan(steps, maximum_reserved_tokens):
         reserve = min(policy["max_attempts"],
                       policy["maximum_reserved_tokens"] // budget) * budget
         reserved += reserve
+        extras = {}
+        if "sources" in row:
+            extras["sources"] = normalize_sources(row["sources"])
+        if "history_policy" in row:
+            if row["history_policy"] not in ("recent", "relevance"):
+                raise CampaignRejected("invalid review context selection")
+            extras["history_policy"] = row["history_policy"]
+        if policy["contract"]["kind"] == "source_quotes":
+            if len(extras.get("sources", [])) < policy["contract"]["minimum_distinct_sources"]:
+                raise CampaignRejected("quote campaign requires sufficiently many explicit source pins")
         normalized.append({"id": node, "depends_on": sorted(dependencies),
                            "message": message.strip(), "max_output_tokens": budget,
-                           "adaptive": policy, "reservation": reserve})
+                           "adaptive": policy, "reservation": reserve, **extras})
     graph = {row["id"]: set(row["depends_on"]) for row in normalized}
     if any(not parents <= seen for parents in graph.values()):
         raise CampaignRejected("unknown workflow dependency")
@@ -115,10 +145,11 @@ def normalize_plan(steps, maximum_reserved_tokens):
 
 
 class ReviewCampaignStore:
-    def __init__(self, store, model_digest, tokenizer_digest):
+    def __init__(self, store, model_digest, tokenizer_digest, *, knowledge=None):
         self.store = store
         self.model_digest = model_digest
         self.tokenizer_digest = tokenizer_digest
+        self.knowledge = knowledge
         with store._transaction():
             store._db.execute("""CREATE TABLE IF NOT EXISTS offline_review_campaigns (
                 session_id TEXT NOT NULL REFERENCES offline_sessions(session_id) ON DELETE CASCADE,
@@ -128,6 +159,20 @@ class ReviewCampaignStore:
                 state_sha256 TEXT NOT NULL,
                 PRIMARY KEY(session_id, campaign_id)
             )""")
+
+    def verify_sources(self, pins):
+        pins = normalize_sources(pins)
+        if self.knowledge is None:
+            raise CampaignConflict("local knowledge authority unavailable")
+        scope = tuple(row["document_id"] for row in pins)
+        try:
+            rows, _ = self.knowledge._verified_snapshot(scope)
+        except RuntimeContractError:
+            raise CampaignConflict("approved campaign source unavailable") from None
+        actual = {row[0]: row[2] for row in rows}
+        expected = {row["document_id"]: row["sha256"] for row in pins}
+        if actual != expected:
+            raise CampaignConflict("approved campaign source digest changed")
 
     def _session(self, sid):
         return self.store.load(sid, self.model_digest, self.tokenizer_digest)
@@ -203,6 +248,9 @@ class ReviewCampaignStore:
                 return self._view(old, current.revision), False
             if current.revision != rev:
                 raise CampaignConflict("session revision changed before campaign creation")
+            for spec in plan["steps"]:
+                if spec.get("sources"):
+                    self.verify_sources(spec["sources"])
             count = self.store._db.execute(
                 "SELECT COUNT(*) FROM offline_review_campaigns WHERE session_id=?", (sid,)).fetchone()[0]
             if count >= MAX_CAMPAIGNS_PER_SESSION:
@@ -244,6 +292,8 @@ class ReviewCampaignStore:
             if node not in self._view(state, current.revision)["ready_steps"]:
                 raise CampaignConflict("step is not ready or was already dispatched")
             spec = next(row for row in state["plan"]["steps"] if row["id"] == node)
+            if spec.get("sources"):
+                self.verify_sources(spec["sources"])
             if state["reserved_tokens"] + spec["reservation"] > state["plan"]["maximum_reserved_tokens"]:
                 raise CampaignConflict("campaign token budget exhausted")
             statuses[node] = {"status": "running", "operation_id": operation_id,
@@ -268,12 +318,16 @@ class ReviewCampaignStore:
                 if current.revision != state["session_revision"]:
                     raise CampaignConflict("conversation changed during campaign")
                 spec = next(row for row in state["plan"]["steps"] if row["id"] == node)
+                if spec.get("sources"):
+                    self.verify_sources(spec["sources"])
                 if (type(report) is not dict
                         or report.get("schema") != "skeleton.jeeves.adaptive-review.v1"
                         or report.get("model_digest") != self.model_digest
                         or report.get("tokenizer_digest") != self.tokenizer_digest
                         or report.get("session_revision") != state["session_revision"]
                         or report.get("question_sha256") != _text_digest(spec["message"])
+                        or report.get("history_policy", "recent") != spec.get("history_policy", "recent")
+                        or report.get("require_full_history") is not (spec.get("history_policy", "recent") == "recent")
                         or report.get("transcript_committed") is not False
                         or report.get("tool_execution_authorized") is not False
                         or report.get("memory_saved") is not False
@@ -285,6 +339,15 @@ class ReviewCampaignStore:
                         or _digest({k: v for k, v in report.items() if k != "report_sha256"})
                         != report.get("report_sha256")):
                     raise CampaignConflict("campaign result lacks bound execution receipt")
+                if spec.get("sources"):
+                    expected = {row["document_id"]: row["sha256"] for row in spec["sources"]}
+                    receipts = report.get("evidence_sources")
+                    if not isinstance(receipts, list) or not receipts or any(
+                            not isinstance(row, dict) or expected.get(row.get("document_id")) != row.get("document_sha256")
+                            for row in receipts):
+                        raise CampaignConflict("campaign result lacks approved source bindings")
+                elif report.get("grounding_context_sha256") is not None:
+                    raise CampaignConflict("unapproved grounded campaign execution")
                 passed = report["adaptive"]["contract_passed"]
                 completed = spec["adaptive"]["contract"]["kind"] == "review" or passed
                 result.update({"status": "complete" if completed else "contract_not_met",
