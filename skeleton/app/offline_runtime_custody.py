@@ -44,7 +44,7 @@ def sealed_cpu_custody(store_path: Path, *, plan_digest: str, model: ModelIdenti
     require(before.origin == "local_probe", "real local probe required for sealed custody")
     first = plan_preflight(source, before, copying_policy, now_ns=time.monotonic_ns())
     require(first["status"] == "candidate", "insufficient headroom for sealed copy")
-    store = WeightShardStore(store_path, maximum_bytes=policy.maximum_source_bytes)
+    store = WeightShardStore(store_path, maximum_bytes=policy.maximum_source_bytes, read_only=True)
     checks = 0
     last_copied = 0
     last_digest = None
