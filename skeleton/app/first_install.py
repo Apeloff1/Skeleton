@@ -66,6 +66,57 @@ def _bounded_json(
     return value if isinstance(value, dict) else None
 
 
+# Mirrored public contract, not a backend import: standalone installer
+# distributions must not initialize FastAPI or its dependencies. A source
+# contract test requires parity with backend/routes/registry_health.py.
+CRITICAL_ROUTE_PATHS = {
+    "routes.creator_economy": "/api/creators",
+    "routes.git_operations": "/api/git/status",
+    "routes.jeeves_media": "/api/jeeves/media/types",
+    "routes.lafs": "/api/lafs/stats",
+    "routes.marketplace": "/api/marketplace/listings",
+    "routes.sorting_vault": "/api/sorting-vault/connections",
+    "routes.swarm_cold_legion": "/api/galaxy-studio/swarm/cold/stats",
+    "routes.swarm_hub": "/api/galaxy-studio/swarm/agents",
+}
+
+
+def critical_route_evidence(status: object) -> tuple[bool, bool, list[str]]:
+    """Validate the redacted registry summary against positive mount evidence.
+
+    Only known first-party module identities leave this boundary. Incomplete
+    or contradictory mount inventories can never establish readiness.
+    """
+    if type(status) is not dict:
+        return False, False, []
+    critical = status.get("critical_routes")
+    if type(critical) is not dict:
+        return False, False, []
+    reported = critical.get("missing")
+    if (type(critical.get("ok")) is not bool
+            or type(critical.get("report_available")) is not bool
+            or type(reported) is not list or len(reported) > len(CRITICAL_ROUTE_PATHS)
+            or any(type(name) is not str or name not in CRITICAL_ROUTE_PATHS for name in reported)
+            or len(set(reported)) != len(reported)):
+        return False, False, []
+    if not critical["report_available"]:
+        return False, False, sorted(reported)
+    names = status.get("mounted_names")
+    paths = status.get("mounted_paths")
+    if (type(names) is not list or len(names) > 16384
+            or any(type(name) is not str for name in names)
+            or type(paths) is not dict or len(paths) > 16384):
+        return False, False, []
+    mounted = set(names)
+    missing = set(reported)
+    for module, endpoint in CRITICAL_ROUTE_PATHS.items():
+        entries = paths.get(module)
+        if (module not in mounted or type(entries) is not list or len(entries) > 16384
+                or any(type(path) is not str for path in entries) or endpoint not in entries):
+            missing.add(module)
+    return True, not missing and critical["ok"], sorted(missing)
+
+
 def critical_backend_route_report(backend_base: str, *, timeout: float = 3.0) -> dict[str, object]:
     """Fail-closed live check shared by app doctor and install --start.
 
@@ -87,20 +138,8 @@ def critical_backend_route_report(backend_base: str, *, timeout: float = 3.0) ->
         backend_base.rstrip("/") + "/api/health/registry",
         timeout=timeout, max_response_bytes=512 * 1024,
     )
-    critical = status.get("critical_routes") if isinstance(status, dict) else None
-    if (
-        isinstance(critical, dict)
-        and type(critical.get("ok")) is bool
-        and type(critical.get("report_available")) is bool
-        and isinstance(critical.get("missing"), list)
-        and all(isinstance(item, str) and len(item) <= 128 for item in critical["missing"])
-        and len(critical["missing"]) <= 32
-    ):
-        report.update(
-            observed=critical["report_available"],
-            ready=critical["ok"] and critical["report_available"] and not critical["missing"],
-            missing=critical["missing"],
-        )
+    observed, ready, missing = critical_route_evidence(status)
+    report.update(observed=observed, ready=ready, missing=missing)
     return report
 
 
@@ -234,6 +273,7 @@ def first_install_report(
             and len(status["providers"]) <= 32
             and all(type(name) is str and 0 < len(name) <= 64
                     for name in status["providers"])
+            and len(set(status["providers"])) == len(status["providers"])
             # The active provider must actually exist in the canonical
             # advertised inventory; an inconsistent response cannot attest
             # configured local or hosted model availability.

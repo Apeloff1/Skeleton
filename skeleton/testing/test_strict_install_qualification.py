@@ -33,6 +33,10 @@ def fixtures(protected=True):
                "product":{"available":True,"canonical_actions":10,"ready_actions":8,
                           "governed_unbound":2,"unsafe_actions":0,"policy_gaps":0,
                           "attestation_sha256":"a"*64}}
+    from skeleton.app.first_install import CRITICAL_ROUTE_PATHS
+    registry={"critical_routes":{"ok":True,"report_available":True,"missing":[]},
+              "mounted_names":list(CRITICAL_ROUTE_PATHS),
+              "mounted_paths":{name:[path] for name,path in CRITICAL_ROUTE_PATHS.items()}}
     return bootstrap,{
         "/setup":b"<!DOCTYPE html><html>setup</html>",
         "/product":b"<!DOCTYPE html><html>product</html>",
@@ -41,7 +45,7 @@ def fixtures(protected=True):
         "/api/v1/health/live":{"alive":True,"application":engine},
         "/api/app/ready":aggregate,
         "/api/app/status":deepcopy(aggregate),
-        "/api/health/registry":{"critical_routes":{"ok":True,"report_available":True,"missing":[]}},
+        "/api/health/registry":registry,
         "/api/ai/providers":{"engine":"skeleton-engine","providers":["local"],"active":"local",
                              "llm_available":True,"availability_observed":True},
     }
@@ -362,3 +366,18 @@ def test_strict_source_pin_rejects_ancestor_checkout_discovery(pinned_checkout):
 def test_index_observation_rejects_incomplete_or_overlong_records(raw):
     with pytest.raises(q.QualificationDenied):
         q._index_records(raw)
+
+
+@pytest.mark.parametrize("field",["mounted_names","mounted_paths"])
+def test_strict_routes_cannot_certify_unobserved_mount_inventory(field):
+    _,payload=fixtures()
+    registry=payload["/api/health/registry"]
+    registry.pop(field)
+    assert q._routes(registry)==("invalid_protocol",{})
+
+
+def test_strict_routes_rejects_summary_disagreeing_with_mount_evidence():
+    _,payload=fixtures()
+    registry=payload["/api/health/registry"]
+    registry["mounted_paths"].pop("routes.marketplace")
+    assert q._routes(registry)==("unqualified",{"missing_count":1})

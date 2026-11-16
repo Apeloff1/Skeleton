@@ -12,6 +12,19 @@ from types import SimpleNamespace
 import pytest
 
 
+def _mounted_registry(summary):
+    from skeleton.app.first_install import CRITICAL_ROUTE_PATHS
+    if not isinstance(summary, dict):
+        return summary
+    result = dict(summary)
+    critical = result.get("critical_routes", {})
+    missing = critical.get("missing", [])
+    result.setdefault("mounted_names", [name for name in CRITICAL_ROUTE_PATHS if name not in missing])
+    result.setdefault("mounted_paths", {name: [path] for name, path in CRITICAL_ROUTE_PATHS.items()
+                                        if name not in missing})
+    return result
+
+
 def _doctor(monkeypatch, tmp_path, critical, *, providers=None, health_hook=None,
             route_hook=None, provider_hook=None, studio_hook=None, environ=None,
             manifest_hook=None):
@@ -48,7 +61,7 @@ def _doctor(monkeypatch, tmp_path, critical, *, providers=None, health_hook=None
         if url.endswith("/api/health/registry"):
             if route_hook:
                 route_hook()
-            return critical
+            return _mounted_registry(critical)
         if provider_hook:
             provider_hook()
         return providers if providers is not None else {
@@ -247,7 +260,7 @@ def test_large_mounted_route_registry_is_observable_over_real_http():
         "mounted_routes": ["/api/studio/" + str(i) for i in range(7000)],
     }
     assert 65536 < len(json.dumps(payload).encode()) < 512 * 1024
-    with _registry_server(payload) as base:
+    with _registry_server(_mounted_registry(payload)) as base:
         report = install.critical_backend_route_report(base, timeout=5)
     assert report["observed"] is True
     assert report["ready"] is True
@@ -386,3 +399,57 @@ def test_doctor_json_admission_rejects_invalid_urls_before_worker(monkeypatch, u
         pytest.fail("invalid diagnostic origin reached worker")
     monkeypatch.setattr("skeleton.app.studio_readiness._bounded_server", forbidden)
     assert install._bounded_json(url, timeout=1) is None
+
+
+
+def test_critical_route_contract_matches_backend_source():
+    import ast
+    from pathlib import Path
+    from skeleton.app.first_install import CRITICAL_ROUTE_PATHS
+    source = Path(__file__).resolve().parents[2] / "backend/routes/registry_health.py"
+    assignments = [node for node in ast.parse(source.read_text(encoding="utf-8")).body
+                   if isinstance(node, ast.AnnAssign)
+                   and isinstance(node.target, ast.Name) and node.target.id == "CRITICAL_ROUTE_PATHS"]
+    assert len(assignments) == 1
+    assert ast.literal_eval(assignments[0].value) == CRITICAL_ROUTE_PATHS
+
+
+@pytest.mark.parametrize("missing", [
+    ["routes.unknown"], ["token:private-value"], ["routes.jeeves_media"]*2, [True], [{}],
+])
+def test_unknown_duplicate_or_sensitive_route_names_never_escape(missing):
+    from skeleton.app.first_install import critical_route_evidence
+    result = critical_route_evidence({"critical_routes":{
+        "ok":False,"report_available":True,"missing":missing,
+    }})
+    assert result == (False, False, [])
+
+
+@pytest.mark.parametrize("field", ["mounted_names", "mounted_paths"])
+def test_positive_summary_without_mount_inventory_is_unqualified(field):
+    from skeleton.app.first_install import critical_route_evidence
+    payload = _mounted_registry({"critical_routes":{"ok":True,"report_available":True,"missing":[]}})
+    payload.pop(field)
+    assert critical_route_evidence(payload) == (False, False, [])
+
+
+@pytest.mark.parametrize("mutation", ["name", "path", "wrong_path", "malformed"])
+def test_false_positive_router_summary_is_denied_by_positive_mount_evidence(mutation):
+    from skeleton.app.first_install import critical_route_evidence
+    payload = _mounted_registry({"critical_routes":{"ok":True,"report_available":True,"missing":[]}})
+    name = "routes.jeeves_media"
+    if mutation == "name":
+        payload["mounted_names"].remove(name)
+    elif mutation == "path":
+        payload["mounted_paths"].pop(name)
+    elif mutation == "wrong_path":
+        payload["mounted_paths"][name] = ["/api/wrong"]
+    else:
+        payload["mounted_paths"][name] = [42]
+    assert critical_route_evidence(payload) == (True, False, [name])
+
+
+def test_unavailable_registry_never_returns_positive_readiness():
+    from skeleton.app.first_install import critical_route_evidence
+    payload = _mounted_registry({"critical_routes":{"ok":True,"report_available":False,"missing":[]}})
+    assert critical_route_evidence(payload) == (False, False, [])

@@ -263,13 +263,12 @@ def _aggregate(value, bootstrap, engine_expected):
 
 
 def _routes(value):
-    critical = value.get("critical_routes")
-    if type(critical) is not dict or type(critical.get("missing")) is not list:
+    from skeleton.app.first_install import critical_route_evidence
+
+    observed, ready, missing = critical_route_evidence(value)
+    if not observed:
         return "invalid_protocol", {}
-    missing = critical["missing"]
-    if len(missing) > 64 or any(type(item) is not str or len(item) > 128 for item in missing):
-        return "invalid_protocol", {}
-    if critical.get("ok") is not True or critical.get("report_available") is not True or missing:
+    if not ready:
         return "unqualified", {"missing_count": len(missing)}
     return "observed", {"missing_count": 0}
 
