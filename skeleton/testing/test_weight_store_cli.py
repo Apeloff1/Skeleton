@@ -140,3 +140,33 @@ def test_scrub_commands_require_exact_cursor_and_verify_completed_snapshot(tmp_p
     code, next_campaign, _ = invoke(["scrub-start", *common(tmp_path), "--scrub-prior-sha256", final])
     assert code == 0 and next_campaign["prior_campaign_digest"] == final
     assert next_campaign["verified_objects"] == 0
+
+
+def test_installed_range_commands_resume_with_independent_index(tmp_path):
+    from skeleton.ai.model_runtime.flgb_model_runtime import canonical_bytes
+    raw, pins, _, plan, _ = authored(tmp_path)
+    assert invoke(["stage", *common(tmp_path), *pins], raw)[0] == 0
+    shard = plan.shards[0]
+    code, index, _ = invoke(["range-index", *common(tmp_path),
+                             "--range-object-sha256", shard.digest,
+                             "--range-object-bytes", str(shard.bytes),
+                             "--range-index-max-bytes", str(shard.bytes)])
+    assert code == 0
+    index_bytes = canonical_bytes(index) + b"\n"
+    args = ["--range-index-sha256", index["digest"]]
+    assert invoke(["range-start", *common(tmp_path), "--range-index-sha256", "0" * 64],
+                  index_bytes)[0] == 2
+    code, started, _ = invoke(["range-start", *common(tmp_path), *args], index_bytes)
+    assert code == 0 and started["status"] == "active"
+    code, _, _ = invoke(["range-status", *common(tmp_path)])
+    assert code == 0
+    advancement = ["range-step", *common(tmp_path), *args,
+                   "--range-campaign-sha256", started["digest"]]
+    code, _, _ = invoke([*advancement, "--range-tranche-bytes", "1"], index_bytes)
+    assert code == 3
+    code, result, _ = invoke(advancement, index_bytes)
+    assert code == 0 and result["status"] == "completed"
+    code, check, _ = invoke(["range-check", *common(tmp_path), *args,
+                             "--range-campaign-sha256", result["campaign"]["digest"]], index_bytes)
+    assert code == 0 and check["current_metadata_revalidated"]
+    assert not check["raw_sha256_recomputed"]
