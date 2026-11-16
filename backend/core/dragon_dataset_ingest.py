@@ -158,7 +158,9 @@ def inspect_dataset(path,member=None,*,expected_sha=None):
 
 def ingest(shard,path,*,member=None,dataset,source,observation_digest,label,
            rights_acknowledged,grant_seconds=86400,corpus=None,expected_sha=None,
-           expected_inspection=None):
+           expected_inspection=None,shard_factory=None):
+    if (shard is None)==(shard_factory is None):
+        raise ValueError("exactly one dataset shard or shard factory required")
     if rights_acknowledged is not True:
         raise ValueError("explicit data-retention rights required")
     path=Path(path)
@@ -169,6 +171,7 @@ def ingest(shard,path,*,member=None,dataset,source,observation_digest,label,
     inspection=_inspection_identity(info,member)
     if expected_inspection is not None and expected_inspection!=inspection:
         raise ValueError("dataset inspection digest differs; storage untouched")
+    if shard is None:shard=shard_factory()
     receipt=shard.begin(dataset=dataset,source=source,observation_digest=observation_digest,
         label=label,expected_rows=info["expected_rows"],expected_chain=info["expected_chain"],
         grant_seconds=grant_seconds,rights_acknowledged=True,corpus=corpus)
@@ -220,8 +223,9 @@ def main(argv=None):
     if st.st_size>4096 or os.name=="posix" and (st.st_uid!=os.getuid() or st.st_mode&0o077):
         parser.error("private scope file required")
     scope=json.loads(scope_path.read_bytes())
-    shard=DatasetShard(scope,args.game,create=os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1")
-    result=ingest(shard,args.path,member=args.member,dataset=args.dataset,source=args.source,
+    def shard_factory():
+        return DatasetShard(scope,args.game,create=os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1")
+    result=ingest(None,args.path,shard_factory=shard_factory,member=args.member,dataset=args.dataset,source=args.source,
         observation_digest=args.observation_digest,label=args.label,grant_seconds=args.grant_seconds,
         rights_acknowledged=True,expected_sha=args.expected_sha,expected_inspection=args.expected_inspection)
     print(json.dumps(result,indent=2))
