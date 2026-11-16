@@ -1,0 +1,211 @@
+"""Integration regressions for sealed source custody and measured execution gates.
+
+Hardware fixtures and the cooperative slice test double are explicitly
+non-qualifying. The whole-request test exercises the actual reference
+inference engine, never a simulated native GGUF execution.
+"""
+from __future__ import annotations
+
+import asyncio
+from dataclasses import replace
+from hashlib import sha256
+import os
+from pathlib import Path
+import threading
+import time
+
+import pytest
+
+from skeleton.ai.model_runtime.flgb_model_runtime import BatchRequest, ModelIdentity, WeightLoadPlan, WeightShard
+from skeleton.ai.model_runtime.weight_shard_store import WeightShardStore
+from skeleton.app.offline_energy_hysteresis import HysteresisPolicy
+from skeleton.app.offline_runtime_custody import sealed_cpu_custody
+from skeleton.app.offline_runtime_preflight import RuntimePreflightError
+from skeleton.app.offline_runtime_queue import OfflineRequestQueue, Progress, QueuePolicy, reserve_cache
+from skeleton.app.offline_runtime_session import OfflineRuntimeSession
+from skeleton.testing.test_offline_runtime_admission import POLICY, sample, stage, GIB
+
+
+def session_fixture(tmp_path, monkeypatch, *, queue_policy=None):
+    root, plan, identity = stage(tmp_path)
+    base = POLICY
+    policy = reserve_cache(base, queue_policy) if queue_policy else base
+    counter = [0]
+
+    def observation():
+        counter[0] += 1
+        return sample(start=time.monotonic_ns() - 1000, origin="local_probe")
+
+    monkeypatch.setattr("skeleton.app.offline_runtime_session.sample_hardware", observation)
+    session = OfflineRuntimeSession(root, plan_digest=plan, model_identity_digest=identity,
+                                    policy=policy, hysteresis=HysteresisPolicy(
+                                        recovery_samples=2, recovery_cooldown_ns=0,
+                                        max_sample_age_ns=policy.sample_age_ns))
+    return session, base, counter
+
+
+class Executor:
+    def __init__(self):
+        self.calls = []
+        self.releases = []
+        self.invalid = False
+
+    def run_slice(self, *, request_id, phase, tokens, deadline_ns, cancel):
+        assert isinstance(cancel, threading.Event)
+        assert deadline_ns >= time.monotonic_ns()
+        self.calls.append((request_id, phase, tokens))
+        return Progress(request_id, phase, tokens + int(self.invalid))
+
+    def release(self, request_id):
+        self.releases.append(request_id)
+
+
+def make_queue(tmp_path, monkeypatch, **overrides):
+    policy = QueuePolicy(**overrides)
+    owner, base, _ = session_fixture(tmp_path, monkeypatch, queue_policy=policy)
+    executor = Executor()
+    return OfflineRequestQueue(owner, policy, executor, base_policy=base), executor
+
+
+def test_queue_preserves_real_phase_order_and_releases_exact_logical_reservation(tmp_path, monkeypatch):
+    queue, executor = make_queue(tmp_path, monkeypatch, max_requests=2, max_active=1,
+                                  max_request_tokens=16, kv_capacity_bytes=128, kv_bytes_per_token=8)
+    queue.submit(BatchRequest("alpha", 2, 2), timeout_ms=10000)
+    assert queue.status()["capacity"]["queued_requests"] == 1
+    first = queue.tick()
+    assert not first["progress"] and not executor.calls
+    assert first["capacity"]["kv_used_bytes"] == 32
+    for _ in range(6):
+        result = queue.tick()
+        if not queue.status()["requests"]:
+            break
+    assert executor.calls == [("alpha", "prefill", 2), ("alpha", "decode", 1), ("alpha", "decode", 1)]
+    assert executor.releases == ["alpha"]
+    assert result["retired"] == [{"request_id": "alpha", "terminal": "completed"}]
+    assert result["capacity"]["kv_used_bytes"] == 0
+    assert result["kv_accounting"] == "logical_reservation_only"
+    queue.close()
+
+
+def test_cache_capacity_and_request_bounds_fail_before_executor(tmp_path, monkeypatch):
+    queue, executor = make_queue(tmp_path, monkeypatch, max_requests=2, max_active=1,
+                                  max_request_tokens=16, kv_capacity_bytes=32, kv_bytes_per_token=8)
+    with pytest.raises(ValueError):
+        queue.submit(BatchRequest("oversized", 4, 1), timeout_ms=10000)
+    queue.submit(BatchRequest("first", 2, 2), timeout_ms=10000)
+    queue.submit(BatchRequest("second", 2, 2), timeout_ms=10000)
+    with pytest.raises(ValueError):
+        queue.submit(BatchRequest("third", 1, 1), timeout_ms=10000)
+    assert queue.tick()["capacity"]["kv_used_bytes"] == 32
+    assert queue.cancel("second")
+    assert queue.cancel("first")
+    retired = queue.tick()["retired"]
+    assert {row["request_id"] for row in retired} == {"first", "second"}
+    assert executor.calls == [] and executor.releases == ["first"]
+    assert queue.status()["capacity"]["kv_used_bytes"] == 0
+    queue.close()
+
+
+def test_executor_overrun_poison_preserves_suspect_reservation(tmp_path, monkeypatch):
+    queue, executor = make_queue(tmp_path, monkeypatch)
+    queue.submit(BatchRequest("bad", 2, 2), timeout_ms=10000)
+    queue.tick()
+    executor.invalid = True
+    with pytest.raises(RuntimePreflightError, match="exceeds exact grant"):
+        queue.tick()
+    assert queue.status()["poisoned"]
+    assert queue.status()["capacity"]["kv_used_bytes"] > 0
+    assert not executor.releases
+    queue.close()
+    assert executor.releases == ["bad"]
+
+
+def test_missing_separate_cache_reserve_refuses_queue(tmp_path, monkeypatch):
+    session, base, _ = session_fixture(tmp_path, monkeypatch)
+    with pytest.raises(RuntimePreflightError, match="separately reserved"):
+        OfflineRequestQueue(session, QueuePolicy(), Executor(), base_policy=base)
+    session.close()
+
+
+def test_native_sealed_owner_real_small_bytes_refuses_mutation(tmp_path, monkeypatch):
+    if not hasattr(os, "memfd_create"):
+        pytest.skip("Linux memfd unavailable")
+    payload = b"actual original weight bytes"
+    checksum = sha256(payload).hexdigest()
+    model = ModelIdentity("test", "v1", "tiny", checksum, checksum, checksum)
+    shard = WeightShard(0, checksum, len(payload), "local")
+    plan = WeightLoadPlan(model.identity_digest, (shard,), len(payload))
+    path = tmp_path / "source.bin"
+    path.write_bytes(payload)
+    store = tmp_path / "store"
+    key = WeightShardStore(store).stage_plan(model, plan, {0: path})
+    monkeypatch.setattr("skeleton.app.offline_runtime_custody.sample_hardware",
+                        lambda: sample(start=time.monotonic_ns() - 1000, origin="local_probe"))
+    with sealed_cpu_custody(store, plan_digest=key, model=model, policy=POLICY,
+                            maximum_sealed_bytes=len(payload)) as (pages, receipt):
+        assert bytes(pages[0]) == payload
+        with pytest.raises(TypeError):
+            pages[0][0] = 0
+        assert receipt["sealed_bytes"] == len(payload)
+        assert not receipt["native_qualified"]
+        # An independent disk mutation cannot mutate the already sealed copy.
+        next((store / "objects").glob("*/*")).write_bytes(b"tampered")
+        assert bytes(pages[0]) == payload
+    assert pages[0].closed
+    with pytest.raises(ValueError):
+        with sealed_cpu_custody(store, plan_digest=key, model=model, policy=POLICY,
+                                maximum_sealed_bytes=len(payload)):
+            pytest.fail("corrupt store should not be yielded")
+
+
+def test_whole_request_uses_actual_reference_engine_after_full_reservation(tmp_path, monkeypatch):
+    from skeleton.ai.runtime.inference.local import LocalInferenceEngine, LocalInferenceRequest, ReferenceNGramModel
+    from skeleton.app.offline_runtime_whole_request import MeasuredWholeRequestEngine
+
+    async def run():
+        session, _, _ = session_fixture(tmp_path, monkeypatch)
+        model = ReferenceNGramModel.train(["hello harbor hello harbor", "hello builder hello builder"])
+        engine = LocalInferenceEngine(model, cache_size=0, max_concurrency=1)
+        adapter = MeasuredWholeRequestEngine(session, engine, backend_digest=model.model_digest)
+        req = LocalInferenceRequest("hello", max_output_tokens=4, seed=1, tool_choice="none")
+        try:
+            deferred = await adapter.generate(req, max_input_tokens=16, timeout_ms=10000)
+            assert deferred.result is None and deferred.receipt["status"] == "deferred"
+            completed = await adapter.generate(req, max_input_tokens=16, timeout_ms=10000)
+            assert completed.result is not None
+            assert completed.receipt["status"] == "completed"
+            assert completed.result.model_digest == model.model_digest
+            assert completed.receipt["usage"]["output_tokens"] <= 4
+            assert completed.receipt["backend_weight_binding"] == "not_assessed"
+            assert not completed.receipt["native_qualified"]
+        finally:
+            adapter.close()
+            await engine.close()
+
+    asyncio.run(run())
+
+
+def test_whole_request_never_dispatches_partial_token_reservation(tmp_path, monkeypatch):
+    from skeleton.ai.runtime.inference.local import LocalInferenceEngine, LocalInferenceRequest, ReferenceNGramModel
+    from skeleton.app.offline_runtime_whole_request import MeasuredWholeRequestEngine
+
+    async def run():
+        session, _, _ = session_fixture(tmp_path, monkeypatch)
+        model = ReferenceNGramModel.train(["hello harbor hello harbor"])
+        engine = LocalInferenceEngine(model, cache_size=0)
+        # Deliberately reduce headroom until canonical iteration grants
+        # cannot cover the requested atomic budget.
+        monkeypatch.setattr("skeleton.app.offline_runtime_session.sample_hardware",
+                            lambda: sample(start=time.monotonic_ns() - 1000, available=2 * GIB,
+                                           origin="local_probe"))
+        adapter = MeasuredWholeRequestEngine(session, engine, backend_digest=model.model_digest)
+        request = LocalInferenceRequest("hello", max_output_tokens=8)
+        try:
+            await adapter.generate(request, max_input_tokens=48, timeout_ms=10000)
+            result = await adapter.generate(request, max_input_tokens=48, timeout_ms=10000)
+            assert result.result is None and result.receipt["status"] == "partial_grant_deferred"
+        finally:
+            adapter.close()
+            await engine.close()
+
+    asyncio.run(run())
