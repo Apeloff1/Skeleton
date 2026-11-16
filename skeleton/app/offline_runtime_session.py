@@ -37,6 +37,7 @@ class OfflineRuntimeSession:
         self._policy = policy
         self._lock = threading.RLock()
         self._closed = False
+        self._consumer: object | None = None
         self._source = inspect_source(self._store, plan_digest=self._plan_digest,
                                       model_identity_digest=self._model_identity_digest, policy=policy)
         self._source_digest = digest(self._source.snapshot())
@@ -52,7 +53,26 @@ class OfflineRuntimeSession:
     def _open(self) -> None:
         require(not self._closed, "offline runtime session is closed")
 
-    def revalidate_source(self) -> dict:
+    def claim_consumer(self) -> object:
+        """Give one trusted execution owner exclusive use of this session.
+
+        A scheduling proposal is not a physical reservation. Sharing this
+        controller between independent consumers would let each consume a
+        new grant while another consumer still owns active execution.
+        A claimed session stays bound until closed; no transferable token
+        or public receipt can restore ownership.
+        """
+        with self._lock:
+            self._open()
+            require(self._consumer is None, "offline session already has an execution owner")
+            self._controller.revoke()
+            self._consumer = object()
+            return self._consumer
+
+    def _authorize(self, consumer: object | None) -> None:
+        require(consumer is self._consumer, "offline session execution owner mismatch")
+
+    def revalidate_source(self, *, consumer: object | None = None) -> dict:
         """Reinspect all selected source bytes and revoke grants before the scan.
 
         Failure closes this session. A changed inventory cannot silently
@@ -60,6 +80,7 @@ class OfflineRuntimeSession:
         """
         with self._lock:
             self._open()
+            self._authorize(consumer)
             self._controller.revoke()
             try:
                 observed = inspect_source(self._store, plan_digest=self._plan_digest,
@@ -75,9 +96,10 @@ class OfflineRuntimeSession:
                     "source_status": "reinspected", "native_qualified": False,
                     "release_qualified": False}
 
-    def offer(self, work: tuple[IterationWork, ...]) -> dict:
+    def offer(self, work: tuple[IterationWork, ...], *, consumer: object | None = None) -> dict:
         with self._lock:
             self._open()
+            self._authorize(consumer)
             try:
                 observed = sample_hardware()
                 require(observed.origin == "local_probe", "local probe required")
@@ -87,16 +109,18 @@ class OfflineRuntimeSession:
                 raise
             return result
 
-    def consume(self, admission: dict) -> tuple[dict, ...]:
+    def consume(self, admission: dict, *, consumer: object | None = None) -> tuple[dict, ...]:
         """Return the exact pending sequence using the actual process clock."""
         with self._lock:
             self._open()
+            self._authorize(consumer)
             return self._controller.consume(admission, now_ns=time.monotonic_ns())
 
     def status(self) -> dict:
         with self._lock:
             return {"closed": self._closed, "source_digest": self._source_digest,
                     "source_verified_ns": self._verified_ns,
+                    "exclusive_consumer_bound": self._consumer is not None,
                     "admission": self._controller.status(),
                     "source_custody": "inspection_only_not_open_handle",
                     "native_qualified": False, "release_qualified": False}
