@@ -335,5 +335,3 @@ def test_app_quantum_recheck_is_generation_bound_and_simulated():
         app.validate_quantum_lease(
             generation=lease.generation, required_tokens=1,
         )
-
-
