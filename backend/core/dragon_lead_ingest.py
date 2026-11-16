@@ -35,7 +35,7 @@ FORMATS={
     "steam-csv":"steam", "steam-parquet":"steam", "steam-json":"steam",
     "modrinth-json":"modrinth", "wikidata-csv":"locator", "locator-csv":"locator",
     "steam-tsv":"steam", "wikidata-tsv":"locator", "locator-tsv":"locator",
-    "normalized-jsonl":None,
+    "wikidata-sparql-json":"locator", "normalized-jsonl":None,
 }
 PROJECTIONS=frozenset({"steam","modrinth","locator"})
 
@@ -195,6 +195,46 @@ def locator_csv(raw,*,delimiter=","):
             yield parse_page(json.dumps(candidate,ensure_ascii=False).encode(),"locator")[0]
     finally:records.close()
 
+def wikidata_sparql_json(raw):
+    """Read a bounded, already supplied SPARQL JSON results export.
+
+    Only a game-filtered item/itemLabel table is accepted. No SPARQL query,
+    URL from the export, remote service, or script is executed.
+    """
+    limit=16*1024*1024
+    data=raw.read(limit+1)
+    if len(data)>limit:raise ValueError("SPARQL JSON export byte cap")
+    try:
+        doc=json.loads(data,object_pairs_hook=_unique_pairs,parse_constant=_reject_constant)
+    except RecursionError as exc:
+        raise ValueError("SPARQL JSON nesting") from exc
+    if (not isinstance(doc,dict) or not isinstance(doc.get("head"),dict)
+            or not isinstance(doc.get("results"),dict)):
+        raise ValueError("SPARQL JSON result schema")
+    fields=doc["head"].get("vars")
+    bindings=doc["results"].get("bindings")
+    if (not isinstance(fields,list) or not 2<=len(fields)<=MAX_COLUMNS
+            or any(not isinstance(x,str) or not 1<=len(x)<=256 for x in fields)
+            or len(set(fields))!=len(fields) or not {"item","itemLabel"}.issubset(fields)
+            or not isinstance(bindings,list) or not 1<=len(bindings)<=50_000):
+        raise ValueError("SPARQL JSON result bounds")
+    for row in bindings:
+        if not isinstance(row,dict) or not set(row).issubset(fields):
+            raise ValueError("SPARQL JSON binding schema")
+        item=row.get("item")
+        label=row.get("itemLabel")
+        if (not isinstance(item,dict) or item.get("type")!="uri"
+                or not isinstance(item.get("value"),str)
+                or not isinstance(label,dict) or label.get("type")!="literal"
+                or not isinstance(label.get("value"),str)):
+            raise ValueError("SPARQL JSON item identity or label")
+        match=re.fullmatch(r"https?://www\\.wikidata\\.org/entity/(Q[1-9][0-9]{0,15})",item["value"])
+        if not match:raise ValueError("SPARQL JSON Wikidata entity")
+        qid=match[1]
+        yield {"url":"https://www.wikidata.org/wiki/"+qid,
+               "title":clean(label["value"],256),"kind":"cross_database_identifiers",
+               "subject":"wikidata:"+qid}
+
 def normalized_jsonl(raw,projection):
     while True:
         line=raw.readline(8194)
@@ -212,6 +252,7 @@ def pages(path,witness,format,projection):
         elif format=="modrinth-json":rows=modrinth_json(stream)
         elif format=="wikidata-csv":rows=wikidata_csv(stream)
         elif format=="wikidata-tsv":rows=wikidata_csv(stream,delimiter="\t")
+        elif format=="wikidata-sparql-json":rows=wikidata_sparql_json(stream)
         elif format=="locator-csv":rows=locator_csv(stream)
         elif format=="locator-tsv":rows=locator_csv(stream,delimiter="\t")
         else:rows=normalized_jsonl(stream,projection)
