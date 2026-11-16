@@ -246,6 +246,11 @@ def qualify(path,format,projection,*,expected_sha=None):
         raise ValueError("dataset bytes changed during qualification")
     return witness,raw_sha,count,chain,n
 
+def _inspection_identity(format,projection,raw_sha,count,chain,n):
+    # This is an integrity comparison token, not a signature or a license.
+    return digest(["skeleton.dragon.offline-export-inspection.v2",
+                   format,projection,raw_sha,count,chain,n])
+
 def inspect_export(path,format,projection,*,expected_sha=None):
     """Read-only validation of a separately supplied local export.
 
@@ -253,15 +258,21 @@ def inspect_export(path,format,projection,*,expected_sha=None):
     or permanent source permission is created by this report.
     """
     _,raw_sha,count,chain,n=qualify(Path(path),format,projection,expected_sha=expected_sha)
-    return {"schema":"skeleton.dragon.offline-export-inspection.v1",
+    return {"schema":"skeleton.dragon.offline-export-inspection.v2",
+            "inspection_digest":_inspection_identity(format,projection,raw_sha,count,chain,n),
             "format":format,"projection":projection,"input_sha256":raw_sha,
             "expected_sha_matched":expected_sha is not None,
             "rows":count,"page_chain":chain,"pages":n,
             "network_executed":False,"graph_written":False,
             "license_verified":False,"source_rights_verified":False}
 
-def ingest(graph,scope,*,path,format,projection,target,rights_reference,grant_seconds,expected_sha=None):
+def ingest(graph,scope,*,path,format,projection,target,rights_reference,grant_seconds,expected_sha=None,
+           expected_inspection=None):
+    expected_inspection=_expected_hash(expected_inspection)
     witness,raw_sha,count,final_chain,total_pages=qualify(path,format,projection,expected_sha=expected_sha)
+    inspection=_inspection_identity(format,projection,raw_sha,count,final_chain,total_pages)
+    if expected_inspection is not None and expected_inspection!=inspection:
+        raise ValueError("offline inspection digest differs; graph untouched")
     begun=graph.begin(scope,target_id=target,projection=projection,source_sha=raw_sha,expected_rows=count,
                       rights_ref=rights_reference,grant_seconds=grant_seconds,acknowledged=True)
     sid=begun["snapshot_id"]
@@ -270,7 +281,8 @@ def ingest(graph,scope,*,path,format,projection,target,rights_reference,grant_se
             raise ValueError("sealed snapshot differs")
         if _source_hash(path,witness)!=raw_sha:
             raise ValueError("input dataset changed before sealed replay")
-        return {**begun,"already_sealed":True,"verified_pages":total_pages,"input_sha256":raw_sha}
+        return {**begun,"already_sealed":True,"verified_pages":total_pages,"input_sha256":raw_sha,
+                "inspection_digest":inspection,"expected_inspection_matched":expected_inspection is not None}
     chain=ZERO;seen=0
     for ordinal,(raw,size) in enumerate(pages(path,witness,format,projection)):
         h=hashlib.sha256(raw).hexdigest()
@@ -280,7 +292,8 @@ def ingest(graph,scope,*,path,format,projection,target,rights_reference,grant_se
         seen+=size
     if seen!=count or chain!=final_chain or _source_hash(path,witness)!=raw_sha:
         raise ValueError("dataset changed across projection passes; snapshot unsealed")
-    return {**graph.seal(scope,sid,chain),"verified_pages":total_pages,"input_sha256":raw_sha}
+    return {**graph.seal(scope,sid,chain),"verified_pages":total_pages,"input_sha256":raw_sha,
+            "inspection_digest":inspection,"expected_inspection_matched":expected_inspection is not None}
 
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
@@ -290,6 +303,7 @@ def main(argv=None):
     parser.add_argument("--projection",choices=["steam","modrinth","locator"],default="steam")
     parser.add_argument("--input",type=Path,required=True)
     parser.add_argument("--expected-sha",default=None)
+    parser.add_argument("--expected-inspection",help="Exact digest of prior offline inspection (import only)")
     parser.add_argument("--tenant")
     parser.add_argument("--owner")
     parser.add_argument("--rights-reference")
@@ -299,11 +313,12 @@ def main(argv=None):
     try:
         _validate_format(args.format,args.projection)
         _expected_hash(args.expected_sha)
+        _expected_hash(args.expected_inspection)
     except ValueError as exc:
         parser.error(str(exc))
     path=args.input.expanduser().absolute()
     if args.inspect_only:
-        if any(value is not None for value in (args.target,args.tenant,args.owner,args.rights_reference)) or args.acknowledge_metadata_rights:
+        if any(value is not None for value in (args.target,args.tenant,args.owner,args.rights_reference,args.expected_inspection)) or args.acknowledge_metadata_rights:
             parser.error("inspection is read-only; omit graph target, scope and import grants")
         print(json.dumps(inspect_export(path,args.format,args.projection,expected_sha=args.expected_sha),sort_keys=True))
         return 0
@@ -316,7 +331,8 @@ def main(argv=None):
     # permission, source grant, or activation of live crawling.
     receipt=ingest(graph,scope,path=path,format=args.format,
                    projection=args.projection,target=args.target,rights_reference=args.rights_reference,
-                   grant_seconds=args.grant_seconds,expected_sha=args.expected_sha)
+                   grant_seconds=args.grant_seconds,expected_sha=args.expected_sha,
+                   expected_inspection=args.expected_inspection)
     print(json.dumps(receipt,sort_keys=True))
     return 0
 
