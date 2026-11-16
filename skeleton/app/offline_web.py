@@ -315,6 +315,31 @@ HTML = r"""<!doctype html>
       <button id="feedback-export" class="small" disabled>Approve and download specialization inputs</button>
       <pre id="feedback-export-result" aria-live="polite"></pre>
     </details>
+    <details id="competitive-panel" class="grounding-preview">
+      <summary>Advanced local execution: generators, speculative decoding, media and tools</summary>
+      <p class="minor">Separate local review engines do not replace Jeeves or write to the conversation. Explicitly grant scoped read-only operations. Configured artifacts are not quality-certified.</p>
+      <button id="competitive-refresh" class="small" disabled>Inspect local capabilities</button>
+      <pre id="competitive-status" aria-live="polite">Not inspected.</pre>
+      <label for="competitive-profiles">Independent generator profiles (comma-separated IDs)</label><input id="competitive-profiles" maxlength="128">
+      <label for="competitive-reserved">Total ensemble reserved output tokens</label><input id="competitive-reserved" type="number" min="2" max="384" value="128">
+      <button id="competitive-ensemble" class="small" disabled>Approve multi-generator review of current prompt</button>
+      <label for="competitive-draft">Compatible speculative draft ID</label><input id="competitive-draft" maxlength="32">
+      <label for="competitive-block">Draft block tokens</label><input id="competitive-block" type="number" min="1" max="8" value="4">
+      <button id="competitive-speculative" class="small" disabled>Run native greedy speculative review</button>
+      <label for="competitive-media-profile">Local media profile ID</label><input id="competitive-media-profile" maxlength="32">
+      <label for="competitive-media-file">Transient PNG, JPEG, WebP or PCM16 WAV (4 MiB max)</label>
+      <input id="competitive-media-file" type="file" accept=".png,.jpg,.jpeg,.webp,.wav">
+      <button id="competitive-media" class="small" disabled>Approve native media classification</button>
+      <label for="competitive-prefetch-queries">Approved possible next queries (one per line)</label><textarea id="competitive-prefetch-queries" rows="4" maxlength="12000"></textarea>
+      <button id="competitive-prefetch" class="small" disabled>Prewarm two highest-ranked queries in selected references</button>
+      <label for="competitive-tool-id">Durable tool campaign ID</label><input id="competitive-tool-id" maxlength="64">
+      <label for="competitive-tool-plan">Closed read-only action graph (JSON)</label>
+      <textarea id="competitive-tool-plan" rows="5" maxlength="24000" placeholder='{"actions":[{"id":"calculation","kind":"calculate","arguments":{"expression":"(3+7)/2"},"depends_on":[],"condition":{"kind":"always","action":null}}],"maximum_calls":1,"maximum_seconds":15}'></textarea>
+      <button id="competitive-tool-run" class="small" disabled>Approve closed tool plan and execute</button>
+      <button id="competitive-tool-inspect" class="small" disabled>Inspect durable tool campaign</button>
+      <button id="competitive-tool-abandon" class="small" disabled>Abandon uncertain campaign (not cancellation)</button>
+      <pre id="competitive-result" aria-live="polite"></pre>
+    </details>
     <details id="context-grounding-preview" class="grounding-preview" hidden>
       <summary>Local grounding passages selected by preview — untrusted text</summary>
       <p id="context-grounding-identity" class="hint"></p>
@@ -380,10 +405,12 @@ html,body{background:var(--canvas);color:var(--text)}button{font-size:12px;min-h
 .advanced-reasoning-options select,.advanced-reasoning-options input:not([type=checkbox]){max-width:100%}
 .advanced-reasoning-options .inline{align-items:stretch}
 .advanced-reasoning-options .inline button{white-space:normal}
-#feedback-panel,#campaign-panel{max-width:100%;min-width:0}
-#feedback-panel[open],#campaign-panel[open]{max-height:30dvh;overflow:auto;overscroll-behavior:contain}
+#feedback-panel,#campaign-panel,#competitive-panel{max-width:100%;min-width:0}
+#feedback-panel[open],#campaign-panel[open],#competitive-panel[open]{max-height:30dvh;overflow:auto;overscroll-behavior:contain}
 #feedback-panel input:not([type=checkbox]),#feedback-panel textarea,#campaign-panel input,#campaign-panel textarea{max-width:100%}
-#feedback-panel label,#campaign-panel label{display:block;overflow-wrap:anywhere}
+#feedback-panel label,#campaign-panel label,#competitive-panel label{display:block;overflow-wrap:anywhere}
+#competitive-panel input,#competitive-panel textarea{max-width:100%;min-width:0}
+#competitive-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:28dvh;overflow:auto}
 #campaign-batch-result,#feedback-result pre,#feedback-export-result{white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:720px){.advanced-reasoning-options[open]{max-height:22dvh}.composer-submit{flex-wrap:nowrap}.composer-submit #send{flex:1;min-width:0}.composer-submit #context-preview{flex:0 0 auto}.composer-submit button{white-space:normal}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
@@ -599,6 +626,15 @@ JAVASCRIPT = r"""'use strict';
       get(id).disabled = locked || working || !state.session;
     });
     get('campaign-batch-run').disabled = locked || working || !inspectedCampaign || foreignLease || state.health?.ready !== true;
+    ['competitive-refresh','competitive-profiles','competitive-reserved','competitive-draft','competitive-block',
+     'competitive-media-profile','competitive-media-file','competitive-prefetch-queries','competitive-tool-id','competitive-tool-plan',
+     'competitive-tool-run','competitive-tool-inspect'].forEach(id=>{get(id).disabled=locked||working||!state.session;});
+    const competitiveUnavailable=locked||working||!state.session||foreignLease||state.health?.ready!==true;
+    get('competitive-ensemble').disabled=competitiveUnavailable||!competitiveCapability?.specialists?.length;
+    get('competitive-speculative').disabled=competitiveUnavailable||!competitiveCapability?.native_greedy_speculative_target||!competitiveCapability?.specialists?.some(x=>x.role==='draft');
+    get('competitive-media').disabled=competitiveUnavailable||!competitiveCapability?.media_profiles?.length;
+    get('competitive-prefetch').disabled=locked||working||!state.session||!competitiveCapability?.predictive_prefetch_available||state.knowledgeScopeMode!=='selected'||scopeBlocked;
+    get('competitive-tool-abandon').disabled=locked||working||!inspectedToolCampaign||inspectedToolCampaign.status!=='running';
     get('campaign-batch-abandon').disabled = locked || working || !inspectedBatch || inspectedBatch.status !== 'running';
     get('feedback-result').querySelectorAll('button').forEach(button => {button.disabled = locked || working;});
     get('campaign-result').querySelectorAll('button').forEach(button => {
@@ -705,6 +741,14 @@ JAVASCRIPT = r"""'use strict';
     get('campaign-batch-budget').value = '128';
     clearFeedbackView();
     get('feedback-panel').open = false;
+    get('competitive-panel').open=false;
+    competitiveCapability=null;
+    inspectedToolCampaign=null;
+    ['competitive-profiles','competitive-draft','competitive-media-profile','competitive-media-file',
+     'competitive-prefetch-queries','competitive-tool-id','competitive-tool-plan'].forEach(id=>{get(id).value='';});
+    get('competitive-reserved').value='128';get('competitive-block').value='4';
+    get('competitive-status').textContent='Not inspected.';
+    get('competitive-result').textContent='';
     get('campaign-batch-panel').open = false;
     get('campaign-panel').open = false;
     get('campaign-budget').value = '256';
@@ -768,7 +812,7 @@ JAVASCRIPT = r"""'use strict';
     // Long file ingestion may stream for hours. Abort only on an explicit
     // workspace lock; the durable import ID allows post-disconnect recovery.
     const timer = path === '/v1/resources/longform/ingest' ? null :
-      setTimeout(cancel, path.endsWith('/campaign-batch-run') ? 210000 : (path.endsWith('/deliberation-review') || path.endsWith('/campaign-advance')) ? 85000 : 15000);
+      setTimeout(cancel, path.endsWith('/campaign-batch-run') ? 210000 : (/\/(?:deliberation-review|campaign-advance|ensemble-review|speculative-review|media-review|tool-campaign-run|predictive-prefetch)$/.test(path)) ? 85000 : 15000);
     let response;
     try {
       response = await fetch(path, {
@@ -1153,6 +1197,8 @@ JAVASCRIPT = r"""'use strict';
   }
   let reviewedMemory = null;
   let verifierCapability = null;
+  let competitiveCapability=null;
+  let inspectedToolCampaign=null;
   let inspectedCampaign = null;
   let inspectedBatch = null;
   function clearFeedbackView() {
@@ -1181,6 +1227,9 @@ JAVASCRIPT = r"""'use strict';
     get('adaptive-artifacts').replaceChildren();
     clearCampaignView();
     clearFeedbackView();
+    inspectedToolCampaign=null;
+    get('competitive-result').textContent='';
+    get('competitive-media-file').value='';
     get('research-panel').hidden = true;
     get('research-panel').open = false;
     get('research-trace').textContent = '';
@@ -1718,6 +1767,142 @@ JAVASCRIPT = r"""'use strict';
     document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
     get('feedback-export-result').textContent='Prepared '+result.train.length+' training and '+
       result.heldout.length+' holdout rows. No training or activation performed. Export '+result.export_sha256;
+  }));
+  const competitivePin=/^[0-9a-f]{64}$/;
+  function competitiveContext() {
+    if(!state.connected||!state.session) throw new Error('Select a local conversation.');
+    return {sid:state.session,rev:state.revision,epoch:state.epoch,scope:state.knowledgeScopeVersion};
+  }
+  function competitiveCurrent(ctx) {
+    return state.connected&&state.session===ctx.sid&&state.revision===ctx.rev&&
+      state.epoch===ctx.epoch&&state.knowledgeScopeVersion===ctx.scope;
+  }
+  async function competitiveCall(ctx,action,body) {
+    const result=await api('POST','/v1/sessions/'+ctx.sid+'/'+action,body);
+    if(!competitiveCurrent(ctx)) throw new Error('Conversation or selected source scope changed during operation.');
+    return result;
+  }
+  function competitiveDisplay(result) {
+    get('competitive-result').textContent=JSON.stringify(result,null,2);
+  }
+  get('competitive-refresh').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),result=await api('GET','/v1/competitive/status');
+    if(!competitiveCurrent(ctx)||result.schema!=='skeleton.jeeves.competitive-capabilities.v1'||
+       result.primary_model_digest!==state.health?.model_digest||result.primary_model_changed!==false||
+       result.network_called!==false||!Array.isArray(result.specialists)||result.specialists.length>3||
+       !Array.isArray(result.media_profiles)||result.media_profiles.length>2) throw new Error('Invalid local capability receipt.');
+    competitiveCapability=result;
+    get('competitive-status').textContent=JSON.stringify(result,null,2);updateControls();
+  }));
+  get('competitive-ensemble').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),question=get('prompt').value.trim();
+    const names=get('competitive-profiles').value.split(',').map(s=>s.trim()).filter(Boolean);
+    const budget=Number(get('budget').value),maximum=Number(get('competitive-reserved').value);
+    const inventory=new Map((competitiveCapability?.specialists||[]).map(row=>[row.id,row]));
+    if(!question||!names.length||names.length>3||new Set(names).size!==names.length||
+       names.some(n=>!inventory.has(n))||!Number.isSafeInteger(budget)||budget<1||budget>128||
+       !Number.isSafeInteger(maximum)||maximum<budget*(1+names.length)||maximum>384)
+      throw new Error('Select explicit local generators within the token budget.');
+    const result=await competitiveCall(ctx,'ensemble-review',{expected_revision:ctx.rev,
+      profiles:names,message:question,max_output_tokens:budget,maximum_reserved_tokens:maximum,approved:true});
+    if(result.schema!=='skeleton.jeeves.generator-ensemble.v1'||result.primary_model_digest!==state.health?.model_digest||
+       result.session_revision!==ctx.rev||result.question_sha256!==await exactLocalSha256(question)||
+       result.registry_sha256!==competitiveCapability.specialist_registry_sha256||result.transcript_committed!==false||
+       result.winner_selected!==false||result.primary_model_changed!==false||
+       !Array.isArray(result.candidates)||result.candidates.length!==names.length+1||
+       !competitivePin.test(result.receipt_sha256)) throw new Error('Invalid generator ensemble receipt.');
+    for(const [index,row] of result.candidates.entries()){
+      const expected=index===0?state.health.model_digest:inventory.get(names[index-1]).model_digest;
+      if(row.model_digest!==expected||row.profile!==(index===0?'jeeves':names[index-1])||
+         typeof row.text!=='string'||row.output_sha256!==await exactLocalSha256(row.text)||
+         !competitivePin.test(row.execution_receipt_digest)||!Number.isSafeInteger(row.output_tokens)||
+         row.output_tokens<0||row.output_tokens>budget)throw new Error('Unbound generator result.');
+    }
+    if(!competitiveCurrent(ctx))throw new Error('Review scope changed.');
+    competitiveDisplay(result);
+  }));
+  get('competitive-speculative').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),question=get('prompt').value.trim();
+    const draft=get('competitive-draft').value.trim(),budget=Number(get('budget').value),block=Number(get('competitive-block').value);
+    const profile=competitiveCapability?.specialists?.find(x=>x.id===draft&&x.role==='draft');
+    if(!profile||!question||!Number.isSafeInteger(budget)||budget<1||budget>128||
+       !Number.isSafeInteger(block)||block<1||block>8)throw new Error('Choose a compatible draft and bounded output.');
+    const result=await competitiveCall(ctx,'speculative-review',{expected_revision:ctx.rev,message:question,
+      draft_profile:draft,max_output_tokens:budget,block,approved:true});
+    if(result.schema!=='skeleton.jeeves.native-speculative.v1'||result.target_model_digest!==state.health?.model_digest||
+       result.draft_model_digest!==profile.model_digest||result.target_authoritative!==true||
+       result.transcript_committed!==false||result.speedup_certified!==false||
+       !Array.isArray(result.generated_ids)||result.generated_ids.length>budget||
+       !competitivePin.test(result.receipt_sha256))throw new Error('Invalid speculative receipt.');
+    competitiveDisplay(result);
+  }));
+  get('competitive-media').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),file=get('competitive-media-file').files?.[0];
+    const profile=get('competitive-media-profile').value.trim();
+    const admitted=competitiveCapability?.media_profiles?.find(x=>x.id===profile);
+    if(!admitted||!file||file.size<1||file.size>4*1024*1024)throw new Error('Select a configured classifier and bounded local file.');
+    const mime=localMediaType(file);
+    if(!['image/png','image/jpeg','image/webp','audio/wav'].includes(mime)||!mime.startsWith(admitted.modality+'/'))
+      throw new Error('File does not match the native classifier modality.');
+    const bytes=await file.arrayBuffer(),pin=await localMediaSha256(bytes);
+    if(!competitiveCurrent(ctx)||get('competitive-media-file').files?.[0]!==file)throw new Error('Media selection changed.');
+    const result=await competitiveCall(ctx,'media-review',{expected_revision:ctx.rev,profile,media_type:mime,
+      media_base64:localMediaBase64(new Uint8Array(bytes)),source_sha256:pin,top_k:Math.min(5,admitted.label_count),approved:true});
+    if(result.schema!=='skeleton.jeeves.local-media-inference.v1'||result.model_sha256!==admitted.model_sha256||
+       result.source_sha256!==pin||result.profile!==profile||result.native_classifier_executed!==true||
+       result.media_bytes_persisted!==false||result.transcript_committed!==false||
+       !competitivePin.test(result.receipt_sha256))throw new Error('Invalid native media receipt.');
+    get('competitive-media-file').value='';competitiveDisplay(result);
+  }));
+  get('competitive-prefetch').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),scope=selectedGroundingScope(true);
+    const candidates=get('competitive-prefetch-queries').value.split('\n').map(s=>s.trim()).filter(Boolean);
+    if(!scope.length||!candidates.length||candidates.length>12||new Set(candidates).size!==candidates.length)
+      throw new Error('Select exact local references and up to twelve distinct approved queries.');
+    const result=await competitiveCall(ctx,'predictive-prefetch',{expected_revision:ctx.rev,
+      document_ids:scope,candidates,maximum_queries:2,approved:true});
+    if(result.schema!=='skeleton.jeeves.predictive-prefetch.v1'||result.session_revision!==ctx.rev||
+       result.generation_performed!==false||JSON.stringify(result.selected_document_ids)!==JSON.stringify(scope)||
+       !Array.isArray(result.warmed)||result.warmed.length>2||!competitivePin.test(result.receipt_sha256))
+      throw new Error('Invalid predictive prefetch receipt.');
+    competitiveDisplay(result);
+  }));
+  function toolCampaignId() {
+    const id=get('competitive-tool-id').value.trim();
+    if(!/^[A-Za-z0-9_-]{1,64}$/.test(id))throw new Error('Enter an explicit campaign identifier.');
+    return id;
+  }
+  function showToolCampaign(ctx,id,result) {
+    if(!competitiveCurrent(ctx)||id!==toolCampaignId()||
+       result.schema!=='skeleton.jeeves.tool-campaign.v1'||result.campaign_id!==id||
+       result.session_id!==ctx.sid||result.network_called!==false||result.knowledge_modified!==false||
+       result.transcript_committed!==false||!competitivePin.test(result.plan_sha256))
+      throw new Error('Tool campaign receipt identity mismatch.');
+    inspectedToolCampaign=result;competitiveDisplay(result);updateControls();
+  }
+  get('competitive-tool-id').addEventListener('input',()=>{
+    inspectedToolCampaign=null;get('competitive-result').textContent='';updateControls();
+  });
+  get('competitive-tool-run').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),id=toolCampaignId();
+    const plan=JSON.parse(get('competitive-tool-plan').value);
+    try{
+      showToolCampaign(ctx,id,await competitiveCall(ctx,'tool-campaign-run',{
+        campaign_id:id,expected_revision:ctx.rev,plan,approved:true}));
+    }catch(error){
+      inspectedToolCampaign=null;
+      throw new Error('Tool outcome uncertain or rejected. Inspect the same ID before any new execution. '+error.message);
+    }
+  }));
+  get('competitive-tool-inspect').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),id=toolCampaignId();
+    showToolCampaign(ctx,id,await competitiveCall(ctx,'tool-campaign-inspect',{campaign_id:id}));
+  }));
+  get('competitive-tool-abandon').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),id=toolCampaignId(),row=inspectedToolCampaign;
+    if(!row||row.campaign_id!==id||row.status!=='running')throw new Error('Inspect the uncertain campaign first.');
+    showToolCampaign(ctx,id,await competitiveCall(ctx,'tool-campaign-abandon',{
+      campaign_id:id,plan_sha256:row.plan_sha256,approved:true}));
   }));
   function renderReviewArtifact(data, kind) {
     if (!data || data.kind !== kind || typeof data.title !== 'string' || data.title.length > 120)
