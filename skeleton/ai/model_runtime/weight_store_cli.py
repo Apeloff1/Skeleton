@@ -16,7 +16,7 @@ import sys
 from typing import Any, BinaryIO, Sequence, TextIO
 
 from .flgb_model_runtime import (
-    MAX_WEIGHT_SHARDS, ModelIdentity, WeightLoadPlan, WeightShard,
+    MAX_WEIGHT_BYTES, MAX_WEIGHT_SHARDS, ModelIdentity, WeightLoadPlan, WeightShard,
     canonical_bytes, require_digest,
 )
 from .weight_shard_store import WeightShardStore, WeightShardStoreError
@@ -104,6 +104,7 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
     parser.add_argument("command", choices=("stage", "inspect", "recovery-review"))
     parser.add_argument("--store", type=Path, required=True)
     parser.add_argument("--maximum-store-bytes", type=int, required=True)
+    parser.add_argument("--maximum-plan-bytes", type=int, default=MAX_WEIGHT_BYTES)
     parser.add_argument("--minimum-free-bytes", type=int, default=1024**3)
     parser.add_argument("--maximum-entries", type=int, default=1_000_000)
     parser.add_argument("--request-sha256")
@@ -123,6 +124,8 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
             raise WeightShardStoreError("absolute local store path required")
         policy = DiskAdmissionPolicy(args.maximum_store_bytes, args.minimum_free_bytes,
                                      args.maximum_entries)
+        if not 1 <= args.maximum_plan_bytes <= MAX_WEIGHT_BYTES:
+            raise WeightShardStoreError("invalid independent logical plan ceiling")
         pins = (args.request_sha256, args.model_identity_sha256, args.plan_sha256)
         if args.command == "stage":
             if not all(value is not None for value in pins) or args.require_clean:
@@ -133,9 +136,9 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
                 model_identity_sha256=pins[1], plan_sha256=pins[2],
             )
             # All request validation occurs before the writable store opens.
-            if request.plan.expected_total_bytes > policy.maximum_store_bytes:
+            if request.plan.expected_total_bytes > args.maximum_plan_bytes:
                 raise WeightShardStoreError("logical plan exceeds explicit stage ceiling")
-            store = WeightShardStore(args.store)
+            store = WeightShardStore(args.store, maximum_bytes=args.maximum_plan_bytes)
             owner = WeightStoreDiskOwner(store, policy)
             key, receipt = owner.stage(request.identity, request.plan,
                                        dict(enumerate(request.paths)))
@@ -149,7 +152,7 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
                 raise WeightShardStoreError("staging pins require stage command")
             if args.require_clean and args.command != "recovery-review":
                 raise WeightShardStoreError("require-clean applies only to recovery-review")
-            store = WeightShardStore(args.store, read_only=True)
+            store = WeightShardStore(args.store, maximum_bytes=args.maximum_plan_bytes, read_only=True)
             owner = WeightStoreDiskOwner(store, policy, initialize=False)
             if args.command == "inspect":
                 result = owner.inspect()
