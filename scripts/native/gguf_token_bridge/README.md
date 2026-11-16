@@ -36,3 +36,10 @@ prompt files if memfd/procfs/sealing is unavailable. Other POSIX hosts retain
 the private named-file path, not descriptor custody. This does not attest
 system loader closure, immutable storage, swap exclusion or physical device
 behavior; these remain independent qualification requirements.
+
+The guarded native verification worker now signals cooperative cancellation
+when its owning async task times out or is cancelled. The bridge observes
+that signal during descriptor hashing, admission and physical subprocess
+polling. The native slot remains occupied until the thread exits; arbitrary
+noncooperative callbacks are not forcibly terminated. Generation and output
+verification share one wall-clock budget, not two independent timeouts.

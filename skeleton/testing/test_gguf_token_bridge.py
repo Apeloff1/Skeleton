@@ -278,3 +278,53 @@ def test_fused_roundtrip_rejects_invalid_evidence(malformed):
         roundtrip=lambda text: malformed)
     with pytest.raises(SealedContextError):
         asyncio.run(guard.generate(request, snapshot=snapshot, tenant_scope_id="tenant"))
+
+
+def test_bounded_native_worker_receives_timeout_cancellation():
+    from skeleton.context.pre_delivery_guard import native_verification_cancel_event
+    from skeleton.context.sealed_sandwich import SealedContextBoundaryError
+    observed = threading.Event()
+
+    async def scenario():
+        guard = GuardedLocalInference(SimpleNamespace(generate=lambda *a: None),
+                                       reviewer=lambda *a: None)
+        def work():
+            event = native_verification_cancel_event()
+            assert event is not None
+            if event.wait(2):
+                observed.set()
+        with pytest.raises(SealedContextBoundaryError, match="timed out"):
+            await guard._bounded_native_call(work, 0.05)
+    asyncio.run(scenario())
+    assert observed.wait(2)
+
+
+def test_bridge_checks_guard_cancellation_before_subprocess(tmp_path):
+    from skeleton.ai.runtime.inference.local import LocalInferenceCancelled
+    from skeleton.context.pre_delivery_guard import _native_verification_cancel
+    model, _, _ = fixture(tmp_path)
+    event = threading.Event()
+    event.set()
+    token = _native_verification_cancel.set(event)
+    try:
+        with pytest.raises(LocalInferenceCancelled):
+            model.roundtrip_ids("private")
+    finally:
+        _native_verification_cancel.reset(token)
+    assert model.execution_snapshot()["processes_started"] == 0
+
+
+def test_generation_and_output_echo_share_one_deadline(tmp_path, monkeypatch):
+    model, _, _ = fixture(tmp_path)
+    request = LocalInferenceRequest(prompt="deadline", max_output_tokens=8)
+    prepared = model.prepare_input(request)
+    actual = model._invoke
+    seen = []
+    def observed(operation, payload, **options):
+        seen.append((operation, options.get("deadline")))
+        return actual(operation, payload, **options)
+    monkeypatch.setattr(model, "_invoke", observed)
+    model.infer_prepared(request, threading.Event(), prepared)
+    assert [name for name, _ in seen] == ["generate", "decode"]
+    assert seen[0][1] == seen[1][1]
+    assert seen[0][1] is not None

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from contextlib import nullcontext
-from contextvars import copy_context
+from contextvars import ContextVar, copy_context
 import asyncio
 import hashlib
 import json
@@ -35,6 +35,14 @@ _DOMAIN = b"skeleton.local.pre_delivery.merkle.v1\x00"
 _MAX_PART_BYTES = 4 * 1024 * 1024
 _MAX_PARTS = 2002
 _DIGEST = re.compile(r"[0-9a-f]{64}\Z")
+_native_verification_cancel: ContextVar[threading.Event | None] = ContextVar(
+    "skeleton_native_verification_cancel", default=None,
+)
+
+
+def native_verification_cancel_event() -> threading.Event | None:
+    """Cooperative stop signal owned by the current bounded native worker."""
+    return _native_verification_cancel.get()
 
 
 def _hash(data: bytes) -> str:
@@ -454,10 +462,20 @@ class GuardedLocalInference:
         loop = asyncio.get_running_loop()
         future: asyncio.Future[tuple[bool, Any]] = loop.create_future()
         context = copy_context()
+        cancel = threading.Event()
+
+        def cancellable_operation() -> Any:
+            token = _native_verification_cancel.set(cancel)
+            try:
+                if cancel.is_set():
+                    raise SealedContextBoundaryError("native verification cancelled")
+                return operation()
+            finally:
+                _native_verification_cancel.reset(token)
 
         def run() -> None:
             try:
-                result = (True, context.run(operation))
+                result = (True, context.run(cancellable_operation))
             except BaseException as exc:
                 result = (False, exc)
             finally:
@@ -484,7 +502,13 @@ class GuardedLocalInference:
         try:
             ok, value = await asyncio.wait_for(asyncio.shield(future), timeout=timeout)
         except TimeoutError as exc:
+            cancel.set()
+            future.cancel()
             raise SealedContextBoundaryError("native verification timed out") from exc
+        except asyncio.CancelledError:
+            cancel.set()
+            future.cancel()
+            raise
         if not ok:
             if isinstance(value, SealedContextError):
                 raise value

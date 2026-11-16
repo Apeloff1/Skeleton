@@ -174,17 +174,21 @@ class GgufTokenBridgeModel(LlamaCppModel):
             raise _fail("GGUF bridge prompt exceeds bounds")
         return raw
 
-    def _invoke(self, operation, payload, *, completion=0, cancel=None):
+    def _invoke(self, operation, payload, *, completion=0, cancel=None, deadline=None):
         if operation not in ("encode", "decode", "roundtrip", "generate") or len(payload) > _MAX_FRAME:
             raise _fail()
+        from skeleton.context.pre_delivery_guard import native_verification_cancel_event
+        guard_cancel = native_verification_cancel_event()
         cancel = cancel if cancel is not None else threading.Event()
         started = time.monotonic()
         limit = float(self.config.timeout_seconds)
         if operation != "generate":
             limit = min(limit, 20.0)
+        if deadline is not None:
+            limit = min(limit, deadline - started)
 
         def interrupt():
-            if cancel.is_set():
+            if cancel.is_set() or (guard_cancel is not None and guard_cancel.is_set()):
                 raise LocalInferenceCancelled("exact GGUF bridge cancelled")
             if time.monotonic() - started >= limit:
                 raise TimeoutError("exact GGUF bridge deadline elapsed")
@@ -337,12 +341,13 @@ class GgufTokenBridgeModel(LlamaCppModel):
         return self.infer_prepared(request, cancel, self.prepare_input(request))
 
     def infer_prepared(self, request, cancel, prepared):
+        started = time.monotonic()
+        deadline = started + float(self.config.timeout_seconds)
         self.validate_prepared_input(request, prepared)
         raw = self._request_bytes(request)
         ids = prepared.token_sequence
-        started = time.monotonic()
         frame = self._invoke("generate", _text(raw) + _pack_ids(ids),
-                             completion=request.max_output_tokens, cancel=cancel)
+                             completion=request.max_output_tokens, cancel=cancel, deadline=deadline)
         finish = frame.number()
         consumed = frame.ids()
         output_ids = frame.ids(request.max_output_tokens)
@@ -354,10 +359,12 @@ class GgufTokenBridgeModel(LlamaCppModel):
             raise _fail("physical GGUF token receipt mismatch")
         if cancel.is_set():
             raise LocalInferenceCancelled("exact GGUF generation cancelled")
-        echo = self._invoke("decode", _pack_ids(output_ids), cancel=cancel)
+        echo = self._invoke("decode", _pack_ids(output_ids), cancel=cancel, deadline=deadline)
         if echo.text() != output:
             raise _fail("physical GGUF output token echo mismatch")
         echo.finish()
+        if time.monotonic() >= deadline:
+            raise TimeoutError("exact GGUF overall generation deadline elapsed")
         if cancel.is_set():
             raise LocalInferenceCancelled("exact GGUF generation cancelled")
         receipt = _digest({"schema": "skeleton.gguf.exact-receipt.v1",
