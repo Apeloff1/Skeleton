@@ -1780,11 +1780,14 @@ sys.stdout.write(json.dumps(result, sort_keys=True, separators=(",", ":"), ensur
 class LocalWorkerEvidenceValidator:
     """Recompute pure job semantics from persisted admitted input, not claims."""
 
-    def __init__(self, custody: SQLiteWorkerCustody) -> None:
+    def __init__(self, custody: SQLiteWorkerCustody, *,
+                 additional_validator: Callable[[HostDispatchAttempt, bytes], bool] | None = None) -> None:
+        if additional_validator is not None and not callable(additional_validator):
+            raise DurableSwarmError("invalid additional local evidence validator")
         self.custody = custody
+        self._additional_validator = additional_validator
 
     def __call__(self, receipt: HostWorkerReceipt, artifact: bytes) -> bool:
-        import json
         from hashlib import sha256
         if receipt.action != "success":
             return False
@@ -1794,9 +1797,13 @@ class LocalWorkerEvidenceValidator:
         attempt = record.attempt
         if (attempt.task_id, attempt.worker_id) != (receipt.task_id, receipt.worker_id):
             return False
+        payload = attempt.payload()
+        if payload.get("operation") not in _LOCAL_OPERATIONS:
+            return (self._additional_validator is not None
+                    and self._additional_validator(attempt, artifact) is True)
         expected = {"version": 1,
                     "payload_sha256": sha256(attempt.payload_json).hexdigest(),
-                    "result": _local_reference(attempt.payload())}
+                    "result": _local_reference(payload)}
         return artifact == _wait_bytes(expected)
 
 
@@ -1836,6 +1843,10 @@ class LocalSubprocessTransport:
                 raise DurableSwarmError("invalid local operation grant")
             self._grants[(_wait_identifier(tenant), _wait_identifier(worker))] = operations
         self.timeout_seconds = timeout_seconds
+
+    @property
+    def max_execution_seconds(self) -> float:
+        return self.timeout_seconds
 
     def __call__(self, attempt: HostDispatchAttempt) -> HostTransportReply:
         import json
@@ -1900,12 +1911,17 @@ class LocalCommittedEvidenceValidator:
     """
 
     def __init__(self, custody: SQLiteWorkerCustody,
-                 original_authority: HostWorkerAuthority) -> None:
+                 original_authority: HostWorkerAuthority, *,
+                 local_validator: LocalWorkerEvidenceValidator | None = None) -> None:
         if not isinstance(original_authority, HostWorkerAuthority):
             raise DurableSwarmError("original trusted worker authority required")
+        if local_validator is not None and (
+                not isinstance(local_validator, LocalWorkerEvidenceValidator)
+                or local_validator.custody is not custody):
+            raise DurableSwarmError("original local evidence validator custody mismatch")
         self.custody = custody
         self.original_authority = original_authority
-        self._local = LocalWorkerEvidenceValidator(custody)
+        self._local = local_validator or LocalWorkerEvidenceValidator(custody)
 
     def _original(self, attempt: HostDispatchAttempt) -> tuple[HostWorkerReceipt, bytes]:
         record = self.custody.lookup(attempt.run_id, attempt.lease_token)
@@ -1927,7 +1943,9 @@ class LocalCommittedEvidenceValidator:
         from hashlib import sha256
         receipt, original = self._original(attempt)
         return _wait_bytes({
-            "version": 1, "kind": "local-pure-committed",
+            "version": 1,
+            "kind": ("local-pure-committed" if attempt.payload().get("operation") in _LOCAL_OPERATIONS
+                     else "local-inference-committed"),
             "original_receipt_sha256": receipt.digest,
             "original_artifact_sha256": sha256(original).hexdigest(),
             "payload_sha256": sha256(attempt.payload_json).hexdigest(),
@@ -2053,7 +2071,7 @@ class ManagedHostDispatcher:
                 or not isinstance(transport, LocalSubprocessTransport)
                 or type(lease_seconds) not in (float, int)
                 or not math.isfinite(lease_seconds)
-                or not transport.timeout_seconds + 10 <= lease_seconds <= 3600
+                or not transport.max_execution_seconds + 10 <= lease_seconds <= 3600
                 or type(max_checkpoints) is not int or not 1 <= max_checkpoints <= 64
                 or type(max_terminal_records) is not int or not 1 <= max_terminal_records <= 1_000_000):
             raise DurableSwarmError("invalid managed host configuration")

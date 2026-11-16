@@ -2852,3 +2852,132 @@ def test_batch_refuses_expired_attempt_renewal_without_releasing_capacity(tmp_pa
     assert broker.is_retired()
     recovered = bridge.load("renewal").restore_runtime().task("job")
     assert recovered.effect_uncertain and recovered.lease_token == task.lease_token
+
+
+def _dispatch_gguf_fixture(tmp_path):
+    """Real subprocess protocol fixture, explicitly not trained model inference."""
+    import hashlib
+    import struct
+    import sys
+    exe = tmp_path / "fixture-runtime"
+    exe.write_text("#!" + sys.executable + "\n"
+                   "import sys\nfrom pathlib import Path\n"
+                   "prompt = Path(sys.argv[sys.argv.index('-f')+1]).read_text()\n"
+                   "assert 'user: ' in prompt and 'assistant:' in prompt\n"
+                   "sys.stdout.write('  exact fixture result\\n')\n", encoding="utf-8")
+    exe.chmod(0o700)
+    model = tmp_path / "fixture.gguf"
+    model.write_bytes(struct.pack("<4sIQQ", b"GGUF", 3, 1, 0))
+    model.chmod(0o600)
+    return {
+        "executable": str(exe), "model": str(model),
+        "runtime_sha256": hashlib.sha256(exe.read_bytes()).hexdigest(),
+        "model_sha256": hashlib.sha256(model.read_bytes()).hexdigest(),
+        "context_tokens": 512, "threads": 1, "batch_tokens": 64,
+        "kv_bytes_per_token": 1024, "reserve_bytes": 32 * 1024**2,
+        "timeout_seconds": 20, "max_output_tokens": 32,
+        "runtime_libraries": [], "workspace_db": None,
+    }
+
+
+def test_dispatcher_actual_gguf_cli_protocol_pins_receipt_and_historical_readback(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX process custody")
+    import hashlib
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    from skeleton.automation.agents.swarm_dispatch_gguf import GGUF_OPERATION
+    options = _dispatch_gguf_fixture(tmp_path)
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "service", tenants=("a",), operations=(GGUF_OPERATION, "integer_sum"),
+        workers=2, max_jobs=8, gguf_options=options,
+    )
+    model_job = {"kind": "submit", "tenant": "a", "task_id": "native",
+                 "operation": GGUF_OPERATION, "input": {"prompt": "Explain hash", "max_output_tokens": 16}}
+    app.enqueue("native-request", model_job)
+    app.enqueue("other", {"kind": "submit", "tenant": "a", "task_id": "compute",
+                          "operation": "integer_sum", "input": [6, 7]})
+    app.start()
+    tick = app.tick()
+    assert set(tick.tasks) == {"native", "compute"}
+    assert tick.disposition == "completed"
+    answer = app.result("a", "native")
+    result = answer["result"]
+    assert result["text"] == "exact fixture result"
+    assert result["model_sha256"] == options["model_sha256"]
+    assert result["quality_certified"] is False
+    assert result["frame"]["raw_stdout_digest"] == hashlib.sha256(b"  exact fixture result\n").hexdigest()
+    assert app.result("a", "compute")["result"] == 13
+    assert app.managed.service._transport.backend.execution_snapshot()["processes_started"] == 1
+    assert app.managed.service._transport.backend.execution_snapshot()["processes_exited"] == 1
+    app.close()
+    # Historical output is verified against sealed policy and durable native
+    # frame, not by rerunning a model or requiring the asset to stay installed.
+    os.unlink(options["model"])
+    reopened = LocalDispatcherApplication(app.directory)
+    assert reopened.result("a", "native") == answer
+
+
+def test_dispatcher_gguf_policy_refuses_wrong_hash_and_task_selected_executable(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX process custody")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    from skeleton.automation.agents.swarm_dispatch_gguf import GGUF_OPERATION
+    from skeleton.automation.agents.swarm_durable import DurableSwarmError
+    options = _dispatch_gguf_fixture(tmp_path)
+    with pytest.raises(DurableSwarmError, match="identity"):
+        LocalDispatcherApplication.initialize(
+            tmp_path / "bad", tenants=("a",), operations=(GGUF_OPERATION,),
+            gguf_options=dict(options, model_sha256="a" * 64),
+        )
+    assert not (tmp_path / "bad").exists()
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "good", tenants=("a",), operations=(GGUF_OPERATION,),
+        workers=1, max_jobs=4, gguf_options=options,
+    )
+    for identity, value in (
+        ("exe", {"prompt": "hi", "max_output_tokens": 8, "executable": "/bin/false"}),
+        ("context", {"prompt": "a" * 510, "max_output_tokens": 16}),
+        ("tool", {"prompt": "hi", "max_output_tokens": 8, "tools": []}),
+    ):
+        app.enqueue(identity, {"kind": "submit", "tenant": "a", "task_id": identity,
+                               "operation": GGUF_OPERATION, "input": value})
+    app.start()
+    assert app.tick().disposition == "idle"
+    assert all(app.inbox.command(identity)["status"] == "rejected"
+               for identity in ("exe", "context", "tool"))
+    assert app.custody.usage()["attempts"] == 0
+    app.close()
+
+
+def test_native_gguf_frame_tampering_refused_even_if_outer_receipt_recomputed(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX process custody")
+    import json
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    from skeleton.automation.agents.swarm_dispatch_gguf import GGUF_OPERATION
+    from skeleton.automation.agents.swarm_durable import _wait_bytes
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "service", tenants=("a",), operations=(GGUF_OPERATION,),
+        workers=1, max_jobs=4, gguf_options=_dispatch_gguf_fixture(tmp_path),
+    )
+    app.enqueue("request", {"kind": "submit", "tenant": "a", "task_id": "native",
+                            "operation": GGUF_OPERATION,
+                            "input": {"prompt": "test", "max_output_tokens": 16}})
+    app.start()
+    assert app.tick().disposition == "completed"
+    digest = app.result("a", "native")["receipt_sha256"]
+    receipt, artifact = app.custody.resolve(digest)
+    attempt = app.custody.lookup(receipt.run_id, receipt.lease_token).attempt
+    assert app.policy.gguf.validate_artifact(attempt, artifact)
+    for key, value in (("text", "changed"), ("quality_certified", True),
+                       ("execution_profile_sha256", "f" * 64), ("input_tokens_estimated", 1)):
+        data = json.loads(artifact)
+        data["result"][key] = value
+        assert not app.policy.gguf.validate_artifact(attempt, _wait_bytes(data))
+    data = json.loads(artifact)
+    data["result"]["frame"]["raw_stdout_digest"] = "b" * 64
+    assert not app.policy.gguf.validate_artifact(attempt, _wait_bytes(data))
+    app.close()

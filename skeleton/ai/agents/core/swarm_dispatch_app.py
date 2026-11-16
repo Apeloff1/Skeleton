@@ -27,6 +27,9 @@ from skeleton.automation.agents.swarm_durable import (
     SQLiteWorkerCustody, SwarmDurableBridge, _HOST_SCHEDULE_FIELD, _HOST_WAIT_FIELD,
     _LOCAL_OPERATIONS, _local_reference, _wait_bytes, _wait_identifier, _wait_time,
 )
+from skeleton.automation.agents.swarm_dispatch_gguf import (
+    GGUF_OPERATION, GGUF_CAPABILITY, PinnedGGUFPolicy, PinnedGGUFTransport,
+)
 from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
 from skeleton.automation.agents.swarm_ingress import SwarmIngressGovernor
 from skeleton.automation.agents.swarm_quota import Quota, SharedQuota
@@ -155,15 +158,18 @@ class DispatcherPolicy:
     inspector_key: bytes
     event_keys: tuple[bytes, ...]
     digest: str
+    gguf: PinnedGGUFPolicy | None = None
 
     @classmethod
     def parse(cls, raw: bytes) -> DispatcherPolicy:
         config = _json_object(raw)
-        if set(config) != {
+        fields = {
             "version", "tenants", "operations", "workers", "max_jobs",
             "timeout_seconds", "lease_seconds", "worker_storage_bytes",
             "outer_history", "worker_keys", "inspector_key", "event_keys",
-        } or config["version"] != _VERSION or type(config["version"]) is not int:
+        }
+        if (set(config) not in (fields, fields | {"gguf"})
+                or config["version"] != _VERSION or type(config["version"]) is not int):
             raise DurableSwarmError("unsupported dispatcher configuration")
         tenants, operations = config["tenants"], config["operations"]
         if (type(tenants) is not list or not 1 <= len(tenants) <= 32
@@ -172,14 +178,18 @@ class DispatcherPolicy:
                 or type(operations) is not list or not operations
                 or any(type(value) is not str for value in operations)
                 or len(set(operations)) != len(operations)
-                or not set(operations).issubset(_LOCAL_OPERATIONS)):
+                or not set(operations).issubset(_LOCAL_OPERATIONS | {GGUF_OPERATION})):
             raise DurableSwarmError("invalid dispatcher tenant or operation inventory")
         for tenant in tenants:
             _identifier(tenant)
         workers = _uint(config["workers"], 1, 32, "worker count")
         max_jobs = _uint(config["max_jobs"], 1, 512, "job retention")
         timeout = _uint(config["timeout_seconds"], 1, 60, "worker timeout")
-        lease = _uint(config["lease_seconds"], timeout + 15, 3600, "writer lease")
+        gguf = PinnedGGUFPolicy.parse(config["gguf"]) if "gguf" in config else None
+        if (gguf is None) != (GGUF_OPERATION not in operations):
+            raise DurableSwarmError("GGUF operation and pinned policy must be provisioned together")
+        maximum_timeout = max(timeout, gguf.timeout_seconds if gguf is not None else 0)
+        lease = _uint(config["lease_seconds"], maximum_timeout + 15, 3600, "writer lease")
         storage = _uint(config["worker_storage_bytes"], 1024 * 1024, 64 * 1024**3,
                         "evidence storage")
         history = _uint(config["outer_history"], 2, 128, "checkpoint retention")
@@ -195,7 +205,7 @@ class DispatcherPolicy:
             raise DurableSwarmError("noncanonical or reused dispatcher credentials")
         return cls(tuple(tenants), frozenset(operations), workers, max_jobs, timeout,
                    lease, storage, history, worker_keys, inspector_key, event_keys,
-                   sha256(raw).hexdigest())
+                   sha256(raw).hexdigest(), gguf)
 
     def public(self) -> dict:
         return {
@@ -204,6 +214,7 @@ class DispatcherPolicy:
             "max_jobs": self.max_jobs, "timeout_seconds": self.timeout_seconds,
             "lease_seconds": self.lease_seconds, "worker_storage_bytes": self.worker_storage_bytes,
             "outer_history": self.outer_history, "policy_sha256": self.digest,
+            "gguf": None if self.gguf is None else self.gguf.public(),
         }
 
     def worker_id(self, index: int) -> str:
@@ -447,7 +458,7 @@ class LocalDispatcherApplication:
         timeout_seconds: int = 10, lease_seconds: int = 120,
         worker_storage_bytes: int = 128 * 1024 * 1024,
         outer_history: int = 16, clock_ms: Callable[[], int] | None = None,
-        store_clock: Callable[[], float] | None = None,
+        store_clock: Callable[[], float] | None = None, gguf_options: dict | None = None,
     ) -> LocalDispatcherApplication:
         from secrets import token_hex
         if os.name != "posix":
@@ -466,6 +477,10 @@ class LocalDispatcherApplication:
             "outer_history": outer_history, "worker_keys": [token_hex(32) for _ in range(workers)],
             "inspector_key": token_hex(32), "event_keys": [token_hex(32) for _ in tenants],
         }
+        if gguf_options is not None:
+            if GGUF_OPERATION not in operations:
+                raise DispatcherRequestError("GGUF provisioning requires explicit operation grant")
+            config["gguf"] = PinnedGGUFPolicy.provision(gguf_options).record()
         data = _canonical(config)
         policy = DispatcherPolicy.parse(data)
         # Exclusive root creation prevents replacing an earlier service or
@@ -505,34 +520,50 @@ class LocalDispatcherApplication:
         finally:
             os.close(fd)
 
-    def start(self) -> ManagedHostDispatcher:
-        if self.managed is not None:
-            raise DurableSwarmError("application service already started")
+    def _authorities(self):
         policy = self.policy
-        original_grants = {}
-        signers = {}
-        transport_grants = {}
-        for index, key in enumerate(policy.worker_keys):
-            worker, issuer = policy.worker_id(index), policy.worker_issuer(index)
-            original_grants[(issuer, worker)] = (key, frozenset({"success"}))
-            signers[worker] = (issuer, key)
-            for tenant in policy.tenants:
-                transport_grants[(tenant, worker)] = policy.operations
+        original_grants = {
+            (policy.worker_issuer(index), policy.worker_id(index)): (key, frozenset({"success"}))
+            for index, key in enumerate(policy.worker_keys)
+        }
+        worker_validator = LocalWorkerEvidenceValidator(
+            self.custody, additional_validator=None if policy.gguf is None else policy.gguf.validate_artifact,
+        )
         original = HostWorkerAuthority(
             _RUN_ID, grants=original_grants, resolve=self.custody.resolve,
-            validate_evidence=LocalWorkerEvidenceValidator(self.custody),
+            validate_evidence=worker_validator,
         )
-        validator = LocalCommittedEvidenceValidator(self.custody, original)
+        validator = LocalCommittedEvidenceValidator(
+            self.custody, original, local_validator=worker_validator,
+        )
         grants = dict(original_grants)
         for index in range(policy.workers):
             grants[("local-inspector", policy.worker_id(index))] = (
                 policy.inspector_key, frozenset({"reconcile:committed"}))
         authority = HostWorkerAuthority(_RUN_ID, grants=grants, resolve=self.custody.resolve,
                                         validate_evidence=validator)
-        transport = LocalSubprocessTransport(
-            self.custody, grants=transport_grants, worker_signers=signers,
-            timeout_seconds=policy.timeout_seconds,
-        )
+        return original, validator, authority
+
+    def start(self) -> ManagedHostDispatcher:
+        if self.managed is not None:
+            raise DurableSwarmError("application service already started")
+        policy = self.policy
+        signers = {policy.worker_id(index): (policy.worker_issuer(index), key)
+                   for index, key in enumerate(policy.worker_keys)}
+        pure_operations = policy.operations & _LOCAL_OPERATIONS
+        transport_grants = {(tenant, worker): pure_operations
+                            for tenant in policy.tenants for worker in signers if pure_operations}
+        _, validator, authority = self._authorities()
+        transport_options = dict(grants=transport_grants, worker_signers=signers,
+                                 timeout_seconds=policy.timeout_seconds)
+        if policy.gguf is None:
+            transport = LocalSubprocessTransport(self.custody, **transport_options)
+        else:
+            transport = PinnedGGUFTransport(
+                self.custody, policy=policy.gguf, workspace_db=self.store.path,
+                gguf_worker=policy.worker_id(0), gguf_tenants=frozenset(policy.tenants),
+                **transport_options,
+            )
         ingress = SwarmIngressGovernor(
             rate_capacity=policy.max_jobs, rate_refill_per_second=32.0,
             default_quota=Quota(max_queued=policy.max_jobs, max_leased=policy.workers,
@@ -547,10 +578,13 @@ class LocalDispatcherApplication:
         if self.store.resume_state(_RUN_ID).checkpoint is None:
             initial = HardenedSwarmRuntime(
                 fenced=True, max_tasks=policy.max_jobs, max_workers=policy.workers,
-                default_lease_seconds=policy.timeout_seconds + 15,
+                default_lease_seconds=transport.max_execution_seconds + 15,
             )
             for worker in signers:
-                initial.register_worker(worker, capacity=1, capabilities=("local-compute",))
+                capabilities = ["local-compute"]
+                if policy.gguf is not None and worker == policy.worker_id(0):
+                    capabilities.append(GGUF_CAPABILITY)
+                initial.register_worker(worker, capacity=1, capabilities=tuple(capabilities))
         self.managed = ManagedHostDispatcher.start(
             self.store, _RUN_ID, ingress=ingress, authority=authority, transport=transport,
             initial_runtime=initial,
@@ -625,9 +659,14 @@ class LocalDispatcherApplication:
         payload = {"operation": operation, "input": body["input"]}
         raw = _canonical(payload, limit=32768)
         try:
-            result = _local_reference(payload)
-            _canonical({"version": 1, "payload_sha256": sha256(raw).hexdigest(),
-                        "result": result}, limit=self.custody.max_artifact_bytes)
+            if operation == GGUF_OPERATION:
+                if self.policy.gguf is None:
+                    raise DurableSwarmError("no provisioned GGUF model")
+                self.policy.gguf.request(payload)
+            else:
+                result = _local_reference(payload)
+                _canonical({"version": 1, "payload_sha256": sha256(raw).hexdigest(),
+                            "result": result}, limit=self.custody.max_artifact_bytes)
         except (ValueError, TypeError, RecursionError, UnicodeError, DurableSwarmError) as exc:
             raise DispatcherRequestError("operation input or result exceeds worker contract") from exc
         payload[_HOST_SCHEDULE_FIELD] = metadata
@@ -654,7 +693,7 @@ class LocalDispatcherApplication:
         if len(runtime.tasks()) >= self.policy.max_jobs or occupied + payload_charge > _MAX_RETAINED_PAYLOAD:
             raise DispatcherRequestError("retained task capacity exhausted")
         task = SwarmTask(task_id, payload, priority=priority, max_attempts=1,
-                         required_capabilities=frozenset({"local-compute"}),
+                         required_capabilities=frozenset({GGUF_CAPABILITY if operation == GGUF_OPERATION else "local-compute"}),
                          dependencies=tuple(deps))
         capture = (managed.submit(tenant, task, singleton_key=singleton)
                    if wait is None else managed.submit_wait(wait, task, singleton_key=singleton))
@@ -853,17 +892,21 @@ class LocalDispatcherApplication:
         if resolved is None:
             raise DurableSwarmError("completed worker result missing")
         receipt, raw = resolved
-        index = next((i for i in range(self.policy.workers)
-                      if self.policy.worker_id(i) == receipt.worker_id), None)
-        if index is None:
-            raise DurableSwarmError("completed worker outside provisioned policy")
-        authority = HostWorkerAuthority(
-            _RUN_ID, grants={(self.policy.worker_issuer(index), receipt.worker_id):
-                             (self.policy.worker_keys[index], frozenset({"success"}))},
-            resolve=self.custody.resolve, validate_evidence=LocalWorkerEvidenceValidator(self.custody),
-        )
-        if not authority(receipt.worker_id, task_id, rows[0][0], "success", digest):
+        record = self.custody.lookup(_RUN_ID, rows[0][0])
+        payload = dict(task.payload)
+        payload.pop(_HOST_WAIT_FIELD, None)
+        payload.pop(_HOST_SCHEDULE_FIELD, None)
+        if (record is None or record.attempt.tenant != tenant
+                or record.attempt.payload_json != _wait_bytes(payload)):
+            raise DurableSwarmError("completed task admission differs from worker result")
+        original, _, authority = self._authorities()
+        if not original(receipt.worker_id, task_id, rows[0][0], "success", digest):
             raise DurableSwarmError("completed worker result failed evidence verification")
+        if task.reconciliation_sha256 is not None:
+            if not authority(receipt.worker_id, task_id, rows[0][0], "reconcile:committed",
+                             task.reconciliation_sha256):
+                raise DurableSwarmError("completed reconciliation evidence refused")
+            result["reconciliation_sha256"] = task.reconciliation_sha256
         result["receipt_sha256"] = digest
         result["result"] = _json_object(raw)["result"]
         return result
@@ -910,7 +953,8 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="action", required=True)
     init = sub.add_parser("init", help="create exclusive private service state and credentials")
     init.add_argument("--tenant", action="append", required=True)
-    init.add_argument("--operation", action="append", choices=sorted(_LOCAL_OPERATIONS), required=True)
+    init.add_argument("--operation", action="append", choices=sorted(_LOCAL_OPERATIONS | {GGUF_OPERATION}), required=True)
+    init.add_argument("--gguf-policy", type=Path, help="private explicit pinned CPU GGUF policy JSON")
     init.add_argument("--workers", type=int, default=2)
     init.add_argument("--max-jobs", type=int, default=128)
     init.add_argument("--timeout", type=int, default=10)
@@ -933,6 +977,8 @@ def main(argv: list[str] | None = None) -> int:
                 args.directory, tenants=tuple(args.tenant), operations=tuple(args.operation),
                 workers=args.workers, max_jobs=args.max_jobs, timeout_seconds=args.timeout,
                 lease_seconds=args.lease,
+                gguf_options=None if args.gguf_policy is None else _json_object(
+                    _read_private(args.gguf_policy, _MAX_COMMAND_BYTES)),
             )
             _print(app.status())
             return 0

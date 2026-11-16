@@ -438,3 +438,45 @@ custody while unrelated work may complete. The application exposes per-
 task and aggregate batch outcomes. Actual process-overlap, mixed failure
 and expiry regressions were added. The configured worker count is a
 physical local concurrency bound, not a claim of measured scaling speed.
+
+## Wave A21: actual pinned CPU GGUF worker execution
+
+The installed dispatcher can now run a real local GGUF generation through
+the canonical LocalInferenceEngine and llama.cpp adapter. Configure
+the existing init command with an explicit additional operation
+gguf_generate and --gguf-policy pointing to an owner-private JSON
+file. The JSON has exact fields: executable, model, runtime_sha256,
+model_sha256, context_tokens, threads, batch_tokens, kv_bytes_per_token,
+reserve_bytes, timeout_seconds, max_output_tokens, runtime_libraries
+(array of filename/digest pairs; empty only when consciously relying on
+the trusted host loader), workspace_db (absolute private existing SQLite
+anchor or null for the dedicated dispatcher database). Supply exact
+SHA-256 pins and a safe context/KV budget. The initializer verifies
+actual artifact identities and seals the canonical execution profile.
+The writer lease must be at least fifteen seconds longer than the
+largest configured execution timeout. Startup revalidates pins;
+commands can never select model paths, executable flags or credentials.
+
+A submit command with operation gguf_generate takes input
+{"prompt":"...","max_output_tokens":32,"seed":0}; seed is optional.
+The admitted UTF-8 byte upper bound and pinned context protect the
+shared input/output window. One explicitly capable physical worker
+uses the existing local inference engine without result caching,
+CPU-only configuration and measured RAM/CPU admission. If workspace_db
+points to the same application workspace, the canonical inference
+lock excludes concurrent generation by that service. It is not a
+system-wide lock covering unrelated workspace paths.
+
+The native backend now exposes exact bounded non-content execution
+receipt frames. Durable artifacts bind the entire admitted payload,
+model, runtime, profile, output, response identity and reconstructed
+native receipt digest. Reconciliation validates the original native
+receipt and distinct inspector receipt without re-execution. Historical
+reads work even if the operator removed the asset. Native receipt
+hashing and host HMAC prove trusted local execution custody, not
+factual answer accuracy or independent third-party attestation.
+Token counts remain backend estimates. No downloaded assets or
+claimed pretrained benchmark result. The explicit CLI fixture tests
+exercise actual native adapter subprocess boundaries, not trained
+weights; real GGUF assets and device qualification remain operator
+and CI responsibilities. Default app boot is unchanged.

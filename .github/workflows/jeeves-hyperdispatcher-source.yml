@@ -13,6 +13,7 @@ on:
       - 'skeleton/intelligence/dispatch_affinity.py'
       - 'skeleton/kernel/global_resource_scheduler.py'
       - 'skeleton/automation/agents/swarm_*.py'
+      - 'skeleton/ai/runtime/inference/llama_cpp.py'
       - 'skeleton/ai/agents/core/swarm_*.py'
       - 'skeleton/ai/runtime/kernel/global_resource_scheduler.py'
       - 'skeleton/intelligence/shared_pressure.py'
