@@ -1345,3 +1345,34 @@ def test_alternative_event_wait_correlation_preserves_timeout_and_scope():
     assert correlate_waits([wait],[replace(a,tenant_id="other")],generation=1,now_ms=9)[0].disposition=="waiting"
     with pytest.raises(DispatchPolicyError):
         correlate_waits([wait],[a],generation=2,now_ms=12)
+
+def test_alternative_affinity_round_preserves_headroom_and_cooldown():
+    from skeleton.intelligence.dispatch_affinity import Activation, HostRoom, CommunicationEdge, plan_affinity_round
+    a=Activation("a","t","left",1,"a"*64,"b"*64,10,True,True,0,2)
+    b=replace(a,activation_id="b",host_id="right",state_sha256="c"*64,movable=False)
+    hosts=[HostRoom("left","t",1,100,10,10,1),HostRoom("right","t",1,100,10,10,1)]
+    kw=dict(tenant_id="t",policy_sha256="a"*64,generation=1,now_ms=100000,minimum_gain_us=1)
+    rows=[CommunicationEdge("a","b",100)]
+    p=plan_affinity_round([a,b],hosts,rows,**kw)
+    assert len(p)==1 and p[0].activation_id=="a" and p[0].target=="right" and p[0].benefit_us==98
+    assert not plan_affinity_round([replace(a,last_move_ms=99999),b],hosts,rows,**kw)
+    assert not plan_affinity_round([a,b],[hosts[0],replace(hosts[1],usable_bytes=20)],rows,**kw)
+    assert not plan_affinity_round([replace(a,idle=False),b],hosts,rows,**kw)
+
+
+def test_alternative_artifact_plan_dedupes_transfer_but_holds_execution():
+    from skeleton.intelligence.dispatch_affinity import ArtifactRef, ArtifactDemand, ArtifactResident, plan_artifacts
+    ref=ArtifactRef("t","a"*64,"b"*64,"c"*64,100)
+    other=replace(ref,environment_sha256="d"*64)
+    demands=[ArtifactDemand("a","gpu",ref,1),ArtifactDemand("b","gpu",ref,2),
+             ArtifactDemand("c","gpu",other,3)]
+    residents=[ArtifactResident("disk",ref,1,True),ArtifactResident("gpu",other,1,False)]
+    kw=dict(generation=1,tenant_id="t",destination_room={"gpu":100},source_bandwidth={"disk":1000},
+            total_transfer_bytes=100)
+    p=plan_artifacts(demands,residents,**kw)
+    assert not p.ready_tasks and p.held_tasks==("a","b","c")
+    assert len(p.transfers)==1 and p.transfers[0].tasks==("a","b")
+    assert p.transfers[0].reservation_bytes==100
+    p2=plan_artifacts(demands,residents+[ArtifactResident("gpu",ref,1,True)],**kw)
+    assert p2.ready_tasks==("a","b") and p2.held_tasks==("c",)
+    assert not p2.transfers

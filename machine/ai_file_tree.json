@@ -422,7 +422,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "795f02305cc276f6cc2855aeaf8eabd7b3a6156c",
+      "source_git_object_sha": "847c15122f0c5acd215aae88eac9ae259cfb5a96",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",

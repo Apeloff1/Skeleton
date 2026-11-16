@@ -39,9 +39,9 @@ Further research queue (not yet verified): Restate, Oban, pg-boss, Faktory, Asyn
 | A15 | Versioned activation identity | Orleans | P |
 | A16 | Idle actor passivation | Pekko / Orleans | P |
 | A17 | Memory-sensitive passivation | Orleans | Open |
-| A18 | Communication affinity graph | Orleans | Open |
-| A19 | Bounded migration rounds | Orleans | Open |
-| A20 | Activation balance and anti-thrash | Orleans | Open |
+| A18 | Communication affinity graph | Orleans | P |
+| A19 | Bounded migration rounds | Orleans | P |
+| A20 | Activation balance and anti-thrash | Orleans | P |
 | A21 | Scale-to-zero safety | Knative | P |
 | A22 | Cooldown and warm retention | KEDA / Knative | P |
 | A23 | Stale scaler metric hold | KEDA | P |
@@ -49,10 +49,10 @@ Further research queue (not yet verified): Restate, Oban, pg-boss, Faktory, Asyn
 | A25 | Uncertain execution capacity floor | Jeeves extension | P |
 | A26 | Hierarchical allocation subleases | Flux / Parsl | Open |
 | A27 | Nested allocation reclamation | Flux | Open |
-| A28 | Data-affinity task scheduling | TaskVine / StarPU | Open |
-| A29 | Shared artifact transfer amortization | TaskVine | Open |
-| A30 | Versioned environment reuse | TaskVine | Open |
-| A31 | Data-ready execution barriers | StarPU / PaRSEC | Open |
+| A28 | Data-affinity task scheduling | TaskVine / StarPU | P |
+| A29 | Shared artifact transfer amortization | TaskVine | P |
+| A30 | Versioned environment reuse | TaskVine | P |
+| A31 | Data-ready execution barriers | StarPU / PaRSEC | P |
 | A32 | Compute-transfer overlap planning | StarPU / Legion | Open |
 | A33 | Weighted resident shard split | Pekko / Orleans | Open |
 | A34 | Bounded membership migration | Pekko | Open |
@@ -99,3 +99,18 @@ identity, non-discarding quiet-window coalescence with hard maximum wait,
 singleton eligibility against active or uncertain ownership, and generation-
 bound event/timeout wake proposals. It does not claim durable singleton locks,
 timer delivery, transactional event ingestion or actual wake publication.
+
+## Wave A4: communication affinity and content-bound scheduling
+
+The bounded affinity planner evaluates the observed communication graph,
+permits only idle and movable activations from the same tenant, policy
+and generation, and calculates marginal locality gain after migration
+cost. It retains destination headroom, enforces byte/move limits and
+cooldown, and updates the simulated graph after each accepted move.
+The artifact planner groups exact destination/content/environment/policy
+identities, avoids transfer duplication and reserves bytes against finite
+destination and round budgets. Missing inputs hold their consumers until
+a fresh verified resident observation exists. Transfer and migration
+remain advisory; no physical movement, cache publication or execution
+is performed. A15 activation generation, A16 idle passivation and A21–25
+lifecycle work remain subject to host integration and qualification.
