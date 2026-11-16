@@ -7,6 +7,10 @@ Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
     offline-runtime  Inspect pinned local weights and measured resource admission
     weight-store     Stage pinned weights and inspect cooperative disk/recovery custody
+    offline-cpu-budget               Inspect local CPU and memory admission
+    offline-energy-budget            Inspect local energy and thermal admission
+    resource-assurance               Execute resource-gated local assurance waves
+    gguf-source-preflight            Check independently pinned GGUF source bytes
     dragon-almanac                   Owner-scoped almanac projection
     dragon-technical-sources         Reviewed technical research leads
     original-native-evolution        Original cross-era source evolution
@@ -1400,6 +1404,18 @@ def main(argv: Optional[List[str]] = None) -> int:
         return recovered_main(rest)
     if cmd == "local-source-assurance":
         from skeleton.app.local_source_assurance import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "offline-cpu-budget":
+        from skeleton.app.offline_cpu_budget import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "offline-energy-budget":
+        from skeleton.app.offline_energy_budget import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "resource-assurance":
+        from skeleton.app.resource_assurance_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "gguf-source-preflight":
+        from skeleton.app.gguf_source_preflight_cli import main as recovered_main
         return recovered_main(rest)
     if cmd == "app":
         from skeleton.app.cli import run_app_cli

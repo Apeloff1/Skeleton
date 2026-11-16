@@ -62,6 +62,10 @@ jeeves-production-training = ["torch>=2.5,<3"]
 hosted-inference = ["openai>=2.54.0,<3", "httpx>=0.28.1,<1"]
 
 [project.scripts]
+skeleton-offline-cpu-budget = "skeleton.app.offline_cpu_budget:main"
+skeleton-offline-energy-budget = "skeleton.app.offline_energy_budget:main"
+skeleton-resource-assurance = "skeleton.app.resource_assurance_cli:main"
+skeleton-gguf-source-preflight = "skeleton.app.gguf_source_preflight_cli:main"
 skeleton-dragon-almanac = "skeleton.ai.game_builder.dragon_almanac_cli:main"
 skeleton-dragon-technical-sources = "skeleton.ai.game_builder.dragon_technical_source_cli:main"
 skeleton-original-native-evolution = "skeleton.ai.game_builder.native_evolution_cli:main"
