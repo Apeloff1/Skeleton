@@ -2538,12 +2538,13 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                 verify_primary(snapshot, _plain(row["checkpoint_identity"]))
                 runtime = run_type.from_snapshot(snapshot)
                 binding = snapshot["binding"]
-                expiry = _utc(row["consent_expires_at"]).timestamp()
+                expiry = binding["consent"]["expires_at"]
+                database_expiry = _utc(row["consent_expires_at"]).timestamp()
                 if (binding["scope"] != scope or binding["consent"] != _plain(row["consent"])
                         or binding["request_digest"] != row["request_digest"]
                         or _digest(_plain(row["request"])) != row["request_digest"]
-                        or expiry != binding["consent"]["expires_at"]
-                        or expiry <= at.timestamp() or row["status"] in {"deleted", "cancelled"}):
+                        or abs(database_expiry - expiry) > .0011
+                        or min(expiry, database_expiry) <= at.timestamp() or row["status"] in {"deleted", "cancelled"}):
                     raise ValueError("acquisition hold authority mismatch")
                 readiness = acquisition_readiness(
                     measurements=snapshot["acquisition_measurements"],
@@ -2554,7 +2555,8 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                 excluded += 1
                 continue
             qualified += 1
-            earliest_expiry = expiry if earliest_expiry is None else min(earliest_expiry, expiry)
+            expiry_fence = min(expiry, database_expiry)
+            earliest_expiry = expiry_fence if earliest_expiry is None else min(earliest_expiry, expiry_fence)
             for host in readiness["hosts"]:
                 # Only restriction metadata is exposed; unheld hosts are not
                 # published as possible alternates to a denied source.
