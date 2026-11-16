@@ -53,15 +53,15 @@ class CampaignStore:
     _append = staticmethod(append_actions)
 
     def _execute(self, sql: str, params: tuple = ()) -> sqlite3.Cursor:
-        # Only the two compile-time namespaces are allowed. Neither SQL
+        # Only the fixed compile-time namespaces are allowed. Neither SQL
         # identifiers nor statements can be selected by JSON input.
-        _check(self._namespace in {"campaign", "expedition"}, "unknown journal namespace")
+        _check(self._namespace in {"campaign", "expedition", "saga"}, "unknown journal namespace")
         return self.db.execute(sql.replace("gf_campaign_", "gf_" + self._namespace + "_"), params)
 
     def __init__(self, db: sqlite3.Connection, *, initialize: bool = True) -> None:
         _check(isinstance(db, sqlite3.Connection), "SQLite connection required")
         self.db = db
-        _check(self._namespace in {"campaign", "expedition"}, "unknown journal namespace")
+        _check(self._namespace in {"campaign", "expedition", "saga"}, "unknown journal namespace")
         _check(not db.in_transaction, "store requires its own transaction boundary")
         db.execute("PRAGMA foreign_keys = ON")
         _check(db.execute("PRAGMA foreign_keys").fetchone()[0] == 1, "foreign keys unavailable")
