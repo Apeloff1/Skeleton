@@ -105,3 +105,91 @@ def test_missing_store_is_never_created_by_inventory(tmp_path: Path) -> None:
     with pytest.raises(OfflineInventoryError):
         inventory_offline_weights(path)
     assert not path.exists()
+
+
+def test_aggregate_budget_refuses_before_any_object_hashing(tmp_path, monkeypatch):
+    _, store = _stage(tmp_path, payload=b"a" * 32)
+    _stage(tmp_path, payload=b"b" * 32)
+
+    def refuse(*args, **kwargs):
+        pytest.fail("weight objects opened before aggregate budget admission")
+
+    monkeypatch.setattr(WeightShardStore, "verified_paths", refuse)
+    with pytest.raises(OfflineInventoryError, match="aggregate"):
+        inventory_offline_weights(store, max_weight_bytes=48)
+
+
+def test_inventory_refuses_a_new_manifest_during_verification(tmp_path, monkeypatch):
+    _, store = _stage(tmp_path)
+    original = WeightShardStore.verified_paths
+    observed = []
+
+    def changing(self, key):
+        paths = original(self, key)
+        if not observed:
+            observed.append(True)
+            _stage(tmp_path, payload=b"new concurrent model")
+        return paths
+
+    monkeypatch.setattr(WeightShardStore, "verified_paths", changing)
+    with pytest.raises(OfflineInventoryError, match="changed during verification"):
+        inventory_offline_weights(store)
+
+
+def test_direct_plan_loader_bounds_sparse_manifest_and_refuses_symlinks(tmp_path):
+    from skeleton.ai.model_runtime.weight_shard_store import WeightShardStoreError
+    key, root = _stage(tmp_path)
+    store = WeightShardStore(root)
+    manifest = root / "manifests" / (key + ".json")
+    raw = manifest.read_bytes()
+    with manifest.open("wb") as handle:
+        handle.truncate(16 * 1024 * 1024 + 1)
+    with pytest.raises(WeightShardStoreError, match="manifest unavailable"):
+        store.load_plan(key)
+    manifest.write_bytes(raw)
+    alternate = tmp_path / "alternate.json"
+    alternate.write_bytes(raw)
+    manifest.unlink()
+    try:
+        manifest.symlink_to(alternate)
+    except OSError:
+        pytest.skip("symlink creation unavailable")
+    with pytest.raises(WeightShardStoreError, match="manifest unavailable"):
+        store.load_plan(key)
+
+
+def test_decoder_streams_are_the_actual_verified_descriptors(tmp_path, monkeypatch):
+    from skeleton.ai.model_runtime import weight_shard_store as module
+    from skeleton.ai.model_runtime.weight_shard_store import WeightShardStoreError
+    payload = b"real offline weights"
+    key, root = _stage(tmp_path, payload=payload)
+    checksum = sha256(payload).hexdigest()
+    model = ModelIdentity("offline-test", "revision-1", "tiny", checksum, checksum, checksum)
+    store = WeightShardStore(root)
+    original = module._hash_stream
+    verified = []
+
+    def observe(stream, *, maximum):
+        verified.append(stream)
+        return original(stream, maximum=maximum)
+
+    monkeypatch.setattr(module, "_hash_stream", observe)
+    with store.open_verified(key, model_identity=model) as streams:
+        assert len(streams) == len(verified) == 1
+        assert streams[0] is verified[0]
+        assert streams[0].tell() == 0
+        assert streams[0].read() == payload
+    assert verified[0].closed
+
+    # Replace the pathname after the exact descriptor has been hashed.
+    # The consumer must not be handed the substituted object.
+    if __import__("os").name != "posix":
+        pytest.skip("open-file replacement regression requires POSIX")
+    object_path = next((root / "objects").glob("*/*"))
+    replacement = tmp_path / "replacement.bin"
+    replacement.write_bytes(b"x" * len(payload))
+    with pytest.raises(WeightShardStoreError, match="changed during inspection"):
+        with store.open_verified(key, model_identity=model) as streams:
+            replacement.replace(object_path)
+            assert streams[0].read() == payload
+    assert all(stream.closed for stream in verified)
