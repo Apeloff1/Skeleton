@@ -1033,6 +1033,28 @@ class OfflineHTTPApplication:
                  if key != "expected_metadata_revision"},
                 expected_metadata_revision=body.get("expected_metadata_revision"),
             )
+        if tail in {"memory-preview", "memory-save"} and method == "POST":
+            from skeleton.app.jeeves_reviewed_memory import (
+                MemoryConflict, MemoryRejected, prepare_memory, save_memory,
+            )
+            required = {"selection"} if tail == "memory-preview" else {
+                "selection", "approved", "approval_sha256",
+            }
+            _fields(body, required, required)
+            if tail == "memory-save" and body["approved"] is not True:
+                raise OfflineHTTPError(403, "saving independent memory requires explicit approval")
+            try:
+                if tail == "memory-preview":
+                    return 200, prepare_memory(self.knowledge, sid, body["selection"])
+                item = save_memory(
+                    self.knowledge, sid, body["selection"],
+                    approved=body["approved"], approval_sha256=body["approval_sha256"],
+                )
+                return (200 if item["reused"] else 201), item
+            except MemoryConflict as exc:
+                raise OfflineHTTPError(409, str(exc)) from None
+            except MemoryRejected as exc:
+                raise OfflineHTTPError(400, str(exc)) from None
         if tail == "context-preview" and method == "POST":
             # Local-only read-only estimate; the actual new turn still
             # validates full-history retention and GGUF native admission.
