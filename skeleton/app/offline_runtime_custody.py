@@ -45,7 +45,31 @@ def sealed_cpu_custody(store_path: Path, *, plan_digest: str, model: ModelIdenti
     first = plan_preflight(source, before, copying_policy, now_ns=time.monotonic_ns())
     require(first["status"] == "candidate", "insufficient headroom for sealed copy")
     store = WeightShardStore(store_path, maximum_bytes=policy.maximum_source_bytes)
-    with store.open_sealed_pages(plan_digest, model_identity=model, max_bytes=maximum) as pages:
+    checks = 0
+    last_copied = 0
+    last_digest = None
+
+    def checkpoint(copied: int, total: int) -> None:
+        nonlocal checks, last_copied, last_digest
+        require(type(total) is int and total == size, "sealed copy total changed")
+        integer(copied, last_copied, size, "sealed copy progress")
+        remaining = size - copied
+        # Previously allocated pages may already appear in the measured
+        # usage. Charge outstanding sealed-copy bytes, not those twice.
+        # Still preserve separate downstream model/worker placement headroom.
+        outstanding = replace(policy, host_reserve_bytes=policy.host_reserve_bytes + remaining)
+        observation = sample_hardware()
+        require(observation.origin == "local_probe", "real local probe required during sealed copy")
+        check = plan_preflight(source, observation, outstanding, now_ns=time.monotonic_ns())
+        require(check["status"] == "candidate", "resource pressure during sealed copy")
+        last_copied = copied
+        last_digest = check["preflight_digest"]
+        checks += 1
+
+    with store.open_sealed_pages(plan_digest, model_identity=model, max_bytes=maximum,
+                                 progress_check=checkpoint) as pages:
+        require(last_copied == size and checks >= 2 and last_digest is not None,
+                "sealed copy did not complete resource checkpoints")
         require(len(pages) == len(source.plan.shards) and
                 all(len(page) == shard.bytes for page, shard in zip(pages, source.plan.shards)),
                 "sealed page count or size drift")
@@ -58,6 +82,7 @@ def sealed_cpu_custody(store_path: Path, *, plan_digest: str, model: ModelIdenti
                 "model_identity_digest": model.identity_digest, "sealed_bytes": size,
                 "shard_count": len(pages), "before_digest": first["preflight_digest"],
                 "after_digest": second["preflight_digest"],
+                "copy_checks": checks, "final_copy_check_digest": last_digest,
                 "custody": "linux_sealed_read_only_pages",
                 "tensor_validation": "not_assessed", "native_qualified": False,
                 "release_qualified": False}
