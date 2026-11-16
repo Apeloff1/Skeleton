@@ -16,7 +16,7 @@ from skeleton.ai.model_runtime.iteration_scheduler import IterationWork
 from skeleton.app.offline_energy_hysteresis import HysteresisPolicy
 from skeleton.app.offline_runtime_control import RuntimeAdmission
 from skeleton.app.offline_runtime_preflight import (
-    RuntimePolicy, digest, inspect_source, require, sample_hardware,
+    RuntimePolicy, digest, inspect_source, integer, require, sample_hardware,
 )
 
 
@@ -29,12 +29,17 @@ class OfflineRuntimeSession:
     """
 
     def __init__(self, store: Path, *, plan_digest: str, model_identity_digest: str,
-                 policy: RuntimePolicy, hysteresis: HysteresisPolicy | None = None) -> None:
+                 policy: RuntimePolicy, hysteresis: HysteresisPolicy | None = None,
+                 maximum_source_age_ns: int | None = None) -> None:
         require(isinstance(policy, RuntimePolicy), "runtime policy required")
         self._store = Path(store)
         self._plan_digest = plan_digest
         self._model_identity_digest = model_identity_digest
         self._policy = policy
+        self._maximum_source_age_ns = (
+            None if maximum_source_age_ns is None else
+            integer(maximum_source_age_ns, 1, 86_400 * 10**9, "source inspection age")
+        )
         self._lock = threading.RLock()
         self._closed = False
         self._consumer: object | None = None
@@ -52,6 +57,16 @@ class OfflineRuntimeSession:
 
     def _open(self) -> None:
         require(not self._closed, "offline runtime session is closed")
+
+    def _source_fresh(self, now_ns: int) -> bool:
+        age = now_ns - self._verified_ns
+        return age >= 0 and (self._maximum_source_age_ns is None or
+                             age <= self._maximum_source_age_ns)
+
+    def _require_fresh_source(self, now_ns: int) -> None:
+        if not self._source_fresh(now_ns):
+            self._controller.revoke()
+            require(False, "source inspection expired; explicit idle reinspection required")
 
     def claim_consumer(self) -> object:
         """Give one trusted execution owner exclusive use of this session.
@@ -101,9 +116,12 @@ class OfflineRuntimeSession:
             self._open()
             self._authorize(consumer)
             try:
+                self._require_fresh_source(time.monotonic_ns())
                 observed = sample_hardware()
                 require(observed.origin == "local_probe", "local probe required")
-                result = self._controller.offer(observed, work, now_ns=time.monotonic_ns())
+                now = time.monotonic_ns()
+                self._require_fresh_source(now)
+                result = self._controller.offer(observed, work, now_ns=now)
             except BaseException:
                 self._controller.revoke()
                 raise
@@ -114,12 +132,16 @@ class OfflineRuntimeSession:
         with self._lock:
             self._open()
             self._authorize(consumer)
-            return self._controller.consume(admission, now_ns=time.monotonic_ns())
+            now = time.monotonic_ns()
+            self._require_fresh_source(now)
+            return self._controller.consume(admission, now_ns=now)
 
     def status(self) -> dict:
         with self._lock:
             return {"closed": self._closed, "source_digest": self._source_digest,
                     "source_verified_ns": self._verified_ns,
+                    "maximum_source_age_ns": self._maximum_source_age_ns,
+                    "source_inspection_fresh": self._source_fresh(time.monotonic_ns()),
                     "exclusive_consumer_bound": self._consumer is not None,
                     "admission": self._controller.status(),
                     "source_custody": "inspection_only_not_open_handle",
