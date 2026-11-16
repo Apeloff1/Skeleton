@@ -662,3 +662,76 @@ def test_setup_invalid_existing_signer_is_visible_in_install_receipt(tmp_path):
     receipt = _setup_phase(result)
     assert "GF_KEYHOLDER_SEED must be exactly 32 bytes" in receipt.detail
     assert "invalid-operator-seed" not in receipt.detail
+
+
+
+def test_atomic_env_staging_is_inside_both_new_and_legacy_privacy_fences(tmp_path, monkeypatch):
+    import os
+    from skeleton.app import setup_runtime
+
+    destination = tmp_path / ".env"
+    original_replace = os.replace
+    observed = []
+
+    def checked_replace(source, target):
+        from pathlib import Path
+        source = Path(source)
+        observed.append(source.name)
+        assert source.name.startswith(".env.")
+        assert not source.name.startswith("..env.")
+        assert source.name.endswith(".tmp")
+        return original_replace(source, target)
+
+    monkeypatch.setattr(os, "replace", checked_replace)
+    setup_runtime._atomic_write(destination, "PRIVATE_VALUE=fixture\n")
+    assert len(observed) == 1
+    assert destination.read_text() == "PRIVATE_VALUE=fixture\n"
+    assert list(tmp_path.iterdir()) == [destination]
+
+
+def test_existing_runtime_read_rejects_same_inode_content_mutation(tmp_path, monkeypatch):
+    import os
+    from skeleton.app import setup_runtime
+
+    source = tmp_path / ".env"
+    source.write_text("VALUE=first\n")
+    if os.name != "nt":
+        source.chmod(0o600)
+    actual_fdopen = os.fdopen
+
+    class MutatingReader:
+        def __init__(self, fd, mode):
+            self.handle = actual_fdopen(fd, mode)
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            self.handle.close()
+        def fileno(self):
+            return self.handle.fileno()
+        def read(self, size):
+            result = self.handle.read(size)
+            source.write_text("VALUE=other\n")
+            # Force a distinguishable metadata epoch even on coarse clocks.
+            info = source.stat()
+            os.utime(source, ns=(info.st_atime_ns, info.st_mtime_ns + 2_000_000_000))
+            return result
+
+    monkeypatch.setattr(os, "fdopen", MutatingReader)
+    with pytest.raises(ValueError, match="identity changed"):
+        setup_runtime._read_existing_env(source)
+
+
+def test_private_runtime_read_preserves_inode_and_repairs_mode(tmp_path):
+    import os
+    from skeleton.app import setup_runtime
+    if os.name == "nt":
+        pytest.skip("POSIX file mode")
+    source = tmp_path / ".env"
+    source.write_text("VALUE=stable\n")
+    source.chmod(0o644)
+    before = source.stat()
+    text, repaired = setup_runtime._read_existing_env(source, private=True)
+    assert (text, repaired) == ("VALUE=stable\n", True)
+    after = source.stat()
+    assert before.st_ino == after.st_ino
+    assert after.st_mode & 0o777 == 0o600

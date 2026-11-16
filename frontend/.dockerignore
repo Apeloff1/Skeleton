@@ -14,6 +14,7 @@ coverage
 # Never send local credentials or runtime configuration to the frontend builder.
 .env
 .env.*
+..env.*
 *.pem
 *.key
 *.p12
@@ -33,6 +34,7 @@ service-account*.json
 .runtime/
 **/.env
 **/.env.*
+**/..env.*
 **/*.pem
 **/*.key
 **/*.p12

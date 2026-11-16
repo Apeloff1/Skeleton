@@ -186,6 +186,11 @@ def _setup_process_lock(root: Path, *, timeout: float = 10.0):
         os.close(descriptor)
 
 
+def _env_descriptor_stamp(info: os.stat_result) -> tuple[int, ...]:
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid,
+            info.st_nlink, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+
+
 def _read_existing_env(path: Path, *, label: str = "runtime .env", private: bool = False) -> tuple[str, bool]:
     """Bound secret-bearing input before reading; never block on a FIFO.
 
@@ -203,23 +208,42 @@ def _read_existing_env(path: Path, *, label: str = "runtime .env", private: bool
         if (
             not stat.S_ISREG(opened.st_mode)
             or not stat.S_ISREG(named.st_mode)
-            or (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino)
+            or _env_descriptor_stamp(opened) != _env_descriptor_stamp(named)
             or (os.name != "nt" and opened.st_nlink != 1)
         ):
             raise ValueError(f"{label} must be a stable, unaliased regular file")
         if opened.st_size > _MAX_ENV_BYTES:
             raise ValueError(f"{label} exceeds the 256 KiB input limit")
         repaired_permissions = False
+        if private and os.name != "nt" and opened.st_uid != os.geteuid():
+            raise ValueError(f"{label} must belong to the current operator")
         if private and os.name != "nt" and stat.S_IMODE(opened.st_mode) != 0o600:
             # Tighten the existing single-link inode through the validated fd;
             # never chmod a pathname that may have been swapped after lstat.
             os.fchmod(handle.fileno(), 0o600)
             repaired_permissions = True
+        # chmod deliberately changes ctime; establish the new descriptor
+        # epoch without admitting content, ownership or link changes.
+        admitted = os.fstat(handle.fileno())
+        if (
+            not stat.S_ISREG(admitted.st_mode)
+            or (opened.st_dev, opened.st_ino, opened.st_uid, opened.st_gid,
+                opened.st_nlink, opened.st_size, opened.st_mtime_ns)
+               != (admitted.st_dev, admitted.st_ino, admitted.st_uid, admitted.st_gid,
+                   admitted.st_nlink, admitted.st_size, admitted.st_mtime_ns)
+            or (private and os.name != "nt" and stat.S_IMODE(admitted.st_mode) != 0o600)
+            or _env_descriptor_stamp(admitted) != _env_descriptor_stamp(os.lstat(path))
+            or (not repaired_permissions and _env_descriptor_stamp(opened) != _env_descriptor_stamp(admitted))
+        ):
+            raise ValueError(f"{label} identity changed before read")
         raw = handle.read(_MAX_ENV_BYTES + 1)
-        # A concurrent rename during read must not be accepted as the
-        # configuration epoch that was originally admitted.
+        final = os.fstat(handle.fileno())
         current = os.lstat(path)
-        if (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino) or not stat.S_ISREG(current.st_mode):
+        if (
+            len(raw) != admitted.st_size
+            or _env_descriptor_stamp(admitted) != _env_descriptor_stamp(final)
+            or _env_descriptor_stamp(final) != _env_descriptor_stamp(current)
+        ):
             raise ValueError(f"{label} identity changed during read")
     if len(raw) > _MAX_ENV_BYTES:
         raise ValueError("runtime .env exceeds the 256 KiB input limit")
@@ -284,7 +308,9 @@ def _atomic_write(path: Path, text: str) -> None:
             "w",
             encoding="utf-8",
             dir=path.parent,
-            prefix=f".{path.name}.",
+            # The name .env already has a leading dot. The previous
+            # double-dot prefix was outside the historic Docker fence.
+            prefix=f"{path.name if path.name.startswith('.') else '.' + path.name}.",
             suffix=".tmp",
             delete=False,
         ) as handle:

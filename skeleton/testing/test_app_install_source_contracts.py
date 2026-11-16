@@ -50,7 +50,7 @@ def _fixture(root: Path) -> None:
         encoding="utf-8",
     )
     private_names = (
-        ".env", ".env.*", "*.pem", "*.key", "*.p12", "*.pfx", "*.crt", "*.cer",
+        ".env", ".env.*", "..env.*", "*.pem", "*.key", "*.p12", "*.pfx", "*.crt", "*.cer",
         "credentials*.json", "service-account*.json", ".runtime",
     )
     private_globs = "".join(f"**/{name}\n" for name in private_names)
@@ -400,3 +400,14 @@ def test_unreviewed_add_cannot_bypass_source_admission(tmp_path, instruction):
 def test_ingress_refuses_nul_even_inside_comment_or_quoted_string():
     for source in (_INGRESS + "# hidden\x00\n", _INGRESS.replace("no-store", "no-store\x00")):
         assert nginx_ingress_errors(source)
+
+
+
+@pytest.mark.parametrize("ignore", [
+    "Dockerfile.dockerignore", "backend/Dockerfile.dockerignore", "frontend/.dockerignore",
+])
+def test_legacy_double_dot_secret_staging_must_remain_excluded(tmp_path, ignore):
+    _fixture(tmp_path)
+    path = tmp_path / ignore
+    path.write_text(path.read_text().replace("**/..env.*\n", ""))
+    assert any("private runtime files" in error for error in build_source_errors(tmp_path))

@@ -30,7 +30,7 @@ _BUILD_CONTEXTS = (
 # Require a terminal privacy fence instead of approximating Docker's complete
 # patternmatcher. Late exceptions may reopen protected files or their parents.
 _PRIVATE_NAMES = (
-    ".env", ".env.*", "*.pem", "*.key", "*.p12", "*.pfx", "*.crt", "*.cer",
+    ".env", ".env.*", "..env.*", "*.pem", "*.key", "*.p12", "*.pfx", "*.crt", "*.cer",
     "credentials*.json", "service-account*.json", ".runtime",
 )
 _RECURSIVE_IGNORES = tuple("**/" + name for name in _PRIVATE_NAMES)
