@@ -183,6 +183,10 @@ class OfflineHTTPApplication:
             self.knowledge = OfflineKnowledgeLibrary(
                 self._store, self.model_digest, self.tokenizer_digest
             )
+            from skeleton.app.jeeves_approved_memory import ApprovedMemory
+            self.approved_memory = ApprovedMemory(
+                self._store, self.model_digest, self.tokenizer_digest,
+            )
             self.reference_reads = LocalReferenceRead(self.knowledge)
             self.reference_writes = LocalReferenceWrite(self.knowledge)
             self.reference_jobs = LocalReferenceJob(self.knowledge)
@@ -655,6 +659,32 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(405, "unsupported local API method")
         if body is None:
             body = {}
+        if path.startswith("/v1/memory/") and method == "POST":
+            from skeleton.app.jeeves_approved_memory import MemoryConflict, MemoryRejected
+            memory = self.approved_memory
+            try:
+                if path == "/v1/memory/list":
+                    _fields(body, {"cursor", "limit", "include_expired"}, set())
+                    return 200, memory.list(**body)
+                if path == "/v1/memory/search":
+                    _fields(body, {"query", "limit", "kinds"}, {"query"})
+                    return 200, memory.search(**body)
+                if path == "/v1/memory/save":
+                    fields = {"kind", "label", "text", "tags", "expires_at",
+                              "source", "approved"}
+                    _fields(body, fields | {"pin"}, fields)
+                    return (200 if body.get("pin") is not None else 201), memory.save(**body)
+                if path == "/v1/memory/delete":
+                    _fields(body, {"pin", "approved"}, {"pin", "approved"})
+                    return 200, memory.delete(**body)
+                if path == "/v1/memory/compose":
+                    _fields(body, {"draft", "pins", "max_bytes"}, {"draft", "pins"})
+                    return 200, memory.compose(**body)
+                raise OfflineHTTPError(404, "unknown approved memory operation")
+            except MemoryConflict:
+                raise OfflineHTTPError(409, "approved memory or source changed; refresh") from None
+            except MemoryRejected:
+                raise OfflineHTTPError(400, "invalid or out-of-budget approved memory operation") from None
         if path == "/v1/resources" and method == "GET":
             try:
                 return 200, self.resource_fabric.monitor()
