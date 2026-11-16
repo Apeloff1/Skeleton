@@ -13,16 +13,16 @@ from pathlib import Path
 import threading
 import time
 
-from skeleton.ai.runtime.inference.deployment import LocalModelDeployment
+from skeleton.ai.runtime.inference.deployment import LocalModelDeployment, LocalModelDeploymentError
 from skeleton.ai.runtime.inference.guarded_composition import ProtectedLocalComponents
 from skeleton.ai.runtime.inference.llama_cpp import (
-    COMPLETION_CHAT_FLAGS, QWEN3_COMPLETION_CHAT_TEMPLATE, LlamaCppModel,
+    COMPLETION_CHAT_FLAGS, QWEN3_COMPLETION_CHAT_TEMPLATE, LlamaCppModel, LlamaCppRuntimeError,
 )
 from skeleton.ai.runtime.inference.adaptive_serving import AdaptiveServingController
 from skeleton.app.offline_cpu_budget import MemoryTopology
 from skeleton.ai.runtime.inference.local import LocalModelAdapter, sample_serving_resources
 from skeleton.app.offline_runtime_preflight import (
-    ModelSource, RuntimePolicy, canonical, digest, identity, inspect_source,
+    ModelSource, RuntimePolicy, RuntimePreflightError, canonical, digest, identity, inspect_source,
     plan_preflight, require, sample_hardware, integer,
 )
 
@@ -170,6 +170,27 @@ class MeasuredLlamaCpuGate:
             self._closed = True
 
 
+def _resolve_measured_source(
+    manifest_path: Path, *, manifest_digest: str, manifest_sha256: str,
+    maximum_deployment_bytes: int, store_path: Path,
+    plan_digest: str, model_identity_digest: str, policy: RuntimePolicy,
+) -> tuple[LocalModelDeployment, ModelSource]:
+    identity(manifest_digest, "deployment digest")
+    identity(manifest_sha256, "raw deployment manifest SHA")
+    integer(maximum_deployment_bytes, 1, 1 << 40, "deployment byte limit")
+    require(isinstance(policy, RuntimePolicy) and policy.backend == "cpu" and policy.verify_gguf_headers,
+            "measured protected CPU policy required")
+    deployment = LocalModelDeployment.load(manifest_path, expected_sha256=manifest_sha256,
+                                          max_artifact_bytes=maximum_deployment_bytes)
+    require(deployment.manifest_digest == manifest_digest, "independent deployment pin mismatch")
+    source = inspect_source(store_path, plan_digest=plan_digest,
+                            model_identity_digest=model_identity_digest, policy=policy)
+    require(len(source.plan.shards) == 1 and
+            source.plan.shards[0].digest == deployment.model_sha256,
+            "deployment and independently verified store disagree")
+    return deployment, source
+
+
 def build_measured_guarded_deployment(
     manifest_path: Path, *, manifest_digest: str, manifest_sha256: str,
     maximum_deployment_bytes: int, store_path: Path,
@@ -184,20 +205,12 @@ def build_measured_guarded_deployment(
     GGUF independently before the additional measured gate is installed.
     Cache is disabled and concurrency is one for this initial CPU profile.
     """
-    identity(manifest_digest, "deployment digest")
-    identity(manifest_sha256, "raw deployment manifest SHA")
-    integer(maximum_deployment_bytes, 1, 1 << 40, "deployment byte limit")
     require(isinstance(components, ProtectedLocalComponents), "trusted protection components required")
-    require(isinstance(policy, RuntimePolicy) and policy.backend == "cpu" and policy.verify_gguf_headers,
-            "measured protected CPU policy required")
-    deployment = LocalModelDeployment.load(manifest_path, expected_sha256=manifest_sha256,
-                                          max_artifact_bytes=maximum_deployment_bytes)
-    require(deployment.manifest_digest == manifest_digest, "independent deployment pin mismatch")
-    source = inspect_source(store_path, plan_digest=plan_digest,
-                            model_identity_digest=model_identity_digest, policy=policy)
-    require(len(source.plan.shards) == 1 and
-            source.plan.shards[0].digest == deployment.model_sha256,
-            "deployment and independently verified store disagree")
+    deployment, source = _resolve_measured_source(
+        manifest_path, manifest_digest=manifest_digest, manifest_sha256=manifest_sha256,
+        maximum_deployment_bytes=maximum_deployment_bytes, store_path=store_path,
+        plan_digest=plan_digest, model_identity_digest=model_identity_digest, policy=policy,
+    )
     adapter = deployment.adapter(cache_size=0, default_seed=default_seed, rehash_artifacts_each_run=True,
                                  max_concurrency=1, max_queue_size=max_queue_size,
                                  max_batch_size=max_batch_size, require_guarded_inference=True,
@@ -243,3 +256,51 @@ class MeasuredLocalDeployment:
             components=components, default_seed=default_seed,
             max_queue_size=max_queue_size, max_batch_size=max_batch_size,
         )
+
+
+    def inspect(self, manifest_path: str | Path) -> dict:
+        """Check the same independent source/profile pins without activating a provider.
+
+        This performs real reads and local hardware observations only. It
+        deliberately accepts no tokenizer, Mongo authority or reviewer.
+        Consequently even a passing result cannot qualify protected chat.
+        """
+        try:
+            deployment, source = _resolve_measured_source(
+                Path(manifest_path), manifest_digest=self.manifest_digest,
+                manifest_sha256=self.manifest_sha256,
+                maximum_deployment_bytes=self.maximum_deployment_bytes,
+                store_path=self.store_path, plan_digest=self.plan_digest,
+                model_identity_digest=self.model_identity_digest, policy=self.policy,
+            )
+            backend = LlamaCppModel(deployment.llama_cpp_config(rehash_artifacts_each_run=True))
+            backend.assert_identity()
+            require(backend.runtime_digest == deployment.executable_sha256,
+                    "native runtime differs from pinned deployment")
+            gate = MeasuredLlamaCpuGate(backend, source, self.policy)
+        except (LocalModelDeploymentError, LlamaCppRuntimeError) as exc:
+            raise RuntimePreflightError("deployment source or profile unavailable") from exc
+        try:
+            try:
+                gate()
+            except RuntimePreflightError:
+                # The gate records its latest denied observation. Never turn
+                # a missing observation into a successful source-only check.
+                pass
+            observation = gate.status()["last"]
+        finally:
+            gate.close()
+        require(type(observation) is dict, "missing measured deployment observation")
+        body = {
+            "schema": "skeleton.offline.measured-deployment-inspection.v1",
+            "manifest_digest": self.manifest_digest, "manifest_sha256": self.manifest_sha256,
+            "plan_digest": self.plan_digest, "model_identity_digest": self.model_identity_digest,
+            "model_digest": backend.model_digest, "runtime_digest": backend.runtime_digest,
+            "execution_profile_digest": backend.execution_profile_digest,
+            "model_is_jeeves": backend.model_id == "jeeves",
+            "source_bytes": source.plan.expected_total_bytes,
+            "observation": observation, "status": observation["status"],
+            "protected_authorities": "not_assessed", "provider_activation": "not_performed",
+            "transferable_grant": False, "native_qualified": False, "release_qualified": False,
+        }
+        return {**body, "inspection_digest": digest(body)}
