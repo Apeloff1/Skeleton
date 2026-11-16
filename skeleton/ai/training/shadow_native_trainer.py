@@ -8,10 +8,11 @@ shadow ledger; independent mirror evaluation remains a separate authority.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from hashlib import sha256
 import os
 import math
+import json
 from pathlib import Path
 from typing import Callable
 from uuid import uuid4
@@ -92,6 +93,7 @@ class ShadowNativeTrainingPolicy:
             }
         if self.adapter_policy is not None:
             payload["native_adapter_policy"] = self.adapter_policy.digest
+            payload["schedule"] = "cosine-global-native-output-lora"
         return digest_json(payload)
 
 
@@ -150,9 +152,15 @@ class ShadowNativeTrainer:
         return lines
 
     def _publish_checkpoint(self, checkpoint_json: str) -> Path:
-        raw = checkpoint_json.encode("utf-8")
+        return self._publish_native_artifact(checkpoint_json.encode("utf-8"), ".native.json")
+
+    def _publish_native_artifact(self, raw: bytes, suffix: str) -> Path:
+        # Existing private content-addressed artifact owner. The sidecar is
+        # observation evidence only, never an activation authorization.
+        if suffix not in (".native.json", ".adapter-evidence.json"):
+            raise ShadowWeightError("unrecognized native candidate artifact suffix")
         digest = sha256(raw).hexdigest()
-        target = self.directory / (digest + ".native.json")
+        target = self.directory / (digest + suffix)
         if target.is_symlink():
             raise ShadowWeightError("native candidate checkpoint must not be a symlink")
         if target.exists():
@@ -284,7 +292,8 @@ class ShadowNativeTrainer:
             code_digest=self.code_digest,
             config_digest=self.policy.digest,
             seed_manifest_digest=digest_json({
-                "training": "deterministic-sgd",
+                "training": "deterministic-output-lora" if self.policy.adapter_policy is not None else "deterministic-sgd",
+                **({"adapter_seed": self.policy.adapter_policy.seed} if self.policy.adapter_policy is not None else {}),
                 "knowledge_digest": item.digest,
                 "champion_digest": item.base_model_digest,
             }),
@@ -294,7 +303,7 @@ class ShadowNativeTrainer:
         genesis = TrainingCheckpoint(
             run_manifest_digest=manifest.digest,
             sequence=0, weights_digest=model.model_digest,
-            optimizer_digest=digest_json({"optimizer": "sgd", "steps": 0}),
+            optimizer_digest=digest_json({"optimizer": "native-output-lora" if self.policy.adapter_policy is not None else "sgd", "steps": 0}),
             rng_digest=digest_json({"mode": "deterministic", "steps": 0}),
         )
         steps = 0
@@ -336,6 +345,23 @@ class ShadowNativeTrainer:
         checkpoint_json = trained.checkpoint_json()
         session.heartbeat()
         checkpoint_path = self._publish_checkpoint(checkpoint_json)
+        adapter_evidence_path = None
+        adapter_evidence_digest = None
+        if adapter_report is not None:
+            session.require_idle()
+            evidence = {
+                "schema": "skeleton.native_adapter_training_evidence.v1",
+                "manifest_digest": manifest.digest,
+                "dataset_digest": dataset.digest,
+                "candidate_model_digest": trained.model_digest,
+                "candidate_checkpoint_bytes_sha256": sha256(checkpoint_json.encode("utf-8")).hexdigest(),
+                "report": asdict(adapter_report),
+                "promotion_authorized": False,
+            }
+            raw = json.dumps(evidence, sort_keys=True, separators=(",", ":"),
+                             ensure_ascii=False, allow_nan=False).encode("utf-8")
+            adapter_evidence_digest = sha256(raw).hexdigest()
+            adapter_evidence_path = self._publish_native_artifact(raw, ".adapter-evidence.json")
         session.heartbeat()
         self.champion.assert_model_unchanged()
         if self.champion.model_digest != item.base_model_digest:
@@ -347,6 +373,7 @@ class ShadowNativeTrainer:
             optimizer_digest=digest_json({
                 "optimizer": "native-output-lora" if adapter_report is not None else "sgd-no-momentum", "steps": steps,
                 **({"adapter_receipt": adapter_report.receipt_digest,
+                    "adapter_evidence_bytes_sha256": adapter_evidence_digest,
                     "factor_digest": adapter_report.factor_digest,
                     "merged_projection_digest": adapter_report.merged_projection_digest,
                     "rank": adapter_report.final_rank,
@@ -370,6 +397,7 @@ class ShadowNativeTrainer:
         return ShadowTrainingArtifacts(
             dataset=dataset, manifest=manifest, checkpoint=checkpoint,
             candidate_id=candidate_id, checkpoint_path=str(checkpoint_path),
+            learning_evidence_path=str(adapter_evidence_path) if adapter_evidence_path is not None else None,
         )
 
 
