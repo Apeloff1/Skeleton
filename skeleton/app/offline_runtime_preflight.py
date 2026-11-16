@@ -252,7 +252,10 @@ def _placement(source: ModelSource, sample: HardwareSample, policy: RuntimePolic
     # Reserve host service RAM up front. GPU and system bytes are never merged
     # into a fictitious single physical address space.
     if policy.backend in ("cpu", "hybrid") and available is not None:
-        capacity = max(0, available - policy.host_reserve_bytes)
+        # Hybrid placement must preserve at least one host worker before
+        # choosing residency; later CPU/energy planning can tighten further.
+        worker_floor = policy.bytes_per_worker if policy.backend == "hybrid" else 0
+        capacity = max(0, available - policy.host_reserve_bytes - worker_floor)
         if capacity:
             devices.append(DeviceDescriptor("host-cpu", "cpu", capacity))
     if policy.backend in ("cuda", "hybrid") and sample.gpu.status == "measured":
@@ -268,9 +271,15 @@ def _placement(source: ModelSource, sample: HardwareSample, policy: RuntimePolic
     if not devices:
         return [], [], "placement_memory_unavailable"
     try:
-        placement = plan_device_placement(source.plan.shards, devices)
+        placement = plan_device_placement(
+            source.plan.shards, devices,
+            preferred_kind="cuda" if policy.backend == "hybrid" else None,
+        )
     except ModelRuntimeError:
         return [], [asdict(d) for d in devices], "canonical_placement_rejected"
+    if policy.backend == "hybrid" and not any(row.device_id != "host-cpu" for row in placement):
+        # Presence of a GPU is not evidence that any selected shard fits it.
+        return [], [asdict(d) for d in devices], "hybrid_cuda_shard_unavailable"
     return [asdict(row) for row in placement], [asdict(d) for d in devices], "candidate"
 
 
