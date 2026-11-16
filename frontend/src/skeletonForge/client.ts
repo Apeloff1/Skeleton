@@ -51,6 +51,27 @@ export function previewHistoricalConductor(
   }, { signal, timeoutMs: 15000, retries: 0 });
 }
 
+/** Public taskset metadata only: no local model inference is triggered. */
+export interface JeevesGameQualityCatalog {
+  schema: string;
+  taskset_id: string;
+  scorer_id: string;
+  taskset_sha256: string;
+  task_count: number;
+  categories: string[];
+  dimensions: string[];
+  model_quality_certified: false;
+  inference_started: false;
+  local_gguf_required_for_run: true;
+}
+
+export function fetchJeevesGameQualityCatalog(signal?: AbortSignal): Promise<ApiResult<JeevesGameQualityCatalog>> {
+  return api.get(`${SKELETON_API}/jeeves/game-quality`, {
+    signal, retries: 0, timeoutMs: 10000,
+    cacheKey: 'skeleton:jeeves-game-quality', cacheTtlMs: 300000,
+  });
+}
+
 export function composeVision(vision: string, signal?: AbortSignal): Promise<ApiResult<ComposeResult>> {
   return api.post(`${SKELETON_API}/compose`, { vision: vision.slice(0, 4000) }, { signal, timeoutMs: 12000, retries: 0 });
 }
