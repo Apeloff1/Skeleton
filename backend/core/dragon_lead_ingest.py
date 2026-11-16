@@ -19,6 +19,7 @@ import json
 import os
 from pathlib import Path
 import re
+import threading
 
 from core.dragon_dataset_ingest import fingerprint,source_stream
 from core.dragon_lead_graph import LeadGraph,MAX_PAGE_ROWS,MAX_SNAPSHOT_ROWS,MAX_PAGE_BYTES,ZERO,parse_page
@@ -27,10 +28,13 @@ from core.dragon_game_corpus import clean,digest
 
 MAX_COLUMNS=256
 MAX_FIELD=4*1024*1024
+MAX_RECORD_CHARS=8*1024*1024
+_CSV_LOCK=threading.RLock()
 CHUNK=1024*1024
 FORMATS={
     "steam-csv":"steam", "steam-parquet":"steam", "steam-json":"steam",
     "modrinth-json":"modrinth", "wikidata-csv":"locator", "locator-csv":"locator",
+    "steam-tsv":"steam", "wikidata-tsv":"locator", "locator-tsv":"locator",
     "normalized-jsonl":None,
 }
 PROJECTIONS=frozenset({"steam","modrinth","locator"})
@@ -74,24 +78,59 @@ def _steam_row(appid,title):
         raise ValueError("invalid provider AppID; source row not silently skipped")
     return {"appid":appid.strip(),"title":clean(title,256)}
 
-def steam_csv(raw):
-    old=csv.field_size_limit(MAX_FIELD)
+class _RecordLines:
+    """Bound each logical CSV record, including quoted multiline fields."""
+    def __init__(self,text):
+        self.text=text
+        self.remaining=MAX_RECORD_CHARS
+    def __iter__(self):
+        return self
+    def __next__(self):
+        line=self.text.readline(self.remaining+1)
+        if not line:raise StopIteration
+        self.remaining-=len(line)
+        if self.remaining<0:raise ValueError("tabular logical record exceeds character bound")
+        return line
+
+def _tabular_rows(raw,*,delimiter=","):
+    if delimiter not in {",","\t"}:raise ValueError("unsupported delimiter")
+    text=io.TextIOWrapper(raw,encoding="utf-8-sig",newline="",errors="strict")
+    lines=_RecordLines(text)
+    reader=csv.reader(lines,delimiter=delimiter,strict=True)
+    def next_record():
+        lines.remaining=MAX_RECORD_CHARS
+        # csv.field_size_limit is process global. Restrict this module's
+        # critical section to one record and always restore the old limit.
+        with _CSV_LOCK:
+            old=csv.field_size_limit(MAX_FIELD)
+            try:return next(reader)
+            except csv.Error as exc:raise ValueError("malformed tabular export") from exc
+            finally:csv.field_size_limit(old)
     try:
-        # newline="" preserves RFC 4180 embedded newlines; text wrapper is
-        # detachable, so source_stream still verifies its file witness.
-        text=io.TextIOWrapper(raw,encoding="utf-8-sig",newline="",errors="strict")
-        try:
-            reader=csv.DictReader(text)
-            columns=reader.fieldnames
-            if not columns or len(columns)>MAX_COLUMNS or len(set(columns))!=len(columns):
-                raise ValueError("invalid Steam CSV header")
-            app=_pick_header(columns,{"appid","app id","steamappid"})
-            title=_pick_header(columns,{"name","title"})
-            for row in reader:
-                if None in row or row[app] is None or row[title] is None:raise ValueError("malformed Steam CSV row")
-                yield _steam_row(row[app],row[title])
-        finally:text.detach()
-    finally:csv.field_size_limit(old)
+        try:header=next_record()
+        except StopIteration:raise ValueError("missing tabular header") from None
+        if (not 1<=len(header)<=MAX_COLUMNS
+                or any(not name.strip() or len(name)>256 for name in header)
+                or len({name.strip().casefold() for name in header})!=len(header)):
+            raise ValueError("invalid or ambiguous tabular header")
+        yield header
+        while True:
+            try:record=next_record()
+            except StopIteration:break
+            if len(record)!=len(header):
+                raise ValueError("tabular row width differs from header")
+            yield dict(zip(header,record,strict=True))
+    finally:text.detach()
+
+def steam_csv(raw,*,delimiter=","):
+    records=_tabular_rows(raw,delimiter=delimiter)
+    try:
+        columns=next(records)
+        app=_pick_header(columns,{"appid","app id","steamappid"})
+        title=_pick_header(columns,{"name","title"})
+        for row in records:
+            yield _steam_row(row[app],row[title])
+    finally:records.close()
 
 def steam_parquet(raw):
     # Optional local reader only. No remote path/URI or auto-install.
@@ -128,44 +167,33 @@ def modrinth_json(raw):
              "project_type":item.get("project_type") or "project"}
         yield parse_page(json.dumps(row,ensure_ascii=False).encode(),"modrinth")[0]
 
-def wikidata_csv(raw):
-    """Consume an explicitly game-filtered Wikidata CSV export.
-    The importer does NOT assert that arbitrary Wikidata items are games.
-    """
-    old=csv.field_size_limit(MAX_FIELD)
+def wikidata_csv(raw,*,delimiter=","):
+    """Consume an explicitly game-filtered local Wikidata export."""
+    records=_tabular_rows(raw,delimiter=delimiter)
     try:
-        text=io.TextIOWrapper(raw,encoding="utf-8-sig",newline="",errors="strict")
-        try:
-            reader=csv.DictReader(text)
-            fields=reader.fieldnames or []
-            if not {"item","itemLabel"}.issubset(fields) or len(fields)>MAX_COLUMNS or len(set(fields))!=len(fields):
-                raise ValueError("Wikidata filtered CSV header")
-            for item in reader:
-                value=item.get("item")
-                if not isinstance(value,str):raise ValueError("Wikidata entity")
-                match=re.fullmatch(r"(?:https?://www\.wikidata\.org/entity/)?(Q[1-9][0-9]{0,15})",value)
-                if not match:raise ValueError("Wikidata entity")
-                qid=match[1]
-                yield {"url":"https://www.wikidata.org/wiki/"+qid,
-                       "title":clean(item["itemLabel"],256),"kind":"cross_database_identifiers",
-                       "subject":"wikidata:"+qid}
-        finally:text.detach()
-    finally:csv.field_size_limit(old)
+        fields=next(records)
+        if not {"item","itemLabel"}.issubset(fields):
+            raise ValueError("Wikidata filtered tabular header")
+        for item in records:
+            match=re.fullmatch(r"(?:https?://www\\.wikidata\\.org/entity/)?(Q[1-9][0-9]{0,15})",item["item"])
+            if not match:raise ValueError("Wikidata entity")
+            qid=match[1]
+            yield {"url":"https://www.wikidata.org/wiki/"+qid,
+                   "title":clean(item["itemLabel"],256),"kind":"cross_database_identifiers",
+                   "subject":"wikidata:"+qid}
+    finally:records.close()
 
-def locator_csv(raw):
-    """Provider-neutral documented export: preserve only approved metadata."""
-    old=csv.field_size_limit(MAX_FIELD)
+def locator_csv(raw,*,delimiter=","):
+    """Provider-neutral operator-supplied metadata export."""
+    records=_tabular_rows(raw,delimiter=delimiter)
     try:
-        text=io.TextIOWrapper(raw,encoding="utf-8-sig",newline="",errors="strict")
-        try:
-            reader=csv.DictReader(text);columns=reader.fieldnames or []
-            if not {"url","title","kind","subject"}.issubset(columns) or len(columns)>MAX_COLUMNS or len(set(columns))!=len(columns):
-                raise ValueError("locator CSV header")
-            for row in reader:
-                candidate={k:row[k] for k in ("url","title","kind","subject")}
-                yield parse_page(json.dumps(candidate,ensure_ascii=False).encode(),"locator")[0]
-        finally:text.detach()
-    finally:csv.field_size_limit(old)
+        columns=next(records)
+        if not {"url","title","kind","subject"}.issubset(columns):
+            raise ValueError("locator tabular header")
+        for row in records:
+            candidate={k:row[k] for k in ("url","title","kind","subject")}
+            yield parse_page(json.dumps(candidate,ensure_ascii=False).encode(),"locator")[0]
+    finally:records.close()
 
 def normalized_jsonl(raw,projection):
     while True:
@@ -178,11 +206,14 @@ def pages(path,witness,format,projection):
     _validate_format(format,projection)
     with source_stream(path,None,witness) as stream:
         if format=="steam-csv":rows=steam_csv(stream)
+        elif format=="steam-tsv":rows=steam_csv(stream,delimiter="\t")
         elif format=="steam-parquet":rows=steam_parquet(stream)
         elif format=="steam-json":rows=steam_json(stream)
         elif format=="modrinth-json":rows=modrinth_json(stream)
         elif format=="wikidata-csv":rows=wikidata_csv(stream)
+        elif format=="wikidata-tsv":rows=wikidata_csv(stream,delimiter="\t")
         elif format=="locator-csv":rows=locator_csv(stream)
+        elif format=="locator-tsv":rows=locator_csv(stream,delimiter="\t")
         else:rows=normalized_jsonl(stream,projection)
         while True:
             selected=list(itertools.islice(rows,MAX_PAGE_ROWS))
@@ -255,7 +286,7 @@ def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target")
     parser.add_argument("--inspect-only",action="store_true",help="Validate local bytes and projection without opening a graph")
-    parser.add_argument("--format",choices=["steam-csv","steam-parquet","steam-json","modrinth-json","wikidata-csv","locator-csv","normalized-jsonl"],required=True)
+    parser.add_argument("--format",choices=sorted(FORMATS),required=True)
     parser.add_argument("--projection",choices=["steam","modrinth","locator"],default="steam")
     parser.add_argument("--input",type=Path,required=True)
     parser.add_argument("--expected-sha",default=None)
