@@ -2500,6 +2500,85 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             raise CrawlerError("crawler_treasury_changed", "Source permission expired during reparse.", 409)
         return {"ok": True, **result}
 
+    async def acquisition_hold_catalog(self, scope: dict[str, str]) -> dict:
+        """Read-only, owner-scoped audit of committed grant-wide holds.
+
+        A current-code witnessed checkpoint is required. No recovery write,
+        new destination, automatic retry, or cross-session grant is allowed.
+        This bounded version-fenced report is not a global dispatch lock.
+        """
+        from skeleton.ai.webcrawler.adaptive_navigation import acquisition_readiness
+
+        at = _now()
+        _, run_type = _core()
+        query = {**scope, "status": {"$nin": ["deleted", "cancelled"]},
+                 "consent_expires_at": {"$gt": at}}
+
+        async def catalogue():
+            return await (self.sessions.find(query, {"_id": 1, "version": 1})
+                .sort("_id", DESCENDING).limit(MAX_SESSIONS + 1)
+                .max_time_ms(2000).to_list(MAX_SESSIONS + 1))
+
+        metadata = await catalogue()
+        excluded = 0
+        qualified = 0
+        holds = {}
+        earliest_expiry = None
+        for item in metadata[:MAX_SESSIONS]:
+            row = await self.sessions.find_one(
+                {"_id": item["_id"], **scope, "version": item["version"]},
+                {"_id": 1, "version": 1, "status": 1, "consent_expires_at": 1,
+                 "snapshot": 1, "checkpoint_identity": 1, "request": 1,
+                 "request_digest": 1, "consent": 1}, max_time_ms=2000)
+            if row is None:
+                raise CrawlerError("crawler_hold_catalog_changed",
+                                   "Acquisition catalogue changed. Refresh.", 409)
+            try:
+                snapshot = _plain(row["snapshot"])
+                verify_primary(snapshot, _plain(row["checkpoint_identity"]))
+                runtime = run_type.from_snapshot(snapshot)
+                binding = snapshot["binding"]
+                expiry = _utc(row["consent_expires_at"]).timestamp()
+                if (binding["scope"] != scope or binding["consent"] != _plain(row["consent"])
+                        or binding["request_digest"] != row["request_digest"]
+                        or _digest(_plain(row["request"])) != row["request_digest"]
+                        or expiry != binding["consent"]["expires_at"]
+                        or expiry <= at.timestamp() or row["status"] in {"deleted", "cancelled"}):
+                    raise ValueError("acquisition hold authority mismatch")
+                readiness = acquisition_readiness(
+                    measurements=snapshot["acquisition_measurements"],
+                    host_ready=snapshot["host_ready"], allowed_hosts=runtime.request.allowed_hosts,
+                    frontier=snapshot["frontier"], now=at.timestamp(), expires_at=expiry,
+                )
+            except (CrawlerError, CheckpointReplicaError, ValueError, KeyError, TypeError, RecursionError):
+                excluded += 1
+                continue
+            qualified += 1
+            earliest_expiry = expiry if earliest_expiry is None else min(earliest_expiry, expiry)
+            for host in readiness["hosts"]:
+                # Only restriction metadata is exposed; unheld hosts are not
+                # published as possible alternates to a denied source.
+                if host["state"] != "held_for_grant":
+                    continue
+                name = host["host"]
+                summary = holds.setdefault(name, {"host": name, "observed_grants": 0,
+                    "latest_grant_expiry": 0, "denial_statuses": 0,
+                    "rejected_success_statuses": 0})
+                summary["observed_grants"] += 1
+                summary["latest_grant_expiry"] = max(summary["latest_grant_expiry"], expiry)
+                summary["denial_statuses"] += host["denial_statuses"]
+                summary["rejected_success_statuses"] += host["rejected_success_statuses"]
+        if (await catalogue() != metadata
+                or earliest_expiry is not None and _now().timestamp() >= earliest_expiry):
+            raise CrawlerError("crawler_hold_catalog_changed",
+                               "Acquisition catalogue changed. Refresh.", 409)
+        return {"ok": True, "schema": "skeleton.dragon.acquisition-holds.v1",
+                "as_of": at.timestamp(), "qualified_sessions": qualified,
+                "excluded_sessions": excluded, "capacity_reached": len(metadata) > MAX_SESSIONS,
+                "holds": [holds[key] for key in sorted(holds)],
+                "reason_inferred": False, "network_executed": False,
+                "dispatch_lock": False, "network_authority_expanded": False}
+
     async def companion_sanctuary(self, scope: dict[str, str]) -> dict:
         """Bounded cross-expedition collection, using only current source consent.
 
