@@ -265,3 +265,87 @@ def test_second_graph_scan_detects_write_after_linearizable_observation():
     with pytest.raises(WriterCutoverDenied):
         asyncio.run(qualify_writer_cutover(signed(),epoch=epoch,collections=collections,
                                            repository_namespace="memory"))
+
+def _private_dir(tmp_path):
+    import os
+    directory = tmp_path / "writer-custody"
+    directory.mkdir(mode=0o700)
+    os.chmod(directory,0o700)
+    return directory
+
+
+def test_durable_local_approval_cannot_be_replayed_after_shutdown(tmp_path):
+    from scripts.start_protected_backend import _reserve_cutover
+    directory = _private_dir(tmp_path)
+    approval = signed()
+    with _reserve_cutover(approval,directory):
+        records=list(directory.glob("approval-*.reserved"))
+        assert len(records)==1
+        assert json.loads(records[0].read_text())["state"]=="reserved_not_qualified"
+    with pytest.raises(WriterCutoverDenied):
+        with _reserve_cutover(approval,directory):
+            pytest.fail("consumed approval replayed")
+
+
+def test_local_deployment_lock_excludes_distinct_approvals_until_exit(tmp_path):
+    from scripts.start_protected_backend import _reserve_cutover
+    directory=_private_dir(tmp_path)
+    one,two=signed(),signed(backup_sha256="9"*64)
+    with _reserve_cutover(one,directory):
+        with pytest.raises(WriterCutoverDenied):
+            with _reserve_cutover(two,directory):
+                pytest.fail("concurrent deployment admitted")
+    with _reserve_cutover(two,directory):
+        assert len(list(directory.glob("approval-*.reserved")))==2
+
+
+def test_failed_startup_burns_approval(tmp_path):
+    from scripts.start_protected_backend import _reserve_cutover
+    directory=_private_dir(tmp_path)
+    approval=signed()
+    with pytest.raises(ValueError):
+        with _reserve_cutover(approval,directory):
+            raise ValueError("startup failed")
+    with pytest.raises(WriterCutoverDenied):
+        with _reserve_cutover(approval,directory):
+            pytest.fail("failed startup reused approval")
+
+
+@pytest.mark.parametrize("kind",["symlink_leaf","symlink_ancestor","public","missing","relative"])
+def test_untrusted_local_custody_directories_denied(tmp_path,kind):
+    from scripts.start_protected_backend import _reserve_cutover
+    from pathlib import Path
+    directory=_private_dir(tmp_path)
+    if kind=="symlink_leaf":
+        alias=tmp_path/"alias"
+        alias.symlink_to(directory,target_is_directory=True)
+        directory=alias
+    elif kind=="symlink_ancestor":
+        alias=tmp_path/"alias"
+        alias.symlink_to(tmp_path,target_is_directory=True)
+        directory=alias/directory.name
+    elif kind=="public":
+        directory.chmod(0o755)
+    elif kind=="missing":
+        directory=directory/"missing"
+    else:
+        directory=Path(directory.name)
+    with pytest.raises(WriterCutoverDenied):
+        with _reserve_cutover(signed(),directory):
+            pytest.fail("untrusted state directory admitted")
+
+
+def test_symlinked_local_lock_does_not_modify_target(tmp_path):
+    import hashlib
+    from scripts.start_protected_backend import _reserve_cutover
+    directory=_private_dir(tmp_path)
+    approval=signed()
+    key=hashlib.sha256(b"skeleton.local-cutover-deployment.v1\0"
+                       + approval.plan.deployment_id.encode("ascii")).hexdigest()
+    victim=tmp_path/"victim"
+    victim.write_text("unchanged")
+    (directory/("deployment-"+key+".lock")).symlink_to(victim)
+    with pytest.raises(WriterCutoverDenied):
+        with _reserve_cutover(approval,directory):
+            pytest.fail("symlink lock admitted")
+    assert victim.read_text()=="unchanged"

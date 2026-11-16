@@ -46,7 +46,8 @@ does not generate the approval nor establish external evidence truth.
       --start-protected-backend --source-head REVIEWED_GIT_SHA \
       --plan /private/cutover.json --signature /private/cutover.sig \
       --authority REVIEWED_AUTHORITY --deployment REVIEWED_DEPLOYMENT \
-      --operator-public-key-hex REVIEWED_PUBLIC_KEY_HEX --port 8001
+      --operator-public-key-hex REVIEWED_PUBLIC_KEY_HEX \
+      --state-dir /private/writer-custody --port 8001
 
 This starts only the existing backend on loopback, one worker, no reload.
 Before fail-soft lifespan or scheduler, it validates the signed live inventory,
@@ -77,3 +78,14 @@ same-principal independent clients, alternate-principal denial, orphan and
 prepared-message denial, divergent revision scope, pending idempotency denial,
 and changed-outbox approval invalidation. Its ephemeral fixture is not a
 production migration, multi-member failover, or installer-to-inference receipt.
+
+Protected startup additionally requires a pre-provisioned, mode-0700 POSIX
+state directory owned by the service account. Use one durable, independently
+controlled directory for the deployment. The launcher holds an exclusive
+local deployment lock and creates a new mode-0600 approval reservation with
+exclusive creation and file/directory fsync before importing and launching the
+backend. Failed or interrupted startup burns the approval. A reservation is
+not a successful admission receipt. Do not delete reservation records to
+recover; reconcile and obtain a fresh signed plan. This is single-host trusted
+filesystem custody, not a distributed lock or a physical anti-rollback witness.
+Default unprotected setup and read-only inspection do not make reservations.
