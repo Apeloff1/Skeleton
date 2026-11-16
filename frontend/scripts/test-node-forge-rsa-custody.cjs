@@ -71,3 +71,40 @@ test('release npm guard invokes exact RSA custody and retains the hostile signat
   // branch for the two older RSA implementations.
   assert.match(security, /version === '1\.4\.0' \|\| version === '1\.4\.2'/);
 });
+
+test('install hook checks the installed RSA source without rewriting it', () => {
+  const vm = require('node:vm');
+  const script = fs.readFileSync(path.resolve(__dirname, 'patch-node-modules.js'), 'utf8');
+  const body = script.slice(script.indexOf('function patchNodeForgeNestedDigestAlgorithm()'),
+    script.indexOf('function patchSprintfFormatBounds()'));
+  const original = fs.readFileSync(rsaPath, 'utf8');
+  let source = original, version = EXPECTED_VERSION;
+  const sandbox = {
+    ROOT: path.resolve(__dirname, '..'), path,
+    fs: {
+      existsSync: () => true,
+      readFileSync: filename => filename.endsWith('package.json')
+        ? JSON.stringify({ version }) : source,
+      writeFileSync: () => assert.fail('install must not mutate reviewed RSA source'),
+    },
+    require: name => {
+      assert.equal(name, './node-forge-rsa-custody.cjs');
+      return { verifyReviewedForgeRsa };
+    },
+    console: { log() {} }, skipped: 0,
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(body + '\npatchNodeForgeNestedDigestAlgorithm();', sandbox);
+  assert.equal(sandbox.skipped, 1);
+  assert.equal(source, original);
+  for (const invalid of ['1.4.0', '1.4.2', '1.4.4']) {
+    version = invalid;
+    assert.throws(() => vm.runInContext('patchNodeForgeNestedDigestAlgorithm();', sandbox),
+      /unreviewed/);
+  }
+  version = EXPECTED_VERSION;
+  source = original + '\n// modified';
+  assert.throws(() => vm.runInContext('patchNodeForgeNestedDigestAlgorithm();', sandbox),
+    /source differs/);
+  assert.equal(sandbox.skipped, 1);
+});
