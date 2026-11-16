@@ -5,6 +5,7 @@ import math
 import hmac
 import random
 import sys
+from array import array
 import threading
 from weakref import WeakKeyDictionary
 from typing import Any, Callable, Iterator, Mapping, Sequence
@@ -1139,7 +1140,9 @@ class NativeLLMRuntime:
                 cache.next_position = len(ids)
                 cache.last_logits = None
                 cache.reserved_bytes = 0
-                if NativeConversationSession._retained_prefix_size(cache) > budget:
+                if (not NativeConversationSession._compact_retained_prefix(
+                        cache, width=self.model.dim, budget=budget)
+                        or NativeConversationSession._retained_prefix_size(cache) > budget):
                     cache = None
             previous_prompt = ids
             previous_binding = binding
@@ -1273,6 +1276,43 @@ class NativeConversationSession:
                 runtime.device_policy, runtime.limits)
 
     @staticmethod
+    def _compact_retained_prefix(cache: KVCache, *, width: int, budget: int) -> bool:
+        """Lossless packed native double rows for private idle CPU banks.
+
+        Only a detached, successful owner-local bank is eligible. Active
+        inference can read packed rows directly; newly appended rows may
+        remain ordinary lists until publication. No quantization, re-encode
+        of token IDs, disk write or accelerator claim. Reject invalid banks
+        without granting idle-retention authority.
+        """
+        count = len(cache.tokens)
+        if (not count or cache.next_position != count or cache.reserved_bytes
+                or width < 1 or budget < 1 or array("d").itemsize != 8
+                or count * cache.n_layers * width * 16 > budget):
+            return False
+        for bank in (cache.K, cache.V):
+            if len(bank) != cache.n_layers:
+                return False
+            for layer in bank:
+                if len(layer) != count:
+                    return False
+                for index, row in enumerate(layer):
+                    if len(row) != width:
+                        return False
+                    if type(row) is array:
+                        if row.typecode != "d" or any(not math.isfinite(x) for x in row):
+                            return False
+                        continue
+                    if type(row) is not list or any(type(x) is not float or not math.isfinite(x) for x in row):
+                        return False
+                    # Convert one row at a time so the whole packed bank
+                    # is never resident alongside a second unpacked bank.
+                    packed = array("d", row)
+                    if sys.getsizeof(packed) < sys.getsizeof(row) + sum(sys.getsizeof(x) for x in row):
+                        layer[index] = packed
+        return True
+
+    @staticmethod
     def _retained_prefix_size(cache: KVCache) -> int:
         # Conservative Python object accounting (not process RSS or driver
         # allocation); count each occurrence even when objects alias.
@@ -1285,7 +1325,11 @@ class NativeConversationSession:
             for layer in bank:
                 size += sys.getsizeof(layer)
                 for row in layer:
-                    size += sys.getsizeof(row) + sum(sys.getsizeof(x) for x in row)
+                    # array owns its C double buffer, not individual
+                    # Python float objects. getsizeof includes that buffer.
+                    size += sys.getsizeof(row)
+                    if type(row) is not array:
+                        size += sum(sys.getsizeof(x) for x in row)
         return size
 
     @property
@@ -1377,7 +1421,10 @@ class NativeConversationSession:
         if (cache is not None and cache.tokens and binding == self._cache_binding()
                 and cache.next_position == len(cache.tokens)
                 and tuple(cache.tokens) == self._tokens[:len(cache.tokens)]):
-            retained_size = self._retained_prefix_size(cache)
+            compacted = self._compact_retained_prefix(
+                cache, width=self.runtime.model.dim, budget=self._prefix_cache_bytes,
+            )
+            retained_size = self._retained_prefix_size(cache) if compacted else self._prefix_cache_bytes + 1
             if (retained_size <= self._prefix_cache_bytes
                     and self.runtime._reserve_idle_cpu_prefix(self, retained_size)):
                 self._prefix_cache = cache
