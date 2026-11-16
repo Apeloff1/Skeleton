@@ -226,6 +226,8 @@ class TurnFeedback:
             if _digest(_stable(payload))!=_sha(digest):
                 raise MemoryRejected("feedback content digest mismatch")
             return payload|{"sha256":digest}
+        except MemoryConflict:
+            raise
         except (TypeError,ValueError,UnicodeError,RecursionError):
             raise MemoryRejected("stored feedback failed source validation") from None
 
