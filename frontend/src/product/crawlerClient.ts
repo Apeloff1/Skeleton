@@ -466,8 +466,8 @@ function navigationUrl(value: unknown): value is string {
 }
 function validNavigationSummary(row: NavigationBacklogSummary): boolean {
   if (!row || row.authority !== 'advisory_only' || row.inventory_complete !== false
-    || row.max_records !== 1024 || row.max_bytes !== 384 * 1024
-    || !integer(row.unique_targets, 1024) || !integer(row.pending, row.unique_targets)
+    || row.max_records !== 4096 || row.max_bytes !== 1024 * 1024
+    || !integer(row.unique_targets, 4096) || !integer(row.pending, row.unique_targets)
     || !integer(row.active, 512) || !integer(row.visited, 1024)
     || !integer(row.depth_held_targets, row.unique_targets) || !row.counts) return false;
   for (const name of ['observations', 'outside_policy', 'capacity_omissions', 'circuit_held',
@@ -1113,7 +1113,7 @@ export async function getNavigationPacket(id:string,signal?:AbortSignal): Promis
   const p=v?.packet;
   if(!v||v.ok!==true||v.session_id!==id||v.network_authorized!==false||!integer(v.version)||!p
     ||!HASH.test(p.snapshot_digest)||!HASH.test(p.packet_digest)||!integer(p.as_of,1000000000000)||!Array.isArray(p.objective)||p.objective.length>20
-    ||!Array.isArray(p.candidates)||p.candidates.length>12
+    ||!Array.isArray(p.candidates)||p.candidates.length>48
     ||p.candidates.some(c=>!HASH.test(c.id)||!Array.isArray(c.terms)||c.terms.length>8
       ||!integer(c.depth,3)||!integer(c.attempts,3)||!integer(c.semantic,1000))) invalid('Invalid navigation packet.');
   return {packet:p,version:v.version};
@@ -1126,7 +1126,7 @@ export async function retainNavigationInventory(id:string,body:{expected_snapsho
     retention_expires_at:number;replayed:boolean;network_authorized:false;metadata_only:true}>(
       ROOT+'/sessions/'+identifier(id)+'/navigation/federate',body,options(signal)),getAuthToken(),'Locator retention not confirmed.');
   if(!v||!HASH.test(v.grant_id)||v.checkpoint!==body.expected_snapshot_digest||v.metadata_only!==true
-    ||v.network_authorized!==false||!integer(v.accepted,1024)||!integer(v.omitted_nonpublic,1024)) invalid('Invalid locator retention receipt.');
+    ||v.network_authorized!==false||!integer(v.accepted,4096)||!integer(v.omitted_nonpublic,4096)) invalid('Invalid locator retention receipt.');
   return v;
 }
 export async function searchNavigationFederation(query:string,cursor?:string,signal?:AbortSignal):Promise<NavigationFederationPage> {
@@ -1138,6 +1138,51 @@ export async function searchNavigationFederation(query:string,cursor?:string,sig
       ||t.network_authorized!==false||t.reviewed!==false||!t.witness||!HASH.test(t.witness.grant_id)
       ||!HASH.test(t.witness.checkpoint)||!Number.isFinite(t.semantic)||t.semantic<0||t.semantic>1)
     ||v.next_cursor!==null&&!/^[a-f0-9]{64}:[a-f0-9]{64}$/.test(v.next_cursor)) invalid('Invalid federation page.');
+  return v;
+}
+export type NavigationPortfolioTarget = {id:string;url:string;host:string;score:number;votes:number;
+  features:{exact:number;concept:number;trigram:number;lineage:number;score:number};
+  jeeves:number;dragon:number;joint:number;lineage_support:number;reviewed:false;network_authorized:false};
+export type NavigationPortfolio = {targets:NavigationPortfolioTarget[];distinct_hosts:number;covered_concepts:number;
+  index_backfill_pending:boolean;lane_truncated:boolean;network_authorized:false;selection_is_advisory:true;receipt:string};
+export async function getNavigationPortfolio(query:string,limit=12,signal?:AbortSignal):Promise<NavigationPortfolio> {
+  if(!query.trim()||query.length>512||!integer(limit,24)||limit<1) invalid('Invalid navigation research objective.');
+  const v=await read(api.get<NavigationPortfolio>(ROOT+'/navigation/federation/portfolio?query='+encodeURIComponent(query)
+    +'&limit='+limit,options(signal)),getAuthToken(),'Navigation portfolio unavailable.');
+  if(!v||v.network_authorized!==false||v.selection_is_advisory!==true||!HASH.test(v.receipt)
+    ||!Array.isArray(v.targets)||v.targets.length>limit||!integer(v.distinct_hosts,v.targets.length)
+    ||!integer(v.covered_concepts,128)||typeof v.index_backfill_pending!=='boolean'||typeof v.lane_truncated!=='boolean'
+    ||v.targets.some(t=>!t||!HASH.test(t.id)||!navigationUrl(t.url)||t.network_authorized!==false||t.reviewed!==false
+      ||!t.features||[t.score,t.jeeves,t.dragon,t.lineage_support,t.features.score].some(n=>!Number.isFinite(n)||n<0||n>1)
+      ||!Number.isFinite(t.joint)||t.joint<-.2||t.joint>1)) invalid('Invalid advisory navigation portfolio.');
+  return v;
+}
+export type NavigationNeighbor = {id:string;url:string;host:string;relation:string;supporting_grants:number;network_authorized:false};
+export async function getNavigationTopology(target:string,direction:'children'|'parents',after?:string,signal?:AbortSignal) {
+  if(!HASH.test(target)||!['children','parents'].includes(direction)||after&&!HASH.test(after)) invalid('Invalid navigation topology cursor.');
+  const v=await read(api.get<{neighbors:NavigationNeighbor[];next_cursor:string|null;
+    network_authorized:false;historical_topology_complete:false}>(ROOT+'/navigation/federation/targets/'+target
+      +'/topology?direction='+direction+(after?'&after='+after:''),options(signal)),getAuthToken(),'Navigation topology unavailable.');
+  if(!v||v.network_authorized!==false||v.historical_topology_complete!==false||!Array.isArray(v.neighbors)
+    ||v.neighbors.length>32||v.neighbors.some(n=>!n||!HASH.test(n.id)||!navigationUrl(n.url)
+      ||!integer(n.supporting_grants)||n.supporting_grants<1||n.network_authorized!==false)
+    ||v.next_cursor!==null&&!HASH.test(v.next_cursor)) invalid('Invalid navigation topology.');
+  return v;
+}
+export async function retainNavigationBatch(body:{sessions:{session_id:string;expected_snapshot_digest:string}[];
+    rights_reference:string;retention_seconds:number;acknowledged:true},signal?:AbortSignal) {
+  if(body.acknowledged!==true||!Array.isArray(body.sessions)||body.sessions.length<1||body.sessions.length>16
+    ||body.sessions.some(x=>!ID.test(x.session_id)||!HASH.test(x.expected_snapshot_digest))
+    ||new Set(body.sessions.map(x=>x.session_id)).size!==body.sessions.length
+    ||!integer(body.retention_seconds,315360000)||body.retention_seconds<900||!body.rights_reference.trim())
+    invalid('Invalid independent metadata retention batch.');
+  const v=await read(api.post<{outcomes:{session_id:string;state:'held'|'published';code?:string;receipt?:unknown}[];
+    published:number;held:number;atomic_batch:false;network_authorized:false}>(ROOT+'/navigation/federation/batch',
+      body,options(signal)),getAuthToken(),'Batch publication not confirmed; retry the same checkpoint identities.');
+  if(!v||v.network_authorized!==false||v.atomic_batch!==false||!Array.isArray(v.outcomes)||v.outcomes.length!==body.sessions.length
+    ||!integer(v.published,16)||!integer(v.held,16)||v.published+v.held!==v.outcomes.length
+    ||v.outcomes.some((x,i)=>!x||x.session_id!==body.sessions[i].session_id||!['held','published'].includes(x.state)))
+    invalid('Invalid navigation batch receipt.');
   return v;
 }
 export async function getNavigationInventory(id: string, cursor?: { snapshot_digest: string; after: number },
