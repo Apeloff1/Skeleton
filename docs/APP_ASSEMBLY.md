@@ -1031,3 +1031,53 @@ port and service alias are checked, but production application vector
 integration, legacy migration and release remain held. The old full-profile
 Compose definition remains unchanged and must not be used to recreate the
 corrected service. No production resources are touched by source qualification.
+
+
+### Exact image construction and independently approved runtime identity
+
+For a clean reviewed checkout, use a pre-existing private work parent outside
+the repository. This explicit operator build extracts only an exact Git
+archive, verifies source file identities before and after each image build,
+and builds isolated production candidate tags for the engine, backend and
+frontend. No existing service container, original installation image tag,
+or production volume is started or replaced.
+
+    python scripts/qualify_first_install_images.py --source-head REVIEWED_SHA build \
+      --work-parent /private/builds --receipt /private/builds/review.json \
+      --backend-origin http://127.0.0.1:8001 --engine-origin http://127.0.0.1:8010
+
+The archive is capped at 32 GiB and the ordinary source inventory at one
+million entries. Git archive export rules apply. Symlinks, special files,
+private configuration and missing required build inputs fail closed. The
+candidate workspace and successfully produced image IDs are preserved on
+interruption. This builder does not establish reproducible dependencies,
+sign images, use private registries or perform a hermetic build.
+
+Independent review creates an approval JSON with exactly schema
+(skeleton.application.first-install-image-approval.v1), source_head,
+build_receipt_sha256 (SHA-256 of the original receipt file), authority_id,
+project, review_evidence_sha256, issued_at and expires_at (integer Unix
+seconds, validity at most one hour). Sign the canonical sorted compact
+ASCII JSON prefixed by the bytes skeleton.first-install-image-approval.v1
+followed by a NUL byte, using the independently pinned Ed25519 key.
+The public key and signature are raw 32-byte and 64-byte files respectively,
+not embedded in the plan. This script never produces the signature.
+
+    python scripts/qualify_first_install_images.py --source-head REVIEWED_SHA prepare \
+      --build-receipt /private/builds/review.json --plan /private/approval.json \
+      --signature /private/approval.sig --public-key /private/authority.pub \
+      --authority REVIEWER --project PROJECT --frontend-port 8080 \
+      --output /private/reviewed-images.json
+
+The resulting Compose override contains only approved isolated image tags
+and pull_policy never. The operator must use the existing canonical
+production mode ports and configuration, the exact approved project, and
+--no-build with the override. No automatic container recreation is
+performed by this tool. The observe mode takes the same approval inputs
+without --output, and independently checks twice that all three running
+image IDs, container identities, loopback publications, expected persistent
+mounts, absence of source-shadowing mounts and canonical bridge ownership
+match the reviewed build. Both strict live application health and actual
+inference remain separate requirements. The receipt is not release or
+Windows/WSL2 qualification. Independent build approval authenticates the
+reviewed evidence, not an untrusted daemon or filesystem.

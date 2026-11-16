@@ -237,6 +237,9 @@ def _scan(fd,session_id):
             if not item.name.startswith(prefix):
                 continue
             suffix=item.name[len(prefix):]
+            other=re.fullmatch(r"([a-z0-9][a-z0-9_-]{0,63})-([0-9]{6})\.json",suffix,re.ASCII)
+            if other is not None and _valid_id(session_id+"-"+other.group(1)):
+                continue  # distinct valid session ID sharing this prefix
             require(re.fullmatch(r"[0-9]{6}\.json",suffix) is not None and len(sequences)<_MAX_EVENTS,
                     "install session record name or capacity invalid")
             sequences.append(int(suffix[:-5]))

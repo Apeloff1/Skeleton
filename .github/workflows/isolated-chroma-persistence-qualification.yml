@@ -8,6 +8,9 @@ on:
       - 'scripts/qualify_chroma_persistence.py'
       - 'skeleton/testing/test_chroma_persistence_qualification.py'
       - 'docker-compose.yml'
+      - 'deploy/chroma/durable.compose.yml'
+      - 'scripts/provision_fresh_chroma.py'
+      - 'skeleton/testing/test_provision_fresh_chroma.py'
       - '.github/workflows/isolated-chroma-persistence-qualification.yml'
 
 permissions:
@@ -31,4 +34,14 @@ jobs:
       - name: Execute disposable pinned image and volume qualification
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-        run: python scripts/qualify_chroma_persistence.py --source-head "$EXPECTED_HEAD" --isolated-ci-fixture
+        run: |
+          umask 077
+          python scripts/qualify_chroma_persistence.py --source-head "$EXPECTED_HEAD" --isolated-ci-fixture > "$RUNNER_TEMP/chroma-persistence.json"
+          sha256sum "$RUNNER_TEMP/chroma-persistence.json"
+      - name: Retain successful exact-head physical receipt
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: chroma-persistence-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/chroma-persistence.json
+          if-no-files-found: error
+          retention-days: 30

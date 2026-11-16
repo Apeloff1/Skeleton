@@ -353,6 +353,8 @@ def install_application(
             hot=hot,
         )
     except ValueError as exc:
+        # Record the rejected startup decision even though no child ran.
+        intent("start")
         phases.append(InstallPhase("start", False, str(exc)))
         return InstallReceipt(root=root, phases=tuple(phases))
     intent("start")

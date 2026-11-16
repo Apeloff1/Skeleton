@@ -126,6 +126,8 @@ jobs:
         run: python -m pytest -q --maxfail=1 skeleton/testing/test_install_session.py
       - name: Qualify fresh durable Chroma provision and preserved-resource recovery
         run: python -m pytest -q --maxfail=1 skeleton/testing/test_provision_fresh_chroma.py
+      - name: Qualify reviewed image archive, approval and running identity boundaries
+        run: python -m pytest -q --maxfail=1 skeleton/testing/test_qualify_first_install_images.py
       - name: Verify construction and provider-owner contracts
         run: |
           python scripts/check_architecture_map.py

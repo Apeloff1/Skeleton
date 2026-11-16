@@ -354,7 +354,7 @@ def _validate_worker_result(raw):
             _require(not facts or (set(facts) == {"missing_count"} and
                      type(facts["missing_count"]) is int and 0 <= facts["missing_count"] <= 64))
         elif name == "provider_readiness":
-            _require(not facts or facts == {"provider_available":False} or
+            _require(not facts or (set(facts)=={"provider_available"} and facts["provider_available"] is False) or
                     (set(facts) == {"provider_available","selected_provider"} and
                      facts["provider_available"] is True and facts["selected_provider"] in _PROVIDERS))
         else:
