@@ -79,6 +79,10 @@ def block_logits(target,trial,start,*,require_gpu,workspace_bytes,poll):
     """One causal graph, all required target positions; no per-token forward."""
     if not 0<=start<len(trial):
         raise RuntimeContractError("invalid block position")
+    n=len(trial);m=target.model
+    charge=4*(4*m.n_heads*n*n+n*(12*m.dim+4*max(m.dim,m.d_ff)+m.V))
+    if charge>workspace_bytes or n*m.V>MAX_LOGIT_CELLS:
+        raise RuntimeContractError("block graph exceeds workspace ceiling")
     accel=target.model._accel
     if accel is None:
         if require_gpu:
@@ -90,14 +94,11 @@ def block_logits(target,trial,start,*,require_gpu,workspace_bytes,poll):
     torch=accel.torch
     if require_gpu and (accel.device_name!="cuda" or not accel.resident):
         raise RuntimeContractError("CUDA fused execution cannot fall back")
-    n=len(trial);m=target.model
-    # Conservative logical scratch for attention, FFN and all-position logits.
-    charge=4*(4*m.n_heads*n*n+n*(12*m.dim+4*max(m.dim,m.d_ff)+m.V))
-    if charge>workspace_bytes:
-        raise RuntimeContractError("block graph exceeds workspace budget")
     context=nullcontext()
     if require_gpu:
         from torch.nn.attention import sdpa_kernel,SDPBackend
+        if not hasattr(torch.nn.functional,"scaled_dot_product_attention"):
+            raise RuntimeContractError("native fused SDPA unavailable")
         context=sdpa_kernel([SDPBackend.FLASH_ATTENTION,SDPBackend.EFFICIENT_ATTENTION])
     with accel._inference_lock(poll),torch.inference_mode(),context:
         accel._assert_training_integrity()
