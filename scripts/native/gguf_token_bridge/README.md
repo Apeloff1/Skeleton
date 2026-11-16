@@ -43,3 +43,10 @@ that signal during descriptor hashing, admission and physical subprocess
 polling. The native slot remains occupied until the thread exits; arbitrary
 noncooperative callbacks are not forcibly terminated. Generation and output
 verification share one wall-clock budget, not two independent timeouts.
+
+The bridge profile now rejects adjacent shared-runtime inventories (the CMake
+build links llama/ggml statically; system loader closure is still unqualified).
+Linux launch verifies descriptor ctime as well as the pre/post digest, freezes
+resource settings before admission, and rechecks immediately before spawn.
+The guarded native callback budget is at most 30 seconds for this backend,
+subject to the caller's shorter existing wall-clock deadline.

@@ -58,8 +58,8 @@ def _verify_artifact(fd, identity, interrupt):
 def _open_artifact(stack, identity, interrupt):
     fd = os.open(identity.path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK)
     stack.callback(os.close, fd)
-    _verify_artifact(fd, identity, interrupt)
-    return fd
+    stamp = _verify_artifact(fd, identity, interrupt)
+    return fd, stamp
 
 
 def _anon(stack, label):
@@ -112,8 +112,8 @@ class _LinuxFrame:
     def __init__(self, stack, base, runtime, model, payload, interrupt):
         self.base = base
         self._runtime, self._model = runtime, model
-        self._runtime_fd = _open_artifact(stack, runtime, interrupt)
-        self._model_fd = _open_artifact(stack, model, interrupt)
+        self._runtime_fd, self._runtime_stamp = _open_artifact(stack, runtime, interrupt)
+        self._model_fd, self._model_stamp = _open_artifact(stack, model, interrupt)
         self._input = _anon(stack, "skeleton-gguf-input")
         self._output = _anon(stack, "skeleton-gguf-output")
         self._stderr = _anon(stack, "skeleton-gguf-stderr")
@@ -137,9 +137,19 @@ class _LinuxFrame:
     def sizes(self):
         return os.fstat(self._output).st_size, os.fstat(self._stderr).st_size
 
+    def check_metadata(self):
+        for fd, identity, stamp in (
+                (self._runtime_fd, self._runtime, self._runtime_stamp),
+                (self._model_fd, self._model, self._model_stamp)):
+            if (_stamp(os.fstat(fd)) != stamp
+                    or _stamp(os.stat(identity.path, follow_symlinks=False)) != stamp):
+                raise _denied()
+
     def verify(self, interrupt):
-        _verify_artifact(self._runtime_fd, self._runtime, interrupt)
-        _verify_artifact(self._model_fd, self._model, interrupt)
+        self.check_metadata()
+        if (_verify_artifact(self._runtime_fd, self._runtime, interrupt) != self._runtime_stamp
+                or _verify_artifact(self._model_fd, self._model, interrupt) != self._model_stamp):
+            raise _denied()
 
     def read(self, limit):
         # No other writer may change response after successful child exit.
@@ -166,6 +176,10 @@ class _NamedFrame:
 
     def sizes(self):
         return self.target.stat().st_size, self._stderr.stat().st_size
+
+    def check_metadata(self):
+        # Non-Linux is explicitly a named-path profile.
+        return None
 
     def verify(self, interrupt):
         # Caller retains legacy full path-based artifact verification.

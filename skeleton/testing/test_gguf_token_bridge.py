@@ -328,3 +328,50 @@ def test_generation_and_output_echo_share_one_deadline(tmp_path, monkeypatch):
     assert [name for name, _ in seen] == ["generate", "decode"]
     assert seen[0][1] == seen[1][1]
     assert seen[0][1] is not None
+
+
+@pytest.mark.skipif(not __import__("sys").platform.startswith("linux"), reason="Linux descriptor custody")
+def test_descriptor_denies_same_inode_restored_bytes_and_mtime(tmp_path):
+    from skeleton.ai.runtime.inference.gguf_private_transport import private_frame
+    model, _, weights = fixture(tmp_path)
+    old = weights.stat()
+    old_bytes = weights.read_bytes()
+    with private_frame(model.runtime_artifact, model.model_artifact, b"SKG1", lambda: None) as frame:
+        with weights.open("r+b") as stream:
+            stream.seek(-1, 2)
+            stream.write(b"x" if old_bytes[-1:] != b"x" else b"y")
+            stream.flush()
+            stream.seek(-1, 2)
+            stream.write(old_bytes[-1:])
+        os.utime(weights, ns=(old.st_atime_ns, old.st_mtime_ns))
+        assert weights.read_bytes() == old_bytes
+        with pytest.raises(LlamaCppRuntimeError):
+            frame.check_metadata()
+
+
+def test_exact_bridge_refuses_adjacent_dynamic_runtime_inventory(tmp_path):
+    model, _, _ = fixture(tmp_path)
+    with pytest.raises(LlamaCppRuntimeError):
+        _compatible(replace(model.config, runtime_libraries=(("libllama.so", "a" * 64),)))
+
+
+def test_resource_callback_cannot_change_profile_before_spawn(tmp_path):
+    model, _, _ = fixture(tmp_path)
+    model._resource_preflight = lambda: setattr(model, "config", replace(model.config, threads=2))
+    with pytest.raises(LlamaCppRuntimeError, match="profile changed"):
+        model.roundtrip_ids("private")
+    assert model.execution_snapshot()["processes_started"] == 0
+
+
+def test_full_identity_verification_observes_guard_cancellation(tmp_path):
+    from skeleton.context.pre_delivery_guard import _native_verification_cancel
+    from skeleton.ai.runtime.inference.local import LocalInferenceCancelled
+    model, _, _ = fixture(tmp_path)
+    event = threading.Event()
+    event.set()
+    token = _native_verification_cancel.set(event)
+    try:
+        with pytest.raises(LocalInferenceCancelled):
+            model.assert_identity()
+    finally:
+        _native_verification_cancel.reset(token)

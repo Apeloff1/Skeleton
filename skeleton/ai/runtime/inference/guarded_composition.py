@@ -122,6 +122,10 @@ def compose_protected_local_adapter(
             engine.model, components.tokenize, components.detokenize,
         ),
         require_token_echo=True,
+        # Exact GGUF performs independently pinned whole-artifact reads and
+        # native vocabulary subprocess calls, not only in-memory callbacks.
+        # The outer serving deadline is still enforced at every phase.
+        native_timeout_seconds=30.0 if getattr(engine.model, "requires_exact_guard_tokens", False) is True else 5.0,
     )
     service = CanonicalGuardedLocalService(
         guard, snapshots=components.snapshots, activation_gate=activation_gate,

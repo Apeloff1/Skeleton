@@ -91,6 +91,7 @@ def _compatible(config):
     if (type(config) is not LlamaCppConfig or config.gpu_layers not in (0, None)
             or config.temperature != 0 or config.extra_args or config.output_framing != "raw"
             or not config.reject_model_symlink or config.environment
+            or config.runtime_libraries
             or config.kv_cache_location != "backend"
             or config.kv_cache_type_k is not None or config.kv_cache_type_v is not None
             or config.context_size is None or (config.threads or 1) > 256
@@ -130,7 +131,12 @@ class GgufTokenBridgeModel(LlamaCppModel):
         _compatible(self.config)
         if not self.config.rehash_artifacts_each_run:
             raise _fail("exact GGUF full artifact admission disabled")
-        super().assert_identity()
+        from skeleton.context.pre_delivery_guard import native_verification_cancel_event
+        event = native_verification_cancel_event()
+        def interrupt():
+            if event is not None and event.is_set():
+                raise LocalInferenceCancelled("exact GGUF identity verification cancelled")
+        self._assert_artifacts_stable(interrupt=interrupt)
 
     def activate_prelaunch_resource_profile(self, profile):
         _compatible(profile)
@@ -200,12 +206,15 @@ class GgufTokenBridgeModel(LlamaCppModel):
             _compatible(self.config)
             if not self.config.rehash_artifacts_each_run:
                 raise _fail("exact GGUF artifact rehash required")
-            if not linux_descriptor_custody() or self.config.runtime_libraries:
+            # Freeze the resource profile before opening/hashing any artifacts.
+            with self._process_lock:
+                self._inference_admitted = True
+                profile = self.execution_profile_digest
+            if not linux_descriptor_custody():
                 self._assert_artifacts_stable(interrupt=interrupt)
             else:
                 self.check_readiness()
             with private_frame(self._runtime, self._model, _MAGIC + payload, interrupt) as frame:
-                profile = self.execution_profile_digest
                 release, process = None, None
                 with self._process_lock:
                     self._inference_admitted = True
@@ -222,6 +231,9 @@ class GgufTokenBridgeModel(LlamaCppModel):
                         if not callable(release):
                             raise _fail("native GGUF lease custody unavailable")
                     interrupt()
+                    if self.execution_profile_digest != profile:
+                        raise _fail("exact GGUF execution profile changed before launch")
+                    frame.check_metadata()
                     process = subprocess.Popen(
                         [frame.executable, operation, frame.model, str(frame.source), str(frame.target),
                          str(self._effective_context()), str(self.config.threads or 1),
@@ -251,11 +263,13 @@ class GgufTokenBridgeModel(LlamaCppModel):
                     if process.returncode != 0:
                         raise _fail("GGUF bridge rejected native execution")
                     frame.verify(interrupt)
-                    if not linux_descriptor_custody() or self.config.runtime_libraries:
+                    if not linux_descriptor_custody():
                         self._assert_artifacts_stable(interrupt=interrupt)
                     if self.execution_profile_digest != profile:
                         raise _fail("exact GGUF execution profile changed")
-                    return _Frame(frame.read(_MAX_FRAME))
+                    result = _Frame(frame.read(_MAX_FRAME))
+                    interrupt()
+                    return result
                 finally:
                     with self._process_lock:
                         self._draining_processes.add(process.pid)
