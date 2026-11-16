@@ -671,6 +671,8 @@ class OfflineHTTPApplication:
                                 GenerationConfig(max_new_tokens=budget))), scope), strict)
                         manifest = prepare_evidence(message.strip(), digest, hits,
                                                    self.model_digest, self.tokenizer_digest)
+                        if adaptive is not None and adaptive["contract"]["kind"] == "source_quotes" and len({c["document_id"] for c in manifest["citations"]}) < adaptive["contract"]["minimum_distinct_sources"]:
+                            raise OfflineHTTPError(422, "insufficient admitted source diversity")
 
                     def recheck():
                         self._admit_local_generation()
@@ -682,7 +684,7 @@ class OfflineHTTPApplication:
                             if manifest is not None:
                                 selected = tuple(sorted({c["document_id"] for c in manifest["citations"]}))
                                 try:
-                                    docs, _ = self.knowledge._verified_snapshot(selected)
+                                    docs, _ = self.knowledge._verified_snapshot(scope if scope is not None else selected)
                                 except RuntimeContractError:
                                     raise OfflineHTTPError(409, "deliberation source changed") from None
                                 sources = {doc[0]: doc for doc in docs}
