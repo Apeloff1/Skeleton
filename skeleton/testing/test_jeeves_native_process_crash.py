@@ -186,6 +186,21 @@ class TestNativeProcessCrashMatrix(unittest.TestCase):
         self.assertEqual(self.queue.inspect(self.order.order_id)["state"],"claimed")
         self.assertEqual(self.backend.calls,0)
 
+    def test_repeated_reader_custody_never_opens_live_sqlite_files(self):
+        from unittest.mock import patch
+        from skeleton.ai.runtime.operational_ai.orchestration.execution_spine import database, path_policy
+        # Any extra file descriptor close can release POSIX locks belonging
+        # to an existing connection in this process. Metadata checks only.
+        with patch.object(path_policy, "private_file_at", side_effect=AssertionError("live file opened")):
+            with patch.object(database, "private_file_at", side_effect=AssertionError("live file opened")):
+                for _ in range(3):
+                    self.db.inspect()
+                    with SpineDatabase(self.temp.name, readonly=True) as reader:
+                        reader.inspect()
+                        with reader.snapshot() as conn:
+                            self.assertEqual(conn.execute("SELECT COUNT(*) FROM requests").fetchone(), (0,))
+        self.assertEqual(self.queue.inspect(self.order.order_id)["state"], "queued")
+
     def test_failed_native_child_never_synthesizes_verified_response(self):
         child=self._run("kill_during_model")
         self.assertEqual(child.returncode,77,child.stderr)

@@ -115,8 +115,13 @@ def test_session_forgery_and_source_revision_fail_closed():
     altered = copy.deepcopy(source)
     altered["scenes"][0]["narrative"] = "Revised original text"
     prove(altered)
-    with pytest.raises(CanonError, match="counterfactual_world_lease_mismatch"):
+    with pytest.raises(CanonError, match="session_world_lease_mismatch"):
         validate_review(data, altered, state)
+    # A session replayed against the new source still cannot authorize the
+    # old review. Both leases must independently fail closed.
+    revised_state = session(altered)
+    with pytest.raises(CanonError, match="counterfactual_world_lease_mismatch"):
+        validate_review(data, altered, revised_state)
 
 
 def test_budgets_do_not_silently_truncate():
