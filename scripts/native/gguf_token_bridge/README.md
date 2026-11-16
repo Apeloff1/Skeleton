@@ -18,3 +18,8 @@ compares the exact admitted IDs before invoking llama_decode on those IDs.
 Binary frames use SKG1 magic and little-endian uint32 lengths/IDs. No raw prompt
 or token list is emitted in public status or logs. This build source is not a
 prebuilt or qualified executable.
+
+The existing first-install reusable CI workflow includes a separate compile-only
+job pinned to the same upstream source SHA. It checks malformed invocations
+without downloading model weights. This receipt must not be represented as
+local inference or hardware qualification.

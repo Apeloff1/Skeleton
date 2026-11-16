@@ -9,12 +9,9 @@ endif()
 find_package(Git REQUIRED)
 execute_process(COMMAND "${GIT_EXECUTABLE}" -C "${LLAMA_CPP_SOURCE}" rev-parse HEAD
   RESULT_VARIABLE git_result OUTPUT_VARIABLE actual_sha OUTPUT_STRIP_TRAILING_WHITESPACE)
-execute_process(COMMAND "${GIT_EXECUTABLE}" -C "${LLAMA_CPP_SOURCE}" rev-parse "b11429^{commit}"
-  RESULT_VARIABLE tag_result OUTPUT_VARIABLE target_sha OUTPUT_STRIP_TRAILING_WHITESPACE)
 execute_process(COMMAND "${GIT_EXECUTABLE}" -C "${LLAMA_CPP_SOURCE}" status --porcelain --untracked-files=all
   RESULT_VARIABLE status_result OUTPUT_VARIABLE dirty OUTPUT_STRIP_TRAILING_WHITESPACE)
-if(NOT git_result EQUAL 0 OR NOT tag_result EQUAL 0 OR NOT status_result EQUAL 0
-    OR NOT actual_sha STREQUAL target_sha
+if(NOT git_result EQUAL 0 OR NOT status_result EQUAL 0
     OR NOT actual_sha STREQUAL "d81235049384534c167caea52b85a694f6103d14"
     OR NOT dirty STREQUAL "")
   message(FATAL_ERROR "llama.cpp checkout is not clean at b11429")
@@ -30,6 +27,16 @@ set(GGML_METAL OFF CACHE BOOL "" FORCE)
 set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
 set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
 set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+set(GGML_BACKEND_DL OFF CACHE BOOL "" FORCE)
+set(GGML_CPU ON CACHE BOOL "" FORCE)
+set(GGML_HIP OFF CACHE BOOL "" FORCE)
+set(GGML_SYCL OFF CACHE BOOL "" FORCE)
+set(GGML_RPC OFF CACHE BOOL "" FORCE)
+set(GGML_BLAS OFF CACHE BOOL "" FORCE)
+set(GGML_CANN OFF CACHE BOOL "" FORCE)
+set(GGML_MUSA OFF CACHE BOOL "" FORCE)
+set(GGML_WEBGPU OFF CACHE BOOL "" FORCE)
+set(GGML_OPENVINO OFF CACHE BOOL "" FORCE)
 add_subdirectory("${LLAMA_CPP_SOURCE}" llama-build EXCLUDE_FROM_ALL)
 add_executable(skeleton-gguf-token-bridge bridge.cpp)
 target_link_libraries(skeleton-gguf-token-bridge PRIVATE llama)
