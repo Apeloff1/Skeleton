@@ -86,7 +86,8 @@ def _digest(value):
 
 def _base(value):
     _require(type(value) is str and 0 < len(value) <= 256
-             and not any(ord(c) <= 32 or ord(c) >= 127 for c in value))
+             and not any(ord(c) <= 32 or ord(c) >= 127 for c in value)
+             and not any(c in value for c in ("?", "#", "%", chr(92))))
     parts = urlsplit(value)
     _require(parts.scheme == "http" and parts.hostname in ("localhost", "127.0.0.1", "::1")
              and parts.username is None and parts.password is None
@@ -100,8 +101,11 @@ def _base(value):
 
 def _get(base, path, *, timeout, html=False):
     host, port, authority = _base(base)
-    _require(type(path) is str and path.startswith("/") and not path.startswith("//")
-             and not any(c in path for c in ("\r", "\n", "#", "?")))
+    _require(type(path) is str and 1 <= len(path) <= 512
+             and re.fullmatch(r"/[A-Za-z0-9_/-]+", path) is not None
+             and "//" not in path)
+    _require(type(timeout) in (float, int) and math.isfinite(timeout)
+             and 0 < timeout <= 10 and type(html) is bool)
     connection = http.client.HTTPConnection(host, port=port, timeout=timeout)
     cap = 65536 if html else _MAX_PACKET
     try:
@@ -129,7 +133,7 @@ def _get(base, path, *, timeout, html=False):
             # HTML presence is intentionally not a JS/browser or UI identity
             # assertion. A static SPA shell alone cannot prove functionality.
             sample = response.read(4096)
-            _require(sample.lstrip().lower().startswith(b"<!doctype html"))
+            _require(re.match(rb"\s*<!doctype\s+html\s*>", sample, re.IGNORECASE) is not None)
             return "observed", None
         data = response.read(cap + 1)
         _require(0 < len(data) <= cap)
@@ -244,12 +248,14 @@ def _aggregate(value, bootstrap, engine_expected):
         if type(product.get(key)) is not int or not 0 <= product[key] <= 1_000_000:
             return "invalid_protocol", {}
     if (product["canonical_actions"] == 0 or product["ready_actions"] > product["canonical_actions"]
+            or product["governed_unbound"] > product["canonical_actions"]
             or product["unsafe_actions"] != 0 or product["policy_gaps"] != 0
             or not _digest(product.get("attestation_sha256"))):
         return "unqualified", {}
     return "observed", {"product_attestation_sha256": product["attestation_sha256"],
                         "canonical_actions": product["canonical_actions"],
-                        "ready_actions": product["ready_actions"]}
+                        "ready_actions": product["ready_actions"],
+                        "governed_unbound": product["governed_unbound"]}
 
 
 def _routes(value):
@@ -334,7 +340,12 @@ def _worker_entry():
         return 2
 
 
-def _validate_worker_result(raw):
+def _validate_worker_result(raw, *, selected=None):
+    """Check exact fact schemas and their relationship to each lane verdict.
+
+    A positive worker flag is not authority when mandatory facts are absent,
+    contradictory, or belong to another configured provider.
+    """
     _require(type(raw) is list and len(raw) == len(_LANES))
     result = []
     for name, item in zip(_LANES, raw, strict=True):
@@ -343,20 +354,42 @@ def _validate_worker_result(raw):
         lane = Lane(**item)
         facts = lane.facts
         if name == "backend_health":
-            _require(not facts or (set(facts) == {"writer_mode"} and facts["writer_mode"] in
-                    ("protected_observed", "legacy_unqualified", "protected_unavailable")))
+            if lane.ok:
+                _require(set(facts) == {"writer_mode"} and facts["writer_mode"] in
+                         ("protected_observed", "legacy_unqualified"))
+            else:
+                _require(not facts or (lane.code == "unqualified" and set(facts) == {"writer_mode"}
+                         and facts["writer_mode"] in ("protected_observed", "legacy_unqualified",
+                                                      "protected_unavailable")))
         elif name in ("aggregate_ready", "aggregate_status"):
-            _require(not facts or (set(facts) == {"product_attestation_sha256","canonical_actions","ready_actions"}
-                    and _digest(facts["product_attestation_sha256"]) and all(
-                        type(facts[key]) is int and 0 <= facts[key] <= 1_000_000
-                        for key in ("canonical_actions","ready_actions"))))
+            if lane.ok:
+                _require(set(facts) == {"product_attestation_sha256","canonical_actions",
+                                        "ready_actions","governed_unbound"}
+                         and _digest(facts["product_attestation_sha256"])
+                         and all(type(facts[key]) is int and 0 <= facts[key] <= 1_000_000
+                                 for key in ("canonical_actions","ready_actions","governed_unbound"))
+                         and 0 < facts["canonical_actions"]
+                         and facts["ready_actions"] <= facts["canonical_actions"]
+                         and facts["governed_unbound"] <= facts["canonical_actions"])
+            else:
+                _require(not facts)
         elif name == "critical_routes":
-            _require(not facts or (set(facts) == {"missing_count"} and
-                     type(facts["missing_count"]) is int and 0 <= facts["missing_count"] <= 64))
+            if lane.ok:
+                _require(set(facts) == {"missing_count"} and type(facts["missing_count"]) is int
+                         and facts["missing_count"] == 0)
+            else:
+                _require(not facts or (lane.code == "unqualified" and set(facts) == {"missing_count"}
+                         and type(facts["missing_count"]) is int and 0 <= facts["missing_count"] <= 64))
         elif name == "provider_readiness":
-            _require(not facts or (set(facts)=={"provider_available"} and facts["provider_available"] is False) or
-                    (set(facts) == {"provider_available","selected_provider"} and
-                     facts["provider_available"] is True and facts["selected_provider"] in _PROVIDERS))
+            if lane.ok:
+                _require(set(facts) == {"provider_available","selected_provider"}
+                         and facts["provider_available"] is True
+                         and type(facts["selected_provider"]) is str
+                         and facts["selected_provider"] in _PROVIDERS
+                         and (selected is None or facts["selected_provider"] == selected))
+            else:
+                _require(not facts or (lane.code == "unqualified"
+                         and set(facts) == {"provider_available"} and facts["provider_available"] is False))
         else:
             _require(not facts)
         result.append(lane.document())
@@ -379,13 +412,13 @@ def _bounded_worker(root, args, timeout):
             done = subprocess.run([sys.executable,"-I","-B","-c",code], cwd=root, env=env,
                                   input=_canonical(args), stdout=output, stderr=error,
                                   timeout=timeout, check=False)
-            if done.returncode != 0:
+            if type(done.returncode) is not int or done.returncode != 0:
                 return _failed_worker("worker_unavailable")
             output.seek(0)
             raw = output.read(_MAX_RECEIPT+1)
         _require(len(raw) <= _MAX_RECEIPT)
         value = json.loads(raw, object_pairs_hook=_unique, parse_constant=_constant)
-        return _validate_worker_result(value)
+        return _validate_worker_result(value, selected=args["selected_provider"])
     except subprocess.TimeoutExpired:
         return _failed_worker("deadline_exceeded")
     except (OSError, ValueError, TypeError, QualificationDenied, RecursionError):
@@ -414,6 +447,7 @@ def assert_source_head(root, expected):
 
 
 def _pass_scope(lanes):
+    lanes = _validate_worker_result(lanes)
     indexed = {row["name"]: row for row in lanes}
     core = all(indexed[name]["ok"] is True for name in _LANES if name != "provider_readiness")
     a = indexed["aggregate_ready"]["facts"]
@@ -424,7 +458,12 @@ def _pass_scope(lanes):
     return {"services_observed":core, "protected_writer_observed":core and mode=="protected_observed",
             "provider_available_observed":core and indexed["provider_readiness"]["ok"] is True,
             "product_attestation_sha256":a.get("product_attestation_sha256") if core else None,
-            "writer_mode":mode}
+            "writer_mode":mode,
+            "canonical_actions":a.get("canonical_actions") if core else None,
+            "ready_actions":a.get("ready_actions") if core else None,
+            "governed_unbound":a.get("governed_unbound") if core else None,
+            "selected_provider":indexed["provider_readiness"]["facts"].get("selected_provider")
+            if core and indexed["provider_readiness"]["ok"] else None}
 
 
 def qualify_live_install(root=None, *, source_head, passes=2, per_probe_timeout=5.0,
@@ -475,7 +514,9 @@ def qualify_live_install(root=None, *, source_head, passes=2, per_probe_timeout=
         receipt["source_observed"]=True
         scopes=[]
         for index in range(passes):
-            lanes = _bounded_worker(root,inputs,hard_timeout)
+            lanes = _validate_worker_result(
+                _bounded_worker(root, inputs, hard_timeout), selected=selected,
+            )
             # Never emit stale or partially accumulated success after an
             # observed .env/source mutation at a round boundary.
             unchanged()

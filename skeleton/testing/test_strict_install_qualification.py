@@ -218,3 +218,82 @@ def test_isolated_worker_process_over_real_loopback():
              "bootstrap":bootstrap,"timeout":2,"selected_provider":"local"},10)
     assert q._pass_scope(result)["services_observed"]
     assert len(calls)==9
+
+
+
+@pytest.mark.parametrize("name,facts", [
+    ("backend_health", {}),
+    ("backend_health", {"writer_mode":"protected_unavailable"}),
+    ("aggregate_ready", {}),
+    ("aggregate_status", {"product_attestation_sha256":"a"*64,
+                          "canonical_actions":0,"ready_actions":0,"governed_unbound":0}),
+    ("aggregate_status", {"product_attestation_sha256":"a"*64,
+                          "canonical_actions":10,"ready_actions":11,"governed_unbound":0}),
+    ("aggregate_status", {"product_attestation_sha256":"a"*64,
+                          "canonical_actions":10,"ready_actions":8,"governed_unbound":11}),
+    ("critical_routes", {}),
+    ("critical_routes", {"missing_count":1}),
+    ("critical_routes", {"missing_count":False}),
+    ("provider_readiness", {}),
+    ("provider_readiness", {"provider_available":False}),
+])
+def test_positive_worker_lane_requires_consistent_mandatory_facts(name,facts):
+    rows=clean_rows()
+    next(row for row in rows if row["name"]==name)["facts"]=facts
+    with pytest.raises(q.QualificationDenied):
+        q._validate_worker_result(rows)
+
+
+def test_worker_selected_provider_must_match_parent_configuration():
+    rows=clean_rows()
+    next(row for row in rows if row["name"]=="provider_readiness")["facts"]["selected_provider"]="openai"
+    with pytest.raises(q.QualificationDenied):
+        q._validate_worker_result(rows,selected="local")
+
+
+@pytest.mark.parametrize("key,new_value",[
+    ("canonical_actions",11),("ready_actions",7),("governed_unbound",3),
+])
+def test_same_attestation_cannot_hide_round_counter_drift(monkeypatch,tmp_path,key,new_value):
+    rows=clean_rows()
+    changed=deepcopy(rows)
+    for row in changed:
+        if row["name"] in ("aggregate_ready","aggregate_status"):
+            row["facts"][key]=new_value
+    patch_host(monkeypatch,tmp_path,[rows,changed])
+    result=q.qualify_live_install(tmp_path,source_head="a"*40)
+    assert result["ok"] is False
+    assert result["service_observation_complete"] is False
+
+
+def test_parent_rejects_fabricated_worker_packet_even_after_initial_success(monkeypatch,tmp_path):
+    rows=clean_rows()
+    changed=deepcopy(rows)
+    next(row for row in changed if row["name"]=="critical_routes")["facts"]={}
+    patch_host(monkeypatch,tmp_path,[rows,changed])
+    result=q.qualify_live_install(tmp_path,source_head="a"*40)
+    assert result["ok"] is False and not result["rounds"]
+
+
+@pytest.mark.parametrize("base",[
+    "http://localhost:80?", "http://localhost:80#", "http://local%68ost:80",
+])
+def test_strict_loopback_rejects_empty_delimiters_and_encoded_authority(base):
+    with pytest.raises(q.QualificationDenied):
+        q._base(base)
+
+
+@pytest.mark.parametrize("path",["/../health","/api//health","/api/%2e","/api/x?","/api/x#",
+                                  "/api/\\x","/"+"x"*512])
+def test_strict_probe_rejects_noncanonical_path_before_transport(monkeypatch,path):
+    def forbidden(*args,**kwargs):
+        pytest.fail("inadmissible route reached HTTP transport")
+    monkeypatch.setattr(q.http.client,"HTTPConnection",forbidden)
+    with pytest.raises(q.QualificationDenied):
+        q._get("http://localhost:80",path,timeout=1)
+
+
+@pytest.mark.parametrize("body",[b"<!doctype html-not-real>",b"<!doctype html",b"<html>"])
+def test_html_prefix_cannot_qualify_setup_document(body):
+    with serve({"/setup":body}) as (base,_):
+        assert q._get(base,"/setup",timeout=1,html=True)[0]!="observed"
