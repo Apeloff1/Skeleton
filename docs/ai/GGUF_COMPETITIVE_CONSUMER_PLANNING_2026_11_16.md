@@ -374,3 +374,26 @@ dedicated CI job acquires only public model bytes, executes local CPU
 inference on the runner and publishes measurements rather than weights.
 Physical CUDA/MPS, Windows, multi-host worker transport, actual large
 index capacity and installed first-launch integration remain held.
+
+## Typed native tuning continuation
+
+The private resident server now exposes opt-in independent prefill threads,
+NUMA, mmap/direct-I/O loading, lazy tensor reads, layer/row/experimental tensor
+splits, CPU expert/dense FFN placement, dynamic expert cache and prompt-local
+n-gram speculative verification through the pinned upstream executable.
+Reference: https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md
+
+Defaults do not modify argv. Additional cache/workspace is charged against the
+conservative aggregate budget, known model geometry is required for placement,
+and CPU affinity constrains prefill threads. No arbitrary flags, remote model
+downloads, disk speculative cache, or automatic fallback. Guarded adapter
+identity includes the typed policy via its existing canonical profile.
+Batch receipts expose requested tuning digest, wall timing and token counts,
+not time-to-first-token, kernel speed, per-device residency or production
+performance. Hardware-specific options require a compatible operator-pinned
+binary and matched native/device qualification. No default installer activation.
+
+Existing paged CUDA, semantic ANN, authenticated bundles and native slot
+migration remain separate execution paths. This increment does not port
+ik_llama.cpp IQK/trellis kernels, external backends, FlashMLA, or cross-host
+parallelism. Neither requested flags nor fixture results prove those features.
