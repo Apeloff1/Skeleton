@@ -576,5 +576,77 @@ class SharedAcquisitionStripeTests(unittest.IsolatedAsyncioTestCase):
             await app._claim_acquisition_stripes(self.row("example.com"), "token")
 
 
+class PinnedAcquisitionAuthorityTests(unittest.IsolatedAsyncioTestCase):
+    def harness(self):
+        source = SharedAcquisitionStripeTests().make_app().limits
+        target = SharedAcquisitionStripeTests().make_app().limits
+        source.update_many = AsyncMock()
+        target.update_many = AsyncMock()
+        app = object.__new__(DragonCrawlerApplication)
+        app._workers = {}
+        app.limits = target
+        app._coordination_limits = source
+        row = {"request": {"allowed_hosts": ["example.com"]}}
+        return app, row, source, target
+
+    async def test_distinct_storage_never_creates_second_origin_pool(self):
+        app, row, source, target = self.harness()
+        await app._claim_acquisition_stripes(row, "token")
+        await app._assert_acquisition_stripes(row, "token")
+        source.find_one_and_update.assert_awaited_once()
+        source.count_documents.assert_awaited_once()
+        target.update_one.assert_not_awaited()
+        target.find_one_and_update.assert_not_awaited()
+        target.count_documents.assert_not_awaited()
+
+    async def test_unavailable_pinned_authority_never_falls_back(self):
+        from pymongo.errors import AutoReconnect
+        app, row, source, target = self.harness()
+        source.update_one.side_effect = AutoReconnect("fixture")
+        with self.assertRaises(AutoReconnect):
+            await app._claim_acquisition_stripes(row, "token")
+        target.update_one.assert_not_awaited()
+        source.count_documents.side_effect = AutoReconnect("fixture")
+        with self.assertRaises(AutoReconnect):
+            await app._assert_acquisition_stripes(row, "token")
+        target.count_documents.assert_not_awaited()
+
+    async def test_split_store_release_discharges_only_owned_stripes(self):
+        from core.dragon_crawler import ACQUISITION_STRIPE_KIND
+        app, _, source, target = self.harness()
+        await app._release_worker_credits("token")
+        expected = {"$unset": {"worker_token": "", "active_session_id": "", "lease_until": ""}}
+        source.update_many.assert_awaited_once_with(
+            {"kind": ACQUISITION_STRIPE_KIND, "worker_token": "token"}, expected)
+        target.update_many.assert_awaited_once_with({"worker_token": "token"}, expected)
+
+    async def test_source_release_failure_still_releases_local_token(self):
+        from pymongo.errors import AutoReconnect
+        app, _, source, target = self.harness()
+        source.update_many.side_effect = AutoReconnect("fixture")
+        with self.assertRaises(AutoReconnect):
+            await app._release_worker_credits("token")
+        target.update_many.assert_awaited_once()
+        self.assertEqual(target.update_many.await_args.args[0], {"worker_token": "token"})
+
+    async def test_single_store_release_preserves_original_cleanup(self):
+        app, _, source, _ = self.harness()
+        app.limits = source
+        await app._release_worker_credits("token")
+        source.update_many.assert_awaited_once()
+        self.assertEqual(source.update_many.await_args.args[0], {"worker_token": "token"})
+
+    def test_constructor_binds_original_or_explicit_shared_authority(self):
+        database = {"dragon_crawler_sessions": Mock(), "dragon_crawler_commands": Mock()}
+        coordination = {"dragon_crawler_commands": Mock()}
+        with patch("core.dragon_crawler.EngineClient.from_env"):
+            app = DragonCrawlerApplication(database)
+            self.assertIs(app._acquisition_store(), database["dragon_crawler_commands"])
+            app.limits = Mock()
+            self.assertIs(app._acquisition_store(), database["dragon_crawler_commands"])
+            app = DragonCrawlerApplication(database, coordination_database=coordination)
+            self.assertIs(app._acquisition_store(), coordination["dragon_crawler_commands"])
+
+
 if __name__ == "__main__":
     unittest.main()
