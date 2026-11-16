@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from skeleton.app.gameforge_campaign import detached, digest
+from skeleton.app import gameforge_saga_league as league
 from skeleton.app.gameforge_saga import MAX_EPISODES, REQUEST_SCHEMA, build_saga, play_saga
 from skeleton.app.original_quest_cli import _encode, _object, _require, _text
 from skeleton.game.gameplay import harbor_crafting as harbor
@@ -56,6 +57,16 @@ def author_saga(source: Any) -> dict:
                 witness = solved["actions"]
                 receipt = {"owner": "harbor_crafting_convoy_solver",
                            "solver_digest": solved["plan_digest"], "witness_origin": "canonical_solver"}
+        elif kind == "convoy_league":
+            rules = league.validate_rules(world, item["rules"])
+            _require("package" not in item, "unsupported league package input")
+            if "witness" in item:
+                witness = item["witness"]
+                receipt = {"owner": "harbor_crafting_convoy_league", "witness_origin": "authored"}
+            else:
+                witness, proof = league.solve_witness(world, rules)
+                receipt = {"owner": "harbor_crafting_convoy_league_solver",
+                           "solver_digest": proof["plan_digest"], "witness_origin": "canonical_solver"}
         else:
             raise ValueError("unknown saga author owner")
         episodes.append({"objective": objective, "kind": kind, "source": world,
