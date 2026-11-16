@@ -182,6 +182,11 @@ def compare(source: Any, left: Any, right: Any) -> dict:
                         "score_delta": new["score"] - old["score"], "energy_delta": new["energy"] - old["energy"],
                         "trust_delta": new["trust"] - old["trust"], "left_flags": old["flags"],
                         "right_flags": new["flags"]})
+        elif old["kind"] == "convoy_league":
+            row.update({key + "_delta": new[key] - old[key]
+                        for key in ("score", "points", "rounds_played")})
+            row.update({"left_earned": old["earned"], "right_earned": new["earned"],
+                        "left_championship": old["championship"], "right_championship": new["championship"]})
         else:
             row.update({key + "_delta": new[key] - old[key]
                         for key in ("hull", "waypoint", "bounty", "points", "credits", "reputation")})
