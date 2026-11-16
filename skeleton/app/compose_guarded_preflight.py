@@ -85,7 +85,7 @@ def _wire_integer(value: object) -> int | None:
 def _valid_principal_utf8(value: str) -> bool:
     """Reject unpaired surrogates and oversized identities before comparison."""
     try:
-        return len(value.encode("utf-8", errors="strict")) <= 256
+        return len(value) <= 128 and len(value.encode("utf-8", errors="strict")) <= 256
     except UnicodeError:
         return False
 

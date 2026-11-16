@@ -7,6 +7,7 @@ import unittest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from skeleton.ai.runtime.inference.reviewer_custody import ReviewerTrustAnchor
+from skeleton.ai.runtime.inference.signed_reviewer_client import SignedReviewerClient as ProductionSignedReviewerClient
 from unittest.mock import patch
 
 from skeleton.ai.runtime.inference.compose_activation import (
@@ -326,7 +327,7 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
             await self.make().activate()
 
     async def test_oversized_or_control_principal_denies(self):
-        for username in ("x" * 129, "bad\\nprincipal", "bad\\u007fprincipal"):
+        for username in ("x" * 129, "bad\nprincipal", "bad\u007fprincipal", "bad\ud800principal", "é" * 129):
             with self.subTest(username=repr(username)):
                 self.database.auth = {"authInfo": {"authenticatedUsers": [
                     {"user": username, "db": "admin"},
@@ -451,7 +452,7 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
         permit = await gate.activate()
         self.database.auth = {"authInfo": {"authenticatedUsers": [
             {"user": "different-writer", "db": "admin"},
-        ]}}
+        ], "authenticatedUserRoles": []}}
         with self.assertRaisesRegex(ActivationBlocked, "authority changed"):
             await gate.assert_active(permit)
         self.assertEqual(gate.phase, ActivationPhase.BLOCKED)
@@ -674,12 +675,9 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
         # A challenge signature alone does not authenticate review verdicts.
         # Production must use the concrete signed transport, not a local
         # permissive callable that happens to delegate attest_challenge().
-        from skeleton.ai.runtime.inference.signed_reviewer_client import (
-            SignedReviewerClient,
-        )
         with patch(
             "skeleton.ai.runtime.inference.signed_reviewer_client.SignedReviewerClient",
-            SignedReviewerClient,
+            ProductionSignedReviewerClient,
         ):
             with self.assertRaisesRegex(ActivationBlocked, "signed independent"):
                 self.make()
@@ -789,7 +787,7 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_owner_scope_rejects_unencodable_and_control_identity(self):
         for scope in ("tenant_id", "actor_id", "context_id"):
-            for invalid in ("broken\\ud800", "broken\\udfff", "name\\x7f", "x" * 513):
+            for invalid in ("broken\ud800", "broken\udfff", "name\x7f", "x" * 513):
                 with self.subTest(scope=scope, invalid=repr(invalid)):
                     with self.assertRaisesRegex(ActivationBlocked, "owner scope invalid"):
                         self.make(**{scope: invalid})

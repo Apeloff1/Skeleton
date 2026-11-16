@@ -285,6 +285,32 @@ class SaveSlotAncestorCustodyTests(unittest.TestCase):
             self.assertFalse(slot.exists())
             self.assertEqual(list(Path(tmp).glob(".campaign-*.tmp")), [])
 
+    def test_reader_rejects_depth_unicode_and_alternative_encodings(self):
+        from skeleton.game.gameplay import offline_grid_save_slot as module
+
+        with tempfile.TemporaryDirectory() as tmp:
+            slot = Path(tmp) / "slot.json"
+            invalid = (
+                (b"[" * (module.MAX_SAVE_DEPTH + 1) + b"0" +
+                 b"]" * (module.MAX_SAVE_DEPTH + 1), "nesting budget"),
+                (b'{"name":"\\ud800"}', "Unicode"),
+                (b'{"\\udfff":1}', "Unicode"),
+                ('{"tick":1}'.encode("utf-16"), "encoding"),
+            )
+            for raw, reason in invalid:
+                with self.subTest(reason=reason):
+                    slot.write_bytes(raw)
+                    with self.assertRaisesRegex(SaveSlotError, reason):
+                        read_slot(slot)
+                    self.assertEqual(slot.read_bytes(), raw)
+            valid = {"name": "雪🚀", "tick": 7}
+            write_slot(slot, valid)
+            self.assertEqual(read_slot(slot), valid)
+            for value in ({"name": "\ud800"}, {"\udfff": 1}):
+                with self.assertRaisesRegex(SaveSlotError, "Unicode"):
+                    write_slot(slot, value)
+                self.assertEqual(read_slot(slot), valid)
+
     def test_writer_uses_bounded_streaming_not_monolithic_json_dumps(self):
         from skeleton.game.gameplay import offline_grid_save_slot as module
 

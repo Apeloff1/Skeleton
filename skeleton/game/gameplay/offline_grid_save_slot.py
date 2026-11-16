@@ -57,14 +57,18 @@ def _finite_float(value: str) -> float:
 
 
 def _decode(payload: bytes) -> object:
-    """Strict input matching the writer: no duplicate keys or NaN/Infinity."""
+    """Restore only bounded, plain UTF-8 JSON admitted by the writer."""
+    if type(payload) is not bytes or len(payload) > MAX_SAVE_BYTES:
+        raise SaveSlotError("save exceeds byte budget")
     try:
-        return json.loads(
-            payload,
+        decoded = json.loads(
+            payload.decode("utf-8", errors="strict"),
             object_pairs_hook=_unique_object,
             parse_constant=_reject_constant,
             parse_float=_finite_float,
         )
+        _admit_snapshot(decoded)
+        return decoded
     except SaveSlotError:
         raise
     except (ValueError, UnicodeError, RecursionError) as exc:
@@ -88,12 +92,22 @@ def _admit_snapshot(snapshot: object) -> None:
             raise SaveSlotError("save exceeds byte budget")
         remaining -= amount
 
+    def admit_text(value: str, overhead: int) -> None:
+        charge(len(value) + overhead)
+        # JSON escapes can hide lone surrogates from a UTF-8 byte decoder.
+        # Validate in bounded chunks, including object keys, before encoding.
+        for start in range(0, len(value), 4096):
+            try:
+                value[start:start + 4096].encode("utf-8", errors="strict")
+            except UnicodeError as exc:
+                raise SaveSlotError("invalid replay snapshot Unicode") from exc
+
     def visit(value: object, depth: int) -> None:
         if depth > MAX_SAVE_DEPTH:
             raise SaveSlotError("save exceeds nesting budget")
         kind = type(value)
         if kind is str:
-            charge(len(value) + 2)
+            admit_text(value, 2)
         elif kind is bool:
             charge(4 if value else 5)
         elif value is None:
@@ -119,7 +133,7 @@ def _admit_snapshot(snapshot: object) -> None:
                     for key, item in value.items():
                         if type(key) is not str:
                             raise SaveSlotError("save record keys must be plain strings")
-                        charge(len(key) + 3)
+                        admit_text(key, 3)
                         visit(item, depth + 1)
                 else:
                     for item in value:

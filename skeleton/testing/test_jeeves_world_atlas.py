@@ -159,7 +159,10 @@ def test_tamper_stale_revision_and_lock_fail_closed(tmp_path):
     html.write_text("tampered")
     with pytest.raises(CanonError, match="atlas_playable_mismatch"):
         store.verify("voyage")
-    store.compile("voyage", expected_atlas_digest=digest(spec))
+    with pytest.raises(CanonError, match="atlas_stale_edit"):
+        store.compile("voyage", expected_atlas_digest=proposed_digest)
+    store.compile("voyage", expected_atlas_digest=approved_digest)
+    assert store.verify("voyage")["atlas_digest"] == approved_digest
     (tmp_path / "voyage.lock").write_text("busy")
     with pytest.raises(CanonError, match="lease_busy"):
         store.verify("voyage")
