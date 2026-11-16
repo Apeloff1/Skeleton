@@ -37,6 +37,9 @@ class SwarmBroker:
         supervisor: SwarmSupervisor | None = None,
         completions: CompletionCache | None = None,
     ) -> None:
+        if runtime.fenced:
+            # Existing broker lacks authenticated attempt and uncertain outcome custody.
+            raise LeaseError("fenced runtime requires a qualified token-aware broker")
         self.runtime = runtime
         self.control = control or SwarmControlPlane(runtime)
         self.supervisor = supervisor or SwarmSupervisor()

@@ -31,6 +31,13 @@ def audit(runtime: SwarmRuntime) -> InvariantReport:
     for task in tasks:
         if task.state is TaskState.LEASED:
             leased_ids.add(task.id)
+        if task.effect_uncertain and (not runtime.fenced or task.state is not TaskState.FAILED):
+            errors.append(f"invalid uncertain state:{task.id}")
+        if any(dep not in task_map for dep in task.dependencies):
+            errors.append(f"unknown task dependency:{task.id}")
+        if task.state is TaskState.LEASED or task.effect_uncertain:
+            if runtime.fenced and not task.lease_token:
+                errors.append(f"fenced task missing token:{task.id}")
             if not task.leased_to:
                 errors.append(f"leased task missing worker:{task.id}")
                 continue
@@ -54,7 +61,7 @@ def audit(runtime: SwarmRuntime) -> InvariantReport:
             task = task_map.get(task_id)
             if task is None:
                 errors.append(f"worker references missing task:{worker.id}:{task_id}")
-            elif task.state is not TaskState.LEASED:
+            elif task.state is not TaskState.LEASED and not task.effect_uncertain:
                 errors.append(f"worker references non-leased task:{worker.id}:{task_id}")
             elif task.leased_to != worker.id:
                 errors.append(f"worker ownership mismatch:{worker.id}:{task_id}")

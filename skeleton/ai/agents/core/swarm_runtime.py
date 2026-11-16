@@ -51,6 +51,7 @@ class SwarmTask:
     dependencies: tuple[str, ...] = ()
     lease_token: str | None = None
     effect_uncertain: bool = False
+    reconciliation_sha256: str | None = None
 
 
 @dataclass(slots=True)
@@ -172,8 +173,10 @@ class SwarmRuntime:
     def submit(self, task: SwarmTask) -> SwarmTask:
         if len(self._tasks) >= self.max_tasks:
             raise AdmissionError("runtime task capacity exhausted")
-        if not task.id.strip():
-            raise AdmissionError("task id must not be empty")
+        if type(task.id) is not str or not task.id.strip() or task.id != task.id.strip():
+            raise AdmissionError("task id must be canonical nonempty text")
+        if type(task.priority) is not int or not 0 <= task.priority <= 1000:
+            raise AdmissionError("invalid task priority")
         if task.id in self._tasks:
             raise AdmissionError(f"duplicate task id: {task.id}")
         if type(task.max_attempts) is not int or not 1 <= task.max_attempts <= 1000:
@@ -183,7 +186,8 @@ class SwarmRuntime:
         ) or len(set(task.dependencies)) != len(task.dependencies):
             raise AdmissionError("dependencies require distinct previously submitted tasks")
         admitted = replace(task, state=TaskState.QUEUED, attempts=0, leased_to=None,
-                           lease_deadline=None, last_error=None, lease_token=None, effect_uncertain=False)
+                           lease_deadline=None, last_error=None, lease_token=None, effect_uncertain=False,
+                           reconciliation_sha256=None)
         self._tasks[admitted.id] = admitted
         self._state_counts[TaskState.QUEUED] += 1
         self._submitted += 1
@@ -207,7 +211,8 @@ class SwarmRuntime:
             raise AdmissionError("runtime task capacity exhausted")
         by_id: dict[str, SwarmTask] = {}
         for task in tasks:
-            if not isinstance(task, SwarmTask) or type(task.id) is not str or not task.id.strip():
+            if (not isinstance(task, SwarmTask) or type(task.id) is not str or not task.id.strip()
+                    or task.id != task.id.strip()):
                 raise AdmissionError("invalid graph node")
             if task.id in by_id or task.id in self._tasks:
                 raise AdmissionError("duplicate graph node")
@@ -388,8 +393,8 @@ class SwarmRuntime:
         retry = outcome == "stopped-no-effect" and task.attempts < task.max_attempts
         state = TaskState.SUCCEEDED if outcome == "committed" else (TaskState.QUEUED if retry else TaskState.DEAD)
         updated = replace(task, state=state, leased_to=None, lease_token=None, lease_deadline=None,
-                          effect_uncertain=False, last_error=None if state is TaskState.SUCCEEDED
-                          else "reconciled:" + evidence_sha256)
+                          effect_uncertain=False, reconciliation_sha256=evidence_sha256,
+                          last_error=None if state is TaskState.SUCCEEDED else "reconciled")
         self._replace(task, updated)
         worker.active.discard(task_id)
         if state is TaskState.SUCCEEDED:
@@ -478,12 +483,14 @@ class SwarmRuntime:
         snapshot = self.snapshot()
         stale = self.stale_workers(stale_after=stale_after)
         saturation = 0.0
-        total_slots = snapshot.available_slots + snapshot.leased
+        held = sum(task.effect_uncertain for task in self._tasks.values())
+        active = snapshot.leased + held
+        total_slots = snapshot.available_slots + active
         if total_slots:
-            saturation = snapshot.leased / total_slots
+            saturation = active / total_slots
         queue_pressure = snapshot.queued / max(1, snapshot.available_slots)
         status = "healthy"
-        if snapshot.dead > 0 or stale:
+        if snapshot.dead > 0 or stale or held:
             status = "degraded"
         if snapshot.workers == 0 and snapshot.queued > 0:
             status = "critical"
@@ -492,6 +499,7 @@ class SwarmRuntime:
             "stale_workers": [worker.id for worker in stale],
             "worker_saturation": round(saturation, 6),
             "queue_pressure": round(queue_pressure, 6),
+            "uncertain_attempts": held,
             "snapshot": asdict(snapshot),
         }
 
@@ -573,9 +581,17 @@ class SwarmRuntime:
                 dependencies=tuple(raw.get("dependencies", ())),
                 lease_token=raw.get("lease_token"),
                 effect_uncertain=raw.get("effect_uncertain", False),
+                reconciliation_sha256=raw.get("reconciliation_sha256"),
             )
             if task.id in runtime._tasks or type(task.effect_uncertain) is not bool:
                 raise ValueError("invalid or duplicate checkpoint task")
+            if task.effect_uncertain and not fenced:
+                raise ValueError("unfenced checkpoint contains uncertain execution")
+            if task.reconciliation_sha256 is not None and (
+                type(task.reconciliation_sha256) is not str or len(task.reconciliation_sha256) != 64
+                or any(c not in "0123456789abcdef" for c in task.reconciliation_sha256)
+            ):
+                raise ValueError("invalid reconciliation digest")
             if fenced and (task.state is TaskState.LEASED or task.effect_uncertain):
                 if not task.leased_to or type(task.lease_token) is not str or len(task.lease_token) != 32 or any(
                     char not in "0123456789abcdef" for char in task.lease_token

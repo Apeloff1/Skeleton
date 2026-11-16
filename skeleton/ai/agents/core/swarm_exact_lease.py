@@ -4,6 +4,7 @@ from __future__ import annotations
 from contextlib import nullcontext
 from dataclasses import replace
 from math import isfinite
+from uuid import uuid4
 
 from skeleton.automation.agents.swarm_runtime import LeaseError, SwarmRuntime, SwarmTask, TaskState
 
@@ -42,6 +43,10 @@ def lease_exact(runtime: SwarmRuntime, worker_id: str, task_id: str) -> SwarmTas
         task = runtime._tasks.get(task_id)
         if task is None or task.state is not TaskState.QUEUED:
             raise LeaseError(f"task is not queued: {task_id}")
+        if task.attempts >= task.max_attempts:
+            raise LeaseError("task attempt budget exhausted")
+        if runtime.blocked_dependencies(task_id):
+            raise LeaseError("task dependencies are not satisfied")
         if not task.required_capabilities.issubset(worker.capabilities):
             raise LeaseError(f"worker lacks required capabilities: {worker_id}")
 
@@ -61,6 +66,8 @@ def lease_exact(runtime: SwarmRuntime, worker_id: str, task_id: str) -> SwarmTas
             attempts=task.attempts + 1,
             leased_to=worker.id,
             lease_deadline=deadline,
+            lease_token=uuid4().hex if runtime.fenced else None,
+            effect_uncertain=False,
         )
 
         runtime._replace(task, updated)

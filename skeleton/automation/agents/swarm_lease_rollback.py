@@ -32,6 +32,8 @@ def rollback_exact_lease(runtime: SwarmRuntime, worker_id: str, task_id: str) ->
     lock = getattr(runtime, "_lock", None)
     context = lock if lock is not None else nullcontext()
     with context:
+        if runtime.fenced:
+            raise LeaseError("fenced rollback requires trusted reconciliation")
         worker_id = _identifier(worker_id, "worker_id")
         task_id = _identifier(task_id, "task_id")
         worker = runtime._workers.get(worker_id)

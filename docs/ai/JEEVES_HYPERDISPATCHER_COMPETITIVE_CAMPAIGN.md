@@ -49,7 +49,7 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 06 | Predictive backfill | P |
 | 07 | Deadline preemption | Open |
 | 08 | Atomic gang scheduling | P |
-| 09 | Work stealing | Open |
+| 09 | Work stealing | P |
 | 10 | Speculative execution | Open |
 | 11 | Capability matchmaking | P |
 | 12 | Task fusion | Open |
@@ -66,7 +66,7 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 23 | Recursive decomposition | Open |
 | 24 | Parallel hypotheses | Open |
 | 25 | Historical-success routing | Open |
-| 26 | Learned cost prediction | Open |
+| 26 | Learned cost prediction | P |
 | 27 | Context affinity | Open |
 | 28 | Mission replanning | Open |
 | 29 | Tool-chain optimization | Open |
@@ -79,30 +79,30 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 36 | Energy scheduling | Open |
 | 37 | Bandwidth optimization | Open |
 | 38 | Model preloading | Open |
-| 39 | KV affinity | Open |
+| 39 | KV affinity | P |
 | 40 | Prefill/decode separation | Open |
-| 41 | Token-level admission | Open |
+| 41 | Token-level admission | P |
 | 42 | Cross-device migration | Open |
 | 43 | Pressure relief | Open |
 | 44 | Storage-aware dispatch | Open |
 | 45 | Heterogeneous accelerators | Open |
 | 46 | Event-sourced execution | Open |
-| 47 | Deterministic replay | Open |
+| 47 | Deterministic replay | P |
 | 48 | Partitioned journals | Open |
 | 49 | Distributed lease fencing | P |
-| 50 | Idempotent side effects | Open |
-| 51 | Transactional publication | Open |
+| 50 | Idempotent side effects | P |
+| 51 | Transactional publication | P |
 | 52 | Compensation | Open |
 | 53 | Deadlock detection | Open |
-| 54 | Checkpoint recovery | Open |
-| 55 | Poison quarantine | Open |
-| 56 | Retry budgets | Open |
+| 54 | Checkpoint recovery | P |
+| 55 | Poison quarantine | P |
+| 56 | Retry budgets | P |
 | 57 | Failure prediction | Open |
-| 58 | Split brain prevention | Open |
+| 58 | Split brain prevention | P |
 | 59 | Journal compaction | Open |
-| 60 | Version migration | Open |
-| 61 | Shadow scheduling | Open |
-| 62 | Counterfactual scheduling | Open |
+| 60 | Version migration | P |
+| 61 | Shadow scheduling | P |
+| 62 | Counterfactual scheduling | P |
 | 63 | Negative capability cache | Open |
 | 64 | Speculative reservations | Open |
 | 65 | Dependency collapse | Open |
@@ -111,7 +111,7 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 68 | Uncertainty-sensitive scheduling | P |
 | 69 | Semantic deduplication | Open |
 | 70 | Cross-domain lending | Open |
-| 71 | Scheduler portfolios | Open |
+| 71 | Scheduler portfolios | P |
 | 72 | Virtual workers | Open |
 
 ## Wave 2: advisory routing and counterfactual evaluation
@@ -198,6 +198,23 @@ sourcing), 47 (exact promotion replay), 50 (no regrant on known committed
 identity, not external exactly-once effect), 51 (atomic lease/receipt publication),
 54 (checkpoint restore holds), 58 (single DB fencing, not distributed consensus),
 59 (bounded swarm heap compaction only, journal compaction remains open).
+
+## Wave 6: hardened runtime, exact leasing and checkpoint convergence
+
+The existing thread-safe HardenedSwarmRuntime, exact-lease helper, fencing helper,
+snapshot validator, restore validator, invariant audit, rollback and broker
+boundaries now reconcile graph admission and opt-in fenced attempts. Restored
+queue-generation index is preserved, exact dispatch cannot bypass dependencies,
+version-2 snapshots preserve uncertain slots, and version-1 remains readable.
+Retention cannot discard unknown effects or referenced dependencies. The existing
+broker deliberately denies fenced mode until authenticated completion and tenant
+quota reconciliation can safely represent uncertain physical effects.
+
+Campaign measurement: 26/72 adoption targets have partial source implementations
+(IDs 01,02,03,04,06,08,09,11,14,26,39,41,47,49,50,51,54,55,56,58,60,61,62,66,68,71).
+None is claimed fully qualified. Event sourcing, distributed deadlock detection,
+and journal compaction are not achieved by receipts, DAG cycle checks or heap
+compaction; these remain open in the primary register.
 
 ## Qualification and rollback
 

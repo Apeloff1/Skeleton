@@ -432,3 +432,72 @@ def test_replacement_pressure_policy_preserves_existing_tenant_cap(tmp_path):
     state.acquire("jeeves", "a", "b", "w", priority=5)
     with pytest.raises(SharedPressureConflict, match="tenant pressure"):
         state.configure(SharedPressurePolicy("jeeves", 4, 32, 1, 16, 1.0), replace=True)
+
+def test_hardened_restore_preserves_queue_generations():
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_runtime import SwarmTask
+    runtime = HardenedSwarmRuntime()
+    runtime.register_worker("w")
+    runtime.submit(SwarmTask("a", {}))
+    restored = HardenedSwarmRuntime.from_state(runtime.export_state())
+    assert [t.id for t in restored.lease("w")] == ["a"]
+
+
+def test_hardened_fenced_checkpoint_and_exact_lease():
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, LeaseError
+    from skeleton.automation.agents.swarm_exact_lease import lease_exact
+    from skeleton.automation.agents.swarm_fencing import fence_for, fenced_renew, fenced_succeed
+    from skeleton.automation.agents.swarm_checkpoint import CheckpointStore
+    from skeleton.automation.agents.swarm_invariants import audit
+    runtime = HardenedSwarmRuntime(fenced=True, clock=lambda: 10.0)
+    runtime.register_worker("w", capacity=2)
+    runtime.submit_many((SwarmTask("child", {}, dependencies=("parent",)), SwarmTask("parent", {})))
+    with pytest.raises(LeaseError):
+        lease_exact(runtime, "w", "child")
+    fence = fence_for(lease_exact(runtime, "w", "parent"))
+    fenced_renew(runtime, fence)
+    assert audit(runtime).ok
+    checkpoint = CheckpointStore().capture(runtime)
+    restored = HardenedSwarmRuntime.from_state(checkpoint.state, clock=lambda: 1.0)
+    assert restored.task("parent").effect_uncertain and restored.worker("w").available == 1
+    assert not restored.lease("w")
+    assert audit(restored).ok
+    restored.reconcile_uncertain("parent", lease_token=fence.lease_token,
+                                 outcome="committed", evidence_sha256="a"*64)
+    assert restored.task("parent").reconciliation_sha256 == "a"*64
+    fenced_succeed(restored, fence_for(lease_exact(restored, "w", "child")))
+    assert audit(restored).ok
+
+
+def test_fenced_broker_and_rollback_fail_closed():
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, LeaseError
+    from skeleton.automation.agents.swarm_broker import SwarmBroker
+    from skeleton.automation.agents.swarm_lease_rollback import rollback_exact_lease
+    runtime = HardenedSwarmRuntime(fenced=True)
+    runtime.register_worker("w")
+    runtime.submit(SwarmTask("a", {}))
+    runtime.lease("w")
+    with pytest.raises(LeaseError):
+        SwarmBroker(runtime)
+    with pytest.raises(LeaseError):
+        rollback_exact_lease(runtime, "w", "a")
+
+
+def test_hardened_retention_cannot_forget_dependency_or_uncertain():
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, AdmissionError
+    runtime = HardenedSwarmRuntime(fenced=True)
+    runtime.register_worker("w")
+    runtime.submit_many((SwarmTask("parent", {}), SwarmTask("child", {}, dependencies=("parent",))))
+    lease = runtime.lease("w")[0]
+    runtime.fail("w", "parent", "error", lease_token=lease.lease_token)
+    with pytest.raises(AdmissionError):
+        runtime.forget("parent")
+    runtime.reconcile_uncertain("parent", lease_token=lease.lease_token,
+                                outcome="committed", evidence_sha256="a"*64)
+    with pytest.raises(AdmissionError):
+        runtime.forget("parent")
+    runtime.cancel("child")
+    assert runtime.forget("child") and runtime.forget("parent")
