@@ -114,6 +114,7 @@ class MongoCanonicalSourceEpoch:
         self._migration_authorizer = migration_authorizer
         self._revocation_authorizer = revocation_authorizer
         self._deployment_latch_pin = None
+        self._required_deployment_latch_pin = None
         self._deployment_latch_failed = False
         self._collection = collection
         self._reader = reader
@@ -143,6 +144,7 @@ class MongoCanonicalSourceEpoch:
         durable publication. No HTTP or model output can bind it.
         """
         if (getattr(self, "_deployment_latch_pin", None) is not None
+                or getattr(self, "_required_deployment_latch_pin", None) is not None
                 or getattr(self, "_deployment_latch_failed", False)
                 or type(reservation) is not dict
                 or set(reservation) != {"generation","latch_sha256"}
@@ -151,21 +153,29 @@ class MongoCanonicalSourceEpoch:
                 or reservation["generation"] % 2 != 1
                 or type(reservation["latch_sha256"]) is not str):
             raise MongoSourceEpochError("canonical writer deployment pin invalid")
-        self._deployment_latch_pin = (reservation["generation"],reservation["latch_sha256"])
+        pin = (reservation["generation"],reservation["latch_sha256"])
+        self._required_deployment_latch_pin = pin
+        self._deployment_latch_pin = pin
+        self._deployment_latch_failed = False
         await self._assert_deployment_latch()
 
     async def _assert_deployment_latch(self) -> None:
         if getattr(self, "_deployment_latch_failed", False):
             raise MongoSourceEpochError("canonical writer deployment reservation quarantined")
         pin = getattr(self, "_deployment_latch_pin", None)
-        if pin is None:
+        required = getattr(self, "_required_deployment_latch_pin", None)
+        if pin is None and required is None:
             return
+        if required is None or pin is not required:
+            self._deployment_latch_failed = True
+            raise MongoSourceEpochError("canonical writer deployment pin replaced")
         try:
             from skeleton.app.canonical_writer_cutover import verify_writer_deployment
             await verify_writer_deployment(epoch=self, reservation={
                 "generation":pin[0],"latch_sha256":pin[1],
             })
             if (self._deployment_latch_pin is not pin
+                    or self._required_deployment_latch_pin is not pin
                     or self._deployment_latch_failed):
                 raise MongoSourceEpochError("canonical writer deployment pin changed")
         except asyncio.CancelledError:

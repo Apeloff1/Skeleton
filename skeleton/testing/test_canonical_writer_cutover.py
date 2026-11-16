@@ -493,3 +493,26 @@ def test_process_reservation_becomes_sticky_denial_after_retirement():
         with pytest.raises(MongoSourceEpochError):
             await epoch._assert_deployment_latch()
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("replacement",["missing","equal_copy","other_generation"])
+def test_local_pin_tampering_cannot_restore_legacy_unbound_mode(replacement):
+    from skeleton.app.canonical_writer_cutover import reserve_writer_deployment
+    from skeleton.persistence.mongo_source_epoch import MongoSourceEpochError
+    epoch,_=latch_fixture()
+    async def run():
+        reservation=await reserve_writer_deployment(signed(),epoch=epoch)
+        await epoch.bind_deployment_latch(reservation)
+        original=epoch._deployment_latch_pin
+        if replacement=="missing":
+            epoch._deployment_latch_pin=None
+        elif replacement=="equal_copy":
+            epoch._deployment_latch_pin=tuple(list(original))
+        else:
+            epoch._deployment_latch_pin=(3,original[1])
+        with pytest.raises(MongoSourceEpochError):
+            await epoch._assert_deployment_latch()
+        epoch._deployment_latch_pin=original
+        with pytest.raises(MongoSourceEpochError):
+            await epoch._assert_deployment_latch()
+    asyncio.run(run())

@@ -135,3 +135,8 @@ The isolated authenticated Mongo v3 harness races separate clients against the
 singleton latch, verifies signed retirement and replay denial, then verifies
 a process pinned to the retired generation remains quarantined when a newer
 generation starts. No production latch is written by that isolated harness.
+
+The process also retains a separate required-pin identity. Loss or replacement
+of the installed pin quarantines the process even if the original tuple is
+later restored. This protects known application-owned paths, not arbitrary
+code execution inside the backend process.
