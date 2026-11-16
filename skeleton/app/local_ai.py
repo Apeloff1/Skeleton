@@ -1259,7 +1259,7 @@ class OfflineAIWindow:
                         from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary
                         library = OfflineKnowledgeLibrary(session.store, session.model_digest,
                                                           session.tokenizer_digest)
-                        hits = library.search(prompt, limit=2)
+                        hits = library.search(prompt, limit=2, diversify=True)
                         if not hits:
                             raise OfflineAIError("No local references match this question.")
                         evidence = prepare_evidence(prompt, digest, hits, session.model_digest,
