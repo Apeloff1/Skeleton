@@ -9,10 +9,10 @@ from collections import defaultdict
 from html import escape
 from typing import Any
 
-from skeleton.app.gameforge_campaign import _admit, digest, verify_session
+from skeleton.app.gameforge_campaign import _admit, append_actions, digest, detached, verify_session
 from skeleton.app.gameforge_campaign_assist import plan_completion
 from skeleton.app.gameforge_quest_bridge import _steps
-from skeleton.app.original_quest_cli import _encode, _require
+from skeleton.app.original_quest_cli import _encode, _integer, _object, _require
 from skeleton.gameforge.errors import GameForgeError
 
 BOARD_SCHEMA = "skeleton.gameforge.campaign.board.v1"
@@ -184,3 +184,46 @@ def verify_comparison(source: Any, left: Any, right: Any, submitted: Any) -> boo
             source, left, right, max_expansions=submitted["search_budget_per_branch"]))
     except (GameForgeError, ValueError, TypeError, KeyError, OverflowError, RecursionError):
         return False
+
+
+HANDOFF_SCHEMA = "skeleton.gameforge.campaign.portable_checkpoint.v1"
+
+
+def choose_board_action(source: Any, checkpoint: Any, board_digest: str, index: int) -> dict:
+    """Select by zero-based index under an exact board digest, never a stale index."""
+    current = board(source, checkpoint)
+    _require(type(board_digest) is str and board_digest == current["board_digest"],
+             "player board changed")
+    legal = current["legal_actions"]
+    _require(bool(legal), "no legal player actions")
+    selected = _integer(index, 0, len(legal) - 1)
+    following = append_actions(source, checkpoint, [legal[selected]])
+    result = {"previous_board_digest": board_digest, "selected_index": selected,
+              "action": legal[selected], "receipt": following,
+              "board": board(source, following), "native_qualified": False,
+              "release_qualified": False}
+    _encode(result)
+    return result
+
+
+def export_checkpoint(source: Any, checkpoint: Any) -> dict:
+    """Portable source-and-receipt envelope, with derived report identities."""
+    current = board(source, checkpoint)
+    body = {"schema": HANDOFF_SCHEMA, "source": source, "receipt": checkpoint,
+            "board_digest": current["board_digest"],
+            "native_qualified": False, "release_qualified": False}
+    result = {**body, "handoff_digest": digest(body)}
+    # Must fit the receiving command with an independent source, too.
+    _encode({"request": source, "handoff": result})
+    return detached(result)
+
+
+def import_checkpoint(source: Any, handoff: Any) -> dict:
+    """The imported source is descriptive; independent input remains authoritative."""
+    _encode({"request": source, "handoff": handoff})
+    data = _object(handoff, {"schema", "source", "receipt", "board_digest",
+                             "native_qualified", "release_qualified", "handoff_digest"})
+    _require(_encode(source) == _encode(data["source"]), "handoff source mismatch")
+    _require(_encode(data) == _encode(export_checkpoint(source, data["receipt"])),
+             "handoff differs from independent canonical replay")
+    return detached(data["receipt"])
