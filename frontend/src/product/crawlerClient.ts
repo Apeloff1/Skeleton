@@ -992,6 +992,37 @@ export async function getDragonSanctuary(signal?: AbortSignal): Promise<DragonSa
     || p.training_permission !== false || p.network_authority_expanded !== false) invalid('Invalid current-consent sanctuary projection.');
   return p;
 }
+export type AcquisitionHoldCatalog = {
+  ok: true; schema: 'skeleton.dragon.acquisition-holds.v1'; as_of: number;
+  qualified_sessions: number; excluded_sessions: number; capacity_reached: boolean;
+  holds: {host: string; observed_grants: number; latest_grant_expiry: number;
+    denial_statuses: number; rejected_success_statuses: number}[];
+  reason_inferred: false; network_executed: false; dispatch_lock: false; network_authority_expanded: false;
+};
+
+export async function getAcquisitionHoldCatalog(signal?: AbortSignal): Promise<AcquisitionHoldCatalog> {
+  const result = await read(api.get<AcquisitionHoldCatalog>(ROOT + '/acquisition-holds', options(signal)),
+    getAuthToken(), 'The owner acquisition restriction catalogue could not be observed.');
+  if (!result || result.ok !== true || result.schema !== 'skeleton.dragon.acquisition-holds.v1'
+    || !Number.isFinite(result.as_of) || result.as_of < 0 || result.as_of > 8640000000
+    || !integer(result.qualified_sessions, 32) || !integer(result.excluded_sessions, 32)
+    || result.qualified_sessions + result.excluded_sessions > 32
+    || typeof result.capacity_reached !== 'boolean' || result.reason_inferred !== false
+    || result.network_executed !== false || result.dispatch_lock !== false || result.network_authority_expanded !== false
+    || !Array.isArray(result.holds) || result.holds.length > 512
+    || result.holds.some(h => !h || typeof h.host !== 'string' || !/^[a-z0-9][a-z0-9.-]{0,252}$/.test(h.host)
+      || !integer(h.observed_grants, result.qualified_sessions) || h.observed_grants < 1
+      || !Number.isFinite(h.latest_grant_expiry) || h.latest_grant_expiry <= result.as_of
+      || h.latest_grant_expiry > 8640000000
+      || !integer(h.denial_statuses, h.observed_grants * 128)
+      || !integer(h.rejected_success_statuses, h.observed_grants * 128)
+      || h.denial_statuses + h.rejected_success_statuses > h.observed_grants * 128)
+    || new Set(result.holds.map(h => h.host)).size !== result.holds.length) {
+    invalid('Invalid owner acquisition restriction catalogue.');
+  }
+  return result;
+}
+
 export async function getCrawlerReadiness(signal?: AbortSignal): Promise<CrawlerReadiness> {
   const value = await read(api.get<CrawlerReadiness>(ROOT + '/readiness', options(signal)), getAuthToken(), 'Crawler readiness is unavailable.');
   if (!value || typeof value.available !== 'boolean' || typeof value.configured !== 'boolean' || typeof value.message !== 'string' || !value.capabilities || !value.limits) invalid('The crawler readiness projection is invalid.');
