@@ -11,6 +11,7 @@ from skeleton.app.gameforge_campaign_cli import open_workspace
 from skeleton.app.gameforge_expedition import (
     build_expedition, play_expedition, resume_expedition, verify_expedition,
 )
+from skeleton.app.gameforge_expedition_author import author_expedition, verify_authoring
 from skeleton.app.gameforge_expedition_board import (
     episode_evidence, expedition_board, turn, verify_board, verify_evidence,
 )
@@ -114,7 +115,7 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
     parser = argparse.ArgumentParser(description="Replay source-bound campaign and local crafting gameplay")
     parser.add_argument("command", choices=("build", "play", "resume", "verify", "verify-play",
         "board", "turn", "verify-board", "evidence", "verify-evidence", "assist", "verify-assist",
-        "compare", "verify-compare", *sorted(PERSISTENT)))
+        "compare", "verify-compare", "author", "verify-author", *sorted(PERSISTENT)))
     parser.add_argument("--database", type=Path)
     args = parser.parse_args(argv)
     if (args.command in PERSISTENT) != (args.database is not None):
@@ -128,6 +129,12 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
         if cmd in PERSISTENT:
             assert args.database is not None
             result = _persistent(cmd, args.database, value)
+        elif cmd == "author":
+            result = author_expedition(value)
+        elif cmd == "verify-author":
+            data = _object(value, {"request", "composition"})
+            _require(verify_authoring(data["request"], data["composition"]), "package composition replay mismatch")
+            result = {"verified": True, "native_qualified": False, "release_qualified": False}
         elif cmd == "build":
             result = build_expedition(value)
         elif cmd == "play":
