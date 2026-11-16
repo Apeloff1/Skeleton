@@ -280,6 +280,46 @@ def cached_mha_context(
     return out
 
 
+def _sample_sparse_top_k(p: Vec, k: int, min_p: float, top_p: float, rng) -> int:
+    """Keep only nonzero selected probabilities after exact dense softmax.
+
+    Preserve original token-index summation, stable ties and RNG draw.
+    Top-k is selected on normalized probabilities (not logits), retaining
+    legacy behavior on underflow/tied probabilities. Nucleus sorting is
+    now O(k log k), and remaining support passes are O(k).
+    """
+    order = nsmallest(k, range(len(p)), key=lambda i: (-p[i], i))
+    # Reestablish the old dense vector's original index traversal order.
+    support = [(i, p[i]) for i in sorted(order) if p[i] > 0.0]
+    total = sum(value for _, value in support) or 1.0
+    support = [(i, value / total) for i, value in support]
+    if min_p > 0.0:
+        floor = min_p * max(value for _, value in support)
+        support = [(i, value) for i, value in support if value >= floor and value > 0.0]
+        total = sum(value for _, value in support)
+        support = [(i, value / total) for i, value in support]
+    if 0.0 < top_p < 1.0:
+        cumulative = 0.0
+        keep = set()
+        for i, value in sorted(support, key=lambda item: -item[1]):
+            keep.add(i)
+            cumulative += value
+            if cumulative >= top_p:
+                break
+        support = [(i, value) for i, value in support if i in keep]
+        total = sum(value for _, value in support) or 1.0
+        support = [(i, value / total) for i, value in support]
+    if rng is None:
+        return max(support, key=lambda item: item[1])[0]
+    r = rng.random()
+    cumulative = 0.0
+    for i, value in support:
+        cumulative += value
+        if r < cumulative:
+            return i
+    return support[-1][0]
+
+
 def sample_logits(
     logits: Vec,
     rng,
@@ -313,12 +353,10 @@ def sample_logits(
     scaled = [(x - maximum) / t for x in logits]
     p = softmax(scaled)
     k = int(top_k or 0)
+    if 0 < k and k * 8 < n:
+        return _sample_sparse_top_k(p, k, float(min_p), float(top_p), rng)
     if 0 < k < n:
-        # Stable ties use the original lower token index, just as full
-        # stable sorting did. For small k this avoids an O(vocab) sorted
-        # index array and reduces selection to O(vocab log k).
-        order = (nsmallest(k, range(n), key=lambda i: (-p[i], i))
-                 if k * 8 < n else sorted(range(n), key=lambda i: -p[i])[:k])
+        order = sorted(range(n), key=lambda i: -p[i])[:k]
         keep = set(order)
         p = [p[i] if i in keep else 0.0 for i in range(n)]
         s = sum(p) or 1.0
