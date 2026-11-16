@@ -68,6 +68,10 @@ def main(argv=None):
             runtime_libraries=tuple(tuple(x.split("=",1)) for x in a.server_library),
             repeats=a.repeats,max_new_tokens=a.max_new_tokens,minimum_speedup=a.minimum_speedup,
             maximum_tail_ratio=a.maximum_tail_ratio)
+        from skeleton.ai.runtime.inference.competitive_holdout import digest
+        report.pop("report_sha256")
+        report["variants_file_sha256"]=a.runtime_variants_sha256
+        report["report_sha256"]=digest(report)
         print(json.dumps(report,sort_keys=True,allow_nan=False))
         return 0
     if a.baseline or a.runtime_variants_sha256:
