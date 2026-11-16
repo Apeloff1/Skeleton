@@ -142,14 +142,25 @@ class TreasuryIntegrationTests(unittest.IsolatedAsyncioTestCase):
         app.sessions=Mock()
         child={**row,"treasury_watch_parent":{"parent_id":"parent"},"worker_watch_claim":"old-claim"}
         app.sessions.find_one=AsyncMock(return_value=child)
+        app.limits=Mock()
+        from core.dragon_crawler import _acquisition_stripes
+        app.limits.count_documents=AsyncMock(
+            return_value=len(_acquisition_stripes(child["request"]["allowed_hosts"])))
         app._watch_authority=AsyncMock(return_value={"claim_token":"new-claim","claim_until":now.timestamp()+100})
         with patch("core.dragon_crawler._now",return_value=now):
             with self.assertRaises(CrawlerError) as caught:
                 await app._live(SCOPE,"child","worker",1,network_margin=True)
         self.assertEqual(caught.exception.code,"crawler_watch_lease")
+        app.limits.count_documents.assert_not_awaited()
         child["worker_watch_claim"]="new-claim"
         with patch("core.dragon_crawler._now",return_value=now):
             self.assertEqual(await app._live(SCOPE,"child","worker",1,network_margin=True),child)
+        app.limits.count_documents.assert_awaited_once()
+        app.limits.count_documents.return_value=0
+        with patch("core.dragon_crawler._now",return_value=now):
+            with self.assertRaises(CrawlerError) as caught:
+                await app._live(SCOPE,"child","worker",1,network_margin=True)
+        self.assertEqual(caught.exception.code,"crawler_acquisition_fenced")
 
     async def test_live_watch_representation_checks_actual_witnessed_parent(self):
         from skeleton.ai.webcrawler.dragon_treasury_watch import create_watch,claim_watch,child_binding
