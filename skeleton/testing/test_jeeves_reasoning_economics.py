@@ -25,7 +25,8 @@ def stage(name,kind="answer",deps=(),required=True,value=5000):
 def observations(kind,elapsed=1000,queue=100,success=True,
                  scope=SCOPE,at=NOW,n=5):
     return tuple(Observation(scope.identity,pin(kind+str(i)),kind,
-                    128,64,elapsed,queue,at,success) for i in range(n))
+                    128,64,128 if success else 0,64 if success else 0,
+                    elapsed,queue,at,success) for i in range(n))
 
 
 class ReasoningEconomicsTest(unittest.TestCase):
@@ -83,9 +84,13 @@ class ReasoningEconomicsTest(unittest.TestCase):
 
     def test_failure_not_hidden_by_average(self):
         evidence=list(observations("answer"))
-        evidence[-1]=replace(evidence[-1],success=False)
+        evidence[-1]=replace(evidence[-1],success=False,actual_input_tokens=0,actual_output_tokens=0)
         result=self.run_plan([stage("answer")],evidence)
         self.assertEqual(dict(result.held).popitem()[1],"required:recorded_failure")
+
+    def test_short_generation_is_not_full_shape_calibration(self):
+        with self.assertRaises(ValueError):
+            replace(observations("answer")[0],actual_output_tokens=1)
 
     def test_worst_latency_plus_margin_and_queue(self):
         evidence=list(observations("answer"))
