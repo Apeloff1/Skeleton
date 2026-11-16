@@ -1851,7 +1851,7 @@ class LocalInferenceEngine:
         self._identity_invalidations = 0
         self._cache_identity: str | None = None
         self._singleflight: dict[
-            tuple[str, asyncio.AbstractEventLoop, int | None, int | None, str, str, int],
+            tuple[str, asyncio.AbstractEventLoop, int | None, int | None, str, str, int, float | None],
             asyncio.Future[LocalInferenceResult],
         ] = {}
         self._singleflight_hits = 0
@@ -3250,6 +3250,9 @@ class LocalInferenceEngine:
             raise ValueError("local inference deadline must be finite monotonic seconds")
         if deadline is not None and deadline <= time.monotonic():
             raise LocalInferenceCancelled("local inference deadline exceeded")
+        # Distinct explicit deadlines must not share a failing short-lived
+        # leader. Keep implicit policy deadlines coalescible within a class.
+        explicit_flight_deadline = None if deadline is None else float(deadline)
         # Size and output checks are cheap and precede cache hashing or any
         # tokenizer callback. Cache hits retain their native preparation win.
         declared_budget = LocalInputBudget.from_limits(
@@ -3335,7 +3338,7 @@ class LocalInferenceEngine:
         # scoped; in-flight failure sharing also pins the caller's ceilings.
         flight_key = (
             key, loop, resource_max_input_tokens, resource_max_output_tokens,
-            work_class, preemption_scope, epoch,
+            work_class, preemption_scope, epoch, explicit_flight_deadline,
         )
         with self._cache_lock:
             future = self._singleflight.get(flight_key)
