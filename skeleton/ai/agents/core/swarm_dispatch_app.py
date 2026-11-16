@@ -31,6 +31,9 @@ from skeleton.automation.agents.swarm_dispatch_archive import SQLiteDispatcherAr
 from skeleton.automation.agents.swarm_dispatch_bindings import (
     BindingDeferred, BindingError, InputBinding, MAX_BINDING_WAIT_MS, materialize, parse_bindings,
 )
+from skeleton.automation.agents.swarm_dispatch_workflow import (
+    MAX_WORKFLOW_BYTES, WorkflowError, WorkflowPlan, compile_workflow, parse_prerequisites,
+)
 from skeleton.automation.agents.swarm_dispatch_gguf import (
     GGUF_OPERATION, GGUF_CAPABILITY, PinnedGGUFPolicy, PinnedGGUFTransport,
 )
@@ -78,7 +81,7 @@ def _canonical(value: object, *, limit: int = _MAX_COMMAND_BYTES) -> bytes:
     return data
 
 
-def _json_object(data: bytes) -> dict:
+def _json_object(data: bytes, *, limit: int = _MAX_COMMAND_BYTES) -> dict:
     def pairs(items):
         out = {}
         for key, value in items:
@@ -94,7 +97,7 @@ def _json_object(data: bytes) -> dict:
         raise DispatcherRequestError("invalid JSON request") from exc
     if type(value) is not dict:
         raise DispatcherRequestError("JSON object required")
-    _canonical(value)
+    _canonical(value, limit=limit)
     return value
 
 
@@ -292,6 +295,16 @@ class DispatcherInbox:
                 """)
                 conn.execute("CREATE INDEX IF NOT EXISTS hyperdispatcher_pending "
                              "ON hyperdispatcher_inbox(run_id,status,sequence)")
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS hyperdispatcher_workflows (
+                        run_id TEXT NOT NULL REFERENCES runs(run_id),
+                        tenant TEXT NOT NULL, workflow_id TEXT NOT NULL,
+                        manifest BLOB NOT NULL, manifest_sha256 TEXT NOT NULL,
+                        seal TEXT NOT NULL, submitted_ms INTEGER NOT NULL,
+                        charge INTEGER NOT NULL CHECK(charge>0),
+                        PRIMARY KEY(run_id,tenant,workflow_id)
+                    ) WITHOUT ROWID
+                """)
                 conn.execute(
                     "INSERT OR IGNORE INTO hyperdispatcher_inbox_policy VALUES (?,?,?,?,?)",
                     (_RUN_ID, _VERSION, policy.digest, self.max_commands, self.max_bytes),
@@ -337,6 +350,10 @@ class DispatcherInbox:
                     "SELECT count(*),coalesce(sum(charge),0) "
                     "FROM hyperdispatcher_inbox WHERE run_id=?", (_RUN_ID,),
                 ).fetchone()
+                reserved += conn.execute(
+                    "SELECT coalesce(sum(charge),0) FROM hyperdispatcher_workflows WHERE run_id=?",
+                    (_RUN_ID,),
+                ).fetchone()[0]
                 if count >= self.max_commands or reserved + charge > self.max_bytes:
                     raise DispatcherRequestError("durable command capacity exhausted")
                 stamp = _wait_time(self.clock_ms())
@@ -355,6 +372,141 @@ class DispatcherInbox:
                 conn.rollback()
                 raise
         return self._public_row(row)
+
+    def _workflow_seal(self, manifest: bytes, stamp: int) -> str:
+        import hmac
+        key = hmac.digest(self.policy.inspector_key, b"skeleton.dispatch.workflow.seal.v1", "sha256")
+        return hmac.digest(key, _wait_bytes([self.policy.digest, stamp, sha256(manifest).hexdigest()]),
+                           "sha256").hex()
+
+    def _workflow_row(self, conn, row) -> dict:
+        import hmac
+        raw, stamp = row["manifest"], row["submitted_ms"]
+        if (type(raw) is not bytes or not 1 <= len(raw) <= MAX_WORKFLOW_BYTES
+                or row["charge"] != len(raw) + 512
+                or not hmac.compare_digest(sha256(raw).hexdigest(), row["manifest_sha256"])
+                or not hmac.compare_digest(self._workflow_seal(raw, stamp), row["seal"])):
+            raise DurableSwarmError("durable workflow manifest seal mismatch")
+        try:
+            manifest = json.loads(raw)
+            if (_wait_bytes(manifest) != raw or type(manifest) is not dict
+                    or set(manifest) != {"version", "workflow_id", "tenant", "deadline_ms", "commands"}
+                    or manifest["version"] != 1
+                    or manifest["workflow_id"] != row["workflow_id"]
+                    or manifest["tenant"] != row["tenant"]
+                    or type(manifest["commands"]) is not list
+                    or not 1 <= len(manifest["commands"]) <= 32):
+                raise DurableSwarmError("durable workflow manifest shape mismatch")
+            jobs = []
+            previous_sequence = 0
+            for item in manifest["commands"]:
+                if type(item) is not dict or set(item) != {"request_id", "body"}:
+                    raise DurableSwarmError("durable workflow command shape mismatch")
+                row_command = conn.execute(
+                    "SELECT * FROM hyperdispatcher_inbox WHERE run_id=? AND request_id=?",
+                    (_RUN_ID, item["request_id"]),
+                ).fetchone()
+                if row_command is None:
+                    raise DurableSwarmError("durable workflow command missing")
+                command = self._decode(row_command)
+                if (command.sequence <= previous_sequence or command.submitted_ms != stamp
+                        or _wait_bytes(command.body) != _wait_bytes(item["body"])
+                        or command.body.get("tenant") != row["tenant"]
+                        or command.body.get("kind") != "submit"):
+                    raise DurableSwarmError("durable workflow command identity changed")
+                previous_sequence = command.sequence
+                jobs.append({**self._public_row(row_command), "task_id": command.body["task_id"]})
+            return {"workflow_id": row["workflow_id"], "tenant": row["tenant"],
+                    "workflow_sha256": row["manifest_sha256"], "submitted_ms": stamp,
+                    "deadline_ms": manifest["deadline_ms"], "jobs": jobs}
+        except (ValueError, TypeError, KeyError, RecursionError, UnicodeError) as exc:
+            raise DurableSwarmError("durable workflow manifest invalid") from exc
+
+    def workflow(self, tenant: str, workflow_id: str) -> dict | None:
+        _identifier(tenant)
+        _identifier(workflow_id)
+        with closing(self.store._connect()) as conn:
+            conn.execute("BEGIN")
+            try:
+                row = conn.execute(
+                    "SELECT * FROM hyperdispatcher_workflows WHERE run_id=? AND tenant=? AND workflow_id=?",
+                    (_RUN_ID, tenant, workflow_id),
+                ).fetchone()
+                result = None if row is None else self._workflow_row(conn, row)
+                conn.commit()
+                return result
+            except BaseException:
+                conn.rollback()
+                raise
+
+    def enqueue_workflow(self, plan: WorkflowPlan) -> dict:
+        """Publish every graph command and its immutable manifest in one SQL transaction."""
+        if not isinstance(plan, WorkflowPlan) or plan.tenant not in self.policy.tenants:
+            raise DispatcherRequestError("workflow plan outside configured tenant")
+        raw = plan.manifest
+        if len(raw) > MAX_WORKFLOW_BYTES or not 1 <= len(plan.commands) <= 32:
+            raise DispatcherRequestError("workflow manifest exceeds bound")
+        digest = plan.digest
+        prepared = [(item.request_id, item.digest, item.body_json,
+                     len(item.body_json)+_MAX_RESULT_BYTES+512) for item in plan.commands]
+        if len({item[0] for item in prepared}) != len(prepared):
+            raise DispatcherRequestError("duplicate workflow request identity")
+        total = len(raw)+512 + sum(item[3] for item in prepared)
+        with closing(self.store._connect()) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                previous = conn.execute(
+                    "SELECT * FROM hyperdispatcher_workflows WHERE run_id=? AND tenant=? AND workflow_id=?",
+                    (_RUN_ID, plan.tenant, plan.workflow_id),
+                ).fetchone()
+                if previous is not None:
+                    if previous["manifest_sha256"] != digest or previous["manifest"] != raw:
+                        raise DispatcherRequestError("workflow identity already binds another graph")
+                    result = self._workflow_row(conn, previous)
+                    conn.commit()
+                    return result
+                stamp = _wait_time(self.clock_ms())
+                if not stamp < plan.deadline_ms <= stamp + MAX_BINDING_WAIT_MS:
+                    raise DispatcherRequestError("workflow deadline outside admission interval")
+                count, occupied = conn.execute(
+                    "SELECT count(*),coalesce(sum(charge),0) FROM hyperdispatcher_inbox WHERE run_id=?",
+                    (_RUN_ID,),
+                ).fetchone()
+                occupied += conn.execute(
+                    "SELECT coalesce(sum(charge),0) FROM hyperdispatcher_workflows WHERE run_id=?",
+                    (_RUN_ID,),
+                ).fetchone()[0]
+                if count + len(prepared) > self.max_commands or occupied + total > self.max_bytes:
+                    raise DispatcherRequestError("atomic workflow ingress capacity exhausted")
+                # Refuse all overlapping standalone or other workflow
+                # requests. Never adopt a partial prior publication.
+                for request_id, _, _, _ in prepared:
+                    if conn.execute(
+                            "SELECT 1 FROM hyperdispatcher_inbox WHERE run_id=? AND request_id=?",
+                            (_RUN_ID, request_id)).fetchone() is not None:
+                        raise DispatcherRequestError("workflow request identity already exists")
+                for request_id, command_digest, data, charge in prepared:
+                    conn.execute(
+                        "INSERT INTO hyperdispatcher_inbox "
+                        "(run_id,request_id,request_sha256,submitted_ms,body,charge,status) "
+                        "VALUES (?,?,?,?,?,?,'pending')",
+                        (_RUN_ID, request_id, command_digest, stamp, data, charge),
+                    )
+                conn.execute(
+                    "INSERT INTO hyperdispatcher_workflows VALUES (?,?,?,?,?,?,?,?)",
+                    (_RUN_ID, plan.tenant, plan.workflow_id, raw, digest,
+                     self._workflow_seal(raw, stamp), stamp, len(raw)+512),
+                )
+                row = conn.execute(
+                    "SELECT * FROM hyperdispatcher_workflows WHERE run_id=? AND tenant=? AND workflow_id=?",
+                    (_RUN_ID, plan.tenant, plan.workflow_id),
+                ).fetchone()
+                result = self._workflow_row(conn, row)
+                conn.commit()
+                return result
+            except BaseException:
+                conn.rollback()
+                raise
 
     @staticmethod
     def _decode(row) -> InboxCommand:
@@ -455,6 +607,13 @@ class DispatcherInbox:
         for status, count, size in rows:
             out[status] = count
             out["reserved_bytes"] += size
+        with closing(self.store._connect()) as conn:
+            workflows, workflow_bytes = conn.execute(
+                "SELECT count(*),coalesce(sum(charge),0) FROM hyperdispatcher_workflows WHERE run_id=?",
+                (_RUN_ID,),
+            ).fetchone()
+        out["workflows"] = workflows
+        out["reserved_bytes"] += workflow_bytes
         return out
 
 
@@ -680,6 +839,66 @@ class LocalDispatcherApplication:
     def enqueue(self, request_id: str, body: dict) -> dict:
         return self.inbox.enqueue(request_id, body)
 
+    def enqueue_workflow(self, tenant: str, workflow_id: str, spec: dict) -> dict:
+        tenant = self._tenant(tenant)
+        try:
+            plan = compile_workflow(workflow_id, tenant, spec, operations=self.policy.operations)
+        except WorkflowError as exc:
+            raise DispatcherRequestError(str(exc)) from exc
+        # Reject invalid static operations before publishing any node.
+        # Linked templates cannot be evaluated until receipts materialize.
+        for command in plan.commands:
+            body = command.body
+            if "bindings" in body:
+                continue
+            payload = {"operation": body["operation"], "input": body["input"]}
+            try:
+                raw = _canonical(payload, limit=32768)
+                if body["operation"] == GGUF_OPERATION:
+                    self.policy.gguf.request(payload)
+                else:
+                    result = _local_reference(payload)
+                    _canonical({"version": 1, "payload_sha256": sha256(raw).hexdigest(),
+                                "result": result}, limit=self.custody.max_artifact_bytes)
+            except (ValueError, TypeError, UnicodeError, RecursionError, DurableSwarmError) as exc:
+                raise DispatcherRequestError("invalid static workflow operation") from exc
+        return self.inbox.enqueue_workflow(plan)
+
+    def workflow_status(self, tenant: str, workflow_id: str) -> dict:
+        tenant = self._tenant(tenant)
+        record = self.inbox.workflow(tenant, workflow_id)
+        if record is None:
+            raise DispatcherRequestError("owned workflow not found")
+        counts = {"pending": 0, "rejected": 0, "queued": 0, "leased": 0,
+                  "succeeded": 0, "failed": 0, "cancelled": 0, "uncertain": 0}
+        for row in record["jobs"]:
+            if row["status"] != "accepted":
+                counts[row["status"]] += 1
+                row["task_state"] = None
+                continue
+            proof = self.result(tenant, row["task_id"])
+            state = "uncertain" if proof["uncertain_on_restore"] else proof["state"]
+            if state == "dead":
+                state = "failed"
+            if state not in counts:
+                raise DurableSwarmError("unknown canonical workflow task state")
+            counts[state] += 1
+            row["task_state"] = state
+            if "receipt_sha256" in proof:
+                row["receipt_sha256"] = proof["receipt_sha256"]
+            if "reconciliation_sha256" in proof:
+                row["reconciliation_sha256"] = proof["reconciliation_sha256"]
+        unfinished = counts["pending"] + counts["queued"] + counts["leased"]
+        if counts["succeeded"] == len(record["jobs"]):
+            status = "succeeded"
+        elif counts["uncertain"]:
+            status = "held-uncertain"
+        elif unfinished:
+            status = "running"
+        else:
+            status = "terminated"
+        return {**record, "workflow_state": status, "counts": counts}
+
     def _resident(self, tenant: str, task_id: str):
         owner = self._owner().owner
         runtime = owner.broker.broker.runtime
@@ -691,45 +910,64 @@ class LocalDispatcherApplication:
     def _binding_input(self, command: InboxCommand, tenant: str, *,
                        historical: bool = False) -> tuple[object, list[dict]]:
         body = command.body
-        if "bindings" not in body:
+        if "bindings" not in body and "prerequisites" not in body:
             if "binding_deadline_ms" in body:
                 raise DispatcherRequestError("binding deadline without bindings")
             return body["input"], []
         try:
-            bindings = parse_bindings(body["bindings"], body["input"], task_id=body["task_id"])
+            bindings = (() if "bindings" not in body else
+                        parse_bindings(body["bindings"], body["input"], task_id=body["task_id"]))
+            prerequisites = (() if "prerequisites" not in body else
+                             parse_prerequisites(body["prerequisites"], task_id=body["task_id"]))
             deadline = _uint(body.get("binding_deadline_ms"), command.submitted_ms + 1,
                              command.submitted_ms + MAX_BINDING_WAIT_MS, "binding deadline")
             if not historical and _wait_time(self.clock_ms()) >= deadline:
                 raise DispatcherRequestError("result binding deadline expired")
 
-            def resolve(binding: InputBinding) -> dict:
-                found = self.inbox.record(binding.source_request_id)
+            proofs = {}
+
+            def resolve_source(source_request_id: str, source_task_id: str) -> dict:
+                identity = (source_request_id, source_task_id)
+                if identity in proofs:
+                    return proofs[identity]
+                found = self.inbox.record(source_request_id)
                 if found is None:
                     raise DispatcherRequestError("earlier owned binding request not found")
                 source, status, acknowledgement = found
                 if (source.sequence >= command.sequence or source.body.get("kind") != "submit"
                         or source.body.get("tenant") != tenant
-                        or source.body.get("task_id") != binding.source_task_id):
+                        or source.body.get("task_id") != source_task_id):
                     raise DispatcherRequestError("binding requires earlier same-tenant submission")
                 if status == "pending":
                     raise BindingDeferred()
                 if status != "accepted":
                     raise DispatcherRequestError("binding source submission rejected")
                 if (type(acknowledgement) is not dict
-                        or acknowledgement.get("task_id") != binding.source_task_id
+                        or acknowledgement.get("task_id") != source_task_id
                         or acknowledgement.get("submission") != "durable"):
                     raise DurableSwarmError("binding source acknowledgement lacks task identity")
                 try:
-                    proof = self.result(tenant, binding.source_task_id, _verify_lineage=False)
+                    proof = self.result(tenant, source_task_id, _verify_lineage=False)
                 except DispatcherRequestError as exc:
                     raise DurableSwarmError("accepted binding source lacks durable task custody") from exc
                 if proof["state"] in ("queued", "leased") or proof["uncertain_on_restore"]:
                     raise BindingDeferred()
                 if proof["state"] != "succeeded":
                     raise DispatcherRequestError("binding source terminated without success")
+                proofs[identity] = proof
                 return proof
 
-            return materialize(body["input"], bindings, resolve)
+            output, lineage = materialize(
+                body["input"], bindings,
+                lambda binding: resolve_source(binding.source_request_id, binding.source_task_id),
+            )
+            for source_request_id, source_task_id in prerequisites:
+                proof = resolve_source(source_request_id, source_task_id)
+                lineage.append({"dependency_only": True, "source_request_id": source_request_id,
+                                "source_task_id": source_task_id,
+                                "receipt_sha256": proof["receipt_sha256"],
+                                "reconciliation_sha256": proof.get("reconciliation_sha256")})
+            return output, lineage
         except BindingError as exc:
             raise DispatcherRequestError(str(exc)) from exc
 
@@ -749,7 +987,7 @@ class LocalDispatcherApplication:
                 or command.body.get("tenant") != tenant
                 or command.body.get("task_id") != task["id"]
                 or command.body.get("operation") != payload.get("operation")
-                or "bindings" not in command.body):
+                or not ({"bindings", "prerequisites"} & set(command.body))):
             raise DurableSwarmError("bound task admission identity changed")
         try:
             resolved, lineage = self._binding_input(command, tenant, historical=True)
@@ -764,7 +1002,7 @@ class LocalDispatcherApplication:
         body = command.body
         required = {"kind", "tenant", "task_id", "operation", "input"}
         permitted = required | {"priority", "dependencies", "singleton", "timer_ms", "event",
-                                "bindings", "binding_deadline_ms"}
+                                "bindings", "prerequisites", "binding_deadline_ms"}
         if not required.issubset(body) or not set(body).issubset(permitted):
             raise DispatcherRequestError("invalid submission properties")
         tenant, task_id = self._tenant(body["tenant"]), _identifier(body["task_id"])
@@ -793,7 +1031,7 @@ class LocalDispatcherApplication:
             if (type(existing) is not dict
                     or any(existing.get(key) != value for key, value in metadata.items())):
                 return False
-            if ("bindings" in body) != ("binding_receipts" in existing):
+            if bool({"bindings", "prerequisites"} & set(body)) != ("binding_receipts" in existing):
                 raise DurableSwarmError("submission replay binding metadata mismatch")
             self._verify_lineage(tenant, record)
             return True
@@ -942,7 +1180,8 @@ class LocalDispatcherApplication:
                 raise DispatcherRequestError("owned pending request not found")
             prior, status, result = target
             if (prior.sequence >= command.sequence or prior.body.get("kind") != "submit"
-                    or prior.body.get("tenant") != tenant or "bindings" not in prior.body):
+                    or prior.body.get("tenant") != tenant
+                    or not ({"bindings", "prerequisites"} & set(prior.body))):
                 raise DispatcherRequestError("owned pending binding request required")
             cancellation = {"reason": "pending result binding cancelled",
                             "cancelled_by": command.request_id}
@@ -1237,6 +1476,12 @@ def main(argv: list[str] | None = None) -> int:
     init.add_argument("--lease", type=int, default=120)
     enqueue = sub.add_parser("enqueue", help="append one exact JSON command from standard input")
     enqueue.add_argument("--id", required=True)
+    workflow = sub.add_parser("workflow-submit", help="atomically publish a bounded JSON graph from stdin")
+    workflow.add_argument("--tenant", required=True)
+    workflow.add_argument("--id", required=True)
+    workflow_status = sub.add_parser("workflow-status", help="inspect exact graph and verified job outcomes")
+    workflow_status.add_argument("--tenant", required=True)
+    workflow_status.add_argument("--id", required=True)
     command = sub.add_parser("command", help="read the durable command acknowledgement")
     command.add_argument("--id", required=True)
     result = sub.add_parser("result", help="read independently verified task output")
@@ -1267,6 +1512,15 @@ def main(argv: list[str] | None = None) -> int:
             if len(data) > _MAX_COMMAND_BYTES:
                 raise DispatcherRequestError("command input too large")
             _print(app.enqueue(args.id, _json_object(data)))
+        elif args.action == "workflow-submit":
+            raw = sys.stdin.buffer.read(MAX_WORKFLOW_BYTES + 1)
+            if len(raw) > MAX_WORKFLOW_BYTES:
+                raise DispatcherRequestError("workflow input too large")
+            # Reuse the exact duplicate-property and finite-JSON parser.
+            data = _json_object(raw, limit=MAX_WORKFLOW_BYTES)
+            _print(app.enqueue_workflow(args.tenant, args.id, data))
+        elif args.action == "workflow-status":
+            _print(app.workflow_status(args.tenant, args.id))
         elif args.action == "command":
             value = app.inbox.command(args.id)
             _print(value)

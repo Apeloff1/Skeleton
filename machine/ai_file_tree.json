@@ -707,7 +707,7 @@
       "source": "skeleton/automation/agents",
       "destination": "skeleton/ai/agents/core",
       "kind": "tree",
-      "source_git_object_sha": "95558986f1d811e642acfef36b5f9e8508c31ab4",
+      "source_git_object_sha": "def50bf2874e086261d6f29e948cd6cf49bd20eb",
       "role": "canonical agent/swarm execution runtime under automation ownership",
       "work_package_refs": [
         "WP-W00",
@@ -766,7 +766,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "af67d3d7083e22ec4b78b6bc9970080944d77f69",
+      "source_git_object_sha": "1469c681c7ab0bdda521d209ee6dabc4b14c7402",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -1675,7 +1675,7 @@
       "source": "skeleton/app/runtime",
       "destination": "skeleton/ai/runtime/application",
       "kind": "tree",
-      "source_git_object_sha": "4533a262531ce65327545222abf865d96798d35f",
+      "source_git_object_sha": "56f4ee17d64ef2a377276c7c7e629176045a91aa",
       "role": "Engine command lifecycle, capability runtime, contract audits, and admission/authorization helpers belong inside the governed AI runtime application layer; this is not the backend product API owner.",
       "work_package_refs": [
         "WP-W01",

@@ -571,3 +571,31 @@ gateway derives scoped source request/task IDs and supports pending
 cancellation under explicit authorization. Six tests cover physical
 multi-stage jobs, archive traversal, fair waiting, expiry, malformed
 paths, cross-scope refusal, crash replay and host integration.
+
+## Wave A25: atomic graph submission and verified workflow status
+
+The private CLI exposes workflow-submit --tenant OWNER --id ID and
+workflow-status --tenant OWNER --id ID. Submit JSON with deadline_ms
+and jobs (at most 32); each job includes request_id, task_id, operation,
+input and optional dependencies, bindings, priority, singleton, timer_ms
+or event. All dependency and binding edges must reference exact internal
+nodes. The deterministic topological compiler refuses cycles, duplicate
+identities, out-of-policy operations, oversized templates and invalid
+gates before publishing any commands. Static operation inputs are
+validated first. Unbound ordering edges become receipt-verified
+prerequisites; result edges use exact value binding. No dependency
+requires indefinitely retaining a settled resident task.
+
+The manifest and every canonical command are published in a single
+SQLite transaction, with a domain-separated seal, bounded capacity
+accounting, no partial adoption of overlapping request identities and
+exact idempotent replay. Reordered equivalent graphs compile to the
+same identity. A graph acceptance is not a promise of atomic physical
+effects: actual task admission, execution and uncertain custody remain
+canonical per-node operations. Workflow status revalidates manifest and
+command identity and independently reads the current canonical task
+outcomes and receipt references. The authenticated host supports scoped
+workflow-submit and workflow-status; a graph submission must receive
+both an exact graph grant and separate authorization for each child.
+Four regressions cover actual fan-in and predecessor compaction,
+transactional refusal, manifest/command integrity and host grants.

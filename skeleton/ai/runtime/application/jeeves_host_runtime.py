@@ -91,7 +91,8 @@ class JeevesDispatcherGateway:
     be requested through this gateway.
     """
 
-    _ACTIONS = frozenset({"submit", "cancel", "cancel-pending", "signal", "reconcile", "command", "result"})
+    _ACTIONS = frozenset({"submit", "cancel", "cancel-pending", "signal", "reconcile", "command", "result",
+                          "workflow-submit", "workflow-status"})
 
     def __init__(self, *, directory: str | Path, policy_sha256: str,
                  scope: JeevesHostContext,
@@ -141,6 +142,47 @@ class JeevesDispatcherGateway:
             raise JeevesHostRuntimeError("dispatcher binding identity changed")
         return app
 
+    def _submit_body(self, supplied: dict, tenant: str) -> dict:
+        required = {"task_id", "operation", "input"}
+        optional = {"priority", "dependencies", "singleton", "timer_ms", "event",
+                    "bindings", "binding_deadline_ms"}
+        if not required.issubset(supplied) or not set(supplied).issubset(required | optional):
+            raise JeevesHostRuntimeError("invalid host submission properties")
+        operation = self._identifier(supplied["operation"])
+        priority = supplied.get("priority", 100)
+        # Reserved urgent lanes belong to the dispatcher administrator,
+        # never to an application caller or a generated task argument.
+        if type(priority) is not int or not 50 <= priority <= 1000:
+            raise JeevesHostRuntimeError("host priority outside granted background lanes")
+        deps = supplied.get("dependencies", [])
+        if (type(deps) is not list or len(deps) > 32
+                or any(type(dep) is not str for dep in deps) or len(set(deps)) != len(deps)):
+            raise JeevesHostRuntimeError("invalid host dependency set")
+        body = {"kind": "submit", "tenant": tenant,
+                "task_id": self._scoped("task", supplied["task_id"]),
+                "operation": operation, "input": supplied["input"],
+                "priority": priority,
+                "dependencies": [self._scoped("task", dep) for dep in deps]}
+        if "singleton" in supplied:
+            body["singleton"] = self._scoped("singleton", supplied["singleton"])
+        for field in ("timer_ms", "event", "binding_deadline_ms"):
+            if field in supplied:
+                body[field] = supplied[field]
+        if "bindings" in supplied:
+            from skeleton.automation.agents.swarm_dispatch_bindings import BindingError, parse_bindings
+            try:
+                bindings = parse_bindings(supplied["bindings"], supplied["input"],
+                                          task_id=supplied["task_id"])
+            except BindingError as exc:
+                raise JeevesHostRuntimeError("invalid host result bindings") from exc
+            body["bindings"] = [
+                {**binding.record(),
+                 "source_request_id": self._scoped("request", binding.source_request_id),
+                 "source_task_id": self._scoped("task", binding.source_task_id)}
+                for binding in bindings
+            ]
+        return body
+
     def execute(self, *, context: JeevesHostContext, action: str,
                 request_id: str, arguments: Mapping[str, Any]) -> dict:
         from skeleton.automation.agents.swarm_dispatch_app import _canonical, _json_object
@@ -158,44 +200,28 @@ class JeevesDispatcherGateway:
         body: dict[str, Any] = {}
         tenant = self._scope.tenant_id
         if action == "submit":
-            required = {"task_id", "operation", "input"}
-            optional = {"priority", "dependencies", "singleton", "timer_ms", "event",
-                        "bindings", "binding_deadline_ms"}
-            if not required.issubset(supplied) or not set(supplied).issubset(required | optional):
-                raise JeevesHostRuntimeError("invalid host submission properties")
-            operation = self._identifier(supplied["operation"])
-            priority = supplied.get("priority", 100)
-            # Reserved urgent lanes belong to the dispatcher administrator,
-            # never to an application caller or a generated task argument.
-            if type(priority) is not int or not 50 <= priority <= 1000:
-                raise JeevesHostRuntimeError("host priority outside granted background lanes")
-            deps = supplied.get("dependencies", [])
-            if (type(deps) is not list or len(deps) > 32
-                    or any(type(dep) is not str for dep in deps) or len(set(deps)) != len(deps)):
-                raise JeevesHostRuntimeError("invalid host dependency set")
-            body = {"kind": "submit", "tenant": tenant,
-                    "task_id": self._scoped("task", supplied["task_id"]),
-                    "operation": operation, "input": supplied["input"],
-                    "priority": priority,
-                    "dependencies": [self._scoped("task", dep) for dep in deps]}
-            if "singleton" in supplied:
-                body["singleton"] = self._scoped("singleton", supplied["singleton"])
-            for field in ("timer_ms", "event", "binding_deadline_ms"):
-                if field in supplied:
-                    body[field] = supplied[field]
-            if "bindings" in supplied:
-                from skeleton.automation.agents.swarm_dispatch_bindings import BindingError, parse_bindings
-                try:
-                    bindings = parse_bindings(supplied["bindings"], supplied["input"],
-                                              task_id=supplied["task_id"])
-                except BindingError as exc:
-                    raise JeevesHostRuntimeError("invalid host result bindings") from exc
-                body["bindings"] = [
-                    {**binding.record(),
-                     "source_request_id": self._scoped("request", binding.source_request_id),
-                     "source_task_id": self._scoped("task", binding.source_task_id)}
-                    for binding in bindings
-                ]
+            body = self._submit_body(supplied, tenant)
+        elif action == "workflow-submit":
+            if set(supplied) != {"deadline_ms", "jobs"} or type(supplied["jobs"]) is not list or not 1 <= len(supplied["jobs"]) <= 32:
+                raise JeevesHostRuntimeError("invalid host workflow graph")
+            scoped_jobs = []
+            child_authorizations = []
+            for node in supplied["jobs"]:
+                if type(node) is not dict or "request_id" not in node or "binding_deadline_ms" in node:
+                    raise JeevesHostRuntimeError("invalid host workflow node")
+                client_request = self._identifier(node["request_id"])
+                original = {key: value for key, value in node.items() if key != "request_id"}
+                scoped = self._submit_body(original, tenant)
+                scoped.pop("kind")
+                scoped.pop("tenant")
+                scoped["request_id"] = self._scoped("request", client_request)
+                scoped_jobs.append(scoped)
+                child_authorizations.append((client_request, _canonical(original)))
+            body = {"deadline_ms": supplied["deadline_ms"], "jobs": scoped_jobs}
+        elif action == "workflow-status":
+            if set(supplied) != {"workflow_id"}:
+                raise JeevesHostRuntimeError("exact client workflow identity required")
+            body = {"workflow_id": self._scoped("workflow", supplied["workflow_id"])}
         elif action == "cancel-pending":
             if set(supplied) != {"request_id"}:
                 raise JeevesHostRuntimeError("exact pending client request identity required")
@@ -229,7 +255,22 @@ class JeevesDispatcherGateway:
             raise JeevesHostRuntimeError("dispatcher host authorization denied")
         # Re-open the same provisioned policy and inode before every
         # authorized operation. Authentication never opens a new service.
+        if action == "workflow-submit":
+            # The graph grant does not waive per-operation host grants.
+            for child_id, child_bytes in child_authorizations:
+                try:
+                    permitted = self._authorize(JeevesDispatchAuthorization(
+                        context, "submit", child_id, child_bytes, self._policy_sha256,
+                    ))
+                except Exception:
+                    raise JeevesHostRuntimeError("workflow child authorization unavailable") from None
+                if permitted is not True:
+                    raise JeevesHostRuntimeError("workflow child authorization denied")
         app = self._app()
+        if action == "workflow-submit":
+            return app.enqueue_workflow(tenant, self._scoped("workflow", request_id), body)
+        if action == "workflow-status":
+            return app.workflow_status(tenant, body["workflow_id"])
         if action == "command":
             found = app.inbox.command(self._scoped("request", supplied["request_id"]))
             return {"found": found is not None, "command": found}

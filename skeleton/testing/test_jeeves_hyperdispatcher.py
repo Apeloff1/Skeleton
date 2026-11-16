@@ -3423,3 +3423,127 @@ def test_host_gateway_scopes_linked_source_requests_and_real_results(tmp_path):
     assert result["input_lineage"][0]["source_task_id"].startswith("app-task-")
     assert result["input_lineage"][0]["source_request_id"].startswith("app-request-")
     app.close()
+
+
+def _workflow_node(request_id, task_id, value, **extra):
+    return {"request_id": request_id, "task_id": task_id, "operation": "integer_sum",
+            "input": value, **extra}
+
+
+def test_atomic_workflow_topological_order_and_actual_fanin_with_one_resident_slot(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "graph", tenants=("a",), operations=("integer_sum",),
+        workers=1, max_jobs=1, history_jobs=12, clock_ms=lambda: 100,
+    )
+    graph = {"deadline_ms": 1000, "jobs": [
+        _workflow_node("r3", "c", [None, None, 3], bindings=[
+            {"source_request_id": "r1", "source_task_id": "a",
+             "source_path": [], "target_path": [0]},
+            {"source_request_id": "r2", "source_task_id": "b",
+             "source_path": [], "target_path": [1]},
+        ]),
+        _workflow_node("r2", "b", [5, 6], dependencies=["a"]),
+        _workflow_node("r1", "a", [2, 4]),
+    ]}
+    receipt = app.enqueue_workflow("a", "workflow", graph)
+    assert [row["task_id"] for row in receipt["jobs"]] == ["a", "b", "c"]
+    assert app.enqueue_workflow("a", "workflow", {"deadline_ms": 1000,
+                                                 "jobs": list(reversed(graph["jobs"]))}) == receipt
+    app.start()
+    for _ in range(6):
+        if app.workflow_status("a", "workflow")["workflow_state"] == "succeeded":
+            break
+        app.tick()
+    assert app.result("a", "c")["result"] == 20
+    assert app.result("a", "b")["input_lineage"][0]["dependency_only"] is True
+    state = app.workflow_status("a", "workflow")
+    assert state["workflow_state"] == "succeeded" and state["counts"]["succeeded"] == 3
+    app.close()
+    reopened = LocalDispatcherApplication(app.directory, clock_ms=lambda: 2000)
+    assert reopened.workflow_status("a", "workflow") == state
+    assert reopened.custody.usage()["attempts"] == 3
+
+
+def test_workflow_atomic_conflict_cycle_and_invalid_operation_leave_no_partial_rows(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication, DispatcherRequestError
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "graph", tenants=("a",), operations=("integer_sum",),
+        workers=1, max_jobs=8, clock_ms=lambda: 100,
+    )
+    app.enqueue("existing", {"kind": "submit", "tenant": "a", "task_id": "standalone",
+                             "operation": "integer_sum", "input": [1]})
+    candidates = [
+        [_workflow_node("fresh", "a", [1]), _workflow_node("existing", "b", [2])],
+        [_workflow_node("fresh", "a", [1], dependencies=["b"]),
+         _workflow_node("other", "b", [2], dependencies=["a"])],
+        [_workflow_node("fresh", "a", [1]), _workflow_node("other", "b", ["bad"])],
+    ]
+    for nodes in candidates:
+        with pytest.raises(DispatcherRequestError):
+            app.enqueue_workflow("a", "refused", {"deadline_ms": 1000, "jobs": nodes})
+        assert app.inbox.command("fresh") is None
+        assert app.inbox.workflow("a", "refused") is None
+    assert app.inbox.summary()["pending"] == 1
+
+
+def test_workflow_manifest_and_command_tampering_fail_closed(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    import sqlite3
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    from skeleton.automation.agents.swarm_durable import DurableSwarmError
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "graph", tenants=("a",), operations=("integer_sum",),
+        workers=1, max_jobs=4, clock_ms=lambda: 100,
+    )
+    app.enqueue_workflow("a", "tamper", {"deadline_ms": 1000,
+                         "jobs": [_workflow_node("r", "job", [2])]})
+    with sqlite3.connect(app.store.path) as conn:
+        conn.execute("UPDATE hyperdispatcher_inbox SET body=? WHERE request_id=?", (b"{}", "r"))
+    with pytest.raises(DurableSwarmError, match="integrity"):
+        app.workflow_status("a", "tamper")
+
+
+def test_workflow_host_requires_graph_and_each_operation_authorization(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    from skeleton.app.runtime.jeeves_host_runtime import JeevesHostContext, JeevesDispatcherGateway, JeevesHostRuntimeError
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "graph", tenants=("a",), operations=("integer_sum",), workers=1, max_jobs=8,
+    )
+    scope = JeevesHostContext("a", "project", "principal", "run", "trace")
+    graph = {"deadline_ms": app.clock_ms()+60000, "jobs": [
+        _workflow_node("parent", "parent", [4]),
+        _workflow_node("child", "child", [6], dependencies=["parent"]),
+    ]}
+    calls = []
+    def allow(question):
+        calls.append((question.action, question.request_id))
+        return question.request_id != "child"
+    gateway = JeevesDispatcherGateway(directory=app.directory, policy_sha256=app.policy.digest,
+                                     scope=scope, authorize=allow)
+    with pytest.raises(JeevesHostRuntimeError, match="child authorization denied"):
+        gateway.execute(context=scope, action="workflow-submit", request_id="flow", arguments=graph)
+    assert app.inbox.summary()["pending"] == 0
+    assert calls == [("workflow-submit", "flow"), ("submit", "parent"), ("submit", "child")]
+    permitted = JeevesDispatcherGateway(directory=app.directory, policy_sha256=app.policy.digest,
+                                       scope=scope, authorize=lambda q: True)
+    permitted.execute(context=scope, action="workflow-submit", request_id="flow", arguments=graph)
+    app.start()
+    app.tick()
+    app.tick()
+    state = permitted.execute(context=scope, action="workflow-status", request_id="inspect",
+                              arguments={"workflow_id": "flow"})
+    assert state["workflow_state"] == "succeeded"
+    assert state["counts"]["succeeded"] == 2
+    app.close()
