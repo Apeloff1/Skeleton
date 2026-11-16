@@ -893,3 +893,64 @@ def test_failed_durable_dispatch_holds_capacity_and_preserves_full_ring():
     assert broker.ingress.quota.usage("a").leased == 1
     with pytest.raises(AdmissionError):
         broker.lease_verified("b", "b")
+
+def test_hierarchical_tenant_limit_applies_across_planes_and_atomic_groups():
+    from skeleton.kernel.global_resource_scheduler import (
+        GlobalResourcePolicy, GlobalResourceScheduler, PlanePolicy,
+        ResourceVector, ResourceRequest, TenantResourcePolicy,
+    )
+    owner = GlobalResourceScheduler(GlobalResourcePolicy(
+        ResourceVector(cpu_millis=100),
+        (PlanePolicy("a", 1, ResourceVector()), PlanePolicy("b", 1, ResourceVector())),
+        tenant_limits=(TenantResourcePolicy("t", ResourceVector(cpu_millis=60)),),
+    ))
+    a = ResourceRequest("a", "a", "t", ResourceVector(cpu_millis=40))
+    b = ResourceRequest("b", "b", "t", ResourceVector(cpu_millis=30))
+    assert owner.reserve_group("ab", (a, b)) is None
+    assert not owner.active_grants() and not owner.queued()
+    owner.submit(a)
+    grant = owner.admit_request("a")
+    owner.submit(b)
+    assert owner.admit_request("b") is None
+    assert owner.snapshot()["tenant_limits"]["t"]["usage"]["cpu_millis"] == 40
+    owner.release(grant.grant_id)
+    assert owner.admit_request("b") is not None
+
+
+def test_deadline_revocation_is_idempotent_and_two_phase():
+    from skeleton.kernel.global_resource_scheduler import (
+        GlobalResourcePolicy, GlobalResourceScheduler, PlanePolicy, ResourceVector, ResourceRequest,
+    )
+    owner = GlobalResourceScheduler(GlobalResourcePolicy(
+        ResourceVector(cpu_millis=100), (PlanePolicy("a", 1, ResourceVector()),)))
+    owner.submit(ResourceRequest("old", "a", "tenant", ResourceVector(cpu_millis=60), priority=5))
+    old = owner.admit_next()
+    owner.submit(ResourceRequest("other", "a", "tenant", ResourceVector(cpu_millis=40), priority=5))
+    other = owner.admit_next()
+    owner.submit(ResourceRequest("urgent", "a", "tenant", ResourceVector(cpu_millis=40),
+                                 priority=5, deadline_tick=100, estimated_ticks=2))
+    revoking = owner.begin_preemption("urgent")
+    assert len(revoking) == 1
+    assert owner.begin_preemption("urgent") == revoking
+    assert owner.usage("a").cpu_millis == 100
+    assert owner.admit_request("urgent") is None
+    owner.ack_preempted(revoking[0].grant_id)
+    assert owner.admit_request("urgent") is not None
+    assert len(owner.active_grants()) == 2
+
+
+def test_deadline_does_not_admit_expired_work_or_preempt_protected_work():
+    from skeleton.kernel.global_resource_scheduler import (
+        GlobalResourcePolicy, GlobalResourceScheduler, PlanePolicy, ResourceVector, ResourceRequest,
+    )
+    owner = GlobalResourceScheduler(GlobalResourcePolicy(
+        ResourceVector(cpu_millis=100), (PlanePolicy("a", 1, ResourceVector()),)))
+    owner.submit(ResourceRequest("protected", "a", "t", ResourceVector(cpu_millis=100), priority=0))
+    protected = owner.admit_next()
+    owner.submit(ResourceRequest("urgent", "a", "t", ResourceVector(cpu_millis=100),
+                                 priority=5, deadline_tick=12, estimated_ticks=2))
+    assert not owner.begin_preemption("urgent")
+    owner.advance(20)
+    owner.release(protected.grant_id)
+    assert owner.admit_next() is None
+    assert owner.snapshot()["deadline_blocked"] == 1

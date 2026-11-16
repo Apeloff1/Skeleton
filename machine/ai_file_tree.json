@@ -1204,7 +1204,7 @@
       "source": "skeleton/kernel",
       "destination": "skeleton/ai/runtime/kernel",
       "kind": "tree",
-      "source_git_object_sha": "0df38bd462846d32aa6c6b00ae65a44a3b4d79c7",
+      "source_git_object_sha": "ee2c721ccce2a714e96ca069e2d67271a0addf06",
       "role": "engine kernel and governance primitives",
       "work_package_refs": [
         "WP-W00",

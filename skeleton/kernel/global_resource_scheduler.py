@@ -211,10 +211,24 @@ class PlanePolicy:
 
 
 @dataclass(frozen=True, slots=True)
+class TenantResourcePolicy:
+    """Optional cross-plane ceiling. A tenant cannot multiply its cap by plane."""
+
+    tenant_id: str
+    maximum: ResourceVector
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "tenant_id", _text(self.tenant_id, "tenant"))
+        if not isinstance(self.maximum, ResourceVector) or self.maximum.empty:
+            raise ResourcePolicyError("tenant maximum must be nonempty resources")
+
+
+@dataclass(frozen=True, slots=True)
 class GlobalResourcePolicy:
     total: ResourceVector
     planes: tuple[PlanePolicy, ...]
     aging_interval: int = 8
+    tenant_limits: tuple[TenantResourcePolicy, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.total, ResourceVector) or self.total.empty:
@@ -240,6 +254,16 @@ class GlobalResourcePolicy:
                 "sum of plane reserves exceeds global capacity"
             )
         object.__setattr__(self, "planes", tuple(sorted(planes, key=lambda p: p.name)))
+        if type(self.tenant_limits) is not tuple or len(self.tenant_limits) > 4096:
+            raise ResourcePolicyError("invalid tenant limits")
+        if any(not isinstance(t, TenantResourcePolicy) for t in self.tenant_limits):
+            raise ResourcePolicyError("invalid tenant policy")
+        if len({t.tenant_id for t in self.tenant_limits}) != len(self.tenant_limits):
+            raise ResourcePolicyError("duplicate tenant policy")
+        if any(not t.maximum.fits_within(self.total) for t in self.tenant_limits):
+            raise ResourcePolicyError("tenant maximum exceeds global resources")
+        object.__setattr__(self, "tenant_limits",
+                           tuple(sorted(self.tenant_limits, key=lambda t: t.tenant_id)))
         object.__setattr__(
             self,
             "aging_interval",
@@ -267,6 +291,8 @@ class ResourceRequest:
     resources: ResourceVector
     priority: int = 5
     preemptible: bool = True
+    deadline_tick: int | None = None
+    estimated_ticks: int = 1
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "request_id", _text(self.request_id, "request_id"))
@@ -281,6 +307,11 @@ class ResourceRequest:
         )
         if not isinstance(self.preemptible, bool):
             raise ResourcePolicyError("preemptible must be boolean")
+        if self.deadline_tick is not None:
+            _integer(self.deadline_tick, "deadline_tick", minimum=1)
+        _integer(self.estimated_ticks, "estimated_ticks", minimum=1)
+        if self.deadline_tick is not None and self.estimated_ticks > self.deadline_tick:
+            raise ResourcePolicyError("estimated service exceeds deadline")
 
     @property
     def identity_digest(self) -> str:
@@ -292,6 +323,8 @@ class ResourceRequest:
                 "resources": self.resources.as_dict(),
                 "priority": self.priority,
                 "preemptible": self.preemptible,
+                **({"deadline_tick": self.deadline_tick, "estimated_ticks": self.estimated_ticks}
+                   if self.deadline_tick is not None or self.estimated_ticks != 1 else {}),
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -314,6 +347,8 @@ class RequestTicket:
             "resources": self.request.resources.as_dict(),
             "priority": self.request.priority,
             "preemptible": self.request.preemptible,
+            "deadline_tick": self.request.deadline_tick,
+            "estimated_ticks": self.request.estimated_ticks,
             "submitted_tick": self.submitted_tick,
             "status": self.status,
             "grant_id": self.grant_id,
@@ -358,6 +393,7 @@ class GlobalResourceScheduler:
             raise TypeError("policy must be GlobalResourcePolicy")
         self.policy = policy
         self._planes = {plane.name: plane for plane in policy.planes}
+        self._tenant_limits = {t.tenant_id: t.maximum for t in policy.tenant_limits}
         self._usage = {plane.name: ResourceVector() for plane in policy.planes}
         self._requests: dict[str, RequestTicket] = {}
         self._grants: dict[str, ResourceGrant] = {}
@@ -387,6 +423,9 @@ class GlobalResourceScheduler:
             self.policy.total, plane.max_fraction
         ):
             raise ResourcePolicyError("request exceeds plane maximum share")
+        maximum = self._tenant_limits.get(request.tenant_id)
+        if maximum is not None and not request.resources.fits_within(maximum):
+            raise ResourcePolicyError("request exceeds tenant maximum")
         with self._lock:
             prior = self._requests.get(request.request_id)
             if prior is not None:
@@ -455,11 +494,14 @@ class GlobalResourceScheduler:
             ):
                 return None
             simulated = dict(self._usage)
+            simulated_tenant = self._tenant_usage(ordered[0].tenant_id)
             for ticket in tickets:
-                if not self._fits_with_usage(ticket, simulated):
+                if not self._fits_with_usage(ticket, simulated, tenant_usage=simulated_tenant,
+                                             at_tick=self._tick + 1):
                     return None
                 plane_name = ticket.request.plane
                 simulated[plane_name] = simulated[plane_name].add(ticket.request.resources)
+                simulated_tenant = simulated_tenant.add(ticket.request.resources)
 
             # All publication occurs under the same existing reentrant lock.
             # Roll back per-group mutations on an unexpected publication error.
@@ -559,8 +601,14 @@ class GlobalResourceScheduler:
             ticket = self._require_ticket(request_id)
             if ticket.status != QUEUED:
                 raise ResourceConflict("preemption requires a queued request")
+            # A previous revocation wave is still physically occupied. Return
+            # the exact outstanding set instead of over-revoking other grants.
+            outstanding = tuple(g for g in self._grants.values()
+                                if g.state == REVOKING and g.revoking_for_request_id == request_id)
+            if outstanding:
+                return tuple(sorted(outstanding, key=lambda g: g.grant_id))
             self._tick += 1
-            if self._fits_candidate(ticket):
+            if self._fits_candidate(ticket) or not self._deadline_possible(ticket):
                 return ()
             needed = ticket.request
             request_priority = self._effective_priority(ticket)
@@ -572,7 +620,9 @@ class GlobalResourceScheduler:
                 and grant.request_id != request_id
                 and (
                     grant.priority > request_priority
-                    or (grant.borrowed and grant.plane != needed.plane)
+                    or self._deadline_precedes(ticket, grant)
+                    or (grant.borrowed and grant.plane != needed.plane
+                        and not self._usage[needed.plane].deficit_from(self._planes[needed.plane].reserved).empty)
                 )
             ]
             candidates.sort(
@@ -584,13 +634,16 @@ class GlobalResourceScheduler:
                 )
             )
             simulated = dict(self._usage)
+            simulated_tenant = self._tenant_usage(needed.tenant_id)
             selected: list[ResourceGrant] = []
             for grant in candidates:
                 simulated[grant.plane] = simulated[grant.plane].subtract(
                     grant.resources
                 )
+                if grant.tenant_id == needed.tenant_id:
+                    simulated_tenant = simulated_tenant.subtract(grant.resources)
                 selected.append(grant)
-                if self._fits_with_usage(ticket, simulated):
+                if self._fits_with_usage(ticket, simulated, tenant_usage=simulated_tenant):
                     break
             else:
                 return ()
@@ -656,6 +709,14 @@ class GlobalResourceScheduler:
         with self._lock:
             return {
                 "kind": "global_resource_scheduler",
+                "tenant_limits": {
+                    tenant: {"usage": self._tenant_usage(tenant).as_dict(), "maximum": cap.as_dict()}
+                    for tenant, cap in sorted(self._tenant_limits.items())
+                },
+                "deadline_blocked": sum(
+                    ticket.status == QUEUED and not self._deadline_possible(ticket)
+                    for ticket in self._requests.values()
+                ),
                 "gap": "G021",
                 "tick": self._tick,
                 "total": self.policy.total.as_dict(),
@@ -747,6 +808,9 @@ class GlobalResourceScheduler:
         fairness = usage.dominant_share(self.policy.total) / plane.weight
         return (
             self._effective_priority(ticket),
+            ticket.request.deadline_tick is None,
+            (ticket.request.deadline_tick - self._tick - ticket.request.estimated_ticks
+             if ticket.request.deadline_tick is not None else 0),
             0 if below_reserve else 1,
             fairness,
             ticket.submitted_tick,
@@ -758,15 +822,51 @@ class GlobalResourceScheduler:
         improvement = max(0, (age - 1) // self.policy.aging_interval)
         return max(0, ticket.request.priority - improvement)
 
+    def _deadline_possible(self, ticket: RequestTicket, at_tick: int | None = None) -> bool:
+        deadline = ticket.request.deadline_tick
+        return deadline is None or (self._tick if at_tick is None else at_tick) + ticket.request.estimated_ticks <= deadline
+
+    def _deadline_precedes(self, ticket: RequestTicket, grant: ResourceGrant) -> bool:
+        # Deadline promotion stays inside the same or lower original urgency.
+        # Never preempt a more protected original priority class for a deadline.
+        incoming = ticket.request
+        if incoming.deadline_tick is None or incoming.priority > grant.priority:
+            return False
+        incumbent = self._require_ticket(grant.request_id).request
+        if incumbent.deadline_tick is None:
+            return True
+        # Conservative full remaining service (no assumed progress).
+        return incoming.deadline_tick - incoming.estimated_ticks < incumbent.deadline_tick - incumbent.estimated_ticks
+
+    def _tenant_usage(self, tenant_id: str) -> ResourceVector:
+        result = ResourceVector()
+        for grant in self._grants.values():
+            if grant.tenant_id == tenant_id and grant.state in {ACTIVE, REVOKING}:
+                result = result.add(grant.resources)
+        return result
+
     def _fits_candidate(self, ticket: RequestTicket) -> bool:
+        if any(g.state == REVOKING and g.revoking_for_request_id == ticket.request.request_id
+               for g in self._grants.values()):
+            return False
         return self._fits_with_usage(ticket, self._usage)
 
     def _fits_with_usage(
         self,
         ticket: RequestTicket,
         usage: dict[str, ResourceVector],
+        *,
+        tenant_usage: ResourceVector | None = None,
+        at_tick: int | None = None,
     ) -> bool:
         request = ticket.request
+        if not self._deadline_possible(ticket, at_tick):
+            return False
+        cap = self._tenant_limits.get(request.tenant_id)
+        if cap is not None:
+            used = self._tenant_usage(request.tenant_id) if tenant_usage is None else tenant_usage
+            if not request.resources.fits_within(cap.subtract(used)):
+                return False
         plane = self._planes[request.plane]
         total_usage = ResourceVector()
         for value in usage.values():
@@ -800,6 +900,7 @@ class GlobalResourceScheduler:
     def _plane_has_queued_demand(self, plane: str) -> bool:
         return any(
             ticket.status == QUEUED and ticket.request.plane == plane
+            and self._deadline_possible(ticket)
             for ticket in self._requests.values()
         )
 

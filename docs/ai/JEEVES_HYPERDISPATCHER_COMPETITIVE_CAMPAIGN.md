@@ -45,9 +45,9 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 02 | Earliest deadline first | P |
 | 03 | Critical path scheduling | P |
 | 04 | Weighted fair queuing | P |
-| 05 | Hierarchical resources | Open |
+| 05 | Hierarchical resources | P |
 | 06 | Predictive backfill | P |
-| 07 | Deadline preemption | Open |
+| 07 | Deadline preemption | P |
 | 08 | Atomic gang scheduling | P |
 | 09 | Work stealing | P |
 | 10 | Speculative execution | P |
@@ -110,7 +110,7 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 67 | Failure-domain isolation | P |
 | 68 | Uncertainty-sensitive scheduling | P |
 | 69 | Semantic deduplication | P |
-| 70 | Cross-domain lending | Open |
+| 70 | Cross-domain lending | P |
 | 71 | Scheduler portfolios | P |
 | 72 | Virtual workers | Open |
 
@@ -343,3 +343,21 @@ external exactly-once effect or production durable store benchmark is claimed.
 Current source register: 54/72 partially implemented targets, not 54 completed.
 New live integration strengthens previously partial targets 1, 2, 4, 14, 49,
 51 and 54. Remaining source gaps and all competitive qualification remain open.
+
+## Wave 13: hierarchical resource control and deadline-aware preemption
+
+The canonical global scheduler accepts opt-in tenant ceilings across all
+planes, including atomic group reservations and revoking grants. Logical
+deadline ticks participate in dispatch priority within the priority class;
+infeasible deadlines remain visible and cannot receive a fresh grant.
+Same-priority deadline preemption and existing reserve reclamation use
+two-phase revocation; repeated requests return outstanding revocations
+rather than prematurely freeing capacity or over-revoking additional work.
+Cross-plane lending remains capacity-accounted, with reserve reclamation
+limited to a plane with an actual reserve deficit. This strengthens the
+existing logical owner rather than creating another allocator.
+
+Partial adoption: 05, 07, 70. Actual host resources and stop acknowledgments
+are not independently qualified. Wave-12 exact head: 50 focused tests
+passed and architecture/mirror validation passed. Merge hold is intentional.
+An unrelated inherited archive test selector failed and requires repair.
