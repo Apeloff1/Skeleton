@@ -71,6 +71,18 @@ class MeasuredWholeRequestEngine:
             if acquired:
                 self._lock.release()
 
+    async def revalidate_source(self, *, timeout_ms: int = 10000) -> dict:
+        """Wait for idle ownership, then explicitly rescan the pinned source.
+
+        timeout_ms bounds lock waiting, not synchronous filesystem hashing.
+        The rescan is trusted operator maintenance, not an inference request.
+        """
+        timeout = integer(timeout_ms, 1, 86_400_000, "reinspection wait timeout")
+        async with self._own_until(time.monotonic_ns() + timeout * 1_000_000):
+            require(not self._closed and not self._session.status()["closed"],
+                    "whole-request adapter is closed")
+            return self._session.revalidate_source(consumer=self._consumer)
+
     async def generate(self, request: LocalInferenceRequest, *, max_input_tokens: int,
                        timeout_ms: int) -> WholeRequestOutcome:
         require(isinstance(request, LocalInferenceRequest), "canonical inference request required")
