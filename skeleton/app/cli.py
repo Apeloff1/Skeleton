@@ -50,6 +50,8 @@ def _parser() -> argparse.ArgumentParser:
     )
     doctor.add_argument("--timeout", type=float, default=3.0, help="per-probe timeout, at most 10 seconds")
     doctor.add_argument("--json", action="store_true", dest="as_json")
+    doctor.add_argument("--require-ai", action="store_true",
+                        help="require --live and observed selected AI readiness for exit zero")
     doctor.add_argument(
         "--studio", action="store_true",
         help="inspect actual local SDK/core prerequisites separately from server readiness",
@@ -655,6 +657,10 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if command == "doctor":
         from skeleton.app.first_install import first_install_report
 
+        if args.require_ai and not args.live:
+            print("doctor --require-ai requires --live")
+            return 2
+
         try:
             report = first_install_report(
                 live=bool(args.live), timeout=args.timeout,
@@ -702,6 +708,8 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             and report["configuration_ready"]
             and report["services_ready"] is not False
         )
+        if args.require_ai:
+            ok = ok and report["services_ready"] is True and report.get("ai_ready") is True
         return 0 if ok else 1
     if command == "plan":
         from skeleton.app.plan import build_plan

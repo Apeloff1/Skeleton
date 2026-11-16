@@ -151,3 +151,27 @@ model ID, model/runtime/tokenizer SHA-256 pins and a signed reviewer. It
 does not admit the current llama.cpp CLI's UTF-8 estimate as an exact
 tokenizer. No production bootstrap or physical model qualification is
 implied by this composition seam.
+
+
+## Explicit trusted native startup and strict consumer doctor
+
+Trusted application code can construct TrustedNativeStartup with its actual
+live Mongo conversation and memory owners, one installed canonical source
+epoch, independent signed reviewer, policy SHA-256 and native model pins,
+then pass it directly to create_app(trusted_protected_bootstrap=...). This
+path validates collection and client identity, read-only stable replica
+and authentication observations, known writer inventory, and atomic server
+configuration before the actual registry constructs each backend.
+The placeholder snapshot reader deliberately denies every request until
+canonical execution binding is installed. Externally owned resources remain
+the deployer's responsibility; drain the application before closing them.
+
+This does not provision a replica set, migrate old data, qualify remote
+writer custody or enable the default standalone Docker deployment.
+For an already running installation, run:
+
+    python -m skeleton app doctor --live --require-ai --json
+
+Exit zero requires observed service/routes and selected AI availability;
+it is not evidence of generation, independent quality, or hardware success.
+Default doctor remains usable for diagnosing a shell whose AI is blocked.

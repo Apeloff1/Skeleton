@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "4ddf9ea536b0592e47463984837c15166dc8d927",
+      "source_git_object_sha": "fdf1fe5b553de008c412124b1aba3f4a4460d1fb",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -98,7 +98,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/runtime/provider_runtime.py",
       "kind": "file",
-      "source_git_object_sha": "4ddf9ea536b0592e47463984837c15166dc8d927",
+      "source_git_object_sha": "fdf1fe5b553de008c412124b1aba3f4a4460d1fb",
       "role": "Existing legacy runtime import alias for the canonical credential-bearing provider runtime; a non-owning compatibility facade.",
       "work_package_refs": [
         "WP-W05",
@@ -614,7 +614,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "7d075832d19ca878887db2bb1f37528037463523",
+      "source_git_object_sha": "b6bbcd9ceccc6d812b94ec0cd93125ab91ff1d58",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",

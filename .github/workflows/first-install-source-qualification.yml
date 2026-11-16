@@ -108,7 +108,8 @@ jobs:
         run: |
           python -m pytest -q --maxfail=1 \
             skeleton/testing/test_native_guard_binding.py \
-            skeleton/testing/test_guarded_backend_component_factory.py
+            skeleton/testing/test_guarded_backend_component_factory.py \
+            skeleton/testing/test_trusted_native_startup.py
       - name: Verify construction and provider-owner contracts
         run: |
           python scripts/check_architecture_map.py

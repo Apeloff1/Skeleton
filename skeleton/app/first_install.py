@@ -254,8 +254,15 @@ def first_install_report(
         next_steps.append(
             "AI configuration is present but canonical readiness was not observed. Inspect app logs backend and app logs skeleton, then rerun app doctor --live; do not treat configuration alone as model availability."
         )
+    # Service/route readiness is deliberately not AI readiness. A healthy
+    # app shell may be useful while a guard is blocked, but never qualify AI.
+    ai_ready = (host.ready is True and checks_ok(checks) is True
+                and services_ready is True and ai["observed"] is True
+                and ai["available"] is True and configured)
     report = {
         "schema_version": "skeleton.application.first_install_report.v1",
+        "ai_ready": ai_ready,
+        "ai_ready_scope": "Observed provider availability only; not inference, quality, device or release qualification.",
         "platform_ready": host.ready,
         "configuration_ready": checks_ok(checks),
         "services_ready": services_ready,
