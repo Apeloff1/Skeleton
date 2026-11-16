@@ -63,6 +63,7 @@ jobs:
           tests/test_select_consumer_gguf.py
           skeleton/testing/test_local_model_deployment.py
           tests/flgb/test_flgb_02_native_runtime.py
+          tests/test_torch_physical_kv_fused_batch.py
 
       - name: Validate masterplan consistency
         run: python scripts/check_ai_master_plan.py

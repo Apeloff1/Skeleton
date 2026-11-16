@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import math
 import hmac
 import random
-from typing import Any, Callable, Iterator, Mapping, Sequence
+from typing import Any, Callable, Generator, Iterator, Mapping, Sequence
 
 from skeleton.cortex.attn import sample_logits
 from skeleton.cortex.transformer import KVCache, TinyTransformer
@@ -101,6 +101,11 @@ class InferenceResult:
 class BatchGenerationResult:
     request_id: str
     result: GenerationResult
+
+
+@dataclass(frozen=True)
+class _FusedLogitsRequest:
+    window: tuple[int, ...]
 
 
 class GenerationStream:
@@ -673,10 +678,12 @@ class NativeLLMRuntime:
         self,
         prompt_sequence: TokenSequence,
         config: GenerationConfig,
-        *, interrupt: Callable[[], None] | None = None,
-    ) -> Iterator[RuntimeEvent]:
+        *, interrupt: Callable[[], None] | None = None, fused: bool = False,
+    ) -> Generator[RuntimeEvent | _FusedLogitsRequest, Sequence[float] | None, GenerationResult]:
         if interrupt is not None:
             interrupt()
+        if fused and config.use_cache:
+            raise RuntimeContractError("fused stateless batch requires explicit use_cache=False")
         self._admit_sequence(prompt_sequence, config)
         admitted_binding = (
             self.model_digest, self.tokenizer.digest, self.architecture.digest,
@@ -733,7 +740,11 @@ class NativeLLMRuntime:
             if interrupt is not None:
                 interrupt()
             window = output[-self.limits.max_context :]
-            if interrupt is None:
+            if fused:
+                raw_logits = yield _FusedLogitsRequest(tuple(window or [self.model.unk]))
+                if raw_logits is None:
+                    raise RuntimeContractError("fused decode lacks logits")
+            elif interrupt is None:
                 raw_logits = self.model._logits_window(window, cache)
             else:
                 raw_logits = self.model._logits_window(window, cache, interrupt=interrupt)
@@ -1054,6 +1065,86 @@ class NativeLLMRuntime:
         finally:
             for stream in active.values():
                 stream.close()
+
+    def generate_fused_batch(
+        self, requests: Sequence[BatchGenerationRequest], *,
+        max_workspace_bytes: int, max_active_slots: int = 8,
+        require_gpu: bool = True,
+        on_event: Callable[[str, RuntimeEvent], None] | None = None,
+        interrupt: Callable[[], None] | None = None,
+    ) -> tuple[BatchGenerationResult, ...]:
+        """GPU batched native decode with independent canonical sampling/results.
+
+        Unlike cooperative serial logits scheduling, equal-length rows share
+        batched tensor operations. Explicit opt-in stateless cache policy.
+        Floating-point batch kernels may differ from serial logits; compare
+        token replay on the exact hardware before enabling this profile.
+        """
+        if type(max_active_slots) is not int or not 1 <= max_active_slots <= min(32, self.limits.max_batch_size):
+            raise RuntimeContractError("invalid fused active slots")
+        if type(require_gpu) is not bool or type(max_workspace_bytes) is not int or not 1 <= max_workspace_bytes <= 1024**4:
+            raise RuntimeContractError("invalid fused workspace or hardware policy")
+        accel = getattr(self.model, "_accel", None)
+        if accel is None or not callable(getattr(accel, "logits_fused_batch", None)):
+            raise RuntimeContractError("fused batch requires a real accelerator")
+        if require_gpu and accel.device_name not in {"cuda", "mps"}:
+            raise RuntimeContractError("fused GPU batch cannot fall back to CPU")
+        if on_event is not None and not callable(on_event):
+            raise RuntimeContractError("fused observer must be callable")
+        admitted = self._admit_batch(requests, interrupt=interrupt)
+        if any(request.config.use_cache for request, _ in admitted):
+            raise RuntimeContractError("fused batch requires explicit cache-free requests")
+        completed = {}
+        # Hold the canonical accelerator lock across the full campaign,
+        # including checkpoint and token sampling, so training cannot rebind.
+        with accel._inference_lock(interrupt):
+            for offset in range(0, len(admitted), max_active_slots):
+                group = admitted[offset:offset + max_active_slots]
+                generators = {
+                    j: self._stream_sequence_impl(seq, req.config, interrupt=interrupt, fused=True)
+                    for j, (req, seq) in enumerate(group)
+                }
+                pending = {}
+                def advance(j, values=None):
+                    stream = generators[j]
+                    while True:
+                        if interrupt is not None:
+                            interrupt()
+                        try:
+                            event = stream.send(values)
+                        except StopIteration as terminal:
+                            if not isinstance(terminal.value, GenerationResult):
+                                raise RuntimeContractError("fused stream missing terminal result")
+                            completed[offset+j] = BatchGenerationResult(group[j][0].request_id, terminal.value)
+                            del generators[j]
+                            return
+                        values = None
+                        if isinstance(event, _FusedLogitsRequest):
+                            pending[j] = event.window
+                            return
+                        if on_event is not None:
+                            on_event(group[j][0].request_id, event)
+                try:
+                    for j in tuple(generators):
+                        advance(j)
+                    while pending:
+                        by_length = {}
+                        for j, window in pending.items():
+                            by_length.setdefault(len(window), []).append(j)
+                        for size in sorted(by_length):
+                            indices = by_length[size]
+                            windows = [pending.pop(j) for j in indices]
+                            logits = accel.logits_fused_batch(windows,
+                                max_workspace_bytes=max_workspace_bytes, require_gpu=require_gpu,
+                                interrupt=interrupt)
+                            if len(logits) != len(indices):
+                                raise RuntimeContractError("fused output row count mismatch")
+                            for j, row in zip(indices, logits):
+                                advance(j, row)
+                finally:
+                    for stream in generators.values():
+                        stream.close()
+        return tuple(completed[j] for j in range(len(admitted)))
 
     def replay(
         self,

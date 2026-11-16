@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import math
 import threading
+import secrets
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Iterable, List, Sequence
 
@@ -87,6 +88,7 @@ class TorchAccel:
         self._weights_modified = False
         self._training_failed = False
         self._state_lock = threading.RLock()
+        self._host_kv_pages: dict[str, dict[str, Any]] = {}
         self.reset_decode_cache()
 
     @property
@@ -247,6 +249,7 @@ class TorchAccel:
             embedding, positions, projection, bias,
         )
         self._layers = staged_layers
+        self._host_kv_pages.clear()
         self._reset_decode_cache_unlocked()
         self._weights_modified = False
         self._adam_moments = {}
@@ -616,6 +619,195 @@ class TorchAccel:
             values = tuple(float(value) for value in result.detach().cpu().tolist())
             self._cached_logits = values
             return list(values)
+
+    def _kv_binding(self):
+        return (self.lm.steps, self.lm.fitted, self.lm.tied, self.lm.ctx,
+                self.lm.n_layers, self.lm.n_heads, self.lm.dim,
+                self.lm.position_mode, self.kv_dtype_name,
+                tuple((id(p), p._version) for p in self._params()))
+
+    @property
+    def host_kv_bytes(self) -> int:
+        with self._state_lock:
+            return sum(row["bytes"] for row in self._host_kv_pages.values())
+
+    def offload_decode_cache(self, scope: str, *, max_host_bytes: int,
+                             require_gpu: bool = True) -> dict[str, Any]:
+        """Move live K/V to owned host tensors and release resident references.
+
+        Explicit private-session owner, bounded in-process custody; no remote
+        spill, no serialization/pickle. Caller owns the runtime and scope.
+        CPU-only tests must opt out of the GPU requirement.
+        """
+        if not isinstance(scope, str) or not 1 <= len(scope) <= 256:
+            raise ValueError("KV offload requires a private scope")
+        if type(max_host_bytes) is not int or not 1 <= max_host_bytes <= 1024**4:
+            raise ValueError("host KV byte ceiling outside bounds")
+        if type(require_gpu) is not bool:
+            raise ValueError("explicit GPU policy required")
+        with self._state_lock, self.torch.inference_mode():
+            self._assert_training_integrity()
+            if not self.resident or (require_gpu and self.device_name not in {"cuda", "mps"}):
+                raise RuntimeError("physical GPU KV offload requires a resident accelerator")
+            if (not self._cached_ids or self._cached_logits is None
+                    or len(self._cached_keys) != self.lm.n_layers
+                    or len(self._cached_values) != self.lm.n_layers):
+                raise RuntimeError("no complete resident decode cache to offload")
+            if len(self._host_kv_pages) >= 128:
+                raise MemoryError("host KV slot limit reached")
+            binding = self._kv_binding()
+            banks = self._cached_keys + self._cached_values
+            logical = sum(p.numel() * p.element_size() for p in banks)
+            if self.host_kv_bytes + logical > max_host_bytes:
+                raise MemoryError("host KV offload would exceed capacity")
+            before = self.kv_reserved_bytes
+            # Copies are complete before state publication. Only occupied
+            # tensors are moved; geometric spare capacity is not retained.
+            host = tuple(p.detach().to("cpu", copy=True).contiguous() for p in banks)
+            if self._kv_binding() != binding:
+                raise RuntimeError("weights changed during KV offload")
+            token = secrets.token_hex(24)
+            self._host_kv_pages[token] = {
+                "scope": scope, "binding": binding, "banks": host, "bytes": logical,
+                "ids": tuple(self._cached_ids), "pos": self._cached_next_position,
+                "logits": self._cached_logits,
+            }
+            self._reset_decode_cache_unlocked()
+            return {"lease": token, "host_bytes": logical, "released_resident_bytes": before,
+                    "device": self.device_name, "resident_bytes": self.kv_reserved_bytes}
+
+    def restore_decode_cache(self, lease: str, scope: str, *,
+                             max_device_bytes: int) -> dict[str, Any]:
+        """Restore actual tensor banks; consume the host lease only on success."""
+        if type(max_device_bytes) is not int or not 1 <= max_device_bytes <= 1024**4:
+            raise ValueError("device KV byte ceiling outside bounds")
+        with self._state_lock, self.torch.inference_mode():
+            self._assert_training_integrity()
+            if not self.resident:
+                raise RuntimeError("no resident accelerator")
+            row = self._host_kv_pages.get(lease) if isinstance(lease, str) else None
+            if row is None or row["scope"] != scope:
+                raise PermissionError("unknown or foreign KV lease")
+            if row["binding"] != self._kv_binding():
+                del self._host_kv_pages[lease]
+                raise RuntimeError("KV lease invalidated by weight revision")
+            if self._cached_ids or self.kv_reserved_bytes:
+                raise RuntimeError("explicitly drain the active decode cache before restore")
+            cap = min(max_device_bytes, self.max_kv_bytes or max_device_bytes)
+            if row["bytes"] > cap:
+                raise MemoryError("device KV restore exceeds capacity")
+            banks = tuple(p.to(self.device, copy=True) for p in row["banks"])
+            if self.device_name == "cuda":
+                self.torch.cuda.synchronize(self.device)
+            elif self.device_name == "mps":
+                self.torch.mps.synchronize()
+            if row["binding"] != self._kv_binding():
+                raise RuntimeError("weights changed during KV restore")
+            count = self.lm.n_layers
+            self._key_buffers = list(banks[:count])
+            self._value_buffers = list(banks[count:])
+            self._cached_keys = list(banks[:count])
+            self._cached_values = list(banks[count:])
+            self._cached_ids = list(row["ids"])
+            self._cached_next_position = row["pos"]
+            self._cached_logits = row["logits"]
+            del self._host_kv_pages[lease]
+            return {"device": self.device_name, "resident_bytes": self.kv_reserved_bytes,
+                    "remaining_host_bytes": self.host_kv_bytes, "tokens": len(self._cached_ids)}
+
+    def discard_host_kv(self, lease: str, scope: str) -> None:
+        with self._state_lock:
+            row = self._host_kv_pages.get(lease) if isinstance(lease, str) else None
+            if row is None or row["scope"] != scope:
+                raise PermissionError("unknown or foreign KV lease")
+            del self._host_kv_pages[lease]
+
+    def logits_fused_batch(self, windows: Sequence[Sequence[int]], *,
+                           max_workspace_bytes: int, require_gpu: bool = True,
+                           interrupt: Callable[[], None] | None = None) -> list[list[float]]:
+        """Single tensor graph for equal-length independent causal sequences.
+
+        Batched projection, RoPE, SDPA and FFN use a true batch dimension;
+        no Python per-request forward loop. This is stateless prefill/decode
+        recomputation, not a paged multi-sequence KV kernel. SDPA may select
+        flash, efficient or math kernels according to the actual hardware.
+        """
+        if type(require_gpu) is not bool or not 1 <= len(windows) <= 32:
+            raise ValueError("invalid fused batch policy or slot count")
+        if type(max_workspace_bytes) is not int or not 1 <= max_workspace_bytes <= 1024**4:
+            raise ValueError("fused batch workspace ceiling required")
+        lm, torch = self.lm, self.torch
+        length = len(windows[0])
+        if not 1 <= length <= lm.ctx or any(len(row) != length for row in windows):
+            raise ValueError("fused batch requires equal nonempty context lengths")
+        if any(type(token) is not int or not 0 <= token < lm.V for row in windows for token in row):
+            raise ValueError("fused batch token outside vocabulary")
+        batch, dim, heads = len(windows), lm.dim, lm.n_heads
+        # Conservative logical scratch charge includes math SDPA scores,
+        # temporary activations and final projection, not allocator overhead.
+        arithmetic = 4 * batch * (4 * heads * length * length +
+            length * (12 * dim + 4 * max(dim, lm.d_ff)) + lm.V)
+        if arithmetic > max_workspace_bytes:
+            raise MemoryError("fused batch exceeds logical workspace ceiling")
+        with self._inference_lock(interrupt):
+            self._assert_training_integrity()
+            if not self.resident or (require_gpu and self.device_name not in {"cuda", "mps"}):
+                raise RuntimeError("fused GPU execution requires an admitted resident accelerator")
+            with torch.inference_mode():
+                ids = torch.tensor(windows, dtype=torch.long, device=self.device)
+                pos = torch.arange(length, device=self.device)
+                x = self._E[ids]
+                if lm.position_mode != "rope":
+                    x = x + self._P[pos]
+                hd = dim // heads
+                d = dim - dim % 2
+                angles = (pos.to(x.dtype).unsqueeze(-1) /
+                    (10000.0 ** (torch.arange(0, d, 2, device=self.device,
+                                             dtype=x.dtype) / float(d))))
+                cos, sin = angles.cos(), angles.sin()
+                def rotate(v):
+                    out = v.clone()
+                    even, odd = v[..., 0:d:2], v[..., 1:d:2]
+                    out[..., 0:d:2] = even * cos - odd * sin
+                    out[..., 1:d:2] = even * sin + odd * cos
+                    return out
+                functional = torch.nn.functional
+                if not hasattr(functional, "scaled_dot_product_attention"):
+                    raise RuntimeError("fused batch requires native SDPA support")
+                for blob in self._layers:
+                    if interrupt is not None:
+                        interrupt()
+                    norm = self._normalize(x, blob, "ln1")
+                    q = rotate(norm @ blob["Wq"].T)
+                    k = rotate(norm @ blob["Wk"].T)
+                    v = norm @ blob["Wv"].T
+                    q, k, v = (p.reshape(batch, length, heads, hd).transpose(1, 2)
+                               for p in (q, k, v))
+                    if self.prefill_query_chunk and length > self.prefill_query_chunk:
+                        parts = []
+                        for start in range(0, length, self.prefill_query_chunk):
+                            if interrupt is not None:
+                                interrupt()
+                            stop = min(length, start + self.prefill_query_chunk)
+                            allowed = pos[:stop].unsqueeze(0) <= pos[start:stop].unsqueeze(1)
+                            parts.append(functional.scaled_dot_product_attention(
+                                q[:, :, start:stop], k[:, :, :stop], v[:, :, :stop],
+                                attn_mask=allowed, dropout_p=0.0, is_causal=False))
+                        values = torch.cat(parts, dim=-2)
+                    else:
+                        values = functional.scaled_dot_product_attention(q, k, v,
+                            dropout_p=0.0, is_causal=True)
+                    x = x + values.transpose(1, 2).reshape(batch, length, dim) @ blob["Wo"].T
+                    if blob.get("W1") is not None:
+                        norm = self._normalize(x, blob, "ln2")
+                        gate = norm @ blob["W1"].T + blob["b1"]
+                        z = (functional.silu(gate) * (norm @ blob["Wu"].T + blob["bu"])
+                             if blob.get("Wu") is not None else self._gelu(gate))
+                        x = x + z @ blob["W2"].T + blob["b2"]
+                values = (x[:, -1] @ self._Wout.T + self._bout).detach().cpu().tolist()
+                if interrupt is not None:
+                    interrupt()
+                return values
 
     def logits(self, ids: Sequence[int], *,
                interrupt: Callable[[], None] | None = None) -> List[float]:
