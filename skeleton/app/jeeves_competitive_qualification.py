@@ -322,7 +322,7 @@ def blind_package(cases,left,right):
     _,rrows,_,_,rreport=validate_capture(cases,right)
     compare(lreport,rreport)
     _fail(left["model_digest"]==right["model_digest"],"distinct models required")
-    review=[];mapping=[]
+    review=[];mapping=[];package_bytes=0
     for case_id,case in sorted(registry.items()):
         for index,spec in enumerate(case.turns):
             if not spec.human_rubric:
@@ -339,6 +339,8 @@ def blind_package(cases,left,right):
                                                  for i in range(index)],
                            "answer_history_b":[(lrows if swapped else rrows)[(case_id,i)]["answer"]
                                                  for i in range(index)]})
+            package_bytes+=len(_stable(review[-1]).encode("utf-8"))
+            _fail(package_bytes>32*1024*1024,"blind review exceeds private package size; use smaller case shards")
             mapping.append({"review_id":review_id,"a_model_digest":a["model_digest"],
                             "b_model_digest":b["model_digest"],
                             "a_answer_sha256":a["answer_sha256"],"b_answer_sha256":b["answer_sha256"]})
