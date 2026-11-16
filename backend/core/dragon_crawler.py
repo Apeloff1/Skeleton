@@ -167,6 +167,78 @@ def _publisher_intent_projection(scope: dict, row: dict) -> dict | None:
                            "Publisher acquisition intent could not be verified.", 503) from exc
 
 
+# Declared representation families are review hints, not proof of protocol,
+# origin identity, access rights, license, or suitability for model use.
+_PUBLISHER_REPRESENTATIONS = {
+    "public_api": frozenset({"application/json", "application/ld+json",
+                            "application/x-ndjson", "application/xml", "text/xml"}),
+    "publisher_feed": frozenset({"application/rss+xml", "application/atom+xml",
+                                 "application/feed+json"}),
+    "open_dataset_manifest": frozenset({"application/json", "application/ld+json",
+                                        "application/x-ndjson", "application/xml",
+                                        "text/xml", "text/csv", "application/csv"}),
+    "licensed_public_export": frozenset({"application/json", "application/x-ndjson",
+                                         "text/csv", "application/csv", "text/plain",
+                                         "application/xml", "text/xml", "application/zip",
+                                         "application/pdf"}),
+}
+
+
+def _publisher_capture_review(intent: dict, snapshot: dict, *, now: float) -> dict:
+    """Review only already-committed observation metadata.
+
+    No request, alternate target, source body, source identity, entitlement,
+    or authorization is returned. Unretained feed discoveries cannot prove
+    which protocol produced them. A matching MIME alone proves no semantics.
+    """
+    method = intent["method"]
+    allowed_types = _PUBLISHER_REPRESENTATIONS[method]
+    observations, sources = snapshot["acquisition_measurements"], snapshot["sources"]
+    if (not isinstance(observations, list) or len(observations) > 128
+            or not isinstance(sources, dict) or len(sources) > 64):
+        raise ValueError("invalid bounded publisher review input")
+    consent_current = now < snapshot["binding"]["consent"]["expires_at"]
+    matching = other = inferred = 0
+    for source in sources.values():
+        mime = source["content_type"].split(";", 1)[0].strip().lower()
+        provenance = source["provenance"]
+        declared = provenance.get("declared_content_type")
+        if (provenance.get("mime_inferred") is True or not isinstance(declared, str)
+                or declared.split(";", 1)[0].strip().lower() != mime):
+            inferred += 1
+        elif mime in allowed_types:
+            matching += 1
+        else:
+            other += 1
+    discovery = sum(row["kind"] == "discovered" for row in observations)
+    denied = sum(row["status"] in {401, 402, 403, 407, 451}
+                 for row in observations)
+    rejected = sum(row["kind"] in {"rejected", "source_rights_restricted"}
+                   for row in observations)
+    if not consent_current:
+        state = "consent_expired"
+    elif denied or rejected:
+        state = "restriction_observed"
+    elif other or inferred:
+        state = "representation_review_required"
+    elif matching:
+        state = "declared_type_match_only"
+    elif discovery:
+        state = "discovery_metadata_only"
+    else:
+        state = "no_reviewable_capture"
+    return {
+        "schema": "skeleton.dragon.publisher-capture-review.v1",
+        "state": state, "settled_requests": len(observations),
+        "retained_captures": len(sources), "declared_type_matches": matching,
+        "other_declared_types": other, "inferred_or_unknown_types": inferred,
+        "discovery_observations": discovery, "denial_statuses": denied,
+        "rejected_observations": rejected, "protocol_verified": False,
+        "publisher_verified": False, "license_verified": False,
+        "source_use_authorized": False, "network_executed": False,
+    }
+
+
 def authenticated_scope(user: dict | None) -> dict[str, str]:
     if not isinstance(user, dict) or user.get("disabled") or user.get("dev_mode"):
         raise CrawlerError("crawler_sign_in_required", "Sign in to use scoped crawler data.", 401)
@@ -636,6 +708,8 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             {"tenant_id": row.get("tenant_id"), "owner_id": row.get("owner_id")}, row)
         if publisher is not None:
             status["publisher_intent"] = publisher
+            status["publisher_capture_review"] = _publisher_capture_review(
+                publisher, runtime.snapshot(), now=_now().timestamp())
         # The companion is historical operational metadata. Current source-use
         # policy separately governs whether its evidence references are shown.
         # A session-level pause/cancel/lease interruption takes precedence
