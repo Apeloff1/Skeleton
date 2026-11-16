@@ -259,7 +259,7 @@ def normalize_policy(value, candidate_tokens):
         rational(contract["expression"])
     elif kind == "source_quotes" and set(contract) == {"kind", "minimum_quotes", "minimum_distinct_sources"}:
         q, d = contract["minimum_quotes"], contract["minimum_distinct_sources"]
-        if type(q) is not int or type(d) is not int or not 1 <= d <= q <= 4:
+        if type(q) is not int or type(d) is not int or not 1 <= d <= min(q, 3) or not 1 <= q <= 4:
             raise ValueError("invalid quote count or source diversity")
     elif kind == "artifact" and set(contract) == {"kind", "artifact_kind"}:
         if type(contract["artifact_kind"]) is not str or contract["artifact_kind"] not in ARTIFACT_KINDS:
