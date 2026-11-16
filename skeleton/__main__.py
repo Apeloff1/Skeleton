@@ -207,6 +207,8 @@ Commands:
     quest-factions-author  Transactionally author and preview faction consequences
     quest-factions-route  Solve replayable faction-gated quest endings
     quest-factions  Play NPC faction reputation and earned quest consequences
+    original-quest  Compose and independently replay recovered mechanics and quest synthesis
+    gameforge-quest  Compose a conductor world and replay graph-bound player quest actions
     quest-author  Edit original quest source and preview offline gameplay
     quest-expedition  Play authored NPC/choice/crafting quest over combat
     quest-expedition-play  Play NPC crafting and combat quests with offline checkpoints
@@ -1281,6 +1283,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "quest-factions":
         from skeleton.game.gameplay.quest_factions import cli as faction_cli
         return faction_cli(rest)
+    if cmd == "original-quest":
+        from skeleton.app.original_quest_cli import main as original_quest_main
+        return original_quest_main(rest)
+    if cmd == "gameforge-quest":
+        from skeleton.app.gameforge_quest_cli import main as gameforge_quest_main
+        return gameforge_quest_main(rest)
     if cmd == "quest-author":
         from skeleton.game.gameplay.expedition_quest_author import cli as author_cli
         return author_cli(rest)
