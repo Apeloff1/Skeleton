@@ -3279,6 +3279,8 @@ async def lifespan(app: FastAPI):
     yield
 
     _runtime_lifecycle.begin_drain(reason="backend-fastapi-lifespan-shutdown")
+    from core.canonical_writer_startup import drain_protected_writer_readiness
+    await drain_protected_writer_readiness(app)
     # ═══════════════════════════════════════════════════════════════════════
     # ★ CLEAN SHUTDOWN (2026-02-18 upgrade)
     #   FastAPI 0.130+ enforces graceful task drain at shutdown.  Without
@@ -3560,10 +3562,16 @@ async def health_ready():
 
     # Probe independent dependencies concurrently so their individual 2s and
     # 1s budgets fit within the product's 2.5s aggregate deadline.
-    mongo_check, vault_checks = await asyncio.gather(
+    from core.canonical_writer_startup import protected_writer_readiness
+
+    mongo_check, vault_checks, writer_check = await asyncio.gather(
         _probe_mongo_readiness(),
         _bounded_vault_observation("ready", _collect_vault_readiness),
+        protected_writer_readiness(app),
     )
+    checks["canonical_writer_custody"] = writer_check
+    if writer_check["ok"] is not True:
+        overall_ok = False
     checks["mongo"] = mongo_check
     if not mongo_check["ok"]:
         overall_ok = False
@@ -3591,34 +3599,6 @@ async def health_ready():
         }
     checks.update(vault_checks)
     if not all(item.get("ok") for item in vault_checks.values()):
-        overall_ok = False
-
-    # A running process is not ready to serve the product if mandatory
-    # first-party endpoints were skipped during registry mounting. This is
-    # process-local inspection only; it makes no network or database calls.
-    try:
-        from routes.registry_health import critical_router_readiness
-
-        checks["critical_routes"] = critical_router_readiness()
-        if not checks["critical_routes"]["ok"]:
-            overall_ok = False
-    except Exception as exc:
-        logger.warning("health probe failed (critical_routes): %s", type(exc).__name__)
-        checks["critical_routes"] = {"ok": False, "error": "registry_probe_failed"}
-        overall_ok = False
-
-    # A running process is not ready to serve the product if mandatory
-    # first-party endpoints were skipped during registry mounting. This is
-    # process-local inspection only; it makes no network or database calls.
-    try:
-        from routes.registry_health import critical_router_readiness
-
-        checks["critical_routes"] = critical_router_readiness()
-        if not checks["critical_routes"]["ok"]:
-            overall_ok = False
-    except Exception as exc:
-        logger.warning("health probe failed (critical_routes): %s", type(exc).__name__)
-        checks["critical_routes"] = {"ok": False, "error": "registry_probe_failed"}
         overall_ok = False
 
     # A running process is not ready to serve the product if mandatory

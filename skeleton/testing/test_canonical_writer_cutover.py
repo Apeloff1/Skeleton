@@ -639,3 +639,95 @@ def test_local_witness_detects_same_process_history_change_before_commit(tmp_pat
         next(directory.glob("witness-*.json")).unlink()
         with pytest.raises(WriterCutoverDenied):
             witness.record({"generation":3,"latch_sha256":"3"*64})
+
+
+def test_legacy_health_explicitly_unqualified_without_database_observation(monkeypatch):
+    from core import canonical_writer_startup as startup
+    app=SimpleNamespace(state=SimpleNamespace())
+    def forbidden():
+        pytest.fail("legacy readiness made new Mongo custody dependency")
+    monkeypatch.setattr(startup,"_owners",forbidden)
+    result=asyncio.run(startup.protected_writer_readiness(app))
+    assert result=={"ok":True,"required":False,"code":"legacy_writer_mode_unqualified",
+                    "known_local_writer_binding_observed":False,
+                    "external_writer_coverage_verified":False,"guarded_local_ai_ready":False}
+
+
+def test_configured_but_missing_startup_state_never_falls_back_to_legacy():
+    from core import canonical_writer_startup as startup
+    app=SimpleNamespace(state=SimpleNamespace())
+    startup.configure_cutover(app,signed())
+    app.state._trusted_writer_cutover=None
+    with pytest.raises(WriterCutoverDenied):
+        asyncio.run(startup.install_before_lifespan(app))
+    result=asyncio.run(startup.protected_writer_readiness(app))
+    assert result["required"] is True and result["ok"] is False
+    assert app.state._writer_cutover_quarantined is True
+
+
+def test_protected_readiness_singleflight_and_non_authorizing_receipt(monkeypatch):
+    from core import canonical_writer_startup as startup
+    app=SimpleNamespace(state=SimpleNamespace(_writer_cutover_requested=True))
+    async def run():
+        entered=asyncio.Event()
+        release=asyncio.Event()
+        calls=[]
+        async def observation(_app):
+            calls.append(_app)
+            entered.set()
+            await release.wait()
+            return startup._readiness("protected_writer_binding_observed",required=True,ok=True)
+        monkeypatch.setattr(startup,"_observe_protected_runtime",observation)
+        first=asyncio.create_task(startup.protected_writer_readiness(app,timeout=.01))
+        await entered.wait()
+        second=asyncio.create_task(startup.protected_writer_readiness(app,timeout=1))
+        pending=await first
+        assert pending["code"]=="protected_writer_observation_pending" and pending["ok"] is False
+        assert not app.state._writer_readiness_task.cancelled()
+        release.set()
+        result=await second
+        assert result["ok"] is True and result["guarded_local_ai_ready"] is False
+        await startup.protected_writer_readiness(app,timeout=1)
+        assert len(calls)==2
+    asyncio.run(run())
+
+
+def test_protected_readiness_rejects_actual_owner_replacement(monkeypatch):
+    from core import canonical_writer_startup as startup
+    epoch,_=latch_fixture()
+    conversation=SimpleNamespace()
+    memory=SimpleNamespace()
+    writer=SimpleNamespace(repository=memory)
+    app=SimpleNamespace(state=SimpleNamespace(_writer_cutover_requested=True,
+         _writer_cutover_installed=True,_writer_cutover_runtime=(conversation,memory,writer,epoch)))
+    monkeypatch.setattr(startup,"_owners",lambda:(epoch._database,object(),memory,writer))
+    async def run():
+        result=await startup.protected_writer_readiness(app)
+        assert result["ok"] is False and result["required"] is True
+        assert app.state._writer_cutover_quarantined is True
+        monkeypatch.setattr(startup,"_owners",lambda:(epoch._database,conversation,memory,writer))
+        assert (await startup.protected_writer_readiness(app))["ok"] is False
+    asyncio.run(run())
+
+
+def test_health_caller_cancellation_does_not_cancel_shared_authority_check(monkeypatch):
+    from core import canonical_writer_startup as startup
+    app=SimpleNamespace(state=SimpleNamespace(_writer_cutover_requested=True))
+    async def run():
+        entered=asyncio.Event()
+        released=asyncio.Event()
+        async def observation(_app):
+            entered.set()
+            await released.wait()
+            return startup._readiness("protected_writer_binding_observed",required=True,ok=True)
+        monkeypatch.setattr(startup,"_observe_protected_runtime",observation)
+        caller=asyncio.create_task(startup.protected_writer_readiness(app))
+        await entered.wait()
+        caller.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await caller
+        task=app.state._writer_readiness_task
+        assert not task.cancelled() and not task.done()
+        await startup.drain_protected_writer_readiness(app)
+        assert task.cancelled()
+    asyncio.run(run())

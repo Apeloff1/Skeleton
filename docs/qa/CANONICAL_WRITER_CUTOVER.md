@@ -174,3 +174,15 @@ external checkpoint. Keep the custody directory independently backed up and
 retain signed receipts outside both restore domains. Bounded to 4,096 witness
 records per deployment and 65,536 directory entries; larger histories require
 a separately reviewed archival/checkpoint protocol.
+
+
+The actual /api/health/ready aggregate now includes a redacted
+canonical_writer_custody result. Legacy mode stays available but is explicitly
+unqualified. A protected process checks exact installed owner identities,
+sticky handles, writer inventory and active database reservation. Failed
+observations quarantine the readiness state; an in-flight shared observation
+times out to not-ready rather than using an old passing result. Concurrent
+health callers coalesce onto one check; cancelling a caller does not cancel
+the authority observation. Shutdown drains that task before Mongo closes.
+This does not attest inference or external writer coverage. The three
+duplicated mandatory route probes have been consolidated to one.

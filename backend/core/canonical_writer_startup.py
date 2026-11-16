@@ -6,12 +6,15 @@ supplies the verified short-lived approval before the existing app lifespan.
 """
 from __future__ import annotations
 
+import asyncio
+
 from skeleton.app.canonical_writer_cutover import (
     VerifiedWriterCutover, WriterCutoverDenied, inspect_writer_inventory, qualify_writer_cutover,
     reserve_writer_deployment, verify_writer_deployment,
 )
 from skeleton.persistence.mongo_source_epoch import (
     MongoCanonicalSourceEpoch, bind_required_canonical_writers,
+    configured_canonical_epoch, verify_canonical_source_writer_inventory,
 )
 
 
@@ -33,9 +36,11 @@ def configure_cutover(app, approval, *, local_checkpoint=None):
     if type(approval) is not VerifiedWriterCutover:
         raise WriterCutoverDenied("explicit signed canonical cutover required")
     approval.verify()
-    if (getattr(app.state, "_trusted_writer_cutover", None) is not None
+    if (getattr(app.state, "_writer_cutover_requested", False)
+            or getattr(app.state, "_trusted_writer_cutover", None) is not None
             or getattr(app.state, "_writer_cutover_installed", False)):
         raise WriterCutoverDenied("canonical cutover startup already configured")
+    app.state._writer_cutover_requested = True
     app.state._trusted_writer_cutover = approval
     app.state._trusted_writer_checkpoint = local_checkpoint
 
@@ -46,7 +51,8 @@ async def install_before_lifespan(app):
     if approval is None:
         # Preserve the ordinary unprotected installation, but never permit
         # this process to restart in legacy mode after protected binding.
-        if getattr(app.state, "_writer_cutover_installed", False):
+        if (getattr(app.state, "_writer_cutover_requested", False)
+                or getattr(app.state, "_writer_cutover_installed", False)):
             raise WriterCutoverDenied("protected backend cannot downgrade")
         return
     if (type(approval) is not VerifiedWriterCutover
@@ -90,6 +96,7 @@ async def install_before_lifespan(app):
         # A failed binding does not roll back to unprotected owners.
         approval.verify()
         bind_required_canonical_writers(conversation=conversation, memory=memory, epoch=epoch)
+        app.state._writer_cutover_runtime = (conversation,memory,writer,epoch)
         app.state._writer_cutover_installed = True
         app.state.canonical_writer_cutover_evidence = {
             "inventory_sha256": inventory.digest,
@@ -116,3 +123,80 @@ async def inspect_configured_inventory():
     return await inspect_writer_inventory(epoch=MongoCanonicalSourceEpoch(db),
                   collections=_collections(conversation, memory),
                   repository_namespace=memory.repository_namespace)
+
+
+def _readiness(code, *, required, ok=False):
+    # Only positive evidence about known writer binding; never inference.
+    return {"ok":ok,"required":required,"code":code,
+            "known_local_writer_binding_observed":required and ok,
+            "external_writer_coverage_verified":False,
+            "guarded_local_ai_ready":False}
+
+
+async def _observe_protected_runtime(app):
+    try:
+        runtime=getattr(app.state,"_writer_cutover_runtime",None)
+        if (getattr(app.state,"_writer_cutover_requested",False) is not True
+                or getattr(app.state,"_writer_cutover_installed",False) is not True
+                or type(runtime) is not tuple or len(runtime)!=4
+                or getattr(app.state,"_writer_cutover_quarantined",False)):
+            raise WriterCutoverDenied("protected writer runtime missing")
+        conversation,memory,writer,epoch=runtime
+        _,actual_conversation,actual_memory,actual_writer=_owners()
+        if (type(epoch) is not MongoCanonicalSourceEpoch
+                or actual_conversation is not conversation or actual_memory is not memory
+                or actual_writer is not writer or writer.repository is not memory
+                or configured_canonical_epoch(conversation) is not epoch
+                or configured_canonical_epoch(memory) is not epoch):
+            raise WriterCutoverDenied("protected writer runtime ownership changed")
+        verify_canonical_source_writer_inventory(conversation=conversation,memory=memory,epoch=epoch)
+        await epoch._assert_deployment_latch()
+        if (getattr(app.state,"_writer_cutover_runtime",None) is not runtime
+                or getattr(app.state,"_writer_cutover_installed",False) is not True
+                or configured_canonical_epoch(conversation) is not epoch
+                or configured_canonical_epoch(memory) is not epoch
+                or getattr(app.state,"_writer_cutover_quarantined",False)):
+            raise WriterCutoverDenied("protected writer runtime changed during observation")
+        return _readiness("protected_writer_binding_observed",required=True,ok=True)
+    except asyncio.CancelledError:
+        app.state._writer_cutover_quarantined=True
+        raise
+    except Exception:
+        app.state._writer_cutover_quarantined=True
+        return _readiness("protected_writer_authority_unavailable",required=True)
+
+
+async def protected_writer_readiness(app, *, timeout=1.8):
+    """Bounded, coalesced observation for the public backend health probe.
+
+    Concurrent requests share one outstanding task; caller timeout or
+    cancellation does not cancel the authoritative check. Never serve a
+    cached successful observation. Ordinary install does not acquire a new
+    database dependency, and unprotected health is explicitly not custody.
+    """
+    state=app.state
+    required=bool(getattr(state,"_writer_cutover_requested",False)
+                  or getattr(state,"_writer_cutover_installed",False)
+                  or getattr(state,"_trusted_writer_cutover",None) is not None
+                  or getattr(state,"_writer_cutover_runtime",None) is not None
+                  or getattr(state,"_writer_cutover_quarantined",False))
+    if not required:
+        return _readiness("legacy_writer_mode_unqualified",required=False,ok=True)
+    if getattr(state,"_writer_cutover_quarantined",False):
+        return _readiness("protected_writer_authority_unavailable",required=True)
+    task=getattr(state,"_writer_readiness_task",None)
+    if task is None or task.done():
+        task=asyncio.create_task(_observe_protected_runtime(app),name="protected-writer-readiness")
+        state._writer_readiness_task=task
+    try:
+        return await asyncio.wait_for(asyncio.shield(task),timeout=timeout)
+    except TimeoutError:
+        return _readiness("protected_writer_observation_pending",required=True)
+
+
+async def drain_protected_writer_readiness(app):
+    """Cancel outstanding health work before the shared Mongo client closes."""
+    task=getattr(app.state,"_writer_readiness_task",None)
+    if task is not None and not task.done():
+        task.cancel()
+        await asyncio.gather(task,return_exceptions=True)
