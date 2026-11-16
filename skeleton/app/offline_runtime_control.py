@@ -119,60 +119,66 @@ class RuntimeAdmission:
         with self._lock:
             # A new offer always invalidates the previous unconsumed proposal.
             self._pending = None
-            integer(now_ns, 0, 2**63-1, "offer timestamp")
-            _work_rows(work)
-            require(digest(self.source.snapshot()) == self._source_digest,
-                    "selected source evidence changed")
-            preflight = plan_preflight(self.source, sample, self.policy, now_ns=now_ns)
-            if self._last_origin is not None and self._last_origin != sample.origin:
-                # Simulated observations cannot prewarm the live admission gate.
+            try:
+                integer(now_ns, 0, 2**63-1, "offer timestamp")
+                _work_rows(work)
+                require(digest(self.source.snapshot()) == self._source_digest,
+                        "selected source evidence changed")
+                preflight = plan_preflight(self.source, sample, self.policy, now_ns=now_ns)
+                if self._last_origin is not None and self._last_origin != sample.origin:
+                    # Simulated observations cannot prewarm the live admission gate.
+                    self._hysteresis = EnergyHysteresis(self._hysteresis.policy)
+                    self._last_sample = None
+                self._last_origin = sample.origin
+                chronological = self._last_sample is None or sample.started_ns > self._last_sample
+                clock_advances = self._last_offer_ns is None or now_ns > self._last_offer_ns
+                if not chronological or not clock_advances or preflight["blockers"]:
+                    self._hysteresis = EnergyHysteresis(self._hysteresis.policy)
+                    hysteresis = None
+                    workers = 0
+                else:
+                    raw = preflight["energy_plan"]
+                    candidate = EnergyAdmission(raw["allowed_workers"], raw["base_workers"],
+                                                raw["reason"], raw["digest"], sample.power, EnergyPolicy())
+                    observed = self._hysteresis.step(candidate, now_ns=now_ns,
+                                                      sampled_ns=sample.started_ns)
+                    hysteresis = asdict(observed)
+                    workers = min(preflight["worker_ceiling"], observed.admitted_workers)
+                if clock_advances:
+                    self._last_offer_ns = now_ns
+                if chronological and clock_advances and preflight["fresh"]:
+                    self._last_sample = sample.started_ns
+                result = _plan(work, preflight, workers, self.policy)
+                self._sequence += 1
+                blockers = list(preflight["blockers"])
+                if not chronological:
+                    blockers.append("replayed_or_nonadvancing_hardware_sample")
+                if not clock_advances:
+                    blockers.append("nonadvancing_offer_clock")
+                if not workers and not blockers:
+                    blockers.append("recovery_hysteresis")
+                body = {"schema": SCHEMA, "sequence": self._sequence,
+                        "source_digest": self._source_digest,
+                        "preflight_digest": preflight["preflight_digest"],
+                        "sample_origin": sample.origin, "issued_ns": now_ns,
+                        "expires_ns": sample.started_ns + self.policy.sample_age_ns,
+                        "worker_ceiling": workers, "hysteresis": hysteresis,
+                        "blockers": blockers, **result,
+                        "status": "candidate" if result["slices"] else "no_grant",
+                        "model_activation": "not_performed", "native_qualified": False,
+                        "release_qualified": False}
+                receipt = {**body, "admission_digest": digest(body)}
+                canonical(receipt)
+                if result["slices"]:
+                    self._pending = receipt
+                # Return detached data so callers cannot alter a pending proposal.
+                import json
+                return {"preflight": preflight, "admission": json.loads(canonical(receipt))}
+            except BaseException:
+                # Malformed or failed evidence cannot retain a warmed grant ceiling.
+                self._pending = None
                 self._hysteresis = EnergyHysteresis(self._hysteresis.policy)
-                self._last_sample = None
-            self._last_origin = sample.origin
-            chronological = self._last_sample is None or sample.started_ns > self._last_sample
-            clock_advances = self._last_offer_ns is None or now_ns > self._last_offer_ns
-            if not chronological or not clock_advances or preflight["blockers"]:
-                self._hysteresis = EnergyHysteresis(self._hysteresis.policy)
-                hysteresis = None
-                workers = 0
-            else:
-                raw = preflight["energy_plan"]
-                candidate = EnergyAdmission(raw["allowed_workers"], raw["base_workers"],
-                                            raw["reason"], raw["digest"], sample.power, EnergyPolicy())
-                observed = self._hysteresis.step(candidate, now_ns=now_ns,
-                                                  sampled_ns=sample.started_ns)
-                hysteresis = asdict(observed)
-                workers = min(preflight["worker_ceiling"], observed.admitted_workers)
-            if clock_advances:
-                self._last_offer_ns = now_ns
-            if chronological and clock_advances and preflight["fresh"]:
-                self._last_sample = sample.started_ns
-            result = _plan(work, preflight, workers, self.policy)
-            self._sequence += 1
-            blockers = list(preflight["blockers"])
-            if not chronological:
-                blockers.append("replayed_or_nonadvancing_hardware_sample")
-            if not clock_advances:
-                blockers.append("nonadvancing_offer_clock")
-            if not workers and not blockers:
-                blockers.append("recovery_hysteresis")
-            body = {"schema": SCHEMA, "sequence": self._sequence,
-                    "source_digest": self._source_digest,
-                    "preflight_digest": preflight["preflight_digest"],
-                    "sample_origin": sample.origin, "issued_ns": now_ns,
-                    "expires_ns": sample.started_ns + self.policy.sample_age_ns,
-                    "worker_ceiling": workers, "hysteresis": hysteresis,
-                    "blockers": blockers, **result,
-                    "status": "candidate" if result["slices"] else "no_grant",
-                    "model_activation": "not_performed", "native_qualified": False,
-                    "release_qualified": False}
-            receipt = {**body, "admission_digest": digest(body)}
-            canonical(receipt)
-            if result["slices"]:
-                self._pending = receipt
-            # Return detached data so callers cannot alter a pending proposal.
-            import json
-            return {"preflight": preflight, "admission": json.loads(canonical(receipt))}
+                raise
 
     def consume(self, receipt: dict, *, now_ns: int) -> tuple[dict, ...]:
         """Consume exactly one local-probe proposal; never issue a new one."""
@@ -184,7 +190,7 @@ class RuntimeAdmission:
             require(type(receipt) is dict and canonical(receipt) == canonical(pending),
                     "proposal differs from exact pending admission")
             require(pending["sample_origin"] == "local_probe", "fixture cannot authorize consumption")
-            require(pending["issued_ns"] <= now_ns <= pending["expires_ns"],
+            require(pending["issued_ns"] <= now_ns < pending["expires_ns"],
                     "iteration proposal is stale or future")
             require(digest(self.source.snapshot()) == self._source_digest, "selected model source changed")
             return tuple(dict(row) for row in pending["slices"])
