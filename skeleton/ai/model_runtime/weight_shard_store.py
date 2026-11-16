@@ -15,7 +15,7 @@ import json
 import os
 import stat
 from pathlib import Path
-from typing import BinaryIO, Iterator, Mapping
+from typing import BinaryIO, Callable, Iterator, Mapping
 from uuid import uuid4
 
 from .flgb_model_runtime import (
@@ -278,12 +278,14 @@ class WeightShardStore:
     @contextmanager
     def open_sealed_pages(
         self, plan_digest: str, *, model_identity: ModelIdentity, max_bytes: int,
+        progress_check: Callable[[int, int], None] | None = None,
     ) -> Iterator[tuple[object, ...]]:
         """Publish Linux read-only shared pages only after full shard verification."""
         from .sealed_weight_pages import open_sealed_weight_pages
 
         with open_sealed_weight_pages(
-            self, plan_digest, model_identity=model_identity, max_bytes=max_bytes
+            self, plan_digest, model_identity=model_identity, max_bytes=max_bytes,
+            progress_check=progress_check,
         ) as pages:
             yield pages
 
