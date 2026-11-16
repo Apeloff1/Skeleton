@@ -284,6 +284,36 @@ class TransportIsolationTests(unittest.TestCase):
 
 
 
+class InterstitialTransportTests(unittest.TestCase):
+    def test_repeated_headers_cannot_erase_explicit_denial(self):
+        from skeleton.ai.webcrawler.adaptive_navigation import access_interstitial_reason
+
+        url = "https://example.com/first"
+        target = ResolvedTarget(url, "example.com", 443, ("93.184.216.34",))
+        connection, response = Mock(), Mock()
+        response.status = 302
+        response.getheaders.return_value = [
+            ("Cf-Mitigated", "challenge"), ("CF-Mitigated", "normal"),
+            ("WWW-Authenticate", "Basic realm=restricted"), ("www-authenticate", ""),
+            ("Location", "https://example.com/other"),
+        ]
+        response.read1.side_effect = AssertionError("redirect body must remain unread")
+        connection.getresponse.return_value = response
+        with (
+            patch("skeleton.ai.webcrawler.bound_http.resolve_target", return_value=target),
+            patch("skeleton.ai.webcrawler.bound_http._PinnedHTTPSConnection", return_value=connection),
+            patch("skeleton.ai.webcrawler.bound_http.threading.Timer"),
+        ):
+            result = SocketBoundFetcher().fetch_once(
+                url, user_agent="SkeletonAI-Crawler/1.0", max_bytes=4096,
+            )
+        self.assertEqual(result.headers["cf-mitigated"], "challenge")
+        self.assertTrue(result.headers["www-authenticate"])
+        self.assertEqual(access_interstitial_reason(result.status, result.headers, result.body),
+                         "explicit_access_challenge")
+        response.read1.assert_not_called()
+
+
 class InterstitialClassifierTests(unittest.TestCase):
     def test_only_fixed_reason_codes_are_returned(self):
         from skeleton.ai.webcrawler.adaptive_navigation import access_interstitial_reason
