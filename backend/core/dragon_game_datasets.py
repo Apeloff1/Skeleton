@@ -26,7 +26,12 @@ MAX_VERSION_ROWS=100_000_000
 MAX_VERSIONS=100_000
 MAX_GRANT=30*86400
 ZERO="0"*64
-SHARDS=256
+BASE_SHARDS=256
+DATASET_LANES=10
+SHARDS=BASE_SHARDS*DATASET_LANES
+ROUTE_SCHEMA="""CREATE TABLE IF NOT EXISTS dataset_game_routes(
+ owner TEXT NOT NULL,game TEXT NOT NULL,lane INTEGER NOT NULL CHECK(lane BETWEEN 0 AND 9),
+ PRIMARY KEY(owner,game)) WITHOUT ROWID;"""
 DENY_KEYS={"password","password_hash","access_token","refresh_token","auth_token","authorization",
            "client_secret","api_key","secret_key","email","private_key","session_cookie","cookie",
            "mail_body","wallet_journal","private_message"}
@@ -144,6 +149,20 @@ def _root():
     return p
 
 
+def shard_path(root,index):
+    if type(index) is not int or not 0<=index<SHARDS:
+        raise ValueError("shard number")
+    lane,bucket=divmod(index,BASE_SHARDS)
+    # Preserve every original file name and every persisted version identity.
+    name="game-data-"+format(bucket,"02x")
+    return root/(name+("-lane-"+str(lane) if lane else "")+".sqlite3")
+
+
+def game_shard_candidates(owner,game):
+    h=hashlib.sha256((owner+game).encode()).digest()
+    return h[0],int.from_bytes(h[1:9],"big")%DATASET_LANES
+
+
 class DatasetShard:
     def __init__(self,scope,game,*,create=False,root=None):
         self.scope=scope
@@ -154,15 +173,61 @@ class DatasetShard:
         st=self.root.stat()
         if os.name=="posix" and (st.st_uid!=os.getuid() or st.st_mode&0o077):
             raise CatalogueHeld("private dataset directory required")
-        shard=hashlib.sha256((self.owner+self.game).encode()).hexdigest()[:2]
-        self.path=self.root/("game-data-"+shard+".sqlite3")
+        bucket,preferred=game_shard_candidates(self.owner,self.game)
         self.root_id=(st.st_dev,st.st_ino)
-        if not self.path.exists():
+        legacy=shard_path(self.root,bucket)
+        if not legacy.exists() and any(
+                (p:=shard_path(self.root,bucket+lane*BASE_SHARDS)).exists() or p.is_symlink()
+                for lane in range(1,DATASET_LANES)):
+            raise CatalogueHeld("dataset routing directory missing")
+        self._bind_file(legacy,create=create)
+        # Legacy file is also the immutable per-game routing directory.
+        # An existing game (even erased version tombstones) stays in lane 0.
+        # New games are assigned once under the legacy directory write lock.
+        with self._db() as db:
+            db.executescript(ROUTE_SCHEMA)
+            db.execute("BEGIN IMMEDIATE" if create else "BEGIN")
+            try:
+                route=db.execute("SELECT lane FROM dataset_game_routes WHERE owner=? AND game=?",
+                    (self.owner,self.game)).fetchone()
+                if route is not None:
+                    lane=route["lane"]
+                else:
+                    previous=db.execute("SELECT 1 FROM dataset_versions WHERE owner=? AND game=? LIMIT 1",
+                        (self.owner,self.game)).fetchone()
+                    lane=0 if previous or not create else preferred
+                    if create:
+                        if lane:
+                            # Create the empty lane before publishing the route.
+                            # A crash before commit leaves only an unused file.
+                            original=self.path,self.file_id
+                            try:self._bind_file(shard_path(self.root,bucket+lane*BASE_SHARDS),create=True)
+                            finally:self.path,self.file_id=original
+                        db.execute("INSERT INTO dataset_game_routes VALUES(?,?,?)",
+                            (self.owner,self.game,lane))
+                db.execute("COMMIT")
+            except BaseException:
+                if db.in_transaction:db.execute("ROLLBACK")
+                raise
+        if lane:
+            # Do not silently re-create a previously assigned missing shard.
+            self._bind_file(shard_path(self.root,bucket+lane*BASE_SHARDS),create=False)
+
+    def _bind_file(self,path,*,create):
+        root=self.root.stat()
+        if self.root.resolve(strict=True)!=self.root or (root.st_dev,root.st_ino)!=self.root_id:
+            raise CatalogueHeld("dataset root changed")
+        if path.is_symlink():raise CatalogueHeld("dataset shard symlink")
+        if not path.exists():
             if not create:raise LookupError("dataset shard unavailable")
-            try:fd=os.open(self.path,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+            try:fd=os.open(path,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
             except FileExistsError:pass
             else:os.close(fd)
-        st=self.path.stat()
+        st=path.stat()
+        if path.is_symlink() or not path.is_file() or os.name=="posix" and (
+                st.st_uid!=os.getuid() or st.st_mode&0o077 or st.st_nlink!=1):
+            raise CatalogueHeld("dataset shard permissions")
+        self.path=path
         self.file_id=(st.st_dev,st.st_ino)
 
     @contextmanager
@@ -371,36 +436,49 @@ class DatasetShard:
     def operator_shard(cls,index):
         if type(index) is not int or not 0<=index<SHARDS:raise ValueError("shard number")
         root=_root()
-        path=root/("game-data-"+format(index,"02x")+".sqlite3")
+        path=shard_path(root,index)
+        if path.is_symlink():raise CatalogueHeld("dataset shard symlink")
         if not path.exists():return None
         obj=cls.__new__(cls)
-        obj.root=root;obj.path=path
+        obj.root=root
         st=root.stat();obj.root_id=(st.st_dev,st.st_ino)
-        st=path.stat();obj.file_id=(st.st_dev,st.st_ino)
+        obj._bind_file(path,create=False)
         obj.scope=None;obj.owner=None;obj.game=None
         return obj
 
 
 def sweep_dataset_shard(corpus_path):
-    """Persistent round robin maintenance; no cross-owner result disclosure."""
+    """Persistent bounded round robin across ten independent dataset lanes."""
     with GameCorpus(corpus_path)._db() as db:
         db.execute("CREATE TABLE IF NOT EXISTS dataset_maintenance(singleton INTEGER PRIMARY KEY CHECK(singleton=1),cursor INTEGER NOT NULL)")
         db.execute("BEGIN IMMEDIATE")
         try:
             db.execute("INSERT OR IGNORE INTO dataset_maintenance VALUES(1,0)")
             idx=db.execute("SELECT cursor FROM dataset_maintenance WHERE singleton=1").fetchone()[0]
-            db.execute("UPDATE dataset_maintenance SET cursor=? WHERE singleton=1",((idx+1)%SHARDS,))
+            if type(idx) is not int or not 0<=idx<SHARDS:raise CatalogueHeld("dataset maintenance cursor")
+            db.execute("UPDATE dataset_maintenance SET cursor=? WHERE singleton=1",((idx+DATASET_LANES)%SHARDS,))
             db.execute("COMMIT")
         except BaseException:
             if db.in_transaction:db.execute("ROLLBACK")
             raise
-    obj=DatasetShard.operator_shard(idx)
-    if obj is None:return {"scanned":0,"removed_records":0}
-    with obj._db() as db:
-        rows=db.execute("""SELECT owner,game,id FROM dataset_versions WHERE state!='erased'
-            AND (expires_at<=? OR state='revoked') ORDER BY expires_at,owner,game,id LIMIT 2""",(int(time.time()),)).fetchall()
     total=0
-    for row in rows:
-        obj.owner=_id(row["owner"]);obj.game=_id(row["game"])
-        total+=obj.collect(row["id"])["removed_records"]
-    return {"scanned":len(rows),"removed_records":total,"secure_erasure":False}
+    scanned=0
+    held=0
+    visited=0
+    for index in ((idx+i)%SHARDS for i in range(DATASET_LANES)):
+        try:
+            obj=DatasetShard.operator_shard(index)
+            visited+=1
+            if obj is None:continue
+            with obj._db() as db:
+                rows=db.execute("""SELECT owner,game,id FROM dataset_versions WHERE state!='erased'
+                    AND (expires_at<=? OR state='revoked') ORDER BY expires_at,owner,game,id LIMIT 2""",(int(time.time()),)).fetchall()
+            for row in rows:
+                obj.owner=_id(row["owner"]);obj.game=_id(row["game"])
+                total+=obj.collect(row["id"])["removed_records"]
+                scanned+=1
+        except (CatalogueHeld,LookupError,ValueError,sqlite3.Error,OSError):
+            # A damaged shard must not starve the other nine. Retry next cycle.
+            held+=1
+    return {"scanned":scanned,"removed_records":total,"shards_visited":visited,
+            "shards_held":held,"secure_erasure":False}

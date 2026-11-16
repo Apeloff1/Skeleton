@@ -23,8 +23,11 @@ from core.dragon_hoarder_bulk import owner_key
 from core.dragon_dataset_library import target,_library
 from core.dragon_mod_seed_catalogue import STEAM_ROUTES,APPID,_canonical_locator
 
-MAX_NODES=20_000_000
-MAX_EDGES=100_000_000
+LEAD_LANES=10
+NODES_PER_LANE=20_000_000
+EDGES_PER_LANE=100_000_000
+MAX_NODES=LEAD_LANES*NODES_PER_LANE
+MAX_EDGES=LEAD_LANES*EDGES_PER_LANE
 MAX_SNAPSHOTS=100_000
 MAX_DYNAMIC_TARGETS=100_000
 MAX_SNAPSHOT_ROWS=100_000_000
@@ -47,6 +50,10 @@ CREATE TABLE IF NOT EXISTS lead_owner(
  CHECK(nodes>=0 AND edges>=0 AND snapshots>=0)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS lead_owner_due ON lead_owner(enabled,due,owner);
+CREATE TABLE IF NOT EXISTS lead_lane_counts(
+ owner TEXT NOT NULL,lane INTEGER NOT NULL CHECK(lane BETWEEN 0 AND 9),
+ nodes INTEGER NOT NULL CHECK(nodes>=0),edges INTEGER NOT NULL CHECK(edges>=0),
+ PRIMARY KEY(owner,lane)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS lead_nodes(
  owner TEXT NOT NULL,id TEXT NOT NULL,url TEXT NOT NULL,host TEXT NOT NULL,
  title TEXT NOT NULL,kind TEXT NOT NULL,family TEXT NOT NULL,
@@ -122,6 +129,32 @@ def _locator(url):
 
 def lead_id(url):
     return digest(["dragon.lead.v1",_locator(url)])
+
+def lead_lane(identifier):
+    key=_id(identifier)
+    return int(key[:4],16)*LEAD_LANES//65536
+
+
+def lane_bounds(lane):
+    if type(lane) is not int or not 0<=lane<LEAD_LANES:raise ValueError("lead lane")
+    low=(lane*65536+LEAD_LANES-1)//LEAD_LANES
+    high=((lane+1)*65536+LEAD_LANES-1)//LEAD_LANES
+    return format(low,"04x"),format(high,"04x") if high<65536 else "g"
+
+
+def _lane_counts(db,owner,lane):
+    row=db.execute("SELECT nodes,edges FROM lead_lane_counts WHERE owner=? AND lane=?",(owner,lane)).fetchone()
+    if row is not None:return row
+    # Lazy indexed migration of existing owner rows; one lane at a time.
+    # Runs inside the caller's transaction; previous binaries must be stopped.
+    low,high=lane_bounds(lane)
+    nodes=db.execute("SELECT COUNT(*) FROM lead_nodes WHERE owner=? AND id>=? AND id<?",
+        (owner,low,high)).fetchone()[0]
+    edges=db.execute("SELECT COUNT(*) FROM lead_edges WHERE owner=? AND child>=? AND child<?",
+        (owner,low,high)).fetchone()[0]
+    db.execute("INSERT INTO lead_lane_counts VALUES(?,?,?,?)",(owner,lane,nodes,edges))
+    return {"nodes":nodes,"edges":edges}
+
 
 def _int(value,low,high):
     if type(value) is not int or not low<=value<=high:raise ValueError("lead integer bound")
@@ -258,21 +291,25 @@ class LeadGraph:
         caps=self._enabled(db,owner)
         node=db.execute("SELECT id FROM lead_nodes WHERE owner=? AND id=?",(owner,identifier)).fetchone()
         spec=SOURCE_CLASSES[kind]
+        lane=lead_lane(identifier)
+        lane_counts=_lane_counts(db,owner,lane)
         if node is None:
-            if caps["nodes"]>=MAX_NODES:raise CatalogueHeld("lead node quota")
+            if caps["nodes"]>=MAX_NODES or lane_counts["nodes"]>=NODES_PER_LANE:raise CatalogueHeld("lead node quota")
             db.execute("""INSERT INTO lead_nodes(owner,id,url,host,title,kind,family,first_seen,last_seen,next_review,observations,state)
                 VALUES(?,?,?,?,?,?,?,?,?,?,0,'candidate')""",
                 (owner,identifier,url,urlsplit(url).hostname,title,kind,spec.family,now,now,now))
             db.execute("INSERT INTO lead_fts(owner,id,title,url,kind,family) VALUES(?,?,?,?,?,?)",
                 (owner,identifier,title,url,kind,spec.family))
             db.execute("UPDATE lead_owner SET nodes=nodes+1 WHERE owner=?",(owner,))
+            db.execute("UPDATE lead_lane_counts SET nodes=nodes+1 WHERE owner=? AND lane=?",(owner,lane))
         eid=digest([parent,identifier,relation,subject,kind,title,witness,snapshot])
         edge=db.execute("SELECT 1 FROM lead_edges WHERE owner=? AND id=?",(owner,eid)).fetchone()
         if edge is None:
-            if caps["edges"]>=MAX_EDGES:raise CatalogueHeld("lead evidence quota")
+            if caps["edges"]>=MAX_EDGES or lane_counts["edges"]>=EDGES_PER_LANE:raise CatalogueHeld("lead evidence quota")
             db.execute("INSERT INTO lead_edges VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                 (owner,eid,parent,identifier,relation,subject,kind,title,witness,snapshot,now,now))
             db.execute("UPDATE lead_owner SET edges=edges+1 WHERE owner=?",(owner,))
+            db.execute("UPDATE lead_lane_counts SET edges=edges+1 WHERE owner=? AND lane=?",(owner,lane))
             db.execute("UPDATE lead_nodes SET observations=observations+1,last_seen=MAX(last_seen,?) WHERE owner=? AND id=?",
                 (now,owner,identifier))
         else:
@@ -293,6 +330,7 @@ class LeadGraph:
         return {**result,"bootstrap_target_rows":len(seed),"available_seed_revision":revision,
                 "growth_floor":147020,"growth_floor_met":result["nodes"]>=147020,
                 "architecture_node_cap":MAX_NODES,"architecture_evidence_cap":MAX_EDGES,
+                "logical_quota_lanes":LEAD_LANES,"physical_graph_sharding":False,
                 "network_authorized":False,"physical_capacity_verified":False}
 
     def bootstrap_pulse(self):

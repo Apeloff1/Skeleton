@@ -20,7 +20,7 @@ from pathlib import Path
 GIB = 1024 ** 3
 TIB = 1024 ** 4
 MAX_OBJECT = 16 * 1024 ** 2
-MAX_VOLUMES = 256
+MAX_VOLUMES = 2560
 MIN_RESERVE = GIB
 _ID = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}\Z")
 _HASH = re.compile(r"[0-9a-f]{64}\Z")
