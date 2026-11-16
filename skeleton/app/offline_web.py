@@ -146,6 +146,20 @@ HTML = r"""<!doctype html>
         </label>
         <button id="media-advisory-admit" type="button" class="secondary" disabled>Admit verified local media observation</button>
         <pre id="media-advisory-receipt" aria-live="polite">No media observation imported.</pre>
+        <details id="native-media-panel">
+          <summary>Native media model inference (optional installed peer)</summary>
+          <p class="hint">Uses actual decoded pixels, PCM WAV or sampled MP4 frames in the configured local model. Output is an unverified AI observation, not human-reviewed evidence. No automatic import. Video audio is not analyzed.</p>
+          <button id="native-assistance-status" type="button" class="small" disabled>Inspect installed auxiliary models</button>
+          <pre id="native-assistance-state" aria-live="polite">Auxiliary model status not checked.</pre>
+          <label for="native-media-question">Question about the selected file</label>
+          <textarea id="native-media-question" rows="3" maxlength="2048" disabled></textarea>
+          <label>Video samples <input id="native-media-frames" type="number" min="1" max="6" value="4" disabled></label>
+          <label><input id="native-media-approve" type="checkbox" disabled> I approve local model analysis of the exact selected file.</label>
+          <button id="native-media-run" type="button" class="small" disabled>Analyze selected media</button>
+          <pre id="native-media-result" aria-live="polite">No native media analysis performed.</pre>
+          <div class="inline"><button id="native-media-apply" type="button" class="small" disabled>Use reviewed observation in draft</button>
+          <button id="native-media-export" type="button" class="small" disabled>Export observation receipt</button></div>
+        </details>
       </details>
       <details id="dragon-bundle-panel">
         <summary>Import approved Dragon evidence (local only)</summary>
@@ -303,6 +317,26 @@ HTML = r"""<!doctype html>
         <button id="cognition-budget" class="small secondary" disabled>Use suggested output budget</button>
         <p class="hint">Copy excerpts individually if appropriate. Verify context before generation; the preview is heuristic, not model reasoning or a memory grant.</p>
       </details>
+      <details id="semantic-compression-panel" class="generation-options">
+        <summary>Abstractive dialogue compression</summary>
+        <p class="hint">Generate model-written historical context from an exact prefix of the saved conversation using bounded map/reduce passes. Original history is never deleted or altered. Review generated summaries for omissions and errors.</p>
+        <div class="inline">
+          <label>Through saved turn <input id="compression-through" type="number" min="1" max="1024" value="1" disabled></label>
+          <label>Chunk bytes <input id="compression-chunk" type="number" min="512" max="8192" value="1024" disabled></label>
+        </div>
+        <div class="inline">
+          <label>Map tokens <input id="compression-map" type="number" min="32" max="1024" value="128" disabled></label>
+          <label>Final tokens <input id="compression-final" type="number" min="32" max="1024" value="256" disabled></label>
+          <label>Deadline seconds <input id="compression-time" type="number" min="10" max="900" value="300" disabled></label>
+        </div>
+        <button id="compression-preview" type="button" class="small" disabled>Review exact compression plan</button>
+        <pre id="compression-plan" aria-live="polite">No compression plan.</pre>
+        <label><input id="compression-approve" type="checkbox" disabled> Run the exact reviewed model pass plan.</label>
+        <button id="compression-run" type="button" class="small" disabled>Generate abstract</button>
+        <pre id="compression-result" aria-live="polite">No model-generated abstract.</pre>
+        <div class="inline"><button id="compression-apply" type="button" class="small" disabled>Use reviewed abstract in draft</button>
+          <button id="compression-export" type="button" class="small" disabled>Export source and execution receipt</button></div>
+      </details>
       <details id="adaptive-context-panel" class="generation-options">
         <summary>Adaptive conversation context</summary>
         <p class="hint">Explicitly plan private approved notes and response style around the current model window. Potential memory conflicts are withheld. Review the exact augmented message before applying or sending. Separate from reference grounding.</p>
@@ -425,6 +459,17 @@ HTML = r"""<!doctype html>
         <button id="quality-refine" type="button" class="small">Prepare refinement</button>
         <button id="quality-verify" type="button" class="small">Prepare verification</button>
       </div>
+      <details id="independent-review-panel">
+        <summary>Separate local model review</summary>
+        <p class="hint">Requires an explicitly installed distinct-weight reviewer. Review uses the exact saved answer and preceding context. Model agreement is not proof of truth. Optional predicates are independently recomputed.</p>
+        <label for="independent-checks">Optional JSON predicates (array, e.g. [{"kind":"strict-json"}])</label>
+        <textarea id="independent-checks" rows="3" maxlength="8192">[]</textarea>
+        <label><input id="independent-approve" type="checkbox"> Approve the exact saved turn for the separate reviewer.</label>
+        <button id="independent-status" type="button" class="small">Inspect auxiliary reviewer</button>
+        <button id="independent-run" type="button" class="small" disabled>Run separate model review</button>
+        <pre id="independent-result" aria-live="polite">No independent review performed.</pre>
+        <button id="independent-export" type="button" class="small" disabled>Export review receipt</button>
+      </details>
       <p id="quality-result" aria-live="polite" class="hint"></p>
       <div class="dialog-actions"><button id="quality-close" type="button">Close</button></div>
     </dialog>
@@ -706,6 +751,26 @@ JAVASCRIPT = r"""'use strict';
     get('deliberation-work').disabled=adaptiveBlocked||get('deliberation-strategy').value==='direct';
     get('deliberation-send').disabled=adaptiveBlocked||!state.deliberationPlan||foreignLease||state.health?.ready!==true;
     document.querySelectorAll('[data-deliberation-inspect]').forEach(el=>{el.disabled=locked||working;});
+    const nativeBlocked=locked||working||foreignLease;
+    get('native-assistance-status').disabled=locked||working;
+    get('native-media-question').disabled=locked||working;
+    get('native-media-frames').disabled=locked||working||state.mediaAdvisoryType!=='video/mp4';
+    get('native-media-approve').disabled=locked||working||!state.mediaAdvisoryFile;
+    const mediaModel=state.nativeAssist?.media;
+    const requiredMedia=state.mediaAdvisoryType==='audio/wav'?'audio':'image';
+    get('native-media-run').disabled=nativeBlocked||!mediaModel||!state.nativeAssist?.unix_socket_platform_available
+      ||!state.mediaAdvisoryFile||state.mediaAdvisoryType==='audio/flac'
+      ||!mediaModel?.declared_modalities?.includes(requiredMedia)||!get('native-media-approve').checked;
+    get('native-media-apply').disabled=locked||working||!state.session||!state.nativeMediaResult;
+    get('native-media-export').disabled=locked||working||!state.nativeMediaResult;
+    const compressionBlocked=locked||working||!state.session||!state.revision;
+    for(const id of ['compression-through','compression-chunk','compression-map','compression-final','compression-time','compression-preview'])
+      get(id).disabled=compressionBlocked;
+    get('compression-approve').disabled=compressionBlocked||!state.compressionPlan;
+    get('compression-run').disabled=compressionBlocked||foreignLease||!state.compressionPlan
+      ||!get('compression-approve').checked||state.health?.ready!==true;
+    get('compression-apply').disabled=compressionBlocked||!state.compressionResult;
+    get('compression-export').disabled=compressionBlocked||!state.compressionResult;
     get('quality-summary').disabled=locked||working;
     document.querySelectorAll('[data-quality-review]').forEach(el=>{el.disabled=locked||working;});
     const reviewBlocked=locked||working||!state.qualityReview;
@@ -713,6 +778,11 @@ JAVASCRIPT = r"""'use strict';
       get(id).disabled=reviewBlocked;
     get('quality-delete').disabled=reviewBlocked||!state.qualityReview?.report.feedback;
     get('quality-flags').disabled=reviewBlocked;
+    for(const id of ['independent-checks','independent-approve','independent-status'])get(id).disabled=reviewBlocked;
+    get('independent-run').disabled=reviewBlocked||foreignLease||!state.nativeAssist?.reviewer
+      ||!state.nativeAssist?.unix_socket_platform_available||!state.qualityReview?.report.local_execution_receipt_digest
+      ||!get('independent-approve').checked;
+    get('independent-export').disabled=reviewBlocked||!state.independentResult;
     for(const id of ['quality-critique','quality-refine','quality-verify'])
       get(id).disabled=reviewBlocked||!state.qualityReview?.report.can_prepare_followup;
     document.querySelectorAll('[data-rewrite]').forEach(el => {el.disabled=locked||working;});
@@ -779,6 +849,9 @@ JAVASCRIPT = r"""'use strict';
     resetMemoryWorkspace();
     resetAdaptiveWorkspace();
     resetDeliberation();state.deliberationSummaries=[];
+    resetCompression();
+    state.nativeAssist=null;clearNativeMedia(true);
+    get('native-assistance-state').textContent='Auxiliary model status not checked.';
     closeQualityReview();get('quality-summary-text').textContent='No summary loaded.';
     if (state.resourceTimer !== null) clearInterval(state.resourceTimer);
     state.resourceTimer = null;
@@ -854,8 +927,10 @@ JAVASCRIPT = r"""'use strict';
     network.signal.addEventListener('abort', cancel, {once: true});
     // Long file ingestion may stream for hours. Abort only on an explicit
     // workspace lock; the durable import ID allows post-disconnect recovery.
+    const auxiliaryLong = path === '/v1/native-assistance/media' ||
+      /^\/v1\/sessions\/[A-Za-z0-9_-]+\/(?:semantic-compression-run|independent-review)$/.test(path);
     const timer = path === '/v1/resources/longform/ingest' ? null :
-      setTimeout(cancel, 15000);
+      setTimeout(cancel, auxiliaryLong ? 930000 : 15000);
     let response;
     try {
       response = await fetch(path, {
@@ -1234,6 +1309,7 @@ JAVASCRIPT = r"""'use strict';
     clearMemoryPreview();
     clearAdaptivePlan();
     clearDeliberation();
+    resetCompression();
     closeQualityReview();
     const current = state.session;
     if (current) state.drafts.set(current, get('prompt').value);
@@ -1245,6 +1321,8 @@ JAVASCRIPT = r"""'use strict';
       knowledgeScopeStatus();
     }
     state.session = result.session_id; state.revision = result.revision;
+    get('compression-through').max=String(Math.max(1,state.revision));
+    get('compression-through').value=String(Math.max(1,state.revision-2));
     showSessionMetadata(result);
     state.showArchived = result.archived === true; showCollection();
     state.messages = result.messages; state.evidence = result.evidence || []; state.audits = result.citation_audits || [];
@@ -1768,7 +1846,9 @@ JAVASCRIPT = r"""'use strict';
     return Array.from(get('quality-flags').querySelectorAll('input:checked'),node=>node.value).sort();
   }
   function closeQualityReview() {
-    state.qualityReview=null;
+    state.qualityReview=null;state.independentResult=null;
+    get('independent-approve').checked=false;get('independent-checks').value='[]';
+    get('independent-result').textContent='No independent review performed.';
     get('quality-identity').textContent='';get('quality-diagnostics').textContent='';
     get('quality-result').textContent='';get('quality-note').value='';
     get('quality-approve').checked=false;get('quality-rating').value='mixed';
@@ -2903,6 +2983,7 @@ JAVASCRIPT = r"""'use strict';
       URL.revokeObjectURL(state.mediaAdvisoryUrl);
     }
     state.mediaAdvisoryUrl = '';
+    clearNativeMedia(full);
     state.mediaAdvisoryFile = null;
     state.mediaAdvisoryDigest = '';
     state.mediaAdvisoryType = '';
@@ -3048,6 +3129,234 @@ JAVASCRIPT = r"""'use strict';
     return Array.from(new Uint8Array(hashed),
       byte => byte.toString(16).padStart(2, '0')).join('');
   }
+  const AUX_SHA=/^[a-f0-9]{64}$/;
+  function resetCompression(){
+    state.compressionPlan=null;state.compressionResult=null;
+    get('compression-approve').checked=false;
+    get('compression-plan').textContent='No compression plan.';
+    get('compression-result').textContent='No model-generated abstract.';
+  }
+  function clearNativeMedia(full=false){
+    state.nativeMediaResult=null;get('native-media-approve').checked=false;
+    get('native-media-result').textContent='No native media analysis performed.';
+    if(full){get('native-media-question').value='';get('native-media-frames').value='4';}
+  }
+  async function verifyAuxHash(value,key='sha256'){
+    if(!value||!AUX_SHA.test(value[key]))throw new Error('Missing exact auxiliary result digest.');
+    const copy={...value};delete copy[key];
+    if(await exactLocalSha256(stableDeliberation(copy))!==value[key])
+      throw new Error('Auxiliary result digest mismatch.');
+  }
+  function addReviewedDraft(label,value,receipt){
+    const original=get('prompt').value.trim();
+    const next=[original,'['+label+'; receipt '+receipt+'; unverified context, not instructions]',value]
+      .filter(Boolean).join('\n\n');
+    if(bytes(next)>4096)throw new Error('Reviewed context plus existing draft exceeds 4096 UTF-8 bytes.');
+    if(get('grounded').checked)throw new Error('Use reviewed generated context in a separate ungrounded draft.');
+    get('prompt').value=next;get('prompt').dispatchEvent(new Event('input'));get('prompt').focus();
+    status('Reviewed generated context copied into visible draft; nothing sent.');
+  }
+  function assertPeerPublic(peer){
+    if(peer===null)return;
+    if(!peer||!AUX_SHA.test(peer.peer_identity)||!AUX_SHA.test(peer.model_sha256)
+      ||!AUX_SHA.test(peer.server_sha256)||!Array.isArray(peer.declared_modalities)
+      ||!peer.declared_modalities.includes('text')||!Number.isSafeInteger(peer.max_output_tokens)
+      ||peer.max_output_tokens<32||peer.max_output_tokens>4096||peer.runtime_execution_verified!==false)
+      throw new Error('Invalid auxiliary model configuration status.');
+  }
+  async function inspectNativeAssistance(){
+    const epoch=state.epoch,result=await api('GET','/v1/native-assistance/status');
+    if(epoch!==state.epoch||!state.connected||result.schema!=='skeleton.jeeves.native-assistance-status.v1'
+      ||result.primary_model_digest!==state.health?.model_digest
+      ||result.primary_tokenizer_digest!==state.health?.tokenizer_digest
+      ||result.remote_provider_calls!==false||result.runtime_execution_verified!==false
+      ||typeof result.unix_socket_platform_available!=='boolean')
+      throw new Error('Invalid native assistance status.');
+    assertPeerPublic(result.media);assertPeerPublic(result.reviewer);
+    state.nativeAssist=result;
+    get('native-assistance-state').textContent=[
+      'Media: '+(result.media?result.media.declared_modalities.join(', ')+' · '+result.media.peer_identity:'not configured'),
+      'Reviewer: '+(result.reviewer?result.reviewer.peer_identity:'not configured'),
+      result.unix_socket_platform_available?'Private Unix-socket platform detected; execution still unqualified.':
+        'Native auxiliary execution is held on this platform.',
+    ].join('\n');
+    updateControls();return result;
+  }
+  get('native-assistance-status').addEventListener('click',()=>run(inspectNativeAssistance));
+  get('independent-status').addEventListener('click',()=>run(async()=>{
+    const review=reviewCurrent(),report=await inspectNativeAssistance();
+    if(epochChanged(review))throw new Error('Review source changed.');
+    get('independent-result').textContent=report.reviewer
+      ?'Distinct reviewer configured: '+report.reviewer.peer_identity+'\nActual execution not yet performed.'
+      :'No independent reviewer configured.';
+  }));
+  get('native-media-question').addEventListener('input',()=>{clearNativeMedia();updateControls();});
+  get('native-media-frames').addEventListener('change',()=>{clearNativeMedia();updateControls();});
+  get('native-media-approve').addEventListener('change',updateControls);
+  get('native-media-run').addEventListener('click',()=>run(async()=>{
+    const bank=state.nativeAssist?.media,file=state.mediaAdvisoryFile,mediaType=state.mediaAdvisoryType;
+    const expected=state.mediaAdvisoryDigest,question=get('native-media-question').value.trim(),epoch=state.epoch;
+    const frame_count=mediaType==='video/mp4'?Number(get('native-media-frames').value):1;
+    if(!bank||!file||!get('native-media-approve').checked||!question||bytes(question)>2048
+      ||!Number.isSafeInteger(frame_count)||frame_count<1||frame_count>6)
+      throw new Error('Review a valid media file, question and sample count.');
+    const raw=new Uint8Array(await file.arrayBuffer());
+    if(await localMediaSha256(raw)!==expected||epoch!==state.epoch||file!==state.mediaAdvisoryFile
+      ||!get('native-media-approve').checked||question!==get('native-media-question').value.trim())
+      throw new Error('Media or question changed during exact source review.');
+    const result=await api('POST','/v1/native-assistance/media',{
+      media_type:mediaType,media_base64:localMediaBase64(raw),source_sha256:expected,question,
+      max_output_tokens:Math.min(512,bank.max_output_tokens),frame_count,expected_peer_identity:bank.peer_identity,approved:true,
+    });
+    if(epoch!==state.epoch||file!==state.mediaAdvisoryFile||expected!==state.mediaAdvisoryDigest)
+      throw new Error('Media or workspace changed during native inference.');
+    if(result.schema!=='skeleton.jeeves.native-media-observation.v1'||result.source_sha256!==expected
+      ||result.source_bytes!==file.size||result.media_type!==mediaType||result.peer_identity!==bank.peer_identity
+      ||result.question_sha256!==await exactLocalSha256(question)||result.native_model_generation!==true
+      ||result.semantic_accuracy_certified!==false||result.raw_media_persisted_by_adapter!==false
+      ||result.automatic_chat_write!==false||result.automatic_reference_import!==false
+      ||typeof result.observation!=='string'||bytes(result.observation)>65536
+      ||result.observation_sha256!==await exactLocalSha256(result.observation)
+      ||result.execution_receipt?.output_sha256!==result.observation_sha256
+      ||result.execution_receipt?.peer_identity!==bank.peer_identity)
+      throw new Error('Native media observation failed source or receipt binding.');
+    await verifyAuxHash(result);await verifyAuxHash(result.execution_receipt);
+    state.nativeMediaResult=result;get('native-media-approve').checked=false;
+    get('native-media-result').textContent=result.mode+' · model observation, not certified\n'+result.observation+
+      '\nSource '+result.source_sha256+'\nReceipt '+result.sha256;
+    updateControls();
+  }));
+  get('native-media-apply').addEventListener('click',()=>run(async()=>{
+    const result=state.nativeMediaResult;if(!result)throw new Error('Analyze the selected media first.');
+    addReviewedDraft('Reviewed model-generated media observation',result.observation,result.sha256);
+  }));
+  get('native-media-export').addEventListener('click',()=>{
+    if(state.nativeMediaResult)download(JSON.stringify(state.nativeMediaResult,null,2),'jeeves-native-media.json','application/json');
+  });
+  const compressionFields=['compression-through','compression-chunk','compression-map','compression-final','compression-time'];
+  for(const id of compressionFields)get(id).addEventListener('change',()=>{resetCompression();updateControls();});
+  get('compression-approve').addEventListener('change',updateControls);
+  function compressionPolicy(){
+    const result={through_turn:Number(get('compression-through').value),chunk_bytes:Number(get('compression-chunk').value),
+      map_tokens:Number(get('compression-map').value),final_tokens:Number(get('compression-final').value),
+      max_seconds:Number(get('compression-time').value)};
+    if(!Object.values(result).every(Number.isSafeInteger)||result.through_turn<1||result.through_turn>state.revision
+      ||result.chunk_bytes<512||result.chunk_bytes>8192||result.map_tokens<32||result.map_tokens>1024
+      ||result.final_tokens<32||result.final_tokens>1024||result.max_seconds<10||result.max_seconds>900)
+      throw new Error('Choose bounded compression source and compute settings.');
+    return result;
+  }
+  async function compressionPreview(){
+    const policy=compressionPolicy(),sid=state.session,revision=state.revision,epoch=state.epoch;
+    const plan=await api('POST','/v1/sessions/'+sid+'/semantic-compression-preview',{policy,expected_revision:revision});
+    if(epoch!==state.epoch||sid!==state.session||revision!==state.revision||
+      stableDeliberation(policy)!==stableDeliberation(compressionPolicy()))
+      throw new Error('Compression source changed.');
+    if(plan.schema!=='skeleton.jeeves.semantic-compression-plan.v1'||plan.session_id!==sid||plan.revision!==revision
+      ||plan.model_digest!==state.health?.model_digest||plan.tokenizer_digest!==state.health?.tokenizer_digest
+      ||stableDeliberation(plan.policy)!==stableDeliberation(policy)||plan.generation_performed!==false
+      ||plan.all_selected_bytes_covered!==true||plan.source_history_changed!==false
+      ||plan.source_messages!==2*policy.through_turn||!Array.isArray(plan.chunks)||plan.chunks.length<1||plan.chunks.length>64
+      ||!Number.isSafeInteger(plan.planned_calls)||plan.planned_calls>96)
+      throw new Error('Invalid exact source compression plan.');
+    await verifyAuxHash(plan,'plan_sha256');
+    const source=state.messages.filter(row=>row.role==='user'||row.role==='assistant').slice(0,plan.source_messages);
+    if(await exactLocalSha256(stableDeliberation(source.map(row=>[row.role,row.content])))!==plan.source_sha256)
+      throw new Error('Compression source differs from saved dialogue.');
+    const offsets=new Map();
+    for(const chunk of plan.chunks){
+      if(!Array.isArray(chunk.spans)||chunk.spans.length<1||chunk.spans.length>64)throw new Error('Invalid source spans.');
+      for(const span of chunk.spans){
+        const row=source[span.message_index];
+        if(!row||row.role!==span.role||span.start!==(offsets.get(span.message_index)||0)
+          ||!Number.isSafeInteger(span.end)||span.end<=span.start
+          ||span.end>Array.from(row.content).length||await exactLocalSha256(row.content)!==span.message_sha256
+          ||await exactLocalSha256(Array.from(row.content).slice(span.start,span.end).join(''))!==span.text_sha256)
+          throw new Error('Compression source offset or digest mismatch.');
+        offsets.set(span.message_index,span.end);
+      }
+    }
+    if(source.some((row,index)=>(offsets.get(index)||0)!==Array.from(row.content).length))
+      throw new Error('Compression plan omits selected source content.');
+    return {plan,policy,sid,revision,epoch};
+  }
+  get('compression-preview').addEventListener('click',()=>run(async()=>{
+    resetCompression();const preview=await compressionPreview();state.compressionPlan=preview;
+    const p=preview.plan;
+    get('compression-plan').textContent=p.source_messages+' saved messages · '+p.source_bytes+' source bytes\n'
+      +p.chunks.length+' exact chunks · '+p.planned_calls+' actual model calls planned\n'
+      +'Maximum generated tokens '+p.max_generated_tokens+'\nPlan '+p.plan_sha256+
+      '\nNo generation performed. Later reductions may not fit.';
+    updateControls();
+  }));
+  get('compression-run').addEventListener('click',()=>run(async()=>{
+    const previous=state.compressionPlan;
+    if(!previous||!get('compression-approve').checked)throw new Error('Approve a fresh compression plan first.');
+    const current=await compressionPreview();
+    if(previous.plan.plan_sha256!==current.plan.plan_sha256||!get('compression-approve').checked)
+      throw new Error('Source or plan changed.');
+    const result=await api('POST','/v1/sessions/'+current.sid+'/semantic-compression-run',{
+      policy:current.policy,expected_revision:current.revision,plan_sha256:current.plan.plan_sha256,approved:true,
+    });
+    if(current.epoch!==state.epoch||current.sid!==state.session||current.revision!==state.revision)
+      throw new Error('Conversation changed during compression.');
+    if(result.schema!=='skeleton.jeeves.semantic-compression-result.v1'
+      ||stableDeliberation(result.plan)!==stableDeliberation(current.plan)||result.generation_performed!==true
+      ||result.abstractive_model_generation!==true||result.all_selected_bytes_submitted_to_map!==true
+      ||result.semantic_faithfulness_certified!==false||result.source_history_changed!==false
+      ||result.automatic_memory_write!==false||typeof result.summary!=='string'||bytes(result.summary)>1536
+      ||await exactLocalSha256(result.summary)!==result.summary_sha256
+      ||!Array.isArray(result.nodes)||result.nodes.length!==current.plan.planned_calls
+      ||result.nodes.at(-1)?.output_sha256!==result.summary_sha256)
+      throw new Error('Compression result custody mismatch.');
+    await verifyAuxHash(result);
+    state.compressionResult=result;get('compression-approve').checked=false;
+    get('compression-result').textContent='Model-generated historical abstract; review before reuse.\n'+result.summary+
+      '\n'+result.nodes.length+' executed passes · '+result.total_output_tokens+' generated tokens\nReceipt '+result.sha256;
+    updateControls();
+  }));
+  get('compression-apply').addEventListener('click',()=>run(async()=>{
+    const result=state.compressionResult;
+    if(!result||result.plan.session_id!==state.session||result.plan.revision!==state.revision)
+      throw new Error('Compression source changed.');
+    addReviewedDraft('Reviewed model-generated historical abstract',result.summary,result.sha256);
+  }));
+  get('compression-export').addEventListener('click',()=>{
+    if(state.compressionResult)download(JSON.stringify(state.compressionResult,null,2),'jeeves-compression.json','application/json');
+  });
+  get('independent-checks').addEventListener('input',()=>{state.independentResult=null;get('independent-approve').checked=false;updateControls();});
+  get('independent-approve').addEventListener('change',updateControls);
+  get('independent-run').addEventListener('click',()=>run(async()=>{
+    const current=reviewCurrent(),peer=state.nativeAssist?.reviewer;
+    if(!peer||!current.report.local_execution_receipt_digest||!get('independent-approve').checked)
+      throw new Error('Approve the exact saved answer and configure a distinct local reviewer.');
+    const raw=get('independent-checks').value;
+    if(bytes(raw)>8192)throw new Error('Verification predicates exceed byte budget.');
+    const checks=JSON.parse(raw);
+    if(!Array.isArray(checks)||checks.length>16)throw new Error('Provide an array of at most 16 predicates.');
+    const result=await api('POST','/v1/sessions/'+current.sid+'/independent-review',{
+      pin:current.pin,checks,expected_peer_identity:peer.peer_identity,max_output_tokens:Math.min(1024,peer.max_output_tokens),approved:true,
+    });
+    if(epochChanged(current)||state.qualityReview!==current)throw new Error('Reviewed answer changed.');
+    if(result.schema!=='skeleton.jeeves.independent-turn-review.v1'||result.session_id!==current.sid
+      ||!exactReviewPin(result.target,current.pin)||result.session_revision!==current.revision
+      ||result.primary_model_digest!==state.health?.model_digest||result.primary_tokenizer_digest!==state.health?.tokenizer_digest
+      ||result.primary_execution_receipt_digest!==current.report.local_execution_receipt_digest
+      ||result.reviewer_peer_identity!==peer.peer_identity||result.reviewer_model_sha256!==peer.model_sha256
+      ||result.distinct_artifact_model_executed!==true||result.general_truth_certified!==false
+      ||result.original_answer_changed!==false||!result.judgment||!result.deterministic_checks
+      ||result.reviewer_execution_receipt?.output_sha256!==await exactLocalSha256(result.reviewer_raw_output))
+      throw new Error('Separate reviewer output or exact answer binding failed.');
+    await verifyAuxHash(result);await verifyAuxHash(result.reviewer_execution_receipt);
+    state.independentResult=result;get('independent-approve').checked=false;
+    get('independent-result').textContent=result.disposition+'\n'+JSON.stringify({
+      judgment:result.judgment,deterministic_checks:result.deterministic_checks},null,2)+
+      '\nReview receipt '+result.sha256+'\nNo general truth certification or automatic answer change.';
+    updateControls();
+  }));
+  get('independent-export').addEventListener('click',()=>{
+    if(state.independentResult)download(JSON.stringify(state.independentResult,null,2),'jeeves-independent-review.json','application/json');
+  });
   function selectedDragonExcerpt() {
     const index = Number(get('dragon-bundle-source').value);
     return Number.isSafeInteger(index) && index >= 0
