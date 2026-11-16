@@ -175,6 +175,8 @@ class HardwareSample:
     started_ns: int
     finished_ns: int
     origin: str
+    scoped_pressure: str | None = None
+    scoped_observation_digest: str | None = None
 
     def __post_init__(self) -> None:
         require(isinstance(self.cpu, CpuTopology) and isinstance(self.memory, MemoryTopology)
@@ -183,6 +185,12 @@ class HardwareSample:
         integer(self.started_ns, 0, 2**63-1, "sample start")
         integer(self.finished_ns, self.started_ns, 2**63-1, "sample finish")
         require(self.origin in ("local_probe", "fixture"), "invalid sample origin")
+        require(self.scoped_pressure in (None, "normal", "elevated", "critical"),
+                "invalid scoped serving pressure")
+        require((self.scoped_pressure is None) == (self.scoped_observation_digest is None),
+                "incomplete scoped serving observation")
+        if self.scoped_observation_digest is not None:
+            identity(self.scoped_observation_digest, "scoped serving observation")
         if self.gpu.status == "measured":
             require(len(self.gpu.devices) <= 32 and len({d.device_id for d in self.gpu.devices}) == len(self.gpu.devices)
                     and sum(d.memory_bytes for d in self.gpu.devices) == self.gpu.measured_free_bytes,
@@ -195,14 +203,47 @@ class HardwareSample:
     def snapshot(self) -> dict:
         return {"cpu": asdict(self.cpu), "memory": asdict(self.memory), "power": asdict(self.power),
                 "gpu": self.gpu.snapshot(), "started_ns": self.started_ns,
-                "finished_ns": self.finished_ns, "origin": self.origin}
+                "finished_ns": self.finished_ns, "origin": self.origin,
+                "scoped_pressure": self.scoped_pressure,
+                "scoped_observation_digest": self.scoped_observation_digest}
+
+
+def intersect_scoped_headroom(memory: MemoryTopology, serving) -> MemoryTopology:
+    """Use the lower of host and canonical process-scoped allocation limits.
+
+    Host free bytes alone are insufficient in nested containers or when
+    Windows commit is restricted. Missing scoped residency telemetry is
+    unavailable, not an unlimited allocation budget.
+    """
+    from skeleton.ai.runtime.inference.adaptive_serving import ServingResources
+
+    require(isinstance(memory, MemoryTopology) and isinstance(serving, ServingResources),
+            "canonical scoped memory evidence required")
+    scoped = serving.allocation_headroom_bytes
+    available = memory.available_bytes
+    if scoped is None or available is None or serving.available_memory_bytes is None:
+        available = None
+    else:
+        available = min(available, scoped)
+    return MemoryTopology(memory.total_bytes, available, "intersection-with-serving-headroom")
 
 
 def sample_hardware() -> HardwareSample:
+    # Import lazily to keep fixture-only planning independent of the serving
+    # engine and to reuse its existing OS/cgroup/commit telemetry authority.
+    from skeleton.ai.runtime.inference.adaptive_serving import AdaptiveServingController
+    from skeleton.ai.runtime.inference.local import sample_serving_resources
+
     started = time.monotonic_ns()
     cpu, memory = probe_cpu_topology(), probe_memory_topology()
     power, gpu = probe_power(), probe_linux_nvidia_memory()
-    return HardwareSample(cpu, memory, power, gpu, started, time.monotonic_ns(), "local_probe")
+    serving = sample_serving_resources(fresh=True)
+    memory = intersect_scoped_headroom(memory, serving)
+    finished = time.monotonic_ns()
+    pressure = AdaptiveServingController(1)
+    pressure.update(serving, now=finished / 1_000_000_000, queued=0)
+    return HardwareSample(cpu, memory, power, gpu, started, finished, "local_probe",
+                          pressure.level, digest(serving.as_dict()))
 
 
 def _placement(source: ModelSource, sample: HardwareSample, policy: RuntimePolicy) -> tuple[list, list, str]:
@@ -256,6 +297,8 @@ def plan_preflight(source: ModelSource, sample: HardwareSample, policy: RuntimeP
     blockers = []
     if not fresh:
         blockers.append("stale_or_future_hardware_sample")
+    if sample.scoped_pressure == "critical":
+        blockers.append("canonical_scoped_serving_pressure_critical")
     if placement_status != "candidate":
         blockers.append(placement_status)
     if sample.memory.available_bytes is None or not sample.memory.total_bytes:
