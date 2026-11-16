@@ -180,7 +180,8 @@ class ReviewCampaignStore:
                  if statuses[row["id"]]["status"] == "pending"
                  and all(statuses[p]["status"] == "complete" for p in row["depends_on"])]
         stale = state["session_revision"] != session_revision
-        return {**state, "ready_steps": [] if stale else ready,
+        unresolved = any(row["status"] == "running" for row in statuses.values())
+        return {**state, "ready_steps": [] if stale or unresolved else ready,
                 "session_snapshot_stale": stale,
                 "all_steps_complete": all(r["status"] == "complete" for r in statuses.values()),
                 "generation_automatic": False, "dependency_output_injected": False,
