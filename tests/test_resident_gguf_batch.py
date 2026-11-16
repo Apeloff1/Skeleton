@@ -217,3 +217,47 @@ def test_native_tuning_geometry_and_cpu_affinity(monkeypatch):
         model, context_per_slot=128)
     with pytest.raises(TypeError):
         ResidentBatchPolicy(2, 128, 1, 1024**3, tuning={"extra_args": ["--host"]})
+
+
+def test_matched_tuning_benchmark_holds_output_drift_and_partial_rows():
+    from scripts.benchmark_resident_gguf_tuning import summarize
+    from copy import deepcopy
+    case = {"case_sha256": "a"*64, "exact": True,
+            "output_sha256": "b"*64, "token_ids_sha256": "c"*64}
+    rows = [{"profile": name, "repeat": r, "offset": 0,
+             "seconds": 2.0 if name == "baseline" else 1.0,
+             "cases": [dict(case), dict(case)]}
+            for name in ("baseline", "candidate") for r in range(2)]
+    report = summarize(rows, ["baseline","candidate"], 2, [0], 2)
+    assert report["summaries"]["candidate"]["parity_eligible"]
+    assert report["summaries"]["candidate"]["median_paired_wall_speedup"] == 2
+    bad = deepcopy(rows)
+    bad[2]["cases"][0]["token_ids_sha256"] = "d"*64
+    assert not summarize(bad, ["baseline","candidate"], 2, [0], 2)["summaries"]["candidate"]["parity_eligible"]
+    unstable = deepcopy(rows)
+    unstable[1]["cases"][0]["exact"] = False
+    assert not summarize(unstable, ["baseline","candidate"], 2, [0], 2)["baseline_stable"]
+    with pytest.raises(ValueError, match="incomplete"):
+        summarize(rows[:-1], ["baseline","candidate"], 2, [0], 2)
+
+
+def test_tuning_config_hash_and_duplicate_rejection(tmp_path):
+    import hashlib
+    from scripts.benchmark_resident_gguf_tuning import read_candidates
+    path = tmp_path / "profiles.json"
+    for data, succeeds in (
+        (b'{"fast":{"prefill_threads":2}}', True),
+        (b'{"fast":{"prefill_threads":2,"prefill_threads":4}}', False),
+        (b'{"fast":{"extra_args":["--host"]}}', False),
+        (b'{"fast":{}}', False),
+        (b'{"fast":{"prefill_threads":2},"also":{"prefill_threads":2}}', False),
+    ):
+        path.write_bytes(data)
+        pin = hashlib.sha256(data).hexdigest()
+        if succeeds:
+            assert read_candidates(path,pin)["fast"].prefill_threads == 2
+            with pytest.raises(ValueError, match="identity"):
+                read_candidates(path,"0"*64)
+        else:
+            with pytest.raises(ValueError):
+                read_candidates(path,pin)
