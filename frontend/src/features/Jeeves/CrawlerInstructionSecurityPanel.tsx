@@ -53,7 +53,7 @@ export default function CrawlerInstructionSecurityPanel({ session }: { session: 
         <Text style={s.label}>{h.host} · {h.state.replaceAll('_', ' ')}</Text>
         <Text style={s.small}>{h.queued} queued · {h.denial_statuses} denial responses · {h.throttle_statuses} throttle responses · {h.rejected_success_statuses} rejected successful-status responses</Text>
         {h.state === 'held_for_grant' && <Text style={s.error}>No automatic requests under the current grant.</Text>}
-        {h.state === 'cooldown' && <Text style={s.small}>Not before {new Date(h.host_ready_at * 1000).toISOString()}; all other checks still apply.</Text>}
+        {h.state === 'cooldown' && <Text style={s.small}>Not before {h.host_ready_at <= 8640000000 ? new Date(h.host_ready_at * 1000).toISOString() : 'the committed hold deadline'}; all other checks still apply.</Text>}
       </View>)}
       <Text style={s.small}>Independent research intake options: publisher-approved API, licensed export, open dataset, or owner-supplied file. Confirm access, usage rights, provenance and retention separately before initiating an independent intake. Do not use a different route to retrieve denied material.</Text>
     </View>}
