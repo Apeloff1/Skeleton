@@ -146,18 +146,26 @@ export function stepIndex(step: Step): number {
   return STEPS.indexOf(step);
 }
 
+export function unsupportedPresetReason(state: QuestionnaireState): string | null {
+  return state.galaxyProfile || (state.playable?.enabled && (state.playable.mode || state.playable.launch))
+    ? 'This Forge endpoint cannot apply the saved Galaxy profile or explicit mini-game mode. Preserve the preset and use a compatible Forge build.'
+    : null;
+}
+
 /** Why the user cannot advance from `step` (null when they can). */
 export function blockReason(state: QuestionnaireState, step: Step = state.step): string | null {
   if (step === 'vision' && !state.vision.trim() && !Object.keys(state.brief).length && !Object.keys(state.beats).length) {
     return 'Describe your game in a sentence or two (or skip ahead and answer the brief).';
   }
   if (step === 'vision' && state.vision.length > VISION_MAX) return `Keep the vision under ${VISION_MAX} characters.`;
+  if (step === 'options' || step === 'review') return unsupportedPresetReason(state);
   return null;
 }
 
 /** Steps reachable by direct navigation (every earlier step unblocked). */
 export function reachable(state: QuestionnaireState, step: Step): boolean {
   const target = stepIndex(step);
+  if (step === 'review' && unsupportedPresetReason(state)) return false;
   for (let i = 0; i < target; i += 1) {
     if (STEPS[i] === 'vision' && blockReason(state, 'vision')) {
       // The vision may be skipped once a brief facet or beat is chosen.
@@ -274,9 +282,8 @@ export const ERA_SOURCE_COPY: Record<ReturnType<typeof eraSource>, string> = {
 export function buildRunRequest(state: QuestionnaireState): RunRequest {
   // Preserve historical preset data, but never silently claim the current
   // archetype-only endpoint applies an explicit mini-game or Galaxy matrix.
-  if (state.galaxyProfile || (state.playable?.enabled && (state.playable.mode || state.playable.launch))) {
-    throw new Error('This Forge endpoint cannot apply the saved Galaxy profile or explicit mini-game mode. Preserve the preset and use a compatible Forge build.');
-  }
+  const unsupported = unsupportedPresetReason(state);
+  if (unsupported) throw new Error(unsupported);
   const answers: Record<string, string> = {};
   // Beat ids and brief facets share one namespace server-side ("combat"
   // exists in both); a beat answer wins because beats are authoritative.
