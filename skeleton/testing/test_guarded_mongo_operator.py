@@ -57,8 +57,8 @@ class OperatorScopeTests(unittest.TestCase):
 
 class SharedWitnessTests(unittest.IsolatedAsyncioTestCase):
     async def test_distinct_source_databases_observe_same_explicit_name_separately(self):
-        env = {"MONGO_URL": "mongodb://backend:private@mongo:27017",
-               "DB_NAME": "tutolage", "SKL_MONGO_URI": "mongodb://engine:private@mongo:27017",
+        env = {"MONGO_URL": "mongodb://dummy-user-1:dummy-password-1@mongo:27017",
+               "DB_NAME": "tutolage", "SKL_MONGO_URI": "mongodb://dummy-user-2:dummy-password-2@mongo:27017",
                "SKL_MONGO_DATABASE": "skeleton"}
         for source, uri_key in (("backend", "MONGO_URL"), ("engine", "SKL_MONGO_URI")):
             with self.subTest(source=source), patch.dict("os.environ", env, clear=True):
@@ -85,7 +85,7 @@ class SharedWitnessTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn("private", str(report))
 
     async def test_invalid_witness_names_fail_before_connection(self):
-        env = {"MONGO_URL": "mongodb://backend:private@mongo:27017", "DB_NAME": "tutolage"}
+        env = {"MONGO_URL": "mongodb://dummy-user-1:dummy-password-1@mongo:27017", "DB_NAME": "tutolage"}
         with patch.dict("os.environ", env, clear=True), \
              patch("motor.motor_asyncio.AsyncIOMotorClient") as factory:
             for name in ("", "x/y", "x" * 64, " x", "x:27017"):
