@@ -339,13 +339,18 @@ class OfflineAISession:
         Never silently substitute unrestricted search, shrink the requested
         output budget, remove a source, or change the durable question.
         """
-        from skeleton.app.offline_grounding import prepare_evidence
+        from skeleton.app.offline_grounding import prepare_evidence, preserves_excerpt_anchors
         if type(require_full_history) is not bool:
             raise OfflineAIError("full-history policy must be a boolean")
         best = None
+        broad = None
         for width in (220, 160, 120, 80, 48):
             manifest = prepare_evidence(prompt, request_digest, hits,
                     self.model_digest, self.tokenizer_digest, excerpt_chars=width)
+            if broad is None:
+                broad = manifest
+            elif not preserves_excerpt_anchors(prompt, broad, manifest):
+                continue
             try:
                 _, retained = self._request(
                     prompt.strip() + "\n\n" + manifest["context"], max_output_tokens,
