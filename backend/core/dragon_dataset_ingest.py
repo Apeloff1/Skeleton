@@ -14,6 +14,7 @@ import json
 import os
 from pathlib import Path,PurePosixPath
 import stat
+import re
 import zipfile
 
 from core.dragon_game_datasets import DatasetShard,parse_page,chain_step,ZERO,MAX_PAGE,MAX_ROWS,MAX_RECORD,MAX_VERSION_ROWS
@@ -106,24 +107,42 @@ def pages(path,member,witness):
         if buffered:yield b"".join(buffered),len(buffered)
 
 
-def plan(path,member=None):
+def raw_sha256(path,witness):
+    """Witness the entire container, not just its selected data member."""
+    h=hashlib.sha256()
+    with source_stream(path,None,witness) as stream:
+        for block in iter(lambda:stream.read(1024*1024),b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def plan(path,member=None,*,expected_sha=None):
+    if expected_sha is not None and (not isinstance(expected_sha,str)
+            or not re.fullmatch(r"[a-f0-9]{64}",expected_sha)):
+        raise ValueError("expected dataset SHA-256 must be lowercase hex")
     path=Path(path)
     witness=fingerprint(path)
+    source_sha=raw_sha256(path,witness)
+    if expected_sha is not None and source_sha!=expected_sha:
+        raise ValueError("raw dataset SHA-256 differs")
     chain=ZERO;rows=count=0
     for count0,(raw,n) in enumerate(pages(path,member,witness)):
         if len(parse_page(raw))!=n:raise ValueError("page validation")
         chain=chain_step(chain,hashlib.sha256(raw).hexdigest(),count0,n)
         rows+=n;count=count0+1
     if not rows:raise ValueError("empty dataset")
-    return {"file_identity":witness,"expected_rows":rows,"expected_chain":chain,"pages":count}
+    if raw_sha256(path,witness)!=source_sha:
+        raise ValueError("raw dataset changed during projection")
+    return {"file_identity":witness,"expected_rows":rows,"expected_chain":chain,"pages":count,
+            "input_sha256":source_sha,"expected_sha_matched":expected_sha is not None}
 
 
 def ingest(shard,path,*,member=None,dataset,source,observation_digest,label,
-           rights_acknowledged,grant_seconds=86400,corpus=None):
+           rights_acknowledged,grant_seconds=86400,corpus=None,expected_sha=None):
     if rights_acknowledged is not True:
         raise ValueError("explicit data-retention rights required")
     path=Path(path)
-    info=plan(path,member)
+    info=plan(path,member,expected_sha=expected_sha)
     receipt=shard.begin(dataset=dataset,source=source,observation_digest=observation_digest,
         label=label,expected_rows=info["expected_rows"],expected_chain=info["expected_chain"],
         grant_seconds=grant_seconds,rights_acknowledged=True,corpus=corpus)
@@ -135,10 +154,12 @@ def ingest(shard,path,*,member=None,dataset,source,observation_digest,label,
         if ack["chain"]!=chain or ack["rows"]!=n or ack["page_hash"]!=hashlib.sha256(raw).hexdigest():
             raise ValueError("dataset page witness changed")
         rows+=n;count=ordinal+1
-    if (rows,chain,count)!=(info["expected_rows"],info["expected_chain"],info["pages"]):
+    if ((rows,chain,count)!=(info["expected_rows"],info["expected_chain"],info["pages"])
+            or raw_sha256(path,info["file_identity"])!=info["input_sha256"]):
         raise ValueError("dataset changed between passes; never seal")
     final=shard.seal(version)
-    return {**final,"pages_verified":count,"network_executed":False,
+    return {**final,"pages_verified":count,"input_sha256":info["input_sha256"],
+            "expected_sha_matched":info["expected_sha_matched"],"network_executed":False,
             "physical_capacity_verified":False,"rights_reviewed":False}
 
 
@@ -152,6 +173,7 @@ def main():
     parser.add_argument("--label",required=True)
     parser.add_argument("--path",required=True)
     parser.add_argument("--member")
+    parser.add_argument("--expected-sha",help="Optional expected SHA-256 of the entire local file")
     parser.add_argument("--grant-seconds",type=int,default=86400)
     parser.add_argument("--acknowledge-retention-rights",action="store_true")
     args=parser.parse_args()
@@ -165,7 +187,7 @@ def main():
     shard=DatasetShard(scope,args.game,create=os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1")
     result=ingest(shard,args.path,member=args.member,dataset=args.dataset,source=args.source,
         observation_digest=args.observation_digest,label=args.label,grant_seconds=args.grant_seconds,
-        rights_acknowledged=True)
+        rights_acknowledged=True,expected_sha=args.expected_sha)
     print(json.dumps(result,indent=2))
 
 
