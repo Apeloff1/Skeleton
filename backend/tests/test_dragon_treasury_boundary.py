@@ -343,7 +343,18 @@ class RecoveryLaneTests(unittest.IsolatedAsyncioTestCase):
         app.build_deep_indexes=AsyncMock(return_value={"indexed":1})
         app.purge_expired_deep_indexes=AsyncMock(return_value={"purged":1})
         app.recover_deep_erasure=AsyncMock(return_value={"cleaned":1})
-        with patch("core.dragon_crawler.crawler_application",app):
+        # Every added recovery lane must remain awaitable: this fixture
+        # exercises scheduler isolation, not real external storage.
+        for method in ("build_deep_dense_indexes","build_full_vector_batch","build_current_vector_batch",
+                       "purge_current_vector_batches","purge_stale_full_vector_batches","cleanup_bulk_copies",
+                       "recover_bulk_copies","reconcile_cold_primaries"):
+            setattr(app,method,AsyncMock(return_value={"fixture":True}))
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            stack.enter_context(patch("core.dragon_crawler.crawler_application",app))
+            for method in ("pulse_release_imports","pulse_world_discovery","pulse_media_archive","pulse_game_datasets","pulse_lead_graph"):
+                stack.enter_context(patch("core.dragon_corpus_runtime."+method,AsyncMock(return_value={"fixture":True})))
+            stack.enter_context(patch("core.dragon_game_routing.backfill_routes",AsyncMock(return_value={"fixture":True})))
             result=await recover_crawler_runs()
         self.assertTrue(result["treasury_watches"]["failed"])
         self.assertEqual(result["treasury_expired_segments"],{"purged":1})

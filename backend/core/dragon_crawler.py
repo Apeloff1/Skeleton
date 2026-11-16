@@ -145,7 +145,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
 
     @property
     def sessions(self):
-        if self._cutover_requested and not self._cutover_active:
+        if getattr(self,"_cutover_requested",False) and not getattr(self,"_cutover_active",False):
             raise CrawlerError("crawler_mongo_cutover_held","Dragon dedicated authority is not qualified.",503)
         return self._sessions
 
@@ -155,7 +155,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
 
     @property
     def limits(self):
-        if self._cutover_requested and not self._cutover_active:
+        if getattr(self,"_cutover_requested",False) and not getattr(self,"_cutover_active",False):
             raise CrawlerError("crawler_mongo_cutover_held","Dragon dedicated authority is not qualified.",503)
         return self._limits
 
@@ -285,7 +285,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                 if available
                 else "Run first-install diagnostics and configure CORE_DB and canonical engine storage admission."
             ),
-            "storage_authority": "dedicated Dragon Mongo" if self._cutover_active else ("held dedicated Dragon Mongo" if self._cutover_requested else "CORE_DB Mongo"),
+            "storage_authority": "dedicated Dragon Mongo" if getattr(self,"_cutover_active",False) else ("held dedicated Dragon Mongo" if getattr(self,"_cutover_requested",False) else "CORE_DB Mongo"),
             "network_reachability_verified": False,
             "capabilities": {
                 "manual_crawl": available,

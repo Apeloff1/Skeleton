@@ -163,3 +163,22 @@ class MongoIntegrationTests(TestCase):
         self.target[move.COLLECTIONS[0]].insert_one({"_id":"unexpected"})
         with self.assertRaises(move.RelocationHeld):move.verify(self.source,self.target,offline_acknowledged=True)
         self.assertEqual(move._state(self.target)["phase"],"copying")
+
+
+class ApplicationCutoverRegressionTests(TestCase):
+    def test_injected_legacy_fixture_handle_and_requested_cutover_hold(self):
+        from core.dragon_crawler import DragonCrawlerApplication,CrawlerError
+        app=object.__new__(DragonCrawlerApplication)
+        session=object();command=object()
+        app.sessions=session;app.limits=command
+        self.assertIs(app.sessions,session)
+        self.assertIs(app.limits,command)
+        app._cutover_requested=True
+        # Missing or false activation remains held when cutover is requested.
+        with self.assertRaises(CrawlerError):_=app.sessions
+        with self.assertRaises(CrawlerError):_=app.limits
+        app._cutover_active=False
+        with self.assertRaises(CrawlerError):_=app.sessions
+        app._cutover_active=True
+        self.assertIs(app.sessions,session)
+        self.assertIs(app.limits,command)
