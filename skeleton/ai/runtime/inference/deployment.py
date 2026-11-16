@@ -21,6 +21,7 @@ from .llama_cpp import (
     _runtime_library_identities,
     build_llama_cpp_adapter,
     inspect_gguf,
+    _serving_metadata,
 )
 from .local import (
     LocalInferenceEngine,
@@ -275,7 +276,8 @@ class LocalModelDeployment:
             raise LocalModelDeploymentError("model artifact digest mismatch")
         try:
             gguf = inspect_gguf(model)
-        except LlamaCppRuntimeError as exc:
+            _serving_metadata(model, gguf).require_single_file(gguf)
+        except (LlamaCppRuntimeError, ValueError) as exc:
             raise LocalModelDeploymentError(f"invalid GGUF model artifact: {exc}") from exc
         deployment = cls(
             manifest_path=resolved_manifest,

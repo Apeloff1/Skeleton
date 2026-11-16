@@ -60,6 +60,7 @@ jobs:
           tests/test_kv_competitive_custody.py
           tests/test_consumer_gguf_shard_audit.py
           tests/test_consumer_gguf_quantization.py
+          tests/test_select_consumer_gguf.py
           skeleton/testing/test_local_model_deployment.py
           tests/flgb/test_flgb_02_native_runtime.py
 
