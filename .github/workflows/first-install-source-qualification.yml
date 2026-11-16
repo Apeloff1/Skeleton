@@ -89,6 +89,16 @@ jobs:
             skeleton/testing/test_guarded_mongo_operator.py
       - name: Qualify canonical Mongo epoch CAS and failure custody
         run: python -m pytest -q -p pytest_asyncio.plugin --maxfail=1 skeleton/testing/test_mongo_source_epoch.py
+      - name: Qualify signed reviewer custody and guarded activation
+        run: |
+          python -m pytest -q --maxfail=1 \
+            skeleton/testing/test_compose_activation_role_custody.py \
+            skeleton/testing/test_compose_guarded_activation.py \
+            skeleton/testing/test_compose_guarded_service.py \
+            skeleton/testing/test_compose_missing_role_inventory.py \
+            skeleton/testing/test_compose_revocation_window_regression.py \
+            skeleton/testing/test_reviewer_custody.py \
+            skeleton/testing/test_signed_reviewer_client.py
       - name: Verify construction and provider-owner contracts
         run: |
           python scripts/check_architecture_map.py
