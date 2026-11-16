@@ -60,6 +60,7 @@ class _Catalog:
     manifests: int
     references: int
     unreferenced: int
+    unreferenced_keys: tuple[str, ...]
 
 
 def _identity(info: os.stat_result) -> tuple[int, ...]:
@@ -159,8 +160,45 @@ def _catalog(owner: WeightStoreDiskOwner, policy: ScrubPolicy) -> _Catalog:
             raise WeightShardStoreError("managed directory changed during scrub catalog")
         add(["directory", path.name, identity])
     store.assert_layout()
+    unreferenced = tuple(sorted(objects.keys() - claims.keys()))
     return _Catalog(chain.hexdigest(), tuple(objects[key] for key in sorted(objects)),
-                    total, len(manifests), references, len(objects.keys() - claims.keys()))
+                    total, len(manifests), references, len(unreferenced), unreferenced)
+
+
+def _verify_catalog_object(owner: WeightStoreDiskOwner, row: _Object) -> None:
+    """Verify a single canonical object under the caller's existing slot."""
+    path = owner._store.objects / row.digest[:2] / row.digest
+    if _identity(path.lstat()) != row.identity:
+        raise WeightShardStoreError("catalog object identity changed before verification")
+    with owner._store._object_reader(WeightShard(0, row.digest, row.size, "local")) as stream:
+        observed, size = _hash_stream(stream, maximum=row.size)
+    if observed != row.digest or size != row.size:
+        raise WeightShardStoreError("catalog object content mismatch")
+    if _identity(path.lstat()) != row.identity:
+        raise WeightShardStoreError("catalog object identity changed after verification")
+
+
+def verify_unreferenced_catalog_objects(owner: WeightStoreDiskOwner, catalog: _Catalog,
+                                        *, maximum_bytes: int) -> dict:
+    """Verify every orphan candidate in an already admitted catalog.
+
+    Caller holds the cooperating slot. This complements the independently
+    verified referenced-object inventory; it cannot authorize deletion.
+    """
+    if type(maximum_bytes) is not int or not 0 <= maximum_bytes <= MAX_WEIGHT_BYTES:
+        raise WeightShardStoreError("invalid orphan verification byte ceiling")
+    selected = set(catalog.unreferenced_keys)
+    objects = tuple(row for row in catalog.objects if row.digest in selected)
+    required = sum(row.size for row in objects)
+    if required > maximum_bytes:
+        raise WeightShardStoreError("unreferenced physical bytes exceed recovery budget")
+    chain = _digest(["unreferenced", catalog.digest])
+    for row in objects:
+        _verify_catalog_object(owner, row)
+        chain = _digest([chain, row.digest, row.size])
+    body = {"catalog_digest": catalog.digest, "verified_objects": len(objects),
+            "verified_bytes": required, "chain_digest": chain, "deletion_authorized": False}
+    return {**body, "digest": _digest(body)}
 
 
 def _state(directory_fd: int, owner: WeightStoreDiskOwner) -> dict | None:
