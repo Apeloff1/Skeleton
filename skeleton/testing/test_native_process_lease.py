@@ -191,3 +191,41 @@ def test_recovery_keeps_live_children_and_failed_releases_accounted():
     assert model._processes_exited == 1 and releases == [True]
     assert not model._active_processes and not model._draining_processes
     assert model.reap_unconfirmed_cleanup() == {"reaped": 0, "remaining": 0}
+
+
+def test_activation_pins_slot_before_first_acquire(tmp_path):
+    directory = private_directory(tmp_path)
+    owner = NativeCpuLeaseOwner(directory, lambda: None)
+    (directory / owner.LOCK_NAME).unlink()
+    with pytest.raises(NativeLeaseError, match="slot unavailable"):
+        owner.acquire()
+    assert not (directory / owner.LOCK_NAME).exists()
+    assert owner.status()["acquired"] == 0
+
+
+def test_ambiguous_parent_release_cannot_be_retried_as_confirmed(tmp_path, monkeypatch):
+    from skeleton.app import offline_native_process_lease as module
+
+    owner = NativeCpuLeaseOwner(private_directory(tmp_path), lambda: None)
+    lease = owner.acquire()
+    fd, = lease.child_pass_fds()
+    real_close = os.close
+
+    def fail_close(descriptor):
+        if descriptor == fd:
+            raise OSError("test ambiguous close")
+        return real_close(descriptor)
+
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(module.os, "close", fail_close)
+            with pytest.raises(OSError, match="ambiguous"):
+                lease()
+        with pytest.raises(NativeLeaseError, match="unconfirmed"):
+            lease()
+        with pytest.raises(NativeLeaseError, match="no longer matches"):
+            lease.child_pass_fds()
+        assert owner.status()["owned_parent_references"] == 1
+    finally:
+        # Test-only explicit cleanup of the deliberately failed close.
+        real_close(fd)
