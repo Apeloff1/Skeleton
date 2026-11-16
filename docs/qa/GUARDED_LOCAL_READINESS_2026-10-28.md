@@ -199,3 +199,26 @@ fixture tests do not constitute compiled native or physical-device proof.
 Do not change existing deployment hashes or guard configuration to enable
 this candidate. Repeated artifact hashing and vocab-only loads require
 measured performance qualification, not assumed throughput.
+
+
+## Real pinned GGUF CPU qualification
+
+The separate exact-gguf-physical-cpu-qualification workflow builds the bridge
+against the exact upstream commit and downloads only the existing pinned
+Qwen3 0.6B Q8_0 recipe on relevant pull-request changes. It verifies real
+native tokenization (including Unicode, whitespace and literal marker text),
+prepared ID custody, actual CPU generation, deterministic physical replay,
+cancelled and altered input denial, and subprocess quiescence. It records
+only bounded hashes, counts, elapsed times and held scope; no generated
+text, private prompt, paths or raw token lists. The binary SHA in this
+workflow binds the freshly built helper to the run, not an independent
+release signer. Source checkout/compile receipts alone do not qualify it.
+
+For an existing reviewed helper and pinned local model, explicitly run:
+
+    python scripts/qualify_exact_gguf_bridge.py --executable /private/bridge --executable-sha256 SHA256 --source-head HEAD_SHA --model /private/Qwen3-0.6B-Q8_0.gguf --output /private/cpu-evidence.json
+
+No download occurs with --model. This is direct native CPU qualification,
+not production activation, independent reviewer trust, live Mongo, chat
+quality, GPU, Windows or release evidence. Wait for genuine exact-head
+execution results before relying on it.

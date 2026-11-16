@@ -1,0 +1,77 @@
+name: Exact GGUF physical CPU qualification
+
+# This is scoped native-model evidence, not production/release qualification.
+# Only relevant changes launch the bounded 639 MB pinned model lane.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/exact-gguf-physical-cpu-qualification.yml'
+      - 'scripts/native/gguf_token_bridge/**'
+      - 'scripts/qualify_exact_gguf_bridge.py'
+      - 'skeleton/ai/runtime/inference/gguf_token_bridge.py'
+      - 'skeleton/ai/runtime/inference/gguf_private_transport.py'
+      - 'skeleton/testing/test_exact_gguf_qualification.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: exact-gguf-real-cpu-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  exact_pinned_model:
+    name: Exact-head real pinned GGUF CPU generation and token custody
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify candidate source
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Checkout exact reviewed upstream
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ggml-org/llama.cpp
+          ref: d81235049384534c167caea52b85a694f6103d14
+          path: .qualification/llama.cpp
+          persist-credentials: false
+      - name: Build pinned CPU native bridge
+        run: |
+          set -eu
+          test "$(git -C .qualification/llama.cpp rev-parse HEAD)" = d81235049384534c167caea52b85a694f6103d14
+          cmake -S scripts/native/gguf_token_bridge -B "$RUNNER_TEMP/gguf-physical-build" -DLLAMA_CPP_SOURCE="$GITHUB_WORKSPACE/.qualification/llama.cpp" -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$RUNNER_TEMP/gguf-physical-build" --target skeleton-gguf-token-bridge --parallel 2
+      - name: Install supported app Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install canonical Python dependencies
+        run: python -m pip install --disable-pip-version-check --no-input -e . 'pytest>=8,<9' 'numpy>=2,<3' 'Pillow>=13.0.0,<14'
+      - name: Qualify bounded receipt publication and admission
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONPATH: ".:backend"
+        run: python -m pytest -q --noconftest skeleton/testing/test_exact_gguf_qualification.py
+      - name: Transfer exact pinned Qwen weights and execute real native qualification
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          PYTHONPATH: ".:backend"
+        run: |
+          set -eu
+          bridge="$RUNNER_TEMP/gguf-physical-build/skeleton-gguf-token-bridge"
+          digest="$(sha256sum "$bridge" | cut -d ' ' -f 1)"
+          python scripts/qualify_exact_gguf_bridge.py --executable "$bridge" --executable-sha256 "$digest" --source-head "$EXPECTED_HEAD" --download --output "$RUNNER_TEMP/exact-gguf-cpu-receipt.json" --threads 2
+      - name: Record scoped receipt digest, not release readiness
+        run: |
+          set -eu
+          test -s "$RUNNER_TEMP/exact-gguf-cpu-receipt.json"
+          sha256sum "$RUNNER_TEMP/exact-gguf-cpu-receipt.json"
+          echo "Real CPU qualification is limited to direct pinned-model generation. Production guard, reviewer, Mongo, device and release holds remain."
