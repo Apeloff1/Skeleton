@@ -766,6 +766,20 @@ class WindowsLauncher:
 
 
 def _headless(args: argparse.Namespace, root: Path) -> int:
+    probe_port = getattr(args, "verify_install_probe", None)
+    if probe_port is not None:
+        # Explicit acceptance path for the installed windowed executable.
+        # Numeric loopback, no authorization or arbitrary path, no writes.
+        if type(probe_port) is not int or not 1 <= probe_port <= 65535:
+            return 2
+        from skeleton.app.first_install import critical_backend_route_report
+        try:
+            observation = critical_backend_route_report(
+                f"http://127.0.0.1:{probe_port}", timeout=5,
+            )
+            return 0 if observation["observed"] is True and observation["ready"] is True else 1
+        except (OSError, ValueError, KeyError, TypeError):
+            return 1
     if args.local_ai_dataset_smoke:
         from skeleton.app.local_ai_dataset import smoke_offline_native_dataset
         try:
@@ -850,6 +864,8 @@ def _headless(args: argparse.Namespace, root: Path) -> int:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(prog="Skeleton.exe")
     mode = result.add_mutually_exclusive_group()
+    mode.add_argument("--verify-install-probe", type=int, metavar="PORT",
+                      help="verify local read-only installed readiness transport against the supplied loopback port")
     mode.add_argument("--verify-payload", action="store_true",
                       help="verify installed application source payload without Docker")
     mode.add_argument("--check", action="store_true")

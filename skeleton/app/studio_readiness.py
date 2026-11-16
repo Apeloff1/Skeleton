@@ -418,7 +418,9 @@ def _bounded_server(root, base, token, timeout, *, endpoint, schema, max_respons
                 stderr=error,
                 env=environment,
                 cwd=root,
-                timeout=timeout + (15 if getattr(sys, "frozen", False) else 0),
+                # Budget bootloader extraction separately from the fixed HTTP
+                # socket timeout; the entire frozen child still has a hard deadline.
+                timeout=timeout + (45 if getattr(sys, "frozen", False) else 0),
                 check=False,
                 **({"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)}
                    if os.name == "nt" and getattr(sys, "frozen", False) else {}),

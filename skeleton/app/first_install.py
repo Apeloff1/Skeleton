@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 import os
+import sys
 from collections.abc import Mapping
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -53,8 +54,12 @@ def _bounded_json(
             return None
     except ValueError:
         return None
+    # Frozen module __file__ lives in the bootloader extraction directory.
+    # The sibling console is installed beside the executable, not in _MEIPASS.
+    worker_root = (Path(sys.executable).resolve().parent if getattr(sys, "frozen", False)
+                   else Path(__file__).resolve().parents[2])
     result = _bounded_server(
-        Path(__file__).resolve().parents[2],
+        worker_root,
         f"{parts.scheme}://{parts.netloc}",
         None,
         timeout,

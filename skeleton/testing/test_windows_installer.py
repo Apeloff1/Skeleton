@@ -736,3 +736,24 @@ def test_windows_hidden_runner_forwards_preloader_stdin(monkeypatch,tmp_path):
     monkeypatch.setattr(launcher.subprocess,"run",child)
     assert _command_check(["docker","info"],code="host:docker",label="Docker",
                           remediation="repair",runner=launcher._hidden_runner).ok
+
+
+@pytest.mark.parametrize("port", [0, 65536])
+def test_windowed_probe_acceptance_rejects_invalid_port_before_transport(monkeypatch,tmp_path,port):
+    from skeleton.app import windows_launcher as launcher
+    monkeypatch.setattr("skeleton.app.first_install.critical_backend_route_report",
+                        lambda *a,**k: pytest.fail("invalid port reached transport"))
+    args=launcher.parser().parse_args(["--verify-install-probe",str(port)])
+    assert launcher._headless(args,tmp_path)==2
+
+
+@pytest.mark.parametrize("observed,ready,expected", [(True,True,0),(True,False,1),(False,True,1)])
+def test_windowed_probe_acceptance_requires_public_mount_evidence(monkeypatch,tmp_path,observed,ready,expected):
+    from skeleton.app import windows_launcher as launcher
+    def registry(base,**kwargs):
+        assert base=="http://127.0.0.1:32123"
+        assert kwargs["timeout"]==5
+        return {"observed":observed,"ready":ready}
+    monkeypatch.setattr("skeleton.app.first_install.critical_backend_route_report",registry)
+    args=launcher.parser().parse_args(["--verify-install-probe","32123"])
+    assert launcher._headless(args,tmp_path)==expected

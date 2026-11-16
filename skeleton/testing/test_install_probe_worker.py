@@ -85,3 +85,18 @@ def test_source_worker_uses_isolated_interpreter(tmp_path,monkeypatch):
     command=worker.worker_command(tmp_path)
     assert command[:4]==[sys.executable,"-I","-B","-c"]
     assert command[-1]==worker.FLAG
+
+
+def test_frozen_parent_resolves_worker_root_from_installed_executable_not_meipass(tmp_path,monkeypatch):
+    from skeleton.app import first_install
+    root=tmp_path/"installed"
+    root.mkdir()
+    monkeypatch.setattr(sys,"frozen",True,raising=False)
+    monkeypatch.setattr(sys,"executable",str(root/"Skeleton.exe"))
+    observed=[]
+    def bounded(worker_root,base,token,timeout,**kwargs):
+        observed.append((worker_root,base,token,kwargs["endpoint"]))
+        return {"observed":True,"report":{"ok":True}}
+    monkeypatch.setattr("skeleton.app.studio_readiness._bounded_server",bounded)
+    assert first_install._bounded_json("http://127.0.0.1:32123/api/health/registry",timeout=1)=={"ok":True}
+    assert observed==[(root,"http://127.0.0.1:32123",None,"/api/health/registry")]

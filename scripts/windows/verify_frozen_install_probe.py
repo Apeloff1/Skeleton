@@ -14,6 +14,17 @@ FLAG = "--internal-install-probe-v1"
 TOKEN = "fixture-bearer-not-a-credential-12345"
 SCHEMA = "skeleton.game.studio_readiness.v1"
 PATH = "/api/game-studio-health"
+REGISTRY = "/api/health/registry"
+CRITICAL = {
+    "routes.creator_economy": "/api/creators",
+    "routes.git_operations": "/api/git/status",
+    "routes.jeeves_media": "/api/jeeves/media/types",
+    "routes.lafs": "/api/lafs/stats",
+    "routes.marketplace": "/api/marketplace/listings",
+    "routes.sorting_vault": "/api/sorting-vault/connections",
+    "routes.swarm_cold_legion": "/api/galaxy-studio/swarm/cold/stats",
+    "routes.swarm_hub": "/api/galaxy-studio/swarm/agents",
+}
 
 
 @contextmanager
@@ -31,7 +42,13 @@ def fixture_server():
                 self.send_header("Location", "/other")
                 self.end_headers()
                 return
-            payload = {"schema_version": SCHEMA, "status": "ready"}
+            if self.path == REGISTRY:
+                missing = ["routes.jeeves_media"] if value == "missing" else []
+                payload = {"critical_routes":{"ok":not missing,"report_available":True,"missing":missing},
+                           "mounted_names":[name for name in CRITICAL if name not in missing],
+                           "mounted_paths":{name:[path] for name,path in CRITICAL.items() if name not in missing}}
+            else:
+                payload = {"schema_version": SCHEMA, "status": "ready"}
             if value == "reflect":
                 payload["secret"] = TOKEN
             raw = json.dumps(payload).encode()
@@ -86,8 +103,22 @@ def qualify(root: Path):
         done = child(json.dumps(invalid).encode())
         if done.returncode != 2 or done.stdout or len(events) != 3:
             raise RuntimeError("frozen worker admitted an unsupported endpoint")
-    # Source-only acceptance must not be mistaken for Docker or device proof.
-    print("Frozen readiness worker: PASS (loopback transport, denial, reflection; fixture only)")
+        launcher = root / "Skeleton.exe"
+        if not launcher.is_file():
+            raise RuntimeError("installed windowed launcher missing")
+        port = base.rsplit(":",1)[-1]
+        for scenario, expected in (("ok",0),("missing",1)):
+            mode["value"] = scenario
+            done = subprocess.run([str(launcher),"--verify-install-probe",port],
+                                  cwd=root, env=env, timeout=120,
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                  check=False)
+            if done.returncode != expected:
+                raise RuntimeError("installed windowed readiness handoff verdict mismatch")
+        if events[3:] != [(REGISTRY,None),(REGISTRY,None)]:
+            raise RuntimeError("windowed parent did not use exact public readiness worker")
+    # A fixture-driven installer check is not Docker or actual device proof.
+    print("Frozen readiness worker and GUI handoff: PASS (loopback fixture only)")
 
 
 if __name__ == "__main__":
