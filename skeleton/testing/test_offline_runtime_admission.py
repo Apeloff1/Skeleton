@@ -441,3 +441,51 @@ def test_exact_expiry_instant_cannot_authorize_consumption():
     with pytest.raises(RuntimePreflightError, match="stale or future"):
         owner.consume(receipt, now_ns=receipt["expires_ns"])
     assert not owner.status()["pending"]
+
+
+def test_canonical_placement_recovers_from_order_dependent_fragmentation():
+    from skeleton.ai.model_runtime.device_placement import plan_device_placement
+    shards = source((3 * GIB, 3 * GIB, 4 * GIB, 6 * GIB, 4 * GIB)).plan.shards
+    devices = (DeviceDescriptor("a", "cuda", 10 * GIB),
+               DeviceDescriptor("b", "cuda", 10 * GIB))
+    placement = plan_device_placement(shards, devices)
+    assert [row.shard_index for row in placement] == list(range(len(shards)))
+    assert [row.bytes for row in placement] == [shard.bytes for shard in shards]
+    assert sum(row.bytes for row in placement if row.device_id == "a") == 10 * GIB
+    assert sum(row.bytes for row in placement if row.device_id == "b") == 10 * GIB
+    assert placement == plan_device_placement(shards, tuple(reversed(devices)))
+
+
+def test_hybrid_prefers_accelerator_and_preserves_host_worker_headroom():
+    policy = replace(POLICY, backend="hybrid")
+    reading = sample(available=12 * GIB, gpu=measured_gpu(free=4 * GIB))
+    result = plan_preflight(source((2 * GIB, 4 * GIB)), reading, policy,
+                            now_ns=reading.finished_ns)
+    assert result["status"] == "candidate"
+    assert result["placement"][0]["device_id"] == "cuda-0"
+    assert result["placement"][1]["device_id"] == "host-cpu"
+    host = next(row for row in result["devices"] if row["device_id"] == "host-cpu")
+    assert host["memory_bytes"] == 12 * GIB - policy.host_reserve_bytes - policy.bytes_per_worker
+    assert result["worker_ceiling"] >= 1
+    assert not result["native_qualified"]
+
+
+def test_hybrid_refuses_cpu_only_placement_even_with_detected_cuda():
+    policy = replace(POLICY, backend="hybrid")
+    reading = sample(available=12 * GIB, gpu=measured_gpu(free=2 * GIB))
+    result = plan_preflight(source((3 * GIB,)), reading, policy,
+                            now_ns=reading.finished_ns)
+    assert result["placement_status"] == "hybrid_cuda_shard_unavailable"
+    assert result["worker_ceiling"] == 0
+    assert not result["placement"]
+
+
+def test_canonical_packing_retains_per_device_reserve_and_shard_boundaries():
+    from skeleton.ai.model_runtime.device_placement import ModelRuntimeError, plan_device_placement
+    shards = source((5 * GIB,)).plan.shards
+    devices = (DeviceDescriptor("a", "cuda", 4 * GIB),
+               DeviceDescriptor("b", "cuda", 4 * GIB))
+    with pytest.raises(ModelRuntimeError, match="insufficient device memory"):
+        plan_device_placement(shards, devices, reserve_bytes_per_device=GIB)
+    with pytest.raises(ModelRuntimeError, match="invalid preferred device kind"):
+        plan_device_placement(shards, devices, preferred_kind="invalid")
