@@ -614,7 +614,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "b6bbcd9ceccc6d812b94ec0cd93125ab91ff1d58",
+      "source_git_object_sha": "a53593660e03fba8052a30ccf1b0aa1712a51e3b",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
