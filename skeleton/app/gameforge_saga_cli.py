@@ -30,7 +30,9 @@ ORDINARY = (
 
 def _budgets(data: dict) -> dict:
     return {"dialogue_budget": data.get("dialogue_budget", 1024),
-            "local_budget": data.get("local_budget", 1024)}
+            "local_budget": data.get("local_budget", 1024),
+            "advanced_states": data.get("advanced_states", 32),
+            "advanced_attempts": data.get("advanced_attempts", 128)}
 
 
 def _persistent(command: str, path: Path, value: Any) -> dict:
@@ -49,7 +51,7 @@ def _persistent(command: str, path: Path, value: Any) -> dict:
         "read-slot", "board-slot", "assist-slot", "compare-slots", "evidence-slot"
     } else set()
     if command == "assist-slot":
-        optional.update({"dialogue_budget", "local_budget"})
+        optional.update({"dialogue_budget", "local_budget", "advanced_states", "advanced_attempts"})
     if command == "compare-slots":
         optional.add("other_revision")
     data = _object(value, fields | extra.get(command, set()), optional)
@@ -128,7 +130,7 @@ def _ordinary(command: str, value: Any) -> dict:
     extras = {"resume": {"additional"}, "turn": {"board_digest", "index"},
               "evidence": {"objective"}, "verify-evidence": {"evidence"},
               "verify-board": {"board"}, "verify-assist": {"recovery"}}
-    optional = {"dialogue_budget", "local_budget"} if command == "assist" else set()
+    optional = {"dialogue_budget", "local_budget", "advanced_states", "advanced_attempts"} if command == "assist" else set()
     data = _object(value, {"request", "receipt"} | extras.get(command, set()), optional)
     source, receipt = data["request"], data["receipt"]
     if command == "resume":
