@@ -531,5 +531,239 @@ async def inspect_writer_inventory(*, epoch, collections, repository_namespace):
         raise WriterCutoverDenied("canonical writer inventory unavailable") from None
 
 
-__all__ = ["CanonicalWriterCutover", "VerifiedWriterCutover", "CutoverInventory",
+
+# One non-expiring latch per canonical database, independent of deployment
+# aliases. No TTL, automatic takeover, or recovery from ambiguous writes.
+_LATCH_COLLECTION = "canonical_writer_deployment_latch"
+_LATCH_ID = "canonical-writer-single-deployment-v1"
+_LATCH_FIELDS = frozenset(("_id","schema","state","generation","highwater",
+                           "deployment_id","authority_id","source_head",
+                           "approval_sha256","quiescence_sha256"))
+_LATCH_SCHEMA = "skeleton.canonical-writer-deployment-latch.v1"
+_RETIRE_DOMAIN = b"skeleton.canonical-writer-deployment-retirement.v1\0"
+
+
+@dataclass(frozen=True, slots=True)
+class WriterDeploymentRetirement:
+    authority_id: str
+    deployment_id: str
+    source_head: str
+    database_name: str
+    active_latch_sha256: str
+    shutdown_evidence_sha256: str
+    issued_at: int
+    expires_at: int
+
+    def __post_init__(self):
+        _require(all(type(x) is str and _ID.fullmatch(x) is not None
+                      for x in (self.authority_id,self.deployment_id))
+                 and type(self.source_head) is str and _SHA.fullmatch(self.source_head) is not None
+                 and _database_name(self.database_name)
+                 and _digest(self.active_latch_sha256) and _digest(self.shutdown_evidence_sha256)
+                 and type(self.issued_at) is int and type(self.expires_at) is int
+                 and 0 < self.issued_at < self.expires_at < (1<<63)
+                 and self.expires_at-self.issued_at <= _MAX_VALIDITY)
+
+    def canonical_bytes(self):
+        return _RETIRE_DOMAIN + _canonical({f.name:getattr(self,f.name) for f in fields(self)})
+
+    def assert_current(self):
+        _require(self.issued_at <= int(time.time()) < self.expires_at)
+
+    @classmethod
+    def parse(cls, raw):
+        _require(type(raw) is bytes and 1 <= len(raw) <= 16384)
+        try:
+            row = json.loads(raw.decode("utf-8","strict"), object_pairs_hook=_unique,parse_constant=_constant)
+            _require(type(row) is dict and set(row) == {f.name for f in fields(cls)})
+            return cls(**row)
+        except WriterCutoverDenied:
+            raise
+        except Exception:
+            raise WriterCutoverDenied("invalid deployment retirement document") from None
+
+
+def _verify_retirement(plan, signature, *, authority_id, deployment_id, source_head, public_key):
+    _require(type(plan) is WriterDeploymentRetirement and plan.authority_id == authority_id
+             and plan.deployment_id == deployment_id and plan.source_head == source_head
+             and type(signature) is bytes and len(signature) == 64
+             and type(public_key) is bytes and len(public_key) == 32)
+    plan.assert_current()
+    try:
+        Ed25519PublicKey.from_public_bytes(public_key).verify(signature,plan.canonical_bytes())
+    except (InvalidSignature,TypeError,ValueError):
+        raise WriterCutoverDenied("deployment retirement signature rejected") from None
+
+
+def _latch_row(row):
+    _require(type(row) is dict and set(row) == _LATCH_FIELDS
+             and row["_id"] == _LATCH_ID and row["schema"] == _LATCH_SCHEMA
+             and row["state"] in ("ACTIVE","RETIRED")
+             and type(row["deployment_id"]) is str and _ID.fullmatch(row["deployment_id"]) is not None
+             and type(row["authority_id"]) is str and _ID.fullmatch(row["authority_id"]) is not None
+             and type(row["source_head"]) is str and _SHA.fullmatch(row["source_head"]) is not None
+             and _digest(row["approval_sha256"]) and _digest(row["quiescence_sha256"]))
+    generation = _number(row["generation"])
+    highwater = _number(row["highwater"])
+    _require((generation % 2 == 1) == (row["state"] == "ACTIVE"))
+    return {**row,"generation":generation,"highwater":highwater}
+
+
+def _latch_digest(row):
+    return hashlib.sha256(b"skeleton.canonical-writer-latch-row.v1\0"+_canonical(_latch_row(row))).hexdigest()
+
+
+def _latch_handles(database):
+    from pymongo.write_concern import WriteConcern
+    writer = database.get_collection(_LATCH_COLLECTION, read_concern=ReadConcern("majority"),
+                       read_preference=ReadPreference.PRIMARY,
+                       write_concern=WriteConcern(w="majority",j=True,wtimeout=10000))
+    reader = database.get_collection(_LATCH_COLLECTION,read_concern=ReadConcern("linearizable"),
+                       read_preference=ReadPreference.PRIMARY)
+    for handle in (writer,reader):
+        _require(handle.name == _LATCH_COLLECTION and handle.database.name == database.name
+                 and handle.database.client is database.client)
+    return writer, reader
+
+
+async def _read_latch(reader):
+    row = await reader.find_one({"_id":_LATCH_ID},max_time_ms=5000)
+    return None if row is None else _latch_row(row)
+
+
+async def _publish_latch(writer,reader,previous,current):
+    from bson.int64 import Int64
+    from pymongo.collation import Collation
+    current = _latch_row(current)
+    stored = {**current,"generation":Int64(current["generation"]),
+              "highwater":Int64(current["highwater"])}
+    if previous is None:
+        result = await writer.insert_one(stored)
+        _require(result.acknowledged is True and result.inserted_id == _LATCH_ID)
+    else:
+        # Full exact-row CAS with binary collation, not merely a state check.
+        predicate = {**previous,"generation":Int64(previous["generation"]),
+                     "highwater":Int64(previous["highwater"])}
+        result = await writer.replace_one(predicate,stored,upsert=False,
+                                          collation=Collation("simple"))
+        _require(result.acknowledged is True and result.matched_count == 1
+                 and result.modified_count == 1)
+    _require(await _read_latch(reader) == current)
+    return current
+
+
+async def reserve_writer_deployment(approval, *, epoch):
+    """Consume a startup approval in the shared, durable database latch.
+
+    A failed or interrupted launch remains ACTIVE. Operator retirement is
+    separate. This is cooperative startup exclusion, not fencing arbitrary
+    Mongo clients or proving old processes have stopped.
+    """
+    _require(type(approval) is VerifiedWriterCutover and type(epoch) is MongoCanonicalSourceEpoch)
+    approval.verify()
+    plan, database = approval.plan, epoch._database
+    try:
+        async with asyncio.timeout(25):
+            observed = await _observe(database)
+            _match_observation(plan,observed,database)
+            writer,reader = _latch_handles(database)
+            previous = await _read_latch(reader)
+            if previous is not None:
+                _require(previous["state"] == "RETIRED"
+                         and previous["deployment_id"] == plan.deployment_id
+                         and previous["authority_id"] == plan.authority_id
+                         and plan.issued_at > previous["highwater"]
+                         and previous["generation"] < (1<<63)-2)
+            current = {
+                "_id":_LATCH_ID,"schema":_LATCH_SCHEMA,"state":"ACTIVE",
+                "generation":1 if previous is None else previous["generation"]+1,
+                "highwater":plan.issued_at,"deployment_id":plan.deployment_id,
+                "authority_id":plan.authority_id,"source_head":plan.source_head,
+                "approval_sha256":hashlib.sha256(plan.canonical_bytes()).hexdigest(),
+                "quiescence_sha256":plan.quiescence_sha256,
+            }
+            approval.verify()
+            result = await _publish_latch(writer,reader,previous,current)
+            _require(observed == await _observe(database))
+            approval.verify()
+            return {"generation":result["generation"],"latch_sha256":_latch_digest(result)}
+    except WriterCutoverDenied:
+        raise
+    except Exception:
+        raise WriterCutoverDenied("shared writer deployment reservation denied or uncertain") from None
+
+
+async def inspect_writer_deployment(*, epoch):
+    """Read-only operator receipt; never indicates backend or AI readiness."""
+    _require(type(epoch) is MongoCanonicalSourceEpoch)
+    db = epoch._database
+    try:
+        async with asyncio.timeout(20):
+            before = await _observe(db)
+            _,reader = _latch_handles(db)
+            row = await _read_latch(reader)
+            _require(row == await _read_latch(reader) and before == await _observe(db))
+            return {"schema":"skeleton.canonical-writer-deployment-observation.v1",
+                    "state":"ABSENT" if row is None else row["state"],
+                    "generation":0 if row is None else row["generation"],
+                    "latch_sha256":None if row is None else _latch_digest(row),
+                    "writes_performed":False,"guarded_local_ai_ready":False}
+    except WriterCutoverDenied:
+        raise
+    except Exception:
+        raise WriterCutoverDenied("shared writer deployment observation unavailable") from None
+
+
+async def verify_writer_deployment(*, epoch, reservation):
+    """Check the exact active reservation before binding local writer owners."""
+    _require(type(epoch) is MongoCanonicalSourceEpoch and type(reservation) is dict
+             and set(reservation) == {"generation","latch_sha256"}
+             and type(reservation["generation"]) is int and _digest(reservation["latch_sha256"]))
+    receipt = await inspect_writer_deployment(epoch=epoch)
+    _require(receipt["state"] == "ACTIVE" and receipt["generation"] == reservation["generation"]
+             and receipt["latch_sha256"] == reservation["latch_sha256"])
+
+
+async def retire_writer_deployment(plan,signature,*,epoch,authority_id,deployment_id,source_head,public_key):
+    """Offline operator-only retirement; never infer shutdown from time or PID.
+
+    The signer must independently establish all processes are stopped and
+    external writer/backup custody is valid. This verifies the receipt hash,
+    not the external shutdown evidence itself.
+    """
+    _require(type(epoch) is MongoCanonicalSourceEpoch)
+    def verify():
+        _verify_retirement(plan,signature,authority_id=authority_id,deployment_id=deployment_id,
+                           source_head=source_head,public_key=public_key)
+    verify()
+    db = epoch._database
+    _require(db.name == plan.database_name)
+    try:
+        async with asyncio.timeout(25):
+            observed = await _observe(db)
+            writer,reader = _latch_handles(db)
+            previous = await _read_latch(reader)
+            _require(previous is not None and previous["state"] == "ACTIVE"
+                     and previous["deployment_id"] == deployment_id
+                     and previous["authority_id"] == authority_id
+                     and _latch_digest(previous) == plan.active_latch_sha256
+                     and plan.issued_at > previous["highwater"]
+                     and previous["generation"] < (1<<63)-1)
+            current = {**previous,"state":"RETIRED","generation":previous["generation"]+1,
+                       "highwater":plan.issued_at,"quiescence_sha256":plan.shutdown_evidence_sha256}
+            verify()
+            result = await _publish_latch(writer,reader,previous,current)
+            _require(observed == await _observe(db))
+            verify()
+            return {"schema":"skeleton.canonical-writer-deployment-retired.v1",
+                    "state":"RETIRED","generation":result["generation"],
+                    "latch_sha256":_latch_digest(result),"guarded_local_ai_ready":False}
+    except WriterCutoverDenied:
+        raise
+    except Exception:
+        raise WriterCutoverDenied("shared writer deployment retirement denied or uncertain") from None
+
+
+__all__ = ["WriterDeploymentRetirement", "reserve_writer_deployment", "inspect_writer_deployment",
+           "verify_writer_deployment", "retire_writer_deployment", "CanonicalWriterCutover", "VerifiedWriterCutover", "CutoverInventory",
            "WriterCutoverDenied", "qualify_writer_cutover", "inspect_writer_inventory"]

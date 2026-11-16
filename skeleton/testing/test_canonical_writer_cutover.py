@@ -349,3 +349,122 @@ def test_symlinked_local_lock_does_not_modify_target(tmp_path):
         with _reserve_cutover(approval,directory):
             pytest.fail("symlink lock admitted")
     assert victim.read_text()=="unchanged"
+
+
+class LatchCollection:
+    def __init__(self,db):
+        self.database,self.name=db,"canonical_writer_deployment_latch"
+        self.row=None
+        self.uncertain=False
+    async def find_one(self,query,**kwargs):
+        assert query=={"_id":"canonical-writer-single-deployment-v1"}
+        return None if self.row is None else dict(self.row)
+    async def insert_one(self,row):
+        if self.row is not None:
+            raise RuntimeError("duplicate")
+        self.row=dict(row)
+        if self.uncertain:
+            raise RuntimeError("uncertain majority acknowledgement")
+        return SimpleNamespace(acknowledged=True,inserted_id=row["_id"])
+    async def replace_one(self,predicate,row,**kwargs):
+        match=int(self.row==predicate)
+        if match:
+            self.row=dict(row)
+        return SimpleNamespace(acknowledged=True,matched_count=match,modified_count=match)
+
+
+def latch_fixture():
+    db,epoch,_=fixture()
+    coll=LatchCollection(db)
+    db.get_collection=lambda name,**kwargs:coll
+    return epoch,coll
+
+
+def retirement(epoch,approval,digest,**updates):
+    from skeleton.app.canonical_writer_cutover import WriterDeploymentRetirement
+    values=dict(authority_id=approval.authority_id,deployment_id=approval.deployment_id,
+                source_head=approval.source_head,database_name=epoch._database.name,
+                active_latch_sha256=digest,shutdown_evidence_sha256="7"*64,
+                issued_at=int(time.time())-1,expires_at=int(time.time())+120)
+    values.update(updates)
+    plan=WriterDeploymentRetirement(**values)
+    key=Ed25519PrivateKey.generate()
+    return plan,key.sign(plan.canonical_bytes()),dict(
+        epoch=epoch,authority_id=plan.authority_id,deployment_id=plan.deployment_id,
+        source_head=plan.source_head,public_key=key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw))
+
+
+def test_database_latch_retirement_and_monotonic_approval_highwater():
+    from skeleton.app.canonical_writer_cutover import (
+        reserve_writer_deployment, inspect_writer_deployment, verify_writer_deployment,
+        retire_writer_deployment,
+    )
+    epoch,coll=latch_fixture()
+    now=int(time.time())
+    first=signed(issued_at=now-4)
+    async def run():
+        assert (await inspect_writer_deployment(epoch=epoch))["state"]=="ABSENT"
+        reservation=await reserve_writer_deployment(first,epoch=epoch)
+        assert reservation["generation"]==1
+        await verify_writer_deployment(epoch=epoch,reservation=reservation)
+        with pytest.raises(WriterCutoverDenied):
+            await reserve_writer_deployment(signed(issued_at=now-3),epoch=epoch)
+        p,s,k=retirement(epoch,first,reservation["latch_sha256"],issued_at=now-2)
+        retired=await retire_writer_deployment(p,s,**k)
+        assert retired["generation"]==2 and retired["state"]=="RETIRED"
+        with pytest.raises(WriterCutoverDenied):
+            await verify_writer_deployment(epoch=epoch,reservation=reservation)
+        with pytest.raises(WriterCutoverDenied):
+            await retire_writer_deployment(p,s,**k)
+        with pytest.raises(WriterCutoverDenied):
+            await reserve_writer_deployment(first,epoch=epoch)
+        again=await reserve_writer_deployment(signed(issued_at=now-1),epoch=epoch)
+        assert again["generation"]==3
+        assert coll.row["state"]=="ACTIVE"
+    asyncio.run(run())
+
+
+def test_uncertain_write_never_grants_startup_or_allows_retry():
+    from skeleton.app.canonical_writer_cutover import reserve_writer_deployment,inspect_writer_deployment
+    epoch,coll=latch_fixture()
+    coll.uncertain=True
+    async def run():
+        with pytest.raises(WriterCutoverDenied):
+            await reserve_writer_deployment(signed(),epoch=epoch)
+        assert (await inspect_writer_deployment(epoch=epoch))["state"]=="ACTIVE"
+        with pytest.raises(WriterCutoverDenied):
+            await reserve_writer_deployment(signed(),epoch=epoch)
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("change",["wrong_digest","wrong_signature","stale_time","wrong_database"])
+def test_retirement_does_not_reset_latch_on_wrong_authority(change):
+    from skeleton.app.canonical_writer_cutover import reserve_writer_deployment,retire_writer_deployment
+    epoch,coll=latch_fixture()
+    first=signed(issued_at=int(time.time())-4)
+    async def run():
+        active=await reserve_writer_deployment(first,epoch=epoch)
+        updates={}
+        if change=="wrong_digest":
+            updates["active_latch_sha256"]="9"*64
+        elif change=="stale_time":
+            updates["issued_at"]=first.plan.issued_at
+        elif change=="wrong_database":
+            updates["database_name"]="different"
+        p,s,k=retirement(epoch,first,active["latch_sha256"],**updates)
+        if change=="wrong_signature":
+            s=b"x"*64
+        before=dict(coll.row)
+        with pytest.raises(WriterCutoverDenied):
+            await retire_writer_deployment(p,s,**k)
+        assert coll.row==before
+    asyncio.run(run())
+
+
+def test_malformed_existing_latch_denies_instead_of_overwriting():
+    from skeleton.app.canonical_writer_cutover import reserve_writer_deployment
+    epoch,coll=latch_fixture()
+    coll.row={"_id":"canonical-writer-single-deployment-v1","state":"RETIRED"}
+    with pytest.raises(WriterCutoverDenied):
+        asyncio.run(reserve_writer_deployment(signed(),epoch=epoch))
+    assert coll.row=={"_id":"canonical-writer-single-deployment-v1","state":"RETIRED"}

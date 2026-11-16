@@ -89,3 +89,34 @@ not a successful admission receipt. Do not delete reservation records to
 recover; reconcile and obtain a fresh signed plan. This is single-host trusted
 filesystem custody, not a distributed lock or a physical anti-rollback witness.
 Default unprotected setup and read-only inspection do not make reservations.
+
+
+### Shared database startup custody
+
+The protected launcher additionally reserves a non-expiring, majority-journaled
+singleton row in canonical_writer_deployment_latch. It validates the signed
+six-collection graph before the reservation, validates the graph again after
+reservation, and checks the exact linearizable ACTIVE row before binding local
+owners. An uncertain write or failed launch leaves the reservation held.
+A second cooperative backend cannot start on the same canonical database,
+including from a different host or under a deployment alias. The fixed row
+identity is database-wide; the generation is monotonic and retirement preserves
+the approval timestamp high-water mark. No TTL or automatic takeover exists.
+
+Use --inspect-deployment --source-head SHA for a read-only state, generation,
+and active latch digest receipt. After independently proving every protected
+process is stopped, an authorized operator signs WriterDeploymentRetirement
+with the active latch digest, exact source/deployment/database/authority pins,
+short validity, and SHA-256 of external shutdown evidence. Use
+--retire-deployment --source-head SHA --plan /private/retirement.json
+--signature /private/retirement.sig --authority ID --deployment ID
+--operator-public-key-hex PIN. This operation is offline administration only:
+never retire an active process, never delete the latch row, and never use
+elapsed time as shutdown evidence. A new startup plan must have an issuance
+timestamp strictly newer than the retirement high-water mark. A different
+deployment or authority requires a separately reviewed migration.
+
+The latch excludes cooperating startup attempts; it does not fence arbitrary
+direct clients, continuously attest an already-running backend, prove external
+shutdown evidence, prevent database snapshot rollback, or authorize inference.
+Those remain independent holds. The default legacy install is unchanged.

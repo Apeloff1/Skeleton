@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from skeleton.app.canonical_writer_cutover import (
     VerifiedWriterCutover, WriterCutoverDenied, inspect_writer_inventory, qualify_writer_cutover,
+    reserve_writer_deployment, verify_writer_deployment,
 )
 from skeleton.persistence.mongo_source_epoch import (
     MongoCanonicalSourceEpoch, bind_required_canonical_writers,
@@ -63,6 +64,16 @@ async def install_before_lifespan(app):
             approval, epoch=epoch, collections=_collections(conversation, memory),
             repository_namespace=memory.repository_namespace,
         )
+        # Reserve shared startup custody only after the first read-only
+        # signed inventory passes. Re-scan under that non-expiring reservation.
+        reservation = await reserve_writer_deployment(approval, epoch=epoch)
+        confirmed = await qualify_writer_cutover(
+            approval, epoch=epoch, collections=_collections(conversation, memory),
+            repository_namespace=memory.repository_namespace,
+        )
+        if confirmed != inventory:
+            raise WriterCutoverDenied("canonical inventory changed during shared reservation")
+        await verify_writer_deployment(epoch=epoch, reservation=reservation)
         # No await between final signed/live admission and sticky binding.
         # A failed binding does not roll back to unprotected owners.
         approval.verify()
@@ -75,6 +86,8 @@ async def install_before_lifespan(app):
             "local_owner_graph_sha256": inventory.graph_sha256,
             "local_collection_counts": dict(inventory.collection_counts),
             "known_local_writer_binding_installed": True,
+            "shared_startup_reservation": reservation,
+            "distributed_writer_fencing_verified": False,
             "external_writer_coverage_verified": False,
             "guarded_local_ai_ready": False,
         }

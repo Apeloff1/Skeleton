@@ -20,7 +20,10 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT/"backend")]
-from skeleton.app.canonical_writer_cutover import CanonicalWriterCutover, VerifiedWriterCutover, WriterCutoverDenied
+from skeleton.app.canonical_writer_cutover import (
+    CanonicalWriterCutover, VerifiedWriterCutover, WriterCutoverDenied,
+    WriterDeploymentRetirement, inspect_writer_deployment, retire_writer_deployment,
+)
 
 
 def _file(path, bound):
@@ -203,6 +206,8 @@ def main(argv=None):
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--inspect-only", action="store_true")
     mode.add_argument("--start-protected-backend", action="store_true")
+    mode.add_argument("--inspect-deployment", action="store_true")
+    mode.add_argument("--retire-deployment", action="store_true")
     parser.add_argument("--source-head", required=True)
     parser.add_argument("--plan", type=Path)
     parser.add_argument("--signature", type=Path)
@@ -214,6 +219,28 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         _source(args.source_head)
+        if args.inspect_deployment or args.retire_deployment:
+            from core.databases import core_db
+            from skeleton.persistence.mongo_source_epoch import MongoCanonicalSourceEpoch
+            epoch = MongoCanonicalSourceEpoch(core_db)
+            if args.inspect_deployment:
+                if any(v is not None for v in (args.plan,args.signature,args.authority,args.deployment,args.operator_public_key_hex,args.state_dir)):
+                    raise WriterCutoverDenied("observation cannot consume retirement approval")
+                result = asyncio.run(inspect_writer_deployment(epoch=epoch))
+            else:
+                if (not args.plan or not args.signature or not args.authority or not args.deployment
+                        or args.state_dir is not None
+                        or re.fullmatch(r"[0-9a-f]{64}",args.operator_public_key_hex or "") is None):
+                    raise WriterCutoverDenied("independently signed offline retirement required")
+                plan = WriterDeploymentRetirement.parse(_file(args.plan,16384))
+                result = asyncio.run(retire_writer_deployment(
+                    plan,_file(args.signature,64),epoch=epoch,authority_id=args.authority,
+                    deployment_id=args.deployment,source_head=args.source_head,
+                    public_key=bytes.fromhex(args.operator_public_key_hex)))
+            _source(args.source_head)
+            result["source_head"] = args.source_head
+            print(json.dumps(result,sort_keys=True))
+            return 0
         if args.inspect_only:
             if any(v is not None for v in (args.plan,args.signature,args.authority,args.deployment,args.operator_public_key_hex,args.state_dir)):
                 raise WriterCutoverDenied("inspection cannot consume approval")
