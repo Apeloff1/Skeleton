@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from hashlib import sha256
+from itertools import islice
 import json
 from statistics import median
 from typing import Iterable
@@ -59,6 +60,19 @@ class TuningScope:
 class Candidate:
     scope: TuningScope
     plan: ConsumerLlamaPlan
+
+    def __post_init__(self) -> None:
+        if type(self.scope) is not TuningScope or type(self.plan) is not ConsumerLlamaPlan:
+            raise ValueError("typed scope and plan required")
+        c = self.plan.configuration
+        if type(c) is not LlamaCppConfig or c.context_size is None or c.threads is None or c.batch_size is None or c.kv_bytes_per_token is None:
+            raise ValueError("candidate needs a complete planned configuration")
+        for value in (self.plan.model_bytes, self.plan.reserved_ram_bytes, self.plan.reserved_kv_bytes, self.plan.estimated_total_bytes, self.plan.available_ram_bytes):
+            _integer(value, 1, 1 << 53)
+        if (self.plan.reserved_kv_bytes != c.context_size * c.kv_bytes_per_token
+                or self.plan.estimated_total_bytes != self.plan.model_bytes + self.plan.reserved_ram_bytes + self.plan.reserved_kv_bytes + c.runtime_scratch_bytes
+                or self.plan.estimated_total_bytes > self.plan.available_ram_bytes):
+            raise ValueError("inconsistent candidate capacity accounting")
 
     @property
     def identity(self) -> str:
@@ -159,11 +173,13 @@ class Decision:
 
 
 def corpus_identity(case_ids: Iterable[str]) -> str:
-    ids = tuple(case_ids)
-    if not 1 <= len(ids) <= 256 or len(set(ids)) != len(ids):
-        raise ValueError("expected unique bounded benchmark corpus")
+    ids = tuple(islice(case_ids, 257))
+    if not 1 <= len(ids) <= 256:
+        raise ValueError("expected bounded benchmark corpus")
     for item in ids:
         _pin(item)
+    if len(set(ids)) != len(ids):
+        raise ValueError("expected unique benchmark corpus")
     return _digest(sorted(ids))
 
 
@@ -190,6 +206,16 @@ def select(profiles: tuple[Candidate, ...], samples: Iterable[Sample], *,
         raise ValueError("corpus identity mismatch")
     if any(p.scope != baseline.scope for p in profiles):
         raise ValueError("candidate crosses evidence scope")
+    config = baseline.plan.configuration
+    for p in profiles[1:]:
+        c = p.plan.configuration
+        if (replace(c, threads=config.threads, batch_size=config.batch_size) != config
+                or c.threads > config.threads or c.batch_size > config.batch_size
+                or (p.plan.model_bytes, p.plan.reserved_ram_bytes, p.plan.reserved_kv_bytes,
+                    p.plan.estimated_total_bytes, p.plan.available_ram_bytes) !=
+                   (baseline.plan.model_bytes, baseline.plan.reserved_ram_bytes, baseline.plan.reserved_kv_bytes,
+                    baseline.plan.estimated_total_bytes, baseline.plan.available_ram_bytes)):
+            raise ValueError("candidate changed a non-tunable setting or capacity reserve")
     expected = {p.identity: p for p in profiles}
     if len(expected) != len(profiles):
         raise ValueError("duplicate candidate")
