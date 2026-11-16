@@ -112,6 +112,63 @@ def _hash_file(path: Path, *, maximum: int) -> tuple[str, int]:
         return _hash_stream(stream, maximum=maximum)
 
 
+class _InventoryVerificationBatch:
+    """Scoped verification reuse for one bounded manifest inventory.
+
+    No persisted stat-based hash cache is trusted. Every distinct object
+    is physically hashed in this batch and all observed file and bucket
+    identities are checked again before inventory publication.
+    """
+
+    def __init__(self, store: "WeightShardStore", expected: Mapping[str, int]) -> None:
+        self._store = store
+        self._expected = dict(expected)
+        self._verified: dict[str, tuple[tuple[int, ...], tuple[int, int]]] = {}
+        self._bytes = 0
+        self._sealed = False
+
+    def _observe(self, shard: WeightShard) -> tuple[Path, tuple[int, ...], tuple[int, int]]:
+        if self._expected.get(shard.digest) != shard.bytes:
+            raise WeightShardStoreError("object outside admitted inventory references")
+        path = self._store._object_path(shard.digest)
+        info = path.lstat()
+        if (not stat.S_ISREG(info.st_mode) or info.st_size != shard.bytes
+                or getattr(info, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)):
+            raise WeightShardStoreError("inventory object violates admitted file identity")
+        return path, _file_identity(info), _directory_identity(path.parent)
+
+    def verify(self, shard: WeightShard) -> Path:
+        if self._sealed:
+            raise WeightShardStoreError("inventory verification batch already finalized")
+        path, identity, bucket = self._observe(shard)
+        prior = self._verified.get(shard.digest)
+        if prior is not None:
+            if prior != (identity, bucket):
+                raise WeightShardStoreError("shared inventory object changed during verification")
+            return path
+        with self._store._object_reader(shard) as stream:
+            observed, size = _hash_stream(stream, maximum=shard.bytes)
+        if observed != shard.digest or size != shard.bytes:
+            raise WeightShardStoreError("stored weight object changed since admission")
+        if self._observe(shard) != (path, identity, bucket):
+            raise WeightShardStoreError("inventory object changed while hashing")
+        self._verified[shard.digest] = (identity, bucket)
+        self._bytes += size
+        return path
+
+    def finalize(self) -> dict[str, int]:
+        if self._sealed or self._verified.keys() != self._expected.keys():
+            raise WeightShardStoreError("incomplete inventory physical verification")
+        for digest, expected in self._verified.items():
+            shard = WeightShard(0, digest, self._expected[digest], "local")
+            _, identity, bucket = self._observe(shard)
+            if (identity, bucket) != expected:
+                raise WeightShardStoreError("inventory object changed before publication")
+        self._store.assert_layout()
+        self._sealed = True
+        return {"distinct_objects": len(self._verified), "verified_object_bytes": self._bytes}
+
+
 class WeightShardStore:
     """Immutable CAS with deterministic manifests and bounded stream memory."""
 
@@ -327,7 +384,8 @@ class WeightShardStore:
         # The private checkpoint is a trusted-code composition boundary,
         # not protection against arbitrary code inside the interpreter.
         markers = (self.root / ".weight-stage.lock", self.root / ".weight-stage-policy.json",
-                   self.root / ".weight-stage-intent.json")
+                   self.root / ".weight-stage-intent.json", self.root / ".weight-stage-last.json",
+                   self.root / ".weight-stage-scrub.json")
         if any(marker.exists() or marker.is_symlink() for marker in markers) and _write_checkpoint is None:
             raise WeightShardStoreError("managed weight store requires cooperative disk owner")
         encoded = self.prepare_stage_manifest(identity, plan, source_paths)
@@ -427,15 +485,22 @@ class WeightShardStore:
         return plan, sha256(raw).hexdigest(), len(raw)
 
     def verified_paths(self, plan_digest: str, *, expected_manifest_sha256: str | None = None,
-                       maximum_manifest_bytes: int = _MAX_MANIFEST_BYTES) -> tuple[Path, ...]:
+                       maximum_manifest_bytes: int = _MAX_MANIFEST_BYTES,
+                       _batch: _InventoryVerificationBatch | None = None) -> tuple[Path, ...]:
         """Return verified shard paths under an optionally exact manifest pin."""
         plan, manifest_sha, _ = self.manifest_evidence(plan_digest, maximum=maximum_manifest_bytes)
         if expected_manifest_sha256 is not None:
             require_digest(expected_manifest_sha256, "expected_manifest_sha256")
             if manifest_sha != expected_manifest_sha256:
                 raise WeightShardStoreError("weight manifest identity changed")
+        if _batch is not None and (not isinstance(_batch, _InventoryVerificationBatch)
+                                   or _batch._store is not self):
+            raise WeightShardStoreError("inventory verification batch belongs to another store")
         paths = []
         for shard in plan.shards:
+            if _batch is not None:
+                paths.append(_batch.verify(shard))
+                continue
             path = self._object_path(shard.digest)
             try:
                 with self._object_reader(shard) as stream:
