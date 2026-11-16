@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - feat/dragon-deployment-custody-qualification-20261116
+      - feat/dragon-ecosystem-storage-custody-20261116
 
 permissions:
   contents: read
