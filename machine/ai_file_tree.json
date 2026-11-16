@@ -5848,6 +5848,7 @@
         "lifecycle_proof.py",
         "mirror_room_evaluation.py",
         "model_release_journal.py",
+        "native_retention_evaluation.py",
         "offline_foundations.py",
         "project_learning.py",
         "project_learning_run.py",
