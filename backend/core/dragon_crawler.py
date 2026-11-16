@@ -239,6 +239,49 @@ def _publisher_capture_review(intent: dict, snapshot: dict, *, now: float) -> di
     }
 
 
+def _publisher_archive_preflight(intent: dict, snapshot: dict, policies: dict, *,
+                                 status: str, now: float, witnessed: bool) -> dict:
+    """Conservative handoff to the existing archive grant authority.
+
+    Only a declared, retained representation may be considered. The canonical
+    archive predicate is applied again at grant creation. This read never
+    reconstructs raw bytes or authorizes any source, dataset, fetch, or model.
+    """
+    from skeleton.ai.webcrawler.dragon_archive_grant import eligible_source
+
+    review = _publisher_capture_review(intent, snapshot, now=now)
+    sources = snapshot["sources"]
+    archive_eligible = sum(eligible_source(source, policies.get(sid, {"version": 0, "enabled": True}))
+                           for sid, source in sources.items())
+    terminal = status in {"completed", "budget_exhausted"} and snapshot["state"] in {
+        "completed", "budget_exhausted"}
+    # Capture consent can expire independently of a separately acknowledged
+    # archive grant. Evaluate retained evidence without treating expiry as a
+    # new right or discarding the other restriction signals.
+    if not witnessed:
+        decision = "checkpoint_unwitnessed"
+    elif not terminal:
+        decision = "terminal_capture_required"
+    elif review["denial_statuses"] or review["rejected_observations"]:
+        decision = "restriction_review_required"
+    elif not sources:
+        decision = "no_retained_capture"
+    elif review["declared_type_matches"] != len(sources):
+        decision = "representation_review_required"
+    elif archive_eligible != len(sources):
+        decision = "archive_policy_held"
+    else:
+        decision = "explicit_archive_grant_required"
+    return {
+        "schema": "skeleton.dragon.publisher-archive-preflight.v1",
+        "state": decision, "snapshot_digest": snapshot["snapshot_digest"],
+        "retained_captures": len(sources), "archive_policy_candidates": archive_eligible,
+        "terminal_capture": terminal, "checkpoint_witnessed": witnessed,
+        "archive_grant_issued": False, "raw_dataset_verified": False,
+        "source_use_authorized": False, "network_executed": False,
+    }
+
+
 def authenticated_scope(user: dict | None) -> dict[str, str]:
     if not isinstance(user, dict) or user.get("disabled") or user.get("dev_mode"):
         raise CrawlerError("crawler_sign_in_required", "Sign in to use scoped crawler data.", 401)
@@ -710,6 +753,10 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             status["publisher_intent"] = publisher
             status["publisher_capture_review"] = _publisher_capture_review(
                 publisher, runtime.snapshot(), now=_now().timestamp())
+            status["publisher_archive_preflight"] = _publisher_archive_preflight(
+                publisher, runtime.snapshot(), self._source_policies(row),
+                status=row["status"], now=_now().timestamp(),
+                witnessed=row.get("checkpoint_identity") is not None)
         # The companion is historical operational metadata. Current source-use
         # policy separately governs whether its evidence references are shown.
         # A session-level pause/cancel/lease interruption takes precedence
@@ -2211,6 +2258,14 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             if row["status"] not in {"completed","budget_exhausted"} or not row.get("checkpoint_identity"):
                 raise CrawlerError("crawler_archive_not_terminal", "Archive permission requires a finished witnessed expedition.",409)
             verify_primary(snapshot,_plain(row["checkpoint_identity"]))
+            publisher = _publisher_intent_projection(scope, row)
+            if publisher is not None:
+                preflight = _publisher_archive_preflight(
+                    publisher, snapshot, self._source_policies(row),
+                    status=row["status"], now=now.timestamp(), witnessed=True)
+                if preflight["state"] != "explicit_archive_grant_required":
+                    raise CrawlerError("crawler_publisher_archive_held",
+                                       "Publisher capture requires independent archive review.", 409)
             try:
                 grant = create_grant(snapshot=snapshot,policies=self._source_policies(row),
                                      now=now.timestamp(),days=body["days"])
