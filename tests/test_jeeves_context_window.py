@@ -277,3 +277,140 @@ def test_real_grounded_strict_context_reuses_evidence_identity_but_fences_turn_p
         assert saved["messages"][0]["content"] == message
     finally:
         app.close()
+
+
+# Cognitive preflight is opt-in, and never an alternate generation path.
+def _cognitive_report():
+    return {"context_tokens": 1024, "estimated_input_tokens": 128,
+            "reserved_output_tokens": 64, "omitted_history_messages": 2}
+
+
+def test_cognitive_plan_exact_unicode_fragments_and_dependency_order():
+    from skeleton.app.jeeves_cognitive import build_preview, verify_preview
+    question = "Compare 🐉 game design; implement Python code; verify evidence?"
+    rows = [
+        {"role": "system", "content": "Never recall this system message: game."},
+        {"role": "user", "content": "My game design uses a dragon companion."},
+        {"role": "assistant", "content": "Fabricated game design fact."},
+        {"role": "user", "content": "Python code for the game is offline."},
+    ]
+    result = build_preview(question, rows, session_revision=2,
+                           model_digest="a"*64, tokenizer_digest="b"*64,
+                           context_report=_cognitive_report())
+    assert verify_preview(result)
+    assert result["suggested_effort"] == "deep"
+    assert result["budget"]["unreserved_units"] == 832
+    assert result["budget"]["recommended_action"] == "review-context"
+    assert {row["message_index"] for row in result["memory"]["matches"]} == {1, 3}
+    for row in result["request_spans"]:
+        assert question[row["start"]:row["end"]] == row["text"]
+        assert sha256(row["text"].encode()).hexdigest() == row["sha256"]
+    seen = set()
+    for step in result["workflow"]:
+        assert set(step["depends_on"]).issubset(seen)
+        assert step["authority"] == "advice-only"
+        seen.add(step["id"])
+    assert not result["tool_execution_authorized"]
+    assert not result["prompt_modified"]
+    assert not result["memory_saved"]
+    assert not result["model_quality_measured"]
+    result["suggested_effort"] = "brief"
+    assert not verify_preview(result)
+
+
+def test_cognitive_memory_exact_excerpt_deduplicates_and_bounds_scan():
+    from skeleton.app.jeeves_cognitive import recall
+    text = "prefix " * 200 + "nebula recovery" + " suffix" * 200
+    messages = [{"role": "user", "content": "nebula old secret"}] * 140
+    messages.extend([{"role": "user", "content": text},
+                     {"role": "user", "content": text},
+                     {"role": "assistant", "content": "nebula recovery invented"}])
+    result = recall("nebula recovery", messages)
+    assert result["history_rows_scanned"] == 128
+    assert result["scan_truncated"]
+    assert result["automatically_injected"] is False
+    matches = result["matches"]
+    assert len(matches) == 2
+    picked = next(row for row in matches if row["message_index"] == 141)
+    assert picked["text"] == text[picked["start"]:picked["end"]]
+    assert "nebula recovery" in picked["text"]
+    assert len(picked["text"]) <= 420
+    assert picked["source_sha256"] == sha256(text.encode()).hexdigest()
+    assert all(row["role"] == "user" for row in matches)
+
+
+def test_cognitive_clauses_does_not_discard_tail():
+    from skeleton.app.jeeves_cognitive import clauses
+    question = "; ".join("clause " + str(i) for i in range(40))
+    spans = clauses(question)
+    assert len(spans) == 8
+    assert spans[-1]["text"].endswith("clause 39")
+    assert spans[-1]["end"] == len(question)
+    assert spans == sorted(spans, key=lambda row: row["start"])
+
+
+def test_cognitive_evidence_reports_overlap_not_entailment_and_refuses_forgery():
+    from skeleton.app.jeeves_cognitive import build_preview
+    passage = "The dragon has a blue wing."
+    manifest = {"citations": [
+        {"citation": "local:12345678:0:" + "b"*16, "passage": passage,
+         "passage_sha256": sha256(passage.encode()).hexdigest()}
+    ]}
+    params = dict(session_revision=0, model_digest="a"*64, tokenizer_digest="b"*64,
+                  context_report=_cognitive_report(), manifest=manifest)
+    result = build_preview("dragon wings; unrelated moon", [], **params)
+    evidence = result["evidence"]
+    assert evidence["source_count"] == 1
+    assert evidence["clause_coverage"][0]["any_lexical_overlap"]
+    assert not evidence["clause_coverage"][1]["any_lexical_overlap"]
+    assert evidence["semantic_entailment_verified"] is False
+    manifest["citations"][0]["passage"] = "altered"
+    with pytest.raises(ValueError, match="unverified preview passage"):
+        build_preview("dragon", [], **params)
+
+
+@pytest.mark.parametrize("override", [
+    {"context_tokens": True}, {"estimated_input_tokens": 0},
+    {"reserved_output_tokens": 999}, {"omitted_history_messages": -1},
+])
+def test_cognitive_budget_rejects_invalid_geometry(override):
+    from skeleton.app.jeeves_cognitive import build_preview
+    with pytest.raises(ValueError):
+        build_preview("hello", [], session_revision=0, model_digest="a"*64,
+                      tokenizer_digest="b"*64, context_report=_cognitive_report() | override)
+
+
+def test_real_context_cognitive_preview_opt_in_and_no_second_generation(tmp_path):
+    from skeleton.app.jeeves_cognitive import verify_preview
+    app = OfflineHTTPApplication(native_model(), tmp_path / "cognitive.sqlite3",
+                                 token="t" * 64)
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        sid = created["session_id"]
+        prefix = f"/v1/sessions/{sid}"
+        _, result = app.dispatch("POST", prefix + "/turn", {
+            "message": "hello offline", "request_id": "cognitive-original-turn",
+            "max_output_tokens": 2,
+        })
+        assert result["revision"] == 1
+        _, before = app.dispatch("GET", prefix)
+        _, normal = app.dispatch("POST", prefix + "/context-preview",
+                                 {"message": "hello offline", "max_output_tokens": 2})
+        assert "cognitive_preview" not in normal
+        _, report = app.dispatch("POST", prefix + "/context-preview", {
+            "message": "hello offline", "max_output_tokens": 2, "cognitive": True,
+        })
+        plan = report["cognitive_preview"]
+        assert verify_preview(plan)
+        assert plan["session_revision"] == 1
+        assert plan["memory"]["matches"][0]["text"] == "hello offline"
+        assert plan["generation_performed"] is False
+        assert report["preview_is_admission_proof"] is False
+        _, after = app.dispatch("GET", prefix)
+        assert after == before
+        with pytest.raises(OfflineHTTPError) as error:
+            app.dispatch("POST", prefix + "/context-preview",
+                         {"message": "hello", "cognitive": 1})
+        assert error.value.status == 400
+    finally:
+        app.close()
