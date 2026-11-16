@@ -767,8 +767,9 @@ JAVASCRIPT = r"""'use strict';
   function inlineChatText(parent, text) {
     // Only literal text nodes and fixed element names, never HTML or URLs.
     const pattern = /(\x60[^\x60\n]{1,512}\x60|\*\*[^*\n]{1,512}\*\*)/g;
-    let offset=0;
+    let offset=0, count=0;
     for (const match of text.matchAll(pattern)) {
+      if (++count>256) break;
       parent.append(document.createTextNode(text.slice(offset,match.index)));
       const token=match[0];
       const node=document.createElement(token.startsWith('**')?'strong':'code');
@@ -907,7 +908,7 @@ JAVASCRIPT = r"""'use strict';
       card.className = 'message ' + (message.role === 'user' ? 'user' : 'assistant');
       const header = document.createElement('header');
       const faith = message.role === 'assistant' ? state.faithfulness[completed] : null;
-      const visible = faith?.published_text || message.content;
+      const visible = typeof faith?.published_text === 'string' ? faith.published_text : message.content;
       header.textContent = message.role === 'user' ? 'YOU' : message.role === 'system' ? 'CONVERSATION INSTRUCTIONS' : (faith && visible !== message.content ? 'GROUNDED ANSWER' : 'LOCAL MODEL');
       const content = document.createElement('div');
       if (message.role==='assistant') {
