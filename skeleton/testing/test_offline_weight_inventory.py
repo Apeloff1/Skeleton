@@ -390,3 +390,106 @@ def test_ingest_refuses_manifest_overflow_before_object_writes(tmp_path, monkeyp
     monkeypatch.setattr(store, "_ingest", lambda *args: pytest.fail("ingest before manifest admission"))
     with pytest.raises(owner.WeightShardStoreError, match="manifest exceeds"):
         store.stage_plan(model, plan, {0: tmp_path / "absent"})
+
+
+def _stage_shared_objects(tmp_path):
+    from dataclasses import replace
+    payload = b"shared weights"
+    checksum = sha256(payload).hexdigest()
+    model = ModelIdentity("shared-model", "revision-1", "tiny", checksum, checksum, checksum)
+    source = tmp_path / "source"
+    source.write_bytes(payload)
+    store = WeightShardStore(tmp_path / "store")
+    shard = WeightShard(0, checksum, len(payload), "local")
+    first = WeightLoadPlan(model.identity_digest, (shard,), len(payload))
+    other = replace(model, revision="revision-2")
+    second = WeightLoadPlan(other.identity_digest, (shard,), len(payload))
+    store.stage_plan(model, first, {0: source})
+    store.stage_plan(other, second, {0: source})
+    return store, first, second, payload
+
+
+def test_inventory_hashes_shared_objects_once_and_separates_physical_bytes(tmp_path, monkeypatch):
+    from skeleton.ai.model_runtime import weight_shard_store as module
+    store, first, second, payload = _stage_shared_objects(tmp_path)
+    original = module._hash_stream
+    observed = []
+
+    def capture(stream, *, maximum):
+        observed.append(maximum)
+        return original(stream, maximum=maximum)
+
+    monkeypatch.setattr(module, "_hash_stream", capture)
+    result = inventory_offline_weights(store.root, max_weight_bytes=len(payload) * 2,
+                                       max_physical_weight_bytes=len(payload))
+    assert result["model_count"] == 2
+    assert result["total_shard_references"] == 2
+    assert result["total_weight_bytes"] == 2 * len(payload)
+    assert result["distinct_weight_objects"] == 1
+    assert result["verified_physical_weight_bytes"] == len(payload)
+    assert observed == [len(payload)]
+    assert {row["plan_digest"] for row in result["models"]} == {first.digest, second.digest}
+    # A subsequent invocation must physically verify rather than trusting
+    # the previous invocation's metadata or process-local cache.
+    assert inventory_offline_weights(store.root)["digest"] == result["digest"]
+    assert observed == [len(payload), len(payload)]
+
+
+def test_physical_weight_read_budget_rejects_before_any_hashing(tmp_path, monkeypatch):
+    from skeleton.ai.model_runtime import weight_shard_store as module
+    store, _, _, payload = _stage_shared_objects(tmp_path)
+    monkeypatch.setattr(module, "_hash_stream", lambda *a, **k: pytest.fail("hashed before admission"))
+    with pytest.raises(OfflineInventoryError, match="distinct physical weights"):
+        inventory_offline_weights(store.root, max_physical_weight_bytes=len(payload) - 1)
+    with pytest.raises(OfflineInventoryError, match="aggregate offline weights"):
+        inventory_offline_weights(store.root, max_weight_bytes=len(payload) * 2 - 1)
+
+
+def test_deduplicated_inventory_detects_object_drift_between_references(tmp_path, monkeypatch):
+    store, first, _, payload = _stage_shared_objects(tmp_path)
+    target = store.verified_paths(first.digest)[0]
+    original = WeightShardStore.verified_paths
+    calls = []
+
+    def mutate(self, key, **kwargs):
+        result = original(self, key, **kwargs)
+        calls.append(key)
+        if len(calls) == 1:
+            target.write_bytes(b"x" * len(payload))
+        return result
+
+    monkeypatch.setattr(WeightShardStore, "verified_paths", mutate)
+    with pytest.raises(OfflineInventoryError, match="verification failed"):
+        inventory_offline_weights(store.root)
+
+
+def test_final_identity_fence_detects_last_verified_object_replacement(tmp_path, monkeypatch):
+    store, first, _, payload = _stage_shared_objects(tmp_path)
+    target = store.verified_paths(first.digest)[0]
+    original = WeightShardStore.verified_paths
+    calls = []
+
+    def mutate(self, key, **kwargs):
+        result = original(self, key, **kwargs)
+        calls.append(key)
+        if len(calls) == 2:
+            replacement = target.with_name("replacement")
+            replacement.write_bytes(payload)
+            replacement.replace(target)
+        return result
+
+    monkeypatch.setattr(WeightShardStore, "verified_paths", mutate)
+    with pytest.raises(OfflineInventoryError, match="verification failed"):
+        inventory_offline_weights(store.root)
+
+
+def test_weight_load_plan_detaches_mutable_shard_declaration():
+    checksum = sha256(b"x").hexdigest()
+    source = [WeightShard(0, checksum, 1, "local")]
+    plan = WeightLoadPlan("a" * 64, source, 1)
+    pin = plan.digest
+    source[0] = WeightShard(0, "b" * 64, 1, "local")
+    source.clear()
+    assert len(plan.shards) == 1
+    assert isinstance(plan.shards, tuple)
+    assert plan.digest == pin
