@@ -132,8 +132,39 @@ def begin_intent(directory_fd: int, *, policy_sha256: str, plan_digest: str,
     }, replace=False)
 
 
-def read_last(directory_fd: int) -> dict | None:
-    return _read(directory_fd, LAST, "skeleton.weight-stage-outcome.v1")
+def read_last(directory_fd: int, policy_sha256: str | None = None) -> dict | None:
+    row = _read(directory_fd, LAST, "skeleton.weight-stage-outcome.v1")
+    if row is None:
+        return None
+    expected = {"schema", "intent_digest", "policy_sha256", "plan_digest", "outcome",
+                "prior_outcome_digest", "evidence", "digest"}
+    if set(row) != expected or row["outcome"] not in ("committed", "recovery_reconciled"):
+        raise WeightShardStoreError("invalid staging outcome fields")
+    for name in ("intent_digest", "policy_sha256", "plan_digest", "digest"):
+        require_digest(row[name], name)
+    if row["prior_outcome_digest"] is not None:
+        require_digest(row["prior_outcome_digest"], "prior outcome digest")
+    if policy_sha256 is not None and row["policy_sha256"] != policy_sha256:
+        raise WeightShardStoreError("staging outcome policy identity mismatch")
+    if type(row["evidence"]) is not dict:
+        raise WeightShardStoreError("invalid staging outcome evidence")
+    if row["outcome"] == "committed":
+        evidence = row["evidence"]
+        if (evidence.get("intent_digest") != row["intent_digest"]
+                or evidence.get("policy_sha256") != row["policy_sha256"]
+                or evidence.get("plan_digest") != row["plan_digest"]
+                or type(evidence.get("digest")) is not str
+                or _digest({key: value for key, value in evidence.items() if key != "digest"}) != evidence["digest"]):
+            raise WeightShardStoreError("committed outcome evidence identity mismatch")
+    else:
+        evidence = row["evidence"]
+        for name in ("review_digest", "inventory_digest"):
+            require_digest(evidence.get(name), name)
+        if (evidence.get("disposition") not in ("committed_manifest_verified", "manifest_not_published")
+                or evidence.get("weight_mutation_performed") is not False
+                or evidence.get("deletion_authorized") is not False):
+            raise WeightShardStoreError("invalid recovery outcome evidence")
+    return row
 
 
 def finish_intent(directory_fd: int, *, policy_sha256: str, intent_digest: str,
@@ -145,7 +176,7 @@ def finish_intent(directory_fd: int, *, policy_sha256: str, intent_digest: str,
     if intent is None or intent["digest"] != intent_digest:
         raise WeightShardStoreError("staging intent identity no longer matches")
     # Refuse to overwrite invalid or externally substituted outcome metadata.
-    prior = read_last(directory_fd)
+    prior = read_last(directory_fd, policy_sha256)
     record = _publish(directory_fd, LAST, {
         "schema": "skeleton.weight-stage-outcome.v1",
         "intent_digest": intent_digest, "policy_sha256": policy_sha256,
@@ -155,7 +186,7 @@ def finish_intent(directory_fd: int, *, policy_sha256: str, intent_digest: str,
     }, replace=True)
     # Read back both controls before clearing. An interruption here leaves
     # the intent available for explicit recovery, not a fabricated success.
-    if read_last(directory_fd) != record or read_intent(directory_fd, policy_sha256) != intent:
+    if read_last(directory_fd, policy_sha256) != record or read_intent(directory_fd, policy_sha256) != intent:
         raise WeightShardStoreError("staging control identity changed before acknowledgement")
     os.unlink(INTENT, dir_fd=directory_fd)
     os.fsync(directory_fd)
