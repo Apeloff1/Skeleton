@@ -9,6 +9,7 @@ not a bag. No ModelPort.
 from __future__ import annotations
 
 import math
+from functools import lru_cache
 from heapq import nsmallest
 from typing import Callable, List, Tuple
 
@@ -156,14 +157,31 @@ def rms_norm_bwd(dy: Vec, x: Vec, hat: Vec, inv: float, g: Vec) -> Tuple[Vec, Ve
     return dx, dg
 
 
+@lru_cache(maxsize=128)
+def _rope_phase_table(d: int, pos: int) -> tuple[tuple[float, float], ...]:
+    # Public geometry only: no activations, tokens, model weights or other
+    # conversation data escape a call. Bound entries AND vector width.
+    result = []
+    for i in range(0, d, 2):
+        theta = float(pos) / (10000.0 ** (i / float(d)))
+        result.append((math.cos(theta), math.sin(theta)))
+    return tuple(result)
+
+
 def apply_rope(x: Vec, pos: int, *, base: float = 10000.0) -> Vec:
     """Rotary position. Even/odd pairs rotated by θ = pos / base^(i/d)."""
     n = len(x)
     out = list(x)
     d = max(2, n - (n % 2))
+    phases = (_rope_phase_table(d, pos)
+              if 2 <= n <= 512 and type(pos) is int and base == 10000.0
+              else None)
     for i in range(0, d, 2):
-        theta = float(pos) / (base ** (i / float(d)))
-        c, s = math.cos(theta), math.sin(theta)
+        if phases is None:
+            theta = float(pos) / (base ** (i / float(d)))
+            c, s = math.cos(theta), math.sin(theta)
+        else:
+            c, s = phases[i // 2]
         a, b = out[i], out[i + 1]
         out[i] = a * c - b * s
         out[i + 1] = a * s + b * c
