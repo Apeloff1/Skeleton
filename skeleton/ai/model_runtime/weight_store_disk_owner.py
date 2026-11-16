@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import shutil
 import stat
+from uuid import uuid4
 from typing import Iterator, Mapping
 
 from .flgb_model_runtime import MAX_WEIGHT_BYTES, ModelIdentity, WeightLoadPlan, canonical_bytes
@@ -24,6 +25,8 @@ _HEX = re.compile(r"[0-9a-f]{64}\Z")
 _BUCKET = re.compile(r"[0-9a-f]{2}\Z")
 _MANIFEST = re.compile(r"[0-9a-f]{64}\.json\Z")
 _LOCK = ".weight-stage.lock"
+_POLICY = ".weight-stage-policy.json"
+_POLICY_LIMIT = 4096
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,9 +92,82 @@ class WeightStoreDiskOwner:
                 os.close(fd)
         finally:
             os.close(directory_fd)
+        # Establish one persistent byte/entry/free-space policy under the
+        # same shared slot. A later process cannot choose a larger cap.
+        with self._owned() as (directory_fd, fd):
+            self._bind_policy(directory_fd, initialize=initialize)
+            self._inspect_lock(directory_fd, fd)
+
+    def _policy_bytes(self) -> bytes:
+        return canonical_bytes({"schema": "skeleton.weight-disk-policy.v1",
+                                "policy": asdict(self._policy)})
+
+    def _read_policy(self, directory_fd: int) -> tuple[bytes, tuple[int, int]]:
+        fd = os.open(_POLICY, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                     dir_fd=directory_fd)
+        try:
+            info = os.fstat(fd)
+            named = os.stat(_POLICY, dir_fd=directory_fd, follow_symlinks=False)
+            if (not _regular(info) or info.st_uid != os.geteuid() or info.st_mode & 0o077
+                    or info.st_dev != self._root_inode[0] or not 1 <= info.st_size <= _POLICY_LIMIT
+                    or _inode(info) != _inode(named)):
+                raise WeightShardStoreError("cooperative disk policy file identity mismatch")
+            with os.fdopen(fd, "rb", closefd=False) as reader:
+                raw = reader.read(_POLICY_LIMIT + 1)
+            final = os.fstat(fd)
+            named = os.stat(_POLICY, dir_fd=directory_fd, follow_symlinks=False)
+            if (len(raw) != info.st_size or _inode(final) != _inode(info)
+                    or _inode(named) != _inode(info) or final.st_size != info.st_size
+                    or final.st_mtime_ns != info.st_mtime_ns or final.st_ctime_ns != info.st_ctime_ns):
+                raise WeightShardStoreError("cooperative disk policy changed during inspection")
+            return raw, _inode(info)
+        finally:
+            os.close(fd)
+
+    def _bind_policy(self, directory_fd: int, *, initialize: bool) -> None:
+        expected = self._policy_bytes()
+        try:
+            raw, observed = self._read_policy(directory_fd)
+        except FileNotFoundError:
+            if not initialize:
+                raise WeightShardStoreError("cooperative disk policy not provisioned") from None
+            # Create a private file, sync it, and publish without replacement.
+            # No automatic policy migration or overwrite is supported.
+            temporary = "." + _POLICY + "." + uuid4().hex + ".tmp"
+            fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                         0o600, dir_fd=directory_fd)
+            try:
+                with os.fdopen(fd, "wb") as writer:
+                    writer.write(expected)
+                    writer.flush()
+                    os.fsync(writer.fileno())
+                os.link(temporary, _POLICY, src_dir_fd=directory_fd, dst_dir_fd=directory_fd,
+                        follow_symlinks=False)
+                os.unlink(temporary, dir_fd=directory_fd)
+                os.fsync(directory_fd)
+            finally:
+                try:
+                    os.unlink(temporary, dir_fd=directory_fd)
+                except FileNotFoundError:
+                    pass
+            raw, observed = self._read_policy(directory_fd)
+        if raw != expected:
+            raise WeightShardStoreError("requested disk policy differs from persisted policy")
+        self._policy_inode = observed
+        self._policy_sha256 = sha256(raw).hexdigest()
+
+    def _assert_policy(self, directory_fd: int) -> None:
+        try:
+            raw, observed = self._read_policy(directory_fd)
+        except OSError as exc:
+            raise WeightShardStoreError("cooperative disk policy unavailable") from exc
+        if observed != self._policy_inode or sha256(raw).hexdigest() != self._policy_sha256:
+            raise WeightShardStoreError("cooperative disk policy identity changed")
 
     def _inspect_lock(self, directory_fd: int, fd: int) -> tuple[int, int]:
         self._store.assert_layout()
+        if hasattr(self, "_policy_inode"):
+            self._assert_policy(directory_fd)
         opened = os.fstat(fd)
         named = os.stat(_LOCK, dir_fd=directory_fd, follow_symlinks=False)
         if (_inode(os.fstat(directory_fd)) != self._root_inode
@@ -180,7 +256,8 @@ class WeightStoreDiskOwner:
             free = shutil.disk_usage(self._store.root).free
             self._inspect_lock(directory_fd, fd)
             body = {"schema": "skeleton.weight-disk-admission.v1",
-                    "policy": asdict(self._policy), "inventory": observed,
+                    "policy": asdict(self._policy), "policy_sha256": self._policy_sha256,
+                    "inventory": observed,
                     "filesystem_free_bytes": free, "hard_quota": False,
                     "cooperative_only": True}
             return {**body, "digest": sha256(canonical_bytes(body)).hexdigest()}
@@ -244,6 +321,7 @@ class WeightStoreDiskOwner:
             body = {"schema": "skeleton.weight-disk-stage.v1", "plan_digest": key,
                     "before": before, "after": after, "admitted_new_bytes": demand,
                     "charged_bytes": charged, "filesystem_free_bytes": free,
-                    "policy": asdict(self._policy), "hard_quota": False,
+                    "policy": asdict(self._policy), "policy_sha256": self._policy_sha256,
+                    "hard_quota": False,
                     "cooperative_only": True}
             return key, {**body, "digest": sha256(canonical_bytes(body)).hexdigest()}
