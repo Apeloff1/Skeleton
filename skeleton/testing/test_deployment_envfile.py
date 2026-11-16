@@ -77,7 +77,7 @@ def test_malformed_lines_report_line_numbers(text: str, message: str) -> None:
 @pytest.mark.parametrize(
     "value",
     ["plain", "", "with space", 'qu"ote', "dollar$sign", "multi\nline", "tab\there", "back\\slash",
-     "hash #x", "ünïcödé", "a=b", "*", "mongodb://u:p@h:27017/db?x=1"],
+     "hash #x", "ünïcödé", "a=b", "*", "mongodb://dummy-u:p@h:27017/db?x=1"],
 )
 def test_render_parse_round_trip(value: str) -> None:
     mapping = {"KEY": value}
@@ -144,7 +144,7 @@ def test_redact_env_masks_secrets_and_uri_passwords() -> None:
     redacted = redact_env({
         "SKL_ENGINE_SERVICE_TOKEN": "abc",
         "EMPTY_TOKEN": "",
-        "SKL_MONGO_URI": "mongodb://user:hunter2@db:27017/x",
+        "SKL_MONGO_URI": "mongodb://dummy-user:hunter2@db:27017/x",
         "PLAIN_URI": "mongodb://db:27017",
         "CUSTOM": "visible",
         "OTHER": "hidden",
@@ -152,7 +152,7 @@ def test_redact_env_masks_secrets_and_uri_passwords() -> None:
     assert redacted["SKL_ENGINE_SERVICE_TOKEN"] == MASK
     assert redacted["EMPTY_TOKEN"] == ""
     assert "hunter2" not in redacted["SKL_MONGO_URI"]
-    assert redacted["SKL_MONGO_URI"].startswith("mongodb://user:")
+    assert redacted["SKL_MONGO_URI"].startswith("mongodb://dummy-user:")
     assert redacted["PLAIN_URI"] == "mongodb://db:27017"
     assert redacted["CUSTOM"] == "visible"
     assert redacted["OTHER"] == MASK
@@ -161,4 +161,4 @@ def test_redact_env_masks_secrets_and_uri_passwords() -> None:
 def test_redact_uri_variants() -> None:
     assert redact_uri("https://example.org/x") == "https://example.org/x"
     assert redact_uri("mongodb://onlyuser@h") == "mongodb://onlyuser@h"
-    assert redact_uri("mongodb://u:p@h1,h2/db?rs=a") == f"mongodb://u:{MASK}@h1,h2/db?rs=a"
+    assert redact_uri("mongodb://dummy-u:p@h1,h2/db?rs=a") == f"mongodb://dummy-u:{MASK}@h1,h2/db?rs=a"
