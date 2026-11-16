@@ -37,6 +37,56 @@ def _safe_export_path(name: str) -> bool:
     )
 
 
+_MAX_PORTABLE_SOURCE_BYTES = 8 * 1024 * 1024
+_MAX_PORTABLE_SOURCE_FILES = 256
+_MAX_PORTABLE_ZIP_BYTES = 9 * 1024 * 1024
+
+
+def _portable_source_size(files: object) -> Optional[int]:
+    """Bound UTF-8 accounting before manifest hashing or response serialization.
+
+    Return None on any malformed path, directory alias, or over-budget file.
+    Count in fixed chunks so a hostile multibyte field cannot allocate a full
+    encoded copy before the compact export budget is enforced.
+    """
+    if type(files) is not dict or not 0 < len(files) <= _MAX_PORTABLE_SOURCE_FILES:
+        return None
+    if "project.godot" not in files:
+        return None
+    total, zip_bytes = 0, 22
+    leaves: set[str] = set()
+    directories: dict[str, str] = {}
+    for name, body in files.items():
+        if not _safe_export_path(name) or type(body) is not str:
+            return None
+        if len(body) > _MAX_PORTABLE_SOURCE_BYTES - total:
+            return None
+        folded = name.casefold()
+        if folded in leaves or folded in directories:
+            return None
+        parts = name.split("/")
+        for depth in range(1, len(parts)):
+            prefix = "/".join(parts[:depth])
+            alias = prefix.casefold()
+            if alias in leaves or (alias in directories and directories[alias] != prefix):
+                return None
+            directories[alias] = prefix
+        leaves.add(folded)
+        zip_bytes += 76 + 2 * len(name)
+        try:
+            for start in range(0, len(body), 64 * 1024):
+                size = len(body[start:start + 64 * 1024].encode("utf-8"))
+                total += size
+                zip_bytes += size
+                if total > _MAX_PORTABLE_SOURCE_BYTES or zip_bytes > _MAX_PORTABLE_ZIP_BYTES:
+                    return None
+        except UnicodeEncodeError:
+            return None
+        if zip_bytes > _MAX_PORTABLE_ZIP_BYTES:
+            return None
+    return total
+
+
 class RunRequest(BaseModel):
     vision: str = Field(default="", max_length=4000)
     era: Optional[str] = Field(default=None, max_length=80)
@@ -114,6 +164,16 @@ def genres() -> Dict[str, Any]:
     return genre_catalog_payload()
 
 
+@router.get("/playable-archetypes")
+def playable_archetypes() -> Dict[str, Any]:
+    """Discover the eight authored source generators; not a live engine verdict."""
+    from skeleton.forge.archetype_content import content_archetypes
+    modes = list(content_archetypes())
+    return {"archetypes": modes, "count": len(modes),
+            "kind": "original_self_contained_godot_2d_mini_game",
+            "native_execution_qualified": False}
+
+
 @router.get("/generations")
 def generations() -> Dict[str, Any]:
     from skeleton.forge.hardware import catalog
@@ -157,34 +217,26 @@ def run(req: RunRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     files = payload.get("files") or {}
     payload = dict(payload)
-    payload["file_names"] = sorted(files)
+    valid_inventory = type(files) is dict and all(type(name) is str for name in files)
+    payload["file_names"] = sorted(files) if valid_inventory else []
+    # Never retain a malformed output inventory from an internal adapter.
+    if not valid_inventory:
+        payload.pop("files", None)
     if req.include_files:
         manifest = payload.get("source_manifest")
         ready = (
-            req.target == "godot"
+            valid_inventory
+            and req.target == "godot"
             and payload.get("succeeded") is True
-            and isinstance(manifest, dict)
+            and type(manifest) is dict
             and manifest.get("schema") == "skeleton.forge.source_manifest.v1"
             and isinstance(manifest.get("sha256"), str)
             and len(manifest["sha256"]) == 64
             and manifest.get("file_count") == len(files)
-            and isinstance(files, dict)
-            and 0 < len(files) <= 256
+            and 0 < len(files) <= _MAX_PORTABLE_SOURCE_FILES
         )
-        source_bytes = 0
-        if ready:
-            for name, body in files.items():
-                if not _safe_export_path(name) or not isinstance(body, str):
-                    ready = False
-                    break
-                try:
-                    source_bytes += len(body.encode("utf-8"))
-                except UnicodeEncodeError:
-                    ready = False
-                    break
-                if source_bytes > 8 * 1024 * 1024:
-                    ready = False
-                    break
+        source_bytes = _portable_source_size(files) if ready else None
+        ready = ready and source_bytes is not None
         if ready:
             # The build's manifest is evidence, not authority by assertion.
             # Recompute against the exact source returned to this caller.
@@ -193,6 +245,15 @@ def run(req: RunRequest) -> Dict[str, Any]:
             from skeleton.forge.source_manifest import source_manifest
             try:
                 ready = source_manifest(files) == manifest
+                if ready and req.playable_content:
+                    from skeleton.forge.playable_provenance import verify_playable_source
+                    source = payload.get("playable_source")
+                    ready = verify_playable_source(files, source)
+                    if ready:
+                        ready = (
+                            (req.playable_archetype is None or source["mode"] == req.playable_archetype)
+                            and (source["launch_scene"] is not None) == req.playable_main_scene
+                        )
             except (ValueError, TypeError, UnicodeError):
                 ready = False
         if ready:

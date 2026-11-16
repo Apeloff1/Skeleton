@@ -309,7 +309,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "709a268d69d38643bff0929e2d66ee8d82708f78",
+      "source_git_object_sha": "43974310ce81853ef1b622581329d43fd972428e",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -1523,7 +1523,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "ed624a9193c31ca71b85e6969673c5b10779def6",
+      "source_git_object_sha": "b8d3aca94fb6a8b2339e54f18bacdfe66a8d8d24",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"

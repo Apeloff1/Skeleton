@@ -49,7 +49,7 @@ func _ready() -> void:
 	get_tree().scene_changed.connect(_on_scene_changed)
 	call_deferred("_refresh_button")
 
-func _on_scene_changed(_scene: Node) -> void:
+func _on_scene_changed() -> void:
 	_switching = false
 	_refresh_button()
 
@@ -115,7 +115,7 @@ def attach_playable_portal(
         or project.count(INPUT_ENTRY) != 1
         or f'run/main_scene="{WORLD_SCENE}"' not in project
         or "PlayablePortal=" in project
-        or SCRIPT_PATH in files
+        or any(path.casefold() == SCRIPT_PATH.casefold() for path in files if type(path) is str)
         or scene not in files
         or "scripts/autoloads/input_bind.gd" not in files
         or "scenes/levels/run_level.tscn" not in files
@@ -162,6 +162,7 @@ def verify_playable_portal(
             and scene in files
             and "scripts/autoloads/input_bind.gd" in files
             and "scenes/levels/run_level.tscn" in files
+            and sum(type(path) is str and path.casefold() == SCRIPT_PATH.casefold() for path in files) == 1
             and files[SCRIPT_PATH] == _script(archetype)
         )
     except (KeyError, ValueError, TypeError, AttributeError):
