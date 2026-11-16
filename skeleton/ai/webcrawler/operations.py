@@ -1279,7 +1279,15 @@ class CrawlRun:
         denied_until = access_denied_hold(response.status, now=now,
                                            expires_at=state["binding"]["consent"]["expires_at"])
         if denied_until is not None:
-            state["host_ready"][host] = max(state["host_ready"].get(host, 0), denied_until)
+            # A redirected policy or content request must not make the
+            # original authority eligible again after the terminal denial.
+            # Hold every already-admitted host in this exact request chain.
+            chain = robots["redirects"] if needs_robots else item["redirects"]
+            held_hosts = {host, p.hostname, urlsplit(item["original_url"]).hostname}
+            held_hosts.update(urlsplit(previous).hostname for previous in chain)
+            for held_host in held_hosts.intersection(self.request.allowed_hosts):
+                state["host_ready"][held_host] = max(
+                    state["host_ready"].get(held_host, 0), denied_until)
         if needs_robots:
             robots["status"] = response.status
             robots["fetched_at"] = now
