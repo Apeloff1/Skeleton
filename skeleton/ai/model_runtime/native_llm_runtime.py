@@ -18,10 +18,8 @@ from .runtime_checkpoint import (
     logical_bytes,
     make_checkpoint,
     parse_checkpoint_json,
-    portable_model_snapshot,
+    capture_validated_model,
     restore_components,
-    snapshot_digest,
-    validate_model_snapshot,
 )
 from .runtime_contracts import (
     BatchGenerationRequest,
@@ -171,9 +169,7 @@ class NativeLLMRuntime:
             raise RuntimeContractError("runtime context exceeds model context")
         self.device_policy = device_policy or DevicePolicy()
 
-        self._model_snapshot = portable_model_snapshot(model)
-        validate_model_snapshot(self._model_snapshot)
-        self._model_digest = snapshot_digest(self._model_snapshot)
+        self._model_snapshot, self._model_digest = capture_validated_model(model)
         self._model_bytes = logical_bytes(self._model_snapshot)
         if self._model_bytes > self.limits.max_model_bytes:
             raise RuntimeContractError("model exceeds runtime memory budget")
@@ -341,9 +337,8 @@ class NativeLLMRuntime:
         return receipt
 
     def _current_model_digest(self) -> str:
-        snapshot = portable_model_snapshot(self.model)
-        validate_model_snapshot(snapshot)
-        return snapshot_digest(snapshot)
+        _, digest = capture_validated_model(self.model)
+        return digest
 
     def assert_model_unchanged(self) -> None:
         if not hmac.compare_digest(self._current_model_digest(), self.model_digest):
@@ -370,8 +365,7 @@ class NativeLLMRuntime:
         )
 
     def refresh_model_identity(self) -> str:
-        snapshot = portable_model_snapshot(self.model)
-        validate_model_snapshot(snapshot)
+        snapshot, digest = capture_validated_model(self.model)
         size = logical_bytes(snapshot)
         if size > self.limits.max_model_bytes:
             raise RuntimeContractError("mutated model exceeds runtime memory budget")
@@ -386,13 +380,12 @@ class NativeLLMRuntime:
             raise RuntimeContractError("mutated model exceeds KV memory budget")
         # Re-pin accelerator tensors and drop old KV state before a changed
         # model identity can be admitted; never serve mismatched weights.
-        digest = snapshot_digest(snapshot)
         accelerator = getattr(self.model, "_accel", None)
         if accelerator is not None:
             try:
                 accelerator.pin()
-                refreshed = portable_model_snapshot(self.model)
-                if not hmac.compare_digest(snapshot_digest(refreshed), digest):
+                _, refreshed_digest = capture_validated_model(self.model)
+                if not hmac.compare_digest(refreshed_digest, digest):
                     raise RuntimeContractError(
                         "model changed while rebinding accelerator"
                     )
