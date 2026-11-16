@@ -264,6 +264,18 @@ HTML = r"""<!doctype html>
       <pre id="deliberation-result" aria-live="polite"></pre>
       <div id="adaptive-artifacts" aria-live="polite"></div>
     </details>
+    <details id="campaign-panel" class="grounding-preview">
+      <summary>Durable multi-step reasoning campaign</summary>
+      <p class="hint">Author up to 12 independent steps. Each dispatch requires approval. Dependencies enforce order, not automatic output injection. Campaign results are separately stored in the local chat database and tied to this conversation revision.</p>
+      <label for="campaign-id">Campaign ID</label><input id="campaign-id" maxlength="64" placeholder="project-review">
+      <label for="campaign-plan">Step graph (JSON array)</label>
+      <textarea id="campaign-plan" rows="6" maxlength="24000" placeholder='[{"id":"inspect","depends_on":[],"message":"Review the constraints","max_output_tokens":32,"adaptive":{"max_attempts":2,"maximum_reserved_tokens":64,"language":"auto","contract":{"kind":"review"}}}]'></textarea>
+      <label for="campaign-budget">Lifetime reserved output tokens</label><input id="campaign-budget" type="number" min="1" max="4096" value="256">
+      <button id="campaign-create" class="small" disabled>Approve and save graph</button>
+      <button id="campaign-inspect" class="small" disabled>Inspect existing graph</button>
+      <div id="campaign-result" aria-live="polite"></div>
+      <button id="campaign-delete" class="small" disabled>Delete inspected campaign</button>
+    </details>
     <details id="context-grounding-preview" class="grounding-preview" hidden>
       <summary>Local grounding passages selected by preview — untrusted text</summary>
       <p id="context-grounding-identity" class="hint"></p>
@@ -522,6 +534,15 @@ JAVASCRIPT = r"""'use strict';
     get('cognitive-preview').disabled = get('context-preview').disabled;
     get('deliberation-review').disabled = get('context-preview').disabled || foreignLease || state.health?.ready !== true;
     get('research-review').disabled = locked || working || !state.session;
+    ['adaptive-mode','adaptive-attempts','adaptive-total','adaptive-language','adaptive-expression',
+      'campaign-id','campaign-plan','campaign-budget','campaign-create','campaign-inspect'].forEach(id => {
+      get(id).disabled = locked || working || !state.session;
+    });
+    get('campaign-delete').disabled = locked || working || !state.session || !inspectedCampaign;
+    get('campaign-result').querySelectorAll('button').forEach(button => {
+      button.disabled = locked || working || !state.session ||
+        (button.dataset.generation === '1' && (foreignLease || state.health?.ready !== true));
+    });
     get('memory-kind').disabled = locked || working;
     get('memory-save').disabled = locked || working || !reviewedMemory;
     get('memory-choices').querySelectorAll('button').forEach(node => {node.disabled = locked || working;});
@@ -661,7 +682,7 @@ JAVASCRIPT = r"""'use strict';
     // Long file ingestion may stream for hours. Abort only on an explicit
     // workspace lock; the durable import ID allows post-disconnect recovery.
     const timer = path === '/v1/resources/longform/ingest' ? null :
-      setTimeout(cancel, path.endsWith('/deliberation-review') ? 60000 : 15000);
+      setTimeout(cancel, (path.endsWith('/deliberation-review') || path.endsWith('/campaign-advance')) ? 60000 : 15000);
     let response;
     try {
       response = await fetch(path, {
@@ -1045,6 +1066,12 @@ JAVASCRIPT = r"""'use strict';
     }
   }
   let reviewedMemory = null;
+  let inspectedCampaign = null;
+  function clearCampaignView() {
+    inspectedCampaign = null;
+    get('campaign-result').replaceChildren();
+    get('campaign-delete').disabled = true;
+  }
   function clearMemoryReview() {
     reviewedMemory = null;
     get('memory-review').textContent = '';
@@ -1057,6 +1084,7 @@ JAVASCRIPT = r"""'use strict';
     get('deliberation-panel').open = false;
     get('deliberation-result').textContent = '';
     get('adaptive-artifacts').replaceChildren();
+    clearCampaignView();
     get('research-panel').hidden = true;
     get('research-panel').open = false;
     get('research-trace').textContent = '';
@@ -1354,6 +1382,110 @@ JAVASCRIPT = r"""'use strict';
     get('research-trace').textContent = lines.join('\n') + '\nNo semantic truth certification.';
     get('research-panel').hidden = false; get('research-panel').open = true;
     status(cards.length ? 'Local research completed. Review exact source passages.' : 'No local reference evidence found.');
+  }));
+  function campaignContext() {
+    if (!state.session) throw new Error('Select a conversation first.');
+    const cid = get('campaign-id').value.trim();
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(cid)) throw new Error('Enter a valid campaign identifier.');
+    return {cid, sid: state.session, epoch: state.epoch};
+  }
+  function sameCampaign(ctx) {
+    return ctx.epoch === state.epoch && ctx.sid === state.session &&
+      ctx.cid === get('campaign-id').value.trim() && state.connected;
+  }
+  async function campaignCall(ctx, action, body) {
+    const payload = await api('POST', '/v1/sessions/' + ctx.sid + '/campaign-' + action,
+      {campaign_id: ctx.cid, ...body});
+    if (!sameCampaign(ctx)) throw new Error('Campaign view changed. Inspect it again.');
+    return payload;
+  }
+  function showCampaign(ctx, graph) {
+    if (!sameCampaign(ctx) || graph.schema !== 'skeleton.jeeves.review-campaign.v1' ||
+        graph.session_id !== ctx.sid || graph.campaign_id !== ctx.cid ||
+        graph.model_digest !== state.health?.model_digest ||
+        graph.tokenizer_digest !== state.health?.tokenizer_digest ||
+        !Number.isSafeInteger(graph.revision) || graph.revision < 0 ||
+        !Array.isArray(graph.plan?.steps) || graph.plan.steps.length > 12 ||
+        !Array.isArray(graph.ready_steps) || graph.dependency_output_injected !== false ||
+        graph.generation_automatic !== false || graph.tool_execution_authorized !== false)
+      throw new Error('Campaign identity or graph is invalid.');
+    inspectedCampaign = graph;
+    const root = get('campaign-result'); root.replaceChildren();
+    const header = document.createElement('p');
+    header.textContent = 'Revision ' + graph.revision + ' — reserved ' + graph.reserved_tokens +
+      '/' + graph.plan.maximum_reserved_tokens + ' tokens' +
+      (graph.session_snapshot_stale ? ' — conversation changed; graph is read-only.' : '');
+    root.append(header);
+    for (const spec of graph.plan.steps) {
+      const row = graph.statuses?.[spec.id];
+      if (!row || typeof row.status !== 'string' || typeof spec.message !== 'string')
+        throw new Error('Campaign step is invalid.');
+      const detail = document.createElement('details'), summary = document.createElement('summary');
+      summary.textContent = spec.id + ' — ' + row.status;
+      const text = document.createElement('pre'); text.textContent = spec.message;
+      detail.append(summary, text);
+      if (row.report) {
+        const result = document.createElement('pre');
+        result.textContent = JSON.stringify(row.report, null, 2);
+        detail.append(result);
+      }
+      if (!graph.session_snapshot_stale && graph.ready_steps.includes(spec.id)) {
+        const button = document.createElement('button');
+        button.textContent = 'Approve and execute this step';
+        button.dataset.generation = '1';
+        button.addEventListener('click', () => run(async () => {
+          if (!sameCampaign(ctx) || inspectedCampaign !== graph) throw new Error('Inspect current graph.');
+          // Unique explicit operation, never automatically retried.
+          const op = crypto.randomUUID();
+          try {
+            showCampaign(ctx, await campaignCall(ctx, 'advance', {
+              step_id: spec.id, operation_id: op, expected_revision: graph.revision, approved: true
+            }));
+          } catch (error) {
+            clearCampaignView();
+            throw new Error('Step outcome unconfirmed. Inspect the campaign; do not submit another step. ' + error.message);
+          }
+        }));
+        detail.append(button);
+      }
+      if (row.status === 'running') {
+        const button = document.createElement('button');
+        button.textContent = 'Mark claim abandoned (does not cancel or retry)';
+        button.addEventListener('click', () => run(async () => {
+          if (!sameCampaign(ctx) || inspectedCampaign !== graph) throw new Error('Inspect current graph.');
+          showCampaign(ctx, await campaignCall(ctx, 'abandon', {
+            step_id: spec.id, operation_id: row.operation_id, expected_revision: graph.revision, approved: true
+          }));
+        }));
+        detail.append(button);
+      }
+      root.append(detail);
+    }
+    updateControls();
+  }
+  get('campaign-id').addEventListener('input', clearCampaignView);
+  get('campaign-create').addEventListener('click', () => run(async () => {
+    const ctx = campaignContext(); let steps;
+    try { steps = JSON.parse(get('campaign-plan').value); } catch { throw new Error('Enter a valid JSON step array.'); }
+    if (!Array.isArray(steps)) throw new Error('Enter a JSON step array.');
+    showCampaign(ctx, await campaignCall(ctx, 'create', {
+      expected_session_revision: state.revision, steps,
+      maximum_reserved_tokens: Number(get('campaign-budget').value), approved: true
+    }));
+  }));
+  get('campaign-inspect').addEventListener('click', () => run(async () => {
+    const ctx = campaignContext();
+    showCampaign(ctx, await campaignCall(ctx, 'inspect', {}));
+  }));
+  get('campaign-delete').addEventListener('click', () => run(async () => {
+    const ctx = campaignContext();
+    if (!inspectedCampaign || inspectedCampaign.campaign_id !== ctx.cid)
+      throw new Error('Inspect this campaign before deleting.');
+    const result = await campaignCall(ctx, 'delete', {
+      expected_revision: inspectedCampaign.revision, approved: true
+    });
+    if (result.deleted_campaign_id !== ctx.cid) throw new Error('Deletion was not confirmed.');
+    clearCampaignView(); status('Campaign deleted. Conversation unchanged.');
   }));
   function renderReviewArtifact(data, kind) {
     if (!data || data.kind !== kind || typeof data.title !== 'string' || data.title.length > 120)
