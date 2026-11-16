@@ -259,3 +259,287 @@ class TenfoldLeadQuotaTests(TestCase):
             self.assertEqual(graph.status(OWNER)["nodes"],1)
             self.assertEqual(graph.status(OWNER)["edges"],1)
             self.assertFalse(graph.status(OWNER)["physical_graph_sharding"])
+
+
+class OfflineExportInspectionTests(TestCase):
+    def setUp(self):
+        self.directory=TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.path=Path(self.directory.name)/"input.csv"
+
+    def fixture(self):
+        raw=b"AppID,Name\n10000001,Alpha\n10000002,Beta\n"
+        self.path.write_bytes(raw)
+        return hashlib.sha256(raw).hexdigest()
+
+    def test_inspect_is_graph_free_and_exact_hash_bound(self):
+        from core.dragon_lead_ingest import inspect_export
+        expected=self.fixture()
+        with patch("core.dragon_lead_ingest.LeadGraph",side_effect=AssertionError("graph must stay closed")):
+            result=inspect_export(self.path,"steam-csv","steam",expected_sha=expected)
+        self.assertEqual(result["input_sha256"],expected)
+        self.assertTrue(result["expected_sha_matched"])
+        self.assertEqual(result["rows"],2)
+        self.assertEqual(result["pages"],1)
+        for field in ("network_executed","graph_written","license_verified","source_rights_verified"):
+            self.assertIs(result[field],False)
+
+    def test_hash_mismatch_precedes_any_projection(self):
+        from core.dragon_lead_ingest import qualify
+        self.fixture()
+        with patch("core.dragon_lead_ingest.pages",side_effect=AssertionError("must not parse")):
+            with self.assertRaisesRegex(ValueError,"SHA-256 differs"):
+                qualify(self.path,"steam-csv","steam",expected_sha="0"*64)
+
+    def test_unsupported_and_cross_projection_modes_fail_before_io(self):
+        from core.dragon_lead_ingest import inspect_export
+        for format,projection in (("unknown","steam"),("steam-csv","locator"),
+                                  ("normalized-jsonl","unknown")):
+            with self.subTest(format=format,projection=projection):
+                with self.assertRaises(ValueError):
+                    inspect_export(self.path,format,projection)
+
+    def test_raw_byte_drift_blocks_graph_begin(self):
+        from core.dragon_lead_ingest import ingest
+        from unittest.mock import Mock
+        expected=self.fixture()
+        graph=Mock()
+        # Model mutation despite an unchanged filesystem witness.
+        with patch("core.dragon_lead_ingest._source_hash",side_effect=[expected,"0"*64]):
+            with self.assertRaisesRegex(ValueError,"changed during qualification"):
+                ingest(graph,OWNER,path=self.path,format="steam-csv",projection="steam",
+                       target="steam-fronkon",rights_reference="fixture",grant_seconds=86400)
+        graph.begin.assert_not_called()
+
+    def test_normalized_page_revalidation_precedes_writes(self):
+        from core.dragon_lead_ingest import qualify
+        self.fixture()
+        with patch("core.dragon_lead_ingest.steam_csv",return_value=iter([{"appid":"garbage","title":"Bad"}])):
+            with self.assertRaises(ValueError):
+                qualify(self.path,"steam-csv","steam")
+
+    def test_modrinth_export_rejects_duplicate_keys_and_nonfinite_numbers(self):
+        from core.dragon_lead_ingest import modrinth_json
+        from io import BytesIO
+        for raw in (b'{"hits":[],"hits":[]}',b'{"hits":[],"score":NaN}'):
+            with self.assertRaises(ValueError):
+                list(modrinth_json(BytesIO(raw)))
+
+    def test_cli_inspection_does_not_require_or_open_owner_storage(self):
+        from core.dragon_lead_ingest import main
+        from contextlib import redirect_stdout
+        from io import StringIO
+        self.fixture()
+        output=StringIO()
+        with patch("core.dragon_lead_ingest.LeadGraph",side_effect=AssertionError("storage opened")):
+            with redirect_stdout(output):
+                status=main(["--inspect-only","--input",str(self.path),"--format","steam-csv"])
+        self.assertEqual(status,0)
+        self.assertFalse(json.loads(output.getvalue())["graph_written"])
+
+
+class StrictLocalTabularExportTests(TestCase):
+    def test_steam_tsv_matches_csv_projection(self):
+        from io import BytesIO
+        from core.dragon_lead_ingest import steam_csv
+        csv_rows=list(steam_csv(BytesIO(b'AppID,Name,Notes\r\n1001,"Alpha, Beta","one\ntwo"\r\n')))
+        tsv_rows=list(steam_csv(BytesIO(b'AppID\tName\tNotes\r\n1001\t"Alpha, Beta"\t"one\ntwo"\r\n'),delimiter="\t"))
+        self.assertEqual(csv_rows,tsv_rows)
+        self.assertEqual(tsv_rows,[{"appid":"1001","title":"Alpha, Beta"}])
+
+    def test_wikidata_tsv_and_locator_tsv_match_canonical_schema(self):
+        from io import BytesIO
+        from core.dragon_lead_ingest import wikidata_csv,locator_csv
+        rows=list(wikidata_csv(BytesIO(b"item\titemLabel\nhttps://www.wikidata.org/entity/Q1234\tA game\n"),delimiter="\t"))
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]["subject"],"wikidata:Q1234")
+        link=list(locator_csv(BytesIO(b"url\ttitle\tkind\tsubject\nhttps://www.wikidata.org/wiki/Q1234\tA game\tcross_database_identifiers\twikidata:Q1234\n"),delimiter="\t"))
+        self.assertEqual(link,rows)
+
+    def test_malformed_rows_and_ambiguous_headers_rejected(self):
+        from io import BytesIO
+        from core.dragon_lead_ingest import steam_csv
+        for raw in (b"AppID,Name,Other\n1001,A\n",b"AppID,Name\n1001,A,B\n",
+                    b"AppID,Name,name\n1001,A,A\n",b"AppID,Name\n1001,\"unterminated\n",
+                    b"AppID,Name,\n1001,A,B\n"):
+            with self.subTest(raw=raw):
+                with self.assertRaises(ValueError):
+                    list(steam_csv(BytesIO(raw)))
+
+    def test_logical_multiline_record_cap_and_limit_restoration(self):
+        import csv
+        from io import BytesIO
+        from core.dragon_lead_ingest import steam_csv
+        before=csv.field_size_limit()
+        raw=BytesIO(b'AppID,Name,Note\n1001,A,"123456789\n123456789\n123456789"\n')
+        with patch("core.dragon_lead_ingest.MAX_RECORD_CHARS",30):
+            with self.assertRaisesRegex(ValueError,"logical record"):
+                list(steam_csv(raw))
+        self.assertEqual(csv.field_size_limit(),before)
+        self.assertFalse(raw.closed)
+
+    def test_tsv_qualification_preserves_projection_page_chain(self):
+        from core.dragon_lead_ingest import inspect_export
+        with TemporaryDirectory() as directory:
+            csv_path=Path(directory)/"games.csv"
+            tsv_path=Path(directory)/"games.tsv"
+            csv_path.write_bytes(b"AppID,Name\n1001,Alpha\n1002,Beta\n")
+            tsv_path.write_bytes(b"AppID\tName\n1001\tAlpha\n1002\tBeta\n")
+            a=inspect_export(csv_path,"steam-csv","steam")
+            b=inspect_export(tsv_path,"steam-tsv","steam")
+            self.assertEqual(a["page_chain"],b["page_chain"])
+            self.assertNotEqual(a["input_sha256"],b["input_sha256"])
+
+
+class LocalVersionedDatasetIntegrityTests(TestCase):
+    def test_jsonl_plan_witnesses_entire_file(self):
+        from core.dragon_dataset_ingest import plan
+        with TemporaryDirectory() as directory:
+            path=Path(directory)/"records.jsonl"
+            raw=b'{"_key":1,"name":"Fixture"}\n'
+            path.write_bytes(raw)
+            expected=hashlib.sha256(raw).hexdigest()
+            receipt=plan(path,expected_sha=expected)
+            self.assertEqual(receipt["input_sha256"],expected)
+            self.assertTrue(receipt["expected_sha_matched"])
+            self.assertEqual(receipt["expected_rows"],1)
+            with self.assertRaisesRegex(ValueError,"SHA-256 differs"):
+                plan(path,expected_sha="0"*64)
+
+    def test_zip_container_identity_is_distinct_from_member_chain(self):
+        import zipfile
+        from core.dragon_dataset_ingest import plan
+        with TemporaryDirectory() as directory:
+            path=Path(directory)/"data.zip"
+            with zipfile.ZipFile(path,"w") as archive:
+                archive.writestr("rows.jsonl",b'{"_key":1,"name":"Fixture"}\n')
+                archive.writestr("notes.txt",b"version one")
+            a=plan(path,"rows.jsonl")
+            with zipfile.ZipFile(path,"w") as archive:
+                archive.writestr("rows.jsonl",b'{"_key":1,"name":"Fixture"}\n')
+                archive.writestr("notes.txt",b"version two")
+            b=plan(path,"rows.jsonl")
+            self.assertEqual(a["expected_chain"],b["expected_chain"])
+            self.assertNotEqual(a["input_sha256"],b["input_sha256"])
+
+    def test_mutated_container_fails_before_version_reservation(self):
+        from core.dragon_dataset_ingest import ingest
+        from unittest.mock import Mock
+        with TemporaryDirectory() as directory:
+            path=Path(directory)/"records.jsonl"
+            path.write_bytes(b'{"_key":1,"name":"Fixture"}\n')
+            shard=Mock()
+            with patch("core.dragon_dataset_ingest.raw_sha256",side_effect=["a"*64,"b"*64]):
+                with self.assertRaisesRegex(ValueError,"changed during projection"):
+                    ingest(shard,path,dataset="fixture",source="fixture",observation_digest="c"*64,
+                           label="fixture",rights_acknowledged=True)
+            shard.begin.assert_not_called()
+
+
+class OfflineInspectionBindingTests(TestCase):
+    def test_lead_inspection_mismatch_precedes_storage_factory(self):
+        from core.dragon_lead_ingest import ingest,inspect_export
+        from unittest.mock import Mock
+        with TemporaryDirectory() as directory:
+            path=Path(directory)/"games.csv"
+            path.write_bytes(b"AppID,Name\n1001,Alpha\n")
+            before=inspect_export(path,"steam-csv","steam")
+            path.write_bytes(b"AppID,Name\n1001,Beta\n")
+            factory=Mock()
+            with self.assertRaisesRegex(ValueError,"inspection digest differs"):
+                ingest(None,OWNER,path=path,format="steam-csv",projection="steam",
+                       target="steam-fronkon",rights_reference="fixture",grant_seconds=86400,
+                       expected_inspection=before["inspection_digest"],graph_factory=factory)
+            factory.assert_not_called()
+
+    def test_inspection_token_binds_format_even_for_identical_projection(self):
+        from core.dragon_lead_ingest import _inspection_identity
+        a=_inspection_identity("steam-csv","steam","a"*64,1,"b"*64,1)
+        for values in (
+            ("steam-tsv","steam","a"*64,1,"b"*64,1),
+            ("steam-csv","steam","c"*64,1,"b"*64,1),
+            ("steam-csv","steam","a"*64,2,"b"*64,1),
+            ("steam-csv","steam","a"*64,1,"d"*64,1),
+            ("steam-csv","steam","a"*64,1,"b"*64,2),
+        ):
+            self.assertNotEqual(a,_inspection_identity(*values))
+
+    def test_versioned_inspection_is_graph_free_and_binds_selected_member(self):
+        from core.dragon_dataset_ingest import inspect_dataset
+        import zipfile
+        with TemporaryDirectory() as directory:
+            path=Path(directory)/"records.zip"
+            with zipfile.ZipFile(path,"w") as archive:
+                for name in ("a.jsonl","b.jsonl"):
+                    archive.writestr(name,b'{"_key":1,"name":"Fixture"}\n')
+            with patch("core.dragon_dataset_ingest.DatasetShard",side_effect=AssertionError("storage opened")):
+                a=inspect_dataset(path,"a.jsonl")
+                b=inspect_dataset(path,"b.jsonl")
+            self.assertEqual(a["input_sha256"],b["input_sha256"])
+            self.assertEqual(a["expected_chain"],b["expected_chain"])
+            self.assertNotEqual(a["inspection_digest"],b["inspection_digest"])
+            self.assertFalse(a["storage_written"])
+
+    def test_versioned_inspection_mismatch_precedes_shard_factory(self):
+        from core.dragon_dataset_ingest import ingest,inspect_dataset
+        from unittest.mock import Mock
+        with TemporaryDirectory() as directory:
+            path=Path(directory)/"records.jsonl"
+            path.write_bytes(b'{"_key":1,"name":"Before"}\n')
+            before=inspect_dataset(path)
+            path.write_bytes(b'{"_key":1,"name":"After"}\n')
+            factory=Mock()
+            with self.assertRaisesRegex(ValueError,"inspection digest differs"):
+                ingest(None,path,dataset="fixture",source="fixture",observation_digest="c"*64,
+                       label="fixture",rights_acknowledged=True,
+                       expected_inspection=before["inspection_digest"],shard_factory=factory)
+            factory.assert_not_called()
+
+    def test_versioned_cli_inspection_never_initializes_storage(self):
+        from core.dragon_dataset_ingest import main
+        from contextlib import redirect_stdout
+        from io import StringIO
+        with TemporaryDirectory() as directory:
+            path=Path(directory)/"data.jsonl"
+            path.write_bytes(b'{"_key":1,"name":"Fixture"}\n')
+            out=StringIO()
+            with patch("core.dragon_dataset_ingest.DatasetShard",side_effect=AssertionError("storage opened")):
+                with redirect_stdout(out):
+                    self.assertEqual(main(["--inspect-only","--path",str(path)]),0)
+            self.assertFalse(json.loads(out.getvalue())["storage_written"])
+
+
+class OfflineSparqlExportTests(TestCase):
+    def fixture(self):
+        return {"head":{"vars":["item","itemLabel"]},"results":{"bindings":[
+            {"item":{"type":"uri","value":"http://www.wikidata.org/entity/Q1234"},
+             "itemLabel":{"type":"literal","xml:lang":"en","value":"Game fixture"}}]}}
+
+    def test_sparql_export_matches_existing_filtered_locator_projection(self):
+        from core.dragon_lead_ingest import wikidata_sparql_json,wikidata_csv
+        from io import BytesIO
+        raw=json.dumps(self.fixture()).encode()
+        result=list(wikidata_sparql_json(BytesIO(raw)))
+        csv_result=list(wikidata_csv(BytesIO(b"item,itemLabel\nQ1234,Game fixture\n")))
+        self.assertEqual(result,csv_result)
+
+    def test_sparql_export_rejects_foreign_entity_and_nonliteral_label(self):
+        from core.dragon_lead_ingest import wikidata_sparql_json
+        from io import BytesIO
+        for field,value in (("item",{"type":"uri","value":"https://example.com/Q1234"}),
+                            ("itemLabel",{"type":"uri","value":"https://example.com/"}),
+                            ("item",{"type":"bnode","value":"Q1234"})):
+            payload=self.fixture()
+            payload["results"]["bindings"][0][field]=value
+            with self.assertRaises(ValueError):
+                list(wikidata_sparql_json(BytesIO(json.dumps(payload).encode())))
+
+    def test_sparql_export_rejects_duplicate_fields_and_missing_required_binding(self):
+        from core.dragon_lead_ingest import wikidata_sparql_json
+        from io import BytesIO
+        payload=self.fixture()
+        del payload["results"]["bindings"][0]["itemLabel"]
+        for raw in (json.dumps(payload).encode(),b'{"head":{},"head":{},"results":{}}'):
+            with self.assertRaises(ValueError):
+                list(wikidata_sparql_json(BytesIO(raw)))
+
