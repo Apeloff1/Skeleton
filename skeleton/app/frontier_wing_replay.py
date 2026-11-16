@@ -15,7 +15,7 @@ def length(v):
     return math.sqrt(v.dot(v))
 
 
-def simulate(document):
+def simulate(document, *, frame_sink=None):
     order=load_order(document)
     geometry=create_geometry(order)
     clock=PresentationClock(order.fps)
@@ -72,6 +72,10 @@ def simulate(document):
                     "strain":frame.max_measured_strain,"pin_error":pins,"max_displacement":move,
                     "min_area":min_area}
             head=digest({"previous":head,"record":record})
+            if frame_sink is not None:
+                # Immutable tuples and detached evidence; downstream consumers
+                # cannot mutate the canonical simulation state.
+                frame_sink(frame_index,tick.deadline_ns,frame.positions,head)
             state=ElasticSkinState(frame.positions,frame.velocities,frame.wetness,frame.temperature_c)
             previous=frame.positions
             frame_index+=1
