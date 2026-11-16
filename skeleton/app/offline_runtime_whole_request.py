@@ -9,7 +9,9 @@ from an external request.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
+from hashlib import sha256
+import json
 import time
 from typing import Any
 
@@ -47,6 +49,7 @@ class MeasuredWholeRequestEngine:
         self._lock = asyncio.Lock()
         self._closed = False
         self._sequence = 0
+        self._consumer = session.claim_consumer()
 
     async def generate(self, request: LocalInferenceRequest, *, max_input_tokens: int,
                        timeout_ms: int) -> WholeRequestOutcome:
@@ -59,16 +62,19 @@ class MeasuredWholeRequestEngine:
         require(demand <= self._session.policy.maximum_tokens and
                 demand <= self._session.policy.prefill_quantum,
                 "whole request exceeds configured atomic token allowance")
+        # Queue waiting consumes the caller's timeout, not a new budget.
+        started = time.monotonic_ns()
+        caller_deadline = started + timeout * 1_000_000
         async with self._lock:
             require(not self._closed, "whole-request adapter is closed")
             require(self._engine.model.model_digest == self._backend_digest, "backend identity changed")
+            require(time.monotonic_ns() < caller_deadline, "whole request expired while waiting for execution ownership")
             self._sequence += 1
-            started = time.monotonic_ns()
             operation = "whole-" + str(self._sequence)
             # This prefill-shaped scheduler request is a conservative reservation
             # of the complete input + output bound, not measured prefill work.
             observation = self._session.offer((IterationWork(
-                operation, InferencePhase.PREFILL, demand),))
+                operation, InferencePhase.PREFILL, demand),), consumer=self._consumer)
             grant = observation["admission"]
             receipt: dict[str, Any] = {
                 "schema": "skeleton.offline.whole-request.v1",
@@ -82,10 +88,10 @@ class MeasuredWholeRequestEngine:
             }
             if grant["status"] != "candidate":
                 return self._finish(receipt, "deferred")
-            slices = self._session.consume(grant)
+            slices = self._session.consume(grant, consumer=self._consumer)
             if slices != ({"request_id": operation, "phase": "prefill", "tokens": demand},):
                 return self._finish(receipt, "partial_grant_deferred")
-            deadline_ns = min(grant["expires_ns"], started + timeout * 1_000_000)
+            deadline_ns = min(grant["expires_ns"], caller_deadline)
             if time.monotonic_ns() >= deadline_ns:
                 return self._finish(receipt, "expired_before_dispatch")
             try:
@@ -108,7 +114,7 @@ class MeasuredWholeRequestEngine:
                 raise
             # Even a real result is not published if it exceeded the grant's
             # lifetime, was cancelled, or failed the canonical completion reason.
-            if (self._closed or time.monotonic_ns() > deadline_ns or
+            if (self._closed or self._session.status()["closed"] or time.monotonic_ns() >= deadline_ns or
                     result.finish_reason not in ("completed", "length")):
                 return self._finish(receipt, "terminal_without_output")
             receipt["usage"] = {"input_tokens": result.input_tokens,
@@ -120,8 +126,27 @@ class MeasuredWholeRequestEngine:
     @staticmethod
     def _finish(receipt: dict, status: str,
                 result: LocalInferenceResult | None = None) -> WholeRequestOutcome:
-        body = {**receipt, "status": status,
-                "output_digest": digest(asdict(result)) if result is not None else None}
+        output_digest = None
+        if result is not None:
+            # Hash bounded UTF-8 output separately from the small receipt.
+            # JSON ASCII escapes can otherwise expand a valid output.
+            text_digest = sha256(result.text.encode("utf-8")).hexdigest() if result.text is not None else None
+            structured_digest = None
+            if result.structured_output is not None:
+                structured = json.dumps(dict(result.structured_output), sort_keys=True,
+                                        separators=(",", ":"), ensure_ascii=False,
+                                        allow_nan=False).encode("utf-8")
+                structured_digest = sha256(structured).hexdigest()
+            output_digest = digest({
+                "model_id": result.model_id, "model_digest": result.model_digest,
+                "text_digest": text_digest, "structured_digest": structured_digest,
+                "input_tokens": result.input_tokens, "output_tokens": result.output_tokens,
+                "finish_reason": result.finish_reason, "response_id": result.response_id,
+                "usage_source": result.usage_source, "cached": result.cached,
+                "execution_receipt_digest": result.execution_receipt_digest,
+                "latency_ms": result.latency_ms,
+            })
+        body = {**receipt, "status": status, "output_digest": output_digest}
         return WholeRequestOutcome({**body, "receipt_digest": digest(body)}, result)
 
     def close(self) -> None:
