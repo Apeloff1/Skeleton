@@ -283,5 +283,133 @@ class TransportIsolationTests(unittest.TestCase):
                 self.assertNotIn("Authorization", headers)
 
 
+
+class InterstitialClassifierTests(unittest.TestCase):
+    def test_only_fixed_reason_codes_are_returned(self):
+        from skeleton.ai.webcrawler.adaptive_navigation import access_interstitial_reason
+
+        cases = (
+            (200, {"Cf-Mitigated": "challenge"}, b"private token", "explicit_access_challenge"),
+            (503, {"cf-mitigated": "challenge"}, b"", "explicit_access_challenge"),
+            (302, {"WWW-Authenticate": "Basic realm=private"}, b"", "authentication_interstitial"),
+            (407, {}, b"", "proxy_authentication_required"),
+            (402, {}, b"", "payment_required"),
+            (200, {"content-type": "text/html"},
+             b"<html><head><title>Verify you are human!</title></head></html>",
+             "access_interstitial_title"),
+            (200, {"content-type": "text/plain"},
+             b"<!DOCTYPE html><html><title>Access &amp; denied</title></html>", None),
+            (200, {"content-type": "text/plain"},
+             b"<!DOCTYPE html><html><title>Access denied</title></html>",
+             "access_interstitial_title"),
+            (200, {"content-type": "text/html"},
+             b"<html><title>How to design a CAPTCHA</title><body>Access denied</body></html>", None),
+            (200, {"content-type": "text/html"},
+             b"<html><title>Game guide</title><body><title>Access denied</title></body></html>", None),
+            (200, {"content-type": "application/json"},
+             b'{"title":"Access denied"}', None),
+            (429, {}, b"", None),
+            (403, {}, b"", None),
+        )
+        for status, headers, body, expected in cases:
+            with self.subTest(status=status, expected=expected):
+                self.assertEqual(access_interstitial_reason(status, headers, body), expected)
+
+    def test_bounded_and_comment_safe(self):
+        from skeleton.ai.webcrawler.adaptive_navigation import access_interstitial_reason
+
+        for page in (
+            b"<html><!-- <title>Access denied</title> --><title>Guide</title></html>",
+            b"<html><title>" + b"x" * 300 + b"</title></html>",
+            b"<html>" + b" " * 33000 + b"<title>Access denied</title></html>",
+            b"<html><title>Access denied",
+        ):
+            with self.subTest(length=len(page)):
+                self.assertIsNone(access_interstitial_reason(200, {"content-type": "text/html"}, page))
+
+class CanonicalInterstitialTests(unittest.TestCase):
+    def test_challenge_quarantines_host_before_discovery_and_survives_restore(self):
+        class ChallengedFetcher(ThrottleFetcher):
+            def fetch_once(self, url, *, user_agent, max_bytes):
+                if url == "https://example.com/first":
+                    self.calls.append(url)
+                    return FetchResponse(url, 200, {
+                        "content-type": "text/html",
+                        "link": '<https://example.com/private>; rel="next"',
+                    }, b"<html><title>Access denied</title><body>private marker</body></html>", time.time())
+                return super().fetch_once(url, user_agent=user_agent, max_bytes=max_bytes)
+
+        fixture = CanonicalThrottleTests()
+        fetcher = ChallengedFetcher()
+        run, at = fixture.create(fetcher, hosts=("example.com", "example.org"))
+        fixture.tick(run, at + 1)
+        with patch("skeleton.ai.webcrawler.operations.inspect_download_media",
+                   side_effect=AssertionError("challenge must not enter MIME parser")):
+            event = fixture.tick(run, at + 2)["slice_events"][0]
+        self.assertEqual(event["reason"], "access_interstitial_title")
+        self.assertEqual(event["kind"], "rejected")
+        snap = run.snapshot()
+        self.assertGreaterEqual(snap["host_ready"]["example.com"], at + 3600)
+        self.assertEqual(snap["usage"]["requests"], 2)
+        self.assertEqual(run.status()["source_count"], 0)
+        self.assertNotIn("private marker", str(snap))
+        self.assertNotIn("https://example.com/private", str(snap))
+        resumed = CrawlRun.from_snapshot(snap, fetcher=fetcher)
+        fixture.tick(resumed, at + 3)
+        self.assertIn("https://example.org/robots.txt", fetcher.calls)
+        self.assertNotIn("https://example.com/second", fetcher.calls)
+
+    def test_explicit_challenge_precedes_retry_and_redirect(self):
+        for status in (302, 503):
+            with self.subTest(status=status):
+                class ChallengedFetcher(ThrottleFetcher):
+                    def fetch_once(self, url, *, user_agent, max_bytes):
+                        if url == "https://example.com/first":
+                            self.calls.append(url)
+                            return FetchResponse(url, status, {
+                                "cf-mitigated": "challenge",
+                                "location": "https://example.org/alternate",
+                                "retry-after": "1",
+                            }, b"", time.time())
+                        return super().fetch_once(url, user_agent=user_agent, max_bytes=max_bytes)
+
+                fixture = CanonicalThrottleTests()
+                fetcher = ChallengedFetcher()
+                run, at = fixture.create(fetcher, hosts=("example.com", "example.org"))
+                fixture.tick(run, at + 1)
+                event = fixture.tick(run, at + 2)["slice_events"][0]
+                self.assertEqual(event["reason"], "explicit_access_challenge")
+                snap = run.snapshot()
+                self.assertGreaterEqual(snap["host_ready"]["example.com"], at + 3600)
+                self.assertNotIn("https://example.org/alternate", str(snap))
+                self.assertFalse(any(row["url"].endswith("/first") for row in snap["frontier"]))
+                self.assertEqual(run.status()["source_count"], 0)
+
+    def test_robots_challenge_holds_original_and_redirected_host(self):
+        class ChallengedRobots(ThrottleFetcher):
+            def fetch_once(self, url, *, user_agent, max_bytes):
+                if url == "https://example.com/robots.txt":
+                    self.calls.append(url)
+                    return FetchResponse(url, 302,
+                        {"location": "https://example.org/robots.txt"}, b"", time.time())
+                if url == "https://example.org/robots.txt":
+                    self.calls.append(url)
+                    return FetchResponse(url, 200, {"cf-mitigated": "challenge"},
+                                         b"", time.time())
+                return super().fetch_once(url, user_agent=user_agent, max_bytes=max_bytes)
+
+        fixture = CanonicalThrottleTests()
+        fetcher = ChallengedRobots()
+        run, at = fixture.create(fetcher, hosts=("example.com", "example.org"))
+        fixture.tick(run, at + 1)
+        fixture.tick(run, at + 2)
+        snap = run.snapshot()
+        for host in ("example.com", "example.org"):
+            self.assertGreaterEqual(snap["host_ready"][host], at + 3600)
+        self.assertEqual(run.status()["source_count"], 0)
+        resumed = CrawlRun.from_snapshot(snap, fetcher=fetcher)
+        fixture.tick(resumed, at + 4)
+        self.assertEqual(len(fetcher.calls), 2)
+
 if __name__ == "__main__":
     unittest.main()
