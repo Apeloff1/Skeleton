@@ -1,25 +1,16 @@
 name: Isolated Mongo replica epoch qualification
 
+# Standalone PR admission is consolidated under Merge Readiness.
+# Every real qualification job retains its existing execution contract.
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - '.github/workflows/isolated-mongo-epoch-qualification.yml'
-      - 'scripts/qualify_isolated_mongo_epoch.py'
-      - 'skeleton/persistence/mongo_source_epoch.py'
-      - 'skeleton/persistence/mongo_epoch_operator.py'
-      - 'skeleton/app/compose_guarded_preflight.py'
-      - 'skeleton/app/canonical_writer_cutover.py'
-      - 'backend/core/canonical_writer_startup.py'
-      - 'skeleton/testing/test_canonical_writer_cutover.py'
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: isolated-mongo-epoch-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: isolated-mongo-epoch-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   authenticated_replica:

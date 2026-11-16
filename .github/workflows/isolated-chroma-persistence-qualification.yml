@@ -1,24 +1,16 @@
 name: Isolated Chroma persistence qualification
 
+# Standalone PR admission is consolidated under Merge Readiness.
+# Every real qualification job retains its existing execution contract.
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - 'scripts/qualify_chroma_persistence.py'
-      - 'skeleton/testing/test_chroma_persistence_qualification.py'
-      - 'docker-compose.yml'
-      - 'deploy/chroma/durable.compose.yml'
-      - 'scripts/provision_fresh_chroma.py'
-      - 'skeleton/testing/test_provision_fresh_chroma.py'
-      - '.github/workflows/isolated-chroma-persistence-qualification.yml'
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: isolated-chroma-persistence-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: isolated-chroma-persistence-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   durable_named_volume:

@@ -701,6 +701,134 @@ jobs:
     permissions:
       contents: read
 
+  source_26:
+    # Required exact-head qualification; no independent PR subscription.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Source 26 / exact-gguf-physical-cpu-qualification
+    uses: ./.github/workflows/exact-gguf-physical-cpu-qualification.yml
+    permissions:
+      contents: read
+
+  source_27:
+    # Required exact-head qualification; no independent PR subscription.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Source 27 / isolated-mongo-epoch-qualification
+    uses: ./.github/workflows/isolated-mongo-epoch-qualification.yml
+    permissions:
+      contents: read
+
+  source_28:
+    # Required exact-head qualification; no independent PR subscription.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Source 28 / isolated-chroma-persistence-qualification
+    uses: ./.github/workflows/isolated-chroma-persistence-qualification.yml
+    permissions:
+      contents: read
+
+  source_29:
+    # Required exact-head qualification; no independent PR subscription.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Source 29 / independent-reviewer-qualification
+    uses: ./.github/workflows/independent-reviewer-qualification.yml
+    permissions:
+      contents: read
+
+  source_30:
+    # Required exact-head qualification; no independent PR subscription.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Source 30 / native-ai-recovery-source-qualification
+    uses: ./.github/workflows/native-ai-recovery-source-qualification.yml
+    permissions:
+      contents: read
+
+  source_31:
+    # Required exact-head qualification; no independent PR subscription.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Source 31 / source-bound-custody-qualification
+    uses: ./.github/workflows/source-bound-custody-qualification.yml
+    permissions:
+      contents: read
+
+  source_32:
+    # Required exact-head qualification; no independent PR subscription.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Source 32 / studio-forge-return-qualification
+    uses: ./.github/workflows/studio-forge-return-qualification.yml
+    permissions:
+      contents: read
+
+  source_33:
+    # Required exact-head qualification; no independent PR subscription.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Source 33 / gameforge-creator-quest-convergence
+    uses: ./.github/workflows/gameforge-creator-quest-convergence.yml
+    permissions:
+      contents: read
+
+  source_34:
+    # Required exact-head qualification; no independent PR subscription.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Source 34 / aift-source-identity-qualification
+    uses: ./.github/workflows/aift-source-identity-qualification.yml
+    permissions:
+      contents: read
+
+  source_35:
+    # Required exact-head qualification; no independent PR subscription.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Source 35 / storage-lazy-flagged-qualification
+    uses: ./.github/workflows/storage-lazy-flagged-qualification.yml
+    permissions:
+      contents: read
+
+  source_36:
+    # Required exact-head qualification; no independent PR subscription.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Source 36 / game-frontier-recovered-source-qualification
+    uses: ./.github/workflows/game-frontier-recovered-source-qualification.yml
+    permissions:
+      contents: read
+
+  source_37:
+    # Required exact-head qualification; no independent PR subscription.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Source 37 / local-first-engine-source-qualification
+    uses: ./.github/workflows/local-first-engine-source-qualification.yml
+    permissions:
+      contents: read
+
+  source_38:
+    # Required exact-head qualification; no independent PR subscription.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Source 38 / local-admission-ledger-qualification
+    uses: ./.github/workflows/local-admission-ledger-qualification.yml
+    permissions:
+      contents: read
+
+  source_39:
+    # Required exact-head qualification; no independent PR subscription.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Source 39 / foundation-cache-realtime-qualification
+    uses: ./.github/workflows/foundation-cache-realtime-qualification.yml
+    permissions:
+      contents: read
+
+  source_40:
+    # Required exact-head qualification; no independent PR subscription.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Source 40 / engine-transport-source-qualification
+    uses: ./.github/workflows/engine-transport-source-qualification.yml
+    permissions:
+      contents: read
+
+  source_41:
+    # Required exact-head qualification; no independent PR subscription.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Source 41 / game-frontier-validation
+    uses: ./.github/workflows/game-frontier-validation.yml
+    permissions:
+      contents: read
+
   source_qualification_gate:
     name: Consolidated Source Qualification Gate
     # All outcomes (including failures/skips) must be reported; cancellation is never success.
@@ -731,6 +859,22 @@ jobs:
       - source_23
       - source_24
       - source_25
+      - source_26
+      - source_27
+      - source_28
+      - source_29
+      - source_30
+      - source_31
+      - source_32
+      - source_33
+      - source_34
+      - source_35
+      - source_36
+      - source_37
+      - source_38
+      - source_39
+      - source_40
+      - source_41
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
@@ -743,7 +887,7 @@ jobs:
           import json
           import os
           from pathlib import Path
-          expected = {f'source_{index:02d}' for index in range(1, 26)}
+          expected = {f'source_{index:02d}' for index in range(1, 42)}
           records = json.loads(os.environ['SOURCE_RESULTS'])
           actual = set(records)
           failures = {
@@ -753,7 +897,7 @@ jobs:
           }
           if actual != expected:
               failures['workflow_membership'] = f'missing={sorted(expected-actual)} extra={sorted(actual-expected)}'
-          summary = ['# Consolidated exact-head source qualification', '']
+          summary = ['# Consolidated exact-head source and scoped native qualification', '']
           summary.extend(f'- {name}: {records.get(name, {}).get("result", "missing")}' for name in sorted(expected))
           summary.append('')
           summary.append('NOT QUALIFIED' if failures else 'Source qualifications passed; independent device/release evidence remains required')

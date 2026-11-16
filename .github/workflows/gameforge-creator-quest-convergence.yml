@@ -1,42 +1,17 @@
 name: GameForge creator + native quest convergence
 
+# Standalone PR admission is consolidated under Merge Readiness.
+# Every real qualification job retains its existing execution contract.
 on:
-  pull_request:
-    paths:
-      - 'frontend/src/skeletonForge/**'
-      - 'frontend/scripts/skeleton-forge/**'
-      - 'frontend/app/galaxy.tsx'
-      - 'frontend/app/skeleton-forge.tsx'
-      - 'frontend/src/features/GalaxyStudioFactory/draftCustody.ts'
-      - 'frontend/src/features/GalaxyStudioFactory/galaxyDraftCodec.ts'
-      - 'frontend/src/features/GalaxyStudioFactory/genreRegistry.ts'
-      - 'frontend/src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal.tsx'
-      - 'backend/routes/skeleton_gameforge.py'
-      - 'skeleton/context/**'
-      - 'skeleton/ai/game_builder/godot_quest_bridge.py'
-      - 'skeleton/testing/test_creator_quest_convergence.py'
-      - 'skeleton/testing/test_gameforge_playable_quest_convergence.py'
-      - 'skeleton/testing/test_gameforge_archetype_playtest.py'
-      - 'skeleton/forge/playtest.py'
-      - 'skeleton/forge/archetype_content.py'
-      - 'skeleton/ai/forge/archetype_content.py'
-      - 'skeleton/forge/playable_portal.py'
-      - 'skeleton/testing/test_gameforge_playable_portal.py'
-      - 'skeleton/testing/test_archetype_playable_e2e.py'
-      - 'skeleton/testing/test_gameforge_native_archive_custody.py'
-      - 'scripts/qualify_gameforge_godot_native.py'
-      - 'skeleton/testing/test_gameforge_source_archive.py'
-      - 'frontend/src/skeletonForge/sourceArchive.ts'
-      - 'frontend/src/skeletonForge/shareSourceArchive.ts'
-      - '.github/workflows/gameforge-creator-quest-convergence.yml'
+  workflow_call:
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: gameforge-convergence-${{ github.ref }}
-  cancel-in-progress: true
+  group: gameforge-convergence-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   creator-native-python:

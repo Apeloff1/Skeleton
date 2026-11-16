@@ -1,24 +1,10 @@
 name: Source-bound native and installer custody qualification
 
+# Standalone PR admission is consolidated under Merge Readiness.
+# Every real qualification job retains its existing execution contract.
 on:
+  workflow_call:
   workflow_dispatch:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "scripts/windows/check_payload_zip.py"
-      - "scripts/windows/test_payload_zip.py"
-      - "scripts/windows/build_installer.ps1"
-      - "scripts/windows/test_installer_source_ref_preflight.py"
-      - "skeleton/local_ai/model_loader.py"
-      - "skeleton/testing/test_local_ai_model_loader_custody.py"
-      - "skeleton/inference/flgb_runtime.py"
-      - "skeleton/ai/runtime/inference/core/flgb_runtime.py"
-      - "skeleton/testing/test_inference_stream_event_type_fencing.py"
-      - "skeleton/app/studio_readiness.py"
-      - "skeleton/testing/test_app_studio_private_token_custody.py"
-      - "skeleton/testing/test_app_compose_loopback_contract.py"
-      - "machine/ai_file_tree.json"
-      - ".github/workflows/source-bound-custody-qualification.yml"
 
 permissions:
   contents: read

@@ -1,17 +1,9 @@
 name: Studio-Forge source-bound project return and custody qualification
 
+# Standalone PR admission is consolidated under Merge Readiness.
+# Every real qualification job retains its existing execution contract.
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
-    paths:
-      - 'frontend/src/skeletonForge/foundation/**'
-      - 'frontend/src/skeletonForge/components/foundation/**'
-      - 'frontend/src/skeletonForge/creatorBridge.ts'
-      - 'frontend/src/skeletonForge/creatorBridgeStorage.ts'
-      - 'frontend/src/skeletonForge/creatorStorageScope.ts'
-      - 'frontend/scripts/skeleton-forge/**'
-      - '.github/workflows/studio-forge-return-qualification.yml'
+  workflow_call:
   workflow_dispatch:
 
 permissions:

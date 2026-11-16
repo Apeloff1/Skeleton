@@ -1,31 +1,16 @@
 name: Independent reviewer TLS and scoped execution qualification
 
+# Standalone PR admission is consolidated under Merge Readiness.
+# Every real qualification job retains its existing execution contract.
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - '.github/workflows/independent-reviewer-qualification.yml'
-      - 'scripts/independent_reviewer_policy.py'
-      - 'scripts/independent_reviewer_replay.py'
-      - 'skeleton/testing/test_independent_reviewer_replay.py'
-      - 'skeleton/app/reviewer_client_configuration.py'
-      - 'scripts/serve_independent_reviewer.py'
-      - 'deploy/independent-reviewer/**'
-      - 'skeleton/testing/test_async_reviewer_guard.py'
-      - 'skeleton/ai/runtime/inference/*reviewer*.py'
-      - 'skeleton/ai/runtime/inference/engine_submission_snapshot.py'
-      - 'skeleton/ai/runtime/inference/guarded_service.py'
-      - 'skeleton/ai/runtime/inference/native_guard_binding.py'
-      - 'skeleton/testing/test_independent_reviewer_service.py'
-      - 'skeleton/testing/test_scoped_reviewer_attestation.py'
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: independent-reviewer-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: independent-reviewer-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   isolated_tls:

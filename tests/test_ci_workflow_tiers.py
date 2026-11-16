@@ -103,10 +103,10 @@ class WorkflowTierTests(unittest.TestCase):
                 source = ROOT / ".github/workflows-archive" / name
                 (root / ".github/workflows-archive" / name).write_text(source.read_text())
             self.assertEqual(audit(root), [])
-            # All 25 source suites remain real callable jobs; reintroducing
+            # All required source and scoped native suites remain real callable jobs; reintroducing
             # independent PR events or dropping the caller must fail closed.
             required_sources = registry["consolidated_required_source_workflows"]
-            self.assertEqual(len(required_sources), 25)
+            self.assertEqual(len(required_sources), 41)
             source_workflow = root / ".github/workflows" / required_sources[0]
             source_original = source_workflow.read_text()
             source_workflow.write_text(source_original.replace(
@@ -191,7 +191,7 @@ class WorkflowTierTests(unittest.TestCase):
             self.assertTrue(any("paused workflow gained automatic" in x for x in audit(root)))
             paused.write_text(before)
             self.assertEqual(audit(root), [])
-            for index in range(10):
+            for index in range(21):
                 (
                     root / ".github/workflows" / f"automatic-extra-{index}.yml"
                 ).write_text(
@@ -202,7 +202,7 @@ class WorkflowTierTests(unittest.TestCase):
             self.assertTrue(
                 any("unexpected active workflow count" in item for item in audit(root))
             )
-            for index in range(10):
+            for index in range(21):
                 (root / ".github/workflows" / f"automatic-extra-{index}.yml").unlink()
             name = registry["specialized_manual_only"][0]
             spec = root / ".github/workflows-archive" / name
@@ -255,20 +255,29 @@ class WorkflowTierTests(unittest.TestCase):
             ))
             strict.write_text(strict_original)
 
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
+            readiness.write_text(readiness_original.replace("      - source_01\n", "", 1))
             self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
             readiness.write_text(readiness_original)
 
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
+            readiness.write_text(readiness_original.replace("      - source_26\n", "", 1))
             self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
             readiness.write_text(readiness_original)
 
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
+            readiness.write_text(readiness_original.replace("      - source_33\n", "", 1))
             self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
             readiness.write_text(readiness_original)
 
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
+            readiness.write_text(readiness_original.replace("      - source_41\n", "", 1))
             self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
+            readiness.write_text(readiness_original)
+
+            # Duplicate aggregate membership and stale cardinality must fail.
+            readiness.write_text(readiness_original.replace(
+                "      - source_41\n", "      - source_41\n      - source_41\n", 1,
+            ))
+            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
+            readiness.write_text(readiness_original.replace("range(1, 42)", "range(1, 26)", 1))
+            self.assertTrue(any("expected membership count drift" in issue for issue in audit(root)))
             readiness.write_text(readiness_original)
 
             # The required Merge Readiness lane must retain the same exact

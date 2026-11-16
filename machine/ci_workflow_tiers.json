@@ -55,7 +55,23 @@
     "native-batch-operator-admission-qualification.yml",
     "native-qualification-report-custody.yml",
     "operational-literal-dispatch-qualification.yml",
-    "perf-profiler-literal-target-qualification.yml"
+    "perf-profiler-literal-target-qualification.yml",
+    "exact-gguf-physical-cpu-qualification.yml",
+    "isolated-mongo-epoch-qualification.yml",
+    "isolated-chroma-persistence-qualification.yml",
+    "independent-reviewer-qualification.yml",
+    "native-ai-recovery-source-qualification.yml",
+    "source-bound-custody-qualification.yml",
+    "studio-forge-return-qualification.yml",
+    "gameforge-creator-quest-convergence.yml",
+    "aift-source-identity-qualification.yml",
+    "storage-lazy-flagged-qualification.yml",
+    "game-frontier-recovered-source-qualification.yml",
+    "local-first-engine-source-qualification.yml",
+    "local-admission-ledger-qualification.yml",
+    "foundation-cache-realtime-qualification.yml",
+    "engine-transport-source-qualification.yml",
+    "game-frontier-validation.yml"
   ],
   "operational_scheduled_non_pr": [
     "queue-drain.yml"

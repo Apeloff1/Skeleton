@@ -46,7 +46,7 @@ MANUAL_SOURCE_QUALIFICATIONS = {
 
 # Each source lane is still required at the exact PR head; they now execute
 # through the existing protected Merge Readiness check instead of creating
-# 25 independent webhook subscriptions. Keep the registry and caller explicit.
+# independent webhook subscriptions. Keep the registry and caller explicit.
 CONSOLIDATED_SOURCE_WORKFLOWS = (
     "backend-literal-lazy-loader-qualification.yml",
     "ci-surface-hold-source-qualification.yml",
@@ -73,6 +73,22 @@ CONSOLIDATED_SOURCE_WORKFLOWS = (
     "native-qualification-report-custody.yml",
     "operational-literal-dispatch-qualification.yml",
     "perf-profiler-literal-target-qualification.yml",
+    "exact-gguf-physical-cpu-qualification.yml",
+    "isolated-mongo-epoch-qualification.yml",
+    "isolated-chroma-persistence-qualification.yml",
+    "independent-reviewer-qualification.yml",
+    "native-ai-recovery-source-qualification.yml",
+    "source-bound-custody-qualification.yml",
+    "studio-forge-return-qualification.yml",
+    "gameforge-creator-quest-convergence.yml",
+    "aift-source-identity-qualification.yml",
+    "storage-lazy-flagged-qualification.yml",
+    "game-frontier-recovered-source-qualification.yml",
+    "local-first-engine-source-qualification.yml",
+    "local-admission-ledger-qualification.yml",
+    "foundation-cache-realtime-qualification.yml",
+    "engine-transport-source-qualification.yml",
+    "game-frontier-validation.yml",
 )
 
 def events(source: str) -> set[str]:
@@ -121,7 +137,7 @@ def audit(root: Path = ROOT) -> list[str]:
     if (type(consolidated) is not list
             or len(consolidated) != len(CONSOLIDATED_SOURCE_WORKFLOWS)
             or tuple(consolidated) != CONSOLIDATED_SOURCE_WORKFLOWS):
-        failures.append("consolidated source registry must preserve all 25 required lanes")
+        failures.append(f"consolidated source registry must preserve all {len(CONSOLIDATED_SOURCE_WORKFLOWS)} required lanes")
         consolidated = list(CONSOLIDATED_SOURCE_WORKFLOWS)
     scheduled = policy.get("operational_scheduled_non_pr")
     paused = policy.get("operational_paused_manual_only")
@@ -206,15 +222,35 @@ def audit(root: Path = ROOT) -> list[str]:
         if len(blocks) != 2:
             failures.append(f"{name}: missing mandatory consolidated source caller {job_id}")
             continue
-        job = blocks[1].split("\n  ", 1)[0]
-        # Inspect the full body up to the following top-level job.
-        call = blocks[1].split("\n  source_", 1)[0]
-        if (f"uses: ./.github/workflows/{name}" not in call
-                or "    if: ${{ github.event_name == 'pull_request'" not in call
-                or "    permissions:\n      contents: read" not in call):
+        # Restrict every invariant to the actual job; another caller must not
+        # satisfy a missing permission, condition or uses clause.
+        call = re.split(r"(?m)^  [A-Za-z0-9_-]+:\s*$", blocks[1], maxsplit=1)[0]
+        expected_if = (
+            "    if: ${{ github.event_name == 'pull_request' && "
+            "!github.event.pull_request.draft && github.event.action != 'converted_to_draft' "
+            "&& github.event.action != 'closed' }}"
+        )
+        if (f"    uses: ./.github/workflows/{name}" not in call.splitlines()
+                or expected_if not in call.splitlines()
+                or "    permissions:\n      contents: read" not in call
+                or "continue-on-error:" in call
+                or "secrets:" in call):
             failures.append(f"{name}: consolidated source caller is not exact-head, read-only and required")
-        if f"      - {job_id}\n" not in readiness_source:
-            failures.append(f"{name}: consolidated source missing from fail-closed gate needs")
+    # Validate membership in the aggregate itself, not incidental references.
+    gate_parts = readiness_source.split("  source_qualification_gate:\n")
+    gate = (re.split(r"(?m)^  [A-Za-z0-9_-]+:\s*$", gate_parts[1], maxsplit=1)[0]
+            if len(gate_parts) == 2 else "")
+    expected_ids = [f"source_{index:02d}" for index in range(1, len(consolidated) + 1)]
+    needs = re.search(r"(?m)^    needs:\s*\n((?:      - [A-Za-z0-9_-]+\n)+)", gate)
+    actual_ids = re.findall(r"(?m)^      - ([A-Za-z0-9_-]+)$", needs.group(1)) if needs else []
+    if actual_ids != expected_ids:
+        failures.append("required consolidated source gate dependency missing, duplicated, reordered or unexpected")
+    if f"range(1, {len(consolidated) + 1})" not in gate:
+        failures.append("consolidated source gate expected membership count drift")
+    if ("if records.get(name, {}).get('result') != 'success'" not in gate
+            or "if actual != expected:" not in gate
+            or "if failures:" not in gate):
+        failures.append("consolidated source gate lost fail-closed result validation")
     if ("  source_qualification_gate:\n" not in readiness_source
             or "SOURCE_RESULTS: ${{ toJSON(needs) }}" not in readiness_source
             or "needs: source_qualification_gate" not in readiness_source

@@ -1,25 +1,18 @@
 name: Exact GGUF physical CPU qualification
 
 # This is scoped native-model evidence, not production/release qualification.
-# Only relevant changes launch the bounded 639 MB pinned model lane.
+# Required PR qualification executes the bounded 639 MB pinned model lane.
+# Standalone PR admission is consolidated under Merge Readiness.
+# Every real qualification job retains its existing execution contract.
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - '.github/workflows/exact-gguf-physical-cpu-qualification.yml'
-      - 'scripts/native/gguf_token_bridge/**'
-      - 'scripts/qualify_exact_gguf_bridge.py'
-      - 'skeleton/ai/runtime/inference/gguf_token_bridge.py'
-      - 'skeleton/ai/runtime/inference/gguf_private_transport.py'
-      - 'skeleton/testing/test_exact_gguf_qualification.py'
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: exact-gguf-real-cpu-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: exact-gguf-real-cpu-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   exact_pinned_model:

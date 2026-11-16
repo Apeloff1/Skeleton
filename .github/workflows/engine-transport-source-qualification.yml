@@ -1,20 +1,15 @@
 name: Canonical engine transport source qualification
 
+# Required by the existing Merge Readiness admission; execution remains real.
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "backend/core/engine_client.py"
-      - "backend/tests/test_engine_client.py"
-      - "backend/tests/test_engine_transport_origin_custody.py"
-      - ".github/workflows/engine-transport-source-qualification.yml"
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: engine-transport-source-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: engine-transport-source-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   engine_transport_source:
@@ -26,6 +21,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify immutable checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - name: Use supported Python 3.11
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
