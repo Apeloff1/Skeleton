@@ -1055,6 +1055,19 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
         ))
         return snapshot, revoked
 
+    async def navigation_packet(self, scope: dict[str, str], identifier: str) -> dict:
+        from skeleton.ai.webcrawler.navigation_semantics import packet
+        row = await self._owned(scope, identifier)
+        self._source_use(row)
+        if (row["status"] not in {"queued", "interrupted"} or row.get("automation", {}).get("enabled")
+                or not row["request"]["frontier_strategy"].startswith("companion")):
+            raise CrawlerError("crawler_navigation_held", "Manual companion selection required.", 409)
+        snapshot = _plain(self._custody_snapshot(row))
+        if snapshot["pending_dispatch"] is not None:
+            raise CrawlerError("crawler_navigation_held", "Recover the interrupted dispatch first.", 409)
+        return {"ok": True, "session_id": identifier, "version": row["version"],
+                "packet": packet(snapshot, now=_now().timestamp()), "network_authorized": False}
+
     async def navigation_inventory(self, scope: dict[str, str], identifier: str, *,
                                    snapshot_digest: str | None = None,
                                    after: int = 0, limit: int = 32) -> dict:
@@ -3760,6 +3773,17 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
             }
         if row["version"] != body["expected_version"]:
             raise CrawlerError("crawler_conflict", "Reload the current crawler revision before running.", 409)
+        if body.get("navigation_advice") is not None:
+            from skeleton.ai.webcrawler.navigation_semantics import advice_weights
+            snapshot = _plain(self._custody_snapshot(row))
+            if (automation_epoch is not None or watch_claim is not None
+                    or not row["request"]["frontier_strategy"].startswith("companion")
+                    or snapshot["pending_dispatch"] is not None):
+                raise CrawlerError("crawler_navigation_held", "Manual companion selection required.", 409)
+            try:
+                advice_weights(body["navigation_advice"], snapshot, now=_now().timestamp())
+            except (ValueError, TypeError, KeyError) as exc:
+                raise CrawlerError("crawler_navigation_stale", "Rebuild the current navigation packet.", 409) from exc
         if row["status"] not in {"queued", "interrupted"}:
             raise CrawlerError(
                 "crawler_not_runnable", "Resume a paused crawl before running another bounded slice.", 409
@@ -4003,6 +4027,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                 authorize=lambda: bridge(self._live(scope, identifier, token, epoch, network_margin=True)),
                 cancelled=cancelled.is_set,
                 on_checkpoint=lambda snapshot, event: bridge(commit(snapshot, event)),
+                **({"navigation_advice": body["navigation_advice"]} if body.get("navigation_advice") is not None else {}),
             )
             return runtime.snapshot(), _plain(summary)
 
