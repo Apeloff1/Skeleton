@@ -58,12 +58,18 @@ def _directory(info: os.stat_result) -> bool:
 class WeightStoreDiskOwner:
     """Explicit cooperating writer owner with scan/admit/write/recount custody."""
 
-    def __init__(self, store: WeightShardStore, policy: DiskAdmissionPolicy) -> None:
+    def __init__(self, store: WeightShardStore, policy: DiskAdmissionPolicy, *,
+                 initialize: bool = True) -> None:
         if not isinstance(store, WeightShardStore) or not isinstance(policy, DiskAdmissionPolicy):
             raise WeightShardStoreError("canonical weight store and disk policy required")
         if os.name != "posix" or not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
             raise WeightShardStoreError("POSIX cooperating disk admission unavailable")
-        store._require_write()
+        if type(initialize) is not bool:
+            raise WeightShardStoreError("invalid disk owner initialization policy")
+        if initialize:
+            store._require_write()
+        else:
+            store.assert_layout()
         self._store = store
         self._policy = policy
         info = store.root.lstat()
@@ -73,8 +79,10 @@ class WeightStoreDiskOwner:
         # Pin the shared lock at activation; never replace an existing inode.
         directory_fd = os.open(store.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
         try:
-            fd = os.open(_LOCK, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK,
-                         0o600, dir_fd=directory_fd)
+            flags = os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK
+            if initialize:
+                flags |= os.O_CREAT
+            fd = os.open(_LOCK, flags, 0o600, dir_fd=directory_fd)
             try:
                 self._lock_inode = self._inspect_lock(directory_fd, fd)
             finally:
@@ -180,6 +188,7 @@ class WeightStoreDiskOwner:
     def stage(self, identity: ModelIdentity, plan: WeightLoadPlan,
               source_paths: Mapping[int, str | Path]) -> tuple[str, dict]:
         """Hold exclusive cooperating custody through final manifest publication."""
+        self._store._require_write()
         with self._owned() as (directory_fd, fd):
             before = self._scan()
             charged = 0
