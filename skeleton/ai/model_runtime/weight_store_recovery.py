@@ -133,7 +133,7 @@ def _review_locked(owner: WeightStoreDiskOwner, policy: RecoveryReviewPolicy,
                 and not getattr(info, "st_file_attributes", 0) & 0x400)
 
     intent = read_intent(directory_fd, owner._policy_sha256)
-    last = read_last(directory_fd)
+    last = read_last(directory_fd, owner._policy_sha256)
     if intent is not None:
         record("unresolved_staging_intent", intent_digest=intent["digest"],
                plan_digest=intent["plan_digest"])
@@ -329,6 +329,7 @@ def acknowledge_weight_store_recovery(owner: WeightStoreDiskOwner, *,
         if current["digest"] != review_digest:
             raise WeightShardStoreError("recovery evidence changed during physical verification")
         owner._inspect_lock(directory_fd, fd)
+        owner._require_control_space()
         result = finish_intent(
             directory_fd, policy_sha256=owner._policy_sha256, intent_digest=intent_digest,
             outcome="recovery_reconciled", evidence={
