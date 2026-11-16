@@ -18,7 +18,8 @@ import time
 from uuid import uuid4
 
 from core.dragon_owner_shards import _private, _open
-from core.dragon_offline_dataset_handoff import qualify_manifest, apply_manifest
+from core.dragon_offline_dataset_handoff import qualify_manifest, apply_manifest,_manifest
+from core.dragon_dataset_ingest import fingerprint
 from core.dragon_hoarder_bulk import owner_key
 from core.dragon_mongo_receipt import _read_json
 from core.dragon_publisher_export_proof import PublisherExportProof
@@ -26,6 +27,8 @@ from core.dragon_publisher_export_proof import PublisherExportProof
 MAX_JOBS = 4096
 MAX_OWNER_JOBS = 128
 MAX_EXECUTION = 3600
+MAX_JOB_BYTES = 128*1024**2
+MAX_JOB_ROWS = 1_000_000
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS export_jobs(
  owner TEXT NOT NULL,id TEXT NOT NULL,manifest TEXT NOT NULL,manifest_sha TEXT NOT NULL,
@@ -56,6 +59,12 @@ def _proof_fields(proof):
             "signature_hex":proof.signature_hex}
 
 
+def _bound_manifest(path,expected_sha,proof):
+    _,items,_=_manifest(path,expected_sha=expected_sha,publisher_proof=proof)
+    if sum(fingerprint(local)[2] for _,local in items)>MAX_JOB_BYTES:
+        raise ValueError("automated import byte bound; use explicit manual import")
+
+
 class ExportJobs:
     def __init__(self,path,*,create=False):
         self.path=Path(path)
@@ -74,7 +83,10 @@ class ExportJobs:
         path=Path(manifest)
         # No raw paths or body content from captured web sources enter a job.
         fields=_proof_fields(proof)
+        _bound_manifest(path,expected_sha,proof)
         _,report=qualify_manifest(path,expected_manifest_sha=expected_sha,publisher_proof=proof)
+        if sum(entry["rows"] for entry in report["entries"])>MAX_JOB_ROWS:
+            raise ValueError("automated import row bound; use explicit manual import")
         identifier=_digest([owner,str(path),expected_sha,fields])
         now=int(time.time())
         with _open(self.path) as db:
@@ -92,7 +104,7 @@ class ExportJobs:
         return {"id":identifier,"state":"queued","expires_at":now+execution_seconds,
                 "entries":len(report["entries"]),"replayed":False,"network_executed":False}
 
-    def pulse(self,scope,*,graph_factory):
+    def pulse(self,scope,*,graph_factory,cancelled=None):
         owner=_scope(scope);token=uuid4().hex
         with _open(self.path) as db:
             db.execute("BEGIN IMMEDIATE")
@@ -111,6 +123,7 @@ class ExportJobs:
             db.execute("COMMIT")
 
         def authorize():
+            if cancelled is not None and cancelled():raise PermissionError("import runner cancelled")
             with _open(self.path) as db:
                 if not db.execute("SELECT 1 FROM export_jobs WHERE owner=? AND id=? AND state='running' AND token=? AND expires_at>?",
                                   (owner,job["id"],token,int(time.time()))).fetchone():
@@ -120,6 +133,8 @@ class ExportJobs:
             authorize()
             saved=json.loads(job["proof_json"])
             proof=PublisherExportProof(**saved) if saved else None
+            _bound_manifest(Path(job["manifest"]),job["manifest_sha"],proof)
+            authorize()
             report=apply_manifest(Path(job["manifest"]),expected_manifest_sha=job["manifest_sha"],
                 scope=scope,graph_factory=graph_factory,rights_acknowledged=True,publisher_proof=proof,authorize=authorize)
             authorize()
@@ -149,6 +164,45 @@ class ExportJobs:
             if changed!=1:raise ValueError("exact unexpired held job required")
             db.execute("COMMIT")
         return {"id":identifier,"state":"queued","deadline_renewed":False}
+
+
+async def scheduler_pulse():
+    """One explicitly enabled owner-local lane, never a remote credential."""
+    import asyncio
+    import threading
+    from core.dragon_corpus_runtime import _bounded,_path
+    from core.dragon_lead_graph import LeadGraph
+    from core.dragon_raw_export_custody import RawExportCustody
+    if os.getenv("SKL_DRAGON_DELIVERY_SCHEDULER","").strip()!="1":
+        return {"configured":False,"network_executed":False}
+    scope_path=os.getenv("SKL_DRAGON_DELIVERY_SCOPE_JSON","").strip()
+    job_path=os.getenv("SKL_DRAGON_EXPORT_JOB_DB_PATH","").strip()
+    raw_path=os.getenv("SKL_DRAGON_RAW_EXPORT_DB_PATH","").strip()
+    if not scope_path or not (job_path or raw_path):
+        return {"configured":True,"failed":True,"reason":"explicit_local_delivery_configuration_required"}
+    cancelled=threading.Event()
+    def work():
+        scope=_read_json(Path(scope_path));_scope(scope)
+        answer={"configured":True,"network_executed":False}
+        if raw_path and not cancelled.is_set():
+            try:answer["retention"]=RawExportCustody(Path(raw_path)).purge_expired(scope,limit=4)
+            except (OSError,ValueError,RuntimeError,sqlite3.Error):
+                answer["retention"]={"failed":True,"reason":"raw_retention_held"}
+        if job_path and not cancelled.is_set():
+            try:answer["import"]=ExportJobs(Path(job_path)).pulse(scope,
+                 graph_factory=lambda:LeadGraph(_path(scope=scope,create=False)),cancelled=cancelled.is_set)
+            except (OSError,ValueError,RuntimeError,sqlite3.Error):
+                answer["import"]={"failed":True,"reason":"local_import_held"}
+        return answer
+    try:
+        return await asyncio.wait_for(_bounded(work),timeout=45)
+    except (TimeoutError,OSError,ValueError,RuntimeError,sqlite3.Error):
+        return {"configured":True,"failed":True,"reason":"bounded_delivery_held","network_executed":False}
+    finally:
+        # _bounded retains the shared thread credit until physical exit.
+        # A timed-out runner may finish its current atomic page; no new page
+        # may start after its next authorize check.
+        cancelled.set()
 
 
 def main(argv=None):
