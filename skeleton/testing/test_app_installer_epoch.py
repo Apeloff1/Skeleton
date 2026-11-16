@@ -39,6 +39,11 @@ def _prepare(monkeypatch, tmp_path: Path) -> Path:
         installer, "compose_command",
         lambda action, **kwargs: ("docker", "compose", action),
     )
+    # Epoch tests isolate the existing daemon binding boundary. The real
+    # binding protocol and install denial path have dedicated tests.
+    from skeleton.app.compose_storage_binding import BindingReport
+    monkeypatch.setattr("skeleton.app.compose_storage_binding.observe_binding",
+                        lambda *a,**k: BindingReport(True,True,"fixture"))
     return env
 
 

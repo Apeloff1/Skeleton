@@ -190,6 +190,10 @@ def _install_with_routes(monkeypatch, tmp_path, *, ready, backend_override=True,
     monkeypatch.setattr(installer, "preflight", lambda *a, **kw: [])
     monkeypatch.setattr(installer, "checks_ok", lambda checks: True)
     monkeypatch.setattr(installer, "runtime_manifest", lambda manifest, **kw: manifest)
+    monkeypatch.setattr("skeleton.app.assembly.launch_network_errors", lambda *a,**k: ())
+    from skeleton.app.compose_storage_binding import BindingReport
+    monkeypatch.setattr("skeleton.app.compose_storage_binding.observe_binding",
+                        lambda *a,**k: BindingReport(True,True,"fixture"))
     monkeypatch.setattr(installer, "compose_command", lambda *a, **kw: ["docker", "compose"])
     monkeypatch.setattr(installer, "public_service_urls", lambda *a, **kw: (
         {"backend": "http://127.0.0.1:8001"} if backend_override else {}

@@ -1,0 +1,251 @@
+"""Read-only admission of resolved Compose project and persistent bindings.
+
+The ordinary Compose config check validates syntax, not storage identity.
+Use the actual resolved project, not a directory-name approximation. Never
+return rendered configuration, credentials, host mount sources or container
+labels to an installation receipt. No daemon mutations are performed here.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+import json
+import re
+import subprocess
+import tempfile
+from pathlib import Path
+from collections.abc import Mapping
+
+from skeleton.app.storage_custody import (
+    CONTAINER_ROLES, VOLUME_ROLES, StorageCustodyDenied, _names,
+)
+
+_PROJECT = re.compile(r"[a-z0-9][a-z0-9_-]{0,127}\Z")
+_BINDINGS = {
+    "mongo": {"/data/db": "mongo_data", "/data/configdb": "mongo_config"},
+    "backend": {"/app/data": "backend_data"},
+    "skeleton": {"/app/data": "skeleton_data"},
+}
+_MAX_CONFIG = 2 * 1024 * 1024
+_MAX_INSPECT = 128 * 1024
+# Emit only the relevant labels and mount metadata. Never inspect Config.Env.
+_CONTAINER_TEMPLATE = (
+    '{"project":{{json (index .Config.Labels "com.docker.compose.project")}},'
+    '"service":{{json (index .Config.Labels "com.docker.compose.service")}},'
+    '"mounts":{{json .Mounts}}}'
+)
+_VOLUME_TEMPLATE = (
+    '{"project":{{json (index .Labels "com.docker.compose.project")}},'
+    '"role":{{json (index .Labels "com.docker.compose.volume")}},'
+    '"driver":{{json .Driver}},"scope":{{json .Scope}}}'
+)
+
+
+@dataclass(frozen=True, slots=True)
+class BindingReport:
+    observed: bool
+    admitted: bool
+    code: str
+    existing_containers: int = 0
+    existing_volumes: int = 0
+
+    def to_dict(self):
+        return {
+            "schema":"skeleton.app.compose_storage_binding.v1",
+            "observed":self.observed,"admitted":self.admitted,"code":self.code,
+            "existing_containers":self.existing_containers,
+            "existing_volumes":self.existing_volumes,
+            "database_authenticated":False,"backup_verified":False,
+            "storage_modified":False,
+        }
+
+
+class BindingDenied(StorageCustodyDenied):
+    pass
+
+
+def _require(condition, code):
+    if condition is not True:
+        raise BindingDenied(code)
+
+
+def _unique(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise BindingDenied("duplicate_observation_field")
+        result[key] = value
+    return result
+
+
+def _constant(_value):
+    raise BindingDenied("invalid_observation_number")
+
+
+def _json_observation(root, runner, command, environ, *, limit):
+    # Disk-backed, private temporary capture, immediately closed. Rendered
+    # config can include secrets, so no stdout/stderr is inherited or logged.
+    # This is ephemeral capture, not secure erasure or backup custody.
+    with tempfile.TemporaryFile() as output:
+        completed = runner(list(command), cwd=root, env=dict(environ),
+                           check=False, stdin=subprocess.DEVNULL, stdout=output,
+                           stderr=subprocess.DEVNULL, text=False, timeout=30)
+        _require(type(getattr(completed,"returncode",None)) is int
+                 and completed.returncode == 0, "docker_observation_failed")
+        output.seek(0)
+        raw = output.read(limit + 1)
+    _require(0 < len(raw) <= limit, "docker_observation_size_invalid")
+    result = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique, parse_constant=_constant)
+    _require(type(result) is dict, "docker_observation_schema_invalid")
+    return result
+
+
+def _resolved_model(config):
+    project = config.get("name")
+    _require(type(project) is str and _PROJECT.fullmatch(project) is not None,
+             "compose_project_identity_invalid")
+    services, volumes = config.get("services"), config.get("volumes")
+    _require(type(services) is dict and type(volumes) is dict
+             and len(services) <= 32 and len(volumes) <= 32, "compose_storage_model_invalid")
+    _require(set(_BINDINGS).issubset(services) and "frontend" in services
+             and set(services).issubset(CONTAINER_ROLES), "compose_service_inventory_invalid")
+    resolved = {}
+    required_roles = {role for mounts in _BINDINGS.values() for role in mounts.values()}
+    _require(required_roles.issubset(volumes) and set(volumes).issubset(VOLUME_ROLES),
+             "compose_volume_inventory_invalid")
+    for role, spec in volumes.items():
+        _require(type(spec) is dict, "compose_volume_model_invalid")
+        name = project + "_" + role
+        _require(spec.get("name") == name
+                 and spec.get("driver", "local") == "local"
+                 and spec.get("external", False) is False
+                 and not spec.get("driver_opts"), "compose_volume_identity_mismatch")
+        resolved[role] = name
+    for service, spec in services.items():
+        _require(type(spec) is dict and spec.get("container_name") == "tutolage-" + service,
+                 "compose_container_identity_mismatch")
+        mounts = spec.get("volumes", [])
+        _require(type(mounts) is list and len(mounts) <= 64, "compose_mount_inventory_invalid")
+        targets = {}
+        for mount in mounts:
+            _require(type(mount) is dict and type(mount.get("target")) is str,
+                     "compose_mount_model_invalid")
+            target = mount["target"]
+            _require(target not in targets, "compose_duplicate_mount_target")
+            targets[target] = mount
+        for target, role in _BINDINGS.get(service, {}).items():
+            mount = targets.get(target)
+            _require(type(mount) is dict and mount.get("type") == "volume"
+                     and mount.get("source") == role and mount.get("read_only", False) is False,
+                     "compose_persistent_mount_mismatch")
+            # A volume mounted over a parent directory can conceal application
+            # files or another state mount; prohibit parents of canonical paths.
+            for other in targets:
+                if other != target:
+                    _require(not target.startswith(other.rstrip("/") + "/"),
+                             "compose_persistent_parent_mount")
+        for target, mount in targets.items():
+            if mount.get("type") == "volume" and mount.get("source") in required_roles:
+                _require(_BINDINGS.get(service, {}).get(target) == mount["source"],
+                         "compose_authority_volume_aliased")
+    return project, resolved
+
+
+def _container_binding(payload, project, role, resolved):
+    _require(payload.get("project") == project and payload.get("service") == role,
+             "existing_container_project_mismatch")
+    mounts = payload.get("mounts")
+    _require(type(mounts) is list and len(mounts) <= 128, "existing_mount_inventory_invalid")
+    targets = {}
+    for mount in mounts:
+        _require(type(mount) is dict and type(mount.get("Destination")) is str,
+                 "existing_mount_inventory_invalid")
+        destination = mount["Destination"]
+        _require(destination not in targets, "existing_duplicate_mount_target")
+        targets[destination] = mount
+    for target, volume_role in _BINDINGS.get(role, {}).items():
+        mount = targets.get(target)
+        _require(type(mount) is dict and mount.get("Type") == "volume"
+                 and mount.get("Name") == resolved[volume_role] and mount.get("RW") is True,
+                 "existing_persistent_mount_mismatch")
+
+
+def _volume_binding(payload, project, role):
+    _require(payload.get("project") == project and payload.get("role") == role
+             and payload.get("driver") == "local" and payload.get("scope") == "local",
+             "existing_volume_ownership_mismatch")
+
+
+def _render_command(command):
+    # Only accept the already constructed pinned Compose invocation. Reuse
+    # its exact file/env selection; never accept arbitrary executable flags.
+    command = tuple(command)
+    _require(command[:2] == ("docker","compose") and "up" in command
+             and "--env-file" in command, "compose_launch_command_invalid")
+    offset = command.index("up")
+    prefix = command[:offset]
+    _require(prefix.count("--env-file") == 1
+             and prefix[prefix.index("--env-file")+1:prefix.index("--env-file")+2] == (".env",),
+             "compose_environment_not_pinned")
+    return (*prefix,"config","--format","json")
+
+
+def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=subprocess.run,
+                    admit=None) -> BindingReport:
+    """Observe intended and existing storage, then recheck inventory and epoch."""
+    root = Path(root).resolve()
+    copied = dict(environ)
+    existing_containers = existing_volumes = 0
+
+    def fence():
+        _require(admit is None or admit() is True, "runtime_epoch_changed")
+
+    def names(args):
+        fence()
+        result = _names(root,runner,args,copied)
+        fence()
+        return result
+
+    def inspect(args, limit):
+        fence()
+        result = _json_observation(root,runner,args,copied,limit=limit)
+        fence()
+        return result
+
+    try:
+        render = _render_command(command)
+        project, resolved = _resolved_model(inspect(render,_MAX_CONFIG))
+        volume_args = ["volume","ls","--format","{{.Name}}"]
+        container_args = ["ps","--all","--format","{{.Names}}"]
+        all_volumes, all_containers = names(volume_args), names(container_args)
+        for role, expected in resolved.items():
+            # Legacy suffix matches and Compose-labeled volumes both imply
+            # previous state. Refuse a parallel empty replacement project.
+            matches = {name for name in all_volumes
+                       if name == role or name.endswith("_" + role)}
+            matches.update(names(["volume","ls","--filter",
+                                  "label=com.docker.compose.volume="+role,"--format","{{.Name}}"]))
+            _require(matches.issubset({expected}), "alternate_persistent_volume_detected")
+            if expected in all_volumes:
+                payload = inspect(["docker","volume","inspect","--format",_VOLUME_TEMPLATE,expected],
+                                  _MAX_INSPECT)
+                _volume_binding(payload,project,role)
+                existing_volumes += 1
+        for role in CONTAINER_ROLES:
+            name = "tutolage-" + role
+            if name in all_containers:
+                payload = inspect(["docker","container","inspect","--format",
+                                   _CONTAINER_TEMPLATE,name],_MAX_INSPECT)
+                _container_binding(payload,project,role,resolved)
+                existing_containers += 1
+        _require(names(volume_args) == all_volumes and names(container_args) == all_containers,
+                 "docker_storage_inventory_changed")
+        _require(_resolved_model(inspect(render,_MAX_CONFIG)) == (project,resolved),
+                 "compose_storage_model_changed")
+        fence()
+        return BindingReport(True,True,"binding_observed",existing_containers,existing_volumes)
+    except BindingDenied as exc:
+        # All BindingDenied codes are fixed internal identifiers.
+        return BindingReport(False,False,str(exc))
+    except (StorageCustodyDenied,OSError,ValueError,TypeError,KeyError,IndexError,
+            RecursionError,subprocess.SubprocessError):
+        return BindingReport(False,False,"binding_observation_unavailable")

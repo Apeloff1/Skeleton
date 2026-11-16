@@ -439,6 +439,9 @@ def test_generic_secret_rotation_keeps_persistent_mongodb_credentials(tmp_path):
 
 
 def test_first_install_build_output_is_discarded_instead_of_retained_in_memory(tmp_path, monkeypatch):
+    from skeleton.app.compose_storage_binding import BindingReport
+    monkeypatch.setattr("skeleton.app.compose_storage_binding.observe_binding",
+                        lambda *a,**k: BindingReport(True,True,"fixture"))
     from skeleton.app.installer import install_application
 
     (tmp_path / ".env").write_text("FRONTEND_PORT=3000\n", encoding="utf-8")
@@ -497,6 +500,9 @@ def test_first_install_build_output_is_discarded_instead_of_retained_in_memory(t
 def test_clean_first_install_checks_critical_routes_on_default_and_custom_ports(
     tmp_path, monkeypatch, env_text, expected_backend_url
 ):
+    from skeleton.app.compose_storage_binding import BindingReport
+    monkeypatch.setattr("skeleton.app.compose_storage_binding.observe_binding",
+                        lambda *a,**k: BindingReport(True,True,"fixture"))
     """Healthy first startup must not crash when no explicit port override exists."""
 
     from skeleton.app.health import ProbeResult

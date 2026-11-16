@@ -1394,6 +1394,9 @@ def _prepare_cli_start(tmp_path, monkeypatch):
     config = tmp_path / ".env"
     config.write_text("FRONTEND_PORT=3000\n", encoding="utf-8")
     monkeypatch.setattr(cli, "find_repo_root", lambda: tmp_path)
+    from skeleton.app.compose_storage_binding import BindingReport
+    monkeypatch.setattr("skeleton.app.compose_storage_binding.observe_binding",
+                        lambda *a,**k: BindingReport(True,True,"fixture"))
     monkeypatch.setattr(cli, "preflight", lambda *a, **k: ())
     monkeypatch.setattr("skeleton.app.preloader.inspect_host", lambda *a, **k: SimpleNamespace(ready=True))
     return config

@@ -407,6 +407,15 @@ def install_application(
             intent("start")
             phases.append(InstallPhase("start", False, str(exc)))
             return InstallReceipt(root=root, phases=tuple(phases))
+        from skeleton.app.compose_storage_binding import observe_binding
+        binding = observe_binding(root, command=command, environ=compose_env,
+                                  runner=runner, admit=source_stable)
+        if not binding.admitted:
+            intent("start")
+            phases.append(InstallPhase("start", False,
+                "persistent storage binding not admitted: " + binding.code
+                + "; preserve existing containers and volumes"))
+            return InstallReceipt(root, tuple(phases))
         intent("start")
         if not source_stable():
             phases.append(InstallPhase("start", False,

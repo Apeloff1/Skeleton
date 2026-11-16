@@ -1149,3 +1149,21 @@ and signing identity must match the admitted private configuration; the
 installer rejects mismatches before its configuration publication or
 Compose startup. These are local installation rules; managed deployments
 using a separate secret-injection contract must qualify separately.
+
+
+
+### Resolved Compose storage binding
+
+Before local startup, the installer and source CLI render the exact pinned
+Compose model in private temporary capture. The resolved project, named
+local-volume definitions and authoritative mount targets must match the
+canonical storage roles. Existing fixed-name containers must have matching
+Compose project/service labels and writable authoritative volume mounts.
+Existing volumes must carry the matching project and role labels. Alternate
+canonical volumes, mount substitutions, foreign containers and changing
+inventory block startup rather than creating a new empty data plane. This
+deliberately requires review of legacy unlabeled or relocated volumes.
+No volume inspection includes database contents and no inspection runs a
+Docker mutation. The transient rendered config may contain credentials;
+it is not retained in the report. This is not secure erasure, database
+authentication, backup verification or a daemon-wide transaction.

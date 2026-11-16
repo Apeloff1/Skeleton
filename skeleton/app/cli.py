@@ -1280,6 +1280,16 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                     return 1
                 if not source_stable():
                     return changed()
+                from skeleton.app.compose_storage_binding import observe_binding
+                from skeleton.app.runtime_operation import compose_operation_environment
+                compose_env = compose_operation_environment(process_env, manifest.mode_env(mode))
+                binding = observe_binding(root, command=startup_command,
+                                          environ=compose_env, admit=source_stable)
+                if not binding.admitted:
+                    print("application start blocked: persistent storage binding not admitted: " + binding.code)
+                    return 1
+                if not source_stable():
+                    return changed()
                 exit_code = _run_compose(
                     startup_command,
                     root,
