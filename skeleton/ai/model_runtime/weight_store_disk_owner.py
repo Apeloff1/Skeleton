@@ -225,7 +225,9 @@ class WeightStoreDiskOwner:
             self._assert_policy(directory_fd)
         opened = os.fstat(fd)
         named = os.stat(_LOCK, dir_fd=directory_fd, follow_symlinks=False)
-        if (_inode(os.fstat(directory_fd)) != self._root_inode
+        root_info = os.fstat(directory_fd)
+        if (_inode(root_info) != self._root_inode or not _directory(root_info)
+                or root_info.st_uid != os.geteuid() or root_info.st_mode & 0o077
                 or not _regular(opened) or opened.st_uid != os.geteuid()
                 or opened.st_mode & 0o077 or opened.st_size != 0
                 or _inode(opened) != _inode(named)):
