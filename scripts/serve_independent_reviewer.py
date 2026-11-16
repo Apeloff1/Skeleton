@@ -192,13 +192,18 @@ def main(argv=None):
     parser.add_argument("--tls-cert", required=True, type=Path)
     parser.add_argument("--tls-key", required=True, type=Path)
     parser.add_argument("--client-ca", required=True, type=Path)
+    parser.add_argument("--replay-database", required=True, type=Path)
+    parser.add_argument("--replay-ledger-id", required=True)
     args = parser.parse_args(argv)
     try:
         address = ipaddress.IPv4Address(args.bind)
         if address.is_multicast or address.is_unspecified or not 1 <= args.port <= 65535:
             raise ValueError("explicit IPv4 bind required")
         policy = ReviewPolicy.load(args.policy, args.policy_sha256)
-        signer = ReviewerPolicySigner(policy, load_signer(args.signing_key))
+        from scripts.independent_reviewer_replay import DurableReplayLedger
+        ledger = DurableReplayLedger(args.replay_database, ledger_id=args.replay_ledger_id,
+            authority=policy.authority_id, domain=policy.deployment_domain)
+        signer = ReviewerPolicySigner(policy, load_signer(args.signing_key), replay_ledger=ledger)
         tls = server_tls(cert=args.tls_cert, key=args.tls_key, client_ca=args.client_ca)
         with BoundedTLSReviewer((str(address), args.port), signer=signer, tls=tls) as server:
             server.serve_forever(poll_interval=.25)

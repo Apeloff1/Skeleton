@@ -193,19 +193,24 @@ class ReviewPolicy:
 
 
 class ReviewerPolicySigner:
-    """Bounded process-local replay custody and independently pinned decisions.
+    """Bounded replay custody and independently pinned decisions.
 
-    Nonces remain consumed for this policy generation until process exit.
-    Exhaustion denies instead of evicting valid replay history. The client
-    independently generates fresh nonces, and persistent replay state across
-    process restarts is not asserted by this implementation.
+    Production executable requires a durable ledger. In-process fixtures may
+    explicitly omit it and then have process-local custody only. Exhaustion
+    denies instead of evicting replay history; no policy rotation resets it.
     """
-    def __init__(self, policy, key, *, clock=time.time, replay_limit=_MAX_REPLAY):
+    def __init__(self, policy, key, *, clock=time.time, replay_limit=_MAX_REPLAY, replay_ledger=None):
         _require(type(policy) is ReviewPolicy and isinstance(key, Ed25519PrivateKey))
         _require(type(replay_limit) is int and 1 <= replay_limit <= _MAX_REPLAY)
         self.policy, self._key, self._clock = policy, key, clock
         self._limit = replay_limit
         self._seen = set()
+        if replay_ledger is not None:
+            from scripts.independent_reviewer_replay import DurableReplayLedger
+            _require(type(replay_ledger) is DurableReplayLedger
+                     and replay_ledger.authority == policy.authority_id
+                     and replay_ledger.domain == policy.deployment_domain)
+        self._replay_ledger = replay_ledger
         self._lock = Lock()
 
     def _gate(self, client, nonce):
@@ -215,8 +220,11 @@ class ReviewerPolicySigner:
             _require(self.policy.active(int(self._clock())))
             # Shared namespace across review and attestation: a nonce can
             # authorize exactly one operation in the current process.
-            _require(nonce not in self._seen and len(self._seen) < self._limit)
-            self._seen.add(nonce)
+            if self._replay_ledger is not None:
+                self._replay_ledger.consume(nonce)
+            else:
+                _require(nonce not in self._seen and len(self._seen) < self._limit)
+                self._seen.add(nonce)
 
     def review(self, raw, client):
         doc = decode_document(raw, MAX_REVIEW_BODY)
