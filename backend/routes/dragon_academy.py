@@ -2673,8 +2673,16 @@ class CrawlerWriteRequest(CrawlerRequest):
         return self
 
 
+class CrawlerNavigationAdvice(CrawlerRequest):
+    snapshot_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    packet_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    jeeves_rank: list[str] = Field(min_length=1, max_length=12)
+    dragon_rank: list[str] = Field(min_length=1, max_length=12)
+
+
 class CrawlerRunRequest(CrawlerWriteRequest):
     max_steps: int = Field(default=4, ge=1, le=4, strict=True)
+    navigation_advice: CrawlerNavigationAdvice | None = None
 
 
 class CrawlerControlRequest(CrawlerWriteRequest):
@@ -3069,7 +3077,7 @@ async def crawler_run(
     session_id: str = URLPath(min_length=1, max_length=128),
     scope: dict = Depends(_crawler_write_scope),
 ) -> dict:
-    return await _crawler_result(crawler_application.run(scope, session_id, body.model_dump()))
+    return await _crawler_result(crawler_application.run(scope, session_id, body.model_dump(exclude_none=True)))
 
 
 @router.post("/crawler/sessions/{session_id}/control")
@@ -3100,6 +3108,14 @@ async def crawler_automation(
         ),
     }
 
+
+
+@router.get("/crawler/sessions/{session_id}/navigation/packet")
+async def crawler_navigation_packet(
+    session_id: str = URLPath(min_length=1, max_length=128),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    return await _crawler_result(crawler_application.navigation_packet(scope, session_id))
 
 
 @router.get("/crawler/sessions/{session_id}/navigation")
