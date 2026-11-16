@@ -10,7 +10,7 @@ from unittest.mock import patch
 from skeleton.cortex.attn import cached_mha, cached_mha_context, sample_logits, softmax
 from skeleton.cortex.transformer import KVCache, TinyTransformer
 from skeleton.ai.model_runtime.native_llm_runtime import NativeConversationSession, NativeLLMRuntime
-from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig, RuntimeContractError
+from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig, RuntimeContractError, RuntimeLimits
 
 
 def old_sampler(logits, rng, *, temperature, top_k, top_p, min_p):
@@ -228,6 +228,23 @@ class PrivatePrefixReuseTests(unittest.TestCase):
             x,y=a.generate(text,cfg),b.generate(text,cfg)
             self.assertEqual(x.generated_ids,y.generated_ids)
             self.assertEqual(a.token_ids,b.token_ids)
+
+    def test_idle_prefix_retention_is_shared_and_bounded_across_sessions(self):
+        model=TinyTransformer(vocab=("hello","world","again"),dim=8,ctx=32,
+                              seed=41,n_heads=2,n_layers=2,d_ff=8)
+        runtime=NativeLLMRuntime(model,limits=RuntimeLimits(
+            max_context=32,max_new_tokens=8,max_total_tokens=40,max_kv_bytes=16384))
+        sessions=[NativeConversationSession(runtime,prefix_cache_bytes=16384) for _ in range(8)]
+        cfg=GenerationConfig(max_new_tokens=3,temperature=0)
+        for session in sessions:
+            session.generate("hello world again",cfg)
+        sizes=[x.prefix_cache_status["estimated_retained_python_bytes"] for x in sessions]
+        self.assertGreater(sum(sizes),0)
+        self.assertLessEqual(sum(sizes),16384)
+        self.assertIn(0,sizes)
+        for session in sessions:
+            session.reset()
+        self.assertFalse(runtime._idle_prefix_bytes)
 
     def test_prefix_budget_validated(self):
         r=make_runtime()
