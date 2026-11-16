@@ -423,3 +423,133 @@ def test_new_mission_bindings_are_strict_and_witness_must_earn_them():
     bad = deepcopy(source)
     bad["episodes"][0]["mission_board"]["source_id"] = "foreign-world"
     assert invoke("build", bad)[0] == 1
+
+
+def test_durable_expedition_fork_restore_and_namespace_isolation(tmp_path):
+    import sqlite3
+    from skeleton.app.gameforge_expedition_store import ExpeditionStore
+    from skeleton.app.gameforge_campaign_store import CampaignStore, RevisionConflict, CampaignStoreError
+    source = request()
+    design = build_expedition(source)
+    witness = design["witness"]
+    start, end = portal(witness), first_resolve(witness)
+    path = tmp_path / "journal.sqlite"
+    with sqlite3.connect(path) as db:
+        narratives = CampaignStore(db)
+        campaigns = narratives.create("shared", source["campaign"], "init")
+        store = ExpeditionStore(db)
+        genesis = store.create("shared", source, "init")
+        assert genesis["receipt"]["schema"] != campaigns["receipt"]["schema"]
+        partial = store.append("shared", source, 0, "partial", witness[:start + 3])
+        assert partial["receipt"]["state"]["episodes"]["s0"]["state"]["inventory"] == {"wood": 2}
+        assert store.append("shared", source, 0, "partial", witness[:start + 3]) == partial
+        with pytest.raises(RevisionConflict):
+            store.append("shared", source, 0, "stale", witness[:1])
+        with pytest.raises(CampaignStoreError):
+            store.read("shared", source["campaign"])
+    with sqlite3.connect(path) as db:
+        store = ExpeditionStore(db, initialize=False)
+        assert store.read("shared", source) == partial
+        remainder = deepcopy(witness[start + 3:end])
+        branch = deepcopy(remainder)
+        branch[-1]["action"]["choice"] = "shelter"
+        alternate = store.append("shared", source, 1, "alternate", branch)
+        forked = store.fork("shared", source, 1, partial["receipt"]["session_digest"], "successful")
+        assert forked["child"]["receipt"] == partial["receipt"]
+        completed = store.append("successful", source, 1, "finish", witness[start + 3:])
+        assert completed["receipt"]["state"]["status"] == "completed"
+        assert store.read("shared", source) == alternate
+        archive = store.snapshot("successful", source)
+        assert archive["namespace"] == "expedition" and archive["head"] == 2
+        assert "receipt" not in archive["operations"][1]
+        restored = store.restore("restored", source, archive)
+        assert restored["receipt"] == completed["receipt"]
+        assert store.history("restored", source)["revisions"] == store.history("successful", source)["revisions"]
+        assert CampaignStore(db, initialize=False).read("shared", source["campaign"]) == campaigns
+        with pytest.raises(CampaignStoreError):
+            CampaignStore(db, initialize=False).restore("wrong", source["campaign"], archive)
+
+
+def test_archive_restore_forgery_and_capacity_are_atomic(tmp_path, monkeypatch):
+    import sqlite3
+    import skeleton.app.gameforge_campaign_store as journal
+    from skeleton.app.gameforge_expedition_store import ExpeditionStore
+    source = request()
+    witness = build_expedition(source)["witness"]
+    with sqlite3.connect(tmp_path / "archive.sqlite") as db:
+        store = ExpeditionStore(db)
+        store.create("source", source, "init")
+        store.append("source", source, 0, "first", witness[:1])
+        archive = store.snapshot("source", source)
+        forged = deepcopy(archive)
+        forged["operations"][1]["receipt_digest"] = "f" * 64
+        rehash(forged, "archive_digest")
+        with pytest.raises(journal.CampaignStoreError, match="independent replay"):
+            store.restore("forged", source, forged)
+        assert db.execute("SELECT slot FROM gf_expedition_slots_v1").fetchall() == [("source",)]
+        forged = deepcopy(archive)
+        forged["operations"][1]["operation"] = "init"
+        rehash(forged, "archive_digest")
+        with pytest.raises(journal.CampaignStoreError, match="duplicate"):
+            store.restore("duplicated", source, forged)
+        monkeypatch.setattr(journal, "MAX_TOTAL_BYTES", 1)
+        with pytest.raises(journal.CampaignStoreError, match="storage ceiling"):
+            store.restore("full", source, archive)
+        assert store.snapshot("source", source) == archive
+
+
+def test_durable_cli_board_turn_recovery_and_lost_response_retries(tmp_path):
+    source = request()
+    path = tmp_path / "game.sqlite"
+    slot = {"request": source, "slot": "play"}
+    zero = invoke("create-slot", {**slot, "operation": "init"}, path)[1]
+    current = invoke("board-slot", slot, path)[1]
+    action = {"type": "dialogue", "npc": "keeper", "choice": "listen"}
+    index = current["board"]["legal_actions"].index(action)
+    selected = {**slot, "operation": "listen", "expected_revision": 0,
+                "board_digest": current["board"]["board_digest"], "index": index}
+    first = invoke("turn-slot", selected, path)[1]
+    assert first["revision"] == 1 and first["receipt"]["actions"] == [action]
+    assert invoke("turn-slot", selected, path)[1] == first
+    assert invoke("turn-slot", {**selected, "operation": "stale"}, path)[0] == 1
+    fork = invoke("fork-slot", {**slot, "parent_revision": 0,
+                               "expected_digest": zero["receipt"]["session_digest"],
+                               "child_slot": "other"}, path)[1]
+    assert fork["child"]["revision"] == 0
+    recovery = invoke("assist-slot", slot, path)[1]["recovery"]
+    assert recovery["status"] == "completion_witness"
+    forged = deepcopy(recovery)
+    forged["additional"] = []
+    rehash(forged, "recovery_digest")
+    operation = {**slot, "operation": "recover", "expected_revision": 1}
+    assert invoke("apply-recovery-slot", {**operation, "recovery": forged}, path)[0] == 1
+    assert invoke("read-slot", slot, path)[1] == first
+    complete = invoke("apply-recovery-slot", {**operation, "recovery": recovery}, path)[1]
+    assert complete["receipt"]["state"]["status"] == "completed"
+    assert invoke("apply-recovery-slot", {**operation, "recovery": recovery}, path)[1] == complete
+    snapshot = invoke("snapshot-slot", slot, path)[1]
+    second_path = tmp_path / "restored.sqlite"
+    restored = invoke("restore-slot", {**slot, "archive": snapshot}, second_path)[1]
+    assert restored == complete
+    comparison = invoke("compare-slots", {**slot, "other_slot": "other"}, path)[1]
+    assert comparison["left_revision"] == 2 and comparison["right_revision"] == 0
+    assert comparison["comparison"]["left_status"] == "completed"
+    assert comparison["comparison"]["right_status"] == "in_progress"
+
+
+def test_two_connections_reject_stale_expedition_write(tmp_path):
+    import sqlite3
+    from skeleton.app.gameforge_expedition_store import ExpeditionStore
+    from skeleton.app.gameforge_campaign_store import RevisionConflict
+    source = request()
+    action = build_expedition(source)["witness"][:1]
+    path = tmp_path / "game.sqlite"
+    with sqlite3.connect(path) as a, sqlite3.connect(path) as b:
+        first = ExpeditionStore(a)
+        first.create("slot", source, "init")
+        second = ExpeditionStore(b, initialize=False)
+        assert second.read("slot", source)["revision"] == 0
+        first.append("slot", source, 0, "write", action)
+        with pytest.raises(RevisionConflict):
+            second.append("slot", source, 0, "racing", action)
+        assert second.read("slot", source)["revision"] == 1
