@@ -130,6 +130,8 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
         self._cutover_requested = database is core_db and requested()
         self._cutover_active = False
         self._mongo_client = None
+        self._derived_database = None
+        self._derived_epochs = {}
         self._sessions = database["dragon_crawler_sessions"]
         self._limits = database["dragon_crawler_commands"]
         try:
@@ -166,13 +168,19 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
         from core.dragon_mongo_cutover import activate
         self._cutover_active=False
         try:
-            client,target=await activate(self.database,self._mongo_client)
+            client,target,epochs=await activate(self.database,self._mongo_client)
         except Exception:
             raise CrawlerError("crawler_mongo_cutover_held","Dragon dedicated authority is not qualified.",503) from None
         self._mongo_client=client
         self._sessions=target["dragon_crawler_sessions"]
         self._limits=target["dragon_crawler_commands"]
         self._indexes_ready=False
+        self._derived_database=target
+        self._derived_epochs=epochs
+        self._current_vector_ready=False
+        self._full_vectors_ready=False
+        self._current_purge_after=None
+        self._full_purge_after=None
         self._cutover_active=True
         return {"configured":True,"active":True}
 

@@ -56,9 +56,12 @@ def build_current_batch(scope,snapshot,windows,encoder):
     return {**value,"digest":digest(value)}
 
 
+from core import dragon_posting_lineage as lineage
+
+
 class DragonCurrentVectorMixin:
     def _current_vectors(self):
-        return self.database["dragon_current_full_vector_postings"]
+        return lineage.collection(self,"current")
 
     async def ensure_current_vector_indexes(self):
         if getattr(self,"_current_vector_ready",False):return
@@ -80,24 +83,27 @@ class DragonCurrentVectorMixin:
         now=_now()
         eligible={"status":{"$in":["completed","budget_exhausted","paused","ready"]},
             "treasury_vault":None,"consent_expires_at":{"$gt":now},
-            "$or":[{"current_vector_due":{"$exists":False}},{"current_vector_due":{"$lte":now.timestamp()}}]}
-        rows=await self.sessions.find(eligible,{"_id":1,"tenant_id":1,"owner_id":1,"version":1,"current_vector_due":1}
+            "$or":lineage.due_predicate(self,"current","current_vector_due",now.timestamp())}
+        rows=await self.sessions.find(eligible,{"_id":1,"tenant_id":1,"owner_id":1,"version":1,"current_vector_due":1,"current_vector_due_storage_epoch":1}
             ).sort([("current_vector_due",1),("_id",1)]).limit(1).max_time_ms(2000).to_list(1)
         if not rows:return {"enabled":True,"idle":True}
         item=rows[0];scope={k:item[k] for k in ("tenant_id","owner_id")}
         lease=now.timestamp()+180
         fence={**scope,"_id":item["_id"],"version":item["version"],
                "consent_expires_at":{"$gt":now},"current_vector_due":item.get("current_vector_due",{"$exists":False})}
-        if not (await self.sessions.update_one(fence,{"$set":{"current_vector_due":lease}})).modified_count:
+        fence.update(lineage.claim_filter(self,"current","current_vector_due",item))
+        update=lineage.claim_update(self,"current","current_vector_due","current_vector_state",lease,item)
+        if not (await self.sessions.update_one(fence,update)).modified_count:
             return {"superseded":True}
         fence["current_vector_due"]=lease
+        fence.update(lineage.state_filter(self,"current","current_vector_due"))
         try:
             row=await self._owned(scope,item["_id"])
             if row["version"]!=item["version"]:return {"superseded":True}
             self._source_use(row)
             snap=_plain(row["snapshot"])
             windows=await _cpu(lambda:current_windows(self,row,snap))
-            gen=digest([scope,item["_id"],row["version"],snap["snapshot_digest"],encoder.identity,windows])
+            gen=lineage.generation(self,"current",digest([scope,item["_id"],row["version"],snap["snapshot_digest"],encoder.identity,windows]))
             old=row.get("current_vector_state") or {}
             cursor=old.get("covered",0) if old.get("generation")==gen else 0
             if type(cursor) is not int or not 0<=cursor<=len(windows):raise ValueError("coverage cursor")
@@ -142,12 +148,13 @@ class DragonCurrentVectorMixin:
             MAX_BATCHES).max_time_ms(2000).to_list(MAX_BATCHES)
         hits=[]
         for posting in postings:
-            row=await self.sessions.find_one({**scope,"_id":posting["session"],"current_vector_state.generation":posting["generation"],
+            row=await self.sessions.find_one({**scope,**lineage.state_filter(self,"current","current_vector_due"),"_id":posting["session"],"current_vector_state.generation":posting["generation"],
                 "current_vector_state.complete":True,"consent_expires_at":{"$gt":_now()}},max_time_ms=2000)
             if not row or row["current_vector_state"]["version"]!=row["version"]:continue
             try:
                 row=await self._owned(scope,row["_id"])
                 state=row["current_vector_state"]
+                if any(row.get(k)!=v for k,v in lineage.state_filter(self,"current","current_vector_due").items()):continue
                 if state["version"]!=row["version"] or state["generation"]!=posting["generation"]:continue
                 self._source_use(row)
                 snap=_plain(row["snapshot"]);batch=posting["batch"]

@@ -29,9 +29,12 @@ def generation(scope,session,snapshot,grant,policies,model,spans):
                    "windows":digest(spans),"schema":"dragon.full-vector-v1"})
 
 
+from core import dragon_posting_lineage as lineage
+
+
 class DragonExhaustiveVectorMixin:
     def _full_vectors(self):
-        return self.database["dragon_full_vector_postings"]
+        return lineage.collection(self,"archive")
 
     async def ensure_full_vector_indexes(self):
         if getattr(self,"_full_vectors_ready",False):return
@@ -54,9 +57,8 @@ class DragonExhaustiveVectorMixin:
         await self.ensure_full_vector_indexes()
         now=_now().timestamp()
         rows=await self.sessions.find({"status":{"$in":sorted(TERMINAL)},"deep_archive.released":True,
-            "archive_grant.expires_at":{"$gt":now},"$or":[{"deep_full_due":{"$exists":False}},
-                 {"deep_full_due":{"$lte":now}}]},
-            {"_id":1,"version":1,"tenant_id":1,"owner_id":1,"deep_full_due":1}
+            "archive_grant.expires_at":{"$gt":now},"$or":lineage.due_predicate(self,"archive","deep_full_due",now)},
+            {"_id":1,"version":1,"tenant_id":1,"owner_id":1,"deep_full_due":1,"deep_full_due_storage_epoch":1}
             ).sort([("deep_full_due",ASCENDING),("_id",ASCENDING)]).limit(1).max_time_ms(2000).to_list(1)
         if not rows:return {"configured":True,"idle":True}
         item=rows[0];scope={k:item[k] for k in ("tenant_id","owner_id")}
@@ -66,16 +68,18 @@ class DragonExhaustiveVectorMixin:
         fence={**scope,"_id":item["_id"],"version":item["version"],
                "deep_archive.released":True,"archive_grant.expires_at":{"$gt":now},
                "deep_full_due":item.get("deep_full_due",{"$exists":False})}
-        reserved=await self.sessions.update_one(fence,{"$set":{"deep_full_due":claim}})
+        fence.update(lineage.claim_filter(self,"archive","deep_full_due",item))
+        update=lineage.claim_update(self,"archive","deep_full_due","deep_full_state",claim,item)
+        reserved=await self.sessions.update_one(fence,update)
         if not reserved.modified_count:return {"superseded":True}
-        fence={**fence,"deep_full_due":claim}
+        fence={**fence,"deep_full_due":claim,**lineage.state_filter(self,"archive","deep_full_due")}
         row=await self.sessions.find_one(fence,max_time_ms=2000)
         if not row:return {"superseded":True}
         try:
             def plan():
                 snap,grant,policies,allowed=self._deep_material(scope,row,_now().timestamp())
                 spans=dense.exhaustive_spans(snap,grant,policies,_now().timestamp(),allowed)
-                gen=generation(scope,row["_id"],snap,grant,policies,encoder.identity,spans)
+                gen=lineage.generation(self,"archive",generation(scope,row["_id"],snap,grant,policies,encoder.identity,spans))
                 return snap,grant,policies,allowed,spans,gen
             snap,grant,policies,allowed,spans,gen=await _cpu(plan)
             previous=row.get("deep_full_state") or {}
@@ -135,13 +139,14 @@ class DragonExhaustiveVectorMixin:
         hits=[]
         for p in postings:
             now=_now().timestamp()
-            row=await self.sessions.find_one({**scope,"_id":p["session"],"deep_full_state.generation":p["generation"],
+            row=await self.sessions.find_one({**scope,**lineage.state_filter(self,"archive","deep_full_due"),"_id":p["session"],"deep_full_state.generation":p["generation"],
                 "deep_full_state.complete":True,"deep_full_state.expires_at":{"$gt":now},
                 "status":{"$in":sorted(TERMINAL)}},max_time_ms=2000)
             if row is None:continue
             try:
                 def rerank():
                     snap,grant,policies,allowed=self._deep_material(scope,row,_now().timestamp())
+                    if any(row.get(k)!=v for k,v in lineage.state_filter(self,"archive","deep_full_due").items()):continue
                     state=row["deep_full_state"]
                     if state["snapshot_digest"]!=snap["snapshot_digest"] or state["grant_digest"]!=digest(grant) or state["policy_digest"]!=digest(policies):
                         return []
