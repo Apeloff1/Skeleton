@@ -9,6 +9,7 @@ physical erasure or backup revocation.
 from __future__ import annotations
 
 import hashlib
+from io import BytesIO
 import os
 from pathlib import Path
 import re
@@ -66,18 +67,35 @@ class RawExportCustody:
                 raise ValueError("explicit raw export store initialization required")
 
     def retain(self,scope,path,*,expected_sha,operation,retention_seconds,rights_acknowledged):
+        path=Path(path);witness=fingerprint(path)
+        return self._retain(scope,size=witness[2],stream_factory=lambda:source_stream(path,None,witness),
+            expected_sha=expected_sha,operation=operation,retention_seconds=retention_seconds,
+            rights_acknowledged=rights_acknowledged)
+
+    def retain_response(self,scope,body,*,expected_sha,operation,retention_seconds,rights_acknowledged):
+        """Retain bounded in-memory decoded HTTP entity bytes, not headers or wire framing.
+
+        The authorized connector must independently evaluate response rights
+        before invoking this internal method. No request or URL is accepted.
+        """
+        if type(body) is not bytes or not 1<=len(body)<=4_000_000:
+            raise ValueError("bounded immutable HTTP entity required")
+        return self._retain(scope,size=len(body),stream_factory=lambda:BytesIO(body),
+            expected_sha=expected_sha,operation=operation,retention_seconds=retention_seconds,
+            rights_acknowledged=rights_acknowledged)
+
+    def _retain(self,scope,*,size,stream_factory,expected_sha,operation,retention_seconds,rights_acknowledged):
         owner=_owner(scope);expected_sha=_hex(expected_sha)
         if (rights_acknowledged is not True or type(retention_seconds) is not int
                 or not 300<=retention_seconds<=30*86400
                 or not isinstance(operation,str) or not 1<=len(operation)<=128 or operation.strip()!=operation):
             raise ValueError("explicit finite raw export retention grant required")
-        path=Path(path);witness=fingerprint(path);size=witness[2]
-        if size>MAX_OBJECT:raise ValueError("raw export object byte cap")
+        if not 1<=size<=MAX_OBJECT:raise ValueError("raw export object byte cap")
         identifier=hashlib.sha256((owner+"\0"+operation).encode()).hexdigest()
         now=int(time.time())
         # Verify full bytes before opening a write transaction; verify again
         # during streaming insertion. The private store is the trust boundary.
-        with source_stream(path,None,witness) as stream:
+        with stream_factory() as stream:
             h=hashlib.sha256()
             for chunk in iter(lambda:stream.read(BLOCK),b""):h.update(chunk)
         if h.hexdigest()!=expected_sha:raise ValueError("raw export SHA-256 differs")
@@ -99,7 +117,7 @@ class RawExportCustody:
                 raise ValueError("raw export disk reserve")
             db.execute("INSERT INTO raw_exports VALUES(?,?,?,?,?,?,'sealed')",(owner,identifier,expected_sha,size,now+retention_seconds,now))
             h=hashlib.sha256();written=0;ordinal=0
-            with source_stream(path,None,witness) as stream:
+            with stream_factory() as stream:
                 for chunk in iter(lambda:stream.read(BLOCK),b""):
                     written+=len(chunk);h.update(chunk)
                     db.execute("INSERT INTO raw_export_chunks VALUES(?,?,?,?,?)",
