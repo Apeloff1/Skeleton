@@ -553,3 +553,40 @@ def test_two_connections_reject_stale_expedition_write(tmp_path):
         with pytest.raises(RevisionConflict):
             second.append("slot", source, 0, "racing", action)
         assert second.read("slot", source)["revision"] == 1
+
+
+def test_canonical_legacy_distribution_is_recovered_as_unplayed_expedition():
+    from skeleton.app.gameforge_expedition_author import AUTHOR_SCHEMA, author_expedition, verify_authoring
+    from skeleton.game.gameplay.harbor_crafting_package import build_package
+    source = mission_request()
+    ep = source["episodes"][0]
+    author = {"schema": AUTHOR_SCHEMA, "campaign": source["campaign"],
+              "bindings": [{"objective": "s0", "world": ep["source"],
+                            "mission_board": ep["mission_board"], "choice": "signal",
+                            "required_missions": ["dispatch"]}]}
+    result = author_expedition(author)
+    assert verify_authoring(author, result)
+    package = build_package(ep["source"], ep["mission_board"], choice="signal")
+    imported = deepcopy(author)
+    imported["bindings"][0]["package"] = package
+    recovered = author_expedition(imported)
+    assert recovered["request"] == result["request"]
+    assert recovered["design_digest"] == result["design_digest"]
+    assert recovered["package_custody"] == result["package_custody"]
+    assert recovered["package_custody"][0]["package_digest"] == package["package_digest"]
+    assert recovered["package_custody"][0]["demo_points"] == 60
+    initial = play_expedition(result["request"], [])
+    assert initial["session_digest"] == result["genesis_digest"]
+    assert initial["state"]["earned_rewards"] == []
+    assert initial["state"]["episodes"]["s0"]["missions"]["points"] == 0
+    design = build_expedition(result["request"])
+    assert design["witness_state"]["status"] == "completed"
+    assert invoke("author", author)[1] == result
+    assert invoke("verify-author", {"request": author, "composition": result})[0] == 0
+    changed = deepcopy(imported)
+    changed["bindings"][0]["world"]["initial_coins"] += 1
+    assert invoke("author", changed)[0] == 1
+    forged = deepcopy(result)
+    forged["package_custody"][0]["demo_points"] = 999
+    rehash(forged, "author_digest")
+    assert not verify_authoring(author, forged)
