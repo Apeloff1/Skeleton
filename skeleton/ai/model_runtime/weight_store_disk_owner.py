@@ -20,6 +20,7 @@ from typing import Iterator, Mapping
 
 from .flgb_model_runtime import MAX_WEIGHT_BYTES, ModelIdentity, WeightLoadPlan, canonical_bytes
 from .weight_shard_store import WeightShardStore, WeightShardStoreError
+from .weight_store_transaction import begin_intent, finish_intent, read_intent, read_last
 
 _HEX = re.compile(r"[0-9a-f]{64}\Z")
 _BUCKET = re.compile(r"[0-9a-f]{2}\Z")
@@ -263,7 +264,10 @@ class WeightStoreDiskOwner:
             body = {"schema": "skeleton.weight-disk-admission.v1",
                     "policy": asdict(self._policy), "policy_sha256": self._policy_sha256,
                     "inventory": observed,
-                    "filesystem_free_bytes": free, "hard_quota": False,
+                    "filesystem_free_bytes": free,
+                    "active_intent": read_intent(directory_fd, self._policy_sha256),
+                    "last_outcome": read_last(directory_fd),
+                    "hard_quota": False,
                     "cooperative_only": True}
             return {**body, "digest": sha256(canonical_bytes(body)).hexdigest()}
 
@@ -272,6 +276,8 @@ class WeightStoreDiskOwner:
         """Hold exclusive cooperating custody through final manifest publication."""
         self._store._require_write()
         with self._owned() as (directory_fd, fd):
+            if read_intent(directory_fd, self._policy_sha256) is not None:
+                raise WeightShardStoreError("unresolved staging intent; recovery review required")
             before = self._scan()
             charged = 0
             if before["accounted_bytes"] > self._policy.maximum_store_bytes:
@@ -313,6 +319,12 @@ class WeightStoreDiskOwner:
                 raise WeightShardStoreError("cooperative store byte ceiling exceeded")
             if shutil.disk_usage(self._store.root).free < self._policy.minimum_free_bytes + demand:
                 raise WeightShardStoreError("filesystem free-byte reserve unavailable")
+            intent = begin_intent(
+                directory_fd, policy_sha256=self._policy_sha256,
+                plan_digest=plan.digest, model_identity_digest=identity.identity_digest,
+                manifest_sha256=sha256(manifest).hexdigest(),
+                before=before, admitted_new_bytes=demand,
+            )
             key = self._store.stage_plan(identity, plan, source_paths,
                 maximum_new_bytes=min(remaining - metadata, self._store.maximum_bytes),
                 _write_checkpoint=checkpoint)
@@ -329,4 +341,15 @@ class WeightStoreDiskOwner:
                     "policy": asdict(self._policy), "policy_sha256": self._policy_sha256,
                     "hard_quota": False,
                     "cooperative_only": True}
-            return key, {**body, "digest": sha256(canonical_bytes(body)).hexdigest()}
+            _, actual_manifest_sha, _ = self._store.bound_model_manifest(
+                key, model_identity=identity, expected_manifest_sha256=intent["manifest_sha256"])
+            body["manifest_sha256"] = actual_manifest_sha
+            body["intent_digest"] = intent["digest"]
+            receipt = {**body, "digest": sha256(canonical_bytes(body)).hexdigest()}
+            self._inspect_lock(directory_fd, fd)
+            outcome = finish_intent(
+                directory_fd, policy_sha256=self._policy_sha256,
+                intent_digest=intent["digest"], outcome="committed", evidence=receipt,
+            )
+            result = {**body, "durable_outcome_digest": outcome["digest"]}
+            return key, {**result, "digest": sha256(canonical_bytes(result)).hexdigest()}
