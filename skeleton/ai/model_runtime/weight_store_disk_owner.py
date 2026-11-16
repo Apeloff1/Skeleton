@@ -407,7 +407,10 @@ class WeightStoreDiskOwner:
             # Final verification reads the committed shards under the exact
             # acknowledged manifest pin. Size accounting alone cannot qualify
             # the staged object bytes after the temporary publication boundary.
-            self._store.verified_paths(key, expected_manifest_sha256=actual_manifest_sha)
+            self._store.verified_paths(key, expected_manifest_sha256=actual_manifest_sha,
+                                       _durable=True)
+            if self._scan() != after:
+                raise WeightShardStoreError("disk inventory changed at durable acknowledgement fence")
             self._inspect_lock(directory_fd, fd)
             self._require_control_space()
             outcome = finish_intent(
