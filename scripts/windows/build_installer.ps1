@@ -282,6 +282,8 @@ $PyInstallerArgs = @(
     "--paths", $PayloadDir,
     "--collect-data", "skeleton.app",
     "--hidden-import", "skeleton.app.health",
+    "--hidden-import", "skeleton.app.install_probe_worker",
+    "--hidden-import", "skeleton.app.studio_readiness",
     "--hidden-import", "skeleton.app.installer",
     "--hidden-import", "skeleton.app.preloader",
     "--hidden-import", "skeleton.app.setup_runtime",

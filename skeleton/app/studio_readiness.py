@@ -381,13 +381,15 @@ def _bounded_server(root, base, token, timeout, *, endpoint, schema, max_respons
     ):
         if key in os.environ:
             environment[key] = os.environ[key]
-    code = (
-        "import sys,json;sys.path.insert(0," + repr(str(root)) + ");"
-        "from skeleton.app.studio_readiness import _server_snapshot;"
-        "args=json.loads(sys.stdin.buffer.read(65537));"
-        "print(json.dumps(_server_snapshot(**args),ensure_ascii=False,allow_nan=False))"
-    )
-    command = [sys.executable, "-I", "-B", "-c", code]
+    from skeleton.app.install_probe_worker import worker_command
+    try:
+        command = worker_command(root)
+    except (OSError, ValueError):
+        return {"observed": False, "code": "server_inventory_unavailable"}
+    if getattr(sys, "frozen", False):
+        # A sibling PyInstaller executable is a fresh application, not a
+        # multiprocessing child of the windowed bootloader.
+        environment["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
     if platform.system() == "Linux" and Path("/usr/bin/prlimit").is_file():
         command = [
             "/usr/bin/prlimit",
@@ -416,10 +418,12 @@ def _bounded_server(root, base, token, timeout, *, endpoint, schema, max_respons
                 stderr=error,
                 env=environment,
                 cwd=root,
-                timeout=timeout,
+                timeout=timeout + (15 if getattr(sys, "frozen", False) else 0),
                 check=False,
+                **({"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)}
+                   if os.name == "nt" and getattr(sys, "frozen", False) else {}),
             )
-            if child.returncode:
+            if type(child.returncode) is not int or child.returncode != 0:
                 return {"observed": False, "code": "server_inventory_unavailable"}
             output.seek(0)
             raw = output.read(MAX_OUTPUT + 1)

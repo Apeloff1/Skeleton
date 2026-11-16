@@ -182,6 +182,13 @@ jobs:
             throw "installed SkeletonOffline.exe help smoke exited $($offlineHelp.ExitCode)"
           }
 
+          # Exercise the actual frozen readiness transport against an isolated
+          # local HTTP fixture. No Docker, external provider or real credential.
+          python scripts/windows/verify_frozen_install_probe.py --install-root $installDir
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed readiness worker acceptance failed"
+          }
+
           $nativeSmoke = Start-Process -FilePath $launcher -ArgumentList @("--local-ai-smoke") -Wait -PassThru
           if ($nativeSmoke.ExitCode -ne 0) {
             throw "installed Skeleton.exe native offline inference smoke exited $($nativeSmoke.ExitCode)"

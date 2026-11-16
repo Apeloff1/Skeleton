@@ -42,6 +42,7 @@ def test_bundled_preloader_does_not_probe_system_pip(monkeypatch, tmp_path):
 
 
 def test_bundled_installer_disables_external_python_requirements(monkeypatch, tmp_path):
+    (tmp_path / ".env").write_text("FRONTEND_PORT=3000\n", encoding="utf-8")
     captured = {}
 
     def fake_preload(root, **kwargs):
@@ -721,3 +722,17 @@ def test_open_app_denies_nonlocal_or_credentialed_setup_urls(monkeypatch, host):
     allowed, detail = launcher.open_running_application()
     assert allowed is False
     assert "local HTTP endpoint" in detail
+
+
+def test_windows_hidden_runner_forwards_preloader_stdin(monkeypatch,tmp_path):
+    from skeleton.app import windows_launcher as launcher
+    from skeleton.app.preloader import _command_check
+    def child(command,**kwargs):
+        assert kwargs["stdin"] == subprocess.DEVNULL
+        assert kwargs["stdout"] == subprocess.DEVNULL
+        assert kwargs["stderr"] == subprocess.DEVNULL
+        assert kwargs["shell"] is False
+        return subprocess.CompletedProcess(command,0)
+    monkeypatch.setattr(launcher.subprocess,"run",child)
+    assert _command_check(["docker","info"],code="host:docker",label="Docker",
+                          remediation="repair",runner=launcher._hidden_runner).ok
