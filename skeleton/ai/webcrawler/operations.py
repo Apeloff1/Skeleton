@@ -35,6 +35,7 @@ from .structured_discovery import (
     extract_robots_sitemaps,
 )
 from .frontier_scheduler import choose_frontier
+from .navigation_semantics import advice_weights
 from .navigation_backlog import (
     new_backlog, observe, count as count_discovery, pending_rows, record_for,
     retire as retire_discovery, validate as validate_backlog,
@@ -119,6 +120,7 @@ def implementation_digest():
                 "document_formats.py",
                 "frontier_scheduler.py",
                 "navigation_backlog.py",
+                "navigation_semantics.py",
                 "adaptive_navigation.py",
                 "acquisition_feedback.py",
                 "information_portfolio.py",
@@ -1179,9 +1181,11 @@ class CrawlRun:
             measurements=state["acquisition_measurements"], robots=state["robots"],
             remaining_requests=self.request.max_requests - state["usage"]["requests"],
             companion=(self._companion(now) if self.request.frontier_strategy.startswith("companion") else None),
+            model_advice=getattr(self, "_navigation_advice", None),
         )
         if item is None:
             return None
+        self._navigation_advice = None  # one canonical target selection only
         url = item["url"]
         if _selection.discourse is not None:
             remember_discourse(state["discovery_backlog"], _selection.discourse)
@@ -1684,11 +1688,21 @@ class CrawlRun:
             depth=item["depth"] + 1, parent_url=url)
         return self._event("captured", now=now, url=url, source_id=source_id)
 
-    def run_slice(self, *, max_steps=4, max_seconds=40, authorize=None, cancelled=None, on_checkpoint=None):
+    def run_slice(self, *, max_steps=4, max_seconds=40, authorize=None, cancelled=None, on_checkpoint=None,
+                  navigation_advice=None):
         _integer(max_steps, 1, 4, "slice steps")
         _number(max_seconds, 0.1, 45, "slice seconds")
         if self._state["state"] not in {"ready", "running"}:
             return {**self.status(), "slice_events": [], "slice_steps": 0}
+        self._navigation_advice = None
+        if navigation_advice is not None:
+            if (not self.request.frontier_strategy.startswith("companion")
+                    or self._state["pending_dispatch"] is not None):
+                raise CrawlOperationError("navigation advice requires a new companion selection")
+            try:
+                self._navigation_advice = advice_weights(navigation_advice, self.snapshot(), now=time.time())
+            except ValueError as exc:
+                raise CrawlOperationError("navigation advice rejected") from exc
         start = time.monotonic()
         self._slice_deadline = start + max_seconds
         self._authorize, self._cancelled, self._on_checkpoint = authorize, cancelled, on_checkpoint
