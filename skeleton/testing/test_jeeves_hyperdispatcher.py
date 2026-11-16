@@ -1998,3 +1998,85 @@ def test_host_signed_worker_receipt_drives_real_durable_broker(tmp_path):
     assert result.state is TaskState.SUCCEEDED
     assert SwarmDurableBridge(make_store(tmp_path)).load("signed-run").restore_runtime().task("signed").state is TaskState.SUCCEEDED
 
+
+def test_signed_continuation_requires_separately_bound_action_receipts(tmp_path):
+    from hashlib import sha256
+    import json
+    from skeleton.automation.agents.swarm_durable import HostWorkerAuthority, HostWorkerReceipt, SwarmDurableBridge
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, TaskState, LeaseError
+    from skeleton.intelligence.dispatch_policy import DispatchCandidate
+    from skeleton.testing.test_durable_run_store import make_store
+
+    run_id = "signed-continuation"
+    worker_key, inspector_key = b"w" * 32, b"i" * 32
+    data = b"independently checked execution evidence"
+    custody = {}
+    verifier = HostWorkerAuthority(
+        run_id, grants={
+            ("worker", "w"): (worker_key, frozenset({"uncertain"})),
+            ("inspector", "w"): (inspector_key, frozenset({"reconcile:committed", "enqueue"})),
+        }, resolve=custody.get, validate_evidence=lambda receipt, raw: raw == data,
+    )
+    runtime, broker = _verified_dispatch_fixture(verify_worker=verifier)
+    store = make_store(tmp_path)
+    store.create_run(run_id)
+    store.claim_run(run_id, "owner", lease_seconds=60)
+    manager = SwarmRecoveryManager(delta_archive=True)
+    bridge = SwarmDurableBridge(store)
+    bridge.submit_unique_verified(run_id, "owner", manager, broker, "a", SwarmTask("parent", {}))
+    _, attempt, _ = bridge.lease_and_capture_verified(
+        run_id, "owner", manager, broker, (DispatchCandidate("parent", "a", 100, 0),), now_ms=10000,
+    )
+
+    def signed(issuer, action, key):
+        receipt = HostWorkerReceipt.issue(
+            run_id=run_id, issuer=issuer, worker_id=attempt.leased_to, task_id=attempt.id,
+            lease_token=attempt.lease_token, action=action, artifact_sha256=sha256(data).hexdigest(),
+            issuer_key=key,
+        )
+        custody[receipt.digest] = (receipt, data)
+        return receipt.digest
+
+    uncertain = signed("worker", "uncertain", worker_key)
+    bridge.finish_and_capture_verified(
+        run_id, "owner", manager, broker, "a", "parent", worker_id=attempt.leased_to,
+        lease_token=attempt.lease_token, outcome="uncertain", evidence_sha256=uncertain,
+    )
+    child = SwarmTask("child", {"x": 1}, dependencies=("parent",))
+    manifest = [[child.id, dict(child.payload), child.priority, child.max_attempts,
+                 sorted(child.required_capabilities), child.dependencies]]
+    pin = sha256(json.dumps([run_id, "a", "parent", manifest], sort_keys=True,
+                            separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode()).hexdigest()
+    reconciled = signed("inspector", "reconcile:committed", inspector_key)
+    continuation = signed("inspector", "enqueue:" + pin, inspector_key)
+    with pytest.raises(LeaseError):
+        bridge.reconcile_and_enqueue_verified(
+            run_id, "owner", manager, broker, "a", "parent", attempt.leased_to,
+            lease_token=attempt.lease_token, evidence_sha256=reconciled, followups=(child,),
+        )
+    assert not broker.is_retired() and runtime.task("child") is None
+    assert runtime.task("parent").effect_uncertain
+    bridge.reconcile_and_enqueue_verified(
+        run_id, "owner", manager, broker, "a", "parent", attempt.leased_to,
+        lease_token=attempt.lease_token, evidence_sha256=reconciled,
+        continuation_evidence_sha256=continuation, followups=(child,),
+    )
+    restored = SwarmDurableBridge(make_store(tmp_path)).load(run_id).restore_runtime()
+    assert restored.task("parent").state is TaskState.SUCCEEDED
+    assert restored.task("child").state is TaskState.QUEUED
+    assert not restored.blocked_dependencies("child")
+
+
+def test_host_worker_authority_refuses_cross_issuer_key_reuse_and_cross_scope_roles():
+    from skeleton.automation.agents.swarm_durable import HostWorkerAuthority, DurableSwarmError
+    for grants in (
+        {("worker", "w"): (b"w" * 32, frozenset({"success"})),
+         ("inspector", "w"): (b"w" * 32, frozenset({"reconcile:committed"}))},
+        {("same", "w"): (b"w" * 32, frozenset({"success"})),
+         ("same", "other"): (b"r" * 32, frozenset({"reconcile:committed"}))},
+    ):
+        with pytest.raises(DurableSwarmError, match="independent"):
+            HostWorkerAuthority("run", grants=grants, resolve=lambda digest: None,
+                                validate_evidence=lambda receipt, evidence: True)
+

@@ -253,7 +253,9 @@ class SwarmDurableBridge:
                                        manager: SwarmRecoveryManager, broker: TenantSwarmBroker,
                                        tenant: str, parent_id: str, parent_worker: str, *,
                                        lease_token: str, evidence_sha256: str,
-                                       followups: tuple[SwarmTask, ...]) -> DurableSwarmCapture:
+                                       followups: tuple[SwarmTask, ...],
+                                       continuation_evidence_sha256: str | None = None
+                                       ) -> DurableSwarmCapture:
         """Commit an uncertain parent's verified success and queued children together.
 
         Child admission happens while the parent still holds its dependency
@@ -297,7 +299,8 @@ class SwarmDurableBridge:
             # Trusted host must independently authorize the exact continuation
             # manifest in addition to the parent's actual outcome evidence.
             broker.broker._verified(parent_worker, parent_id, lease_token,
-                                    "enqueue:" + pin, evidence_sha256)
+                                    "enqueue:" + pin, continuation_evidence_sha256
+                                    if continuation_evidence_sha256 is not None else evidence_sha256)
             broker.broker._verified(parent_worker, parent_id, lease_token,
                                     "reconcile:committed", evidence_sha256)
             for task in followups:
@@ -756,6 +759,8 @@ class HostWorkerAuthority:
                 or not 1 <= max_artifact_bytes <= 64 * 1024 * 1024):
             raise DurableSwarmError("invalid worker evidence authority")
         self._grants: dict[tuple[str, str], tuple[bytes, frozenset[str]]] = {}
+        issuer_roles: dict[str, bool] = {}
+        key_owners: dict[bytes, str] = {}
         for scope, grant in grants.items():
             if (type(scope) is not tuple or len(scope) != 2
                     or type(grant) is not tuple or len(grant) != 2):
@@ -771,7 +776,14 @@ class HostWorkerAuthority:
             if (actions & {"success", "uncertain"}
                     and actions - {"success", "uncertain"}):
                 raise DurableSwarmError("worker and reconciler grants must be separate")
-            self._grants[(_wait_identifier(issuer), _wait_identifier(worker_id))] = (key, actions)
+            issuer, worker_id = _wait_identifier(issuer), _wait_identifier(worker_id)
+            effect_role = bool(actions & {"success", "uncertain"})
+            if (issuer_roles.get(issuer, effect_role) != effect_role
+                    or key_owners.get(key, issuer) != issuer):
+                raise DurableSwarmError("worker issuer roles and credentials must be independent")
+            issuer_roles[issuer] = effect_role
+            key_owners[key] = issuer
+            self._grants[(issuer, worker_id)] = (key, actions)
         self._resolve = resolve
         self._validate_evidence = validate_evidence
         self._max_artifact_bytes = max_artifact_bytes

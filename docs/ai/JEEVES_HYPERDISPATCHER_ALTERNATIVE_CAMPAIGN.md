@@ -249,3 +249,16 @@ an adversarial fixture checks wrong worker/attempt/run/key, artifact mutation
 and action escalation. Previously inherited worker-refusal test fixtures now
 use explicit verification only where a successful synthetic outcome is intended.
 
+### A12 continuation receipt separation
+
+Atomic uncertain-parent reconciliation and follow-up admission now accept
+a separately signed continuation-manifest receipt alongside the exact
+reconciliation receipt. The old single-digest interface remains compatible
+with existing host verifiers, but the strict signed verifier refuses it for
+two different actions. Credentials cannot be reused across distinct issuers,
+and one issuer cannot receive both effect and reconciliation roles even at
+different worker scopes. The new real-SQLite regression exercises refusal
+with insufficient authorization followed by successful durable publication
+with distinct action receipts. Key custody and the actual independent
+physical evidence validator remain externally provisioned.
+
