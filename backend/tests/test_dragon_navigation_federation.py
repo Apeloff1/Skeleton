@@ -11,11 +11,14 @@ import sqlite3
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 from core.dragon_navigation_federation import NavigationFederation
-from skeleton.ai.webcrawler.navigation_backlog import observe
+from skeleton.ai.webcrawler.navigation_backlog import observe, new_backlog, validate, MAX_BYTES
+from core import dragon_navigation_graph as graph
 from skeleton.ai.webcrawler.navigation_semantics import (
     semantic_features, packet, make_advice, advice_weights, parse_rank, role_prompt,
+    tournament, digest, target_id, validate_packet,
 )
 from skeleton.ai.webcrawler.operations import CrawlRun, CrawlRequest
 
@@ -63,6 +66,53 @@ class SemanticNavigationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             advice_weights(advice,run.snapshot(),now=NOW)
         self.assertNotIn("https://",role_prompt(p,"jeeves"))
+
+    def test_full_48_candidate_model_tournament_with_strict_role_boundaries(self):
+        value={"snapshot_digest":"a"*64,"as_of":NOW,"objective":["flight","manual"],
+            "candidates":[{"id":target_id("https://example.com/guide/"+str(i)),
+             "terms":["flight","guide"],"depth":1,"attempts":0,"semantic":1000-i}
+             for i in range(48)]}
+        value["packet_digest"]=digest(value)
+        calls=[]
+        def fake(group,role,first,stage):
+            ids=validate_packet(group)
+            self.assertLessEqual(len(ids),8)
+            self.assertNotIn("https://",role_prompt(group,role,first))
+            if role=="dragon":self.assertIsNotNone(first)
+            calls.append((stage,role,group["packet_digest"]))
+            return list(range(1,len(ids)+1))
+        advice=tournament(value,fake)
+        self.assertEqual(len(calls),18)
+        self.assertEqual(advice["packet_digest"],value["packet_digest"])
+        self.assertTrue(set(advice["jeeves_rank"])<=set(validate_packet(value)))
+        self.assertEqual(calls[-1][:2],("final","dragon"))
+        # Fixture inference is not actual local model evidence.
+        with self.assertRaises(ValueError):
+            tournament(value,lambda *_:[999])
+
+    def test_wide_incremental_inventory_and_tamper_detection(self):
+        ledger=new_backlog()
+        for i in range(2500):
+            observe(ledger,url=f"https://example.com/flight/{i}",parent=None,depth=0,kind="seed")
+        self.assertEqual(len(ledger["records"]),2500)
+        self.assertLess(ledger["record_bytes"],MAX_BYTES)
+        for i in range(200):
+            observe(ledger,url=f"https://example.com/flight/{i}",
+                parent="https://example.com/root",depth=0,kind="seed")
+        validate(ledger,admit=lambda url:url,max_depth=0)
+        ledger["record_bytes"]-=1
+        with self.assertRaises(ValueError):
+            validate(ledger,admit=lambda url:url,max_depth=0)
+
+    def test_wider_plaintext_sitemap_parser(self):
+        from skeleton.ai.webcrawler.core import CrawlPolicy
+        from skeleton.ai.webcrawler.structured_discovery import parse_plaintext_sitemap
+        body=("\n".join(f"https://example.com/guide/{i}" for i in range(1500))).encode()
+        result=parse_plaintext_sitemap(body,document_url="https://example.com/sitemap.txt",
+            policy=CrawlPolicy(allowed_hosts=frozenset({"example.com"})),
+            max_links=1024,max_entries=4096)
+        self.assertEqual(len(result.links),1024)
+        self.assertTrue(result.capped)
 
     def test_cooling_target_is_not_in_packet(self):
         run=fixture(terminal=False)
@@ -117,6 +167,54 @@ class FederationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.publish(fixture(scope=OTHER),"foreign")
 
+    def test_graph_topology_portfolio_and_revocation(self):
+        run=fixture(9,2)
+        root=target_id("https://example.com/start")
+        parent="https://example.com/aerodynamics/handbook/9/0"
+        child="https://example.com/aviation/tutorial"
+        observe(run._state["discovery_backlog"],url=child,parent=parent,depth=1,kind="document_link")
+        grant=self.publish(run,"graph-session")
+        reopened=NavigationFederation(self.path)
+        neighbors=reopened.topology(SCOPE,target=root,now=NOW)
+        self.assertEqual(len(neighbors["neighbors"]),2)
+        self.assertEqual(reopened.topology(OTHER,target=root,now=NOW)["neighbors"],[])
+        trail=reopened.trail(SCOPE,root=root,query="flight manual",now=NOW,depth=3)
+        self.assertTrue(any(x["id"]==target_id(child) and x["depth"]==2 for x in trail["targets"]))
+        shortlist=reopened.shortlist(SCOPE,query="flight manual",now=NOW)
+        self.assertGreaterEqual(len(shortlist["targets"]),3)
+        portfolio=reopened.portfolio(SCOPE,query="flight manual",now=NOW)
+        self.assertGreaterEqual(len(portfolio["targets"]),3)
+        self.assertTrue(all(x["network_authorized"] is False for x in portfolio["targets"]))
+        self.assertTrue(all("yield_prior" in x["historical_feedback"] for x in portfolio["targets"]))
+        self.assertFalse(portfolio["index_backfill_pending"])
+        target=target_id(child)
+        review=reopened.review(SCOPE,target=target,state="held",reason="operator review",
+            expected_revision=0,next_review=NOW+60,now=NOW)
+        self.assertEqual(review["revision"],1)
+        with self.assertRaises(ValueError):
+            reopened.review(SCOPE,target=target,state="candidate",reason="stale",
+                expected_revision=0,next_review=NOW+60,now=NOW)
+        self.assertNotIn(target,[x["id"] for x in reopened.shortlist(SCOPE,query="flight manual",now=NOW)["targets"]])
+        reopened.revoke(SCOPE,grant["grant_id"])
+        self.assertEqual(reopened.topology(SCOPE,target=root,now=NOW)["neighbors"],[])
+        self.assertEqual(reopened.shortlist(SCOPE,query="flight manual",now=NOW)["targets"],[])
+        reopened.purge(SCOPE,now=NOW)
+        with sqlite3.connect(self.path) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM navigation_edges").fetchone()[0],0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM navigation_postings").fetchone()[0],0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM navigation_outcomes").fetchone()[0],0)
+
+    def test_versioned_index_rebuild_without_inventing_historical_edges(self):
+        self.publish(fixture(11,3),"legacy-index")
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE navigation_indexed SET revision=?",("f"*64,))
+        self.assertTrue(self.federation.shortlist(SCOPE,query="flight",now=NOW)["index_backfill_pending"])
+        result=self.federation.reindex(SCOPE,limit=2)
+        self.assertEqual(result["indexed"],2)
+        self.assertTrue(result["next_cursor"])
+        self.federation.reindex(SCOPE,after=result["next_cursor"])
+        self.assertFalse(self.federation.shortlist(SCOPE,query="flight",now=NOW)["index_backfill_pending"])
+
     def test_physical_cross_session_scaling(self):
         # The ordinary CI qualification actually writes and reads many
         # sessions, beyond the active-crawler allowance. The optional
@@ -146,11 +244,17 @@ class FederationTests(unittest.TestCase):
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0],"ok")
             self.assertEqual(db.execute("SELECT COUNT(*) FROM navigation_nodes").fetchone()[0],expected+1)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM navigation_grants").fetchone()[0],batches)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM navigation_edges").fetchone()[0],expected)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM navigation_indexed").fetchone()[0],expected+1)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM navigation_outcomes").fetchone()[0],expected+batches)
+            posting_count=db.execute("SELECT COUNT(*) FROM navigation_postings").fetchone()[0]
+            self.assertGreater(posting_count,expected)
             self.assertEqual(db.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()[0],0)
         with open(self.path,"rb") as f:
             os.fsync(f.fileno())
         evidence={"fixture_sessions":batches,"distinct_semantic_matches":expected,
-            "database_bytes":self.path.stat().st_size,"write_seconds":round(write_elapsed,5),
+            "database_bytes":self.path.stat().st_size,"semantic_postings":posting_count,"witnessed_edges":expected,
+            "write_seconds":round(write_elapsed,5),
             "read_seconds":round(read_elapsed,5),"write_rows_per_second":round(expected/write_elapsed,2),
             "read_rows_per_second":round(expected/read_elapsed,2),"readback_verified":True,
             "production_capacity_verified":False,"user_device_verified":False}
