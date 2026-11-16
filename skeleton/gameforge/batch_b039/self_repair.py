@@ -10,6 +10,7 @@ module consumes them through small typed seams (``RouteChoice`` and
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from copy import deepcopy
 import math
 from typing import Callable, Mapping, Sequence
 
@@ -174,63 +175,90 @@ Clock = Callable[[], float]
 class RepairLoop:
     """Bounded diagnose→propose→evaluate loop with greedy (hill-climb) acceptance.
 
-    Only improvements are kept, so the result is never worse than the input.
-    Budgets are checked *before* each spend, so they are never exceeded.
+    Only improvements are kept. Callbacks are synchronous and cooperative:
+    elapsed time is checked before and after each external callback, but a
+    running callback cannot be forcibly preempted or its external cost refunded.
+    Late candidate evaluations never promote an artifact.
     """
 
     def __init__(self, evaluator: Evaluator, proposer: Proposer, router: Router,
                  budget: Budget, clock: Clock, patience: int = 2) -> None:
-        if patience < 1:
+        if type(patience) is not int or patience < 1:
             raise ValueError("patience must be >= 1")
         self.evaluator, self.proposer, self.router = evaluator, proposer, router
         self.budget, self.clock, self.patience = budget, clock, patience
 
     def run(self, artifact: Mapping[str, object]) -> RepairOutcome:
         start = self.clock()
-        if (isinstance(start, bool) or not isinstance(start, (int, float))
-                or not math.isfinite(start)):
+        if (type(start) not in (int, float) or not math.isfinite(start)):
             raise ValueError("repair clock must provide finite timestamps")
-        current = dict(artifact)
-        result = self.evaluator(current)
+        previous = start
+
+        def elapsed():
+            nonlocal previous
+            observed = self.clock()
+            if (type(observed) not in (int, float) or not math.isfinite(observed)
+                    or observed < previous):
+                raise ValueError("repair clock must advance monotonically")
+            previous = observed
+            return observed - start
+
+        def evaluate(candidate):
+            # Evaluators and proposers get detached data. Rejected trials
+            # cannot mutate the original artifact or the incumbent.
+            returned = self.evaluator(deepcopy(candidate))
+            if not isinstance(returned, EvalResult):
+                raise ValueError("typed evaluator result required")
+            return returned
+
+        current = deepcopy(dict(artifact))
+        result = evaluate(current)
         out = RepairOutcome("already_passing", current, result.score, 0, 0.0, 0.0)
+        out.seconds_spent = elapsed()
+        if out.seconds_spent >= self.budget.max_seconds:
+            return self._stop(out, "exhausted", "time budget")
         if result.passed:
-            out.stop_reason = "input passes evals"
-            return out
+            return self._stop(out, "already_passing", "input passes evals")
         stale = 0
         while True:
-            elapsed = self.clock() - start
-            if not math.isfinite(elapsed) or elapsed < 0:
-                raise ValueError("repair clock must advance monotonically")
-            out.seconds_spent = elapsed
             if out.steps >= self.budget.max_mutations:
                 return self._stop(out, "exhausted", "mutation budget")
-            if elapsed >= self.budget.max_seconds:
+            if out.seconds_spent >= self.budget.max_seconds:
                 return self._stop(out, "exhausted", "time budget")
             diags = diagnose(result)
             route = self.router(diags)
-            mutation = self.proposer(current, diags, route)
+            out.seconds_spent = elapsed()
+            if out.seconds_spent >= self.budget.max_seconds:
+                return self._stop(out, "exhausted", "time budget")
+            if not isinstance(route, RouteChoice):
+                raise ValueError("typed repair route required")
+            if out.cost_spent + route.unit_cost > self.budget.max_cost:
+                return self._stop(out, "exhausted", "cost budget")
+            mutation = self.proposer(deepcopy(current), diags, route)
+            out.seconds_spent = elapsed()
+            if out.seconds_spent >= self.budget.max_seconds:
+                return self._stop(out, "exhausted", "time budget")
             if mutation is None:
                 return self._stop(out, "stalled", "proposer has no candidate")
-            cost = mutation.cost + route.unit_cost
-            if cost < 0:
-                raise ValueError("mutation cost must be non-negative")
+            if not isinstance(mutation, Mutation):
+                raise ValueError("typed repair mutation required")
+            cost = _finite_nonnegative("combined mutation cost", mutation.cost + route.unit_cost)
             if out.cost_spent + cost > self.budget.max_cost:
                 return self._stop(out, "exhausted", "cost budget")
             out.steps += 1
             out.cost_spent += cost
-            candidate = dict(mutation.payload)
-            new = self.evaluator(candidate)
-            out.provenance.append(ProvenanceRecord(
-                out.steps, route.model, route.provider, digest(current), digest(candidate),
-                tuple(d.category for d in diags), result.score, new.score, cost))
+            candidate = deepcopy(dict(mutation.payload))
+            new = evaluate(candidate)
+            out.seconds_spent = elapsed()
+            row = ProvenanceRecord(out.steps, route.model, route.provider, digest(current),
+                digest(candidate), tuple(d.category for d in diags), result.score, new.score, cost)
+            out.provenance.append(row.validate())
+            if out.seconds_spent >= self.budget.max_seconds:
+                return self._stop(out, "exhausted", "time budget")
             if new.score > result.score or (new.passed and not result.passed):
                 current, result, stale = candidate, new, 0
                 out.artifact, out.best_score = current, result.score
                 if result.passed:
-                    elapsed = self.clock() - start
-                    if not math.isfinite(elapsed) or elapsed < 0:
-                        raise ValueError("repair clock must advance monotonically")
-                    out.seconds_spent = elapsed
                     return self._stop(out, "repaired", "evals pass")
             else:
                 stale += 1

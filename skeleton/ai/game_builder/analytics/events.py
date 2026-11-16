@@ -59,14 +59,14 @@ def _num(v: Any, name: str, *, optional: bool = False) -> float | None:
 
 
 def clean_attrs(attrs: Mapping[str, Any] | None) -> tuple[tuple[str, Any], ...]:
-    if not attrs:
+    if attrs is None:
         return ()
     if not isinstance(attrs, Mapping) or len(attrs) > MAX_ATTRS:
         raise EventError(f"attrs must be a mapping of at most {MAX_ATTRS} entries")
     out = []
+    if any(type(k) is not str or not re.fullmatch(r"[a-z][a-z0-9_]{0,31}", k) for k in attrs):
+        raise EventError("bad attr key")
     for k, v in sorted(attrs.items()):
-        if not isinstance(k, str) or not re.fullmatch(r"[a-z][a-z0-9_]{0,31}", k):
-            raise EventError(f"bad attr key {k!r}")
         if PII_KEYS.search(k):
             raise EventError(f"attr {k!r} looks like personal data")
         if isinstance(v, str):
@@ -131,7 +131,10 @@ class GameplayEvent:
             raise EventError(f"unknown event fields {sorted(extra)}")
         kw = {k: d[k] for k in known if k in d}
         kw["attrs"] = tuple(clean_attrs(d.get("attrs")))
-        return cls(**kw)
+        try:
+            return cls(**kw)
+        except (TypeError, OverflowError) as exc:
+            raise EventError("invalid gameplay event fields") from exc
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {"schema": SCHEMA, "player": self.player, "session_id": self.session_id,

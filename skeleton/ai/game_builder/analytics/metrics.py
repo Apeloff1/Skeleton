@@ -2,20 +2,61 @@
 from __future__ import annotations
 
 import json
+import math
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from statistics import median
 from typing import Any, Iterable, Mapping, Sequence
 
 from .events import EventType as T
-from .events import GameplayEvent
+from .events import GameplayEvent, EventError
 from .privacy import ANON
 
 HEATMAP_SCHEMA = "skeleton.game_builder.analytics.difficulty_heatmap.v1"
 
 
+MAX_METRIC_EVENTS = 1_000_000
+
+
+def _session_key(event: GameplayEvent) -> tuple[str, str]:
+    return event.player, event.session_id
+
+
+def _unit_key(event: GameplayEvent) -> tuple[str, str]:
+    return ("anonymous_session", event.session_id) if event.player == ANON else ("player", event.player)
+
+
 def _ordered(events: Iterable[GameplayEvent]) -> list[GameplayEvent]:
-    return sorted(events, key=lambda e: (e.player, e.day, e.session_id, e.seq))
+    """Bound input, collapse exact retries, and reject conflicting event identity.
+
+    Within-session sequence is authoritative. Day orders sessions, not events
+    inside a session; clocks reset between sessions.
+    """
+    unique = {}
+    days = {}
+    for index, event in enumerate(events):
+        if index >= MAX_METRIC_EVENTS:
+            raise EventError("analytics metric event ceiling")
+        if not isinstance(event, GameplayEvent):
+            raise EventError("typed gameplay event required")
+        key = (*_session_key(event), event.seq)
+        prior = unique.get(key)
+        if prior is not None:
+            if prior != event:
+                raise EventError("conflicting event sequence identity")
+            continue
+        unique[key] = event
+        sid = _session_key(event)
+        days[sid] = min(days.get(sid, event.day), event.day)
+    rows = sorted(unique.values(), key=lambda e: (e.player, days[_session_key(e)], e.session_id, e.seq))
+    last = {}
+    for event in rows:
+        key = _session_key(event)
+        previous = last.get(key)
+        if previous is not None and (event.t < previous.t or event.day < previous.day):
+            raise EventError("session event clock regressed")
+        last[key] = event
+    return rows
 
 
 @dataclass(frozen=True)
@@ -33,11 +74,11 @@ class Session:
 
 
 def build_sessions(events: Iterable[GameplayEvent]) -> list[Session]:
-    by: dict[str, list[GameplayEvent]] = defaultdict(list)
-    for e in events:
-        by[e.session_id].append(e)
+    by: dict[tuple[str, str], list[GameplayEvent]] = defaultdict(list)
+    for e in _ordered(events):
+        by[_session_key(e)].append(e)
     out = []
-    for sid, evs in by.items():
+    for (_, sid), evs in by.items():
         evs.sort(key=lambda e: e.seq)
         last = evs[-1].type
         ended = "session_end" if last is T.SESSION_END else "quit" if last is T.QUIT else "truncated"
@@ -81,9 +122,9 @@ class Funnel:
 
     def run(self, events: Iterable[GameplayEvent]) -> FunnelResult:
         reached = [0] * len(self.steps)
-        units: dict[str, list[GameplayEvent]] = defaultdict(list)
+        units: dict[tuple[str, str], list[GameplayEvent]] = defaultdict(list)
         for e in _ordered(events):
-            units[e.session_id if e.player == ANON else e.player].append(e)
+            units[_unit_key(e)].append(e)
         for evs in units.values():
             i = 0
             for e in evs:
@@ -114,7 +155,7 @@ class StageStats:
     failures: int = 0
     deaths: int = 0
     drop_offs: int = 0  # units whose last attempt here was never completed and who then stopped
-    units: set[str] = field(default_factory=set)
+    units: set[tuple[str, str]] = field(default_factory=set)
     clear_times: list[float] = field(default_factory=list)
 
     @property
@@ -134,12 +175,16 @@ def stage_stats(events: Iterable[GameplayEvent]) -> dict[tuple[str, str | None],
     def get(lv: str, enc: str | None) -> StageStats:
         return stats.setdefault((lv, enc), StageStats(lv, enc))
 
-    units: dict[str, list[GameplayEvent]] = defaultdict(list)
+    units: dict[tuple[str, str], list[GameplayEvent]] = defaultdict(list)
     for e in _ordered(events):
-        units[e.session_id if e.player == ANON else e.player].append(e)
+        units[_unit_key(e)].append(e)
     for unit, evs in units.items():
         open_at: dict[tuple[str, str | None], float] = {}
+        previous_session = None
         for e in evs:
+            if e.session_id != previous_session:
+                open_at.clear()
+                previous_session = e.session_id
             if e.level_id is None:
                 continue
             key = (e.level_id, e.encounter_id if e.type in (T.ENCOUNTER_START, T.ENCOUNTER_COMPLETE,
@@ -161,9 +206,13 @@ def stage_stats(events: Iterable[GameplayEvent]) -> dict[tuple[str, str | None],
                 st.units.add(unit)
                 open_at.pop(key, None)
             elif e.type is T.DEATH:
-                get(e.level_id, None).deaths += 1
+                level = get(e.level_id, None)
+                level.deaths += 1
+                level.units.add(unit)
                 if e.encounter_id is not None:
-                    get(e.level_id, e.encounter_id).deaths += 1
+                    encounter = get(e.level_id, e.encounter_id)
+                    encounter.deaths += 1
+                    encounter.units.add(unit)
         # Drop-off: the unit's final level (and encounter) touched was never cleared after its last start.
         for key in _uncleared_tail(evs):
             stats[key].drop_offs += 1
@@ -230,10 +279,30 @@ class DifficultyHeatmap:
             raise ValueError("min_players must be a positive bounded integer")
         if type(self.suppressed) is not int or self.suppressed < 0:
             raise ValueError("suppressed must be a non-negative integer")
+        seen = set()
         for cell in self.cells:
+            if not isinstance(cell, DifficultyCell):
+                raise ValueError("typed heatmap cell required")
+            identity = (cell.level_id, cell.encounter_id)
+            if identity in seen:
+                raise ValueError("duplicate difficulty cell")
+            seen.add(identity)
             if (type(cell.players) is not int or cell.players < 0
                     or 0 < cell.players < self.min_players):
                 raise ValueError("heatmap cell violates minimum player threshold")
+            counters = (cell.attempts, cell.completions, cell.failures, cell.deaths, cell.drop_offs)
+            if any(type(n) is not int or n < 0 for n in counters) or cell.drop_offs > cell.players:
+                raise ValueError("invalid heatmap counters")
+            if cell.players == 0 and (any(counters) or cell.median_clear_s is not None
+                                      or cell.attempts_per_clear is not None):
+                raise ValueError("zero-cohort heatmap contains observations")
+            if type(cell.low_confidence) is not bool or cell.low_confidence != (cell.players < self.min_players):
+                raise ValueError("inconsistent heatmap confidence")
+            for n in (cell.fail_rate, cell.drop_off_rate, cell.difficulty):
+                if type(n) not in (int, float) or not math.isfinite(n) or not 0 <= n <= 1:
+                    raise ValueError("invalid heatmap rate")
+            if cell.players == 0 and any((cell.fail_rate, cell.drop_off_rate, cell.difficulty)):
+                raise ValueError("zero-cohort heatmap contains rates")
 
     def cell(self, level_id: str, encounter_id: str | None = None) -> DifficultyCell | None:
         return next((c for c in self.cells if (c.level_id, c.encounter_id) == (level_id, encounter_id)), None)
@@ -271,6 +340,8 @@ def difficulty_heatmap(events: Iterable[GameplayEvent], plan: Mapping[str, Any] 
                        *, min_players: int = 5) -> DifficultyHeatmap:
     """Build the heatmap. With ``plan`` the cells follow plan order, include unplayed ids
     (zeros, low_confidence) and ignore ids the plan does not know."""
+    if type(min_players) is not int or not 1 <= min_players <= 1_000_000:
+        raise ValueError("min_players must be a positive bounded integer")
     stats = stage_stats(events)
     keys = plan_ids(plan) if plan is not None else sorted(stats, key=lambda k: (k[0], k[1] or ""))
     cells, suppressed = [], 0
