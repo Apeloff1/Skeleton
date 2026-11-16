@@ -59,6 +59,7 @@ jobs:
           tests/test_compare_consumer_gguf.py
           tests/test_kv_competitive_custody.py
           tests/test_consumer_gguf_shard_audit.py
+          tests/test_consumer_gguf_quantization.py
           skeleton/testing/test_local_model_deployment.py
 
       - name: Validate masterplan consistency
