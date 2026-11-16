@@ -39,19 +39,19 @@ class SignedReviewerTests(unittest.IsolatedAsyncioTestCase):
         if self.client is not None:
             await self.client.aclose()
 
-    def respond(self, request):
-        response = self._respond(request)
-        # MockTransport responses using content= are already consumed. Return
-        # an actual raw byte stream to exercise the production streaming path.
-        return httpx.Response(response.status_code, headers=response.headers,
-                              stream=httpx.ByteStream(response.content))
+    @staticmethod
+    def raw_response(status, *, content=b"", headers=None, json_value=None):
+        # Do not pre-decode hostile compression or consume the raw body.
+        if json_value is not None:
+            content = json.dumps(json_value).encode("utf-8")
+        return httpx.Response(status, headers=headers, stream=httpx.ByteStream(content))
 
-    def _respond(self, request):
+    def respond(self, request):
         self.calls.append(request.url.path)
         if request.url.path == "/v1/attest":
-            return httpx.Response(200, content=self.key.sign(request.content))
+            return self.raw_response(200, content=self.key.sign(request.content))
         if request.url.path != "/v1/review":
-            return httpx.Response(404)
+            return self.raw_response(404)
         data = json.loads(request.content)
         fields = {
             "schema": "skeleton.guard.signed-review.v1",
@@ -69,13 +69,13 @@ class SignedReviewerTests(unittest.IsolatedAsyncioTestCase):
             encoded = encoded[:-1] + ',"allowed":false,"signature":"' + (
                 base64.b64encode(signature).decode()
             ) + '"}'
-            return httpx.Response(200, content=encoded.encode())
+            return self.raw_response(200, content=encoded.encode())
         if self.mode == "nonfinite":
             encoded = json.dumps(fields, separators=(",", ":"))
             encoded = encoded[:-1] + ',"extra":NaN,"signature":"' + (
                 base64.b64encode(signature).decode()
             ) + '"}'
-            return httpx.Response(200, content=encoded.encode())
+            return self.raw_response(200, content=encoded.encode())
         if self.mode == "replay":
             fields["nonce"] = "stale"
         if self.mode == "digest":
@@ -83,15 +83,15 @@ class SignedReviewerTests(unittest.IsolatedAsyncioTestCase):
         if self.mode == "unsigned":
             signature = b"invalid"
         if self.mode == "oversize":
-            return httpx.Response(200, content=b"x" * 8193)
+            return self.raw_response(200, content=b"x" * 8193)
         if self.mode == "redirect":
-            return httpx.Response(302, headers={"Location": "https://other.invalid"})
+            return self.raw_response(302, headers={"Location": "https://other.invalid"})
         if self.mode == "compressed":
-            return httpx.Response(200, content=b"compressed", headers={"Content-Encoding": "gzip"})
+            return self.raw_response(200, content=b"compressed", headers={"Content-Encoding": "gzip"})
         if self.mode == "declared_oversize":
-            return httpx.Response(200, content=b"{}", headers={"Content-Length": "99999999"})
+            return self.raw_response(200, content=b"{}", headers={"Content-Length": "99999999"})
         fields["signature"] = base64.b64encode(signature).decode()
-        return httpx.Response(200, json=fields)
+        return self.raw_response(200, json_value=fields)
 
     def make(self):
         transport = httpx.MockTransport(self.respond)
@@ -171,7 +171,7 @@ class SignedReviewerTests(unittest.IsolatedAsyncioTestCase):
         client = self.make()
         original = client._async
         async def cannot_produce_signature(request):
-            return httpx.Response(
+            return self.raw_response(
                 200, content=b"not a signature",
                 headers={"Content-Encoding": "gzip"},
             )

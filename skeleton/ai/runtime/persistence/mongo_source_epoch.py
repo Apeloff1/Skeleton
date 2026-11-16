@@ -74,7 +74,7 @@ def _verified_epoch_record(
     number = _epoch_integer(doc.get("epoch"))
     if number is None or not 2 <= number <= _MAX_EPOCH:
         return None
-    if number % 2 != (1 if phase == "writing" else 0):
+    if number % 2 != (1 if phase in ("writing", "revoked") else 0):
         return None
     return number
 
@@ -82,7 +82,8 @@ def _verified_epoch_record(
 class MongoCanonicalSourceEpoch:
     """Tenant/actor scoped durable writer fence shared by source owners."""
 
-    def __init__(self, database: Any) -> None:
+    def __init__(self, database: Any, *, migration_authorizer: Any = None,
+                 revocation_authorizer: Any = None) -> None:
         # A memory-only dummy/independently created collection is NOT accepted
         # as the production epoch witness.
         if not callable(getattr(database, "get_collection", None)):
@@ -109,6 +110,9 @@ class MongoCanonicalSourceEpoch:
                 raise MongoSourceEpochError("durable source epoch collection unavailable")
         if not callable(getattr(reader, "find_one", None)):
             raise MongoSourceEpochError("linearizable source epoch reader unavailable")
+        self._database = database
+        self._migration_authorizer = migration_authorizer
+        self._revocation_authorizer = revocation_authorizer
         self._collection = collection
         self._reader = reader
         self._active: ContextVar[_BoundWriter | None] = ContextVar(
@@ -145,8 +149,8 @@ class MongoCanonicalSourceEpoch:
                 }, max_time_ms=_EPOCH_READ_MAX_TIME_MS)
         except MongoSourceEpochError:
             raise
-        except Exception as exc:
-            raise MongoSourceEpochError("linearizable source epoch read unavailable") from exc
+        except Exception:
+            raise MongoSourceEpochError("linearizable source epoch read unavailable") from None
         number = _verified_epoch_record(
             doc, key=key, tenant_id=tenant_id, actor_id=actor_id,
             phase="stable", writer_token=None,
@@ -155,18 +159,134 @@ class MongoCanonicalSourceEpoch:
             raise MongoSourceEpochError("canonical source epoch missing, writing or quarantined")
         return number
 
-    async def provision_migration_epoch(self, *, tenant_id: str, actor_id: str) -> None:
-        """ONLY for an operator-controlled quiescent migration; never on reads."""
-        key = self._key(tenant_id, actor_id)
+    async def _operator_snapshot(self) -> tuple[object, ...]:
+        """Observe primary and authenticated roles; not proof of quiescence."""
+        from skeleton.app.compose_guarded_preflight import (
+            _authenticated_principals, _database_name, _plain_document, _trusted_topology,
+        )
+
+        database = self._database
+        db_name = getattr(database, "name", None)
+        if not _database_name(db_name) or not callable(getattr(database, "command", None)):
+            raise MongoSourceEpochError("operator epoch database authority unavailable")
         try:
-            await self._collection.insert_one({
-                "_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
-                "phase": "stable", "epoch": 2, "writer_token": None,
-            })
-        except Exception as exc:
+            async with asyncio.timeout(_EPOCH_READ_DEADLINE_SECONDS):
+                hello = await database.command("hello")
+                auth = await database.command("connectionStatus")
+        except Exception:
+            raise MongoSourceEpochError("operator replica-set authority unavailable") from None
+        topology = _trusted_topology(hello)
+        principals = _authenticated_principals(auth)
+        if topology is None:
+            raise MongoSourceEpochError("operator replica-set primary required")
+        if (principals is None or not _plain_document(auth)
+                or not _plain_document(auth.get("authInfo"))
+                or not auth["authInfo"].get("authenticatedUserRoles")):
+            raise MongoSourceEpochError("operator authenticated role custody required")
+        return (db_name, topology, principals)
+
+    async def _authorize_operator(self, authorizer: Any, **binding: Any) -> None:
+        if not callable(authorizer):
+            raise MongoSourceEpochError("explicit operator epoch authority required")
+        try:
+            async with asyncio.timeout(_EPOCH_READ_DEADLINE_SECONDS):
+                granted = await authorizer(**binding)
+        except Exception:
+            raise MongoSourceEpochError("operator epoch authority unavailable") from None
+        if granted is not True:
+            raise MongoSourceEpochError("operator epoch authority denied")
+
+    async def provision_migration_epoch(self, *, tenant_id: str, actor_id: str) -> None:
+        """Insert once under explicit quiescent migration authority; never reset."""
+        key = self._key(tenant_id, actor_id)
+        if not callable(self._migration_authorizer):
+            raise MongoSourceEpochError("explicit operator migration authority required")
+        initial = await self._operator_snapshot()
+        await self._authorize_operator(
+            self._migration_authorizer, tenant_id=tenant_id, actor_id=actor_id,
+            database_name=initial[0], purpose="quiescent-initial-epoch-v1",
+        )
+        if await self._operator_snapshot() != initial:
+            raise MongoSourceEpochError("operator epoch authority changed before migration")
+        try:
+            async with asyncio.timeout(_EPOCH_MUTATION_DEADLINE_SECONDS):
+                inserted = await self._collection.insert_one({
+                    "_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
+                    "phase": "stable", "epoch": 2, "writer_token": None,
+                })
+            if (getattr(inserted, "acknowledged", None) is not True
+                    or type(getattr(inserted, "inserted_id", None)) is not str
+                    or inserted.inserted_id != key):
+                raise MongoSourceEpochError("migration write acknowledgement unverified")
+            observed = await self.read_epoch(
+                tenant_id=tenant_id, actor_id=actor_id, context_id=actor_id,
+            )
+            if observed != 2 or await self._operator_snapshot() != initial:
+                raise MongoSourceEpochError("migration state or authority changed")
+        except Exception:
+            # An ambiguous result may already be durable. Never retry or reset.
             raise MongoSourceEpochError(
-                "source epoch already initialized or migration unavailable"
-            ) from exc
+                "source epoch already initialized or migration uncertain; reconcile"
+            ) from None
+
+    async def revoke_actor(
+        self, *, tenant_id: str, actor_id: str, expected_epoch: int, reason_code: str,
+    ) -> int:
+        """Terminal actor quarantine using an exact stable-generation CAS."""
+        key = self._key(tenant_id, actor_id)
+        if (type(expected_epoch) is not int or not 2 <= expected_epoch < _MAX_EPOCH
+                or expected_epoch % 2):
+            raise MongoSourceEpochError("revocation requires a stable expected epoch")
+        if type(reason_code) is not str or reason_code not in (
+            "operator-revoke", "security-incident", "authority-retired",
+        ):
+            raise MongoSourceEpochError("revocation reason invalid")
+        if not callable(self._revocation_authorizer):
+            raise MongoSourceEpochError("explicit operator revocation authority required")
+        initial = await self._operator_snapshot()
+        await self._authorize_operator(
+            self._revocation_authorizer, tenant_id=tenant_id, actor_id=actor_id,
+            database_name=initial[0], expected_epoch=expected_epoch, reason_code=reason_code,
+            purpose="terminal-actor-revocation-v1",
+        )
+        observed = await self.read_epoch(
+            tenant_id=tenant_id, actor_id=actor_id, context_id=actor_id,
+        )
+        if observed != expected_epoch or await self._operator_snapshot() != initial:
+            raise MongoSourceEpochError("revocation source authority changed")
+        try:
+            from pymongo import ReturnDocument
+            async with asyncio.timeout(_EPOCH_MUTATION_DEADLINE_SECONDS):
+                revoked = await self._collection.find_one_and_update(
+                    {"_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
+                     "phase": "stable", "writer_token": None, "epoch": expected_epoch},
+                    {"$inc": {"epoch": 1}, "$set": {
+                        "phase": "revoked", "writer_token": None,
+                        "revocation_reason": reason_code,
+                    }},
+                    return_document=ReturnDocument.AFTER,
+                )
+            generation = _verified_epoch_record(
+                revoked, key=key, tenant_id=tenant_id, actor_id=actor_id,
+                phase="revoked", writer_token=None,
+            )
+            if (generation != expected_epoch + 1
+                    or type(revoked.get("revocation_reason")) is not str
+                    or revoked["revocation_reason"] != reason_code):
+                raise MongoSourceEpochError("revocation CAS unverified")
+            async with asyncio.timeout(_EPOCH_READ_DEADLINE_SECONDS):
+                record = await self._reader.find_one({
+                    "_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
+                }, max_time_ms=_EPOCH_READ_MAX_TIME_MS)
+            if (_verified_epoch_record(record, key=key, tenant_id=tenant_id, actor_id=actor_id,
+                    phase="revoked", writer_token=None) != generation
+                    or type(record.get("revocation_reason")) is not str
+                    or record["revocation_reason"] != reason_code
+                    or await self._operator_snapshot() != initial):
+                raise MongoSourceEpochError("revocation readback unverified")
+            return generation
+        except Exception:
+            raise MongoSourceEpochError("revocation uncertain; reconcile without retry") from None
 
     def require_actor_writer(self, *, tenant_id: str, actor_id: str) -> None:
         """Guard lower-level mutation paths that cannot acquire own epoch."""
@@ -444,6 +564,16 @@ _MEMORY_INTERNAL_MUTATION_METHODS = (
 )
 
 
+def _require_unshadowed_writer(owner: Any, class_method: Any, name: str) -> None:
+    try:
+        bound = getattr(owner, name)
+    except Exception:
+        raise MongoSourceEpochError("canonical writer binding unavailable: " + name) from None
+    if (not callable(class_method) or getattr(bound, "__self__", None) is not owner
+            or getattr(bound, "__func__", None) is not class_method):
+        raise MongoSourceEpochError("canonical writer instance override: " + name)
+
+
 def verify_canonical_source_writer_inventory(*, conversation: Any, memory: Any, epoch: Any) -> None:
     """Fail closed if an expected production Mongo mutation loses writer custody.
 
@@ -470,15 +600,21 @@ def verify_canonical_source_writer_inventory(*, conversation: Any, memory: Any, 
         if (active is not expected
                 or getattr(active, "__canonical_source_writer_fence__", None) != "conversation"):
             raise MongoSourceEpochError("unfenced canonical conversation writer: " + name)
+        _require_unshadowed_writer(conversation, expected, name)
     for name, fence in _MEMORY_WRITER_METHODS.items():
         method = getattr(MongoMemoryRepository, name, None)
         if getattr(method, "__canonical_source_writer_fence__", None) != fence:
             raise MongoSourceEpochError("unfenced canonical memory writer: " + name)
+        _require_unshadowed_writer(memory, method, name)
     for name in _MEMORY_INTERNAL_MUTATION_METHODS:
-        if not callable(getattr(MongoMemoryRepository, name, None)):
+        method = getattr(MongoMemoryRepository, name, None)
+        if not callable(method):
             raise MongoSourceEpochError("missing fenced Mongo memory mutation helper: " + name)
-    if not callable(getattr(MongoMemoryRepository, "_require_canonical_writer", None)):
+        _require_unshadowed_writer(memory, method, name)
+    method = getattr(MongoMemoryRepository, "_require_canonical_writer", None)
+    if not callable(method):
         raise MongoSourceEpochError("missing internal Mongo memory writer guard")
+    _require_unshadowed_writer(memory, method, "_require_canonical_writer")
     from skeleton.persistence.mongo_memento_repository import MongoMementoAuthority
 
     # The ciphertext sidecar edits the canonical conversation's head and

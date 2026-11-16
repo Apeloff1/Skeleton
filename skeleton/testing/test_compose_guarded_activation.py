@@ -294,7 +294,7 @@ class ActivationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(permit.epoch, 2)
         self.assertEqual(await gate.assert_active(permit), permit)
         self.assertEqual(await gate.assert_active(), permit)
-        self.assertEqual(self.inventory.call_count, 3)
+        self.assertEqual(self.inventory.call_count, 6)
 
 
     async def test_principal_rotation_during_final_epoch_read_denies(self):

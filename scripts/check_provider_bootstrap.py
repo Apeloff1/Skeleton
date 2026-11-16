@@ -104,6 +104,7 @@ _ALLOWED_SURFACE_CLASSES = frozenset(
         "provider_declaration",
         "noncredential_compatibility_facade",
         "automation_provider_explicitly_separate_and_receipt-gated",
+        "independent_guard_reviewer_transport",
     }
 )
 
@@ -408,7 +409,8 @@ def _looks_like_provider_network_surface(
     if any(f"/{prefix}" in relative for prefix in _NON_PROVIDER_NETWORK_PATH_PREFIXES):
         return False
 
-    provider_path = any(term in relative for term in _AI_SURFACE_PATH_TERMS)
+    provider_path = (any(term in relative for term in _AI_SURFACE_PATH_TERMS)
+                     or relative.endswith("/skeleton/ai/runtime/inference/signed_reviewer_client.py"))
     provider_context = (
         bool(signals["credential_markers"])
         or bool(signals["sdk_imports"])

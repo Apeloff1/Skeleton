@@ -526,13 +526,13 @@ def test_unretired_mismatch_still_denies_physical_deletion():
 def test_witnessed_publication_and_retirement_hold_source_epoch_until_acknowledged():
     """Canonical reads cannot see a stable epoch before external witness CAS."""
     from skeleton.persistence.mongo_source_epoch import (
-        MongoCanonicalSourceEpoch, MongoSourceEpochError,
+        MongoSourceEpochError,
     )
-    from skeleton.testing.test_mongo_source_epoch import Database
+    from skeleton.testing.test_mongo_source_epoch import epoch as fixture_epoch
 
     async def scenario():
         archive, mongo, witness, guard = setup()
-        epoch = MongoCanonicalSourceEpoch(Database())
+        epoch = fixture_epoch()
         mongo.conversation = SimpleNamespace(canonical_source_epoch=epoch, memento_witness=witness)
         await epoch.provision_migration_epoch(tenant_id="tenant", actor_id="owner")
         original_cas = witness.compare_and_set
@@ -565,13 +565,13 @@ def test_witnessed_publication_and_retirement_hold_source_epoch_until_acknowledg
 def test_unacknowledged_witness_commit_quarantines_canonical_source_epoch():
     """A durable Mongo frame with no witness CAS is not a stable source state."""
     from skeleton.persistence.mongo_source_epoch import (
-        MongoCanonicalSourceEpoch, MongoSourceEpochError,
+        MongoSourceEpochError,
     )
-    from skeleton.testing.test_mongo_source_epoch import Database
+    from skeleton.testing.test_mongo_source_epoch import epoch as fixture_epoch
 
     async def scenario():
         archive, mongo, witness, guard = setup()
-        epoch = MongoCanonicalSourceEpoch(Database())
+        epoch = fixture_epoch()
         mongo.conversation = SimpleNamespace(canonical_source_epoch=epoch, memento_witness=witness)
         await epoch.provision_migration_epoch(tenant_id="tenant", actor_id="owner")
         witness.reject = True
