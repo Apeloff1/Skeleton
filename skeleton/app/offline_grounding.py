@@ -6,6 +6,7 @@ The original question remains the durable user message, never a source passage.
 """
 from __future__ import annotations
 
+from collections import Counter
 from hashlib import sha256
 import json
 import re
@@ -152,6 +153,46 @@ def _excerpt_start(question: str, passage: str, *, width: int = MAX_EXCERPT_CHAR
         return len(covered), rarity, -abs(start - target), -start
 
     return max(candidates, key=rank)
+
+
+def preserves_excerpt_anchors(question: str, broad: dict[str, Any],
+                             compact: dict[str, Any]) -> bool:
+    """Do not buy a smaller context by dropping observed critical anchors.
+
+    This is a conservative lexical screen, not an entailment judgment.
+    A compact excerpt must be a subspan of its broad origin and retain
+    matched query terms, numeric literals and explicit qualifier words.
+    """
+    from .offline_knowledge import _terms
+    import unicodedata
+    terms = set(_terms(question))
+    def anchors(text):
+        normalized = unicodedata.normalize("NFKC", text).casefold()
+        important = re.findall(
+            r"(?<!\w)(?:not|no|never|without|unless|except|only|cannot|may|might|must|"
+            r"before|after|at least|at most|up to|more than|less than)(?!\w)"
+            r"|(?<!\w)[+-]?\d+(?:[.,]\d+)*(?:%|°)?",
+            normalized,
+        )
+        covered = set(_terms(normalized, limit=600)).intersection(terms)
+        return covered, Counter(important)
+    previous = broad["citations"]
+    current = compact["citations"]
+    if len(previous) != len(current):
+        return False
+    for old, new in zip(previous, current):
+        if (old["citation"] != new["citation"] or old["char_start"] > new["char_start"]
+                or new["char_end"] > old["char_end"]):
+            return False
+        lo = new["char_start"] - old["char_start"]
+        hi = new["char_end"] - old["char_start"]
+        if old["passage"][lo:hi] != new["passage"]:
+            return False
+        old_terms, old_atoms = anchors(old["passage"])
+        new_terms, new_atoms = anchors(new["passage"])
+        if not old_terms <= new_terms or any(new_atoms[key] < count for key, count in old_atoms.items()):
+            return False
+    return True
 
 
 def _prompt_suffix(citations: list[dict[str, Any]]) -> str:
