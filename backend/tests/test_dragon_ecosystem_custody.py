@@ -91,3 +91,22 @@ class EcosystemTests(TestCase):
         eco.export(destination,offline_acknowledged=True)
         with (destination/"pack-0"/"1.sqlite3").open("ab") as out:out.write(b"tamper")
         with self.assertRaises(custody.DeploymentHeld):eco.verify(destination)
+
+
+    def test_sealed_payload_namespaced_readback(self):
+        import hashlib
+        path,bulk=self.manifest()
+        archive=ShardedManifestArchive(path,bulk)
+        raw=b"physical custody fixture"
+        lanes=archive._lanes(SCOPE)
+        operation=next(str(i) for i in range(100) if int(lanes.identifier("fixture",str(i))[:16],16)%10!=0)
+        begun=archive.begin(SCOPE,logical_key="fixture",operation=operation,
+                            expected_hash=hashlib.sha256(raw).hexdigest(),expected_bytes=len(raw))
+        identifier=begun["manifest"]
+        archive.append(SCOPE,identifier,0,raw);archive.seal(SCOPE,identifier)
+        destination=self.root/"backup"
+        eco.export(destination,offline_acknowledged=True)
+        result=eco.audit_payloads(destination)
+        self.assertEqual(result["sealed_manifests_verified"],1)
+        self.assertEqual(result["decoded_bytes_verified"],len(raw))
+        self.assertEqual(result["chunk_references_verified"],1)

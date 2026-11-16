@@ -177,7 +177,9 @@ def export(destination,*,offline_acknowledged=False):
             folder=dest/("pack-"+str(i//1024))
             if not folder.exists():custody._dir(folder,create=True)
             name=folder.name+"/"+str(i)+".sqlite3"
-            with _checkpoint(path):witness=custody._copy(path,dest/name)
+            with _checkpoint(path):
+                custody._require_space([(folder,path.stat().st_size)])
+                witness=custody._copy(path,dest/name)
             db.execute("INSERT INTO files VALUES(?,?,?,?,?,?)",(i,plane,str(path),name,witness["bytes"],witness["sha256"]))
         # Re-enumerate and rehash every source before publishing. This detects
         # many accidental writer changes but does not replace a real stop.
@@ -218,6 +220,77 @@ def verify(destination):
                 "verified":True,"mongo_included":False,"derived_indexes_included":False,
                 "application_launch_verified":False,"physical_capacity_verified":False}
     finally:db.close()
+
+
+def audit_payloads(destination):
+    """Stream every sealed manifest from copied payloads; at most eight open volume databases."""
+    from collections import OrderedDict
+    from core.dragon_hoarder_bulk import BulkArchive,owner_key,_storage_owner
+    from core.dragon_manifest_write_lanes import _namespace
+    from core.dragon_hoarder_manifests import BLOCK
+    receipt=verify(destination);dest=Path(destination)
+    index=sqlite3.connect((dest/"catalogue.sqlite3").as_uri()+"?mode=ro&immutable=1",uri=True)
+    volumes={};cache=OrderedDict();count=chunks=total=0
+    def connect(path):
+        db=sqlite3.connect(path.as_uri()+"?mode=ro&immutable=1",uri=True);db.row_factory=sqlite3.Row
+        return db
+    def payload(plane,name):
+        key=(plane,name)
+        if key not in volumes:raise custody.DeploymentHeld("manifest volume not in export")
+        if key in cache:
+            cache.move_to_end(key);return cache[key]
+        if len(cache)>=8:
+            _,old=cache.popitem(last=False);old.close()
+        db=connect(volumes[key]);cache[key]=db
+        return db
+    try:
+        for plane,name in index.execute("SELECT plane,name FROM files WHERE plane IN ('primary_payload','backup_payload')"):
+            path=dest/name;db=connect(path)
+            try:
+                marker=db.execute("SELECT name FROM volume_identity WHERE singleton=1").fetchone()
+                if not marker or (plane,marker[0]) in volumes:raise custody.DeploymentHeld("payload volume marker differs")
+                stats=db.execute("SELECT COUNT(*),COALESCE(SUM(compressed_bytes),0) FROM objects").fetchone()
+                usage=db.execute("SELECT objects,payload_bytes FROM usage WHERE singleton=1").fetchone()
+                if not usage or tuple(stats)!=tuple(usage):raise custody.DeploymentHeld("payload usage witness differs")
+                volumes[plane,marker[0]]=path
+            finally:db.close()
+        for plane,name in index.execute("SELECT plane,name FROM files WHERE plane IN ('primary_manifest','backup_manifest') ORDER BY id"):
+            db=connect(dest/name)
+            try:
+                lane=None
+                if _table(db,"manifest_write_identity"):
+                    lane=db.execute("SELECT owner,epoch,lane FROM manifest_write_identity WHERE singleton=1").fetchone()
+                    if lane is None:raise custody.DeploymentHeld("manifest partition marker missing")
+                if not _table(db,"manifests"):continue
+                for row in db.execute("SELECT owner,id,scope_json,expected_hash,expected_bytes FROM manifests WHERE state='sealed' ORDER BY owner,id"):
+                    scope=json.loads(row["scope_json"])
+                    if owner_key(scope)!=row["owner"] or lane is not None and lane["owner"]!=row["owner"]:
+                        raise custody.DeploymentHeld("manifest scope differs")
+                    physical=_storage_owner(scope,_namespace(lane["epoch"],lane["lane"]) if lane else None)
+                    h=hashlib.sha256();size=ordinal=0
+                    for part in db.execute("""SELECT p.ordinal,c.digest,c.volume,c.raw_bytes,c.compressed_bytes
+                        FROM placements p JOIN chunks c ON c.owner=p.owner AND c.digest=p.digest
+                        WHERE p.owner=? AND p.manifest=? ORDER BY p.ordinal""",(row["owner"],row["id"])):
+                        expected=min(BLOCK,row["expected_bytes"]-size)
+                        if expected<=0 or part["ordinal"]!=ordinal or part["raw_bytes"]!=expected or part["compressed_bytes"] is None:
+                            raise custody.DeploymentHeld("sealed chunk ordering or size differs")
+                        stored=payload(plane.replace("manifest","payload"),part["volume"]).execute(
+                            "SELECT raw_bytes,compressed_bytes,payload FROM objects WHERE owner=? AND digest=?",
+                            (physical,part["digest"])).fetchone()
+                        if not stored or stored[0]!=expected or stored[1]!=part["compressed_bytes"] or len(stored[2])!=stored[1]:
+                            raise custody.DeploymentHeld("sealed payload receipt differs")
+                        raw=BulkArchive._decode(stored[2],expected,part["digest"])
+                        h.update(raw);size+=len(raw);ordinal+=1;chunks+=1
+                    if size!=row["expected_bytes"] or h.hexdigest()!=row["expected_hash"]:
+                        raise custody.DeploymentHeld("sealed manifest content witness differs")
+                    total+=size;count+=1
+            finally:db.close()
+        return {**receipt,"sealed_manifests_verified":count,"chunk_references_verified":chunks,
+                "decoded_bytes_verified":total,"building_and_aborted_verified":False,
+                "sealed_payload_integrity_verified":True,"source_authorized":False}
+    finally:
+        for db in cache.values():db.close()
+        index.close()
 
 
 def restore_new(destination,*,offline_acknowledged=False):
@@ -266,9 +339,11 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest="command",required=True)
     a=sub.add_parser("export");a.add_argument("--destination",required=True);a.add_argument("--offline-writers-stopped",action="store_true")
     v=sub.add_parser("verify");v.add_argument("--destination",required=True)
+    q=sub.add_parser("audit-payloads");q.add_argument("--destination",required=True)
     r=sub.add_parser("restore-new");r.add_argument("--destination",required=True);r.add_argument("--offline-writers-stopped",action="store_true")
     args=p.parse_args()
     if args.command=="export":answer=export(args.destination,offline_acknowledged=args.offline_writers_stopped)
+    elif args.command=="audit-payloads":answer=audit_payloads(args.destination)
     elif args.command=="restore-new":answer=restore_new(args.destination,offline_acknowledged=args.offline_writers_stopped)
     else:answer=verify(args.destination)
     print(json.dumps(answer,sort_keys=True))
