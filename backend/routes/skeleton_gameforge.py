@@ -48,6 +48,7 @@ class RunRequest(BaseModel):
     answers: Dict[str, str] = Field(default_factory=dict, max_length=64)
     # Sparse, explicit design-instrument edits. Raw values are validated by GameForge.
     operator_axes: Optional[Dict[str, Any]] = Field(default=None, max_length=16)
+    galaxy_profile: Optional[Dict[str, Any]] = Field(default=None, max_length=2)
     blend: Optional[list] = Field(default=None, max_length=3)
     t: float = Field(default=0.5, ge=0.0, le=1.0, allow_inf_nan=False)
     generation: Optional[str] = Field(default=None, max_length=80)
@@ -57,6 +58,12 @@ class RunRequest(BaseModel):
     playtest: Optional[Literal["off", "auto", "require"]] = None
     quest_content: bool = False
     quest_length: int = Field(default=3, ge=1, le=8)
+
+    @field_validator("galaxy_profile")
+    @classmethod
+    def _validate_galaxy_profile(cls, profile: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        from skeleton.context.galaxy_profile import normalise_galaxy_profile
+        return normalise_galaxy_profile(profile)
 
     @field_validator("answers")
     @classmethod
@@ -137,6 +144,7 @@ def run(req: RunRequest) -> Dict[str, Any]:
             overwrite=False,
             answers=req.answers or None,
             **({"operator_axes": req.operator_axes} if req.operator_axes is not None else {}),
+            **({"galaxy_profile": req.galaxy_profile} if req.galaxy_profile is not None else {}),
             blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
             generation=req.generation,
             **({"playable_content": True} if req.playable_content else {}),
