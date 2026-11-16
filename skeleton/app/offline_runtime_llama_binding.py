@@ -85,59 +85,78 @@ class MeasuredLlamaCpuGate:
         self._closed = False
 
     def __call__(self) -> None:
-        """Called before prompt preparation and again before native spawn."""
+        """Record the latest rejection even when an evidence collector fails."""
         with self._lock:
-            require(not self._closed, "measured native gate closed")
-            require(digest(self._source.snapshot()) == self._source_digest,
-                    "runtime source evidence changed")
-            require((self._backend.model_digest, self._backend.runtime_digest,
-                     self._backend.execution_profile_digest) ==
-                    (self._model_digest, self._runtime_digest, self._profile),
-                    "native execution profile changed")
-            reading = sample_hardware()
-            require(reading.origin == "local_probe", "real local probe required")
-            # The canonical inference engine probe follows nested cgroups,
-            # Windows commit limits and pressure signals. Do not count host
-            # free memory that its scoped probe cannot actually allocate.
-            serving = sample_serving_resources()
-            scoped = serving.allocation_headroom_bytes
-            available = reading.memory.available_bytes
-            if scoped is None or available is None or serving.available_memory_bytes is None:
-                available = None
-            else:
-                available = min(scoped, available)
-            reading = replace(reading, memory=MemoryTopology(
-                reading.memory.total_bytes, available, "intersection-with-serving-headroom"))
-            now = time.monotonic_ns()
-            planned = plan_preflight(self._source, reading, self._policy, now_ns=now)
-            # Fresh classification per invocation: the canonical controller
-            # throttles consecutive samples internally, which must not hide
-            # a critical observation at the actual child-spawn boundary.
-            pressure = AdaptiveServingController(1)
-            pressure.update(serving, now=now / 1_000_000_000, queued=0)
-            # Treat the canonical energy-reduced worker ceiling as a
-            # conservative maximum for native threads. An already activated
-            # runtime must not silently rewrite its pinned execution profile.
-            admitted = (planned["status"] == "candidate" and planned["worker_ceiling"] >= self._threads
-                        and pressure.level != "critical")
             self._sequence += 1
-            blockers = list(planned["blockers"])
-            if pressure.level == "critical":
-                blockers.append("canonical_serving_" + pressure.reason)
-            if planned["worker_ceiling"] < self._threads:
-                blockers.append("native_thread_ceiling_exceeded")
-            body = {"schema": SCHEMA, "sequence": self._sequence,
-                    "source_digest": self._source_digest, "model_digest": self._model_digest,
-                    "runtime_digest": self._runtime_digest, "execution_profile_digest": self._profile,
-                    "preflight_digest": planned["preflight_digest"], "checked_ns": now,
-                    "serving_observation_digest": digest(serving.as_dict()),
-                    "serving_pressure": pressure.level, "serving_reason": pressure.reason,
-                    "threads": self._threads, "worker_ceiling": planned["worker_ceiling"],
-                    "kv_reserve_bytes": self._kv_reserve, "scratch_reserve_bytes": self._scratch,
-                    "blockers": blockers, "status": "candidate" if admitted else "blocked",
-                    "native_qualified": False, "release_qualified": False}
-            self._last = {**body, "gate_digest": digest(body)}
-            require(admitted, "measured CPU native launch denied")
+            self._last = None
+            try:
+                self._check()
+            except BaseException:
+                if self._last is None:
+                    body = {
+                        "schema": SCHEMA, "sequence": self._sequence,
+                        "source_digest": self._source_digest, "model_digest": self._model_digest,
+                        "runtime_digest": self._runtime_digest, "execution_profile_digest": self._profile,
+                        "checked_ns": time.monotonic_ns(), "threads": self._threads,
+                        "kv_reserve_bytes": self._kv_reserve, "scratch_reserve_bytes": self._scratch,
+                        "worker_ceiling": 0, "preflight_digest": None,
+                        "blockers": ["native_evidence_check_failed"], "status": "blocked",
+                        "native_qualified": False, "release_qualified": False,
+                    }
+                    self._last = {**body, "gate_digest": digest(body)}
+                raise
+
+    def _check(self) -> None:
+        require(not self._closed, "measured native gate closed")
+        require(digest(self._source.snapshot()) == self._source_digest,
+                "runtime source evidence changed")
+        require((self._backend.model_digest, self._backend.runtime_digest,
+                 self._backend.execution_profile_digest) ==
+                (self._model_digest, self._runtime_digest, self._profile),
+                "native execution profile changed")
+        reading = sample_hardware()
+        require(reading.origin == "local_probe", "real local probe required")
+        # The canonical inference engine probe follows nested cgroups,
+        # Windows commit limits and pressure signals. Do not count host
+        # free memory that its scoped probe cannot actually allocate.
+        serving = sample_serving_resources(fresh=True)
+        scoped = serving.allocation_headroom_bytes
+        available = reading.memory.available_bytes
+        if scoped is None or available is None or serving.available_memory_bytes is None:
+            available = None
+        else:
+            available = min(scoped, available)
+        reading = replace(reading, memory=MemoryTopology(
+            reading.memory.total_bytes, available, "intersection-with-serving-headroom"))
+        now = time.monotonic_ns()
+        planned = plan_preflight(self._source, reading, self._policy, now_ns=now)
+        # Fresh classification per invocation: the canonical controller
+        # throttles consecutive samples internally, which must not hide
+        # a critical observation at the actual child-spawn boundary.
+        pressure = AdaptiveServingController(1)
+        pressure.update(serving, now=now / 1_000_000_000, queued=0)
+        # Treat the canonical energy-reduced worker ceiling as a
+        # conservative maximum for native threads. An already activated
+        # runtime must not silently rewrite its pinned execution profile.
+        admitted = (planned["status"] == "candidate" and planned["worker_ceiling"] >= self._threads
+                    and pressure.level != "critical")
+        blockers = list(planned["blockers"])
+        if pressure.level == "critical":
+            blockers.append("canonical_serving_" + pressure.reason)
+        if planned["worker_ceiling"] < self._threads:
+            blockers.append("native_thread_ceiling_exceeded")
+        body = {"schema": SCHEMA, "sequence": self._sequence,
+                "source_digest": self._source_digest, "model_digest": self._model_digest,
+                "runtime_digest": self._runtime_digest, "execution_profile_digest": self._profile,
+                "preflight_digest": planned["preflight_digest"], "checked_ns": now,
+                "serving_observation_digest": digest(serving.as_dict()),
+                "serving_pressure": pressure.level, "serving_reason": pressure.reason,
+                "threads": self._threads, "worker_ceiling": planned["worker_ceiling"],
+                "kv_reserve_bytes": self._kv_reserve, "scratch_reserve_bytes": self._scratch,
+                "blockers": blockers, "status": "candidate" if admitted else "blocked",
+                "native_qualified": False, "release_qualified": False}
+        self._last = {**body, "gate_digest": digest(body)}
+        require(admitted, "measured CPU native launch denied")
 
     def status(self) -> dict:
         with self._lock:
