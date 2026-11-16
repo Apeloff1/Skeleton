@@ -43,7 +43,8 @@ def _canonical_line(value) -> bytes:
 
 def convert_text_vectors(source: Path, destination: Path, *, source_sha256: str,
                          name: str, dimensions: int, header: bool,
-                         max_rows: int, approved: bool) -> dict:
+                         max_rows: int, approved: bool,
+                         skip_unrepresentable: bool=False) -> dict:
     """Normalize plain whitespace-separated learned vectors into sorted JSONL.
 
     Use an owner-private temporary SQLite ordering stage, not an unbounded
@@ -52,7 +53,7 @@ def convert_text_vectors(source: Path, destination: Path, *, source_sha256: str,
     A normalized duplicate is rejected rather than silently choosing a vector.
     """
     source_sha256=_validated_sha(source_sha256)
-    if (approved is not True or type(header) is not bool or
+    if (approved is not True or type(header) is not bool or type(skip_unrepresentable) is not bool or
             type(dimensions) is not int or not MIN_DIM<=dimensions<=MAX_DIM or
             type(max_rows) is not int or not 1<=max_rows<=MAX_VOCAB or
             type(name) is not str or not name.strip() or "\x00" in name
@@ -68,7 +69,7 @@ def convert_text_vectors(source: Path, destination: Path, *, source_sha256: str,
             raise MemoryRejected("conversion source changed while opening")
         db=sqlite3.connect(str(Path(stage)/"sort.sqlite3"))
         output_hash=sha256();input_hash=sha256()
-        seen=0;admitted=0;consumed=0;expected_rows=None
+        seen=0;admitted=0;consumed=0;expected_rows=None;unsupported=0;collisions=0
         def read_line():
             nonlocal consumed
             raw=handle.readline(MAX_ROW_BYTES+1)
@@ -96,11 +97,25 @@ def convert_text_vectors(source: Path, destination: Path, *, source_sha256: str,
                 seen+=1
                 # For frequency-sorted inventories, keep only an explicit
                 # bounded prefix; the entire source is still hashed/read.
-                token=_stable_token(_normalize(parts[0]))
                 values=_vector(tuple(float(x) for x in parts[1:]),dimensions)
+                try:
+                    token=_stable_token(_normalize(parts[0]))
+                except MemoryRejected:
+                    if not skip_unrepresentable:
+                        raise
+                    unsupported+=1
+                    continue
                 if admitted<max_rows:
                     line=_canonical_line([token,list(values)])
-                    db.execute("INSERT INTO words VALUES(?,?)",(token,line))
+                    try:
+                        db.execute("INSERT INTO words VALUES(?,?)",(token,line))
+                    except sqlite3.IntegrityError:
+                        if not skip_unrepresentable:
+                            raise
+                        # In explicit lossy mode retain the first canonical
+                        # token, never silently average distinct vectors.
+                        collisions+=1
+                        continue
                     admitted+=1
             if (not admitted or (expected_rows is not None and seen!=expected_rows)
                     or consumed!=before.st_size or input_hash.hexdigest()!=source_sha256
@@ -140,6 +155,8 @@ def convert_text_vectors(source: Path, destination: Path, *, source_sha256: str,
     return {"schema":ASSET_SCHEMA,"source_sha256":source_sha256,
             "asset_sha256":output_hash.hexdigest(),"dimensions":dimensions,
             "input_rows":seen,"admitted_rows":admitted,"bytes":out_size,
+            "unsupported_tokens_skipped":unsupported,"admitted_prefix_collisions_skipped":collisions,
+            "lossy_token_conversion":skip_unrepresentable,
             "network_used":False,"semantic_quality_certified":False}
 
 
@@ -159,6 +176,8 @@ def main(argv=None) -> int:
     convert.add_argument("--header",action="store_true")
     convert.add_argument("--max-rows",type=int,default=MAX_VOCAB)
     convert.add_argument("--approve",action="store_true")
+    convert.add_argument("--skip-unrepresentable",action="store_true",
+                         help="Explicitly skip nonword tokens and keep first normalized duplicate.")
     for command in ("status","install","refresh","uninstall"):
         p=sub.add_parser(command)
         p.add_argument("--database",type=Path,required=True)
@@ -178,7 +197,8 @@ def main(argv=None) -> int:
         if args.command=="convert":
             _print(convert_text_vectors(args.source,args.destination,
                 source_sha256=args.source_sha256,name=args.name,dimensions=args.dimensions,
-                header=args.header,max_rows=args.max_rows,approved=args.approve))
+                header=args.header,max_rows=args.max_rows,approved=args.approve,
+                skip_unrepresentable=args.skip_unrepresentable))
             return 0
         model=_validated_sha(args.model_digest)
         tokenizer=_validated_sha(args.tokenizer_digest)
