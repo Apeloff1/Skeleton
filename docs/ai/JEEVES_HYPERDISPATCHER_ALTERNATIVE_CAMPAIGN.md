@@ -480,3 +480,26 @@ claimed pretrained benchmark result. The explicit CLI fixture tests
 exercise actual native adapter subprocess boundaries, not trained
 weights; real GGUF assets and device qualification remain operator
 and CI responsibilities. Default app boot is unchanged.
+
+## Wave A22: rolling complete terminal history and bounded resident scheduler
+
+Initialize with --max-jobs for the resident checkpoint window and an explicit
+larger --history-jobs (up to 100000), --history-mib, --inbox-mib and
+--evidence-mib appropriate to physical disk capacity. Existing configurations
+without a history policy retain their earlier limits and database schema.
+The private archive stores exact terminal task records, source checkpoint
+identity, original verified receipt reference, tenant, and a domain-separated
+HMAC. Publication is a live-owner/latest-checkpoint SQLite transaction before
+resident deletion. Leaf-first compaction refuses any resident reference or
+uncertain/active effect. The scheduler forgets those exact terminal entries
+only after archive readback and captures its new resident state. If a crash
+occurs between the two commits, restart reuses the original immutable archive
+row, not a second execution. The permanent archive identity prevents submitting
+any old task under a new request, and same-tenant archived successful parents
+can satisfy new dependency gates after evidence revalidation. Historical
+result reads still verify the original result and any inspector reconciliation.
+Counters are checked by the streaming audit-history command. Finite logical
+limits remain explicit: no physical disk guarantee, indefinite retention or
+cross-host archive claim. Four regression tests cover rolling beyond the live
+window, dependency retention, archive/capture crash recovery, tenant refusal,
+tampering, historical capacity and no duplicate physical execution.

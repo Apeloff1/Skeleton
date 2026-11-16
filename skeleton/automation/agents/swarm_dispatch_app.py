@@ -27,6 +27,7 @@ from skeleton.automation.agents.swarm_durable import (
     SQLiteWorkerCustody, SwarmDurableBridge, _HOST_SCHEDULE_FIELD, _HOST_WAIT_FIELD,
     _LOCAL_OPERATIONS, _local_reference, _wait_bytes, _wait_identifier, _wait_time,
 )
+from skeleton.automation.agents.swarm_dispatch_archive import SQLiteDispatcherArchive
 from skeleton.automation.agents.swarm_dispatch_gguf import (
     GGUF_OPERATION, GGUF_CAPABILITY, PinnedGGUFPolicy, PinnedGGUFTransport,
 )
@@ -159,6 +160,9 @@ class DispatcherPolicy:
     event_keys: tuple[bytes, ...]
     digest: str
     gguf: PinnedGGUFPolicy | None = None
+    history_jobs: int = 0
+    history_bytes: int = 0
+    inbox_bytes: int = _MAX_INBOX_BYTES
 
     @classmethod
     def parse(cls, raw: bytes) -> DispatcherPolicy:
@@ -168,7 +172,7 @@ class DispatcherPolicy:
             "timeout_seconds", "lease_seconds", "worker_storage_bytes",
             "outer_history", "worker_keys", "inspector_key", "event_keys",
         }
-        if (set(config) not in (fields, fields | {"gguf"})
+        if (set(config) - {"gguf", "history"} != fields
                 or config["version"] != _VERSION or type(config["version"]) is not int):
             raise DurableSwarmError("unsupported dispatcher configuration")
         tenants, operations = config["tenants"], config["operations"]
@@ -200,12 +204,20 @@ class DispatcherPolicy:
         worker_keys = tuple(_key(value) for value in config["worker_keys"])
         inspector_key = _key(config["inspector_key"])
         event_keys = tuple(_key(value) for value in config["event_keys"])
+        history_jobs, history_bytes, inbox_bytes = max_jobs, 0, _MAX_INBOX_BYTES
+        if "history" in config:
+            retention = config["history"]
+            if type(retention) is not dict or set(retention) != {"jobs", "bytes", "inbox_bytes"}:
+                raise DurableSwarmError("invalid history retention policy")
+            history_jobs = _uint(retention["jobs"], max_jobs + 1, 100000, "history identities")
+            history_bytes = _uint(retention["bytes"], 1024**2, 32 * 1024**3, "history bytes")
+            inbox_bytes = _uint(retention["inbox_bytes"], _MAX_INBOX_BYTES, 16 * 1024**3, "inbox bytes")
         all_keys = (*worker_keys, inspector_key, *event_keys)
         if len(set(all_keys)) != len(all_keys) or raw != _canonical(config):
             raise DurableSwarmError("noncanonical or reused dispatcher credentials")
         return cls(tuple(tenants), frozenset(operations), workers, max_jobs, timeout,
                    lease, storage, history, worker_keys, inspector_key, event_keys,
-                   sha256(raw).hexdigest(), gguf)
+                   sha256(raw).hexdigest(), gguf, history_jobs, history_bytes, inbox_bytes)
 
     def public(self) -> dict:
         return {
@@ -215,6 +227,8 @@ class DispatcherPolicy:
             "lease_seconds": self.lease_seconds, "worker_storage_bytes": self.worker_storage_bytes,
             "outer_history": self.outer_history, "policy_sha256": self.digest,
             "gguf": None if self.gguf is None else self.gguf.public(),
+            "max_resident_jobs": self.max_jobs, "max_history_jobs": self.history_jobs,
+            "history_bytes": self.history_bytes, "inbox_bytes": self.inbox_bytes,
         }
 
     def worker_id(self, index: int) -> str:
@@ -247,7 +261,8 @@ class DispatcherInbox:
         self.store = store
         self.policy = policy
         self.clock_ms = clock_ms
-        self.max_commands = min(8192, max(64, policy.max_jobs * 12))
+        self.max_commands = min(1_200_000, max(64, policy.history_jobs * 12))
+        self.max_bytes = policy.inbox_bytes
         with closing(store._connect()) as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
@@ -276,13 +291,13 @@ class DispatcherInbox:
                              "ON hyperdispatcher_inbox(run_id,status,sequence)")
                 conn.execute(
                     "INSERT OR IGNORE INTO hyperdispatcher_inbox_policy VALUES (?,?,?,?,?)",
-                    (_RUN_ID, _VERSION, policy.digest, self.max_commands, _MAX_INBOX_BYTES),
+                    (_RUN_ID, _VERSION, policy.digest, self.max_commands, self.max_bytes),
                 )
                 row = conn.execute(
                     "SELECT version,policy_sha256,max_commands,max_bytes "
                     "FROM hyperdispatcher_inbox_policy WHERE run_id=?", (_RUN_ID,),
                 ).fetchone()
-                if tuple(row) != (_VERSION, policy.digest, self.max_commands, _MAX_INBOX_BYTES):
+                if tuple(row) != (_VERSION, policy.digest, self.max_commands, self.max_bytes):
                     raise DurableSwarmError("inbox policy differs from durable configuration")
                 conn.commit()
             except BaseException:
@@ -319,7 +334,7 @@ class DispatcherInbox:
                     "SELECT count(*),coalesce(sum(charge),0) "
                     "FROM hyperdispatcher_inbox WHERE run_id=?", (_RUN_ID,),
                 ).fetchone()
-                if count >= self.max_commands or reserved + charge > _MAX_INBOX_BYTES:
+                if count >= self.max_commands or reserved + charge > self.max_bytes:
                     raise DispatcherRequestError("durable command capacity exhausted")
                 stamp = _wait_time(self.clock_ms())
                 conn.execute(
@@ -422,6 +437,7 @@ class ApplicationTick:
     stop_requested: bool
     tasks: tuple[str, ...] = ()
     outcomes: tuple[tuple[str, str], ...] = ()
+    archived_tasks: tuple[str, ...] = ()
 
 
 class LocalDispatcherApplication:
@@ -444,9 +460,14 @@ class LocalDispatcherApplication:
         self.clock_ms = clock_ms if clock_ms is not None else lambda: time.time_ns() // 1_000_000
         self.inbox = DispatcherInbox(self.store, policy=self.policy, clock_ms=self.clock_ms)
         self.custody = SQLiteWorkerCustody(
-            self.directory / "evidence", max_attempts=self.policy.max_jobs,
+            self.directory / "evidence", max_attempts=self.policy.history_jobs,
             max_bytes=self.policy.worker_storage_bytes, max_artifact_bytes=65536,
         )
+        self.archive = (None if not self.policy.history_bytes else SQLiteDispatcherArchive(
+            self.store, run_id=_RUN_ID, policy_sha256=self.policy.digest,
+            archive_key=self.policy.inspector_key, max_jobs=self.policy.history_jobs,
+            max_bytes=self.policy.history_bytes,
+        ))
         self.managed: ManagedHostDispatcher | None = None
         self._recovery: LocalCommittedRecovery | None = None
         self._stop_requested = False
@@ -459,6 +480,8 @@ class LocalDispatcherApplication:
         worker_storage_bytes: int = 128 * 1024 * 1024,
         outer_history: int = 16, clock_ms: Callable[[], int] | None = None,
         store_clock: Callable[[], float] | None = None, gguf_options: dict | None = None,
+        history_jobs: int | None = None, history_bytes: int = 512 * 1024**2,
+        inbox_bytes: int = 128 * 1024**2,
     ) -> LocalDispatcherApplication:
         from secrets import token_hex
         if os.name != "posix":
@@ -477,6 +500,8 @@ class LocalDispatcherApplication:
             "outer_history": outer_history, "worker_keys": [token_hex(32) for _ in range(workers)],
             "inspector_key": token_hex(32), "event_keys": [token_hex(32) for _ in tenants],
         }
+        if history_jobs is not None:
+            config["history"] = {"jobs": history_jobs, "bytes": history_bytes, "inbox_bytes": inbox_bytes}
         if gguf_options is not None:
             if GGUF_OPERATION not in operations:
                 raise DispatcherRequestError("GGUF provisioning requires explicit operation grant")
@@ -527,7 +552,11 @@ class LocalDispatcherApplication:
             for index, key in enumerate(policy.worker_keys)
         }
         worker_validator = LocalWorkerEvidenceValidator(
-            self.custody, additional_validator=None if policy.gguf is None else policy.gguf.validate_artifact,
+            self.custody, additional_validator=None if policy.gguf is None else (
+                lambda attempt, raw: attempt.tenant in policy.tenants
+                and attempt.worker_id == policy.worker_id(0)
+                and policy.gguf.validate_artifact(attempt, raw)
+            ),
         )
         original = HostWorkerAuthority(
             _RUN_ID, grants=original_grants, resolve=self.custody.resolve,
@@ -654,8 +683,29 @@ class LocalDispatcherApplication:
                     and prior.payload.get(_HOST_SCHEDULE_FIELD) == metadata):
                 return {"task_id": task_id, "submission": "durable"}
             raise DispatcherRequestError("task identity already bound to another command")
+        old = None if self.archive is None else self.archive.get(task_id)
+        if old is not None:
+            if old.tenant == tenant and old.task["payload"].get(_HOST_SCHEDULE_FIELD) == metadata:
+                return {"task_id": task_id, "submission": "durable"}
+            raise DispatcherRequestError("task identity already bound to archived command")
+        live_dependencies = []
         for dep in deps:
-            self._resident(tenant, _identifier(dep))
+            dep = _identifier(dep)
+            if runtime.task(dep) is not None:
+                self._resident(tenant, dep)
+                live_dependencies.append(dep)
+                continue
+            previous = None if self.archive is None else self.archive.get(dep)
+            if previous is None or previous.tenant != tenant:
+                raise DispatcherRequestError("owned dependency not found")
+            if previous.task["state"] != "succeeded":
+                raise DispatcherRequestError("archived dependency did not succeed")
+            proof = self._result_for_record(tenant, previous.task, expected_receipt=previous.receipt_sha256)
+            if proof.get("receipt_sha256") != previous.receipt_sha256:
+                raise DurableSwarmError("archived dependency evidence missing")
+        if self.archive is not None and self.archive.unique_count(
+                tuple(task.id for task in runtime.tasks())) >= self.policy.history_jobs:
+            raise DispatcherRequestError("total task history capacity exhausted")
         payload = {"operation": operation, "input": body["input"]}
         raw = _canonical(payload, limit=32768)
         try:
@@ -690,11 +740,29 @@ class LocalDispatcherApplication:
         if wait is not None:
             payload_charge += len(_canonical(wait.record())) + 128
         occupied = sum(len(_canonical(dict(task.payload))) for task in runtime.tasks())
+        if (self.archive is not None
+                and (len(runtime.tasks()) >= self.policy.max_jobs
+                     or occupied + payload_charge > _MAX_RETAINED_PAYLOAD)):
+            self.archive.compact(managed, target_resident=max(0, self.policy.max_jobs // 2),
+                                 prove_result=self._result_for_record)
+            # A requested live parent must not disappear from the job's
+            # dependency inventory during resident compaction.
+            kept = []
+            for parent in live_dependencies:
+                if runtime.task(parent) is not None:
+                    kept.append(parent)
+                    continue
+                saved = self.archive.get(parent)
+                if saved is None or saved.tenant != tenant or saved.task["state"] != "succeeded":
+                    raise DispatcherRequestError("compacted dependency did not succeed")
+                self._result_for_record(tenant, saved.task, expected_receipt=saved.receipt_sha256)
+            live_dependencies = kept
+            occupied = sum(len(_canonical(dict(task.payload))) for task in runtime.tasks())
         if len(runtime.tasks()) >= self.policy.max_jobs or occupied + payload_charge > _MAX_RETAINED_PAYLOAD:
             raise DispatcherRequestError("retained task capacity exhausted")
         task = SwarmTask(task_id, payload, priority=priority, max_attempts=1,
                          required_capabilities=frozenset({GGUF_CAPABILITY if operation == GGUF_OPERATION else "local-compute"}),
-                         dependencies=tuple(deps))
+                         dependencies=tuple(live_dependencies))
         capture = (managed.submit(tenant, task, singleton_key=singleton)
                    if wait is None else managed.submit_wait(wait, task, singleton_key=singleton))
         if capture is None:
@@ -746,6 +814,17 @@ class LocalDispatcherApplication:
             raise DispatcherRequestError("unsupported operator command")
         tenant = self._tenant(command.body["tenant"])
         task_id = _identifier(command.body["task_id"])
+        runtime = self._owner().owner.broker.broker.runtime
+        if runtime.task(task_id) is None and self.archive is not None:
+            archived = self.archive.get(task_id)
+            if archived is None or archived.tenant != tenant:
+                raise DispatcherRequestError("owned task not found")
+            if kind == "cancel" and archived.task["state"] == "cancelled":
+                return {"task_id": task_id, "state": "cancelled"}
+            if kind == "reconcile" and archived.task.get("reconciliation_sha256"):
+                proof = self._result_for_record(tenant, archived.task, expected_receipt=archived.receipt_sha256)
+                return {"task_id": task_id, "reconciliation_sha256": proof["reconciliation_sha256"]}
+            raise DispatcherRequestError("archived task is terminal")
         task = self._resident(tenant, task_id)
         if kind == "cancel":
             if task.state not in (TaskState.QUEUED, TaskState.CANCELLED) or task.effect_uncertain:
@@ -828,11 +907,19 @@ class LocalDispatcherApplication:
         batch = managed.tick_batch(
             self._candidates(now_ms), now_ms=now_ms, limit=self.policy.workers, timer_limit=16,
         )
+        archived = ()
+        if self.archive is not None:
+            resident = len(managed.owner.broker.broker.runtime.tasks())
+            if resident >= max(1, self.policy.max_jobs * 3 // 4):
+                archived = self.archive.compact(
+                    managed, target_resident=self.policy.max_jobs // 2,
+                    prove_result=self._result_for_record,
+                )
         managed.prune_outer_checkpoints(keep=self.policy.outer_history)
         ids = tuple(row.task_id for row in batch.outcomes)
         return ApplicationTick(
             count, cancelled, recovered, batch.disposition, ids[0] if ids else None, False,
-            ids, tuple((row.task_id, row.disposition) for row in batch.outcomes),
+            ids, tuple((row.task_id, row.disposition) for row in batch.outcomes), archived,
         )
 
     def close(self) -> None:
@@ -857,7 +944,8 @@ class LocalDispatcherApplication:
                 "writer_present": resume.run.worker_id is not None,
                 "checkpoint_revision": None if resume.checkpoint is None else resume.checkpoint.revision,
                 "restored_task_counts": snapshot, "inbox": self.inbox.summary(),
-                "worker_custody": self.custody.usage()}
+                "worker_custody": self.custody.usage(),
+                "terminal_history": None if self.archive is None else self.archive.usage()}
 
     def result(self, tenant: str, task_id: str) -> dict:
         tenant, task_id = self._tenant(tenant), _identifier(task_id)
@@ -867,17 +955,29 @@ class LocalDispatcherApplication:
         runtime = loaded.restore_runtime()
         task = runtime.task(task_id)
         tenant_checkpoint = loaded.manager.tenant_store.get(loaded.manager.store.latest().sequence)
-        if task is None or tenant_checkpoint is None:
-            raise DispatcherRequestError("owned task not found")
+        if task is None:
+            archived = None if self.archive is None else self.archive.get(task_id)
+            if archived is None or archived.tenant != tenant:
+                raise DispatcherRequestError("owned task not found")
+            return self._result_for_record(tenant, archived.task, expected_receipt=archived.receipt_sha256)
+        if tenant_checkpoint is None:
+            raise DurableSwarmError("resident task lacks durable tenant sidecar")
         # The tenant sidecar is authoritative, including terminal identity.
         owners = dict(tenant_checkpoint.active)
         owners.update(dict(tenant_checkpoint.terminal))
         if owners.get(task_id) != tenant:
             raise DispatcherRequestError("owned task not found")
-        result = {"task_id": task_id, "tenant": tenant, "state": task.state.value,
-                  "uncertain_on_restore": task.effect_uncertain}
+        return self._result_for_record(tenant, runtime._task_record(task))
+
+    def _result_for_record(self, tenant: str, task: dict, *,
+                           expected_receipt: str | None = None) -> dict:
+        task_id = task["id"]
+        result = {"task_id": task_id, "tenant": tenant, "state": task["state"],
+                  "uncertain_on_restore": task["effect_uncertain"]}
         # Never present an unacknowledged worker result as completed.
-        if task.state is not TaskState.SUCCEEDED:
+        if task["state"] != "succeeded":
+            if expected_receipt is not None:
+                raise DurableSwarmError("terminal non-success cannot assert worker success")
             return result
         with closing(self.custody._connect()) as conn:
             rows = conn.execute(
@@ -888,12 +988,14 @@ class LocalDispatcherApplication:
         if len(rows) != 1:
             raise DurableSwarmError("completed task does not have one exact worker result")
         digest = rows[0][1]
+        if expected_receipt is not None and digest != expected_receipt:
+            raise DurableSwarmError("archived worker receipt identity changed")
         resolved = self.custody.resolve(digest)
         if resolved is None:
             raise DurableSwarmError("completed worker result missing")
         receipt, raw = resolved
         record = self.custody.lookup(_RUN_ID, rows[0][0])
-        payload = dict(task.payload)
+        payload = dict(task["payload"])
         payload.pop(_HOST_WAIT_FIELD, None)
         payload.pop(_HOST_SCHEDULE_FIELD, None)
         if (record is None or record.attempt.tenant != tenant
@@ -902,11 +1004,12 @@ class LocalDispatcherApplication:
         original, _, authority = self._authorities()
         if not original(receipt.worker_id, task_id, rows[0][0], "success", digest):
             raise DurableSwarmError("completed worker result failed evidence verification")
-        if task.reconciliation_sha256 is not None:
+        reconciliation = task.get("reconciliation_sha256")
+        if reconciliation is not None:
             if not authority(receipt.worker_id, task_id, rows[0][0], "reconcile:committed",
-                             task.reconciliation_sha256):
+                             reconciliation):
                 raise DurableSwarmError("completed reconciliation evidence refused")
-            result["reconciliation_sha256"] = task.reconciliation_sha256
+            result["reconciliation_sha256"] = reconciliation
         result["receipt_sha256"] = digest
         result["result"] = _json_object(raw)["result"]
         return result
@@ -956,7 +1059,11 @@ def main(argv: list[str] | None = None) -> int:
     init.add_argument("--operation", action="append", choices=sorted(_LOCAL_OPERATIONS | {GGUF_OPERATION}), required=True)
     init.add_argument("--gguf-policy", type=Path, help="private explicit pinned CPU GGUF policy JSON")
     init.add_argument("--workers", type=int, default=2)
-    init.add_argument("--max-jobs", type=int, default=128)
+    init.add_argument("--max-jobs", type=int, default=128, help="resident scheduler identity capacity")
+    init.add_argument("--history-jobs", type=int, help="explicit rolling terminal history identity ceiling")
+    init.add_argument("--history-mib", type=int, default=512)
+    init.add_argument("--inbox-mib", type=int, default=128)
+    init.add_argument("--evidence-mib", type=int, default=128)
     init.add_argument("--timeout", type=int, default=10)
     init.add_argument("--lease", type=int, default=120)
     enqueue = sub.add_parser("enqueue", help="append one exact JSON command from standard input")
@@ -967,6 +1074,7 @@ def main(argv: list[str] | None = None) -> int:
     result.add_argument("--tenant", required=True)
     result.add_argument("--task", required=True)
     sub.add_parser("status")
+    sub.add_parser("audit-history", help="stream and verify every retained terminal history row")
     serve = sub.add_parser("serve", help="run the actual foreground dispatcher")
     serve.add_argument("--poll", type=float, default=0.25)
     serve.add_argument("--max-cycles", type=int)
@@ -977,6 +1085,8 @@ def main(argv: list[str] | None = None) -> int:
                 args.directory, tenants=tuple(args.tenant), operations=tuple(args.operation),
                 workers=args.workers, max_jobs=args.max_jobs, timeout_seconds=args.timeout,
                 lease_seconds=args.lease,
+                history_jobs=args.history_jobs, history_bytes=args.history_mib * 1024**2,
+                inbox_bytes=args.inbox_mib * 1024**2, worker_storage_bytes=args.evidence_mib * 1024**2,
                 gguf_options=None if args.gguf_policy is None else _json_object(
                     _read_private(args.gguf_policy, _MAX_COMMAND_BYTES)),
             )
@@ -996,6 +1106,10 @@ def main(argv: list[str] | None = None) -> int:
             _print(app.result(args.tenant, args.task))
         elif args.action == "status":
             _print(app.status())
+        elif args.action == "audit-history":
+            if app.archive is None:
+                raise DispatcherRequestError("rolling terminal history not provisioned")
+            _print(app.archive.audit())
         elif args.action == "serve":
             from threading import Event
             stopped = Event()

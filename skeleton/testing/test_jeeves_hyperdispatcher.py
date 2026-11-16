@@ -2981,3 +2981,134 @@ def test_native_gguf_frame_tampering_refused_even_if_outer_receipt_recomputed(tm
     data["result"]["frame"]["raw_stdout_digest"] = "b" * 64
     assert not app.policy.gguf.validate_artifact(attempt, _wait_bytes(data))
     app.close()
+
+
+def test_dispatcher_rolling_history_reclaims_residency_without_losing_identity(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication, DispatcherRequestError
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "service", tenants=("a", "b"), operations=("integer_sum",),
+        workers=1, max_jobs=1, history_jobs=8,
+    )
+    app.start()
+    for i in range(6):
+        request = {"kind": "submit", "tenant": "a", "task_id": f"job-{i}",
+                   "operation": "integer_sum", "input": [i, 1]}
+        if i:
+            request["dependencies"] = [f"job-{i-1}"]
+        app.enqueue(f"req-{i}", request)
+        tick = app.tick()
+        assert tick.disposition == "completed" and tick.archived_tasks == (f"job-{i}",)
+        assert app.result("a", f"job-{i}")["result"] == i+1
+        assert len(app.managed.owner.broker.broker.runtime.tasks()) == 0
+    assert app.archive.audit()["verified_jobs"] == 6
+    duplicate = {"kind": "submit", "tenant": "a", "task_id": "job-0",
+                 "operation": "integer_sum", "input": [99]}
+    app.enqueue("duplicate", duplicate)
+    app.enqueue("foreign", dict(duplicate, tenant="b", task_id="foreign", dependencies=["job-0"]))
+    assert app.tick().disposition == "idle"
+    assert app.inbox.command("duplicate")["status"] == "rejected"
+    assert app.inbox.command("foreign")["status"] == "rejected"
+    with pytest.raises(DispatcherRequestError):
+        app.result("b", "job-0")
+    app.close()
+    restored = LocalDispatcherApplication(app.directory)
+    for i in range(6):
+        assert restored.result("a", f"job-{i}")["result"] == i+1
+    assert restored.status()["terminal_history"]["jobs"] == 6
+    assert restored.custody.usage()["completed"] == 6
+
+
+def test_dispatcher_terminal_history_crash_between_archive_and_residency_checkpoint(tmp_path, monkeypatch):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    from skeleton.automation.agents.swarm_durable import DurableSwarmError
+    from skeleton.testing.test_durable_run_store import Clock
+    clock = Clock()
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "service", tenants=("a",), operations=("integer_sum",),
+        workers=1, max_jobs=1, history_jobs=4, timeout_seconds=1, lease_seconds=20,
+        clock_ms=lambda: 100, store_clock=clock,
+    )
+    app.enqueue("req", {"kind": "submit", "tenant": "a", "task_id": "job",
+                        "operation": "integer_sum", "input": [3, 4]})
+    managed = app.start()
+    original = managed.owner.bridge._capture_checked
+    def lost(run_id, owner_id, manager, broker):
+        if app.archive.get("job") is not None and broker.broker.runtime.task("job") is None:
+            raise DurableSwarmError("injected archive checkpoint interruption")
+        return original(run_id, owner_id, manager, broker)
+    monkeypatch.setattr(managed.owner.bridge, "_capture_checked", lost)
+    with pytest.raises(DurableSwarmError, match="injected"):
+        app.tick()
+    assert managed.owner.broker.is_retired()
+    prepared = app.archive.get("job")
+    assert prepared is not None
+    assert app.result("a", "job")["result"] == 7
+    clock.advance(21)
+    reopened = LocalDispatcherApplication(app.directory, clock_ms=lambda: 100, store_clock=clock)
+    reopened.start()
+    assert reopened.tick().archived_tasks == ("job",)
+    assert reopened.archive.get("job").archive_sha256 == prepared.archive_sha256
+    assert reopened.archive.audit()["verified_jobs"] == 1
+    assert reopened.custody.usage()["attempts"] == 1
+    assert reopened.result("a", "job")["result"] == 7
+    reopened.close()
+
+
+def test_dispatcher_history_tamper_and_capacity_refuse_unsafe_reuse(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    import sqlite3
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    from skeleton.automation.agents.swarm_durable import DurableSwarmError
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "service", tenants=("a",), operations=("integer_sum",),
+        workers=1, max_jobs=1, history_jobs=2,
+    )
+    app.start()
+    for i in range(3):
+        app.enqueue(f"req-{i}", {"kind": "submit", "tenant": "a", "task_id": f"job-{i}",
+                                 "operation": "integer_sum", "input": [i]})
+        app.tick()
+    assert app.inbox.command("req-2")["status"] == "rejected"
+    assert app.archive.audit()["verified_jobs"] == 2
+    app.close()
+    with sqlite3.connect(app.store.path) as conn:
+        conn.execute("UPDATE hyperdispatcher_history SET body=? WHERE task_id=?", (b"{}", "job-0"))
+    with pytest.raises(DurableSwarmError, match="integrity"):
+        app.result("a", "job-0")
+    with pytest.raises(DurableSwarmError, match="integrity"):
+        app.archive.audit()
+
+
+def test_dispatcher_history_keeps_live_parent_until_all_references_finish(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    now = [100]
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "service", tenants=("a",), operations=("integer_sum",),
+        workers=1, max_jobs=2, history_jobs=8, clock_ms=lambda: now[0],
+    )
+    app.enqueue("parent", {"kind": "submit", "tenant": "a", "task_id": "parent",
+                           "operation": "integer_sum", "input": [1]})
+    app.enqueue("child", {"kind": "submit", "tenant": "a", "task_id": "child",
+                          "operation": "integer_sum", "input": [2],
+                          "dependencies": ["parent"], "timer_ms": 200})
+    app.start()
+    assert app.tick().task_id == "parent"
+    assert app.archive.get("parent") is None
+    assert app.managed.owner.broker.broker.runtime.task("parent") is not None
+    now[0] = 200
+    finished = app.tick()
+    assert finished.task_id == "child" and finished.archived_tasks == ("child",)
+    assert app.result("a", "child")["result"] == 2
+    assert app.result("a", "parent")["result"] == 1
+    app.close()
