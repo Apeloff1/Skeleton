@@ -226,3 +226,21 @@ workers, and pressure tests. No physical capacity or latency claim from this wav
 Logical group slots are not Ray-style distributed physical allocation. Ranking
 currently scans a bounded authorized set; scale qualification and indexed next
 selection are follow-up work. Roll back the whole reviewed commit; the new pressure receipt table is additive; preserve receipt tombstones and do not activate legacy writers that could reopen already committed identities. Existing queue rows and callers remain compatible.
+
+## Wave 7: CI closure repairs and authenticated host broker boundary
+
+The previous exact head ran 31 focused tests, 30 passing; first-import dependency
+failure was a missing Pydantic install. Workflow now installs the existing
+project and the already used qualification dependencies, declares concurrency,
+and removes trailing EOF whitespace. Inherited live AI mapping counts and
+admission-root ownership are reconciled without changing any validator or hold.
+
+The hardened runtime may now be used through an explicitly configured
+host verifier at the existing SwarmBroker boundary. Verified outcome and
+reconciliation methods bind worker, task, attempt token, action and evidence
+digest, then recheck ownership under lock. Legacy ingress/completion calls
+still reject fenced execution; tenant broker construction/rebind also rejects
+it until quota/accounting and transport authorization are qualified. This is
+a host integration interface, not a deployed transport credential scheme.
+The legacy control plane now leases the exact selected task rather than the
+unrelated highest-priority task from its worker queue.

@@ -46,6 +46,8 @@ class TenantSwarmBroker:
     ) -> None:
         if max_terminal_records < 1:
             raise ValueError("max_terminal_records must be positive")
+        if broker.runtime.fenced:
+            raise AdmissionError("fenced tenant dispatch requires qualified quota/transport custody")
         self.broker = broker
         self.ingress = ingress or SwarmIngressGovernor()
         self.max_terminal_records = max_terminal_records
@@ -102,6 +104,8 @@ class TenantSwarmBroker:
     def rebind(self, broker: SwarmBroker) -> None:
         with self._lock:
             self._assert_active()
+            if broker.runtime.fenced:
+                raise AdmissionError("fenced tenant dispatch requires qualified quota/transport custody")
             self.broker = broker
 
     @staticmethod

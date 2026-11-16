@@ -501,3 +501,52 @@ def test_hardened_retention_cannot_forget_dependency_or_uncertain():
         runtime.forget("parent")
     runtime.cancel("child")
     assert runtime.forget("child") and runtime.forget("parent")
+
+def test_verified_broker_exact_dispatch_and_reconciliation():
+    from skeleton.automation.agents.swarm_broker import SwarmBroker
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, LeaseError, TaskState
+    from skeleton.automation.agents.swarm_tenant_broker import TenantSwarmBroker
+    from skeleton.automation.agents.swarm_runtime import AdmissionError
+
+    runtime = HardenedSwarmRuntime(fenced=True, clock=lambda: 10.0)
+    runtime.register_worker("worker")
+    authorized = set()
+    def verify(worker, task, token, action, digest):
+        return (worker, task, token, action, digest) in authorized
+    broker = SwarmBroker(runtime, verify_worker=verify)
+    with pytest.raises(AdmissionError):
+        TenantSwarmBroker(broker)
+    broker.submit_queued(SwarmTask("unrelated", {}, priority=0))
+    broker.submit_queued(SwarmTask("target", {}, priority=10))
+    lease = broker.lease_authorized("target")
+    assert lease.id == "target"
+    assert runtime.task("unrelated").state is TaskState.QUEUED
+    with pytest.raises(LeaseError):
+        broker.record_success("worker", "target")
+    with pytest.raises(LeaseError):
+        broker.record_verified("worker", "target", lease_token=lease.lease_token,
+                               outcome="success", evidence_sha256="a"*64)
+    authorized.add(("worker", "target", lease.lease_token, "uncertain", "b"*64))
+    result = broker.record_verified("worker", "target", lease_token=lease.lease_token,
+                                    outcome="uncertain", evidence_sha256="b"*64)
+    assert result.task.effect_uncertain and runtime.worker("worker").available == 0
+    authorized.add(("worker", "target", lease.lease_token, "reconcile:committed", "c"*64))
+    resolved = broker.reconcile_verified("worker", "target", lease_token=lease.lease_token,
+                                         outcome="committed", evidence_sha256="c"*64)
+    assert resolved.task.state is TaskState.SUCCEEDED
+    assert resolved.task.reconciliation_sha256 == "c"*64
+    assert runtime.worker("worker").available == 1
+
+
+def test_control_plane_leases_requested_task_not_other_priority_head():
+    from skeleton.automation.agents.swarm_control import SwarmControlPlane
+    from skeleton.automation.agents.swarm_runtime import SwarmRuntime, SwarmTask, TaskState
+
+    runtime = SwarmRuntime()
+    runtime.register_worker("w")
+    control = SwarmControlPlane(runtime)
+    control.submit(SwarmTask("urgent", {}, priority=0))
+    control.submit(SwarmTask("specific", {}, priority=100))
+    assert control.lease_best("specific").id == "specific"
+    assert runtime.task("urgent").state is TaskState.QUEUED
