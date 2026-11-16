@@ -559,7 +559,7 @@ def _ensure_runtime_environment_locked(
     repaired_permissions = False
     admitted_stamp = None
 
-    if not created:
+    if initial_stamp is not None:
         observed_stamp: list[tuple[int, ...]] = []
         text, repaired_permissions = _read_existing_env(
             env_path, private=True, observed_stamp=observed_stamp,
@@ -567,7 +567,9 @@ def _ensure_runtime_environment_locked(
         if len(observed_stamp) != 1:
             raise ValueError("runtime .env read did not yield an admitted destination")
         admitted_stamp = observed_stamp[0]
-        if (initial_stamp[:2] != admitted_stamp[:2]
+        # Tightening permissions may alter mode and ctime, not content.
+        stable_fields = (0, 1, 3, 4, 5, 6, 7)
+        if (any(initial_stamp[i] != admitted_stamp[i] for i in stable_fields)
                 or (not repaired_permissions and initial_stamp != admitted_stamp)):
             raise ValueError("runtime .env changed before setup input admission")
         if repaired_permissions:
@@ -638,13 +640,15 @@ def _ensure_runtime_environment_locked(
     # Keep its signing identity stable too, without sharing signing material
     # between the two existing authentication surfaces.
     gameforge_secret = values.get("GAMEFORGE_JWT_SECRET", "")
-    if _is_placeholder(gameforge_secret) or not 32 <= len(gameforge_secret) <= 4096:
+    if _is_placeholder(gameforge_secret):
         gameforge_secret = secrets.token_hex(32)
         text = _replace_env_value(text, "GAMEFORGE_JWT_SECRET", gameforge_secret)
         values["GAMEFORGE_JWT_SECRET"] = gameforge_secret
         configured.append("GAMEFORGE_JWT_SECRET")
     else:
         preserved.append("GAMEFORGE_JWT_SECRET")
+        if not 32 <= len(gameforge_secret) <= 4096 or gameforge_secret != gameforge_secret.strip():
+            warnings.append("GAMEFORGE_JWT_SECRET is invalid; preserve the original signing identity and restore a qualified value")
 
     # The backend and engine must share this value before Compose can start.
     # Upgrade existing .env files as well as templates predating Stage-5.
@@ -694,6 +698,7 @@ def _ensure_runtime_environment_locked(
         "MONGO_URL": mongo_authority + "tutolage?authSource=admin",
         "SKL_MONGO_URI": mongo_authority + "skeleton?authSource=admin",
     }
+    existing_uri_replaced = False
     for key, generated in generated_uris.items():
         current = values.get(key, "")
         database = "tutolage" if key == "MONGO_URL" else "skeleton"
@@ -710,6 +715,12 @@ def _ensure_runtime_environment_locked(
             (not current_is_mongo_uri and _is_placeholder(current))
             or (local_generated_uri and current != generated)
         ):
+            if current_is_mongo_uri:
+                # Reconciliation of an authenticated URI can change the
+                # persistent database authority; require storage admission.
+                parsed = urlsplit(current)
+                if parsed.username is not None or parsed.password is not None:
+                    existing_uri_replaced = True
             text = _replace_env_value(text, key, generated)
             values[key] = generated
             configured.append(key)
@@ -760,7 +771,7 @@ def _ensure_runtime_environment_locked(
     if environment_guard is not None:
         environment_guard(dict(published))
         _require_configuration_destination(env_path, admitted_stamp)
-    if storage_guard is not None and DURABLE_KEYS.intersection(configured):
+    if storage_guard is not None and (DURABLE_KEYS.intersection(configured) or existing_uri_replaced):
         storage_guard()
         _require_configuration_destination(env_path, admitted_stamp)
     if _prepare_model_directory(root, values):

@@ -1288,3 +1288,15 @@ origins, durable state paths, dependency health gates and canonical
 build contexts before a mutation. Only fixed failure codes leave the
 observer. This does not inspect running process credentials or prove
 source-to-image provenance.
+
+
+Local installation supports a bounded single-line dotenv literal format.
+Use literal UTF-8 and single quotes or doubled dollars for dollar-bearing
+secrets. Host-dependent expansion, unsupported quoted escapes, decoded
+controls and bare carriage returns are rejected without echoing values.
+Invalid nonplaceholder GameForge signing keys are preserved; restore
+a qualified identity instead of silently replacing it. Reconciliation
+of previously authenticated bundled database URIs requires the same
+storage guard as new persistent credentials. Shell overrides may not
+substitute stored JWT or engine service identity. Permission repair
+does not authorize intervening content changes.

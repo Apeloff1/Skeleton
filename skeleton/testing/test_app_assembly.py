@@ -1647,3 +1647,42 @@ def test_readonly_cli_drops_health_evidence_after_configuration_epoch_loss(tmp_p
     if command=="status":
         result=result["runtime_health"]
     assert result["ok"] is False and result["results"]==[]
+
+
+
+@pytest.mark.parametrize("payload", [
+    'PRIVATE="fixture\\nvalue"\n',
+    'PRIVATE="fixture\\rvalue"\n',
+    'PRIVATE="fixture\\tvalue"\n',
+    'PRIVATE="fixture\\u0000"\n',
+    'PRIVATE="fixture\\u0041"\n',
+    'PRIVATE="fixture\\q"\n',
+    'PRIVATE=$' + '{UNREVIEWED_SECRET:-fixture}\n',
+    'PRIVATE="$UNREVIEWED_SECRET"\n',
+    'PRIVATE=first\rOTHER=second\n',
+    'PRIVATE="fixture\tvalue"\n',
+])
+def test_dotenv_literal_boundary_rejects_ambiguous_or_controlled_values(payload):
+    from skeleton.app.assembly import _parse_dotenv_content
+    with pytest.raises(ValueError,match="runtime .env") as denied:
+        _parse_dotenv_content(payload)
+    assert "fixture" not in str(denied.value)
+    assert "UNREVIEWED_SECRET" not in str(denied.value)
+
+
+def test_dotenv_supported_literal_quoting_dollars_and_crlf():
+    from skeleton.app.assembly import _parse_dotenv_content
+    payload = (
+        "SINGLE='$VARIABLE # literal'\r\n"
+        'DOUBLE="$$VARIABLE and \\"quoted\\""\r\n'
+        'UNQUOTED=$$VARIABLE\t# external comment\r\n'
+        'PATH="C:\\\\local\\\\model"\r\n'
+        'BARE=literal$!\r\n'
+    )
+    assert _parse_dotenv_content(payload) == {
+        "SINGLE":"$VARIABLE # literal",
+        "DOUBLE":'$VARIABLE and "quoted"',
+        "UNQUOTED":"$VARIABLE",
+        "PATH":r"C:\local\model",
+        "BARE":"literal$!",
+    }

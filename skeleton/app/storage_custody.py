@@ -27,6 +27,7 @@ DURABLE_KEYS = frozenset({
 # Compose gives shell variables precedence over the explicit env file.
 _PERSISTENT_OVERRIDES = DURABLE_KEYS | {
     "MONGO_URL", "SKL_MONGO_URI", "DB_NAME", "MONGO_INITDB_DATABASE",
+    "JWT_SECRET", "SKL_ENGINE_SERVICE_TOKEN",
 }
 _DEFAULTS = {"MONGO_INITDB_ROOT_USERNAME":"admin", "DB_NAME":"tutolage",
              "MONGO_INITDB_DATABASE":"tutolage"}

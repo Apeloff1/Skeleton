@@ -965,3 +965,50 @@ def test_installer_external_identity_override_denied_even_with_valid_source(tmp_
     assert "GF_SEAL_SECRET" in receipt.phases[-1].detail
     assert "other-persistent-key" not in repr(receipt.to_dict())
     assert config.read_bytes()==previous
+
+
+
+def test_existing_invalid_gameforge_identity_is_preserved_not_rotated(tmp_path):
+    from skeleton.app import setup_runtime as setup
+    p=tmp_path/".env"
+    setup.ensure_runtime_environment(tmp_path)
+    p.write_text(setup._replace_env_value(p.read_text(),"GAMEFORGE_JWT_SECRET","short-existing-key"))
+    result=setup.ensure_runtime_environment(tmp_path,rotate_secrets=True,
+        storage_guard=lambda:pytest.fail("nonplaceholder persistent identity must not be regenerated"))
+    assert setup._parse_env(p.read_text())["GAMEFORGE_JWT_SECRET"]=="short-existing-key"
+    assert "GAMEFORGE_JWT_SECRET" in result.preserved_keys
+    assert any("restore a qualified value" in w for w in result.warnings)
+
+
+def test_existing_authenticated_uri_reconciliation_requires_storage_custody(tmp_path):
+    from skeleton.app import setup_runtime as setup
+    from skeleton.app.storage_custody import StorageCustodyDenied
+    p=tmp_path/".env"
+    setup.ensure_runtime_environment(tmp_path)
+    original=setup._replace_env_value(p.read_text(),"MONGO_URL",
+        _test_mongo_uri("admin","previous-password","mongo:27017","tutolage"))
+    p.write_text(original)
+    def deny():
+        assert p.read_text()==original
+        raise StorageCustodyDenied("existing storage")
+    with pytest.raises(StorageCustodyDenied,match="existing storage"):
+        setup.ensure_runtime_environment(tmp_path,storage_guard=deny)
+    assert p.read_text()==original
+
+
+def test_setup_detects_same_inode_content_change_before_permission_repair(tmp_path,monkeypatch):
+    import os
+    from skeleton.app import setup_runtime as setup
+    if os.name=="nt":
+        pytest.skip("POSIX permission repair")
+    p=tmp_path/".env"
+    p.write_text("MONGO_INITDB_ROOT_PASSWORD=old-value\n")
+    p.chmod(0o644)
+    real=setup._read_existing_env
+    def changed(path,**kwargs):
+        path.write_text("MONGO_INITDB_ROOT_PASSWORD=operator-new-value\n")
+        return real(path,**kwargs)
+    monkeypatch.setattr(setup,"_read_existing_env",changed)
+    with pytest.raises(ValueError,match="changed before setup input admission"):
+        setup.ensure_runtime_environment(tmp_path)
+    assert p.read_text()=="MONGO_INITDB_ROOT_PASSWORD=operator-new-value\n"

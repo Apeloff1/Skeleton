@@ -307,21 +307,55 @@ def find_repo_root(start: Path | None = None) -> Path:
     raise FileNotFoundError("could not locate Skeleton repository root")
 
 
-def _dotenv_value(raw: str) -> str:
-    """Read ordinary values and the literal secret format written by setup."""
+def _literal_dollars(value: str) -> str:
+    """Decode escaped dollars, never evaluate host-dependent expansion."""
+    result = []
+    index = 0
+    while index < len(value):
+        char = value[index]
+        if char != "$":
+            result.append(char)
+            index += 1
+            continue
+        if value[index:index + 2] == "$$":
+            result.append("$")
+            index += 2
+            continue
+        following = value[index + 1:index + 2]
+        if following and (following == "{" or following == "_"
+                          or following.isascii() and following.isalpha()):
+            raise ValueError("runtime .env contains unsupported variable interpolation")
+        result.append("$")
+        index += 1
+    return "".join(result)
 
+
+def _dotenv_value(raw: str) -> str:
+    """Decode the maintained single-line literal subset, not a shell."""
     value = raw.strip()
     if len(value) >= 2 and value[0] == value[-1] == '"':
+        inner = value[1:-1]
+        i = 0
+        while i < len(inner):
+            if inner[i] == "\\":
+                if i + 1 >= len(inner) or inner[i + 1] not in ('"', "\\"):
+                    raise ValueError("runtime .env contains unsupported quoted escape")
+                i += 2
+            else:
+                i += 1
         try:
             decoded = json.loads(value)
         except ValueError:
-            pass  # Preserve compatibility with older non-JSON quoted values.
-        else:
-            if isinstance(decoded, str):
-                return decoded.replace("$$", "$")
-    if len(value) >= 2 and value[0] == value[-1] == "'":
-        return value[1:-1].replace("\\'", "'")
-    return value.split(" #", 1)[0].rstrip()
+            raise ValueError("runtime .env contains invalid quoted literal") from None
+        decoded = _literal_dollars(decoded)
+    elif len(value) >= 2 and value[0] == value[-1] == "'":
+        decoded = value[1:-1].replace("\\'", "'")
+    else:
+        decoded = _literal_dollars(re.split(r"[ \t]+#", value, maxsplit=1)[0].rstrip())
+    if any(ord(ch) < 32 or 127 <= ord(ch) < 160 or 0xD800 <= ord(ch) <= 0xDFFF
+           or ch in "\u2028\u2029" for ch in decoded):
+        raise ValueError("runtime .env contains unsupported decoded characters")
+    return decoded
 
 
 _MAX_DOTENV_BYTES = 256 * 1024
@@ -340,8 +374,11 @@ def _parse_dotenv_content(content: str) -> dict[str, str]:
     if any((ord(ch) < 32 and ch not in "\r\n\t") or ord(ch) == 127
            or ch in "\u0085\u2028\u2029" for ch in content):
         raise ValueError("runtime .env contains unsupported control or line separators")
+    content = content.replace("\r\n", "\n")
+    if "\r" in content:
+        raise ValueError("runtime .env contains unsupported carriage return")
     values: dict[str, str] = {}
-    for raw_line in content.splitlines():
+    for raw_line in content.split("\n"):
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
