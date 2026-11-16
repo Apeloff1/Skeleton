@@ -1,6 +1,7 @@
 """Exercise real local scheduler with a synthetic, controlled blocking backend."""
 import asyncio
 import threading
+import time
 import unittest
 
 from skeleton.ai.runtime.inference.local import (
@@ -85,6 +86,26 @@ class FlightIsolationTests(unittest.IsolatedAsyncioTestCase):
         self.release.set()
         await asyncio.gather(one,two)
         self.assertEqual(self.calls,2)
+
+    async def test_distinct_explicit_deadlines_cannot_share_leader_failure(self):
+        now=time.monotonic()
+        one=self.generate(deadline=now+10)
+        await self.until(self.started.is_set)
+        two=self.generate(deadline=now+20)
+        await self.until(lambda:self.flights()==2)
+        self.release.set()
+        await asyncio.gather(one,two)
+        self.assertEqual(self.calls,2)
+
+    async def test_identical_explicit_deadline_still_deduplicates(self):
+        deadline=time.monotonic()+10
+        one=self.generate(deadline=deadline)
+        await self.until(self.started.is_set)
+        two=self.generate(deadline=deadline)
+        await self.until(lambda:self.waiters()==1)
+        self.release.set()
+        await asyncio.gather(one,two)
+        self.assertEqual(self.calls,1)
 
     async def test_clear_cache_separates_following_generation(self):
         one=self.generate()
