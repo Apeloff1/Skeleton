@@ -70,6 +70,10 @@ on:
       - 'skeleton/app/orphan_source_graph*.py'
       - 'skeleton/app/orphan_graph_ownership.py'
       - 'skeleton/app/recovered_evidence.py'
+      - 'skeleton/app/frontier_campaign_*.py'
+      - 'skeleton/jeeves/game_frontier_*.py'
+      - 'skeleton/ai/agents/jeeves/game_frontier_*.py'
+      - 'skeleton/testing/test_recovered_frontier_archive.py'
       - 'skeleton/app/grounded_quest_cli.py'
       - 'skeleton/ai/game_builder/grounded_quest_qualification.py'
       - 'skeleton/frontier_nav/signed_navigation.py'
@@ -281,6 +285,11 @@ jobs:
         env:
           PYTHONPATH: '.:backend'
         run: python -m pytest -q skeleton/testing/test_recovered_signed_navigation.py tests/test_frontier_nav_gf_h.py
+
+      - name: Recovered frontier campaign and durable archive lifecycle
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_frontier_archive.py tests/test_game_frontier_session.py tests/test_game_frontier_campaign.py tests/test_game_frontier_milestone_9.py tests/test_game_frontier_milestone_14.py
 
       - name: Consumer share and Chroma custody regressions
         env:
