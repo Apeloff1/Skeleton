@@ -241,3 +241,34 @@ with the approved runtime, native descriptor retention, complete child
 process-tree containment, sustained resource pressure, cross-process
 deployment qualification and Windows Job Object semantics remain independent
 holds. No merge or release authorization.
+
+
+## Runtime sustainment and accounting
+
+The measured deployment now binds a distinct canonical running-resource
+callback. Before process creation, the admission callback still charges
+the whole model, context-wide KV and scratch reserve. After the native
+owner has a live process, each periodic monitor uses fresh scoped
+telemetry, the base free service reserve, per-thread headroom, the
+canonical CPU/energy policy and critical serving-pressure classification.
+It does not ask the OS for capacity to load a second copy of the model
+that is already contributing to current usage. The monitor has independent
+redacted counters and receipts, cannot authorize a further allocation,
+and refuses to report sustainment for a backend without an owned child.
+No residency credit or measured remaining-allocation claim is made.
+Runtime pressure or invalid evidence causes the original native drain
+path to execute. Legacy deployment compositions that install only a launch
+guard retain their existing callback for running probes.
+
+The canonical engine memory estimate also uses the larger of the known
+GGUF geometry and explicit operator KV estimate, rather than treating a
+smaller explicit estimate as permission to undercount known geometry.
+
+The cooperating process slot now pins its inode at activation and refuses
+to recreate a missing name during acquisition. An ambiguous parent
+descriptor release remains a persistent in-memory cleanup fault instead
+of allowing a subsequent no-op release to report success. The trusted
+operator must still preserve the directory and inode across restarts.
+Source regression tests cover these boundaries with fixture measurements;
+actual resident-model pressure and native process-tree teardown require
+independent physical validation.
