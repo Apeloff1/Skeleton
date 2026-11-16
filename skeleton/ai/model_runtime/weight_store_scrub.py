@@ -287,6 +287,7 @@ def start_weight_scrub(owner: WeightStoreDiskOwner, policy: ScrubPolicy | None =
                   "failure_digest": None, "failure_reason": None, "failure_object_digest": None,
                   "prior_campaign_digest": prior_campaign_digest}
         owner._inspect_lock(directory_fd, fd)
+        owner._require_control_space()
         return _save(directory_fd, record, replace=prior is not None)
 
 
@@ -329,6 +330,7 @@ def advance_weight_scrub(owner: WeightStoreDiskOwner, *, campaign_digest: str,
             state["failure_reason"] = reason
             state["failure_object_digest"] = object_digest
             owner._inspect_lock(directory_fd, fd)
+            owner._require_control_space()
             saved = _save(directory_fd, state, replace=True)
             return {"status": "blocked", "reason": reason, "object_digest": object_digest,
                     "campaign": saved, "verified_this_tranche": 0,
@@ -381,6 +383,7 @@ def advance_weight_scrub(owner: WeightStoreDiskOwner, *, campaign_digest: str,
                      verified_bytes=state["verified_bytes"] + consumed,
                      chain_digest=chain, tranches=state["tranches"] + 1,
                      status="completed" if index + count == len(catalog.objects) else "active")
+        owner._require_control_space()
         saved = _save(directory_fd, state, replace=True)
         return {"status": saved["status"], "campaign": saved,
                 "verified_this_tranche": count, "bytes_this_tranche": consumed,
