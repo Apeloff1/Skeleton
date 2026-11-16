@@ -152,7 +152,8 @@ class OfflineHTTPApplication:
     """One locally selected model identity, one SQLite authority, bounded work."""
 
     def __init__(self, backend: LocalDesktopModel, database: str | Path,
-                 *, token: str, semantic_ranker=None, semantic_multihop=False) -> None:
+                 *, token: str, semantic_ranker=None, semantic_multihop=False,
+                 nli_verifier=None) -> None:
         if not isinstance(token, str) or len(token) < 32:
             raise OfflineHTTPError(400, "a strong authorization token is required")
         # The generic offline desktop still supports native model fixtures.
@@ -164,6 +165,11 @@ class OfflineHTTPApplication:
         if type(semantic_multihop) is not bool or (semantic_multihop and semantic_ranker is None):
             raise OfflineHTTPError(400,"multi-hop requires explicit local semantic profile")
         self._semantic_multihop=semantic_multihop
+        if nli_verifier is not None:
+            from skeleton.app.jeeves_nli import LocalNLIVerifier
+            if not isinstance(nli_verifier, LocalNLIVerifier) or nli_verifier.model_sha256 == backend.model_digest:
+                raise OfflineHTTPError(400, "explicit distinct local classifier required")
+        self.nli_verifier = nli_verifier
         self.backend = backend
         self.database = Path(database)
         self.resource_fabric = AdaptiveResourceFabric(self.database)
@@ -255,6 +261,8 @@ class OfflineHTTPApplication:
         with self._lock:
             if self.longform is not None:
                 self.longform.close()
+            if self.nli_verifier is not None:
+                self.nli_verifier.clear_cache()
             self._store.close()
 
     def _request_cancel(self, turn: _LocalTurn) -> None:
@@ -598,7 +606,7 @@ class OfflineHTTPApplication:
     def _deliberation_review(self, sid: str, body: dict[str, Any], *, expected_source_pins=None) -> dict[str, Any]:
         from skeleton.app.jeeves_deliberation import deliberate, MAX_CANDIDATE_TOKENS
         _fields(body, {"message", "expected_revision", "approved", "max_output_tokens",
-                       "require_full_history", "grounded", "document_ids", "adaptive", "history_policy"},
+                       "require_full_history", "grounded", "document_ids", "adaptive", "history_policy", "learned_review"},
                 {"message", "expected_revision", "approved"})
         if body["approved"] is not True:
             raise OfflineHTTPError(403, "bounded local inference review requires explicit approval")
@@ -623,6 +631,11 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(400, "relevance packing requires explicit lossy review context")
         if adaptive is not None and adaptive["contract"]["kind"] == "source_quotes" and not grounded:
             raise OfflineHTTPError(400, "exact source quote contract requires grounded review")
+        learned = body.get("learned_review", False)
+        if type(learned) is not bool or (learned and not grounded):
+            raise OfflineHTTPError(400, "learned review requires explicit grounding")
+        if learned and self.nli_verifier is None:
+            raise OfflineHTTPError(422, "no pinned local learned verifier configured")
         scope = _document_scope(body, grounded)
         with self._turn_lock:
             if self._closing or self._active_session is not None:
@@ -705,6 +718,23 @@ class OfflineHTTPApplication:
                         self._inference_circuit.record_failure()
                         raise
                     self._inference_circuit.record_success()
+                    if learned:
+                        from skeleton.app.jeeves_learned_review import review_candidates
+                        from skeleton.app.jeeves_nli import digest as nli_digest
+                        recheck()
+                        identity = nli_digest({"session": sid, "revision": revision,
+                                               "model": self.model_digest,
+                                               "context": manifest["context_sha256"]})
+                        try:
+                            report["learned_review"] = review_candidates(
+                                self.nli_verifier, report["candidates"], manifest,
+                                scope=identity, deadline=time.monotonic()+20,
+                            )
+                        except (ValueError, RuntimeError, OSError, TimeoutError):
+                            raise OfflineHTTPError(422, "local learned review incomplete; no result certified") from None
+                        recheck()
+                        report["report_sha256"] = nli_digest({
+                            k: v for k, v in report.items() if k != "report_sha256"})
                     return report
         except LocalInferenceLeaseBusy:
             raise OfflineHTTPError(423, "another local service owns the inference execution slot") from None
@@ -999,6 +1029,14 @@ class OfflineHTTPApplication:
                 "message_bytes": 4096,
                 "grounded_query_bytes": 1024,
             }
+        if path == "/v1/verification/status" and method == "GET":
+            verifier = self.nli_verifier
+            return 200, {"schema": "skeleton.jeeves.verification-status.v1",
+                         "learned_verifier_configured": verifier is not None,
+                         "verifier_identity": None if verifier is None else verifier.identity,
+                         "maximum_pairs": None if verifier is None else verifier.policy.max_pairs,
+                         "scores_calibrated": False, "primary_model_changed": False,
+                         "network_called": False, "automatic_delivery_authorized": False}
         if path == "/v1/advisory/status" and method == "GET":
             from skeleton.app.jeeves_advisory import SCHEMA
             return 200, {
@@ -1843,7 +1881,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--semantic-index-sha256")
     parser.add_argument("--semantic-index-root",type=Path,help="attach the explicitly published managed local generation")
     parser.add_argument("--semantic-multihop",action="store_true")
+    parser.add_argument("--nli-config", type=Path, help="explicit SHA-pinned local NLI classifier configuration")
+    parser.add_argument("--nli-config-sha256")
     args = parser.parse_args(argv)
+    if bool(args.nli_config)!=bool(args.nli_config_sha256):
+        parser.error("NLI configuration and exact file digest must be supplied together")
     if bool(args.semantic_config)!=bool(args.semantic_config_sha256):
         parser.error("semantic configuration and exact file digest must be supplied together")
     if args.semantic_index_root is not None and (args.semantic_index is not None or not args.semantic_config):
@@ -1864,7 +1906,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.semantic_config is not None:
             from skeleton.retrieval.semantic_config import load_semantic_ranker
             ranker=load_semantic_ranker(args.semantic_config,args.semantic_config_sha256)
-        app = OfflineHTTPApplication(backend, db, token=token,semantic_ranker=ranker,semantic_multihop=args.semantic_multihop)
+        verifier = None
+        if args.nli_config is not None:
+            from skeleton.app.jeeves_nli import load_nli_config
+            verifier = load_nli_config(args.nli_config, args.nli_config_sha256)
+        app = OfflineHTTPApplication(backend, db, token=token,semantic_ranker=ranker,
+                                     semantic_multihop=args.semantic_multihop,nli_verifier=verifier)
         if args.semantic_index is not None:
             app.knowledge.attach_semantic_ann(args.semantic_index,args.semantic_index_sha256)
         if args.semantic_index_root is not None:
