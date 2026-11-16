@@ -169,3 +169,42 @@ in both supported root metadata sources. The governed server mirror has
 been synchronized without replacing the two credential-bearing provider
 facades. Full CI, physical cgroup/commit/thermal qualification and actual
 native model execution are not established by these source changes.
+
+
+## Exclusive cooperative execution and source freshness
+
+A session handed to a cooperative request queue or whole-request adapter
+now has exactly one claimed in-process execution owner. Claiming revokes
+prior pending grants and recovery state. Unrelated consumers cannot
+offer, consume or revalidate through that session. This identity-based
+fence is a trusted-code integration contract, not a security sandbox
+against arbitrary Python running in the same interpreter. Independent
+sessions and direct backend callers still require their own coordinated
+resource budgets.
+
+The queue permits explicit reinspection only while no pending or active
+request and no iteration remain. The whole-request adapter serializes
+reinspection with execution. Its reinspection timeout bounds lock
+waiting, not disk hashing. A session may be constructed with an explicit
+`maximum_source_age_ns` between one nanosecond and one day. When set,
+source inspection expiration revokes pending admission and refuses
+further offers/consumption until explicit reinspection. This is a
+completion-timestamp freshness bound, not continuous file integrity or
+immutable source residency. Without this opt-in limit, prior behavior
+remains explicit reinspection. An expiration or failure during active
+queue execution may poison the queue; finish cleanup and reopen a newly
+inspected session rather than silently regranting work.
+
+Whole-request lock waiting now consumes the original caller timeout and
+is bounded without cancelling the current owner. Admission and result
+publication still use the earlier of the caller deadline and the
+consumed grant expiry. Output receipt digests bind hashes of the UTF-8
+text and canonical structured result separately from bounded metadata;
+a large valid multibyte result no longer expands the compact diagnostic
+receipt past its serialization ceiling. The receipt does not retain
+result text or grant further authority.
+
+The source regressions include exclusive ownership, competing adapters,
+deadline-bound wait, compact Unicode custody digests, expiry before
+consumption and idle-only reinspection. Tests remain subject to
+exact-head CI, independent runtime qualification and all existing holds.
