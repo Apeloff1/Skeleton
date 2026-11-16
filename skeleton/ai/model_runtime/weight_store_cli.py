@@ -28,6 +28,10 @@ from .weight_store_scrub import (
     ScrubPolicy, advance_weight_scrub, require_completed_weight_scrub,
     start_weight_scrub, weight_scrub_status,
 )
+from .weight_store_range import (
+    advance_weight_range, build_weight_chunk_index, check_completed_weight_range,
+    read_chunk_index, start_weight_range, weight_range_status,
+)
 
 _MAX_REQUEST_BYTES = 16 * 1024**2
 _MAX_OUTPUT_BYTES = 8 * 1024**2
@@ -108,7 +112,8 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
          stdout: TextIO | None = None, stderr: TextIO | None = None) -> int:
     parser = argparse.ArgumentParser(description="Cooperating offline weight store administration")
     parser.add_argument("command", choices=("stage", "inspect", "recovery-review", "acknowledge-recovery",
-                                            "scrub-start", "scrub-step", "scrub-status", "scrub-check"))
+                                            "scrub-start", "scrub-step", "scrub-status", "scrub-check",
+                                            "range-index", "range-start", "range-step", "range-status", "range-check"))
     parser.add_argument("--store", type=Path, required=True)
     parser.add_argument("--maximum-store-bytes", type=int, required=True)
     parser.add_argument("--maximum-plan-bytes", type=int, default=MAX_WEIGHT_BYTES)
@@ -129,6 +134,15 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
     parser.add_argument("--scrub-total-bytes", type=int, default=MAX_WEIGHT_BYTES)
     parser.add_argument("--scrub-tranche-bytes", type=int, default=4 * 1024**3)
     parser.add_argument("--scrub-tranche-objects", type=int, default=64)
+    parser.add_argument("--range-object-sha256")
+    parser.add_argument("--range-object-bytes", type=int)
+    parser.add_argument("--range-index-max-bytes", type=int)
+    parser.add_argument("--range-chunk-bytes", type=int, default=16 * 1024**2)
+    parser.add_argument("--range-index-sha256")
+    parser.add_argument("--range-campaign-sha256")
+    parser.add_argument("--range-prior-sha256")
+    parser.add_argument("--range-tranche-bytes", type=int, default=1024**3)
+    parser.add_argument("--range-tranche-chunks", type=int, default=64)
     parser.add_argument("--require-clean", action="store_true",
                         help="Exit 3 for a completed review containing anomalies")
     args = parser.parse_args(argv)
@@ -151,6 +165,23 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
             raise WeightShardStoreError("active scrub pin requires scrub-step or scrub-check")
         if args.command in ("scrub-step", "scrub-check") and args.scrub_campaign_sha256 is None:
             raise WeightShardStoreError("exact scrub campaign SHA required")
+        range_object = (args.range_object_sha256, args.range_object_bytes, args.range_index_max_bytes)
+        if args.command == "range-index":
+            if not all(value is not None for value in range_object):
+                raise WeightShardStoreError("range-index requires explicit object pin, size and read ceiling")
+        elif any(value is not None for value in range_object):
+            raise WeightShardStoreError("range object declaration requires range-index")
+        index_commands = ("range-start", "range-step", "range-check")
+        if (args.range_index_sha256 is not None) != (args.command in index_commands):
+            raise WeightShardStoreError("exact independent range index pin required only for range campaign operations")
+        if (args.range_campaign_sha256 is not None) != (args.command in ("range-step", "range-check")):
+            raise WeightShardStoreError("exact range campaign cursor required only for advancement or check")
+        if args.range_prior_sha256 is not None and args.command != "range-start":
+            raise WeightShardStoreError("prior range campaign pin requires range-start")
+        index = None
+        if args.command in index_commands:
+            incoming = stdin if stdin is not None else sys.stdin.buffer
+            index = read_chunk_index(incoming, expected_digest=args.range_index_sha256)
         if args.command == "stage":
             if not all(value is not None for value in pins) or args.require_clean:
                 raise WeightShardStoreError("stage requires three independent pins")
@@ -179,12 +210,33 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
             acknowledge = args.command == "acknowledge-recovery"
             if acknowledge and not all(value is not None for value in recovery_pins):
                 raise WeightShardStoreError("acknowledge-recovery requires explicit evidence pins and verification ceiling")
-            writable = acknowledge or args.command in ("scrub-start", "scrub-step")
+            writable = acknowledge or args.command in ("scrub-start", "scrub-step", "range-start", "range-step")
             store = WeightShardStore(args.store, maximum_bytes=args.maximum_plan_bytes,
                                      read_only=not writable, create=False)
             owner = WeightStoreDiskOwner(store, policy, initialize=False)
             if args.command == "inspect":
                 result = owner.inspect()
+            elif args.command == "range-index":
+                result = build_weight_chunk_index(
+                    owner, object_digest=range_object[0], object_bytes=range_object[1],
+                    maximum_bytes=range_object[2], chunk_bytes=args.range_chunk_bytes,
+                )
+            elif args.command == "range-start":
+                result = start_weight_range(owner, index, expected_index_digest=args.range_index_sha256,
+                                            prior_campaign_digest=args.range_prior_sha256)
+            elif args.command == "range-step":
+                result = advance_weight_range(
+                    owner, index, expected_index_digest=args.range_index_sha256,
+                    campaign_digest=args.range_campaign_sha256,
+                    maximum_chunks=args.range_tranche_chunks, maximum_bytes=args.range_tranche_bytes,
+                )
+            elif args.command == "range-status":
+                result = weight_range_status(owner)
+            elif args.command == "range-check":
+                result = check_completed_weight_range(
+                    owner, index, expected_index_digest=args.range_index_sha256,
+                    campaign_digest=args.range_campaign_sha256,
+                )
             elif args.command == "scrub-start":
                 result = start_weight_scrub(owner, ScrubPolicy(
                     maximum_entries=args.review_entries,
@@ -220,7 +272,7 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
         if len(encoded) > _MAX_OUTPUT_BYTES:
             raise WeightShardStoreError("administrative receipt exceeds byte bounds")
         output.write(encoded.decode("utf-8") + "\n")
-        if args.command == "scrub-step" and result.get("status") in ("blocked", "larger_tranche_required"):
+        if args.command in ("scrub-step", "range-step") and result.get("status") in ("blocked", "larger_tranche_required"):
             return 3
         return 3 if args.require_clean and result.get("status") != "no_anomalies_observed" else 0
     except (ValueError, TypeError, KeyError, RecursionError, OverflowError, OSError) as exc:
