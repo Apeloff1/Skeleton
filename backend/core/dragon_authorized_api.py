@@ -101,6 +101,22 @@ def _raw_candidate(response,token):
         return False
 
 
+def api_record_id(scope,host):
+    return "dragon-official-api:"+_digest([owner_key(scope),host])
+
+
+async def assert_no_api_restriction(app,scope,hosts):
+    """Canonical crawler dispatch honors held or uncertain official API calls."""
+    from core.dragon_crawler import CrawlerError
+    ids=[api_record_id(scope,h) for h in sorted(set(hosts)&set(PROVIDERS.values()))]
+    if not ids:return
+    found=await app._acquisition_store().find_one(
+        {"_id":{"$in":ids},"kind":"dragon_official_api_v1",
+         "state":{"$nin":["ready","completed"]}},{"_id":1},max_time_ms=2000)
+    if found is not None:
+        raise CrawlerError("crawler_connector_held","Official API restriction requires independent review.",409)
+
+
 async def execute(app,grant_path,*,expected_grant_digest):
     from core.dragon_crawler import CrawlerError
     grant_path=Path(grant_path)
@@ -126,7 +142,7 @@ async def execute(app,grant_path,*,expected_grant_digest):
     store=app._acquisition_store()
     # One durable record per owner and fixed API host. Uncertain/denied
     # calls are not repeatable, even with a new operation or resource.
-    rid="dragon-official-api:"+_digest([owner_key(scope),host])
+    rid=api_record_id(scope,host)
     token=uuid4().hex
     try:
         await store.insert_one({"_id":rid,"kind":"dragon_official_api_v1",
