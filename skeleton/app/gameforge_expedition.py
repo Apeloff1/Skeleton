@@ -14,8 +14,11 @@ from skeleton.app.gameforge_campaign import (
     play_campaign, verify_session as verify_campaign_session,
 )
 from skeleton.app.gameforge_quest_bridge import _steps
-from skeleton.app.original_quest_cli import _encode, _object, _require, _text
+from skeleton.app.original_quest_cli import _encode, _object, _require, _strings, _text
 from skeleton.game.gameplay import harbor_crafting as harbor
+from skeleton.game.gameplay.harbor_crafting_missions import (
+    mission_report, validate_board, verify_mission_report,
+)
 from skeleton.gameforge.errors import GameForgeError
 
 REQUEST_SCHEMA = "skeleton.gameforge.expedition.request.v1"
@@ -38,7 +41,8 @@ def _admit(source: Any) -> tuple[dict, dict, list, dict, dict]:
     _require(type(raw) is list and 1 <= len(raw) <= MAX_EPISODES, "invalid episode count")
     episodes = {}
     for row in raw:
-        entry = _object(row, {"objective", "source", "required_ending", "witness"})
+        entry = _object(row, {"objective", "source", "required_ending", "witness"},
+                        {"mission_board", "required_missions"})
         objective = _text(entry["objective"], 128)
         _require(objective in by_id and objective not in episodes, "unknown or duplicate episode objective")
         world = harbor.validate_source(entry["source"])
@@ -52,15 +56,39 @@ def _admit(source: Any) -> tuple[dict, dict, list, dict, dict]:
         verified = harbor.verify_bundle(bundle, require_win=True)
         _require(verified["ending"] == ending and verified["delivered"],
                  "episode witness did not earn its required ending")
-        episodes[objective] = {"source": world, "ending": ending,
-                               "witness": [harbor.normalize_action(a) for a in witness]}
+        episode = {"source": world, "ending": ending,
+                   "witness": [harbor.normalize_action(a) for a in witness]}
+        _require(("mission_board" in entry) == ("required_missions" in entry),
+                 "mission board and required missions must be supplied together")
+        if "mission_board" in entry:
+            board = validate_board(entry["mission_board"], world)
+            required = sorted(_strings(entry["required_missions"], 12, 48, nonempty=True))
+            _require(set(required) <= {mission["id"] for mission in board["missions"]},
+                     "unknown required mission")
+            episode.update({"mission_board": board, "required_missions": required})
+            _require(_mission_summary(episode, bundle)["satisfied"],
+                     "episode witness did not earn every required mission")
+        episodes[objective] = episode
     return data, campaign, steps, gates, episodes
 
 
-def _open_gate(objective: str, episodes: dict, states: dict) -> bool:
+def _mission_summary(episode: dict, bundle: dict) -> dict:
+    report = mission_report(bundle, episode["mission_board"])
+    earned = verify_mission_report(report)
+    required = episode["required_missions"]
+    latest = report["journal"][-1]["progress"] if report["journal"] else {
+        row["id"]: [0] * len(row["objectives"]) for row in episode["mission_board"]["missions"]
+    }
+    return {"board_digest": report["board_digest"], "report_digest": report["report_digest"],
+            "required": required, "completed": earned["completed"], "points": earned["points"],
+            "progress": latest, "satisfied": set(required) <= set(earned["completed"])}
+
+
+def _open_gate(objective: str, episodes: dict, states: dict, missions: dict) -> bool:
     return objective not in episodes or (
         states[objective]["ending"] == episodes[objective]["ending"]
         and states[objective]["delivered"] is True
+        and ("mission_board" not in episodes[objective] or missions[objective]["satisfied"])
     )
 
 
@@ -91,6 +119,7 @@ def _replay(data: dict, campaign: dict, steps: list, gates: dict, episodes: dict
     resolved = 0
     projected = []
     authorized: set[str] = set()
+    missions: dict[str, dict] = {}
     # Dialogue authorization is replayed at every portal admission; otherwise
     # its original owner checks the complete projected ledger at the end.
     episode_actions: dict[str, list] = {key: [] for key in episodes}
@@ -124,7 +153,11 @@ def _replay(data: dict, campaign: dict, steps: list, gates: dict, episodes: dict
             item = _object(event, {"type", "objective", "npc"})
             _require(item["objective"] == oid and loc == current["location"],
                      "expedition objective out of order or outside region")
-            _require(_open_gate(oid, episodes, states), "required harbor ending not earned")
+            if oid in episodes and "mission_board" in episodes[oid]:
+                episode = episodes[oid]
+                missions[oid] = _mission_summary(episode, harbor.export_bundle(
+                    episode["source"], episode_actions[oid]))
+            _require(_open_gate(oid, episodes, states, missions), "required harbor ending or missions not earned")
             resolved += 1
         elif kind == "dialogue":
             _object(event, {"type", "npc", "choice"})
@@ -142,11 +175,16 @@ def _replay(data: dict, campaign: dict, steps: list, gates: dict, episodes: dict
         bundle = harbor.export_bundle(episode["source"], episode_actions[oid])
         verified = harbor.verify_bundle(bundle)
         _require(verified == states[oid], "harbor incremental and independent replay disagree")
+        if "mission_board" in episode:
+            missions[oid] = _mission_summary(episode, bundle)
         summaries[oid] = {
             "source_digest": bundle["source_digest"], "bundle_digest": bundle["bundle_digest"],
             "event_count": len(bundle["events"]), "state": verified,
-            "required_ending": episode["ending"], "gate_satisfied": _open_gate(oid, episodes, states),
+            "required_ending": episode["ending"], "gate_satisfied": _open_gate(oid, episodes, states, missions),
         }
+
+        if oid in missions:
+            summaries[oid]["missions"] = missions[oid]
 
     legal = []
     blockers = []
@@ -154,7 +192,7 @@ def _replay(data: dict, campaign: dict, steps: list, gates: dict, episodes: dict
         current = steps[resolved]
         oid = current["id"]
         for action in state["legal_actions"]:
-            if action["type"] == "resolve" and not _open_gate(action["objective"], episodes, states):
+            if action["type"] == "resolve" and not _open_gate(action["objective"], episodes, states, missions):
                 continue
             legal.append(action)
         if oid in episodes:
@@ -164,9 +202,11 @@ def _replay(data: dict, campaign: dict, steps: list, gates: dict, episodes: dict
             if local and dialogue_ready:
                 legal.extend({"type": "harbor", "objective": oid, "action": action}
                              for action in _available_harbor(episode["source"], states[oid]))
-            if not _open_gate(oid, episodes, states):
+            if not _open_gate(oid, episodes, states, missions):
                 harbor_state = states[oid]
-                if harbor_state["ending"] is not None:
+                if harbor_state["ending"] == episode["ending"] and oid in missions and not missions[oid]["satisfied"]:
+                    reason = "required_missions_missing"
+                elif harbor_state["ending"] is not None:
                     reason = "alternate_ending"
                 elif harbor_state["tick"] >= episode["source"]["max_ticks"]:
                     reason = "tick_budget_exhausted"
