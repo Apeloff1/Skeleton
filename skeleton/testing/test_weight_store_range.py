@@ -195,3 +195,15 @@ def test_whole_object_indexing_refuses_read_ceiling_before_hashing(tmp_path, mon
         build_weight_chunk_index(owner, object_digest=index.object_digest,
                                  object_bytes=index.object_bytes,
                                  maximum_bytes=index.object_bytes - 1, chunk_bytes=CHUNK)
+
+
+def test_range_control_space_failure_keeps_prior_cursor(tmp_path, monkeypatch):
+    import shutil
+    owner, _, _, index = setup(tmp_path)
+    state = start_weight_range(owner, index, expected_index_digest=index.digest)
+    with monkeypatch.context() as patch:
+        patch.setattr(shutil, "disk_usage", lambda _: shutil._ntuple_diskusage(8192, 4096, 4096))
+        with pytest.raises(WeightShardStoreError, match="reserve unavailable for control publication"):
+            step(owner, index, state)
+    assert weight_range_status(owner)["campaign"] == state
+    assert step(owner, index, state)["campaign"]["verified_chunks"] == 1
