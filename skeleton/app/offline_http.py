@@ -1560,10 +1560,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--semantic-config-sha256")
     parser.add_argument("--semantic-index",type=Path)
     parser.add_argument("--semantic-index-sha256")
+    parser.add_argument("--semantic-index-root",type=Path,help="attach the explicitly published managed local generation")
     parser.add_argument("--semantic-multihop",action="store_true")
     args = parser.parse_args(argv)
     if bool(args.semantic_config)!=bool(args.semantic_config_sha256):
         parser.error("semantic configuration and exact file digest must be supplied together")
+    if args.semantic_index_root is not None and (args.semantic_index is not None or not args.semantic_config):
+        parser.error("managed semantic generation requires local encoder and no explicit index path")
     if bool(args.semantic_index)!=bool(args.semantic_index_sha256) or (args.semantic_index and not args.semantic_config):
         parser.error("semantic index requires exact index digest and configured local encoder")
     app = None
@@ -1583,6 +1586,9 @@ def main(argv: list[str] | None = None) -> int:
         app = OfflineHTTPApplication(backend, db, token=token,semantic_ranker=ranker,semantic_multihop=args.semantic_multihop)
         if args.semantic_index is not None:
             app.knowledge.attach_semantic_ann(args.semantic_index,args.semantic_index_sha256)
+        if args.semantic_index_root is not None:
+            from .offline_semantic_journal import SemanticIndexJournal
+            SemanticIndexJournal(app.knowledge,args.semantic_index_root).attach()
         # Bind before creating private credentials: a conflicting port must
         # not leave behind an unused secret file on the user's disk.
         with LocalOnlyHTTPServer(app, port=args.port) as server:

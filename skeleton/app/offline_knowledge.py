@@ -174,6 +174,7 @@ class OfflineKnowledgeLibrary:
         self._semantic_ranker=semantic_ranker
         self._semantic_cache=None
         self._semantic_ann=None
+        self._semantic_journal=None
         if semantic_ranker is not None:
             from skeleton.retrieval.semantic_long_context import ContextualRanker
             from skeleton.retrieval.semantic_vector_cache import DerivedVectorCache
@@ -415,6 +416,8 @@ class OfflineKnowledgeLibrary:
         terms = _terms(query)
         if not terms and selected is None and self._semantic_ranker is None:
             return []
+        if self._semantic_journal is not None:
+            self._semantic_journal.refresh_attachment()
         if self._semantic_ann is not None:
             return self._ann_search(query,limit=limit,selected=selected,evidence_excerpt=evidence_excerpt)
         documents, records = self._verified_snapshot(selected)
