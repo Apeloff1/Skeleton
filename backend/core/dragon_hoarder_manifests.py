@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import stat
 import time
 
 from core.dragon_hoarder_bulk import BulkArchive,Receipt,StorageHeld,owner_key
@@ -132,10 +133,23 @@ class ManifestArchive:
         st=self.path.stat()
         if (st.st_dev,st.st_ino)!=self.file_identity or os.name=="posix" and (st.st_uid!=os.getuid() or st.st_mode&0o077):
             raise StorageHeld("manifest identity or permission changed")
-        for suffix in ("-wal","-shm"):
+        for suffix in ("-wal","-shm","-journal"):
             path=Path(str(self.path)+suffix)
-            if path.is_symlink() or path.exists() and not path.is_file():
-                raise StorageHeld("unsafe manifest sidecar")
+            # SQLite may remove an ephemeral sidecar during another close.
+            # Inspect a single inode, then reobserve only an unlinked inode.
+            # Live symlinks, hardlinks, nonregular and nonprivate files fail.
+            for attempt in range(3):
+                try:
+                    info=path.lstat()
+                except FileNotFoundError:
+                    break
+                if not stat.S_ISREG(info.st_mode) or os.name=="posix" and (
+                        info.st_uid!=os.getuid() or info.st_mode&0o077):
+                    raise StorageHeld("unsafe manifest sidecar")
+                if info.st_nlink==1:
+                    break
+                if info.st_nlink!=0 or attempt==2:
+                    raise StorageHeld("unsafe manifest sidecar")
         db=sqlite3.connect(self.path,timeout=5,isolation_level=None)
         db.row_factory=sqlite3.Row
         try:

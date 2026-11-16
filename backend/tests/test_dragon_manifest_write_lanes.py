@@ -53,6 +53,41 @@ class ManifestWriteLanesTests(TestCase):
     def provision(self):
         return provision(self.path,SCOPE,offline_acknowledged=True)
 
+    def test_manifest_connection_reobserves_unlinked_sidecar(self):
+        import os
+        archive=ManifestArchive(self.path,self.bulk)
+        original=Path.lstat
+        side=Path(str(self.path)+"-wal")
+        live=original(self.path)
+        removed=list(live)
+        removed[3]=0
+        observations=[]
+        def racing(candidate):
+            if candidate==side:
+                observations.append(candidate)
+                if len(observations)==1:
+                    return os.stat_result(removed)
+                raise FileNotFoundError(str(candidate))
+            return original(candidate)
+
+        with patch.object(Path,"lstat",racing):
+            with archive._db() as db:
+                self.assertEqual(db.execute("SELECT 1").fetchone()[0],1)
+        self.assertEqual(len(observations),2)
+
+    def test_manifest_connection_rejects_live_sidecar_hardlink(self):
+        import os
+        archive=ManifestArchive(self.path,self.bulk)
+        side=Path(str(self.path)+"-wal")
+        self.assertFalse(side.exists())
+        os.link(self.path,side)
+        try:
+            with self.assertRaises(StorageHeld):
+                with archive._db():
+                    self.fail("unsafe sidecar admitted")
+        finally:
+            side.unlink()
+
     def test_transient_sidecar_unlink_is_reobserved(self):
         import os
         from core.dragon_owner_shards import _private
