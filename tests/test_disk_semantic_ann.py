@@ -30,3 +30,24 @@ def test_disk_ann_real_shard_fanout_and_scope(tmp_path,worker_mode):
     with path.open("ab") as stream:stream.write(b"changed")
     with pytest.raises(OSError,match="changed"):
         index.search("feline",enc.query("feline").dense)
+
+
+def test_candidate_chunk_reader_preserves_order_and_detects_missing_rows():
+    import sqlite3
+    import time
+    index=object.__new__(DiskANN)
+    with sqlite3.connect(":memory:") as db:
+        db.execute("CREATE TABLE leaves(id INTEGER PRIMARY KEY,span,source,revision,ordinal,start,end,vector)")
+        db.executemany("INSERT INTO leaves VALUES(?,?,?,?,?,?,?,?)",
+            ((i,str(i),"src","rev",i,0,1,b"v") for i in range(300)))
+        calls=[]
+        db.set_trace_callback(calls.append)
+        order=list(range(299,-1,-1))
+        rows=list(index._candidate_rows(db,order,time.monotonic()+30))
+        assert [rid for rid,row in rows]==order
+        assert all(row[0]==str(rid) for rid,row in rows)
+        assert len([x for x in calls if x.startswith("SELECT")])==3
+        with pytest.raises(ValueError,match="missing"):
+            list(index._candidate_rows(db,[2,999],time.monotonic()+30))
+        with pytest.raises(TimeoutError,match="deadline"):
+            list(index._candidate_rows(db,[1],time.monotonic()-1))
