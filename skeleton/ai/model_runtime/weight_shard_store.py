@@ -287,6 +287,13 @@ class WeightShardStore:
         and no model manifest is published until the whole plan verifies.
         """
         self._require_write()
+        # Once a cooperating writer slot has been provisioned, legacy
+        # direct staging must not bypass its admission and accounting.
+        # The private checkpoint is a trusted-code composition boundary,
+        # not protection against arbitrary code inside the interpreter.
+        marker = self.root / ".weight-stage.lock"
+        if (marker.exists() or marker.is_symlink()) and _write_checkpoint is None:
+            raise WeightShardStoreError("managed weight store requires cooperative disk owner")
         if not isinstance(identity, ModelIdentity) or not isinstance(plan, WeightLoadPlan):
             raise WeightShardStoreError("model identity and weight load plan required")
         if plan.model_identity_digest != identity.identity_digest:
