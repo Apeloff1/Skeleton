@@ -281,7 +281,8 @@ class NativeRuntimeLocalModel:
         return hashlib.sha256(
             self._stable_json(
                 {
-                    "schema": "skeleton.native.execution-profile.v1",
+                    "schema": "skeleton.native.execution-profile.v2",
+                    "sampling_policy": "legacy-default-greedy-explicit-request-v1",
                     "runtime": self._runtime_digest,
                     "device": self.runtime.device.to_dict(),
                     "device_policy": self.runtime.device_policy.to_dict(),
@@ -729,12 +730,25 @@ class NativeRuntimeLocalModel:
         execution_profile = self.execution_profile_digest
         started = time.perf_counter()
         eos_id = self.runtime.tokenizer.special_token_id("eos")
+        # Historically, the native adapter ignored non-default request
+        # sampling fields and always generated greedily. Preserve the
+        # historical all-default trajectory, but honor explicitly different
+        # profiles and bind the effective sampling configuration to replay.
+        explicit_sampling = (
+            request.temperature != 1.0 or request.top_k != 0
+            or request.top_p != 1.0 or request.min_p != 0.0
+            or request.repetition_penalty != 1.0
+        )
+        if request.top_k > self.runtime.tokenizer.vocab_size:
+            raise NativeRuntimeBackendError("top_k exceeds admitted native vocabulary")
         config = GenerationConfig(
             max_new_tokens=request.max_output_tokens,
             seed=request.seed,
-            temperature=0.0,
-            top_k=0,
-            top_p=1.0,
+            temperature=request.temperature if explicit_sampling else 0.0,
+            top_k=request.top_k,
+            top_p=request.top_p,
+            min_p=request.min_p,
+            repetition_penalty=request.repetition_penalty,
             use_cache=True,
             stop_token_ids=() if eos_id is None else (eos_id,),
             stop_strings=request.stop,
