@@ -3426,9 +3426,9 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
             claimed = await self._acquisition_store().find_one_and_update(
                 {"_id": slot, "kind": ACQUISITION_STRIPE_KIND,
                  "$or": [{"lease_until": {"$exists": False}},
-                         {"$expr": {"$lte": ["$lease_until", "$NOW"]}}]},
+                         {"$expr": {"$lte": ["$lease_until", "$$NOW"]}}]},
                 [{"$set": {"worker_token": {"$literal": token},
-                           "lease_until": {"$add": ["$NOW", LEASE_SECONDS * 1000]}}}],
+                           "lease_until": {"$add": ["$$NOW", LEASE_SECONDS * 1000]}}}],
                 return_document=ReturnDocument.AFTER,
             )
             if claimed is None or claimed.get("worker_token") != token:
@@ -3441,7 +3441,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
         count = await self._acquisition_store().count_documents(
             {"_id": {"$in": list(slots)}, "kind": ACQUISITION_STRIPE_KIND,
              "worker_token": token,
-             "$expr": {"$gt": ["$lease_until", {"$add": ["$NOW", 15000]}]}},
+             "$expr": {"$gt": ["$lease_until", {"$add": ["$$NOW", 15000]}]}},
             limit=len(slots), maxTimeMS=2000,
         )
         if count != len(slots):
