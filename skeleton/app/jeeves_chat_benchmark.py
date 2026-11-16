@@ -100,6 +100,8 @@ def run(client: LocalChatClient, *, output_tokens: int, max_seconds: int,
     from .jeeves_chat_eval_scenarios import inventory
     selected = CASES if cases is None else tuple(cases)
     suite = inventory(selected)
+    if suite["turns"] > 4000:
+        raise CaptureRejected("live execution shard exceeds 4000 turns; split the generated case range")
     if type(output_tokens) is not int or not 1 <= output_tokens <= 8192:
         raise CaptureRejected("invalid output budget")
     if type(max_seconds) is not int or not 1 <= max_seconds <= 86400:
@@ -119,6 +121,7 @@ def run(client: LocalChatClient, *, output_tokens: int, max_seconds: int,
         "system_prompt": None, "retries": 0,
     }))
     captures, sessions = [], []
+    answer_bytes = 0
     deadline = time.monotonic() + max_seconds
     for case in selected:
         if time.monotonic() >= deadline:
@@ -159,6 +162,9 @@ def run(client: LocalChatClient, *, output_tokens: int, max_seconds: int,
                     or messages[-2] != {"role": "user", "content": spec.prompt}
                     or messages[-1] != {"role": "assistant", "content": answer}):
                 raise CaptureRejected("durable conversation readback mismatch")
+            answer_bytes += len(answer.encode("utf-8"))
+            if answer_bytes > 16 * 1024 * 1024:
+                raise CaptureRejected("live capture byte budget exhausted; use smaller evaluation shards")
             captures.append({
                 "case_id": case.case_id, "case_sha256": case.fingerprint(),
                 "turn_index": index, "prompt_sha256": _hash(spec.prompt),
@@ -227,19 +233,28 @@ def main(argv=None) -> int:
     describe=sub.add_parser("inventory")
     scenario_options(describe)
     describe.add_argument("--output",required=True,type=Path)
+    aggregate=sub.add_parser("aggregate")
+    scenario_options(aggregate)
+    aggregate.add_argument("--input",type=Path,action="append",required=True)
+    aggregate.add_argument("--output",required=True,type=Path)
     diff = sub.add_parser("compare")
     diff.add_argument("left", type=Path)
     diff.add_argument("right", type=Path)
     diff.add_argument("--output", required=True, type=Path)
     args = parser.parse_args(argv)
     try:
-        if args.command in {"run","inventory"}:
+        if args.command in {"run","inventory","aggregate"}:
             from .jeeves_chat_eval_scenarios import build_suite, inventory
             chosen=build_suite(seed=args.seed,start=args.generated_start,count=args.generated_count,
                                include_baseline=not args.no_baseline,long_turns=args.long_turns)
             if args.command=="inventory":
                 _write_new(args.output,inventory(chosen))
                 print("Inventory written; no model generation or quality result.")
+                return 0
+            if args.command=="aggregate":
+                from .jeeves_chat_eval_aggregate import aggregate_shards
+                _write_new(args.output,aggregate_shards(chosen,args.input))
+                print("Complete matched shard inventory aggregated; no independent semantic certification.")
                 return 0
         if args.command == "run":
             if not args.execute:
