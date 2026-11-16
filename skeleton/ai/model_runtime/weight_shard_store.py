@@ -385,7 +385,7 @@ class WeightShardStore:
         # not protection against arbitrary code inside the interpreter.
         markers = (self.root / ".weight-stage.lock", self.root / ".weight-stage-policy.json",
                    self.root / ".weight-stage-intent.json", self.root / ".weight-stage-last.json",
-                   self.root / ".weight-stage-scrub.json")
+                   self.root / ".weight-stage-scrub.json", self.root / ".weight-stage-range.json")
         if any(marker.exists() or marker.is_symlink() for marker in markers) and _write_checkpoint is None:
             raise WeightShardStoreError("managed weight store requires cooperative disk owner")
         encoded = self.prepare_stage_manifest(identity, plan, source_paths)
