@@ -515,3 +515,127 @@ All newly authored regression sources are selected by the existing
 sealed-context gate. Physical disk exhaustion, real power-loss
 injection, filesystem semantics across platforms, exact-head CI and
 native Windows locking remain separate qualification requirements.
+
+
+## Physical integrity campaigns and shared runtime custody
+
+The managed weight store now supports a durable physical verification
+campaign distinct from its staging intent, metadata recovery review and
+selected-model runtime inspection. The campaign is scoped to the complete
+canonical object namespace, including unreferenced retained CAS objects.
+Its initial catalog independently bounds entries, aggregate object
+length, manifest bytes and logical references before any object hashing.
+It validates manifest-to-object length and identity relationships and
+constructs a deterministic incremental catalog digest without serializing
+all object rows into a diagnostic receipt.
+
+Each explicit advancement holds the cooperating writer slot, validates the
+exact current campaign digest, rebuilds the admitted metadata catalog,
+and verifies a bounded number of whole objects within an explicit byte
+ceiling. Object hashing happens on the canonical verified descriptor.
+Before cursor publication, the complete catalog is checked again.
+Successful tranches durably advance an object/byte counter and chained
+digest. An interrupted tranche does not advance the previously published
+cursor; it may have to repeat already-read bytes. Large individual
+objects require a sufficiently large explicit tranche allowance. No
+portable partial SHA-256 state, background job, or time-bounded disk-read
+interrupt is implemented.
+
+Same-size content corruption is detected by actual hashing, including for
+unreferenced objects. Metadata drift, changed manifests or object identity,
+missing references and verification failures cannot silently complete a
+campaign. A blocked campaign retains a bounded reason and affected
+object digest when available. Restarting or replacing an existing
+campaign requires its exact independent prior cursor pin. No deletion,
+quarantine move, repair, download or model activation takes place.
+
+Use the same persisted disk policy arguments as the managed staging
+commands:
+
+```sh
+skeleton-weight-store scrub-start --store /private/service/weights \
+  --maximum-store-bytes 274877906944 --minimum-free-bytes 8589934592
+skeleton-weight-store scrub-status --store /private/service/weights \
+  --maximum-store-bytes 274877906944 --minimum-free-bytes 8589934592
+skeleton-weight-store scrub-step --store /private/service/weights \
+  --maximum-store-bytes 274877906944 --minimum-free-bytes 8589934592 \
+  --scrub-campaign-sha256 "$CURRENT_CURSOR" \
+  --scrub-tranche-bytes 8589934592 --scrub-tranche-objects 64
+skeleton-weight-store scrub-check --store /private/service/weights \
+  --maximum-store-bytes 274877906944 --minimum-free-bytes 8589934592 \
+  --scrub-campaign-sha256 "$COMPLETED_CURSOR"
+```
+
+Use the new cursor digest returned by each successful step for the next
+step. Exit 3 identifies a blocked step or a next object larger than the
+explicit tranche budget; exit 2 identifies rejection. A completed
+campaign records prior physical reads. A scrub-check independently
+rebinds that prior campaign to current manifest/file metadata under a
+shared slot; it does not rehash historical campaign bytes. The
+bounded cursor and chain are trusted local control metadata, not a
+cryptographic signature or tamper-proof immutable audit archive.
+
+### Runtime and decoder integration
+
+Existing managed stores can be opened without provisioning a new lock,
+policy or directory. The reader obtains and independently rebinds the
+persisted policy, root identity and lock identity. Cooperating shared
+readers can coexist, while participating writers must wait or retry
+after the nonblocking slot denial. An unresolved staging intent or
+interrupted root control publication blocks managed source inspection.
+The installed inventory CLI, source preflight, verified decoder streams
+and sealed-page owner now participate in shared custody. The sealed CPU
+adapter retains it from inspection through synchronous consumer use.
+Ordinary selected source inspection releases custody when it returns;
+the resulting receipt is not a lease for a future execution. Direct
+low-level inspection helpers remain trusted composition APIs, including
+the recovery owner's verification under its already-held exclusive slot.
+
+Operators may independently pin a completed scrub campaign with
+`skeleton-offline-runtime ... --require-scrub-sha256 "$COMPLETED_CURSOR"`.
+The inspection binds both the observed scrub receipt and exact campaign
+digest to the selected source and the runtime policy. Legacy stores
+cannot satisfy this optional requirement. Source inspection still
+independently verifies committed weight bytes; prior scrub evidence
+never substitutes for loading verification. Measured protected
+deployment uses this requirement during source qualification when its
+trusted startup policy supplies the pin. It is not continuous rehashing
+of every store object during inference.
+
+The staged transaction also re-verifies committed object bytes under
+its exact manifest before advancing the durable outcome. Decoder
+identity and source layout are rechecked at publication and normal
+consumer exit. Private root permissions are validated at each
+managed lock boundary. Provisioning remains an explicit operator-idle
+transition; old unmodified writers and unrelated OS processes are not
+controlled by these advisory locks.
+
+### Scalable inventory verification
+
+The canonical inventory admits logical referenced bytes and distinct
+physical read bytes separately. Repeated references to the same digest
+are physically hashed once per invocation, using a bounded in-memory
+verification batch. Each reuse must match the first observed object
+and bucket identity, and all distinct objects are checked again before
+publishing the inventory. No persistent stat-only hash cache or prior
+invocation is accepted as fresh physical evidence. New receipt fields
+report distinct object count and physically verified bytes. Logical
+aggregate limits still apply, and the standalone inventory accepts
+`--max-physical-weight-bytes` as an independent read ceiling.
+Inventory declarations now agree with the canonical 65,536-shard
+per-plan maximum, still subject to the separate metadata, reference,
+runtime receipt and physical mapping bounds. The canonical load-plan
+contract detaches caller-owned mutable shard lists before digesting.
+
+The implementation deliberately preserves bounded metadata scans
+between tranches and final fences, at the cost of repeated metadata
+enumeration. It does not promise an atomic snapshot against arbitrary
+uncooperative filesystem writers, native Windows shared locking,
+cryptographically authenticated historical scrub evidence, tensor
+validation, or physical model execution. New source regression suites
+cover content corruption, restart/cursor custody, shared readers,
+writer exclusion, runtime evidence binding, physical read
+deduplication, high shard-count declarations and installed CLI routes.
+The existing sealed-context gate explicitly selects those tests
+alongside sealed-memory and NVML regression sources. Exact-head test
+execution and platform qualification remain independently required.
