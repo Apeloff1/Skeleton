@@ -259,11 +259,13 @@ class ApprovedMemory:
             raise MemoryConflict("memory unavailable")
         return self._decode(row, now=now)
 
-    def _verify_source(self, source: dict[str, Any] | None, note: str) -> None:
+    def _verify_source(self, source: dict[str, Any] | None, note: str, *,
+                       require_current: bool = True) -> None:
         if source is None:
             return
         stored = self.store.load(source["session_id"], *self.scope)
-        if stored.revision != source["revision"]:
+        if (stored.revision < source["revision"]
+                or (require_current and stored.revision != source["revision"])):
             raise MemoryConflict("source conversation changed; refresh exact excerpt")
         messages = stored.transcript.to_list()
         index = source["message_index"]
@@ -298,7 +300,12 @@ class ApprovedMemory:
                 if (previous["revision"], previous["sha256"]) != (
                         old_pin["revision"], old_pin["sha256"]):
                     raise MemoryConflict("memory revision conflict")
-            self._verify_source(source, text)
+            # A metadata-only edit may preserve previously approved immutable
+            # source coordinates after append-only conversation growth. New
+            # source admissions always require the exact current revision.
+            same_origin = bool(previous and previous["source"] == source
+                               and previous["text"] == text)
+            self._verify_source(source, text, require_current=not same_origin)
             mid = previous["memory_id"] if previous else secrets.token_urlsafe(18)
             # Wall-clock rollback does not move the durable update clock backward.
             updated = max(now, previous["updated_at"]) if previous else now
@@ -395,7 +402,8 @@ class ApprovedMemory:
         terms = _features(query, limit=64)
         if not terms:
             return {"records": [], "candidate_limit_reached": False,
-                    "method": "indexed-lexical-subword"}
+                    "method": "indexed-lexical-subword", "query_sha256": _digest(query),
+                    "model_digest": self.scope[0], "tokenizer_digest": self.scope[1]}
         now = int(time.time())
         placeholders = ",".join("?" for _ in terms)
         # The indexed first pass bounds materialized notes. Exact words have
