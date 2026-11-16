@@ -138,7 +138,7 @@ def inspect_manifest(path, *, expected_manifest_sha, publisher_proof=None):
 
 
 def apply_manifest(path, *, expected_manifest_sha, scope, graph_factory, rights_acknowledged,
-                   publisher_proof=None):
+                   publisher_proof=None, authorize=None):
     """Explicit operator import; sequential independent canonical settlements.
 
     A failing later entry does not roll back a previously sealed snapshot.
@@ -153,17 +153,21 @@ def apply_manifest(path, *, expected_manifest_sha, scope, graph_factory, rights_
         raise ValueError("explicit owner scope required")
     items, report = qualify_manifest(path, expected_manifest_sha=expected_manifest_sha,
                                       publisher_proof=publisher_proof)
+    if authorize is not None: authorize()
     graph = graph_factory()
     settled = []
     for entry, local in items:
+        if authorize is not None: authorize()
         receipt = ingest(graph, scope, path=local, format=entry["format"],
                          projection=entry["projection"], target=entry["target"],
                          rights_reference=entry["rights_reference"],
                          grant_seconds=entry["grant_seconds"], expected_sha=entry["sha256"],
-                         expected_inspection=entry["inspection_digest"])
+                         expected_inspection=entry["inspection_digest"],
+                         **({"authorize":authorize} if authorize is not None else {}))
         if (receipt["state"] != "sealed" or receipt["input_sha256"] != entry["sha256"]
                 or receipt["inspection_digest"] != entry["inspection_digest"]):
             raise ValueError("canonical dataset settlement differs")
+        if authorize is not None: authorize()
         settled.append({"target": entry["target"], "snapshot_id": receipt["snapshot_id"],
                         "inspection_digest": receipt["inspection_digest"],
                         "already_sealed": bool(receipt.get("already_sealed", False))})
