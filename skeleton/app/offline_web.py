@@ -57,6 +57,16 @@ HTML = r"""<!doctype html>
           <button id="memory-list" class="small" disabled>Load saved notes</button>
           <button id="memory-more" class="small" disabled>More</button></div>
         <p id="memory-status" class="hint" aria-live="polite">Not loaded.</p>
+        <details id="memory-vector-panel">
+          <summary>Optional learned-vector recall</summary>
+          <p class="hint">An owner-installed local word-vector asset is optional. Refresh derives note vectors; no remote queries, automatic installation, or language-model training.</p>
+          <pre id="memory-vector-state" aria-live="polite">Encoder status not checked.</pre>
+          <div class="inline">
+            <button id="memory-vector-status" class="small" disabled>Inspect encoder</button>
+            <button id="memory-vector-start" class="small" disabled>Build index page</button>
+            <button id="memory-vector-more" class="small" disabled>Next index page</button>
+          </div>
+        </details>
         <div id="memory-records" aria-label="Saved memory records"></div>
         <div class="inline">
           <button id="memory-compose" class="small" disabled>Preview selected notes in draft</button>
@@ -276,6 +286,40 @@ HTML = r"""<!doctype html>
         <button id="cognition-budget" class="small secondary" disabled>Use suggested output budget</button>
         <p class="hint">Copy excerpts individually if appropriate. Verify context before generation; the preview is heuristic, not model reasoning or a memory grant.</p>
       </details>
+      <details id="adaptive-context-panel" class="generation-options">
+        <summary>Adaptive conversation context</summary>
+        <p class="hint">Explicitly plan private approved notes and response style around the current model window. Potential memory conflicts are withheld. Review the exact augmented message before applying or sending. Separate from reference grounding.</p>
+        <label for="adaptive-profile">Response approach</label>
+        <select id="adaptive-profile" disabled>
+          <option value="neutral">Neutral</option><option value="direct">Direct</option>
+          <option value="analytical">Analytical</option><option value="technical">Technical</option>
+          <option value="creative">Creative</option><option value="tutor">Tutor</option>
+          <option value="critical">Critical review</option>
+        </select>
+        <label for="adaptive-kinds">Eligible approved memory categories</label>
+        <select id="adaptive-kinds" multiple size="4" disabled>
+          <option value="preference" selected>Preferences</option><option value="fact" selected>Facts</option>
+          <option value="goal" selected>Goals</option><option value="constraint" selected>Constraints</option>
+          <option value="rejection" selected>Rejected approaches</option><option value="correction" selected>Corrections</option>
+          <option value="style" selected>Style</option><option value="project" selected>Projects</option>
+        </select>
+        <div class="inline">
+          <label>Maximum notes <input id="adaptive-count" type="number" min="0" max="4" value="4" disabled></label>
+          <label>Draft bytes <input id="adaptive-bytes" type="number" min="128" max="4096" value="4096" disabled></label>
+        </div>
+        <label><input id="adaptive-anchors" type="checkbox" checked disabled> Recover recent topics for short continuations and follow reviewed tag associations</label>
+        <label><input id="adaptive-dense" type="checkbox" disabled> Include optional installed learned-vector matches</label>
+        <button id="adaptive-plan" type="button" class="small" disabled>Plan adaptive context</button>
+        <pre id="adaptive-report" aria-live="polite">No adaptive plan.</pre>
+        <details id="adaptive-preview" hidden>
+          <summary>Exact reviewed user message</summary>
+          <pre id="adaptive-text"></pre>
+        </details>
+        <div class="inline">
+          <button id="adaptive-apply" type="button" class="small" disabled>Apply reviewed draft</button>
+          <button id="adaptive-send" type="button" class="small primary" disabled>Generate with reviewed draft</button>
+        </div>
+      </details>
       <div class="composer-submit">
         <span class="hint keyboard-hint">Ctrl / ⌘ + Enter to send</span>
         <button id="context-preview" class="small" disabled>Preview context</button>
@@ -344,6 +388,7 @@ html,body{background:var(--canvas);color:var(--text)}button{font-size:12px;min-h
 @media(max-width:720px){.topbar{padding:13px 14px 10px;gap:9px}.topbar .conversation-heading{order:3;flex-basis:100%;min-width:0}.topbar h1{font-size:20px}.topbar p{font-size:9px}.topbar .indicator{margin-left:auto}.model-tools{font-size:10px}.model-tools>summary{padding:7px 8px}.model-tools .indicator{margin-left:0}.model-tools>div{right:0;width:min(260px,82vw)}.conversation-toolbar{padding:7px 12px;gap:6px;flex-wrap:wrap}.conversation-toolbar #revision{font-size:9px}.conversation-toolbar .hint{font-size:9px}.conversation-actions{gap:3px}.conversation-actions button{min-height:30px;padding:5px 7px;font-size:10px}.intro{padding:20px 22px;overflow:auto}.intro .glow{width:43px;height:43px;border-radius:14px;font-size:27px;margin-bottom:17px}.intro h2{font-size:28px;margin-bottom:12px}.intro p{font-size:12px;line-height:1.7}.intro .minor{font-size:10px;margin-top:14px;padding-top:10px}.getting-started{margin:14px 0;gap:7px;font-size:11px}.getting-started b{width:19px;height:19px}.composer{width:calc(100% - 20px);padding:11px;border-radius:12px}.composer textarea{min-height:62px;max-height:22vh;padding:10px;font-size:13px}.composer-submit{gap:6px;margin-top:6px}.composer-submit .keyboard-hint{display:none}.composer-submit button{font-size:11px;min-height:34px}.generation-options{margin-top:5px}.generation-options .bottom{gap:10px}.generation-options label{font-size:10px}.context-report{padding:6px 12px;font-size:9px;max-height:44px;overflow:auto}.status{padding:6px 12px 9px;font-size:10px;max-height:56px;overflow:auto}.messages{padding:16px 12px;gap:14px}.message{padding:14px;max-width:97%;font-size:13px}.transcript-tools{margin:2px}.sidebar{padding:18px 15px}.sidebar .sessions{max-height:29vh;min-height:120px}.sidebar .knowledge-section{max-height:none}.workspace-section{padding:13px 0}.brand{margin-bottom:17px}.brand #sidebar-close{min-height:32px}.shell.library-open .main{pointer-events:none}.sidebar-close:focus-visible{outline-offset:2px}}
 #memory-panel input:not([type=checkbox]),#memory-panel select,#memory-panel textarea{width:100%;box-sizing:border-box;color:#edf0f8;background:#111925;border:1px solid #465575;border-radius:7px;padding:7px;font:inherit}#memory-panel label{display:block;margin:7px 0}#memory-panel label input[type=checkbox]{width:auto}#memory-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:165px;overflow:auto;font-size:11px}#memory-panel .memory-card{border:1px solid #34445e;border-radius:8px;padding:9px;margin:9px 0}#memory-panel .memory-card strong{overflow-wrap:anywhere}#memory-panel .memory-card .inline{margin-top:6px}
 .chat-richtext{white-space:normal;overflow-wrap:anywhere}.chat-richtext p,.chat-richtext blockquote{white-space:pre-wrap;line-height:1.58;margin:7px 0}.chat-richtext h3,.chat-richtext h4,.chat-richtext h5{font-weight:700;margin:16px 0 7px;font-size:inherit}.chat-richtext h3{font-size:1.24em}.chat-richtext h4{font-size:1.12em}.chat-richtext ul,.chat-richtext ol{white-space:normal;padding-left:24px;margin:9px 0}.chat-richtext li{margin:4px 0;white-space:pre-wrap}.chat-richtext blockquote{border-left:3px solid #50668b;padding-left:12px;color:#bdcbe0}.chat-richtext code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:#101723;border-radius:4px;padding:1px 4px;font-size:.91em}.chat-richtext .chat-code{background:#101723;border:1px solid #35435a;border-radius:8px;margin:10px 0;overflow:hidden}.chat-code-header{display:flex;align-items:center;justify-content:space-between;padding:5px 10px;background:#1e293b;color:#aebeda;font-size:11px}.chat-richtext pre{overflow:auto;white-space:pre;max-height:420px;margin:0;padding:12px;line-height:1.5}.chat-richtext pre code{padding:0;white-space:pre;background:transparent}.chat-table-scroll{overflow-x:auto;margin:9px 0}.chat-richtext table{border-collapse:collapse;min-width:220px;text-align:left;font-size:.92em}.chat-richtext th,.chat-richtext td{border:1px solid #3b4b65;padding:7px;vertical-align:top}.chat-richtext th{background:#263449}.chat-richtext hr{border:0;border-top:1px solid #42516b}
+#adaptive-context-panel{max-height:43vh;overflow:auto;overscroll-behavior:contain}#adaptive-context-panel select,#adaptive-context-panel input[type=number]{background:#101723;color:#edf0f8;border:1px solid #465575;border-radius:7px;padding:6px;font:inherit}#adaptive-context-panel select{display:block;width:100%;margin:5px 0}#adaptive-context-panel input[type=checkbox]{width:auto}#adaptive-context-panel label{display:block;margin:5px 0}#adaptive-context-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto;font-size:11px}#adaptive-context-panel button{margin-top:4px}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 
 """
@@ -558,6 +603,14 @@ JAVASCRIPT = r"""'use strict';
     get('memory-compose').disabled = locked || working || !state.session || !state.memorySelected?.size;
     get('memory-apply').disabled = locked || working || !state.memoryPreview;
     get('memory-detach').disabled = locked || working || !state.memorySource;
+    get('memory-vector-status').disabled=locked||working;
+    get('memory-vector-start').disabled=locked||working||!state.vectorStatus?.bank;
+    get('memory-vector-more').disabled=locked||working||!state.vectorStatus?.bank||!state.vectorCursor;
+    const adaptiveBlocked=locked||working||!state.session||get('grounded').checked;
+    for(const id of ['adaptive-profile','adaptive-kinds','adaptive-count','adaptive-bytes',
+      'adaptive-anchors','adaptive-dense','adaptive-plan']) get(id).disabled=adaptiveBlocked;
+    get('adaptive-apply').disabled=adaptiveBlocked||!state.adaptivePlan;
+    get('adaptive-send').disabled=adaptiveBlocked||!state.adaptivePlan||foreignLease||state.health?.ready!==true;
     document.querySelectorAll('[data-rewrite]').forEach(el => {el.disabled=locked||working;});
     document.querySelectorAll('[data-memory-control]').forEach(el => {
       el.disabled = locked || working || (el.dataset.memoryControl === 'select' && el.dataset.expired === 'true');
@@ -620,6 +673,7 @@ JAVASCRIPT = r"""'use strict';
   function lock() {
     clearCognition(true);
     resetMemoryWorkspace();
+    resetAdaptiveWorkspace();
     if (state.resourceTimer !== null) clearInterval(state.resourceTimer);
     state.resourceTimer = null;
     get('resource-monitor').textContent = 'Connect to inspect your device.';
@@ -1043,6 +1097,7 @@ JAVASCRIPT = r"""'use strict';
   async function selectSession(id) {
     clearCognition(true);
     clearMemoryPreview();
+    clearAdaptivePlan();
     const current = state.session;
     if (current) state.drafts.set(current, get('prompt').value);
     const result = await api('GET', '/v1/sessions/' + id);
@@ -1248,6 +1303,7 @@ JAVASCRIPT = r"""'use strict';
   function invalidateContextPreview() {
     clearCognition(false);
     clearMemoryPreview();
+    clearAdaptivePlan();
     clearGroundingPreview();
     const display = get('context-report');
     display.classList.remove('warning');
@@ -1274,7 +1330,7 @@ JAVASCRIPT = r"""'use strict';
     }
   });
   get('cognition-sources').addEventListener('change', () => clearCognition(false));
-  get('prompt').addEventListener('input', () => {clearCognition(false); clearMemoryPreview();});
+  get('prompt').addEventListener('input', () => {clearCognition(false); clearMemoryPreview(); clearAdaptivePlan();});
   get('cognition-preview').addEventListener('click', () => run(async () => {
     clearCognition(false);
     const message = get('prompt').value.trim();
@@ -1568,6 +1624,204 @@ JAVASCRIPT = r"""'use strict';
     invalidateContextPreview(); sidebar(false); get('prompt').focus();
     status('Reviewed context added to visible draft. Send explicitly when ready.');
   }));
+  function clearAdaptivePlan() {
+    state.adaptivePlan=null;
+    get('adaptive-report').textContent='No adaptive plan.';
+    get('adaptive-text').textContent='';
+    get('adaptive-preview').hidden=true;get('adaptive-preview').open=false;
+    get('adaptive-apply').disabled=true;get('adaptive-send').disabled=true;
+  }
+  function resetAdaptiveWorkspace() {
+    clearAdaptivePlan();
+    state.vectorStatus=null;state.vectorCursor=null;
+    get('memory-vector-state').textContent='Encoder status not checked.';
+    get('adaptive-profile').value='neutral';
+    get('adaptive-count').value='4';get('adaptive-bytes').value='4096';
+    get('adaptive-anchors').checked=true;get('adaptive-dense').checked=false;
+    for(const option of get('adaptive-kinds').options) option.selected=true;
+  }
+  function validateVectorStatus(result) {
+    const sha=/^[a-f0-9]{64}$/;
+    if(!result||result.schema!=='skeleton.jeeves.memory-vector-index.v1'
+      ||result.model_digest!==state.health?.model_digest
+      ||result.tokenizer_digest!==state.health?.tokenizer_digest
+      ||result.remote_calls!==false||result.semantic_quality_certified!==false
+      ||!Number.isSafeInteger(result.active_memories)||result.active_memories<0
+      ||!Number.isSafeInteger(result.indexed_active_memories)||result.indexed_active_memories<0
+      ||result.indexed_active_memories>result.active_memories
+      ||!Number.isSafeInteger(result.covered_active_memories)||result.covered_active_memories<0
+      ||result.covered_active_memories>result.indexed_active_memories
+      ||(result.bank!==null&&(!result.bank||!sha.test(result.bank.asset_sha256)
+        ||typeof result.bank.model_name!=='string'
+        ||!Number.isSafeInteger(result.bank.dimensions)||result.bank.dimensions<4||result.bank.dimensions>512
+        ||!Number.isSafeInteger(result.bank.vocabulary)||result.bank.vocabulary<1||result.bank.vocabulary>250000)))
+      throw new Error('Invalid local encoder status.');
+  }
+  async function refreshVectorStatus(message='') {
+    const epoch=state.epoch;
+    const result=await api('POST','/v1/memory-vector/status',{});
+    if(epoch!==state.epoch||!state.connected)throw new Error('Workspace locked.');
+    validateVectorStatus(result);
+    if(state.vectorStatus?.bank?.asset_sha256!==result.bank?.asset_sha256) state.vectorCursor=null;
+    state.vectorStatus=result;
+    get('memory-vector-state').textContent=result.bank
+      ?result.bank.model_name+' · '+result.bank.dimensions+' dimensions · '+result.bank.vocabulary+' words'
+        +'\nAsset '+result.bank.asset_sha256
+        +'\nIndexed active notes '+result.indexed_active_memories+'/'+result.active_memories
+        +' · with covered words '+result.covered_active_memories
+        +'\nStatic learned word-vector pooling; not transformer reasoning or certified semantic quality.'
+      :'No local vector bank installed. Lexical recall remains available.';
+    if(message)get('memory-vector-state').textContent+='\n'+message;
+    updateControls();
+  }
+  async function refreshVectorPage(first) {
+    const previous=state.vectorStatus,epoch=state.epoch;
+    if(!previous?.bank||(!first&&!state.vectorCursor))throw new Error('Inspect the installed encoder first.');
+    const asset=previous.bank.asset_sha256,cursor=first?null:state.vectorCursor;
+    const result=await api('POST','/v1/memory-vector/refresh',{
+      expected_asset:asset,approved:true,limit:64,...(cursor?{cursor}:{}),
+    });
+    if(epoch!==state.epoch||!state.connected)throw new Error('Workspace locked.');
+    if(result.asset_sha256!==asset||!Number.isSafeInteger(result.processed)
+      ||result.processed<0||result.processed>64||!Number.isSafeInteger(result.embedded)
+      ||result.embedded<0||result.embedded>result.processed
+      ||(result.next_cursor!==null&&!/^[A-Za-z0-9_-]{8,100}$/.test(result.next_cursor)))
+      throw new Error('Invalid vector index page receipt.');
+    state.vectorCursor=result.next_cursor;
+    clearAdaptivePlan();
+    await refreshVectorStatus('Last page: '+result.processed+' processed, '+result.embedded+' embedded.'
+      +(state.vectorCursor?' More pages available.':' End of this keyset scan; inspect current index coverage.'));
+  }
+  get('memory-vector-status').addEventListener('click',()=>run(()=>refreshVectorStatus()));
+  get('memory-vector-start').addEventListener('click',()=>run(()=>refreshVectorPage(true)));
+  get('memory-vector-more').addEventListener('click',()=>run(()=>refreshVectorPage(false)));
+  function adaptivePolicy() {
+    const kinds=Array.from(get('adaptive-kinds').selectedOptions,row=>row.value).sort();
+    const max_records=Number(get('adaptive-count').value),max_bytes=Number(get('adaptive-bytes').value);
+    if(!Number.isInteger(max_records)||max_records<0||max_records>4
+      ||!Number.isInteger(max_bytes)||max_bytes<128||max_bytes>4096)
+      throw new Error('Choose a valid note count and draft-byte budget.');
+    return {kinds,max_records,max_bytes,profile:get('adaptive-profile').value,
+      use_recent_anchors:get('adaptive-anchors').checked,withhold_conflicts:true,
+      use_vector_recall:get('adaptive-dense').checked};
+  }
+  function echoPolicy(result, expected) {
+    return result&&result.profile===expected.profile&&result.max_records===expected.max_records
+      &&result.max_bytes===expected.max_bytes&&result.use_recent_anchors===expected.use_recent_anchors
+      &&result.withhold_conflicts===expected.withhold_conflicts&&result.use_vector_recall===expected.use_vector_recall
+      &&JSON.stringify(result.kinds)===JSON.stringify(expected.kinds);
+  }
+  function validAccounting(row, budget, model) {
+    return row&&row.model_digest===model&&row.read_only===true&&row.generation_performed===false
+      &&Number.isSafeInteger(row.estimated_input_tokens)&&row.estimated_input_tokens>=1
+      &&Number.isSafeInteger(row.context_tokens)&&row.context_tokens>=1
+      &&row.reserved_output_tokens===budget&&row.estimated_total_tokens===row.estimated_input_tokens+budget
+      &&row.estimated_total_tokens<=row.context_tokens&&Number.isSafeInteger(row.omitted_history_messages)
+      &&row.omitted_history_messages>=0&&row.fits_full_history===(row.omitted_history_messages===0);
+  }
+  async function adaptivePreview() {
+    if(get('grounded').checked)throw new Error('Use memory planning in a separate ungrounded turn.');
+    const message=get('prompt').value.trim(),sid=state.session,revision=state.revision,epoch=state.epoch;
+    const policy=adaptivePolicy(),max_output_tokens=Number(get('budget').value);
+    const require_full_history=get('context-preserve').checked;
+    const model=state.health?.model_digest,tokenizer=state.health?.tokenizer_digest;
+    if(!message||!sid||bytes(message)>policy.max_bytes||!Number.isInteger(max_output_tokens)
+      ||max_output_tokens<1||max_output_tokens>state.health?.max_output_tokens)
+      throw new Error('Enter a valid message and model output budget.');
+    const result=await api('POST','/v1/sessions/'+sid+'/adaptive-context',{
+      message,policy,expected_revision:revision,max_output_tokens,require_full_history,grounded:false,
+    });
+    const sha=/^[a-f0-9]{64}$/;
+    if(!result||result.schema!=='skeleton.jeeves.adaptive-context.v1'
+      ||result.session_id!==sid||result.session_revision!==revision||result.model_digest!==model
+      ||result.tokenizer_digest!==tokenizer||!echoPolicy(result.policy,policy)
+      ||result.output_tokens!==max_output_tokens||result.strict!==require_full_history
+      ||result.read_only!==true||result.generation_performed!==false||result.automatic_injection!==false
+      ||result.semantic_quality_certified!==false||result.preview_is_admission_proof!==false
+      ||typeof result.composed_text!=='string'||bytes(result.composed_text)>policy.max_bytes
+      ||(result.composed_text!==message&&!result.composed_text.startsWith(message+'\n\n'))
+      ||!sha.test(result.plan_sha256)||!sha.test(result.policy_sha256)
+      ||await exactLocalSha256(message)!==result.draft_sha256
+      ||await exactLocalSha256(result.composed_text)!==result.composed_sha256
+      ||!validAccounting(result.accounting,max_output_tokens,model)
+      ||!validAccounting(result.baseline_accounting,max_output_tokens,model)
+      ||result.accounting.omitted_history_messages>result.baseline_accounting.omitted_history_messages
+      ||(require_full_history&&!result.accounting.fits_full_history)
+      ||!Array.isArray(result.selected)||result.selected.length>policy.max_records
+      ||!Array.isArray(result.selection_details)||result.selection_details.length!==result.selected.length
+      ||!Array.isArray(result.possible_conflicts)||result.possible_conflicts.length>72
+      ||!Array.isArray(result.excluded)||result.excluded.length>72
+      ||!Array.isArray(result.anchors)||result.anchors.length>3
+      ||!Number.isSafeInteger(result.candidate_count)||result.candidate_count<0||result.candidate_count>72)
+      throw new Error('Invalid adaptive context plan.');
+    const selected=new Set();
+    for(const pin of result.selected){
+      if(!pin||!/^[A-Za-z0-9_-]{8,100}$/.test(pin.memory_id)||!Number.isSafeInteger(pin.revision)
+        ||pin.revision<1||!sha.test(pin.sha256)||selected.has(pin.memory_id))
+        throw new Error('Invalid adaptive note pin.');
+      selected.add(pin.memory_id);
+    }
+    for(const group of result.possible_conflicts){
+      if(!group||group.disposition!=='withhold-pending-user-review'
+        ||group.semantic_conflict_verified!==false||!Array.isArray(group.memory_ids)
+        ||group.memory_ids.some(id=>selected.has(id)))throw new Error('Invalid conflict disposition.');
+    }
+    if(epoch!==state.epoch||!state.connected||sid!==state.session||revision!==state.revision
+      ||get('prompt').value.trim()!==message||get('grounded').checked
+      ||Number(get('budget').value)!==max_output_tokens||get('context-preserve').checked!==require_full_history
+      ||JSON.stringify(adaptivePolicy())!==JSON.stringify(policy)
+      ||state.health?.model_digest!==model||state.health?.tokenizer_digest!==tokenizer)
+      throw new Error('Draft, policy, model or conversation changed during preview.');
+    return {result,message,sid,revision,epoch,policy,max_output_tokens,require_full_history};
+  }
+  function showAdaptivePlan(plan) {
+    const report=plan.result,lines=[
+      'Selected '+report.selected.length+' of '+report.candidate_count+' candidates'
+        +(report.candidate_scan_truncated?' · candidate scan bounded':''),
+      'Response approach: '+report.effective_profile+' · recent anchors '+report.anchors.length,
+      'Possible conflict groups withheld: '+report.possible_conflicts.length,
+      'Omitted history before/after: '+report.baseline_accounting.omitted_history_messages
+        +'/'+report.accounting.omitted_history_messages,
+      'Estimated context '+report.accounting.estimated_total_tokens+'/'+report.accounting.context_tokens,
+    ];
+    if(report.dense_recall?.requested)lines.push(report.dense_recall.enabled
+      ?'Learned vector coverage: '+report.dense_recall.indexed_active_memories+'/'+report.dense_recall.active_memories
+        +' indexed notes · '+report.dense_recall.queries_with_coverage+' represented queries'
+      :'No vector bank installed; lexical recall only.');
+    for(const row of report.selection_details)
+      lines.push('• '+row.label+' ['+row.kind+']'+(row.bridge?' · tag '+row.bridge:'')
+        +(row.dense_cosine!==null&&row.dense_cosine!==undefined?' · cosine '+row.dense_cosine:''));
+    const reasons={};
+    for(const row of report.excluded)reasons[row.reason]=(reasons[row.reason]||0)+1;
+    for(const reason of Object.keys(reasons).sort())lines.push(reason+': '+reasons[reason]);
+    lines.push('Plan '+report.plan_sha256,'No inference yet. Current request and runtime limits remain authoritative.');
+    get('adaptive-report').textContent=lines.join('\n');
+    get('adaptive-text').textContent=report.composed_text;
+    get('adaptive-preview').hidden=false;get('adaptive-preview').open=true;
+    state.adaptivePlan=plan;
+  }
+  for(const id of ['adaptive-profile','adaptive-kinds','adaptive-count','adaptive-bytes','adaptive-anchors','adaptive-dense'])
+    get(id).addEventListener('change',clearAdaptivePlan);
+  get('adaptive-plan').addEventListener('click',()=>run(async()=>{
+    clearAdaptivePlan();showAdaptivePlan(await adaptivePreview());
+  }));
+  async function applyAdaptive(andSend) {
+    const prior=state.adaptivePlan;
+    if(!prior)throw new Error('Review a fresh adaptive plan first.');
+    const fresh=await adaptivePreview();
+    if(prior.result.plan_sha256!==fresh.result.plan_sha256
+      ||prior.result.composed_text!==fresh.result.composed_text
+      ||prior.sid!==fresh.sid||prior.revision!==fresh.revision)
+      throw new Error('Memory selection or context estimate changed; preview again.');
+    // This is the exact normal user message, not an undisclosed system
+    // prompt. Existing generation and replay contracts remain unchanged.
+    get('prompt').value=fresh.result.composed_text;
+    invalidateContextPreview();
+    if(andSend) await submit(false);
+    else {status('Reviewed adaptive message applied. Send explicitly when ready.');get('prompt').focus();}
+  }
+  get('adaptive-apply').addEventListener('click',()=>run(()=>applyAdaptive(false)));
+  get('adaptive-send').addEventListener('click',()=>run(()=>applyAdaptive(true)));
   async function previewLocalContext(message, max_output_tokens, grounded, require_full_history) {
     if (!state.session) throw new Error('Select a conversation first.');
     const epoch = state.epoch;
