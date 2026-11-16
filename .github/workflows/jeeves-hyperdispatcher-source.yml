@@ -12,6 +12,8 @@ on:
       - 'skeleton/intelligence/shared_pressure.py'
       - 'skeleton/ai/runtime/intelligence/**'
       - 'skeleton/testing/test_jeeves_hyperdispatcher.py'
+      - 'machine/ai_file_tree.json'
+      - '.machine/repository.toml'
       - '.github/workflows/jeeves-hyperdispatcher-source.yml'
 concurrency:
   group: jeeves-hyperdispatcher-source-${{ github.event.pull_request.number || github.ref }}

@@ -273,3 +273,15 @@ architecture validator. The separate integration source-object audit identified
 inherited stale source pins; the four verified mismatches for Jeeves, Learning,
 School and Provenance are corrected against their actual Git trees. No historical
 audit record or validator has been changed. Final-head CI remains required.
+
+## Wave 9: verified tenant custody and checkpoint accounting
+
+The existing tenant broker now supports an explicit verified host mode. Admission
+reserves a finite identity retention slot and validates same-tenant dependencies;
+dispatch charges tenant leased quota before exact task publication. Unknown
+effects retain the worker slot and tenant leased quota. Reconciliation verifies
+the same attempt and reserves queued quota before a retry can be published.
+Wrong-tenant requests and changed replay identity are rejected. The tenant
+checkpoint classifies uncertain tasks as active and rebuilds leased accounting;
+legacy HTTP/broker calls cannot silently enter verified mode. This is a tested
+candidate interface for a trusted host, not external transport activation.

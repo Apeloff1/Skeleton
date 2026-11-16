@@ -609,3 +609,109 @@ def test_negative_capability_invalidation_and_two_choice():
     assert should_requeue(miss, changed_capabilities=frozenset(), **(args | {"tenant_id":"other"}))
     assert len(set(two_choice_indices("task", 4, 2))) == 2
     assert two_choice_indices("task", 4, 1) == (0,)
+
+def test_verified_tenant_quota_retains_uncertain_effect_through_restore():
+    from skeleton.automation.agents.swarm_broker import SwarmBroker
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, AdmissionError, TaskState
+    from skeleton.automation.agents.swarm_tenant_broker import TenantSwarmBroker
+    from skeleton.automation.agents.swarm_tenant_checkpoint import TenantCheckpointStore
+    from skeleton.automation.agents.swarm_ingress import SwarmIngressGovernor
+    from skeleton.automation.agents.swarm_quota import Quota, QuotaExceeded
+    runtime = HardenedSwarmRuntime(fenced=True, clock=lambda: 10.0)
+    runtime.register_worker("w", capacity=2)
+    verified = set()
+    def verify(worker, task, token, action, digest):
+        return (worker, task, token, action, digest) in verified
+    governor = SwarmIngressGovernor(default_quota=Quota(max_queued=2, max_leased=1))
+    broker = TenantSwarmBroker(SwarmBroker(runtime, verify_worker=verify), governor, verified_mode=True)
+    assert broker.submit_verified_queued("t", SwarmTask("a", {})).admitted
+    assert broker.submit_verified_queued("t", SwarmTask("b", {})).admitted
+    with pytest.raises(AdmissionError):
+        broker.lease_verified("other", "a")
+    attempt = broker.lease_verified("t", "a")
+    assert attempt.lease_token
+    verified.add(("w", "a", attempt.lease_token, "uncertain", "a"*64))
+    result = broker.record_verified("t", "w", "a", lease_token=attempt.lease_token,
+                                    outcome="uncertain", evidence_sha256="a"*64)
+    assert result.task.effect_uncertain
+    assert governor.quota.usage("t").leased == 1
+    assert broker.repair().terminalized == 0
+    with pytest.raises(QuotaExceeded):
+        broker.lease_verified("t", "b")
+    store = TenantCheckpointStore()
+    checkpoint = store.capture(1, broker)
+    restored = HardenedSwarmRuntime.from_state(runtime.export_state(), clock=lambda: 1.0)
+    restored_governor = governor.fork_empty()
+    restored_broker = TenantSwarmBroker(SwarmBroker(restored, verify_worker=verify), restored_governor,
+                                        verified_mode=True)
+    store.restore(restored_broker, checkpoint.sequence)
+    assert restored_governor.quota.usage("t").leased == 1
+    assert restored.task("a").effect_uncertain
+    verified.add(("w", "a", attempt.lease_token, "reconcile:committed", "b"*64))
+    outcome = restored_broker.reconcile_verified("t", "w", "a", lease_token=attempt.lease_token,
+                                                  outcome="committed", evidence_sha256="b"*64)
+    assert outcome.task.state is TaskState.SUCCEEDED
+    assert restored_governor.quota.usage("t").leased == 0
+    assert restored_broker.lease_verified("t", "b").id == "b"
+
+
+def test_verified_tenant_retry_reserves_queue_quota_before_reconciliation():
+    from skeleton.automation.agents.swarm_broker import SwarmBroker
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, LeaseError
+    from skeleton.automation.agents.swarm_tenant_broker import TenantSwarmBroker
+    from skeleton.automation.agents.swarm_ingress import SwarmIngressGovernor
+    from skeleton.automation.agents.swarm_quota import Quota, QuotaExceeded
+    runtime = HardenedSwarmRuntime(fenced=True)
+    runtime.register_worker("w")
+    governor = SwarmIngressGovernor(default_quota=Quota(max_queued=1, max_leased=1))
+    permitted = set()
+    def verify(worker, task, token, action, digest):
+        return (worker, task, token, action, digest) in permitted
+    broker = TenantSwarmBroker(SwarmBroker(runtime, verify_worker=verify), governor, verified_mode=True)
+    broker.submit_verified_queued("t", SwarmTask("a", {}))
+    first = broker.lease_verified("t", "a")
+    permitted.add(("w", "a", first.lease_token, "uncertain", "a"*64))
+    broker.record_verified("t", "w", "a", lease_token=first.lease_token,
+                           outcome="uncertain", evidence_sha256="a"*64)
+    with pytest.raises(LeaseError):
+        broker.reconcile_verified("t", "w", "a", lease_token=first.lease_token,
+                                  outcome="stopped-no-effect", evidence_sha256="b"*64)
+    assert governor.quota.usage("t").leased == 1
+    assert governor.quota.usage("t").queued == 0
+    broker.submit_verified_queued("t", SwarmTask("b", {}))
+    permitted.add(("w", "a", first.lease_token, "reconcile:stopped-no-effect", "b"*64))
+    with pytest.raises(QuotaExceeded):
+        broker.reconcile_verified("t", "w", "a", lease_token=first.lease_token,
+                                  outcome="stopped-no-effect", evidence_sha256="b"*64)
+    assert runtime.task("a").effect_uncertain and governor.quota.usage("t").leased == 1
+    runtime.cancel("b")
+    broker.repair()
+    broker.reconcile_verified("t", "w", "a", lease_token=first.lease_token,
+                              outcome="stopped-no-effect", evidence_sha256="b"*64)
+    assert governor.quota.usage("t").queued == 1
+    second = broker.lease_verified("t", "a")
+    assert second.lease_token != first.lease_token
+
+
+def test_verified_tenant_replay_and_cross_tenant_dependencies():
+    from skeleton.automation.agents.swarm_broker import SwarmBroker
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, AdmissionError
+    from skeleton.automation.agents.swarm_tenant_broker import TenantSwarmBroker
+    runtime = HardenedSwarmRuntime(fenced=True)
+    broker = TenantSwarmBroker(SwarmBroker(runtime, verify_worker=lambda *args: False),
+                               verified_mode=True, max_terminal_records=2)
+    task = SwarmTask("a", {"x": 1})
+    assert broker.submit_verified_queued("t", task).admitted
+    assert broker.submit_verified_queued("t", task).duplicate
+    with pytest.raises(AdmissionError):
+        broker.submit_verified_queued("other", task)
+    with pytest.raises(AdmissionError):
+        broker.submit_verified_queued("t", replace(task, priority=4))
+    with pytest.raises(AdmissionError):
+        broker.submit_verified_queued("other", SwarmTask("b", {}, dependencies=("a",)))
+    assert broker.submit_verified_queued("t", SwarmTask("b", {}, dependencies=("a",))).admitted
+    with pytest.raises(AdmissionError):
+        broker.submit_verified_queued("t", SwarmTask("c", {}))

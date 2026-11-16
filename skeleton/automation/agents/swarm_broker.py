@@ -43,6 +43,8 @@ class SwarmBroker:
         if runtime.fenced and (not callable(verify_worker) or getattr(runtime, "_lock", None) is None):
             raise LeaseError("fenced runtime requires a trusted verifier and hardened runtime")
         self._verify_worker = verify_worker
+        if control is not None and control.runtime is not runtime:
+            raise LeaseError("control plane does not own the broker runtime")
         self.runtime = runtime
         self.control = control or SwarmControlPlane(runtime)
         self.supervisor = supervisor or SwarmSupervisor()

@@ -16,7 +16,7 @@ from threading import RLock
 from time import time
 from typing import Callable, Deque
 
-from skeleton.automation.agents.swarm_tenant_broker import TERMINAL_STATES, TenantRepairResult, TenantSwarmBroker
+from skeleton.automation.agents.swarm_tenant_broker import TenantRepairResult, TenantSwarmBroker, is_terminal
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,6 +162,8 @@ class TenantCheckpointStore:
         checkpoint = self._validate_checkpoint(checkpoint)
         if len(checkpoint.terminal) > broker.max_terminal_records:
             raise ValueError("tenant checkpoint exceeds target terminal record capacity")
+        if broker.verified_mode and len(checkpoint.active) + len(checkpoint.terminal) > broker.max_terminal_records:
+            raise ValueError("verified checkpoint exceeds identity retention capacity")
 
         status = broker.status()
         if status["tracked_tasks"] or status["terminal_records"] or status["ingress"]["accounted_tasks"]:
@@ -172,11 +174,11 @@ class TenantCheckpointStore:
             task = resident.get(task_id)
             if task is None:
                 raise ValueError(f"active tenant task missing from restored runtime: {task_id}")
-            if task.state in TERMINAL_STATES:
+            if is_terminal(task):
                 raise ValueError(f"active tenant task is terminal in restored runtime: {task_id}")
         for task_id, _tenant in checkpoint.terminal:
             task = resident.get(task_id)
-            if task is not None and task.state not in TERMINAL_STATES:
+            if task is not None and not is_terminal(task):
                 raise ValueError(f"terminal tenant task is active in restored runtime: {task_id}")
 
         with broker._lock:
