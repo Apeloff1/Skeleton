@@ -127,6 +127,8 @@ def review(root,owner,lead,*,identity,witness,decision,now,due):
     with _open(root) as policy:
         policy.execute("BEGIN")
         try:
+            from core.dragon_graph_structural import guard
+            guard(policy)
             if not enabled(policy):
                 policy.execute("COMMIT");return None
             if policy.execute("PRAGMA journal_mode").fetchone()[0].lower()!="delete":

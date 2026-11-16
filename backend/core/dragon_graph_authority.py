@@ -153,12 +153,16 @@ def tables(db,identifier):
 def _fence(db):
     if not db.in_transaction:raise GraphHeld("canonical graph write requires transaction")
     if active(db):
+        from core.dragon_graph_structural import guard
+        guard(db)
         if db.execute("UPDATE main.dragon_graph_authority SET commit_sequence=commit_sequence+1 WHERE singleton=1").rowcount!=1:
             raise GraphHeld("root commit fence missing")
 
 
 def read_fence(db):
     if not db.in_transaction:raise GraphHeld("canonical graph read requires transaction")
+    from core.dragon_graph_structural import guard
+    guard(db)
     if db.execute("SELECT commit_sequence FROM main.dragon_graph_authority WHERE singleton=1").fetchone() is None:
         raise GraphHeld("root read fence missing")
     # Pin each rollback-journal read lock before reading graph rows. Independent
@@ -339,7 +343,8 @@ def provision(root,paths,*,offline_acknowledged=False):
                 child.execute("PRAGMA journal_mode=DELETE")
                 child.execute("PRAGMA synchronous=EXTRA")
                 from core.dragon_graph_direct_writer import SCHEMA as DIRECT_SCHEMA
-                child.executescript(SCHEMA+DIRECT_SCHEMA)
+                from core.dragon_graph_structural import RECEIPT as STRUCTURAL_SCHEMA
+                child.executescript(SCHEMA+DIRECT_SCHEMA+STRUCTURAL_SCHEMA+";")
                 child.execute("INSERT INTO graph_identity VALUES(1,?,?)",(epoch,i))
         _attach_files(db,root,layout)
         db.execute("BEGIN IMMEDIATE")
@@ -375,6 +380,8 @@ def provision(root,paths,*,offline_acknowledged=False):
             db.execute("INSERT INTO main.dragon_graph_authority VALUES(1,?,0)",(json.dumps(layout,separators=(",",":")),))
             from core.dragon_graph_direct_writer import publish_marker
             publish_marker(db,epoch)
+            from core.dragon_graph_structural import publish
+            publish(db,epoch)
             db.execute("COMMIT")
         except BaseException:
             if db.in_transaction:db.execute("ROLLBACK")
@@ -536,8 +543,21 @@ def main():
     recovery=sub.add_parser("recover-probe");recovery.add_argument("--root",required=True);recovery.add_argument("--id",required=True)
     upgrade=sub.add_parser("enable-direct-writers");upgrade.add_argument("--root",required=True)
     upgrade.add_argument("--offline-writers-stopped",action="store_true")
+    structural=sub.add_parser("enable-structural-writers");structural.add_argument("--root",required=True)
+    structural.add_argument("--offline-writers-stopped",action="store_true")
+    repair=sub.add_parser("recover-structural");repair.add_argument("--root",required=True)
+    state=sub.add_parser("structural-status");state.add_argument("--root",required=True)
     a=parser.parse_args()
-    if a.command=="enable-direct-writers":
+    if a.command=="enable-structural-writers":
+        from core.dragon_graph_structural import install
+        receipt=install(a.root,offline_acknowledged=a.offline_writers_stopped)
+    elif a.command=="recover-structural":
+        from core.dragon_graph_structural import recover
+        receipt=recover(a.root)
+    elif a.command=="structural-status":
+        from core.dragon_graph_structural import status
+        receipt=status(a.root)
+    elif a.command=="enable-direct-writers":
         from core.dragon_graph_direct_writer import install
         receipt=install(a.root,offline_acknowledged=a.offline_writers_stopped)
     elif a.command=="provision":receipt=provision(a.root,a.paths,offline_acknowledged=a.offline_writers_stopped)

@@ -260,6 +260,9 @@ class LeadGraph:
             from core.dragon_owner_shards import ShardHeld
             try:
                 if not authority.attach(db,self.path):db.executescript(SCHEMA)
+                else:
+                    from core.dragon_graph_structural import guard
+                    guard(db)
             except (authority.GraphHeld,ShardHeld,OSError) as exc:raise CatalogueHeld("canonical graph topology held") from exc
             try:yield db
             except authority.GraphHeld as exc:raise CatalogueHeld("canonical graph operation held") from exc
@@ -287,6 +290,8 @@ class LeadGraph:
         return self.status(scope)
 
     def _enabled(self,db,owner):
+        from core.dragon_graph_structural import guard
+        guard(db)
         row=db.execute("SELECT * FROM lead_owner WHERE owner=?",(owner,)).fetchone()
         if row is None or not row["enabled"]:raise CatalogueHeld("lead expansion disabled")
         return row
@@ -334,6 +339,8 @@ class LeadGraph:
             partitioned=authority.active(db)
             from core.dragon_graph_direct_writer import enabled
             independent_reviews=enabled(db) if partitioned else False
+            from core.dragon_graph_structural import enabled as structural_enabled
+            independent_structure=structural_enabled(db) if partitioned else False
             record=db.execute("""SELECT enabled,bootstrap_revision,bootstrap_cursor,bootstrapped,nodes,edges,snapshots,due
                 FROM lead_owner WHERE owner=?""",(owner,)).fetchone()
         result=dict(record) if record else {"enabled":0,"bootstrap_revision":None,"bootstrap_cursor":0,"bootstrapped":0,"nodes":0,"edges":0,"snapshots":0,"due":0}
@@ -343,9 +350,12 @@ class LeadGraph:
                 "logical_quota_lanes":LEAD_LANES,"physical_graph_sharding":partitioned,
                 "canonical_write_lanes":LEAD_LANES if partitioned else 1,"coordinated_writer":True,
                 "independent_review_writers":LEAD_LANES if independent_reviews else 0,
+                "independent_structural_writers":LEAD_LANES if independent_structure else 0,
                 "network_authorized":False,"physical_capacity_verified":False}
 
     def bootstrap_pulse(self):
+        from core.dragon_graph_structural import configured,pulse
+        if configured(self.path):return pulse(self.path,"bootstrap")
         revision,inventory=bootstrap_inventory();now=int(time.time())
         _quota_disk(self.path)
         with self._db() as db:
@@ -508,6 +518,13 @@ class LeadGraph:
         # Locator-only leads are retained as historical candidate metadata.
         # Revocation stops future imports, and evidence browsing reports status.
         owner=owner_key(scope);sid=_id(sid)
+        # Pending independent batches contain only catalogue and unscoped
+        # expansion metadata. Revocation must remain available even during a
+        # held structural batch; it operates solely on the root grant ledger.
+        with self.corpus._db() as db:
+            if authority.active(db):
+                result=db.execute("UPDATE lead_snapshots SET state='revoked',expires_at=0 WHERE owner=? AND id=?",(owner,sid))
+                return {"revoked":result.rowcount==1,"candidate_locators_retained":True,"network_authorized":False}
         with self._db() as db:
             result=db.execute("UPDATE lead_snapshots SET state='revoked',expires_at=0 WHERE owner=? AND id=?",(owner,sid))
         return {"revoked":result.rowcount==1,"candidate_locators_retained":True,"network_authorized":False}
@@ -515,12 +532,15 @@ class LeadGraph:
     def dataset_candidates(self,scope,*,after=None,limit=32):
         owner=owner_key(scope);_int(limit,1,100)
         with self._db() as db:
+            if authority.active(db):
+                db.execute("BEGIN");authority.read_fence(db)
             rows=db.execute("""SELECT n.id,n.url,n.title,n.kind,c.first_seen,c.last_seen,
                 t.id AS target_id,t.projection,t.enabled,t.expires_at FROM lead_dataset_candidates c
                 JOIN lead_nodes n ON n.owner=c.owner AND n.id=c.lead
                 LEFT JOIN lead_dynamic_targets t ON t.owner=c.owner AND t.lead=c.lead
                 WHERE c.owner=? AND c.lead>? ORDER BY c.lead LIMIT ?""",
                 (owner,_id(after) if after else "",limit+1)).fetchall()
+            if db.in_transaction:db.execute("COMMIT")
         return {"candidates":[{**dict(r),"network_authorized":False,"source_verified":False} for r in rows[:limit]],
             "next_cursor":rows[limit-1]["id"] if len(rows)>limit else None,
             "network_authorized":False}
@@ -662,6 +682,8 @@ class LeadGraph:
         from core.dragon_release_queue import ReleaseQueue
         now=int(time.time());_quota_disk(self.path)
         with ReleaseQueue(self.path)._db() as db:pass
+        from core.dragon_graph_structural import configured,pulse
+        if configured(self.path):return pulse(self.path,"catalogue")
         with self._db() as db:
             db.execute("BEGIN IMMEDIATE")
             counts={"processed":0,"held":0,"network_executed":False}
@@ -704,14 +726,17 @@ class LeadGraph:
     def expansion_pulse(self):
         """Expand feed-supplied AppIDs without guessing identifiers or fetching."""
         now=int(time.time());_quota_disk(self.path)
+        from core.dragon_graph_structural import configured,pulse
+        parallel=configured(self.path)
+        independent=pulse(self.path,"expansion") if parallel else {"processed":0,"held":0}
         with self._db() as db:
             db.execute("BEGIN IMMEDIATE")
             try:
                 jobs=db.execute("""SELECT j.* FROM lead_expand_jobs j JOIN lead_owner o ON o.owner=j.owner
-                    WHERE j.state='queued' AND o.enabled=1 AND (j.snapshot IS NULL OR EXISTS(
+                    WHERE j.state='queued' AND o.enabled=1 AND (?=0 OR j.snapshot IS NOT NULL) AND (j.snapshot IS NULL OR EXISTS(
                     SELECT 1 FROM lead_snapshots s WHERE s.owner=j.owner AND s.id=j.snapshot AND s.state IN ('open','sealed') AND s.expires_at>?))
-                    ORDER BY j.created_at,j.owner,j.id LIMIT 16""",(now,)).fetchall()
-                processed=0;held=0
+                    ORDER BY j.created_at,j.owner,j.id LIMIT 16""",(int(parallel),now)).fetchall()
+                processed=independent["processed"];held=independent["held"]
                 for job in jobs:
                     db.execute("SAVEPOINT lead_expansion_row")
                     try:

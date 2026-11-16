@@ -198,6 +198,11 @@ async def pulse_lead_graph():
         def work():
             graph=LeadGraph(_maintenance_path("leads"))
             results={}
+            from core.dragon_graph_structural import configured,status,recover
+            if configured(graph.path) and status(graph.path)["state"]=="pending":
+                try:results["structural_recovery"]=recover(graph.path)
+                except (CatalogueHeld,ValueError,sqlite3.Error,OSError):
+                    return {"structural_recovery":{"held":True},"network_executed":False}
             for key,operation in (("bootstrap",graph.bootstrap_pulse),("catalogue",graph.catalogue_pulse),("bundle",graph.bundle_pulse),("expansion",graph.expansion_pulse)):
                 try:results[key]=operation()
                 except (CatalogueHeld,ValueError,sqlite3.Error,OSError):
