@@ -205,9 +205,10 @@ class OfflineRequestQueue:
             # close() may have won the interval after tick acquired custody.
             # No further observation or admission should occur in that case.
             if self._closed:
+                retired = self._sweep(time.monotonic_ns())
                 body = {"schema": SCHEMA, "sequence": self._sequence,
                         "admission_digest": None, "scheduler_digest": self._scheduler.snapshot()["digest"],
-                        "progress": [], "retired": self._sweep(time.monotonic_ns()),
+                        "progress": [], "retired": retired,
                         "capacity": self._scheduler.capacity(), "status": "closed",
                         "kv_accounting": "logical_reservation_only",
                         "executor": "trusted_cooperative_owner",
