@@ -208,3 +208,60 @@ def test_later_staging_error_leaves_exact_durable_intent(tmp_path):
     assert another.inspect()["active_intent"] == intent
     with pytest.raises(WeightShardStoreError, match="unresolved staging intent"):
         another.stage(identity, plan, paths)
+
+ 
+def test_stage_requires_verified_descriptor_durability_before_outcome(tmp_path, monkeypatch):
+    import stat
+    from skeleton.ai.model_runtime import weight_shard_store as module
+
+    store = WeightShardStore(tmp_path / "store")
+    owner = WeightStoreDiskOwner(store, DiskAdmissionPolicy(1 << 20, minimum_free_bytes=0))
+    identity, plan, paths = prepare(tmp_path)
+    original = os.fsync
+    synced_files = set()
+    synced_directories = set()
+
+    def capture(fd):
+        info = os.fstat(fd)
+        if stat.S_ISREG(info.st_mode):
+            synced_files.add((info.st_dev, info.st_ino))
+        elif stat.S_ISDIR(info.st_mode):
+            synced_directories.add((info.st_dev, info.st_ino))
+        return original(fd)
+
+    monkeypatch.setattr(module.os, "fsync", capture)
+    key, receipt = owner.stage(identity, plan, paths)
+    target = store.verified_paths(key)[0]
+    manifest = store.manifests / (key + ".json")
+    assert receipt["durable_outcome_digest"] == owner.inspect()["last_outcome"]["digest"]
+    for path in (target, manifest):
+        info = path.stat()
+        assert (info.st_dev, info.st_ino) in synced_files
+    for path in (target.parent, store.objects, store.manifests, store.root):
+        info = path.stat()
+        assert (info.st_dev, info.st_ino) in synced_directories
+    assert not list(target.parent.glob("*.tmp"))
+    assert owner.inspect()["active_intent"] is None
+
+
+def test_failed_durability_barrier_retains_exact_intent(tmp_path, monkeypatch):
+    from skeleton.ai.model_runtime import weight_shard_store as module
+
+    store = WeightShardStore(tmp_path / "store")
+    owner = WeightStoreDiskOwner(store, DiskAdmissionPolicy(1 << 20, minimum_free_bytes=0))
+    identity, plan, paths = prepare(tmp_path)
+    original = store.verified_paths
+
+    def fail_at_final_verification(key, **kwargs):
+        assert kwargs["_durable"] is True
+        with monkeypatch.context() as patch:
+            patch.setattr(module.os, "fsync", lambda fd: (_ for _ in ()).throw(OSError("fixture sync failure")))
+            return original(key, **kwargs)
+
+    monkeypatch.setattr(store, "verified_paths", fail_at_final_verification)
+    with pytest.raises(WeightShardStoreError):
+        owner.stage(identity, plan, paths)
+    observed = owner.inspect()
+    assert observed["active_intent"]["plan_digest"] == plan.digest
+    assert observed["last_outcome"] is None
+    assert (store.manifests / (plan.digest + ".json")).exists()
