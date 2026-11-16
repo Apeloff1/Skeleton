@@ -2500,7 +2500,9 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             raise CrawlerError("crawler_treasury_changed", "Source permission expired during reparse.", 409)
         return {"ok": True, **result}
 
-    async def acquisition_hold_catalog(self, scope: dict[str, str]) -> dict:
+    async def acquisition_hold_catalog(self, scope: dict[str, str], *,
+                                       peer_hosts: tuple[str, ...] | None = None,
+                                       exclude_session: str | None = None) -> dict:
         """Read-only, owner-scoped audit of committed grant-wide holds.
 
         A current-code witnessed checkpoint is required. No recovery write,
@@ -2513,6 +2515,12 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         _, run_type = _core()
         query = {**scope, "status": {"$nin": ["deleted", "cancelled"]},
                  "consent_expires_at": {"$gt": at}}
+
+        if peer_hosts is not None:
+            if not 1 <= len(peer_hosts) <= 16 or not exclude_session:
+                raise ValueError("invalid peer acquisition audit scope")
+            query["request.allowed_hosts"] = {"$in": list(peer_hosts)}
+            query["_id"] = {"$ne": exclude_session}
 
         async def catalogue():
             return await (self.sessions.find(query, {"_id": 1, "version": 1})
@@ -2580,6 +2588,29 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                 "holds": [holds[key] for key in sorted(holds)],
                 "reason_inferred": False, "network_executed": False,
                 "dispatch_lock": False, "network_authority_expanded": False}
+
+    async def _guard_peer_acquisition(self, scope: dict[str, str], row: dict) -> None:
+        """Deny dispatch when a witnessed overlapping expedition is held.
+
+        Called only after claiming the existing owner slice credit, before
+        claiming a global worker slot or commencing IO. Owner-credit
+        serialization is not a cross-tenant host lock. Unqualified overlapping
+        snapshots must not be treated as permission to dispatch.
+        """
+        hosts = tuple(row["request"]["allowed_hosts"])
+        try:
+            report = await asyncio.wait_for(
+                self.acquisition_hold_catalog(scope, peer_hosts=hosts,
+                                              exclude_session=row["_id"]), timeout=8)
+        except TimeoutError as exc:
+            raise CrawlerError("crawler_peer_acquisition_unavailable",
+                               "Peer acquisition audit timed out; no request started.", 503) from exc
+        if report["capacity_reached"] or report["excluded_sessions"]:
+            raise CrawlerError("crawler_peer_acquisition_unavailable",
+                               "Overlapping acquisition revisions are not qualified.", 409)
+        if any(hold["host"] in hosts for hold in report["holds"]):
+            raise CrawlerError("crawler_peer_acquisition_held",
+                               "Another current expedition has a conserved host hold.", 409)
 
     async def companion_sanctuary(self, scope: dict[str, str]) -> dict:
         """Bounded cross-expedition collection, using only current source consent.
@@ -3343,6 +3374,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                 raise CrawlerError(
                     "crawler_capacity", "This account already has an active bounded crawler slice.", 429
                 )
+            await self._guard_peer_acquisition(scope, row)
             global_credit = None
             for index in range(capacity.limit):
                 slot = "crawler-slice:" + str(index)
