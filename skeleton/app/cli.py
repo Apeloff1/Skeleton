@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import subprocess
 from collections.abc import Sequence
@@ -425,15 +426,28 @@ def _run_compose(
     root: Path,
     *,
     env_overrides: dict[str, str] | None = None,
+    process_env: dict[str, str] | None = None,
 ) -> int:
-    env = os.environ.copy()
+    env = dict(os.environ if process_env is None else process_env)
     if env_overrides:
         env.update(env_overrides)
     # An inherited Compose setting must not remove an older Chroma container
     # that is now an orphan and may own the only copy of writable /data.
     env["COMPOSE_REMOVE_ORPHANS"] = "0"
-    completed = subprocess.run(list(command), cwd=root, check=False, env=env)
-    return int(completed.returncode)
+    if "--env-file" in command:
+        env["COMPOSE_DISABLE_ENV_FILE"] = "0"
+        env["COMPOSE_PROFILES"] = ""
+        env.pop("COMPOSE_ENV_FILES", None)
+    try:
+        completed = subprocess.run(list(command), cwd=root, check=False, env=env)
+    except (OSError, subprocess.SubprocessError) as exc:
+        print("Compose operation failed: " + type(exc).__name__)
+        return 1
+    status = getattr(completed, "returncode", None)
+    if type(status) is not int or not 0 <= status <= 255:
+        print("Compose operation returned an uncertain process status")
+        return 1
+    return status
 
 
 def run_app_cli(argv: Sequence[str] | None = None) -> int:
@@ -1175,16 +1189,37 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             print("--production and --hot are mutually exclusive")
             return 2
         # Invalid verification budgets must never start containers first.
-        if args.verify_attempts < 1 or not 0 <= args.verify_delay <= 60:
-            print("startup verification requires positive attempts and delay from 0 to 60 seconds")
+        if not 1 <= args.verify_attempts <= 120 or not math.isfinite(args.verify_delay) or not 0 <= args.verify_delay <= 30:
+            print("startup verification requires 1 to 120 attempts and delay from 0 to 30 seconds")
             return 2
-        checks = preflight(root, runtime=True, manifest=manifest)
+        from skeleton.app.setup_runtime import runtime_source_fingerprint
+
+        process_env = dict(os.environ)
+        try:
+            admitted = runtime_source_fingerprint(root)
+        except (OSError, ValueError, UnicodeError):
+            print("application start aborted: private runtime configuration unavailable; run app setup first")
+            return 2
+
+        def source_stable():
+            try:
+                return runtime_source_fingerprint(root) == admitted
+            except (OSError, ValueError, UnicodeError):
+                return False
+
+        def changed():
+            print("application start cannot be qualified: runtime configuration changed; preserve existing services and .env")
+            return 2
+
+        checks = preflight(root, runtime=True, manifest=manifest, environ=process_env)
         if not checks_ok(checks):
             for check in checks:
                 if not check.ok and check.required:
                     print(f"[FAIL] {check.message}")
             print("application start aborted: runtime preflight failed")
             return 1
+        if not source_stable():
+            return changed()
         from skeleton.app.preloader import inspect_host
 
         host = inspect_host(root, require_pip=False)
@@ -1194,7 +1229,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                     print(f"[FAIL] {check.detail}; {check.remediation}")
             return 1
         try:
-            manifest = runtime_manifest(manifest, root=root)
+            manifest = runtime_manifest(manifest, root=root, environ=process_env)
         except (OSError, ValueError, UnicodeError):
             print("application start aborted: runtime configuration changed or is unsafe")
             return 2
@@ -1206,15 +1241,21 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 full=bool(args.full),
                 build=not bool(args.no_build),
                 hot=bool(args.hot),
+                install_env=True,
             )
         except ValueError as exc:
             print(str(exc))
             return 1
+        if not source_stable():
+            return changed()
         exit_code = _run_compose(
             startup_command,
             root,
             env_overrides=manifest.mode_env(mode),
+            process_env=process_env,
         )
+        if not source_stable():
+            return changed()
         if exit_code or bool(args.no_verify):
             return exit_code
 
@@ -1232,6 +1273,8 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             print(f"invalid startup verification budget: {exc}")
             return 2
 
+        if not source_stable():
+            return changed()
         for result in results:
             status = result.status if result.status is not None else "-"
             print(
@@ -1239,6 +1282,13 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 f"{result.service:<10} status={status} {result.url} {result.detail}"
             )
         if probes_ok(results):
+            from skeleton.app.first_install import critical_backend_route_report
+            registry = critical_backend_route_report(manifest.service("backend").public_url, timeout=3.0)
+            if not source_stable():
+                return changed()
+            if registry["ready"] is not True:
+                print("application start: critical API routers missing or unverified; inspect app doctor --live")
+                return 1
             print("application services: ready; AI availability is reported separately by app doctor --live")
             return 0
         print("application start: services launched but readiness verification failed")

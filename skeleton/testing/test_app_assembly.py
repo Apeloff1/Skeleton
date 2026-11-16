@@ -1385,3 +1385,119 @@ def test_host_command_rejects_malformed_exit_status(status):
                             remediation="repair", runner=lambda *a, **k: SimpleNamespace(returncode=status))
     assert result.ok is False
     assert result.detail == "Docker returned invalid process status"
+
+
+
+def _prepare_cli_start(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from skeleton.app import cli
+    config = tmp_path / ".env"
+    config.write_text("FRONTEND_PORT=3000\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "find_repo_root", lambda: tmp_path)
+    monkeypatch.setattr(cli, "preflight", lambda *a, **k: ())
+    monkeypatch.setattr("skeleton.app.preloader.inspect_host", lambda *a, **k: SimpleNamespace(ready=True))
+    return config
+
+
+@pytest.mark.parametrize("options", [
+    ["--verify-attempts", "121"], ["--verify-attempts", "0"],
+    ["--verify-delay", "31"], ["--verify-delay", "nan"], ["--verify-delay", "inf"],
+])
+def test_cli_start_rejects_entire_invalid_probe_budget_before_mutation(tmp_path, monkeypatch, options):
+    from skeleton.app import cli
+    _prepare_cli_start(tmp_path, monkeypatch)
+    def forbidden(*a, **k):
+        pytest.fail("invalid startup budget reached preflight or mutation")
+    monkeypatch.setattr(cli, "preflight", forbidden)
+    monkeypatch.setattr(cli, "_run_compose", forbidden)
+    assert cli.run_app_cli(["up", *options]) == 2
+
+
+@pytest.mark.parametrize("stage", ["preflight", "manifest", "compose", "health", "registry"])
+def test_cli_start_cannot_qualify_changed_configuration(tmp_path, monkeypatch, stage):
+    from skeleton.app import cli
+    from skeleton.app.health import ProbeResult
+    config = _prepare_cli_start(tmp_path, monkeypatch)
+    seen = []
+
+    def observe(name):
+        seen.append(name)
+        if stage == name:
+            config.write_text("FRONTEND_PORT=3300\n", encoding="utf-8")
+
+    real_manifest = cli.runtime_manifest
+    def preflight(*a, **k):
+        observe("preflight")
+        return ()
+    def manifest(*a, **k):
+        result = real_manifest(*a, **k)
+        observe("manifest")
+        return result
+    def compose(command, root, **kw):
+        assert "--env-file" in command
+        observe("compose")
+        return 0
+    def health(**kw):
+        observe("health")
+        return (ProbeResult("backend", "http://localhost:8001/api/health", True, 200, "ok"),)
+    def registry(*a, **k):
+        observe("registry")
+        return {"ready": True}
+
+    monkeypatch.setattr(cli, "preflight", preflight)
+    monkeypatch.setattr(cli, "runtime_manifest", manifest)
+    monkeypatch.setattr(cli, "_run_compose", compose)
+    monkeypatch.setattr("skeleton.app.health.wait_for_application", health)
+    monkeypatch.setattr("skeleton.app.first_install.critical_backend_route_report", registry)
+    assert cli.run_app_cli(["up"]) == 2
+    assert seen == ["preflight", "manifest", "compose", "health", "registry"][:seen.index(stage)+1]
+
+
+def test_cli_no_verify_does_not_bypass_configuration_epoch(tmp_path, monkeypatch):
+    from skeleton.app import cli
+    config = _prepare_cli_start(tmp_path, monkeypatch)
+    def compose(*a, **kw):
+        config.write_text("FRONTEND_PORT=3300\n")
+        return 0
+    monkeypatch.setattr(cli, "_run_compose", compose)
+    assert cli.run_app_cli(["up", "--no-verify"]) == 2
+
+
+@pytest.mark.parametrize("ready", [True, False])
+def test_cli_start_requires_critical_routes_not_only_healthy_socket(tmp_path, monkeypatch, ready):
+    from skeleton.app import cli
+    from skeleton.app.health import ProbeResult
+    _prepare_cli_start(tmp_path, monkeypatch)
+    monkeypatch.setattr(cli, "_run_compose", lambda *a, **k: 0)
+    monkeypatch.setattr("skeleton.app.health.wait_for_application", lambda **k: (
+        ProbeResult("backend", "http://localhost:8001/api/health", True, 200, "ok"),
+    ))
+    monkeypatch.setattr("skeleton.app.first_install.critical_backend_route_report", lambda *a, **k: {"ready": ready})
+    assert cli.run_app_cli(["up"]) == (0 if ready else 1)
+
+
+@pytest.mark.parametrize("status", [False, True, "0", None, -9, 2**40])
+def test_cli_compose_rejects_uncertain_process_status(tmp_path, monkeypatch, status):
+    from types import SimpleNamespace
+    from skeleton.app import cli
+    monkeypatch.setattr(cli.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=status))
+    assert cli._run_compose(("docker", "compose", "up"), tmp_path) == 1
+
+
+def test_cli_compose_pins_original_process_environment(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from skeleton.app import cli
+    captured = {"FRONTEND_PORT": "3000", "COMPOSE_ENV_FILES": "elsewhere.env",
+                "COMPOSE_REMOVE_ORPHANS": "1", "COMPOSE_PROFILES": "full"}
+    monkeypatch.setenv("FRONTEND_PORT", "3300")
+    def subprocess_run(*a, **kw):
+        env = kw["env"]
+        assert env["FRONTEND_PORT"] == "3000"
+        assert "COMPOSE_ENV_FILES" not in env
+        assert env["COMPOSE_REMOVE_ORPHANS"] == "0"
+        assert env["COMPOSE_PROFILES"] == ""
+        assert env["COMPOSE_DISABLE_ENV_FILE"] == "0"
+        return SimpleNamespace(returncode=0)
+    monkeypatch.setattr(cli.subprocess, "run", subprocess_run)
+    assert cli._run_compose(("docker", "compose", "--env-file", ".env", "up"), tmp_path,
+                            process_env=captured) == 0
