@@ -232,7 +232,7 @@ class NativeAdapterTests(unittest.TestCase):
 
     def test_preemption_discards_unmerged_factors(self):
         candidate=runtime()
-        def stop():
+        def stop(*_args):
             raise ShadowTrainingPaused("preempt")
         with patch("skeleton.ai.training.native_adapter_learning._update",side_effect=stop):
             with self.assertRaises(ShadowTrainingPaused):
