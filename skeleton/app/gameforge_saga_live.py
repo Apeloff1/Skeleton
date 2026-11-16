@@ -56,6 +56,11 @@ def _menu(stream: TextIO, stored: dict, view: dict) -> None:
                                     "score": episode["score"], "target": episode["target_score"],
                                     "hull": episode["hull"], "threat": episode["threat"],
                                     "standings": episode["standings"], "remaining": episode["remaining"]})
+        elif episode["kind"] in {"timed_season", "delivery_chain"}:
+            _json(stream, "ROUND", {"objective": oid, "kind": episode["kind"],
+                                    "round": episode["next_round"], "score": episode["score"],
+                                    "standings": episode["standings"], "remaining": episode["remaining"],
+                                    "course_progress": episode["course_progress"]})
         else:
             _json(stream, "CONVOY", {"objective": oid, "hull": episode["hull"],
                                     "threat": episode["threat"], "waypoint": episode["waypoint"],
