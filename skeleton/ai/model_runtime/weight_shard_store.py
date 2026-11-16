@@ -116,11 +116,11 @@ class WeightShardStore:
     """Immutable CAS with deterministic manifests and bounded stream memory."""
 
     def __init__(self, directory: str | Path, *, maximum_bytes: int = MAX_WEIGHT_BYTES,
-                 read_only: bool = False) -> None:
+                 read_only: bool = False, create: bool = True) -> None:
         if isinstance(maximum_bytes, bool) or not isinstance(maximum_bytes, int) or not 1 <= maximum_bytes <= MAX_WEIGHT_BYTES:
             raise WeightShardStoreError("invalid weight-storage budget")
-        if type(read_only) is not bool:
-            raise WeightShardStoreError("read-only store selection must be boolean")
+        if type(read_only) is not bool or type(create) is not bool:
+            raise WeightShardStoreError("weight store open mode must be boolean")
         self.root = Path(directory).absolute()
         self.objects = self.root / "objects"
         self.manifests = self.root / "manifests"
@@ -129,7 +129,7 @@ class WeightShardStore:
         # read-only opening never invokes mkdir, even for a missing layout.
         self._layout = {}
         for path in (self.root, self.objects, self.manifests):
-            if not read_only:
+            if create and not read_only:
                 try:
                     path.mkdir(mode=0o700, parents=path == self.root, exist_ok=True)
                 except OSError as exc:
@@ -291,8 +291,9 @@ class WeightShardStore:
         # direct staging must not bypass its admission and accounting.
         # The private checkpoint is a trusted-code composition boundary,
         # not protection against arbitrary code inside the interpreter.
-        marker = self.root / ".weight-stage.lock"
-        if (marker.exists() or marker.is_symlink()) and _write_checkpoint is None:
+        markers = (self.root / ".weight-stage.lock", self.root / ".weight-stage-policy.json",
+                   self.root / ".weight-stage-intent.json")
+        if any(marker.exists() or marker.is_symlink() for marker in markers) and _write_checkpoint is None:
             raise WeightShardStoreError("managed weight store requires cooperative disk owner")
         if not isinstance(identity, ModelIdentity) or not isinstance(plan, WeightLoadPlan):
             raise WeightShardStoreError("model identity and weight load plan required")
