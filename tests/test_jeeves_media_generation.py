@@ -120,8 +120,9 @@ def test_logmel_frontend_is_finite_and_signal_dependent():
     t=np.arange(512,dtype=np.float32)
     first=np.sin(2*np.pi*t/8)[None,:].astype(np.float32)
     second=np.sin(2*np.pi*t/32)[None,:].astype(np.float32)
-    filters=np.ones((16,65),dtype=np.float32)
-    filters[:,32:]*=0.01
+    filters=np.full((16,65),.001,dtype=np.float32)
+    filters[:8,2:8]=1
+    filters[8:,12:20]=1
     geo={"n_fft":128,"hop":64,"mel_bins":16}
     a=logmel(first,geo,filters);b=logmel(second,geo,filters)
     assert a.shape==b.shape==(1,16,8)
