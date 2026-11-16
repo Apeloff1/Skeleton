@@ -559,7 +559,7 @@ class OfflineHTTPApplication:
                 if len(text.encode("utf-8")) > 1024:
                     raise OfflineHTTPError(400, "grounded query exceeds 1024 bytes")
                 try:
-                    hits = self.knowledge.search(text, limit=2, document_ids=document_ids)
+                    hits = self.knowledge.search(text, limit=2, document_ids=document_ids,evidence_excerpt=True)
                 except RuntimeContractError:
                     raise OfflineHTTPError(422, "selected local reference unavailable") from None
                 if not hits:
@@ -1049,7 +1049,7 @@ class OfflineHTTPApplication:
                     query = message.strip()
                     try:
                         hits = self.knowledge.search(
-                            query, limit=2, document_ids=document_ids,
+                            query, limit=2, document_ids=document_ids,evidence_excerpt=True,
                         )
                     except RuntimeContractError:
                         raise OfflineHTTPError(422, "selected local reference unavailable") from None

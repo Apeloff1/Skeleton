@@ -389,11 +389,14 @@ class OfflineKnowledgeLibrary:
         raise RuntimeContractError("unknown local reference document")
 
     def search(self, query: str, *, limit: int = 6,
-               document_ids: tuple[str, ...] | list[str] | None = None
+               document_ids: tuple[str, ...] | list[str] | None = None,
+               evidence_excerpt: bool = False
                ) -> list[dict[str, Any]]:
         if (not isinstance(query, str) or not query.strip()
                 or len(query.encode("utf-8")) > MAX_QUERY_BYTES):
             raise RuntimeContractError("invalid local reference query")
+        if type(evidence_excerpt) is not bool:
+            raise RuntimeContractError("explicit semantic evidence excerpt mode required")
         if type(limit) is not int or not 1 <= limit <= 12:
             raise RuntimeContractError("invalid reference search limit")
         # Do not fall back to the entire library if an explicitly selected
@@ -412,7 +415,7 @@ class OfflineKnowledgeLibrary:
             records = [row for row in records if row[0] in selected_set]
             documents = [row for row in documents if row[0] in selected_set]
         if self._semantic_ranker is not None:
-            return self._semantic_search(query,documents,records,limit=limit,selected=selected)
+            return self._semantic_search(query,documents,records,limit=limit,selected=selected,evidence_excerpt=evidence_excerpt)
         if not terms:
             return []
         corpus: list[tuple[tuple[Any, ...], set[str], dict[str, int]]] = []
@@ -447,7 +450,7 @@ class OfflineKnowledgeLibrary:
         scored.sort(key=lambda hit: (-hit.score, hit.document_id, hit.chunk_index))
         return [hit.to_dict() for hit in scored[:limit]]
 
-    def _semantic_search(self,query,documents,records,*,limit,selected):
+    def _semantic_search(self,query,documents,records,*,limit,selected,evidence_excerpt):
         from collections import defaultdict
         from skeleton.retrieval.semantic_long_context import document_spans
         policy=self._semantic_ranker.policy
@@ -463,6 +466,14 @@ class OfflineKnowledgeLibrary:
                 for source_id,title,pin,body,_ in documents:
                     spans.extend(document_spans(source_id,pin,body,by_source[source_id],policy))
                 ranked,proof=self._semantic_ranker.search(query,spans,limit=limit,cache=self._semantic_cache)
+                results=[]
+                for row,score in ranked:
+                    start,end=(0,len(row.text))
+                    if evidence_excerpt:
+                        from .offline_grounding import MAX_EXCERPT_CHARS
+                        start,end=self._semantic_ranker.evidence_excerpt(query,row,max_chars=MAX_EXCERPT_CHARS)
+                    results.append(LocalKnowledgeHit(row.source_id,titles[row.source_id],row.revision,row.ordinal,
+                                                     row.start+start,row.start+end,row.text[start:end],score).to_dict())
                 observed,_=self._verified_snapshot()
                 if selected is not None:
                     observed=[row for row in observed if row[0] in set(selected)]
@@ -472,8 +483,7 @@ class OfflineKnowledgeLibrary:
                     raise RuntimeContractError("semantic source authority changed during retrieval")
             except (ValueError,MemoryError,OSError) as exc:
                 raise RuntimeContractError("bounded learned semantic retrieval failed") from exc
-        return [LocalKnowledgeHit(row.source_id,titles[row.source_id],row.revision,row.ordinal,
-                                 row.start,row.end,row.text,score).to_dict() for row,score in ranked]
+        return results
 
 
 __all__ = [

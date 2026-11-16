@@ -233,6 +233,8 @@ class ContextualRanker:
                                    (parent,eligible,0.35)):
             order=sorted(pool,key=lambda i:(-scores[i],keys[i]))[:p.candidate_pool]
             for pos,i in enumerate(order,1):rank_sum[i]+=weight/(20+pos)
+        for i in sorted((j for j in eligible if exact[j]),key=lambda j:(-exact[j],-lexical[j],keys[j]))[:p.candidate_pool]:
+            rank_sum[i]+=0.04
         pool=sorted(rank_sum,key=lambda i:(-exact[i],-rank_sum[i],keys[i]))[:p.candidate_pool]
         # Neighbor expansion adds only exact nearby leaves. This permits
         # antecedent/definition recovery around a selected semantic match.
@@ -257,7 +259,7 @@ class ContextualRanker:
             for i in remaining:
                 row=spans[i]
                 if any(row.source_id==spans[j].source_id and row.revision==spans[j].revision and
-                       row.start<spans[j].end and spans[j].start<row.end for j in selected):
+                       max(0,min(row.end,spans[j].end)-max(row.start,spans[j].start))*3>=min(row.end-row.start,spans[j].end-spans[j].start) for j in selected):
                     continue
                 redundancy=max((max(0.0,float(dense[i]@dense[j])) for j in selected),default=0.0)
                 adjacent=any(spans[j].source_id==row.source_id and spans[j].revision==row.revision and abs(spans[j].ordinal-row.ordinal)==1 for j in selected)
@@ -280,3 +282,39 @@ class ContextualRanker:
                  "semantic_entailment_verified":False}
         receipt["receipt_sha256"]=_digest(receipt)
         return rows,receipt
+
+    def evidence_excerpt(self,query,span:SemanticSpan,*,max_chars=220):
+        """Select real contextual token windows within the winning exact leaf.
+
+        Preserve exact character anchors, including paraphrase hits with no
+        lexical match, before the existing offline grounded-turn compiler.
+        """
+        import numpy as np
+        if not isinstance(span,SemanticSpan) or type(max_chars) is not int or not 32<=max_chars<=600:
+            raise ValueError("bounded evidence excerpt required")
+        if len(span.text)<=max_chars:
+            return 0,len(span.text)
+        q,qmulti=_as_embedding(self.encoder.query(query,segments=16),self.encoder.policy.dimension,16)
+        stop=len(span.text)-max_chars
+        starts=set(range(0,stop+1,max_chars//3))
+        starts.update((0,stop))
+        anchors=set(t for t in terms(query) if any(ch.isdigit() for ch in t) or any(ch in "-_.:" for ch in t))
+        # Add exact phrase/identifier-centered candidates without altering
+        # original Unicode source coordinates.
+        for m in _WORD.finditer(span.text):
+            if set(terms(m.group())).intersection(anchors):
+                starts.add(max(0,min(stop,m.start()-max_chars//3)))
+        if len(starts)>256:
+            raise ValueError("semantic excerpt candidate limit exceeded")
+        starts=sorted(starts)
+        ranges=[(span.local_start+x,span.local_start+x+max_chars) for x in starts]
+        vectors=self.encoder.spans(span.context,ranges,segments=self.policy.segments)
+        ranked=[]
+        qterms=set(terms(query))
+        for start,vec in zip(starts,vectors):
+            dense,multi=_as_embedding(vec,self.encoder.policy.dimension,self.policy.segments)
+            wordset=set(terms(span.text[start:start+max_chars]))
+            score=.55*float(dense@q)+.35*float((qmulti@multi.T).max(axis=1).mean())+.10*len(qterms&wordset)/max(1,len(qterms))
+            ranked.append((len(anchors&wordset),score,-start))
+        start=-max(ranked)[2]
+        return start,start+max_chars
