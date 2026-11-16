@@ -1755,3 +1755,163 @@ def test_alternative_policy_seal_is_covered_by_tenant_checksum():
     archive["archive_checksum"]=manager._archive_checksum({k:v for k,v in archive.items() if k!="archive_checksum"})
     with pytest.raises(ValueError,match="checksum"):
         SwarmRecoveryManager.from_archive(archive)
+
+
+def _host_wait_driver_fixture(tmp_path, *, clock, key=b"k" * 32):
+    from skeleton.testing.test_durable_run_store import make_store
+    from skeleton.automation.agents.swarm_durable import HostWaitDriver, SwarmDurableBridge
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    runtime, broker = _verified_dispatch_fixture()
+    store = make_store(tmp_path)
+    store.create_run("host-wait")
+    store.claim_run("host-wait", "owner", lease_seconds=60)
+    bridge = SwarmDurableBridge(store)
+    manager = SwarmRecoveryManager(delta_archive=True)
+    driver = HostWaitDriver(bridge, "host-wait", "owner", manager, broker,
+                            source_keys={("a", "source"): key}, clock_ms=clock)
+    return runtime, broker, bridge, manager, driver
+
+
+def test_host_timer_restarts_and_releases_only_due_exact_tasks(tmp_path):
+    from skeleton.testing.test_durable_run_store import make_store
+    from skeleton.automation.agents.swarm_durable import HostWaitDriver, HostWaitIntent, SwarmDurableBridge
+    from skeleton.automation.agents.swarm_broker import SwarmBroker
+    from skeleton.automation.agents.swarm_tenant_broker import TenantSwarmBroker
+    from skeleton.automation.agents.swarm_runtime import SwarmTask
+    now = [10]
+    runtime, broker, bridge, manager, driver = _host_wait_driver_fixture(tmp_path, clock=lambda: now[0])
+    for name, deadline in (("late", 30), ("a-early", 20), ("b-early", 20)):
+        intent = HostWaitIntent("host-wait", "a", name, "timer", "host-clock", "deadline", deadline)
+        assert driver.submit(intent, SwarmTask(name, {}))
+    assert driver.poll_due_timers() == ()
+    reloaded_bridge = SwarmDurableBridge(make_store(tmp_path))
+    loaded = reloaded_bridge.load("host-wait")
+    recovered = loaded.restore_runtime()
+    replacement = TenantSwarmBroker(SwarmBroker(recovered, verify_worker=lambda *args: True),
+                                   broker.ingress.fork_empty(), verified_mode=True)
+    loaded.manager.restore_tenants(replacement)
+    restarted = HostWaitDriver(reloaded_bridge, "host-wait", "owner", loaded.manager,
+                               replacement, source_keys={}, clock_ms=lambda: now[0])
+    now[0] = 20
+    assert restarted.poll_due_timers(limit=1) == ("a-early",)
+    assert restarted.poll_due_timers(limit=1) == ("b-early",)
+    assert restarted.poll_due_timers() == ()
+    now[0] = 30
+    assert restarted.poll_due_timers() == ("late",)
+    final = reloaded_bridge.load("host-wait").restore_runtime()
+    for name in ("late", "a-early", "b-early"):
+        assert not final.dispatch_blocked(name)
+        assert final.task(name).wake_receipt_sha256
+
+
+def test_host_event_rejects_forgery_cross_scope_future_and_conflicting_receipt(tmp_path):
+    from dataclasses import replace
+    from skeleton.automation.agents.swarm_durable import HostEventReceipt, HostWaitIntent, DurableSwarmError
+    from skeleton.automation.agents.swarm_runtime import SwarmTask
+    runtime, broker, bridge, manager, driver = _host_wait_driver_fixture(tmp_path, clock=lambda: 50)
+    intent = HostWaitIntent("host-wait", "a", "event", "event", "source", "finished", 20, 60)
+    other = replace(intent, task_id="other")
+    for wait in (intent, other):
+        assert driver.submit(wait, SwarmTask(wait.task_id, {}))
+    with pytest.raises(DurableSwarmError):
+        driver.submit(replace(intent, tenant="b", task_id="outside"), SwarmTask("outside", {}))
+    receipt = HostEventReceipt.issue(intent, event_id="one", evidence_sha256="a" * 64,
+                                     observed_ms=40, source_key=b"k" * 32)
+    forged = HostEventReceipt.issue(intent, event_id="one", evidence_sha256="a" * 64,
+                                    observed_ms=40, source_key=b"x" * 32)
+    future = HostEventReceipt.issue(intent, event_id="two", evidence_sha256="a" * 64,
+                                    observed_ms=55, source_key=b"k" * 32)
+    old = HostEventReceipt.issue(intent, event_id="old", evidence_sha256="a" * 64,
+                                 observed_ms=19, source_key=b"k" * 32)
+    for invalid in (forged, future, old, replace(receipt, evidence_sha256="b" * 64)):
+        with pytest.raises(DurableSwarmError):
+            driver.deliver_event("a", "event", invalid)
+    with pytest.raises(DurableSwarmError):
+        driver.deliver_event("a", "other", receipt)
+    assert runtime.dispatch_blocked("event")
+    driver.deliver_event("a", "event", receipt)
+    driver.deliver_event("a", "event", receipt)
+    assert not runtime.dispatch_blocked("event")
+    assert runtime.dispatch_blocked("other")
+    conflicting = HostEventReceipt.issue(intent, event_id="different", evidence_sha256="a" * 64,
+                                         observed_ms=40, source_key=b"k" * 32)
+    with pytest.raises(DurableSwarmError):
+        driver.deliver_event("a", "event", conflicting)
+    assert bridge.load("host-wait").restore_runtime().task("event").wake_receipt_sha256 == receipt.digest
+
+
+def test_host_timer_refuses_unbound_or_forged_envelope(tmp_path):
+    from skeleton.automation.agents.swarm_durable import HostWaitIntent, DurableSwarmError
+    from skeleton.automation.agents.swarm_runtime import SwarmTask
+    runtime, broker, bridge, manager, driver = _host_wait_driver_fixture(tmp_path, clock=lambda: 50)
+    intent = HostWaitIntent("host-wait", "a", "forged", "timer", "host-clock", "deadline", 20)
+    assert bridge.submit_unique_verified(
+        "host-wait", "owner", manager, broker, "a",
+        SwarmTask("forged", {"_jeeves_host_wait_v1": intent.record()}, wait_intent_sha256="a" * 64),
+    )
+    with pytest.raises(DurableSwarmError, match="identity"):
+        driver.poll_due_timers()
+    assert runtime.dispatch_blocked("forged")
+
+
+def test_verified_normal_completion_persists_before_success_ack(tmp_path):
+    from skeleton.intelligence.dispatch_policy import DispatchCandidate
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, TaskState
+    runtime, broker, bridge, manager, driver = _host_wait_driver_fixture(tmp_path, clock=lambda: 50)
+    bridge.submit_unique_verified("host-wait", "owner", manager, broker, "a", SwarmTask("normal", {}))
+    _, task, _ = bridge.lease_and_capture_verified(
+        "host-wait", "owner", manager, broker,
+        (DispatchCandidate("normal", "a", 100, 0),), now_ms=10000,
+    )
+    result, _ = bridge.finish_and_capture_verified(
+        "host-wait", "owner", manager, broker, "a", "normal",
+        worker_id=task.leased_to, lease_token=task.lease_token, outcome="success",
+        evidence_sha256="a" * 64,
+    )
+    assert result.state is TaskState.SUCCEEDED
+    assert bridge.load("host-wait").restore_runtime().task("normal").state is TaskState.SUCCEEDED
+
+
+def test_verified_completion_ambiguous_write_retires_and_restores_attempt():
+    from skeleton.automation.agents.swarm_durable import SwarmDurableBridge, DurableSwarmError
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.automation.agents.swarm_runtime import SwarmTask
+    from skeleton.intelligence.dispatch_policy import DispatchCandidate
+    runtime, broker = _verified_dispatch_fixture()
+    store = _DispatcherCheckpointFixture()
+    bridge = SwarmDurableBridge(store)
+    manager = SwarmRecoveryManager(delta_archive=True)
+    bridge.submit_unique_verified("run", "owner", manager, broker, "a", SwarmTask("normal", {}))
+    _, task, _ = bridge.lease_and_capture_verified(
+        "run", "owner", manager, broker, (DispatchCandidate("normal", "a", 100, 0),), now_ms=10000,
+    )
+    store.fail = True
+    with pytest.raises(DurableSwarmError, match="restore"):
+        bridge.finish_and_capture_verified(
+            "run", "owner", manager, broker, "a", "normal", worker_id=task.leased_to,
+            lease_token=task.lease_token, outcome="success", evidence_sha256="a" * 64,
+        )
+    assert broker.is_retired()
+    assert bridge.load("run").restore_runtime().task("normal").effect_uncertain
+
+
+def test_verified_uncertain_reconciliation_durable_retry(tmp_path):
+    from skeleton.intelligence.dispatch_policy import DispatchCandidate
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, TaskState
+    runtime, broker, bridge, manager, driver = _host_wait_driver_fixture(tmp_path, clock=lambda: 50)
+    bridge.submit_unique_verified("host-wait", "owner", manager, broker, "a", SwarmTask("retry", {}))
+    _, task, _ = bridge.lease_and_capture_verified(
+        "host-wait", "owner", manager, broker, (DispatchCandidate("retry", "a", 100, 0),), now_ms=10000,
+    )
+    uncertain, _ = bridge.finish_and_capture_verified(
+        "host-wait", "owner", manager, broker, "a", "retry", worker_id=task.leased_to,
+        lease_token=task.lease_token, outcome="uncertain", evidence_sha256="a" * 64,
+    )
+    assert uncertain.effect_uncertain
+    retry, _ = bridge.reconcile_and_capture_verified(
+        "host-wait", "owner", manager, broker, "a", "retry", worker_id=task.leased_to,
+        lease_token=task.lease_token, outcome="stopped-no-effect", evidence_sha256="b" * 64,
+    )
+    assert retry.state is TaskState.QUEUED and not retry.effect_uncertain
+    assert bridge.load("host-wait").restore_runtime().task("retry").state is TaskState.QUEUED
+

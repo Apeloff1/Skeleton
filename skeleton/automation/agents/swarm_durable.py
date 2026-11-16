@@ -316,6 +316,65 @@ class SwarmDurableBridge:
                 broker.retire()
                 raise DurableSwarmError("completion and enqueue stopped; restore durable custody") from exc
 
+
+    def finish_and_capture_verified(
+        self, run_id: str, owner_id: str, manager: SwarmRecoveryManager,
+        broker: TenantSwarmBroker, tenant: str, task_id: str, *,
+        worker_id: str, lease_token: str, outcome: str,
+        evidence_sha256: str,
+    ) -> tuple[SwarmTask, DurableSwarmCapture]:
+        """Publish a normal outcome only after durable readback.
+
+        A transport must not acknowledge an attempt until this returns. On
+        ambiguous publication restore the authoritative archive, never retry
+        the physical effect. The host continues to own the run-writer lease.
+        """
+        if outcome not in ("success", "uncertain"):
+            raise DurableSwarmError("unsupported verified outcome")
+        tenant, task_id = broker._tenant(tenant), broker._task_id(task_id)
+        runtime = broker.broker.runtime
+        with broker._lock, broker.broker._completion_lock, runtime._lock, manager._lock:
+            resident = broker._verified_resident(tenant, task_id)
+            if (resident.state is not TaskState.LEASED or resident.effect_uncertain
+                    or resident.leased_to != worker_id or resident.lease_token != lease_token):
+                raise DurableSwarmError("active attempt identity changed")
+            try:
+                result = broker.record_verified(
+                    tenant, worker_id, task_id, lease_token=lease_token,
+                    outcome=outcome, evidence_sha256=evidence_sha256,
+                )
+                return result.task, self._capture_checked(run_id, owner_id, manager, broker)
+            except Exception as exc:
+                broker.retire()
+                raise DurableSwarmError("completion publication stopped; restore durable custody") from exc
+
+    def reconcile_and_capture_verified(
+        self, run_id: str, owner_id: str, manager: SwarmRecoveryManager,
+        broker: TenantSwarmBroker, tenant: str, task_id: str, *,
+        worker_id: str, lease_token: str, outcome: str,
+        evidence_sha256: str,
+    ) -> tuple[SwarmTask, DurableSwarmCapture]:
+        """Commit independently verified reconciliation before releasing custody."""
+        if outcome not in ("committed", "stopped-no-effect", "stopped-terminal"):
+            raise DurableSwarmError("unsupported reconciliation outcome")
+        tenant, task_id = broker._tenant(tenant), broker._task_id(task_id)
+        runtime = broker.broker.runtime
+        with broker._lock, broker.broker._completion_lock, runtime._lock, manager._lock:
+            resident = broker._verified_resident(tenant, task_id)
+            if (not resident.effect_uncertain or resident.leased_to != worker_id
+                    or resident.lease_token != lease_token):
+                raise DurableSwarmError("uncertain attempt identity changed")
+            try:
+                result = broker.reconcile_verified(
+                    tenant, worker_id, task_id, lease_token=lease_token,
+                    outcome=outcome, evidence_sha256=evidence_sha256,
+                )
+                return result.task, self._capture_checked(run_id, owner_id, manager, broker)
+            except Exception as exc:
+                broker.retire()
+                raise DurableSwarmError("reconciliation stopped; restore durable custody") from exc
+
+
     def load(self, run_id: str) -> DurableSwarmRecovery | None:
         """Load and verify the latest durable swarm archive for an outer run."""
         resume = self.store.resume_state(run_id)
@@ -346,3 +405,265 @@ class SwarmDurableBridge:
         """Restore the latest swarm runtime, or ``None`` when no archive exists."""
         recovery = self.load(run_id)
         return None if recovery is None else recovery.restore_runtime()
+
+# Host-owned wait protocol. Raw task payloads never supply signing keys or clock
+# authority. The reserved envelope is stored in the existing task checkpoint.
+_HOST_WAIT_FIELD = "_jeeves_host_wait_v1"
+_MAX_WAIT_MS = (1 << 53) - 1
+
+
+def _wait_identifier(value: str) -> str:
+    if (type(value) is not str or not 1 <= len(value) <= 256
+            or value != value.strip()
+            or any(ord(char) < 33 or ord(char) > 126 for char in value)):
+        raise DurableSwarmError("invalid host wait identifier")
+    return value
+
+
+def _wait_time(value: int) -> int:
+    if type(value) is not int or not 0 <= value <= _MAX_WAIT_MS:
+        raise DurableSwarmError("invalid host wait timestamp")
+    return value
+
+
+def _wait_digest(value: str) -> str:
+    if (type(value) is not str or len(value) != 64
+            or any(char not in "0123456789abcdef" for char in value)):
+        raise DurableSwarmError("invalid host wait digest")
+    return value
+
+
+def _wait_bytes(value: object) -> bytes:
+    import json
+    return json.dumps(value, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=True, allow_nan=False).encode("ascii")
+
+
+def _wait_hash(value: object) -> str:
+    from hashlib import sha256
+    return sha256(_wait_bytes(value)).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class HostWaitIntent:
+    """Exact run/tenant/task-bound event or UTC timer intent."""
+
+    run_id: str
+    tenant: str
+    task_id: str
+    kind: str
+    source: str
+    selector: str
+    not_before_ms: int
+    expires_ms: int | None = None
+
+    def __post_init__(self) -> None:
+        for value in (self.run_id, self.tenant, self.task_id, self.source, self.selector):
+            _wait_identifier(value)
+        if self.kind not in ("timer", "event"):
+            raise DurableSwarmError("invalid host wait kind")
+        if self.kind == "timer" and (self.source != "host-clock" or self.selector != "deadline"
+                                     or self.expires_ms is not None):
+            raise DurableSwarmError("invalid timer intent")
+        _wait_time(self.not_before_ms)
+        if self.expires_ms is not None and _wait_time(self.expires_ms) < self.not_before_ms:
+            raise DurableSwarmError("invalid event window")
+
+    def record(self) -> dict[str, object]:
+        return {
+            "run_id": self.run_id, "tenant": self.tenant, "task_id": self.task_id,
+            "kind": self.kind, "source": self.source, "selector": self.selector,
+            "not_before_ms": self.not_before_ms, "expires_ms": self.expires_ms,
+        }
+
+    @property
+    def digest(self) -> str:
+        return _wait_hash(["jeeves-host-wait-v1", self.record()])
+
+    @classmethod
+    def from_record(cls, record: object) -> HostWaitIntent:
+        if type(record) is not dict or set(record) != {
+            "run_id", "tenant", "task_id", "kind", "source", "selector",
+            "not_before_ms", "expires_ms",
+        }:
+            raise DurableSwarmError("invalid pinned host wait envelope")
+        return cls(**record)
+
+
+@dataclass(frozen=True, slots=True)
+class HostEventReceipt:
+    """Source-authenticated event evidence; the transport retains its envelope."""
+
+    intent_sha256: str
+    event_id: str
+    evidence_sha256: str
+    observed_ms: int
+    signature_sha256: str
+
+    def __post_init__(self) -> None:
+        _wait_digest(self.intent_sha256)
+        _wait_identifier(self.event_id)
+        _wait_digest(self.evidence_sha256)
+        _wait_time(self.observed_ms)
+        _wait_digest(self.signature_sha256)
+
+    def signed_fields(self) -> list[object]:
+        return ["jeeves-host-event-v1", self.intent_sha256, self.event_id,
+                self.evidence_sha256, self.observed_ms]
+
+    @property
+    def digest(self) -> str:
+        return _wait_hash([self.signed_fields(), self.signature_sha256])
+
+    @classmethod
+    def issue(cls, intent: HostWaitIntent, *, event_id: str, evidence_sha256: str,
+              observed_ms: int, source_key: bytes) -> HostEventReceipt:
+        """For trusted event collectors with the independently provisioned key."""
+        import hmac
+        if intent.kind != "event":
+            raise DurableSwarmError("not an event intent")
+        _validate_wait_key(source_key)
+        unsigned = cls(intent.digest, event_id, evidence_sha256, observed_ms, "0" * 64)
+        signature = hmac.digest(source_key, _wait_bytes(unsigned.signed_fields()),
+                                "sha256").hex()
+        return cls(intent.digest, event_id, evidence_sha256, observed_ms, signature)
+
+
+def _validate_wait_key(key: bytes) -> None:
+    if type(key) is not bytes or not 32 <= len(key) <= 128:
+        raise DurableSwarmError("invalid host event key")
+
+
+class HostWaitDriver:
+    """Trusted local run-owner handler for event delivery and restart-safe timers.
+
+    Invoke poll_due_timers from the host's existing service loop. No hidden
+    thread, external webhook endpoint, clock synchronization or key storage is
+    created. Key provisioning belongs to the trusted host, not a task.
+    """
+
+    def __init__(
+        self, bridge: SwarmDurableBridge, run_id: str, owner_id: str,
+        manager: SwarmRecoveryManager, broker: TenantSwarmBroker, *,
+        source_keys: dict[tuple[str, str], bytes],
+        clock_ms: Callable[[], int] | None = None,
+    ) -> None:
+        from time import time_ns
+        self.bridge = bridge
+        self.run_id = _wait_identifier(run_id)
+        self.owner_id = _wait_identifier(owner_id)
+        self.manager = manager
+        self.broker = broker
+        broker._assert_verified()
+        if type(source_keys) is not dict or len(source_keys) > 4096:
+            raise DurableSwarmError("invalid event source registry")
+        self._source_keys: dict[tuple[str, str], bytes] = {}
+        for scope, key in source_keys.items():
+            if type(scope) is not tuple or len(scope) != 2:
+                raise DurableSwarmError("invalid event source scope")
+            tenant, source = scope
+            _validate_wait_key(key)
+            self._source_keys[(_wait_identifier(tenant), _wait_identifier(source))] = key
+        if clock_ms is not None and not callable(clock_ms):
+            raise DurableSwarmError("invalid host clock")
+        self._clock_ms = clock_ms if clock_ms is not None else lambda: time_ns() // 1_000_000
+
+    def _now(self) -> int:
+        return _wait_time(self._clock_ms())
+
+    def submit(self, intent: HostWaitIntent, task: SwarmTask, *,
+               singleton_key: str | None = None) -> DurableSwarmCapture | None:
+        from dataclasses import replace
+        if (not isinstance(intent, HostWaitIntent) or not isinstance(task, SwarmTask)
+                or intent.run_id != self.run_id or intent.task_id != task.id
+                or task.wait_intent_sha256 is not None or task.wake_receipt_sha256 is not None
+                or _HOST_WAIT_FIELD in task.payload):
+            raise DurableSwarmError("host wait submission identity mismatch")
+        if intent.kind == "event" and (intent.tenant, intent.source) not in self._source_keys:
+            raise DurableSwarmError("event source unavailable for tenant")
+        payload = dict(task.payload)
+        payload[_HOST_WAIT_FIELD] = intent.record()
+        prepared = replace(task, payload=payload, wait_intent_sha256=intent.digest)
+        return self.bridge.submit_unique_verified(
+            self.run_id, self.owner_id, self.manager, self.broker,
+            intent.tenant, prepared, singleton_key=singleton_key,
+        )
+
+    def _read(self, tenant: str, task_id: str) -> tuple[HostWaitIntent, SwarmTask]:
+        task = self.broker._verified_resident(tenant, task_id)
+        intent = HostWaitIntent.from_record(task.payload.get(_HOST_WAIT_FIELD))
+        if (intent.run_id != self.run_id or intent.tenant != tenant
+                or intent.task_id != task_id or intent.digest != task.wait_intent_sha256):
+            raise DurableSwarmError("persisted host wait identity mismatch")
+        return intent, task
+
+    def _publish(self, intent: HostWaitIntent, receipt_sha256: str) -> DurableSwarmCapture:
+        # The authenticated decision is exact to the four bridge callback
+        # arguments. Neither caller payload nor any other task can reuse it.
+        identity = (intent.tenant, intent.task_id, intent.digest, receipt_sha256)
+        return self.bridge.wake_and_capture_verified(
+            self.run_id, self.owner_id, self.manager, self.broker,
+            intent.tenant, intent.task_id, intent_sha256=intent.digest,
+            receipt_sha256=receipt_sha256,
+            verify_wake=lambda *values: values == identity,
+        )
+
+    def deliver_event(self, tenant: str, task_id: str,
+                      receipt: HostEventReceipt) -> DurableSwarmCapture:
+        import hmac
+        if not isinstance(receipt, HostEventReceipt):
+            raise DurableSwarmError("invalid event receipt")
+        runtime = self.broker.broker.runtime
+        with self.broker._lock, runtime._lock:
+            intent, task = self._read(tenant, task_id)
+            key = self._source_keys.get((tenant, intent.source))
+            if intent.kind != "event" or key is None or receipt.intent_sha256 != intent.digest:
+                raise DurableSwarmError("event source or wait identity refused")
+            expected = hmac.digest(key, _wait_bytes(receipt.signed_fields()), "sha256").hex()
+            if not hmac.compare_digest(expected, receipt.signature_sha256):
+                raise DurableSwarmError("event signature refused")
+            now = self._now()
+            if (receipt.observed_ms < intent.not_before_ms or receipt.observed_ms > now
+                    or (intent.expires_ms is not None and receipt.observed_ms > intent.expires_ms)):
+                raise DurableSwarmError("event observation outside registered window")
+            if task.wake_receipt_sha256 not in (None, receipt.digest):
+                raise DurableSwarmError("conflicting event receipt")
+            return self._publish(intent, receipt.digest)
+
+    def poll_due_timers(self, *, limit: int = 64) -> tuple[str, ...]:
+        """Wake up to limit due tasks, each with checkpoint/readback before return.
+
+        The durable task list is the timer source of truth, so a restarted host
+        can resume without an auxiliary timer database. Missed ticks do not
+        discard due timers. UTC clock accuracy is the host's responsibility.
+        """
+        if type(limit) is not int or not 1 <= limit <= 1024:
+            raise DurableSwarmError("invalid timer batch bound")
+        runtime = self.broker.broker.runtime
+        with self.broker._lock, runtime._lock:
+            self.broker._assert_verified()
+            now = self._now()
+            due: list[HostWaitIntent] = []
+            for task in runtime.tasks():
+                if (task.state is not TaskState.QUEUED or task.attempts
+                        or task.wake_receipt_sha256 is not None
+                        or _HOST_WAIT_FIELD not in task.payload):
+                    continue
+                tenant = self.broker.tenant_for(task.id)
+                if tenant is None:
+                    raise DurableSwarmError("unowned timer candidate")
+                intent, _ = self._read(tenant, task.id)
+                if intent.kind == "timer" and intent.not_before_ms <= now:
+                    due.append(intent)
+            due.sort(key=lambda intent: (intent.not_before_ms, intent.tenant, intent.task_id))
+            published: list[str] = []
+            for intent in due[:limit]:
+                # Deterministic receipt identity across clock ticks and restarts.
+                # Recheck the trusted clock to fail closed on a backwards sample.
+                if self._now() < intent.not_before_ms:
+                    break
+                receipt = _wait_hash(["jeeves-host-timer-v1", intent.digest, intent.not_before_ms])
+                self._publish(intent, receipt)
+                published.append(intent.task_id)
+            return tuple(published)
+

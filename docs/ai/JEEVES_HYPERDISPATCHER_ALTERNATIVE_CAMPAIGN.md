@@ -207,3 +207,28 @@ signature, independent authorization, or a persistent rate-credit ledger.
 Live policy changes require the trusted owner and a new durable checkpoint.
 New regressions cover canonical ordering, accounting stability, rejection
 of relaxed quota on restore, and invalid sidecar integrity.
+
+## Wave A11: host-owned timer and authenticated event execution
+
+The existing recovery archive now carries a reserved, exact run/tenant/task
+host-wait intent in the task payload; its existing wait digest independently
+binds that envelope. The trusted owner driver submits through the canonical
+durable bridge and scans restored queued waits for due UTC timers. Due timers
+are ordered by deadline and identity, batch bounded, and published using the
+existing wait gate only after checkpoint/readback. Restart needs no secondary
+timer database. Trusted event collectors sign exact wait/evidence/timestamp
+receipts with tenant/source-scoped HMAC-SHA256 keys; cross-wait, forged,
+out-of-window and conflicting receipts fail closed. The checkpoint retains
+receipt digest; the trusted collector must keep the signed envelope for audit.
+Ordinary success/uncertain outcomes and uncertain-attempt reconciliation now
+have durable checkpoint/readback wrappers; ambiguous writes retire the owner
+instead of acknowledging an effect or releasing custody by replay.
+
+Host registration, production credential provisioning/rotation, UTC clock
+integrity, durable external event intake, service-loop invocation, physical
+worker verifiers, and independent runtime/competitor qualification remain
+required. This is a concrete executable local owner API, not a deployed
+daemon, distributed transport, or claim that all 108 targets are complete.
+Six focused regression cases cover restart, signature attacks, exact envelope
+custody, durable completion, ambiguous write, and durable retry.
+
