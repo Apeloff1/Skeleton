@@ -1046,3 +1046,255 @@ def test_campaign_browser_routes_are_explicit_and_local():
     assert "result.textContent = JSON.stringify(row.report, null, 2)" in JAVASCRIPT
     assert "Mark claim abandoned (does not cancel or retry)" in JAVASCRIPT
     assert "get('campaign-plan').value = '';" in JAVASCRIPT
+
+
+
+def test_relevance_packing_preserves_old_useful_turn_and_exact_original_pairs():
+    from skeleton.app.jeeves_history_pack import pack_history, digest
+    history = (
+        ("user", "Nebula recovery requires the violet module."),
+        ("assistant", "Check the committed Nebula recovery specification."),
+        ("user", "Unrelated discussion " * 100),
+        ("assistant", "Unrelated text " * 100),
+        ("user", "What is the weather?"),
+        ("assistant", "Weather is unrelated."),
+        ("user", "Latest deployment status"),
+        ("assistant", "Deployment ready for review."),
+    )
+    selected, proof = pack_history(
+        "Nebula recovery", history, recent_turns=1,
+        fits=lambda pairs: sum(len(row[1]) for row in pairs) <= 210,
+    )
+    assert selected == history[:2] + history[-2:]
+    assert [turn["turn_index"] for turn in proof["selected_turns"]] == [0, 3]
+    assert proof["omitted_turns"] == 2
+    assert proof["selected_history_sha256"] == digest(selected)
+    assert proof["receipt_sha256"] == digest({k: v for k, v in proof.items()
+                                               if k != "receipt_sha256"})
+    assert proof["history_modified"] is False
+    assert proof["summarized"] is False
+
+
+def test_relevance_history_bounded_scan_and_admission():
+    from skeleton.app.jeeves_history_pack import pack_history, MAX_ADMISSION_CHECKS
+    history = tuple(row for i in range(180)
+                    for row in (("user", "nebula case " + str(i)),
+                                ("assistant", "nebula reviewed " + str(i))))
+    decisions = []
+    def fits(rows):
+        decisions.append(rows)
+        return len(rows) <= 4
+    selected, proof = pack_history("nebula", history, fits=fits)
+    assert len(selected) == 4
+    assert proof["scan_start_turn"] == 84
+    assert proof["scan_truncated"] is True
+    assert proof["admission_checks"] == len(decisions) <= MAX_ADMISSION_CHECKS
+    assert all(row["turn_index"] >= 84 for row in proof["selected_turns"])
+    with pytest.raises(ValueError):
+        pack_history("nebula", (("assistant", "bad"), ("user", "roles")), fits=fits)
+    with pytest.raises(ValueError):
+        pack_history("nebula", history, fits=lambda _: False)
+
+
+def test_relevance_history_native_review_retains_source_proof_without_commit(tmp_path):
+    app = OfflineHTTPApplication(native_model(), tmp_path / "packed-review.sqlite3", token="t"*64)
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        route = "/v1/sessions/" + created["session_id"]
+        for i, question in enumerate(("hello offline", "world", "hello")):
+            app.dispatch("POST", route + "/turn", {"message": question,
+                         "request_id": "pack-turn-" + str(i), "max_output_tokens": 2})
+        before = app.dispatch("GET", route)[1]
+        body = {"message": "hello offline", "expected_revision": 3, "approved": True,
+                "max_output_tokens": 2, "history_policy": "relevance",
+                "require_full_history": False, "adaptive": _adaptive_policy(total=2, attempts=1)}
+        _, report = app.dispatch("POST", route + "/deliberation-review", body)
+        assert report["history_policy"] == "relevance"
+        assert report["require_full_history"] is False
+        candidate = report["candidates"][0]
+        proof = candidate["history_packing"]
+        assert proof["total_turns"] == 3
+        assert len(proof["selected_turns"]) + proof["omitted_turns"] == 3
+        assert candidate["estimated_history_retained"] == len(proof["selected_turns"]) * 2
+        assert report["candidate_challenge"]["winner_selected"] is False
+        assert app.dispatch("GET", route)[1] == before
+        with pytest.raises(OfflineHTTPError) as error:
+            app.dispatch("POST", route + "/deliberation-review", body | {"require_full_history": True})
+        assert error.value.status == 400
+    finally:
+        app.close()
+
+
+def _quote_manifest():
+    passages = ["The Nebula module restores the vault.", "Recovery requires the violet key."]
+    rows = []
+    for i, text in enumerate(passages):
+        doc = "document-" + str(i)
+        pin = sha256(text.encode()).hexdigest()
+        rows.append({"document_id": doc, "document_sha256": pin,
+                     "citation": "local:" + doc + ":0:" + pin[:16],
+                     "passage": text, "passage_sha256": pin, "char_start": 0,
+                     "char_end": len(text)})
+    return {"citations": rows}
+
+
+def test_exact_source_quote_contract_checks_content_diversity_and_offsets():
+    import json
+    from skeleton.app.jeeves_constraints import assess
+    manifest = _quote_manifest()
+    contract = {"kind": "source_quotes", "minimum_quotes": 2, "minimum_distinct_sources": 2}
+    quotes = [{"citation": row["citation"], "quote": row["passage"]}
+              for row in manifest["citations"]]
+    answer = json.dumps({"quotes": quotes})
+    result = assess(answer, contract, evidence=manifest)
+    proof = result["quote_verification"]
+    assert result["passed"] is True and proof["distinct_document_count"] == 2
+    assert proof["literal_identity_verified"] is True
+    assert proof["source_truth_verified"] is False
+    assert proof["answer_completeness_verified"] is False
+    for span, row in zip(proof["quotes"], manifest["citations"]):
+        assert row["passage"][span["start"]:span["end"]] == span["quote"]
+        assert span["quote_sha256"] == sha256(span["quote"].encode()).hexdigest()
+    for invalid in [
+        {"quotes": [quotes[0], quotes[0]]},
+        {"quotes": [quotes[0], quotes[1] | {"quote": "Recovery uses the orange key."}]},
+        {"quotes": [quotes[0], quotes[1] | {"citation": "local:invented"}]},
+        {"quotes": quotes, "answer": "false extrapolation"},
+    ]:
+        assert assess(json.dumps(invalid), contract, evidence=manifest)["passed"] is False
+    assert assess(answer, contract)["passed"] is False
+
+
+def test_exact_quotes_reject_overlaps_ambiguous_matches_and_corrupted_passage():
+    import json
+    from skeleton.app.jeeves_constraints import assess
+    manifest = _quote_manifest()
+    row = manifest["citations"][0]
+    contract = {"kind": "source_quotes", "minimum_quotes": 2, "minimum_distinct_sources": 1}
+    answer = json.dumps({"quotes": [
+        {"citation": row["citation"], "quote": "The Nebula module"},
+        {"citation": row["citation"], "quote": "Nebula module restores"},
+    ]})
+    assert not assess(answer, contract, evidence=manifest)["passed"]
+    repeated = "The Nebula module. The Nebula module."
+    row.update(passage=repeated, passage_sha256=sha256(repeated.encode()).hexdigest(),
+               char_end=len(repeated))
+    single = contract | {"minimum_quotes": 1}
+    text = json.dumps({"quotes": [{"citation": row["citation"], "quote": "The Nebula module"}]})
+    assert not assess(text, single, evidence=manifest)["passed"]
+    row["passage"] = "Changed passage identity."
+    assert not assess(text, single, evidence=manifest)["passed"]
+
+
+def test_grounded_quote_review_requires_scope_and_distinct_sources_before_generation(tmp_path):
+    app = OfflineHTTPApplication(native_model(), tmp_path / "quote-admission.sqlite3", token="t"*64)
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        route = "/v1/sessions/" + created["session_id"]
+        policy = _adaptive_policy(total=4, attempts=1)
+        policy["contract"] = {"kind": "source_quotes", "minimum_quotes": 2,
+                              "minimum_distinct_sources": 2}
+        body = {"message": "Nebula recovery", "expected_revision": 0, "approved": True,
+                "max_output_tokens": 4, "adaptive": policy}
+        with pytest.raises(OfflineHTTPError) as error:
+            app.dispatch("POST", route + "/deliberation-review", body)
+        assert error.value.status == 400
+        first = app.knowledge.add_text("One source", "Nebula recovery uses the violet module.")
+        with pytest.raises(OfflineAIError):
+            app.dispatch("POST", route + "/deliberation-review",
+                         body | {"grounded": True, "document_ids": [first["document_id"]]})
+        assert app._active_session is None
+        assert app.dispatch("GET", route)[1]["revision"] == 0
+    finally:
+        app.close()
+
+
+def test_candidate_challenge_reports_literal_numeric_disagreement_not_truth():
+    from skeleton.app.jeeves_candidate_challenge import examine, digest
+    texts = ["The module timeout is 20 ms. The local state is ready.",
+             "The module timeout is 45 ms. The local state is ready."]
+    candidates = [{"text": text, "output_sha256": sha256(text.encode()).hexdigest(),
+                   "faithfulness": None, "citation_audit": None} for text in texts]
+    report = examine(candidates)
+    assert report["distinct_exact_outputs"] == 2
+    assert report["semantic_contradiction_verified"] is False
+    assert report["winner_selected"] is False
+    assert len(report["numeric_disagreements"]) == 1
+    diff = report["numeric_disagreements"][0]
+    assert diff["left"]["numeric_literals"] == ["20"]
+    assert diff["right"]["numeric_literals"] == ["45"]
+    for side in (diff["left"], diff["right"]):
+        original = texts[side["candidate_index"]][side["start"]:side["end"]]
+        assert side["segment_sha256"] == sha256(original.encode()).hexdigest()
+    assert report["receipt_sha256"] == digest({k: v for k, v in report.items()
+                                                if k != "receipt_sha256"})
+    with pytest.raises(ValueError):
+        examine([candidates[0] | {"text": "changed"}])
+
+
+def test_grounded_campaign_pins_source_and_rejects_withdrawal_before_reservation(tmp_path):
+    app = OfflineHTTPApplication(native_model(), tmp_path / "grounded-dag.sqlite3", token="t"*64)
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        route = "/v1/sessions/" + created["session_id"]
+        doc = app.knowledge.add_text("Recovery source", "Nebula recovery uses the violet module.")
+        pin = {"document_id": doc["document_id"], "sha256": doc["sha256"]}
+        spec = _campaign_step("review", question="Nebula recovery") | {"sources": [pin]}
+        create = {"campaign_id": "grounded-dag", "expected_session_revision": 0,
+                  "approved": True, "steps": [spec], "maximum_reserved_tokens": 4}
+        with pytest.raises(OfflineHTTPError) as error:
+            app.dispatch("POST", route + "/campaign-create",
+                         create | {"steps": [spec | {"sources": [pin | {"sha256": "0"*64}]}]})
+        assert error.value.status == 409
+        _, graph = app.dispatch("POST", route + "/campaign-create", create)
+        assert graph["plan"]["steps"][0]["sources"] == [pin]
+        app.knowledge.delete(doc["document_id"])
+        body = {"campaign_id": "grounded-dag", "step_id": "review", "operation_id": "source-op",
+                "expected_revision": 0, "approved": True}
+        with pytest.raises(OfflineHTTPError) as error:
+            app.dispatch("POST", route + "/campaign-advance", body)
+        assert error.value.status == 409
+        _, current = app.dispatch("POST", route + "/campaign-inspect", {"campaign_id": "grounded-dag"})
+        assert current["reserved_tokens"] == 0
+        assert current["statuses"]["review"]["status"] == "pending"
+    finally:
+        app.close()
+
+
+def test_grounded_campaign_executes_real_native_and_retains_exact_scope_receipt(tmp_path):
+    app = OfflineHTTPApplication(native_model(), tmp_path / "grounded-dag-real.sqlite3", token="t"*64)
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        route = "/v1/sessions/" + created["session_id"]
+        doc = app.knowledge.add_text("Recovery source", "Nebula recovery uses the violet module.")
+        other = app.knowledge.add_text("Excluded", "Nebula recovery alternative unrelated text.")
+        pin = {"document_id": doc["document_id"], "sha256": doc["sha256"]}
+        spec = _campaign_step("review", question="Nebula recovery") | {
+            "sources": [pin], "history_policy": "relevance"}
+        app.dispatch("POST", route + "/campaign-create", {
+            "campaign_id": "real-scope", "expected_session_revision": 0,
+            "approved": True, "steps": [spec], "maximum_reserved_tokens": 4})
+        _, current = app.dispatch("POST", route + "/campaign-advance", {
+            "campaign_id": "real-scope", "step_id": "review", "operation_id": "read-scoped",
+            "expected_revision": 0, "approved": True})
+        report = current["statuses"]["review"]["report"]
+        assert current["all_steps_complete"]
+        assert report["generation_performed"] is True and report["history_policy"] == "relevance"
+        assert report["evidence_sources"]
+        assert {row["document_id"] for row in report["evidence_sources"]} == {doc["document_id"]}
+        assert all(row["document_sha256"] == doc["sha256"] for row in report["evidence_sources"])
+        assert app.dispatch("GET", route)[1]["revision"] == 0
+        assert other["document_id"] != doc["document_id"]
+    finally:
+        app.close()
+
+
+def test_wave_iv_browser_receipts_and_controls():
+    from skeleton.app.offline_web import HTML, JAVASCRIPT
+    for item in ("review-history-policy", "quote-minimum", "quote-sources"):
+        assert f'id="{item}"' in HTML
+    assert "history_policy: historyPolicy" in JAVASCRIPT
+    assert "Quotation does not match supplied passage." in JAVASCRIPT
+    assert "Selected history pair identity changed." in JAVASCRIPT
+    assert "Candidate disagreement span mismatch." in JAVASCRIPT
+    assert "not semantic contradictions" in JAVASCRIPT
