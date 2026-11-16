@@ -65,6 +65,7 @@ hosted-inference = ["openai>=2.54.0,<3", "httpx>=0.28.1,<1"]
 skeleton-original-quest = "skeleton.app.original_quest_cli:main"
 skeleton-gameforge-quest = "skeleton.app.gameforge_quest_cli:main"
 skeleton-gameforge-campaign = "skeleton.app.gameforge_campaign_cli:main"
+skeleton-gameforge-expedition = "skeleton.app.gameforge_expedition_cli:main"
 skeleton-harbor-crafting = "skeleton.game.gameplay.harbor_crafting_cli:main"
 skeleton-harbor-beacon-rescue = "skeleton.game.gameplay.harbor_crafting_beacon_cli:main"
 skeleton = "skeleton.__main__:main"
