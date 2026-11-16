@@ -639,3 +639,103 @@ deduplication, high shard-count declarations and installed CLI routes.
 The existing sealed-context gate explicitly selects those tests
 alongside sealed-memory and NVML regression sources. Exact-head test
 execution and platform qualification remain independently required.
+
+
+## Independently pinned range integrity and bounded large-object resume
+
+Whole-object scrub remains the canonical raw SHA-256 verification path.
+For very large objects, an additional independent range index can be
+authored by reading one complete object once, verifying its raw CAS
+digest against the caller's independent object pin and deriving
+SHA-256 digests for successive fixed-size chunks during the same read.
+Index authoring is explicitly bounded by the supplied object byte
+ceiling. A canonical index includes the original object digest and
+length, chunk size, ordered chunk digests and its independent index
+digest. Chunk size is a power of two from 64 KiB through 128 MiB;
+at most 65,536 chunk digests are supported and index JSON is limited
+to 8 MiB. These are declaration bounds, not physical capacity claims.
+
+The operator preserves the trusted index independently. Later
+verification campaigns require the exact index digest and canonical
+index bytes again. Each advancement seeks directly to the durable
+chunk cursor and hashes only the next bounded sequence of complete
+chunks; it does not reread previously checked ranges. The final
+short chunk is bound to its exact remaining byte count. A fresh
+catalog-wide scan is not required for this individual-object
+diagnostic. The campaign retains the observed file and bucket
+identities, policy, index identity, ordered digest chain, counters,
+and exact prior campaign pin. A failure persists a bounded reason
+and affected chunk index, without advancing the cursor; an interrupted
+tranche leaves the previously published cursor available for retry.
+The configured free-space reserve must permit control publication.
+
+Example operator operations, using the same persisted managed disk
+policy arguments on each invocation:
+
+```sh
+skeleton-weight-store range-index --store /private/service/weights \
+  --maximum-store-bytes 274877906944 --minimum-free-bytes 8589934592 \
+  --range-object-sha256 "$OBJECT_SHA" --range-object-bytes "$OBJECT_BYTES" \
+  --range-index-max-bytes "$OBJECT_BYTES" --range-chunk-bytes 16777216 > index.json
+skeleton-weight-store range-start --store /private/service/weights \
+  --maximum-store-bytes 274877906944 --minimum-free-bytes 8589934592 \
+  --range-index-sha256 "$TRUSTED_INDEX_SHA" < index.json
+skeleton-weight-store range-step --store /private/service/weights \
+  --maximum-store-bytes 274877906944 --minimum-free-bytes 8589934592 \
+  --range-index-sha256 "$TRUSTED_INDEX_SHA" \
+  --range-campaign-sha256 "$CURRENT_CURSOR" \
+  --range-tranche-bytes 1073741824 --range-tranche-chunks 64 < index.json
+skeleton-weight-store range-status --store /private/service/weights \
+  --maximum-store-bytes 274877906944 --minimum-free-bytes 8589934592
+skeleton-weight-store range-check --store /private/service/weights \
+  --maximum-store-bytes 274877906944 --minimum-free-bytes 8589934592 \
+  --range-index-sha256 "$TRUSTED_INDEX_SHA" \
+  --range-campaign-sha256 "$COMPLETED_CURSOR" < index.json
+```
+
+The candidate index digest must come from trusted whole-object index
+authoring and independent retention, not simply a digest asserted by
+an untrusted index supplier. A completed range campaign proves
+observed range equivalence to that pinned index, not freshly recomputed
+raw SHA-256. It cannot satisfy the separately required full-store
+scrub pin or substitute for independently verified model activation.
+The range-check command revalidates current file metadata only.
+A blocked step or larger-tranche requirement returns exit 3.
+Logical read ceilings do not control operating-system read-ahead or
+provide a time bound for blocked I/O.
+
+### Recovery and runtime source fences
+
+Recovery acknowledgement now admits the complete distinct physical
+object namespace within the independent recovery byte ceiling before
+hashing. It independently verifies the committed reference inventory
+and all retained unreferenced objects, checks their counts and bytes
+against the admitted catalog and rechecks the complete metadata
+identity. The original logical aggregate reference ceiling also
+remains in effect. Neither valid orphan contents nor the recovery
+record authorizes removal. An orphan content mismatch blocks recovery.
+
+The durable last-outcome parser now checks outcome fields, policy
+identity and nested committed-receipt identity before new staging
+mutation. Recovery outcomes must preserve their non-destructive
+disposition. Scrub, range and recovery control publication checks
+the configured remaining disk reserve; an inability to durably
+publish cannot turn a consumed read into an advanced cursor.
+
+Managed source inspection evidence is also rebound at cooperative
+offer and consumption boundaries and the measured native gate's
+launch and running checks. The fence checks managed-policy identity,
+selected manifest identity, interrupted transaction state and any
+independently required completed full-store scrub evidence. An
+unresolved transaction or changed manifest revokes pending session
+grants. This is a metadata fence under a shared slot, not a
+continuous file-content hash or an execution-long lease. The actual
+decoder and sealed-source custody paths retain their independent
+verification responsibilities. Legacy-to-managed provisioning
+requires explicitly reopening the inspected source.
+
+All new range, recovery, CLI and managed-source regression sources
+are selected through the existing sealed-context qualification gate.
+No Windows locking, physical device execution, real disk-full or
+power-loss qualification, cryptographically authenticated historical
+audit transcript, or exact-head test success is claimed.
