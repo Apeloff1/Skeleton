@@ -106,11 +106,12 @@ The limits are eight episodes, at most 256 ticks per local episode,
 owner's own harbor-bundle byte ceiling remains in force. These bounds
 do not establish physical performance or storage capacity.
 
-The existing campaign SQLite journal accepts campaign receipts, not
-these stronger expedition receipts; expedition durability and persistent
-branch management require a separate integration. This command performs
-no automatic database writes, native rendering, model calls, network
-requests, engine export or release.
+The expedition journal now uses a separate fixed SQLite namespace and
+full expedition replay adapter. See GAMEFORGE_EXPEDITION_DURABILITY.md for
+explicit slot management, portable archives, mission gates and package
+authoring. Neither stateless gameplay nor design automatically writes a
+save. No native rendering, model calls, network requests, engine export
+or release is performed.
 
 ## Qualification
 
