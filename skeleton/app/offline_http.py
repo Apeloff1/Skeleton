@@ -657,7 +657,7 @@ class OfflineHTTPApplication:
             body = {}
         if path == "/v1/dragon/navigation-discourse" and method == "POST":
             from skeleton.ai.webcrawler.navigation_semantics import (
-                validate_packet, role_prompt, parse_rank, make_advice,
+                validate_packet, role_prompt, parse_rank, tournament, ADVICE_LIFETIME,
             )
             from skeleton.ai.jeeves_local_policy import primary_model_id
             _fields(body, {"packet", "approved"}, {"packet", "approved"})
@@ -665,13 +665,13 @@ class OfflineHTTPApplication:
                 raise OfflineHTTPError(403, "explicit local Jeeves discourse approval required")
             packet = body["packet"]
             ids = validate_packet(packet)
-            ranks, receipts = [], []
-            # Use the existing public session/turn authority for both calls:
-            # real native inference, model identity, SQLite receipts and
-            # single-executor lease. Distinct contexts prevent role leakage.
-            # A single primary model is used for both role turns.
-            for role in ("jeeves", "dragon"):
-                prompt = role_prompt(packet, role, ranks[0] if ranks else None)
+            if not 0 <= time.time() - packet["as_of"] <= ADVICE_LIFETIME:
+                raise OfflineHTTPError(409, "navigation packet expired")
+            receipts = []
+            def execute(group, role, first, stage):
+                if not 0 <= time.time() - packet["as_of"] <= ADVICE_LIFETIME:
+                    raise OfflineHTTPError(409, "navigation tournament expired")
+                prompt = role_prompt(group, role, first)
                 _, session = self.dispatch("POST", "/v1/sessions",
                     {"system": "You are a bounded local navigation ranking role. Output only a JSON array."})
                 sid = session["session_id"]
@@ -685,11 +685,16 @@ class OfflineHTTPApplication:
                         or not isinstance(execution, dict)
                         or execution.get("output_sha256") != result.get("output_digest")):
                     raise OfflineHTTPError(503, "local navigation execution receipt unavailable")
-                ranks.append(parse_rank(result["text"], len(ids)))
-                receipts.append({"role": role, "session_id": sid, "request_id": rid,
+                rank = parse_rank(result["text"], len(group["candidates"]))
+                receipts.append({"role": role, "stage":stage, "group_digest":group["packet_digest"],
+                    "session_id": sid, "request_id": rid,
                     "execution_receipt_digest": execution["execution_receipt_digest"],
                     "output_digest": result["output_digest"]})
-            return 200, {"advice": make_advice(packet, *ranks),
+                return rank
+            advice = tournament(packet, execute)
+            if not 0 <= time.time() - packet["as_of"] <= ADVICE_LIFETIME:
+                raise OfflineHTTPError(409, "navigation tournament expired")
+            return 200, {"advice": advice, "candidate_count":len(ids),
                          "model_digest": self.model_digest, "role_receipts": receipts,
                          "single_local_model_two_roles": True, "network_authorized": False}
         if path == "/v1/resources" and method == "GET":
