@@ -184,3 +184,44 @@ def test_review_bounds_references_and_metadata(tmp_path):
         review_weight_store(owner, RecoveryReviewPolicy(maximum_metadata_bytes=1))
     with pytest.raises(WeightShardStoreError, match="entry ceiling"):
         review_weight_store(owner, RecoveryReviewPolicy(maximum_entries=1))
+
+
+def test_recovery_acknowledgement_hashes_unreferenced_objects(tmp_path):
+    owner, _, _, _ = failed_intent(tmp_path)
+    payload = b"retained orphan"
+    key = sha256(payload).hexdigest()
+    bucket = owner._store.objects / key[:2]
+    bucket.mkdir(exist_ok=True)
+    target = bucket / key
+    target.write_bytes(b"x" * len(payload))
+    review = review_weight_store(owner)
+    assert review["unreferenced_candidates"] == 1
+    with pytest.raises(WeightShardStoreError, match="catalog object content mismatch"):
+        ack(owner, review)
+    assert owner.inspect()["active_intent"] is not None
+    # Explicit local fixture repair, then obtain new review evidence.
+    target.write_bytes(payload)
+    updated = review_weight_store(owner)
+    outcome = ack(owner, updated)
+    assert outcome["evidence"]["verified_physical_objects"] == 1
+    assert outcome["evidence"]["verified_physical_bytes"] == len(payload)
+    assert target.read_bytes() == payload
+    assert owner.inspect()["active_intent"] is None
+
+
+def test_recovery_physical_budget_admits_orphans_before_hashing(tmp_path, monkeypatch):
+    owner, _, _, _ = failed_intent(tmp_path)
+    payload = b"retained orphan"
+    key = sha256(payload).hexdigest()
+    bucket = owner._store.objects / key[:2]
+    bucket.mkdir(exist_ok=True)
+    (bucket / key).write_bytes(payload)
+    review = review_weight_store(owner)
+    from skeleton.ai.model_runtime import weight_store_scrub as module
+    monkeypatch.setattr(module, "_hash_stream", lambda *a, **k: pytest.fail("hash before admission"))
+    with pytest.raises(WeightShardStoreError, match="catalog byte ceiling"):
+        acknowledge_weight_store_recovery(
+            owner, intent_digest=review["active_intent"]["digest"],
+            review_digest=review["digest"], maximum_verified_weight_bytes=len(payload) - 1,
+        )
+    assert owner.inspect()["active_intent"] is not None
