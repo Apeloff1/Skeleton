@@ -62,6 +62,8 @@ jeeves-production-training = ["torch>=2.5,<3"]
 hosted-inference = ["openai>=2.54.0,<3", "httpx>=0.28.1,<1"]
 
 [project.scripts]
+skeleton-synthesized-quest = "skeleton.app.synthesized_quest_cli:main"
+skeleton-gameforge-quest-qualify = "skeleton.app.gameforge_quest_qualification:main"
 skeleton-asset-source-audit = "skeleton.app.asset_source_audit:main"
 skeleton-netcode-replay-qualify = "skeleton.app.netcode_replay_qualification:main"
 skeleton-offline-dialogue = "skeleton.app.dialogue_cli:main"

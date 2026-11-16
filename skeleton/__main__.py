@@ -7,6 +7,8 @@ Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
     offline-runtime  Inspect pinned local weights and measured resource admission
     weight-store     Stage pinned weights and inspect cooperative disk/recovery custody
+    synthesized-quest                Execute location-gated synthesized quest campaigns
+    gameforge-quest-qualify          Qualify GameForge planning and quest execution
     asset-source-audit               Content-bound asset and sidecar intake
     netcode-replay-qualify           Measured in-process network replay qualification
     offline-dialogue                 Authored dialogue choices and verified saves
@@ -1336,6 +1338,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         return recovered_main(rest)
     if cmd == "offline-dialogue":
         from skeleton.app.dialogue_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "synthesized-quest":
+        from skeleton.app.synthesized_quest_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "gameforge-quest-qualify":
+        from skeleton.app.gameforge_quest_qualification import main as recovered_main
         return recovered_main(rest)
     if cmd == "app":
         from skeleton.app.cli import run_app_cli

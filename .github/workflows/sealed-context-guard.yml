@@ -69,6 +69,11 @@ on:
       - 'skeleton/app/orphan_cli_audit.py'
       - 'skeleton/app/orphan_source_graph*.py'
       - 'skeleton/app/orphan_graph_ownership.py'
+      - 'skeleton/app/recovered_evidence.py'
+      - 'skeleton/app/synthesized_quest_cli.py'
+      - 'skeleton/app/gameforge_quest_qualification.py'
+      - 'skeleton/ai/game_builder/synthesized_quest_*.py'
+      - 'skeleton/testing/test_synthesized_quest_recovery.py'
       - 'skeleton/app/asset_source_audit.py'
       - 'skeleton/app/netcode_replay_qualification.py'
       - 'skeleton/testing/test_recovered_game_production.py'
@@ -209,6 +214,11 @@ jobs:
         env:
           PYTHONPATH: '.:backend'
         run: python -m pytest -q skeleton/testing/test_recovered_game_production.py tests/game_asset_ingest/test_asset_ingest.py tests/test_netcode_b064_headless_server.py
+
+      - name: Recovered quest and seven-stage conductor execution
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_synthesized_quest_recovery.py skeleton/testing/test_quest_objective_runtime.py skeleton/testing/test_constraint_quest_synthesis.py skeleton/testing/test_genre_template_composition.py skeleton/gameforge/test_gameforge_conductor.py
 
       - name: Consumer share and Chroma custody regressions
         env:
