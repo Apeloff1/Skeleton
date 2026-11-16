@@ -731,6 +731,8 @@ class OfflineHTTPApplication:
                                     else self.transformer_memory.refresh(**body))
                     return 200,result
                 raise OfflineHTTPError(404,"unknown local transformer memory operation")
+            except (LocalInferenceLeaseBusy,LocalInferenceLeaseUnavailable):
+                raise OfflineHTTPError(409,"local inference lease unavailable for semantic recall") from None
             except MemoryConflict:
                 raise OfflineHTTPError(409,"transformer encoder or approved memory changed") from None
             except MemoryRejected:
