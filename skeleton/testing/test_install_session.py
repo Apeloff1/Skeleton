@@ -34,6 +34,7 @@ def fixture(tmp_path,monkeypatch):
 
 
 def setup(session,root):
+    session.complete_phase(InstallPhase("preload",True,"host"))
     session.begin_phase("setup-runtime")
     (root/".env").write_text("PRIVATE_CONFIGURATION=not-for-receipts")
     phase=InstallPhase("setup-runtime",True,"raw detail not-for-receipts")
@@ -41,10 +42,20 @@ def setup(session,root):
     return phase
 
 
+def through_config(session,root):
+    setup(session,root)
+    session.complete_phase(InstallPhase("python-install",True,"skipped",required=False))
+    session.complete_phase(InstallPhase("runtime-preflight",True,"preflight"))
+    session.begin_phase("compose-config")
+    session.complete_phase(InstallPhase("compose-config",True,"compose"))
+    return [InstallPhase(name,ok,"redacted",required=required)
+            for name,ok,required in session.state.phase_results]
+
+
 def test_interrupt_then_replay_existing_idempotent_pipeline(tmp_path,monkeypatch):
     root,directory=fixture(tmp_path,monkeypatch)
     with s.open_session(root,directory,"one",HEAD,options()) as session:
-        setup(session,root)
+        through_config(session,root)
         session.begin_phase("start")
         assert session.state.pending=="start"
     prior=s.inspect_session(directory,"one")
@@ -69,6 +80,7 @@ def test_interrupt_then_replay_existing_idempotent_pipeline(tmp_path,monkeypatch
 def test_ambiguous_setup_does_not_regenerate_secrets(tmp_path,monkeypatch):
     root,directory=fixture(tmp_path,monkeypatch)
     with s.open_session(root,directory,"one",HEAD,options()) as session:
+        session.complete_phase(InstallPhase("preload",True,"host"))
         session.begin_phase("setup-runtime")
         (root/".env").write_text("preserve-created-credentials")
     with pytest.raises(s.InstallSessionDenied):
@@ -81,8 +93,10 @@ def test_ambiguous_setup_does_not_regenerate_secrets(tmp_path,monkeypatch):
 def test_changed_session_inputs_fail_closed(tmp_path,monkeypatch,changed):
     root,directory=fixture(tmp_path,monkeypatch)
     with s.open_session(root,directory,"one",HEAD,options()) as session:
-        phase=setup(session,root)
-        session.finish(InstallReceipt(root,(phase,InstallPhase("runtime-preflight",False,"fail"))))
+        setup(session,root)
+        session.complete_phase(InstallPhase("python-install",True,"skipped",required=False))
+        phases=[InstallPhase(n,o,"redacted",required=r) for n,o,r in session.state.phase_results]
+        session.finish(InstallReceipt(root,tuple(phases+[InstallPhase("runtime-preflight",False,"fail")])))
     head=HEAD
     opts=options()
     paths=sorted(directory.glob("install-one-*.json"))
@@ -119,10 +133,10 @@ def test_concurrent_install_different_session_same_checkout_denied(tmp_path,monk
 def test_success_requires_no_unresolved_mutation(tmp_path,monkeypatch):
     root,directory=fixture(tmp_path,monkeypatch)
     with s.open_session(root,directory,"one",HEAD,options()) as session:
-        phase=setup(session,root)
+        phases=through_config(session,root)
         session.begin_phase("start")
         with pytest.raises(s.InstallSessionDenied):
-            session.finish(InstallReceipt(root,(phase,)))
+            session.finish(InstallReceipt(root,tuple(phases)))
 
 
 def test_phase_fence_checks_source_before_mutation(tmp_path,monkeypatch):
@@ -234,9 +248,10 @@ def test_success_path_refuses_divergent_transcript(mutation):
 def test_truncated_positive_receipt_cannot_publish_terminal_success(tmp_path,monkeypatch):
     root,directory=fixture(tmp_path,monkeypatch)
     with s.open_session(root,directory,"one",HEAD,options()) as session:
-        phase=setup(session,root)
+        setup(session,root)
+        phases=[InstallPhase(n,o,"redacted",required=r) for n,o,r in session.state.phase_results]
         with pytest.raises(s.InstallSessionDenied,match="incomplete or inconsistent"):
-            session.finish(InstallReceipt(root,(phase,)))
+            session.finish(InstallReceipt(root,tuple(phases)))
     assert s.inspect_session(directory,"one")["active_or_interrupted"]
 
 
@@ -255,10 +270,85 @@ def test_receipt_must_belong_to_session_checkout(tmp_path,monkeypatch):
 def test_interrupted_terminal_retains_uncertain_phase(tmp_path,monkeypatch):
     root,directory=fixture(tmp_path,monkeypatch)
     with s.open_session(root,directory,"one",HEAD,options()) as session:
-        setup(session,root)
+        through_config(session,root)
         session.begin_phase("start")
         session._append("ATTEMPT_END",{"outcome":"interrupted"})
     result=s.inspect_session(directory,"one")
     assert result["outcome"]=="interrupted"
     assert result["uncertain_phase"]=="start"
     assert result["last_interrupted_phase"]=="start"
+
+
+@pytest.mark.parametrize("name", sorted(s._INTENTS))
+def test_no_mutation_intent_can_precede_preload(tmp_path,monkeypatch,name):
+    root,directory=fixture(tmp_path,monkeypatch)
+    with s.open_session(root,directory,"order",HEAD,options(install_python=True)) as session:
+        count=len(session.rows)
+        with pytest.raises(s.InstallSessionDenied,match="ordered prerequisites"):
+            session.begin_phase(name)
+        assert len(session.rows)==count and session.state.pending is None
+
+
+@pytest.mark.parametrize("name", ["readiness","critical-api-routes","runtime-preflight",
+                                   "compose-config","start","python-install"])
+def test_readiness_and_mutations_cannot_skip_setup(tmp_path,monkeypatch,name):
+    root,directory=fixture(tmp_path,monkeypatch)
+    with s.open_session(root,directory,"order",HEAD,options(install_python=True)) as session:
+        session.complete_phase(InstallPhase("preload",True,"host"))
+        with pytest.raises(s.InstallSessionDenied,match="ordered prerequisites"):
+            session.complete_phase(InstallPhase(name,True,"fabricated"))
+        assert len(session.state.phase_results)==1
+
+
+@pytest.mark.parametrize("name", ["start","python-install","setup-runtime","compose-config"])
+def test_only_selected_next_intent_is_admitted_after_setup(tmp_path,monkeypatch,name):
+    root,directory=fixture(tmp_path,monkeypatch)
+    with s.open_session(root,directory,"order",HEAD,options()) as session:
+        setup(session,root)
+        with pytest.raises(s.InstallSessionDenied,match="ordered prerequisites"):
+            session.begin_phase(name)
+        assert session.state.pending is None
+
+
+def test_frontend_recovery_only_after_failed_start_and_never_qualifies(tmp_path,monkeypatch):
+    root,directory=fixture(tmp_path,monkeypatch)
+    with s.open_session(root,directory,"recover",HEAD,options()) as session:
+        through_config(session,root)
+        with pytest.raises(s.InstallSessionDenied):
+            session.begin_phase("setup-ui-recovery")
+        session.begin_phase("start")
+        session.complete_phase(InstallPhase("start",False,"failed"))
+        with pytest.raises(s.InstallSessionDenied):
+            session.complete_phase(InstallPhase("readiness",True,"fake"))
+        session.begin_phase("setup-ui-recovery")
+        session.complete_phase(InstallPhase("setup-ui-recovery",True,"local",required=False))
+        session.complete_phase(InstallPhase("setup-ui-availability",True,"local",required=False))
+        with pytest.raises(s.InstallSessionDenied):
+            session.begin_phase("setup-ui-recovery")
+        phases=[InstallPhase(n,o,"redacted",required=r) for n,o,r in session.state.phase_results]
+        session.finish(InstallReceipt(root,tuple(phases)))
+    assert s.inspect_session(directory,"recover")["outcome"]=="blocked"
+
+
+@pytest.mark.parametrize("opts,reason",[
+    (options(full=True),"chroma-persistence"),
+    (options(hot=True),"arguments"),
+    (options(start=False,require_strict=True),"qualification-input"),
+])
+def test_invalid_pipeline_options_record_only_early_blocker(tmp_path,monkeypatch,opts,reason):
+    root,directory=fixture(tmp_path,monkeypatch)
+    with s.open_session(root,directory,"invalid",HEAD,opts) as session:
+        with pytest.raises(s.InstallSessionDenied):
+            session.complete_phase(InstallPhase("preload",True,"host"))
+        session.finish(InstallReceipt(root,(InstallPhase(reason,False,"blocked"),)))
+    assert s.inspect_session(directory,"invalid")["outcome"]=="blocked"
+
+
+def test_validation_only_journal_blocks_unselected_start(tmp_path,monkeypatch):
+    root,directory=fixture(tmp_path,monkeypatch)
+    with s.open_session(root,directory,"validate",HEAD,options(start=False)) as session:
+        phases=through_config(session,root)
+        with pytest.raises(s.InstallSessionDenied):
+            session.begin_phase("start")
+        session.finish(InstallReceipt(root,tuple(phases)))
+    assert s.inspect_session(directory,"validate")["outcome"]=="passed"

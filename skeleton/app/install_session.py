@@ -70,9 +70,11 @@ def _valid_id(value):
 def _snapshot(root):
     # Absence is distinct from unverifiable or unsafe configuration.
     path=root/".env"
-    if not path.exists() and not path.is_symlink():
-        return None
     try:
+        try:
+            path.lstat()
+        except FileNotFoundError:
+            return None
         result=runtime_source_fingerprint(root)
         require(_hex(result),"private runtime source fingerprint unavailable")
         return result
@@ -308,6 +310,100 @@ def _successful_phases(options, results):
     return observed[index:] == expected[2:]
 
 
+def _planned_results(options):
+    plan = [
+        ("preload", True), ("setup-runtime", True),
+        ("python-install", options["install_python"]),
+        ("runtime-preflight", True), ("compose-config", True),
+    ]
+    if options["start"]:
+        plan.extend((name, True) for name in
+                    ("start", "readiness", "critical-api-routes"))
+    if options["require_strict"]:
+        plan.append(("strict-live-qualification", True))
+    return plan
+
+
+def _next_phase(state):
+    results = [row for row in state.phase_results if row[0] != "configuration-note"]
+    plan = _planned_results(state.options)
+    # Only positive prior observations advance the ordinary path.
+    if any(not ok or (name, required) != plan[index]
+           for index, (name, ok, required) in enumerate(results)
+           if index < len(plan)) or len(results) >= len(plan):
+        return None
+    return plan[len(results)]
+
+
+def _options_allow_pipeline(options):
+    return not (options["production"] and options["hot"]
+                or options["start"] and options["full"]
+                or options["require_strict"] and not options["start"]
+                or (options["require_protected"] or options["require_ai"])
+                   and not options["require_strict"])
+
+
+def _recovery_next(state):
+    names = tuple(row[0] for row in state.phase_results)
+    if not state.options["start"] or not state.failed_required or not names:
+        return None
+    if state.phase_results[-1] == ("start", False, True):
+        return "setup-ui-recovery"
+    if state.phase_results[-1] == ("setup-ui-recovery", True, False):
+        return "setup-ui-availability"
+    return None
+
+
+def _admit_intent(state, name):
+    if not state.active or state.pending is not None:
+        return False
+    if name == "setup-ui-recovery":
+        return _recovery_next(state) == name
+    return (_options_allow_pipeline(state.options) and not state.failed_required
+            and _next_phase(state) == (name, True))
+
+
+def _admit_result(state, name, ok, required):
+    if not state.active:
+        return False
+    results = state.phase_results
+    if not results and state.pending is None and not ok and required:
+        if name in {"arguments", "qualification-input", "qualification-source",
+                    "chroma-persistence", "install-session"}:
+            return True
+    if name == "runtime-source-epoch":
+        # An epoch failure may interrupt an in-flight recovery intent.
+        return bool(results) and not ok and required and (
+            state.pending is None or state.pending == "setup-ui-recovery"
+        ) and not any(row[0] == name for row in results)
+    if state.failed_required:
+        expected = _recovery_next(state)
+        if name != expected or required:
+            return False
+        if name == "setup-ui-recovery":
+            return state.pending == name or (state.pending is None and not ok)
+        return state.pending is None
+    if not _options_allow_pipeline(state.options):
+        return False
+    if name == "configuration-note":
+        return (state.pending is None and ok and not required and bool(results)
+                and results[-1][0] in {"setup-runtime", "configuration-note"}
+                and results[-1][1])
+    next_phase = _next_phase(state)
+    if name in {"runtime-manifest", "public-endpoints"}:
+        prerequisite = "runtime-preflight" if name == "runtime-manifest" else "compose-config"
+        return (state.pending is None and not ok and required and bool(results)
+                and results[-1] == (prerequisite, True, True)
+                and (name != "public-endpoints" or state.options["start"]))
+    if next_phase != (name, required):
+        return False
+    if name in _INTENTS and required:
+        return state.pending == name
+    if state.pending is not None:
+        return False
+    return required or ok  # a skipped Python phase is positive and optional
+
+
 def _reduce(rows):
     if not rows:
         return None
@@ -328,11 +424,13 @@ def _reduce(rows):
             state.failed_required=False
             state.phase_results=()
         elif kind=="PHASE_INTENT":
-            require(state.active and state.pending is None and (not state.failed_required or data["name"]=="setup-ui-recovery"))
+            require(_admit_intent(state, data["name"]),
+                    "install mutation intent lacks ordered prerequisites")
             state.pending=data["name"]
         elif kind=="PHASE_RESULT":
-            require(state.active)
             name=data["name"]
+            require(_admit_result(state, name, data["ok"], data["required"]),
+                    "install phase result lacks ordered prerequisites")
             if name in _INTENTS and state.pending==name:
                 state.pending=None
             elif name in _INTENTS:
