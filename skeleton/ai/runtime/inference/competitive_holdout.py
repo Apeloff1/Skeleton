@@ -132,6 +132,7 @@ def compare(profiles,holdout,*,holdout_sha256,server,server_sha256,policy,
         "repeats":repeats,"slots":policy.slots,"context_per_slot":policy.context_per_slot,
         "gpu_layers_requested":policy.gpu_layers,"flash_attention":policy.flash_attention,
         "batch_tokens":policy.batch_tokens,"microbatch_tokens":policy.microbatch_tokens,
+        "runtime_profile_sha256":digest(asdict(policy)),"runtime_profile":asdict(policy),
         "competitors":[{"label":label,"model_sha256":model.model_digest,"manifest_sha256":dep.manifest_digest,
                         "model_bytes":model.total_model_bytes} for label,(dep,model) in admitted.items()],
         "summaries":summaries,"rows":results,"activation_authorized":False,
@@ -245,11 +246,9 @@ def compare_runtime_profiles(competitor, holdout_path, *, holdout_sha256, server
         if time.monotonic()-began>=total_seconds:
             raise TimeoutError("runtime campaign deadline exceeded; incomplete evidence withheld")
     for repeat in range(repeats):
-        # Rotate and reverse to distribute cold startup/order effects.
+        # Rotate each repeat; even two variants exchange the first position.
         shift = repeat % len(labels)
         ordered = labels[shift:]+labels[:shift]
-        if repeat%2:
-            ordered = ordered[::-1]
         for label in ordered:
             check_time()
             policy = policies[label]
