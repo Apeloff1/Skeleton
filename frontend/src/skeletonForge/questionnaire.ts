@@ -8,6 +8,7 @@
  * answered (skeleton/context/questionnaire.intake), and the UI says so.
  */
 import type { Beat, RunRequest } from './types';
+import type { GalaxyProfile } from './galaxyHandoff';
 import { GENRE_CHOICES } from './genreCatalog';
 import { isDesignAxis, normaliseAxisEdit, sparseInstrumentPayload } from './instruments';
 import { mappedBriefGenre, specializedVision } from './galaxyGenres';
@@ -69,6 +70,17 @@ export interface ForgeOptions {
   generation: string | null;
 }
 
+export const PLAYABLE_SLICES = [
+  { id: 'extraction', label: 'Extraction', hint: 'Recover three caches while managing heat and reach exit' },
+  { id: 'combat_loop', label: 'Arena Combat', hint: 'Survive and clear three escalating enemy waves' },
+  { id: 'pipeline', label: 'Factory Logistics', hint: 'Carry raw materials through refinery and delivery' },
+  { id: 'puzzle', label: 'Spatial Puzzle', hint: 'Activate switches in order to complete a room puzzle' },
+  { id: 'racing', label: 'Racing Time Trial', hint: 'Complete three laps through a checkpoint course' },
+  { id: 'survival', label: 'Scavenging Survival', hint: 'Manage hydration, collect supplies, reach shelter' },
+  { id: 'stealth', label: 'Stealth Infiltration', hint: 'Avoid guard vision, retrieve intel and escape' },
+  { id: 'crafting', label: 'Crafting Delivery', hint: 'Collect parts, use a workshop, deliver a crafted item' },
+] as const;
+
 export interface QuestionnaireState {
   step: Step;
   vision: string;
@@ -78,11 +90,13 @@ export interface QuestionnaireState {
   instruments: Record<string, number>;
   /** Historical Galaxy Studio genre specialization (mapped to a canonical vote). */
   galaxyGenre?: string | null;
+  /** Preserved historical authoring metadata; not a claim of current backend support. */
+  galaxyProfile?: GalaxyProfile | null;
   options: ForgeOptions;
   /** Explicit opt-in native Godot room-entry quest prototype. */
   quest?: { enabled: boolean; length: number };
   /** Opt in to three existing executable Godot archetype sidecar scenes. */
-  playable?: { enabled: boolean };
+  playable?: { enabled: boolean; mode?: string; launch?: boolean };
   /** Optional Godot headless boot qualification. */
   playtest?: 'off' | 'auto' | 'require';
   sourceExport?: { enabled: boolean };
@@ -95,6 +109,7 @@ export type QuestionnaireAction =
   | { type: 'setAxis'; axis: string; value: number | null }
   | { type: 'resetAxes' }
   | { type: 'setGalaxyGenre'; genre: string | null }
+  | { type: 'restoreDesignPreset'; state: QuestionnaireState }
   | { type: 'setOption'; key: keyof ForgeOptions; value: string | null }
   | { type: 'setSourceExportEnabled'; value: boolean }
   | { type: 'setPlayableEnabled'; value: boolean }
@@ -188,7 +203,8 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
     case 'setSourceExportEnabled':
       return { ...state, sourceExport: { enabled: action.value === true } };
     case 'setPlayableEnabled':
-      return { ...state, playable: { enabled: action.value === true } };
+      return { ...state, playable: { ...state.playable, enabled: action.value === true,
+        ...(action.value !== true && state.playable?.launch ? { launch: false } : {}) } };
     case 'setPlaytestMode':
       return { ...state, playtest: ['off', 'auto', 'require'].includes(action.value) ? action.value : 'off' };
     case 'setQuestEnabled':
@@ -215,6 +231,8 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
     }
     case 'goto':
       return reachable(state, action.step) ? { ...state, step: action.step } : state;
+    case 'restoreDesignPreset':
+      return { ...action.state, step: 'options' };
     case 'reset':
       return INITIAL_STATE;
     default:
@@ -254,6 +272,11 @@ export const ERA_SOURCE_COPY: Record<ReturnType<typeof eraSource>, string> = {
 };
 
 export function buildRunRequest(state: QuestionnaireState): RunRequest {
+  // Preserve historical preset data, but never silently claim the current
+  // archetype-only endpoint applies an explicit mini-game or Galaxy matrix.
+  if (state.galaxyProfile || (state.playable?.enabled && (state.playable.mode || state.playable.launch))) {
+    throw new Error('This Forge endpoint cannot apply the saved Galaxy profile or explicit mini-game mode. Preserve the preset and use a compatible Forge build.');
+  }
   const answers: Record<string, string> = {};
   // Beat ids and brief facets share one namespace server-side ("combat"
   // exists in both); a beat answer wins because beats are authoritative.
