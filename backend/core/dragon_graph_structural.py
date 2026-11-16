@@ -308,7 +308,7 @@ def reserve_feed(root,scope,*,url,raw,adapter,options,subscription_id,batch_id):
             if not _owner_enabled(db,owner):
                 db.execute("COMMIT");return None,{"enabled":False}
             source=db.execute("SELECT * FROM release_imports WHERE owner=? AND id=?",(owner,batch_id)).fetchone()
-            if source is None or source["input_digest"]!=input_digest:
+            if source is None or source["input_digest"]!=input_digest or source["total"]!=len({p.event_key for p in proposals}):
                 raise CatalogueHeld("feed release batch witness differs")
             db.execute(FEED_RECEIPTS)
             prior=db.execute("SELECT request_sha,proposals FROM dragon_parallel_feed_receipts WHERE owner=? AND batch=?",(owner,batch_id)).fetchone()
@@ -346,6 +346,7 @@ def reserve(root,mode):
         try:
             previous=_pending(db)
             if previous:
+                if previous[0]["mode"]!=mode:raise CatalogueHeld("different structural operation pending; recover first")
                 db.execute("COMMIT");return previous
             seq=db.execute("SELECT sequence FROM main.dragon_graph_structural WHERE singleton=1").fetchone()[0]+1
             now=int(time.time())
@@ -486,6 +487,9 @@ def apply_lane(root,sequence,plan_sha,index):
             if policy.execute("PRAGMA journal_mode").fetchone()[0].lower()!="delete":
                 raise a.GraphHeld("structural policy journal differs")
             plan=item[0];part=plan["lanes"].get(str(index))
+            if not _live_grants(policy,plan):
+                policy.execute("COMMIT")
+                return {"lane":index,"skipped":True,"reason":"grant_changed"}
             if part is None:raise a.GraphHeld("unreserved lane")
             layout=a._layout(policy,root)
             witness=_sha(part)
@@ -621,6 +625,8 @@ def settle(root,sequence,plan_sha):
                 for job in plan["jobs"]:
                     if db.execute("UPDATE "+table+" SET state=? WHERE owner=? AND id=? AND state='queued'",
                                   (job["state"],job["owner"],job["id"])).rowcount!=1:raise a.GraphHeld("job settlement differs")
+            if plan["mode"]=="expansion" and not _live_grants(db,plan):
+                raise a.GraphHeld("snapshot grant expired during expansion settlement")
             a._fence(db)
             db.execute("COMMIT")
         except BaseException:
