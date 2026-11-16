@@ -231,6 +231,15 @@ def install_application(
     for warning in setup.warnings:
         phases.append(InstallPhase("configuration-note", True, warning, required=False))
 
+    # Validation-only installs also consume private configuration. Bind the
+    # exact bytes immediately after setup, before pip or Compose can run.
+    try:
+        admitted_digest = runtime_source_fingerprint(root)
+    except (OSError, ValueError, UnicodeError):
+        phases.append(_runtime_source_rejection())
+        return InstallReceipt(root=root, phases=tuple(phases))
+    admitted_process_env = dict(os.environ)
+
     if install_python:
         intent("python-install")
         python_phase = _run(
@@ -257,21 +266,11 @@ def install_application(
             )
         )
 
-    # Admit one process environment before runtime preflight; all later
-    # manifest, Compose and readiness decisions consume the same snapshot.
-    admitted_process_env = dict(os.environ)
-    # Observe the .env source before preflight itself can read its contents.
-    # Recheck afterward so configuration changes during validation cannot
-    # certify startup using a different source or inode.
-    admitted_digest: str | None = None
-    if start:
-        try:
-            # A fresh installed runtime must have a bounded private source.
-            # No bypass for a missing or replaced .env, including bundled EXEs.
-            admitted_digest = runtime_source_fingerprint(root)
-        except (OSError, ValueError, UnicodeError):
-            phases.append(_runtime_source_rejection())
-            return InstallReceipt(root=root, phases=tuple(phases))
+    # pip or a cooperating observer may have changed the source. Neither
+    # validation-only nor start mode may continue under the new epoch.
+    if not _runtime_source_stable(root, admitted_digest):
+        phases.append(_runtime_source_rejection())
+        return InstallReceipt(root=root, phases=tuple(phases))
     manifest = load_manifest()
     runtime_checks = preflight(
         root, runtime=True, manifest=manifest, environ=admitted_process_env,
@@ -315,10 +314,18 @@ def install_application(
     # Validate precisely the configuration used for startup. The production
     # frontend uses port 8080, unlike the default development Compose model.
     mode = "production" if production else "development"
-    compose_env = {**admitted_process_env, **manifest.mode_env(mode), "COMPOSE_REMOVE_ORPHANS": "0"}
+    compose_env = {
+        **admitted_process_env, **manifest.mode_env(mode),
+        "COMPOSE_REMOVE_ORPHANS": "0",
+        "COMPOSE_DISABLE_ENV_FILE": "0",
+        "COMPOSE_PROFILES": "",
+    }
+    # The CLI flag is the authority, rather than a process-supplied list
+    # of alternate dotenv files or an inherited activation profile.
+    compose_env.pop("COMPOSE_ENV_FILES", None)
     intent("compose-config")
     compose_validate = _run(
-        compose_command("config", manifest=manifest, full=full, hot=hot),
+        compose_command("config", manifest=manifest, full=full, hot=hot, install_env=True),
         root=root,
         runner=runner,
         label="compose-config",
@@ -326,10 +333,10 @@ def install_application(
         env=compose_env,
     )
     phases.append(compose_validate)
-    if not compose_validate.ok or not start:
-        return InstallReceipt(root=root, phases=tuple(phases))
-    if admitted_digest is None or not _runtime_source_stable(root, admitted_digest):
+    if not _runtime_source_stable(root, admitted_digest):
         phases.append(_runtime_source_rejection())
+        return InstallReceipt(root=root, phases=tuple(phases))
+    if not compose_validate.ok or not start:
         return InstallReceipt(root=root, phases=tuple(phases))
 
     try:
@@ -352,6 +359,7 @@ def install_application(
             full=full,
             build=True,
             hot=hot,
+            install_env=True,
         )
     except ValueError as exc:
         # Record the rejected startup decision even though no child ran.
@@ -403,7 +411,7 @@ def install_application(
             )
             intent("setup-ui-recovery")
             recovery = _run(
-                compose_command("up", manifest=diagnostic_manifest, hot=hot),
+                compose_command("up", manifest=diagnostic_manifest, hot=hot, install_env=True),
                 root=root,
                 runner=runner,
                 label="setup-ui-recovery",

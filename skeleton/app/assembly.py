@@ -854,14 +854,23 @@ def compose_command(
     follow: bool = False,
     service: str = "",
     hot: bool = False,
+    install_env: bool = False,
 ) -> tuple[str, ...]:
-    """Build a shell-free Docker Compose command for the unified app."""
+    """Build a shell-free Docker Compose command for the unified app.
+
+    The installer has already admitted its private configuration source.
+    Pin that exact relative env file in every installer Compose invocation.
+    """
+    if type(install_env) is not bool:
+        raise ValueError("install_env must be boolean")
 
     manifest = manifest or load_manifest()
     action = action.strip().lower()
     base = ["docker", "compose", "-f", manifest.compose_file]
     if hot:
         base.extend(["-f", manifest.hot_compose_file])
+    if install_env:
+        base.extend(["--env-file", ".env"])
 
     if action == "up":
         from skeleton.app.plan import build_plan

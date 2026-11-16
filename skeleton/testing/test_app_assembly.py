@@ -1333,3 +1333,19 @@ def test_readonly_dotenv_rejects_same_inode_mutation(tmp_path, monkeypatch):
     monkeypatch.setattr(os, "fdopen", Reader)
     with pytest.raises(ValueError, match="changed"):
         _read_dotenv(source)
+
+
+@pytest.mark.parametrize("action", ["config", "up"])
+@pytest.mark.parametrize("hot", [False, True])
+def test_compose_installer_commands_select_exact_private_env_file(action, hot):
+    command = compose_command(action, install_env=True, hot=hot)
+    pos = command.index("--env-file")
+    assert command[pos:pos + 3] == ("--env-file", ".env", action)
+    assert command.count("--env-file") == 1
+    assert "--env-file" not in compose_command(action, hot=hot)
+
+
+@pytest.mark.parametrize("value", [None, 0, 1, "true"])
+def test_compose_install_env_switch_is_explicit_boolean(value):
+    with pytest.raises(ValueError, match="install_env"):
+        compose_command("config", install_env=value)

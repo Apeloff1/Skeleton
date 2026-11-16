@@ -568,3 +568,75 @@ def test_runtime_preflight_cannot_swap_private_config_before_epoch_admission(
     assert receipt.phases[-1].name == "runtime-source-epoch"
     assert not any(x.name in {"compose-config", "start", "readiness"}
                    for x in receipt.phases)
+
+
+
+@pytest.mark.parametrize("start", [False, True])
+def test_compose_source_is_pinned_and_ambient_file_selection_removed(tmp_path, monkeypatch, start):
+    _prepare(monkeypatch, tmp_path)
+    monkeypatch.setenv("COMPOSE_ENV_FILES", "external.env")
+    monkeypatch.setenv("COMPOSE_DISABLE_ENV_FILE", "1")
+    monkeypatch.setenv("COMPOSE_PROFILES", "full")
+    monkeypatch.setenv("COMPOSE_REMOVE_ORPHANS", "1")
+    observed = []
+
+    def command(action, **kwargs):
+        assert kwargs["install_env"] is True
+        return ("docker", "compose", action)
+
+    def run(args, **kwargs):
+        observed.append(args[-1])
+        environment = kwargs["env"]
+        assert "COMPOSE_ENV_FILES" not in environment
+        assert environment["COMPOSE_DISABLE_ENV_FILE"] == "0"
+        assert environment["COMPOSE_PROFILES"] == ""
+        assert environment["COMPOSE_REMOVE_ORPHANS"] == "0"
+        # Avoid an actual startup or subsequent network probes.
+        return subprocess.CompletedProcess(args, 1 if args[-1] == "up" else 0)
+
+    monkeypatch.setattr(installer, "compose_command", command)
+    if start:
+        # An independently startable frontend can enter setup recovery;
+        # fail its fake Compose invocation too, without using live services.
+        _forbid_network(monkeypatch)
+    result = installer.install_application(tmp_path, start=start, install_python=False, runner=run)
+    assert observed[0] == "config"
+    assert result.ok is (not start)
+
+
+def test_validation_only_rejects_config_mutation_during_compose(tmp_path, monkeypatch):
+    env = _prepare(monkeypatch, tmp_path)
+    _forbid_network(monkeypatch)
+    def runner(command, **kwargs):
+        env.write_text("FRONTEND_PORT=3300\n", encoding="utf-8")
+        return _completed(command)
+    receipt = installer.install_application(tmp_path, install_python=False, start=False, runner=runner)
+    assert not receipt.ok
+    assert receipt.phases[-1].name == "runtime-source-epoch"
+
+
+@pytest.mark.parametrize("start", [False, True])
+def test_pip_cannot_change_admitted_runtime_config_before_compose(tmp_path, monkeypatch, start):
+    env = _prepare(monkeypatch, tmp_path)
+    _forbid_network(monkeypatch)
+    calls = []
+    def runner(command, **kwargs):
+        calls.append(command)
+        assert command[1:4] == ["-m", "pip", "install"]
+        env.write_text("FRONTEND_PORT=3300\n", encoding="utf-8")
+        return _completed(command)
+    receipt = installer.install_application(tmp_path, install_python=True, start=start, runner=runner)
+    assert len(calls) == 1
+    assert not receipt.ok
+    assert receipt.phases[-1].name == "runtime-source-epoch"
+
+
+@pytest.mark.parametrize("start", [False, True])
+def test_missing_setup_output_denies_all_install_modes_before_pip(tmp_path, monkeypatch, start):
+    env = _prepare(monkeypatch, tmp_path)
+    env.unlink()
+    def forbidden(*args, **kwargs):
+        pytest.fail("unadmitted private configuration reached a subprocess")
+    receipt = installer.install_application(tmp_path, install_python=True, start=start, runner=forbidden)
+    assert not receipt.ok
+    assert receipt.phases[-1].name == "runtime-source-epoch"

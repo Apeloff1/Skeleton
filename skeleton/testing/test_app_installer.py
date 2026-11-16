@@ -275,7 +275,11 @@ def test_setup_preserves_external_mongo_when_local_credentials_are_repaired(tmp_
 
 
 def test_installer_validates_compose_with_start_mode_environment(tmp_path, monkeypatch):
+    (tmp_path / ".env").write_text("FRONTEND_PORT=3000\n", encoding="utf-8")
     monkeypatch.setenv("COMPOSE_REMOVE_ORPHANS", "1")
+    monkeypatch.setenv("COMPOSE_ENV_FILES", "external.env")
+    monkeypatch.setenv("COMPOSE_DISABLE_ENV_FILE", "1")
+    monkeypatch.setenv("COMPOSE_PROFILES", "full")
     report = PreloadReport(
         root=tmp_path,
         platform="test",
@@ -304,6 +308,10 @@ def test_installer_validates_compose_with_start_mode_environment(tmp_path, monke
     assert env["FRONTEND_CONTAINER_PORT"] == "8080"
     assert env["NODE_ENV"] == "production"
     assert env["COMPOSE_REMOVE_ORPHANS"] == "0"
+    assert env["COMPOSE_DISABLE_ENV_FILE"] == "0"
+    assert env["COMPOSE_PROFILES"] == ""
+    assert "COMPOSE_ENV_FILES" not in env
+    assert command[-4:-2] == ("--env-file", ".env")
 
 @pytest.mark.parametrize(
     ("host", "srv"),
