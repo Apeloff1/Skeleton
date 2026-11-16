@@ -136,6 +136,21 @@ class OfflineRuntimeSession:
             self._require_fresh_source(now)
             return self._controller.consume(admission, now_ns=now)
 
+    def execution_deadline(self, grant_expires_ns: int, *, consumer: object) -> int:
+        """Intersect a consumed grant's expiry with the pinned inspection limit.
+
+        This method cannot issue a grant. The exclusive consumer must
+        already have consumed the exact pending receipt. Expiration of
+        either bound prevents dispatch and successful output publication.
+        """
+        with self._lock:
+            self._open()
+            self._authorize(consumer)
+            deadline = integer(grant_expires_ns, 1, 2**63 - 1, "grant expiry")
+            if self._maximum_source_age_ns is not None:
+                deadline = min(deadline, self._verified_ns + self._maximum_source_age_ns)
+            return deadline
+
     def status(self) -> dict:
         with self._lock:
             return {"closed": self._closed, "source_digest": self._source_digest,
