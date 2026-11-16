@@ -190,7 +190,7 @@ class OfflineHTTPApplication:
             self.reference_writes = LocalReferenceWrite(self.knowledge)
             self.reference_jobs = LocalReferenceJob(self.knowledge)
             from skeleton.app.jeeves_review_campaign import ReviewCampaignStore
-            self.review_campaigns = ReviewCampaignStore(self._store, self.model_digest, self.tokenizer_digest)
+            self.review_campaigns = ReviewCampaignStore(self._store, self.model_digest, self.tokenizer_digest, knowledge=self.knowledge)
         except BaseException:
             if self.longform is not None:
                 self.longform.close()
@@ -574,9 +574,13 @@ class OfflineHTTPApplication:
                     "message": spec["message"],
                     "expected_revision": view["session_revision"], "approved": True,
                     "max_output_tokens": spec["max_output_tokens"],
-                    "require_full_history": True, "grounded": False,
+                    "require_full_history": spec.get("history_policy", "recent") == "recent",
+                    "history_policy": spec.get("history_policy", "recent"),
+                    "grounded": bool(spec.get("sources")),
                     "adaptive": spec["adaptive"],
-                })
+                    **({"document_ids": [row["document_id"] for row in spec["sources"]]}
+                       if spec.get("sources") else {}),
+                }, expected_source_pins=spec.get("sources"))
                 return 200, campaigns.settle(sid, cid, node, op, report)
             except BaseException:
                 # Preserve uncertain execution and the full reservation.
@@ -591,7 +595,7 @@ class OfflineHTTPApplication:
         except CampaignRejected as exc:
             raise OfflineHTTPError(400, str(exc)) from None
 
-    def _deliberation_review(self, sid: str, body: dict[str, Any]) -> dict[str, Any]:
+    def _deliberation_review(self, sid: str, body: dict[str, Any], *, expected_source_pins=None) -> dict[str, Any]:
         from skeleton.app.jeeves_deliberation import deliberate, MAX_CANDIDATE_TOKENS
         _fields(body, {"message", "expected_revision", "approved", "max_output_tokens",
                        "require_full_history", "grounded", "document_ids", "adaptive", "history_policy"},
@@ -636,8 +640,30 @@ class OfflineHTTPApplication:
                     history = tuple((row["role"], row["content"]) for row in rows
                                     if row["role"] != "system")
                     manifest = None
+                    def check_pins():
+                        if expected_source_pins:
+                            from skeleton.app.jeeves_review_campaign import CampaignRejected
+                            try:
+                                self.review_campaigns.verify_sources(expected_source_pins)
+                            except (CampaignRejected, RuntimeContractError):
+                                raise OfflineHTTPError(409, "approved campaign source changed") from None
+                    check_pins()
                     if grounded:
-                        hits = self._grounding_hits(message.strip(), scope)
+                        if adaptive is not None and adaptive["contract"]["kind"] == "source_quotes":
+                            # Prefer source diversity instead of several high-ranked
+                            # passages from the same document. Ranking is not truth.
+                            ranked = self.knowledge.search(message.strip(), limit=12,
+                                                           document_ids=scope, evidence_excerpt=True)
+                            hits, seen, remaining = [], set(), []
+                            for hit in ranked:
+                                if hit["document_id"] in seen:
+                                    remaining.append(hit)
+                                else:
+                                    seen.add(hit["document_id"])
+                                    hits.append(hit)
+                            hits = (hits+remaining)[:3]
+                        else:
+                            hits = self._grounding_hits(message.strip(), scope)
                         if not hits:
                             raise OfflineHTTPError(422, "no local reference passages match this question")
                         digest = _strict_context_digest(scoped_grounded_request_digest(
@@ -650,6 +676,7 @@ class OfflineHTTPApplication:
                         self._admit_local_generation()
                         with self._store.read_snapshot():
                             current = self._session(sid)
+                            check_pins()
                             if current.revision != revision or current.transcript.to_list() != rows:
                                 raise OfflineHTTPError(409, "conversation changed during deliberation")
                             if manifest is not None:
