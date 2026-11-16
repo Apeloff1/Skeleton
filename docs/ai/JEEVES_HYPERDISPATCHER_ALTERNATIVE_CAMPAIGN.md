@@ -310,3 +310,20 @@ general code/tool execution, production model inference, process sandboxing,
 or deployment qualification. Physical disk headroom, encryption, external
 receipt intake, orchestration startup, lease renewal and independent
 competitive measurements remain open.
+
+## Wave A15: committed-result crash reconciliation
+
+The SQLite evidence journal migrates v1 to v2 transactionally and retains
+a separate immutable second-issuer reconciliation receipt per original
+attempt. Both the result and subsequent reconciliation are SHA-bound,
+capacity-accounted and independently readable. The original committed
+worker receipt is resolved and revalidated using the original worker
+authority and deterministic operation semantics; the inspector signs a
+distinct committed-recovery receipt that references the original receipt,
+artifact and exact admitted payload. The existing canonical broker
+revalidates the inspector's authority and checkpoints/readbacks before
+releasing the uncertain task. No subprocess is launched during recovery.
+Pending or mismatched attempts remain uncertain. This establishes a
+recoverable local pure-job effect path, not a general external side-effect
+or physical-stop proof. Two regressions cover the lost owner checkpoint
+window and rejection of unproven attempts.

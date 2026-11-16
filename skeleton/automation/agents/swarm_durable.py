@@ -1038,7 +1038,7 @@ class SQLiteWorkerCustody:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 version = conn.execute("PRAGMA user_version").fetchone()[0]
-                if version not in (0, 1):
+                if version not in (0, 1, 2):
                     raise DurableSwarmError("unsupported worker custody schema")
                 if version == 0:
                     existing = conn.execute(
@@ -1071,6 +1071,19 @@ class SQLiteWorkerCustody:
                     conn.execute("INSERT INTO custody_limits VALUES (1,?,?,?)",
                                  (max_attempts, max_bytes, max_artifact_bytes))
                     conn.execute("PRAGMA user_version=1")
+                if version in (0, 1):
+                    conn.execute("""
+                        CREATE TABLE reconciliations (
+                            run_id TEXT NOT NULL, lease_token TEXT NOT NULL,
+                            original_digest TEXT NOT NULL,
+                            receipt_digest TEXT NOT NULL UNIQUE,
+                            receipt BLOB NOT NULL, artifact BLOB NOT NULL,
+                            charge INTEGER NOT NULL CHECK(charge>0),
+                            PRIMARY KEY (run_id, lease_token),
+                            FOREIGN KEY (run_id, lease_token) REFERENCES attempts(run_id, lease_token)
+                        ) WITHOUT ROWID
+                    """)
+                    conn.execute("PRAGMA user_version=2")
                 limits = conn.execute(
                     "SELECT max_attempts,max_bytes,max_artifact_bytes FROM custody_limits WHERE id=1"
                 ).fetchone()
@@ -1097,6 +1110,7 @@ class SQLiteWorkerCustody:
         try:
             conn.execute("PRAGMA synchronous=FULL")
             conn.execute("PRAGMA trusted_schema=OFF")
+            conn.execute("PRAGMA foreign_keys=ON")
             return conn
         except BaseException:
             conn.close()
@@ -1128,6 +1142,9 @@ class SQLiteWorkerCustody:
                 count, occupied = conn.execute(
                     "SELECT count(*),coalesce(sum(charge),0) FROM attempts"
                 ).fetchone()
+                occupied += conn.execute(
+                    "SELECT coalesce(sum(charge),0) FROM reconciliations"
+                ).fetchone()[0]
                 if count >= self.max_attempts or occupied + charge > self.max_bytes:
                     raise DurableSwarmError("worker evidence custody capacity exhausted")
                 conn.execute(
@@ -1198,6 +1215,13 @@ class SQLiteWorkerCustody:
                 "WHERE receipt_digest=? AND length(receipt)<=4096 AND length(artifact)<=?",
                 (digest, self.max_artifact_bytes),
             ).fetchone()
+            if row is None:
+                row = conn.execute(
+                    "SELECT r.run_id,r.lease_token,a.worker_id,a.task_id,r.receipt,r.artifact "
+                    "FROM reconciliations r JOIN attempts a USING(run_id,lease_token) "
+                    "WHERE r.receipt_digest=? AND length(r.receipt)<=4096 AND length(r.artifact)<=?",
+                    (digest, self.max_artifact_bytes),
+                ).fetchone()
         if row is None:
             return None
         try:
@@ -1232,14 +1256,73 @@ class SQLiteWorkerCustody:
             _wait_digest(row[4])
         return LocalAttemptRecord(attempt, row[4])
 
+    def publish_reconciliation(self, attempt: HostDispatchAttempt,
+                               original_digest: str, receipt: HostWorkerReceipt,
+                               artifact: bytes) -> str:
+        """Immutable second-issuer evidence linked to the original durable result."""
+        from contextlib import closing
+        from dataclasses import asdict
+        from hashlib import sha256
+        _check_local_attempt(attempt)
+        _wait_digest(original_digest)
+        if (type(receipt) is not HostWorkerReceipt or receipt.action != "reconcile:committed"
+                or type(artifact) is not bytes or not 1 <= len(artifact) <= self.max_artifact_bytes
+                or (receipt.run_id, receipt.worker_id, receipt.task_id, receipt.lease_token)
+                != (attempt.run_id, attempt.worker_id, attempt.task_id, attempt.lease_token)
+                or sha256(artifact).hexdigest() != receipt.artifact_sha256):
+            raise DurableSwarmError("invalid committed reconciliation identity")
+        encoded = _wait_bytes(asdict(receipt))
+        if len(encoded) > 4096:
+            raise DurableSwarmError("reconciliation receipt exceeds reservation")
+        digest = receipt.digest
+        charge = len(encoded) + len(artifact)
+        with closing(self._connect()) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                original = conn.execute(
+                    "SELECT tenant,task_id,worker_id,payload,receipt_digest FROM attempts "
+                    "WHERE run_id=? AND lease_token=?", (attempt.run_id, attempt.lease_token)
+                ).fetchone()
+                if original != (attempt.tenant, attempt.task_id, attempt.worker_id,
+                                attempt.payload_json, original_digest):
+                    raise DurableSwarmError("original worker result custody missing")
+                prior = conn.execute(
+                    "SELECT original_digest,receipt_digest,receipt,artifact FROM reconciliations "
+                    "WHERE run_id=? AND lease_token=?", (attempt.run_id, attempt.lease_token)
+                ).fetchone()
+                identity = (original_digest, digest, encoded, artifact)
+                if prior is not None:
+                    if prior != identity:
+                        raise DurableSwarmError("immutable reconciliation conflict")
+                else:
+                    occupied = conn.execute(
+                        "SELECT (SELECT coalesce(sum(charge),0) FROM attempts) + "
+                        "(SELECT coalesce(sum(charge),0) FROM reconciliations)"
+                    ).fetchone()[0]
+                    if occupied + charge > self.max_bytes:
+                        raise DurableSwarmError("reconciliation custody capacity exhausted")
+                    conn.execute("INSERT INTO reconciliations VALUES (?,?,?,?,?,?,?)",
+                                 (attempt.run_id, attempt.lease_token, *identity, charge))
+                conn.commit()
+            except BaseException:
+                conn.rollback()
+                raise
+        if self.resolve(digest) != (receipt, artifact):
+            raise DurableSwarmError("reconciliation receipt readback mismatch")
+        return digest
+
     def usage(self) -> dict[str, int]:
         from contextlib import closing
         with closing(self._connect()) as conn:
             count, charge, completed = conn.execute(
                 "SELECT count(*),coalesce(sum(charge),0),count(receipt_digest) FROM attempts"
             ).fetchone()
-        return {"attempts": count, "reserved_bytes": charge,
-                "completed": completed, "uncertain": count - completed}
+            reconciled, reconciliation_bytes = conn.execute(
+                "SELECT count(*),coalesce(sum(charge),0) FROM reconciliations"
+            ).fetchone()
+        return {"attempts": count, "reserved_bytes": charge + reconciliation_bytes,
+                "completed": completed, "uncertain": count - completed,
+                "reconciliations": reconciled}
 
 
 _LOCAL_OPERATIONS = frozenset({"sha256_text", "integer_sum", "json_sha256"})
@@ -1394,3 +1477,118 @@ class LocalSubprocessTransport:
         )
         digest = self.custody.finish(attempt, receipt, artifact)
         return HostTransportReply("success", digest)
+
+
+class LocalCommittedEvidenceValidator:
+    """Verify a separately authorized recovery receipt against original bytes.
+
+    A valid worker result alone never opens an uncertain task. The historical
+    success signature must be checked by the original worker authority,
+    semantic validation must still pass, and the current broker must verify
+    the distinct reconciliation issuer.
+    """
+
+    def __init__(self, custody: SQLiteWorkerCustody,
+                 original_authority: HostWorkerAuthority) -> None:
+        if not isinstance(original_authority, HostWorkerAuthority):
+            raise DurableSwarmError("original trusted worker authority required")
+        self.custody = custody
+        self.original_authority = original_authority
+        self._local = LocalWorkerEvidenceValidator(custody)
+
+    def _original(self, attempt: HostDispatchAttempt) -> tuple[HostWorkerReceipt, bytes]:
+        record = self.custody.lookup(attempt.run_id, attempt.lease_token)
+        if record is None or record.attempt != attempt or record.receipt_sha256 is None:
+            raise DurableSwarmError("no proven committed worker result")
+        bundle = self.custody.resolve(record.receipt_sha256)
+        if bundle is None:
+            raise DurableSwarmError("original worker evidence unavailable")
+        receipt, artifact = bundle
+        if (receipt.action != "success" or not self._local(receipt, artifact)
+                or self.original_authority(
+                    attempt.worker_id, attempt.task_id, attempt.lease_token,
+                    "success", receipt.digest,
+                ) is not True):
+            raise DurableSwarmError("original worker evidence refused")
+        return receipt, artifact
+
+    def artifact(self, attempt: HostDispatchAttempt) -> bytes:
+        from hashlib import sha256
+        receipt, original = self._original(attempt)
+        return _wait_bytes({
+            "version": 1, "kind": "local-pure-committed",
+            "original_receipt_sha256": receipt.digest,
+            "original_artifact_sha256": sha256(original).hexdigest(),
+            "payload_sha256": sha256(attempt.payload_json).hexdigest(),
+            "tenant": attempt.tenant,
+        })
+
+    def __call__(self, receipt: HostWorkerReceipt, artifact: bytes) -> bool:
+        if receipt.action == "success":
+            return self._local(receipt, artifact)
+        if receipt.action != "reconcile:committed":
+            return False
+        try:
+            record = self.custody.lookup(receipt.run_id, receipt.lease_token)
+            if (record is None or (record.attempt.worker_id, record.attempt.task_id)
+                    != (receipt.worker_id, receipt.task_id)):
+                return False
+            return artifact == self.artifact(record.attempt)
+        except (DurableSwarmError, ValueError, TypeError):
+            return False
+
+
+class LocalCommittedRecovery:
+    """Recover an already committed pure job without repeating physical work.
+
+    No result, pending tombstone, wrong payload, invalid receipt, or unrelated
+    attempt can be resolved by this path. Stopped/no-effect and general
+    external side-effect reconciliation remain separately authorized.
+    """
+
+    def __init__(self, custody: SQLiteWorkerCustody,
+                 validator: LocalCommittedEvidenceValidator, *,
+                 issuer: str, issuer_key: bytes) -> None:
+        if validator.custody is not custody:
+            raise DurableSwarmError("reconciliation validator custody mismatch")
+        _validate_wait_key(issuer_key)
+        self.custody = custody
+        self.validator = validator
+        self.issuer = _wait_identifier(issuer)
+        self._issuer_key = issuer_key
+
+    def reconcile(self, owner: HostWaitDriver, tenant: str,
+                  task_id: str) -> tuple[SwarmTask, DurableSwarmCapture]:
+        from hashlib import sha256
+        runtime = owner.broker.broker.runtime
+        with owner.broker._lock, runtime._lock:
+            task = owner.broker._verified_resident(tenant, task_id)
+            if (not task.effect_uncertain or task.leased_to is None
+                    or task.lease_token is None):
+                raise DurableSwarmError("not an exact uncertain attempt")
+            payload = dict(task.payload)
+            payload.pop(_HOST_WAIT_FIELD, None)
+            attempt = HostDispatchAttempt(
+                owner.run_id, tenant, task_id, task.leased_to,
+                task.lease_token, _wait_bytes(payload),
+            )
+        # No scheduler locks across immutable external evidence reads.
+        artifact = self.validator.artifact(attempt)
+        original, _ = self.validator._original(attempt)
+        if (original.issuer == self.issuer
+                or not isinstance(owner.broker.broker._verify_worker, HostWorkerAuthority)):
+            raise DurableSwarmError("independent reconciliation authority required")
+        signed = HostWorkerReceipt.issue(
+            run_id=attempt.run_id, issuer=self.issuer, worker_id=attempt.worker_id,
+            task_id=attempt.task_id, lease_token=attempt.lease_token,
+            action="reconcile:committed", artifact_sha256=sha256(artifact).hexdigest(),
+            issuer_key=self._issuer_key,
+        )
+        digest = self.custody.publish_reconciliation(
+            attempt, original.digest, signed, artifact,
+        )
+        return owner.bridge.reconcile_and_capture_verified(
+            owner.run_id, owner.owner_id, owner.manager, owner.broker, tenant, task_id,
+            worker_id=attempt.worker_id, lease_token=attempt.lease_token,
+            outcome="committed", evidence_sha256=digest,
+        )

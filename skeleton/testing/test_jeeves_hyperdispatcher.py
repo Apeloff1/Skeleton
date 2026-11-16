@@ -2317,3 +2317,93 @@ def test_local_subprocess_full_dispatch_and_persistent_evidence(tmp_path):
     receipt, artifact = reopened.resolve(report.evidence_sha256)
     assert LocalWorkerEvidenceValidator(reopened)(receipt, artifact)
     assert reopened.usage()["completed"] == 1
+
+
+def test_local_committed_recovery_repairs_crash_after_receipt_without_relaunch(tmp_path, monkeypatch):
+    import subprocess
+    from skeleton.automation.agents.swarm_durable import (
+        SQLiteWorkerCustody, LocalSubprocessTransport, LocalWorkerEvidenceValidator,
+        LocalCommittedEvidenceValidator, LocalCommittedRecovery, HostWorkerAuthority,
+        HostWaitDriver, HostDispatchAttempt, SwarmDurableBridge, DurableSwarmError,
+    )
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.automation.agents.swarm_tenant_broker import TenantSwarmBroker
+    from skeleton.automation.agents.swarm_broker import SwarmBroker
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, TaskState
+    from skeleton.intelligence.dispatch_policy import DispatchCandidate
+    from skeleton.testing.test_durable_run_store import make_store
+    run_id = "recover-local"
+    directory = _private_worker_directory(tmp_path)
+    custody = SQLiteWorkerCustody(directory)
+    worker_grants = {("worker", "w"): (b"w" * 32, frozenset({"success"}))}
+    original = HostWorkerAuthority(run_id, grants=worker_grants, resolve=custody.resolve,
+                                   validate_evidence=LocalWorkerEvidenceValidator(custody))
+    runtime, broker = _verified_dispatch_fixture(verify_worker=original)
+    store = make_store(tmp_path)
+    store.create_run(run_id)
+    store.claim_run(run_id, "owner", lease_seconds=60)
+    bridge = SwarmDurableBridge(store)
+    manager = SwarmRecoveryManager(delta_archive=True)
+    payload = {"operation": "integer_sum", "input": [11, 13]}
+    bridge.submit_unique_verified(run_id, "owner", manager, broker, "a", SwarmTask("physical", payload))
+    _, task, _ = bridge.lease_and_capture_verified(
+        run_id, "owner", manager, broker, (DispatchCandidate("physical", "a", 100, 0),), now_ms=10000,
+    )
+    transport = LocalSubprocessTransport(
+        custody, grants={("a", "w"): frozenset({"integer_sum"})},
+        worker_signers={"w": ("worker", b"w" * 32)},
+    )
+    attempt = HostDispatchAttempt(run_id, "a", task.id, task.leased_to, task.lease_token,
+                                  b'{"input":[11,13],"operation":"integer_sum"}')
+    reply = transport(attempt)
+    # No completion checkpoint: simulate owner loss after verified worker custody.
+    reopened = SQLiteWorkerCustody(directory)
+    restored_bridge = SwarmDurableBridge(make_store(tmp_path))
+    recovered = restored_bridge.load(run_id)
+    restored_runtime = recovered.restore_runtime()
+    assert restored_runtime.task(task.id).effect_uncertain
+    original = HostWorkerAuthority(run_id, grants=worker_grants, resolve=reopened.resolve,
+                                   validate_evidence=LocalWorkerEvidenceValidator(reopened))
+    validator = LocalCommittedEvidenceValidator(reopened, original)
+    grants = dict(worker_grants)
+    grants[("inspector", "w")] = (b"i" * 32, frozenset({"reconcile:committed"}))
+    authority = HostWorkerAuthority(run_id, grants=grants, resolve=reopened.resolve,
+                                    validate_evidence=validator)
+    replacement = TenantSwarmBroker(SwarmBroker(restored_runtime, verify_worker=authority),
+                                    broker.ingress.fork_empty(), verified_mode=True)
+    recovered.manager.restore_tenants(replacement)
+    owner = HostWaitDriver(restored_bridge, run_id, "owner", recovered.manager, replacement,
+                           source_keys={}, clock_ms=lambda: 50)
+    def forbidden(*args, **kwargs):
+        raise AssertionError("recovery attempted physical relaunch")
+    monkeypatch.setattr(subprocess, "run", forbidden)
+    recovery = LocalCommittedRecovery(reopened, validator, issuer="inspector", issuer_key=b"i" * 32)
+    final, _ = recovery.reconcile(owner, "a", task.id)
+    assert final.state is TaskState.SUCCEEDED and not final.effect_uncertain
+    assert final.reconciliation_sha256 != reply.evidence_sha256
+    receipt, artifact = reopened.resolve(final.reconciliation_sha256)
+    assert receipt.issuer == "inspector" and validator(receipt, artifact)
+    assert reopened.usage()["reconciliations"] == 1
+    assert restored_bridge.load(run_id).restore_runtime().task(task.id).state is TaskState.SUCCEEDED
+    with pytest.raises((DurableSwarmError, ValueError)):
+        recovery.reconcile(owner, "a", task.id)
+
+
+def test_local_committed_recovery_refuses_pending_or_modified_attempt(tmp_path):
+    from skeleton.automation.agents.swarm_durable import (
+        SQLiteWorkerCustody, LocalWorkerEvidenceValidator, LocalCommittedEvidenceValidator,
+        HostWorkerAuthority, HostDispatchAttempt, DurableSwarmError,
+    )
+    custody = SQLiteWorkerCustody(_private_worker_directory(tmp_path))
+    attempt = HostDispatchAttempt("run", "a", "task", "w", "a" * 32,
+                                  b'{"input":[1],"operation":"integer_sum"}')
+    assert custody.begin(attempt)
+    original = HostWorkerAuthority("run", grants={
+        ("worker", "w"): (b"w" * 32, frozenset({"success"})),
+    }, resolve=custody.resolve, validate_evidence=LocalWorkerEvidenceValidator(custody))
+    validator = LocalCommittedEvidenceValidator(custody, original)
+    for candidate in (attempt, replace(attempt, tenant="other"),
+                      replace(attempt, payload_json=b'{"input":[2],"operation":"integer_sum"}')):
+        with pytest.raises(DurableSwarmError):
+            validator.artifact(candidate)
+    assert custody.usage()["reconciliations"] == 0
