@@ -286,3 +286,91 @@ Design references: contextual retrieval (Anthropic, 2024), late chunking
 (arXiv:2409.04701), RAPTOR (arXiv:2401.18059; this implementation uses
 centroids, not abstractive summary trees), ColBERT (segment MaxSim inspired),
 and vLLM block prefix reuse and chunked prefill scheduling.
+
+## Scalable persistent ANN and pretrained admission
+
+The immutable local disk ANN uses multiple independent SQLite files, random
+hyperplane LSH bands, low-margin multiprobe neighbors, separately indexed
+exact identifier anchors, exact cosine reranking of bounded candidates, and
+thread or explicitly spawned process fanout. It does not load the full
+vector corpus into RAM during queries. Every shard is hashed on admission
+and checked for file identity drift before and after each query. The
+manifest binds the source inventory, retrieval feature space, projection
+geometry, runtime NumPy version and ordered file bytes. Incomplete or
+failed shards never become a partial successful query.
+
+Configured limits: 1–64 shards, 1–16 workers, up to 100 million indexed
+leaves, up to 1 TiB index budget; these are safety ceilings, not physically
+qualified storage or throughput claims. The index remains approximate:
+collision buckets and candidate limits can reduce recall. The builder is
+streamed per source document, but a single document is still verified and
+materialized using the canonical document owner. Existing canonical source
+writes and metadata snapshot scans retain their own scale limits. Process
+workers are local trusted child processes, not a remote distributed cluster.
+
+The offline knowledge library builds a generation from one SQLite read
+snapshot. When the source inventory changes, the attached generation
+fails closed until an explicit new generation is built and pinned. Query
+candidate pointers are independently resolved against verified canonical
+source slices and reranked before becoming citations. The derived index is
+not a source authority. A stale immutable generation may still retain
+historic derived vectors on disk; the operator must retire old private
+generations when retention policy requires erasure.
+
+### Build and attach
+
+The `local-semantic` optional group is declared in both package metadata
+surfaces. On an existing private library and reviewed local encoder:
+
+```sh
+python -m scripts.build_semantic_ann \
+  --database /private/library.sqlite --model-digest MODEL_SHA256 \
+  --tokenizer-digest TOKENIZER_SHA256 --config /private/semantic.json \
+  --config-sha256 CONFIG_SHA256 --index-root /private/ann \
+  --generation generation-001 --shards 8 --workers 4 \
+  --worker-mode process --max-index-bytes 68719476736
+```
+
+Use the receipt's manifest SHA-256 with the existing offline HTTP startup
+flags `--semantic-index PATH --semantic-index-sha256 SHA` together with the
+semantic config flags. A private preexisting root is required. No default
+installer activation or background rebuild is implied.
+
+### Pretrained artifacts
+
+`scripts.provision_semantic_models` supports explicit acquisition of a
+fixed public catalog or import from operator-provisioned bare source Git
+snapshots and exact local model files. No remote repository code is
+checked out or executed. The published source commit binds tokenizer
+Git blob content and the exact LFS pointer; the weight SHA-256 must match
+the separate reviewed catalog. The installed retrieval runtime performs
+no acquisition. Candidate config is published only after native CPU
+encoder execution succeeds. Optional reranker admission also executes
+the actual pair graph before publication. Runtime graph restrictions
+remain enforced, including rejection of nonstandard operators and
+external tensors.
+
+Catalog: BGE-small-en-v1.5 FP32 / INT8 exports and BGE-reranker-base INT8,
+from Xenova's fixed ONNX export revisions. Base model cards identify
+MIT licensing; export redistribution requires separate license review.
+The contextual mean-pooling implementation differs from the publisher's
+standard embedding recipe and must not inherit publisher benchmark scores.
+
+```sh
+python -m scripts.provision_semantic_models \
+  --destination /private/bge-package --encoder bge-small-f32 \
+  --acquire-reviewed-public-models
+python -m scripts.qualify_pretrained_semantic \
+  --package /private/bge-package --output /private/diagnostic.json
+```
+
+Offline alternative: `--offline-snapshot /private/snapshots`, containing
+each requested profile's `source.git` bare repository and `model.onnx`.
+The operator must supply trusted local binaries, dependencies and artifacts.
+Actual public diagnostic qualification uses repository-authored examples
+with recall/precision/MRR/nDCG, multi-evidence coverage and ANN candidate
+recall. It does not establish independent benchmark superiority. A
+dedicated CI job acquires only public model bytes, executes local CPU
+inference on the runner and publishes measurements rather than weights.
+Physical CUDA/MPS, Windows, multi-host worker transport, actual large
+index capacity and installed first-launch integration remain held.
