@@ -57,11 +57,22 @@ def _private(path,*,create=False):
         raise ShardHeld("private single-link shard file required")
     for suffix in ("-wal","-shm","-journal"):
         side=Path(str(p)+suffix)
-        if side.is_symlink():raise ShardHeld("unsafe shard sidecar")
-        if side.exists():
-            info=side.lstat()
-            if not stat.S_ISREG(info.st_mode) or info.st_nlink!=1 or os.name=="posix" and (
+        # SQLite may unlink its transient sidecars as another connection
+        # closes. Inspect one inode observation, not exists()/lstat() pairs.
+        # An already unlinked inode is never accepted: observe the pathname
+        # again, with a bounded retry budget. All live objects must remain
+        # private regular single-link files; dangling symlinks are denied.
+        for attempt in range(3):
+            try:
+                info=side.lstat()
+            except FileNotFoundError:
+                break
+            if not stat.S_ISREG(info.st_mode) or os.name=="posix" and (
                     info.st_uid!=os.getuid() or info.st_mode&0o077):
+                raise ShardHeld("unsafe shard sidecar")
+            if info.st_nlink==1:
+                break
+            if info.st_nlink!=0 or attempt==2:
                 raise ShardHeld("unsafe shard sidecar")
     return p,(s.st_dev,s.st_ino)
 
