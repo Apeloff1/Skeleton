@@ -960,6 +960,10 @@ class LlamaCppModel:
         self._process_lock = threading.Lock()
         self._active_processes: set[int] = set()
         self._draining_processes: set[int] = set()
+        # Only populated when synchronous cleanup did not establish death
+        # and output-pump drain. Keep both the process and its lease owned.
+        self._unconfirmed_cleanup: dict[int, tuple[Any, tuple[threading.Thread, ...], Callable[[], None] | None]] = {}
+        self._cleanup_recovery_lock = threading.Lock()
         self._spawning_processes = 0
         self._processes_started = 0
         self._inference_admitted = False
@@ -1175,6 +1179,7 @@ class LlamaCppModel:
                 "active_processes": len(self._active_processes),
                 "draining_processes": len(self._draining_processes),
                 "spawning_processes": self._spawning_processes,
+                "unconfirmed_cleanup": len(self._unconfirmed_cleanup),
                 "processes_started": self._processes_started,
                 "processes_exited": self._processes_exited,
                 "termination_requests": self._termination_requests,
@@ -1189,6 +1194,38 @@ class LlamaCppModel:
                 "resource_preflight_bound": self._resource_preflight_bound,
                 "resource_preflight_checks": self._resource_preflight_checks,
             }
+
+    def reap_unconfirmed_cleanup(self) -> dict[str, int]:
+        """Retry only confirmed-dead cleanup; never signal a reused PID.
+
+        Live children remain owned and block new admissions. The original
+        termination path is responsible for OS signals. This nonblocking
+        recovery operation does not claim physical shutdown while a child,
+        output pump or failed lease release remains outstanding.
+        """
+        with self._cleanup_recovery_lock:
+            with self._process_lock:
+                pending = tuple(self._unconfirmed_cleanup.items())
+            reaped = 0
+            for pid, (process, pumps, release) in pending:
+                if process.poll() is None or any(pump.is_alive() for pump in pumps):
+                    continue
+                try:
+                    for stream in (process.stdout, process.stderr):
+                        if stream is not None:
+                            stream.close()
+                    if release is not None:
+                        release()
+                except (OSError, ValueError, RuntimeError):
+                    continue
+                with self._process_lock:
+                    self._unconfirmed_cleanup.pop(pid)
+                    self._active_processes.discard(pid)
+                    self._draining_processes.discard(pid)
+                    self._processes_exited += 1
+                    reaped += 1
+            with self._process_lock:
+                return {"reaped": reaped, "remaining": len(self._unconfirmed_cleanup)}
 
     @property
     def memory_estimate_source(self) -> str:
@@ -1671,6 +1708,8 @@ class LlamaCppModel:
         with self._process_lock:
             # Freeze profile before prompt hashing or artifact checks begin.
             # This prevents a digest/config race with late resource retuning.
+            if self._unconfirmed_cleanup:
+                raise LlamaCppRuntimeError("previous native cleanup remains unconfirmed")
             self._inference_admitted = True
             resource_guard = self._resource_preflight
             lease_factory = getattr(self, "_resource_lease_factory", None)
@@ -1751,8 +1790,24 @@ class LlamaCppModel:
                         release_lease = lease_factory()
                         if not callable(release_lease):
                             raise LlamaCppRuntimeError(
-                                "Metal lease did not provide release callback"
+                                "native resource lease did not provide release callback"
                             )
+                    # Existing outer HTTP lease and optional native resource
+                    # lease are independent. Never overwrite one with the other.
+                    inherited = gguf_child_pass_fds() if os.name == "posix" else ()
+                    resource_fds = getattr(release_lease, "child_pass_fds", None)
+                    if resource_fds is not None:
+                        if os.name != "posix" or not callable(resource_fds):
+                            raise LlamaCppRuntimeError("native resource lease inheritance unavailable")
+                        extra = resource_fds()
+                        if (type(extra) is not tuple or len(extra) != 1
+                                or type(extra[0]) is not int or extra[0] < 0):
+                            raise LlamaCppRuntimeError("native resource lease descriptor invalid")
+                        os.fstat(extra[0])
+                        inherited = tuple(dict.fromkeys((*inherited, *extra)))
+                    # Tokenization, resource probes and lease checks may run
+                    # long enough to consume the remaining execution budget.
+                    interrupt()
                     process = subprocess.Popen(
                         command,
                         stdin=subprocess.DEVNULL,
@@ -1771,7 +1826,7 @@ class LlamaCppModel:
                         # a replacement server from launching a second GGUF.
                         # Windows must use its own job-object containment;
                         # POSIX pass_fds is never supplied on Windows.
-                        **({"pass_fds": gguf_child_pass_fds()} if os.name == "posix" else {}),
+                        **({"pass_fds": inherited} if os.name == "posix" else {}),
                         creationflags=(getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0),
                     )
                 except BaseException:
@@ -1897,12 +1952,25 @@ class LlamaCppModel:
                         if process.stderr is not None:
                             process.stderr.close()
                     finally:
-                        with self._process_lock:
-                            self._active_processes.discard(process.pid)
-                            self._draining_processes.discard(process.pid)
-                            self._processes_exited += 1
-                        if release_lease is not None:
-                            release_lease()
+                        # A termination request is not a death receipt. If
+                        # reaping or pipe cleanup raised, retain the process
+                        # handle, lease and accounting for explicit recovery.
+                        confirmed = process.poll() is not None and not any(pump.is_alive() for pump in pumps)
+                        try:
+                            if confirmed and release_lease is not None:
+                                release_lease()
+                        except BaseException:
+                            confirmed = False
+                            raise
+                        finally:
+                            with self._process_lock:
+                                if confirmed:
+                                    self._active_processes.discard(process.pid)
+                                    self._draining_processes.discard(process.pid)
+                                    self._processes_exited += 1
+                                else:
+                                    self._draining_processes.add(process.pid)
+                                    self._unconfirmed_cleanup[process.pid] = (process, tuple(pumps), release_lease)
                 return_code = process.poll()
                 if return_code is None:
                     raise LlamaCppRuntimeError("local runtime could not be terminated")
