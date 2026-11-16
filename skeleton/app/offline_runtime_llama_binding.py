@@ -19,14 +19,13 @@ from skeleton.ai.runtime.inference.llama_cpp import (
     COMPLETION_CHAT_FLAGS, QWEN3_COMPLETION_CHAT_TEMPLATE, LlamaCppModel, LlamaCppRuntimeError,
 )
 from skeleton.ai.runtime.inference.adaptive_serving import AdaptiveServingController
-from skeleton.app.offline_cpu_budget import MemoryTopology
 from skeleton.app.offline_cpu_budget import plan_cpu_workers
 from skeleton.app.offline_energy_budget import plan_energy_workers, EnergyPolicy
 from skeleton.app.offline_native_process_lease import NativeCpuLeaseOwner, NativeLeaseError
 from skeleton.ai.runtime.inference.local import LocalModelAdapter, sample_serving_resources
 from skeleton.app.offline_runtime_preflight import (
     ModelSource, RuntimePolicy, RuntimePreflightError, canonical, digest, identity, inspect_source,
-    plan_preflight, require, sample_hardware, integer,
+    plan_preflight, require, sample_hardware, integer, intersect_scoped_headroom,
 )
 
 SCHEMA = "skeleton.offline.measured-llama-cpu.v1"
@@ -142,14 +141,7 @@ class MeasuredLlamaCpuGate:
         # Windows commit limits and pressure signals. Do not count host
         # free memory that its scoped probe cannot actually allocate.
         serving = sample_serving_resources(fresh=True)
-        scoped = serving.allocation_headroom_bytes
-        available = reading.memory.available_bytes
-        if scoped is None or available is None or serving.available_memory_bytes is None:
-            available = None
-        else:
-            available = min(scoped, available)
-        reading = replace(reading, memory=MemoryTopology(
-            reading.memory.total_bytes, available, "intersection-with-serving-headroom"))
+        reading = replace(reading, memory=intersect_scoped_headroom(reading.memory, serving))
         now = time.monotonic_ns()
         require(0 <= now - reading.started_ns <= self._policy.sample_age_ns
                 and reading.finished_ns <= now, "stale native resource observation")
@@ -229,6 +221,8 @@ class MeasuredLlamaCpuGate:
                     blockers.append("running_host_reserve_exhausted")
                 if energy.allowed_workers < self._threads:
                     blockers.append("running_thread_ceiling_exceeded")
+                if reading.scoped_pressure == "critical":
+                    blockers.append("canonical_scoped_serving_pressure_critical")
                 if pressure.level == "critical":
                     blockers.append("canonical_serving_" + pressure.reason)
                 if not self._backend.execution_snapshot()["active_processes"]:
