@@ -109,3 +109,11 @@ def test_lane_pagination_does_not_change_global_accounting(index):
     assert a["counts"]==b["counts"] and a["filtered_count"]==a["lens_count"]
     assert all(row["lane"]=="dragon_observation" for row in a["rows"]+b["rows"])
     assert not {r["task_id"] for r in a["rows"]}&{r["task_id"] for r in b["rows"]}
+
+
+def test_nested_index_mutation_is_not_accepted(index):
+    from dataclasses import replace
+    tasks=deepcopy(index.tasks)
+    tasks[0]["material_ready"]=not tasks[0]["material_ready"]
+    with pytest.raises(EvidenceError):
+        queue(replace(index,tasks=tasks))

@@ -127,3 +127,17 @@ def test_scope_isolated_and_unauthorized_calls_do_not_create_db(tmp_path):
 def test_mirror_bytes(name):
     root=Path(__file__).resolve().parents[2]/"skeleton"
     assert (root/"jeeves"/name).read_bytes()==(root/"ai"/"agents"/"jeeves"/name).read_bytes()
+
+
+def test_persistent_db_is_required():
+    with pytest.raises(EvidenceError,match="persistent"):
+        append_campaign(":memory:","scope",order(),expected_head=GENESIS,authorized=True)
+
+
+def test_corrupt_source_shape_is_rejected_as_integrity_error(tmp_path):
+    db=tmp_path/"frontier.db"
+    first=append_campaign(db,"scope",order(),expected_head=GENESIS,authorized=True)
+    with sqlite3.connect(db) as conn:
+        conn.execute("UPDATE frontier_archive_events_v1 SET source=?",(b'{}',))
+    with pytest.raises(EvidenceError):
+        audit_archive(db,"scope",expected_head=first["head"],authorized=True)

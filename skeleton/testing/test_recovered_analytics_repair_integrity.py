@@ -131,3 +131,10 @@ def test_clock_rewind_after_route_is_rejected():
         return route(None)
     with pytest.raises(ValueError,match="monotonically"):
         RepairLoop(evaluate,lambda *a:None,rewind,Budget(3,10,1),clock).run({"nested":{"score":0}})
+
+
+def test_unknown_failure_severity_cannot_be_silently_passing():
+    with pytest.raises(ValueError):
+        EvalFailure("rule","unverified","fatal")
+    with pytest.raises(ValueError):
+        EvalResult(1,("untyped",))

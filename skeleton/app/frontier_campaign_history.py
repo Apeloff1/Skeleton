@@ -51,7 +51,16 @@ def project(scope,rows,*,retention,history_limit,expected_head,campaign_id=None)
         order=parse(source_bytes)
         # Check count before running the canonical owner. A false stored
         # counter cannot force the replay beyond its declared work budget.
-        actual=sum(len(session["steps"]) for session in order["sessions"])
+        try:
+            sessions=order["sessions"]
+            if type(sessions) is not list or not 1<=len(sessions)<=32:
+                raise EvidenceError("invalid stored session list")
+            if any(type(session) is not dict or type(session.get("steps")) is not list
+                   or not 1<=len(session["steps"])<=128 for session in sessions):
+                raise EvidenceError("invalid stored step list")
+            actual=sum(len(session["steps"]) for session in sessions)
+        except (KeyError,TypeError) as exc:
+            raise EvidenceError("invalid stored source structure") from exc
         if actual!=observed_steps:
             raise EvidenceError("stored step accounting diverges")
         export,evidence=build_campaign(order)

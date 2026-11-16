@@ -33,6 +33,8 @@ MAX_DB_BYTES=256*1024*1024
 
 def _open(path,*,write):
     p=Path(path)
+    if str(p)==":memory:":
+        raise EvidenceError("persistent archive path required")
     if p.is_symlink() or (p.exists() and not p.is_file()):
         raise EvidenceError("cooperative archive path must be a regular file")
     if not write and not p.is_file():

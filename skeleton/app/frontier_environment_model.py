@@ -68,11 +68,14 @@ def weather_block(value):
     temp=number(x["temperature"],-80,70)
     wet=number(x["humidity"],0,1)
     rain=number(x["rain"],0,1000)
+    velocity=vec(x["velocity"],100)
+    if velocity.dot(velocity)>100**2:
+        raise EvidenceError("motion speed exceeds traction envelope")
     return WeatherBlock(integer(x["frames"],1,MAX_FRAMES),
         Weather(vec(x["wind"],150),temp,rain,wet,sunlight=number(x["sunlight"],0,1)),
         AirConditions(altitude_m=number(x["altitude"],-500,11000),temperature_c=temp,
                       relative_humidity=wet,fog_liquid_g_m3=number(x["fog"],0,3),rain_mm_h=rain),
-        number(x["cloud"],0,1),vec(x["acceleration"],50),vec(x["velocity"],100))
+        number(x["cloud"],0,1),vec(x["acceleration"],50),velocity)
 
 
 def micro(x):

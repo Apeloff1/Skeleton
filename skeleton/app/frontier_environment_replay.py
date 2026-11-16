@@ -71,7 +71,9 @@ def _simulate(order):
         climate=LightClimate(air,block.weather.precipitation_mm_h,block.cloud)
         for _ in range(block.frames):
             frame=clock.next_frame()
-            dt=(clock.deadline(frame.index+1)-frame.deadline_ns)/1_000_000_000
+            if frame.frame_index!=index:
+                raise EvidenceError("canonical presentation frame sequence diverged")
+            dt=(clock.deadline(frame.frame_index+1)-frame.deadline_ns)/1_000_000_000
             terrain=evolve_microclimate(micro,block.weather,block.air,s.traction,delta_s=dt)
             micro=terrain.state
             wind=block.weather.wind.scaled(air.effective_wind_factor)+terrain.pressure_wind_delta

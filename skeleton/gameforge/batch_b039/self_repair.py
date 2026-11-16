@@ -53,6 +53,12 @@ class EvalFailure:
     message: str
     severity: str = "error"  # error | warning
 
+    def __post_init__(self) -> None:
+        if (type(self.check) is not str or not self.check or len(self.check)>256
+                or type(self.message) is not str or len(self.message)>4096
+                or self.severity not in ("error","warning")):
+            raise ValueError("invalid evaluation failure")
+
 
 @dataclass(frozen=True)
 class EvalResult:
@@ -63,6 +69,9 @@ class EvalResult:
         if (isinstance(self.score, bool) or not isinstance(self.score, (int, float))
                 or not math.isfinite(self.score)):
             raise ValueError("evaluation score must be finite")
+        if (type(self.failures) is not tuple or len(self.failures)>4096
+                or any(not isinstance(f,EvalFailure) for f in self.failures)):
+            raise ValueError("typed evaluation failures required")
 
     @property
     def passed(self) -> bool:

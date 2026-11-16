@@ -64,7 +64,23 @@ def reconcile(index,receipts,*,keys,expected_head,authorized):
         raise EvidenceError("canonical work index required")
     _keys(keys)
     _sha(expected_head)
+    if (type(index.tasks) is not tuple or not 1<=len(index.tasks)<=MAX_TASKS
+            or len(index.tasks)%len(LANES)):
+        raise EvidenceError("invalid canonical work index inventory")
+    # Frozen dataclass attributes do not make nested dictionaries immutable.
+    # Recheck every task and the enclosing index before accepting receipts.
+    for task in index.tasks:
+        if (type(task) is not dict or task.get("lane") not in LANES
+                or task.get("source_report_digest")!=index.source_digest
+                or task.get("catalog_digest")!=index.catalog_digest):
+            raise EvidenceError("work task identity altered")
+        pin(digest({k:v for k,v in task.items() if k!="task_id"}),task.get("task_id"))
     known=index.by_identity
+    if len(known)!=len(index.tasks):
+        raise EvidenceError("duplicate work task identity")
+    pin(digest({"source":index.source_digest,"catalog":index.catalog_digest,
+                "audit":index.campaign_audit_digest,"tasks":[t["task_id"] for t in index.tasks]}),
+        index.identity)
     by_task={}
     by_reviewer={}
     artifact_lanes={}
