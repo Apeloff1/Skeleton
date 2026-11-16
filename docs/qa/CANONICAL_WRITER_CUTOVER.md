@@ -70,3 +70,10 @@ write entrypoints check installed handle identity and concern, and recheck
 before the epoch can become stable after mutation. This does not make direct
 Mongo clients or unregistered collection writers safe; memento transactions
 and cross-owner deletion remain separate reviewed surfaces.
+
+The disposable authenticated Mongo qualification now exercises the v2 local
+owner graph using actual BSON projections, majority reads, a real stable epoch,
+same-principal independent clients, alternate-principal denial, orphan and
+prepared-message denial, divergent revision scope, pending idempotency denial,
+and changed-outbox approval invalidation. Its ephemeral fixture is not a
+production migration, multi-member failover, or installer-to-inference receipt.

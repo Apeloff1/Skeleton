@@ -10,6 +10,9 @@ on:
       - 'skeleton/persistence/mongo_source_epoch.py'
       - 'skeleton/persistence/mongo_epoch_operator.py'
       - 'skeleton/app/compose_guarded_preflight.py'
+      - 'skeleton/app/canonical_writer_cutover.py'
+      - 'backend/core/canonical_writer_startup.py'
+      - 'skeleton/testing/test_canonical_writer_cutover.py'
 
 permissions:
   contents: read
@@ -22,7 +25,7 @@ jobs:
   authenticated_replica:
     name: Exact-head isolated authenticated Mongo replica epoch and CAS
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

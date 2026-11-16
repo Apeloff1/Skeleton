@@ -31,12 +31,16 @@ from pymongo import AsyncMongoClient
 from pymongo.write_concern import WriteConcern
 
 from skeleton.app.compose_guarded_preflight import inspect_compose_mongo_epoch
+from skeleton.app.canonical_writer_cutover import (
+    CanonicalWriterCutover, VerifiedWriterCutover, WriterCutoverDenied,
+    inspect_writer_inventory, qualify_writer_cutover, _observe,
+)
 from skeleton.persistence.mongo_epoch_operator import EpochApproval, EpochOperatorAuthorization
 from skeleton.persistence.mongo_source_epoch import MongoCanonicalSourceEpoch, MongoSourceEpochError
 
 IMAGE = "mongo:7.0.41@sha256:b096b4cb9269f3ebcf363be63f1c50920f786879d03a1890347a3bf33f1f0df0"
 DOCKER = ["docker", "--host", "unix:///var/run/docker.sock"]
-SCHEMA = "skeleton.mongo.isolated_replica_qualification.v1"
+SCHEMA = "skeleton.mongo.isolated_replica_qualification.v2"
 _SHA = re.compile(r"[0-9a-f]{40}\Z")
 _ID = re.compile(r"[0-9a-f]{64}\Z")
 _START = """set -eu
@@ -150,7 +154,142 @@ async def _competing_writer(owner, actor):
         raise QualificationError("concurrent writer acquired occupied epoch")
 
 
-async def _check_epochs(port, dbname, writer_secret, reader_secret):
+async def _deny_cutover(awaitable):
+    try:
+        await awaitable
+    except WriterCutoverDenied:
+        return
+    raise QualificationError("unsafe canonical cutover was admitted")
+
+
+def _fixture_collections(db):
+    return {
+        "threads": db["conversation_threads"],
+        "messages": db["conversation_messages"],
+        "records": db["canonical_memory_records"],
+        "revisions": db["canonical_memory_revisions"],
+        "projection_outbox": db["canonical_memory_projection_outbox"],
+        "idempotency": db["canonical_memory_idempotency"],
+    }
+
+
+async def _fixture_cutover(head, signer, owner, peer, reader, db, peerdb, read_db):
+    """Qualify the real Mongo projection/aggregation/linearizable scan seam."""
+    handles = _fixture_collections(db)
+    peer_handles = _fixture_collections(peerdb)
+    read_handles = _fixture_collections(read_db)
+    tenant, actor = "fixture-tenant", "actor-a"
+    common = {"repository_namespace":"memory","memory_id":"memory-a",
+              "tenant_id":tenant,"namespace":"qualification"}
+    root = {**common,"subject_id":actor,"version":Int64(2)}
+    snap = {key:value for key,value in root.items() if key!="repository_namespace"}
+    seed = {
+        "threads":{"_id":"thread-a","thread_id":"thread-a","tenant_id":tenant,
+                   "owner_id":actor,"version":2,"message_sequence":1},
+        "messages":{"_id":"message-a","message_id":"message-a","thread_id":"thread-a",
+                    "sequence":1,"_commit_state":"committed",
+                    "content":"fixture payload deliberately excluded from metadata inventory"},
+        "records":root,
+        "revisions":{**common,"version":Int64(2),"record":dict(snap)},
+        "projection_outbox":{**common,"event_id":"event-a","memory_version":Int64(2),
+                             "action":"upsert","published_at":None,"record":dict(snap)},
+        "idempotency":{**common,"idempotency_key":"request-a","request_digest":"d"*64,
+                       "status":"committed","result":dict(snap)},
+    }
+    # Only the freshly created fixture namespace is mutated; these are not
+    # deployment migration operations and never run against a supplied URI.
+    for lane, row in seed.items():
+        result = await handles[lane].with_options(
+            write_concern=WriteConcern(w="majority", j=True, wtimeout=10000)
+        ).insert_one(row)
+        require(result.acknowledged is True, "cutover fixture seed not acknowledged")
+    async def inspect(epoch, collections):
+        return await inspect_writer_inventory(epoch=epoch, collections=collections,
+                                              repository_namespace="memory")
+    async def admit(approval, epoch=owner, collections=handles):
+        return await qualify_writer_cutover(approval, epoch=epoch, collections=collections,
+                                            repository_namespace="memory")
+    async def approve():
+        receipt = await inspect(owner, handles)
+        topology, principals = await _observe(db)
+        now = int(time.time())
+        evidence = lambda name: hashlib.sha256(("isolated-ci-only:"+name).encode()).hexdigest()
+        plan = CanonicalWriterCutover(
+            authority_id="disposable-ci-only", deployment_id=db.name, source_head=head,
+            database_name=db.name, replica_set=topology[0], voting_hosts=topology[3],
+            principal_inventory=principals, issued_at=now-1, expires_at=now+120,
+            epoch_count=receipt["epoch_count"], source_scope_count=receipt["source_scope_count"],
+            inventory_sha256=receipt["inventory_sha256"], backup_sha256=evidence("backup"),
+            quiescence_sha256=evidence("quiescence"),
+            external_writer_retirement_sha256=evidence("retirement"),
+            storage_provenance_sha256=evidence("storage"),
+        )
+        return VerifiedWriterCutover(plan, signer.sign(plan.canonical_bytes()),
+                                     plan.authority_id, plan.deployment_id, head,
+                                     signer.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw))
+    receipt = await inspect(owner, handles)
+    require(receipt["local_collection_counts"] == dict.fromkeys(handles,1)
+            and receipt["epoch_count"] == 2 and receipt["source_scope_count"] == 1
+            and receipt["writer_cutover_authorized"] is False
+            and receipt["writes_performed"] is False
+            and "fixture payload" not in json.dumps(receipt),
+            "real cutover observation leaked payload or granted authority")
+    approval = await approve()
+    first = await admit(approval)
+    require(first.digest == receipt["inventory_sha256"], "real signed graph digest mismatch")
+    peer_result = await admit(approval, peer, peer_handles)
+    require(peer_result == first, "identical authenticated peer disagreed")
+    await _deny_cutover(admit(approval, reader, read_handles))
+    await _deny_cutover(admit(approval, owner, peer_handles))
+    checks = {"real_signed_six_collection_graph_and_same_principal_peer":True,
+              "different_principal_and_foreign_client_handles_denied":True}
+    # Corrupt one structural boundary at a time from a separate authenticated
+    # client, require both observer and signed startup to fail, restore exact
+    # metadata, then qualify the same original approval.
+    cases = (
+        ("messages", {"_id":"message-a"}, {"_commit_state":"prepared"}, {"_commit_state":"committed"}),
+        ("messages", {"_id":"message-a"}, {"thread_id":"orphan"}, {"thread_id":"thread-a"}),
+        ("revisions", {"memory_id":"memory-a"}, {"record.subject_id":"other"}, {"record.subject_id":actor}),
+        ("idempotency", {"memory_id":"memory-a"}, {"status":"pending"}, {"status":"committed"}),
+    )
+    for lane, query, broken, repaired in cases:
+        coll = peer_handles[lane].with_options(
+            write_concern=WriteConcern(w="majority", j=True, wtimeout=10000))
+        changed = await coll.update_one(query, {"$set":broken})
+        require(changed.matched_count == 1 and changed.modified_count == 1, "fixture corruption not applied")
+        await _deny_cutover(inspect(owner, handles))
+        await _deny_cutover(admit(approval))
+        restored = await coll.update_one(query, {"$set":repaired})
+        require(restored.modified_count == 1, "fixture corruption not restored")
+        require((await admit(approval)).digest == first.digest, "fixture graph restoration mismatch")
+    checks["real_orphan_prepared_cross_subject_and_pending_denial"] = True
+    # A structurally valid publication-state mutation changes the signed
+    # inventory even though the graph remains valid for read-only inspection.
+    coll = peer_handles["projection_outbox"].with_options(
+        write_concern=WriteConcern(w="majority", j=True, wtimeout=10000))
+    changed = await coll.update_one({"event_id":"event-a"},
+                                    {"$set":{"published_at":"2026-01-01T00:00:00Z"}})
+    require(changed.modified_count == 1, "fixture publication state not changed")
+    observed = await inspect(owner, handles)
+    require(observed["inventory_sha256"] != first.digest, "changed graph reused old digest")
+    await _deny_cutover(admit(approval))
+    require((await admit(await approve())).digest == observed["inventory_sha256"],
+            "fresh independent graph approval did not qualify")
+    restored = await coll.update_one({"event_id":"event-a"},{"$set":{"published_at":None}})
+    require(restored.modified_count == 1, "fixture publication state not restored")
+    require((await admit(approval)).digest == first.digest, "original graph restoration mismatch")
+    checks["valid_metadata_change_requires_new_signed_approval"] = True
+    # No increment: the remaining physical CAS tests below depend on the
+    # pre-existing generations. Assert graph qualification itself was read-only.
+    require(await _read(owner, "actor-a") == 2 and await _read(owner, "actor-b") == 2,
+            "cutover qualification unexpectedly modified an epoch")
+    for collection in handles.values():
+        require(await collection.count_documents({}) == 1, "cutover fixture row count changed")
+    checks["cutover_admission_does_not_mutate_epoch_or_row_inventory"] = True
+    return checks
+
+
+async def _check_epochs(head, port, dbname, writer_secret, reader_secret):
     signer = Ed25519PrivateKey.generate()
     clients = [
         _client(port, user="fixture_writer", password=writer_secret, database=dbname),
@@ -184,6 +323,7 @@ async def _check_epochs(port, dbname, writer_secret, reader_secret):
                 and denied["canonical_actor_epoch_stable_observed"] is False,
                 "unauthenticated preflight admitted")
         checks["authenticated_read_only_observation"] = True
+        checks.update(await _fixture_cutover(head, signer, owner, peer, reader, db, peerdb, read_db))
 
         async with owner.writer(**_scope("actor-a")):
             owner.require_actor_writer(**_scope("actor-a"))
@@ -296,7 +436,7 @@ test.createUser({{user:"fixture_reader",pwd:{_j(reader)},roles:[{{role:"read",db
         require(match is not None, "fixture is not loopback-only")
         port = int(match.group(1))
         require(1 <= port <= 65535, "invalid fixture port")
-        checks = asyncio.run(_check_epochs(port, dbname, writer, reader))
+        checks = asyncio.run(_check_epochs(head, port, dbname, writer, reader))
     finally:
         # Only the uniquely generated, label-bound container may be removed.
         inspected = _docker("inspect", "--format", "{{.Id}} {{index .Config.Labels \"org.skeleton.isolated-epoch\"}}",
