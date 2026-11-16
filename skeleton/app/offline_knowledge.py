@@ -649,12 +649,15 @@ class OfflineKnowledgeLibrary:
             except (ValueError,MemoryError,OSError,LocalResourcePressure) as exc:
                 raise RuntimeContractError("bounded disk semantic retrieval failed") from exc
 
-    def search_multihop(self,query,*,document_ids=None,limit=3,policy=None,interrupt=None):
+    def search_multihop(self,query,*,document_ids=None,limit=3,policy=None,interrupt=None,
+                        allow_lexical=False):
         from dataclasses import replace
         from .offline_grounding import normalized_document_scope
         from skeleton.retrieval.evidence_walk import walk,EvidenceWalkPolicy
         selected=normalized_document_scope(document_ids)
-        if self._semantic_ranker is None:
+        if type(allow_lexical) is not bool:
+            raise RuntimeContractError("explicit lexical research policy required")
+        if self._semantic_ranker is None and not allow_lexical:
             raise RuntimeContractError("multi-hop requires explicitly configured learned retrieval")
         if type(limit) is not int or not 1<=limit<=3:raise RuntimeContractError("invalid multi-hop result limit")
         policy=replace(policy or EvidenceWalkPolicy(),max_evidence=limit)
@@ -665,8 +668,9 @@ class OfflineKnowledgeLibrary:
                 return self.search(text,limit=count,document_ids=selected,evidence_excerpt=True)
             try:
                 hits,proof=walk(query,retrieve,policy=policy,
-                    embed=lambda text:ranker.encoder.query(text).dense,
-                    dimension=ranker.encoder.policy.dimension,interrupt=interrupt)
+                    embed=(None if ranker is None else lambda text:ranker.encoder.query(text).dense),
+                    dimension=None if ranker is None else ranker.encoder.policy.dimension,
+                    interrupt=interrupt)
             except RuntimeContractError:raise
             except (ValueError,MemoryError,OSError) as exc:
                 raise RuntimeContractError("bounded multi-hop retrieval failed") from exc
