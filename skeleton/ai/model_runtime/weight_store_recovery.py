@@ -81,12 +81,29 @@ def _review_locked(owner: WeightStoreDiskOwner, policy: RecoveryReviewPolicy,
     manifests_complete = True
     layout_complete = True
     directory_identities = {}
+    scan_identity = sha256()
+    managed_directories = {path: _identity(path.lstat()) for path in (store.root, store.objects, store.manifests)}
 
     def visit() -> None:
         nonlocal entries
         entries += 1
         if entries > policy.maximum_entries:
             raise WeightShardStoreError("recovery review entry ceiling exceeded")
+
+    def scan(path, area: str):
+        """Collect bounded names, then emit deterministic observed metadata."""
+        with os.scandir(path) as listing:
+            names = []
+            for item in listing:
+                visit()
+                names.append(item.name)
+        for name in sorted(names):
+            info = (path / name).lstat()
+            scan_identity.update(canonical_bytes({
+                "area": area, "name_digest": _key(name), "identity": _identity(info),
+            }))
+            scan_identity.update(b"\n")
+            yield name, info
 
     def record(kind: str, **fields: Any) -> None:
         counts[kind] = counts.get(kind, 0) + 1
@@ -120,77 +137,67 @@ def _review_locked(owner: WeightStoreDiskOwner, policy: RecoveryReviewPolicy,
     if intent is not None:
         record("unresolved_staging_intent", intent_digest=intent["digest"],
                plan_digest=intent["plan_digest"])
-    with os.scandir(store.root) as listing:
-        for item in listing:
-            visit()
-            if item.name.startswith("..weight-stage-") and item.name.endswith(".tmp"):
+    for name, _ in scan(store.root, "root"):
+        if name.startswith("..weight-stage-") and name.endswith(".tmp"):
+            layout_complete = False
+            record("interrupted_control_publication", name_digest=_key(name))
+    for name, info in scan(store.objects, "objects"):
+        if (not _BUCKET.fullmatch(name) or not stat.S_ISDIR(info.st_mode)
+                or info.st_dev != owner._root_inode[0]):
+            layout_complete = False
+            record("unexpected_bucket", name_digest=_key(name))
+            continue
+        directory_identities[name] = _identity(info)
+        parent = store.objects / name
+        for child, child_info in scan(parent, "objects/" + name):
+            temp = _OBJECT_TEMP.fullmatch(child)
+            if temp and temp.group(1)[:2] == name and valid_regular(child_info):
+                classify_temporary("objects", temp, child_info, maybe_stat(parent / temp.group(1)))
+            elif (_HEX.fullmatch(child) and child[:2] == name
+                  and valid_regular(child_info) and child_info.st_size > 0):
+                objects[child] = _identity(child_info)
+                if child_info.st_nlink != 1:
+                    record("nonexclusive_object_inode", object_digest=child)
+            else:
                 layout_complete = False
-                record("interrupted_control_publication", name_digest=_key(item.name))
-    with os.scandir(store.objects) as listing:
-        for bucket in listing:
-            visit()
-            info = bucket.stat(follow_symlinks=False)
-            if (not _BUCKET.fullmatch(bucket.name) or not stat.S_ISDIR(info.st_mode)
-                    or info.st_dev != owner._root_inode[0]):
-                layout_complete = False
-                record("unexpected_bucket", name_digest=_key(bucket.name))
-                continue
-            directory_identities[bucket.name] = (info.st_dev, info.st_ino)
-            parent = store.objects / bucket.name
-            with os.scandir(parent) as children:
-                for item in children:
-                    visit()
-                    info = item.stat(follow_symlinks=False)
-                    temp = _OBJECT_TEMP.fullmatch(item.name)
-                    if temp and temp.group(1)[:2] == bucket.name and valid_regular(info):
-                        classify_temporary("objects", temp, info, maybe_stat(parent / temp.group(1)))
-                    elif (_HEX.fullmatch(item.name) and item.name[:2] == bucket.name
-                          and valid_regular(info) and info.st_size > 0):
-                        objects[item.name] = _identity(info)
-                        if info.st_nlink != 1:
-                            record("nonexclusive_object_inode", object_digest=item.name)
-                    else:
-                        layout_complete = False
-                        record("unexpected_object_entry", name_digest=_key(item.name))
-    with os.scandir(store.manifests) as listing:
-        for item in listing:
-            visit()
-            info = item.stat(follow_symlinks=False)
-            temp = _MANIFEST_TEMP.fullmatch(item.name)
-            if temp and valid_regular(info):
-                classify_temporary("manifests", temp, info,
-                                   maybe_stat(store.manifests / (temp.group(1) + ".json")))
-                # An uncommitted manifest may be needed for recovery.
+                record("unexpected_object_entry", name_digest=_key(child))
+    for name, info in scan(store.manifests, "manifests"):
+        temp = _MANIFEST_TEMP.fullmatch(name)
+        if temp and valid_regular(info):
+            classify_temporary("manifests", temp, info,
+                               maybe_stat(store.manifests / (temp.group(1) + ".json")))
+            manifests_complete = False
+            continue
+        match = _MANIFEST.fullmatch(name)
+        if not match or not valid_regular(info) or not 1 <= info.st_size <= 16 * 1024**2:
+            manifests_complete = False
+            record("unexpected_manifest_entry", name_digest=_key(name))
+            continue
+        key = match.group(1)
+        metadata += info.st_size
+        if metadata > policy.maximum_metadata_bytes:
+            raise WeightShardStoreError("recovery review metadata ceiling exceeded")
+        try:
+            plan, manifest_sha, size = store.manifest_evidence(key, maximum=info.st_size)
+        except (ValueError, OSError):
+            manifests_complete = False
+            record("invalid_committed_manifest", plan_digest=key)
+            continue
+        if size != info.st_size:
+            raise WeightShardStoreError("manifest changed during recovery review")
+        committed[key] = (manifest_sha, size)
+        scan_identity.update(canonical_bytes({"manifest_digest": key, "manifest_sha256": manifest_sha}))
+        scan_identity.update(b"\n")
+        if info.st_nlink != 1:
+            record("nonexclusive_manifest_inode", plan_digest=key)
+        references += len(plan.shards)
+        if references > policy.maximum_references:
+            raise WeightShardStoreError("recovery review reference ceiling exceeded")
+        for shard in plan.shards:
+            previous = claimed.setdefault(shard.digest, shard.bytes)
+            if previous != shard.bytes:
                 manifests_complete = False
-                continue
-            match = _MANIFEST.fullmatch(item.name)
-            if not match or not valid_regular(info) or not 1 <= info.st_size <= 16 * 1024**2:
-                manifests_complete = False
-                record("unexpected_manifest_entry", name_digest=_key(item.name))
-                continue
-            key = match.group(1)
-            metadata += info.st_size
-            if metadata > policy.maximum_metadata_bytes:
-                raise WeightShardStoreError("recovery review metadata ceiling exceeded")
-            try:
-                plan, manifest_sha, size = store.manifest_evidence(key, maximum=info.st_size)
-            except (ValueError, OSError):
-                manifests_complete = False
-                record("invalid_committed_manifest", plan_digest=key)
-                continue
-            if size != info.st_size:
-                raise WeightShardStoreError("manifest changed during recovery review")
-            committed[key] = (manifest_sha, size)
-            if info.st_nlink != 1:
-                record("nonexclusive_manifest_inode", plan_digest=key)
-            references += len(plan.shards)
-            if references > policy.maximum_references:
-                raise WeightShardStoreError("recovery review reference ceiling exceeded")
-            for shard in plan.shards:
-                previous = claimed.setdefault(shard.digest, shard.bytes)
-                if previous != shard.bytes:
-                    manifests_complete = False
-                    record("conflicting_object_reference", object_digest=shard.digest)
+                record("conflicting_object_reference", object_digest=shard.digest)
     for key, size in sorted(claimed.items()):
         observed = objects.get(key)
         if observed is None:
@@ -211,8 +218,11 @@ def _review_locked(owner: WeightStoreDiskOwner, policy: RecoveryReviewPolicy,
             raise WeightShardStoreError("object changed during recovery review")
     for name, initial in directory_identities.items():
         info = (store.objects / name).lstat()
-        if not stat.S_ISDIR(info.st_mode) or (info.st_dev, info.st_ino) != initial:
+        if not stat.S_ISDIR(info.st_mode) or _identity(info) != initial:
             raise WeightShardStoreError("bucket changed during recovery review")
+    for path, initial in managed_directories.items():
+        if _identity(path.lstat()) != initial:
+            raise WeightShardStoreError("managed directory changed during recovery review")
     # Never classify unreferenced objects when unknown manifests or
     # interrupted manifest publication could still refer to those bytes.
     unreferenced = 0
@@ -224,6 +234,8 @@ def _review_locked(owner: WeightStoreDiskOwner, policy: RecoveryReviewPolicy,
     owner._inspect_lock(directory_fd, fd)
     body = {"schema": "skeleton.weight-store-recovery-review.v1",
             "entries": entries, "metadata_bytes": metadata,
+            "scan_identity_sha256": scan_identity.hexdigest(),
+            "policy_sha256": owner._policy_sha256,
             "manifest_references": references, "canonical_objects": len(objects),
             "valid_manifests": len(committed),
             "manifest_reference_scan_complete": manifests_complete,
