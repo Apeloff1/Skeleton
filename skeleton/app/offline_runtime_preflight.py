@@ -154,8 +154,14 @@ def inspect_source(root: Path, *, plan_digest: str, model_identity_digest: str,
     require(len(matches) == 1 and matches[0]["model_identity_digest"] == model_identity_digest,
             "requested plan is not in verified inventory under pinned identity")
     store = WeightShardStore(root, maximum_bytes=policy.maximum_source_bytes, read_only=True)
-    plan = store.load_plan(plan_digest)
-    paths = store.verified_paths(plan_digest)
+    match = matches[0]
+    plan, manifest_sha, manifest_bytes = store.manifest_evidence(
+        plan_digest, maximum=match["manifest_bytes"]
+    )
+    require(manifest_sha == match["manifest_sha256"] and manifest_bytes == match["manifest_bytes"],
+            "selected manifest identity changed since inventory verification")
+    paths = store.verified_paths(plan_digest, expected_manifest_sha256=manifest_sha,
+                                 maximum_manifest_bytes=manifest_bytes)
     require(plan.model_identity_digest == model_identity_digest
             and plan.expected_total_bytes == matches[0]["weight_bytes"]
             and len(paths) == matches[0]["shard_count"], "inventory and selected plan differ")
@@ -163,6 +169,9 @@ def inspect_source(root: Path, *, plan_digest: str, model_identity_digest: str,
     if policy.verify_gguf_headers:
         headers = tuple(asdict(inspect_gguf(path, expected_sha256=shard.digest, max_bytes=shard.bytes))
                         for shard, path in zip(plan.shards, paths))
+    _, final_sha, final_size = store.manifest_evidence(plan_digest, maximum=manifest_bytes)
+    require(final_sha == manifest_sha and final_size == manifest_bytes,
+            "selected manifest identity changed during inspection")
     return ModelSource(plan_digest, model_identity_digest, inventory["digest"], plan, headers)
 
 
