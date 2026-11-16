@@ -9,6 +9,7 @@ from an external request.
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from hashlib import sha256
 import json
@@ -19,7 +20,7 @@ from skeleton.ai.runtime.inference.local import (
     LocalInferenceEngine, LocalInferenceRequest, LocalInferenceResult,
 )
 from skeleton.ai.model_runtime.iteration_scheduler import InferencePhase, IterationWork
-from skeleton.app.offline_runtime_preflight import digest, identity, integer, require
+from skeleton.app.offline_runtime_preflight import RuntimePreflightError, digest, identity, integer, require
 from skeleton.app.offline_runtime_session import OfflineRuntimeSession
 
 
@@ -51,6 +52,25 @@ class MeasuredWholeRequestEngine:
         self._sequence = 0
         self._consumer = session.claim_consumer()
 
+    @asynccontextmanager
+    async def _own_until(self, deadline_ns: int):
+        remaining = (deadline_ns - time.monotonic_ns()) / 1_000_000_000
+        require(remaining > 0, "whole request expired while waiting for execution ownership")
+        # Bound waiting itself, not only dispatch after a possibly stuck owner.
+        # The timeout scope ends immediately after successful acquisition.
+        acquired = False
+        try:
+            try:
+                async with asyncio.timeout(remaining):
+                    await self._lock.acquire()
+                    acquired = True
+            except TimeoutError as exc:
+                raise RuntimePreflightError("whole request expired while waiting for execution ownership") from exc
+            yield
+        finally:
+            if acquired:
+                self._lock.release()
+
     async def generate(self, request: LocalInferenceRequest, *, max_input_tokens: int,
                        timeout_ms: int) -> WholeRequestOutcome:
         require(isinstance(request, LocalInferenceRequest), "canonical inference request required")
@@ -65,8 +85,8 @@ class MeasuredWholeRequestEngine:
         # Queue waiting consumes the caller's timeout, not a new budget.
         started = time.monotonic_ns()
         caller_deadline = started + timeout * 1_000_000
-        async with self._lock:
-            require(not self._closed, "whole-request adapter is closed")
+        async with self._own_until(caller_deadline):
+            require(not self._closed and not self._session.status()["closed"], "whole-request adapter is closed")
             require(self._engine.model.model_digest == self._backend_digest, "backend identity changed")
             require(time.monotonic_ns() < caller_deadline, "whole request expired while waiting for execution ownership")
             self._sequence += 1
