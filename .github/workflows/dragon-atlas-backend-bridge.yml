@@ -48,7 +48,7 @@ jobs:
           "cryptography>=50.0.2"
       - name: Compile backend and fixture
         run: |
-          python -m py_compile backend/core/dragon_crawler.py
+          python -m py_compile backend/core/dragon_crawler.py backend/core/dragon_exhaustive_vectors.py backend/core/dragon_current_vectors.py backend/core/dragon_posting_lineage.py
           python -m py_compile backend/tests/test_dragon_atlas_bridge.py
           python -m py_compile skeleton/ai/webcrawler/operations.py
           python -m py_compile skeleton/ai/webcrawler/media_probe.py

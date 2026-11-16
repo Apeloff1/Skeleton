@@ -146,7 +146,7 @@ class DragonExhaustiveVectorMixin:
             try:
                 def rerank():
                     snap,grant,policies,allowed=self._deep_material(scope,row,_now().timestamp())
-                    if any(row.get(k)!=v for k,v in lineage.state_filter(self,"archive","deep_full_due").items()):continue
+                    if any(row.get(k)!=v for k,v in lineage.state_filter(self,"archive","deep_full_due").items()):return []
                     state=row["deep_full_state"]
                     if state["snapshot_digest"]!=snap["snapshot_digest"] or state["grant_digest"]!=digest(grant) or state["policy_digest"]!=digest(policies):
                         return []
