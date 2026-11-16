@@ -248,9 +248,12 @@ class OfflineHTTPApplication:
         for worker in workers:
             if worker is not threading.current_thread():
                 worker.join()
-        if self.longform is not None:
-            self.longform.close()
-        self._store.close()
+        # Synchronous review operations use the same app lock as turns.
+        # Do not close the shared SQLite authority while one is settling.
+        with self._lock:
+            if self.longform is not None:
+                self.longform.close()
+            self._store.close()
 
     def _request_cancel(self, turn: _LocalTurn) -> None:
         if turn.state in TERMINAL_TURN_STATES:
@@ -529,6 +532,86 @@ class OfflineHTTPApplication:
             rows,_proof=self.knowledge.search_multihop(text,document_ids=document_ids,limit=3)
             return rows
         return self.knowledge.search(text,limit=2,document_ids=document_ids,evidence_excerpt=True)
+
+    def _deliberation_review(self, sid: str, body: dict[str, Any]) -> dict[str, Any]:
+        from skeleton.app.jeeves_deliberation import deliberate, MAX_CANDIDATE_TOKENS
+        _fields(body, {"message", "expected_revision", "approved", "max_output_tokens",
+                       "require_full_history", "grounded", "document_ids"},
+                {"message", "expected_revision", "approved"})
+        if body["approved"] is not True:
+            raise OfflineHTTPError(403, "two local inference calls require explicit approval")
+        message, revision = body["message"], body["expected_revision"]
+        strict, grounded = body.get("require_full_history", True), body.get("grounded", False)
+        budget = _budget(body, min(self.default_output_tokens, MAX_CANDIDATE_TOKENS))
+        if (type(message) is not str or not message.strip() or len(message.encode("utf-8")) > 1024
+                or type(revision) is not int or revision < 0
+                or type(strict) is not bool or type(grounded) is not bool
+                or budget > MAX_CANDIDATE_TOKENS):
+            raise OfflineHTTPError(400, "invalid bounded deliberation policy")
+        scope = _document_scope(body, grounded)
+        with self._turn_lock:
+            if self._closing or self._active_session is not None:
+                raise OfflineHTTPError(409, "another local generation is still running")
+            self._active_session = sid
+        try:
+            with self._lock:
+                self._admit_local_generation()
+                with self._inference_lease.hold():
+                    saved = self._session(sid)
+                    if saved.revision != revision:
+                        raise OfflineHTTPError(409, "conversation changed before deliberation")
+                    rows = saved.transcript.to_list()
+                    system = next((row["content"] for row in rows if row["role"] == "system"), "")
+                    history = tuple((row["role"], row["content"]) for row in rows
+                                    if row["role"] != "system")
+                    manifest = None
+                    if grounded:
+                        hits = self._grounding_hits(message.strip(), scope)
+                        if not hits:
+                            raise OfflineHTTPError(422, "no local reference passages match this question")
+                        digest = _strict_context_digest(scoped_grounded_request_digest(
+                            grounded_request_digest(_digest_request(message.strip(),
+                                GenerationConfig(max_new_tokens=budget))), scope), strict)
+                        manifest = prepare_evidence(message.strip(), digest, hits,
+                                                   self.model_digest, self.tokenizer_digest)
+
+                    def recheck():
+                        self._admit_local_generation()
+                        with self._store.read_snapshot():
+                            current = self._session(sid)
+                            if current.revision != revision or current.transcript.to_list() != rows:
+                                raise OfflineHTTPError(409, "conversation changed during deliberation")
+                            if manifest is not None:
+                                selected = tuple(sorted({c["document_id"] for c in manifest["citations"]}))
+                                try:
+                                    docs, _ = self.knowledge._verified_snapshot(selected)
+                                except RuntimeContractError:
+                                    raise OfflineHTTPError(409, "deliberation source changed") from None
+                                sources = {doc[0]: doc for doc in docs}
+                                for c in manifest["citations"]:
+                                    doc = sources[c["document_id"]]
+                                    if (doc[2] != c["document_sha256"] or
+                                            doc[3][c["char_start"]:c["char_end"]] != c["passage"]):
+                                        raise OfflineHTTPError(409, "deliberation source changed")
+                    try:
+                        report = asyncio.run(deliberate(
+                            self.backend, message, history=history, instructions=system,
+                            revision=revision, model_digest=self.model_digest,
+                            tokenizer_digest=self.tokenizer_digest, output_tokens=budget,
+                            require_full_history=strict, evidence=manifest, recheck=recheck,
+                        ))
+                    except (LlamaCppRuntimeError, NativeRuntimeBackendError, TimeoutError, OSError):
+                        self._inference_circuit.record_failure()
+                        raise
+                    self._inference_circuit.record_success()
+                    return report
+        except LocalInferenceLeaseBusy:
+            raise OfflineHTTPError(423, "another local service owns the inference execution slot") from None
+        except LocalInferenceLeaseUnavailable:
+            raise OfflineHTTPError(503, "private local inference execution lock is unavailable") from None
+        finally:
+            with self._turn_lock:
+                self._active_session = None
 
     def _perform_turn(self, session_id: str,
                       request: dict[str, Any], *, turn: _LocalTurn | None = None) -> dict[str, Any]:
@@ -1033,6 +1116,8 @@ class OfflineHTTPApplication:
                  if key != "expected_metadata_revision"},
                 expected_metadata_revision=body.get("expected_metadata_revision"),
             )
+        if tail == "deliberation-review" and method == "POST":
+            return 200, self._deliberation_review(sid, body)
         if tail in {"memory-preview", "memory-save"} and method == "POST":
             from skeleton.app.jeeves_reviewed_memory import (
                 MemoryConflict, MemoryRejected, prepare_memory, save_memory,
