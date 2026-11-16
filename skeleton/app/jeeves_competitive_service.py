@@ -21,7 +21,7 @@ from skeleton.app.jeeves_tool_campaign import LocalToolCampaign,ToolCampaignConf
 from skeleton.app.jeeves_local_lease import LocalInferenceLeaseBusy,LocalInferenceLeaseUnavailable
 from skeleton.app.offline_grounding import normalized_document_scope
 
-ACTIONS=frozenset({"ensemble-review","speculative-review","media-review","predictive-prefetch",
+ACTIONS=frozenset({"ensemble-review","speculative-review","stochastic-review","media-review","media-generate","predictive-prefetch",
                    "tool-campaign-run","tool-campaign-inspect","tool-campaign-abandon"})
 
 
@@ -48,11 +48,19 @@ def _text(value,limit):
 
 
 class CompetitiveService:
-    def __init__(self,app,*,specialists=None,media=None):
+    def __init__(self,app,*,specialists=None,media=None,media_generator=None,predictor=None):
         if specialists is not None and not isinstance(specialists,SpecialistRegistry):
             raise ValueError("explicit pinned specialist registry required")
         if media is not None and not isinstance(media,LocalMediaRegistry):
             raise ValueError("explicit pinned media registry required")
+        from skeleton.app.jeeves_media_generation import GenerationMediaRegistry
+        from skeleton.retrieval.learned_embeddings import LocalPairReranker
+        if media_generator is not None and not isinstance(media_generator,GenerationMediaRegistry):
+            raise ValueError("explicit pinned conditional media generator required")
+        if predictor is not None and not isinstance(predictor,LocalPairReranker):
+            raise ValueError("explicit pinned learned forecasting model required")
+        self.media_generator=media_generator
+        self.predictor=predictor
         self.app=app
         self.specialists=specialists
         self.media=media
@@ -70,7 +78,13 @@ class CompetitiveService:
                 "media_profiles":[] if self.media is None else self.media.inventory(),
                 "media_registry_sha256":None if self.media is None else self.media.identity,
                 "native_greedy_speculative_target":speculative,
-                "predictive_prefetch_available":self.app.knowledge._semantic_ranker is None and not self.app._semantic_multihop,
+                "stochastic_speculative_target":runtime is not None and not runtime.model.use_mod,
+                "cuda_fused_speculative_target":runtime is not None and runtime.model._accel is not None and runtime.model._accel.device_name=="cuda",
+                "media_generation_profiles":[] if self.media_generator is None else self.media_generator.inventory(),
+                "media_generation_registry_sha256":None if self.media_generator is None else self.media_generator.identity,
+                "learned_forecast_identity":None if self.predictor is None else self.predictor.identity,
+                "model_directed_tool_selection":runtime is not None,
+                "predictive_prefetch_available":self.app.knowledge._semantic_ranker is None and self.app.knowledge._semantic_ann is None and self.app.knowledge._semantic_journal is None and not self.app._semantic_multihop,
                 "prefetch":self.prefetch.stats(),"tool_capabilities":["search","calculate","document_identity"],
                 "maximum_tool_calls":8,"primary_model_changed":False,"network_called":False,
                 "transcript_committed":False}
@@ -135,25 +149,56 @@ class CompetitiveService:
             # Tool plans are finite read-only functions. No model or inference
             # lease is needed; shared store transactions fence the receipts.
             try:
-                return self.tools.run(sid,body["campaign_id"],body["expected_revision"],body["plan"])
+                from skeleton.app.jeeves_tool_campaign import normalize_plan
+                plan=normalize_plan(body["plan"])
+                if "selector" not in plan:
+                    return self.tools.run(sid,body["campaign_id"],body["expected_revision"],plan)
+                if not isinstance(app.backend,NativeRuntimeLocalModel):
+                    raise _error(422,"native model-directed tool selection required")
+                with self._generation(sid):
+                    # Replays preserve the original durable authorization even
+                    # after a subsequent conversation revision.
+                    from skeleton.app.jeeves_model_tool_selector import NativeToolSelector
+                    selector=NativeToolSelector(app.backend.runtime,plan["selector"])
+                    return self.tools.run(sid,body["campaign_id"],body["expected_revision"],plan,selector=selector)
             except ToolCampaignConflict as exc:
                 raise _error(409,str(exc)) from None
             except (ToolCampaignError,RuntimeContractError,ValueError):
                 raise _error(400,"local tool plan rejected") from None
         if action=="predictive-prefetch":
-            _fields(body,{"expected_revision","candidates","document_ids","approved"},{"maximum_queries"})
+            _fields(body,{"expected_revision","candidates","document_ids","approved"},{"maximum_queries","learned"})
             if not self.status()["predictive_prefetch_available"]:
                 raise _error(422,"prefetch currently requires exact lexical retrieval, not mutable ANN ranking")
-            with app._lock:
+            learned=body.get("learned",False)
+            if type(learned) is not bool or (learned and self.predictor is None):
+                raise _error(422,"explicit configured learned predictor required")
+            from contextlib import nullcontext
+            guard=self._generation(sid) if learned else nullcontext()
+            with guard,app._lock:
                 if app._closing:
                     raise _error(409,"local service closing")
                 rows,recheck=self._snapshot(sid,body["expected_revision"])
                 try:
                     return self.prefetch.warm(sid,body["expected_revision"],rows,body["candidates"],
                         body["document_ids"],maximum_queries=body.get("maximum_queries",2),
-                        search=app._grounding_hits,recheck=recheck)
+                        search=app._grounding_hits,recheck=recheck,predictor=self.predictor if learned else None)
                 except (ValueError,RuntimeContractError):
                     raise _error(422,"scoped relevance prefetch rejected") from None
+        if action=="media-generate":
+            _fields(body,{"expected_revision","profile","media_type","media_base64","source_sha256","approved"},{"question","max_output_tokens"})
+            if self.media_generator is None:
+                raise _error(422,"no pinned conditional media generator configured")
+            with self._generation(sid):
+                _,recheck=self._snapshot(sid,body["expected_revision"])
+                try:
+                    result=self.media_generator.generate(body["profile"],
+                        {k:body[k] for k in ("media_type","media_base64","source_sha256")},
+                        question=body.get("question",""),max_output=body.get("max_output_tokens",64),
+                        interrupt=lambda: recheck())
+                except Exception:
+                    raise _error(422,"conditional media execution rejected or incomplete") from None
+                recheck()
+                return result
         if action=="media-review":
             _fields(body,{"expected_revision","profile","media_type","media_base64","source_sha256","approved"},{"top_k"})
             if self.media is None:
@@ -192,9 +237,11 @@ class CompetitiveService:
                     raise _error(422,"local ensemble incomplete; no candidate selected") from None
                 fence()
                 return result
-        if action=="speculative-review":
-            _fields(body,{"expected_revision","message","draft_profile","max_output_tokens","approved"},{"block"})
-            if not self.status()["native_greedy_speculative_target"] or self.specialists is None:
+        if action in {"speculative-review","stochastic-review"}:
+            optional={"block"} if action=="speculative-review" else {"block","temperature","seed","top_k","top_p","min_p","require_gpu","workspace_bytes"}
+            _fields(body,{"expected_revision","message","draft_profile","max_output_tokens","approved"},optional)
+            capability="native_greedy_speculative_target" if action=="speculative-review" else "stochastic_speculative_target"
+            if not self.status()[capability] or self.specialists is None:
                 raise _error(422,"native CPU target and pinned compatible draft required")
             question=_text(body["message"],1024)
             budget=_int(body["max_output_tokens"],1,128)
@@ -217,9 +264,18 @@ class CompetitiveService:
                             raise TimeoutError("speculative execution deadline")
                         if app._closing:
                             raise RuntimeContractError("local service closing")
-                    result=generate_speculative(app.backend.runtime,draft,request.rendered_input,
-                        GenerationConfig(max_new_tokens=budget,temperature=0,use_cache=False),
-                        block=block,interrupt=fence)
+                    if action=="speculative-review":
+                        result=generate_speculative(app.backend.runtime,draft,request.rendered_input,
+                            GenerationConfig(max_new_tokens=budget,temperature=0,use_cache=False),
+                            block=block,interrupt=fence)
+                    else:
+                        from skeleton.app.jeeves_stochastic_speculation import generate
+                        result=generate(app.backend.runtime,draft,request.rendered_input,
+                            GenerationConfig(max_new_tokens=budget,temperature=body.get("temperature",0.8),
+                                seed=body.get("seed",0),top_k=body.get("top_k",0),top_p=body.get("top_p",1.0),
+                                min_p=body.get("min_p",0.0),use_cache=False),
+                            block=block,require_gpu=body.get("require_gpu",False),
+                            workspace_bytes=body.get("workspace_bytes",256*1024**2),interrupt=fence)
                 except (ValueError,RuntimeContractError,RuntimeError,TimeoutError,OSError):
                     raise _error(422,"native speculative review rejected") from None
                 recheck()
