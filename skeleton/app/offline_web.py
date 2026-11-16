@@ -221,6 +221,8 @@ HTML = r"""<!doctype html>
         <label for="context-preserve"><input id="context-preserve" type="checkbox" checked> Require entire conversation context</label>
         <label for="budget">Output tokens <input id="budget" type="number" min="1" max="8192" value="32"></label>
       </div>
+      <details id="advanced-reasoning-options" class="advanced-reasoning-options">
+      <summary>Advanced local reasoning &amp; verification</summary>
       <div class="inline">
         <label for="adaptive-mode">Adaptive review <select id="adaptive-mode"><option value="off">Off — compare two candidates</option><option value="review">Budgeted reasoning</option><option value="arithmetic">Exact arithmetic</option><option value="source_quotes">Exact local source quotations</option><option value="table">Table artifact</option><option value="checklist">Checklist artifact</option><option value="series">Numeric series artifact</option></select></label>
         <label for="adaptive-attempts">Maximum attempts <input id="adaptive-attempts" type="number" min="1" max="4" value="4"></label>
@@ -232,14 +234,19 @@ HTML = r"""<!doctype html>
       <label for="review-history-policy">Review context selection <select id="review-history-policy"><option value="recent">Recent turns (default)</option><option value="relevance">Relevance packing (explicitly lossy)</option></select></label>
       <label for="quote-minimum">Minimum exact quotes <input id="quote-minimum" type="number" min="1" max="4" value="1"></label>
       <label for="quote-sources">Minimum distinct local source documents <input id="quote-sources" type="number" min="1" max="3" value="1"></label>
+      <label for="learned-review"><input id="learned-review" type="checkbox" disabled> Independently review grounded candidates using the configured local NLI classifier</label>
+      <p id="learned-review-status" class="minor">No verifier capability checked.</p>
       <p class="minor">Relevance packing requires disabling full-history preservation for review. Exact source quotes require local evidence; literal identity is not factual truth. Arithmetic equality and artifact structure are independently checked only within their contracts.</p>
+      <div class="inline">
+        <button id="cognitive-preview" class="small" disabled>Review reasoning plan</button>
+        <button id="deliberation-review" class="small" disabled>Run reasoning review (no save)</button>
+        <button id="research-review" class="small" disabled>Research local references (multi-hop)</button>
+      </div>
+      </details>
       </details>
       <div class="composer-submit">
         <span class="hint keyboard-hint">Ctrl / ⌘ + Enter to send</span>
         <button id="context-preview" class="small" disabled>Preview context</button>
-        <button id="cognitive-preview" class="small" disabled>Review reasoning plan</button>
-        <button id="deliberation-review" class="small" disabled>Run reasoning review (no save)</button>
-        <button id="research-review" class="small" disabled>Research local references (multi-hop)</button>
         <button id="send" class="primary">Generate locally ↗</button>
         <button id="retry-turn" class="secondary" hidden>Retry original turn</button>
       </div>
@@ -337,6 +344,14 @@ CSS = r"""*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family
 html,body{background:var(--canvas);color:var(--text)}button{font-size:12px;min-height:34px;border-radius:9px}button:hover:not(:disabled){border-color:#7184ac}.primary{background:#b8caf7;border-color:#b8caf7;color:#142443;font-weight:750}.primary:hover:not(:disabled){background:#d1ddfc;border-color:#d1ddfc}.secondary{background:#1b2130}.shell{grid-template-columns:320px minmax(0,1fr)}.sidebar{background:#141820;padding:24px 18px;gap:0;border-color:#29303f}.brand{margin-bottom:22px}.brand-mark{border-radius:50%;width:42px;height:42px;color:#d4e0fc;background:#26334c;border-color:#465d85;font-size:25px}.brand strong{font-size:22px;letter-spacing:-.7px}.brand small{letter-spacing:0;color:#aab7ce;font-size:11px}.connect{background:#1b2230;padding:12px;border-color:#354059}.connect .hint{margin:8px 0 0;font-size:11px}.connect input{padding:10px}.heading{margin-top:22px;margin-bottom:10px;letter-spacing:.9px;font-size:11px}.session-views{display:flex;gap:4px;background:#0f141e;padding:4px;border:1px solid #2d3648;border-radius:10px;margin-bottom:11px}.session-views button{flex:1;background:transparent;border-color:transparent;color:#b9c5da;min-height:30px}.session-views button[aria-pressed=true]{background:#2b3852;color:#eef2ff;border-color:#405578}.sessions{flex:1 0 140px;max-height:35vh;min-height:120px;margin:10px 0 2px}.session{padding:11px 12px;border-radius:10px;border:1px solid transparent;line-height:1.4}.session.active{background:#29364d;border-color:#455c83}.session .session-title{display:flex;gap:6px;align-items:baseline;font-size:13px;font-weight:650;color:#e7edf9}.session .pin-marker{color:#c6d6fb;font-size:11px}.session small{font-size:10px;color:#aab8ce;margin-top:5px}.session .session-preview{font-size:11px;color:#b4bfd1}.instructions{font-size:11px;margin:10px 0 12px}.workspace-section{flex-shrink:0;border-top:1px solid #2e3748;padding:14px 0;font-size:12px}.workspace-section>summary{cursor:pointer;font-weight:650;color:#d5def0;list-style-position:inside;padding:2px 0}.workspace-section>summary>span{display:block;font-size:10px;font-weight:400;color:#a5b3cb;margin:4px 0 0 14px}.workspace-section .knowledge-section{border:0;margin-top:14px;padding-top:0;max-height:none;overflow:visible}.workspace-section .knowledge-section>.heading{margin-top:0}.workspace-section .sidebar-footer{border:0;padding:14px 0 0}.workspace-section details{margin-top:8px}.workspace-section details>summary{cursor:pointer;line-height:1.5;color:#c2cfe8}.workspace-section details[open]>summary{margin-bottom:10px}.advanced-reference[open]{display:grid;gap:8px;padding-top:9px}.model-tools{position:relative;font-size:11px;flex-shrink:0}.model-tools>summary{cursor:pointer;padding:8px 10px;border:1px solid #39435a;border-radius:9px;color:#bac8e0;list-style-position:inside}.model-tools>div{position:absolute;right:0;top:calc(100% + 9px);z-index:8;width:260px;border:1px solid #485976;border-radius:12px;padding:14px;background:#1b2434;box-shadow:0 14px 30px #0007;display:grid;gap:9px}.model-tools .indicator{border-radius:7px;white-space:normal;line-height:1.5;text-align:center}.topbar{position:relative;gap:14px;padding:25px 34px 20px;border-color:#2b3241;align-items:center}.conversation-heading{min-width:0;flex:1}.eyebrow{display:block;text-transform:uppercase;letter-spacing:1.8px;font-size:9px;line-height:1.8;color:#a6b8d8;font-weight:650}.topbar h1{font-size:22px;font-weight:550;letter-spacing:-.6px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.topbar p{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px;line-height:1.5;color:#a9b7cd;margin-top:5px}.indicator{font-size:9px;letter-spacing:.8px;padding:7px 10px;border-color:#435272;white-space:nowrap}.conversation-toolbar{display:flex;flex-shrink:0;gap:10px;align-items:center;border-bottom:1px solid #252e3f;padding:9px 34px;font-size:10px;color:#aebbd1}.conversation-toolbar .hint{font-size:10px}.conversation-actions{display:flex;gap:5px;margin-left:auto}.conversation-actions button{background:transparent;font-size:10px;min-height:28px;padding:4px 8px}.conversation-actions button[aria-pressed=true]{background:#2e3e5c;color:#d8e5ff;border-color:#718cb7}.intro{max-width:680px;padding:40px 36px;margin:auto;text-align:left}.intro .glow{display:grid;place-items:center;width:62px;height:62px;border:1px solid #465a7d;border-radius:20px;background:radial-gradient(ellipse at top,#394e78,#1c2435);color:#d6e1ff;font-size:34px;margin-bottom:24px}.intro h2{font-size:clamp(27px,3vw,42px);line-height:1.15;font-family:Georgia,ui-serif,serif;font-weight:400;letter-spacing:-1.2px;margin:0 0 18px}.intro p{font-size:14px;line-height:1.8;color:#b2bfd5;margin:10px 0}.intro .minor{font-size:11px;border-top:1px solid #2e374b;padding-top:14px;margin-top:20px;color:#a1afc7;line-height:1.7}.getting-started{display:grid;gap:9px;margin:24px 0;color:#c2cde0;font-size:12px}.getting-started span{display:flex;align-items:center;gap:10px}.getting-started b{font-size:10px;font-weight:600;width:22px;height:22px;border:1px solid #4a5b77;border-radius:50%;display:inline-grid;place-items:center;color:#d2e0fb;background:#202b3f}.messages{padding:30px 34px;max-width:960px;gap:20px}.messages:empty{display:none}.message{border-radius:14px;max-width:92%;padding:18px 20px;font-size:14px}.message.user{background:#283852;border-color:#435c83}.message.assistant{background:#181e2a;border-color:#313e55}.message header{font-size:9px;letter-spacing:1.3px;color:#c4d5f7}.message-actions button{min-height:28px;font-size:10px;background:transparent}.transcript-tools{flex-shrink:0;margin:7px 0}.transcript-tools button{border-color:transparent;background:transparent;color:#b3c2dc;font-size:10px}.composer{flex-shrink:0;width:calc(100% - 68px);max-width:892px;padding:17px;background:#1b2230;border-color:#465575;border-radius:16px;box-shadow:0 8px 30px #0003}.composer>label{font-size:11px;color:#cad7ee}.composer textarea{border-color:#34445f;background:#111925;min-height:84px;max-height:28vh;line-height:1.6;font-size:14px;padding:12px;resize:vertical}.generation-options{font-size:10px;color:#b5c5df;margin-top:9px}.generation-options>summary{cursor:pointer;width:fit-content;padding:5px 0}.generation-options .bottom{gap:12px;padding:8px 0;border-top:1px solid #34435d}.generation-options label{font-size:10px}.composer-submit{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:9px;flex-wrap:wrap}.composer-submit .hint{font-size:10px;margin-right:auto}.composer-submit button{min-height:36px;font-size:11px}.context-report{background:transparent;border-color:transparent;font-size:10px;line-height:1.5;padding:8px 34px;color:#aabbd7}.status{flex-shrink:0;padding:8px 34px 14px;font-size:11px;color:#b8c6dc;line-height:1.5}.dialog-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}#session-title-dialog{max-width:470px}#session-title-dialog h2{font-family:Georgia,ui-serif,serif;font-size:27px;font-weight:400;margin:9px 0}#session-title-dialog label{display:block;font-size:12px;margin-top:20px}#session-title-input{display:block;width:100%;color:#f3f5fa;background:#0d1624;border:1px solid #526d96;border-radius:8px;font:inherit;padding:12px;margin-top:9px}.form-error{font-size:12px;color:#ffbcbf;min-height:1.5em}.session-empty{padding:14px 10px;line-height:1.7}.session-empty strong{display:block;color:#d5def0;font-size:12px;margin-bottom:5px}.session-empty p{font-size:11px;color:#aab9d1;margin:0}
 @media(min-width:721px) and (max-width:1100px){.shell{grid-template-columns:285px minmax(0,1fr)}.sidebar{padding:20px 14px}.topbar{padding:21px 24px 17px;flex-wrap:wrap}.conversation-heading{flex-basis:100%}.conversation-toolbar{padding:9px 24px}.intro{padding:28px}.composer{width:calc(100% - 40px)}.keyboard-hint{display:none}}
 @media(max-width:720px){.topbar{padding:13px 14px 10px;gap:9px}.topbar .conversation-heading{order:3;flex-basis:100%;min-width:0}.topbar h1{font-size:20px}.topbar p{font-size:9px}.topbar .indicator{margin-left:auto}.model-tools{font-size:10px}.model-tools>summary{padding:7px 8px}.model-tools .indicator{margin-left:0}.model-tools>div{right:0;width:min(260px,82vw)}.conversation-toolbar{padding:7px 12px;gap:6px;flex-wrap:wrap}.conversation-toolbar #revision{font-size:9px}.conversation-toolbar .hint{font-size:9px}.conversation-actions{gap:3px}.conversation-actions button{min-height:30px;padding:5px 7px;font-size:10px}.intro{padding:20px 22px;overflow:auto}.intro .glow{width:43px;height:43px;border-radius:14px;font-size:27px;margin-bottom:17px}.intro h2{font-size:28px;margin-bottom:12px}.intro p{font-size:12px;line-height:1.7}.intro .minor{font-size:10px;margin-top:14px;padding-top:10px}.getting-started{margin:14px 0;gap:7px;font-size:11px}.getting-started b{width:19px;height:19px}.composer{width:calc(100% - 20px);padding:11px;border-radius:12px}.composer textarea{min-height:62px;max-height:22vh;padding:10px;font-size:13px}.composer-submit{gap:6px;margin-top:6px}.composer-submit .keyboard-hint{display:none}.composer-submit button{font-size:11px;min-height:34px}.generation-options{margin-top:5px}.generation-options .bottom{gap:10px}.generation-options label{font-size:10px}.context-report{padding:6px 12px;font-size:9px;max-height:44px;overflow:auto}.status{padding:6px 12px 9px;font-size:10px;max-height:56px;overflow:auto}.messages{padding:16px 12px;gap:14px}.message{padding:14px;max-width:97%;font-size:13px}.transcript-tools{margin:2px}.sidebar{padding:18px 15px}.sidebar .sessions{max-height:29vh;min-height:120px}.sidebar .knowledge-section{max-height:none}.workspace-section{padding:13px 0}.brand{margin-bottom:17px}.brand #sidebar-close{min-height:32px}.shell.library-open .main{pointer-events:none}.sidebar-close:focus-visible{outline-offset:2px}}
+/* Keep advanced review controls from consuming the whole chat viewport. */
+.advanced-reasoning-options{max-width:100%;min-width:0;margin-top:8px;border-top:1px solid #34435d;padding:8px 0}
+.advanced-reasoning-options[open]{max-height:34vh;overflow:auto;overscroll-behavior:contain}
+.advanced-reasoning-options label{display:block;max-width:100%;overflow-wrap:anywhere;margin:6px 0}
+.advanced-reasoning-options select,.advanced-reasoning-options input:not([type=checkbox]){max-width:100%}
+.advanced-reasoning-options .inline{align-items:stretch}
+.advanced-reasoning-options .inline button{white-space:normal}
+@media(max-width:720px){.advanced-reasoning-options[open]{max-height:22dvh}.composer-submit{flex-wrap:nowrap}.composer-submit #send{flex:1;min-width:0}.composer-submit #context-preview{flex:0 0 auto}.composer-submit button{white-space:normal}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 
 """
@@ -537,6 +552,8 @@ JAVASCRIPT = r"""'use strict';
     get('cognitive-preview').disabled = get('context-preview').disabled;
     get('deliberation-review').disabled = get('context-preview').disabled || foreignLease || state.health?.ready !== true;
     get('research-review').disabled = locked || working || !state.session;
+    get('learned-review').disabled = locked || working || !verifierCapability?.learned_verifier_configured;
+    if (get('learned-review').disabled && !working) get('learned-review').checked = false;
     ['adaptive-mode','adaptive-attempts','adaptive-total','adaptive-language','adaptive-expression','review-history-policy','quote-minimum','quote-sources',
       'campaign-id','campaign-plan','campaign-budget','campaign-create','campaign-inspect'].forEach(id => {
       get(id).disabled = locked || working || !state.session;
@@ -642,6 +659,11 @@ JAVASCRIPT = r"""'use strict';
     get('adaptive-expression').value = '';
     get('adaptive-mode').value = 'off';
     get('adaptive-language').value = 'auto';
+    get('advanced-reasoning-options').open = false;
+    get('generation-options').open = false;
+    get('learned-review').checked = false;
+    verifierCapability = null;
+    get('learned-review-status').textContent = 'No verifier capability checked.';
     get('review-history-policy').value = 'recent';
     get('quote-minimum').value = '1';
     get('quote-sources').value = '1';
@@ -1078,6 +1100,7 @@ JAVASCRIPT = r"""'use strict';
     }
   }
   let reviewedMemory = null;
+  let verifierCapability = null;
   let inspectedCampaign = null;
   function clearCampaignView() {
     inspectedCampaign = null;
@@ -1554,6 +1577,9 @@ JAVASCRIPT = r"""'use strict';
     const scopeVersion = state.knowledgeScopeVersion;
     const session = state.session, revision = state.revision, epoch = state.epoch;
     const mode = get('adaptive-mode').value;
+    const learned = get('learned-review').checked;
+    if (learned && (!grounded || !verifierCapability?.learned_verifier_configured))
+      throw new Error('Learned review requires a configured verifier and explicit grounding.');
     const historyPolicy = get('review-history-policy').value;
     const quoteMinimum = Number(get('quote-minimum').value);
     const quoteSources = Number(get('quote-sources').value);
@@ -1570,7 +1596,7 @@ JAVASCRIPT = r"""'use strict';
         mode === 'source_quotes' ? {kind: 'source_quotes', minimum_quotes: quoteMinimum, minimum_distinct_sources: quoteSources} :
         {kind: 'artifact', artifact_kind: mode}
     };
-    const policyMatches = () => mode === get('adaptive-mode').value && historyPolicy === get('review-history-policy').value &&
+    const policyMatches = () => learned === get('learned-review').checked && mode === get('adaptive-mode').value && historyPolicy === get('review-history-policy').value &&
       (mode !== 'source_quotes' || (quoteMinimum === Number(get('quote-minimum').value) && quoteSources === Number(get('quote-sources').value))) && (!adaptive ||
       (adaptive.max_attempts === Number(get('adaptive-attempts').value) &&
        adaptive.maximum_reserved_tokens === Number(get('adaptive-total').value) &&
@@ -1585,7 +1611,7 @@ JAVASCRIPT = r"""'use strict';
     const report = await api('POST', '/v1/sessions/' + session + '/deliberation-review', {
       message, expected_revision: revision, approved: true, max_output_tokens: tokens,
       grounded, require_full_history: strict, ...(scope.length ? {document_ids: scope} : {}),
-      history_policy: historyPolicy, ...(adaptive ? {adaptive} : {})
+      history_policy: historyPolicy, ...(adaptive ? {adaptive} : {}), ...(learned ? {learned_review: true} : {})
     });
     const sha = /^[0-9a-f]{64}$/;
     if (report.schema !== (adaptive ? 'skeleton.jeeves.adaptive-review.v1' : 'skeleton.jeeves.deliberation-review.v1') ||
@@ -1717,6 +1743,41 @@ JAVASCRIPT = r"""'use strict';
     }
     lines.push('Structural challenge: ' + challenge.numeric_disagreements.length +
       ' numeric literal differences in shared templates; not semantic contradictions.');
+    if (learned) {
+      const review = report.learned_review;
+      if (!review || review.schema !== 'skeleton.jeeves.learned-candidate-comparison.v1' ||
+          review.verifier_identity !== verifierCapability.verifier_identity ||
+          review.winner_selected !== false || review.semantic_truth_verified !== false ||
+          !Array.isArray(review.candidate_reports) || review.candidate_reports.length !== report.candidates.length ||
+          !Number.isSafeInteger(review.total_pairs) || review.total_pairs < 0 ||
+          review.total_pairs > verifierCapability.maximum_pairs || !sha.test(review.receipt_sha256))
+        throw new Error('Invalid independent classifier receipt.');
+      lines.push('', 'Independent local NLI review (uncalibrated model scores, not verified facts):');
+      for (const [index, result] of review.candidate_reports.entries()) {
+        const candidate = report.candidates[index];
+        if (result.candidate_sha256 !== candidate.output_sha256 ||
+            result.verifier_identity !== review.verifier_identity ||
+            result.semantic_truth_verified !== false || result.automatic_delivery_authorized !== false ||
+            !Array.isArray(result.claims) || result.claims.length > 8)
+          throw new Error('Classifier result is not bound to this candidate.');
+        lines.push(candidate.strategy + ': ' + result.disposition + ' (' + result.pairs_considered + ' pairs)');
+        for (const claim of result.claims) {
+          if (!Number.isSafeInteger(claim.start) || !Number.isSafeInteger(claim.end) ||
+              claim.start < 0 || claim.end <= claim.start || claim.end > Array.from(candidate.text).length ||
+              claim.text_sha256 !== await exactLocalSha256(Array.from(candidate.text).slice(claim.start, claim.end).join('')) ||
+              !Array.isArray(claim.source_results) || claim.source_results.length > 3)
+            throw new Error('Learned claim span identity mismatch.');
+          for (const scored of claim.source_results) {
+            const source = suppliedSources.get(scored.citation);
+            if (!source || source.passage_sha256 !== scored.passage_sha256 ||
+                source.document_sha256 !== scored.document_sha256 ||
+                !['contradiction','neutral','entailment','uncertain'].includes(scored.decision))
+              throw new Error('Classifier source scope changed.');
+          }
+          lines.push('  ' + claim.disposition + ' [' + claim.start + '–' + claim.end + ']');
+        }
+      }
+    } else if (report.learned_review !== undefined) throw new Error('Unexpected classifier result.');
     if (report.actual_total_output_tokens !== produced ||
         epoch !== state.epoch || !state.connected || state.session !== session ||
         state.revision !== revision || get('prompt').value.trim() !== message ||
@@ -1737,6 +1798,32 @@ JAVASCRIPT = r"""'use strict';
     get('deliberation-panel').open = true;
     status('Review the local candidates. Conversation history is unchanged.');
   }));
+  get('advanced-reasoning-options').addEventListener('toggle', () => {
+    if (!get('advanced-reasoning-options').open || !state.connected || state.busy) return;
+    const epoch = state.epoch;
+    void (async () => {
+      try {
+        const result = await api('GET','/v1/verification/status');
+        if (epoch !== state.epoch || !state.connected) return;
+        if (result.schema !== 'skeleton.jeeves.verification-status.v1' ||
+            result.primary_model_changed !== false || result.network_called !== false ||
+            result.automatic_delivery_authorized !== false ||
+            typeof result.learned_verifier_configured !== 'boolean' ||
+            (result.learned_verifier_configured &&
+             (!/^[0-9a-f]{64}$/.test(result.verifier_identity) ||
+              !Number.isSafeInteger(result.maximum_pairs) || result.maximum_pairs < 1 || result.maximum_pairs > 64)))
+          throw new Error('Invalid local verifier capability.');
+        verifierCapability = result;
+        get('learned-review-status').textContent = result.learned_verifier_configured ?
+          'Pinned CPU classifier available. Its judgments are fallible.' : 'No pinned local classifier configured.';
+      } catch {
+        if (epoch !== state.epoch) return;
+        verifierCapability = null;
+        get('learned-review-status').textContent = 'Local verifier capability unavailable.';
+      }
+      if (epoch === state.epoch) updateControls();
+    })();
+  });
   get('cognitive-preview').addEventListener('click', () => run(async () => {
     const message = get('prompt').value.trim();
     const budget = Number(get('budget').value);
@@ -1754,7 +1841,7 @@ JAVASCRIPT = r"""'use strict';
     await previewLocalContext(message, max_output_tokens,
       grounded, get('context-preserve').checked);
   }));
-  ['grounded', 'context-preserve', 'budget', 'review-history-policy', 'adaptive-mode', 'quote-minimum', 'quote-sources'].forEach(id =>
+  ['grounded', 'context-preserve', 'budget', 'review-history-policy', 'adaptive-mode', 'quote-minimum', 'quote-sources', 'learned-review'].forEach(id =>
     get(id).addEventListener('change', invalidateContextPreview));
   async function submit(retry = false) {
     const epoch = state.epoch;
