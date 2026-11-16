@@ -808,14 +808,14 @@ def test_speculative_hedge_rejects_effectful_and_unbudgeted_work():
     assert not propose_hedge(replace(o, alternative_domain="a"))
     assert not propose_hedge(replace(o, deadline_remaining_ms=59))
 
-def _verified_dispatch_fixture():
+def _verified_dispatch_fixture(*, verify_worker=None):
     from skeleton.automation.agents.swarm_broker import SwarmBroker
     from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
     from skeleton.automation.agents.swarm_runtime import SwarmTask
     from skeleton.automation.agents.swarm_tenant_broker import TenantSwarmBroker
     runtime = HardenedSwarmRuntime(fenced=True, clock=lambda: 10.0)
     runtime.register_worker("w", capacity=2)
-    broker = TenantSwarmBroker(SwarmBroker(runtime, verify_worker=lambda *args: False), verified_mode=True)
+    broker = TenantSwarmBroker(SwarmBroker(runtime, verify_worker=verify_worker if verify_worker is not None else lambda *args: False), verified_mode=True)
     broker.submit_verified_queued("a", SwarmTask("a", {}, priority=100))
     broker.submit_verified_queued("b", SwarmTask("b", {}, priority=0))
     return runtime, broker
@@ -1761,7 +1761,7 @@ def _host_wait_driver_fixture(tmp_path, *, clock, key=b"k" * 32):
     from skeleton.testing.test_durable_run_store import make_store
     from skeleton.automation.agents.swarm_durable import HostWaitDriver, SwarmDurableBridge
     from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
-    runtime, broker = _verified_dispatch_fixture()
+    runtime, broker = _verified_dispatch_fixture(verify_worker=lambda *args: True)
     store = make_store(tmp_path)
     store.create_run("host-wait")
     store.claim_run("host-wait", "owner", lease_seconds=60)
@@ -1877,7 +1877,7 @@ def test_verified_completion_ambiguous_write_retires_and_restores_attempt():
     from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
     from skeleton.automation.agents.swarm_runtime import SwarmTask
     from skeleton.intelligence.dispatch_policy import DispatchCandidate
-    runtime, broker = _verified_dispatch_fixture()
+    runtime, broker = _verified_dispatch_fixture(verify_worker=lambda *args: True)
     store = _DispatcherCheckpointFixture()
     bridge = SwarmDurableBridge(store)
     manager = SwarmRecoveryManager(delta_archive=True)
@@ -1914,4 +1914,87 @@ def test_verified_uncertain_reconciliation_durable_retry(tmp_path):
     )
     assert retry.state is TaskState.QUEUED and not retry.effect_uncertain
     assert bridge.load("host-wait").restore_runtime().task("retry").state is TaskState.QUEUED
+
+
+def test_host_worker_authority_uses_pinned_bytes_and_separate_action_grants():
+    from dataclasses import replace
+    from hashlib import sha256
+    from skeleton.automation.agents.swarm_durable import HostWorkerAuthority, HostWorkerReceipt, DurableSwarmError
+    artifact = b"verified external evidence"
+    pin = sha256(artifact).hexdigest()
+    worker_key, reconcile_key = b"w" * 32, b"r" * 32
+    bundles = {}
+    verifier = HostWorkerAuthority(
+        "run", grants={
+            ("worker", "w"): (worker_key, frozenset({"success", "uncertain"})),
+            ("inspector", "w"): (reconcile_key, frozenset({"reconcile:committed"})),
+        }, resolve=bundles.get, validate_evidence=lambda receipt, raw: raw == artifact,
+    )
+    def issue(issuer, action, key, **changes):
+        fields = dict(run_id="run", issuer=issuer, worker_id="w", task_id="t",
+                      lease_token="a" * 32, action=action, artifact_sha256=pin, issuer_key=key)
+        fields.update(changes)
+        receipt = HostWorkerReceipt.issue(**fields)
+        bundles[receipt.digest] = (receipt, artifact)
+        return receipt
+    valid = issue("worker", "success", worker_key)
+    assert verifier("w", "t", "a" * 32, "success", valid.digest)
+    assert not verifier("w", "other", "a" * 32, "success", valid.digest)
+    assert not verifier("w", "t", "b" * 32, "success", valid.digest)
+    forged = issue("worker", "success", b"x" * 32)
+    assert not verifier("w", "t", "a" * 32, "success", forged.digest)
+    wrong_run = issue("worker", "success", worker_key, run_id="other")
+    assert not verifier("w", "t", "a" * 32, "success", wrong_run.digest)
+    escalation = issue("worker", "reconcile:committed", worker_key)
+    assert not verifier("w", "t", "a" * 32, "reconcile:committed", escalation.digest)
+    reconciled = issue("inspector", "reconcile:committed", reconcile_key)
+    assert verifier("w", "t", "a" * 32, "reconcile:committed", reconciled.digest)
+    bundles[valid.digest] = (valid, artifact + b"!")
+    assert not verifier("w", "t", "a" * 32, "success", valid.digest)
+    bundles[valid.digest] = (replace(valid, signature_sha256="0" * 64), artifact)
+    assert not verifier("w", "t", "a" * 32, "success", valid.digest)
+    with pytest.raises(DurableSwarmError):
+        HostWorkerAuthority("run", grants={
+            ("worker", "w"): (worker_key, frozenset({"success", "reconcile:committed"})),
+        }, resolve=bundles.get, validate_evidence=lambda *args: True)
+
+
+def test_host_signed_worker_receipt_drives_real_durable_broker(tmp_path):
+    from hashlib import sha256
+    from skeleton.automation.agents.swarm_durable import HostWorkerAuthority, HostWorkerReceipt, SwarmDurableBridge
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, TaskState
+    from skeleton.intelligence.dispatch_policy import DispatchCandidate
+    from skeleton.testing.test_durable_run_store import make_store
+    data = b"independent result evidence"
+    key = b"s" * 32
+    custody = {}
+    verifier = HostWorkerAuthority(
+        "signed-run", grants={("worker", "w"): (key, frozenset({"success"}))},
+        resolve=custody.get, validate_evidence=lambda receipt, raw: raw == data,
+    )
+    runtime, broker = _verified_dispatch_fixture(verify_worker=verifier)
+    store = make_store(tmp_path)
+    store.create_run("signed-run")
+    store.claim_run("signed-run", "owner", lease_seconds=60)
+    manager = SwarmRecoveryManager(delta_archive=True)
+    bridge = SwarmDurableBridge(store)
+    assert bridge.submit_unique_verified("signed-run", "owner", manager, broker, "a", SwarmTask("signed", {}))
+    _, task, _ = bridge.lease_and_capture_verified(
+        "signed-run", "owner", manager, broker,
+        (DispatchCandidate("signed", "a", 100, 0),), now_ms=10000,
+    )
+    receipt = HostWorkerReceipt.issue(
+        run_id="signed-run", issuer="worker", worker_id=task.leased_to,
+        task_id=task.id, lease_token=task.lease_token, action="success",
+        artifact_sha256=sha256(data).hexdigest(), issuer_key=key,
+    )
+    custody[receipt.digest] = (receipt, data)
+    result, capture = bridge.finish_and_capture_verified(
+        "signed-run", "owner", manager, broker, "a", task.id,
+        worker_id=task.leased_to, lease_token=task.lease_token,
+        outcome="success", evidence_sha256=receipt.digest,
+    )
+    assert result.state is TaskState.SUCCEEDED
+    assert SwarmDurableBridge(make_store(tmp_path)).load("signed-run").restore_runtime().task("signed").state is TaskState.SUCCEEDED
 

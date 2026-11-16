@@ -667,3 +667,145 @@ class HostWaitDriver:
                 published.append(intent.task_id)
             return tuple(published)
 
+# Worker evidence must authenticate both the exact attempt and its evidence
+# bytes. A reconciliation issuer may be independent of the original worker.
+_WORKER_ACTIONS = frozenset({
+    "success", "uncertain", "reconcile:committed",
+    "reconcile:stopped-no-effect", "reconcile:stopped-terminal", "enqueue",
+})
+
+
+def _worker_action(value: str) -> str:
+    if type(value) is not str:
+        raise DurableSwarmError("invalid worker receipt action")
+    if value in _WORKER_ACTIONS and value != "enqueue":
+        return value
+    if value.startswith("enqueue:"):
+        _wait_digest(value[8:])
+        return "enqueue"
+    raise DurableSwarmError("invalid worker receipt action")
+
+
+@dataclass(frozen=True, slots=True)
+class HostWorkerReceipt:
+    """Authenticated immutable worker/reconciler evidence envelope."""
+
+    run_id: str
+    issuer: str
+    worker_id: str
+    task_id: str
+    lease_token: str
+    action: str
+    artifact_sha256: str
+    signature_sha256: str
+
+    def __post_init__(self) -> None:
+        for value in (self.run_id, self.issuer, self.worker_id, self.task_id):
+            _wait_identifier(value)
+        if (type(self.lease_token) is not str or len(self.lease_token) != 32
+                or any(char not in "0123456789abcdef" for char in self.lease_token)):
+            raise DurableSwarmError("invalid worker receipt attempt token")
+        _worker_action(self.action)
+        _wait_digest(self.artifact_sha256)
+        _wait_digest(self.signature_sha256)
+
+    def signed_fields(self) -> list[object]:
+        return ["jeeves-host-worker-v1", self.run_id, self.issuer, self.worker_id,
+                self.task_id, self.lease_token, self.action, self.artifact_sha256]
+
+    @property
+    def digest(self) -> str:
+        return _wait_hash([self.signed_fields(), self.signature_sha256])
+
+    @classmethod
+    def issue(cls, *, run_id: str, issuer: str, worker_id: str, task_id: str,
+              lease_token: str, action: str, artifact_sha256: str,
+              issuer_key: bytes) -> HostWorkerReceipt:
+        import hmac
+        from dataclasses import replace
+        _validate_wait_key(issuer_key)
+        unsigned = cls(run_id, issuer, worker_id, task_id, lease_token, action,
+                       artifact_sha256, "0" * 64)
+        signature = hmac.digest(issuer_key, _wait_bytes(unsigned.signed_fields()),
+                                "sha256").hex()
+        return replace(unsigned, signature_sha256=signature)
+
+
+class HostWorkerAuthority:
+    """Callable verifier for the canonical SwarmBroker verify_worker seam.
+
+    Trusted host configuration supplies distinct issuer/worker/action grants,
+    a receipt resolver and an independent evidence-content validator. The
+    resolver supplies exact receipt AND artifact bytes from host custody.
+    No digest, signature, or worker assertion alone proves a physical effect.
+    The caller must keep receipts available after restart and provision
+    reconciliation grants separately from ordinary worker grants.
+    """
+
+    def __init__(
+        self, run_id: str, *,
+        grants: dict[tuple[str, str], tuple[bytes, frozenset[str]]],
+        resolve: Callable[[str], tuple[HostWorkerReceipt, bytes] | None],
+        validate_evidence: Callable[[HostWorkerReceipt, bytes], bool],
+        max_artifact_bytes: int = 16 * 1024 * 1024,
+    ) -> None:
+        self.run_id = _wait_identifier(run_id)
+        if (type(grants) is not dict or len(grants) > 10000
+                or not callable(resolve) or not callable(validate_evidence)
+                or type(max_artifact_bytes) is not int
+                or not 1 <= max_artifact_bytes <= 64 * 1024 * 1024):
+            raise DurableSwarmError("invalid worker evidence authority")
+        self._grants: dict[tuple[str, str], tuple[bytes, frozenset[str]]] = {}
+        for scope, grant in grants.items():
+            if (type(scope) is not tuple or len(scope) != 2
+                    or type(grant) is not tuple or len(grant) != 2):
+                raise DurableSwarmError("invalid worker issuer scope")
+            issuer, worker_id = scope
+            key, actions = grant
+            _validate_wait_key(key)
+            if (type(actions) is not frozenset or not actions
+                    or not actions.issubset(_WORKER_ACTIONS)):
+                raise DurableSwarmError("invalid worker issuer action grant")
+            # Distinct effect and reconciliation roles per issuer. A worker
+            # with a completion credential cannot promote its own uncertainty.
+            if (actions & {"success", "uncertain"}
+                    and actions - {"success", "uncertain"}):
+                raise DurableSwarmError("worker and reconciler grants must be separate")
+            self._grants[(_wait_identifier(issuer), _wait_identifier(worker_id))] = (key, actions)
+        self._resolve = resolve
+        self._validate_evidence = validate_evidence
+        self._max_artifact_bytes = max_artifact_bytes
+
+    def __call__(self, worker_id: str, task_id: str, lease_token: str,
+                 action: str, evidence_sha256: str) -> bool:
+        import hmac
+        from hashlib import sha256
+        try:
+            action_scope = _worker_action(action)
+            _wait_digest(evidence_sha256)
+            bundle = self._resolve(evidence_sha256)
+            if type(bundle) is not tuple or len(bundle) != 2:
+                return False
+            receipt, artifact = bundle
+            if (type(receipt) is not HostWorkerReceipt or type(artifact) is not bytes
+                    or len(artifact) > self._max_artifact_bytes
+                    or (receipt.run_id, receipt.worker_id, receipt.task_id,
+                        receipt.lease_token, receipt.action) !=
+                       (self.run_id, worker_id, task_id, lease_token, action)
+                    or not hmac.compare_digest(receipt.digest, evidence_sha256)):
+                return False
+            grant = self._grants.get((receipt.issuer, worker_id))
+            if grant is None or action_scope not in grant[1]:
+                return False
+            expected = hmac.digest(grant[0], _wait_bytes(receipt.signed_fields()),
+                                   "sha256").hex()
+            if (not hmac.compare_digest(expected, receipt.signature_sha256)
+                    or not hmac.compare_digest(sha256(artifact).hexdigest(),
+                                               receipt.artifact_sha256)):
+                return False
+            return self._validate_evidence(receipt, artifact) is True
+        except Exception:
+            # Malformed evidence, unavailable custody or a failing independent
+            # validator may never open a verified execution boundary.
+            return False
+

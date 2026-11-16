@@ -232,3 +232,20 @@ daemon, distributed transport, or claim that all 108 targets are complete.
 Six focused regression cases cover restart, signature attacks, exact envelope
 custody, durable completion, ambiguous write, and durable retry.
 
+## Wave A12: authenticated worker and independent reconciliation receipts
+
+The canonical broker's existing verifier injection now has a concrete
+HostWorkerAuthority implementation. Each signed receipt binds run, issuer,
+worker, task, attempt token, exact action (including continuation digest),
+and independently pinned artifact bytes. Verification checks the receipt
+digest, HMAC, source scope, action grant, actual artifact digest and a required
+independent content-validator callback before the broker accepts an effect.
+Completion and reconciliation action grants cannot be mixed for an issuer
+scope. The host remains responsible for independently provisioned keys,
+persistent immutable receipt/artifact custody, and the semantic correctness of
+the physical evidence validator. An unavailable resolver/validator fails
+closed. A fixture verifies signed completion through real SQLite recovery;
+an adversarial fixture checks wrong worker/attempt/run/key, artifact mutation
+and action escalation. Previously inherited worker-refusal test fixtures now
+use explicit verification only where a successful synthetic outcome is intended.
+
