@@ -225,3 +225,21 @@ def test_storage_wrap_includes_telemetry_privacy_without_import(storage_client):
     assert response.json()["wrapped_core"] == len(lazy_registry.module_names())
     assert "core.telemetry_privacy" in lazy_registry._LOADERS
     assert "core.telemetry_privacy" not in set(sys.modules) - before
+
+
+def test_canonical_writer_loader_is_literal_and_deferred(monkeypatch):
+    name = "core.canonical_writer_startup"
+    assert lazy_registry.module_names().count("canonical_writer_startup") == 1
+    requested = []
+    marker = object()
+
+    def controlled(module_name):
+        requested.append(module_name)
+        return marker
+
+    monkeypatch.setattr(lazy_registry.importlib, "import_module", controlled)
+    assert requested == []
+    assert lazy_registry._LOADERS[name]() is marker
+    assert requested == [name]
+    with pytest.raises(ValueError):
+        lazy_registry.lazy_import(name + ".unregistered")

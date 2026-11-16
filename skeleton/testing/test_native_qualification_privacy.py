@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 from skeleton.ai.runtime.operational_ai.native_qualification.privacy import inspect_public_fields
 from skeleton.ai.runtime.operational_ai.native_qualification.errors import QualificationError
+from skeleton.ai.runtime.operational_ai.native_qualification.cases import QualificationCase
+from skeleton.ai.runtime.operational_ai.native_qualification.corpus import iter_cases
 
 
 class TestQualificationPrivacy(unittest.TestCase):
@@ -24,7 +26,7 @@ class TestQualificationPrivacy(unittest.TestCase):
             inspect_public_fields({"danger":object()})
 
     def test_empty_prompt_denied(self):
-        damaged = self.records[0].record()
+        damaged = next(iter_cases()).record()
         damaged["steps"][0]["prompt"] = ""
         with self.assertRaises(QualificationError):
             QualificationCase.from_json(damaged)
