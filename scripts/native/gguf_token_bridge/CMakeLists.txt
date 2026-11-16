@@ -14,7 +14,9 @@ execute_process(COMMAND "${GIT_EXECUTABLE}" -C "${LLAMA_CPP_SOURCE}" rev-parse "
 execute_process(COMMAND "${GIT_EXECUTABLE}" -C "${LLAMA_CPP_SOURCE}" status --porcelain --untracked-files=all
   RESULT_VARIABLE status_result OUTPUT_VARIABLE dirty OUTPUT_STRIP_TRAILING_WHITESPACE)
 if(NOT git_result EQUAL 0 OR NOT tag_result EQUAL 0 OR NOT status_result EQUAL 0
-    OR NOT actual_sha STREQUAL target_sha OR NOT dirty STREQUAL "")
+    OR NOT actual_sha STREQUAL target_sha
+    OR NOT actual_sha STREQUAL "d81235049384534c167caea52b85a694f6103d14"
+    OR NOT dirty STREQUAL "")
   message(FATAL_ERROR "llama.cpp checkout is not clean at b11429")
 endif()
 set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)

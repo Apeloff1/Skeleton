@@ -111,6 +111,7 @@ def make_pinned_native_guard_factory(
     they must not be derived from whatever model happened to load.
     """
     from .native_runtime import NativeRuntimeLocalModel
+    from .gguf_token_bridge import GgufTokenBridgeModel
     from .signed_reviewer_client import SignedReviewerClient
     from .reviewer_custody import ReviewerTrustAnchor
     if (type(reviewer) is not SignedReviewerClient
@@ -125,17 +126,39 @@ def make_pinned_native_guard_factory(
         raise ProviderPolicyError("duplicate native guard model pins")
 
     def build(backend: Any, reader: TrustedSnapshotReader) -> ProtectedLocalComponents:
-        if type(backend) not in (NativeTransformerModel, NativeRuntimeLocalModel):
+        if type(backend) not in (NativeTransformerModel, NativeRuntimeLocalModel, GgufTokenBridgeModel):
             raise ProviderPolicyError("loaded backend lacks admitted exact native tokenizer")
         if type(getattr(backend, "model_id", None)) is not str:
             raise ProviderPolicyError("native guard model identity invalid")
         pin = by_id.get(backend.model_id)
         if pin is None or reviewer._anchor != anchor:
             raise ProviderPolicyError("native guard model or reviewer pin unavailable")
-        components = _exact_native_components(backend, snapshots=reader, reviewer=reviewer)
+        if type(backend) is GgufTokenBridgeModel:
+            backend.assert_identity()
+            encode, decode = backend.encode_ids, backend.decode_ids
+
+            def bridge_verify(active, encoder, decoder):
+                if active is not backend or encoder is not encode or decoder is not decode:
+                    return False
+                try:
+                    backend.assert_identity()
+                    return (getattr(backend.encode_ids, "__func__", None) is getattr(encode, "__func__", None)
+                            and getattr(backend.decode_ids, "__func__", None) is getattr(decode, "__func__", None))
+                except Exception:
+                    return False
+
+            components = ProtectedLocalComponents(
+                snapshots=reader, reviewer=reviewer, tokenize=encode, detokenize=decode,
+                verify_native_tokenizer=bridge_verify,
+                sampler_support=lambda *_: False, projection_attestor=lambda *_: False,
+            )
+            get_tokenizer_digest = lambda: backend.tokenizer_digest
+        else:
+            components = _exact_native_components(backend, snapshots=reader, reviewer=reviewer)
+            get_tokenizer_digest = lambda: backend.runtime.tokenizer.digest
         expected = (pin.model_digest, pin.runtime_digest, pin.tokenizer_digest)
         try:
-            observed = (backend.model_digest, backend.runtime_digest, backend.runtime.tokenizer.digest)
+            observed = (backend.model_digest, backend.runtime_digest, get_tokenizer_digest())
             if observed != expected:
                 raise ProviderPolicyError("loaded native backend differs from operator pins")
         except Exception:
@@ -149,7 +172,7 @@ def make_pinned_native_guard_factory(
                         and backend.model_id == pin.model_id
                         and verify(active, encoder, decoder)
                         and (backend.model_digest, backend.runtime_digest,
-                             backend.runtime.tokenizer.digest) == expected)
+                             get_tokenizer_digest()) == expected)
             except Exception:
                 return False
 

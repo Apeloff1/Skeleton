@@ -188,8 +188,9 @@ class LocalModelDeployment:
             raise LocalModelDeploymentError(
                 "unsupported deployment manifest key(s): " + ", ".join(sorted(map(str, unknown_top_level)))
             )
-        if payload.get("runtime_kind") != "llama.cpp-cli":
-            raise LocalModelDeploymentError("runtime_kind must be llama.cpp-cli")
+        runtime_kind = payload.get("runtime_kind")
+        if runtime_kind not in ("llama.cpp-cli", "llama.cpp-token-bridge-v1"):
+            raise LocalModelDeploymentError("unsupported local runtime kind")
         model_id = payload.get("model_id")
         if not isinstance(model_id, str) or not model_id.strip():
             raise LocalModelDeploymentError("model_id must be non-empty")
@@ -277,9 +278,12 @@ class LocalModelDeployment:
             gguf = inspect_gguf(model)
         except LlamaCppRuntimeError as exc:
             raise LocalModelDeploymentError(f"invalid GGUF model artifact: {exc}") from exc
+        if runtime_kind == "llama.cpp-token-bridge-v1":
+            from .gguf_token_bridge import _compatible
+            _compatible(validated)
         deployment = cls(
             manifest_path=resolved_manifest,
-            runtime_kind="llama.cpp-cli",
+            runtime_kind=runtime_kind,
             executable_path=executable,
             executable_sha256=executable_digest,
             model_path=model,
@@ -378,7 +382,14 @@ class LocalModelDeployment:
         require_guarded_inference: bool = False,
         guarded_components: Any | None = None,
     ) -> LocalModelAdapter:
-        adapter = build_llama_cpp_adapter(
+        if self.runtime_kind == "llama.cpp-token-bridge-v1":
+            from .gguf_token_bridge import build_exact_gguf_adapter
+            builder = build_exact_gguf_adapter
+        elif self.runtime_kind == "llama.cpp-cli":
+            builder = build_llama_cpp_adapter
+        else:
+            raise LocalModelDeploymentError("unsupported activated runtime kind")
+        adapter = builder(
             self.llama_cpp_config(rehash_artifacts_each_run=rehash_artifacts_each_run),
             cache_size=cache_size,
             default_seed=default_seed,
