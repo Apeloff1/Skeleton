@@ -86,12 +86,15 @@ def _run(
     except (OSError, subprocess.SubprocessError) as exc:
         return InstallPhase(label, False, f"{label} failed: {type(exc).__name__}")
 
-    detail = f"{label} completed" if completed.returncode == 0 else f"{label} exited {completed.returncode}"
-    if completed.returncode and label == "python-install":
+    status = getattr(completed, "returncode", None)
+    if type(status) is not int or not -(2**31) <= status <= 2**32 - 1:
+        return InstallPhase(label, False, f"{label} returned invalid process status")
+    detail = f"{label} completed" if status == 0 else f"{label} exited {status}"
+    if status and label == "python-install":
         detail += "; use an activated Python 3.11+ virtual environment and install requirements.txt; inspect package-index access"
-    elif completed.returncode:
+    elif status:
         detail += "; run app doctor and inspect the named service with app logs; credentials are omitted from this receipt"
-    return InstallPhase(label, completed.returncode == 0, detail)
+    return InstallPhase(label, status == 0, detail)
 
 
 def _preload_phase(report: PreloadReport) -> InstallPhase:
@@ -367,6 +370,7 @@ def install_application(
         phases.append(InstallPhase("start", False, str(exc)))
         return InstallReceipt(root=root, phases=tuple(phases))
     intent("start")
+    recoverable_start_failure = False
     try:
         completed = runner(
             list(command),
@@ -378,8 +382,18 @@ def install_application(
             env=compose_env,
             timeout=1800.0,
         )
-        ok = completed.returncode == 0
-        detail = "application services started" if ok else f"application start exited {completed.returncode}"
+        status = getattr(completed, "returncode", None)
+        valid_status = type(status) is int and -(2**31) <= status <= 2**32 - 1
+        ok = valid_status and status == 0
+        # Negative POSIX signal exits, Windows exception codes, timeouts and
+        # malformed process receipts may leave daemon operations in flight.
+        # Only a normal nonzero exit permits a second controlled invocation.
+        recoverable_start_failure = valid_status and 0 < status <= 255
+        detail = (
+            "application services started" if ok else
+            f"application start exited {status}" if valid_status else
+            "application start returned invalid process status"
+        )
         if not ok:
             detail += "; inspect app doctor and app logs <service>; no credentials are included"
         phases.append(InstallPhase("start", ok, detail))
@@ -393,7 +407,13 @@ def install_application(
         return InstallReceipt(root=root, phases=tuple(phases))
 
     full_start_ok = phases[-1].ok
-    if not full_start_ok:
+    if not full_start_ok and not recoverable_start_failure:
+        phases.append(InstallPhase(
+            "setup-ui-recovery", False,
+            "startup completion is uncertain; inspect existing containers before retrying; no second Compose mutation attempted",
+            required=False,
+        ))
+    if not full_start_ok and recoverable_start_failure:
         # A failed protected-stack start must remain a required failure. When
         # the canonical frontend is independently startable, attempt only its
         # diagnostic surface; never remove backend/engine health fences or
@@ -409,9 +429,13 @@ def install_application(
                 default_services=("frontend",),
                 full_services=("frontend",),
             )
+            recovery_command = compose_command(
+                "up", manifest=diagnostic_manifest, hot=hot,
+                install_env=True, frontend_recovery=True,
+            )
             intent("setup-ui-recovery")
             recovery = _run(
-                compose_command("up", manifest=diagnostic_manifest, hot=hot, install_env=True),
+                recovery_command,
                 root=root,
                 runner=runner,
                 label="setup-ui-recovery",

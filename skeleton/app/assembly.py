@@ -855,6 +855,7 @@ def compose_command(
     service: str = "",
     hot: bool = False,
     install_env: bool = False,
+    frontend_recovery: bool = False,
 ) -> tuple[str, ...]:
     """Build a shell-free Docker Compose command for the unified app.
 
@@ -866,6 +867,15 @@ def compose_command(
 
     manifest = manifest or load_manifest()
     action = action.strip().lower()
+    if type(frontend_recovery) is not bool:
+        raise ValueError("frontend_recovery must be boolean")
+    if frontend_recovery and (
+        action != "up" or full or not install_env
+        or manifest.default_services != ("frontend",)
+        or manifest.full_services != ("frontend",)
+        or manifest.service("frontend").depends_on
+    ):
+        raise ValueError("frontend recovery requires an isolated frontend-only install plan")
     base = ["docker", "compose", "-f", manifest.compose_file]
     if hot:
         base.extend(["-f", manifest.hot_compose_file])
@@ -886,6 +896,10 @@ def compose_command(
         for profile in profiles:
             base.extend(["--profile", profile])
         command = [*base, "up", "-d"]
+        if frontend_recovery:
+            # The actual Compose graph, not merely the in-memory plan, must
+            # be prevented from implicitly starting protected dependencies.
+            command.append("--no-deps")
         if build:
             command.append("--build")
         command.extend(plan.services)

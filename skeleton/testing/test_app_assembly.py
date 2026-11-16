@@ -1349,3 +1349,39 @@ def test_compose_installer_commands_select_exact_private_env_file(action, hot):
 def test_compose_install_env_switch_is_explicit_boolean(value):
     with pytest.raises(ValueError, match="install_env"):
         compose_command("config", install_env=value)
+
+
+def test_frontend_recovery_compose_never_starts_implicit_dependencies():
+    from dataclasses import replace
+    from skeleton.app.assembly import load_manifest
+    manifest = replace(load_manifest(), default_services=("frontend",), full_services=("frontend",))
+    command = compose_command("up", manifest=manifest, install_env=True, frontend_recovery=True)
+    assert "--no-deps" in command
+    assert command[-1] == "frontend"
+    assert "--no-deps" not in compose_command("up")
+
+
+@pytest.mark.parametrize("action,full,pinned", [
+    ("config", False, True), ("up", True, True), ("up", False, False),
+])
+def test_frontend_recovery_rejects_nonisolated_authority(action, full, pinned):
+    from dataclasses import replace
+    from skeleton.app.assembly import load_manifest
+    manifest = replace(load_manifest(), default_services=("frontend",), full_services=("frontend",))
+    with pytest.raises(ValueError, match="frontend recovery"):
+        compose_command(action, full=full, install_env=pinned, manifest=manifest, frontend_recovery=True)
+
+
+def test_frontend_recovery_rejects_full_canonical_graph():
+    with pytest.raises(ValueError, match="frontend recovery"):
+        compose_command("up", install_env=True, frontend_recovery=True)
+
+
+@pytest.mark.parametrize("status", [False, True, None, "0", 2**40])
+def test_host_command_rejects_malformed_exit_status(status):
+    from types import SimpleNamespace
+    from skeleton.app.preloader import _command_check
+    result = _command_check(["docker", "info"], code="host:docker", label="Docker",
+                            remediation="repair", runner=lambda *a, **k: SimpleNamespace(returncode=status))
+    assert result.ok is False
+    assert result.detail == "Docker returned invalid process status"

@@ -640,3 +640,69 @@ def test_missing_setup_output_denies_all_install_modes_before_pip(tmp_path, monk
     receipt = installer.install_application(tmp_path, install_python=True, start=start, runner=forbidden)
     assert not receipt.ok
     assert receipt.phases[-1].name == "runtime-source-epoch"
+
+
+@pytest.mark.parametrize("outcome", ["timeout", "launch_error", "signal", "windows_exception",
+                                      "boolean", "string", "missing"])
+def test_uncertain_start_cannot_trigger_second_compose_mutation(tmp_path, monkeypatch, outcome):
+    from types import SimpleNamespace
+    _prepare(monkeypatch, tmp_path)
+    _forbid_network(monkeypatch)
+    monkeypatch.setattr("skeleton.app.health.probe_local_setup",
+                        lambda *a, **k: pytest.fail("uncertain start must not probe recovery"))
+    seen = []
+
+    def runner(command, **kwargs):
+        seen.append(command[-1])
+        if command[-1] == "config":
+            return _completed(command)
+        assert seen == ["config", "up"]
+        if outcome == "timeout":
+            raise subprocess.TimeoutExpired(command, 1800)
+        if outcome == "launch_error":
+            raise OSError("private daemon diagnostic")
+        if outcome == "missing":
+            return SimpleNamespace()
+        status = {"signal": -9, "windows_exception": 0xC0000005,
+                  "boolean": False, "string": "private status"}[outcome]
+        return SimpleNamespace(returncode=status)
+
+    receipt = installer.install_application(tmp_path, start=True, install_python=False, runner=runner)
+    assert seen == ["config", "up"]
+    assert not receipt.ok
+    assert receipt.phases[-1].name == "setup-ui-recovery"
+    assert not receipt.phases[-1].ok and not receipt.phases[-1].required
+    assert "private daemon diagnostic" not in repr(receipt.to_dict())
+    assert "private status" not in repr(receipt.to_dict())
+
+
+@pytest.mark.parametrize("status", [False, True, "0", None, float("nan"), 2**40])
+def test_malformed_config_exit_cannot_claim_success(tmp_path, monkeypatch, status):
+    from types import SimpleNamespace
+    _prepare(monkeypatch, tmp_path)
+    _forbid_network(monkeypatch)
+    receipt = installer.install_application(
+        tmp_path, install_python=False, start=False,
+        runner=lambda *a, **k: SimpleNamespace(returncode=status),
+    )
+    assert not receipt.ok
+    assert receipt.phases[-1].name == "compose-config"
+
+
+def test_recovery_declares_no_dependency_start_authority(tmp_path, monkeypatch):
+    _prepare(monkeypatch, tmp_path)
+    commands = []
+    plans = []
+    def command(action, **kwargs):
+        plans.append((action, kwargs))
+        return ("docker", "compose", action)
+    def runner(args, **kwargs):
+        commands.append(args[-1])
+        return subprocess.CompletedProcess(args, 9 if args[-1] == "up" else 0)
+    monkeypatch.setattr(installer, "compose_command", command)
+    receipt = installer.install_application(tmp_path, start=True, install_python=False, runner=runner)
+    assert not receipt.ok
+    assert commands == ["config", "up", "up"]
+    assert plans[-1][1]["frontend_recovery"] is True
+    assert plans[-1][1]["manifest"].default_services == ("frontend",)
+    assert not plans[1][1].get("frontend_recovery", False)
