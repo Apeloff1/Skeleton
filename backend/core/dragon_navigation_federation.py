@@ -330,3 +330,41 @@ async def application_call(application,scope,operation,**kwargs):
         return await _bounded(work)
     except (OSError,sqlite3.Error,CatalogueHeld,TimeoutError) as exc:
         raise CrawlerError("crawler_navigation_storage_held","The configured navigation catalogue is unavailable.",503) from exc
+
+
+async def batch_publish(application,scope,*,sessions,rights_reference,retention_seconds,acknowledged):
+    """Bounded, retry-safe batch of independently authorized checkpoints.
+
+    Each publication has its own transaction and grant identity. A request
+    never silently renews expired authority or grants other owners access.
+    Partial outcomes are explicit; replay the same batch to recover receipts.
+    """
+    from core.dragon_crawler import CrawlerError
+    if acknowledged is not True or not isinstance(sessions,list) or not 1<=len(sessions)<=16:
+        raise ValueError("explicit bounded locator retention batch required")
+    _text(rights_reference,256)
+    if type(retention_seconds) is not int or not 900<=retention_seconds<=MAX_RETENTION:
+        raise ValueError("navigation retention interval")
+    identifiers=set()
+    for item in sessions:
+        if not isinstance(item,dict) or set(item)!={"session_id","expected_snapshot_digest"}:
+            raise ValueError("navigation batch checkpoint schema")
+        identifier=_text(item["session_id"],128)
+        _hash(item["expected_snapshot_digest"])
+        if identifier in identifiers:raise ValueError("duplicate batch session")
+        identifiers.add(identifier)
+    result=[]
+    for item in sessions:
+        try:
+            receipt=await application_call(application,scope,"publish",**item,
+                rights_reference=rights_reference,retention_seconds=retention_seconds,
+                acknowledged=True)
+        except CrawlerError as exc:
+            result.append({"session_id":item["session_id"],"state":"held","code":exc.code})
+        except (ValueError,TypeError,KeyError,LookupError):
+            result.append({"session_id":item["session_id"],"state":"held","code":"navigation_checkpoint_held"})
+        else:
+            result.append({"session_id":item["session_id"],"state":"published","receipt":receipt})
+    return {"outcomes":result,"published":sum(x["state"]=="published" for x in result),
+        "held":sum(x["state"]=="held" for x in result),"atomic_batch":False,
+        "network_authorized":False}
