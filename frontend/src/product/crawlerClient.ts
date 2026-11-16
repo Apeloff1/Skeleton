@@ -240,6 +240,14 @@ export type NavigationTarget = {
   pending: boolean; phase: 'visited' | 'active' | 'depth_held' | 'pending' | 'observed_only';
   navigation_authorized: false;
 };
+export type NavigationPacket = { snapshot_digest:string; packet_digest:string; objective:string[];
+  candidates:{id:string;terms:string[];depth:number;attempts:number;semantic:number}[] };
+export type NavigationAdvice = { snapshot_digest:string; packet_digest:string;
+  jeeves_rank:string[];dragon_rank:string[] };
+export type NavigationFederationPage = { targets:{id:string;url:string;host:string;semantic:number;
+  witness:{grant_id:string;source_session:string;checkpoint:string;expires:number;relation:string;occurrence_count:number};
+  network_authorized:false;reviewed:false}[]; next_cursor:string|null;
+  candidate_metadata_only:true;network_authorized:false;global_completeness_claimed:false };
 export type NavigationInventory = {
   ok: true; session_id: string; snapshot_digest: string; read_only: true;
   targets: NavigationTarget[]; next_after: number | null; summary: NavigationBacklogSummary;
@@ -1099,6 +1107,39 @@ export async function listCrawls(cursor?: string, signal?: AbortSignal): Promise
 export async function getCrawl(id: string, signal?: AbortSignal): Promise<CrawlSession> {
   const value = await read(api.get<{ session: CrawlSession }>(ROOT + '/sessions/' + identifier(id), options(signal)), getAuthToken(), 'The crawler session could not be refreshed.'); return session(value.session, id);
 }
+export async function getNavigationPacket(id:string,signal?:AbortSignal): Promise<{packet:NavigationPacket;version:number}> {
+  const v=await read(api.get<{ok:true;session_id:string;packet:NavigationPacket;version:number;network_authorized:false}>(
+    ROOT+'/sessions/'+identifier(id)+'/navigation/packet',options(signal)),getAuthToken(),'Navigation packet unavailable.');
+  const p=v?.packet;
+  if(!v||v.ok!==true||v.session_id!==id||v.network_authorized!==false||!integer(v.version)||!p
+    ||!HASH.test(p.snapshot_digest)||!HASH.test(p.packet_digest)||!Array.isArray(p.objective)||p.objective.length>20
+    ||!Array.isArray(p.candidates)||p.candidates.length>12
+    ||p.candidates.some(c=>!HASH.test(c.id)||!Array.isArray(c.terms)||c.terms.length>8
+      ||!integer(c.depth,3)||!integer(c.attempts,3)||!integer(c.semantic,1000))) invalid('Invalid navigation packet.');
+  return {packet:p,version:v.version};
+}
+export async function retainNavigationInventory(id:string,body:{expected_snapshot_digest:string;
+    rights_reference:string;retention_seconds:number;acknowledged:true},signal?:AbortSignal) {
+  if(!HASH.test(body.expected_snapshot_digest)||body.acknowledged!==true||!integer(body.retention_seconds,315360000)
+    ||body.retention_seconds<900||!body.rights_reference.trim()) invalid('Explicit locator retention authority required.');
+  const v=await read(api.post<{grant_id:string;checkpoint:string;accepted:number;omitted_nonpublic:number;
+    retention_expires_at:number;replayed:boolean;network_authorized:false;metadata_only:true}>(
+      ROOT+'/sessions/'+identifier(id)+'/navigation/federate',body,options(signal)),getAuthToken(),'Locator retention not confirmed.');
+  if(!v||!HASH.test(v.grant_id)||v.checkpoint!==body.expected_snapshot_digest||v.metadata_only!==true
+    ||v.network_authorized!==false||!integer(v.accepted,1024)||!integer(v.omitted_nonpublic,1024)) invalid('Invalid locator retention receipt.');
+  return v;
+}
+export async function searchNavigationFederation(query:string,cursor?:string,signal?:AbortSignal):Promise<NavigationFederationPage> {
+  if(query.length>512||cursor&&!/^[a-f0-9]{64}:[a-f0-9]{64}$/.test(cursor)) invalid('Invalid federation search.');
+  const v=await read(api.get<NavigationFederationPage>(ROOT+'/navigation/federation?query='+encodeURIComponent(query)
+    +(cursor?'&after='+encodeURIComponent(cursor):''),options(signal)),getAuthToken(),'Navigation federation search unavailable.');
+  if(!v||v.candidate_metadata_only!==true||v.network_authorized!==false||v.global_completeness_claimed!==false
+    ||!Array.isArray(v.targets)||v.targets.length>32||v.targets.some(t=>!HASH.test(t.id)||!navigationUrl(t.url)
+      ||t.network_authorized!==false||t.reviewed!==false||!t.witness||!HASH.test(t.witness.grant_id)
+      ||!HASH.test(t.witness.checkpoint)||!Number.isFinite(t.semantic)||t.semantic<0||t.semantic>1)
+    ||v.next_cursor!==null&&!/^[a-f0-9]{64}:[a-f0-9]{64}$/.test(v.next_cursor)) invalid('Invalid federation page.');
+  return v;
+}
 export async function getNavigationInventory(id: string, cursor?: { snapshot_digest: string; after: number },
   signal?: AbortSignal): Promise<NavigationInventory> {
   if (cursor && (!HASH.test(cursor.snapshot_digest) || !integer(cursor.after, 1000000000)))
@@ -1161,7 +1202,7 @@ export async function createCrawl(body: CrawlCreate, signal?: AbortSignal): Prom
   for (const seed of body.seeds) { let url: URL; try { url = new URL(seed); } catch { throw new ChatClientError('Enter complete http or https seed URLs, one per line.', { kind: 'validation' }); } if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || seed.length > 2048) throw new ChatClientError('Use http or https URLs without embedded credentials.', { kind: 'validation' }); }
   const value = await read(api.post<{ session: CrawlSession }>(ROOT + '/sessions', body, options(signal)), getAuthToken(), 'The crawl could not be created. Retry the same request to check its outcome.'); return session(value.session);
 }
-export async function runCrawl(id: string, body: CrawlCommand & { max_steps: number }, signal?: AbortSignal): Promise<CrawlSession> {
+export async function runCrawl(id: string, body: CrawlCommand & { max_steps: number; navigation_advice?: NavigationAdvice }, signal?: AbortSignal): Promise<CrawlSession> {
   const value = await read(api.post<{ session: CrawlSession }>(ROOT + '/sessions/' + identifier(id) + '/run', body, options(signal)), getAuthToken(), 'The bounded slice did not return a confirmed result. Refresh or retry the same request.'); return session(value.session, id);
 }
 export async function controlCrawl(id: string, body: CrawlCommand & { action: 'pause' | 'resume' | 'cancel' }, signal?: AbortSignal): Promise<CrawlSession> {
