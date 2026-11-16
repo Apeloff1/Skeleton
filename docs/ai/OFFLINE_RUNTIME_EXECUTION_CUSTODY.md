@@ -358,3 +358,53 @@ Focused regressions cover mapping ceilings, sequential source ownership,
 manifest drift at copy completion, distinct absent-byte limits and
 pre-ingest manifest bounds. Actual platform qualification and all
 required exact-head checks remain outstanding.
+
+
+## Cooperative weight-store disk admission
+
+The optional `WeightStoreDiskOwner` composes the canonical store's
+existing staging path with a private POSIX writer lock, bounded
+inventory and explicit free-space reserve. Participating writers use
+the same preserved lock inode and the same trusted operator policy.
+The scan accounts for all canonical object and manifest file lengths,
+including unreferenced objects, and refuses unexpected temporary files,
+links, noncanonical bucket names and mixed filesystems. Prospective
+object, bucket, manifest and byte ceilings are evaluated before staging.
+Actual temporary object and manifest writes are independently charged
+and recheck the observed filesystem free-space reserve. The final
+inventory must reconcile with the bytes actually charged.
+
+```python
+from skeleton.ai.model_runtime.weight_shard_store import WeightShardStore
+from skeleton.ai.model_runtime.weight_store_disk_owner import (
+    DiskAdmissionPolicy, WeightStoreDiskOwner,
+)
+
+store = WeightShardStore("/private/service/weights")
+owner = WeightStoreDiskOwner(store, DiskAdmissionPolicy(
+    maximum_store_bytes=256 * 1024**3,
+    minimum_free_bytes=8 * 1024**3,
+))
+# Trusted local caller supplies the canonical identity, plan and paths.
+# key, receipt = owner.stage(identity, plan, source_paths)
+# observed = owner.inspect()
+```
+
+This is opt-in cooperating-writer admission, not a hard physical disk
+quota or filesystem isolation. Direct legacy staging bypasses the
+shared lock; all participating processes must use the owner. The private
+root, policy and lock inode must remain stable under trusted operator
+custody. File lengths do not include filesystem allocation rounding,
+metadata, snapshots or unrelated processes' writes. A disk failure or
+unexpected file may require recovery review; no automatic deletion,
+rollback of already published immutable objects, or filesystem-wide
+reservation is claimed. The ordinary staging path also enforces its
+per-operation new-object cap at the actual write boundary rather than
+only the initial existence check.
+
+Regression sources cover cooperating contention, orphan accounting,
+free-space and prospective entry limits, interrupted temporary files,
+lock replacement and stale existence observations. They are selected by
+the existing sealed-context workflow. Native Windows locking, platform
+qualification, crash injection on real storage and final-head CI remain
+outstanding.
