@@ -261,6 +261,18 @@ class PeerAcquisitionGateTests(unittest.IsolatedAsyncioTestCase):
             await app._guard_peer_acquisition(SCOPE, row)
         self.assertEqual(caught.exception.status, 503)
 
+    async def test_cancelled_peer_retains_observed_active_hold(self):
+        fixture = AcquisitionHoldCatalogTests()
+        row, now = fixture.hold_fixture()
+        row["status"] = "cancelled"
+        app = fixture.app_for([row])
+        with patch("core.dragon_crawler._now", return_value=now):
+            report = await app.acquisition_hold_catalog(
+                SCOPE, peer_hosts=("example.com",), exclude_session="current")
+        self.assertEqual(report["qualified_sessions"], 1)
+        self.assertEqual(report["holds"][0]["host"], "example.com")
+        self.assertEqual(app.sessions.find.call_args.args[0]["status"], {"$ne": "deleted"})
+
     async def test_peer_catalogue_queries_are_owner_and_host_scoped(self):
         fixture = AcquisitionHoldCatalogTests()
         row, now = fixture.hold_fixture()
