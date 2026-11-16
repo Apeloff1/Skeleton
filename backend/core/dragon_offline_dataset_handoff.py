@@ -16,6 +16,7 @@ import re
 from core.dragon_dataset_ingest import fingerprint, source_stream
 from core.dragon_lead_ingest import inspect_export, ingest
 from core.dragon_lead_graph import LeadGraph
+from core.dragon_publisher_export_proof import PublisherExportProof
 from core.dragon_corpus_runtime import _path
 
 SCHEMA = "skeleton.dragon.offline-dataset-handoff.v1"
@@ -54,7 +55,7 @@ def _canonical_file(root, relative):
     return path
 
 
-def _manifest(path):
+def _manifest(path, *, expected_sha=None, publisher_proof=None):
     path = Path(path)
     witness = fingerprint(path)
     if witness[2] > MAX_MANIFEST_BYTES:
@@ -63,6 +64,12 @@ def _manifest(path):
         raw = stream.read(MAX_MANIFEST_BYTES + 1)
     if not raw or len(raw) > MAX_MANIFEST_BYTES:
         raise ValueError("handoff manifest byte bound")
+    raw_sha = hashlib.sha256(raw).hexdigest()
+    if expected_sha is not None and raw_sha != expected_sha:
+        raise ValueError("manifest SHA-256 differs")
+    if publisher_proof is not None and not isinstance(publisher_proof, PublisherExportProof):
+        raise ValueError("invalid publisher proof")
+    proof_receipt = publisher_proof.verify(raw) if publisher_proof is not None else None
     try:
         doc = json.loads(raw, object_pairs_hook=_pairs, parse_constant=_finite)
     except RecursionError as exc:
@@ -97,16 +104,15 @@ def _manifest(path):
         if total > MAX_BATCH_BYTES:
             raise ValueError("handoff total byte cap")
         items.append((dict(entry), local))
-    return hashlib.sha256(raw).hexdigest(), items
+    return raw_sha, items, proof_receipt
 
 
-def qualify_manifest(path, *, expected_manifest_sha):
+def qualify_manifest(path, *, expected_manifest_sha, publisher_proof=None):
     """Return internal plan plus public aggregate; no writes or network."""
     if not isinstance(expected_manifest_sha, str) or not HEX.fullmatch(expected_manifest_sha):
         raise ValueError("exact manifest SHA-256 required")
-    manifest_sha, items = _manifest(path)
-    if manifest_sha != expected_manifest_sha:
-        raise ValueError("manifest SHA-256 differs")
+    manifest_sha, items, proof_receipt = _manifest(path, expected_sha=expected_manifest_sha,
+                                                      publisher_proof=publisher_proof)
     public = []
     for entry, local in items:
         receipt = inspect_export(local, entry["format"], entry["projection"],
@@ -116,19 +122,23 @@ def qualify_manifest(path, *, expected_manifest_sha):
         public.append({"target": entry["target"], "input_sha256": receipt["input_sha256"],
                        "inspection_digest": receipt["inspection_digest"],
                        "rows": receipt["rows"], "pages": receipt["pages"]})
-    if _manifest(path)[0] != manifest_sha:
+    final_sha, _, final_proof = _manifest(path, expected_sha=manifest_sha, publisher_proof=publisher_proof)
+    if final_sha != manifest_sha or final_proof != proof_receipt:
         raise ValueError("manifest changed during qualification")
     return items, {"schema": SCHEMA, "manifest_sha256": manifest_sha,
-                   "entries": public, "network_executed": False,
+                   "entries": public, "publisher_proof": proof_receipt,
+                   "network_executed": False,
                    "graph_written": False, "license_verified": False,
                    "source_rights_verified": False}
 
 
-def inspect_manifest(path, *, expected_manifest_sha):
-    return qualify_manifest(path, expected_manifest_sha=expected_manifest_sha)[1]
+def inspect_manifest(path, *, expected_manifest_sha, publisher_proof=None):
+    return qualify_manifest(path, expected_manifest_sha=expected_manifest_sha,
+                            publisher_proof=publisher_proof)[1]
 
 
-def apply_manifest(path, *, expected_manifest_sha, scope, graph_factory, rights_acknowledged):
+def apply_manifest(path, *, expected_manifest_sha, scope, graph_factory, rights_acknowledged,
+                   publisher_proof=None):
     """Explicit operator import; sequential independent canonical settlements.
 
     A failing later entry does not roll back a previously sealed snapshot.
@@ -141,7 +151,8 @@ def apply_manifest(path, *, expected_manifest_sha, scope, graph_factory, rights_
             or any(not isinstance(v, str) or not 1 <= len(v.strip()) <= 256
                    for v in scope.values())):
         raise ValueError("explicit owner scope required")
-    items, report = qualify_manifest(path, expected_manifest_sha=expected_manifest_sha)
+    items, report = qualify_manifest(path, expected_manifest_sha=expected_manifest_sha,
+                                      publisher_proof=publisher_proof)
     graph = graph_factory()
     settled = []
     for entry, local in items:
@@ -166,22 +177,35 @@ def main(argv=None):
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--manifest-sha256", required=True)
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--publisher-public-key", help="Raw Ed25519 public key (lowercase hex)")
+    parser.add_argument("--publisher-key-sha256", help="Independently trusted raw public-key fingerprint")
+    parser.add_argument("--publisher-signature", help="Detached manifest signature (lowercase hex)")
     parser.add_argument("--tenant")
     parser.add_argument("--owner")
     parser.add_argument("--acknowledge-metadata-rights", action="store_true")
     args = parser.parse_args(argv)
     path = args.manifest.expanduser().absolute()
+    proof_fields = (args.publisher_public_key, args.publisher_key_sha256, args.publisher_signature)
+    publisher_proof = None
+    if any(x is not None for x in proof_fields):
+        if not all(proof_fields):
+            parser.error("signed export requires public key, independent key pin and detached signature")
+        try:
+            publisher_proof = PublisherExportProof(*proof_fields)
+        except ValueError as exc:
+            parser.error(str(exc))
     if not args.apply:
         if args.tenant is not None or args.owner is not None or args.acknowledge_metadata_rights:
             parser.error("inspection cannot include write authority")
-        result = inspect_manifest(path, expected_manifest_sha=args.manifest_sha256)
+        result = inspect_manifest(path, expected_manifest_sha=args.manifest_sha256,
+                                  publisher_proof=publisher_proof)
     else:
         if not args.tenant or not args.owner or not args.acknowledge_metadata_rights:
             parser.error("apply requires explicit owner and metadata rights")
         scope = {"tenant_id": args.tenant, "owner_id": args.owner}
         result = apply_manifest(path, expected_manifest_sha=args.manifest_sha256, scope=scope,
                                 graph_factory=lambda: LeadGraph(_path(scope=scope, create=False)),
-                                rights_acknowledged=True)
+                                rights_acknowledged=True, publisher_proof=publisher_proof)
     print(json.dumps(result, sort_keys=True))
     return 0
 
