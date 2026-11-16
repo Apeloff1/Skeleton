@@ -217,13 +217,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--max-physical-weight-bytes", type=int)
     args = parser.parse_args(argv)
     try:
-        result = inventory_offline_weights(
-            args.store, max_entries=args.max_entries, max_weight_bytes=args.max_weight_bytes,
-            max_manifest_bytes=args.max_manifest_bytes, max_shard_references=args.max_shard_references,
-            max_physical_weight_bytes=args.max_physical_weight_bytes,
-        )
-    except OfflineInventoryError as exc:
-        parser.exit(2, "offline inventory unavailable: " + str(exc) + "\n")
+        from .managed_weight_read import managed_weight_read
+
+        store = WeightShardStore(args.store, maximum_bytes=args.max_weight_bytes, read_only=True)
+        with managed_weight_read(store):
+            result = inventory_offline_weights(
+                args.store, max_entries=args.max_entries, max_weight_bytes=args.max_weight_bytes,
+                max_manifest_bytes=args.max_manifest_bytes, max_shard_references=args.max_shard_references,
+                max_physical_weight_bytes=args.max_physical_weight_bytes,
+            )
+    except (OfflineInventoryError, WeightShardStoreError, OSError) as exc:
+        parser.exit(2, "offline inventory unavailable: " + type(exc).__name__ + "\n")
     print(json.dumps(result, sort_keys=True, separators=(",", ":")))
     return 0
 
