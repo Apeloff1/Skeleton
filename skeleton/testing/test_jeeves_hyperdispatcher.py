@@ -954,3 +954,55 @@ def test_deadline_does_not_admit_expired_work_or_preempt_protected_work():
     owner.release(protected.grant_id)
     assert owner.admit_next() is None
     assert owner.snapshot()["deadline_blocked"] == 1
+
+def test_classification_abstains_on_ties_and_rejects_prohibited_labels():
+    from skeleton.intelligence.dispatch_expansion import TaskTaxon, classify_labels
+    a = TaskTaxon("a", frozenset({"code"}), frozenset({"python"}), frozenset({"write"}))
+    b = TaskTaxon("b", frozenset({"code"}), frozenset({"rust"}), frozenset())
+    kwargs = dict(policy_sha256="a"*64, evidence_sha256="b"*64)
+    assert classify_labels(frozenset({"code"}), [a,b], **kwargs).status == "hold_ambiguous"
+    assert classify_labels(frozenset({"code","python"}), [b,a], **kwargs).task_class == "a"
+    assert classify_labels(frozenset({"code","python","write"}), [a,b], **kwargs).task_class == "b"
+    assert classify_labels(frozenset({"unknown"}), [a,b], **kwargs).status == "hold_unknown"
+
+
+def test_model_worker_choice_cannot_forge_eligibility_or_observation():
+    from skeleton.intelligence.dispatch_expansion import WorkerChoice, validate_model_choice
+    from skeleton.intelligence.dispatch_cognitive import binding
+    a = WorkerChoice("w", 1, "t", "a"*64, "b"*64, "c"*64)
+    pin = binding("eligible-workers-v1", [("w", 1, "t", "a"*64, "b"*64, "c"*64)])
+    assert validate_model_choice(a, [a], authorized_set_sha256=pin) == a
+    assert validate_model_choice(replace(a, generation=2), [a], authorized_set_sha256=pin) is None
+    with pytest.raises(DispatchPolicyError):
+        validate_model_choice(a, [replace(a, tenant_id="other")], authorized_set_sha256=pin)
+
+
+def test_nested_decomposition_preserves_budget_and_rejects_effects():
+    from skeleton.intelligence.dispatch_expansion import DecompositionNode, validate_expansion
+    root = DecompositionNode("root", None, "plan", "a"*64, "pure", 100, 100, 100)
+    a = DecompositionNode("a", "root", "plan", "b"*64, "pure", 60, 60, 60)
+    b = DecompositionNode("b", "root", "execute", "c"*64, "pure", 40, 40, 40)
+    c = DecompositionNode("c", "a", "execute", "d"*64, "pure", 60, 60, 60, ("b",))
+    kwargs = dict(root_id="root", tenant_id="t", policy_sha256="a"*64,
+                  approved_operations=frozenset({"plan","execute"}))
+    plan = validate_expansion([root,a,b,c], **kwargs)
+    assert plan.execution_order == ("b","c") and plan.maximum_depth == 2
+    assert plan.token_reservation == 100
+    assert validate_expansion([c,b,a,root], **kwargs) == plan
+    for change in (replace(c, effect="write"), replace(c, tokens=61),
+                   replace(c, dependencies=("a",)), replace(c, parent_id="c")):
+        with pytest.raises(DispatchPolicyError):
+            validate_expansion([root,a,b,change], **kwargs)
+
+
+def test_tool_fusion_is_pure_linear_and_policy_bound():
+    from skeleton.intelligence.dispatch_expansion import propose_fusion
+    from skeleton.intelligence.dispatch_workflow import WorkflowNode
+    a = WorkflowNode("a","t","parse","a"*64,"b"*64,"c"*64,"d"*64,(),10,8,"pure")
+    b = replace(a, task_id="b", operation="transform", dependencies=("a",))
+    c = replace(b, task_id="c", dependencies=("b",))
+    kw = dict(eligible_operations=frozenset({"parse","transform"}))
+    assert propose_fusion([a,b,c], **kw)[0].tasks == ("a","b","c")
+    assert not propose_fusion([a,replace(b,effect="write")], **kw)
+    assert not propose_fusion([a,replace(b,policy_sha256="0"*64)], **kw)
+    assert not propose_fusion([a,b,replace(c,dependencies=("a",))], **kw)

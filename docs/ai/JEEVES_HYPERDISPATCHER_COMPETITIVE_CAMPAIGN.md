@@ -52,24 +52,24 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 09 | Work stealing | P |
 | 10 | Speculative execution | P |
 | 11 | Capability matchmaking | P |
-| 12 | Task fusion | Open |
-| 13 | Dynamic decomposition | Open |
+| 12 | Task fusion | P |
+| 13 | Dynamic decomposition | P |
 | 14 | Starvation prevention | P |
 | 15 | Adaptive batching | P |
-| 16 | Semantic classification | Open |
-| 17 | Model-directed worker selection | Open |
+| 16 | Semantic classification | P |
+| 17 | Model-directed worker selection | P |
 | 18 | Specialist discovery | P |
 | 19 | Reasoning complexity estimation | P |
 | 20 | Uncertainty routing | P |
 | 21 | Multi-model delegation | P |
 | 22 | Adversarial verification | P |
-| 23 | Recursive decomposition | Open |
+| 23 | Recursive decomposition | P |
 | 24 | Parallel hypotheses | P |
 | 25 | Historical-success routing | P |
 | 26 | Learned cost prediction | P |
 | 27 | Context affinity | P |
 | 28 | Mission replanning | P |
-| 29 | Tool-chain optimization | Open |
+| 29 | Tool-chain optimization | P |
 | 30 | Redundant reasoning elimination | P |
 | 31 | CPU/GPU balancing | P |
 | 32 | Unified memory | P |
@@ -361,3 +361,22 @@ Partial adoption: 05, 07, 70. Actual host resources and stop acknowledgments
 are not independently qualified. Wave-12 exact head: 50 focused tests
 passed and architecture/mirror validation passed. Merge hold is intentional.
 An unrelated inherited archive test selector failed and requires repair.
+
+## Wave 14: constrained semantic classification and recursive expansion
+
+Source-bound taxonomy classification consumes verified labels and abstains
+on ambiguous classes. A model-proposed worker must match an independently
+bound, tenant/task/policy-scoped eligible set exactly, including its
+generation and observation digest. Recursive decomposition validates
+approved pure operations, parent budgets, depth, graph topology, leaf
+dependencies and conservative service totals. Fusion proposes bounded,
+scope-compatible straight-line pure tool chains without fanout; intermediate
+observability and executable support must be verified by the owner. These
+are proposal validators, not trained semantic classification, autonomous
+tool execution or live workflow mutation. New partial targets: 12, 13,
+16, 17, 23, 29.
+
+The draft-19 source job's nonexistent archive test selector is replaced
+with the existing invalid-custody parametrized cases and source-tamper
+nonpublication regression. The original deterministic inspection and
+preflight assertions remain.
