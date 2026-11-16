@@ -128,3 +128,54 @@ def test_cli_real_integration(source, capsys):
     report = json.loads(capsys.readouterr().out)
     assert report["component_count"] > 0
     assert main(["--root", str(source), "--max-entries", "1"]) == 3
+
+
+def test_pagination_pins_full_inventory_and_plan(source):
+    first = analyze(source, budget=GraphBudget(reported_components=1))
+    second = analyze(source, budget=GraphBudget(reported_components=1),
+                     component_offset=first["next_component_offset"],
+                     expected_plan_digest=first["candidate_plan_digest"],
+                     expected_inventory_digest=first["source_inventory_digest"])
+    assert second["component_offset"] == 1
+    assert second["components"] != first["components"]
+    assert second["candidate_plan_digest"] == first["candidate_plan_digest"]
+    with pytest.raises(GraphError):
+        analyze(source, component_offset=1)
+    write(source, "skeleton/shared.py", "new_value = 1\n")
+    with pytest.raises(GraphError, match="inventory pin"):
+        analyze(source, component_offset=1,
+                expected_plan_digest=first["candidate_plan_digest"],
+                expected_inventory_digest=first["source_inventory_digest"])
+
+
+def test_ownership_classifies_mirrors_without_collapsing(source):
+    write(source, "skeleton/mirror/leaf.py", (source / "skeleton/leaf.py").read_text())
+    raw = json.dumps({"schema_version": 1, "mappings": [
+        {"id": "M", "kind": "file", "source": "skeleton/leaf.py",
+         "destination": "skeleton/mirror/leaf.py"},
+    ], "native_ai_owners": []}).encode()
+    report = analyze(source, ownership_raw=raw)
+    observations = {row["path"]: row for item in report["components"]
+                    for row in item["ownership_observations"]}
+    original = observations["skeleton/leaf.py"]
+    mirror = observations["skeleton/mirror/leaf.py"]
+    assert original["status"] == "declared_source_owner"
+    assert mirror["status"] == "declared_staged_destination"
+    assert mirror["declarations"][0]["byte_equality"] == "equal"
+    assert by_module(report)["skeleton.leaf"] != by_module(report)["skeleton.mirror.leaf"]
+    assert not mirror["owner_cutover_authorized"]
+
+
+def test_ownership_overlay_not_misclassified(source):
+    raw = json.dumps({"schema_version": 1, "mappings": [
+        {"id": "TREE", "kind": "tree", "source": "skeleton/legacy",
+         "destination": "skeleton/hidden", "overlay_children": ["outer.py"]},
+    ], "native_ai_owners": [
+        {"id": "NATIVE", "kind": "file", "path": "skeleton/hidden/outer.py"},
+    ]}).encode()
+    report = analyze(source, ownership_raw=raw)
+    observations = {row["path"]: row for item in report["components"]
+                    for row in item["ownership_observations"]}
+    assert observations["skeleton/hidden/outer.py"]["status"] == "declared_native_owner"
+    assert any(x["classification"] == "excluded_or_overlay"
+               for x in observations["skeleton/hidden/outer.py"]["declarations"])

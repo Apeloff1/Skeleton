@@ -8,6 +8,7 @@ import sys
 from typing import Sequence
 
 from skeleton.app.orphan_source_graph import GraphBudget, GraphError, analyze
+from skeleton.app.orphan_cli_audit import ScanBudget, _ReadBudget
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -20,12 +21,29 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--max-total-bytes", type=int, default=256 * 1024 * 1024)
     parser.add_argument("--max-edges", type=int, default=1_000_000)
     parser.add_argument("--max-components", type=int, default=256)
+    parser.add_argument("--machine-ownership", action="store_true",
+                        help="Observe the fixed repository machine/ai_file_tree.json declaration")
+    parser.add_argument("--component-offset", type=int, default=0)
+    parser.add_argument("--expected-plan-digest")
+    parser.add_argument("--expected-inventory-digest")
     args = parser.parse_args(argv)
     try:
         budget = GraphBudget(args.max_entries, args.max_modules,
                              args.max_file_bytes, args.max_total_bytes,
                              args.max_edges, args.max_components)
-        result = analyze(args.root, extra_roots=args.entry, budget=budget)
+        ownership = None
+        if args.machine_ownership:
+            root = args.root.resolve(strict=True)
+            machine = root / "machine"
+            if machine.is_symlink() or not machine.is_dir():
+                raise GraphError("machine ownership directory unavailable")
+            reader = _ReadBudget(ScanBudget(max_file_bytes=8 * 1024 * 1024,
+                                            max_total_bytes=8 * 1024 * 1024))
+            ownership = reader.read(machine / "ai_file_tree.json")
+        result = analyze(args.root, extra_roots=args.entry, budget=budget,
+                         ownership_raw=ownership, component_offset=args.component_offset,
+                         expected_plan_digest=args.expected_plan_digest,
+                         expected_inventory_digest=args.expected_inventory_digest)
     except (GraphError, ValueError, OSError, KeyError, SyntaxError) as exc:
         print(json.dumps({"error": type(exc).__name__,
                           "source_inventory_complete": False}), file=sys.stderr)

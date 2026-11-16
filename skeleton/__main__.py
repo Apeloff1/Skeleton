@@ -7,6 +7,17 @@ Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
     offline-runtime  Inspect pinned local weights and measured resource admission
     weight-store     Stage pinned weights and inspect cooperative disk/recovery custody
+    local-ai-boot                    Startup diagnosis and explicit principal binding
+    local-ai-bootstrap               Private state and key provisioning
+    local-durable-worker             Local native durable work owner
+    local-flight-events              Finite source-bound event watch
+    local-flight-outbox              Principal-scoped spool custody
+    local-flight-control             Explicit local flight operations
+    local-flight-metrics             Read-only private flight metrics
+    local-laptop-client              Local scriptable laptop client
+    local-laptop-runtime             Verified local laptop runtime
+    dragon-research-game             Build original game from captured research
+    era-source-validate              Validate authored room and era JSON
     orphan-source-graph           Dependency-order possible source orphans without imports
     studio-portfolio-verify       Replay-qualify independently pinned game cohorts
     jeeves-desktop-campaign-delivery   Explicit campaign source delivery
@@ -1281,6 +1292,39 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "orphan-source-graph":
         from skeleton.app.orphan_source_graph_cli import main as orphan_graph_main
         return orphan_graph_main(rest)
+    if cmd == "local-ai-boot":
+        from skeleton.ai.runtime.operational_ai.deployment.boot.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-ai-bootstrap":
+        from skeleton.ai.runtime.operational_ai.deployment.bootstrap.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-durable-worker":
+        from skeleton.ai.runtime.operational_ai.durable_jobs.worker_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-flight-events":
+        from skeleton.ai.runtime.operational_ai.transport.flight.event_stream.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-flight-outbox":
+        from skeleton.ai.runtime.operational_ai.transport.flight.outbox_delivery.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-flight-control":
+        from skeleton.ai.runtime.operational_ai.orchestration.flight_control.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-flight-metrics":
+        from skeleton.ai.runtime.operational_ai.orchestration.flight_control.daemon.operator_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-laptop-client":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.client_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-laptop-runtime":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "dragon-research-game":
+        from skeleton.ai.webcrawler.game_builder_cli import run as recovered_main
+        return recovered_main(rest)
+    if cmd == "era-source-validate":
+        from skeleton.ai.simulation.era.scripting.cli import main as recovered_main
+        return recovered_main(rest)
     if cmd == "app":
         from skeleton.app.cli import run_app_cli
         return run_app_cli(rest)

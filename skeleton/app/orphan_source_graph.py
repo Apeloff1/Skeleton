@@ -345,7 +345,10 @@ def _plan(graph, nodes, unreachable):
     ))
 
 
-def analyze(root: Path, *, extra_roots=(), budget: GraphBudget = GraphBudget()):
+def analyze(root: Path, *, extra_roots=(), budget: GraphBudget = GraphBudget(),
+            ownership_raw: bytes | None = None, component_offset: int = 0,
+            expected_plan_digest: str | None = None,
+            expected_inventory_digest: str | None = None):
     """Return a static, dependency-ordered candidate graph and evidence digests."""
     if not isinstance(budget, GraphBudget) or type(extra_roots) not in (list, tuple):
         raise GraphError("invalid analysis inputs")
@@ -353,6 +356,10 @@ def analyze(root: Path, *, extra_roots=(), budget: GraphBudget = GraphBudget()):
             all(p.isidentifier() for p in x.split(".")) and
             (x == "skeleton" or x.startswith("skeleton.")) for x in extra_roots):
         raise GraphError("invalid explicit root set")
+    if type(component_offset) is not int or not 0 <= component_offset <= budget.modules:
+        raise GraphError("invalid component offset")
+    if component_offset and (expected_plan_digest is None or expected_inventory_digest is None):
+        raise GraphError("pagination requires independent plan and inventory pins")
     root = Path(root).resolve(strict=True)
     nodes, seeds, metadata = _inventory(root, budget)
     seeds.update(extra_roots)
@@ -361,6 +368,30 @@ def analyze(root: Path, *, extra_roots=(), budget: GraphBudget = GraphBudget()):
     reached = _reachable(graph, seeds)
     unreachable = set(nodes) - reached
     plan = _plan(graph, nodes, unreachable)
+    ownership_digest = None
+    ownership_counts = {}
+    if ownership_raw is not None:
+        from skeleton.app.orphan_graph_ownership import OwnershipIndex
+        owner_index = OwnershipIndex(ownership_raw)
+        ownership_digest = hashlib.sha256(ownership_raw).hexdigest()
+        by_path = {node.path: node for node in nodes.values()}
+        for component in plan:
+            labels = [owner_index.classify(nodes[name], by_path)
+                      for name in component["modules"]]
+            component["ownership_observations"] = labels
+            for label in labels:
+                status = label["status"]
+                ownership_counts[status] = ownership_counts.get(status, 0) + 1
+    inventory_digest = _digest([
+        (module, node.path, node.sha256) for module, node in sorted(nodes.items())
+    ])
+    plan_digest = _digest({"components": plan, "ownership_manifest_sha256": ownership_digest})
+    if expected_plan_digest is not None and expected_plan_digest != plan_digest:
+        raise GraphError("candidate plan pin changed")
+    if expected_inventory_digest is not None and expected_inventory_digest != inventory_digest:
+        raise GraphError("source inventory pin changed")
+    if component_offset > len(plan):
+        raise GraphError("component offset outside plan")
     by_digest = defaultdict(list)
     for module, node in sorted(nodes.items()):
         by_digest[node.sha256].append(module)
@@ -385,19 +416,23 @@ def analyze(root: Path, *, extra_roots=(), budget: GraphBudget = GraphBudget()):
         "dynamic_unknown_calls": sum(n.dynamic_unknown for n in nodes.values()),
         "unresolved_local_prefix_count": len(unresolved),
         "unresolved_local_prefix_sample": unresolved[:128],
-        "source_inventory_digest": _digest([
-            (module, node.path, node.sha256) for module, node in sorted(nodes.items())
-        ]),
+        "source_inventory_digest": inventory_digest,
         "graph_digest": _digest(graph),
         "root_digest": _digest(sorted(seeds)),
-        "candidate_plan_digest": _digest(plan),
+        "candidate_plan_digest": plan_digest,
+        "ownership_manifest_sha256": ownership_digest,
+        "candidate_ownership_counts": ownership_counts,
         "duplicate_byte_group_count": len(duplicates),
         "duplicate_byte_groups_sample": [
             {"sha256": key, "modules": modules[:32]}
             for key, modules in duplicates[:64]
         ],
-        "components": plan[:budget.reported_components],
-        "component_output_truncated": len(plan) > budget.reported_components,
+        "components": plan[component_offset:component_offset + budget.reported_components],
+        "component_offset": component_offset,
+        "next_component_offset": (component_offset + budget.reported_components
+            if component_offset + budget.reported_components < len(plan) else None),
+        "component_output_truncated": (component_offset > 0 or
+            component_offset + budget.reported_components < len(plan)),
         "scan": metadata,
     }
     return {**body, "report_digest": _digest(body)}
