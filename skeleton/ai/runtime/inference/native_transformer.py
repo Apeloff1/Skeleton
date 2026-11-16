@@ -49,7 +49,8 @@ class NativeTransformerModel:
     protocol_capabilities = ("text-generation",)
     tokenizer_kind = "native_tokenizer"
 
-    def __init__(self, runtime: NativeLLMRuntime, *, model_id: str = "skeleton-native-transformer") -> None:
+    def __init__(self, runtime: NativeLLMRuntime, *, model_id: str = "skeleton-native-transformer",
+                 measured_kernel_profile=None) -> None:
         if not isinstance(runtime, NativeLLMRuntime):
             raise TypeError("runtime must be NativeLLMRuntime")
         if not isinstance(model_id, str) or not model_id.strip():
@@ -59,6 +60,12 @@ class NativeTransformerModel:
         self._admitted_model_id = self.model_id
         self._model_digest = runtime.model_digest
         self._tokenizer_digest = runtime.tokenizer.digest
+        self._measured_kernel_profile=measured_kernel_profile
+        if measured_kernel_profile is not None:
+            from skeleton.ai.model_runtime.kernel_qualification import MeasuredKernelProfile
+            if not isinstance(measured_kernel_profile,MeasuredKernelProfile):
+                raise RuntimeContractError("measured kernel profile required")
+            measured_kernel_profile.assert_matches(runtime)
         self._runtime_digest = self._compute_runtime_digest()
         self._preparation_issuer = object()
 
@@ -199,6 +206,9 @@ class NativeTransformerModel:
                 for name in ("max_chars", "max_tokens", "max_chunks", "max_chunk_chars")
             },
         }
+        if self._measured_kernel_profile is not None:
+            self._measured_kernel_profile.assert_matches(self.runtime)
+            payload["measured_kernel_profile_sha256"]=self._measured_kernel_profile.digest
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
         return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
@@ -272,7 +282,16 @@ class NativeTransformerModel:
             include_stop_tokens=False,
         )
         audit = _NativeStreamAudit(self.runtime, prompt_sequence, config)
-        stream = self.runtime.stream_sequence(prompt_sequence, config, interrupt=interrupt)
+        profile=self._measured_kernel_profile
+        if profile is not None:
+            profile.assert_matches(self.runtime)
+            if config.max_new_tokens>profile.max_output_tokens:
+                raise RuntimeContractError("request exceeds measured kernel output envelope")
+            stream=self.runtime.stream_paged_sequence(prompt_sequence,config,
+                max_workspace_bytes=profile.max_workspace_bytes,paged_kv_bytes=profile.paged_kv_bytes,
+                interrupt=interrupt)
+        else:
+            stream = self.runtime.stream_sequence(prompt_sequence, config, interrupt=interrupt)
         with stream:
             # The native decoder stops internally and still produces its real
             # terminal result, usage and receipt. Closing at a token event
@@ -352,6 +371,7 @@ def build_native_transformer_adapter(
     require_guarded_inference: bool = False,
     guarded_components: Any | None = None,
     guarded_components_factory: Callable[[NativeTransformerModel], Any] | None = None,
+    measured_kernel_profile=None,
 ) -> LocalModelAdapter:
     """Build canonical transformer; protected mode requires trusted composition."""
     from skeleton.provider_runtime import ProviderPolicyError
@@ -367,7 +387,9 @@ def build_native_transformer_adapter(
             raise ProviderPolicyError("protected transformer requires trusted component factory")
     elif guarded_components is not None or guarded_components_factory is not None:
         raise ProviderPolicyError("protected components require enforced transformer mode")
-    backend = NativeTransformerModel(runtime, model_id=model_id)
+    if measured_kernel_profile is not None and not require_guarded_inference:
+        raise ProviderPolicyError("measured kernel activation requires canonical guarded application")
+    backend = NativeTransformerModel(runtime, model_id=model_id, measured_kernel_profile=measured_kernel_profile)
     if guarded_components_factory is not None:
         try:
             guarded_components = guarded_components_factory(backend)

@@ -131,10 +131,10 @@ async def run_guarded(service, requests: Sequence[LocalInferenceRequest], *,
             if current!=authorized[r.digest]:
                 raise SealedContextReplayError("adaptive source changed before dispatch")
             generated=await service.generate(r,tenant_scope_id=tenant_scope_id,context_id=context_id,
-                                             contract=contract,deadline=stop,cache_allowed=False)
+                                             contract=contract,deadline=stop)
             result=generated.result
             if (not isinstance(result,LocalInferenceResult) or result.tool_calls or
-                    result.finish_reason!="completed" or not isinstance(result.text,str) or
+                    result.finish_reason not in {"completed","length"} or not isinstance(result.text,str) or
                     not result.text.strip() or result.output_tokens>r.max_output_tokens):
                 raise SealedContextBoundaryError("adaptive candidate is incomplete")
             response=hashlib.sha256(result.text.encode()).hexdigest()

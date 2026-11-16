@@ -20,7 +20,7 @@ class _Sequence:
 
 class PagedBatchSession:
     def __init__(self, accelerator, *, slots: int, context: int, max_kv_bytes: int,
-                 page_tokens: int = 16, require_gpu: bool = True):
+                 page_tokens: int = 16, require_gpu: bool = True, max_workspace_bytes: int = 256*1024**2):
         self.accel = accelerator
         self.torch = accelerator.torch
         self.lm = accelerator.lm
@@ -54,6 +54,14 @@ class PagedBatchSession:
         effective_cap = min(max_kv_bytes, accelerator.max_kv_bytes or max_kv_bytes)
         if self.reserved_bytes + accelerator.kv_reserved_bytes > effective_cap:
             raise MemoryError("physical paged backing allocation exceeds KV ceiling")
+        if type(max_workspace_bytes) is not int or not 1<=max_workspace_bytes<=1024**4:
+            raise ValueError("paged workspace ceiling required")
+        # Conservative explicit temporary QKV/FFN/logits/table accounting.
+        workspace=4*slots*(16*self.lm.dim+6*max(self.lm.dim,self.lm.d_ff)+self.lm.V+4*self.pages_per_slot)
+        if accelerator.device_name=="cpu":
+            workspace+=8*slots*self.heads*context*(self.dim+1)
+        if workspace>max_workspace_bytes:
+            raise MemoryError("paged workspace exceeds ceiling")
         self.binding = accelerator._kv_binding()
         self.states = {i: _Sequence() for i in range(slots)}
         self.free = list(reversed(range(self.page_count)))

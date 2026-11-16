@@ -920,6 +920,39 @@ class NativeLLMRuntime:
             checkpoint_digest=checkpoint["digest"],
         )
 
+    def stream_paged_sequence(self, sequence: TokenSequence, config: GenerationConfig, *,
+                              max_workspace_bytes: int, paged_kv_bytes: int, interrupt=None):
+        """Preserve the canonical pre-tokenized stream and audit events."""
+        from .paged_attention import PagedBatchSession
+        self._admit_sequence(sequence, config)
+        accel=getattr(self.model,"_accel",None)
+        if accel is None or accel.device_name!="cuda" or not config.use_cache:
+            raise RuntimeContractError("protected paged stream requires resident CUDA and cached config")
+
+        def drive():
+            with accel._inference_lock(interrupt):
+                session=PagedBatchSession(accel,slots=1,context=self.limits.max_context,
+                    max_kv_bytes=paged_kv_bytes,max_workspace_bytes=max_workspace_bytes,require_gpu=True)
+                gen=self._stream_sequence_impl(sequence,config,interrupt=interrupt,fused=True,paged=True)
+                try:
+                    if session.page_bytes*session.pages_per_slot>self.limits.max_kv_bytes:
+                        raise RuntimeContractError("paged stream allocation exceeds runtime KV ceiling")
+                    reply=None
+                    while True:
+                        try:
+                            event=gen.send(reply)
+                        except StopIteration as terminal:
+                            return terminal.value
+                        reply=None
+                        if isinstance(event,_FusedLogitsRequest):
+                            reply=_PagedLogitsReply(*session.logits([0],[event.window],interrupt=interrupt)[0])
+                        else:
+                            yield event
+                finally:
+                    gen.close()
+                    session.close()
+        return GenerationStream(drive())
+
     def generate_reconstructed_context(self, spool, checkpoint_digest: str, question: str,
                                        config: GenerationConfig, policy, *, interrupt=None):
         """Explicit offline operator context reconstruction with exact source receipt."""
@@ -1130,7 +1163,7 @@ class NativeLLMRuntime:
                 if paged:
                     from .paged_attention import PagedBatchSession
                     session = PagedBatchSession(accel, slots=len(group), context=self.limits.max_context,
-                        max_kv_bytes=paged_kv_bytes, require_gpu=require_gpu)
+                        max_kv_bytes=paged_kv_bytes, max_workspace_bytes=max_workspace_bytes, require_gpu=require_gpu)
                     if session.pages_per_slot*session.page_bytes > self.limits.max_kv_bytes:
                         session.close()
                         raise RuntimeContractError("paged per-stream allocation exceeds runtime KV ceiling")
