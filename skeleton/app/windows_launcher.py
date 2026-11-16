@@ -152,7 +152,9 @@ def stop_runtime(root: Path | None = None) -> tuple[bool, str]:
         with runtime_operation(root, "stop") as lease:
             if not lease.current():
                 return False, "Runtime operation custody changed; inspect existing services"
-            completed = _hidden_runner(
+            from skeleton.app.runtime_mutation import run_mutation
+            completed = run_mutation(
+                lease, "compose-stop", _hidden_runner,
                 list(compose_command("down", manifest=load_manifest(), install_env=True)),
                 cwd=root, check=False, text=True, timeout=90,
                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -160,8 +162,8 @@ def stop_runtime(root: Path | None = None) -> tuple[bool, str]:
             )
             if not lease.current():
                 return False, "Runtime operation custody changed; inspect existing services"
-    except RuntimeOperationDenied:
-        return False, "Stop blocked: another installation operation is active or the lock is unsafe"
+    except RuntimeOperationDenied as exc:
+        return False, "Stop blocked: " + str(exc)
     except (OSError, subprocess.SubprocessError) as exc:
         return False, f"Unable to stop services: {type(exc).__name__}; check Docker Desktop"
     status = getattr(completed, "returncode", None)

@@ -22,6 +22,8 @@ from skeleton.app.assembly import (
     runtime_manifest,
 )
 from skeleton.app.preloader import PreloadReport, inspect_host
+from skeleton.app.runtime_operation import RuntimeOperationDenied
+from skeleton.app.runtime_mutation import run_mutation
 from skeleton.app.setup_runtime import SetupResult, ensure_runtime_environment, runtime_source_fingerprint
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
@@ -83,7 +85,7 @@ def _run(
             timeout=timeout,
             **({"env": env} if env is not None else {}),
         )
-    except (OSError, subprocess.SubprocessError) as exc:
+    except (OSError, subprocess.SubprocessError, RuntimeOperationDenied) as exc:
         return InstallPhase(label, False, f"{label} failed: {type(exc).__name__}")
 
     status = getattr(completed, "returncode", None)
@@ -402,10 +404,11 @@ def install_application(
             return InstallReceipt(root, tuple(phases))
         recoverable_start_failure = False
         try:
-            completed = runner(
-                list(command),
+            completed = run_mutation(
+                lease, "compose-start", runner, list(command),
                 cwd=root,
                 check=False,
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 text=True,
@@ -427,7 +430,7 @@ def install_application(
             if not ok:
                 detail += "; inspect app doctor and app logs <service>; no credentials are included"
             phases.append(InstallPhase("start", ok, detail))
-        except (OSError, subprocess.SubprocessError) as exc:
+        except (OSError, subprocess.SubprocessError, RuntimeOperationDenied) as exc:
             phases.append(InstallPhase("start", False, f"application start failed: {type(exc).__name__}"))
 
         # Even an apparently successful Compose exit cannot attest a startup
@@ -440,7 +443,7 @@ def install_application(
         if not full_start_ok and not recoverable_start_failure:
             phases.append(InstallPhase(
                 "setup-ui-recovery", False,
-                "startup completion is uncertain; inspect existing containers before retrying; no second Compose mutation attempted",
+                "startup completion is uncertain; inspect runtime-recovery status before retrying; no second Compose mutation attempted",
                 required=False,
             ))
         if not full_start_ok and recoverable_start_failure:
@@ -467,10 +470,13 @@ def install_application(
                 if not source_stable():
                     phases.append(_runtime_source_rejection())
                     return InstallReceipt(root, tuple(phases))
+                def recovery_runner(*args, **kwargs):
+                    return run_mutation(lease, "setup-ui-recovery", runner, *args, **kwargs)
+
                 recovery = _run(
                     recovery_command,
                     root=root,
-                    runner=runner,
+                    runner=recovery_runner,
                     label="setup-ui-recovery",
                     timeout=900.0,
                     env=compose_env,
@@ -592,9 +598,12 @@ def install_application(
     try:
         with runtime_operation(root, "install") as lease:
             return run_pipeline(lease)
-    except RuntimeOperationDenied:
-        return InstallReceipt(root, (InstallPhase("runtime-operation", False,
-            "installation operation unavailable; another process may own the runtime"),))
+    except RuntimeOperationDenied as exc:
+        failure = InstallPhase("runtime-operation", False, str(exc))
+        if not phases:
+            phases.append(failure)
+            return InstallReceipt(root, tuple(phases))
+        return InstallReceipt(root, (*phases, failure))
 
 
 def configure_setup_parsers(subparsers: argparse._SubParsersAction) -> None:

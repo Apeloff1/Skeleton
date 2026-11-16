@@ -427,6 +427,7 @@ def _run_compose(
     *,
     env_overrides: dict[str, str] | None = None,
     process_env: dict[str, str] | None = None,
+    lease=None,
 ) -> int:
     env = dict(os.environ if process_env is None else process_env)
     if env_overrides:
@@ -441,7 +442,13 @@ def _run_compose(
         # Lifecycle subprocesses may print interpolated credentials or
         # huge build output. Explicit logs/ps remain operator diagnostics.
         mutation = "up" in command or "stop" in command or "config" in command
-        completed = subprocess.run(
+        dispatch = subprocess.run
+        if lease is not None and ("up" in command or "stop" in command):
+            from skeleton.app.runtime_mutation import run_mutation
+            label = "compose-start" if "up" in command else "compose-stop"
+            def dispatch(*args, **kwargs):
+                return run_mutation(lease, label, subprocess.run, *args, **kwargs)
+        completed = dispatch(
             list(command), cwd=root, check=False, env=env,
             **({"stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL,
                 "stderr": subprocess.DEVNULL, "timeout": 1800 if "up" in command else 90}
@@ -461,6 +468,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     """Run the application assembly CLI and return a process-style exit code."""
 
     arguments = list(argv or ())
+    if arguments and arguments[0] == "runtime-recovery":
+        from skeleton.app.runtime_mutation import main as recovery_main
+        return recovery_main(arguments[1:], root=find_repo_root())
     if arguments and arguments[0] == "mongo-preflight":
         from skeleton.app.compose_guarded_preflight import main as mongo_preflight_main
         return mongo_preflight_main(arguments[1:])
@@ -1270,6 +1280,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                     root,
                     env_overrides=manifest.mode_env(mode),
                     process_env=process_env,
+                    lease=lease,
                 )
                 if not source_stable():
                     return changed()
@@ -1310,8 +1321,8 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                     return 0
                 print("application start: services launched but readiness verification failed")
                 return 1
-        except RuntimeOperationDenied:
-            print("application start blocked: another runtime operation is active or the lock is unsafe")
+        except RuntimeOperationDenied as exc:
+            print("application start blocked: " + str(exc))
             return 1
     if command == "smoke":
         from skeleton.app.health import probes_ok, wait_for_application
@@ -1377,10 +1388,11 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                     return 1
                 result = _run_compose(
                     compose_command("down", manifest=manifest, install_env=True), root,
+                    lease=lease,
                 )
                 return result if lease.current() else 1
-        except RuntimeOperationDenied:
-            print("application stop blocked: another runtime operation is active or the lock is unsafe")
+        except RuntimeOperationDenied as exc:
+            print("application stop blocked: " + str(exc))
             return 1
     if command == "ps":
         return _run_compose(compose_command("ps", manifest=manifest), root)

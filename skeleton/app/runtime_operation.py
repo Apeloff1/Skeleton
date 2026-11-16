@@ -82,7 +82,7 @@ class RuntimeOperation:
 @contextmanager
 def runtime_operation(root: Path, operation: str, *, wait_seconds: float = 0.25):
     """Acquire a stable OS-backed lease; release on all ordinary exit paths."""
-    if operation not in OPERATIONS:
+    if operation not in OPERATIONS and operation != "recover":
         raise ValueError("unknown runtime operation")
     if (type(wait_seconds) not in (float, int)
             or not 0 <= wait_seconds <= 10):
@@ -137,6 +137,10 @@ def runtime_operation(root: Path, operation: str, *, wait_seconds: float = 0.25)
                 raise RuntimeOperationDenied("runtime operation lock changed during initialization")
         except OSError:
             raise RuntimeOperationDenied("runtime operation unavailable; inspect installation permissions") from None
+        if operation != "recover":
+            from skeleton.app.runtime_mutation import pending
+            if pending(lease) is not None:
+                raise RuntimeOperationDenied("previous runtime mutation unresolved; inspect runtime-recovery status")
         yield lease
     finally:
         if descriptor is not None:

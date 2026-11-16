@@ -769,3 +769,21 @@ def test_installer_rejects_hot_reload_collision_before_compose(tmp_path,monkeypa
         runner=lambda *a,**k: pytest.fail("overlapping hot ports reached Compose"))
     assert not receipt.ok and receipt.phases[-1].name=="runtime-manifest"
     assert "hot-reload ports" in receipt.phases[-1].detail
+
+
+
+def test_uncertain_start_blocks_second_install_before_preflight(tmp_path,monkeypatch):
+    from skeleton.app.runtime_mutation import recovery_status
+    _prepare(monkeypatch,tmp_path)
+    calls=[]
+    def runner(command,**kwargs):
+        calls.append(command[-1])
+        if command[-1]=="up":
+            raise subprocess.TimeoutExpired(command,1800)
+        return _completed(command)
+    first=installer.install_application(tmp_path,start=True,install_python=False,runner=runner)
+    assert not first.ok and calls==["config","up"]
+    assert recovery_status(tmp_path)["mutation"]=="compose-start"
+    monkeypatch.setattr(installer,"inspect_host",lambda *a,**k:pytest.fail("second install reached preflight"))
+    second=installer.install_application(tmp_path,start=True,install_python=False,runner=runner)
+    assert not second.ok and second.phases[0].name=="runtime-operation"
