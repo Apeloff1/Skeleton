@@ -174,3 +174,32 @@ def rerank(query:str, excerpts, *, scope:Scope,
                      "excluded":sorted(excluded.items())})
     return Reranked(scope.identity,tuple(ranked),tuple(sorted(excluded.items())),
                     len(lex_order),len(channels),receipt)
+
+
+def prepare_ranked_request(request, *, scope:Scope, excerpts, budget,
+                           count_request, required_claims:tuple[str,...],
+                           revoked_sources:frozenset[str],
+                           revoked_revisions:frozenset[str],
+                           channels:tuple[RankedChannel,...]=(),
+                           max_tokenizer_calls:int=160):
+    """Compose the hybrid ranker with the existing canonical packer.
+
+    No sealed context is mutated, all evidence remains reference data, and
+    the caller must revalidate source authorization and seal before inference.
+    """
+    from .local import LocalInferenceRequest, LocalInputBudget
+    from .evidence_packing import prepare_evidence_request
+
+    if type(request) is not LocalInferenceRequest or type(budget) is not LocalInputBudget:
+        raise ValueError("canonical typed request and budget required")
+    if type(scope) is not Scope or request.context_digest is not None or scope.query_sha256!=request.digest:
+        raise ValueError("ranking is bound to the original unsealed request")
+    rank=rerank(request.prompt,excerpts,scope=scope,
+                query_text_sha256=sha256(request.prompt.encode("utf-8")).hexdigest(),
+                channels=channels,revoked_sources=revoked_sources,
+                revoked_revisions=revoked_revisions)
+    prepared,packing=prepare_evidence_request(request,scope=scope,excerpts=rank.ranked,
+                      budget=budget,count_request=count_request,required_claims=required_claims,
+                      revoked_sources=revoked_sources,revoked_revisions=revoked_revisions,
+                      max_tokenizer_calls=max_tokenizer_calls)
+    return prepared,packing,rank
