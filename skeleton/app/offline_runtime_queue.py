@@ -13,7 +13,7 @@ import time
 from typing import Protocol, Any
 
 from skeleton.ai.model_runtime.admission_scheduler import AdmissionLimits, RuntimeAdmissionScheduler
-from skeleton.ai.model_runtime.flgb_model_runtime import BatchRequest, ModelRuntimeError
+from skeleton.ai.model_runtime.flgb_model_runtime import BatchRequest
 from skeleton.ai.model_runtime.iteration_scheduler import InferencePhase, IterationWork
 from skeleton.app.offline_runtime_preflight import RuntimePolicy, digest, integer, require
 from skeleton.app.offline_runtime_session import OfflineRuntimeSession
@@ -87,16 +87,15 @@ class OfflineRequestQueue:
     """
 
     def __init__(self, session: OfflineRuntimeSession, policy: QueuePolicy,
-                 executor: SliceExecutor) -> None:
+                 executor: SliceExecutor, *, base_policy: RuntimePolicy) -> None:
         require(isinstance(session, OfflineRuntimeSession), "trusted session required")
         require(isinstance(policy, QueuePolicy), "queue policy required")
         require(callable(getattr(executor, "run_slice", None)) and
                 callable(getattr(executor, "release", None)), "trusted slice executor required")
         # The application session publishes its immutable policy through a
         # read-only property. Its host reserve must include the whole KV budget.
-        require(session.policy.backend == "cpu" and
-                session.policy.host_reserve_bytes >= policy.kv_capacity_bytes,
-                "session lacks CPU cache reserve")
+        require(isinstance(base_policy, RuntimePolicy) and session.policy == reserve_cache(base_policy, policy),
+                "session lacks separately reserved CPU cache budget")
         self._session = session
         self._policy = policy
         self._executor = executor
@@ -207,7 +206,7 @@ class OfflineRequestQueue:
                 row = self._requests.get(key)
                 require(row is not None and key in self._scheduler.active_ids, "grant request no longer active")
                 now = time.monotonic_ns()
-                if row.cancel.is_set() or now >= row.deadline_ns:
+                if self._closed or row.cancel.is_set() or now >= row.deadline_ns:
                     continue
                 if now > grant["expires_ns"]:
                     break
@@ -271,6 +270,8 @@ class OfflineRequestQueue:
             return
         try:
             with self._lock:
+                # After a poisoned executor, only an explicit successful
+                # release can retire its suspect logical reservation.
                 for key in tuple(self._requests):
                     self._retire(key, completed=False)
         except BaseException:
