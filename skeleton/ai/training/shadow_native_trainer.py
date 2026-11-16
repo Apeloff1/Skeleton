@@ -171,7 +171,12 @@ class ShadowNativeTrainer:
         model = NativeLLMRuntime.restore_json(self.champion.checkpoint_json())
         if model.model_digest != item.base_model_digest:
             raise ShadowWeightError("cloned native baseline has a different digest")
-        estimated_steps = sum(max(0, len(model.model._ids(line)) - 1) for line in corpus)
+        estimated_steps = 0
+        for line in corpus:
+            session.require_idle()
+            estimated_steps += max(0, len(model.model._ids(line)) - 1)
+            if estimated_steps > self.policy.maximum_steps:
+                raise ShadowTrainingRejected("source-corpus-step-budget")
         if not 1 <= estimated_steps <= self.policy.maximum_steps:
             raise ShadowTrainingRejected("source-corpus-step-budget")
         dataset = DatasetRevision(
@@ -212,7 +217,7 @@ class ShadowNativeTrainer:
             batch = corpus[offset:offset + chunk_size]
             steps += model.model.fit(
                 batch, lr=self.policy.learning_rate_ppm / 1_000_000,
-                schedule="cosine",
+                schedule="cosine", interrupt=session.require_idle,
             )
         session.require_idle()
         if steps != estimated_steps:
@@ -221,9 +226,17 @@ class ShadowNativeTrainer:
         trained.assert_model_unchanged()
         if trained.model_digest == item.base_model_digest:
             raise ShadowTrainingRejected("candidate-training-no-weight-change")
+        session.require_idle()
+        self.champion.assert_model_unchanged()
+        if self.champion.model_digest != item.base_model_digest:
+            raise ShadowTrainingRejected("training-champion-drift")
         checkpoint_json = trained.checkpoint_json()
+        session.heartbeat()
         checkpoint_path = self._publish_checkpoint(checkpoint_json)
         session.heartbeat()
+        self.champion.assert_model_unchanged()
+        if self.champion.model_digest != item.base_model_digest:
+            raise ShadowTrainingRejected("training-champion-drift")
         checkpoint = TrainingCheckpoint(
             run_manifest_digest=manifest.digest,
             sequence=1,
