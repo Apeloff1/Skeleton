@@ -268,8 +268,16 @@ class WeightShardStore:
         identity: ModelIdentity,
         plan: WeightLoadPlan,
         source_paths: Mapping[int, str | Path],
+        *,
+        maximum_new_bytes: int | None = None,
     ) -> str:
-        """Materialize a model's physical bytes, never activating a model."""
+        """Materialize physical bytes, with optional per-operation new-byte cap.
+
+        The cap estimates distinct absent CAS objects before any ingestion.
+        It is not a filesystem quota or concurrent writer reservation.
+        Partial objects from a later failed ingestion remain content-addressed
+        and no model manifest is published until the whole plan verifies.
+        """
         self._require_write()
         if not isinstance(identity, ModelIdentity) or not isinstance(plan, WeightLoadPlan):
             raise WeightShardStoreError("model identity and weight load plan required")
@@ -277,10 +285,14 @@ class WeightShardStore:
             raise WeightShardStoreError("model identity differs from weight load plan")
         if plan.expected_total_bytes > self.maximum_bytes:
             raise WeightShardStoreError("weight plan exceeds storage budget")
-        if set(source_paths) != {shard.index for shard in plan.shards}:
+        if (not isinstance(source_paths, Mapping)
+                or any(type(index) is not int for index in source_paths)
+                or set(source_paths) != {shard.index for shard in plan.shards}):
             raise WeightShardStoreError("source index set does not match shard manifest")
-        for shard in plan.shards:
-            self._ingest(shard, source_paths[shard.index])
+        if maximum_new_bytes is not None and (
+            type(maximum_new_bytes) is not int or not 0 <= maximum_new_bytes <= self.maximum_bytes
+        ):
+            raise WeightShardStoreError("invalid new weight byte ceiling")
         manifest = {
             "schema_version": 1,
             "model_identity_digest": identity.identity_digest,
@@ -289,8 +301,36 @@ class WeightShardStore:
             "expected_total_bytes": plan.expected_total_bytes,
             "shards": [asdict(shard) for shard in plan.shards],
         }
+        encoded = canonical_bytes(manifest)
+        if not 1 <= len(encoded) <= _MAX_MANIFEST_BYTES:
+            raise WeightShardStoreError("weight manifest exceeds byte bounds")
+        target_manifest = self._manifest_path(plan.digest)
+        if target_manifest.exists() or target_manifest.is_symlink():
+            if _read_manifest(target_manifest) != encoded:
+                raise WeightShardStoreError("existing content-addressed manifest is inconsistent")
+        distinct: dict[str, int] = {}
+        new_bytes = 0
+        for shard in plan.shards:
+            prior = distinct.get(shard.digest)
+            if prior is not None:
+                if prior != shard.bytes:
+                    raise WeightShardStoreError("same weight digest has conflicting byte declarations")
+                continue
+            distinct[shard.digest] = shard.bytes
+            target = self._object_path(shard.digest)
+            if target.exists() or target.is_symlink():
+                with self._object_reader(shard) as stream:
+                    observed, count = _hash_stream(stream, maximum=shard.bytes)
+                if observed != shard.digest or count != shard.bytes:
+                    raise WeightShardStoreError("existing weight object failed content identity")
+            else:
+                new_bytes += shard.bytes
+                if maximum_new_bytes is not None and new_bytes > maximum_new_bytes:
+                    raise WeightShardStoreError("new weight bytes exceed operation budget")
+        for shard in plan.shards:
+            self._ingest(shard, source_paths[shard.index])
         self.assert_layout()
-        self._write_once(self._manifest_path(plan.digest), canonical_bytes(manifest))
+        self._write_once(target_manifest, encoded)
         self.assert_layout()
         return plan.digest
 
