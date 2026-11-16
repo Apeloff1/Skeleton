@@ -493,3 +493,14 @@ def test_weight_load_plan_detaches_mutable_shard_declaration():
     assert len(plan.shards) == 1
     assert isinstance(plan.shards, tuple)
     assert plan.digest == pin
+
+
+def test_inventory_declaration_uses_canonical_shard_count_ceiling():
+    from skeleton.ai.model_runtime.flgb_model_runtime import MAX_WEIGHT_SHARDS
+    from skeleton.ai.model_runtime.offline_inventory import VerifiedOfflineWeightPlan
+    row = VerifiedOfflineWeightPlan("a" * 64, "b" * 64, MAX_WEIGHT_SHARDS,
+                                    MAX_WEIGHT_SHARDS, "c" * 64, 1)
+    assert row.shard_count == MAX_WEIGHT_SHARDS == 65_536
+    with pytest.raises(OfflineInventoryError, match="shard count"):
+        VerifiedOfflineWeightPlan("a" * 64, "b" * 64, MAX_WEIGHT_SHARDS + 1,
+                                  MAX_WEIGHT_SHARDS + 1)
