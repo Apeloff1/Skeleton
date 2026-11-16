@@ -152,6 +152,7 @@ class ResidentGGUFBatch:
         self._deadline = 0.0
         self._batches = 0
         self._closed = False
+        self._guarded_owner = None
         self._watchdog = None
         self._spill_root = spill_root
         if bool(policy.slot_spill_bytes) != (spill_root is not None):
@@ -188,7 +189,7 @@ class ResidentGGUFBatch:
             self._overflow.set()
 
     def _call(self, endpoint, payload=None, *, deadline):
-        if endpoint not in {"/health", "/tokenize", "/completion"}:
+        if endpoint not in {"/health", "/tokenize", "/detokenize", "/completion"}:
             slot = re.fullmatch(r"/slots/([0-9]+)\?action=(save|restore|erase)", endpoint)
             if not self._spill_temp or not slot or not 0 <= int(slot.group(1)) < self._policy.slots:
                 raise ValueError("unapproved native endpoint")
@@ -322,6 +323,8 @@ class ResidentGGUFBatch:
         with self._lock:
             if not self._ready.is_set() or self._closed:
                 raise RuntimeError("resident batch requires entered session")
+            if self._guarded_owner is not None:
+                raise RuntimeError("guarded resident session cannot accept operator batch calls")
             p = self._policy
             if self._batches >= p.max_batches:
                 raise RuntimeError("resident session batch quota exhausted")
