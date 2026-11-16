@@ -23,6 +23,70 @@ from .runtime_contracts import (
 )
 
 
+def _canonical_digest_and_size(value: Any, *, maximum: int | None = None) -> tuple[str, int]:
+    """Hash canonical JSON without retaining a second full checkpoint buffer.
+
+    Identical JSON configuration to canonical_bytes. Batch encoder fragments
+    to avoid allocating a contiguous serialized copy of the weight graph.
+    The largest individual string remains an encoder allocation.
+    """
+    from .flgb_model_runtime import ModelRuntimeError
+    encoder = json.JSONEncoder(sort_keys=True, separators=(",", ":"),
+                               allow_nan=False, ensure_ascii=False)
+    hasher = sha256()
+    pending = bytearray()
+    total = 0
+    try:
+        for fragment in encoder.iterencode(value):
+            raw = fragment.encode("utf-8")
+            total += len(raw)
+            if maximum is not None and total > maximum:
+                raise RuntimeContractError("checkpoint exceeds byte budget")
+            if len(raw) >= 65536:
+                if pending:
+                    hasher.update(pending)
+                    pending.clear()
+                hasher.update(raw)
+            else:
+                pending.extend(raw)
+                if len(pending) >= 65536:
+                    hasher.update(pending)
+                    pending.clear()
+        if pending:
+            hasher.update(pending)
+    except RuntimeContractError:
+        raise
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise ModelRuntimeError("value is not canonical-json encodable") from exc
+    return hasher.hexdigest(), total
+
+
+def _large_snapshot(value: Mapping[str, Any]) -> bool:
+    graph = value.get("model", value)
+    if not isinstance(graph, Mapping):
+        return False
+    dimensions = (graph.get("dim", 0), graph.get("ctx", 0),
+                  graph.get("n_layers", 0), graph.get("d_ff", 0))
+    if any(type(x) is not int or x < 0 for x in dimensions):
+        return False
+    dim, context, layers, ff = dimensions
+    vocab = graph.get("itos")
+    vocab_size = len(vocab) if isinstance(vocab, (list, tuple)) else 0
+    cells = 2 * vocab_size * dim + context * dim + layers * (4 * dim * dim + 3 * dim * ff)
+    return cells >= 131072
+
+
+def _digest_and_size(value: Mapping[str, Any], *, maximum: int | None = None) -> tuple[str, int]:
+    # Small checkpoints benefit from CPython's fast C JSON encoder.
+    # Stream larger graphs without changing canonical identities.
+    if _large_snapshot(value):
+        return _canonical_digest_and_size(value, maximum=maximum)
+    raw = canonical_bytes(value)
+    if maximum is not None and len(raw) > maximum:
+        raise RuntimeContractError("checkpoint exceeds byte budget")
+    return sha256(raw).hexdigest(), len(raw)
+
+
 def portable_model_snapshot(model: TinyTransformer) -> dict[str, Any]:
     raw = model.snapshot()
     if not isinstance(raw, dict):
@@ -30,12 +94,12 @@ def portable_model_snapshot(model: TinyTransformer) -> dict[str, Any]:
     snapshot = dict(raw)
     snapshot.pop("device", None)
     snapshot.pop("resident", None)
-    canonical_bytes(snapshot)
+    _digest_and_size(snapshot)
     return snapshot
 
 
 def snapshot_digest(snapshot: Mapping[str, Any]) -> str:
-    return sha256(canonical_bytes(snapshot)).hexdigest()
+    return _digest_and_size(snapshot)[0]
 
 
 def logical_bytes(value: Any) -> int:
@@ -186,10 +250,8 @@ def make_checkpoint(
         "limits": limits.to_dict(),
         "device_policy": device_policy.to_dict(),
     }
-    raw = canonical_bytes(body)
-    if len(raw) > limits.max_checkpoint_bytes:
-        raise RuntimeContractError("checkpoint exceeds byte budget")
-    return {**body, "digest": sha256(raw).hexdigest()}
+    digest, _ = _digest_and_size(body, maximum=limits.max_checkpoint_bytes)
+    return {**body, "digest": digest}
 
 
 def checkpoint_json(checkpoint: Mapping[str, Any], *, max_bytes: int) -> str:
@@ -247,9 +309,7 @@ def validate_checkpoint(checkpoint: Mapping[str, Any]) -> dict[str, Any]:
     }
     if set(checkpoint) != expected_keys:
         raise RuntimeContractError("runtime checkpoint envelope shape mismatch")
-    encoded_checkpoint = canonical_bytes(checkpoint)
-    if len(encoded_checkpoint) > MAX_CHECKPOINT_BYTES:
-        raise RuntimeContractError("runtime checkpoint exceeds global byte budget")
+    _digest_and_size(checkpoint, maximum=MAX_CHECKPOINT_BYTES)
     expected = checkpoint.get("digest")
     if (
         not isinstance(expected, str)
@@ -259,7 +319,7 @@ def validate_checkpoint(checkpoint: Mapping[str, Any]) -> dict[str, Any]:
         raise RuntimeContractError("runtime checkpoint digest missing")
     body = dict(checkpoint)
     body.pop("digest", None)
-    observed = sha256(canonical_bytes(body)).hexdigest()
+    observed = _digest_and_size(body)[0]
     if not hmac.compare_digest(observed, expected):
         raise RuntimeContractError("runtime checkpoint integrity failure")
 
@@ -314,8 +374,7 @@ def restore_components(
     if set(limits_raw) != required_limit_keys:
         raise RuntimeContractError("runtime checkpoint limits shape mismatch")
     limits = RuntimeLimits(**dict(limits_raw))
-    if len(canonical_bytes(checkpoint)) > limits.max_checkpoint_bytes:
-        raise RuntimeContractError("runtime checkpoint exceeds configured byte budget")
+    _digest_and_size(checkpoint, maximum=limits.max_checkpoint_bytes)
 
     policy_raw = body["device_policy"]
     required_policy_keys = {"requested", "allow_fallback"}
