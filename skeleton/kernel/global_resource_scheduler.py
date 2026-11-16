@@ -363,6 +363,7 @@ class GlobalResourceScheduler:
         self._grants: dict[str, ResourceGrant] = {}
         self._tick = 0
         self._grant_sequence = 0
+        self._group_receipts: dict[str, tuple[tuple[tuple[str, str], ...], tuple[str, ...]]] = {}
         self._lock = threading.RLock()
 
     @property
@@ -398,6 +399,91 @@ class GlobalResourceScheduler:
             ticket = RequestTicket(request, self._tick, QUEUED)
             self._requests[request.request_id] = ticket
             return ticket
+
+    def reserve_group(
+        self, group_id: str, requests: tuple[ResourceRequest, ...]
+    ) -> tuple[ResourceGrant, ...] | None:
+        """Atomically submit AND reserve a bounded same-tenant resource group.
+
+        The caller is the existing resource admission owner, not a model. A
+        failed group creates no member tickets, so ordinary dispatch cannot
+        accidentally start half of it. Existing queued runnable work and
+        protected plane reserves retain precedence. This local authority owns
+        declared resource vectors; host allocation and acknowledgement remain
+        the responsibility of the existing executor.
+        """
+        group_id = _text(group_id, "group_id")
+        if type(requests) is not tuple or not 1 <= len(requests) <= 64:
+            raise ResourcePolicyError("group must contain between 1 and 64 requests")
+        if any(not isinstance(request, ResourceRequest) for request in requests):
+            raise ResourcePolicyError("invalid group member")
+        if len({r.request_id for r in requests}) != len(requests):
+            raise ResourceConflict("duplicate group request")
+        if len({r.tenant_id for r in requests}) != 1:
+            raise ResourceConflict("resource group must have one tenant")
+        ordered = tuple(sorted(requests, key=lambda r: (r.priority, r.request_id)))
+        identities = tuple((r.request_id, r.identity_digest) for r in ordered)
+        for request in ordered:
+            plane = self.policy.plane(request.plane)
+            if not request.resources.fits_within(self.policy.total):
+                raise ResourcePolicyError("group member exceeds global capacity")
+            if request.resources.exceeds_fraction(self.policy.total, plane.max_fraction):
+                raise ResourcePolicyError("group member exceeds plane share")
+
+        with self._lock:
+            existing = self._group_receipts.get(group_id)
+            if existing is not None:
+                prior_identities, grant_ids = existing
+                if identities != prior_identities:
+                    raise ResourceConflict("group replay changed resource identity")
+                grants = tuple(self._require_grant(grant_id) for grant_id in grant_ids)
+                if any(grant.state != ACTIVE for grant in grants):
+                    raise ResourceConflict("resource group is no longer fully active")
+                return grants
+            if len(self._group_receipts) >= 4096:
+                raise ResourceUnavailable("resource group receipt capacity exhausted")
+            if any(r.request_id in self._requests for r in ordered):
+                raise ResourceConflict("group member already has a resource ticket")
+
+            # No queue identities, usage, grants or ticks are modified until all
+            # members are proven to fit the same immutable logical snapshot.
+            tickets = tuple(RequestTicket(r, self._tick + 1, QUEUED) for r in ordered)
+            incumbent = self._select_candidate()
+            if incumbent is not None and any(
+                self._candidate_score(incumbent) < self._candidate_score(ticket)
+                for ticket in tickets
+            ):
+                return None
+            simulated = dict(self._usage)
+            for ticket in tickets:
+                if not self._fits_with_usage(ticket, simulated):
+                    return None
+                plane_name = ticket.request.plane
+                simulated[plane_name] = simulated[plane_name].add(ticket.request.resources)
+
+            # All publication occurs under the same existing reentrant lock.
+            # Roll back per-group mutations on an unexpected publication error.
+            previous_tick, previous_sequence = self._tick, self._grant_sequence
+            previous_usage = dict(self._usage)
+            member_ids = {ticket.request.request_id for ticket in tickets}
+            grants: list[ResourceGrant] = []
+            try:
+                self._tick += 1
+                for ticket in tickets:
+                    self._requests[ticket.request.request_id] = ticket
+                    grants.append(self._grant(ticket))
+                self._group_receipts[group_id] = (identities, tuple(g.grant_id for g in grants))
+            except Exception:
+                self._tick, self._grant_sequence = previous_tick, previous_sequence
+                self._usage = previous_usage
+                for request_id in member_ids:
+                    self._requests.pop(request_id, None)
+                for grant_id, grant in tuple(self._grants.items()):
+                    if grant.request_id in member_ids:
+                        del self._grants[grant_id]
+                self._group_receipts.pop(group_id, None)
+                raise
+            return tuple(grants)
 
     def cancel(self, request_id: str) -> RequestTicket:
         request_id = _text(request_id, "request_id")
@@ -534,7 +620,8 @@ class GlobalResourceScheduler:
                 raise ResourceConflict(
                     "preemption target is no longer queued"
                 )
-        return self.release(grant_id)
+            # Keep target validation and definitive release under the same lock.
+            return self.release(grant_id)
 
     def queued(self) -> tuple[RequestTicket, ...]:
         with self._lock:

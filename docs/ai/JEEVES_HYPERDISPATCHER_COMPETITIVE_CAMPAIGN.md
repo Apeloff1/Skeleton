@@ -138,6 +138,21 @@ duration prediction), 39 (cache-aware routing), 41 (token reservation proposal),
 inference cache proof, broker persistence, learned production routing, durable
 acknowledgment and policy activation remain open.
 
+## Wave 3: cross-plane resource group admission and race closure
+
+The existing kernel GlobalResourceScheduler already implements plane reserves,
+share borrowing, weighted dominant-share fairness, priority aging and two-phase
+preemption. Wave 3 preserves those mechanisms and adds bounded atomic
+submit-and-reserve groups against that same authority: no partially queued
+members when capacity is unavailable; queued incumbent precedence; strict
+single-tenant group identity; exact active replay; concurrent contention
+serialized; protected reserve checks for every member; no regrant after release.
+A preemption acknowledgement race is closed by retaining the existing RLock
+from target validation through release. No actual distributed host allocation
+or cross-process group persistence is asserted. Local group receipt capacity is
+bounded, and exhaustion fails closed; durable versioned receipt migration and
+retention policy remain future work.
+
 ## Qualification and rollback
 
 Run the focused test file, existing shared pressure tests, and every AGENTS.md

@@ -197,3 +197,78 @@ def test_shadow_schedule_reproducible_and_protected():
     assert len(choose_shadow(rows, slots=1)) == 5
     overlap = shadow_schedule(rows, slots=2, policy="deadline")
     assert overlap.timeline[1][1] == 0
+
+
+def test_cross_plane_resource_group_is_atomic_and_replay_fenced():
+    from skeleton.kernel.global_resource_scheduler import (
+        GlobalResourcePolicy, GlobalResourceScheduler, PlanePolicy,
+        ResourceVector, ResourceRequest, ResourceConflict,
+    )
+
+    owner = GlobalResourceScheduler(GlobalResourcePolicy(
+        ResourceVector(cpu_millis=100, memory_mb=100),
+        (PlanePolicy("ai", 1, ResourceVector(cpu_millis=10)),
+         PlanePolicy("forge", 1, ResourceVector(memory_mb=10))),
+    ))
+    a = ResourceRequest("a", "ai", "tenant", ResourceVector(cpu_millis=60, memory_mb=30))
+    b = ResourceRequest("b", "forge", "tenant", ResourceVector(cpu_millis=30, memory_mb=60))
+    c = ResourceRequest("c", "forge", "tenant", ResourceVector(cpu_millis=50, memory_mb=60))
+    before = owner.snapshot()
+    assert owner.reserve_group("group", (a, c)) is None
+    assert owner.snapshot() == before and owner.queued() == ()
+    grants = owner.reserve_group("group", (a, b))
+    assert grants is not None and len(grants) == 2
+    assert owner.reserve_group("group", (b, a)) == grants
+    assert owner.usage("ai").cpu_millis == 60
+    assert owner.usage("forge").memory_mb == 60
+    with pytest.raises(ResourceConflict):
+        owner.reserve_group("group", (a, c))
+    owner.release(grants[0].grant_id)
+    with pytest.raises(ResourceConflict):
+        owner.reserve_group("group", (a, b))
+
+
+def test_resource_group_respects_incumbent_and_tenant_boundary():
+    from skeleton.kernel.global_resource_scheduler import (
+        GlobalResourcePolicy, GlobalResourceScheduler, PlanePolicy,
+        ResourceVector, ResourceRequest, ResourceConflict,
+    )
+
+    owner = GlobalResourceScheduler(GlobalResourcePolicy(
+        ResourceVector(cpu_millis=100),
+        (PlanePolicy("ai", 1, ResourceVector(cpu_millis=20)),
+         PlanePolicy("forge", 1, ResourceVector(cpu_millis=20))),
+    ))
+    urgent = ResourceRequest("urgent", "forge", "tenant", ResourceVector(cpu_millis=20), priority=0)
+    owner.submit(urgent)
+    a = ResourceRequest("a", "ai", "tenant", ResourceVector(cpu_millis=40))
+    b = ResourceRequest("b", "ai", "tenant", ResourceVector(cpu_millis=40))
+    before = owner.snapshot()
+    assert owner.reserve_group("g", (a, b)) is None
+    assert owner.snapshot() == before
+    with pytest.raises(ResourceConflict):
+        owner.reserve_group("g", (a, replace(b, tenant_id="other")))
+    assert owner.admit_request("urgent") is not None
+    assert owner.reserve_group("g", (a, b)) is not None
+    assert owner.snapshot()["active"] == 3
+
+
+def test_resource_group_contending_threads_cannot_overbook():
+    from skeleton.kernel.global_resource_scheduler import (
+        GlobalResourcePolicy, GlobalResourceScheduler, PlanePolicy,
+        ResourceVector, ResourceRequest,
+    )
+
+    owner = GlobalResourceScheduler(GlobalResourcePolicy(
+        ResourceVector(cpu_millis=100),
+        (PlanePolicy("ai", 1, ResourceVector()),),
+    ))
+    def reserve(index):
+        return owner.reserve_group(f"group-{index}", tuple(
+            ResourceRequest(f"{index}-{member}", "ai", "t", ResourceVector(cpu_millis=40))
+            for member in range(2)
+        ))
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        grants = list(pool.map(reserve, range(2)))
+    assert sum(g is not None for g in grants) == 1
+    assert owner.usage("ai").cpu_millis == 80
