@@ -1257,7 +1257,8 @@ class LlamaCppModel:
         # scratch and context KV conservatively, including GPU-offloaded
         # models; this is host admission, not measured VRAM or shared-page use.
         context = self._effective_context()
-        kv = self.config.kv_bytes_per_token or self._serving_metadata.kv_bytes_per_token_upper_bound or 0
+        kv = max(self.config.kv_bytes_per_token or 0,
+                 self._serving_metadata.kv_bytes_per_token_upper_bound or 0)
         return self._model.size_bytes + self.config.runtime_scratch_bytes + context * kv
 
     @property
