@@ -441,5 +441,52 @@ class CanonicalInterstitialTests(unittest.TestCase):
         fixture.tick(resumed, at + 4)
         self.assertEqual(len(fetcher.calls), 2)
 
+
+class AcquisitionReadinessTests(unittest.TestCase):
+    def test_checkpoint_derived_readiness_keeps_counts_and_distinguishes_unknown_causes(self):
+        from skeleton.ai.webcrawler.adaptive_navigation import acquisition_readiness
+
+        rows = [
+            {"host": "example.com", "status": 403, "kind": "rejected"},
+            {"host": "example.com", "status": 200, "kind": "rejected"},
+            {"host": "example.org", "status": 429, "kind": "retry"},
+            {"host": "example.org", "status": None, "kind": "error"},
+        ]
+        inputs = dict(measurements=rows, host_ready={"example.com": 200, "example.org": 120},
+                      allowed_hosts=("example.org", "example.com", "example.net"),
+                      frontier=[{"url": "https://example.com/item"}], expires_at=200)
+        r = acquisition_readiness(**inputs, now=100)
+        hosts = {h["host"]: h for h in r["hosts"]}
+        self.assertEqual(r["settled_requests"], 4)
+        self.assertEqual(r["queued"], 1)
+        self.assertEqual(hosts["example.com"]["state"], "held_for_grant")
+        self.assertEqual(hosts["example.com"]["denial_statuses"], 1)
+        self.assertEqual(hosts["example.com"]["rejected_success_statuses"], 1)
+        self.assertEqual(hosts["example.org"]["state"], "cooldown")
+        self.assertEqual(hosts["example.org"]["throttle_statuses"], 1)
+        self.assertEqual(hosts["example.net"]["state"], "no_host_hold")
+        self.assertFalse(r["reason_inferred"])
+        self.assertFalse(r["network_authority_expanded"])
+        self.assertTrue(r["independent_intake_requires_new_authorization"])
+        self.assertNotIn("/item", str(r))
+        self.assertTrue(all(h["state"] == "consent_expired"
+                            for h in acquisition_readiness(**inputs, now=200)["hosts"]))
+
+    def test_readiness_matches_restored_canonical_checkpoint(self):
+        fixture = CanonicalThrottleTests()
+        fetcher = ThrottleFetcher(failure=403)
+        run, at = fixture.create(fetcher)
+        fixture.tick(run, at + 1)
+        fixture.tick(run, at + 2)
+        snap = run.snapshot()
+        resumed = CrawlRun.from_snapshot(snap, fetcher=fetcher)
+        with patch("skeleton.ai.webcrawler.operations.time.time", return_value=at + 3):
+            r = run.status()["acquisition_readiness"]
+            self.assertEqual(resumed.status()["acquisition_readiness"], r)
+        self.assertEqual(r["settled_requests"], 2)
+        self.assertEqual(r["hosts"][0]["denial_statuses"], 1)
+        self.assertEqual(r["hosts"][0]["state"], "held_for_grant")
+
+
 if __name__ == "__main__":
     unittest.main()
