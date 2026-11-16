@@ -1,6 +1,6 @@
 import hashlib
 import pytest
-from test_learned_context_encoder import build_encoder
+from tests.test_learned_context_encoder import build_encoder
 from skeleton.retrieval.semantic_long_context import ContextualRanker,SemanticPolicy
 from skeleton.ai.model_runtime.offline_chat import OfflineChatStore
 from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary

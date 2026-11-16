@@ -1,5 +1,5 @@
 """Semantic selection must feed original token spans, not generated summaries."""
-from test_learned_context_encoder import build_encoder
+from tests.test_learned_context_encoder import build_encoder
 from skeleton.retrieval.semantic_long_context import ContextualRanker,SemanticPolicy
 from skeleton.ai.model_runtime.long_context_spool import LongContextSpool
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime

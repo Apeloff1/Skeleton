@@ -1,7 +1,7 @@
 import sqlite3
 import threading
 import hashlib
-from test_learned_context_encoder import build_encoder
+from tests.test_learned_context_encoder import build_encoder
 from skeleton.retrieval.semantic_long_context import ContextualRanker,SemanticPolicy,document_spans
 from skeleton.retrieval.semantic_vector_cache import DerivedVectorCache
 
