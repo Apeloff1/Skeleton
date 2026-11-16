@@ -3622,6 +3622,7 @@ class ProviderRegistry:
                         LocalModelDeploymentError,
                         load_local_model_adapter,
                     )
+                    from skeleton.ai.runtime.inference.llama_cpp import LlamaCppRuntimeError
 
                     measured_gate = None
                     if measured_local_deployment is not None:
@@ -3641,7 +3642,7 @@ class ProviderRegistry:
                             guarded_components=guarded_components,
                             **capacity,
                         )
-                except (LocalModelDeploymentError, ProviderPolicyError, OSError, TypeError, ValueError, RuntimeError) as exc:
+                except (LocalModelDeploymentError, LlamaCppRuntimeError, ProviderPolicyError, OSError, TypeError, ValueError) as exc:
                     raise ProviderUnavailableError("local provider deployment failed activation") from exc
                 if jeeves_local_only and adapter.model != "jeeves":
                     if measured_gate is not None:
