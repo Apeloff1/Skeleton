@@ -35,6 +35,7 @@ from .runtime_contracts import (
     RuntimeUsage,
 )
 from .tokenization import NativeTokenizer, StreamingTextFeed, TokenizerContractError
+from .decode_acceleration import RollingPenaltyWindow, WordStopMatcher
 
 
 @dataclass(frozen=True)
@@ -558,6 +559,7 @@ class NativeLLMRuntime:
     def _sampling_logits(
         logits: Sequence[float], history: Sequence[int], generated_count: int,
         config: GenerationConfig,
+        *, repetition_counts: Mapping[int, int] | None = None,
     ) -> list[float]:
         """Apply request-bound policies without mutating model graph logits.
 
@@ -568,9 +570,12 @@ class NativeLLMRuntime:
         adjusted = list(logits)
         if (config.repetition_penalty != 1.0 or config.presence_penalty
                 or config.frequency_penalty):
-            counts: dict[int, int] = {}
-            for token_id in history[-config.penalty_window:]:
-                counts[token_id] = counts.get(token_id, 0) + 1
+            if repetition_counts is None:
+                counts: dict[int, int] = {}
+                for token_id in history[-config.penalty_window:]:
+                    counts[token_id] = counts.get(token_id, 0) + 1
+            else:
+                counts = repetition_counts
             for token_id, count in counts.items():
                 value = adjusted[token_id]
                 value = (value / config.repetition_penalty if value >= 0.0
@@ -762,6 +767,15 @@ class NativeLLMRuntime:
             cache.reset_count = 0
         output = list(prompt_sequence.token_ids)
         generated: list[int] = []
+        penalty = (RollingPenaltyWindow(output, config.penalty_window)
+                   if config.repetition_penalty != 1.0 or config.presence_penalty or config.frequency_penalty
+                   else None)
+        # The canonical word tokenizer is append-only; BPE can revise the
+        # entire rendering if an unknown piece appears, so stays on its
+        # authoritative complete-decode path.
+        stop_matcher = (WordStopMatcher(config.stop_strings)
+                        if config.stop_strings and type(self.tokenizer) is NativeTokenizer
+                        and getattr(self.model, "bpe", None) is None else None)
         stop_ids = set(config.stop_token_ids)
         finish_reason = "length"
         cache_resets = 0
@@ -790,7 +804,8 @@ class NativeLLMRuntime:
 
             next_id = int(
                 sample_logits(
-                    self._sampling_logits(logits, output, len(generated), config),
+                    self._sampling_logits(logits, output, len(generated), config,
+                                          repetition_counts=penalty.counts if penalty is not None else None),
                     rng,
                     temperature=config.temperature,
                     top_k=config.top_k,
@@ -802,16 +817,33 @@ class NativeLLMRuntime:
                 raise RuntimeContractError("sampler emitted token outside vocabulary")
             output.append(next_id)
             generated.append(next_id)
+            if penalty is not None:
+                penalty.append(next_id)
             token_text = self.tokenizer.token_text(next_id)
             stop_token_hit = next_id in stop_ids
             stop_string_hit = False
+            if stop_matcher is not None:
+                stop_matcher.append(token_text)
             if config.stop_strings and len(generated) >= config.min_new_tokens:
-                decoded = self.tokenizer.decode_ids(generated)
-                matches = [decoded.find(marker) for marker in config.stop_strings]
-                matches = [position for position in matches if position >= 0]
-                if matches:
-                    stopped_text = decoded[:min(matches)]
-                    stop_string_hit = True
+                # Preserve the decoder's token-budget rejection even when
+                # no stop marker has yet matched the incremental scan.
+                if len(generated) > self.tokenizer.limits.max_tokens:
+                    raise TokenizerContractError("decode token budget exceeded")
+                if stop_matcher is None or stop_matcher.first is not None:
+                    decoded = self.tokenizer.decode_ids(generated)
+                    if stop_matcher is not None:
+                        try:
+                            position = stop_matcher.verify(decoded)
+                        except ValueError as exc:
+                            raise RuntimeContractError("word stop matching drift") from exc
+                        stopped_text = decoded[:position]
+                        stop_string_hit = True
+                    else:
+                        matches = [decoded.find(marker) for marker in config.stop_strings]
+                        matches = [position for position in matches if position >= 0]
+                        if matches:
+                            stopped_text = decoded[:min(matches)]
+                            stop_string_hit = True
             cache_tokens = len(cache.tokens) if cache is not None else 0
             if cache is not None:
                 kv_peak = max(kv_peak, self.estimate_kv_bytes(cache_tokens), cache.reserved_bytes)
