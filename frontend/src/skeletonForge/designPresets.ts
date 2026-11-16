@@ -101,12 +101,12 @@ export function normalisePresetState(input: unknown): QuestionnaireState {
   }
   const era = safeOption(options.era, 'era');
   const generation = safeOption(options.generation, 'generation');
-  const genre = input.galaxyGenre === null ? null : input.galaxyGenre;
+  const genre = input.galaxyGenre == null ? null : input.galaxyGenre;
   if (genre !== null && (typeof genre !== 'string' || !galaxyGenre(genre))) {
     reject('unknown historical genre');
   }
   let profile = null;
-  if (input.galaxyProfile !== null) {
+  if (input.galaxyProfile != null) {
     if (!plain(input.galaxyProfile) || input.galaxyProfile.schema !== GALAXY_PROFILE_SCHEMA) {
       reject('invalid historical Galaxy profile');
     }
@@ -119,12 +119,16 @@ export function normalisePresetState(input: unknown): QuestionnaireState {
     reject('invalid native quest configuration');
   }
   if (!plain(playable) || typeof playable.enabled !== 'boolean'
-      || typeof playable.launch !== 'boolean'
-      || !PLAYABLE_SLICES.some((row) => row.id === playable.mode)) {
+      || (playable.launch !== undefined && typeof playable.launch !== 'boolean')
+      || (playable.mode !== undefined && !PLAYABLE_SLICES.some((row) => row.id === playable.mode))) {
     reject('invalid playable mini-game selection');
   }
   if (quest.enabled && playable.launch) reject('quest and mini-game cannot both own startup');
   if (!playable.enabled && playable.launch) reject('disabled mini-game cannot own startup');
+  const playtest = input.playtest ?? 'off';
+  if (playtest !== 'off' && playtest !== 'auto' && playtest !== 'require') reject('invalid playtest policy');
+  const sourceExport = input.sourceExport ?? { enabled: false };
+  if (!plain(sourceExport) || typeof sourceExport.enabled !== 'boolean') reject('invalid source export policy');
   return {
     ...INITIAL_STATE,
     step: 'options',
@@ -133,7 +137,10 @@ export function normalisePresetState(input: unknown): QuestionnaireState {
     galaxyGenre: genre as string | null,
     galaxyProfile: profile,
     quest: { enabled: quest.enabled, length: quest.length as number },
-    playable: { enabled: playable.enabled, mode: playable.mode as string, launch: playable.launch },
+    playable: { enabled: playable.enabled,
+      ...(typeof playable.mode === 'string' ? { mode: playable.mode } : {}),
+      ...(typeof playable.launch === 'boolean' ? { launch: playable.launch } : {}) },
+    playtest, sourceExport: { enabled: sourceExport.enabled },
     options: { archetype: options.archetype as string, target: options.target as string, era, generation },
   };
 }
