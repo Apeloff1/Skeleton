@@ -17,6 +17,7 @@ from skeleton.app.offline_energy_hysteresis import HysteresisPolicy
 from skeleton.app.offline_runtime_control import RuntimeAdmission
 from skeleton.app.offline_runtime_preflight import (
     RuntimePolicy, digest, inspect_source, integer, require, sample_hardware,
+    revalidate_source_metadata,
 )
 
 
@@ -49,6 +50,7 @@ class OfflineRuntimeSession:
         self._controller = RuntimeAdmission(self._source, policy, hysteresis_policy=(
             hysteresis or HysteresisPolicy(max_sample_age_ns=policy.sample_age_ns)))
         self._verified_ns = time.monotonic_ns()
+        self._last_metadata_fence = None
 
     @property
     def policy(self) -> RuntimePolicy:
@@ -67,6 +69,15 @@ class OfflineRuntimeSession:
         if not self._source_fresh(now_ns):
             self._controller.revoke()
             require(False, "source inspection expired; explicit idle reinspection required")
+
+    def _rebind_metadata(self) -> None:
+        self._last_metadata_fence = None
+        try:
+            evidence = revalidate_source_metadata(self._store, self._source, self._policy)
+        except BaseException:
+            self._controller.revoke()
+            raise
+        self._last_metadata_fence = evidence["digest"]
 
     def claim_consumer(self) -> object:
         """Give one trusted execution owner exclusive use of this session.
@@ -117,6 +128,7 @@ class OfflineRuntimeSession:
             self._authorize(consumer)
             try:
                 self._require_fresh_source(time.monotonic_ns())
+                self._rebind_metadata()
                 observed = sample_hardware()
                 require(observed.origin == "local_probe", "local probe required")
                 now = time.monotonic_ns()
@@ -132,6 +144,7 @@ class OfflineRuntimeSession:
         with self._lock:
             self._open()
             self._authorize(consumer)
+            self._rebind_metadata()
             now = time.monotonic_ns()
             self._require_fresh_source(now)
             return self._controller.consume(admission, now_ns=now)
@@ -160,6 +173,7 @@ class OfflineRuntimeSession:
                     "exclusive_consumer_bound": self._consumer is not None,
                     "admission": self._controller.status(),
                     "source_custody": "inspection_only_not_open_handle",
+                    "last_metadata_fence_digest": self._last_metadata_fence,
                     "native_qualified": False, "release_qualified": False}
 
     def close(self) -> None:
