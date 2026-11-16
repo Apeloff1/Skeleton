@@ -232,6 +232,15 @@ class SocketBoundFetcher:
             out_headers = {key.lower(): value for key, value in response_headers}
             _coalesce_bounded_link_headers(response_headers, out_headers)
             _coalesce_bounded_xrobots_headers(response_headers, out_headers)
+            # Preserve restrictive access signals across repeated headers.
+            # Last-value-wins normalization must not erase an explicit hold.
+            if any(key.lower() == "cf-mitigated" and value.strip().lower() == "challenge"
+                   for key, value in response_headers):
+                out_headers["cf-mitigated"] = "challenge"
+            authenticate = next((value for key, value in response_headers
+                                 if key.lower() == "www-authenticate" and value.strip()), None)
+            if authenticate is not None:
+                out_headers["www-authenticate"] = authenticate
             # A duplicate Retry-After is ambiguous; the conservative local
             # interpretation is to hold for the entire possible consent horizon.
             # Never use a last-header-wins value that might shorten the hold.
