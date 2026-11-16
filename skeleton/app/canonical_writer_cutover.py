@@ -29,7 +29,7 @@ from skeleton.persistence.mongo_source_epoch import (
     MongoCanonicalSourceEpoch, _verified_epoch_record,
 )
 
-_DOMAIN = b"skeleton.canonical-writer-cutover.v1\0"
+_DOMAIN = b"skeleton.canonical-writer-cutover.v2\0"
 _SHA = re.compile(r"[0-9a-f]{40}\Z", re.ASCII)
 _HEX = re.compile(r"[0-9a-f]{64}\Z", re.ASCII)
 _ID = re.compile(r"[A-Za-z0-9_.:-]{1,128}\Z", re.ASCII)
@@ -179,6 +179,8 @@ class VerifiedWriterCutover:
 class CutoverInventory:
     epochs: tuple[tuple[str, int], ...]
     source_scopes: tuple[str, ...]
+    graph_sha256: str
+    collection_counts: tuple[tuple[str, int], ...]
 
     def __post_init__(self):
         _require(type(self.epochs) is tuple and type(self.source_scopes) is tuple
@@ -186,6 +188,11 @@ class CutoverInventory:
         _require(all(type(row) is tuple and len(row) == 2 and _digest(row[0])
                      and type(row[1]) is int and 2 <= row[1] < (1<<63)
                      and row[1] % 2 == 0 for row in self.epochs))
+        _require(_digest(self.graph_sha256) and type(self.collection_counts) is tuple
+                 and all(type(row) is tuple and len(row) == 2 for row in self.collection_counts)
+                 and tuple(name for name, _ in self.collection_counts) == tuple(_GRAPH_FIELDS)
+                 and all(type(count) is int and 0 <= count <= _GRAPH_LIMIT
+                         for _, count in self.collection_counts))
         keys = tuple(row[0] for row in self.epochs)
         _require(tuple(sorted(set(keys))) == keys)
         _require(all(_digest(v) for v in self.source_scopes)
@@ -194,8 +201,9 @@ class CutoverInventory:
 
     @property
     def digest(self):
-        return hashlib.sha256(b"skeleton.canonical-epoch-inventory.v1\0"+_canonical({
+        return hashlib.sha256(b"skeleton.canonical-epoch-inventory.v2\0"+_canonical({
             "epochs": self.epochs, "source_scopes": self.source_scopes,
+            "graph_sha256": self.graph_sha256, "collection_counts": self.collection_counts,
         })).hexdigest()
 
     def matches(self, plan):
@@ -268,7 +276,172 @@ async def _scope_inventory(collection, actor_field, maximum):
     return seen
 
 
-async def _inventory(epoch, *, threads, records, maximum, verify_linearizable):
+# Bounded metadata-only graph of the six known canonical source collections.
+_GRAPH_LIMIT = 250_000
+_GRAPH_FIELDS = {
+    "threads": ("_id", "thread_id", "tenant_id", "owner_id", "version", "message_sequence"),
+    "messages": ("_id", "message_id", "thread_id", "sequence", "_commit_state"),
+    "records": ("repository_namespace", "memory_id", "tenant_id", "namespace",
+                "subject_id", "version"),
+    "revisions": ("repository_namespace", "memory_id", "tenant_id", "namespace",
+                  "version", "record.memory_id", "record.tenant_id", "record.namespace",
+                  "record.subject_id", "record.version"),
+    "projection_outbox": ("repository_namespace", "event_id", "memory_id", "tenant_id",
+                          "namespace", "memory_version", "action", "record.memory_id",
+                          "record.tenant_id", "record.namespace", "record.subject_id",
+                          "record.version", "published_at"),
+    "idempotency": ("repository_namespace", "memory_id", "tenant_id", "namespace",
+                    "idempotency_key", "request_digest", "status", "result.memory_id",
+                    "result.tenant_id", "result.namespace", "result.subject_id",
+                    "result.version"),
+}
+_GRAPH_NAMES = {
+    "threads": "conversation_threads", "messages": "conversation_messages",
+    "records": "canonical_memory_records", "revisions": "canonical_memory_revisions",
+    "projection_outbox": "canonical_memory_projection_outbox",
+    "idempotency": "canonical_memory_idempotency",
+}
+
+
+def _identity(value):
+    _require(_scope(value))
+    return value
+
+
+def _number(value, minimum=1):
+    from bson.int64 import Int64
+    _require(type(value) in (int, Int64) and minimum <= value < (1 << 63))
+    return int(value)
+
+
+class _OwnerGraph:
+    """Structural metadata evidence, not payload or historical completeness."""
+
+    def __init__(self, repository_namespace):
+        self.namespace = _identity(repository_namespace)
+        self.threads = {}
+        self.records = {}
+        self.scopes = set()
+        self.counts = {}
+        self.unique = set()
+        self.lane = None
+        self.hash = hashlib.sha256(b"skeleton.canonical-local-owner-graph.v1\0")
+        self.hash.update(_canonical(self.namespace))
+
+    def begin(self, lane):
+        _require(lane in _GRAPH_FIELDS and lane not in self.counts)
+        if self.lane is not None:
+            self.hash.update(_canonical(("end", self.lane, self.counts[self.lane])))
+        self.unique.clear()
+        self.lane = lane
+        self.counts[lane] = 0
+        self.hash.update(_canonical(("begin", lane)))
+
+    def _key(self, row):
+        _require(row.get("repository_namespace") == self.namespace)
+        return tuple(_identity(row.get(key)) for key in ("tenant_id", "namespace", "memory_id"))
+
+    def _snapshot(self, row, root, field, version_field):
+        snap = row.get(field)
+        _require(type(snap) is dict)
+        tenant, namespace, memory_id = self._key(row)
+        subject, version = root
+        _require(snap.get("memory_id") == memory_id and snap.get("tenant_id") == tenant
+                 and snap.get("namespace") == namespace and snap.get("subject_id") == subject)
+        observed = _number(snap.get("version"))
+        _require(observed <= version)
+        if version_field is not None:
+            _require(observed == _number(row.get(version_field)))
+        return observed
+
+    def feed(self, row):
+        lane = self.lane
+        _require(type(row) is dict and lane is not None)
+        self.counts[lane] += 1
+        _require(self.counts[lane] <= _GRAPH_LIMIT)
+        if lane == "threads":
+            key = _identity(row.get("thread_id"))
+            _require(row.get("_id") == key and key not in self.threads)
+            tenant, actor = (_identity(row.get(k)) for k in ("tenant_id", "owner_id"))
+            version = _number(row.get("version"))
+            sequence = _number(row.get("message_sequence"), 0)
+            self.threads[key] = (tenant, actor, version, sequence)
+            self.scopes.add(MongoCanonicalSourceEpoch._key(tenant, actor))
+            normalized = (key, tenant, actor, version, sequence)
+        elif lane == "messages":
+            key = _identity(row.get("message_id"))
+            thread = _identity(row.get("thread_id"))
+            _require(row.get("_id") == key and thread in self.threads)
+            sequence = _number(row.get("sequence"))
+            _require(row.get("_commit_state") == "committed"
+                     and sequence <= self.threads[thread][3])
+            _require(("message", key) not in self.unique
+                     and ("sequence", thread, sequence) not in self.unique)
+            self.unique.update((("message", key), ("sequence", thread, sequence)))
+            normalized = (key, thread, sequence, "committed")
+        elif lane == "records":
+            key = self._key(row)
+            _require(key not in self.records and ("memory", key[2]) not in self.unique)
+            self.unique.add(("memory", key[2]))
+            subject = _identity(row.get("subject_id"))
+            version = _number(row.get("version"))
+            self.records[key] = (subject, version)
+            self.scopes.add(MongoCanonicalSourceEpoch._key(key[0], subject))
+            normalized = (key, subject, version)
+        else:
+            key = self._key(row)
+            _require(key in self.records)
+            root = self.records[key]
+            if lane == "revisions":
+                version = self._snapshot(row, root, "record", "version")
+                identity = (key, version)
+                normalized = (identity, root[0])
+            elif lane == "projection_outbox":
+                version = self._snapshot(row, root, "record", "memory_version")
+                identity = _identity(row.get("event_id"))
+                action = _identity(row.get("action"))
+                published = row.get("published_at")
+                _require(published is None or _scope(published))
+                normalized = (identity, key, root[0], version, action, published)
+            else:
+                _require(lane == "idempotency" and row.get("status") == "committed")
+                version = self._snapshot(row, root, "result", None)
+                identity = (key[0], key[1], _identity(row.get("idempotency_key")))
+                digest = row.get("request_digest")
+                _require(_digest(digest))
+                normalized = (identity, key, root[0], version, digest, "committed")
+            _require(identity not in self.unique)
+            self.unique.add(identity)
+        self.hash.update(_canonical(normalized))
+        self.hash.update(b"\n")
+
+    def finish(self):
+        _require(tuple(self.counts) == tuple(_GRAPH_FIELDS))
+        self.hash.update(_canonical(("end", self.lane, self.counts[self.lane])))
+        return self.hash.hexdigest(), tuple(sorted(self.scopes)), tuple(self.counts.items())
+
+
+async def _owner_graph(database, collections, repository_namespace):
+    _require(type(collections) is dict and set(collections) == set(_GRAPH_FIELDS))
+    graph = _OwnerGraph(repository_namespace)
+    for lane, fields in _GRAPH_FIELDS.items():
+        collection = collections[lane]
+        _require(collection.name == _GRAPH_NAMES[lane]
+                 and collection.database.name == database.name
+                 and collection.database.client is database.client)
+        graph.begin(lane)
+        projection = {key: 1 for key in fields}
+        if "_id" not in projection:
+            projection["_id"] = 0
+        cursor = (_majority(collection).find({}, projection, collation={"locale": "simple"})
+                  .sort("_id", 1).limit(_GRAPH_LIMIT+1).max_time_ms(_SCAN_MS))
+        async for row in _cursor_rows(cursor, _GRAPH_LIMIT):
+            graph.feed(row)
+    return graph.finish()
+
+
+async def _inventory(epoch, *, collections, repository_namespace, maximum, verify_linearizable):
+    threads, records = collections["threads"], collections["records"]
     locations = {}
     cursor = _majority(epoch._collection).find({}, {
         "_id":1, "tenant_id":1, "actor_id":1, "phase":1, "epoch":1, "writer_token":1,
@@ -283,7 +456,8 @@ async def _inventory(epoch, *, threads, records, maximum, verify_linearizable):
         locations[key] = (tenant, actor, gen)
     scopes = (await _scope_inventory(threads, "owner_id", maximum)
               | await _scope_inventory(records, "subject_id", maximum))
-    _require(scopes.issubset(locations))
+    graph_digest, graph_scopes, counts = await _owner_graph(epoch._database, collections, repository_namespace)
+    _require(scopes == set(graph_scopes) and scopes.issubset(locations))
     if verify_linearizable:
         async def check(row):
             tenant, actor, gen = row
@@ -294,32 +468,31 @@ async def _inventory(epoch, *, threads, records, maximum, verify_linearizable):
                 for current in ordered[i:i+_BATCH]:
                     group.create_task(check(current))
     return CutoverInventory(tuple(sorted((k,v[2]) for k,v in locations.items())),
-                            tuple(sorted(scopes)))
+                            tuple(sorted(scopes)), graph_digest, counts)
 
 
-async def qualify_writer_cutover(approval, *, epoch, threads, records):
+async def qualify_writer_cutover(approval, *, epoch, collections, repository_namespace):
     """Validate two identical majority inventories plus per-actor linearizable reads.
 
     Bound every database observation, deny incomplete inventories, and verify
-    the independent signed plan before and after I/O. This only scans thread
-    and memory roots, not all message, idempotency, revision, outbox, archive
-    or external writer surfaces. Those remain independently reviewed.
+    the independent signed plan before and after I/O. Scan every known local
+    conversation/memory owner collection. Archives, external writers, payload
+    custody and historical completeness remain independently reviewed.
     """
     _require(type(approval) is VerifiedWriterCutover and type(epoch) is MongoCanonicalSourceEpoch)
     approval.verify()
     plan, database = approval.plan, epoch._database
-    for collection, name in ((threads,"conversation_threads"),(records,"canonical_memory_records"),
-                             (epoch._collection,"canonical_source_epochs"),(epoch._reader,"canonical_source_epochs")):
+    for collection, name in ((epoch._collection,"canonical_source_epochs"),(epoch._reader,"canonical_source_epochs")):
         _require(collection.name == name and collection.database.name == plan.database_name
                  and collection.database.client is database.client)
     try:
         async with asyncio.timeout(_SCAN_TIMEOUT):
             start = await _observe(database)
             _match_observation(plan, start, database)
-            first = await _inventory(epoch, threads=threads, records=records,
+            first = await _inventory(epoch, collections=collections, repository_namespace=repository_namespace,
                                      maximum=plan.epoch_count, verify_linearizable=True)
             _require(first.matches(plan))
-            second = await _inventory(epoch, threads=threads, records=records,
+            second = await _inventory(epoch, collections=collections, repository_namespace=repository_namespace,
                                       maximum=plan.epoch_count, verify_linearizable=False)
             end = await _observe(database)
             _require(first == second and start == end)
@@ -331,25 +504,25 @@ async def qualify_writer_cutover(approval, *, epoch, threads, records):
         raise WriterCutoverDenied("live canonical writer inventory unavailable") from None
 
 
-async def inspect_writer_inventory(*, epoch, threads, records):
+async def inspect_writer_inventory(*, epoch, collections, repository_namespace):
     """Read-only operator inventory evidence; never creates an approval."""
     _require(type(epoch) is MongoCanonicalSourceEpoch)
     db = epoch._database
-    for collection, name in ((threads,"conversation_threads"),(records,"canonical_memory_records"),
-                             (epoch._collection,"canonical_source_epochs")):
+    for collection, name in ((epoch._collection,"canonical_source_epochs"),(epoch._reader,"canonical_source_epochs")):
         _require(collection.name == name and collection.database.name == db.name
                  and collection.database.client is db.client)
     try:
         async with asyncio.timeout(_SCAN_TIMEOUT):
             first_topology = await _observe(db)
-            first = await _inventory(epoch, threads=threads, records=records,
+            first = await _inventory(epoch, collections=collections, repository_namespace=repository_namespace,
                                      maximum=_MAX_ACTORS, verify_linearizable=True)
-            second = await _inventory(epoch, threads=threads, records=records,
+            second = await _inventory(epoch, collections=collections, repository_namespace=repository_namespace,
                                       maximum=_MAX_ACTORS, verify_linearizable=False)
             _require(first == second and first_topology == await _observe(db))
-            return {"schema":"skeleton.canonical-writer-observation.v1",
+            return {"schema":"skeleton.canonical-writer-observation.v2",
                     "epoch_count":len(first.epochs), "source_scope_count":len(first.source_scopes),
-                    "inventory_sha256":first.digest, "stable_primary_observed":True,
+                    "inventory_sha256":first.digest, "local_owner_graph_sha256":first.graph_sha256,
+                    "local_collection_counts":dict(first.collection_counts), "stable_primary_observed":True,
                     "writes_performed":False, "writer_cutover_authorized":False,
                     "guarded_local_ai_ready":False}
     except WriterCutoverDenied:

@@ -21,6 +21,13 @@ def _owners():
     return core_db, conversation_authority, canonical_memory_repository, canonical_memory_writer
 
 
+def _collections(conversation, memory):
+    return {"threads": conversation.threads, "messages": conversation.messages,
+            "records": memory.records, "revisions": memory.revisions,
+            "projection_outbox": memory.projection_outbox,
+            "idempotency": memory.idempotency}
+
+
 def configure_cutover(app, approval):
     if type(approval) is not VerifiedWriterCutover:
         raise WriterCutoverDenied("explicit signed canonical cutover required")
@@ -53,7 +60,8 @@ async def install_before_lifespan(app):
             raise WriterCutoverDenied("actual canonical writer ownership unavailable")
         epoch = MongoCanonicalSourceEpoch(db)
         inventory = await qualify_writer_cutover(
-            approval, epoch=epoch, threads=conversation.threads, records=memory.records,
+            approval, epoch=epoch, collections=_collections(conversation, memory),
+            repository_namespace=memory.repository_namespace,
         )
         # No await between final signed/live admission and sticky binding.
         # A failed binding does not roll back to unprotected owners.
@@ -64,6 +72,8 @@ async def install_before_lifespan(app):
             "inventory_sha256": inventory.digest,
             "epoch_count": len(inventory.epochs),
             "source_scope_count": len(inventory.source_scopes),
+            "local_owner_graph_sha256": inventory.graph_sha256,
+            "local_collection_counts": dict(inventory.collection_counts),
             "known_local_writer_binding_installed": True,
             "external_writer_coverage_verified": False,
             "guarded_local_ai_ready": False,
@@ -77,4 +87,5 @@ async def install_before_lifespan(app):
 async def inspect_configured_inventory():
     db, conversation, memory, _ = _owners()
     return await inspect_writer_inventory(epoch=MongoCanonicalSourceEpoch(db),
-                  threads=conversation.threads, records=memory.records)
+                  collections=_collections(conversation, memory),
+                  repository_namespace=memory.repository_namespace)

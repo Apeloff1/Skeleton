@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from skeleton.app.canonical_writer_cutover import (
     CanonicalWriterCutover, VerifiedWriterCutover, CutoverInventory, WriterCutoverDenied,
-    qualify_writer_cutover, inspect_writer_inventory,
+    qualify_writer_cutover, inspect_writer_inventory, _OwnerGraph, _GRAPH_FIELDS, _GRAPH_NAMES,
 )
 from skeleton.persistence.mongo_source_epoch import MongoCanonicalSourceEpoch
 
@@ -39,7 +39,7 @@ class Collection:
     def with_options(self,**kwargs):
         assert kwargs["read_concern"].level == "majority"
         return self
-    def find(self,*args): return Cursor(self.rows)
+    def find(self,*args,**kwargs): return Cursor(getattr(self,"find_rows",self.rows))
     def aggregate(self,*args,**kwargs):
         assert kwargs["allowDiskUse"] is False
         return Cursor(self.rows)
@@ -56,8 +56,38 @@ class Database:
     async def command(self, name):
         return self.hello if name == "hello" else self.auth
 
+def graph_rows():
+    root = {"repository_namespace":"memory","memory_id":"mem","tenant_id":TENANT,
+            "namespace":"local","subject_id":ACTOR,"version":2}
+    snap = {k:v for k,v in root.items() if k!="repository_namespace"}
+    common = {k:v for k,v in root.items() if k not in ("subject_id","version")}
+    return {
+        "threads":[{"_id":"thread","thread_id":"thread","tenant_id":TENANT,
+                    "owner_id":ACTOR,"version":2,"message_sequence":1}],
+        "messages":[{"_id":"message","message_id":"message","thread_id":"thread",
+                     "sequence":1,"_commit_state":"committed"}],
+        "records":[root],
+        "revisions":[{**common,"version":2,"record":dict(snap)}],
+        "projection_outbox":[{**common,"event_id":"event","memory_version":2,
+                              "action":"upsert","published_at":None,"record":dict(snap)}],
+        "idempotency":[{**common,"idempotency_key":"idem","request_digest":"f"*64,
+                        "status":"committed","result":dict(snap)}],
+    }
+
+
+def expected_inventory():
+    rows = graph_rows()
+    graph = _OwnerGraph("memory")
+    for lane in _GRAPH_FIELDS:
+        graph.begin(lane)
+        for row in rows[lane]:
+            graph.feed(row)
+    digest, scopes, counts = graph.finish()
+    return CutoverInventory(((KEY,2),),scopes,digest,counts)
+
+
 def signed(inventory=None,**updates):
-    inventory = inventory or CutoverInventory(((KEY,2),),(KEY,))
+    inventory = inventory or expected_inventory()
     now = int(time.time())
     data = dict(authority_id="operator",deployment_id="fixture",source_head="a"*40,
        database_name="canonical", replica_set="rs0", voting_hosts=HOSTS,
@@ -81,7 +111,13 @@ def fixture():
     epoch.read_epoch=AsyncMock(return_value=2)
     threads=Collection("conversation_threads",db,[{"_id":{"tenant":TENANT,"actor":ACTOR}}])
     records=Collection("canonical_memory_records",db,[])
-    return db,epoch,threads,records
+    rows = graph_rows()
+    collections = {lane:Collection(_GRAPH_NAMES[lane],db,data) for lane,data in rows.items()}
+    threads.find_rows = rows["threads"]
+    records.find_rows = rows["records"]
+    records.rows = [{"_id":{"tenant":TENANT,"actor":ACTOR}}]
+    collections.update(threads=threads,records=records)
+    return db,epoch,collections
 
 def test_signed_plan_binds_source_and_scope_and_expiry():
     approval=signed()
@@ -98,31 +134,31 @@ def test_signed_plan_binds_source_and_scope_and_expiry():
         signed(issued_at=int(time.time())-500,expires_at=int(time.time())-1)
 
 def test_read_only_inventory_and_signed_live_gate():
-    _,epoch,threads,records=fixture()
+    _,epoch,collections=fixture()
     async def run():
-        observed=await inspect_writer_inventory(epoch=epoch,threads=threads,records=records)
+        observed=await inspect_writer_inventory(epoch=epoch,collections=collections,repository_namespace="memory")
         assert observed["guarded_local_ai_ready"] is False and observed["writes_performed"] is False
         approval=signed()
-        result=await qualify_writer_cutover(approval,epoch=epoch,threads=threads,records=records)
+        result=await qualify_writer_cutover(approval,epoch=epoch,collections=collections,repository_namespace="memory")
         assert result.digest==observed["inventory_sha256"] and result.matches(approval.plan)
         assert epoch.read_epoch.await_count==2
     asyncio.run(run())
 
 @pytest.mark.parametrize("change",["missing","odd","actor","role","generation","foreign_db","oversize","second_scan"])
 def test_cutover_denies_ambiguous_or_unapproved_source(change):
-    db,epoch,threads,records=fixture()
+    db,epoch,collections=fixture()
     if change=="missing":
         epoch._collection.rows=[]
     elif change=="odd":
         epoch._collection.rows[0]["epoch"]=3
     elif change=="actor":
-        records.rows=[{"_id":{"tenant":TENANT,"actor":"uncovered"}}]
+        collections["records"].rows=[{"_id":{"tenant":TENANT,"actor":"uncovered"}}]
     elif change=="role":
         db.auth["authInfo"]["authenticatedUserRoles"][0]["role"]="root"
     elif change=="generation":
         epoch.read_epoch.return_value=4
     elif change=="foreign_db":
-        threads.database=Database()
+        collections["threads"].database=Database()
     elif change=="oversize":
         epoch._collection.rows*=2
     elif change=="second_scan":
@@ -131,7 +167,7 @@ def test_cutover_denies_ambiguous_or_unapproved_source(change):
             return 2
         epoch.read_epoch.side_effect=changed
     with pytest.raises(WriterCutoverDenied):
-        asyncio.run(qualify_writer_cutover(signed(),epoch=epoch,threads=threads,records=records))
+        asyncio.run(qualify_writer_cutover(signed(),epoch=epoch,collections=collections,repository_namespace="memory"))
 
 def test_launch_context_cannot_use_unverified_approval():
     from core.canonical_writer_startup import configure_cutover
@@ -146,9 +182,10 @@ def test_backend_lifespan_admission_never_swallows_cutover_error(monkeypatch):
     from core import canonical_writer_startup as startup
     app=SimpleNamespace(state=SimpleNamespace())
     startup.configure_cutover(app,signed())
-    db,epoch,threads,records=fixture()
-    conversation=SimpleNamespace(threads=threads,canonical_source_epoch=None)
-    memory=SimpleNamespace(records=records,canonical_source_epoch=None)
+    db,epoch,collections=fixture()
+    conversation=SimpleNamespace(threads=collections["threads"],messages=collections["messages"],canonical_source_epoch=None)
+    memory=SimpleNamespace(repository_namespace="memory",canonical_source_epoch=None,
+                           **{k:collections[k] for k in ("records","revisions","projection_outbox","idempotency")})
     writer=SimpleNamespace(repository=memory)
     monkeypatch.setattr(startup,"_owners",lambda:(db,conversation,memory,writer))
     monkeypatch.setattr(startup,"MongoCanonicalSourceEpoch",lambda db:epoch)
@@ -159,3 +196,72 @@ def test_backend_lifespan_admission_never_swallows_cutover_error(monkeypatch):
         asyncio.run(startup.install_before_lifespan(app))
     assert conversation.canonical_source_epoch is None and memory.canonical_source_epoch is None
     assert not getattr(app.state,"_writer_cutover_installed",False)
+
+@pytest.mark.parametrize("lane,change", [
+    ("messages", {"_commit_state":"prepared"}),
+    ("messages", {"thread_id":"missing"}),
+    ("messages", {"sequence":2}),
+    ("threads", {"_id":"alias"}),
+    ("records", {"repository_namespace":"other"}),
+    ("records", {"subject_id":"another_actor"}),
+    ("revisions", {"version":3}),
+    ("revisions", {"memory_id":"missing"}),
+    ("projection_outbox", {"memory_version":3}),
+    ("projection_outbox", {"record":{"subject_id":"other"}}),
+    ("idempotency", {"status":"pending"}),
+    ("idempotency", {"request_digest":"invalid"}),
+    ("idempotency", {"result":{"subject_id":"other"}}),
+])
+def test_complete_local_graph_rejects_unresolved_or_foreign_metadata(lane,change):
+    _,epoch,collections=fixture()
+    target=collections[lane]
+    rows=getattr(target,"find_rows",target.rows)
+    rows[0].update(change)
+    with pytest.raises(WriterCutoverDenied):
+        asyncio.run(qualify_writer_cutover(signed(),epoch=epoch,collections=collections,
+                                           repository_namespace="memory"))
+
+
+@pytest.mark.parametrize("lane",tuple(_GRAPH_FIELDS))
+def test_signed_graph_denies_duplicate_or_disappeared_rows(lane):
+    for duplicate in (True,False):
+        _,epoch,collections=fixture()
+        target=collections[lane]
+        rows=getattr(target,"find_rows",target.rows)
+        if duplicate:
+            rows.append(dict(rows[0]))
+        else:
+            rows.clear()
+        with pytest.raises(WriterCutoverDenied):
+            asyncio.run(qualify_writer_cutover(signed(),epoch=epoch,collections=collections,
+                                               repository_namespace="memory"))
+
+
+def test_valid_but_changed_metadata_invalidates_old_approval():
+    _,epoch,collections=fixture()
+    collections["projection_outbox"].rows[0]["published_at"]="2026-11-16T06:00:00Z"
+    with pytest.raises(WriterCutoverDenied):
+        asyncio.run(qualify_writer_cutover(signed(),epoch=epoch,collections=collections,
+                                           repository_namespace="memory"))
+
+
+def test_receipt_contains_only_counts_and_hashes_not_actor_or_content():
+    _,epoch,collections=fixture()
+    collections["messages"].rows[0]["content"]="private payload must not enter receipt"
+    receipt=asyncio.run(inspect_writer_inventory(epoch=epoch,collections=collections,
+                                                  repository_namespace="memory"))
+    assert receipt["local_collection_counts"]==dict.fromkeys(_GRAPH_FIELDS,1)
+    assert receipt["local_owner_graph_sha256"]==expected_inventory().graph_sha256
+    assert "private payload" not in json.dumps(receipt)
+    assert receipt["writer_cutover_authorized"] is False
+
+
+def test_second_graph_scan_detects_write_after_linearizable_observation():
+    _,epoch,collections=fixture()
+    async def race(**kwargs):
+        collections["projection_outbox"].rows[0]["published_at"]="2026-11-16T06:00:00Z"
+        return 2
+    epoch.read_epoch.side_effect=race
+    with pytest.raises(WriterCutoverDenied):
+        asyncio.run(qualify_writer_cutover(signed(),epoch=epoch,collections=collections,
+                                           repository_namespace="memory"))

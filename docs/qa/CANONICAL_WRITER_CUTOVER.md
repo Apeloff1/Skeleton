@@ -9,9 +9,13 @@ Before considering it, independently quiesce all writers, establish encrypted
 backup/restore custody, prove physical deployment identity and retire direct
 or unregistered mutation principals. Reconcile all canonical collections and
 existing actor epochs using independently reviewed migration procedures.
-The source gate scans canonical thread and memory root actor coverage and
-stable epoch records; it does not scan every message, revision, archive,
-outbox, orphan or external writer. Missing, writing, revoked or inconsistent
+The v2 source gate scans stable epoch records plus all six known local canonical
+owner collections: threads, committed messages, memory roots, revisions,
+projection outbox, and committed idempotency receipts. It checks exact scope
+relationships, logical identity uniqueness and bounded version relationships.
+Unresolved prepared messages or pending memory reservations deny admission;
+a separate reviewed recovery is required. The gate does not verify payloads,
+complete historical continuity, archive or external writer surfaces. Missing, writing, revoked or inconsistent
 epochs deny the entire initial cutover. No automatic repair or reset occurs.
 
 With the existing backend Mongo configuration, observe the inventory only:
@@ -19,11 +23,13 @@ With the existing backend Mongo configuration, observe the inventory only:
     PYTHONPATH=.:backend python scripts/start_protected_backend.py \
       --inspect-only --source-head REVIEWED_GIT_SHA
 
-The command prints only counts, inventory SHA and non-authorizing readiness
-flags. It requires authenticated stable replica-set primary, majority actor
+The command prints only counts, the v2 inventory SHA, local-owner graph SHA,
+collection counts and non-authorizing readiness flags. It requires authenticated stable replica-set primary, majority actor
 inventory and per-actor linearizable epoch equality. No credentials or actor
 IDs are printed. Current implementation caps the inventory at 65,536 actor
-epochs and has a 120-second bounded scan. Larger deployments require a
+epochs, 250,000 metadata rows per owner collection and a 120-second bounded
+scan. The v2 signature domain and inventory digest invalidate v1 approvals;
+issue a new independently reviewed approval. Never reuse a v1 signature. Larger deployments require a
 separately reviewed sharded inventory/qualification path, not a bypass.
 
 An independent authority may sign a CanonicalWriterCutover plan's
