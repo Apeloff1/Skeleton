@@ -1528,13 +1528,13 @@ class CrawlRun:
                 elif plaintext_sitemap:
                     discovery = parse_plaintext_sitemap(
                         response.body, document_url=url,
-                        policy=self.policy, max_links=128, max_entries=512,
+                        policy=self.policy, max_links=256, max_entries=1024,
                     )
                 else:
                     discovery = parse_structured_discovery(
                         response.body,
                         media_type=ctype, document_url=url,
-                        policy=self.policy, max_links=128, max_entries=512,
+                        policy=self.policy, max_links=256, max_entries=1024,
                     )
             except UnsupportedDiscoveryRoot:
                 # A valid, non-feed XML root may be retained as inert,
@@ -1602,7 +1602,7 @@ class CrawlRun:
                     raise ParserFault("deadline")
                 doc = extract_document(
                     response, item["original_url"],
-                    max_links=128, max_text_chars=self.request.max_response_bytes,
+                    max_links=256, max_text_chars=self.request.max_response_bytes,
                     link_base_url=url,
                     **({"pdf_deadline_seconds": min(8.0, remaining)} if ctype == "application/pdf" else {}),
                 )
