@@ -285,6 +285,36 @@ class TransportIsolationTests(unittest.TestCase):
 
 
 class InterstitialTransportTests(unittest.TestCase):
+    def test_explicit_success_status_hold_does_not_decode_or_read_body(self):
+        from skeleton.ai.webcrawler.adaptive_navigation import access_interstitial_reason
+
+        for signal in (("CF-Mitigated", "challenge"), ("WWW-Authenticate", "Basic realm=restricted")):
+            with self.subTest(signal=signal[0]):
+                url = "https://example.com/first"
+                target = ResolvedTarget(url, "example.com", 443, ("93.184.216.34",))
+                connection, response = Mock(), Mock()
+                response.status = 200
+                response.getheaders.return_value = [
+                    signal, ("Content-Length", "99999999"), ("Content-Length", "1"),
+                    ("Content-Encoding", "unsupported"), ("Transfer-Encoding", "chunked"),
+                ]
+                response.read1.side_effect = AssertionError("held entity must stay unread")
+                connection.getresponse.return_value = response
+                with (
+                    patch("skeleton.ai.webcrawler.bound_http.resolve_target", return_value=target),
+                    patch("skeleton.ai.webcrawler.bound_http._PinnedHTTPSConnection", return_value=connection),
+                    patch("skeleton.ai.webcrawler.bound_http.threading.Timer"),
+                ):
+                    result = SocketBoundFetcher().fetch_once(
+                        url, user_agent="SkeletonAI-Crawler/1.0", max_bytes=4096,
+                    )
+                self.assertEqual(result.status, 200)
+                self.assertEqual(result.body, b"")
+                self.assertEqual(result.content_encoding, "identity")
+                self.assertIsNotNone(access_interstitial_reason(result.status, result.headers, result.body))
+                response.read1.assert_not_called()
+                connection.close.assert_called_once()
+
     def test_repeated_headers_cannot_erase_explicit_denial(self):
         from skeleton.ai.webcrawler.adaptive_navigation import access_interstitial_reason
 
