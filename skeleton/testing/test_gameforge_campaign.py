@@ -275,3 +275,31 @@ def test_cli_refuses_symlink_and_public_parent(tmp_path):
     public = tmp_path / "public"
     public.mkdir(mode=0o755)
     assert invoke("create-slot", data, public / "db.sqlite")[0] == 1
+
+
+def test_read_never_initializes_unrelated_database(tmp_path):
+    path = tmp_path / "other.sqlite"
+    path.touch(mode=0o600)
+    with sqlite3.connect(path) as db:
+        db.execute("CREATE TABLE unrelated (value TEXT)")
+    assert invoke("read-slot", {"request": spec(), "slot": "a"}, path)[0] == 1
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall() == [("unrelated",)]
+
+
+def test_head_rollback_and_nonobject_receipt_are_detected(tmp_path):
+    source = spec()
+    with sqlite3.connect(tmp_path / "campaign.sqlite") as db:
+        store = CampaignStore(db)
+        store.create("slot", source, "create")
+        action = build_campaign(source)["witness"][:1]
+        store.append("slot", source, 0, "advance", action)
+        db.execute("UPDATE gf_campaign_slots_v1 SET head=0")
+        db.commit()
+        with pytest.raises(CampaignStoreError, match="journal disagree"):
+            store.read("slot", source)
+        db.execute("UPDATE gf_campaign_slots_v1 SET head=1")
+        db.execute("UPDATE gf_campaign_revisions_v1 SET receipt=? WHERE revision=1", (b"[]",))
+        db.commit()
+        with pytest.raises(CampaignStoreError):
+            store.read("slot", source)
