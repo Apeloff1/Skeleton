@@ -14,7 +14,7 @@ from skeleton.app.gameforge_quest_bridge import (
     verify_design, verify_session,
 )
 from skeleton.app.gameforge_quest_cli import main
-from skeleton.app.original_quest_cli import QuestRequestError
+from skeleton.app.original_quest_cli import MAX_BYTES, QuestRequestError, _encode
 from skeleton.gameforge.conductor import ConductorConfig, GameForgeConductor
 from skeleton.gameforge.plans import STEPS
 
@@ -272,3 +272,17 @@ def test_cli_all_operations_and_real_package_module():
     proc = subprocess.run([sys.executable, "-m", "skeleton", "gameforge-quest", "build"],
                           input=encoded(spec), capture_output=True, timeout=60, check=True)
     assert json.loads(proc.stdout) == design
+
+
+def test_direct_python_input_cannot_amplify_pending_nodes_or_text():
+    repeated = "x" * 16_384
+    with pytest.raises(QuestRequestError, match="character budget"):
+        _encode([repeated] * (MAX_BYTES // len(repeated) + 1))
+    with pytest.raises(QuestRequestError, match="pending node budget"):
+        _encode([[0] * 10_000] * 11)
+
+
+def test_only_minimal_cli_dispatch_and_packaging_are_added():
+    import skeleton.__main__ as entrypoint
+    assert "original-quest" in entrypoint.__doc__
+    assert "gameforge-quest" in entrypoint.__doc__
