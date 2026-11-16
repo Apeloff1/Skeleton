@@ -27,7 +27,6 @@ from skeleton.ai.model_runtime import (
     RuntimeUsage,
 )
 from skeleton.ai.model_runtime.runtime_contracts import RUNTIME_SCHEMA, digest_json
-from skeleton.ai.model_runtime.native_llm_runtime import GenerationStream
 from .private_prefill import PrivatePrefillPool
 from skeleton.ai.model_runtime.tokenization import TokenSequence, TokenizerContractError
 from skeleton.skills.tool_contract import (
@@ -792,10 +791,10 @@ class NativeRuntimeLocalModel:
                 )
             stream_handle = (
                 self.runtime.stream_sequence(prompt_sequence, config, interrupt=interrupt)
-                if prefix_lease is None else GenerationStream(self.runtime._stream_sequence_impl(
+                if prefix_lease is None else self.runtime.stream_sequence(
                     prompt_sequence, config, interrupt=interrupt,
                     _private_cpu_cache=prefix_lease.cache,
-                ))
+                )
             )
             with stream_handle as stream:
                 for event in stream:
