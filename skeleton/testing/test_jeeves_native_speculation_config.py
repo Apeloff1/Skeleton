@@ -88,6 +88,17 @@ class NativeSpeculationConfigTests(unittest.TestCase):
             with self.subTest(args=args),self.assertRaises(ValueError):
                 replace(BASE,extra_args=args)
 
+    def test_documented_remote_and_unpinned_artifact_aliases_refused(self):
+        for args in (("--docker-repo","remote"),("-dr=remote",),
+                     ("--gpt-oss-20b-default",),("--vision-gemma-12b-default",),
+                     ("--lora","unbound.gguf"),("--shard","other.gguf"),
+                     ("--ple=other.gguf",),("--control-vector","extra.gguf"),
+                     ("--prompt-cache","old.bin"),("--override-kv","x=str:y"),
+                     ("--n-gpu-layers","all"),("--temperature","2"),
+                     ("--draft-max","64"),("--device-draft","CPU")):
+            with self.subTest(args=args),self.assertRaises(ValueError):
+                replace(BASE,extra_args=args)
+
     def test_trained_context_is_independent_ceiling(self):
         obj=self.fixture(replace(BASE,**SPEC))
         obj._serving_metadata=GgufServingMetadata(architecture="llama",context_length=16)
