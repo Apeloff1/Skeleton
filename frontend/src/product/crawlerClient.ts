@@ -240,9 +240,9 @@ export type NavigationTarget = {
   pending: boolean; phase: 'visited' | 'active' | 'depth_held' | 'pending' | 'observed_only';
   navigation_authorized: false;
 };
-export type NavigationPacket = { snapshot_digest:string; packet_digest:string; objective:string[];
+export type NavigationPacket = { snapshot_digest:string; packet_digest:string; as_of:number; objective:string[];
   candidates:{id:string;terms:string[];depth:number;attempts:number;semantic:number}[] };
-export type NavigationAdvice = { snapshot_digest:string; packet_digest:string;
+export type NavigationAdvice = { snapshot_digest:string; packet_digest:string; as_of:number;
   jeeves_rank:string[];dragon_rank:string[] };
 export type NavigationFederationPage = { targets:{id:string;url:string;host:string;semantic:number;
   witness:{grant_id:string;source_session:string;checkpoint:string;expires:number;relation:string;occurrence_count:number};
@@ -1112,7 +1112,7 @@ export async function getNavigationPacket(id:string,signal?:AbortSignal): Promis
     ROOT+'/sessions/'+identifier(id)+'/navigation/packet',options(signal)),getAuthToken(),'Navigation packet unavailable.');
   const p=v?.packet;
   if(!v||v.ok!==true||v.session_id!==id||v.network_authorized!==false||!integer(v.version)||!p
-    ||!HASH.test(p.snapshot_digest)||!HASH.test(p.packet_digest)||!Array.isArray(p.objective)||p.objective.length>20
+    ||!HASH.test(p.snapshot_digest)||!HASH.test(p.packet_digest)||!integer(p.as_of,1000000000000)||!Array.isArray(p.objective)||p.objective.length>20
     ||!Array.isArray(p.candidates)||p.candidates.length>12
     ||p.candidates.some(c=>!HASH.test(c.id)||!Array.isArray(c.terms)||c.terms.length>8
       ||!integer(c.depth,3)||!integer(c.attempts,3)||!integer(c.semantic,1000))) invalid('Invalid navigation packet.');
