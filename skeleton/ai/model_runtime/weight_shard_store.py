@@ -83,10 +83,12 @@ def _bounded_regular_reader(path: Path, maximum: int) -> Iterator[BinaryIO]:
         raise WeightShardStoreError("weight source unavailable during inspection") from exc
 
 
-def _read_manifest(path: Path) -> bytes:
-    with _bounded_regular_reader(path, _MAX_MANIFEST_BYTES) as stream:
-        raw = stream.read(_MAX_MANIFEST_BYTES + 1)
-        if not raw or len(raw) > _MAX_MANIFEST_BYTES:
+def _read_manifest(path: Path, *, maximum: int = _MAX_MANIFEST_BYTES) -> bytes:
+    if type(maximum) is not int or not 1 <= maximum <= _MAX_MANIFEST_BYTES:
+        raise WeightShardStoreError("invalid manifest read ceiling")
+    with _bounded_regular_reader(path, maximum) as stream:
+        raw = stream.read(maximum + 1)
+        if not raw or len(raw) > maximum:
             raise WeightShardStoreError("weight manifest exceeds byte bounds")
         return raw
 
@@ -292,11 +294,11 @@ class WeightShardStore:
         self.assert_layout()
         return plan.digest
 
-    def _load_plan_manifest(self, plan_digest: str) -> tuple[WeightLoadPlan, dict]:
+    def _load_plan_manifest(self, plan_digest: str, *, maximum: int = _MAX_MANIFEST_BYTES) -> tuple[WeightLoadPlan, dict]:
         """Reconstruct a plan and its identity fields from one bounded read."""
         path = self._manifest_path(plan_digest)
         try:
-            raw = _read_manifest(path)
+            raw = _read_manifest(path, maximum=maximum)
             manifest = json.loads(raw)
         except (OSError, ValueError, RecursionError) as exc:
             raise WeightShardStoreError("weight plan manifest unavailable") from exc
@@ -331,6 +333,12 @@ class WeightShardStore:
     def load_plan(self, plan_digest: str) -> WeightLoadPlan:
         """Reconstruct a committed plan without trusting caller-supplied paths."""
         return self._load_plan_manifest(plan_digest)[0]
+
+    def manifest_evidence(self, plan_digest: str, *, maximum: int = _MAX_MANIFEST_BYTES) -> tuple[WeightLoadPlan, str, int]:
+        """Bind complete canonical manifest bytes, not just the load-plan digest."""
+        plan, manifest = self._load_plan_manifest(plan_digest, maximum=maximum)
+        raw = canonical_bytes(manifest)
+        return plan, sha256(raw).hexdigest(), len(raw)
 
     def verified_paths(self, plan_digest: str) -> tuple[Path, ...]:
         """Return only shards that still match their immutable content identity."""
