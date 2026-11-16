@@ -251,6 +251,7 @@ def start_weight_range(owner: WeightStoreDiskOwner, index: WeightChunkIndex, *,
                "tranches": 0, "status": "active", "failure": None,
                "prior_campaign_digest": prior_campaign_digest}
         owner._inspect_lock(directory_fd, fd)
+        owner._require_control_space()
         return _save(directory_fd, row, replace=prior is not None)
 
 
@@ -276,6 +277,7 @@ def advance_weight_range(owner: WeightStoreDiskOwner, index: WeightChunkIndex, *
             row["status"] = "blocked"
             row["failure"] = {"reason": reason, "chunk": chunk}
             owner._inspect_lock(directory_fd, fd)
+            owner._require_control_space()
             saved = _save(directory_fd, row, replace=True)
             return {"status": "blocked", "campaign": saved, "verified_this_tranche": 0,
                     "bytes_this_tranche": 0, "failure": saved["failure"]}
@@ -320,6 +322,7 @@ def advance_weight_range(owner: WeightStoreDiskOwner, index: WeightChunkIndex, *
         row.update(verified_chunks=cursor, verified_bytes=index.prefix_bytes(cursor),
                    tranches=row["tranches"] + 1, chain_digest=chain,
                    status="completed" if cursor == len(index.chunk_sha256) else "active")
+        owner._require_control_space()
         saved = _save(directory_fd, row, replace=True)
         return {"status": saved["status"], "campaign": saved, "verified_this_tranche": count,
                 "bytes_this_tranche": consumed, "raw_sha256_recomputed": False,
