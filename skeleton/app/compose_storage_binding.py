@@ -50,12 +50,14 @@ class _BindingIdentity:
     # A random per-campaign HMAC key avoids exposing an offline secret
     # guessing oracle even if an in-memory identity is accidentally logged.
     model_key: bytes
+    active_runtime_digests: tuple[tuple[str, str], ...]
 # Emit only the relevant labels and mount metadata. Never inspect Config.Env.
 _CONTAINER_TEMPLATE = (
     '{"project":{{json (index .Config.Labels "com.docker.compose.project")}},'
     '"service":{{json (index .Config.Labels "com.docker.compose.service")}},'
     '"id":{{json .Id}},"running":{{json .State.Running}},'
     '"image_id":{{json .Image}},"image_ref":{{json .Config.Image}},'
+    '"started_at":{{json .State.StartedAt}},"restart_count":{{json .RestartCount}},'
     '"ports":{{json .NetworkSettings.Ports}},"mounts":{{json .Mounts}}}'
 )
 _VOLUME_TEMPLATE = (
@@ -268,7 +270,8 @@ def _render_command(command):
 
 def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=subprocess.run,
                     admit=None, previous: BindingReport | None=None,
-                    require_started: bool=False) -> BindingReport:
+                    require_started: bool=False,
+                    require_same_runtime: bool=False) -> BindingReport:
     """Observe intended and existing storage, then recheck inventory and epoch."""
     root = Path(root).resolve()
     copied = dict(environ)
@@ -291,7 +294,8 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
 
     try:
         render = _render_command(command)
-        _require(type(require_started) is bool, "binding_mode_invalid")
+        _require(type(require_started) is bool and type(require_same_runtime) is bool
+                 and (not require_same_runtime or require_started), "binding_mode_invalid")
         def daemon():
             data = inspect(["docker","info","--format",'{"id":{{json .ID}}}'],_MAX_INSPECT)
             identity = data.get("id")
@@ -302,9 +306,7 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
         daemon_digest = daemon()
         hot = "docker-compose.hot.yml" in render
         from skeleton.app.assembly import _runtime_env
-        from skeleton.app.compose_runtime_identity import (
-            RuntimeIdentityDenied, model_identity, actual_identity, verify_image,
-        )
+        from skeleton.app.compose_runtime_identity import model_identity, actual_identity, verify_image
         config = inspect(render,_MAX_CONFIG)
         project, resolved = _resolved_model(config,root=root,hot=hot)
         values = _runtime_env(root,copied)
@@ -341,7 +343,13 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
             tagged = inspect(["docker","image","inspect","--format",'{"id":{{json .Id}}}',
                               expected.image],_MAX_INSPECT)
             verify_image(tagged,image_id)
-            return _digest((image_id,ports))
+            started = payload.get("started_at")
+            restarts = payload.get("restart_count")
+            _require(type(started) is str and _VOLUME_STAMP.fullmatch(started) is not None
+                     and not started.startswith("0001-")
+                     and type(restarts) is int and 0 <= restarts <= 2**31-1,
+                     "running_container_epoch_unverified")
+            return _digest((payload["id"],started,restarts,image_id,ports))
 
         if require_started:
             _require(all("tutolage-"+role in all_containers for role in _ACTIVE_ROLES)
@@ -374,6 +382,10 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
         if require_started:
             for role, digest in previous.identity.volume_digests:
                 _require(volume_digests.get(role) == digest, "previous_persistent_volume_changed")
+        if require_same_runtime:
+            _require(dict(previous.identity.active_runtime_digests) == runtime_digests
+                     and set(runtime_digests) == set(_ACTIVE_ROLES),
+                     "runtime_epoch_changed_during_qualification")
         for role, digest in volume_digests.items():
             payload = inspect(["docker","volume","inspect","--format",_VOLUME_TEMPLATE,resolved[role]],_MAX_INSPECT)
             _require(_volume_binding(payload,project,role) == digest, "volume_binding_changed")
@@ -395,7 +407,8 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
         del reloaded
         fence()
         _require(daemon() == daemon_digest, "docker_daemon_changed")
-        identity = _BindingIdentity(daemon_digest,model_digest,tuple(sorted(volume_digests.items())),key)
+        identity = _BindingIdentity(daemon_digest,model_digest,tuple(sorted(volume_digests.items())),
+                                    key,tuple(sorted(runtime_digests.items())))
         return BindingReport(True,True,"binding_observed",existing_containers,existing_volumes,identity)
     except (BindingDenied, RuntimeIdentityDenied) as exc:
         # All BindingDenied codes are fixed internal identifiers.

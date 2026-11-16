@@ -1195,3 +1195,11 @@ per-campaign keyed fingerprint covers the entire resolved Compose model,
 including build arguments and environment, without publishing secret-bearing
 config or fingerprint data. This does not establish registry trust, build
 provenance, image source parity, immutable volume identity or device readiness.
+
+Positive HTTP and critical-router qualification is now followed by a final
+read-only runtime continuity observation. Active container IDs, start
+timestamps, restart counts, image identities and ingress bindings must
+match the post-start observation. An observed restart or replacement
+invalidates the earlier HTTP evidence. The stricter optional live
+qualification gets the same final continuity check. This is sampled
+continuity, not continuous monitoring or physical-device certification.

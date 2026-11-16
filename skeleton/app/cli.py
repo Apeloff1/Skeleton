@@ -1343,6 +1343,14 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                     if registry["ready"] is not True:
                         print("application start: critical API routers missing or unverified; inspect app doctor --live")
                         return 1
+                    continuity = observe_binding(root, command=startup_command, environ=compose_env,
+                        admit=source_stable, previous=post, require_started=True,
+                        require_same_runtime=True)
+                    if not continuity.admitted:
+                        print("application readiness blocked: runtime continuity unverified: " + continuity.code)
+                        return 1
+                    if not source_stable():
+                        return changed()
                     print("application services: ready; AI availability is reported separately by app doctor --live")
                     return 0
                 print("application start: services launched but readiness verification failed")

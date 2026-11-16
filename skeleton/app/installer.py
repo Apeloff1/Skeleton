@@ -600,14 +600,24 @@ def install_application(
                 backend_url = host_urls["backend"] if "backend" in host_urls else manifest.service("backend").public_url
                 route_status = critical_backend_route_report(backend_url, timeout=3.0)
                 routes_ready = route_status["ready"] is True
+                continuity_failure = None
+                if routes_ready and source_stable():
+                    continuity = observe_binding(root, command=command, environ=compose_env,
+                        runner=runner, admit=source_stable, previous=post, require_started=True,
+                        require_same_runtime=True)
+                    if not continuity.admitted:
+                        continuity_failure = continuity.code
+                        routes_ready = False
                 phases.append(
                     InstallPhase(
                         "critical-api-routes",
                         routes_ready,
                         (
-                            "required application API routers are registered"
+                            "required application API routers are registered in the reobserved runtime epoch"
                             if routes_ready
-                            else "required API routes missing or unverified; inspect app doctor --live and /api/health/registry"
+                            else "runtime continuity unverified: " + continuity_failure
+                            if continuity_failure else
+                            "required API routes missing or unverified; inspect app doctor --live and /api/health/registry"
                         ),
                     )
                 )
@@ -621,6 +631,13 @@ def install_application(
                 require_protected=qualification_require_protected, require_ai=qualification_require_ai,
                 environ=admitted_process_env)
             stable = admitted_digest is not None and source_stable()
+            if stable and qualification["ok"] is True:
+                stable_runtime = observe_binding(root, command=command, environ=compose_env,
+                    runner=runner, admit=source_stable, previous=post, require_started=True,
+                    require_same_runtime=True)
+                if not stable_runtime.admitted:
+                    qualification = {"ok":False,"code":stable_runtime.code}
+                stable = source_stable()
             phases.append(InstallPhase("strict-live-qualification",qualification["ok"] is True and stable,
                 "bounded multi-round application observation; " + qualification["code"]
                 + "; actual inference/device/release remain separately held"))

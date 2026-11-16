@@ -79,6 +79,7 @@ def fixture_runner(*, resolved=None, volumes=(), containers=(), container_overri
                              for path,volume in binding._BINDINGS.get(role,{}).items()]}
             _,published,target=runtime.HOST_DEFAULTS[role]
             value.update(image_id="sha256:"+"d"*64,
+                         started_at="2026-01-01T12:00:00.000000000Z",restart_count=0,
                          image_ref=payload["services"][role].get("image",PROJECT+"-"+role),
                          ports={str(target)+"/tcp":[{"HostIp":"127.0.0.1","HostPort":str(published)}]})
             if container_override:
@@ -346,3 +347,34 @@ def test_custom_production_ports_and_hot_ports_have_separate_exact_contract():
     value["services"]["frontend"]["ports"].extend(
         {"host_ip":"127.0.0.1","target":p,"published":str(p)} for p in runtime._HOT)
     assert len(runtime.model_identity(value,values={"FRONTEND_PORT":"3300","FRONTEND_CONTAINER_PORT":"8080"},hot=True)["frontend"].ports)==5
+
+
+
+@pytest.mark.parametrize("change",[
+    {}, {"id":"f"*64}, {"restart_count":1}, {"started_at":"2026-01-01T12:01:00Z"},
+])
+def test_readiness_binds_active_container_epoch_across_observations(tmp_path,change):
+    original,_=fixture_runner()
+    before=observe(tmp_path,original)
+    volumes=tuple(PROJECT+"_"+role for role in binding.VOLUME_ROLES)
+    containers=tuple("tutolage-"+role for role in binding._ACTIVE_ROLES)
+    started,_=fixture_runner(volumes=volumes,containers=containers)
+    post=observe(tmp_path,started,previous=before,require_started=True)
+    assert post.admitted
+    last,_=fixture_runner(volumes=volumes,containers=containers,container_override=change)
+    result=observe(tmp_path,last,previous=post,require_started=True,require_same_runtime=True)
+    assert result.admitted is (not change)
+    if change:
+        assert result.code=="runtime_epoch_changed_during_qualification"
+
+
+@pytest.mark.parametrize("override",[
+    {"started_at":None},{"started_at":"0001-01-01T00:00:00Z"},
+    {"restart_count":True},{"restart_count":-1},
+])
+def test_missing_or_invalid_runtime_epoch_is_not_qualified(tmp_path,override):
+    before,_=fixture_runner()
+    previous=observe(tmp_path,before)
+    after,_=fixture_runner(volumes=tuple(PROJECT+"_"+r for r in binding.VOLUME_ROLES),
+        containers=tuple("tutolage-"+r for r in binding._ACTIVE_ROLES),container_override=override)
+    assert observe(tmp_path,after,previous=previous,require_started=True).code=="running_container_epoch_unverified"
