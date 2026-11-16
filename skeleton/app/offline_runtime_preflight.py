@@ -136,7 +136,8 @@ class ModelSource:
     def snapshot(self) -> dict:
         return {"plan_digest": self.plan_digest, "model_identity_digest": self.model_identity_digest,
                 "inventory_digest": self.inventory_digest, "weight_bytes": self.plan.expected_total_bytes,
-                "shards": [asdict(row) for row in self.plan.shards],
+                "shards": [{"index": row.index, "digest": row.digest, "bytes": row.bytes,
+                            "source_label_digest": digest(row.source)} for row in self.plan.shards],
                 "gguf_headers": [dict(row) for row in self.headers],
                 "tensor_validation": "not_assessed", "activation": "not_performed"}
 
@@ -182,6 +183,12 @@ class HardwareSample:
         integer(self.started_ns, 0, 2**63-1, "sample start")
         integer(self.finished_ns, self.started_ns, 2**63-1, "sample finish")
         require(self.origin in ("local_probe", "fixture"), "invalid sample origin")
+        if self.gpu.status == "measured":
+            require(len(self.gpu.devices) <= 32 and len({d.device_id for d in self.gpu.devices}) == len(self.gpu.devices)
+                    and sum(d.memory_bytes for d in self.gpu.devices) == self.gpu.measured_free_bytes,
+                    "inconsistent native device memory aggregate")
+            require(all(d.kind == "cuda" and d.device_id != "host-cpu" for d in self.gpu.devices),
+                    "unexpected native device identity")
         if self.origin == "local_probe":
             require(self.gpu.source != "simulated_nvml", "simulated GPU cannot enter live sample")
 
