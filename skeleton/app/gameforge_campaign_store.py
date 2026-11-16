@@ -95,7 +95,12 @@ class CampaignStore:
             "SELECT source_digest, head FROM gf_campaign_slots_v1 WHERE slot=?", (slot,)
         ).fetchone()
         _check(row is not None and row[0] == digest(source), "missing slot or independent source mismatch")
-        return _integer(row[1], 0, MAX_REVISIONS - 1)
+        head = _integer(row[1], 0, MAX_REVISIONS - 1)
+        count, maximum = self.db.execute(
+            "SELECT COUNT(*), MAX(revision) FROM gf_campaign_revisions_v1 WHERE slot=?", (slot,)
+        ).fetchone()
+        _check(count == head + 1 and maximum == head, "slot head and journal disagree")
+        return head
 
     def _row(self, slot: str, revision: int) -> tuple:
         row = self.db.execute("""
@@ -117,7 +122,7 @@ class CampaignStore:
             receipt = json.loads(raw.decode("ascii"))
         except (UnicodeError, ValueError, RecursionError) as exc:
             raise CampaignStoreError("stored receipt cannot be decoded") from exc
-        _check(_encode(receipt) == raw and receipt.get("session_digest") == receipt_hash
+        _check(type(receipt) is dict and _encode(receipt) == raw and receipt.get("session_digest") == receipt_hash
                and verify_session(source, receipt), "stored checkpoint replay mismatch")
         _check((revision == 0 and previous is None and receipt["actions"] == [])
                or (revision > 0 and type(previous) is str and len(previous) == 64),
@@ -142,8 +147,10 @@ class CampaignStore:
                                "expected_revision": revision - 1,
                                "additional": actions[len(prefix):]})
             _check(row[2] == expected, "stored append request mismatch")
-        return {"slot": slot, "revision": revision, "operation": row[1],
-                "receipt": receipt, "native_qualified": False, "release_qualified": False}
+        result = {"slot": slot, "revision": revision, "operation": row[1],
+                  "receipt": receipt, "native_qualified": False, "release_qualified": False}
+        _encode(result)  # Reject oversized response before a write transaction commits.
+        return result
 
     def _capacity(self, slot: str, raw: bytes) -> None:
         slot_bytes = self.db.execute(
@@ -241,7 +248,8 @@ class CampaignStore:
         with self._transaction(write=False):
             head = self._slot(slot, source)
             rows = self.db.execute("""
-                SELECT revision, operation, request_digest, previous_digest, receipt_digest, receipt
+                SELECT revision, operation, request_digest, previous_digest, receipt_digest,
+                       CASE WHEN length(receipt) <= 2097152 THEN receipt ELSE NULL END
                 FROM gf_campaign_revisions_v1 WHERE slot=? ORDER BY revision
             """, (slot,))
             count = 0
