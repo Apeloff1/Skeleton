@@ -91,7 +91,7 @@ class JeevesDispatcherGateway:
     be requested through this gateway.
     """
 
-    _ACTIONS = frozenset({"submit", "cancel", "signal", "reconcile", "command", "result"})
+    _ACTIONS = frozenset({"submit", "cancel", "cancel-pending", "signal", "reconcile", "command", "result"})
 
     def __init__(self, *, directory: str | Path, policy_sha256: str,
                  scope: JeevesHostContext,
@@ -159,7 +159,8 @@ class JeevesDispatcherGateway:
         tenant = self._scope.tenant_id
         if action == "submit":
             required = {"task_id", "operation", "input"}
-            optional = {"priority", "dependencies", "singleton", "timer_ms", "event"}
+            optional = {"priority", "dependencies", "singleton", "timer_ms", "event",
+                        "bindings", "binding_deadline_ms"}
             if not required.issubset(supplied) or not set(supplied).issubset(required | optional):
                 raise JeevesHostRuntimeError("invalid host submission properties")
             operation = self._identifier(supplied["operation"])
@@ -179,9 +180,27 @@ class JeevesDispatcherGateway:
                     "dependencies": [self._scoped("task", dep) for dep in deps]}
             if "singleton" in supplied:
                 body["singleton"] = self._scoped("singleton", supplied["singleton"])
-            for field in ("timer_ms", "event"):
+            for field in ("timer_ms", "event", "binding_deadline_ms"):
                 if field in supplied:
                     body[field] = supplied[field]
+            if "bindings" in supplied:
+                from skeleton.automation.agents.swarm_dispatch_bindings import BindingError, parse_bindings
+                try:
+                    bindings = parse_bindings(supplied["bindings"], supplied["input"],
+                                              task_id=supplied["task_id"])
+                except BindingError as exc:
+                    raise JeevesHostRuntimeError("invalid host result bindings") from exc
+                body["bindings"] = [
+                    {**binding.record(),
+                     "source_request_id": self._scoped("request", binding.source_request_id),
+                     "source_task_id": self._scoped("task", binding.source_task_id)}
+                    for binding in bindings
+                ]
+        elif action == "cancel-pending":
+            if set(supplied) != {"request_id"}:
+                raise JeevesHostRuntimeError("exact pending client request identity required")
+            body = {"kind": action, "tenant": tenant,
+                    "request_id": self._scoped("request", supplied["request_id"])}
         elif action == "command":
             if set(supplied) != {"request_id"}:
                 raise JeevesHostRuntimeError("exact client request identity required")

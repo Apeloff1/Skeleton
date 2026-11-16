@@ -3237,3 +3237,189 @@ def test_dispatcher_archive_rollover_preserves_strict_delta_and_monotonic_outer_
     assert predecessor.restore_latest().task("job").state.value == "succeeded"
     assert app.result("a", "job")["result"] == 9
     app.close()
+
+
+def _linked_submit(task, request, parent, values, *, deadline=1000, tenant="a"):
+    return {
+        "kind": "submit", "tenant": tenant, "task_id": task,
+        "operation": "integer_sum", "input": values,
+        "bindings": [{"source_request_id": request, "source_task_id": parent,
+                      "source_path": [], "target_path": [0]}],
+        "binding_deadline_ms": deadline,
+    }
+
+
+def test_result_linked_pipeline_consumes_real_verified_outputs_across_archival(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    from hashlib import sha256
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "pipeline", tenants=("a",), operations=("integer_sum",),
+        workers=1, max_jobs=1, history_jobs=10, clock_ms=lambda: 100,
+    )
+    app.enqueue("p1", {"kind": "submit", "tenant": "a", "task_id": "first",
+                       "operation": "integer_sum", "input": [1, 2]})
+    app.enqueue("p2", _linked_submit("second", "p1", "first", [None, 4]))
+    app.enqueue("p3", _linked_submit("third", "p2", "second", [None, 8]))
+    app.start()
+    first = app.tick()
+    assert first.task_id == "first" and first.deferred_commands == ("p2", "p3")
+    assert app.inbox.command("p2")["status"] == "pending"
+    assert app.tick().task_id == "second"
+    assert app.tick().task_id == "third"
+    assert [app.result("a", name)["result"] for name in ("first", "second", "third")] == [3, 7, 15]
+    leaf = app.result("a", "third")
+    assert leaf["input_lineage"][0]["receipt_sha256"] == app.result("a", "second")["receipt_sha256"]
+    assert leaf["input_lineage"][0]["value_sha256"] == sha256(b"7").hexdigest()
+    assert app.archive.audit()["verified_jobs"] == 3
+    app.close()
+    restored = LocalDispatcherApplication(app.directory, clock_ms=lambda: 2000)
+    assert restored.result("a", "third") == leaf
+    assert restored.custody.usage()["attempts"] == 3
+
+
+def test_result_linked_pending_round_robin_reaches_event_signal_and_cancellation(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "fair", tenants=("a",), operations=("integer_sum",),
+        workers=1, max_jobs=8, clock_ms=lambda: 100,
+    )
+    app.enqueue("source", {"kind": "submit", "tenant": "a", "task_id": "source",
+                           "operation": "integer_sum", "input": [2],
+                           "event": {"selector": "ready", "not_before_ms": 100}})
+    app.enqueue("one", _linked_submit("one", "source", "source", [None, 4]))
+    app.enqueue("two", _linked_submit("two", "source", "source", [None, 7]))
+    app.enqueue("cancel-two", {"kind": "cancel-pending", "tenant": "a", "request_id": "two"})
+    app.enqueue("signal", {"kind": "signal", "tenant": "a", "task_id": "source",
+                           "event_id": "event-1", "selector": "ready", "evidence": True})
+    app.start()
+    for _ in range(8):
+        app.tick(command_limit=1)
+    assert app.inbox.command("two")["status"] == "rejected"
+    assert app.inbox.command("cancel-two")["status"] == "accepted"
+    assert app.result("a", "one")["result"] == 6
+    assert app.custody.usage()["attempts"] == 2
+    app.close()
+
+
+def test_result_bindings_deadline_cycle_scope_and_invalid_path_never_launch(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    now = [100]
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "refusal", tenants=("a", "b"), operations=("integer_sum",),
+        workers=1, max_jobs=12, clock_ms=lambda: now[0],
+    )
+    app.enqueue("source", {"kind": "submit", "tenant": "a", "task_id": "source",
+                           "operation": "integer_sum", "input": [1],
+                           "timer_ms": 5000})
+    app.enqueue("expire", _linked_submit("expire", "source", "source", [None], deadline=200))
+    app.enqueue("foreign", _linked_submit("foreign", "source", "source", [None], tenant="b"))
+    app.enqueue("forward", _linked_submit("forward", "later", "later", [None]))
+    app.enqueue("later", _linked_submit("later", "forward", "forward", [None]))
+    invalid = _linked_submit("invalid", "source", "source", [8])
+    app.enqueue("invalid", invalid)
+    app.start()
+    app.tick()
+    assert app.inbox.command("expire")["status"] == "pending"
+    assert all(app.inbox.command(name)["status"] == "rejected"
+               for name in ("foreign", "forward", "later", "invalid"))
+    now[0] = 200
+    app.tick()
+    assert app.inbox.command("expire")["status"] == "rejected"
+    assert app.custody.usage()["attempts"] == 0
+    app.close()
+
+
+def test_result_binding_replay_after_task_capture_before_acknowledgement(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    from skeleton.testing.test_durable_run_store import Clock
+    clock = Clock()
+    now = [100]
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "replay", tenants=("a",), operations=("integer_sum",), workers=1,
+        max_jobs=4, timeout_seconds=1, lease_seconds=20,
+        clock_ms=lambda: now[0], store_clock=clock,
+    )
+    app.enqueue("root", {"kind": "submit", "tenant": "a", "task_id": "root",
+                         "operation": "integer_sum", "input": [2, 3]})
+    app.start()
+    assert app.tick().task_id == "root"
+    app.enqueue("child", _linked_submit("child", "root", "root", [None, 11], deadline=200))
+    command = app.inbox.pending()[0]
+    assert app._apply(command)["submission"] == "durable"
+    assert app.inbox.command("child")["status"] == "pending"
+    app.managed.stop()
+    clock.advance(21)
+    now[0] = 500
+    restored = LocalDispatcherApplication(app.directory, clock_ms=lambda: now[0], store_clock=clock)
+    restored.start()
+    assert restored.tick().task_id == "child"
+    assert restored.inbox.command("child")["status"] == "accepted"
+    assert restored.result("a", "child")["result"] == 16
+    assert restored.custody.usage()["attempts"] == 2
+    restored.close()
+
+
+def test_binding_path_exact_json_nested_values_and_overlap_refusal():
+    from skeleton.automation.agents.swarm_dispatch_bindings import (
+        BindingError, materialize, parse_bindings,
+    )
+    template = {"prompt": None, "settings": [None]}
+    raw = [
+        {"source_request_id": "r", "source_task_id": "a", "source_path": ["text"], "target_path": ["prompt"]},
+        {"source_request_id": "r", "source_task_id": "a", "source_path": ["tokens", 1], "target_path": ["settings", 0]},
+    ]
+    bindings = parse_bindings(raw, template, task_id="b")
+    calls = []
+    def proof(binding):
+        calls.append(binding.source_task_id)
+        return {"task_id": "a", "state": "succeeded", "uncertain_on_restore": False,
+                "receipt_sha256": "a"*64, "result": {"text": "literal {not a command}", "tokens": [1, 2]}}
+    output, lineage = materialize(template, bindings, proof)
+    assert output == {"prompt": "literal {not a command}", "settings": [2]}
+    assert template == {"prompt": None, "settings": [None]}
+    assert calls == ["a"] and len(lineage) == 2
+    with pytest.raises(BindingError):
+        parse_bindings(raw + [raw[0]], template, task_id="b")
+    with pytest.raises(BindingError):
+        parse_bindings([dict(raw[0], target_path=["settings"])], template, task_id="b")
+
+
+def test_host_gateway_scopes_linked_source_requests_and_real_results(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.app.runtime.jeeves_host_runtime import JeevesHostContext, JeevesDispatcherGateway
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "service", tenants=("a",), operations=("integer_sum",), workers=1, max_jobs=8,
+    )
+    scope = JeevesHostContext("a", "project", "principal", "run", "trace")
+    gateway = JeevesDispatcherGateway(directory=app.directory, policy_sha256=app.policy.digest,
+                                     scope=scope, authorize=lambda question: True)
+    gateway.execute(context=scope, action="submit", request_id="parent",
+                    arguments={"task_id": "parent", "operation": "integer_sum", "input": [5, 6]})
+    child = _linked_submit("child", "parent", "parent", [None, 10],
+                           deadline=app.clock_ms() + 60000)
+    child.pop("tenant")
+    child.pop("kind")
+    gateway.execute(context=scope, action="submit", request_id="child", arguments=child)
+    app.start()
+    app.tick()
+    app.tick()
+    result = gateway.execute(context=scope, action="result", request_id="inspect", arguments={"task_id": "child"})
+    assert result["result"] == 21
+    assert result["input_lineage"][0]["source_task_id"].startswith("app-task-")
+    assert result["input_lineage"][0]["source_request_id"].startswith("app-request-")
+    app.close()

@@ -28,6 +28,9 @@ from skeleton.automation.agents.swarm_durable import (
     _LOCAL_OPERATIONS, _local_reference, _wait_bytes, _wait_identifier, _wait_time,
 )
 from skeleton.automation.agents.swarm_dispatch_archive import SQLiteDispatcherArchive
+from skeleton.automation.agents.swarm_dispatch_bindings import (
+    BindingDeferred, BindingError, InputBinding, MAX_BINDING_WAIT_MS, materialize, parse_bindings,
+)
 from skeleton.automation.agents.swarm_dispatch_gguf import (
     GGUF_OPERATION, GGUF_CAPABILITY, PinnedGGUFPolicy, PinnedGGUFTransport,
 )
@@ -353,26 +356,54 @@ class DispatcherInbox:
                 raise
         return self._public_row(row)
 
-    def pending(self, *, limit: int = 16) -> tuple[InboxCommand, ...]:
-        _uint(limit, 1, 128, "inbox batch")
+    @staticmethod
+    def _decode(row) -> InboxCommand:
+        data = row["body"]
+        if (type(data) is not bytes or len(data) > _MAX_COMMAND_BYTES
+                or sha256(data).hexdigest() != row["request_sha256"]):
+            raise DurableSwarmError("durable command integrity failure")
+        body = _json_object(data)
+        if _canonical(body) != data:
+            raise DurableSwarmError("noncanonical durable command")
+        return InboxCommand(row["sequence"], row["request_id"],
+                            row["request_sha256"], row["submitted_ms"], body)
+
+    def record(self, request_id: str) -> tuple[InboxCommand, str, dict | None] | None:
+        _identifier(request_id)
         with closing(self.store._connect()) as conn:
-            rows = conn.execute(
-                "SELECT sequence,request_id,request_sha256,submitted_ms,body "
-                "FROM hyperdispatcher_inbox WHERE run_id=? AND status='pending' "
-                "ORDER BY sequence LIMIT ?", (_RUN_ID, limit),
-            ).fetchall()
-        commands = []
-        for row in rows:
-            data = row["body"]
-            if (type(data) is not bytes or len(data) > _MAX_COMMAND_BYTES
-                    or sha256(data).hexdigest() != row["request_sha256"]):
-                raise DurableSwarmError("durable command integrity failure")
-            body = _json_object(data)
-            if _canonical(body) != data:
-                raise DurableSwarmError("noncanonical durable command")
-            commands.append(InboxCommand(row["sequence"], row["request_id"],
-                                         row["request_sha256"], row["submitted_ms"], body))
-        return tuple(commands)
+            row = conn.execute(
+                "SELECT * FROM hyperdispatcher_inbox WHERE run_id=? AND request_id=?",
+                (_RUN_ID, request_id),
+            ).fetchone()
+        if row is None:
+            return None
+        public = self._public_row(row)
+        return self._decode(row), public["status"], public["result"]
+
+    def pending(self, *, limit: int = 16, after: int = 0) -> tuple[InboxCommand, ...]:
+        _uint(limit, 1, 128, "inbox batch")
+        _uint(after, 0, 2**63-1, "inbox cursor")
+        with closing(self.store._connect()) as conn:
+            # A consistent read with two indexed range scans. Deferred work
+            # cannot block later signals, cancellations or independent jobs.
+            conn.execute("BEGIN")
+            try:
+                rows = conn.execute(
+                    "SELECT sequence,request_id,request_sha256,submitted_ms,body "
+                    "FROM hyperdispatcher_inbox WHERE run_id=? AND status='pending' AND sequence>? "
+                    "ORDER BY sequence LIMIT ?", (_RUN_ID, after, limit),
+                ).fetchall()
+                if after and len(rows) < limit:
+                    rows += conn.execute(
+                        "SELECT sequence,request_id,request_sha256,submitted_ms,body "
+                        "FROM hyperdispatcher_inbox WHERE run_id=? AND status='pending' AND sequence<=? "
+                        "ORDER BY sequence LIMIT ?", (_RUN_ID, after, limit-len(rows)),
+                    ).fetchall()
+                conn.commit()
+            except BaseException:
+                conn.rollback()
+                raise
+        return tuple(self._decode(row) for row in rows)
 
     def acknowledge(self, owner_id: str, command: InboxCommand, *,
                     accepted: bool, result: dict) -> None:
@@ -438,6 +469,7 @@ class ApplicationTick:
     tasks: tuple[str, ...] = ()
     outcomes: tuple[tuple[str, str], ...] = ()
     archived_tasks: tuple[str, ...] = ()
+    deferred_commands: tuple[str, ...] = ()
 
 
 class LocalDispatcherApplication:
@@ -471,6 +503,7 @@ class LocalDispatcherApplication:
         self.managed: ManagedHostDispatcher | None = None
         self._recovery: LocalCommittedRecovery | None = None
         self._stop_requested = False
+        self._inbox_cursor = 0
 
     @classmethod
     def initialize(
@@ -655,10 +688,83 @@ class LocalDispatcherApplication:
             raise DispatcherRequestError("owned task not found")
         return task
 
+    def _binding_input(self, command: InboxCommand, tenant: str, *,
+                       historical: bool = False) -> tuple[object, list[dict]]:
+        body = command.body
+        if "bindings" not in body:
+            if "binding_deadline_ms" in body:
+                raise DispatcherRequestError("binding deadline without bindings")
+            return body["input"], []
+        try:
+            bindings = parse_bindings(body["bindings"], body["input"], task_id=body["task_id"])
+            deadline = _uint(body.get("binding_deadline_ms"), command.submitted_ms + 1,
+                             command.submitted_ms + MAX_BINDING_WAIT_MS, "binding deadline")
+            if not historical and _wait_time(self.clock_ms()) >= deadline:
+                raise DispatcherRequestError("result binding deadline expired")
+
+            def resolve(binding: InputBinding) -> dict:
+                found = self.inbox.record(binding.source_request_id)
+                if found is None:
+                    raise DispatcherRequestError("earlier owned binding request not found")
+                source, status, acknowledgement = found
+                if (source.sequence >= command.sequence or source.body.get("kind") != "submit"
+                        or source.body.get("tenant") != tenant
+                        or source.body.get("task_id") != binding.source_task_id):
+                    raise DispatcherRequestError("binding requires earlier same-tenant submission")
+                if status == "pending":
+                    raise BindingDeferred()
+                if status != "accepted":
+                    raise DispatcherRequestError("binding source submission rejected")
+                if (type(acknowledgement) is not dict
+                        or acknowledgement.get("task_id") != binding.source_task_id
+                        or acknowledgement.get("submission") != "durable"):
+                    raise DurableSwarmError("binding source acknowledgement lacks task identity")
+                try:
+                    proof = self.result(tenant, binding.source_task_id, _verify_lineage=False)
+                except DispatcherRequestError as exc:
+                    raise DurableSwarmError("accepted binding source lacks durable task custody") from exc
+                if proof["state"] in ("queued", "leased") or proof["uncertain_on_restore"]:
+                    raise BindingDeferred()
+                if proof["state"] != "succeeded":
+                    raise DispatcherRequestError("binding source terminated without success")
+                return proof
+
+            return materialize(body["input"], bindings, resolve)
+        except BindingError as exc:
+            raise DispatcherRequestError(str(exc)) from exc
+
+    def _verify_lineage(self, tenant: str, task: dict) -> list[dict]:
+        payload = task["payload"]
+        metadata = payload.get(_HOST_SCHEDULE_FIELD)
+        if not isinstance(metadata, dict) or "binding_receipts" not in metadata:
+            return []
+        found = self.inbox.record(metadata.get("request_id"))
+        if found is None:
+            raise DurableSwarmError("bound task has no exact original inbox command")
+        command, status, _ = found
+        if (status not in ("pending", "accepted")
+                or command.request_sha256 != metadata.get("request_sha256")
+                or command.submitted_ms != metadata.get("enqueued_ms")
+                or command.body.get("kind") != "submit"
+                or command.body.get("tenant") != tenant
+                or command.body.get("task_id") != task["id"]
+                or command.body.get("operation") != payload.get("operation")
+                or "bindings" not in command.body):
+            raise DurableSwarmError("bound task admission identity changed")
+        try:
+            resolved, lineage = self._binding_input(command, tenant, historical=True)
+        except (DispatcherRequestError, BindingDeferred) as exc:
+            raise DurableSwarmError("historical result binding cannot be verified") from exc
+        if (_wait_bytes(resolved) != _wait_bytes(payload.get("input"))
+                or _wait_bytes(lineage) != _wait_bytes(metadata["binding_receipts"])):
+            raise DurableSwarmError("bound result lineage changed")
+        return lineage
+
     def _submit(self, command: InboxCommand) -> dict:
         body = command.body
         required = {"kind", "tenant", "task_id", "operation", "input"}
-        permitted = required | {"priority", "dependencies", "singleton", "timer_ms", "event"}
+        permitted = required | {"priority", "dependencies", "singleton", "timer_ms", "event",
+                                "bindings", "binding_deadline_ms"}
         if not required.issubset(body) or not set(body).issubset(permitted):
             raise DispatcherRequestError("invalid submission properties")
         tenant, task_id = self._tenant(body["tenant"]), _identifier(body["task_id"])
@@ -682,16 +788,28 @@ class LocalDispatcherApplication:
         metadata = {"request_id": command.request_id, "request_sha256": command.request_sha256,
                     "enqueued_ms": command.submitted_ms}
         prior = runtime.task(task_id)
+        def same_submission(record: dict) -> bool:
+            existing = record["payload"].get(_HOST_SCHEDULE_FIELD)
+            if (type(existing) is not dict
+                    or any(existing.get(key) != value for key, value in metadata.items())):
+                return False
+            if ("bindings" in body) != ("binding_receipts" in existing):
+                raise DurableSwarmError("submission replay binding metadata mismatch")
+            self._verify_lineage(tenant, record)
+            return True
+
         if prior is not None:
-            if (owner.broker.tenant_for(task_id) == tenant
-                    and prior.payload.get(_HOST_SCHEDULE_FIELD) == metadata):
+            if owner.broker.tenant_for(task_id) == tenant and same_submission(runtime._task_record(prior)):
                 return {"task_id": task_id, "submission": "durable"}
             raise DispatcherRequestError("task identity already bound to another command")
         old = None if self.archive is None else self.archive.get(task_id)
         if old is not None:
-            if old.tenant == tenant and old.task["payload"].get(_HOST_SCHEDULE_FIELD) == metadata:
+            if old.tenant == tenant and same_submission(old.task):
                 return {"task_id": task_id, "submission": "durable"}
             raise DispatcherRequestError("task identity already bound to archived command")
+        resolved_input, lineage = self._binding_input(command, tenant)
+        if lineage:
+            metadata["binding_receipts"] = lineage
         live_dependencies = []
         for dep in deps:
             dep = _identifier(dep)
@@ -710,7 +828,7 @@ class LocalDispatcherApplication:
         if self.archive is not None and self.archive.unique_count(
                 tuple(task.id for task in runtime.tasks())) >= self.policy.history_jobs:
             raise DispatcherRequestError("total task history capacity exhausted")
-        payload = {"operation": operation, "input": body["input"]}
+        payload = {"operation": operation, "input": resolved_input}
         raw = _canonical(payload, limit=32768)
         try:
             if operation == GGUF_OPERATION:
@@ -763,6 +881,8 @@ class LocalDispatcherApplication:
             live_dependencies = kept
             occupied = sum(len(_canonical(dict(task.payload))) for task in runtime.tasks())
         if len(runtime.tasks()) >= self.policy.max_jobs or occupied + payload_charge > _MAX_RETAINED_PAYLOAD:
+            if lineage:
+                raise BindingDeferred()
             raise DispatcherRequestError("retained task capacity exhausted")
         task = SwarmTask(task_id, payload, priority=priority, max_attempts=1,
                          required_capabilities=frozenset({GGUF_CAPABILITY if operation == GGUF_OPERATION else "local-compute"}),
@@ -770,6 +890,8 @@ class LocalDispatcherApplication:
         capture = (managed.submit(tenant, task, singleton_key=singleton)
                    if wait is None else managed.submit_wait(wait, task, singleton_key=singleton))
         if capture is None:
+            if lineage:
+                raise BindingDeferred()
             raise DispatcherRequestError("admission quota refused")
         return {"task_id": task_id, "submission": "durable"}
 
@@ -811,6 +933,30 @@ class LocalDispatcherApplication:
             return self._submit(command)
         if kind == "signal":
             return self._signal(command)
+        if kind == "cancel-pending":
+            if set(command.body) != {"kind", "tenant", "request_id"}:
+                raise DispatcherRequestError("invalid pending cancellation request")
+            tenant = self._tenant(command.body["tenant"])
+            target = self.inbox.record(_identifier(command.body["request_id"]))
+            if target is None:
+                raise DispatcherRequestError("owned pending request not found")
+            prior, status, result = target
+            if (prior.sequence >= command.sequence or prior.body.get("kind") != "submit"
+                    or prior.body.get("tenant") != tenant or "bindings" not in prior.body):
+                raise DispatcherRequestError("owned pending binding request required")
+            cancellation = {"reason": "pending result binding cancelled",
+                            "cancelled_by": command.request_id}
+            if status == "rejected" and result == cancellation:
+                return {"request_id": prior.request_id, "status": "cancelled"}
+            if status != "pending":
+                raise DispatcherRequestError("binding request is already settled")
+            runtime = self._owner().owner.broker.broker.runtime
+            if (runtime.task(prior.body["task_id"]) is not None
+                    or (self.archive is not None and self.archive.get(prior.body["task_id"]) is not None)):
+                raise DispatcherRequestError("task already admitted; use task cancellation")
+            self.inbox.acknowledge(self._owner().owner.owner_id, prior,
+                                   accepted=False, result=cancellation)
+            return {"request_id": prior.request_id, "status": "cancelled"}
         if kind == "stop" and set(command.body) == {"kind"}:
             self._stop_requested = True
             return {"stop": "requested"}
@@ -854,7 +1000,7 @@ class LocalDispatcherApplication:
             if task.state is not TaskState.QUEUED:
                 continue
             metadata = task.payload.get(_HOST_SCHEDULE_FIELD)
-            if (type(metadata) is not dict or set(metadata) != {
+            if (type(metadata) is not dict or set(metadata) - {"binding_receipts"} != {
                     "request_id", "request_sha256", "enqueued_ms"}):
                 raise DurableSwarmError("queued task has no admitted schedule identity")
             tenant = owner.broker.tenant_for(task.id)
@@ -887,10 +1033,23 @@ class LocalDispatcherApplication:
         managed = self._owner()
         managed.renew()
         count = 0
-        for command in self.inbox.pending(limit=command_limit):
+        deferred = []
+        for command in self.inbox.pending(limit=command_limit, after=self._inbox_cursor):
+            self._inbox_cursor = command.sequence
             managed.renew()
+            # A preceding pending cancellation may have settled a later row
+            # already fetched in this batch. Never execute a stale snapshot.
+            status = self.inbox.command(command.request_id)
+            if status is None or status["request_sha256"] != command.request_sha256:
+                raise DurableSwarmError("pending command identity disappeared")
+            if status["status"] != "pending":
+                continue
             try:
                 result = self._apply(command)
+            except BindingDeferred:
+                managed._ensure_active()
+                deferred.append(command.request_id)
+                continue
             except DispatcherRequestError as exc:
                 managed._ensure_active()
                 # Only request errors known to precede mutation are rejected.
@@ -904,7 +1063,8 @@ class LocalDispatcherApplication:
             if self._stop_requested:
                 break
         if self._stop_requested:
-            return ApplicationTick(count, (), (), "stopping", None, True)
+            return ApplicationTick(count, (), (), "stopping", None, True,
+                                   deferred_commands=tuple(deferred))
         recovered = self._recover_committed()
         cancelled = managed.propagate_dependencies()
         now_ms = _wait_time(self.clock_ms())
@@ -923,7 +1083,7 @@ class LocalDispatcherApplication:
         ids = tuple(row.task_id for row in batch.outcomes)
         return ApplicationTick(
             count, cancelled, recovered, batch.disposition, ids[0] if ids else None, False,
-            ids, tuple((row.task_id, row.disposition) for row in batch.outcomes), archived,
+            ids, tuple((row.task_id, row.disposition) for row in batch.outcomes), archived, tuple(deferred),
         )
 
     def close(self) -> None:
@@ -951,7 +1111,7 @@ class LocalDispatcherApplication:
                 "worker_custody": self.custody.usage(),
                 "terminal_history": None if self.archive is None else self.archive.usage()}
 
-    def result(self, tenant: str, task_id: str) -> dict:
+    def result(self, tenant: str, task_id: str, *, _verify_lineage: bool = True) -> dict:
         tenant, task_id = self._tenant(tenant), _identifier(task_id)
         loaded = SwarmDurableBridge(self.store).load(_RUN_ID)
         if loaded is None:
@@ -963,7 +1123,8 @@ class LocalDispatcherApplication:
             archived = None if self.archive is None else self.archive.get(task_id)
             if archived is None or archived.tenant != tenant:
                 raise DispatcherRequestError("owned task not found")
-            return self._result_for_record(tenant, archived.task, expected_receipt=archived.receipt_sha256)
+            return self._result_for_record(tenant, archived.task, expected_receipt=archived.receipt_sha256,
+                                           verify_lineage=_verify_lineage)
         if tenant_checkpoint is None:
             raise DurableSwarmError("resident task lacks durable tenant sidecar")
         # The tenant sidecar is authoritative, including terminal identity.
@@ -971,10 +1132,10 @@ class LocalDispatcherApplication:
         owners.update(dict(tenant_checkpoint.terminal))
         if owners.get(task_id) != tenant:
             raise DispatcherRequestError("owned task not found")
-        return self._result_for_record(tenant, runtime._task_record(task))
+        return self._result_for_record(tenant, runtime._task_record(task), verify_lineage=_verify_lineage)
 
     def _result_for_record(self, tenant: str, task: dict, *,
-                           expected_receipt: str | None = None) -> dict:
+                           expected_receipt: str | None = None, verify_lineage: bool = True) -> dict:
         task_id = task["id"]
         result = {"task_id": task_id, "tenant": tenant, "state": task["state"],
                   "uncertain_on_restore": task["effect_uncertain"]}
@@ -1016,6 +1177,10 @@ class LocalDispatcherApplication:
             result["reconciliation_sha256"] = reconciliation
         result["receipt_sha256"] = digest
         result["result"] = _json_object(raw)["result"]
+        if verify_lineage:
+            lineage = self._verify_lineage(tenant, task)
+            if lineage:
+                result["input_lineage"] = lineage
         return result
 
     def serve(self, *, poll_seconds: float = 0.25, max_cycles: int | None = None,

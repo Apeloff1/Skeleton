@@ -539,3 +539,35 @@ encoder and replay guard remain unchanged. A failed/ambiguous publication
 retires the generation and does not undo SQL commits. Startup audits archived
 identity seals and counts before admitting new tasks. Added a regression
 checking the full anchor and independently reconstructible predecessor.
+
+## Wave A24: verified result-linked application workflows
+
+A submission may now specify up to eight exact result bindings and an
+explicit binding_deadline_ms (at most seven days beyond inbox admission).
+Each binding has source_request_id, source_task_id, source_path and
+target_path. Paths are bounded arrays of literal object keys or list
+indexes; an empty path selects the root. Targets must be existing null
+placeholders, with no overlapping paths, no expressions or interpolation.
+For example, a second integer_sum job can use input [null, 4] and bind
+source_path [] to target_path [0] of an earlier integer_sum result.
+The source must be an earlier durable same-tenant submit command whose
+task identity matches the accepted acknowledgement. Earlier deferred
+submissions can form chains; forward references and cycles are refused.
+Uncertain effects remain pending; failed sources reject and deadlines
+expire. The inbox rotates bounded indexed scans so deferred work cannot
+starve later event signals, cancellation or unrelated submissions.
+cancel-pending can settle an earlier unadmitted linked request without
+executing it. Admitted tasks still require normal queued cancellation.
+
+Resolved bytes, source receipt and optional reconciliation digests and
+exact value hashes are sealed into the canonical task's scheduling
+metadata. The worker receives only the fully materialized operation.
+Replay after admission checks original request identity and reconstructs
+lineage without re-executing or reapplying an expired deadline. Historical
+result reads revalidate immediate parent receipts and replay their direct
+substitutions, not an unbounded recursive traversal. Parent results may
+be archived outside the resident window. The authenticated Jeeves host
+gateway derives scoped source request/task IDs and supports pending
+cancellation under explicit authorization. Six tests cover physical
+multi-stage jobs, archive traversal, fair waiting, expiry, malformed
+paths, cross-scope refusal, crash replay and host integration.
