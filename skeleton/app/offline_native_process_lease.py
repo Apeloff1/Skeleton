@@ -31,27 +31,37 @@ class NativeProcessLease:
         self._fd: int | None = fd
         self._identity = identity
         self._released = released
+        self._release_unconfirmed = False
         self._lock = threading.RLock()
 
     def child_pass_fds(self) -> tuple[int, ...]:
         with self._lock:
             fd = self._fd
-            if fd is None or _identity(os.fstat(fd)) != self._identity:
+            if self._release_unconfirmed or fd is None or _identity(os.fstat(fd)) != self._identity:
                 raise NativeLeaseError("native lease descriptor no longer matches its owner")
             return (fd,)
 
     def __call__(self) -> None:
         with self._lock:
+            if self._release_unconfirmed:
+                raise NativeLeaseError("native lease release remains unconfirmed")
             fd = self._fd
             if fd is None:
                 return
             # Closing this parent reference does not unlock a child reference.
             # Never use LOCK_UN: it would release the entire shared OFD.
-            if _identity(os.fstat(fd)) != self._identity:
-                raise NativeLeaseError("native lease descriptor changed before release")
-            self._fd = None
-            os.close(fd)
-            self._released()
+            try:
+                if _identity(os.fstat(fd)) != self._identity:
+                    raise NativeLeaseError("native lease descriptor changed before release")
+                self._fd = None
+                os.close(fd)
+                self._released()
+            except BaseException:
+                # A failed close can leave descriptor state ambiguous; retrying
+                # a numeric FD may close an unrelated, newly reused descriptor.
+                # Never treat a second release call as confirmation in this case.
+                self._release_unconfirmed = True
+                raise
 
 
 class NativeCpuLeaseOwner:
@@ -72,6 +82,7 @@ class NativeCpuLeaseOwner:
         self._denied = 0
         self._directory_identity = self._inspect_directory()
         self._lock_identity: tuple[int, int] | None = None
+        self._pin_lock_inode()
 
     def _inspect_directory(self) -> tuple[int, int]:
         try:
@@ -100,6 +111,23 @@ class NativeCpuLeaseOwner:
             raise NativeLeaseError("native lease directory changed after activation")
         return observed
 
+    def _pin_lock_inode(self) -> None:
+        """Pin the named inode at activation, without acquiring its flock."""
+        directory_fd = fd = None
+        try:
+            directory_fd = os.open(self._directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            fd = os.open(self.LOCK_NAME, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW
+                         | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NONBLOCK", 0),
+                         0o600, dir_fd=directory_fd)
+            self._lock_identity = self._check_file(directory_fd, fd)
+        except OSError as exc:
+            raise NativeLeaseError("native lease inode unavailable at activation") from exc
+        finally:
+            if fd is not None:
+                os.close(fd)
+            if directory_fd is not None:
+                os.close(directory_fd)
+
     def acquire(self) -> NativeProcessLease:
         """Acquire nonblocking exclusion, then revalidate resource headroom."""
         import fcntl
@@ -110,11 +138,12 @@ class NativeCpuLeaseOwner:
                 if self._inspect_directory() != self._directory_identity:
                     raise NativeLeaseError("native lease directory changed after activation")
                 dirfd = os.open(self._directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-                fd = os.open(self.LOCK_NAME, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW
+                # Activation already pinned the inode. Never recreate a
+                # missing name after a potentially live child owned the lock.
+                fd = os.open(self.LOCK_NAME, os.O_RDWR | os.O_NOFOLLOW
                              | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NONBLOCK", 0),
-                             0o600, dir_fd=dirfd)
+                             dir_fd=dirfd)
                 observed = self._check_file(dirfd, fd)
-                self._lock_identity = observed
                 try:
                     fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 except OSError as exc:
