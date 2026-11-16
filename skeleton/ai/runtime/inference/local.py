@@ -1851,7 +1851,7 @@ class LocalInferenceEngine:
         self._identity_invalidations = 0
         self._cache_identity: str | None = None
         self._singleflight: dict[
-            tuple[str, asyncio.AbstractEventLoop, int | None, int | None],
+            tuple[str, asyncio.AbstractEventLoop, int | None, int | None, str, str, int],
             asyncio.Future[LocalInferenceResult],
         ] = {}
         self._singleflight_hits = 0
@@ -3333,7 +3333,10 @@ class LocalInferenceEngine:
         # An underfunded leader must not make an otherwise admissible request
         # fail merely because they share content. Cache entries remain content
         # scoped; in-flight failure sharing also pins the caller's ceilings.
-        flight_key = (key, loop, resource_max_input_tokens, resource_max_output_tokens)
+        flight_key = (
+            key, loop, resource_max_input_tokens, resource_max_output_tokens,
+            work_class, preemption_scope, epoch,
+        )
         with self._cache_lock:
             future = self._singleflight.get(flight_key)
             leader = future is None
@@ -3371,6 +3374,11 @@ class LocalInferenceEngine:
                     resource_max_input_tokens=resource_max_input_tokens,
                     resource_max_output_tokens=resource_max_output_tokens,
                 )
+                if self._key(request, scope) != key:
+                    raise ProviderPolicyError("local execution identity changed during coalesced wait")
+                with self._cache_lock:
+                    if epoch != self._cache_epoch:
+                        raise ProviderPolicyError("local coalesced result crossed a cache invalidation")
                 return result
             try:
                 # Only the leader prepares; cache hits and followers retain
