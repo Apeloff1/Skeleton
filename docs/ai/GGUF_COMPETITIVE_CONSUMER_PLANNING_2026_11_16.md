@@ -32,3 +32,23 @@ reverting this increment; L13 no qualification promotion without exact-head
 tests and physical measurements. These are implementation notes, not sign-off.
 
 Validate `python -m pytest -q tests/test_consumer_llama_budget.py tests/test_gguf_consumer_auto_geometry.py`.
+
+## Paired local competitive diagnostic
+
+Supply two to four existing digest-pinned greedy local deployments:
+
+`python -m scripts.compare_consumer_gguf --profile baseline=/private/base.json --profile candidate=/private/candidate.json --repeats 2 > diagnostic.json`
+
+The first profile is the comparison reference. Twelve public tasks test exact
+UTF-8 output across reasoning, code, format and evidence grounding. Interleaved
+rotating execution, matched prompts/token ceilings, repeated trials, explicit
+failure denominators, paired exact wins/losses and wall-time ratios on jointly
+correct tasks reduce misleading comparisons. Native receipt identity and hash
+are checked; identity failures hold further work for that profile. The campaign
+does not download anything, echo paths or raw prompts/results, run generated
+code, confer promotion, or override existing deployment controls. Its soft
+deadline prevents new attempts; it is not a hard subprocess cancellation.
+The result is neither private holdout evidence nor a signed attestation.
+
+Source tests use synthetic receipts and deliberately do not claim native model
+performance. Run `python -m pytest -q --noconftest tests/test_compare_consumer_gguf.py`.

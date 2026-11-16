@@ -54,6 +54,9 @@ jobs:
           skeleton/testing/test_vol007_async_runtime.py
           skeleton/testing/test_vol007_batching.py
           skeleton/testing/test_vol007_speculation.py
+          tests/test_consumer_llama_budget.py
+          tests/test_gguf_consumer_auto_geometry.py
+          tests/test_compare_consumer_gguf.py
 
       - name: Validate masterplan consistency
         run: python scripts/check_ai_master_plan.py
