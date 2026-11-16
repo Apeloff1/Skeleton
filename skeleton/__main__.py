@@ -212,6 +212,7 @@ Commands:
     gameforge-campaign  Play authored NPC quest gates and replay persistent campaign revisions
     gameforge-expedition  Play generated quests with earned local crafting and delivery episodes
     gameforge-saga  Compose and play multi-owner survey, weather and tactical convoy episodes
+    gameforge-saga-live  Play a persistent saga through an interactive terminal
     quest-author  Edit original quest source and preview offline gameplay
     quest-expedition  Play authored NPC/choice/crafting quest over combat
     quest-expedition-play  Play NPC crafting and combat quests with offline checkpoints
@@ -1289,6 +1290,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "original-quest":
         from skeleton.app.original_quest_cli import main as original_quest_main
         return original_quest_main(rest)
+    if cmd == "gameforge-saga-live":
+        from skeleton.app.gameforge_saga_live import main as saga_live_main
+        return saga_live_main(rest)
     if cmd == "gameforge-saga":
         from skeleton.app.gameforge_saga_cli import main as saga_main
         return saga_main(rest)
