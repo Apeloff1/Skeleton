@@ -197,6 +197,8 @@ class OfflineHTTPApplication:
             self.reference_jobs = LocalReferenceJob(self.knowledge)
             from skeleton.app.jeeves_review_campaign import ReviewCampaignStore
             self.review_campaigns = ReviewCampaignStore(self._store, self.model_digest, self.tokenizer_digest, knowledge=self.knowledge)
+            from skeleton.app.jeeves_campaign_batch import CampaignBatchController
+            self.campaign_batches = CampaignBatchController(self.review_campaigns)
             from skeleton.app.jeeves_reviewed_feedback import ReviewedFeedbackStore
             self.reviewed_feedback = ReviewedFeedbackStore(self._store, self.model_digest, self.tokenizer_digest)
         except BaseException:
@@ -1307,6 +1309,39 @@ class OfflineHTTPApplication:
         if tail in {"campaign-create", "campaign-inspect", "campaign-advance",
                     "campaign-abandon", "campaign-delete"} and method == "POST":
             return self._review_campaign(sid, tail, body)
+        if tail in {"campaign-batch-run", "campaign-batch-inspect", "campaign-batch-abandon"} and method == "POST":
+            from skeleton.app.jeeves_review_campaign import CampaignConflict, CampaignRejected
+            keys = {
+                "campaign-batch-run": {"campaign_id", "batch_id", "plan_sha256", "expected_revision",
+                                       "steps", "maximum_reserved_tokens", "maximum_seconds", "approved"},
+                "campaign-batch-inspect": {"campaign_id", "batch_id"},
+                "campaign-batch-abandon": {"campaign_id", "batch_id", "approval_sha256", "approved"},
+            }[tail]
+            _fields(body, keys, keys)
+            if tail != "campaign-batch-inspect" and body["approved"] is not True:
+                raise OfflineHTTPError(403, "explicit immutable batch approval required")
+            cid = body["campaign_id"]
+            try:
+                if tail == "campaign-batch-inspect":
+                    return 200, self.campaign_batches.inspect(sid, cid, body["batch_id"])
+                if tail == "campaign-batch-abandon":
+                    return 200, self.campaign_batches.abandon(sid, cid, body["batch_id"], body["approval_sha256"])
+                def advance(node, operation, revision, deadline):
+                    # Cooperative deadline checked before every dispatch by the
+                    # controller. Existing native single-step caps remain active.
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("approved batch deadline elapsed")
+                    return self._review_campaign(sid, "campaign-advance", {
+                        "campaign_id": cid, "step_id": node, "operation_id": operation,
+                        "expected_revision": revision, "approved": True,
+                    })[1]
+                return 200, self.campaign_batches.execute(sid, cid, {
+                    k:v for k,v in body.items() if k not in {"campaign_id","approved"}
+                }, advance=advance)
+            except CampaignConflict as exc:
+                raise OfflineHTTPError(409, str(exc)) from None
+            except CampaignRejected as exc:
+                raise OfflineHTTPError(400, str(exc)) from None
         if tail in {"feedback-save", "feedback-list", "feedback-delete", "feedback-export"} and method == "POST":
             from skeleton.app.jeeves_reviewed_feedback import FeedbackConflict, FeedbackRejected
             from skeleton.app.jeeves_reviewed_feedback import _digest as feedback_digest
