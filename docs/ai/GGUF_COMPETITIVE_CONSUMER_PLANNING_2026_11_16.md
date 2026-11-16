@@ -204,3 +204,85 @@ paged reference tests and kernel measurement; source-only tests cover the
 new guarded and reconstruction boundaries. CUDA/Triton device execution,
 operator GGUF benchmark, full installed guarded application activation,
 physical memory/throughput and Windows/WSL2 remain independent holds.
+
+## Learned semantic long-context extension
+
+The former lexical reconstruction path remains available. The explicit local
+semantic profile adds actual token-level ONNX hidden states, contextual
+pooling after encoding, dense/BM25 reciprocal rank fusion, parent centroid
+navigation, segment-level MaxSim, exact identifier protection, neighboring
+span recovery, overlap-aware diversity, and optional independent local
+cross-encoder inference. Parent vectors are derived navigational features,
+not generated summaries or independently verified assertions. Retrieved
+evidence remains original exact source text or token IDs.
+
+**Operator activation.** Install the optional `local-semantic` dependency
+group from trusted local wheels (use `--no-index --find-links` for a fully
+offline installation). Provision a self-contained token-level ONNX encoder
+with rank-three `last_hidden_state` output and its tokenizer JSON, from a
+trusted publisher and with reviewed license and artifact digests. The
+runtime will not download models, execute remote model code, use custom
+ONNX operator domains or follow external tensor references. The CPU
+provider is explicit; ONNX native libraries and the pinned model graph
+remain trusted executable computation, not an OS-sandboxed input.
+
+Example semantic config (replace artifact hashes and model geometry with
+actual reviewed values):
+```json
+{
+  "schema": "skeleton.local.semantic-config.v1",
+  "encoder_path": "encoder.onnx",
+  "encoder_sha256": "REPLACE_WITH_EXACT_SHA256",
+  "tokenizer_path": "tokenizer.json",
+  "tokenizer_sha256": "REPLACE_WITH_EXACT_SHA256",
+  "encoder_policy": {"dimension": 384, "max_tokens": 2048},
+  "retrieval_policy": {"context_chars": 2000}
+}
+```
+Optional `reranker` contains relative `model_path`, `model_sha256`,
+`tokenizer_path`, `tokenizer_sha256`, and `policy` (one/two-column
+classification logits, positive index and bounded pair count).
+
+Start existing offline HTTP application with its normal model/database/token
+arguments plus `--semantic-config PATH --semantic-config-sha256 SHA`.
+No public configuration or request-body encoder selection is accepted.
+The model-scoped SQLite authority verifies exact source hashes and leaves,
+then stores derived vector features under source/context, model, tokenizer,
+encoder and retrieval-profile identities. No stale source becomes eligible
+after deletion. Cache bytes are disposable and checksummed; not a proof
+against a malicious process that controls both DB rows and checksums.
+This implementation uses bounded exhaustive dense search, not an ANN or
+distributed archive index; existing source snapshot materialization remains
+a scale limitation. Encoding and cache population happen on demand.
+
+Native `generate_reconstructed_context(..., semantic_ranker=...)` can
+select semantically relevant decoded source-token windows without lexical
+overlap, optionally place strongest evidence near context edges, and pass
+the original immutable source token IDs through normal native inference.
+Decoded token windows are an encoder projection, not proof of lossless
+reconstruction of raw original text. Output still requires independent
+factual review.
+
+**Hidden serving-engine improvements.** Paged native generation now yields
+ready short/decode rows between bounded prefill quanta rather than waiting
+for a long prefill barrier. An explicit trusted private session can borrow
+already computed full immutable prefix pages from an active donor, retaining
+reference counts and writing only private suffix pages. Sharing remains
+default-off and never crosses session boundaries. The slot pool is still
+preallocated; page reuse reduces redundant computation and logical occupancy,
+not measured allocator reservation.
+
+**Qualification.** `python -m scripts.benchmark_semantic_context` with
+pinned semantic config and independently labeled local holdout JSON executes
+paired BM25 and semantic recall/precision/MRR/nDCG, all-required multi-hop
+coverage, no-lexical-overlap subset, latency and warm-cache observations.
+Holdout JSON contains `documents` rows (id, sha256, text) and `questions`
+rows (id, question, group, expected as [document-id, chunk-ordinal] pairs).
+The report binds source and model identities and emits no raw corpus or
+question text. Synthetic ONNX regression fixtures do not attest real model
+quality, producer independence, end-user installation or GPU speed.
+
+Design references: contextual retrieval (Anthropic, 2024), late chunking
+(arXiv:2409.04701), RAPTOR (arXiv:2401.18059; this implementation uses
+centroids, not abstractive summary trees), ColBERT (segment MaxSim inspired),
+and vLLM block prefix reuse and chunked prefill scheduling.
