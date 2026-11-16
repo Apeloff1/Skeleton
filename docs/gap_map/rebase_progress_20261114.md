@@ -28,7 +28,7 @@ Companion to docs/GAP_MAP.md. Covers archive/*, recovery/* and reconcile/* branc
 | `recovery/dirty102-code-state-skeleton-f4-20261107-202211-50b11f` | 0 clean / 1 conflicting / 0 empty / 0 patch-id on main | pending: all unique commits conflict (dirty-snapshot); file-level port needed |
 | `recovery/dirty102-code-state-skeleton-outbox-20261107-202211-9bc509` | 0 clean / 1 conflicting / 0 empty / 0 patch-id on main | pending: all unique commits conflict (dirty-snapshot); file-level port needed |
 | `recovery/dirty102-code-state-skeleton-willy-b025-20261107-202229-e1a357` | 1 clean / 1 conflicting / 0 empty / 0 patch-id on main | pending triage: needs manual conflict resolution |
-| `recovery/dirty102-deletion-heavy-state-sk-cli-e2e-20261107-202333-4ac957` | 0 clean / 1 conflicting / 0 empty / 0 patch-id on main | pending: all unique commits conflict (dirty-snapshot); file-level port needed |
+| `recovery/dirty102-deletion-heavy-state-[redacted-key-shaped-branch-suffix]` | 0 clean / 1 conflicting / 0 empty / 0 patch-id on main | pending: all unique commits conflict (dirty-snapshot); file-level port needed |
 | `recovery/dirty102-deletion-heavy-state-skeleton-cos-export-20261107-202325-636db1` | 0 clean / 1 conflicting / 0 empty / 0 patch-id on main | pending: all unique commits conflict (dirty-snapshot); file-level port needed |
 | `recovery/pr5097-pre-rebase-20261110` | 4 clean / 14 conflicting / 6 empty / 0 patch-id on main | pending triage: needs manual conflict resolution |
 | `recovery/pre-rebase-jeeves-native-r88-20261113-r2` | 4 clean / 191 conflicting / 107 empty / 0 patch-id on main | pending triage: needs manual conflict resolution |
@@ -61,7 +61,7 @@ Companion to docs/GAP_MAP.md. Covers archive/*, recovery/* and reconcile/* branc
 | `reconcile/jeeves-world-custody-mirror-20261109-r02` | 0 clean / 3 conflicting / 5 empty / 0 patch-id on main | pending: all unique commits conflict (dirty-snapshot); file-level port needed |
 | `reconcile/p0-mass-dragon-volumes-20261108-r01` | 3 clean / 16 conflicting / 6 empty / 0 patch-id on main | pending triage: needs manual conflict resolution |
 | `reconcile/quarantine-ecs-agent-ai-20261108-r1` | 0 clean / 7 conflicting / 1 empty / 0 patch-id on main | pending: all unique commits conflict (dirty-snapshot); file-level port needed |
-| `recovery/dirty102-code-state-sk-20261107-202754-1f063d` | 1 clean / 0 conflicting / 0 empty / 0 patch-id on main | pending: clean, not yet published |
+| `recovery/dirty102-code-state-[redacted-key-shaped-branch-suffix]` | 1 clean / 0 conflicting / 0 empty / 0 patch-id on main | pending: clean, not yet published |
 | `recovery/dirty102-code-state-skeleton-f3-20261107-202210-7e0632` | 0 clean / 1 conflicting / 0 empty / 0 patch-id on main | pending: all unique commits conflict (dirty-snapshot); file-level port needed |
 | `recovery/dirty102-code-state-wt-4253-20261107-202213-35fcc9` | 0 clean / 1 conflicting / 0 empty / 0 patch-id on main | pending: all unique commits conflict (dirty-snapshot); file-level port needed |
 | `recovery/dirty102-deletion-heavy-state-skeleton-cos-b023-20261107-202325-101d2a` | 0 clean / 1 conflicting / 0 empty / 0 patch-id on main | pending: all unique commits conflict (dirty-snapshot); file-level port needed |
