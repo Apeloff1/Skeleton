@@ -289,3 +289,51 @@ def test_cli_reuses_real_store_and_explicit_fixture_probe(tmp_path, monkeypatch)
     assert main(["preflight", *opts, "--model-identity-sha", "0"*64],
                 stdout=out, stderr=err) == 2
     assert not out.getvalue() and str(store) not in err.getvalue()
+
+
+def test_runtime_session_owns_clock_and_revokes_on_source_reinspection(tmp_path, monkeypatch):
+    from skeleton.app.offline_runtime_session import OfflineRuntimeSession
+    store, key, model = stage(tmp_path)
+    tick = [1_000_000_000]
+    # Synthetic hardware is deliberately mocked in this regression.
+    monkeypatch.setattr("skeleton.app.offline_runtime_session.time.monotonic_ns", lambda: tick[0] + 1)
+    monkeypatch.setattr("skeleton.app.offline_runtime_session.sample_hardware",
+                        lambda: sample(start=tick[0], origin="local_probe"))
+    session = OfflineRuntimeSession(store, plan_digest=key, model_identity_digest=model,
+                                    policy=POLICY, hysteresis=HysteresisPolicy(
+                                        recovery_samples=2, recovery_cooldown_ns=0,
+                                        max_sample_age_ns=POLICY.sample_age_ns))
+    with session:
+        assert session.offer(work())["admission"]["status"] == "no_grant"
+        tick[0] += 10
+        grant = session.offer(work())["admission"]
+        assert grant["status"] == "candidate"
+        assert session.consume(grant) == tuple(grant["slices"])
+        tick[0] += 10
+        new = session.offer(work())["admission"]
+        assert new["status"] == "candidate"
+        assert session.revalidate_source()["source_status"] == "reinspected"
+        with pytest.raises(RuntimePreflightError, match="no pending"):
+            session.consume(new)
+        next((store / "objects").glob("*/*")).write_bytes(b"changed")
+        with pytest.raises(ValueError):
+            session.revalidate_source()
+        assert session.status()["closed"]
+        with pytest.raises(RuntimePreflightError, match="closed"):
+            session.offer(work())
+    assert session.status()["closed"]
+
+
+def test_gpu_aggregate_drift_rejected_and_source_label_not_published():
+    invalid = NativeGpuMemoryReceipt("simulated_nvml", "measured",
+                                     (DeviceDescriptor("cuda-0", "cuda", GIB),),
+                                     8 * GIB, 2 * GIB)
+    with pytest.raises(RuntimePreflightError, match="aggregate"):
+        sample(gpu=invalid)
+    original = source()
+    shard = WeightShard(0, original.plan.shards[0].digest, GIB, "/private/model/path")
+    plan = WeightLoadPlan(original.model_identity_digest, (shard,), GIB)
+    redacted = ModelSource(plan.digest, original.model_identity_digest,
+                            original.inventory_digest, plan, ())
+    assert "/private/model/path" not in json.dumps(redacted.snapshot())
+    assert redacted.snapshot()["shards"][0]["source_label_digest"] == digest(shard.source)
