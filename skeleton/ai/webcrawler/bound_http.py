@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from urllib.parse import unquote, urlsplit
 
 from .core import FetchResponse
+from .adaptive_navigation import access_interstitial_reason
 from .content_coding import BoundedHTTPBody, normalize_content_coding
 from .dns_binding import (
     ResolvedTarget,
@@ -225,24 +226,39 @@ class SocketBoundFetcher:
             response_headers = response.getheaders()
             if sum(len(key) + len(value) for key, value in response_headers) > 32768:
                 raise ValueError("response header bound exceeded")
-            if sum(key.lower() == "content-length" for key, _ in response_headers) > 1:
-                raise ValueError("ambiguous Content-Length headers")
-            if sum(key.lower() == "content-encoding" for key, _ in response_headers) > 1:
-                raise ValueError("ambiguous Content-Encoding headers")
             out_headers = {key.lower(): value for key, value in response_headers}
             _coalesce_bounded_link_headers(response_headers, out_headers)
             _coalesce_bounded_xrobots_headers(response_headers, out_headers)
+            # Preserve restrictive access signals across repeated headers.
+            # Last-value-wins normalization must not erase an explicit hold.
+            if any(key.lower() == "cf-mitigated" and value.strip().lower() == "challenge"
+                   for key, value in response_headers):
+                out_headers["cf-mitigated"] = "challenge"
+            authenticate = next((value for key, value in response_headers
+                                 if key.lower() == "www-authenticate" and value.strip()), None)
+            if authenticate is not None:
+                out_headers["www-authenticate"] = authenticate
             # A duplicate Retry-After is ambiguous; the conservative local
             # interpretation is to hold for the entire possible consent horizon.
             # Never use a last-header-wins value that might shorten the hold.
             if sum(key.lower() == "retry-after" for key, _ in response_headers) > 1:
                 out_headers["retry-after"] = "86400"
-            if "content-length" in out_headers and "transfer-encoding" in out_headers:
-                raise ValueError("ambiguous response framing")
+            # A known access obstruction needs no entity read, even when a
+            # 2xx interstitial claims unsupported coding or ambiguous framing.
+            # Return the original restrictive signal to the canonical caller,
+            # rather than converting it into a transport error and retry.
+            explicit_hold = access_interstitial_reason(int(response.status), out_headers, b"")
+            if explicit_hold is None:
+                if sum(key.lower() == "content-length" for key, _ in response_headers) > 1:
+                    raise ValueError("ambiguous Content-Length headers")
+                if sum(key.lower() == "content-encoding" for key, _ in response_headers) > 1:
+                    raise ValueError("ambiguous Content-Encoding headers")
+                if "content-length" in out_headers and "transfer-encoding" in out_headers:
+                    raise ValueError("ambiguous response framing")
             # Status-only responses cannot become captured sources. Do not
             # decompress attacker-controlled denial/overload/redirect bodies;
             # preserve the status and bounded headers, including Retry-After.
-            if not 200 <= response.status < 300:
+            if explicit_hold is not None or not 200 <= response.status < 300:
                 body = b""
                 wire_bytes, wire_hash, coding = None, None, "identity"
             else:
