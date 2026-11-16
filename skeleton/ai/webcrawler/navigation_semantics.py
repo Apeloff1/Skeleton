@@ -14,7 +14,10 @@ import re
 import unicodedata
 from urllib.parse import unquote, urlsplit
 
-MAX_CANDIDATES = 12
+MAX_CANDIDATES = 48
+ROLE_GROUP = 8
+MAX_RANK = 12
+ADVICE_LIFETIME = 900
 HEX = re.compile(r"[0-9a-f]{64}\Z")
 WORD = re.compile(r"[^\W_]{2,40}", re.UNICODE)
 CONCEPTS = (
@@ -34,6 +37,66 @@ CONCEPTS = (
     ("multiplayer", "mmo", "mmorpg", "online", "cooperative", "network"),
     ("asset", "assets", "model", "texture", "sprite", "animation", "mesh"),
     ("build", "compile", "compiler", "installation", "install", "deployment"),
+    ("engine", "renderer", "rendering", "graphics", "shaders", "lighting", "rasterization", "raytracing"),
+    ("character", "avatar", "npc", "companion", "creature", "monster", "actor"),
+    ("animation", "rigging", "skeleton", "skinning", "motion", "locomotion", "blendspace", "retargeting"),
+    ("audio", "sound", "music", "voice", "speech", "acoustics", "soundtrack"),
+    ("inventory", "loot", "equipment", "items", "crafting", "recipes", "gear"),
+    ("combat", "battle", "weapon", "damage", "defense", "attack", "hitbox"),
+    ("economy", "market", "trade", "auction", "currency", "pricing", "exchange"),
+    ("strategy", "tactics", "planning", "decision", "optimization", "heuristics"),
+    ("procedural", "generation", "randomization", "seed", "noise", "terrain", "biome"),
+    ("navigation", "pathfinding", "navmesh", "routing", "waypoint", "astar"),
+    ("level", "stage", "scene", "mission", "chapter", "encounter", "dungeon"),
+    ("worldbuilding", "lore", "narrative", "story", "dialogue", "characters", "fiction"),
+    ("accessibility", "subtitles", "captions", "contrast", "remapping", "assistive"),
+    ("localization", "translation", "language", "i18n", "internationalization"),
+    ("controller", "keyboard", "input", "touch", "gamepad", "joystick", "controls"),
+    ("emulation", "emulator", "homebrew", "rom", "compatibility", "retro", "console"),
+    ("save", "checkpoint", "persistence", "serialize", "restore", "backup"),
+    ("database", "sqlite", "mongodb", "postgresql", "storage", "indexing", "sharding"),
+    ("search", "retrieval", "ranking", "query", "relevance", "discovery"),
+    ("embedding", "vector", "semantic", "similarity", "encoder", "representation"),
+    ("inference", "generation", "llm", "transformer", "gguf", "llama", "tokenizer"),
+    ("memory", "cache", "ram", "vram", "paging", "offload", "swap"),
+    ("parallel", "concurrency", "worker", "dispatch", "scheduler", "async"),
+    ("observability", "telemetry", "metrics", "trace", "logging", "diagnostics"),
+    ("testing", "test", "validation", "qualification", "regression", "fixture"),
+    ("recovery", "resilience", "failover", "retry", "rollback", "redundancy"),
+    ("browser", "web", "crawler", "spider", "sitemap", "hyperlink", "robots"),
+    ("syndication", "rss", "atom", "feed", "webhook", "subscription"),
+    ("licensing", "license", "copyright", "rights", "attribution", "provenance"),
+    ("research", "paper", "publication", "journal", "survey", "bibliography"),
+    ("wiki", "encyclopedia", "knowledge", "glossary", "faq", "lexicon"),
+    ("community", "forum", "discussion", "discord", "reddit", "fan"),
+    ("esports", "tournament", "ranked", "competitive", "leaderboard"),
+    ("speedrun", "speedrunning", "route", "record", "glitchless"),
+    ("modpack", "modloader", "forge", "fabric", "modrinth", "curseforge"),
+    ("steam", "storefront", "depot", "appmanifest", "workshop"),
+    ("godot", "unity", "unreal", "ue5", "engine", "editor"),
+    ("mesh", "geometry", "vertex", "polygon", "topology", "uv", "material"),
+    ("networking", "replication", "netcode", "server", "client", "matchmaking"),
+    ("agent", "orchestration", "assistant", "automation", "planner", "tool"),
+    ("image", "vision", "ocr", "picture", "screenshot", "photography"),
+    ("video", "media", "playback", "streaming", "codec", "transcode"),
+    ("history", "timeline", "chronology", "revision", "historical", "legacy"),
+    ("geospatial", "gis", "coordinates", "cartography", "geodata", "geojson"),
+    ("scientific", "science", "experiment", "measurement", "analysis", "method"),
+    ("education", "learning", "course", "lecture", "curriculum", "training"),
+    ("law", "regulation", "statute", "legal", "legislation", "compliance"),
+    ("manufacturing", "fabrication", "engineering", "assembly", "production"),
+    ("health", "medicine", "clinical", "medical", "biology", "anatomy"),
+    ("astronomy", "space", "planet", "orbit", "cosmology", "telescope"),
+    ("art", "design", "illustration", "composition", "aesthetic", "concept"),
+    ("architecture", "architectural", "building", "structure", "construction"),
+    ("ecology", "nature", "environment", "ecosystem", "conservation"),
+    ("math", "mathematics", "algebra", "calculus", "statistics", "probability"),
+    ("finance", "financial", "investment", "accounting", "budget", "capital"),
+    ("transport", "rail", "road", "shipping", "aviation", "logistics"),
+    ("hardware", "gpu", "cpu", "processor", "device", "accelerator"),
+    ("protocol", "http", "https", "rest", "graphql", "grpc", "socket"),
+    ("formats", "json", "xml", "csv", "parquet", "yaml", "schema"),
+    ("compression", "archive", "zip", "gzip", "zstd", "encoding"),
 )
 _LOOKUP = {}
 for i, group in enumerate(CONCEPTS):
@@ -141,7 +204,9 @@ def role_prompt(value, role, first=None):
     ids = validate_packet(value)
     if role not in {"jeeves", "dragon"}:
         raise ValueError("navigation advisory role")
-    fields = [{"n": i+1, "terms": row["terms"], "depth": row["depth"],
+    if len(ids) > ROLE_GROUP:
+        raise ValueError("navigation role requires a bounded tournament group")
+    fields = [{"n": i+1, "terms": [t[:20] for t in row["terms"][:6]], "depth": row["depth"],
                "attempts": row["attempts"], "semantic": row["semantic"]}
               for i, row in enumerate(value["candidates"])]
     # Prompt data is inert, lexical metadata; all outputs are validated by
@@ -176,6 +241,8 @@ def make_advice(value, first, second):
     ids = validate_packet(value)
     for rank in (first, second):
         parse_rank(json.dumps(rank), len(ids))
+        if len(rank)>MAX_RANK:
+            raise ValueError("navigation final rank too large")
     return {"snapshot_digest": value["snapshot_digest"], "as_of": value["as_of"],
             "packet_digest": value["packet_digest"],
             "jeeves_rank": [ids[i-1] for i in first],
@@ -191,7 +258,7 @@ def advice_weights(advice, snapshot, *, now):
     # only if it matches a deterministic packet reconstructed from the
     # exact snapshot at the supplied dispatch time. Otherwise fail closed.
     at = advice["as_of"]
-    if type(at) is not int or not 0 <= now - at <= 300:
+    if type(at) is not int or not 0 <= now - at <= ADVICE_LIFETIME:
         raise ValueError("navigation model advice outside finite validity window")
     current = packet(snapshot, now=at)
     ids = set(validate_packet(current))
@@ -200,7 +267,7 @@ def advice_weights(advice, snapshot, *, now):
     ranks = []
     for key in ("jeeves_rank", "dragon_rank"):
         rank = advice[key]
-        if (not isinstance(rank, list) or not 1 <= len(rank) <= MAX_CANDIDATES
+        if (not isinstance(rank, list) or not 1 <= len(rank) <= MAX_RANK
                 or any(not _hash(v) or v not in ids for v in rank)
                 or len(set(rank)) != len(rank)):
             raise ValueError("unbound navigation model target")
@@ -208,3 +275,53 @@ def advice_weights(advice, snapshot, *, now):
     return {v: round(.55*ranks[0].get(v,0)+.45*ranks[1].get(v,0)
                       - .15*abs(ranks[0].get(v,0)-ranks[1].get(v,0)), 8)
             for v in ids}
+
+
+def subpacket(value, indices):
+    """Preserve original candidate identity and snapshot in a derived group."""
+    ids=validate_packet(value)
+    if not isinstance(indices,(tuple,list)) or not 1<=len(indices)<=ROLE_GROUP:
+        raise ValueError("invalid tournament group")
+    if any(type(i) is not int or not 0<=i<len(ids) for i in indices) or len(set(indices))!=len(indices):
+        raise ValueError("unknown tournament candidate")
+    raw={k:v for k,v in value.items() if k not in {"candidates","packet_digest"}}
+    raw["candidates"]=[value["candidates"][i] for i in indices]
+    return {**raw,"packet_digest":digest(raw)}
+
+
+def tournament(value, execute):
+    """Stratified elimination, reciprocal critique and final arbitration.
+
+    execute(group, role, first_rank, stage) must return a strict numeric
+    local rank. No generated URLs, prose, or tokens enter dispatch. A 48-way
+    packet uses at most eight two-role matches with at most eight candidates
+    each. Failure of any match aborts the entire advisory computation.
+    """
+    ids=validate_packet(value)
+    def match(indices,stage):
+        group=subpacket(value,indices)
+        first=execute(group,"jeeves",None,stage)
+        first=parse_rank(json.dumps(first),len(indices))
+        second=execute(group,"dragon",first,stage)
+        second=parse_rank(json.dumps(second),len(indices))
+        a={indices[n-1]:1/(1+i) for i,n in enumerate(first)}
+        b={indices[n-1]:1/(1+i) for i,n in enumerate(second)}
+        order=sorted(set(a)|set(b),key=lambda i:(
+            -(.55*a.get(i,0)+.45*b.get(i,0)-.15*abs(a.get(i,0)-b.get(i,0))),i))
+        return order,[indices[n-1]+1 for n in first],[indices[n-1]+1 for n in second]
+    if len(ids)<=ROLE_GROUP:
+        _,first,second=match(list(range(len(ids))),"final")
+        return make_advice(value,first,second)
+    # Interleave strongest lexical candidates across brackets instead of
+    # allowing the deterministic top eight to consume all tournament slots.
+    groups=math.ceil(len(ids)/ROLE_GROUP)
+    winners=[]
+    for g in range(groups):
+        order,_,_=match(list(range(g,len(ids),groups)),"group-"+str(g))
+        winners.extend(order[:2])
+    if len(winners)>ROLE_GROUP:
+        order,_,_=match(winners[::2],"semifinal-a")
+        other,_,_=match(winners[1::2],"semifinal-b")
+        winners=order[:4]+other[:4]
+    _,first,second=match(winners,"final")
+    return make_advice(value,first,second)
