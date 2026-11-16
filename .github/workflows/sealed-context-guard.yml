@@ -69,6 +69,9 @@ on:
       - 'skeleton/app/orphan_cli_audit.py'
       - 'skeleton/app/orphan_source_graph*.py'
       - 'skeleton/app/orphan_graph_ownership.py'
+      - 'skeleton/app/asset_source_audit.py'
+      - 'skeleton/app/netcode_replay_qualification.py'
+      - 'skeleton/testing/test_recovered_game_production.py'
       - 'skeleton/testing/test_recovered_flight_commands.py'
       - 'skeleton/testing/test_orphan_source_graph.py'
       - 'skeleton/ai/game_builder/offline_portfolio*.py'
@@ -201,6 +204,11 @@ jobs:
         env:
           PYTHONPATH: '.:backend'
         run: python -m pytest -q skeleton/testing/test_orphan_source_graph.py skeleton/testing/test_recovered_flight_commands.py
+
+      - name: Recovered asset and headless replay integration regressions
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_game_production.py tests/game_asset_ingest/test_asset_ingest.py tests/test_netcode_b064_headless_server.py
 
       - name: Consumer share and Chroma custody regressions
         env:

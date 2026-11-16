@@ -7,6 +7,9 @@ Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
     offline-runtime  Inspect pinned local weights and measured resource admission
     weight-store     Stage pinned weights and inspect cooperative disk/recovery custody
+    asset-source-audit               Content-bound asset and sidecar intake
+    netcode-replay-qualify           Measured in-process network replay qualification
+    offline-dialogue                 Authored dialogue choices and verified saves
     local-ai-boot                    Startup diagnosis and explicit principal binding
     local-ai-bootstrap               Private state and key provisioning
     local-durable-worker             Local native durable work owner
@@ -1324,6 +1327,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         return recovered_main(rest)
     if cmd == "era-source-validate":
         from skeleton.ai.simulation.era.scripting.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "asset-source-audit":
+        from skeleton.app.asset_source_audit import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "netcode-replay-qualify":
+        from skeleton.app.netcode_replay_qualification import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "offline-dialogue":
+        from skeleton.app.dialogue_cli import main as recovered_main
         return recovered_main(rest)
     if cmd == "app":
         from skeleton.app.cli import run_app_cli

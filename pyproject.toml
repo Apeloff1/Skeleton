@@ -62,6 +62,9 @@ jeeves-production-training = ["torch>=2.5,<3"]
 hosted-inference = ["openai>=2.54.0,<3", "httpx>=0.28.1,<1"]
 
 [project.scripts]
+skeleton-asset-source-audit = "skeleton.app.asset_source_audit:main"
+skeleton-netcode-replay-qualify = "skeleton.app.netcode_replay_qualification:main"
+skeleton-offline-dialogue = "skeleton.app.dialogue_cli:main"
 skeleton-local-ai-boot = "skeleton.ai.runtime.operational_ai.deployment.boot.cli:main"
 skeleton-local-ai-bootstrap = "skeleton.ai.runtime.operational_ai.deployment.bootstrap.cli:main"
 skeleton-local-durable-worker = "skeleton.ai.runtime.operational_ai.durable_jobs.worker_cli:main"
