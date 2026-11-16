@@ -56,7 +56,7 @@ def _entry(value: object) -> tuple[str, str, str]:
 
 
 def verify_export_batch(
-    root: str | Path, *, expected_index_sha256: str, authorized: bool,
+    root: str | Path | int, *, expected_index_sha256: str, authorized: bool,
 ) -> dict[str, object]:
     """Verify every package through the canonical game replay implementation.
 
@@ -70,7 +70,7 @@ def verify_export_batch(
             or not _HEX.fullmatch(expected_index_sha256)):
         raise OfflineBatchVerificationError("independent index SHA-256 pin required")
     try:
-        root_fd = _root_fd(root)
+        root_fd = os.dup(root) if type(root) is int else _root_fd(root)
     except (OSError, TypeError, ValueError) as exc:
         raise OfflineBatchVerificationError("unsafe batch root") from exc
     try:
