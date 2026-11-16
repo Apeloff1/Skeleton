@@ -340,9 +340,14 @@ class WeightShardStore:
         raw = canonical_bytes(manifest)
         return plan, sha256(raw).hexdigest(), len(raw)
 
-    def verified_paths(self, plan_digest: str) -> tuple[Path, ...]:
-        """Return only shards that still match their immutable content identity."""
-        plan = self.load_plan(plan_digest)
+    def verified_paths(self, plan_digest: str, *, expected_manifest_sha256: str | None = None,
+                       maximum_manifest_bytes: int = _MAX_MANIFEST_BYTES) -> tuple[Path, ...]:
+        """Return verified shard paths under an optionally exact manifest pin."""
+        plan, manifest_sha, _ = self.manifest_evidence(plan_digest, maximum=maximum_manifest_bytes)
+        if expected_manifest_sha256 is not None:
+            require_digest(expected_manifest_sha256, "expected_manifest_sha256")
+            if manifest_sha != expected_manifest_sha256:
+                raise WeightShardStoreError("weight manifest identity changed")
         paths = []
         for shard in plan.shards:
             path = self._object_path(shard.digest)
