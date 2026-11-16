@@ -20,7 +20,8 @@ class _Sequence:
 
 class PagedBatchSession:
     def __init__(self, accelerator, *, slots: int, context: int, max_kv_bytes: int,
-                 page_tokens: int = 16, require_gpu: bool = True, max_workspace_bytes: int = 256*1024**2):
+                 page_tokens: int = 16, require_gpu: bool = True, max_workspace_bytes: int = 256*1024**2,
+                 private_prefix_scope: str | None = None):
         self.accel = accelerator
         self.torch = accelerator.torch
         self.lm = accelerator.lm
@@ -62,6 +63,12 @@ class PagedBatchSession:
             workspace+=8*slots*self.heads*context*(self.dim+1)
         if workspace>max_workspace_bytes:
             raise MemoryError("paged workspace exceeds ceiling")
+        if private_prefix_scope is not None and (not isinstance(private_prefix_scope,str) or not 1<=len(private_prefix_scope)<=256):
+            raise ValueError("explicit private prefix reuse scope required")
+        self._prefix_scope=private_prefix_scope
+        self._page_refs=[0]*self.page_count
+        self.reused_prefix_tokens=0
+        self.prefill_steps=0
         self.binding = accelerator._kv_binding()
         self.states = {i: _Sequence() for i in range(slots)}
         self.free = list(reversed(range(self.page_count)))
@@ -77,8 +84,16 @@ class PagedBatchSession:
             raise RuntimeError("paged session closed or weights changed")
         self.accel._assert_training_integrity()
 
+    def _drop_page_ref(self,page):
+        if self._page_refs[page]<=0:
+            raise RuntimeError("paged reference accounting corrupt")
+        self._page_refs[page]-=1
+        if self._page_refs[page]==0:
+            self.free.append(page)
+
     def _release(self, state):
-        self.free.extend(state.pages)
+        for page in state.pages:
+            self._drop_page_ref(page)
         state.pages.clear()
         state.tokens.clear()
         state.logits = None
@@ -94,6 +109,7 @@ class PagedBatchSession:
         self.free.clear()
         self.keys.clear()
         self.values.clear()
+        self._page_refs.clear()
 
     def _reference(self, q, keys, values, table, lengths):
         torch = self.torch
@@ -117,7 +133,13 @@ class PagedBatchSession:
             if pos % self.page_tokens == 0:
                 if not self.free:
                     raise MemoryError("paged pool exhausted")
-                state.pages.append(self.free.pop())
+                page=self.free.pop()
+                if self._page_refs[page]:
+                    raise RuntimeError("allocated page was still referenced")
+                self._page_refs[page]=1
+                state.pages.append(page)
+            if self._page_refs[state.pages[-1]]!=1:
+                raise RuntimeError("attempt to write immutable shared prefix page")
         device = a.device
         tokens = torch.tensor(ids, dtype=torch.long, device=device)
         pos = torch.tensor(positions, dtype=torch.long, device=device)
@@ -163,35 +185,105 @@ class PagedBatchSession:
             state.tokens.append(token)
             state.logits = row
 
-    def logits(self, slots, windows, *, interrupt=None):
-        """Append only missing suffixes; re-prefill shifted/deviating windows."""
+    def _reuse_full_pages(self,slot,window):
+        """Share only complete immutable pages from active same-session donors.
+
+        The caller must supply an explicitly owner-private scope to enable
+        this optimization. No cross-session or cross-tenant reuse. Leave at
+        least one token to compute the recipient's own last logits.
+        """
+        if self._prefix_scope is None:
+            return
+        state=self.states[slot]
+        best=None
+        matched=len(state.tokens)
+        for other,donor in self.states.items():
+            if other==slot:
+                continue
+            cap=min(len(donor.tokens),len(window)-1)
+            cap-=cap%self.page_tokens
+            if cap<=matched:
+                continue
+            common=0
+            while common<cap and donor.tokens[common]==window[common]:
+                common+=1
+            common-=common%self.page_tokens
+            if common>matched:
+                best=donor
+                matched=common
+        if best is None:
+            return
+        pages=list(best.pages[:matched//self.page_tokens])
+        prefix=list(best.tokens[:matched])
+        previous=len(state.tokens)
+        # Pin donor pages before relinquishing recipient references: the
+        # recipient may already share some of the donor's prefix chain.
+        for page in pages:
+            if self._page_refs[page]<=0:
+                raise RuntimeError("unowned prefix page")
+            self._page_refs[page]+=1
+        self._release(state)
+        state.pages=pages
+        state.tokens=prefix
+        self.reused_prefix_tokens+=matched-previous
+
+    def _rows_ready(self,slots,windows):
+        return {slot:(list(self.states[slot].logits),len(self.states[slot].tokens),
+                     len(self.states[slot].pages)*self.page_bytes,self.states[slot].resets)
+                for slot,window in zip(slots,windows)
+                if len(self.states[slot].tokens)==len(window) and self.states[slot].logits is not None}
+
+    def logits_ready(self,slots,windows,*,max_steps=4,interrupt=None):
+        """Bound each prefill quantum; return ready sequences without HOL blocking."""
         self._assert_live()
-        if len(slots) != len(windows) or not slots or len(set(slots)) != len(slots):
+        if type(max_steps) is not int or not 1<=max_steps<=128:
+            raise ValueError("invalid paged prefill quantum")
+        if len(slots)!=len(windows) or not slots or len(set(slots))!=len(slots):
             raise ValueError("unique paged slot/window pairs required")
         if any(slot not in self.states for slot in slots):
             raise ValueError("unknown paged slot")
-        if any(not 1 <= len(row) <= self.context or any(type(t) is not int or not 0 <= t < self.lm.V for t in row) for row in windows):
+        if any(not 1<=len(row)<=self.context or any(type(t) is not int or not 0<=t<self.lm.V for t in row) for row in windows):
             raise ValueError("invalid paged token window")
         try:
-            with self.accel._inference_lock(interrupt), self.torch.inference_mode():
+            with self.accel._inference_lock(interrupt),self.torch.inference_mode():
                 self._assert_live()
-                for slot, window in zip(slots, windows):
-                    state = self.states[slot]
-                    if tuple(window[:len(state.tokens)]) != tuple(state.tokens):
-                        state.resets += 1
+                for slot,window in zip(slots,windows):
+                    state=self.states[slot]
+                    if tuple(window[:len(state.tokens)])!=tuple(state.tokens):
+                        state.resets+=1
                         self._release(state)
-                while True:
-                    active = [(slot, window[len(self.states[slot].tokens)])
-                              for slot, window in zip(slots, windows)
-                              if len(self.states[slot].tokens) < len(window)]
+                    self._reuse_full_pages(slot,window)
+                ready=self._rows_ready(slots,windows)
+                if ready:
+                    return ready
+                for _ in range(max_steps):
+                    if interrupt is not None:
+                        interrupt()
+                    active=[(slot,window[len(self.states[slot].tokens)])
+                            for slot,window in zip(slots,windows)
+                            if len(self.states[slot].tokens)<len(window)]
                     if not active:
-                        break
-                    self._step([i for i, _ in active], [t for _, t in active], interrupt)
-                self._assert_live()
-                return [(list(self.states[slot].logits),
-                         len(self.states[slot].tokens),
-                         len(self.states[slot].pages)*self.page_bytes,
-                         self.states[slot].resets) for slot in slots]
+                        raise RuntimeError("paged prefill cannot produce required logits")
+                    self._step([i for i,_ in active],[t for _,t in active],interrupt)
+                    self.prefill_steps+=1
+                    self._assert_live()
+                    ready=self._rows_ready(slots,windows)
+                    if ready:
+                        return ready
+                return {}
         except BaseException:
             self.close()
             raise
+
+    def logits(self, slots, windows, *, interrupt=None):
+        """Compatibility full barrier for single-stream or synchronous callers."""
+        outstanding=dict(zip(slots,windows))
+        if len(outstanding)!=len(slots) or len(windows)!=len(slots) or not slots:
+            raise ValueError("unique paged slot/window pairs required")
+        result={}
+        while outstanding:
+            ready=self.logits_ready(list(outstanding),list(outstanding.values()),interrupt=interrupt)
+            for slot,row in ready.items():
+                result[slot]=row
+                del outstanding[slot]
+        return [result[slot] for slot in slots]

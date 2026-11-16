@@ -1126,6 +1126,7 @@ class NativeLLMRuntime:
         self, requests: Sequence[BatchGenerationRequest], *,
         max_workspace_bytes: int, max_active_slots: int = 8,
         require_gpu: bool = True, paged_kv_bytes: int | None = None,
+        private_prefix_scope: str | None = None, prefill_steps_per_tick: int = 4,
         on_event: Callable[[str, RuntimeEvent], None] | None = None,
         interrupt: Callable[[], None] | None = None,
     ) -> tuple[BatchGenerationResult, ...]:
@@ -1149,6 +1150,10 @@ class NativeLLMRuntime:
             raise RuntimeContractError("fused observer must be callable")
         admitted = self._admit_batch(requests, interrupt=interrupt)
         paged = paged_kv_bytes is not None
+        if type(prefill_steps_per_tick) is not int or not 1<=prefill_steps_per_tick<=128:
+            raise RuntimeContractError("invalid paged prefill scheduling quantum")
+        if private_prefix_scope is not None and (not paged or not isinstance(private_prefix_scope,str) or not 1<=len(private_prefix_scope)<=256):
+            raise RuntimeContractError("private prefix sharing requires an explicit paged owner scope")
         if any(request.config.use_cache != paged for request, _ in admitted):
             raise RuntimeContractError("fused batch cache mode must match explicit paged policy")
         if paged and (type(paged_kv_bytes) is not int or not 1 <= paged_kv_bytes <= 1024**4):
@@ -1163,7 +1168,8 @@ class NativeLLMRuntime:
                 if paged:
                     from .paged_attention import PagedBatchSession
                     session = PagedBatchSession(accel, slots=len(group), context=self.limits.max_context,
-                        max_kv_bytes=paged_kv_bytes, max_workspace_bytes=max_workspace_bytes, require_gpu=require_gpu)
+                        max_kv_bytes=paged_kv_bytes, max_workspace_bytes=max_workspace_bytes, require_gpu=require_gpu,
+                        private_prefix_scope=private_prefix_scope)
                     if session.pages_per_slot*session.page_bytes > self.limits.max_kv_bytes:
                         session.close()
                         raise RuntimeContractError("paged per-stream allocation exceeds runtime KV ceiling")
@@ -1199,8 +1205,10 @@ class NativeLLMRuntime:
                     while pending:
                         if session is not None:
                             indices = list(pending)
-                            windows = [pending.pop(j) for j in indices]
-                            for j, row in zip(indices, session.logits(indices, windows, interrupt=interrupt)):
+                            windows = [pending[j] for j in indices]
+                            ready=session.logits_ready(indices,windows,max_steps=prefill_steps_per_tick,interrupt=interrupt)
+                            for j,row in ready.items():
+                                del pending[j]
                                 advance(j, _PagedLogitsReply(*row))
                             continue
                         by_length = {}
