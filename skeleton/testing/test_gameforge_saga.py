@@ -276,3 +276,42 @@ def test_saga_installed_cli_routes_authority_and_persistent_board(authored, tmp_
     archive = invoke("snapshot-slot", slot, path)[1]
     assert invoke("restore-slot", {**slot, "slot": "restored", "archive": archive}, path)[0] == 0
     assert invoke("verify-play", {"request": authored, "receipt": stage["receipt"]})[0] == 0
+
+
+def test_interactive_player_commits_only_selected_actions_and_reopens(authored, tmp_path):
+    from skeleton.app.gameforge_saga_live import play_live
+    path = tmp_path / "live.sqlite"
+    with sqlite3.connect(path) as db:
+        store = SagaStore(db)
+        zero = store.create("slot", authored, "init")
+        current = board(authored, zero["receipt"])
+        action = {"type": "dialogue", "npc": "keeper", "choice": "listen"}
+        selected = current["legal_actions"].index(action) + 1
+        outgoing = io.StringIO()
+        commands = ("not-a-command\n9999\nhint\n" + str(selected) + "\nquit\n").encode("ascii")
+        assert play_live(store, authored, "slot", io.BytesIO(commands), outgoing) == 0
+        text = outgoing.getvalue()
+        assert "REJECTED unknown player command" in text
+        assert "REJECTED selection outside current menu" in text
+        assert "HINT " in text and "ACCEPTED " in text and "CHECKPOINT " in text
+        assert store.read("slot", authored)["receipt"]["actions"] == [action]
+    with sqlite3.connect(path) as db:
+        store = SagaStore(db, initialize=False)
+        before = store.read("slot", authored)
+        out = io.StringIO()
+        assert play_live(store, authored, "slot", io.BytesIO(b"status\nquit\n"), out) == 0
+        assert store.read("slot", authored) == before
+        assert play_live(store, authored, "slot", io.BytesIO(b"x"*257+b"\n1\n"), out) == 2
+        assert store.read("slot", authored) == before
+
+
+def test_live_player_cli_reopens_same_independent_source(authored, tmp_path):
+    from skeleton.app.gameforge_saga_live import main as live_main
+    source = tmp_path / "source.json"
+    source.write_bytes(encoded(authored))
+    database = tmp_path / "saga.sqlite"
+    args = ["--source", str(source), "--database", str(database), "--slot", "live"]
+    output, error = io.StringIO(), io.StringIO()
+    assert live_main([*args, "--create"], stdin=io.BytesIO(b"quit\n"), stdout=output, stderr=error) == 0
+    assert live_main(args, stdin=io.BytesIO(b"quit\n"), stdout=output, stderr=error) == 0
+    assert "CHECKPOINT " in output.getvalue()
