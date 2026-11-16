@@ -11,7 +11,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import multiprocessing
 from dataclasses import asdict,dataclass
 import hashlib
-import itertools
+from collections import Counter
 import json
 import math
 import os
@@ -53,7 +53,7 @@ class DiskANNPolicy:
                 raise ValueError("invalid local disk ANN policy")
         if self.worker_mode not in {"thread","process"}:
             raise ValueError("explicit local ANN executor mode required")
-        if self.bands*self.probes*self.bucket_limit+self.max_anchor_terms*self.bucket_limit>262144 or self.shards*self.shard_candidate_limit>262144:
+        if self.bands*self.probes*self.bucket_limit+2*self.max_anchor_terms*self.bucket_limit>262144 or self.shards*self.shard_candidate_limit>262144:
             raise ValueError("aggregate ANN candidate workspace outside bounds")
         if self.probes>self.bits+1 or self.shard_candidate_limit<self.bucket_limit:
             raise ValueError("invalid ANN multi-probe/candidate geometry")
@@ -131,6 +131,14 @@ def _anchors(text,limit):
         (any(c.isdigit() for c in x) or any(c in "-_.:" for c in x))}))[:limit]
 
 
+def _sparse(text):
+    # Full normalized terms, not only identifiers. Bounded per-leaf storage;
+    # digests are derived features, not a privacy boundary.
+    words=Counter(x for x in terms(text) if 1<=len(x)<=128)
+    return [(hashlib.sha256(term.encode()).hexdigest(),min(count,255))
+            for term,count in sorted(words.items(),key=lambda x:(-x[1],x[0]))[:256]]
+
+
 def _init(db):
     db.executescript("""
       PRAGMA journal_mode=DELETE;
@@ -142,6 +150,8 @@ def _init(db):
         UNIQUE(source,revision,ordinal));
       CREATE TABLE buckets(band INTEGER NOT NULL,code INTEGER NOT NULL,
         id INTEGER NOT NULL REFERENCES leaves(id),PRIMARY KEY(band,code,id)) WITHOUT ROWID;
+      CREATE TABLE sparse(term TEXT NOT NULL,id INTEGER NOT NULL REFERENCES leaves(id),
+        tf INTEGER NOT NULL,PRIMARY KEY(term,id)) WITHOUT ROWID;
       CREATE TABLE anchors(term TEXT NOT NULL,id INTEGER NOT NULL REFERENCES leaves(id),
         PRIMARY KEY(term,id)) WITHOUT ROWID;
     """)
@@ -189,7 +199,8 @@ def build_generation(root,name,rows,*,space,source_snapshot,dimension,
             vector=_unit(feature.dense,dimension)
             blob=vector.astype("<f4",copy=False).tobytes()
             anchors=_anchors(span.text,policy.max_anchor_terms)
-            logical+=len(blob)+len(span.source_id.encode())+512+policy.bands*48+sum(len(x.encode())+48 for x in anchors)
+            sparse=_sparse(span.text)
+            logical+=len(blob)+len(span.source_id.encode())+512+policy.bands*48+sum(len(x.encode())+48 for x in anchors)+len(sparse)*144
             if logical>policy.max_index_bytes:
                 raise MemoryError("ANN logical disk reservation exceeded")
             shard=int(span.identity[:16],16)%policy.shards
@@ -199,6 +210,7 @@ def build_generation(root,name,rows,*,space,source_snapshot,dimension,
             rid=row.lastrowid
             db.executemany("INSERT INTO buckets VALUES(?,?,?)",[(band,code,rid) for band,code,_ in _codes(vector,planes,policy)])
             db.executemany("INSERT INTO anchors VALUES(?,?)",[(a,rid) for a in anchors])
+            db.executemany("INSERT INTO sparse VALUES(?,?,?)",[(term,rid,tf) for term,tf in sparse])
             counts[shard]+=1
             if processed%1024==0:
                 if sum(p.stat().st_size for p in stage.iterdir() if p.is_file())>policy.max_index_bytes:
@@ -219,7 +231,7 @@ def build_generation(root,name,rows,*,space,source_snapshot,dimension,
             artifacts.append({"name":path.name,"sha256":pin,"bytes":size,"rows":count})
         if sum(x["bytes"] for x in artifacts)>policy.max_index_bytes:
             raise MemoryError("ANN physical generation exceeds disk budget")
-        manifest={"schema":"skeleton.local.disk-ann.v1","space":space,"source_snapshot":source_snapshot,
+        manifest={"schema":"skeleton.local.disk-ann.v2","space":space,"source_snapshot":source_snapshot,
                   "dimension":dimension,"projection_sha256":plane_hash,"numpy_version":np.__version__,
                   "policy":asdict(policy),"rows":processed,"artifacts":artifacts}
         raw=json.dumps(manifest,sort_keys=True,separators=(",",":"),allow_nan=False).encode()
@@ -248,6 +260,7 @@ class ANNCandidate:
     end:int
     cosine:float
     anchor_matches:int
+    lexical_matches:int=0
 
 
 class DiskANN:
@@ -263,8 +276,9 @@ class DiskANN:
         if pin!=manifest_sha256 or hashlib.sha256(raw).hexdigest()!=pin or len(raw)!=size:
             raise ValueError("ANN manifest digest mismatch")
         m=json.loads(raw)
-        if m.get("schema")!="skeleton.local.disk-ann.v1" or m.get("space")!=expected_space or m.get("source_snapshot")!=expected_snapshot or m.get("numpy_version")!=np.__version__:
+        if m.get("schema") not in {"skeleton.local.disk-ann.v1","skeleton.local.disk-ann.v2"} or m.get("space")!=expected_space or m.get("source_snapshot")!=expected_snapshot or m.get("numpy_version")!=np.__version__:
             raise ValueError("ANN source/feature/runtime identity mismatch")
+        self.schema=m["schema"]
         self.policy=DiskANNPolicy(**m["policy"])
         self.dimension=m["dimension"]
         if type(self.dimension) is not int or not 2<=self.dimension<=4096:
@@ -295,7 +309,39 @@ class DiskANN:
         if not stat.S_ISREG(info.st_mode) or (info.st_dev,info.st_ino,info.st_size,info.st_mtime_ns,info.st_ctime_ns)!=expected:
             raise OSError("ANN shard changed after admission")
 
-    def _search(self,entry,q,codes,anchors,deadline,allowed):
+    def fetch_dense(self,spans):
+        """Reuse exact previously encoded leaves, never stale source revisions.
+
+        The previous immutable generation is independently pinned on open.
+        Missing rows are returned as misses rather than guessed embeddings.
+        """
+        import numpy as np
+        if not isinstance(spans,(list,tuple)) or len(spans)>256 or any(not isinstance(s,SemanticSpan) for s in spans):
+            raise ValueError("bounded exact semantic reuse batch required")
+        grouped={}
+        for span in spans:
+            grouped.setdefault(int(span.identity[:16],16)%self.policy.shards,[]).append(span)
+        found={}
+        for shard,group in grouped.items():
+            entry=self._files[shard]
+            self._assert_identity(entry)
+            db=sqlite3.connect(entry[0].as_uri()+"?mode=ro&immutable=1",uri=True,timeout=1)
+            try:
+                db.execute("PRAGMA query_only=ON")
+                db.execute("PRAGMA trusted_schema=OFF")
+                for span in group:
+                    row=db.execute("SELECT source,revision,ordinal,start,end,vector FROM leaves WHERE span=?",(span.identity,)).fetchone()
+                    if row is None:continue
+                    if tuple(row[:5])!=(span.source_id,span.revision,span.ordinal,span.start,span.end) or len(row[5])!=4*self.dimension:
+                        raise ValueError("prior semantic vector provenance mismatch")
+                    dense=_unit(np.frombuffer(row[5],dtype="<f4"),self.dimension)
+                    # Derived dense-only record; never used as a late-interaction vector.
+                    found[span.identity]=SpanEmbedding(tuple(map(float,dense)),())
+                self._assert_identity(entry)
+            finally:db.close()
+        return found
+
+    def _search(self,entry,q,codes,anchors,sparse_terms,deadline,allowed):
         import numpy as np
         path,_,_=entry
         self._assert_identity(entry)
@@ -308,21 +354,27 @@ class DiskANN:
             candidates={}
             exhausted=False
             filters=" AND l.source IN ("+",".join("?" for _ in allowed)+")" if allowed else ""
-            def collect(sql,args,anchor=False):
+            def collect(sql,args,channel=0):
                 nonlocal exhausted
                 for index,(rid,) in enumerate(db.execute(sql+filters+" ORDER BY l.id LIMIT ?",(*args,*allowed,p.bucket_limit+1))):
                     if index>=p.bucket_limit:
                         exhausted=True;break
-                    previous=candidates.setdefault(rid,[0,0])
-                    previous[int(anchor)]+=1
+                    previous=candidates.setdefault(rid,[0,0,0])
+                    previous[channel]+=1
             for term in anchors:
                 if time.monotonic()>=deadline:raise TimeoutError("ANN shard deadline exceeded")
                 collect("SELECT l.id FROM anchors a JOIN leaves l ON l.id=a.id WHERE a.term=?",(term,),True)
+            if self.schema=="skeleton.local.disk-ann.v2":
+                # Exact sparse postings form a complementary candidate channel.
+                # Query terms capped, identifier channel retains priority.
+                for term in sparse_terms:
+                    if time.monotonic()>=deadline:raise TimeoutError("ANN sparse deadline exceeded")
+                    collect("SELECT l.id FROM sparse s JOIN leaves l ON l.id=s.id WHERE s.term=?",(term,),2)
             for band,code,neighbors in codes:
                 for signature in (code,*neighbors):
                     if time.monotonic()>=deadline:raise TimeoutError("ANN shard deadline exceeded")
                     collect("SELECT l.id FROM buckets b JOIN leaves l ON l.id=b.id WHERE b.band=? AND b.code=?",(band,signature))
-            ordered=sorted(candidates,key=lambda rid:(-candidates[rid][1],-candidates[rid][0],rid))
+            ordered=sorted(candidates,key=lambda rid:(-candidates[rid][1],-(candidates[rid][0]+2*candidates[rid][2]),rid))
             if len(ordered)>p.shard_candidate_limit:exhausted=True
             results=[]
             for rid in ordered[:p.shard_candidate_limit]:
@@ -334,9 +386,9 @@ class DiskANN:
                     raise PermissionError("ANN allowed-source filter drift")
                 vector=_unit(np.frombuffer(row[6],dtype="<f4"),self.dimension)
                 score=float(np.clip(vector@q,-1,1))
-                results.append(ANNCandidate(*row[:6],score,candidates[rid][1]))
+                results.append(ANNCandidate(*row[:6],score,candidates[rid][1],candidates[rid][2]))
             self._assert_identity(entry)
-            results.sort(key=lambda row:(-row.anchor_matches,-row.cosine,row.span_sha256))
+            results.sort(key=lambda row:(-row.anchor_matches,-(row.cosine+min(row.lexical_matches,8)*.035),row.span_sha256))
             return results[:p.global_candidate_limit],exhausted,len(candidates)
         finally:db.close()
 
@@ -354,6 +406,7 @@ class DiskANN:
         q=_unit(vector,self.dimension)
         codes=_codes(q,self._planes,p)
         anchors=_anchors(query,p.max_anchor_terms)
+        sparse_terms=tuple(x[0] for x in _sparse(query)[:min(16,p.max_anchor_terms)])
         deadline=time.monotonic()+p.query_timeout_seconds
         merged=[]
         count=0
@@ -364,17 +417,17 @@ class DiskANN:
         # The process executor serializes only trusted internally constructed
         # value objects, never an imported pickle or external worker payload.
         with pool as executor:
-            futures=[executor.submit(self._search,entry,q,codes,anchors,deadline,allowed) for entry in self._files]
+            futures=[executor.submit(self._search,entry,q,codes,anchors,sparse_terms,deadline,allowed) for entry in self._files]
             for f in futures:
                 rows,cut,observed=f.result(timeout=max(0.001,deadline-time.monotonic()))
                 merged.extend(rows);truncated|=cut;count+=observed
         if len({row.span_sha256 for row in merged})!=len(merged):
             raise ValueError("duplicate candidate across ANN shards")
-        ranked=sorted(merged,key=lambda x:(-x.anchor_matches,-x.cosine,x.span_sha256))[:limit]
+        ranked=sorted(merged,key=lambda x:(-x.anchor_matches,-(x.cosine+min(x.lexical_matches,8)*.035),x.span_sha256))[:limit]
         receipt={"schema":"skeleton.local.disk-ann-query.v1","manifest_sha256":self.manifest_sha256,
                  "space_sha256":self.space,"source_snapshot_sha256":self.snapshot,
                  "shards_searched":len(self._files),"worker_mode":p.worker_mode,"indexed_rows":self.rows,"candidate_pointers":count,
-                 "bucket_or_shard_truncation":bool(truncated),"approximate":True,
+                 "bucket_or_shard_truncation":bool(truncated),"sparse_candidate_channel":self.schema=="skeleton.local.disk-ann.v2","approximate":True,
                  "selected":[r.span_sha256 for r in ranked],"citation_authorized":False}
         receipt["receipt_sha256"]=_digest(receipt)
         return tuple(ranked),receipt

@@ -512,13 +512,25 @@ class OfflineKnowledgeLibrary:
                 h.update(raw)
         return h.hexdigest()
 
-    def build_semantic_ann(self,root,name,policy,*,interrupt=None):
+    def build_semantic_ann(self,root,name,policy,*,previous=None,interrupt=None):
         """Publish a private generation from one canonical SQLite read snapshot."""
-        from skeleton.retrieval.disk_semantic_ann import build_generation,DiskANNPolicy
+        from skeleton.retrieval.disk_semantic_ann import build_generation,DiskANNPolicy,DiskANN
         from skeleton.retrieval.semantic_long_context import document_spans
         if self._semantic_ranker is None or not isinstance(policy,DiskANNPolicy):
             raise RuntimeContractError("explicit local learned ranker and ANN policy required")
         ranker=self._semantic_ranker
+        if previous is not None and (not isinstance(previous,DiskANN) or previous.space!=ranker.identity or previous.dimension!=ranker.encoder.policy.dimension):
+            raise RuntimeContractError("previous ANN feature space differs from current ranker")
+        reuse={"reused_dense":0,"encoded_dense":0,"encoder_calls":0}
+        def features(batch):
+            cached=previous.fetch_dense(batch) if previous is not None else {}
+            missing=[leaf for leaf in batch if leaf.identity not in cached]
+            encoded,calls=ranker._features(missing,None,interrupt) if missing else ({},0)
+            reuse["reused_dense"]+=len(cached)
+            reuse["encoded_dense"]+=len(missing)
+            reuse["encoder_calls"]+=calls
+            for leaf in batch:
+                yield leaf,cached.get(leaf.identity) or encoded[leaf.identity]
         db=self.store._db
         with self.store._lock:
             if db.in_transaction:
@@ -539,12 +551,10 @@ class OfflineKnowledgeLibrary:
                         for span in document_spans(doc[0],doc[2],doc[3],pieces,ranker.policy):
                             batch.append(span)
                             if len(batch)==128:
-                                vectors,_=ranker._features(batch,None,interrupt)
-                                for leaf in batch:yield leaf,vectors[leaf.identity]
+                                yield from features(batch)
                                 batch.clear()
                         if batch:
-                            vectors,_=ranker._features(batch,None,interrupt)
-                            for leaf in batch:yield leaf,vectors[leaf.identity]
+                            yield from features(batch)
                 receipt=build_generation(root,name,rows(),space=ranker.identity,
                     source_snapshot=snapshot,dimension=ranker.encoder.policy.dimension,
                     policy=policy,interrupt=interrupt)
@@ -553,6 +563,8 @@ class OfflineKnowledgeLibrary:
             if self.semantic_source_snapshot()!=snapshot:
                 # Immutable build remains historical but cannot activate.
                 raise RuntimeContractError("source changed during ANN build; generation is historical only")
+        receipt.update(reuse)
+        receipt["previous_manifest_sha256"]=previous.manifest_sha256 if previous is not None else None
         return receipt
 
     def attach_semantic_ann(self,root,manifest_sha256):
@@ -620,6 +632,8 @@ class OfflineKnowledgeLibrary:
                     if self._semantic_cache is not None:self._semantic_cache.invalidate()
                     raise RuntimeContractError("semantic ANN authority changed during retrieval")
                 return result
+            except RuntimeContractError:
+                raise
             except (ValueError,MemoryError,OSError) as exc:
                 raise RuntimeContractError("bounded disk semantic retrieval failed") from exc
 
