@@ -627,14 +627,25 @@ def _qualification_receipt(
     return receipt
 
 
+def _qualification_model(deployment: LocalModelDeployment) -> LlamaCppModel:
+    model = LlamaCppModel(deployment.llama_cpp_config(rehash_artifacts_each_run=True))
+    # Validate the identities captured by the backend before any native launch,
+    # not merely after receiving output. The backend retains per-run rehashing.
+    if (model.model_artifact.sha256 != deployment.model_sha256 or
+            model.runtime_artifact.sha256 != deployment.executable_sha256):
+        raise LocalModelDeploymentError("qualification runtime or model identity changed before dispatch")
+    return model
+
+
 async def qualify_local_model_deployment(
     manifest_path: str | Path,
     *,
     prompt: str = "Respond with a short offline readiness acknowledgement.",
     max_output_tokens: int = 32,
+    expected_manifest_sha256: str | None = None,
 ) -> dict[str, Any]:
-    deployment = LocalModelDeployment.load(manifest_path)
-    model = LlamaCppModel(deployment.llama_cpp_config(rehash_artifacts_each_run=True))
+    deployment = LocalModelDeployment.load(manifest_path, expected_sha256=expected_manifest_sha256)
+    model = _qualification_model(deployment)
     try:
         result = await LocalInferenceEngine(model, cache_size=0).generate(
             _qualification_request(
@@ -657,9 +668,10 @@ def qualify_local_model_deployment_sync(
     *,
     prompt: str = "Respond with a short offline readiness acknowledgement.",
     max_output_tokens: int = 32,
+    expected_manifest_sha256: str | None = None,
 ) -> dict[str, Any]:
-    deployment = LocalModelDeployment.load(manifest_path)
-    model = LlamaCppModel(deployment.llama_cpp_config(rehash_artifacts_each_run=True))
+    deployment = LocalModelDeployment.load(manifest_path, expected_sha256=expected_manifest_sha256)
+    model = _qualification_model(deployment)
     try:
         result = model.infer(
             _qualification_request(

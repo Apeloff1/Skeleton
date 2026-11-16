@@ -76,11 +76,12 @@ class Profile:
     model_sha256: str
     executable_sha256: str
     model_id: str
+    manifest_file_sha256: str
 
     def __post_init__(self):
         if not isinstance(self.label, str) or not _LABEL.fullmatch(self.label):
             raise ValueError("invalid profile label")
-        for value in (self.manifest_sha256, self.model_sha256, self.executable_sha256):
+        for value in (self.manifest_sha256, self.model_sha256, self.executable_sha256, self.manifest_file_sha256):
             if not isinstance(value, str) or not _HEX.fullmatch(value):
                 raise ValueError("profile requires exact SHA-256 identities")
         if not isinstance(self.model_id, str) or not self.model_id or len(self.model_id) > 1024:
@@ -88,18 +89,24 @@ class Profile:
 
     @classmethod
     def load(cls, label: str, manifest: Path) -> Profile:
-        deployment = LocalModelDeployment.load(manifest)
+        manifest = manifest.expanduser().resolve(strict=True)
+        with manifest.open("rb") as stream:
+            raw = stream.read(1024 * 1024 + 1)
+        if not 1 <= len(raw) <= 1024 * 1024:
+            raise ValueError("manifest file exceeds bounds")
+        file_digest = hashlib.sha256(raw).hexdigest()
+        deployment = LocalModelDeployment.load(manifest, expected_sha256=file_digest)
         if deployment.temperature != 0:
             raise ValueError("matched diagnostic requires greedy temperature zero")
         if deployment.timeout_seconds > 300:
             raise ValueError("diagnostic profile timeout must be at most 300 seconds")
         return cls(label, deployment.manifest_path, deployment.manifest_digest,
-                   deployment.model_sha256, deployment.executable_sha256, deployment.model_id)
+                   deployment.model_sha256, deployment.executable_sha256, deployment.model_id, file_digest)
 
     def public(self) -> dict:
         return dict(label=self.label, manifest_sha256=self.manifest_sha256,
                     model_sha256=self.model_sha256, executable_sha256=self.executable_sha256,
-                    model_id_sha256=_text_digest(self.model_id))
+                    model_id_sha256=_text_digest(self.model_id), manifest_file_sha256=self.manifest_file_sha256)
 
 
 def _receipt(profile: Profile, task: Task, receipt: object) -> str:
@@ -178,7 +185,8 @@ def compare(
                     began = clock()
                     try:
                         receipt = qualify(profile.manifest, prompt=task.prompt,
-                                          max_output_tokens=task.max_tokens)
+                                          max_output_tokens=task.max_tokens,
+                                          expected_manifest_sha256=profile.manifest_file_sha256)
                     except (LocalModelDeploymentError, OSError, TimeoutError):
                         row["status"] = "execution_failed"
                     else:
@@ -198,12 +206,15 @@ def compare(
     paired = {}
     indexed = {(r["profile"], r["task"], r["repeat"]): r for r in rows}
     for profile in profiles[1:]:
-        wins = losses = ties = joint_exact = 0
+        wins = losses = ties = joint_exact = unmatched = 0
         ratios = []
         for task in _TASKS:
             for repeat in range(repeats):
                 baseline = indexed[reference, task.name, repeat]
                 contender = indexed[profile.label, task.name, repeat]
+                if not all(row["status"] in {"exact", "different"} for row in (baseline, contender)):
+                    unmatched += 1
+                    continue
                 a, b = baseline["status"] == "exact", contender["status"] == "exact"
                 wins += b and not a
                 losses += a and not b
@@ -213,7 +224,7 @@ def compare(
                     if baseline["elapsed_seconds"] > 0:
                         ratios.append(contender["elapsed_seconds"] / baseline["elapsed_seconds"])
         paired[profile.label] = dict(exact_wins=wins, exact_losses=losses, exact_ties=ties,
-                                    jointly_exact=joint_exact,
+                                    jointly_exact=joint_exact, unmatched_attempt_pairs=unmatched,
                                     median_wall_ratio_on_joint_exact=statistics.median(ratios) if ratios else None)
     report = {
         "schema": "skeleton.gguf.matched-diagnostic.v1",

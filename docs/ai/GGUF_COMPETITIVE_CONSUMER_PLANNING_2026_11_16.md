@@ -52,3 +52,14 @@ The result is neither private holdout evidence nor a signed attestation.
 
 Source tests use synthetic receipts and deliberately do not claim native model
 performance. Run `python -m pytest -q --noconftest tests/test_compare_consumer_gguf.py`.
+
+### Native pre-dispatch identity continuity
+
+The comparator pins the raw manifest bytes as well as the canonical manifest
+identity, passing the byte pin into the existing native qualification owner.
+Both sync and async qualification now compare the backend's captured weight
+and executable digests to the admitted manifest before inference. The
+existing per-run rehash remains enabled. Paired wins/losses exclude
+non-completed pairs and count those separately; they still appear as
+non-successes in the full planned-attempt denominators. This is not an
+OS sandbox or a signed measurement. Native device and exact-head CI remain held.

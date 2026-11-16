@@ -8,8 +8,8 @@ from scripts import compare_consumer_gguf as mod
 
 def _profiles():
     return [
-        mod.Profile("baseline", Path("baseline.json"), "a"*64, "b"*64, "c"*64, "base"),
-        mod.Profile("candidate", Path("candidate.json"), "d"*64, "e"*64, "f"*64, "cand"),
+        mod.Profile("baseline", Path("baseline.json"), "a"*64, "b"*64, "c"*64, "base", "1"*64),
+        mod.Profile("candidate", Path("candidate.json"), "d"*64, "e"*64, "f"*64, "cand", "2"*64),
     ]
 
 
@@ -17,8 +17,9 @@ def _qualifier(profiles, *, different=False, drift=False, corrupt=False):
     by_path = {p.manifest: p for p in profiles}
     by_prompt = {task.prompt: task for task in mod._TASKS}
     calls = []
-    def qualify(path, *, prompt, max_output_tokens):
+    def qualify(path, *, prompt, max_output_tokens, expected_manifest_sha256):
         p = by_path[path]
+        assert expected_manifest_sha256 == p.manifest_file_sha256
         calls.append((p.label, prompt))
         task = by_prompt[prompt]
         assert max_output_tokens == task.max_tokens
@@ -67,6 +68,8 @@ def test_identity_fault_holds_remaining_candidate_work(fault):
     assert sum(label == "candidate" for label, _ in calls) == 1
     assert report["summaries"]["candidate"]["failed"] == 12
     assert report["summaries"]["baseline"]["exact"] == 12
+    assert report["paired"]["candidate"]["exact_losses"] == 0
+    assert report["paired"]["candidate"]["unmatched_attempt_pairs"] == 12
 
 
 def test_failure_counted_and_no_false_exact():
