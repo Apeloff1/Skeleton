@@ -114,6 +114,8 @@ jobs:
         run: |
           python -m py_compile backend/core/dragon_dataset_ingest.py backend/core/dragon_lead_ingest.py backend/core/dragon_offline_dataset_handoff.py backend/core/dragon_publisher_export_proof.py
           python -m unittest discover -s backend/tests -p 'test_dragon_lead_graph.py' -v
+          python -m py_compile backend/core/dragon_capture_export_witness.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_capture_export_witness.py' -v
 
       - name: Canonical physical graph and independent writer qualification
         timeout-minutes: 8
