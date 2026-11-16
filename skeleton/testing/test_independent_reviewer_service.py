@@ -210,6 +210,8 @@ def test_real_mutual_tls_signed_review_and_attestation(tmp_path):
             try:
                 assert client(TEXT, digest(TEXT.encode())).allowed is True
                 assert client("unknown", digest(b"unknown")).allowed is False
+                assert (await client.review_async(TEXT, digest(TEXT.encode()))).allowed is True
+                assert (await client.review_async("unknown", digest(b"unknown"))).allowed is False
                 verifier = ReviewerCustodyVerifier(reviewer=client,
                     authority_id=anchor.authority_id, trust_anchor=anchor)
                 await verifier.verify(**SCOPE, epoch=2)

@@ -34,8 +34,11 @@ class ProtectedLocalComponents:
     projection_attestor: Callable[[Any, str, str], bool]
     roundtrip: Callable[[str], tuple[Sequence[int], str]] | None = None
     attest_source: Callable[..., Any] | None = None
+    review_async: Callable[..., Any] | None = None
 
     def __post_init__(self) -> None:
+        if self.review_async is not None and not callable(self.review_async):
+            raise ProviderPolicyError("protected local async review must be callable")
         if self.attest_source is not None and not callable(self.attest_source):
             raise ProviderPolicyError("protected local source attestation must be callable")
         if self.roundtrip is not None and not callable(self.roundtrip):
@@ -115,7 +118,7 @@ def compose_protected_local_adapter(
     if verified is not True:
         raise ProviderPolicyError("active model tokenizer identity was not verified")
     guard = GuardedLocalInference(
-        engine, reviewer=components.reviewer,
+        engine, reviewer=components.reviewer, review_async=components.review_async,
         tokenize=components.tokenize,
         detokenize=components.detokenize,
         roundtrip=components.roundtrip,

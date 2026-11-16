@@ -257,6 +257,7 @@ class GuardedLocalInference:
     def __init__(
         self, engine: Any, *,
         reviewer: BoundedAdversarialReviewer,
+        review_async: Callable[[str, str], Awaitable[Any]] | None = None,
         tokenize: Callable[[str], Sequence[int]] | None = None,
         detokenize: Callable[[Sequence[int]], str] | None = None,
         roundtrip: Callable[[str], tuple[Sequence[int], str]] | None = None,
@@ -281,6 +282,9 @@ class GuardedLocalInference:
             raise SealedContextError("native verification timeout must be finite and within 30 seconds")
         self.engine = engine
         self.reviewer = reviewer
+        if review_async is not None and not callable(review_async):
+            raise SealedContextError("async reviewer must be callable")
+        self._review_async = review_async
         self.tokenize = tokenize
         self.detokenize = detokenize
         if roundtrip is not None and not callable(roundtrip):
@@ -519,6 +523,22 @@ class GuardedLocalInference:
         if not self._review_slot.acquire(blocking=False):
             raise SealedContextBoundaryError("adversarial reviewer is busy")
         reviewer = self.reviewer
+        async_review = self._review_async
+        if async_review is not None:
+            try:
+                async with asyncio.timeout(timeout):
+                    verdict = await async_review(evidence.untrusted_text, evidence.untrusted_sha256)
+                    if self._review_async is not async_review or self.reviewer is not reviewer:
+                        raise SealedContextIntegrityError("adversarial reviewer changed during admission")
+                    return reviewer, verdict
+            except TimeoutError:
+                raise SealedContextBoundaryError("adversarial reviewer timed out") from None
+            except SealedContextError:
+                raise
+            except Exception:
+                raise SealedContextBoundaryError("adversarial reviewer unavailable") from None
+            finally:
+                self._review_slot.release()
         loop = asyncio.get_running_loop()
         future: asyncio.Future[Any] = loop.create_future()
 

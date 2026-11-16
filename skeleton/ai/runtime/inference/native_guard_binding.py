@@ -199,7 +199,16 @@ def make_pinned_native_guard_factory(
                 await reader.attest_reviewer(verifier=verifier, pin=pin, snapshot=snapshot,
                                              request_digest=request_digest)
 
-        return replace(components, verify_native_tokenizer=pinned_verifier, attest_source=attest)
+        async def signed_review(text, context_sha256):
+            if reviewer._anchor != anchor or getattr(reviewer, "_closed", True) is not False:
+                raise ProviderPolicyError("independent reviewer authority changed")
+            verdict = await SignedReviewerClient.review_async(reviewer, text, context_sha256)
+            if reviewer._anchor != anchor or getattr(reviewer, "_closed", True) is not False:
+                raise ProviderPolicyError("independent reviewer authority changed")
+            return verdict
+
+        return replace(components, verify_native_tokenizer=pinned_verifier, attest_source=attest,
+                       review_async=signed_review)
 
     return ProtectedLocalComponentFactory(snapshots=snapshots, build=build)
 

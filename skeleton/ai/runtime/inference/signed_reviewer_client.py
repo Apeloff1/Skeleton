@@ -119,7 +119,7 @@ class SignedReviewerClient:
             self._sync.close()
             raise
 
-    def __call__(self, untrusted_text: str, context_sha256: str) -> ReviewVerdict:
+    def _review_request(self, untrusted_text: str, context_sha256: str):
         if self._closed:
             raise ReviewerCustodyError("reviewer client closed")
         if type(untrusted_text) is not str or type(context_sha256) is not str:
@@ -137,6 +137,10 @@ class SignedReviewerClient:
             schema="skeleton.guard.review-request.v1", nonce=nonce,
             context_sha256=context_sha256, untrusted_text=untrusted_text,
         )
+        return nonce, request
+
+    def __call__(self, untrusted_text: str, context_sha256: str) -> ReviewVerdict:
+        nonce, request = self._review_request(untrusted_text, context_sha256)
         deadline = _now() + self._timeout_seconds
         try:
             with self._sync.stream(
@@ -159,6 +163,11 @@ class SignedReviewerClient:
             raise
         except Exception:
             raise ReviewerCustodyError("reviewer transport unavailable") from None
+        return self._verify_review(body, nonce, context_sha256)
+
+    def _verify_review(self, body, nonce, context_sha256):
+        if self._closed:
+            raise ReviewerCustodyError("reviewer client closed")
         try:
             doc = json.loads(
                 body, object_pairs_hook=_unique_json_object,
@@ -191,6 +200,38 @@ class SignedReviewerClient:
             doc["reason_code"],
         )
 
+    async def review_async(self, untrusted_text: str, context_sha256: str) -> ReviewVerdict:
+        """Cancellable total-deadline HTTP review, without worker threads."""
+        nonce, request = self._review_request(untrusted_text, context_sha256)
+        deadline = _now() + self._timeout_seconds
+        body = bytearray()
+        try:
+            async with asyncio.timeout(self._timeout_seconds):
+                async with self._async.stream(
+                    "POST", self._base_url + "/v1/review", json=request,
+                    headers={"Accept": "application/json", "Accept-Encoding": "identity"},
+                ) as response:
+                    if response.status_code != 200:
+                        raise ReviewerCustodyError("reviewer unavailable")
+                    _bounded_headers(response, _MAX_RESPONSE)
+                    # Do not accumulate hidden buffers waiting for a chunk size.
+                    async for chunk in response.aiter_raw():
+                        if _now() >= deadline or len(chunk) > _MAX_RESPONSE - len(body):
+                            raise ReviewerCustodyError("reviewer deadline or response bound elapsed")
+                        body.extend(chunk)
+                if _now() >= deadline:
+                    raise ReviewerCustodyError("reviewer total deadline elapsed")
+                result = self._verify_review(body, nonce, context_sha256)
+                if _now() >= deadline:
+                    raise ReviewerCustodyError("reviewer total deadline elapsed")
+                return result
+        except ReviewerCustodyError:
+            raise
+        except TimeoutError:
+            raise ReviewerCustodyError("reviewer total deadline elapsed") from None
+        except Exception:
+            raise ReviewerCustodyError("reviewer transport unavailable") from None
+
     async def attest_challenge(self, payload: bytes) -> bytes:
         if self._closed:
             raise ReviewerCustodyError("reviewer client closed")
@@ -207,7 +248,7 @@ class SignedReviewerClient:
                         raise ReviewerCustodyError("reviewer signer unavailable")
                     _bounded_headers(response, 64)
                     output = bytearray()
-                    async for chunk in response.aiter_raw(chunk_size=64):
+                    async for chunk in response.aiter_raw():
                         if _now() >= deadline:
                             raise ReviewerCustodyError("reviewer signing deadline elapsed")
                         output.extend(chunk)

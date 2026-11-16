@@ -233,3 +233,74 @@ class SignedReviewerTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AsyncSignedReviewerTests(SignedReviewerTests):
+    async def test_async_signed_allow_and_deny(self):
+        client = self.make()
+        digest = hashlib.sha256(b"source").hexdigest()
+        self.assertIs((await client.review_async("source", digest)).allowed, True)
+        self.mode = "deny"
+        self.assertIs((await client.review_async("source", digest)).allowed, False)
+
+    async def test_async_review_wire_forgery_denied(self):
+        client = self.make()
+        digest = hashlib.sha256(b"source").hexdigest()
+        for mode in ("replay", "digest", "unsigned", "oversize", "redirect",
+                     "compressed", "declared_oversize", "duplicate", "nonfinite"):
+            self.mode = mode
+            with self.subTest(mode=mode), self.assertRaises(ReviewerCustodyError):
+                await client.review_async("source", digest)
+
+    async def test_stalled_async_stream_is_cancelled_on_total_deadline(self):
+        import asyncio
+        client = self.make()
+        await client._async.aclose()
+        client._timeout_seconds = 0.05
+        closed = asyncio.Event()
+
+        class Stall(httpx.AsyncByteStream):
+            async def __aiter__(self):
+                try:
+                    yield b"{"
+                    await asyncio.sleep(10)
+                finally:
+                    closed.set()
+            async def aclose(self):
+                closed.set()
+
+        async def respond(request):
+            return httpx.Response(200, stream=Stall())
+
+        client._async = httpx.AsyncClient(transport=httpx.MockTransport(respond))
+        with self.assertRaisesRegex(ReviewerCustodyError, "deadline"):
+            await client.review_async("source", hashlib.sha256(b"source").hexdigest())
+        self.assertTrue(closed.is_set())
+
+    async def test_external_cancel_propagates_and_releases_stream(self):
+        import asyncio
+        client = self.make()
+        await client._async.aclose()
+        entered, closed = asyncio.Event(), asyncio.Event()
+
+        class Stall(httpx.AsyncByteStream):
+            async def __aiter__(self):
+                try:
+                    entered.set()
+                    await asyncio.sleep(10)
+                    yield b"{}"
+                finally:
+                    closed.set()
+            async def aclose(self):
+                closed.set()
+
+        async def respond(request):
+            return httpx.Response(200, stream=Stall())
+
+        client._async = httpx.AsyncClient(transport=httpx.MockTransport(respond))
+        task = asyncio.create_task(client.review_async("source", hashlib.sha256(b"source").hexdigest()))
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        task.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await task
+        self.assertTrue(closed.is_set())
