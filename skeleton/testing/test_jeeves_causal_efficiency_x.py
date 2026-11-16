@@ -2,17 +2,14 @@
 from __future__ import annotations
 
 from array import array
-from dataclasses import replace
 import math
-import random
-import sys
 import threading
 import unittest
 from unittest.mock import PropertyMock, patch
 
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime, NativeConversationSession
 from skeleton.ai.model_runtime.flgb_model_runtime import VocabularyManifest, digest_json
-from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig, RuntimeContractError
+from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig
 from skeleton.ai.model_runtime.tokenization import NativeTokenizer, TokenizerContractError
 from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
 from skeleton.ai.runtime.inference.local import LocalInferenceRequest
@@ -56,16 +53,17 @@ class LastQueryTests(unittest.TestCase):
         ids=rt.encode(TEXT).token_ids
         final=model.layers[-1]
         import skeleton.cortex.transformer as module
+        import skeleton.cortex.attn as attention
         original=module.matvec
         counts={}
         def count(matrix, vector):
             counts[id(matrix)]=counts.get(id(matrix),0)+1
             return original(matrix,vector)
-        with patch.object(module,"matvec",side_effect=count):
+        with patch.object(module,"matvec",side_effect=count), patch.object(attention,"matvec",side_effect=count):
             expected=model._unembed(model._forward(ids,retain_cache=False)[0][-1])
         baseline=dict(counts)
         counts.clear()
-        with patch.object(module,"matvec",side_effect=count):
+        with patch.object(module,"matvec",side_effect=count), patch.object(attention,"matvec",side_effect=count):
             actual=model._logits(ids)
         self.assertEqual(actual,expected)
         for matrix in (final.Wq,final.Wo,final.W1,final.Wu,final.W2):
