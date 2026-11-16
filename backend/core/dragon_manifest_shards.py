@@ -26,7 +26,9 @@ class ShardedManifestArchive:
         self._lock=RLock()
 
     def ledger_paths(self):
-        try:return shard_paths(self.path,"manifest")
+        try:
+            from core.dragon_ecosystem_custody import manifest_paths
+            return tuple(manifest_paths(self.path))
         except (ShardHeld,OSError) as exc:raise StorageHeld("manifest topology held") from exc
 
     def _owner(self,scope):

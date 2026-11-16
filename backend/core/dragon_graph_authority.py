@@ -414,6 +414,8 @@ def qualify(root,*,full=False):
                 _verify_graph(db);_verify_directory(db)
                 from core.dragon_graph_direct_writer import verify
                 verify(db)
+                from core.dragon_graph_multi_batch import verify as verify_multi
+                verify_multi(db)
             db.execute("COMMIT")
         except BaseException:
             if db.in_transaction:db.execute("ROLLBACK")
@@ -547,8 +549,18 @@ def main():
     structural.add_argument("--offline-writers-stopped",action="store_true")
     repair=sub.add_parser("recover-structural");repair.add_argument("--root",required=True)
     state=sub.add_parser("structural-status");state.add_argument("--root",required=True)
+    concurrent=sub.add_parser("enable-multi-batch");concurrent.add_argument("--root",required=True)
+    concurrent.add_argument("--offline-writers-stopped",action="store_true")
+    overlapping=sub.add_parser("enable-same-owner");overlapping.add_argument("--root",required=True)
+    overlapping.add_argument("--offline-writers-stopped",action="store_true")
     a=parser.parse_args()
-    if a.command=="enable-structural-writers":
+    if a.command=="enable-same-owner":
+        from core.dragon_graph_owner_concurrency import install
+        receipt=install(a.root,offline_acknowledged=a.offline_writers_stopped)
+    elif a.command=="enable-multi-batch":
+        from core.dragon_graph_multi_batch import install
+        receipt=install(a.root,offline_acknowledged=a.offline_writers_stopped)
+    elif a.command=="enable-structural-writers":
         from core.dragon_graph_structural import install
         receipt=install(a.root,offline_acknowledged=a.offline_writers_stopped)
     elif a.command=="recover-structural":

@@ -1,0 +1,14 @@
+# Dragon ecosystem offline local custody
+
+Run only after stopping every application, crawler, importer, garbage collector and older writer. Explicit environment-based scope: configured knowledge/practice databases, owner corpus roots and their canonical graph children, primary/backup manifest owner roots and enrolled internal write lanes, configured primary/backup Hoarder payload volumes, existing dataset files across all 2,560 routing positions. Missing referenced children hold; no implicit creation. Unknown or unconfigured stores, Mongo collections, derived index trees, unrelated application stores, keys and settings are excluded. Do not treat this as full application backup.
+
+From backend:
+- python -m core.dragon_ecosystem_custody export --destination PRIVATE_NEW_DIRECTORY --offline-writers-stopped
+- python -m core.dragon_ecosystem_custody verify --destination PRIVATE_NEW_DIRECTORY
+- python -m core.dragon_ecosystem_custody restore-new --destination PRIVATE_NEW_DIRECTORY --offline-writers-stopped
+
+Requires private absolute original paths, local filesystem semantics and sufficient aggregate free space. Journal checkpoint and DELETE conversion are performed per database while application writers are stopped. Exclusive per-file locks and final re-enumeration/hash readback detect many accidental changes, but do not constitute a distributed snapshot across arbitrary active writers. The SQLite inventory catalogue publishes only after every configured file has been copied and verified. Verification entails file hashes and SQLite integrity/FK checks. It does not decode all payloads against manifest content hashes or establish signed provenance. Keep the original package read-only and separately protected. Restore never overwrites; payload/graph children are copied before metadata, but no partial restore is launchable. Existing exact copies may replay. Partial staged copies or multiple hard links require custody inspection. Configuration and original paths remain unchanged.
+
+Nested manifest enrollment is now included in Hoarder physical qualification identity, invalidating receipts that omitted those files. Large enrollment counts increase qualification inventory cost and may exceed the existing receipt bound; fail closed, not silently omit. Physical device benchmark, Mongo relocation, full app startup/restore and exact-head CI remain distinct acceptance gates.
+
+Optional exhaustive sealed-payload witness: `python -m core.dragon_ecosystem_custody audit-payloads --destination PRIVATE_BACKUP`. Verifies volume usage counters, every sealed manifest's ordered chunk references, partition-specific physical owner identity, compressed/raw lengths, decompression and original whole-document SHA-256 from exported bytes. Eight volume connections maximum; scans all sealed manifests and can be expensive. Building, aborted and unreferenced payloads are preserved without asserting semantic completeness.
