@@ -113,6 +113,8 @@ class ModelSource:
     inventory_digest: str
     plan: WeightLoadPlan
     headers: tuple[dict, ...]
+    manifest_sha256: str | None = None
+    manifest_bytes: int | None = None
 
     def __post_init__(self) -> None:
         for key in ("plan_digest", "model_identity_digest", "inventory_digest"):
@@ -121,6 +123,11 @@ class ModelSource:
                 and self.plan.digest == self.plan_digest
                 and self.plan.model_identity_digest == self.model_identity_digest,
                 "selected source plan identity mismatch")
+        require((self.manifest_sha256 is None) == (self.manifest_bytes is None),
+                "incomplete selected manifest pin")
+        if self.manifest_sha256 is not None:
+            identity(self.manifest_sha256, "selected manifest SHA")
+            integer(self.manifest_bytes, 1, 16 * MIB, "selected manifest bytes")
         require(type(self.headers) is tuple and len(self.headers) in (0, len(self.plan.shards)),
                 "incomplete GGUF framing set")
         for shard, header in zip(self.plan.shards, self.headers):
@@ -139,6 +146,7 @@ class ModelSource:
                 "shards": [{"index": row.index, "digest": row.digest, "bytes": row.bytes,
                             "source_label_digest": digest(row.source)} for row in self.plan.shards],
                 "gguf_headers": [dict(row) for row in self.headers],
+                "manifest_sha256": self.manifest_sha256, "manifest_bytes": self.manifest_bytes,
                 "tensor_validation": "not_assessed", "activation": "not_performed"}
 
 
@@ -172,7 +180,8 @@ def inspect_source(root: Path, *, plan_digest: str, model_identity_digest: str,
     _, final_sha, final_size = store.manifest_evidence(plan_digest, maximum=manifest_bytes)
     require(final_sha == manifest_sha and final_size == manifest_bytes,
             "selected manifest identity changed during inspection")
-    return ModelSource(plan_digest, model_identity_digest, inventory["digest"], plan, headers)
+    return ModelSource(plan_digest, model_identity_digest, inventory["digest"], plan, headers,
+                       manifest_sha, manifest_bytes)
 
 
 @dataclass(frozen=True, slots=True)
