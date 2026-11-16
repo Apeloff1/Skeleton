@@ -130,6 +130,8 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
         self._cutover_requested = database is core_db and requested()
         self._cutover_active = False
         self._mongo_client = None
+        self._derived_database = None
+        self._derived_epochs = {}
         self._sessions = database["dragon_crawler_sessions"]
         self._limits = database["dragon_crawler_commands"]
         try:
@@ -143,7 +145,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
 
     @property
     def sessions(self):
-        if self._cutover_requested and not self._cutover_active:
+        if getattr(self,"_cutover_requested",False) and not getattr(self,"_cutover_active",False):
             raise CrawlerError("crawler_mongo_cutover_held","Dragon dedicated authority is not qualified.",503)
         return self._sessions
 
@@ -153,7 +155,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
 
     @property
     def limits(self):
-        if self._cutover_requested and not self._cutover_active:
+        if getattr(self,"_cutover_requested",False) and not getattr(self,"_cutover_active",False):
             raise CrawlerError("crawler_mongo_cutover_held","Dragon dedicated authority is not qualified.",503)
         return self._limits
 
@@ -166,13 +168,19 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
         from core.dragon_mongo_cutover import activate
         self._cutover_active=False
         try:
-            client,target=await activate(self.database,self._mongo_client)
+            client,target,epochs=await activate(self.database,self._mongo_client)
         except Exception:
             raise CrawlerError("crawler_mongo_cutover_held","Dragon dedicated authority is not qualified.",503) from None
         self._mongo_client=client
         self._sessions=target["dragon_crawler_sessions"]
         self._limits=target["dragon_crawler_commands"]
         self._indexes_ready=False
+        self._derived_database=target
+        self._derived_epochs=epochs
+        self._current_vector_ready=False
+        self._full_vectors_ready=False
+        self._current_purge_after=None
+        self._full_purge_after=None
         self._cutover_active=True
         return {"configured":True,"active":True}
 
@@ -277,7 +285,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                 if available
                 else "Run first-install diagnostics and configure CORE_DB and canonical engine storage admission."
             ),
-            "storage_authority": "dedicated Dragon Mongo" if self._cutover_active else ("held dedicated Dragon Mongo" if self._cutover_requested else "CORE_DB Mongo"),
+            "storage_authority": "dedicated Dragon Mongo" if getattr(self,"_cutover_active",False) else ("held dedicated Dragon Mongo" if getattr(self,"_cutover_requested",False) else "CORE_DB Mongo"),
             "network_reachability_verified": False,
             "capabilities": {
                 "manual_crawl": available,

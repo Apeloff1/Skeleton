@@ -112,10 +112,14 @@ def enroll(graph,scope,*,acknowledged=False,reset=False):
     if acknowledged is not True or type(reset) is not bool:raise ValueError("edge metadata acknowledgement")
     _root();owner=owner_key(scope)
     from core.dragon_graph_authority import active
+    from core.dragon_projection_relocation import permit
+    from core.dragon_graph_deployment import DeploymentHeld
     with graph._db() as db:
         if active(db):raise ValueError("derived projection redundant in canonical graph mode")
         db.execute("BEGIN IMMEDIATE")
         try:
+            try:permit(db,"edges",_root())
+            except DeploymentHeld as exc:raise EdgeHeld("projection relocation held") from exc
             if not db.execute("SELECT 1 FROM lead_owner WHERE owner=?",(owner,)).fetchone():raise LookupError("lead owner missing")
             prior=db.execute("SELECT epoch FROM lead_edge_enrollment WHERE owner=?",(owner,)).fetchone()
             if prior and not reset:epoch=prior[0]
@@ -186,10 +190,18 @@ def _step(source,owner,epoch,lane):
 
 
 def pulse(graph):
-    _root();now=int(time.time())
+    target=_root()
+    from core.dragon_projection_relocation import advance,permit
+    from core.dragon_graph_deployment import DeploymentHeld
+    try:rotation=advance(graph,"edges",target)
+    except DeploymentHeld as exc:raise EdgeHeld("projection relocation held") from exc
+    if rotation is not None:return rotation
+    now=int(time.time())
     with graph._db() as db:
         db.execute("BEGIN IMMEDIATE")
         try:
+            try:permit(db,"edges",target)
+            except DeploymentHeld as exc:raise EdgeHeld("projection relocation held") from exc
             job=db.execute("SELECT * FROM lead_edge_enrollment WHERE due<=? ORDER BY due,owner LIMIT 1",(now,)).fetchone()
             if job is None:
                 db.execute("COMMIT");return {"processed":0}
@@ -202,6 +214,8 @@ def pulse(graph):
             raise
         db.execute("BEGIN")
         try:
+            try:permit(db,"edges",target)
+            except DeploymentHeld as exc:raise EdgeHeld("projection relocation held") from exc
             result=_step(db,owner,epoch,lane)
             db.execute("COMMIT")
         except BaseException:
@@ -221,6 +235,10 @@ def pulse(graph):
 
 
 def lookup(db,owner,lead,*,field,lower,limit):
+    from core.dragon_projection_relocation import permit
+    from core.dragon_graph_deployment import DeploymentHeld
+    try:permit(db,"edges",_root())
+    except DeploymentHeld as exc:raise EdgeHeld("projection relocation held") from exc
     if field not in {"parent","child"} or type(limit) is not int or not 1<=limit<=100:raise ValueError("edge search bounds")
     enrollment=db.execute("SELECT epoch FROM lead_edge_enrollment WHERE owner=?",(owner,)).fetchone()
     if not enrollment:raise EdgeHeld("edge projection not enrolled")

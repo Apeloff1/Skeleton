@@ -83,7 +83,9 @@ async def activate(source,client=None):
     try:
         target=client[receipt["target_db"]]
         await verify_remote(target,receipt)
-        return client,target
+        from core.dragon_posting_lineage import prepare
+        epochs=await prepare(target,receipt["receipt_sha"])
+        return client,target,epochs
     except BaseException:
         if owned and client is not None:client.close()
         raise
