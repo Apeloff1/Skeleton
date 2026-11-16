@@ -318,3 +318,94 @@ def plan_artifacts(demands: Sequence[ArtifactDemand], residents: Sequence[Artifa
         room[destination]-=artifact.byte_count
         total_transfer_bytes-=artifact.byte_count
     return ArtifactPlan(tuple(sorted(tasks-held)),tuple(sorted(held)),tuple(transfers))
+
+
+@dataclass(frozen=True, slots=True)
+class PipelineJob:
+    task_id: str
+    transfer_us: int
+    compute_us: int
+    bytes_staged: int
+    deadline_us: int
+    priority: int
+
+    def __post_init__(self) -> None:
+        identifier(self.task_id)
+        bounded_int(self.transfer_us,"transfer duration")
+        bounded_int(self.compute_us,"compute duration",1)
+        bounded_int(self.bytes_staged,"staging bytes")
+        bounded_int(self.deadline_us,"deadline",1)
+        bounded_int(self.priority,"priority",0,1000)
+
+
+@dataclass(frozen=True, slots=True)
+class PipelineInterval:
+    task_id: str
+    transfer_start_us: int
+    transfer_end_us: int
+    compute_start_us: int
+    compute_end_us: int
+
+
+@dataclass(frozen=True, slots=True)
+class PipelinePlan:
+    intervals: tuple[PipelineInterval,...]
+    held: tuple[str,...]
+    makespan_us: int
+    serial_us: int
+    peak_staging_bytes: int
+
+
+def plan_compute_transfer_overlap(jobs: Sequence[PipelineJob], *, staging_bytes: int,
+                                  dedicated_copy_verified: bool,
+                                  horizon_us: int) -> PipelinePlan:
+    """Simulate one copy lane and one compute lane with bounded staging custody.
+
+    A verified separate copy engine is required for overlap. Every job retains
+    its staging reservation from copy start through compute completion.
+    Intervals are estimates, not native GPU execution or readiness evidence.
+    """
+    bounded_int(staging_bytes,"staging capacity")
+    bounded_int(horizon_us,"horizon",1)
+    if type(dedicated_copy_verified) is not bool or len(jobs)>4096:
+        raise DispatchPolicyError("invalid pipeline input")
+    if any(not isinstance(j,PipelineJob) for j in jobs) or len({j.task_id for j in jobs})!=len(jobs):
+        raise DispatchPolicyError("invalid pipeline identity")
+    from heapq import heappush,heappop
+    copy_end=compute_end=live=peak=serial=0
+    releases=[]
+    result=[]
+    held=[]
+    for job in sorted(jobs,key=lambda j:(j.priority>10,j.deadline_us,j.priority,j.task_id)):
+        if job.bytes_staged>staging_bytes:
+            held.append(job.task_id)
+            continue
+        start=max(copy_end,0 if dedicated_copy_verified else compute_end)
+        # Remove finished reservations; then push copy start forward until
+        # there is room. No capacity is credited before prior compute ends.
+        pending=list(releases)
+        staged=live
+        while pending and pending[0][0]<=start:
+            _,size=heappop(pending)
+            staged-=size
+        while pending and staged+job.bytes_staged>staging_bytes:
+            finish,size=heappop(pending)
+            start=max(start,finish)
+            staged-=size
+        end=start+job.transfer_us
+        calculate=max(end,compute_end)
+        finish=calculate+job.compute_us
+        if finish>min(job.deadline_us,horizon_us):
+            held.append(job.task_id)
+            continue
+        while pending and pending[0][0]<=start:
+            _,size=heappop(pending)
+            staged-=size
+        live=staged+job.bytes_staged
+        releases=pending
+        heappush(releases,(finish,job.bytes_staged))
+        peak=max(peak,live)
+        copy_end,compute_end=end,finish
+        serial+=job.transfer_us+job.compute_us
+        result.append(PipelineInterval(job.task_id,start,end,calculate,finish))
+    return PipelinePlan(tuple(result),tuple(sorted(held)),compute_end,serial,peak)

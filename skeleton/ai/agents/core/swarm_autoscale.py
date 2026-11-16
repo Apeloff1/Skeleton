@@ -204,3 +204,73 @@ def retire_idle_verified(runtime: SwarmRuntime, proposal: IdleRetirement, *,
             return False
         runtime.unregister_worker(proposal.worker_id, requeue=False)
         return runtime.worker(proposal.worker_id) is None
+
+
+@dataclass(frozen=True, slots=True)
+class WorkerMemoryObservation:
+    worker_id: str
+    generation_sha256: str
+    observed_seconds: float
+    reclaimable_bytes: int
+    reload_ms: int
+
+    def __post_init__(self) -> None:
+        if (type(self.worker_id) is not str or not self.worker_id
+                or type(self.generation_sha256) is not str or len(self.generation_sha256)!=64
+                or any(c not in "0123456789abcdef" for c in self.generation_sha256)):
+            raise ValueError("invalid worker memory identity")
+        if (isinstance(self.observed_seconds,bool) or not isfinite(self.observed_seconds)
+                or type(self.reclaimable_bytes) is not int or not 0 <= self.reclaimable_bytes <= 10**15
+                or type(self.reload_ms) is not int or not 0 <= self.reload_ms <= 10**12):
+            raise ValueError("invalid memory observation")
+
+
+def propose_memory_passivation(runtime: SwarmRuntime, observations: tuple[WorkerMemoryObservation,...],
+                                *, reclaim_bytes: int, desired_slots: int, idle_seconds: float,
+                                max_age_seconds: float = 5.0, maximum_workers: int = 64,
+                                protected: frozenset[str] = frozenset()) -> tuple[IdleRetirement,...]:
+    """Prefer fresh generation-bound reclaimable bytes per reload cost.
+
+    Observed reclaimable bytes must already exclude shared memory and pinned
+    descendants. A proposal neither evicts memory nor authorizes physical stop.
+    Final stop/removal must use the existing verified retirement boundary.
+    """
+    if (type(reclaim_bytes) is not int or not 1 <= reclaim_bytes <= 10**15
+            or isinstance(max_age_seconds,bool) or not isfinite(max_age_seconds) or max_age_seconds<=0
+            or type(maximum_workers) is not int or not 1<=maximum_workers<=1024
+            or len(observations)>4096 or any(not isinstance(o,WorkerMemoryObservation) for o in observations)
+            or len({o.worker_id for o in observations})!=len(observations)):
+        raise ValueError("invalid memory passivation observations")
+    if not runtime.fenced or getattr(runtime,"_lock",None) is None:
+        raise ValueError("passivation requires hardened fenced runtime")
+    with runtime._lock:
+        snapshot=runtime.snapshot()
+        if snapshot.queued:
+            return ()
+        # Enumerate all idle eligible roots without over-selecting capacity;
+        # perform the memory-prioritized selection against the same slot floor.
+        occupied=snapshot.leased+sum(t.effect_uncertain for t in runtime.tasks())
+        spare=snapshot.available_slots+occupied-max(occupied,desired_slots)
+        now=runtime._clock()
+        ranked=[]
+        if type(desired_slots) is not int or desired_slots<0 or isinstance(idle_seconds,bool) or not isfinite(idle_seconds) or idle_seconds<=0:
+            raise ValueError("invalid passivation floor")
+        for o in observations:
+            worker=runtime.worker(o.worker_id)
+            if (worker is None or worker.id in protected or worker.parent_id is not None
+                    or worker.delegated_capacity or worker.active or not o.reclaimable_bytes
+                    or now-worker.last_seen<idle_seconds or not 0<=now-o.observed_seconds<=max_age_seconds
+                    or _retirement_identity(worker)!=o.generation_sha256):
+                continue
+            ranked.append((-Fraction(o.reclaimable_bytes,max(1,o.reload_ms)),worker.id,o,worker))
+        result=[]
+        reclaimed=0
+        for _,_,o,worker in sorted(ranked,key=lambda row:row[:2]):
+            if len(result)>=maximum_workers or reclaimed>=reclaim_bytes:
+                break
+            if worker.capacity>spare:
+                continue
+            result.append(IdleRetirement(worker.id,worker.capacity,worker.last_seen,o.generation_sha256))
+            spare-=worker.capacity
+            reclaimed+=o.reclaimable_bytes
+        return tuple(result)

@@ -1484,3 +1484,52 @@ def test_alternative_failed_continuation_publication_retires_owner():
     assert broker.is_retired()
     recovered=bridge.load("run").restore_runtime()
     assert recovered.task("a").effect_uncertain and recovered.task("next") is None
+
+def test_alternative_weighted_shard_ownership_is_stable_and_capacity_bounded():
+    from skeleton.automation.agents.swarm_sharding import ShardMember, ResidentShard, weighted_owners, plan_resident_rebalance
+    a=ShardMember("a",1,1,1000,50,False)
+    b=ShardMember("b",1,2,100,50)
+    c=ShardMember("c",1,5,100,50)
+    members=(a,b,c)
+    shards=tuple(ResidentShard(str(i),"t","a","a"*64,10,1,i!=0) for i in range(5))
+    assert weighted_owners("key",members,generation=1,replicas=3)==weighted_owners("key",tuple(reversed(members)),generation=1,replicas=3)
+    counts={key:0 for key in ("b","c")}
+    for i in range(1000):
+        counts[weighted_owners(str(i),members,generation=1)[0]]+=1
+    assert counts["c"]>counts["b"]
+    p=plan_resident_rebalance(shards,members,tenant_id="t",generation=1,max_moves=2,max_bytes=20)
+    assert len(p.moves)==2 and p.reserved_bytes==20 and "0" in p.held
+    assert p==plan_resident_rebalance(tuple(reversed(shards)),tuple(reversed(members)),tenant_id="t",generation=1,max_moves=2,max_bytes=20)
+    assert all(m.source=="a" and m.target in {"b","c"} for m in p.moves)
+    with pytest.raises(ValueError):
+        plan_resident_rebalance(shards,members,tenant_id="wrong",generation=1)
+
+
+def test_alternative_passivation_ranks_memory_with_generation_and_slot_floor():
+    from skeleton.automation.agents.swarm_autoscale import WorkerMemoryObservation, _retirement_identity, propose_memory_passivation
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    now=[1.0]
+    runtime=HardenedSwarmRuntime(fenced=True,clock=lambda:now[0])
+    for key in ("a","b","c"):
+        runtime.register_worker(key,capacity=1)
+    now[0]=100.0
+    rows=tuple(WorkerMemoryObservation(key,_retirement_identity(runtime.worker(key)),100.0,size,10)
+               for key,size in (("a",5),("b",100),("c",50)))
+    result=propose_memory_passivation(runtime,rows,reclaim_bytes=100,desired_slots=2,idle_seconds=5)
+    assert [r.worker_id for r in result]==["b"]
+    stale=tuple(replace(row,observed_seconds=1.0) for row in rows)
+    assert not propose_memory_passivation(runtime,stale,reclaim_bytes=100,desired_slots=0,idle_seconds=5)
+    assert not propose_memory_passivation(runtime,rows,reclaim_bytes=100,desired_slots=3,idle_seconds=5)
+
+
+def test_alternative_copy_compute_overlap_respects_staging_and_deadlines():
+    from skeleton.intelligence.dispatch_affinity import PipelineJob, plan_compute_transfer_overlap
+    jobs=[PipelineJob("a",10,100,10,1000,5),PipelineJob("b",10,100,10,1000,5)]
+    parallel=plan_compute_transfer_overlap(jobs,staging_bytes=20,dedicated_copy_verified=True,horizon_us=1000)
+    serial=plan_compute_transfer_overlap(jobs,staging_bytes=20,dedicated_copy_verified=False,horizon_us=1000)
+    limited=plan_compute_transfer_overlap(jobs,staging_bytes=10,dedicated_copy_verified=True,horizon_us=1000)
+    assert parallel.makespan_us==210 and parallel.peak_staging_bytes==20
+    assert serial.makespan_us==limited.makespan_us==220
+    assert parallel.intervals[1].transfer_start_us==10
+    assert not plan_compute_transfer_overlap(jobs,staging_bytes=0,dedicated_copy_verified=True,horizon_us=1000).intervals
+    assert plan_compute_transfer_overlap(jobs,staging_bytes=20,dedicated_copy_verified=True,horizon_us=110).held==("b",)

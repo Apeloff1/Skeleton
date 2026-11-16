@@ -38,7 +38,7 @@ Further research queue (not yet verified): Restate, Oban, pg-boss, Faktory, Asyn
 | A14 | Transactional unique job identity | River / Oban | P |
 | A15 | Versioned activation identity | Orleans | P |
 | A16 | Idle actor passivation | Pekko / Orleans | P |
-| A17 | Memory-sensitive passivation | Orleans | Open |
+| A17 | Memory-sensitive passivation | Orleans | P |
 | A18 | Communication affinity graph | Orleans | P |
 | A19 | Bounded migration rounds | Orleans | P |
 | A20 | Activation balance and anti-thrash | Orleans | P |
@@ -53,9 +53,9 @@ Further research queue (not yet verified): Restate, Oban, pg-boss, Faktory, Asyn
 | A29 | Shared artifact transfer amortization | TaskVine | P |
 | A30 | Versioned environment reuse | TaskVine | P |
 | A31 | Data-ready execution barriers | StarPU / PaRSEC | P |
-| A32 | Compute-transfer overlap planning | StarPU / Legion | Open |
-| A33 | Weighted resident shard split | Pekko / Orleans | Open |
-| A34 | Bounded membership migration | Pekko | Open |
+| A32 | Compute-transfer overlap planning | StarPU / Legion | P |
+| A33 | Weighted resident shard split | Pekko / Orleans | P |
+| A34 | Bounded membership migration | Pekko | P |
 | A35 | Measured dispatch policy comparison | HPX / Taskflow | Open |
 | A36 | End-to-end mixed-workload qualification | All alternatives | Open |
 
@@ -141,3 +141,16 @@ hold the existing exclusive run-writer lease and must not bypass the
 verified owner. No external side-effect transaction or automatic replay
 of a completed continuation is claimed. Uncertain write acknowledgment
 requires recovery and inspection, not blind repetition.
+
+## Wave A7: memory pressure passivation, weighted shards and overlapped pipelines
+
+Root retirement proposals can prioritize independently observed reclaimable
+bytes per estimated reload time while honoring freshness, exact activation
+identity, occupied capacity and minimum retained slots. The existing verified
+stop boundary remains authoritative. Weighted rendezvous placement is stable
+across membership order and includes bounded resident-state redistribution
+with distinct tenant/generation, byte/step budget and uncredited source release.
+The copy/compute pipeline proposes separate transfer and execution intervals
+only when a distinct copy engine has been verified; staging remains charged
+through work completion and deadlines/horizon remain enforced. None of these
+proposals moves bytes, activates workers, or claims actual GPU performance.
