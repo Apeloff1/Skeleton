@@ -674,6 +674,13 @@ def settle(root,sequence,plan_sha):
                 db.execute("COMMIT");return {"processed":0,"held":0,"replayed":True,"network_executed":False}
             plan,witness=pending
             if (plan["sequence"],witness)!=(sequence,plan_sha):raise a.GraphHeld("settlement reservation differs")
+            if same.enabled(db):
+                from core.dragon_lead_graph import MAX_NODES,MAX_EDGES
+                for owner in {job["owner"] for job in plan["jobs"]}:
+                    row=db.execute("SELECT nodes,edges FROM main.lead_owner WHERE owner=?",(owner,)).fetchone()
+                    escrow=same.quota(db,owner)
+                    if row is None or row[0]+escrow[0]>MAX_NODES or row[1]+escrow[1]>MAX_EDGES:
+                        raise a.GraphHeld("owner quota escrow witness differs at settlement")
             if not _live_grants(db,plan):
                 _rollback_grant(db,plan,witness)
                 db.execute("COMMIT")

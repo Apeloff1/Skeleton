@@ -110,7 +110,7 @@ def lanes(plan):
                 if before is None:count[0 if kind=="nodes" else 1]+=1
     # All changed lanes, including timestamp-only and replay changes, locked.
     claimed={(owner,index):[nodes,edges] for owner,index,nodes,edges in plan["deltas"]}
-    if result!=claimed:raise a.GraphHeld("lane quota witness differs")
+    if len(claimed)!=len(plan["deltas"]) or result!=claimed:raise a.GraphHeld("lane quota witness differs")
     return result
 
 
@@ -121,7 +121,7 @@ def reserve(db,plan):
     totals={owner:[0,0] for owner in owners}
     for owner in owners:
         check_owner(db,owner)
-        if plan["mode"]=="bootstrap" and db.execute("SELECT 1 FROM main.structural_batch_owners WHERE owner=?",(owner,)).fetchone():
+        if plan["mode"]=="bootstrap" and db.execute("SELECT 1 FROM main.structural_batch_owners WHERE owner=? AND sequence<>?",(owner,seq)).fetchone():
             raise ReservationBusy("bootstrap requires exclusive owner")
     for owner,kind,identity in resources:check_resource(db,owner,kind,identity)
     for (owner,index),delta in lane_rows.items():
