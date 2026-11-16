@@ -4811,6 +4811,63 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
             "valid_until": self._capture_freshness(row, source)["valid_until"],
         }
 
+    async def publisher_export_witness(self, scope, identifier, source_id, *, expected_version):
+        """Read exact raw-body identity, without exporting or retrieving bytes."""
+        from core.dragon_capture_export_witness import build_witness
+        from skeleton.ai.webcrawler.dragon_archive_grant import archive_expiry
+
+        def material(row):
+            if (type(expected_version) is not int or expected_version < 1
+                    or row["version"] != expected_version
+                    or row["status"] not in {"completed", "budget_exhausted"}
+                    or row.get("worker_token") is not None
+                    or row.get("lease_until") is not None
+                    or row.get("last_worker_exit_confirmed") is False):
+                raise CrawlerError("crawler_capture_witness_held",
+                                   "Select the current quiescent terminal capture.",409)
+            intent = _publisher_intent_projection(scope,row)
+            if intent is None or row.get("checkpoint_identity") is None:
+                raise CrawlerError("crawler_capture_witness_held",
+                                   "Witnessed publisher intake required.",409)
+            snapshot = _plain(self._custody_snapshot(row))
+            verify_primary(snapshot,_plain(row["checkpoint_identity"]))
+            policies = self._source_policies(row)
+            now = _now().timestamp()
+            review = _publisher_archive_preflight(intent,snapshot,policies,
+                        status=row["status"],now=now,witnessed=True)
+            if review["state"] != "explicit_archive_grant_required":
+                raise CrawlerError("crawler_capture_witness_held",
+                                   "Publisher archive review is held.",409)
+            source = snapshot["sources"].get(source_id)
+            if source is None:
+                raise CrawlerError("crawler_source_not_found","Captured source not found.",404)
+            policy = self._capture_policy(row,source)
+            self._assert_source_use(row,source)
+            if archive_expiry(row.get("archive_grant"),snapshot_digest=snapshot["snapshot_digest"],
+                              source=source,policy=policy,now=now) is None:
+                raise CrawlerError("crawler_capture_witness_held",
+                                   "Separate active archive permission required.",403)
+            if (source["provenance"].get("raw_bytes_retained") is not False
+                    or source["provenance"].get("raw_body_hash") != source["raw_body_hash"]):
+                raise CrawlerError("crawler_capture_witness_held",
+                                   "Raw body evidence is not qualified.",409)
+            return build_witness(session_id=identifier,session_version=expected_version,
+                    source_id=source_id,snapshot_digest=snapshot["snapshot_digest"],
+                    intent_digest=intent["intent_digest"],source_policy_version=policy["version"],
+                    raw_body_sha256=source["raw_body_hash"])
+
+        try:
+            result = material(await self._owned(scope,identifier))
+            # Re-read the owner/version/permission fence before returning a
+            # historical identity. A receipt cannot grant later source use.
+            if material(await self._owned(scope,identifier)) != result:
+                raise CrawlerError("crawler_capture_witness_held",
+                                   "Capture evidence changed during inspection.",409)
+            return result
+        except (CheckpointReplicaError,ValueError,KeyError,TypeError) as exc:
+            raise CrawlerError("crawler_capture_witness_held",
+                               "Capture evidence could not be verified.",409) from exc
+
     async def source_chunk(
         self,
         scope: dict[str, str],
