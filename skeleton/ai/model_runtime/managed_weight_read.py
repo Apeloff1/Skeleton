@@ -10,7 +10,7 @@ from .weight_store_disk_owner import WeightStoreDiskOwner
 
 _CONTROL_NAMES = (
     ".weight-stage.lock", ".weight-stage-policy.json", ".weight-stage-intent.json",
-    ".weight-stage-last.json", ".weight-stage-scrub.json",
+    ".weight-stage-last.json", ".weight-stage-scrub.json", ".weight-stage-range.json",
 )
 
 
