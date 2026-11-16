@@ -88,7 +88,7 @@ export function normalisePresetState(input: unknown): QuestionnaireState {
   }
   const instruments: Record<string, number> = Object.create(null);
   for (const [axis, value] of Object.entries(input.instruments)) {
-    if (!isDesignAxis(axis) || typeof value !== 'number') reject('unrecognised cockpit axis');
+    if (!isDesignAxis(axis) || typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) reject('invalid cockpit axis');
     const normalized = normaliseAxisEdit(value);
     if (normalized === null) reject('cockpit value must be finite and bounded');
     instruments[axis] = normalized;
@@ -99,14 +99,14 @@ export function normalisePresetState(input: unknown): QuestionnaireState {
       || !TARGETS.some((row) => row.id === options.target)) {
     reject('unavailable archetype or output');
   }
-  const era = safeOption(options.era, 'era');
-  const generation = safeOption(options.generation, 'generation');
-  const genre = input.galaxyGenre === null ? null : input.galaxyGenre;
+  const era = safeOption(options.era ?? null, 'era');
+  const generation = safeOption(options.generation ?? null, 'generation');
+  const genre = input.galaxyGenre ?? null;
   if (genre !== null && (typeof genre !== 'string' || !galaxyGenre(genre))) {
     reject('unknown historical genre');
   }
   let profile = null;
-  if (input.galaxyProfile !== null) {
+  if (input.galaxyProfile != null) {
     if (!plain(input.galaxyProfile) || input.galaxyProfile.schema !== GALAXY_PROFILE_SCHEMA) {
       reject('invalid historical Galaxy profile');
     }
@@ -119,12 +119,16 @@ export function normalisePresetState(input: unknown): QuestionnaireState {
     reject('invalid native quest configuration');
   }
   if (!plain(playable) || typeof playable.enabled !== 'boolean'
-      || typeof playable.launch !== 'boolean'
-      || !PLAYABLE_SLICES.some((row) => row.id === playable.mode)) {
+      || (playable.launch !== undefined && typeof playable.launch !== 'boolean')
+      || (playable.mode !== undefined && !PLAYABLE_SLICES.some((row) => row.id === playable.mode))) {
     reject('invalid playable mini-game selection');
   }
   if (quest.enabled && playable.launch) reject('quest and mini-game cannot both own startup');
   if (!playable.enabled && playable.launch) reject('disabled mini-game cannot own startup');
+  const playtest = input.playtest === undefined ? 'off' : input.playtest;
+  if (playtest !== 'off' && playtest !== 'auto' && playtest !== 'require') reject('invalid playtest mode');
+  const sourceExport = input.sourceExport === undefined ? { enabled: false } : input.sourceExport;
+  if (!plain(sourceExport) || typeof sourceExport.enabled !== 'boolean') reject('invalid source export preference');
   return {
     ...INITIAL_STATE,
     step: 'options',
@@ -133,8 +137,11 @@ export function normalisePresetState(input: unknown): QuestionnaireState {
     galaxyGenre: genre as string | null,
     galaxyProfile: profile,
     quest: { enabled: quest.enabled, length: quest.length as number },
-    playable: { enabled: playable.enabled, mode: playable.mode as string, launch: playable.launch },
+    playable: { enabled: playable.enabled, ...(playable.mode === undefined ? {} : { mode: playable.mode as string }),
+      ...(playable.launch === undefined ? {} : { launch: playable.launch as boolean }) },
     options: { archetype: options.archetype as string, target: options.target as string, era, generation },
+    playtest,
+    sourceExport: { enabled: sourceExport.enabled },
   };
 }
 
@@ -177,6 +184,8 @@ export function decodeDesignPresets(raw: string | null): DesignPreset[] {
   if (!plain(document) || document.schema !== DESIGN_PRESET_SCHEMA || !Array.isArray(document.entries)) {
     reject('unsupported local library');
   }
+  // Bound the record count before normalizing full matrix payloads.
+  if (document.entries.length > MAX_SAVED_PRESETS) reject('too many saved designs');
   const entries = document.entries.map(normalisePreset);
   // Re-encode to validate aggregate budget, duplicate names and schema.
   encodeDesignPresets(entries);
