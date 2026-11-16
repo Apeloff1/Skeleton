@@ -70,7 +70,7 @@ class Candidate:
         for value in (self.plan.model_bytes, self.plan.reserved_ram_bytes, self.plan.reserved_kv_bytes, self.plan.estimated_total_bytes, self.plan.available_ram_bytes):
             _integer(value, 1, 1 << 53)
         if (self.plan.reserved_kv_bytes != c.context_size * c.kv_bytes_per_token
-                or self.plan.estimated_total_bytes != self.plan.model_bytes + self.plan.reserved_ram_bytes + self.plan.reserved_kv_bytes + c.runtime_scratch_bytes
+                or self.plan.estimated_total_bytes != self.plan.model_bytes + self.plan.reserved_ram_bytes + self.plan.reserved_kv_bytes + c.runtime_scratch_bytes + c.speculation_reserve_bytes
                 or self.plan.estimated_total_bytes > self.plan.available_ram_bytes):
             raise ValueError("inconsistent candidate capacity accounting")
 
@@ -87,6 +87,8 @@ class Candidate:
                 "temperature", "timeout_seconds", "output_framing",
                 "max_output_bytes", "max_stderr_bytes", "runtime_scratch_bytes",
                 "kv_bytes_per_token", "reject_model_symlink", "rehash_artifacts_each_run",
+                "speculation_runtime_sha256", "speculation_ngram", "speculation_draft_tokens",
+                "speculation_min_hits", "speculation_reserve_bytes",
                 "runtime_libraries",
             )},
             "args": _digest(c.extra_args), "environment": _digest(dict(c.environment)),
