@@ -2680,6 +2680,25 @@ class CrawlerNavigationRetention(CrawlerRequest):
     acknowledged: bool = Field(strict=True)
 
 
+class CrawlerNavigationReview(CrawlerRequest):
+    state: str = Field(pattern=r"^(candidate|held|retired)$")
+    reason: str = Field(min_length=1,max_length=256)
+    expected_revision: int = Field(ge=0,le=9223372036854775806,strict=True)
+    next_review: int = Field(ge=0,le=1000000000000,strict=True)
+
+
+class CrawlerNavigationBatchItem(CrawlerRequest):
+    session_id: str = Field(min_length=1,max_length=128)
+    expected_snapshot_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class CrawlerNavigationBatch(CrawlerRequest):
+    sessions: list[CrawlerNavigationBatchItem] = Field(min_length=1,max_length=16)
+    rights_reference: str = Field(min_length=1,max_length=256)
+    retention_seconds: int = Field(ge=900,le=315360000,strict=True)
+    acknowledged: bool = Field(strict=True)
+
+
 class CrawlerNavigationAdvice(CrawlerRequest):
     as_of: int = Field(ge=0,le=1000000000000,strict=True)
     snapshot_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
@@ -3157,6 +3176,73 @@ async def crawler_navigation_purge(
 ) -> dict:
     from core.dragon_navigation_federation import application_call
     return await _crawler_result(application_call(crawler_application,scope,"purge"))
+
+
+@router.post("/crawler/navigation/federation/batch")
+async def crawler_navigation_batch(
+    body: CrawlerNavigationBatch,
+    scope: dict = Depends(_crawler_write_scope),
+) -> dict:
+    from core.dragon_navigation_federation import batch_publish
+    return await _crawler_result(batch_publish(crawler_application,scope,**body.model_dump()))
+
+
+@router.get("/crawler/navigation/federation/shortlist")
+async def crawler_navigation_shortlist(
+    query: str = Query(min_length=1,max_length=512),
+    host: str | None = Query(default=None,max_length=253),
+    limit: int = Query(default=48,ge=1,le=48),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"shortlist",
+        query=query,host=host,limit=limit))
+
+
+@router.get("/crawler/navigation/federation/portfolio")
+async def crawler_navigation_portfolio(
+    query: str = Query(min_length=1,max_length=512),
+    limit: int = Query(default=12,ge=1,le=24),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"portfolio",
+        query=query,limit=limit))
+
+
+@router.get("/crawler/navigation/federation/targets/{target}/topology")
+async def crawler_navigation_topology(
+    target: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+    direction: str = Query(default="children",pattern=r"^(children|parents)$"),
+    after: str | None = Query(default=None,pattern=r"^[a-f0-9]{64}$"),
+    limit: int = Query(default=32,ge=1,le=100),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"topology",
+        target=target,direction=direction,after=after,limit=limit))
+
+
+@router.post("/crawler/navigation/federation/targets/{target}/review")
+async def crawler_navigation_review(
+    body: CrawlerNavigationReview,
+    target: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+    scope: dict = Depends(_crawler_write_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"review",
+        target=target,**body.model_dump()))
+
+
+@router.post("/crawler/navigation/federation/reindex")
+async def crawler_navigation_reindex(
+    after: str | None = Query(default=None,pattern=r"^[a-f0-9]{64}$"),
+    limit: int = Query(default=100,ge=1,le=100),
+    scope: dict = Depends(_crawler_write_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"reindex",
+        after=after,limit=limit))
 
 
 @router.get("/crawler/sessions/{session_id}/navigation/packet")
