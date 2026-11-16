@@ -1954,6 +1954,7 @@ def main(argv: list[str] | None = None) -> int:
     model = parser.add_mutually_exclusive_group(required=True)
     model.add_argument("--native-checkpoint", type=Path)
     model.add_argument("--gguf-deployment", type=Path)
+    parser.add_argument("--native-device",choices=("cpu","torch-cpu","cuda"),help="explicit strict native execution device; no silent fallback")
     parser.add_argument("--database", type=Path)
     parser.add_argument("--token-file", type=Path, required=True,
                         help="new private bearer-token file; never overwritten")
@@ -1978,6 +1979,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--prefetch-predictor-config",type=Path,help="pinned local learned next-query predictor")
     parser.add_argument("--prefetch-predictor-config-sha256")
     args = parser.parse_args(argv)
+    if args.native_device is not None and args.native_checkpoint is None:
+        parser.error("native execution device requires a native checkpoint")
     if (bool(args.media_generation_config)!=bool(args.media_generation_config_sha256) or
             bool(args.prefetch_predictor_config)!=bool(args.prefetch_predictor_config_sha256)):
         parser.error("media generator and forecast model configurations require exact file digests")
@@ -1999,6 +2002,11 @@ def main(argv: list[str] | None = None) -> int:
         backend = (load_native_checkpoint(args.native_checkpoint)
                    if args.native_checkpoint is not None
                    else load_gguf_deployment(args.gguf_deployment))
+        if args.native_device is not None:
+            from skeleton.ai.model_runtime.runtime_contracts import DevicePolicy
+            from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
+            backend.runtime.bind_device(DevicePolicy(requested=args.native_device,allow_fallback=False))
+            backend=NativeRuntimeLocalModel(backend.runtime)
         db = args.database or private_desktop_database(backend.model_digest)
         token = secrets.token_urlsafe(48)
         ranker=None
