@@ -144,7 +144,7 @@ class OfflineAISession:
     assistant/workspace and terminal-turn authority instead.
     """
 
-    def __init__(self, backend: LocalDesktopModel) -> None:
+    def __init__(self, backend: LocalDesktopModel, *, prefill_owner: str | None = None) -> None:
         if not isinstance(backend, (NativeRuntimeLocalModel, LlamaCppModel)):
             raise OfflineAIError("canonical offline model backend required")
         if isinstance(backend, NativeRuntimeLocalModel):
@@ -152,11 +152,24 @@ class OfflineAISession:
         else:
             backend._assert_artifacts_stable()
         self.backend = backend
+        # Opaque process-local host namespace; never derived from user text,
+        # a URL or the database path. HTTP shares its own private namespace
+        # across per-turn session objects; desktop sessions own theirs.
+        self._owns_prefill_namespace = prefill_owner is None
+        self._prefill_namespace = prefill_owner or secrets.token_urlsafe(24)
         self.engine = LocalInferenceEngine(backend, cache_size=0)
         self.history: tuple[tuple[str, str], ...] = ()
         self.instructions: str = ""
 
+    def _prefill_scope(self) -> str:
+        return getattr(self, "session_id", "ephemeral")
+
+    def _forget_prefill(self, session_id: str | None = None) -> None:
+        if isinstance(self.backend, NativeRuntimeLocalModel):
+            self.backend.forget_private_prefill(self._prefill_namespace, session_id)
+
     def clear(self) -> None:
+        self._forget_prefill(self._prefill_scope())
         self.history = ()
 
     @property
@@ -198,6 +211,7 @@ class OfflineAISession:
             path, model_digest=self.backend.model_digest,
             tokenizer_digest=self.backend.tokenizer_digest,
         )
+        self._forget_prefill(self._prefill_scope())
         self.history = restored
         return len(restored) // 2
 
@@ -226,6 +240,7 @@ class OfflineAISession:
         from .offline_history import restore_history
 
         restored = restore_history(path, self.model_digest)
+        self._forget_prefill(self._prefill_scope())
         self.history = restored
         return len(restored) // 2
 
@@ -406,7 +421,14 @@ class OfflineAISession:
             inference_prompt, max_output_tokens,
             require_full_history=require_full_history,
         )
-        result: LocalInferenceResult = await self.engine.generate(request)
+        if isinstance(self.backend, NativeRuntimeLocalModel):
+            scope = self._prefill_scope()
+            self.backend.register_private_prefill(self._prefill_namespace, scope)
+            result: LocalInferenceResult = await self.engine.generate(
+                request, scope_id=scope, tenant_scope_id=self._prefill_namespace,
+            )
+        else:
+            result = await self.engine.generate(request)
         if (
             not isinstance(result.text, str)
             or not result.text.strip()
@@ -462,8 +484,9 @@ class DurableOfflineAISession(OfflineAISession):
     """
 
     def __init__(self, backend: LocalDesktopModel, *,
-                 database: str | Path, session_id: str | None = None) -> None:
-        super().__init__(backend)
+                 database: str | Path, session_id: str | None = None,
+                 prefill_owner: str | None = None) -> None:
+        super().__init__(backend, prefill_owner=prefill_owner)
         self.store = OfflineChatStore(database)
         self._busy_lock = threading.Lock()
         self._busy = False
@@ -560,6 +583,7 @@ class DurableOfflineAISession(OfflineAISession):
         self.store.delete(
             session_id, self.backend.model_digest, self.tokenizer_digest
         )
+        self._forget_prefill(session_id)
         if session_id == self.session_id:
             self.create_conversation()
 
@@ -659,6 +683,7 @@ class DurableOfflineAISession(OfflineAISession):
         except BaseException:
             # Discard uncommitted in-memory content even when inference itself
             # succeeded but SQLite CAS/disk storage failed.
+            self._forget_prefill(self.session_id)
             self.history = previous_history
             raise
         finally:
@@ -668,6 +693,8 @@ class DurableOfflineAISession(OfflineAISession):
     def close(self) -> None:
         if self._busy:
             raise OfflineAIError("cannot close active local generation")
+        if self._owns_prefill_namespace:
+            self._forget_prefill()
         self.store.close()
 
 
