@@ -253,7 +253,7 @@ server {
     # location = /setup { ignored comment
     location = /setup {
         try_files /setup.html /setup/index.html =404;
-        add_header Cache-Control "no-store";
+        add_header Cache-Control "no-store" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
         add_header Content-Security-Policy "frame-ancestors 'self'; base-uri 'self'; object-src 'none'" always;
     }
@@ -296,12 +296,17 @@ def test_production_ingress_rejects_duplicate_location_before_install(tmp_path, 
 @pytest.mark.parametrize("source,reason", [
     (_INGRESS.replace("=404", "/index.html"), "exported route or return 404"),
     (_INGRESS.replace("camera=()", "camera=(self)"), "privacy or cache policy drift"),
-    (_INGRESS.replace('add_header Cache-Control "no-store";', ""),
+    (_INGRESS.replace('add_header Cache-Control "no-store" always;',
+                      'add_header Cache-Control "no-store";'), "privacy or cache policy drift"),
+    (_INGRESS.replace('add_header Cache-Control "no-store" always;',
+                      'add_header Cache-Control "no-store" always;\n        add_header Cache-Control "public" always;'),
+     "privacy or cache policy drift"),
+    (_INGRESS.replace('add_header Cache-Control "no-store" always;', ""),
      "privacy or cache policy drift"),
     (_INGRESS.replace("location = /setup", "location /setup"), "missing exact setup"),
     (_INGRESS.replace('return 200 "ok\\n";', 'return 200 "wrong";'), "literal liveness"),
     (_INGRESS.replace("server {", "server {\ninclude alternate.conf;"), "unreviewed include"),
-    (_INGRESS.replace("location = /setup {", "location = /setup {\nif ($uri) { return 200; }"),
+    (_INGRESS.replace("\n    location = /setup {", "\n    location = /setup {\n        if ($uri) { return 200; }"),
      "nested block"),
     (_INGRESS + "}", "malformed"),
     (_INGRESS + "'unterminated", "malformed"),
