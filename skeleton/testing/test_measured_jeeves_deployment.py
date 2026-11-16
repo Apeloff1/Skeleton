@@ -8,6 +8,8 @@ are explicit test fixtures, never operational qualification.
 from __future__ import annotations
 
 import asyncio
+import io
+import json
 from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
@@ -69,7 +71,7 @@ def install_probes(monkeypatch, *, available=12 * GIB, scoped=12 * GIB,
                         lambda: sample(start=time.monotonic_ns() - 1000, available=available,
                                        temperature=temperature, origin=origin))
     monkeypatch.setattr("skeleton.app.offline_runtime_llama_binding.sample_serving_resources",
-                        lambda: ServingResources(memory_used_fraction=0.25,
+                        lambda *, fresh=False: ServingResources(memory_used_fraction=0.25,
                                                  available_memory_bytes=scoped,
                                                  memory_stall_fraction=memory_stall,
                                                  source="test-fixture"))
@@ -233,3 +235,136 @@ def test_measured_registry_unavailable_not_legacy_fallback_on_pin_failure(author
     assert not registry.active.available
     assert registry.measured_local_status() is None
     assert registry.redundancy_status()["fallback_providers"] == []
+
+
+def test_latest_evidence_failure_never_leaves_old_candidate(authored, monkeypatch):
+    install_probes(monkeypatch)
+    gate = MeasuredLlamaCpuGate(authored.backend, authored.source, authored.policy)
+    gate()
+    assert gate.status()["last"]["status"] == "candidate"
+    install_probes(monkeypatch, origin="fixture")
+    with pytest.raises(RuntimePreflightError, match="real local probe"):
+        gate()
+    assert gate.status()["checks"] == 2
+    assert gate.status()["last"]["status"] == "blocked"
+    assert gate.status()["last"]["blockers"] == ["native_evidence_check_failed"]
+    assert gate.status()["last"]["worker_ceiling"] == 0
+
+
+def test_spawn_fence_requests_uncached_collection(authored, monkeypatch):
+    install_probes(monkeypatch)
+    samples = []
+
+    def scoped(*, fresh=False):
+        samples.append(fresh)
+        return ServingResources(memory_used_fraction=0.25 if len(samples) == 1 else 0.995,
+                                available_memory_bytes=12 * GIB, source="test-fixture")
+
+    monkeypatch.setattr("skeleton.app.offline_runtime_llama_binding.sample_serving_resources", scoped)
+    gate = MeasuredLlamaCpuGate(authored.backend, authored.source, authored.policy)
+    gate()
+    with pytest.raises(RuntimePreflightError, match="launch denied"):
+        gate()
+    assert samples == [True, True]
+    assert gate.status()["last"]["serving_pressure"] == "critical"
+
+
+def test_serving_sampler_fresh_bypasses_existing_cache(monkeypatch):
+    from skeleton.ai.runtime.inference import local
+    calls = []
+    now = time.monotonic()
+    old = ServingResources(available_memory_bytes=GIB, source="cached-test")
+    new = ServingResources(available_memory_bytes=0, source="fresh-test")
+
+    def collect():
+        calls.append(True)
+        return new
+
+    monkeypatch.setattr(local, "_RESOURCE_COLLECTION", (now, old))
+    monkeypatch.setattr(local.time, "monotonic", lambda: now)
+    monkeypatch.setattr(local.os, "name", "posix")
+    monkeypatch.setattr(local.sys, "platform", "linux")
+    monkeypatch.setattr(local, "_sample_linux_resources", collect)
+    assert local.sample_serving_resources() is old
+    assert local.sample_serving_resources(fresh=True) is new
+    assert calls == [True]
+    assert local.sample_serving_resources() is new
+
+
+def test_pre_activation_inspection_is_neither_provider_nor_transferable_grant(authored, monkeypatch):
+    use_source(authored, monkeypatch)
+    install_probes(monkeypatch)
+    monkeypatch.setattr("skeleton.ai.runtime.inference.llama_cpp.subprocess.Popen",
+                        lambda *args, **kw: pytest.fail("inspection must not start a child"))
+    candidate = authored.spec.inspect(authored.deployment.manifest_path)
+    assert candidate["status"] == "candidate"
+    assert candidate["model_is_jeeves"]
+    assert candidate["provider_activation"] == "not_performed"
+    assert candidate["protected_authorities"] == "not_assessed"
+    assert not candidate["transferable_grant"] and not candidate["native_qualified"]
+    assert str(authored.deployment.manifest_path) not in json.dumps(candidate)
+    install_probes(monkeypatch, scoped=0)
+    blocked = authored.spec.inspect(authored.deployment.manifest_path)
+    assert blocked["status"] == "blocked"
+    assert blocked["observation"]["worker_ceiling"] == 0
+    authored.deployment.manifest_path.write_bytes(b"{}")
+    with pytest.raises(RuntimePreflightError, match="source or profile unavailable"):
+        authored.spec.inspect(authored.deployment.manifest_path)
+
+
+def test_installed_deployment_check_reports_pressure_and_no_activation(authored, monkeypatch):
+    from skeleton.app.offline_runtime_cli import main
+    use_source(authored, monkeypatch)
+    install_probes(monkeypatch, scoped=0)
+    args = ["deployment-check", "--store", str(authored.spec.store_path),
+            "--plan-sha", authored.spec.plan_digest,
+            "--model-identity-sha", authored.spec.model_identity_digest,
+            "--deployment", str(authored.deployment.manifest_path),
+            "--manifest-sha256", authored.spec.manifest_sha256,
+            "--manifest-digest", authored.spec.manifest_digest,
+            "--deployment-budget-mib", "1048576", "--require-candidate"]
+    out, err = io.StringIO(), io.StringIO()
+    assert main(args, stdout=out, stderr=err) == 3
+    result = json.loads(out.getvalue())
+    assert result["status"] == "blocked" and not result["transferable_grant"]
+    assert not err.getvalue()
+    out, err = io.StringIO(), io.StringIO()
+    assert main(args + ["--skip-gguf-framing"], stdout=out, stderr=err) == 2
+    assert not out.getvalue() and str(authored.spec.store_path) not in err.getvalue()
+
+
+def test_server_startup_requires_trusted_bootstrap_and_typed_model_pin(authored):
+    from skeleton.api.server import ServerState, create_app
+    with pytest.raises(RuntimeError, match="trusted protected bootstrap"):
+        create_app(measured_local_deployment=authored.spec)
+    with pytest.raises(TypeError, match="preconfigured"):
+        create_app(measured_local_deployment={})
+    state = ServerState()
+    with pytest.raises(TypeError):
+        state.configure_engine_measured_deployment({})
+    state.configure_engine_measured_deployment(authored.spec)
+    with pytest.raises(RuntimeError, match="rebound"):
+        state.configure_engine_measured_deployment(authored.spec)
+    with pytest.raises(RuntimeError, match="requires native guard and canonical Mongo"):
+        state.bind_engine_execution_service()
+    assert state.engine_execution_service is None
+    assert state.engine_execution_coordinator is None
+    state = ServerState()
+    state._engine_shutdown_pending = True
+    with pytest.raises(RuntimeError, match="before engine startup"):
+        state.configure_engine_measured_deployment(authored.spec)
+
+
+def test_server_registry_factory_preserves_canonical_governed_route(authored, monkeypatch):
+    from skeleton.api.server import ServerState
+    from skeleton.intelligence.admission_runtime import AdmissionRuntime
+    local_environment(authored, monkeypatch)
+    registry = ServerState._activate_engine_provider_registry(
+        admission_runtime=AdmissionRuntime(),
+        guarded_local_components=protected_components(),
+        measured_local_deployment=authored.spec,
+    )
+    assert registry.active.model == "jeeves"
+    assert registry.active.require_guarded_inference
+    assert registry.measured_local_status()["checks"] == 0
+    asyncio.run(registry.active.close())
