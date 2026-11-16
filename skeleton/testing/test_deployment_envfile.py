@@ -161,4 +161,4 @@ def test_redact_env_masks_secrets_and_uri_passwords() -> None:
 def test_redact_uri_variants() -> None:
     assert redact_uri("https://example.org/x") == "https://example.org/x"
     assert redact_uri("mongodb://onlyuser@h") == "mongodb://onlyuser@h"
-    assert redact_uri("mongodb://u:example-p@h1,h2/db?rs=a") == f"mongodb://u:{MASK}@h1,h2/db?rs=a"
+    assert redact_uri("mongodb://dummy-u:example-p@h1,h2/db?rs=a") == f"mongodb://dummy-u:{MASK}@h1,h2/db?rs=a"
