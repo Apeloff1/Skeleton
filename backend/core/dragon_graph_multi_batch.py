@@ -138,7 +138,8 @@ def terminal(db,seq,witness):
 def finish(db,plan,witness,*,aborted=False):
     seq=plan["sequence"]
     for key in plan["lanes"]:
-        db.execute("DELETE FROM "+a._alias(int(key))+".structural_receipts WHERE sequence=?",(seq,))
+        change=db.execute("DELETE FROM "+a._alias(int(key))+".structural_receipts WHERE sequence=?",(seq,))
+        if not aborted and change.rowcount!=1:raise a.GraphHeld("settled lane receipt disappeared")
     db.execute("DELETE FROM main.structural_batch_owners WHERE sequence=?",(seq,))
     if db.execute("DELETE FROM main.structural_batches WHERE sequence=? AND sha256=?",(seq,witness)).rowcount!=1:
         raise a.GraphHeld("multi-batch reservation disappeared")

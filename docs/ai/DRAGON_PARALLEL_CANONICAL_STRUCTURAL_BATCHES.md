@@ -23,3 +23,12 @@ The existing read-only Dragon Atlas backend workflow explicitly invokes this fix
 ### Multi-root maintenance
 
 Each pulse claims two distinct owner roots from the persistent rotation and runs their batches concurrently, isolating a missing root instead of blocking the other. Each root still serializes its own pending reservation and final settlement; no same-root multi-batch concurrency claim. Nested lane workers remain bounded to four per batch. Unsharded installations retain one root. Actual throughput remains hardware- and contention-dependent.
+
+
+### Same-root multi-batch operation
+
+After recovering all old pending reservations, stop all writers and take a coherent backup of the root plus all ten canonical graph databases. Explicitly enable the new protocol using `python -m core.dragon_graph_authority enable-multi-batch --root /private/corpus/root.db --offline-writers-stopped`. Existing and new layouts retain the legacy one-batch protocol until this activation. Downgrading after activation is unsupported.
+
+The upgraded root holds up to four distinct-owner reservations (64 MiB aggregate plan bytes). Individual owners remain exclusive across pending plans so quotas, preimages, snapshot grants and page chains cannot overlap. Physical lane receipts are keyed by reservation sequence; different batches sharing a lane are serialized there, while up to four independent lane workers advance separate physical files concurrently. The scheduler reserves bounded work before applying lane groups and settles only after worker completion. Terminal results can settle out of order. Root reservation and final publication are still serialized. The aggregate fence intentionally holds ordinary graph access until all reservations settle or compensate, including reads of otherwise unaffected owners. A missing file can still block attached-root settlement. Recovery resumes pending reservations only; an invalid grant compensates that plan without touching another owner's rows. A bounded terminal cache retains 4096 diagnostics; authoritative page/feed/job receipts survive its eviction. Full qualification checks for orphan reservations and lane receipts.
+
+No same-owner concurrent batches, online migration, measured throughput or live hardware qualification is claimed. Regression fixtures cover independent owner reservations, simultaneous physical lane writes, shared-lane receipt custody, reverse-order publication, quota limits, grant compensation, scheduler admission and idle audit. Execute exact-head CI before promoting this change.
