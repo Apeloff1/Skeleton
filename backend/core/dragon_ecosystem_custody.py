@@ -25,6 +25,8 @@ MAX_FILES=1_000_000
 DB_VARS={
     "knowledge":"SKL_DRAGON_KNOWLEDGE_DB_PATH",
     "practice":"SKL_DRAGON_PRACTICE_DB_PATH",
+    "raw_export_custody":"SKL_DRAGON_RAW_EXPORT_DB_PATH",
+    "export_jobs":"SKL_DRAGON_EXPORT_JOB_DB_PATH",
     "corpus":"SKL_DRAGON_GAME_CORPUS_DB_PATH",
     "primary_manifest":"SKL_DRAGON_HOARDER_MANIFEST_DB_PATH",
     "backup_manifest":"SKL_DRAGON_HOARDER_BACKUP_MANIFEST_PATH",
