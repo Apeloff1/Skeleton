@@ -96,7 +96,10 @@ def _identity(value, label):
 
 
 def run(client: LocalChatClient, *, output_tokens: int, max_seconds: int,
-        model_digest: str) -> dict:
+        model_digest: str, cases=None) -> dict:
+    from .jeeves_chat_eval_scenarios import inventory
+    selected = CASES if cases is None else tuple(cases)
+    suite = inventory(selected)
     if type(output_tokens) is not int or not 1 <= output_tokens <= 8192:
         raise CaptureRejected("invalid output budget")
     if type(max_seconds) is not int or not 1 <= max_seconds <= 86400:
@@ -117,7 +120,7 @@ def run(client: LocalChatClient, *, output_tokens: int, max_seconds: int,
     }))
     captures, sessions = [], []
     deadline = time.monotonic() + max_seconds
-    for case in CASES:
+    for case in selected:
         if time.monotonic() >= deadline:
             raise CaptureRejected("benchmark deadline reached; no complete qualification")
         created = client.request("POST", "/v1/sessions", {})
@@ -167,11 +170,11 @@ def run(client: LocalChatClient, *, output_tokens: int, max_seconds: int,
     if (final.get("model_digest") != model_digest
             or final.get("tokenizer_digest") != status.get("tokenizer_digest")):
         raise CaptureRejected("model identity changed during benchmark")
-    report = qualify(CASES, captures, model_digest=model_digest, protocol_digest=protocol)
+    report = qualify(selected, captures, model_digest=model_digest, protocol_digest=protocol)
     return {
         "schema": "skeleton.jeeves.local-benchmark-capture.v1",
         "model_digest": model_digest, "tokenizer_digest": status.get("tokenizer_digest"),
-        "protocol_digest": protocol, "sessions": sessions, "captures": captures,
+        "protocol_digest": protocol, "suite_inventory": suite, "sessions": sessions, "captures": captures,
         "report": report, "live_endpoint_observed": True,
         "independent_receipt_verification": False,
     }
@@ -214,12 +217,30 @@ def main(argv=None) -> int:
     launch.add_argument("--timeout", default=120, type=int)
     launch.add_argument("--max-seconds", default=7200, type=int)
     launch.add_argument("--execute", action="store_true")
+    def scenario_options(p):
+        p.add_argument("--generated-count",type=int,default=0)
+        p.add_argument("--generated-start",type=int,default=0)
+        p.add_argument("--seed",type=int,default=0)
+        p.add_argument("--long-turns",type=int,default=0)
+        p.add_argument("--no-baseline",action="store_true")
+    scenario_options(launch)
+    describe=sub.add_parser("inventory")
+    scenario_options(describe)
+    describe.add_argument("--output",required=True,type=Path)
     diff = sub.add_parser("compare")
     diff.add_argument("left", type=Path)
     diff.add_argument("right", type=Path)
     diff.add_argument("--output", required=True, type=Path)
     args = parser.parse_args(argv)
     try:
+        if args.command in {"run","inventory"}:
+            from .jeeves_chat_eval_scenarios import build_suite, inventory
+            chosen=build_suite(seed=args.seed,start=args.generated_start,count=args.generated_count,
+                               include_baseline=not args.no_baseline,long_turns=args.long_turns)
+            if args.command=="inventory":
+                _write_new(args.output,inventory(chosen))
+                print("Inventory written; no model generation or quality result.")
+                return 0
         if args.command == "run":
             if not args.execute:
                 raise CaptureRejected("explicit --execute is required")
@@ -230,7 +251,8 @@ def main(argv=None) -> int:
                 raise CaptureRejected("output already exists")
             client = LocalChatClient(args.port, read_token(args.token_file), args.timeout)
             result = run(client, output_tokens=args.output_tokens,
-                         max_seconds=args.max_seconds, model_digest=args.model_digest)
+                         max_seconds=args.max_seconds, model_digest=args.model_digest,
+                         cases=chosen)
         else:
             result = compare(_read_report(args.left), _read_report(args.right))
         _write_new(args.output, result)
