@@ -156,8 +156,9 @@ def apply_manifest(path, *, expected_manifest_sha, scope, graph_factory, rights_
         settled.append({"target": entry["target"], "snapshot_id": receipt["snapshot_id"],
                         "inspection_digest": receipt["inspection_digest"],
                         "already_sealed": bool(receipt.get("already_sealed", False))})
-    return {**report, "graph_written": True, "settlements": settled,
-            "atomic_batch": False, "network_authorized": False}
+    return {**report, "graph_written": None, "graph_apply_completed": True,
+            "settlements": settled, "atomic_batch": False,
+            "network_authorized": False}
 
 
 def main(argv=None):
