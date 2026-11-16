@@ -390,6 +390,165 @@ class SqliteSharedPressureLedger:
             conn.execute("DELETE FROM shared_pressure_queue WHERE ticket_id = ?", (ticket_id,))
             return lease
 
+    def promote_ranked(
+        self,
+        scope: str,
+        owner_id: str,
+        *,
+        authorized_tickets: tuple[SharedQueueTicket, ...],
+        now: float | None = None,
+        lease_seconds: float | None = None,
+        aging_interval_ms: int = 30_000,
+    ) -> SharedPressureLease | None:
+        """Select and promote one explicitly authorized ticket atomically.
+
+        No implicit worker authority: the caller provides exact previously
+        admitted ticket records for work that this worker is allowed to run.
+        The ledger rechecks records, hard caps and soft pressure in one write
+        transaction. Existing direct-promotion semantics remain unchanged.
+        """
+        from .dispatch_policy import DispatchCandidate, rank_candidates
+
+        scope, owner = _id(scope, "scope"), _id(owner_id, "owner_id")
+        timestamp = _time(now, "now")
+        if type(authorized_tickets) is not tuple or len(authorized_tickets) > 4096:
+            raise SharedPressureError("invalid authorized ticket set")
+        with self._write() as conn:
+            policy = self._policy(self._policy_row(conn, scope))
+            self._reap(conn, scope, timestamp)
+            global_snap = self._snapshot(conn, policy, None)
+            if global_snap.active >= policy.max_concurrency:
+                return None
+            counts: dict[str, int] = {}
+            candidates: list[DispatchCandidate] = []
+            tickets: dict[str, SharedQueueTicket] = {}
+            for expected in authorized_tickets:
+                if not isinstance(expected, SharedQueueTicket) or expected.scope != scope:
+                    raise SharedPressureConflict("authorized ticket scope mismatch")
+                if expected.ticket_id in tickets:
+                    raise SharedPressureConflict("duplicate authorized ticket")
+                tickets[expected.ticket_id] = expected
+                row = conn.execute(
+                    "SELECT * FROM shared_pressure_queue WHERE ticket_id = ?", (expected.ticket_id,)
+                ).fetchone()
+                if row is None:
+                    continue
+                if self._ticket(row) != expected:
+                    raise SharedPressureConflict("authorized ticket changed")
+                if expected.tenant_id not in counts:
+                    counts[expected.tenant_id] = int(conn.execute(
+                        "SELECT COUNT(*) FROM shared_pressure_lease WHERE scope = ? AND tenant_id = ?",
+                        (scope, expected.tenant_id),
+                    ).fetchone()[0])
+                snap = SharedPressureSnapshot(
+                    scope, global_snap.active, global_snap.queued,
+                    policy.max_concurrency, policy.max_queue_depth,
+                    expected.tenant_id, counts[expected.tenant_id],
+                )
+                if not self._decision(policy, snap, expected.priority, for_queue=False).admitted:
+                    continue
+                if conn.execute(
+                    "SELECT 1 FROM shared_pressure_lease WHERE scope = ? AND operation_id = ?",
+                    (scope, expected.task_id),
+                ).fetchone() is not None:
+                    continue
+                candidates.append(DispatchCandidate(
+                    expected.ticket_id, expected.tenant_id, expected.priority,
+                    int(expected.enqueued_at * 1000),
+                ))
+            ranking = rank_candidates(
+                candidates, now_ms=int(timestamp * 1000), tenant_active=counts,
+                aging_interval_ms=aging_interval_ms,
+                protected_priority=policy.protect_priority_at_or_below,
+            )
+            if not ranking:
+                return None
+            return self._insert_ranked_lease(
+                conn, policy, tickets[ranking[0].ticket_id], owner, timestamp, lease_seconds,
+            )
+
+    def promote_group(
+        self,
+        scope: str,
+        owner_id: str,
+        *,
+        authorized_tickets: tuple[SharedQueueTicket, ...],
+        now: float | None = None,
+        lease_seconds: float | None = None,
+    ) -> tuple[SharedPressureLease, ...]:
+        """Atomically reserve every authorized member or roll back all members.
+
+        This reserves logical slots in one existing pressure scope, not GPUs
+        or physical nodes. The caller must separately hold physical resources.
+        """
+        scope, owner = _id(scope, "scope"), _id(owner_id, "owner_id")
+        timestamp = _time(now, "now")
+        if type(authorized_tickets) is not tuple or not 1 <= len(authorized_tickets) <= 64:
+            raise SharedPressureError("invalid group size")
+        if any(not isinstance(t, SharedQueueTicket) or t.scope != scope for t in authorized_tickets):
+            raise SharedPressureConflict("authorized group scope mismatch")
+        if len({t.ticket_id for t in authorized_tickets}) != len(authorized_tickets):
+            raise SharedPressureConflict("duplicate authorized group ticket")
+        with self._write() as conn:
+            policy = self._policy(self._policy_row(conn, scope))
+            self._reap(conn, scope, timestamp)
+            if self._snapshot(conn, policy, None).active + len(authorized_tickets) > policy.max_concurrency:
+                raise SharedPressureExceeded("shared_concurrency_saturated")
+            leases: list[SharedPressureLease] = []
+            for expected in sorted(authorized_tickets, key=lambda t: (t.priority, t.ticket_id)):
+                row = conn.execute(
+                    "SELECT * FROM shared_pressure_queue WHERE ticket_id = ?", (expected.ticket_id,)
+                ).fetchone()
+                if row is None or self._ticket(row) != expected:
+                    raise SharedPressureConflict("authorized group ticket unavailable")
+                decision = self._decision(
+                    policy, self._snapshot(conn, policy, expected.tenant_id),
+                    expected.priority, for_queue=False,
+                )
+                if not decision.admitted:
+                    raise SharedPressureExceeded(decision.reason)
+                leases.append(self._insert_ranked_lease(
+                    conn, policy, expected, owner, timestamp, lease_seconds,
+                ))
+            return tuple(leases)
+
+    @staticmethod
+    def _insert_ranked_lease(
+        conn: sqlite3.Connection,
+        policy: SharedPressurePolicy,
+        ticket: SharedQueueTicket,
+        owner: str,
+        timestamp: float,
+        lease_seconds: float | None,
+    ) -> SharedPressureLease:
+        from uuid import uuid4
+
+        duration = policy.default_lease_seconds if lease_seconds is None else float(lease_seconds)
+        if not math.isfinite(duration) or duration <= 0 or not math.isfinite(timestamp + duration):
+            raise SharedPressureError("lease_seconds must be finite and positive")
+        # Unlike legacy deterministic lease identities, each physical attempt
+        # gets a new fence. Retried operations must inspect the current lease,
+        # not reissue an uncertain promotion or release using an expired fence.
+        lease = SharedPressureLease(
+            "prs-" + uuid4().hex, ticket.scope, ticket.task_id,
+            ticket.tenant_id, owner, ticket.priority, timestamp, timestamp + duration,
+        )
+        try:
+            conn.execute(
+                "INSERT INTO shared_pressure_lease "
+                "(lease_id, scope, operation_id, tenant_id, owner_id, priority, acquired_at, expires_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (lease.lease_id, lease.scope, lease.operation_id, lease.tenant_id,
+                 lease.owner_id, lease.priority, lease.acquired_at, lease.expires_at),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise SharedPressureConflict("operation already leased") from exc
+        if conn.execute(
+            "DELETE FROM shared_pressure_queue WHERE ticket_id = ?", (ticket.ticket_id,)
+        ).rowcount != 1:
+            raise SharedPressureConflict("queue ticket changed during promotion")
+        return lease
+
     def lease_for_operation(
         self,
         scope: str,
@@ -476,3 +635,4 @@ __all__ = [
     "SharedQueueTicket",
     "SqliteSharedPressureLedger",
 ]
+

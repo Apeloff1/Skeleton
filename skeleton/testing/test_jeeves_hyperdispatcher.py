@@ -1,0 +1,136 @@
+"""Focused regression tests for the existing pressure owner's dispatcher."""
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
+
+import pytest
+
+from skeleton.intelligence.dispatch_policy import (
+    DispatchCandidate, DispatchPolicyError, PlacementNode, PlacementRequest,
+    ResourceVector, critical_paths, place_gang, rank_candidates, safe_backfill,
+)
+from skeleton.intelligence.shared_pressure import (
+    SharedPressureConflict, SharedPressureError, SharedPressureExceeded,
+    SharedPressurePolicy, SqliteSharedPressureLedger,
+)
+
+
+def ledger(tmp_path, *, concurrency=4, tenant=2):
+    result = SqliteSharedPressureLedger(tmp_path / "pressure.sqlite")
+    result.configure(SharedPressurePolicy("jeeves", concurrency, 32, tenant, 16, 1.0))
+    return result
+
+
+def test_protected_aging_and_determinism():
+    rows = [
+        DispatchCandidate("old", "a", 100, 0),
+        DispatchCandidate("new", "b", 30, 100_000),
+        DispatchCandidate("protected", "c", 10, 100_000),
+    ]
+    kwargs = dict(now_ms=100_000, tenant_active={}, aging_interval_ms=1000)
+    order = rank_candidates(rows, **kwargs)
+    assert [x.ticket_id for x in order] == ["protected", "old", "new"]
+    assert order == rank_candidates(list(reversed(rows)), **kwargs)
+    assert order[1].effective_priority == 11
+
+
+def test_deadline_share_and_future():
+    rows = [DispatchCandidate("a", "a", 20, 0), DispatchCandidate("b", "b", 20, 0)]
+    assert rank_candidates(rows, now_ms=1, tenant_active={"a": 2, "b": 0})[0].ticket_id == "b"
+    rows[0] = replace(rows[0], deadline_ms=3)
+    assert rank_candidates(rows, now_ms=1, tenant_active={"a": 2})[0].ticket_id == "a"
+    with pytest.raises(DispatchPolicyError):
+        rank_candidates(rows, now_ms=1, tenant_active={}, tenant_weights={"a": 0})
+    with pytest.raises(DispatchPolicyError):
+        rank_candidates(rows + [rows[0]], now_ms=1, tenant_active={})
+    with pytest.raises(DispatchPolicyError):
+        rank_candidates([replace(rows[0], enqueued_ms=2)], now_ms=1, tenant_active={})
+
+
+def test_resource_gang_and_locality():
+    gpu = ResourceVector((("gpu", 1), ("ram", 8)))
+    demand = ResourceVector((("gpu", 1), ("ram", 4)))
+    nodes = [
+        PlacementNode("n1", gpu, frozenset({"cuda"}), frozenset({"model"}), "rack1"),
+        PlacementNode("n2", gpu, frozenset({"cuda"}), failure_domain="rack2"),
+    ]
+    req = PlacementRequest("a", demand, frozenset({"cuda"}), frozenset({"model"}))
+    assert place_gang([req], nodes) == (("a", "n1"),)
+    assert place_gang([req, replace(req, task_id="b")], nodes) == (("a", "n1"), ("b", "n2"))
+    assert place_gang([req, replace(req, task_id="b"), replace(req, task_id="c")], nodes) is None
+    assert place_gang([replace(req, required=frozenset({"metal"}))], nodes) is None
+    assert nodes[0].capacity == gpu
+    with pytest.raises(DispatchPolicyError):
+        place_gang([req, replace(req, task_id="b")], nodes, search_budget=1)
+
+
+def test_critical_paths_and_backfill():
+    assert critical_paths({"a": 2, "b": 5, "c": 3}, {"a": (), "b": ("a",), "c": ("a",)}) == {
+        "a": 7, "b": 5, "c": 3,
+    }
+    with pytest.raises(DispatchPolicyError):
+        critical_paths({"a": 1, "b": 1}, {"a": ("b",), "b": ("a",)})
+    assert safe_backfill(now_ms=10, reservation_ms=20, estimated_ms=8, uncertainty_ms=2)
+    assert not safe_backfill(now_ms=10, reservation_ms=20, estimated_ms=8, uncertainty_ms=3)
+
+
+def test_ranked_is_atomic_and_scope_bound(tmp_path):
+    left = ledger(tmp_path, concurrency=1, tenant=1)
+    right = SqliteSharedPressureLedger(left.path)
+    low = left.enqueue("jeeves", "a", "low", priority=40, now=1)
+    high = left.enqueue("jeeves", "b", "high", priority=5, now=2)
+    with pytest.raises(SharedPressureConflict):
+        left.promote_ranked("jeeves", "worker", authorized_tickets=(replace(high, tenant_id="x"),), now=3)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda item: item[0].promote_ranked(
+            "jeeves", item[1], authorized_tickets=(low, high), now=3
+        ), [(left, "w1"), (right, "w2")]))
+    admitted = [row for row in results if row is not None]
+    assert len(admitted) == 1 and admitted[0].operation_id == "high"
+    assert right.snapshot("jeeves", now=3).queued == 1
+
+
+def test_expired_attempt_cannot_release_new_attempt(tmp_path):
+    state = ledger(tmp_path)
+    ticket = state.enqueue("jeeves", "a", "task", priority=5, now=1)
+    first = state.promote_ranked("jeeves", "worker", authorized_tickets=(ticket,), now=2, lease_seconds=1)
+    assert first is not None
+    newer = state.enqueue("jeeves", "a", "task", priority=5, now=4)
+    second = state.promote_ranked("jeeves", "worker", authorized_tickets=(newer,), now=5)
+    assert second is not None and second.lease_id != first.lease_id
+    with pytest.raises(SharedPressureError):
+        state.release(first.lease_id, "worker")
+    assert state.lease_for_operation("jeeves", "task", now=5) == second
+
+
+def test_group_rolls_back_on_tenant_capacity_and_stale_ticket(tmp_path):
+    state = ledger(tmp_path, concurrency=3, tenant=1)
+    a = state.enqueue("jeeves", "a", "a", priority=5, now=1)
+    b = state.enqueue("jeeves", "a", "b", priority=5, now=1)
+    c = state.enqueue("jeeves", "b", "c", priority=5, now=1)
+    with pytest.raises(SharedPressureExceeded):
+        state.promote_group("jeeves", "w", authorized_tickets=(a, b), now=2)
+    assert state.snapshot("jeeves", now=2).active == 0
+    assert state.snapshot("jeeves", now=2).queued == 3
+    with pytest.raises(SharedPressureConflict):
+        state.promote_group("jeeves", "w", authorized_tickets=(a, replace(c, priority=6)), now=2)
+    assert state.snapshot("jeeves", now=2).queued == 3
+    leases = state.promote_group("jeeves", "w", authorized_tickets=(a, c), now=2)
+    assert {item.operation_id for item in leases} == {"a", "c"}
+    assert state.snapshot("jeeves", now=2).active == 2
+    assert state.snapshot("jeeves", now=2).queued == 1
+
+
+def test_unapproved_ticket_not_selected_and_capped_tenant_skipped(tmp_path):
+    state = ledger(tmp_path, concurrency=3, tenant=1)
+    state.acquire("jeeves", "a", "already", "w", priority=5, now=1)
+    a = state.enqueue("jeeves", "a", "a", priority=0, now=1)
+    b = state.enqueue("jeeves", "b", "b", priority=50, now=1)
+    state.enqueue("jeeves", "c", "unapproved", priority=0, now=1)
+    chosen = state.promote_ranked("jeeves", "w", authorized_tickets=(a, b), now=2)
+    assert chosen is not None and chosen.operation_id == "b"
+
+
+def test_no_unknown_resource_or_duplicate_dimension():
+    with pytest.raises(DispatchPolicyError):
+        ResourceVector((("gpu", 1), ("gpu", 2)))
+    assert not ResourceVector((("gpu", 1),)).fits(ResourceVector((("cpu", 8),)))
