@@ -58,13 +58,14 @@ class Policy:
     min_hits: int=2
     min_agreement_bp: int=8000
     max_rounds: int=4096
+    max_output_tokens: int=8192
     cooldown_rounds: int=8
 
     def __post_init__(self):
         for value,lo,hi in ((self.vocab_size,1,1<<24),(self.history_tokens,32,65536),
                             (self.ngram,2,24),(self.max_draft,1,64),
                             (self.min_hits,1,32),(self.min_agreement_bp,5001,10000),
-                            (self.max_rounds,1,65536),(self.cooldown_rounds,1,128)):
+                            (self.max_rounds,1,65536),(self.max_output_tokens,1,8192),(self.cooldown_rounds,1,128)):
             _int(value,lo,hi)
         if self.history_tokens < self.ngram+self.max_draft:
             raise ValueError("insufficient history capacity")
@@ -80,10 +81,11 @@ class Draft:
     prefix_sha256: str
     round_id: int
     token_ids: tuple[int,...]
+    remaining_output: int
 
     @property
     def identity(self):
-        return _digest([self.scope_sha256,self.prefix_sha256,self.round_id,self.token_ids])
+        return _digest([self.scope_sha256,self.prefix_sha256,self.round_id,self.token_ids,self.remaining_output])
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +131,7 @@ class LocalDraftWindow:
                 self.close()
                 raise ValueError("prompt token stream exceeds finite ceiling")
             self._append(token)
+        self._prompt_length=self._length
 
     def _append(self,token):
         _int(token,0,self.policy.vocab_size-1)
@@ -158,6 +161,8 @@ class LocalDraftWindow:
         if self._closed or self._pending is not None:
             raise ValueError("closed or already pending speculation round")
         _int(remaining_output,0,8192)
+        if remaining_output > self.policy.max_output_tokens-(self._length-self._prompt_length):
+            raise ValueError("proposal exceeds original generation ceiling")
         if not remaining_output or self._round>=self.policy.max_rounds:
             return None
         self._round+=1
@@ -181,7 +186,7 @@ class LocalDraftWindow:
             key=key[1:]+(token,)
         if not draft:
             return None
-        result=Draft(self.scope.identity,self.prefix_sha256,self._round,tuple(draft))
+        result=Draft(self.scope.identity,self.prefix_sha256,self._round,tuple(draft),remaining_output)
         self._pending=result
         return result
 
@@ -198,7 +203,7 @@ class LocalDraftWindow:
         draft=self._pending
         if feedback.scope_sha256!=self.scope.identity or feedback.draft_sha256!=draft.identity:
             raise ValueError("different target feedback scope")
-        if type(committed_target_tokens) is not tuple or not 1<=len(committed_target_tokens)<=len(draft.token_ids)+1:
+        if type(committed_target_tokens) is not tuple or not 1<=len(committed_target_tokens)<=min(len(draft.token_ids)+1,draft.remaining_output):
             raise ValueError("invalid committed target sequence")
         for x in committed_target_tokens:
             _int(x,0,self.policy.vocab_size-1)
@@ -213,7 +218,7 @@ class LocalDraftWindow:
         # a shorter draft as output. Full acceptance permits a bonus token.
         if matched<len(draft.token_ids) and len(committed_target_tokens)!=matched+1:
             raise ValueError("rejected draft lacks target replacement")
-        if self._length+len(committed_target_tokens)>1_056_768:
+        if self._length-self._prompt_length+len(committed_target_tokens)>self.policy.max_output_tokens:
             raise ValueError("request history ceiling exceeded")
         for x in committed_target_tokens:
             self._append(x)
@@ -238,7 +243,7 @@ class LocalDraftWindow:
         """Observe ordinary verified generation when no proposal is pending."""
         if self._closed or self._pending is not None or type(tokens) is not tuple or not 1<=len(tokens)<=8192:
             raise ValueError("invalid ordinary target token update")
-        if self._length+len(tokens)>1_056_768:
+        if self._length-self._prompt_length+len(tokens)>self.policy.max_output_tokens:
             raise ValueError("request history ceiling exceeded")
         for x in tokens:
             _int(x,0,self.policy.vocab_size-1)
@@ -250,6 +255,7 @@ class LocalDraftWindow:
         self._history.clear()
         self._index.clear()
         self._pending=None
+        self._prefix_hash=sha256(b"jeeves-speculation-closed-v1")
 
     def stats(self):
         return {"scope_sha256":self.scope.identity,"rounds":self._round,
