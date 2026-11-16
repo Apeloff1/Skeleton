@@ -553,6 +553,17 @@ class WeightShardStore:
     def open_verified(
         self, plan_digest: str, *, model_identity: ModelIdentity,
     ) -> Iterator[tuple[BinaryIO, ...]]:
+        """Hold managed read custody before manifest parsing and through use."""
+        from .managed_weight_read import managed_weight_read
+
+        with managed_weight_read(self):
+            with self._open_verified(plan_digest, model_identity=model_identity) as streams:
+                yield streams
+
+    @contextmanager
+    def _open_verified(
+        self, plan_digest: str, *, model_identity: ModelIdentity,
+    ) -> Iterator[tuple[BinaryIO, ...]]:
         """Open verified, ordered shard streams for an explicit model decoder."""
         if not isinstance(model_identity, ModelIdentity):
             raise WeightShardStoreError("model identity required for weight loading")
@@ -562,9 +573,7 @@ class WeightShardStore:
         # hashing a pathname, closing it, then reopening an unverified file.
         # The sealed-memory owner still hashes during its own immutable copy;
         # ordinary streams do not prevent concurrent writes by the store owner.
-        from .managed_weight_read import managed_weight_read
-
-        with managed_weight_read(self), ExitStack() as stack:
+        with ExitStack() as stack:
             streams: list[BinaryIO] = []
             for shard in plan.shards:
                 stream = stack.enter_context(
