@@ -8,6 +8,9 @@ on:
     paths:
       - 'skeleton/ai/webcrawler/**'
       - 'backend/core/dragon_crawler.py'
+      - 'backend/core/dragon_navigation_federation.py'
+      - 'backend/tests/test_dragon_navigation_federation.py'
+      - 'skeleton/app/offline_http.py'
       - 'backend/routes/dragon_academy.py'
       - 'frontend/src/product/crawlerClient.ts'
       - 'tests/test_ai_webcrawler_navigation_backlog.py'
@@ -20,7 +23,7 @@ concurrency:
 jobs:
   navigation:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -35,7 +38,7 @@ jobs:
           python-version: "3.11.16"
       - name: Compile modified runtime and application adapter
         run: |
-          python -m py_compile skeleton/ai/webcrawler/navigation_backlog.py skeleton/ai/webcrawler/frontier_scheduler.py skeleton/ai/webcrawler/operations.py backend/core/dragon_crawler.py backend/routes/dragon_academy.py tests/test_ai_webcrawler_navigation_backlog.py
+          python -m py_compile skeleton/ai/webcrawler/navigation_semantics.py backend/core/dragon_navigation_federation.py backend/tests/test_dragon_navigation_federation.py skeleton/app/offline_http.py skeleton/ai/webcrawler/parser_worker.py skeleton/ai/webcrawler/parser_isolation.py skeleton/ai/webcrawler/navigation_backlog.py skeleton/ai/webcrawler/frontier_scheduler.py skeleton/ai/webcrawler/operations.py backend/core/dragon_crawler.py backend/routes/dragon_academy.py tests/test_ai_webcrawler_navigation_backlog.py
       - name: Checkpoint, discourse, and policy fixture regressions
         env:
           PYTHONPATH: ".:backend:tests"
@@ -43,3 +46,9 @@ jobs:
         run: |
           python -m unittest discover -s tests -p 'test_ai_webcrawler_navigation_backlog.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_host_backpressure.py' -v
+      - name: Semantic selection and actual SQLite cross-session disk qualification
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+          SKL_DRAGON_NAV_QUALIFICATION_BATCHES: "40"
+        run: python -m unittest discover -s backend/tests -p 'test_dragon_navigation_federation.py' -v
