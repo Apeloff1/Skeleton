@@ -59,6 +59,22 @@ export interface ComposeResult {
   topology?: Topology;
 }
 
+export interface GenreControlProfile {
+  schema: string;
+  genre: string;
+  family: string;
+  catalogs: string[];
+  actions: { id: string; kind: string; context?: string }[];
+  bindings: {
+    action: string;
+    control: string;
+    modifiers: string[];
+    scale: number;
+    axis: string;
+    deadzone: number;
+  }[];
+}
+
 export interface Beat {
   id: string;
   prompt: string;
@@ -79,23 +95,6 @@ export interface GenerationRow {
   order?: number;
   tagline?: string;
   [k: string]: unknown;
-}
-
-/** Read-only source-backed game-control profile, not playable-engine proof. */
-export interface GenreControlProfile {
-  schema: string;
-  genre: string;
-  family: string;
-  catalogs: string[];
-  actions: { id: string; kind: string; context?: string }[];
-  bindings: {
-    action: string;
-    control: string;
-    modifiers: string[];
-    scale: number;
-    axis: string;
-    deadzone: number;
-  }[];
 }
 
 /**
@@ -132,6 +131,9 @@ export interface RunRequest {
   include_files?: boolean;
   /** Optional playable Godot archetype sidecar scene (three verified templates). */
   playable_content?: boolean;
+  playable_archetype?: string;
+  playable_main_scene?: boolean;
+  galaxy_profile?: import('./galaxyHandoff').GalaxyProfile;
   /** Optional main-scene Godot boot, plus playable sidecar completion if present. */
   playtest?: 'auto' | 'require';
   /** Optional native room-entry quest attached to the generated Godot project. */

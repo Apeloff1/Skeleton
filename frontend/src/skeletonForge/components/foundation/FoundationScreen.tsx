@@ -4,6 +4,7 @@
  * cockpit, not a second poller.
  */
 import React from 'react';
+import * as Crypto from 'expo-crypto';
 import { getAuthEpoch, subscribeAuthChanges } from '../../../auth/gameforgeAuth';
 import { shareGodotSourceArchive } from '../../shareSourceArchive';
 import type { RunRequest } from '../../types';
@@ -17,7 +18,7 @@ import {
 import { handoffFromStudio, studioStateFromHandoff } from '../../creatorBridge';
 import { storeCreatorBridge, withCreatorBridge } from '../../creatorBridgeStorage';
 import { asyncStorageKv, hasLegacyStudioProjects, legacyReadOnlyKv } from '../../foundation/storageDevice';
-import { loadFoundation, saveFoundation } from '../../foundation/storage';
+import { loadFoundation, saveFoundation, updateFoundation } from '../../foundation/storage';
 import { composeSummaryOf, consoleFailures } from '../../cockpitScreen';
 import { useCockpitConsole } from '../../consoleHooks';
 import { useForgeCatalog, useForgeRun, useLiveCompose, useNow } from '../../hooks';
@@ -47,10 +48,12 @@ export default function FoundationScreen(props: { onSetup: () => void; onOpenCoc
   // The entire session, not merely its project list, must be discarded on
   // account rotation. Compose results, console history, source artifacts,
   // the owner ID and any in-flight run all belong to the previous identity.
-  return <FoundationScreenSession key={authEpoch} {...props} />;
+  return <FoundationScreenSession key={authEpoch} sessionEpoch={authEpoch} {...props} />;
 }
 
-function FoundationScreenSession({ onSetup, onOpenCockpit }: { onSetup: () => void; onOpenCockpit: () => void }) {
+function FoundationScreenSession({ onSetup, onOpenCockpit, sessionEpoch }: {
+  onSetup: () => void; onOpenCockpit: () => void; sessionEpoch: number;
+}) {
   const catalog = useForgeCatalog();
   const [vision, setVision] = React.useState('');
   const compose = useLiveCompose(vision);
@@ -107,10 +110,11 @@ function FoundationScreenSession({ onSetup, onOpenCockpit }: { onSetup: () => vo
       setExportBusy(false);
     });
   }, [ownerId, run.phase, run.payload]);
-  const store = React.useMemo(() => asyncStorageKv(), []);
+  const store = React.useMemo(() => asyncStorageKv(sessionEpoch), [sessionEpoch]);
   const auth = React.useMemo(() => gameforgeAuthPort(), []);
   const load = React.useCallback(async () => {
-    const epoch = getAuthEpoch();
+    const epoch = sessionEpoch;
+    if (getAuthEpoch() !== epoch) throw new Error('Stale Studio session');
     const result = await loadFoundation(store);
     if (result.holdSaves) return result;
     if (epoch !== getAuthEpoch()) throw new Error('Account changed while loading Studio projects');
@@ -123,36 +127,55 @@ function FoundationScreenSession({ onSetup, onOpenCockpit }: { onSetup: () => vo
         throw new Error('Returned Forge draft is not source-bound to a Studio project');
       }
       if (epoch !== getAuthEpoch()) throw new Error('Account changed while applying Studio return');
-      const at = new Date().toISOString();
-      const reconciled = reconcileStudioReturn(
-        result.projects, returned.studioProjectId,
-        returned.studioProjectUpdatedAt, restored, at,
+      const receipt = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256, 'skeleton.studio.return.v1:' + JSON.stringify(returned),
       );
-      const originalUpdated = reconciled.status === 'applied' || reconciled.status === 'already-applied';
-      const projects = originalUpdated ? reconciled.projects
-        : recoverStudioReturnAsCopy(result.projects, restored, at).projects;
-      await saveFoundation(store, {
-        onboarded: result.onboarded, projects, prefs: result.prefs,
-        projectsCorrupt: false, holdSaves: false,
+      if (epoch !== getAuthEpoch()) throw new Error('Account changed while binding Studio return');
+      const sourceId = returned.studioProjectId;
+      const sourceRevision = returned.studioProjectUpdatedAt;
+      const committed = await updateFoundation(store, current => {
+        if (epoch !== getAuthEpoch()) throw new Error('Account changed before Studio return publication');
+        const at = new Date().toISOString();
+        const reconciled = reconcileStudioReturn(
+          current.projects, sourceId, sourceRevision, restored, at, receipt,
+        );
+        if (reconciled.status === 'invalid') throw new Error('Returned Forge draft failed project admission');
+        const originalUpdated = reconciled.status === 'applied' || reconciled.status === 'already-applied';
+        const projects = originalUpdated ? reconciled.projects
+          : recoverStudioReturnAsCopy(current.projects, restored, at, receipt).projects;
+        const snapshot = { ...current, projects };
+        return { snapshot, result: { loaded: snapshot, originalUpdated } };
       });
       if (epoch !== getAuthEpoch()) throw new Error('Account changed while committing Studio return');
-      setStudioReturnNotice(originalUpdated
+      setStudioReturnNotice(committed.originalUpdated
         ? 'Advanced Forge edits were saved to the original Studio project.'
         : 'The original project changed or was deleted. Your Forge edits were preserved as a separate project copy.');
-      return { ...result, projects };
+      return committed.loaded;
     });
-    return transferred ?? result;
-  }, [store]);
+    if (epoch !== getAuthEpoch()) throw new Error('Account changed before publishing Studio projects');
+    // A no-handoff path may have waited for another adapter; reload under
+    // the namespace queue rather than exposing a stale initial observation.
+    return transferred ?? await loadFoundation(store);
+  }, [store, sessionEpoch]);
   const save = React.useCallback((snap: PersistSnapshot) => saveFoundation(store, snap), [store]);
-  const openAdvancedCockpit = React.useCallback((project?: StudioProject) => {
-    if (cockpitTransferLock.current) return;
+  const openAdvancedCockpit = React.useCallback((project?: StudioProject, snapshot?: PersistSnapshot) => {
+    if (cockpitTransferLock.current || sessionEpoch !== getAuthEpoch()) return;
     if (!project) { onOpenCockpit(); return; }
+    if (!snapshot || snapshot.holdSaves || snapshot.projectsCorrupt
+        || !snapshot.projects.some(item => item.id === project.id && item.updatedAt === project.updatedAt)) {
+      setCockpitTransferError('Save and verify the source project before opening Forge cockpit.');
+      return;
+    }
     cockpitTransferLock.current = true;
     setCockpitTransferError(null);
     const epoch = getAuthEpoch();
     try {
       const envelope = handoffFromStudio(project.questionnaire, project.id, project.updatedAt);
-      void storeCreatorBridge(envelope).then(() => {
+      // Persist the exact source revision before publishing its handoff.
+      void saveFoundation(store, snapshot).then(() => {
+        if (epoch !== getAuthEpoch()) throw new Error('Account changed before Forge transfer');
+        return storeCreatorBridge(envelope, epoch);
+      }).then(() => {
         if (epoch !== getAuthEpoch()) throw new Error('Account changed during Forge transfer');
         onOpenCockpit();
       }).catch(() => {
@@ -162,7 +185,7 @@ function FoundationScreenSession({ onSetup, onOpenCockpit }: { onSetup: () => vo
       cockpitTransferLock.current = false;
       setCockpitTransferError('This Studio project could not be transferred into Forge cockpit.');
     }
-  }, [onOpenCockpit]);
+  }, [onOpenCockpit, sessionEpoch, store]);
   const importLegacy = React.useCallback(async () => {
     const epoch = getAuthEpoch();
     const old = await loadFoundation(legacyReadOnlyKv());
