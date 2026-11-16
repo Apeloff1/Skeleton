@@ -233,3 +233,48 @@ def test_memfd_failure_never_downgrades_to_named_frames(tmp_path, monkeypatch):
     with pytest.raises(LlamaCppRuntimeError, match="descriptor"):
         with private_frame(model.runtime_artifact, model.model_artifact, b"SKG1", lambda: None):
             pytest.fail("unexpected downgrade")
+
+
+def test_guard_fused_roundtrip_does_not_invoke_split_callbacks():
+    calls = []
+    def combined(text):
+        calls.append(text)
+        return tuple(text.encode()), text
+    def split(*args):
+        pytest.fail("split path unexpectedly invoked")
+    engine = SimpleNamespace()
+    engine.model = SimpleNamespace()
+    async def generate(request, **kwargs):
+        return SimpleNamespace(text="ok")
+    engine.generate = generate
+    request = LocalInferenceRequest(prompt="hello", instructions="policy")
+    snapshot = TrustedContextSnapshot(
+        merkle_root(request_parts(request)), hashlib.sha256(b"policy").hexdigest(),
+        1, "tenant", "thread",
+    )
+    guard = GuardedLocalInference(engine,
+        reviewer=lambda text, digest: ReviewVerdict(True, digest, "reviewer", "allow"),
+        tokenize=split, detokenize=split, roundtrip=combined)
+    result, receipt = asyncio.run(guard.generate(request, snapshot=snapshot, tenant_scope_id="tenant"))
+    assert result.text == "ok"
+    assert len(calls) == 3
+    assert all(value == request.rendered_input for value in calls)
+
+
+@pytest.mark.parametrize("malformed", [((), 42), ([1, 2], "echo"), (("bad",), "echo")])
+def test_fused_roundtrip_rejects_invalid_evidence(malformed):
+    from skeleton.context.sealed_sandwich import SealedContextError
+    async def generate(request, **kwargs):
+        pytest.fail("malformed evidence reached inference")
+    engine = SimpleNamespace(model=SimpleNamespace(), generate=generate)
+    request = LocalInferenceRequest(prompt="hello", instructions="policy")
+    snapshot = TrustedContextSnapshot(
+        merkle_root(request_parts(request)), hashlib.sha256(b"policy").hexdigest(),
+        1, "tenant", "thread",
+    )
+    guard = GuardedLocalInference(engine,
+        reviewer=lambda text, digest: ReviewVerdict(True, digest, "reviewer", "allow"),
+        tokenize=lambda text: (), detokenize=lambda tokens: "",
+        roundtrip=lambda text: malformed)
+    with pytest.raises(SealedContextError):
+        asyncio.run(guard.generate(request, snapshot=snapshot, tenant_scope_id="tenant"))

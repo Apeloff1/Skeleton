@@ -32,8 +32,11 @@ class ProtectedLocalComponents:
     verify_native_tokenizer: Callable[[Any, Callable[..., Any], Callable[..., Any]], bool]
     sampler_support: Callable[[Any, Any], bool]
     projection_attestor: Callable[[Any, str, str], bool]
+    roundtrip: Callable[[str], tuple[Sequence[int], str]] | None = None
 
     def __post_init__(self) -> None:
+        if self.roundtrip is not None and not callable(self.roundtrip):
+            raise ProviderPolicyError("protected local roundtrip must be callable")
         if not callable(getattr(self.snapshots, "resolve", None)):
             raise ProviderPolicyError("protected local deployment lacks trusted snapshot authority")
         for name in (
@@ -112,6 +115,7 @@ def compose_protected_local_adapter(
         engine, reviewer=components.reviewer,
         tokenize=components.tokenize,
         detokenize=components.detokenize,
+        roundtrip=components.roundtrip,
         sampler_support=components.sampler_support,
         projection_attestor=components.projection_attestor,
         tokenizer_identity_attestor=lambda: components.verify_native_tokenizer(

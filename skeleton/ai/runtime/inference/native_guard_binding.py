@@ -135,9 +135,10 @@ def make_pinned_native_guard_factory(
             raise ProviderPolicyError("native guard model or reviewer pin unavailable")
         if type(backend) is GgufTokenBridgeModel:
             backend.assert_identity()
-            encode, decode = backend.encode_ids, backend.decode_ids
+            encode, decode, roundtrip = backend.encode_ids, backend.decode_ids, backend.roundtrip_ids
             if (getattr(encode, "__func__", None) is not GgufTokenBridgeModel.encode_ids
-                    or getattr(decode, "__func__", None) is not GgufTokenBridgeModel.decode_ids):
+                    or getattr(decode, "__func__", None) is not GgufTokenBridgeModel.decode_ids
+                    or getattr(roundtrip, "__func__", None) is not GgufTokenBridgeModel.roundtrip_ids):
                 raise ProviderPolicyError("exact GGUF tokenizer methods were replaced")
 
             def bridge_verify(active, encoder, decoder):
@@ -146,12 +147,14 @@ def make_pinned_native_guard_factory(
                 try:
                     backend.assert_identity()
                     return (getattr(backend.encode_ids, "__func__", None) is getattr(encode, "__func__", None)
-                            and getattr(backend.decode_ids, "__func__", None) is getattr(decode, "__func__", None))
+                            and getattr(backend.decode_ids, "__func__", None) is getattr(decode, "__func__", None)
+                            and getattr(backend.roundtrip_ids, "__func__", None) is getattr(roundtrip, "__func__", None))
                 except Exception:
                     return False
 
             components = ProtectedLocalComponents(
                 snapshots=reader, reviewer=reviewer, tokenize=encode, detokenize=decode,
+                roundtrip=roundtrip,
                 verify_native_tokenizer=bridge_verify,
                 sampler_support=lambda *_: False, projection_attestor=lambda *_: False,
             )

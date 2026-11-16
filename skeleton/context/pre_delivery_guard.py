@@ -251,6 +251,7 @@ class GuardedLocalInference:
         reviewer: BoundedAdversarialReviewer,
         tokenize: Callable[[str], Sequence[int]] | None = None,
         detokenize: Callable[[Sequence[int]], str] | None = None,
+        roundtrip: Callable[[str], tuple[Sequence[int], str]] | None = None,
         sampler_support: Callable[[Any, DeliveryContract], bool] | None = None,
         projection_attestor: Callable[[Any, str, str], bool] | None = None,
         tokenizer_identity_attestor: Callable[[], bool] | None = None,
@@ -274,6 +275,9 @@ class GuardedLocalInference:
         self.reviewer = reviewer
         self.tokenize = tokenize
         self.detokenize = detokenize
+        if roundtrip is not None and not callable(roundtrip):
+            raise SealedContextError("native roundtrip verification must be callable")
+        self._roundtrip = roundtrip
         self.sampler_support = sampler_support
         self.projection_attestor = projection_attestor
         self.tokenizer_identity_attestor = tokenizer_identity_attestor
@@ -308,6 +312,29 @@ class GuardedLocalInference:
             raise SealedContextBoundaryError("native tokenizer identity verification unavailable") from None
         if verified is not True:
             raise SealedContextIntegrityError("native tokenizer identity changed")
+
+    def _verified_native_roundtrip(self, rendered: str) -> tuple[str, bytes]:
+        """Hash the exact IDs and verify the byte echo without retaining tokens."""
+        if self._roundtrip is not None:
+            evidence = self._native_callback(self._roundtrip, rendered)
+            if type(evidence) is not tuple or len(evidence) != 2:
+                raise SealedContextIntegrityError("native tokenizer roundtrip evidence malformed")
+            tokens, decoded = evidence
+            if type(tokens) is not tuple:
+                raise SealedContextIntegrityError("native roundtrip token vector must be immutable")
+        else:
+            if self.tokenize is None or self.detokenize is None:
+                raise SealedContextBoundaryError("native tokenizer echo verification is not configured")
+            tokens = self._native_callback(self.tokenize, rendered)
+            # Retain the historical validate-before-decode behavior.
+            digest = _token_id_digest(tokens)
+            decoded = self._native_callback(self.detokenize, tokens)
+            if type(decoded) is not str:
+                raise SealedContextIntegrityError("native tokenizer roundtrip evidence malformed")
+            return digest, decoded.encode("utf-8", errors="strict")
+        if type(decoded) is not str:
+            raise SealedContextIntegrityError("native tokenizer roundtrip evidence malformed")
+        return _token_id_digest(tokens), decoded.encode("utf-8", errors="strict")
 
     def _preflight_evidence(
         self, request: Any, *, snapshot: TrustedContextSnapshot,
@@ -355,9 +382,8 @@ class GuardedLocalInference:
         if self.require_token_echo and (self.tokenize is None or self.detokenize is None):
             raise SealedContextBoundaryError("native tokenizer echo verification is not configured")
         if self.tokenize is not None and self.detokenize is not None:
-            tokens = self._native_callback(self.tokenize, rendered)
-            token_sequence_digest = _token_id_digest(tokens)
-            if self._native_callback(self.detokenize, tokens).encode("utf-8", errors="strict") != encoded:
+            token_sequence_digest, echoed = self._verified_native_roundtrip(rendered)
+            if echoed != encoded:
                 raise SealedContextIntegrityError("native tokenizer round trip changed input bytes")
             token_digest = _hash(encoded)
         untrusted = "\n".join(text for _, text in request.history) + "\n" + request.prompt
@@ -556,10 +582,10 @@ class GuardedLocalInference:
         if admitted_token_ids is not None:
             if self.tokenize is None or self.detokenize is None:
                 raise SealedContextBoundaryError("admitted tokenizer is no longer available")
-            after_tokens = self._native_callback(self.tokenize, after_rendered)
-            if _token_id_digest(after_tokens) != admitted_token_ids:
+            after_ids, after_echo = self._verified_native_roundtrip(after_rendered)
+            if after_ids != admitted_token_ids:
                 raise SealedContextIntegrityError("native token ID sequence changed during inference")
-            if self._native_callback(self.detokenize, after_tokens).encode("utf-8", errors="strict") != after_bytes:
+            if after_echo != after_bytes:
                 raise SealedContextIntegrityError("native tokenizer echo changed during inference")
         if callable(native_renderer) and after_rendered != request.rendered_input:
             if self.projection_attestor is None or self._native_callback(
