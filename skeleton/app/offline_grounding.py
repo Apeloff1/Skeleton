@@ -117,7 +117,7 @@ def _citation(hit: dict[str, Any]) -> dict[str, Any]:
     )} | {"passage_sha256": _digest(hit["passage"])}
 
 
-def _excerpt_start(question: str, passage: str) -> int:
+def _excerpt_start(question: str, passage: str, *, width: int = MAX_EXCERPT_CHARS) -> int:
     """Select an exact original-text window by lexical query coverage.
 
     Normalization is used only to compare terms. Offsets always index the
@@ -126,7 +126,7 @@ def _excerpt_start(question: str, passage: str) -> int:
     """
     from .offline_knowledge import _terms
     terms = set(_terms(question))
-    maximum = max(0, len(passage) - MAX_EXCERPT_CHARS)
+    maximum = max(0, len(passage) - width)
     if not terms or not maximum:
         return 0
     # Keep combining marks attached to their original word for normalization.
@@ -138,11 +138,11 @@ def _excerpt_start(question: str, passage: str) -> int:
     candidates = {0, maximum}
     for start, end, _ in matches:
         candidates.update(max(0, min(maximum, position))
-                          for position in (start, start - 40, end - MAX_EXCERPT_CHARS))
+                          for position in (start, start - 40, end - width))
 
     def rank(start):
         included = [(left, words) for left, right, words in matches
-                    if start <= left and right <= start + MAX_EXCERPT_CHARS]
+                    if start <= left and right <= start + width]
         covered = set().union(*(words for _, words in included))
         # Repeated boilerplate must not outweigh rare query terms. Keep useful
         # trailing explanation, rather than ending precisely on the last term.
@@ -169,11 +169,14 @@ def _prompt_suffix(citations: list[dict[str, Any]]) -> str:
 
 
 def prepare_evidence(question: str, request_digest: str, hits: list[dict[str, Any]],
-                     model_digest: str, tokenizer_digest: str) -> dict[str, Any]:
+                     model_digest: str, tokenizer_digest: str, *,
+                     excerpt_chars: int = MAX_EXCERPT_CHARS) -> dict[str, Any]:
     if not isinstance(question, str) or not question.strip():
         raise RuntimeContractError("grounded turn requires user question")
     if not isinstance(hits, list) or not 1 <= len(hits) <= MAX_EVIDENCE_HITS:
         raise RuntimeContractError("no bounded local evidence available for grounding")
+    if type(excerpt_chars) is not int or not 48 <= excerpt_chars <= MAX_EXCERPT_CHARS:
+        raise RuntimeContractError("invalid source excerpt width")
     citations = []
     for hit in hits:
         # Validate the complete search hit before narrowing it. A malformed
@@ -182,8 +185,8 @@ def prepare_evidence(question: str, request_digest: str, hits: list[dict[str, An
         # Search verifies the full source chunk first. Record only the exact
         # relevant window that will actually be presented to the model, with truthful
         # character offsets into the original SHA-pinned document.
-        start = _excerpt_start(question, hit["passage"])
-        excerpt = hit["passage"][start:start + MAX_EXCERPT_CHARS]
+        start = _excerpt_start(question, hit["passage"], width=excerpt_chars)
+        excerpt = hit["passage"][start:start + excerpt_chars]
         selected = dict(hit, passage=excerpt,
                         char_start=hit["char_start"] + start,
                         char_end=hit["char_start"] + start + len(excerpt))
