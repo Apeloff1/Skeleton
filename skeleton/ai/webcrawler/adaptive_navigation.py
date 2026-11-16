@@ -213,3 +213,54 @@ def access_interstitial_reason(status: int, headers: Mapping[str, str], body: by
     except (ValueError, AssertionError, UnicodeError):
         return None
     return "access_interstitial_title" if parser.matched() else None
+
+
+def acquisition_readiness(*, measurements, host_ready, allowed_hosts, frontier, now, expires_at):
+    """Metadata-only view over the canonical checkpoint; never emits fetch targets.
+
+    A deadline spanning the grant is a hold, not evidence of why it occurred.
+    Ordinary HTTP status counts survive event-tail eviction, but do not
+    identify all challenges (a 200 may be an interstitial). No second state,
+    credentials, retries, source substitution or network authority is created.
+    """
+    if any(type(v) not in (int, float) or not math.isfinite(v) or v < 0
+           for v in (now, expires_at)):
+        raise ValueError("invalid acquisition readiness clock")
+    hosts = tuple(sorted(set(allowed_hosts)))
+    if len(hosts) > 16 or len(measurements) > 128 or len(frontier) > 512:
+        raise ValueError("acquisition readiness bounds exceeded")
+    counts = {host: {"settled": 0, "denial_statuses": 0, "throttle_statuses": 0,
+                     "rejected_success_statuses": 0, "queued": 0}
+              for host in hosts}
+    for row in measurements:
+        data = counts[row["host"]]
+        status = row["status"]
+        data["settled"] += 1
+        data["denial_statuses"] += int(status in {401, 402, 403, 407, 451})
+        data["throttle_statuses"] += int(status in {429, 503})
+        data["rejected_success_statuses"] += int(
+            status is not None and 200 <= status < 300 and row["kind"] == "rejected"
+        )
+    for row in frontier:
+        counts[urlsplit(row["url"]).hostname]["queued"] += 1
+    rows = []
+    for host in hosts:
+        ready = host_ready.get(host, 0)
+        if now >= expires_at:
+            state = "consent_expired"
+        elif ready >= expires_at:
+            state = "held_for_grant"
+        elif ready > now:
+            state = "cooldown"
+        else:
+            state = "no_host_hold"
+        rows.append({"host": host, "state": state, "host_ready_at": ready, **counts[host]})
+    return {
+        "schema": "skeleton.dragon.acquisition-readiness.v1",
+        "hosts": rows,
+        "settled_requests": len(measurements),
+        "queued": len(frontier),
+        "network_authority_expanded": False,
+        "reason_inferred": False,
+        "independent_intake_requires_new_authorization": True,
+    }
