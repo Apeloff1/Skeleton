@@ -280,7 +280,19 @@ class NativeAdapterTests(unittest.TestCase):
                 is_idle=lambda:True,trainer=trainer)
             receipt=worker.run_once()
             self.assertEqual(receipt.disposition,"staged")
-            restored=NativeLLMRuntime.restore_json(Path(receipt.checkpoint_path).read_bytes())
+            checkpoint_raw=Path(receipt.checkpoint_path).read_bytes()
+            restored=NativeLLMRuntime.restore_json(checkpoint_raw)
+            import json
+            evidence_path=Path(receipt.learning_evidence_path)
+            evidence_raw=evidence_path.read_bytes()
+            evidence=json.loads(evidence_raw)
+            self.assertEqual(evidence_path.name,
+                             sha256(evidence_raw).hexdigest()+".adapter-evidence.json")
+            self.assertEqual(evidence["candidate_checkpoint_bytes_sha256"],
+                             sha256(checkpoint_raw).hexdigest())
+            self.assertEqual(evidence["candidate_model_digest"],restored.model_digest)
+            self.assertEqual(evidence["report"]["base_model_digest"],champion.model_digest)
+            self.assertFalse(evidence["promotion_authorized"])
             self.assertNotEqual(restored.model_digest,champion.model_digest)
             self.assertEqual(restored.model.E,champion.model.E)
             self.assertNotEqual(restored.model.Wout,champion.model.Wout)
