@@ -49,13 +49,18 @@ def _fixture(root: Path) -> None:
         "COPY scripts/asset.js ./scripts/\n",
         encoding="utf-8",
     )
-    private_globs = "**/.env\n**/.env.*\n**/*.pem\n**/*.key\n"
+    private_names = (
+        ".env", ".env.*", "*.pem", "*.key", "*.p12", "*.pfx", "*.crt", "*.cer",
+        "credentials*.json", "service-account*.json", ".runtime",
+    )
+    private_globs = "".join(f"**/{name}\n" for name in private_names)
     (root / "Dockerfile.dockerignore").write_text(private_globs, encoding="utf-8")
     (root / "backend" / "Dockerfile.dockerignore").write_text(
         private_globs, encoding="utf-8"
     )
     (root / "frontend" / ".dockerignore").write_text(
-        ".env\n.env.*\n*.pem\n*.key\n", encoding="utf-8"
+        "".join(f"{name}\n" for name in private_names) + private_globs,
+        encoding="utf-8"
     )
 
 
@@ -331,3 +336,67 @@ def test_repository_ingress_preserves_one_exact_setup_location():
     root = find_repo_root(Path(__file__))
     source = (root / "frontend" / "nginx.conf").read_text(encoding="utf-8")
     assert nginx_ingress_errors(source) == ()
+
+
+@pytest.mark.parametrize("ignore", [
+    "Dockerfile.dockerignore",
+    "backend/Dockerfile.dockerignore",
+    "frontend/.dockerignore",
+])
+@pytest.mark.parametrize("exception", ["!**", "!skeleton/**", "!**/.env", "!**/.runtime/"])
+def test_context_privacy_fence_refuses_late_reinclusion(tmp_path, ignore, exception):
+    _fixture(tmp_path)
+    path = tmp_path / ignore
+    path.write_text(path.read_text() + exception + "\n")
+    assert any("private runtime files" in item for item in build_source_errors(tmp_path))
+
+
+def test_context_privacy_fence_accepts_reinclusion_before_complete_fence(tmp_path):
+    _fixture(tmp_path)
+    path = tmp_path / "Dockerfile.dockerignore"
+    path.write_text("**\n!skeleton/**\n" + path.read_text())
+    assert build_source_errors(tmp_path) == ()
+
+
+@pytest.mark.parametrize("rule", ["**/.env", "**/*.pfx", "**/credentials*.json", "**/.runtime"])
+def test_frontend_nested_private_material_must_be_excluded(tmp_path, rule):
+    _fixture(tmp_path)
+    path = tmp_path / "frontend" / ".dockerignore"
+    path.write_text(path.read_text().replace(rule + "\n", ""))
+    assert any("private runtime files" in item for item in build_source_errors(tmp_path))
+
+
+def test_frontend_dockerfile_specific_ignore_cannot_shadow_reviewed_policy(tmp_path):
+    _fixture(tmp_path)
+    (tmp_path / "frontend" / "Dockerfile.dockerignore").write_text("node_modules\n")
+    assert any("unsafe Docker context ignore" in item for item in build_source_errors(tmp_path))
+
+
+@pytest.mark.parametrize("line", [
+    "COPY --from=builder --unknown=x /opt/venv /opt/venv",
+    "COPY --from=builder",
+    "COPY --from= /opt/venv /opt/venv",
+    "COPY --from=builder --from=other /opt/venv /opt/venv",
+    "COPY --link-malformed pyproject.toml ./",
+    "COPY --link=maybe pyproject.toml ./",
+    r"COPY ..\secret ./",
+    "COPY '' ./",
+])
+def test_stage_and_host_copy_parser_rejects_ambiguous_instructions(line):
+    assert _copy_sources(line) is None
+
+
+@pytest.mark.parametrize("instruction", [
+    "ADD https://example.invalid/archive.tar.gz /app/",
+    "ADD pyproject.toml ./",
+])
+def test_unreviewed_add_cannot_bypass_source_admission(tmp_path, instruction):
+    _fixture(tmp_path)
+    path = tmp_path / "Dockerfile"
+    path.write_text(path.read_text() + instruction + "\n")
+    assert any("unreviewed Docker ADD" in item for item in build_source_errors(tmp_path))
+
+
+def test_ingress_refuses_nul_even_inside_comment_or_quoted_string():
+    for source in (_INGRESS + "# hidden\x00\n", _INGRESS.replace("no-store", "no-store\x00")):
+        assert nginx_ingress_errors(source)

@@ -27,10 +27,35 @@ _BUILD_CONTEXTS = (
     ("frontend", "frontend/Dockerfile", "frontend", "frontend/.dockerignore"),
 )
 # These rules constrain *source* admission, not container execution policy.
-_REQUIRED_IGNORES = (
-    (".env", ".env.*", "*.pem", "*.key"),
-    ("**/.env", "**/.env.*", "**/*.pem", "**/*.key"),
+# Require a terminal privacy fence instead of approximating Docker's complete
+# patternmatcher. Late exceptions may reopen protected files or their parents.
+_PRIVATE_NAMES = (
+    ".env", ".env.*", "*.pem", "*.key", "*.p12", "*.pfx", "*.crt", "*.cer",
+    "credentials*.json", "service-account*.json", ".runtime",
 )
+_RECURSIVE_IGNORES = tuple("**/" + name for name in _PRIVATE_NAMES)
+
+
+def _private_ignore_fence(source: str, *, frontend: bool) -> bool:
+    """Require every privacy rule after the final context re-inclusion."""
+    if "\x00" in source or "\\" in source:
+        return False
+    terminal: set[str] = set()
+    for physical in source.splitlines():
+        line = physical.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("!"):
+            terminal.clear()
+        else:
+            terminal.add(line.rstrip("/"))
+    required = _RECURSIVE_IGNORES + (_PRIVATE_NAMES if frontend else ())
+    return all(rule in terminal for rule in required)
+
+
+def _descriptor_stamp(info: os.stat_result) -> tuple[int, ...]:
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_nlink,
+            info.st_size, info.st_mtime_ns, info.st_ctime_ns)
 
 
 
@@ -46,17 +71,20 @@ def _bounded_source_text(path: Path) -> str:
         if (
             not stat.S_ISREG(opened.st_mode)
             or not stat.S_ISREG(current.st_mode)
-            or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)
+            or _descriptor_stamp(opened) != _descriptor_stamp(current)
             or (os.name != "nt" and opened.st_nlink != 1)
             or opened.st_size > MAX_DOCKERFILE_BYTES
         ):
             raise ValueError("unsafe or oversized build contract input")
         data = source.read(MAX_DOCKERFILE_BYTES + 1)
+        final = os.fstat(source.fileno())
         current = os.lstat(path)
         if (
-            len(data) > MAX_DOCKERFILE_BYTES
+            len(data) != opened.st_size
+            or len(data) > MAX_DOCKERFILE_BYTES
             or not stat.S_ISREG(current.st_mode)
-            or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)
+            or _descriptor_stamp(opened) != _descriptor_stamp(final)
+            or _descriptor_stamp(final) != _descriptor_stamp(current)
         ):
             raise ValueError("build contract input changed or exceeded budget")
     return data.decode("utf-8")
@@ -103,6 +131,9 @@ def _safe_existing_source(context: Path, candidate: Path) -> bool:
 
 def _copy_sources(line: str) -> tuple[str, ...] | None:
     """Extract supported literal COPY sources; None denotes malformed syntax."""
+    # Continuations are already handled; do not let shlex silently alter paths.
+    if "\\" in line or "\x00" in line:
+        return None
     try:
         tokens = shlex.split(line, comments=False, posix=True)
     except ValueError:
@@ -110,20 +141,26 @@ def _copy_sources(line: str) -> tuple[str, ...] | None:
     if not tokens or tokens[0].upper() != "COPY":
         return None
     arguments = tokens[1:]
+    flags: set[str] = set()
     while arguments and arguments[0].startswith("--"):
         flag = arguments.pop(0)
-        if flag.startswith("--from="):
-            # From-stage copies do not refer to the host source checkout.
-            return ()
-        if not flag.startswith(("--chown=", "--chmod=", "--link")):
+        key, sep, value = flag.partition("=")
+        if key in flags or key not in {"--from", "--chown", "--chmod", "--link"}:
             return None
+        if key == "--link":
+            if sep and value not in {"true", "false"}:
+                return None
+        elif not sep or not value:
+            return None
+        flags.add(key)
     if len(arguments) < 2:
         return None
     # JSON-array COPY is intentionally not used by the pinned installation
     # Dockerfiles; fail closed if a new syntax is introduced without review.
-    if arguments[0].startswith("["):
+    if arguments[0].startswith("[") or any(not arg for arg in arguments):
         return None
-    return tuple(arguments[:-1])
+    # Parse the entire instruction before allowing a stage-copy exemption.
+    return () if "--from" in flags else tuple(arguments[:-1])
 
 
 
@@ -190,7 +227,8 @@ def nginx_ingress_errors(source: str) -> tuple[str, ...]:
     deliberately refuses includes, nested locations and conflicting route
     declarations in this one maintained configuration.
     """
-    if not isinstance(source, str) or len(source) > MAX_DOCKERFILE_BYTES:
+    if (not isinstance(source, str) or "\x00" in source
+            or len(source.encode("utf-8", errors="replace")) > MAX_DOCKERFILE_BYTES):
         return ("invalid or oversized production ingress",)
     frames: list[tuple[str, ...]] = []
     words: list[str] = []
@@ -299,23 +337,23 @@ def build_source_errors(root: Path) -> tuple[str, ...]:
         source = root / dockerfile
         ignored = root / ignore_path
         try:
+            if not _safe_existing_source(root, source):
+                raise ValueError("unsafe Dockerfile path")
             instructions = _bounded_source_text(source).splitlines()
         except (OSError, UnicodeError, ValueError):
             issues.append(f"{scope}: Dockerfile missing, linked, oversized or unreadable")
             continue
         try:
-            ignore_lines = {
-                line.strip()
-                for line in _bounded_source_text(ignored).splitlines()
-                if line.strip() and not line.strip().startswith("#")
-            }
+            if not _safe_existing_source(root, ignored):
+                raise ValueError("unsafe Docker ignore path")
+            # Dockerfile-specific ignores take precedence over context ignores.
+            if scope == "frontend" and os.path.lexists(str(source) + ".dockerignore"):
+                raise ValueError("unreviewed Dockerfile-specific ignore override")
+            ignore_source = _bounded_source_text(ignored)
         except (OSError, UnicodeError, ValueError):
             issues.append(f"{scope}: missing or unsafe Docker context ignore file")
             continue
-        # The engine and backend use per-Dockerfile allowlists. The frontend
-        # uses a dedicated subtree and its own denylist.
-        required = _REQUIRED_IGNORES[0 if scope == "frontend" else 1]
-        if any(rule not in ignore_lines for rule in required):
+        if not _private_ignore_fence(ignore_source, frontend=scope == "frontend"):
             issues.append(f"{scope}: private runtime files are not excluded from Docker context")
 
         # Dockerfile lines can include backslash continuations. COPY sources
@@ -335,7 +373,11 @@ def build_source_errors(root: Path) -> tuple[str, ...]:
         if pending:
             issues.append(f"{scope}: incomplete Dockerfile line continuation")
         for line in logical:
-            if line.split(maxsplit=1)[0].upper() != "COPY":
+            instruction = line.split(maxsplit=1)[0].upper()
+            if instruction == "ADD":
+                issues.append(f"{scope}: unreviewed Docker ADD instruction")
+                continue
+            if instruction != "COPY":
                 continue
             sources = _copy_sources(line)
             if sources is None:

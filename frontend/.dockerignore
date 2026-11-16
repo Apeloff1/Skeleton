@@ -14,7 +14,6 @@ coverage
 # Never send local credentials or runtime configuration to the frontend builder.
 .env
 .env.*
-!.env.example
 *.pem
 *.key
 *.p12
@@ -28,3 +27,18 @@ service-account*.json
 *.log
 *.tmp
 *.bak
+
+# COPY . includes nested project source. Keep private material and runtime
+# journals excluded throughout the subtree; no exceptions below this fence.
+.runtime/
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.crt
+**/*.cer
+**/credentials*.json
+**/service-account*.json
+**/.runtime/
