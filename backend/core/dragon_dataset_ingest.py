@@ -137,12 +137,38 @@ def plan(path,member=None,*,expected_sha=None):
             "input_sha256":source_sha,"expected_sha_matched":expected_sha is not None}
 
 
+def _inspection_identity(info,member):
+    raw=json.dumps(["skeleton.dragon.dataset-inspection.v1",member,
+                    info["input_sha256"],info["expected_rows"],info["expected_chain"],info["pages"]],
+                   ensure_ascii=False,separators=(",",":"),allow_nan=False).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def inspect_dataset(path,member=None,*,expected_sha=None):
+    """Inspect a separately supplied file without opening dataset storage."""
+    info=plan(path,member,expected_sha=expected_sha)
+    return {"schema":"skeleton.dragon.dataset-inspection.v1",
+            "inspection_digest":_inspection_identity(info,member),
+            "input_sha256":info["input_sha256"],
+            "expected_sha_matched":info["expected_sha_matched"],
+            "expected_rows":info["expected_rows"],"expected_chain":info["expected_chain"],
+            "pages":info["pages"],"container_member_selected":member is not None,
+            "network_executed":False,"storage_written":False,"rights_reviewed":False}
+
+
 def ingest(shard,path,*,member=None,dataset,source,observation_digest,label,
-           rights_acknowledged,grant_seconds=86400,corpus=None,expected_sha=None):
+           rights_acknowledged,grant_seconds=86400,corpus=None,expected_sha=None,
+           expected_inspection=None):
     if rights_acknowledged is not True:
         raise ValueError("explicit data-retention rights required")
     path=Path(path)
+    if expected_inspection is not None and (not isinstance(expected_inspection,str)
+            or not re.fullmatch(r"[a-f0-9]{64}",expected_inspection)):
+        raise ValueError("expected inspection digest must be lowercase hex")
     info=plan(path,member,expected_sha=expected_sha)
+    inspection=_inspection_identity(info,member)
+    if expected_inspection is not None and expected_inspection!=inspection:
+        raise ValueError("dataset inspection digest differs; storage untouched")
     receipt=shard.begin(dataset=dataset,source=source,observation_digest=observation_digest,
         label=label,expected_rows=info["expected_rows"],expected_chain=info["expected_chain"],
         grant_seconds=grant_seconds,rights_acknowledged=True,corpus=corpus)
@@ -159,24 +185,34 @@ def ingest(shard,path,*,member=None,dataset,source,observation_digest,label,
         raise ValueError("dataset changed between passes; never seal")
     final=shard.seal(version)
     return {**final,"pages_verified":count,"input_sha256":info["input_sha256"],
+            "inspection_digest":inspection,"expected_inspection_matched":expected_inspection is not None,
             "expected_sha_matched":info["expected_sha_matched"],"network_executed":False,
             "physical_capacity_verified":False,"rights_reviewed":False}
 
 
-def main():
+def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--scope-json",required=True,help="Private operator-owned scope JSON file")
-    parser.add_argument("--game",required=True)
-    parser.add_argument("--source",required=True)
-    parser.add_argument("--observation-digest",required=True)
-    parser.add_argument("--dataset",required=True)
-    parser.add_argument("--label",required=True)
+    parser.add_argument("--scope-json",help="Private operator-owned scope JSON file")
+    parser.add_argument("--game")
+    parser.add_argument("--source")
+    parser.add_argument("--observation-digest")
+    parser.add_argument("--dataset")
+    parser.add_argument("--label")
+    parser.add_argument("--inspect-only",action="store_true")
+    parser.add_argument("--expected-inspection",help="Exact digest of prior read-only inspection")
     parser.add_argument("--path",required=True)
     parser.add_argument("--member")
     parser.add_argument("--expected-sha",help="Optional expected SHA-256 of the entire local file")
     parser.add_argument("--grant-seconds",type=int,default=86400)
     parser.add_argument("--acknowledge-retention-rights",action="store_true")
-    args=parser.parse_args()
+    args=parser.parse_args(argv)
+    scope_fields=(args.scope_json,args.game,args.source,args.observation_digest,args.dataset,args.label)
+    if args.inspect_only:
+        if any(x is not None for x in scope_fields+(args.expected_inspection,)) or args.acknowledge_retention_rights:
+            parser.error("inspection cannot include storage scope or import authority")
+        print(json.dumps(inspect_dataset(args.path,args.member,expected_sha=args.expected_sha),sort_keys=True))
+        return 0
+    if not all(scope_fields):parser.error("import requires explicit scope and dataset binding")
     if not args.acknowledge_retention_rights:parser.error("explicit retention acknowledgement is required")
     scope_path=Path(args.scope_json)
     fingerprint(scope_path)
@@ -187,8 +223,9 @@ def main():
     shard=DatasetShard(scope,args.game,create=os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1")
     result=ingest(shard,args.path,member=args.member,dataset=args.dataset,source=args.source,
         observation_digest=args.observation_digest,label=args.label,grant_seconds=args.grant_seconds,
-        rights_acknowledged=True,expected_sha=args.expected_sha)
+        rights_acknowledged=True,expected_sha=args.expected_sha,expected_inspection=args.expected_inspection)
     print(json.dumps(result,indent=2))
+    return 0
 
 
-if __name__=="__main__":main()
+if __name__=="__main__":raise SystemExit(main())
