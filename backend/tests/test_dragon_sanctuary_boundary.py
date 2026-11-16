@@ -484,5 +484,97 @@ class PublisherErasureTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("private-metadata", str(mutation))
 
 
+class SharedAcquisitionStripeTests(unittest.IsolatedAsyncioTestCase):
+    def make_app(self):
+        app = object.__new__(DragonCrawlerApplication)
+        app._workers = {}
+        app.limits = Mock()
+        app.limits.update_one = AsyncMock()
+        app.limits.find_one = AsyncMock(return_value={})
+        app.limits.find_one_and_update = AsyncMock(return_value={"worker_token": "token"})
+        app.limits.count_documents = AsyncMock(return_value=1)
+        return app
+
+    def row(self, *hosts):
+        return {"_id": "session", **SCOPE, "request": {"allowed_hosts": list(hosts)}}
+
+    def test_canonical_stripe_identity_is_bounded_and_owner_independent(self):
+        from core.dragon_crawler import _acquisition_stripes, ACQUISITION_STRIPES
+        a = _acquisition_stripes(["example.com", "example.org"])
+        b = _acquisition_stripes(["example.org", "example.com", "example.org"])
+        self.assertEqual(a, b)
+        self.assertEqual(a, tuple(sorted(set(a))))
+        self.assertTrue(set(_acquisition_stripes(["example.com"])).issubset(a))
+        for value in a:
+            self.assertTrue(value.startswith("crawler-acquisition-v1:"))
+            self.assertLess(int(value.rsplit(":", 1)[1], 16), ACQUISITION_STRIPES)
+            self.assertNotIn("example", value)
+        for bad in ([], ["UPPER.example"], ["a..example"], ["https://example.com"], ["x"]*17):
+            with self.assertRaises(ValueError):
+                _acquisition_stripes(bad)
+
+    async def test_shared_leases_use_database_clock_and_all_admitted_stripes(self):
+        from core.dragon_crawler import _acquisition_stripes, ACQUISITION_STRIPE_KIND, LEASE_SECONDS
+        app = self.make_app()
+        row = self.row("example.com", "example.org")
+        slots = _acquisition_stripes(row["request"]["allowed_hosts"])
+        await app._claim_acquisition_stripes(row, "token")
+        self.assertEqual(app.limits.find_one_and_update.await_count, len(slots))
+        for slot, call in zip(slots, app.limits.find_one_and_update.await_args_list, strict=True):
+            query, mutation = call.args
+            self.assertEqual(query["_id"], slot)
+            self.assertEqual(query["kind"], ACQUISITION_STRIPE_KIND)
+            self.assertIn({"$expr": {"$lte": ["$lease_until", "$NOW"]}}, query["$or"])
+            self.assertEqual(mutation[0]["$set"]["lease_until"], {"$add": ["$NOW", LEASE_SECONDS*1000]})
+            self.assertEqual(mutation[0]["$set"]["worker_token"], {"$literal": "token"})
+            self.assertNotIn("owner_id", query)
+            self.assertNotIn("example", str(mutation))
+        app.limits.count_documents.return_value = len(slots)
+        await app._assert_acquisition_stripes(row, "token")
+        query = app.limits.count_documents.await_args.args[0]
+        self.assertEqual(query["_id"], {"$in": list(slots)})
+        self.assertEqual(query["worker_token"], "token")
+        self.assertEqual(query["$expr"], {"$gt": ["$lease_until", {"$add": ["$NOW", 15000]}]})
+
+    async def test_shared_contention_denies_entire_slice(self):
+        app = self.make_app()
+        app.limits.find_one_and_update.return_value = None
+        with self.assertRaises(CrawlerError) as caught:
+            await app._claim_acquisition_stripes(self.row("example.com", "example.org"), "token")
+        self.assertEqual(caught.exception.code, "crawler_acquisition_capacity")
+        self.assertEqual(caught.exception.status, 429)
+        app.limits.find_one_and_update.assert_awaited_once()
+
+    async def test_local_undrained_worker_is_not_displaced_even_if_database_lease_expired(self):
+        app = self.make_app()
+        app.limits.find_one.return_value = {"worker_token": "old"}
+        app._workers["old"] = (Mock(), Mock(done=Mock(return_value=False)))
+        with self.assertRaises(CrawlerError) as caught:
+            await app._claim_acquisition_stripes(self.row("example.com"), "token")
+        self.assertEqual(caught.exception.code, "crawler_acquisition_capacity")
+        app.limits.find_one_and_update.assert_not_awaited()
+
+    async def test_missing_or_foreign_coordination_record_fails_closed(self):
+        app = self.make_app()
+        app.limits.find_one.return_value = None
+        with self.assertRaises(CrawlerError) as caught:
+            await app._claim_acquisition_stripes(self.row("example.com"), "token")
+        self.assertEqual(caught.exception.status, 503)
+        app.limits.find_one_and_update.assert_not_awaited()
+
+    async def test_missing_or_expiring_stripe_prevents_transport_authority(self):
+        app = self.make_app()
+        app.limits.count_documents.return_value = 0
+        with self.assertRaises(CrawlerError) as caught:
+            await app._assert_acquisition_stripes(self.row("example.com"), "token")
+        self.assertEqual(caught.exception.code, "crawler_acquisition_fenced")
+
+    async def test_backend_fences_foreign_or_wrong_claim_receipt(self):
+        app = self.make_app()
+        app.limits.find_one_and_update.return_value = {"worker_token": "foreign"}
+        with self.assertRaises(CrawlerError):
+            await app._claim_acquisition_stripes(self.row("example.com"), "token")
+
+
 if __name__ == "__main__":
     unittest.main()
