@@ -298,6 +298,102 @@ class CampaignStore:
             _encode(result)
             return result
 
+    def snapshot(self, slot: str, source: Any) -> dict:
+        """Export a compact operation ledger; every historical receipt is replayed.
+
+        Only suffix actions and operation identities are retained in the
+        portable form, rather than repeatedly embedding complete checkpoints.
+        """
+        slot = _identity(slot)
+        with self._transaction(write=False):
+            head = self._slot(slot, source)
+            operations = []
+            prefix = []
+            retained = 0
+            for revision in range(head + 1):
+                row = self._row(slot, revision)
+                verified = self._verified(slot, source, revision)["receipt"]
+                retained += len(row[5])
+                _check(retained <= MAX_SLOT_BYTES, "snapshot exceeds stored byte ceiling")
+                actions = verified["actions"]
+                operations.append({
+                    "operation": row[1], "additional": actions[len(prefix):],
+                    "receipt_digest": verified["session_digest"],
+                })
+                prefix = actions
+            body = {"schema": "skeleton.gameforge.revision_archive.v1",
+                    "namespace": self._namespace, "source_digest": digest(source),
+                    "origin_slot": slot, "head": head, "operations": operations,
+                    "native_qualified": False, "release_qualified": False}
+            result = {**body, "archive_digest": digest(body)}
+            _encode({"request": source, "archive": result})
+            return result
+
+    def restore(self, slot: str, source: Any, archive: Any) -> dict:
+        """Atomically reconstruct an archived operation ledger in a new slot.
+
+        The archive cannot select a different runtime adapter, and all
+        claimed revision digests must match independent owner replay.
+        """
+        slot = _identity(slot)
+        _encode({"request": source, "archive": archive})
+        _check(type(archive) is dict and set(archive) == {
+            "schema", "namespace", "source_digest", "origin_slot", "head",
+            "operations", "native_qualified", "release_qualified", "archive_digest",
+        }, "invalid revision archive shape")
+        _check(archive["schema"] == "skeleton.gameforge.revision_archive.v1"
+               and archive["namespace"] == self._namespace
+               and archive["source_digest"] == digest(source)
+               and archive["native_qualified"] is False
+               and archive["release_qualified"] is False, "revision archive authority mismatch")
+        _identity(archive["origin_slot"])
+        _check(archive["archive_digest"] == digest({
+            key: value for key, value in archive.items() if key != "archive_digest"
+        }), "archive digest mismatch")
+        head = _integer(archive["head"], 0, MAX_REVISIONS - 1)
+        operations = archive["operations"]
+        _check(type(operations) is list and len(operations) == head + 1,
+               "archive count and head mismatch")
+        seen = set()
+        for revision, row in enumerate(operations):
+            _check(type(row) is dict and set(row) == {"operation", "additional", "receipt_digest"},
+                   "invalid archive operation")
+            operation = _identity(row["operation"])
+            _check(operation not in seen, "duplicate archived operation")
+            seen.add(operation)
+            _check(type(row["additional"]) is list
+                   and bool(row["additional"]) == bool(revision), "invalid archived action suffix")
+            _check(type(row["receipt_digest"]) is str
+                   and re.fullmatch("[0-9a-f]{64}", row["receipt_digest"]) is not None,
+                   "invalid archived receipt digest")
+        source_hash = digest(source)
+        with self._transaction():
+            _check(self._execute("SELECT 1 FROM gf_campaign_slots_v1 WHERE slot=?", (slot,)).fetchone()
+                   is None, "restore destination already exists")
+            _check(self._execute("SELECT COUNT(*) FROM gf_campaign_slots_v1").fetchone()[0] < MAX_SLOTS,
+                   "slot ceiling exceeded")
+            self._execute("INSERT INTO gf_campaign_slots_v1(slot,source_digest,head) VALUES(?,?,?)",
+                          (slot, source_hash, head))
+            receipt = None
+            for revision, row in enumerate(operations):
+                if revision == 0:
+                    receipt = self._play(source, [])
+                    previous = None
+                    request_hash = digest({"kind": "create", "source_digest": source_hash})
+                else:
+                    assert receipt is not None
+                    previous = receipt["session_digest"]
+                    receipt = self._append(source, receipt, row["additional"])
+                    request_hash = digest({"kind": "append", "source_digest": source_hash,
+                                           "expected_revision": revision - 1,
+                                           "additional": row["additional"]})
+                _check(receipt["session_digest"] == row["receipt_digest"],
+                       "archived checkpoint differs from independent replay")
+                self._insert(slot, revision, row["operation"], request_hash, previous, receipt)
+            result = self._verified(slot, source, head)
+            _encode(result)
+            return result
+
     def history(self, slot: str, source: Any) -> dict:
         """Audit the complete bounded chain from genesis, not just the current pair."""
         slot = _identity(slot)
