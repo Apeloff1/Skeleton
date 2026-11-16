@@ -400,3 +400,59 @@ def test_guarded_deployment_binds_shared_native_slot(authored, monkeypatch, tmp_
         lease()
         asyncio.run(registry.active.close())
     assert registry.measured_local_status()["shared_native_lease"]["owned_parent_references"] == 0
+
+
+def test_running_sustainment_does_not_charge_the_entire_model_again(authored, monkeypatch):
+    gate = MeasuredLlamaCpuGate(authored.backend, authored.source, authored.policy)
+    install_probes(monkeypatch)
+    gate()
+    assert gate.status()["last"]["status"] == "candidate"
+    # The fixture CPU profile needs two 256 MiB worker allowances. Exactly
+    # that headroom plus the existing 1 GiB service reserve satisfies the
+    # running budget, but cannot fund a second full KV/weight allocation.
+    remaining = GIB + 512 * 1024**2
+    install_probes(monkeypatch, available=remaining, scoped=remaining)
+    with pytest.raises(RuntimePreflightError, match="launch denied"):
+        gate()
+    with authored.backend._process_lock:
+        authored.backend._active_processes.add(123)
+    try:
+        gate.monitor_running()
+        last = gate.status()["last_running"]
+        assert last["status"] == "sustainment_candidate"
+        assert last["worker_ceiling"] == 2
+        assert not last["allocation_authorized"]
+        assert not last["native_qualified"]
+        assert gate.status()["last"]["status"] == "blocked"
+        install_probes(monkeypatch, available=remaining, scoped=remaining, temperature=95)
+        with pytest.raises(RuntimePreflightError, match="sustainment denied"):
+            gate.monitor_running()
+        last = gate.status()["last_running"]
+        assert last["status"] == "blocked"
+        assert "running_thread_ceiling_exceeded" in last["blockers"]
+        install_probes(monkeypatch, available=remaining, scoped=remaining, origin="fixture")
+        with pytest.raises(RuntimePreflightError, match="real local probe"):
+            gate.monitor_running()
+        assert gate.status()["last_running"]["blockers"] == ["native_running_evidence_failed"]
+    finally:
+        with authored.backend._process_lock:
+            authored.backend._active_processes.discard(123)
+    assert gate.status()["running_checks"] == 3
+
+
+def test_running_monitor_is_bound_to_the_native_owner_before_dispatch(authored, monkeypatch):
+    local_environment(authored, monkeypatch)
+    registry = ProviderRegistry.from_env(guarded_components=protected_components(),
+                                         measured_local_deployment=authored.spec)
+    model = registry.active.engine.model
+    try:
+        assert model.execution_snapshot()["running_resource_monitor_bound"]
+        assert model.execution_snapshot()["running_resource_checks"] == 0
+        with pytest.raises(LlamaCppRuntimeError, match="cannot change"):
+            model.install_running_resource_monitor(lambda: None)
+        with pytest.raises(RuntimePreflightError, match="sustainment denied"):
+            install_probes(monkeypatch)
+            model._running_resource_monitor()
+        assert "running_native_process_not_owned" in registry.measured_local_status()["last_running"]["blockers"]
+    finally:
+        asyncio.run(registry.active.close())
