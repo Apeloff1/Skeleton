@@ -14,6 +14,8 @@ from skeleton.app.gameforge_campaign import (
     append_actions, build_campaign, play_campaign, verify_campaign, verify_session,
 )
 from skeleton.app.gameforge_campaign_store import CampaignStore, CampaignStoreError
+from skeleton.app.gameforge_campaign_assist import plan_completion, verify_assistance
+from skeleton.app.gameforge_campaign_board import board, compare_branches, render_html
 from skeleton.app.original_quest_cli import _encode, _object, _require, read_document
 from skeleton.gameforge.errors import GameForgeError
 
@@ -77,11 +79,12 @@ def main(
 ) -> int:
     parser = argparse.ArgumentParser(description="Source-bound GameForge narrative campaign and revision journal")
     commands = ("build", "verify", "play", "verify-play", "resume",
-                "create-slot", "append-slot", "read-slot", "history")
+                "create-slot", "append-slot", "read-slot", "history", "fork-slot",
+                "board", "assist", "verify-assist", "compare", "html")
     parser.add_argument("command", choices=commands)
     parser.add_argument("--database", type=Path)
     args = parser.parse_args(argv)
-    persistent = args.command in {"create-slot", "append-slot", "read-slot", "history"}
+    persistent = args.command in {"create-slot", "append-slot", "read-slot", "history", "fork-slot"}
     if persistent != (args.database is not None):
         parser.error("database required only for persistent slot commands")
     incoming = stdin if stdin is not None else sys.stdin.buffer
@@ -102,6 +105,27 @@ def main(
             verifier = verify_campaign if args.command == "verify" else verify_session
             _require(verifier(data["request"], data["receipt"]), "independent campaign replay mismatch")
             result = {"verified": True, "native_qualified": False, "release_qualified": False}
+        elif args.command in {"board", "html", "assist", "verify-assist"}:
+            required = {"request", "receipt"}
+            if args.command == "verify-assist":
+                required.add("assistance")
+            data = _object(value, required, {"max_expansions"} if args.command == "assist" else set())
+            if args.command == "board":
+                result = board(data["request"], data["receipt"])
+            elif args.command == "html":
+                outgoing.write(render_html(data["request"], data["receipt"]) + "\\n")
+                return 0
+            elif args.command == "assist":
+                result = plan_completion(data["request"], data["receipt"],
+                                         max_expansions=data.get("max_expansions", 1024))
+            else:
+                _require(verify_assistance(data["request"], data["receipt"], data["assistance"]),
+                         "assistance does not replay")
+                result = {"verified": True, "native_qualified": False, "release_qualified": False}
+        elif args.command == "compare":
+            data = _object(value, {"request", "left", "right"}, {"max_expansions"})
+            result = compare_branches(data["request"], data["left"], data["right"],
+                                      max_expansions=data.get("max_expansions", 256))
         else:
             required = {"request", "slot"}
             optional: set[str] = set()
@@ -111,6 +135,8 @@ def main(
                 required.update({"expected_revision", "additional"})
             if args.command == "read-slot":
                 optional.add("revision")
+            if args.command == "fork-slot":
+                required.update({"parent_revision", "expected_digest", "child_slot"})
             data = _object(value, required, optional)
             assert args.database is not None
             with open_workspace(args.database, create=args.command == "create-slot") as store:
@@ -121,6 +147,9 @@ def main(
                                           data["operation"], data["additional"])
                 elif args.command == "read-slot":
                     result = store.read(data["slot"], data["request"], data.get("revision"))
+                elif args.command == "fork-slot":
+                    result = store.fork(data["slot"], data["request"], data["parent_revision"],
+                                        data["expected_digest"], data["child_slot"])
                 else:
                     result = store.history(data["slot"], data["request"])
         outgoing.write(_encode(result).decode("ascii") + "\n")
