@@ -1848,6 +1848,9 @@ class LocalInferenceEngine:
         self._cache_bytes = 0
         self._cache_evictions = 0
         self._cache_expirations = 0
+        self._cache_expiry_sweeps = 0
+        self._cache_next_expiry = math.inf
+        self._cache_expiry_policy_ttl: float | None = None
         self._identity_invalidations = 0
         self._cache_identity: str | None = None
         self._singleflight: dict[
@@ -2346,6 +2349,7 @@ class LocalInferenceEngine:
                 "ttl_seconds": serving["policy"]["cache_ttl_seconds"],
                 "evictions": self._cache_evictions,
                 "expirations": self._cache_expirations,
+                "expiry_sweeps": self._cache_expiry_sweeps,
                 "identity_invalidations": self._identity_invalidations,
                 "singleflight_active": len(self._singleflight),
                 "singleflight_hits": self._singleflight_hits,
@@ -2403,10 +2407,11 @@ class LocalInferenceEngine:
             with self._cache_lock:
                 self._cache_evictions += len(self._cache)
                 self._cache.clear()
+                self._cache_next_expiry = math.inf
                 self._cache_bytes = 0
                 self._cache_epoch += 1
         elif action == "trim_cache":
-            self._trim_cache()
+            self._trim_cache(force=True)
         else:
             with self._capacity_lock:
                 if self._closed and action == "resume":
@@ -2443,6 +2448,7 @@ class LocalInferenceEngine:
         with self._cache_lock:
             self._cache_evictions += len(self._cache)
             self._cache.clear()
+            self._cache_next_expiry = math.inf
             self._cache_bytes = 0
             self._cache_epoch += 1
         cancelled = False
@@ -2952,24 +2958,41 @@ class LocalInferenceEngine:
             }
         )
 
-    def _trim_cache(self) -> None:
+    def _trim_cache(self, *, force: bool = False) -> None:
         with self._capacity_lock:
             self._sample_pressure_locked(time.monotonic())
             policy = self._serving.policy
             byte_limit = self._effective_cache_limit_locked()
         now = time.monotonic()
         with self._cache_lock:
-            for key, item in tuple(self._cache.items()):
-                if now >= min(item.expires_at, item.created_at + policy.cache_ttl_seconds):
-                    self._cache_bytes -= item.size_bytes
-                    del self._cache[key]
-                    self._cache_expirations += 1
+            ttl = policy.cache_ttl_seconds
+            # LRU hits reorder entries, not their expiry. Retain an exact
+            # lower bound on the next possible expiry instead of scanning
+            # every cached response before every request. A shortened TTL
+            # forces a fresh sweep; direct cache hits still check their own
+            # current expiry, and memory pressure still trims on every call.
+            if (force or self._cache_expiry_policy_ttl != ttl
+                    or now >= self._cache_next_expiry):
+                self._cache_expiry_sweeps += 1
+                next_expiry = math.inf
+                for key, item in tuple(self._cache.items()):
+                    expiry = min(item.expires_at, item.created_at + ttl)
+                    if now >= expiry:
+                        self._cache_bytes -= item.size_bytes
+                        del self._cache[key]
+                        self._cache_expirations += 1
+                    else:
+                        next_expiry = min(next_expiry, expiry)
+                self._cache_next_expiry = next_expiry
+                self._cache_expiry_policy_ttl = ttl
             while self._cache and (
                 len(self._cache) > self.cache_size or self._cache_bytes > byte_limit
             ):
                 _, item = self._cache.popitem(last=False)
                 self._cache_bytes -= item.size_bytes
                 self._cache_evictions += 1
+            if not self._cache:
+                self._cache_next_expiry = math.inf
 
     @staticmethod
     def _cache_size_bytes(result: LocalInferenceResult, maximum: int) -> int:
@@ -3289,6 +3312,7 @@ class LocalInferenceEngine:
                 if self._cache_identity is not None:
                     self._identity_invalidations += 1
                 self._cache.clear()
+                self._cache_next_expiry = math.inf
                 self._cache_bytes = 0
                 self._cache_identity = identity
                 self._cache_epoch += 1
@@ -3529,6 +3553,10 @@ class LocalInferenceEngine:
                         replace(result), now, now + policy.cache_ttl_seconds, size_bytes,
                     )
                     self._cache_bytes += size_bytes
+                    effective_ttl = policy.cache_ttl_seconds
+                    if self._cache_expiry_policy_ttl is not None:
+                        effective_ttl = min(effective_ttl, self._cache_expiry_policy_ttl)
+                    self._cache_next_expiry = min(self._cache_next_expiry, now + effective_ttl)
                     while len(self._cache) > self.cache_size or self._cache_bytes > byte_limit:
                         _, discarded = self._cache.popitem(last=False)
                         self._cache_bytes -= discarded.size_bytes
