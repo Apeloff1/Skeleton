@@ -68,7 +68,8 @@ export default function QuestionnaireFlow(props: QuestionnaireFlowProps) {
         ) : (
           <Button
             label="⚒ Forge it"
-            onPress={() => props.onForge(buildRunRequest(state))}
+            onPress={() => { if (!blocked) props.onForge(buildRunRequest(state)); }}
+            disabled={!!blocked}
             busy={props.forging}
             a11yHint="Runs the GameForge pipeline with these answers"
             testID="q-forge"
@@ -428,6 +429,8 @@ function Row({ k, v }: { k: string; v: string }) {
 }
 
 function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: QuestionnaireFlowProps) {
+  const hold = blockReason(state, 'review');
+  if (hold) return <View accessibilityRole="alert" testID="q-preset-compatibility-hold"><Text>{hold}</Text></View>;
   const req = buildRunRequest(state);
   const shadowed = shadowedBriefFacets(state);
   const arch = ARCHETYPES.find((a) => a.id === req.archetype);
