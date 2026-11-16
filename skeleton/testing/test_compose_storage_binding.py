@@ -23,7 +23,8 @@ def model():
 
 
 def fixture_runner(*, resolved=None, volumes=(), containers=(), container_override=None,
-                   volume_override=None, fail_on=None, drift=False, changed_model=False):
+                   volume_override=None, fail_on=None, drift=False, changed_model=False,
+                   daemon="fixture-daemon", container_running=True, created="2026-01-01T12:00:00Z"):
     payload=model() if resolved is None else resolved
     calls=[]
     def runner(command,**kw):
@@ -33,7 +34,9 @@ def fixture_runner(*, resolved=None, volumes=(), containers=(), container_overri
         assert kw["env"]=={"DOCKER_CONTEXT":"fixture-context"}
         if fail_on and fail_on in command:
             return subprocess.CompletedProcess(command,1)
-        if command[1]=="compose":
+        if command[1]=="info":
+            raw=json.dumps({"id":daemon}).encode()
+        elif command[1]=="compose":
             assert tuple(command)==COMMAND[:6]+("config","--format","json")
             value=deepcopy(payload)
             if changed_model and sum(c[1]=="compose" for c in calls)>1:
@@ -51,13 +54,14 @@ def fixture_runner(*, resolved=None, volumes=(), containers=(), container_overri
             raw=b"".join(n.encode()+b"\n" for n in containers)
         elif command[1:3]==["volume","inspect"]:
             role=command[-1][len(PROJECT)+1:]
-            value={"project":PROJECT,"role":role,"driver":"local","scope":"local"}
+            value={"project":PROJECT,"role":role,"driver":"local","scope":"local",
+                   "created":created,"options":None}
             if volume_override:
                 value.update(volume_override)
             raw=json.dumps(value).encode()
         elif command[1:3]==["container","inspect"]:
             role=command[-1].removeprefix("tutolage-")
-            value={"project":PROJECT,"service":role,
+            value={"project":PROJECT,"service":role,"id":"a"*64,"running":container_running,
                    "mounts":[{"Type":"volume","Name":PROJECT+"_"+volume,"Destination":path,"RW":True}
                              for path,volume in binding._BINDINGS.get(role,{}).items()]}
             if container_override:
@@ -70,9 +74,9 @@ def fixture_runner(*, resolved=None, volumes=(), containers=(), container_overri
     return runner,calls
 
 
-def observe(root,runner,admit=None):
+def observe(root,runner,admit=None,**options):
     return binding.observe_binding(root,command=COMMAND,environ={"DOCKER_CONTEXT":"fixture-context"},
-                                   runner=runner,admit=admit)
+                                   runner=runner,admit=admit,**options)
 
 
 def test_empty_project_and_existing_matched_project_both_admitted(tmp_path):
@@ -118,7 +122,7 @@ def test_resolved_config_denies_authority_substitution(tmp_path,mutation):
         mounts.append({"type":"bind","target":"/data","source":"elsewhere"})
     runner,calls=fixture_runner(resolved=value)
     assert not observe(tmp_path,runner).admitted
-    assert len(calls)==1
+    assert len(calls)==2
 
 
 @pytest.mark.parametrize("role",binding.VOLUME_ROLES)
@@ -183,7 +187,9 @@ def test_installer_integration_denies_mutation_before_start(tmp_path,monkeypatch
     def runner(command,**kw):
         calls.append(command)
         assert "up" not in command
-        if "--format" in command:
+        if command[1]=="info":
+            kw["stdout"].write(json.dumps({"id":"fixture-daemon"}).encode())
+        elif "--format" in command:
             value=model()
             value["volumes"]["mongo_data"]["name"]="alternate"
             kw["stdout"].write(json.dumps(value).encode())
@@ -191,4 +197,39 @@ def test_installer_integration_denies_mutation_before_start(tmp_path,monkeypatch
     receipt=installer.install_application(tmp_path,start=True,install_python=False,runner=runner)
     assert not receipt.ok and receipt.phases[-1].name=="start"
     assert "compose_volume_identity_mismatch" in receipt.phases[-1].detail
-    assert len(calls)==2
+    assert len(calls)==3
+
+
+
+@pytest.mark.parametrize("scenario",["healthy","missing","stopped","daemon_changed","volume_recreated"])
+def test_post_start_requires_same_daemon_existing_volume_and_running_services(tmp_path,scenario):
+    old_volumes=(PROJECT+"_mongo_data",)
+    before,_=fixture_runner(volumes=old_volumes)
+    previous=observe(tmp_path,before)
+    assert previous.admitted
+    volumes=tuple(PROJECT+"_"+role for role in binding.VOLUME_ROLES)
+    containers=tuple("tutolage-"+role for role in binding._ACTIVE_ROLES)
+    opts={}
+    if scenario=="missing":
+        containers=containers[:-1]
+    elif scenario=="stopped":
+        opts["container_running"]=False
+    elif scenario=="daemon_changed":
+        opts["daemon"]="other-daemon"
+    elif scenario=="volume_recreated":
+        opts["created"]="2026-02-01T12:00:00Z"
+    after,_=fixture_runner(volumes=volumes,containers=containers,**opts)
+    result=observe(tmp_path,after,previous=previous,require_started=True)
+    assert result.admitted is (scenario=="healthy")
+    assert "fixture-daemon" not in repr(result.to_dict())
+
+
+def test_missing_prelaunch_receipt_cannot_certify_post_start(tmp_path):
+    runner,_=fixture_runner()
+    assert observe(tmp_path,runner,require_started=True).code=="prior_binding_unverified"
+
+
+def test_volume_driver_options_deny_changed_storage_semantics(tmp_path):
+    runner,_=fixture_runner(volumes=(PROJECT+"_mongo_data",),
+                           volume_override={"options":{"device":"unreviewed"}})
+    assert observe(tmp_path,runner).code=="existing_volume_driver_options_unqualified"

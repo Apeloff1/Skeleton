@@ -1167,3 +1167,13 @@ No volume inspection includes database contents and no inspection runs a
 Docker mutation. The transient rendered config may contain credentials;
 it is not retained in the report. This is not secure erasure, database
 authentication, backup verification or a daemon-wide transaction.
+
+
+A successful Compose process exit triggers a second binding observation.
+The selected daemon identity and resolved storage model must still match,
+previously observed volume creation metadata must remain stable, and the
+four required application containers must be running with canonical
+bindings. Container and volume metadata are sampled twice per observation.
+These are point-in-time metadata checks, not immutable volume identity,
+data-content validation, or proof against arbitrary external Docker races.
+The CLI --no-verify switch skips HTTP verification only, not storage custody.

@@ -437,12 +437,20 @@ def install_application(
             status = getattr(completed, "returncode", None)
             valid_status = type(status) is int and -(2**31) <= status <= 2**32 - 1
             ok = valid_status and status == 0
+            binding_failure = None
+            if ok and source_stable():
+                post = observe_binding(root, command=command, environ=compose_env,
+                    runner=runner, admit=source_stable, previous=binding, require_started=True)
+                if not post.admitted:
+                    binding_failure = post.code
+                    ok = False
             # Negative POSIX signal exits, Windows exception codes, timeouts and
             # malformed process receipts may leave daemon operations in flight.
             # Only a normal nonzero exit permits a second controlled invocation.
             recoverable_start_failure = valid_status and 0 < status <= 255
             detail = (
-                "application services started" if ok else
+                "application services started with reobserved storage binding" if ok else
+                "post-start storage binding not admitted: " + binding_failure if binding_failure else
                 f"application start exited {status}" if valid_status else
                 "application start returned invalid process status"
             )

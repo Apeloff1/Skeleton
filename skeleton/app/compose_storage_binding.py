@@ -8,6 +8,7 @@ labels to an installation receipt. No daemon mutations are performed here.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import json
 import re
 import subprocess
@@ -27,16 +28,34 @@ _BINDINGS = {
 }
 _MAX_CONFIG = 2 * 1024 * 1024
 _MAX_INSPECT = 128 * 1024
+_ACTIVE_ROLES = ("mongo", "skeleton", "backend", "frontend")
+_VOLUME_STAMP = re.compile(r"[0-9A-Za-z:+. -]{1,128}\Z")
+_DAEMON_ID = re.compile(r"[0-9A-Za-z:_-]{1,256}\Z")
+_CONTAINER_ID = re.compile(r"[0-9a-f]{64}\Z")
+
+
+def _digest(value):
+    return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(",",":"),
+                                    ensure_ascii=True,allow_nan=False).encode("ascii")).hexdigest()
+
+
+@dataclass(frozen=True, slots=True, repr=False)
+class _BindingIdentity:
+    daemon_digest: str
+    model_digest: str
+    volume_digests: tuple[tuple[str, str], ...]
 # Emit only the relevant labels and mount metadata. Never inspect Config.Env.
 _CONTAINER_TEMPLATE = (
     '{"project":{{json (index .Config.Labels "com.docker.compose.project")}},'
     '"service":{{json (index .Config.Labels "com.docker.compose.service")}},'
+    '"id":{{json .Id}},"running":{{json .State.Running}},'
     '"mounts":{{json .Mounts}}}'
 )
 _VOLUME_TEMPLATE = (
     '{"project":{{json (index .Labels "com.docker.compose.project")}},'
     '"role":{{json (index .Labels "com.docker.compose.volume")}},'
-    '"driver":{{json .Driver}},"scope":{{json .Scope}}}'
+    '"driver":{{json .Driver}},"scope":{{json .Scope}},'
+    '"created":{{json .CreatedAt}},"options":{{json .Options}}}'
 )
 
 
@@ -47,6 +66,7 @@ class BindingReport:
     code: str
     existing_containers: int = 0
     existing_volumes: int = 0
+    identity: _BindingIdentity | None = None
 
     def to_dict(self):
         return {
@@ -141,7 +161,8 @@ def _resolved_model(config):
             # files or another state mount; prohibit parents of canonical paths.
             for other in targets:
                 if other != target:
-                    _require(not target.startswith(other.rstrip("/") + "/"),
+                    _require(not target.startswith(other.rstrip("/") + "/")
+                             and not other.startswith(target.rstrip("/") + "/"),
                              "compose_persistent_parent_mount")
         for target, mount in targets.items():
             if mount.get("type") == "volume" and mount.get("source") in required_roles:
@@ -150,9 +171,14 @@ def _resolved_model(config):
     return project, resolved
 
 
-def _container_binding(payload, project, role, resolved):
+def _container_binding(payload, project, role, resolved, *, require_running=False):
     _require(payload.get("project") == project and payload.get("service") == role,
              "existing_container_project_mismatch")
+    ident = payload.get("id")
+    _require(type(ident) is str and _CONTAINER_ID.fullmatch(ident) is not None
+             and type(payload.get("running")) is bool, "existing_container_state_invalid")
+    if require_running:
+        _require(payload["running"] is True, "required_container_not_running")
     mounts = payload.get("mounts")
     _require(type(mounts) is list and len(mounts) <= 128, "existing_mount_inventory_invalid")
     targets = {}
@@ -167,12 +193,32 @@ def _container_binding(payload, project, role, resolved):
         _require(type(mount) is dict and mount.get("Type") == "volume"
                  and mount.get("Name") == resolved[volume_role] and mount.get("RW") is True,
                  "existing_persistent_mount_mismatch")
+        for other in targets:
+            if other != target:
+                _require(not target.startswith(other.rstrip("/") + "/")
+                         and not other.startswith(target.rstrip("/") + "/"),
+                         "existing_persistent_mount_shadowed")
+    authority = {resolved[volume] for mounts in _BINDINGS.values() for volume in mounts.values()}
+    for target,mount in targets.items():
+        if mount.get("Type") == "volume" and mount.get("Name") in authority:
+            expected = _BINDINGS.get(role,{}).get(target)
+            _require(expected is not None and mount["Name"] == resolved[expected],
+                     "existing_authority_volume_aliased")
+    return _digest((ident, payload["running"], role, [
+        (target, mount.get("Type"), mount.get("Name"), mount.get("RW"))
+        for target,mount in sorted(targets.items())
+    ]))
 
 
 def _volume_binding(payload, project, role):
     _require(payload.get("project") == project and payload.get("role") == role
              and payload.get("driver") == "local" and payload.get("scope") == "local",
              "existing_volume_ownership_mismatch")
+    created = payload.get("created")
+    _require(type(created) is str and _VOLUME_STAMP.fullmatch(created) is not None,
+             "existing_volume_creation_unverified")
+    _require(payload.get("options") in (None, {}), "existing_volume_driver_options_unqualified")
+    return _digest((project,role,payload["driver"],payload["scope"],created))
 
 
 def _render_command(command):
@@ -190,7 +236,8 @@ def _render_command(command):
 
 
 def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=subprocess.run,
-                    admit=None) -> BindingReport:
+                    admit=None, previous: BindingReport | None=None,
+                    require_started: bool=False) -> BindingReport:
     """Observe intended and existing storage, then recheck inventory and epoch."""
     root = Path(root).resolve()
     copied = dict(environ)
@@ -213,10 +260,33 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
 
     try:
         render = _render_command(command)
+        _require(type(require_started) is bool, "binding_mode_invalid")
+        def daemon():
+            data = inspect(["docker","info","--format",'{"id":{{json .ID}}}'],_MAX_INSPECT)
+            identity = data.get("id")
+            _require(type(identity) is str and _DAEMON_ID.fullmatch(identity) is not None,
+                     "docker_daemon_identity_unverified")
+            return _digest(identity)
+
+        daemon_digest = daemon()
         project, resolved = _resolved_model(inspect(render,_MAX_CONFIG))
+        model_digest = _digest((project,resolved))
+        if require_started:
+            _require(previous is not None and previous.admitted is True
+                     and previous.identity is not None, "prior_binding_unverified")
+            _require(previous.identity.daemon_digest == daemon_digest
+                     and previous.identity.model_digest == model_digest,
+                     "launch_daemon_or_storage_model_changed")
         volume_args = ["volume","ls","--format","{{.Name}}"]
         container_args = ["ps","--all","--format","{{.Names}}"]
         all_volumes, all_containers = names(volume_args), names(container_args)
+        volume_digests = {}
+        container_digests = {}
+        if require_started:
+            _require(all("tutolage-"+role in all_containers for role in _ACTIVE_ROLES)
+                     and all(resolved[role] in all_volumes
+                             for mounts in _BINDINGS.values() for role in mounts.values()),
+                     "required_runtime_storage_not_observed")
         for role, expected in resolved.items():
             # Legacy suffix matches and Compose-labeled volumes both imply
             # previous state. Refuse a parallel empty replacement project.
@@ -228,21 +298,36 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
             if expected in all_volumes:
                 payload = inspect(["docker","volume","inspect","--format",_VOLUME_TEMPLATE,expected],
                                   _MAX_INSPECT)
-                _volume_binding(payload,project,role)
+                volume_digests[role] = _volume_binding(payload,project,role)
                 existing_volumes += 1
         for role in CONTAINER_ROLES:
             name = "tutolage-" + role
             if name in all_containers:
                 payload = inspect(["docker","container","inspect","--format",
                                    _CONTAINER_TEMPLATE,name],_MAX_INSPECT)
-                _container_binding(payload,project,role,resolved)
+                container_digests[role] = _container_binding(payload,project,role,resolved,
+                    require_running=require_started and role in _ACTIVE_ROLES)
                 existing_containers += 1
+        if require_started:
+            for role, digest in previous.identity.volume_digests:
+                _require(volume_digests.get(role) == digest, "previous_persistent_volume_changed")
+        for role, digest in volume_digests.items():
+            payload = inspect(["docker","volume","inspect","--format",_VOLUME_TEMPLATE,resolved[role]],_MAX_INSPECT)
+            _require(_volume_binding(payload,project,role) == digest, "volume_binding_changed")
+        for role,digest in container_digests.items():
+            payload = inspect(["docker","container","inspect","--format",_CONTAINER_TEMPLATE,
+                               "tutolage-"+role],_MAX_INSPECT)
+            _require(_container_binding(payload,project,role,resolved,
+                require_running=require_started and role in _ACTIVE_ROLES) == digest,
+                "container_binding_changed")
         _require(names(volume_args) == all_volumes and names(container_args) == all_containers,
                  "docker_storage_inventory_changed")
         _require(_resolved_model(inspect(render,_MAX_CONFIG)) == (project,resolved),
                  "compose_storage_model_changed")
         fence()
-        return BindingReport(True,True,"binding_observed",existing_containers,existing_volumes)
+        _require(daemon() == daemon_digest, "docker_daemon_changed")
+        identity = _BindingIdentity(daemon_digest,model_digest,tuple(sorted(volume_digests.items())))
+        return BindingReport(True,True,"binding_observed",existing_containers,existing_volumes,identity)
     except BindingDenied as exc:
         # All BindingDenied codes are fixed internal identifiers.
         return BindingReport(False,False,str(exc))

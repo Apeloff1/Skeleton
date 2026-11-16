@@ -1299,8 +1299,18 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 )
                 if not source_stable():
                     return changed()
-                if exit_code or bool(args.no_verify):
+                if exit_code:
                     return exit_code
+                post = observe_binding(root, command=startup_command, environ=compose_env,
+                    admit=source_stable, previous=binding, require_started=True)
+                if not post.admitted:
+                    print("application start blocked: post-start persistent binding not admitted: " + post.code)
+                    return 1
+                if not source_stable():
+                    return changed()
+                if bool(args.no_verify):
+                    # Skips HTTP smoke only, never persistent storage custody.
+                    return 0
 
                 from skeleton.app.health import probes_ok, wait_for_application
 
