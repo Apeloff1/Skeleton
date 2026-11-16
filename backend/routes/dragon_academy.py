@@ -2643,6 +2643,16 @@ class CrawlerCreateRequest(CrawlerRequest):
         return self
 
 
+class CrawlerPublisherIntakeRequest(CrawlerRequest):
+    idempotency_key: str = Field(min_length=1, max_length=128)
+    endpoint: str = Field(min_length=1, max_length=2048)
+    method: str = Field(pattern=r"^(public_api|publisher_feed|open_dataset_manifest|licensed_public_export)$")
+    consent: bool = Field(strict=True)
+    rights_acknowledged: bool = Field(strict=True)
+    publisher_permission_acknowledged: bool = Field(strict=True)
+    independent_resource_acknowledged: bool = Field(strict=True)
+
+
 class CrawlerWriteRequest(CrawlerRequest):
     idempotency_key: str = Field(min_length=1, max_length=128)
     expected_version: int = Field(ge=1, strict=True)
@@ -2996,6 +3006,14 @@ async def crawler_companion_sanctuary(scope: dict = Depends(_crawler_scope)) -> 
 async def crawler_acquisition_holds(scope: dict = Depends(_crawler_scope)) -> dict:
     """Read-only owner-scoped restriction audit; not a dispatch authorization."""
     return await _crawler_result(crawler_application.acquisition_hold_catalog(scope))
+
+
+@router.post("/crawler/publisher-intake")
+async def crawler_publisher_intake(
+    body: CrawlerPublisherIntakeRequest, scope: dict = Depends(_crawler_write_scope),
+) -> dict:
+    return {"ok": True, "session": await _crawler_result(
+        crawler_application.create_publisher_intake(scope, body.model_dump()))}
 
 
 @router.get("/crawler/sessions")
