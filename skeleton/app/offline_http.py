@@ -59,7 +59,7 @@ from skeleton.app.offline_reference_write import (
 )
 from skeleton.app.offline_grounding import (
     audit_answer_citations, audit_answer_faithfulness, grounded_request_digest,
-    normalized_document_scope, scoped_grounded_request_digest, prepare_evidence,
+    normalized_document_scope, scoped_grounded_request_digest,
 )
 
 
@@ -566,9 +566,6 @@ class OfflineHTTPApplication:
                     raise OfflineHTTPError(
                         422, "no local reference passages match this question"
                     )
-                manifest = prepare_evidence(
-                    text, digest, hits, self.model_digest, self.tokenizer_digest,
-                )
             try:
                 # Acquire only for NEW generation. Already committed historical
                 # replies stay available while a peer runs its model.
@@ -584,6 +581,10 @@ class OfflineHTTPApplication:
                         self.backend, database=self.database, session_id=session_id
                     )
                     try:
+                        if grounded:
+                            manifest = chat.prepare_grounded_evidence(
+                                text, digest, hits, budget, require_full_history=strict,
+                            )
                         # Runtime adaptation and durability CAS are controlled by
                         # DurableOfflineAISession. A failed turn leaves no partial text.
                         async def generate():
@@ -1064,14 +1065,16 @@ class OfflineHTTPApplication:
                             )), document_ids,
                         ), strict,
                     )
-                    manifest = prepare_evidence(
-                        query, digest, hits, self.model_digest, self.tokenizer_digest
-                    )
-                    context = manifest["context"]
                 session = DurableOfflineAISession(
                     self.backend, database=self.database, session_id=sid
                 )
                 try:
+                    if grounded:
+                        # Preview remains descriptive even when strict full-history
+                        # admission is impossible; the returned policy flag tells
+                        # the operator whether generation may be submitted.
+                        manifest = session.prepare_grounded_evidence(query, digest, hits, budget)
+                        context = manifest["context"]
                     report = session.preview_context(
                         message.strip(), budget, grounding_context=context
                     )
