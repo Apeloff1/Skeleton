@@ -220,12 +220,57 @@ def verify(destination):
     finally:db.close()
 
 
+def restore_new(destination,*,offline_acknowledged=False):
+    """Restore configured originals only; never replace existing bytes.
+
+    All source files must be available in a verified package. A partially
+    restored set is NOT a launchable deployment. Restore payload and graph
+    children before their manifest/corpus metadata, while writers stay off.
+    """
+    custody._ack(offline_acknowledged);receipt=verify(destination)
+    dest=custody._dir(Path(destination));catalogue,_=_private(dest/"catalogue.sqlite3")
+    db=sqlite3.connect(catalogue.as_uri()+"?mode=ro&immutable=1",uri=True)
+    try:
+        requests={}
+        for original,size,digest in db.execute("SELECT original,bytes,sha256 FROM files"):
+            target=Path(original)
+            if target.exists() or target.is_symlink():
+                if custody._fingerprint(target)!={"bytes":size,"sha256":digest}:
+                    raise custody.DeploymentHeld("existing original differs")
+                if any(s.exists() or s.is_symlink() for s in custody._sidecars(target)):
+                    raise custody.DeploymentHeld("existing original has sidecars")
+            else:
+                custody._unused(target)
+                requests[target.parent]=requests.get(target.parent,0)+size
+        custody._require_space(list(requests.items()))
+        copied=0
+        order="""SELECT original,name,bytes,sha256 FROM files ORDER BY
+            CASE plane WHEN 'primary_payload' THEN 0 WHEN 'backup_payload' THEN 0
+                       WHEN 'graph' THEN 1 WHEN 'dataset' THEN 2
+                       WHEN 'primary_manifest' THEN 3 WHEN 'backup_manifest' THEN 3
+                       WHEN 'corpus' THEN 4 ELSE 5 END,id"""
+        for original,name,size,digest in db.execute(order):
+            target=Path(original);witness={"bytes":size,"sha256":digest}
+            if not target.exists():
+                custody._publish_copy(dest/name,target,witness);copied+=1
+            if custody._fingerprint(target)!=witness:raise custody.DeploymentHeld("restore witness differs")
+        for original,size,digest in db.execute("SELECT original,bytes,sha256 FROM files"):
+            if custody._fingerprint(Path(original))!={"bytes":size,"sha256":digest}:
+                raise custody.DeploymentHeld("complete restore differs")
+        return {**receipt,"restored":True,"new_files":copied,"configuration_changed":False,
+                "application_launch_verified":False}
+    finally:db.close()
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest="command",required=True)
     a=sub.add_parser("export");a.add_argument("--destination",required=True);a.add_argument("--offline-writers-stopped",action="store_true")
     v=sub.add_parser("verify");v.add_argument("--destination",required=True)
+    r=sub.add_parser("restore-new");r.add_argument("--destination",required=True);r.add_argument("--offline-writers-stopped",action="store_true")
     args=p.parse_args()
-    answer=export(args.destination,offline_acknowledged=args.offline_writers_stopped) if args.command=="export" else verify(args.destination)
+    if args.command=="export":answer=export(args.destination,offline_acknowledged=args.offline_writers_stopped)
+    elif args.command=="restore-new":answer=restore_new(args.destination,offline_acknowledged=args.offline_writers_stopped)
+    else:answer=verify(args.destination)
     print(json.dumps(answer,sort_keys=True))
 
 
