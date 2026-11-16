@@ -5,6 +5,8 @@ import math
 import hmac
 import random
 import sys
+import threading
+from weakref import WeakKeyDictionary
 from typing import Any, Callable, Iterator, Mapping, Sequence
 
 from skeleton.cortex.attn import sample_logits
@@ -161,6 +163,10 @@ class NativeLLMRuntime:
             raise RuntimeContractError("TinyTransformer required")
         self.model = model
         self.limits = limits or RuntimeLimits.for_model(model)
+        # Idle session prefix caches are disposable, per-runtime, globally
+        # bounded retention. Weak keys do not prolong session lifetimes.
+        self._idle_prefix_lock = threading.Lock()
+        self._idle_prefix_bytes = WeakKeyDictionary()
         if self.limits.max_context > model.ctx:
             raise RuntimeContractError("runtime context exceeds model context")
         self.device_policy = device_policy or DevicePolicy()
@@ -235,6 +241,24 @@ class NativeLLMRuntime:
         if not isinstance(store, CpuKVSpillStore):
             raise RuntimeContractError("CpuKVSpillStore required")
         return store.restore(self, digest)
+
+    def _reserve_idle_cpu_prefix(self, session, size: int) -> bool:
+        """Bound aggregate idle Python KV retention, not concurrent workers."""
+        if type(size) is not int or size <= 0:
+            return False
+        with self._idle_prefix_lock:
+            previous = self._idle_prefix_bytes.get(session, 0)
+            total = sum(self._idle_prefix_bytes.values()) - previous
+            cap = min(256 * 1024**2, self.limits.max_kv_bytes)
+            if (total + size > cap
+                    or (not previous and len(self._idle_prefix_bytes) >= 32)):
+                return False
+            self._idle_prefix_bytes[session] = size
+            return True
+
+    def _release_idle_cpu_prefix(self, session) -> None:
+        with self._idle_prefix_lock:
+            self._idle_prefix_bytes.pop(session, None)
 
     def estimate_kv_bytes(self, tokens: int) -> int:
         count = max(0, int(tokens))
@@ -1111,6 +1135,7 @@ class NativeConversationSession:
         return self._tokens
 
     def _clear_prefix_cache(self) -> None:
+        self.runtime._release_idle_cpu_prefix(self)
         self._prefix_cache = None
         self._prefix_binding = None
         self._prefix_reused_tokens = 0
@@ -1202,6 +1227,7 @@ class NativeConversationSession:
                and not self.runtime.model.use_mod)
         if cpu:
             if (cache is None or cache_binding != binding
+                    or cache.owner is not self.runtime.model
                     or cache.next_position != len(cache.tokens)
                     or tuple(cache.tokens) != prompt_ids[:len(cache.tokens)]
                     or self._retained_prefix_size(cache) > self._prefix_cache_bytes):
@@ -1224,10 +1250,12 @@ class NativeConversationSession:
         self._tokens = (prompt_ids + result.generated_ids)[-self.runtime.limits.max_context:]
         if (cache is not None and cache.tokens and binding == self._cache_binding()
                 and cache.next_position == len(cache.tokens)
-                and tuple(cache.tokens) == self._tokens[:len(cache.tokens)]
-                and self._retained_prefix_size(cache) <= self._prefix_cache_bytes):
-            self._prefix_cache = cache
-            self._prefix_binding = binding
+                and tuple(cache.tokens) == self._tokens[:len(cache.tokens)]):
+            retained_size = self._retained_prefix_size(cache)
+            if (retained_size <= self._prefix_cache_bytes
+                    and self.runtime._reserve_idle_cpu_prefix(self, retained_size)):
+                self._prefix_cache = cache
+                self._prefix_binding = binding
         self._prefix_reused_tokens = reused
         self.turns += 1
         self._revision += 1
