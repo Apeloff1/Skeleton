@@ -303,9 +303,9 @@ def test_directory_entries_are_flushed_before_terminal_sqlite_publication(manage
     def publish(source, destination):
         events.append("publish")
         return original_publish(source, destination)
-    def complete(rid):
+    def complete(rid, expected):
         events.append("complete")
-        return original_complete(rid)
+        return original_complete(rid, expected)
     monkeypatch.setattr(builder, "_fsync_directory", flush)
     monkeypatch.setattr(builder, "publish_create_only", publish)
     monkeypatch.setattr(manager, "_complete", complete)
