@@ -84,7 +84,7 @@ def inventory_offline_weights(
     # Admit the entire declared byte budget before opening any weight object.
     # Otherwise N individually valid plans can force N huge reads before
     # the original post-read aggregate check reports exhaustion.
-    declared = []
+    declared: list[VerifiedOfflineWeightPlan] = []
     cumulative = 0
     try:
         for name in sorted(names):
@@ -93,16 +93,18 @@ def inventory_offline_weights(
             cumulative += plan.expected_total_bytes
             if cumulative > max_weight_bytes:
                 raise OfflineInventoryError("aggregate offline weights exceed byte budget")
-            declared.append((digest, plan))
-        for digest, plan in declared:
-            paths = store.verified_paths(digest)
-            # Recheck the manifest used for object verification. No partial
-            # inventory is returned if the claimed plan changed.
-            if store.load_plan(digest) != plan or len(paths) != len(plan.shards):
-                raise OfflineInventoryError("verified plan identity or shard count mismatch")
-            verified.append(VerifiedOfflineWeightPlan(
-                digest, plan.model_identity_digest, len(paths), plan.expected_total_bytes
+            declared.append(VerifiedOfflineWeightPlan(
+                digest, plan.model_identity_digest, len(plan.shards), plan.expected_total_bytes
             ))
+        # Retain only fixed-size declarations, not every shard manifest.
+        for row in declared:
+            paths = store.verified_paths(row.plan_digest)
+            plan = store.load_plan(row.plan_digest)
+            if (plan.model_identity_digest != row.model_identity_digest
+                    or plan.expected_total_bytes != row.weight_bytes
+                    or len(plan.shards) != row.shard_count or len(paths) != row.shard_count):
+                raise OfflineInventoryError("verified plan identity or shard count mismatch")
+            verified.append(row)
         with os.scandir(path / "manifests") as listing:
             observed = []
             for item in listing:
