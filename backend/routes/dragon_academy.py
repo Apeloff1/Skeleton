@@ -2673,6 +2673,13 @@ class CrawlerWriteRequest(CrawlerRequest):
         return self
 
 
+class CrawlerNavigationRetention(CrawlerRequest):
+    expected_snapshot_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    rights_reference: str = Field(min_length=1,max_length=256)
+    retention_seconds: int = Field(ge=900,le=315360000,strict=True)
+    acknowledged: bool = Field(strict=True)
+
+
 class CrawlerNavigationAdvice(CrawlerRequest):
     snapshot_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
     packet_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
@@ -3108,6 +3115,47 @@ async def crawler_automation(
         ),
     }
 
+
+
+@router.post("/crawler/sessions/{session_id}/navigation/federate")
+async def crawler_navigation_federate(
+    body: CrawlerNavigationRetention,
+    session_id: str = URLPath(min_length=1,max_length=128),
+    scope: dict = Depends(_crawler_write_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"publish",
+        session_id=session_id,**body.model_dump()))
+
+
+@router.get("/crawler/navigation/federation")
+async def crawler_navigation_federation(
+    query: str = Query(default="",max_length=512),
+    host: str | None = Query(default=None,max_length=253),
+    after: str | None = Query(default=None,max_length=129),
+    limit: int = Query(default=32,ge=1,le=100),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"search",
+        query=query,host=host,after=after,limit=limit))
+
+
+@router.delete("/crawler/navigation/federation/{grant}")
+async def crawler_navigation_revoke(
+    grant: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+    scope: dict = Depends(_crawler_write_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"revoke",grant=grant))
+
+
+@router.post("/crawler/navigation/federation/purge")
+async def crawler_navigation_purge(
+    scope: dict = Depends(_crawler_write_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"purge"))
 
 
 @router.get("/crawler/sessions/{session_id}/navigation/packet")
