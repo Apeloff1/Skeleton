@@ -152,8 +152,11 @@ def video_parts(raw,frame_count,deadline):
     try:
         # BytesIO, explicit demuxer and no external filename/URL. Native
         # demux/decoder code is trusted local dependency, not a security sandbox.
-        with av.open(io.BytesIO(raw),mode="r",format="mp4",
-                     options={"protocol_whitelist":"file,pipe","probesize":str(MAX_RAW),
+        def deny_external_io(url,flags,options):
+            raise PeerRejected("external media I/O is forbidden")
+        with av.open(io.BytesIO(raw),mode="r",format="mp4",io_open=deny_external_io,
+                     options={"protocol_whitelist":"pipe","enable_drefs":"0",
+                              "use_absolute_path":"0","probesize":str(MAX_RAW),
                               "analyzeduration":"2000000"}) as container:
             if len(container.streams.video)!=1:
                 raise PeerRejected("video requires exactly one decoded video stream")
@@ -179,7 +182,8 @@ def video_parts(raw,frame_count,deadline):
                 if frame.pts is None or frame.time_base is None:
                     raise PeerRejected("video lacks timestamped frames")
                 stamp=float(frame.pts*frame.time_base)
-                if not math.isfinite(stamp) or frame.width*frame.height>MAX_PIXELS:
+                if (not math.isfinite(stamp) or not 1<=frame.width<=4096
+                        or not 1<=frame.height<=4096 or frame.width*frame.height>MAX_PIXELS):
                     raise PeerRejected("invalid decoded video frame")
                 if origin is None:
                     origin=stamp
