@@ -492,6 +492,9 @@ def install_application(
                     )
                 )
                 if recovery.ok:
+                    if not source_stable():
+                        phases.append(_runtime_source_rejection())
+                        return InstallReceipt(root, tuple(phases))
                     from skeleton.app.health import probe_local_setup
 
                     probe = probe_local_setup(
@@ -540,6 +543,7 @@ def install_application(
                 attempts=60,
                 delay=2.0,
                 public_url_overrides=host_urls,
+                admit=source_stable,
             )
             if admitted_digest is None or not source_stable():
                 phases.append(_runtime_source_rejection())
@@ -558,6 +562,9 @@ def install_application(
                 )
             )
             if healthy:
+                if not source_stable():
+                    phases.append(_runtime_source_rejection())
+                    return InstallReceipt(root, tuple(phases))
                 from skeleton.app.first_install import critical_backend_route_report
 
                 # public_service_urls is intentionally a sparse *override* map.

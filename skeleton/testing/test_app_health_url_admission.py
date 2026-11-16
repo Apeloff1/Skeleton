@@ -283,3 +283,49 @@ def test_setup_protocol_failure_is_redacted(monkeypatch):
     result = probe_local_setup(service)
     assert not result.ok
     assert "private-response-content" not in repr(result.to_dict())
+
+
+
+@pytest.mark.parametrize("boundary", ["before-first", "after-first", "before-aggregate"])
+def test_admission_loss_drops_all_probe_evidence(monkeypatch,boundary):
+    from skeleton.app import health
+    calls=[]
+    def admitted():
+        if boundary=="before-first":
+            return False
+        if boundary=="after-first":
+            return not calls
+        return len(calls)<3
+    def probe(service,*,timeout):
+        calls.append(service.name)
+        return health.ProbeResult(service.name,service.public_url,True,200,"fixture")
+    def aggregate(*a,**k):
+        pytest.fail("invalidated epoch reached aggregate health")
+    monkeypatch.setattr(health,"probe_url",probe)
+    monkeypatch.setattr(health,"probe_http",aggregate)
+    result=health.probe_application(admit=admitted)
+    assert result==()
+    assert len(calls)=={"before-first":0,"after-first":1,"before-aggregate":3}[boundary]
+
+
+def test_readiness_does_not_retry_after_epoch_rejection(monkeypatch):
+    from skeleton.app import health
+    calls=[]
+    def probe(**kw):
+        calls.append("round")
+        assert kw["admit"]() is True
+        calls.append("invalidated")
+        assert kw["admit"]() is False
+        calls.append("restored")
+        assert kw["admit"]() is False
+        return (health.ProbeResult("backend","http://localhost:8001",True,200,"fixture"),)
+    monkeypatch.setattr(health,"probe_application",probe)
+    monkeypatch.setattr(health.time,"sleep",lambda *a:pytest.fail("stale epoch retried"))
+    assert health.wait_for_application(attempts=4,admit=lambda: "invalidated" not in calls or "restored" in calls)==()
+    assert calls==["round","invalidated","restored"]
+
+
+def test_admission_requires_exact_boolean_not_truthy_value(monkeypatch):
+    from skeleton.app import health
+    monkeypatch.setattr(health,"probe_url",lambda *a,**k:pytest.fail("truthy admission accepted"))
+    assert health.probe_application(admit=lambda:1)==()

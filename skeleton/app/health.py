@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Mapping
+from typing import Callable, Mapping
 import math
 import re
 import time
@@ -271,16 +271,28 @@ def probe_url(service: ServiceSpec, *, timeout: float = 3.0) -> ProbeResult:
     url = service.public_url.rstrip("/") + "/" + service.health_path.lstrip("/")
     return probe_http(service.name, url, timeout=timeout)
 
+def _admitted(admit: Callable[[], bool] | None) -> bool:
+    if admit is None:
+        return True
+    try:
+        return admit() is True
+    except (OSError, ValueError, RuntimeError, UnicodeError):
+        return False
+
+
 def probe_application(
     *,
     manifest: AssemblyManifest | None = None,
     full: bool = False,
     timeout: float = 3.0,
     public_url_overrides: Mapping[str, str] | None = None,
+    admit: Callable[[], bool] | None = None,
 ) -> tuple[ProbeResult, ...]:
     """Probe the actual host-facing URLs for the active assembly profile."""
 
     manifest = manifest or load_manifest()
+    if not _admitted(admit):
+        return ()
     active = set(manifest.full_services if full else manifest.default_services)
     results = []
     for service in manifest.services:
@@ -290,17 +302,24 @@ def probe_application(
             continue
         configured_url = (public_url_overrides or {}).get(service.name)
         effective = replace(service, public_url=configured_url) if configured_url else service
+        if not _admitted(admit):
+            return ()
         results.append(probe_url(effective, timeout=timeout))
+        if not _admitted(admit):
+            return ()
 
     backend = manifest.service("backend")
     backend_url = (public_url_overrides or {}).get("backend", backend.public_url)
     ready_url = backend_url.rstrip("/") + manifest.contract_path("ready")
+    if not _admitted(admit):
+        return ()
     results.append(probe_http("application", ready_url, timeout=timeout))
-    return tuple(results)
+    return tuple(results) if _admitted(admit) else ()
 
 
 def probes_ok(results: tuple[ProbeResult, ...]) -> bool:
-    return bool(results) and all(result.ok for result in results)
+    return (bool(results)
+            and all(result.ok is True for result in results))
 
 
 def wait_for_application(
@@ -311,6 +330,7 @@ def wait_for_application(
     attempts: int = 10,
     delay: float = 1.0,
     public_url_overrides: Mapping[str, str] | None = None,
+    admit: Callable[[], bool] | None = None,
 ) -> tuple[ProbeResult, ...]:
     """Retry whole-application probes until healthy or the budget is exhausted."""
 
@@ -323,16 +343,28 @@ def wait_for_application(
 
     manifest = manifest or load_manifest()
     latest: tuple[ProbeResult, ...] = ()
+    # Latch a refused epoch across the complete retry campaign. No subsequent
+    # successful observation can rehabilitate evidence collected across it.
+    valid = True
+
+    def still_admitted():
+        nonlocal valid
+        valid = valid and _admitted(admit)
+        return valid
+
     for attempt in range(attempts):
-        if public_url_overrides is None:
-            latest = probe_application(manifest=manifest, full=full, timeout=timeout)
-        else:
-            latest = probe_application(
-                manifest=manifest, full=full, timeout=timeout,
-                public_url_overrides=public_url_overrides,
-            )
+        if not still_admitted():
+            return ()
+        options = {}
+        if public_url_overrides is not None:
+            options["public_url_overrides"] = public_url_overrides
+        if admit is not None:
+            options["admit"] = still_admitted
+        latest = probe_application(manifest=manifest, full=full, timeout=timeout, **options)
+        if not still_admitted():
+            return ()
         if probes_ok(latest):
             return latest
         if attempt + 1 < attempts and delay:
             time.sleep(delay)
-    return latest
+    return latest if still_admitted() else ()

@@ -1081,3 +1081,38 @@ match the reviewed build. Both strict live application health and actual
 inference remain separate requirements. The receipt is not release or
 Windows/WSL2 qualification. Independent build approval authenticates the
 reviewed evidence, not an untrusted daemon or filesystem.
+
+
+
+### Interrupted lifecycle operations
+
+The installer, source CLI and Windows launcher share an OS-backed lifecycle
+lease and write a bounded, non-secret intent before invoking Compose start,
+stop or isolated setup-UI recovery. A signal, interrupted process, timeout,
+OS error or invalid exit receipt leaves that intent in place. Ordinary
+process completion clears only the matching intent. This is a local
+cooperating-client safety boundary, not a Docker daemon lock or proof of
+database consistency; Windows directory power-loss durability is not qualified.
+
+Inspect the previous operation without dispatching a new Docker command:
+
+```text
+python -m skeleton app runtime-recovery status
+SkeletonOffline.exe --runtime-recovery status
+```
+
+Check Docker Desktop or the selected Docker context and existing Compose
+project, confirm that no previous operation is still running, and inspect
+persistent data before acknowledging. The installed launcher also exposes
+**Interrupted Operation** and **Acknowledge Recovery**. Use the exact ID
+from the status receipt:
+
+```text
+python -m skeleton app runtime-recovery acknowledge OPERATION_ID --daemon-inspected
+SkeletonOffline.exe --runtime-recovery acknowledge OPERATION_ID --daemon-inspected
+```
+
+Acknowledgment records an explicit operator decision; it does not verify
+daemon idleness, retry startup, delete application data or certify readiness.
+A malformed or mismatched intent is intentionally preserved for manual
+investigation. Do not delete the lock or pending record to bypass custody.

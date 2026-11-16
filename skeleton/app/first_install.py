@@ -264,7 +264,7 @@ def first_install_report(
     if live and source_ok and manifest_ok:
         from skeleton.app.health import probe_application, probes_ok
 
-        probes = probe_application(manifest=manifest, timeout=timeout)
+        probes = probe_application(manifest=manifest, timeout=timeout, admit=epoch_stable)
         services_ready = probes_ok(probes)
         live_checks = [probe.to_dict() for probe in probes]
         backend_base = manifest.service("backend").public_url.rstrip("/")

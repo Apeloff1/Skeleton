@@ -331,6 +331,11 @@ class WindowsLauncher:
         self._add_button(buttons, "Local AI (offline)", self.local_ai)
         self._add_button(buttons, "Stop", self.stop)
 
+        recovery_buttons = ttk.Frame(outer)
+        recovery_buttons.pack(fill="x", pady=(0, 12))
+        self._add_button(recovery_buttons, "Interrupted Operation", self.inspect_recovery)
+        self._add_button(recovery_buttons, "Acknowledge Recovery", self.acknowledge_recovery)
+
         offline_buttons = ttk.Frame(outer)
         offline_buttons.pack(fill="x", pady=(0, 12))
         self._add_button(
@@ -430,6 +435,42 @@ class WindowsLauncher:
                     pass
 
         threading.Thread(target=worker, name="skeleton-windows-launcher", daemon=True).start()
+
+    def inspect_recovery(self) -> None:
+        from skeleton.app.runtime_mutation import recovery_status
+        def work():
+            result = recovery_status(self.app_root)
+            if not result["pending"]:
+                return True, "No unresolved runtime mutation intent."
+            return False, (
+                "Interrupted runtime operation: " + result["mutation"]
+                + "\nOperation ID: " + result["operation_id"]
+                + "\nInspect Docker Desktop, running jobs, the selected project and persistent data."
+                + "\nDo not acknowledge until you have checked the previous operation."
+            )
+        self._run_worker("Inspecting recovery…", work, lambda result: result[1])
+
+    def acknowledge_recovery(self) -> None:
+        from tkinter import simpledialog, messagebox
+        from skeleton.app.runtime_mutation import acknowledge
+        operation_id = simpledialog.askstring(
+            "Recovery acknowledgment", "Enter the exact operation ID from Interrupted Operation:",
+            parent=self.window,
+        )
+        if operation_id is None:
+            return
+        confirmed = messagebox.askyesno(
+            "Confirm manual inspection",
+            "Have you inspected Docker Desktop, the previous operation, selected project and "
+            "persistent data? Acknowledgment does not prove the daemon is idle or retry automatically.",
+            parent=self.window,
+        )
+        if not confirmed:
+            return
+        def work():
+            acknowledge(self.app_root, operation_id.strip(), daemon_inspected=True)
+            return True, "Exact recovery intent acknowledged. No Docker operation was started."
+        self._run_worker("Acknowledging recovery…", work, lambda result: result[1])
 
     def system_check(self) -> None:
         self._run_worker(

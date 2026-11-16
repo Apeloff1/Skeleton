@@ -1296,6 +1296,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                         timeout=3.0,
                         attempts=int(args.verify_attempts),
                         delay=float(args.verify_delay),
+                        admit=source_stable,
                     )
                 except ValueError as exc:
                     print(f"invalid startup verification budget: {exc}")
