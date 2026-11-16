@@ -3547,3 +3547,181 @@ def test_workflow_host_requires_graph_and_each_operation_authorization(tmp_path)
     assert state["workflow_state"] == "succeeded"
     assert state["counts"]["succeeded"] == 2
     app.close()
+
+
+def test_workflow_independent_roots_wait_for_resident_capacity_and_claim_task_ids(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication, DispatcherRequestError
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "roots", tenants=("a", "b"), operations=("integer_sum",),
+        workers=1, max_jobs=1, history_jobs=12, clock_ms=lambda: 100,
+    )
+    app.enqueue_workflow("a", "roots", {"deadline_ms": 1000, "jobs": [
+        _workflow_node("a1", "a1", [1]), _workflow_node("a2", "a2", [2]),
+        _workflow_node("a3", "a3", [3]),
+    ]})
+    with pytest.raises(DispatcherRequestError, match="reserved"):
+        app.enqueue("foreign", {"kind": "submit", "tenant": "b", "task_id": "a2",
+                                "operation": "integer_sum", "input": [90]})
+    with pytest.raises(DispatcherRequestError, match="identity"):
+        app.enqueue_workflow("b", "collision", {"deadline_ms": 1000, "jobs": [
+            _workflow_node("c1", "a2", [90]),
+        ]})
+    app.start()
+    assert app.tick().deferred_commands == ("a2", "a3")
+    app.tick()
+    app.tick()
+    assert app.workflow_status("a", "roots")["workflow_state"] == "succeeded"
+    assert app.custody.usage()["attempts"] == 3
+    app.close()
+
+
+def test_workflow_root_admission_deadline_expires_without_physical_attempt(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    now = [100]
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "deadline", tenants=("a",), operations=("integer_sum",),
+        workers=1, max_jobs=2, clock_ms=lambda: now[0],
+    )
+    app.enqueue_workflow("a", "late", {"deadline_ms": 200,
+                                      "jobs": [_workflow_node("r", "job", [2])]})
+    now[0] = 200
+    app.start()
+    assert app.tick().disposition == "idle"
+    assert app.inbox.command("r")["status"] == "rejected"
+    assert app.custody.usage()["attempts"] == 0
+    app.close()
+
+
+def test_workflow_cancellation_stops_queued_and_unadmitted_nodes_without_fake_effects(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "cancel", tenants=("a",), operations=("integer_sum",),
+        workers=1, max_jobs=2, history_jobs=8, clock_ms=lambda: 100,
+    )
+    app.enqueue_workflow("a", "flow", {"deadline_ms": 1000, "jobs": [
+        _workflow_node("r1", "parent", [2], timer_ms=300),
+        _workflow_node("r2", "child", [5], dependencies=["parent"]),
+    ]})
+    app.enqueue("stop-flow", {"kind": "workflow-cancel", "tenant": "a", "workflow_id": "flow"})
+    app.start()
+    app.tick()
+    state = app.workflow_status("a", "flow")
+    assert state["workflow_state"] == "cancelled"
+    assert state["counts"]["cancelled"] == 1 and state["counts"]["rejected"] == 1
+    assert state["cancellation"]["result"]["active_effects_terminated"] is False
+    assert app.custody.usage()["attempts"] == 0
+    app.enqueue("stop-again", {"kind": "workflow-cancel", "tenant": "a", "workflow_id": "flow"})
+    app.tick()
+    assert app.inbox.command("stop-again")["result"] == app.inbox.command("stop-flow")["result"]
+    app.close()
+
+
+def test_workflow_cancel_intent_recovered_before_new_dispatch_after_owner_loss(tmp_path, monkeypatch):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    from skeleton.automation.agents.swarm_durable import DurableSwarmError
+    from skeleton.testing.test_durable_run_store import Clock
+    clock, now = Clock(), [100]
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "recover-cancel", tenants=("a",), operations=("integer_sum",),
+        workers=1, max_jobs=4, history_jobs=10, timeout_seconds=1, lease_seconds=20,
+        store_clock=clock, clock_ms=lambda: now[0],
+    )
+    app.enqueue_workflow("a", "flow", {"deadline_ms": 1000, "jobs": [
+        _workflow_node("r1", "first", [1], timer_ms=200),
+        _workflow_node("r2", "second", [2], timer_ms=200),
+    ]})
+    managed = app.start()
+    app.tick()
+    app.enqueue("cancel", {"kind": "workflow-cancel", "tenant": "a", "workflow_id": "flow"})
+    original = managed.cancel_queued
+    calls = []
+    def interrupted(tenant, task_id):
+        calls.append(task_id)
+        if len(calls) == 2:
+            raise DurableSwarmError("injected owner loss during graph cancellation")
+        return original(tenant, task_id)
+    monkeypatch.setattr(managed, "cancel_queued", interrupted)
+    with pytest.raises(DurableSwarmError, match="injected"):
+        app.tick()
+    assert app.inbox.cancellation("a", "flow")["status"] == "pending"
+    managed.stop()
+    clock.advance(21)
+    now[0] = 300
+    recovered = LocalDispatcherApplication(app.directory, store_clock=clock, clock_ms=lambda: now[0])
+    recovered.start()
+    recovered.tick(command_limit=1)
+    state = recovered.workflow_status("a", "flow")
+    assert state["workflow_state"] == "cancelled" and state["counts"]["cancelled"] == 2
+    assert recovered.custody.usage()["attempts"] == 0
+    recovered.close()
+
+
+def test_workflow_cancel_preserves_unresolved_physical_attempt(tmp_path, monkeypatch):
+    import os
+    import subprocess
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "held", tenants=("a",), operations=("integer_sum",),
+        workers=1, max_jobs=4, clock_ms=lambda: 100,
+    )
+    app.enqueue_workflow("a", "flow", {"deadline_ms": 1000, "jobs": [
+        _workflow_node("r1", "parent", [1]),
+        _workflow_node("r2", "child", [2], dependencies=["parent"]),
+    ]})
+    app.start()
+    def unknown(*args, **kwargs):
+        raise subprocess.TimeoutExpired("approved worker", 1)
+    monkeypatch.setattr(subprocess, "run", unknown)
+    assert app.tick().disposition == "transport-unknown"
+    app.enqueue("cancel", {"kind": "workflow-cancel", "tenant": "a", "workflow_id": "flow"})
+    app.tick()
+    state = app.workflow_status("a", "flow")
+    assert state["workflow_state"] == "cancelled-held-uncertain"
+    assert state["counts"]["uncertain"] == 1
+    assert state["cancellation"]["result"]["counts"]["held_uncertain"] == 1
+    assert app.custody.usage()["attempts"] == 1
+    app.close()
+
+
+def test_workflow_host_graph_cancellation_requires_its_own_scope_grant(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    from skeleton.app.runtime.jeeves_host_runtime import JeevesHostContext, JeevesDispatcherGateway, JeevesHostRuntimeError
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "scope", tenants=("a",), operations=("integer_sum",), workers=1, max_jobs=4,
+    )
+    context = JeevesHostContext("a", "p", "owner", "r", "t")
+    gateway = JeevesDispatcherGateway(directory=app.directory, policy_sha256=app.policy.digest,
+                                     scope=context, authorize=lambda q: q.action != "workflow-cancel")
+    gateway.execute(context=context, action="workflow-submit", request_id="flow", arguments={
+        "deadline_ms": app.clock_ms()+60000, "jobs": [_workflow_node("req", "job", [5])],
+    })
+    with pytest.raises(JeevesHostRuntimeError, match="denied"):
+        gateway.execute(context=context, action="workflow-cancel", request_id="cancel",
+                        arguments={"workflow_id": "flow"})
+    granted = JeevesDispatcherGateway(directory=app.directory, policy_sha256=app.policy.digest,
+                                     scope=context, authorize=lambda q: True)
+    granted.execute(context=context, action="workflow-cancel", request_id="cancel",
+                    arguments={"workflow_id": "flow"})
+    app.start()
+    app.tick()
+    state = granted.execute(context=context, action="workflow-status", request_id="inspect",
+                            arguments={"workflow_id": "flow"})
+    assert state["workflow_state"] == "cancelled" and app.custody.usage()["attempts"] == 0
+    app.close()

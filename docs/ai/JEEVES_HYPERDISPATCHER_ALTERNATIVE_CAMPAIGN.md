@@ -599,3 +599,29 @@ workflow-submit and workflow-status; a graph submission must receive
 both an exact graph grant and separate authorization for each child.
 Four regressions cover actual fan-in and predecessor compaction,
 transactional refusal, manifest/command integrity and host grants.
+
+## Wave A26: durable workflow lifecycle, capacity waiting and cancellation
+
+Workflow creation now reserves every task identity as well as each request
+identity. Existing sealed graphs migrate to a durable membership index in
+one transaction. Standalone work cannot claim an already reserved graph
+task. The owner checks manifest membership before admission. New graph roots
+share the same bounded admission deadline and defer on temporary resident
+capacity or ingress pressure rather than being permanently rejected merely
+because a sibling occupies the scheduler.
+
+The new workflow-cancel --tenant OWNER --id FLOW --request-id REQUEST command
+and authenticated host action request graph cancellation. An immutable,
+domain-separated cancellation intent is published under the live owner before
+any member changes. Queued tasks receive canonical durable cancellation,
+unadmitted requests receive exact rejection acknowledgements, and admitted
+tasks with lost acknowledgement are recovered without another execution.
+Succeeded or failed effects remain historical facts. Unresolved physical
+effects retain their exact lease and accounting; cancellation does not claim
+that they stopped. On takeover, interrupted cancellation intents are processed
+before normal ingress and physical dispatch. Repeated cancellation returns the
+original receipt. Six regressions cover root pressure, deadlines, reservation,
+queued/unadmitted cancellation, interrupted cancellation, uncertain effects
+and the separately authorized host workflow-cancel action. The graph creation
+collision scan is bounded by the configured inbox ceiling but is linear in
+historical commands; production-scale latency remains to be measured.

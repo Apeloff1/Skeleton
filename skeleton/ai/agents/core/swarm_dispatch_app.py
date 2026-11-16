@@ -305,6 +305,7 @@ class DispatcherInbox:
                         PRIMARY KEY(run_id,tenant,workflow_id)
                     ) WITHOUT ROWID
                 """)
+                self._install_workflow_control(conn)
                 conn.execute(
                     "INSERT OR IGNORE INTO hyperdispatcher_inbox_policy VALUES (?,?,?,?,?)",
                     (_RUN_ID, _VERSION, policy.digest, self.max_commands, self.max_bytes),
@@ -319,6 +320,46 @@ class DispatcherInbox:
             except BaseException:
                 conn.rollback()
                 raise
+
+    def _install_workflow_control(self, conn) -> None:
+        existed = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='hyperdispatcher_workflow_members'"
+        ).fetchone() is not None
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS hyperdispatcher_workflow_members (
+                run_id TEXT NOT NULL, tenant TEXT NOT NULL, workflow_id TEXT NOT NULL,
+                request_id TEXT NOT NULL, task_id TEXT NOT NULL,
+                PRIMARY KEY(run_id,request_id),
+                UNIQUE(run_id,task_id),
+                FOREIGN KEY(run_id,tenant,workflow_id)
+                    REFERENCES hyperdispatcher_workflows(run_id,tenant,workflow_id),
+                FOREIGN KEY(run_id,request_id) REFERENCES hyperdispatcher_inbox(run_id,request_id)
+            ) WITHOUT ROWID
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS hyperdispatcher_member_graph "
+                     "ON hyperdispatcher_workflow_members(run_id,tenant,workflow_id)")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS hyperdispatcher_workflow_cancellations (
+                run_id TEXT NOT NULL, tenant TEXT NOT NULL, workflow_id TEXT NOT NULL,
+                request_id TEXT NOT NULL, manifest_sha256 TEXT NOT NULL,
+                command_sha256 TEXT NOT NULL, seal TEXT NOT NULL,
+                PRIMARY KEY(run_id,tenant,workflow_id),
+                UNIQUE(run_id,request_id),
+                FOREIGN KEY(run_id,tenant,workflow_id)
+                    REFERENCES hyperdispatcher_workflows(run_id,tenant,workflow_id),
+                FOREIGN KEY(run_id,request_id) REFERENCES hyperdispatcher_inbox(run_id,request_id)
+            ) WITHOUT ROWID
+        """)
+        # Existing A25 databases are migrated once, atomically, from their
+        # exact HMAC-sealed manifests. Duplicate task identities fail closed.
+        if not existed:
+            for row in conn.execute("SELECT * FROM hyperdispatcher_workflows WHERE run_id=?",
+                                    (_RUN_ID,)):
+                manifest = self._workflow_row(conn, row, verify_members=False)
+                for node in manifest["jobs"]:
+                    conn.execute("INSERT INTO hyperdispatcher_workflow_members VALUES (?,?,?,?,?)",
+                                 (_RUN_ID, manifest["tenant"], manifest["workflow_id"],
+                                  node["request_id"], node["task_id"]))
 
     @staticmethod
     def _public_row(row) -> dict:
@@ -346,6 +387,13 @@ class DispatcherInbox:
                         raise DispatcherRequestError("command identity already binds other bytes")
                     conn.commit()
                     return self._public_row(previous)
+                if body.get("kind") == "submit" and type(body.get("task_id")) is str:
+                    claim = conn.execute(
+                        "SELECT request_id FROM hyperdispatcher_workflow_members "
+                        "WHERE run_id=? AND task_id=?", (_RUN_ID, body["task_id"]),
+                    ).fetchone()
+                    if claim is not None:
+                        raise DispatcherRequestError("task identity reserved by workflow")
                 count, reserved = conn.execute(
                     "SELECT count(*),coalesce(sum(charge),0) "
                     "FROM hyperdispatcher_inbox WHERE run_id=?", (_RUN_ID,),
@@ -379,7 +427,7 @@ class DispatcherInbox:
         return hmac.digest(key, _wait_bytes([self.policy.digest, stamp, sha256(manifest).hexdigest()]),
                            "sha256").hex()
 
-    def _workflow_row(self, conn, row) -> dict:
+    def _workflow_row(self, conn, row, *, verify_members: bool = True) -> dict:
         import hmac
         raw, stamp = row["manifest"], row["submitted_ms"]
         if (type(raw) is not bytes or not 1 <= len(raw) <= MAX_WORKFLOW_BYTES
@@ -397,6 +445,15 @@ class DispatcherInbox:
                     or type(manifest["commands"]) is not list
                     or not 1 <= len(manifest["commands"]) <= 32):
                 raise DurableSwarmError("durable workflow manifest shape mismatch")
+            members = {}
+            if verify_members:
+                members = dict(conn.execute(
+                    "SELECT request_id,task_id FROM hyperdispatcher_workflow_members "
+                    "WHERE run_id=? AND tenant=? AND workflow_id=?",
+                    (_RUN_ID, row["tenant"], row["workflow_id"]),
+                ))
+                if len(members) != len(manifest["commands"]):
+                    raise DurableSwarmError("workflow membership inventory missing or changed")
             jobs = []
             previous_sequence = 0
             for item in manifest["commands"]:
@@ -414,6 +471,8 @@ class DispatcherInbox:
                         or command.body.get("tenant") != row["tenant"]
                         or command.body.get("kind") != "submit"):
                     raise DurableSwarmError("durable workflow command identity changed")
+                if verify_members and members.get(command.request_id) != command.body["task_id"]:
+                    raise DurableSwarmError("workflow membership identity changed")
                 previous_sequence = command.sequence
                 jobs.append({**self._public_row(row_command), "task_id": command.body["task_id"]})
             return {"workflow_id": row["workflow_id"], "tenant": row["tenant"],
@@ -485,6 +544,18 @@ class DispatcherInbox:
                             "SELECT 1 FROM hyperdispatcher_inbox WHERE run_id=? AND request_id=?",
                             (_RUN_ID, request_id)).fetchone() is not None:
                         raise DispatcherRequestError("workflow request identity already exists")
+                # Task IDs are globally unique in the canonical scheduler.
+                # Reject collisions at graph creation, not after half the
+                # graph has already executed. JSON1 is not required: every
+                # existing submit row is decoded with its canonical hash.
+                desired = {item.body["task_id"] for item in plan.commands}
+                for existing in conn.execute(
+                        "SELECT sequence,request_id,request_sha256,submitted_ms,body "
+                        "FROM hyperdispatcher_inbox WHERE run_id=?", (_RUN_ID,)):
+                    previous_command = self._decode(existing)
+                    if (previous_command.body.get("kind") == "submit"
+                            and previous_command.body.get("task_id") in desired):
+                        raise DispatcherRequestError("workflow task identity already exists")
                 for request_id, command_digest, data, charge in prepared:
                     conn.execute(
                         "INSERT INTO hyperdispatcher_inbox "
@@ -497,6 +568,10 @@ class DispatcherInbox:
                     (_RUN_ID, plan.tenant, plan.workflow_id, raw, digest,
                      self._workflow_seal(raw, stamp), stamp, len(raw)+512),
                 )
+                for item in plan.commands:
+                    conn.execute("INSERT INTO hyperdispatcher_workflow_members VALUES (?,?,?,?,?)",
+                                 (_RUN_ID, plan.tenant, plan.workflow_id, item.request_id,
+                                  item.body["task_id"]))
                 row = conn.execute(
                     "SELECT * FROM hyperdispatcher_workflows WHERE run_id=? AND tenant=? AND workflow_id=?",
                     (_RUN_ID, plan.tenant, plan.workflow_id),
@@ -507,6 +582,140 @@ class DispatcherInbox:
             except BaseException:
                 conn.rollback()
                 raise
+
+    def workflow_member(self, command: InboxCommand) -> dict | None:
+        """Resolve an exact command and its graph before task admission."""
+        with closing(self.store._connect()) as conn:
+            conn.execute("BEGIN")
+            try:
+                claim = conn.execute(
+                    "SELECT * FROM hyperdispatcher_workflow_members WHERE run_id=? AND task_id=?",
+                    (_RUN_ID, command.body["task_id"]),
+                ).fetchone()
+                if claim is None:
+                    conn.commit()
+                    return None
+                if claim["request_id"] != command.request_id:
+                    raise DispatcherRequestError("task identity reserved by another workflow request")
+                row = conn.execute(
+                    "SELECT * FROM hyperdispatcher_workflows WHERE run_id=? AND tenant=? AND workflow_id=?",
+                    (_RUN_ID, claim["tenant"], claim["workflow_id"]),
+                ).fetchone()
+                if row is None:
+                    raise DurableSwarmError("workflow member has no sealed manifest")
+                graph = self._workflow_row(conn, row)
+                node = next((item for item in graph["jobs"] if item["request_id"] == command.request_id), None)
+                if (node is None or node["request_sha256"] != command.request_sha256
+                        or node["sequence"] != command.sequence
+                        or graph["tenant"] != command.body["tenant"]):
+                    raise DurableSwarmError("workflow command differs from sealed membership")
+                conn.commit()
+                return graph
+            except BaseException:
+                conn.rollback()
+                raise
+
+    def _cancel_seal(self, graph: dict, command: InboxCommand) -> str:
+        import hmac
+        key = hmac.digest(self.policy.inspector_key, b"skeleton.dispatch.workflow.cancel.v1", "sha256")
+        return hmac.digest(key, _wait_bytes([
+            self.policy.digest, graph["tenant"], graph["workflow_id"], graph["workflow_sha256"],
+            command.request_id, command.request_sha256, command.sequence,
+        ]), "sha256").hex()
+
+    def _cancel_record(self, conn, row, graph: dict) -> tuple[InboxCommand, str, dict | None]:
+        import hmac
+        target = conn.execute(
+            "SELECT * FROM hyperdispatcher_inbox WHERE run_id=? AND request_id=?",
+            (_RUN_ID, row["request_id"]),
+        ).fetchone()
+        if target is None:
+            raise DurableSwarmError("workflow cancellation command missing")
+        command = self._decode(target)
+        if (row["manifest_sha256"] != graph["workflow_sha256"]
+                or row["command_sha256"] != command.request_sha256
+                or command.body != {"kind": "workflow-cancel", "tenant": graph["tenant"],
+                                    "workflow_id": graph["workflow_id"]}
+                or command.sequence <= max(job["sequence"] for job in graph["jobs"])
+                or not hmac.compare_digest(row["seal"], self._cancel_seal(graph, command))
+                or target["status"] not in ("pending", "accepted")):
+            raise DurableSwarmError("workflow cancellation intent identity mismatch")
+        return command, target["status"], self._public_row(target)["result"]
+
+    def cancellation(self, tenant: str, workflow_id: str) -> dict | None:
+        with closing(self.store._connect()) as conn:
+            conn.execute("BEGIN")
+            try:
+                row = conn.execute(
+                    "SELECT * FROM hyperdispatcher_workflow_cancellations "
+                    "WHERE run_id=? AND tenant=? AND workflow_id=?",
+                    (_RUN_ID, tenant, workflow_id),
+                ).fetchone()
+                if row is None:
+                    conn.commit()
+                    return None
+                manifest = conn.execute(
+                    "SELECT * FROM hyperdispatcher_workflows WHERE run_id=? AND tenant=? AND workflow_id=?",
+                    (_RUN_ID, tenant, workflow_id),
+                ).fetchone()
+                if manifest is None:
+                    raise DurableSwarmError("workflow cancellation manifest missing")
+                command, status, receipt = self._cancel_record(conn, row, self._workflow_row(conn, manifest))
+                conn.commit()
+                return {"request_id": command.request_id, "status": status, "result": receipt}
+            except BaseException:
+                conn.rollback()
+                raise
+
+    def begin_cancellation(self, owner_id: str, command: InboxCommand) -> tuple[dict, InboxCommand, str, dict | None]:
+        tenant, workflow_id = command.body["tenant"], command.body["workflow_id"]
+        with closing(self.store._connect()) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                run = self.store._require_run(conn, _RUN_ID)
+                self.store._require_live_owner(run, owner_id, self.store._now())
+                row = conn.execute(
+                    "SELECT * FROM hyperdispatcher_workflows WHERE run_id=? AND tenant=? AND workflow_id=?",
+                    (_RUN_ID, tenant, workflow_id),
+                ).fetchone()
+                if row is None:
+                    raise DispatcherRequestError("owned workflow not found")
+                graph = self._workflow_row(conn, row)
+                if command.sequence <= max(job["sequence"] for job in graph["jobs"]):
+                    raise DispatcherRequestError("workflow cancellation predates graph")
+                previous = conn.execute(
+                    "SELECT * FROM hyperdispatcher_workflow_cancellations "
+                    "WHERE run_id=? AND tenant=? AND workflow_id=?",
+                    (_RUN_ID, tenant, workflow_id),
+                ).fetchone()
+                if previous is None:
+                    conn.execute(
+                        "INSERT INTO hyperdispatcher_workflow_cancellations VALUES (?,?,?,?,?,?,?)",
+                        (_RUN_ID, tenant, workflow_id, command.request_id, graph["workflow_sha256"],
+                         command.request_sha256, self._cancel_seal(graph, command)),
+                    )
+                    previous = conn.execute(
+                        "SELECT * FROM hyperdispatcher_workflow_cancellations "
+                        "WHERE run_id=? AND tenant=? AND workflow_id=?",
+                        (_RUN_ID, tenant, workflow_id),
+                    ).fetchone()
+                original, status, result = self._cancel_record(conn, previous, graph)
+                conn.commit()
+                return graph, original, status, result
+            except BaseException:
+                conn.rollback()
+                raise
+
+    def outstanding_cancellations(self, *, limit: int = 16) -> tuple[InboxCommand, ...]:
+        _uint(limit, 1, 128, "workflow cancellation batch")
+        with closing(self.store._connect()) as conn:
+            rows = conn.execute(
+                "SELECT i.* FROM hyperdispatcher_workflow_cancellations c "
+                "JOIN hyperdispatcher_inbox i ON i.run_id=c.run_id AND i.request_id=c.request_id "
+                "WHERE c.run_id=? AND i.status='pending' ORDER BY i.sequence LIMIT ?",
+                (_RUN_ID, limit),
+            ).fetchall()
+        return tuple(self._decode(row) for row in rows)
 
     @staticmethod
     def _decode(row) -> InboxCommand:
@@ -897,7 +1106,16 @@ class LocalDispatcherApplication:
             status = "running"
         else:
             status = "terminated"
-        return {**record, "workflow_state": status, "counts": counts}
+        cancellation = self.inbox.cancellation(tenant, workflow_id)
+        if cancellation is not None and status != "succeeded":
+            if counts["uncertain"]:
+                status = "cancelled-held-uncertain"
+            elif unfinished:
+                status = "cancelling"
+            else:
+                status = "cancelled"
+        return {**record, "workflow_state": status, "counts": counts,
+                **({"cancellation": cancellation} if cancellation is not None else {})}
 
     def _resident(self, tenant: str, task_id: str):
         owner = self._owner().owner
@@ -1045,6 +1263,12 @@ class LocalDispatcherApplication:
             if old.tenant == tenant and same_submission(old.task):
                 return {"task_id": task_id, "submission": "durable"}
             raise DispatcherRequestError("task identity already bound to archived command")
+        graph = self.inbox.workflow_member(command)
+        if graph is not None:
+            if self.inbox.cancellation(tenant, graph["workflow_id"]) is not None:
+                raise DispatcherRequestError("workflow cancellation already recorded")
+            if _wait_time(self.clock_ms()) >= graph["deadline_ms"]:
+                raise DispatcherRequestError("workflow admission deadline expired")
         resolved_input, lineage = self._binding_input(command, tenant)
         if lineage:
             metadata["binding_receipts"] = lineage
@@ -1119,7 +1343,7 @@ class LocalDispatcherApplication:
             live_dependencies = kept
             occupied = sum(len(_canonical(dict(task.payload))) for task in runtime.tasks())
         if len(runtime.tasks()) >= self.policy.max_jobs or occupied + payload_charge > _MAX_RETAINED_PAYLOAD:
-            if lineage:
+            if lineage or graph is not None:
                 raise BindingDeferred()
             raise DispatcherRequestError("retained task capacity exhausted")
         task = SwarmTask(task_id, payload, priority=priority, max_attempts=1,
@@ -1128,7 +1352,7 @@ class LocalDispatcherApplication:
         capture = (managed.submit(tenant, task, singleton_key=singleton)
                    if wait is None else managed.submit_wait(wait, task, singleton_key=singleton))
         if capture is None:
-            if lineage:
+            if lineage or graph is not None:
                 raise BindingDeferred()
             raise DispatcherRequestError("admission quota refused")
         return {"task_id": task_id, "submission": "durable"}
@@ -1165,12 +1389,91 @@ class LocalDispatcherApplication:
         self._owner().deliver_event(tenant, task_id, receipt)
         return {"task_id": task_id, "wake_receipt_sha256": receipt.digest}
 
+    def _cancel_workflow(self, command: InboxCommand) -> dict:
+        if set(command.body) != {"kind", "tenant", "workflow_id"}:
+            raise DispatcherRequestError("invalid workflow cancellation request")
+        tenant = self._tenant(command.body["tenant"])
+        _identifier(command.body["workflow_id"])
+        managed = self._owner()
+        owner = managed.owner
+        graph, original, status, prior = self.inbox.begin_cancellation(owner.owner_id, command)
+        if status == "accepted":
+            return prior
+        runtime = owner.broker.broker.runtime
+        # The durable cancellation intent is published before touching any
+        # task. On takeover, complete it before any new dispatch can occur.
+        counts = {"unadmitted": 0, "cancelled": 0, "succeeded": 0,
+                  "failed": 0, "held_uncertain": 0, "already_rejected": 0}
+        for item in graph["jobs"]:
+            managed.renew()
+            found = self.inbox.record(item["request_id"])
+            if found is None:
+                raise DurableSwarmError("workflow cancellation member disappeared")
+            node, current_status, acknowledgement = found
+            task_id = item["task_id"]
+            if node.request_sha256 != item["request_sha256"]:
+                raise DurableSwarmError("workflow cancellation member changed")
+            marker = {"reason": "workflow cancelled before task admission",
+                      "cancelled_by": original.request_id}
+            if current_status == "rejected":
+                counts["unadmitted" if acknowledgement == marker else "already_rejected"] += 1
+                continue
+            resident = runtime.task(task_id)
+            archived = None if resident is not None or self.archive is None else self.archive.get(task_id)
+            if resident is not None:
+                record = runtime._task_record(resident)
+                actual_tenant = owner.broker.tenant_for(task_id)
+            elif archived is not None:
+                record, actual_tenant = archived.task, archived.tenant
+            else:
+                record, actual_tenant = None, None
+            if record is None:
+                if current_status != "pending":
+                    raise DurableSwarmError("accepted workflow cancellation member has no task custody")
+                self.inbox.acknowledge(owner.owner_id, node, accepted=False, result=marker)
+                counts["unadmitted"] += 1
+                continue
+            metadata = record["payload"].get(_HOST_SCHEDULE_FIELD)
+            if (actual_tenant != tenant or type(metadata) is not dict
+                    or metadata.get("request_id") != node.request_id
+                    or metadata.get("request_sha256") != node.request_sha256
+                    or metadata.get("enqueued_ms") != node.submitted_ms):
+                raise DurableSwarmError("workflow cancellation task custody mismatch")
+            self._verify_lineage(tenant, record)
+            exact_ack = {"task_id": task_id, "submission": "durable"}
+            if current_status == "pending":
+                # A prior owner captured admission but lost its ack. Preserve
+                # that fact before settling a queued task; never call submit.
+                self.inbox.acknowledge(owner.owner_id, node, accepted=True, result=exact_ack)
+            elif acknowledgement != exact_ack:
+                raise DurableSwarmError("workflow cancellation member acknowledgement mismatch")
+            state = record["state"]
+            if record.get("effect_uncertain") or state == "leased":
+                counts["held_uncertain"] += 1
+            elif state == "queued":
+                managed.cancel_queued(tenant, task_id)
+                counts["cancelled"] += 1
+            elif state in ("cancelled", "succeeded"):
+                counts[state] += 1
+            elif state in ("dead", "failed"):
+                counts["failed"] += 1
+            else:
+                raise DurableSwarmError("unexpected workflow member state")
+        result = {"workflow_id": graph["workflow_id"], "workflow_sha256": graph["workflow_sha256"],
+                  "cancellation_request_id": original.request_id, "counts": counts,
+                  "active_effects_terminated": False}
+        if original.request_id != command.request_id:
+            self.inbox.acknowledge(owner.owner_id, original, accepted=True, result=result)
+        return result
+
     def _apply(self, command: InboxCommand) -> dict:
         kind = command.body.get("kind")
         if kind == "submit":
             return self._submit(command)
         if kind == "signal":
             return self._signal(command)
+        if kind == "workflow-cancel":
+            return self._cancel_workflow(command)
         if kind == "cancel-pending":
             if set(command.body) != {"kind", "tenant", "request_id"}:
                 raise DispatcherRequestError("invalid pending cancellation request")
@@ -1273,6 +1576,16 @@ class LocalDispatcherApplication:
         managed.renew()
         count = 0
         deferred = []
+        # Restore an interrupted cancellation before normal inbox work or
+        # physical dispatch. Never skip a durable intent due to cursor order.
+        for command in self.inbox.outstanding_cancellations(limit=16):
+            managed.renew()
+            result = self._cancel_workflow(command)
+            managed.renew()
+            self.inbox.acknowledge(managed.owner.owner_id, command, accepted=True, result=result)
+            count += 1
+        if self.inbox.outstanding_cancellations(limit=1):
+            return ApplicationTick(count, (), (), "cancelling", None, False)
         for command in self.inbox.pending(limit=command_limit, after=self._inbox_cursor):
             self._inbox_cursor = command.sequence
             managed.renew()
@@ -1482,6 +1795,10 @@ def main(argv: list[str] | None = None) -> int:
     workflow_status = sub.add_parser("workflow-status", help="inspect exact graph and verified job outcomes")
     workflow_status.add_argument("--tenant", required=True)
     workflow_status.add_argument("--id", required=True)
+    workflow_cancel = sub.add_parser("workflow-cancel", help="durably request safe graph cancellation")
+    workflow_cancel.add_argument("--tenant", required=True)
+    workflow_cancel.add_argument("--id", required=True, help="workflow ID")
+    workflow_cancel.add_argument("--request-id", required=True)
     command = sub.add_parser("command", help="read the durable command acknowledgement")
     command.add_argument("--id", required=True)
     result = sub.add_parser("result", help="read independently verified task output")
@@ -1521,6 +1838,9 @@ def main(argv: list[str] | None = None) -> int:
             _print(app.enqueue_workflow(args.tenant, args.id, data))
         elif args.action == "workflow-status":
             _print(app.workflow_status(args.tenant, args.id))
+        elif args.action == "workflow-cancel":
+            _print(app.enqueue(args.request_id, {"kind": "workflow-cancel",
+                                                "tenant": args.tenant, "workflow_id": args.id}))
         elif args.action == "command":
             value = app.inbox.command(args.id)
             _print(value)

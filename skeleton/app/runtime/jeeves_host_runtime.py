@@ -92,7 +92,7 @@ class JeevesDispatcherGateway:
     """
 
     _ACTIONS = frozenset({"submit", "cancel", "cancel-pending", "signal", "reconcile", "command", "result",
-                          "workflow-submit", "workflow-status"})
+                          "workflow-submit", "workflow-status", "workflow-cancel"})
 
     def __init__(self, *, directory: str | Path, policy_sha256: str,
                  scope: JeevesHostContext,
@@ -218,10 +218,12 @@ class JeevesDispatcherGateway:
                 scoped_jobs.append(scoped)
                 child_authorizations.append((client_request, _canonical(original)))
             body = {"deadline_ms": supplied["deadline_ms"], "jobs": scoped_jobs}
-        elif action == "workflow-status":
+        elif action in ("workflow-status", "workflow-cancel"):
             if set(supplied) != {"workflow_id"}:
                 raise JeevesHostRuntimeError("exact client workflow identity required")
             body = {"workflow_id": self._scoped("workflow", supplied["workflow_id"])}
+            if action == "workflow-cancel":
+                body.update({"kind": action, "tenant": tenant})
         elif action == "cancel-pending":
             if set(supplied) != {"request_id"}:
                 raise JeevesHostRuntimeError("exact pending client request identity required")
