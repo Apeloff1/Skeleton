@@ -11,6 +11,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 import threading
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
@@ -40,6 +41,8 @@ MAX_SESSIONS = 32
 MAX_OPERATIONS = 128
 LEASE_SECONDS = 120
 MAX_CONCURRENT_SLICES = 4
+ACQUISITION_STRIPES = 4096
+ACQUISITION_STRIPE_KIND = "dragon_acquisition_stripe_v1"
 MAX_AUTO_SLICES = 64
 MAX_AUTO_SECONDS = 3600
 MAX_SOURCE_AGE_SECONDS = 86400
@@ -309,6 +312,26 @@ def _core():
     from skeleton.ai.webcrawler.operations import CrawlRequest, CrawlRun
 
     return CrawlRequest, CrawlRun
+
+
+def _acquisition_stripes(hosts) -> tuple[str, ...]:
+    """Finite conservative contention domain; no persisted host names.
+
+    Identical canonical hosts always map to the same stripe. Collisions
+    serialize unrelated origins too. This is not registrable-domain or IP
+    coalescing, nor a cross-database or external-crawler coordination system.
+    """
+    if not isinstance(hosts, (list, tuple)) or not 1 <= len(hosts) <= 16:
+        raise ValueError("invalid acquisition host set")
+    slots = set()
+    for host in hosts:
+        if (not isinstance(host, str) or not 1 <= len(host) <= 253
+                or not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?", host)
+                or ".." in host):
+            raise ValueError("invalid canonical acquisition host")
+        value = int.from_bytes(hashlib.sha256(host.encode("ascii")).digest()[:8], "big")
+        slots.add(f"crawler-acquisition-v1:{value % ACQUISITION_STRIPES:04x}")
+    return tuple(sorted(slots))
 
 
 def _safe_error(exc: BaseException) -> str:
@@ -3344,6 +3367,60 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
             await self._drain(row)
         return await self.get(scope, identifier)
 
+    async def _claim_acquisition_stripes(self, row: dict, token: str) -> None:
+        """Reserve all admitted canonical origins before any runner can start.
+
+        Shared command collection is the authority. Use server time; a local
+        still-draining handle cannot be displaced merely by lease expiry.
+        Contention rejects the entire slice. The caller's existing token-only
+        abort path discharges any acquired prefix; uncertain writes can only
+        leave a bounded unused lease.
+        """
+        slots = _acquisition_stripes(row["request"]["allowed_hosts"])
+        for slot in slots:
+            try:
+                await self.limits.update_one(
+                    {"_id": slot},
+                    {"$setOnInsert": {"kind": ACQUISITION_STRIPE_KIND}},
+                    upsert=True,
+                )
+            except DuplicateKeyError:
+                # Another instance initialized this fixed ID concurrently.
+                pass
+            existing = await self.limits.find_one(
+                {"_id": slot, "kind": ACQUISITION_STRIPE_KIND}, {"worker_token": 1})
+            if existing is None:
+                raise CrawlerError("crawler_acquisition_coordination_unavailable",
+                                   "Shared acquisition coordination is unavailable.", 503)
+            handle = self._workers.get(existing.get("worker_token"))
+            if handle is not None and not handle[1].done():
+                raise CrawlerError("crawler_acquisition_capacity",
+                                   "Shared acquisition capacity is occupied.", 429)
+            claimed = await self.limits.find_one_and_update(
+                {"_id": slot, "kind": ACQUISITION_STRIPE_KIND,
+                 "$or": [{"lease_until": {"$exists": False}},
+                         {"$expr": {"$lte": ["$lease_until", "$NOW"]}}]},
+                [{"$set": {"worker_token": {"$literal": token},
+                           "lease_until": {"$add": ["$NOW", LEASE_SECONDS * 1000]}}}],
+                return_document=ReturnDocument.AFTER,
+            )
+            if claimed is None or claimed.get("worker_token") != token:
+                raise CrawlerError("crawler_acquisition_capacity",
+                                   "Shared acquisition capacity is occupied.", 429)
+
+    async def _assert_acquisition_stripes(self, row: dict, token: str) -> None:
+        """Check every stripe immediately before canonical transport authority."""
+        slots = _acquisition_stripes(row["request"]["allowed_hosts"])
+        count = await self.limits.count_documents(
+            {"_id": {"$in": list(slots)}, "kind": ACQUISITION_STRIPE_KIND,
+             "worker_token": token,
+             "$expr": {"$gt": ["$lease_until", {"$add": ["$NOW", 15000]}]}},
+            limit=len(slots), maxTimeMS=2000,
+        )
+        if count != len(slots):
+            raise CrawlerError("crawler_acquisition_fenced",
+                               "Shared acquisition lease is incomplete or expired.", 409)
+
     async def _live(
         self, scope: dict[str, str], identifier: str, token: str, epoch: int, *, network_margin: bool = False
     ) -> dict:
@@ -3412,6 +3489,8 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                     "crawler_grant_expired", "Autonomous capture authority is no longer current.", 403
                 )
             await self._grant_principal(scope, grant)
+        if network_margin:
+            await self._assert_acquisition_stripes(row, token)
         return row
 
     async def _settle_unstarted(
@@ -3684,6 +3763,8 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                     "The bounded crawler worker capacity is occupied; retry after a slice drains.",
                     429,
                 )
+            await self._claim_acquisition_stripes(row, token)
+            await self._assert_acquisition_stripes(row, token)
             claim = {"_id": identifier, **scope, "version": row["version"], "status": row["status"]}
             if automation_epoch is not None:
                 claim.update(
