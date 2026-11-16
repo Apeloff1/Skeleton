@@ -47,8 +47,8 @@ Further research queue (not yet verified): Restate, Oban, pg-boss, Faktory, Asyn
 | A23 | Stale scaler metric hold | KEDA | P |
 | A24 | Service-rate-based scale demand | KEDA / Parsl | P |
 | A25 | Uncertain execution capacity floor | Jeeves extension | P |
-| A26 | Hierarchical allocation subleases | Flux / Parsl | Open |
-| A27 | Nested allocation reclamation | Flux | Open |
+| A26 | Hierarchical allocation subleases | Flux / Parsl | P |
+| A27 | Nested allocation reclamation | Flux | P |
 | A28 | Data-affinity task scheduling | TaskVine / StarPU | P |
 | A29 | Shared artifact transfer amortization | TaskVine | P |
 | A30 | Versioned environment reuse | TaskVine | P |
@@ -114,3 +114,16 @@ a fresh verified resident observation exists. Transfer and migration
 remain advisory; no physical movement, cache publication or execution
 is performed. A15 activation generation, A16 idle passivation and A21–25
 lifecycle work remain subject to host integration and qualification.
+
+## Wave A5: nested allocation authority and affinity repair
+
+The existing global resource scheduler owns bounded, attempt-tokened nested
+subleases. Children consume their parent's allocation, not a second physical
+reservation. Root release cannot bypass descendants; root preemption marks
+the subtree revoking, and trusted stop verification releases descendant
+allocations leaf-first. Completed sublease IDs remain tombstones. Cancelling
+root preemption leaves already requested child stops conservatively revoking.
+The host must reserve only the undelegated remainder for direct work. No
+distributed persistence or physical stop protocol is implied.
+The wave-A4 exact-head test failure (dictionary mutated during affinity scan)
+is repaired by nonmutating lookup. Existing regression kept intact.

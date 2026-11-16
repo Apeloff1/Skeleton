@@ -25,6 +25,8 @@ import json
 import math
 import threading
 from typing import Any
+from uuid import uuid4
+from collections.abc import Callable
 
 
 ACTIVE = "active"
@@ -385,6 +387,18 @@ class ResourceGrant:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class AllocationSublease:
+    sublease_id: str
+    parent_id: str
+    root_grant_id: str
+    tenant_id: str
+    resources: ResourceVector
+    depth: int
+    token: str
+    state: str = ACTIVE
+
+
 class GlobalResourceScheduler:
     """Deterministic cross-plane capacity, fairness, and preemption authority."""
 
@@ -400,6 +414,9 @@ class GlobalResourceScheduler:
         self._tick = 0
         self._grant_sequence = 0
         self._group_receipts: dict[str, tuple[tuple[tuple[str, str], ...], tuple[str, ...]]] = {}
+        self._subleases: dict[str, AllocationSublease] = {}
+        self._children: dict[str, set[str]] = {}
+        self._delegated: dict[str, ResourceVector] = {}
         self._lock = threading.RLock()
 
     @property
@@ -573,12 +590,131 @@ class GlobalResourceScheduler:
                 return None
             return self._grant(candidate)
 
+    def reserve_sublease(self, parent_id: str, sublease_id: str, tenant_id: str,
+                         resources: ResourceVector, *, parent_token: str | None = None
+                         ) -> AllocationSublease | None:
+        """Partition an existing grant, never allocate additional global capacity.
+
+        Trusted host API: root identity alone is not caller authentication.
+        Descendants additionally require the exact parent attempt token.
+        Completed identities remain tombstones; no implicit recycling.
+        """
+        parent_id, sublease_id, tenant_id = (_text(v, "allocation identity")
+                                              for v in (parent_id, sublease_id, tenant_id))
+        if not isinstance(resources, ResourceVector) or resources.empty:
+            raise ResourcePolicyError("empty sublease resources")
+        with self._lock:
+            parent = self._subleases.get(parent_id)
+            if parent is not None:
+                if parent.token != parent_token or parent.state != ACTIVE:
+                    raise ResourceConflict("stale or stopped parent allocation")
+                root = self._require_grant(parent.root_grant_id)
+                capacity, depth = parent.resources, parent.depth + 1
+            else:
+                if parent_token is not None:
+                    raise ResourceConflict("unexpected root token")
+                root = self._require_grant(parent_id)
+                capacity, depth = root.resources, 1
+            if root.state != ACTIVE or root.tenant_id != tenant_id or depth > 8:
+                raise ResourceConflict("allocation authority unavailable")
+            prior = self._subleases.get(sublease_id)
+            if prior is not None:
+                if (prior.parent_id, prior.tenant_id, prior.resources) != (parent_id, tenant_id, resources):
+                    raise ResourceConflict("sublease identity conflict")
+                return prior if prior.state == ACTIVE else None
+            if sublease_id in self._grants or sublease_id.startswith("grant-"):
+                raise ResourceConflict("reserved root identity namespace")
+            if len(self._subleases) >= 100000:
+                raise ResourceUnavailable("sublease identity retention exhausted")
+            delegated = self._delegated.get(parent_id, ResourceVector())
+            if not resources.fits_within(capacity.subtract(delegated)):
+                return None
+            record = AllocationSublease(sublease_id, parent_id, root.grant_id, tenant_id,
+                                        resources, depth, uuid4().hex)
+            self._subleases[sublease_id] = record
+            self._children.setdefault(parent_id, set()).add(sublease_id)
+            self._delegated[parent_id] = delegated.add(resources)
+            return record
+
+    def allocation_remaining(self, parent_id: str) -> ResourceVector:
+        with self._lock:
+            child = self._subleases.get(parent_id)
+            if child is not None:
+                if child.state != ACTIVE:
+                    return ResourceVector()
+                root = self._require_grant(child.root_grant_id)
+                capacity = child.resources
+            else:
+                root = self._require_grant(parent_id)
+                capacity = root.resources
+            if root.state != ACTIVE:
+                return ResourceVector()
+            return capacity.subtract(self._delegated.get(parent_id, ResourceVector()))
+
+    def _mark_subtree_revoking(self, parent_id: str) -> tuple[AllocationSublease, ...]:
+        pending = list(self._children.get(parent_id, ()))
+        result = []
+        while pending:
+            key = pending.pop()
+            row = self._subleases[key]
+            if row.state == COMPLETED:
+                continue
+            row = replace(row, state=REVOKING)
+            self._subleases[key] = row
+            result.append(row)
+            pending.extend(self._children.get(key, ()))
+        return tuple(sorted(result, key=lambda row: (-row.depth, row.sublease_id)))
+
+    def begin_sublease_reclamation(self, sublease_id: str, *, token: str) -> tuple[AllocationSublease, ...]:
+        with self._lock:
+            row = self._subleases.get(sublease_id)
+            if row is None or row.token != token or row.state == COMPLETED:
+                raise ResourceConflict("invalid sublease reclamation identity")
+            row = replace(row, state=REVOKING)
+            self._subleases[sublease_id] = row
+            return self._mark_subtree_revoking(sublease_id) + (row,)
+
+    def acknowledge_sublease_stop(self, sublease_id: str, *, token: str, evidence_sha256: str,
+                                   verify_stop: Callable[[str, str, str], bool]) -> AllocationSublease:
+        """Retain every delegation until independently verified stop and leaf-first ack."""
+        if (not callable(verify_stop) or type(evidence_sha256) is not str
+                or len(evidence_sha256) != 64 or any(c not in "0123456789abcdef" for c in evidence_sha256)):
+            raise ResourcePolicyError("invalid stop evidence")
+        with self._lock:
+            row = self._subleases.get(sublease_id)
+            if row is None or row.token != token:
+                raise ResourceConflict("stale sublease token")
+            if row.state == COMPLETED:
+                return row
+            if row.state != REVOKING or self._children.get(sublease_id):
+                raise ResourceConflict("reclamation requires stopped descendants")
+        if verify_stop(sublease_id, token, evidence_sha256) is not True:
+            raise ResourceConflict("stop evidence refused")
+        with self._lock:
+            current = self._subleases.get(sublease_id)
+            if current != row or self._children.get(sublease_id):
+                raise ResourceConflict("allocation changed during verification")
+            completed = replace(row, state=COMPLETED)
+            self._subleases[sublease_id] = completed
+            self._children[row.parent_id].discard(sublease_id)
+            self._delegated[row.parent_id] = self._delegated[row.parent_id].subtract(row.resources)
+            return completed
+
+    def subleases(self, root_grant_id: str) -> tuple[AllocationSublease, ...]:
+        with self._lock:
+            self._require_grant(root_grant_id)
+            return tuple(sorted((r for r in self._subleases.values()
+                                 if r.root_grant_id == root_grant_id and r.state != COMPLETED),
+                                key=lambda r: (-r.depth, r.sublease_id)))
+
     def release(self, grant_id: str) -> ResourceGrant:
         grant_id = _text(grant_id, "grant_id")
         with self._lock:
             grant = self._require_grant(grant_id)
             if grant.state not in {ACTIVE, REVOKING}:
                 return grant
+            if self._children.get(grant_id):
+                raise ResourceConflict("delegated allocations must be reconciled before root release")
             self._usage[grant.plane] = self._usage[grant.plane].subtract(
                 grant.resources
             )
@@ -656,6 +792,7 @@ class GlobalResourceScheduler:
                     revoking_for_request_id=request_id,
                 )
                 self._grants[grant.grant_id] = revoking
+                self._mark_subtree_revoking(grant.grant_id)
                 marked.append(revoking)
             return tuple(marked)
 
@@ -717,6 +854,8 @@ class GlobalResourceScheduler:
                     ticket.status == QUEUED and not self._deadline_possible(ticket)
                     for ticket in self._requests.values()
                 ),
+                "subleases_active": sum(r.state == ACTIVE for r in self._subleases.values()),
+                "subleases_revoking": sum(r.state == REVOKING for r in self._subleases.values()),
                 "gap": "G021",
                 "tick": self._tick,
                 "total": self.policy.total.as_dict(),

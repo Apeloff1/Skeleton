@@ -160,7 +160,7 @@ def plan_affinity_round(activations: Sequence[Activation], hosts: Sequence[HostR
             for target,cost in by_host.items():
                 if target==source or room[target]<a.memory_bytes or slots[target]<1:
                     continue
-                benefit=cost-by_host[source]-a.transfer_cost_us
+                benefit=cost-by_host.get(source,0)-a.transfer_cost_us
                 if benefit<minimum_gain_us:
                     continue
                 rank=(-benefit,a.memory_bytes,a.activation_id,target)

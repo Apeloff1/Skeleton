@@ -1376,3 +1376,52 @@ def test_alternative_artifact_plan_dedupes_transfer_but_holds_execution():
     p2=plan_artifacts(demands,residents+[ArtifactResident("gpu",ref,1,True)],**kw)
     assert p2.ready_tasks==("a","b") and p2.held_tasks==("c",)
     assert not p2.transfers
+
+def test_alternative_nested_subleases_cannot_mint_capacity_or_release_parent():
+    from skeleton.kernel.global_resource_scheduler import (
+        GlobalResourcePolicy, GlobalResourceScheduler, PlanePolicy, ResourceVector,
+        ResourceRequest, ResourceConflict,
+    )
+    scheduler=GlobalResourceScheduler(GlobalResourcePolicy(
+        ResourceVector(cpu_millis=100), (PlanePolicy("a",1,ResourceVector()),)))
+    scheduler.submit(ResourceRequest("root","a","t",ResourceVector(cpu_millis=100)))
+    root=scheduler.admit_next()
+    child=scheduler.reserve_sublease(root.grant_id,"child","t",ResourceVector(cpu_millis=60))
+    leaf=scheduler.reserve_sublease("child","leaf","t",ResourceVector(cpu_millis=40),parent_token=child.token)
+    assert scheduler.usage("a").cpu_millis==100
+    assert scheduler.allocation_remaining("child").cpu_millis==20
+    assert scheduler.reserve_sublease(root.grant_id,"over","t",ResourceVector(cpu_millis=41)) is None
+    with pytest.raises(ResourceConflict):
+        scheduler.reserve_sublease("child","bad","t",ResourceVector(cpu_millis=1),parent_token="stale")
+    with pytest.raises(ResourceConflict):
+        scheduler.release(root.grant_id)
+    assert [r.sublease_id for r in scheduler.begin_sublease_reclamation("child",token=child.token)]==["leaf","child"]
+    kw=dict(evidence_sha256="a"*64,verify_stop=lambda *args:True)
+    with pytest.raises(ResourceConflict):
+        scheduler.acknowledge_sublease_stop("child",token=child.token,**kw)
+    scheduler.acknowledge_sublease_stop("leaf",token=leaf.token,**kw)
+    scheduler.acknowledge_sublease_stop("child",token=child.token,**kw)
+    assert scheduler.reserve_sublease(root.grant_id,"child","t",ResourceVector(cpu_millis=60)) is None
+    assert scheduler.release(root.grant_id).state=="completed"
+
+
+def test_alternative_root_preemption_drains_nested_allocations_leaf_first():
+    from skeleton.kernel.global_resource_scheduler import (
+        GlobalResourcePolicy, GlobalResourceScheduler, PlanePolicy, ResourceVector,
+        ResourceRequest, ResourceConflict,
+    )
+    owner=GlobalResourceScheduler(GlobalResourcePolicy(
+        ResourceVector(cpu_millis=10),(PlanePolicy("a",1,ResourceVector()),)))
+    owner.submit(ResourceRequest("old","a","t",ResourceVector(cpu_millis=10),priority=9))
+    root=owner.admit_next()
+    child=owner.reserve_sublease(root.grant_id,"child","t",ResourceVector(cpu_millis=5))
+    owner.submit(ResourceRequest("new","a","t",ResourceVector(cpu_millis=10),priority=0))
+    assert owner.begin_preemption("new")[0].grant_id==root.grant_id
+    assert owner.subleases(root.grant_id)[0].state=="revoking"
+    assert owner.usage("a").cpu_millis==10
+    with pytest.raises(ResourceConflict):
+        owner.ack_preempted(root.grant_id)
+    owner.acknowledge_sublease_stop("child",token=child.token,evidence_sha256="a"*64,
+                                    verify_stop=lambda *args:True)
+    owner.ack_preempted(root.grant_id)
+    assert owner.admit_next().request_id=="new"

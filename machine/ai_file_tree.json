@@ -422,7 +422,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "847c15122f0c5acd215aae88eac9ae259cfb5a96",
+      "source_git_object_sha": "a12328e16ea5061b27a374759c4cdc1106408a00",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -1204,7 +1204,7 @@
       "source": "skeleton/kernel",
       "destination": "skeleton/ai/runtime/kernel",
       "kind": "tree",
-      "source_git_object_sha": "ee2c721ccce2a714e96ca069e2d67271a0addf06",
+      "source_git_object_sha": "8b87a3956cb24d17b557061ef98adf575df4dec3",
       "role": "engine kernel and governance primitives",
       "work_package_refs": [
         "WP-W00",
