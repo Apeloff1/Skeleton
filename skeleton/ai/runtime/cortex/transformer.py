@@ -956,22 +956,36 @@ class TinyTransformer:
         self.steps += 1
         return loss
 
-    def fit(self, texts: Iterable[str], *, lr: float = 0.04, schedule: str = "const") -> int:
-        corpus = [t for t in texts if t]
-        windows: List[Tuple[List[int], int]] = []
-        for raw in corpus:
-            ids = self._ids(raw)
-            if len(ids) < 2:
-                continue
-            for i in range(1, len(ids)):
-                windows.append((ids[max(0, i - self.ctx):i], ids[i]))
-        total = max(1, len(windows))
+    def fit(self, texts: Iterable[str], *, lr: float = 0.04, schedule: str = "const",
+            interrupt: Callable[[], None] | None = None) -> int:
+        """Exact historical SGD order with token-linear preparation storage.
+
+        Materialize token IDs once to pin tokenizer output and the cosine
+        schedule's total steps before mutation. Never retain the quadratic
+        collection of overlapping context windows. The optional callback
+        is checked at each preparation and optimizer boundary; an interrupted
+        fit can have partial weight changes and MUST remain candidate-only.
+        """
+        sequences = []
+        document_count = 0
+        for raw in texts:
+            if interrupt is not None:
+                interrupt()
+            if raw:
+                document_count += 1
+                sequences.append(self._ids(raw))
+        total = max(1, sum(max(0, len(ids)-1) for ids in sequences))
         n = 0
-        for step, (window, target) in enumerate(windows):
-            eta = cosine_lr(step, total, base=lr) if schedule == "cosine" else lr
-            self._sgd(window, target, eta)
-            n += 1
-        self.fitted += len(corpus)
+        for ids in sequences:
+            for i in range(1, len(ids)):
+                if interrupt is not None:
+                    interrupt()
+                eta = cosine_lr(n, total, base=lr) if schedule == "cosine" else lr
+                self._sgd(ids[max(0, i - self.ctx):i], ids[i], eta)
+                n += 1
+                if interrupt is not None:
+                    interrupt()
+        self.fitted += document_count
         return n
 
     def logprob(self, text: str, *, cached: bool = False,
