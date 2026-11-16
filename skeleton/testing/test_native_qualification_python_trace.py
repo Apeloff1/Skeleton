@@ -33,6 +33,20 @@ class TestPythonTraceQualification(unittest.TestCase):
             24,
         )
 
+    def test_distinct_trace_cases_retain_independent_fixed_oracles(self):
+        records = {case.case_id: case for case in self.records}
+        items = [2, 5]
+        copied = items[:]
+        copied.append(7)
+        expected = {
+            "python_trace_15": str("harbor"[-4:-1]),
+            "python_trace_19": str(sum(items)),
+            "python_trace_23": str(sum(n * n for n in range(1, 5) if n % 2 == 0)),
+        }
+        for case_id, answer in expected.items():
+            with self.subTest(case=case_id):
+                self.assertEqual(records[case_id].steps[0].checks[0].expected, answer)
+
     def test_case_ids_and_digests_are_canonical(self):
         self.assertEqual(len({c.case_id for c in self.records}), 24)
         for case in self.records:
