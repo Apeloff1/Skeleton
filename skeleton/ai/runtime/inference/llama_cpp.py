@@ -284,6 +284,12 @@ class LlamaCppConfig:
     # Optional integrity inventory for files adjacent to the executable. This
     # does not attest system libraries or the dynamic loader's complete closure.
     runtime_libraries: tuple[tuple[str, str], ...] = ()
+    # Opt-in single-model speculation. None preserves the historical profile.
+    speculation_runtime_sha256: str | None = None
+    speculation_ngram: int = 0
+    speculation_draft_tokens: int = 0
+    speculation_min_hits: int = 0
+    speculation_reserve_bytes: int = 0
 
     def __post_init__(self) -> None:
         if not isinstance(self.executable, str) or not self.executable.strip():
@@ -343,6 +349,27 @@ class LlamaCppConfig:
                 raise ValueError(
                     f"{name} requires explicit f16, q8_0 or q4_0"
                 )
+        spec_fields = (self.speculation_ngram, self.speculation_draft_tokens,
+                       self.speculation_min_hits, self.speculation_reserve_bytes)
+        if self.speculation_runtime_sha256 is None:
+            if any(type(v) is not int or v != 0 for v in spec_fields):
+                raise ValueError("speculation requires an explicitly pinned native runtime")
+        else:
+            if (type(self.speculation_runtime_sha256) is not str
+                    or not _HEX64.fullmatch(self.speculation_runtime_sha256)):
+                raise ValueError("invalid speculation executable SHA256")
+            for value, low, high in (
+                (self.speculation_ngram, 2, 24),
+                (self.speculation_draft_tokens, 1, 64),
+                (self.speculation_min_hits, 1, 32),
+                (self.speculation_reserve_bytes, 128 * 1024**2, 4 * 1024**3),
+            ):
+                if type(value) is not int or not low <= value <= high:
+                    raise ValueError("invalid explicit speculation shape")
+            if self.gpu_layers != 0 or self.temperature != 0.0:
+                raise ValueError("initial speculation profile requires CPU-only greedy generation")
+            if self.context_size is None or self.speculation_ngram + self.speculation_draft_tokens >= self.context_size:
+                raise ValueError("speculation needs an explicit sufficient context window")
         normalized_args: list[str] = []
         for item in self.extra_args:
             if not isinstance(item, str) or not item:
@@ -350,6 +377,14 @@ class LlamaCppConfig:
             if any(ord(ch) < 32 or ord(ch) == 127 for ch in item):
                 raise ValueError("extra_args may not contain control characters")
             option = item.split("=", 1)[0] if item.startswith("--") else item
+            # An unpinned second model, shared token lookup pool/file, or
+            # synthetic acceptance benchmark must never bypass this owner.
+            if (option.startswith("--spec-") or option in {
+                "--spec", "--spec-default", "--model-draft", "--hf-repo-draft",
+                "--lookup-cache-static", "--lookup-cache-dynamic",
+            } or any(item == flag or item.startswith(flag + "=")
+                     for flag in ("-md", "-hfd", "-hfrd", "-lcs", "-lcd"))):
+                raise ValueError("extra_args may not activate unmanaged speculation")
             managed = option in _MANAGED_LONG_FLAGS
             if not item.startswith("--"):
                 managed = managed or any(
@@ -687,7 +722,7 @@ def plan_consumer_llama_cpp(
     # A tuning budget may tighten, but never erase a larger existing reservation.
     scratch = max(config.runtime_scratch_bytes, budget.runtime_scratch_bytes)
     kv_per_token = max(config.kv_bytes_per_token or 0, budget.kv_bytes_per_token)
-    fixed = reserved + scratch + model_bytes
+    fixed = reserved + scratch + model_bytes + config.speculation_reserve_bytes
     available_for_kv = budget.ram_bytes - fixed
     minimum_kv = kv_per_token * 128
     if available_for_kv < minimum_kv:
@@ -1025,6 +1060,9 @@ class LlamaCppModel:
             raise TypeError("config must be LlamaCppConfig")
         self.config = config
         self._runtime = _identity(config.executable, executable=True, reject_symlink=False)
+        if (config.speculation_runtime_sha256 is not None
+                and self._runtime.sha256 != config.speculation_runtime_sha256):
+            raise LlamaCppRuntimeError("speculation runtime artifact differs from approved identity")
         self._runtime_libraries = (
             _runtime_library_identities(Path(self._runtime.path).parent, config.runtime_libraries)
             if config.runtime_libraries else ()
@@ -1084,7 +1122,8 @@ class LlamaCppModel:
             "reject_model_symlink", "rehash_artifacts_each_run",
             "output_framing", "runtime_scratch_bytes",
             "kv_bytes_per_token", "kv_cache_type_k", "kv_cache_type_v",
-            "runtime_libraries",
+            "runtime_libraries", "speculation_runtime_sha256", "speculation_ngram",
+            "speculation_draft_tokens", "speculation_min_hits", "speculation_reserve_bytes",
         )
         if any(getattr(profile, field) != getattr(self.config, field)
                for field in immutable_fields):
@@ -1225,6 +1264,15 @@ class LlamaCppModel:
             # A corrected role renderer must not reuse a generation cached
             # under the old single-user-blob conversation transport.
             profile["prompt_format"] = native_chat_profile
+        if self.config.speculation_runtime_sha256 is not None:
+            profile["speculation"] = {
+                "runtime": self.config.speculation_runtime_sha256,
+                "mode": "ngram-simple",
+                "ngram": self.config.speculation_ngram,
+                "draft_tokens": self.config.speculation_draft_tokens,
+                "min_hits": self.config.speculation_min_hits,
+                "reserve_bytes": self.config.speculation_reserve_bytes,
+            }
         return _digest(profile)
 
     def _effective_context(self) -> int:
@@ -1282,7 +1330,8 @@ class LlamaCppModel:
         # models; this is host admission, not measured VRAM or shared-page use.
         context = self._effective_context()
         kv = self.config.kv_bytes_per_token or self._serving_metadata.kv_bytes_per_token_upper_bound or 0
-        return self._model.size_bytes + self.config.runtime_scratch_bytes + context * kv
+        return (self._model.size_bytes + self.config.runtime_scratch_bytes
+                + self.config.speculation_reserve_bytes + context * kv)
 
     @property
     def model_artifact(self) -> ArtifactIdentity:
@@ -1533,6 +1582,18 @@ class LlamaCppModel:
             command.extend(("--cache-type-k", self.config.kv_cache_type_k))
         if self.config.kv_cache_type_v is not None:
             command.extend(("--cache-type-v", self.config.kv_cache_type_v))
+        if self.config.speculation_runtime_sha256 is not None:
+            if (schema_file is not None or request.tools or request.structured_output_schema is not None):
+                raise LlamaCppRuntimeError("initial speculative profile excludes tool/schema generation")
+            if self._runtime.sha256 != self.config.speculation_runtime_sha256:
+                raise LlamaCppRuntimeError("speculative runtime identity changed")
+            command.extend((
+                "--spec-type", "ngram-simple",
+                "--spec-ngram-simple-size-n", str(self.config.speculation_ngram),
+                "--spec-ngram-simple-size-m", str(self.config.speculation_draft_tokens),
+                "--spec-ngram-simple-min-hits", str(self.config.speculation_min_hits),
+                "--spec-draft-n-max", str(self.config.speculation_draft_tokens),
+            ))
         if schema_file is not None:
             command.extend(("--json-schema-file", str(schema_file)))
         if self._native_chat_profile() is None:
