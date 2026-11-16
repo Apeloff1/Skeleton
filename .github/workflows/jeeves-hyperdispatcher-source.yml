@@ -18,6 +18,7 @@ on:
       - 'skeleton/intelligence/shared_pressure.py'
       - 'skeleton/ai/runtime/intelligence/**'
       - 'skeleton/testing/test_jeeves_hyperdispatcher.py'
+      - 'pyproject.toml'
       - 'skeleton/testing/test_durable_run_store.py'
       - 'skeleton/state/run_store.py'
       - 'skeleton/ai/runtime/state/run_store.py'

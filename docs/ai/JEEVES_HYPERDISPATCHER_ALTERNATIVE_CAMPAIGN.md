@@ -378,3 +378,46 @@ are never renumbered. Managed owners expose explicit graceful close, periodic
 outer retention and durable cancellation/dependency propagation. Source and
 mirror files retain parity. New tests cover cancellation and dependency
 propagation plus independent run-store retention and exact-owner takeover.
+
+## Wave A19: installed private local dispatcher service
+
+Install the repository package and invoke the actual script:
+
+    skeleton-jeeves-dispatch --directory /absolute/private-dispatch init --tenant owner --operation integer_sum --operation shortest_path
+    printf '%s' '{"kind":"submit","tenant":"owner","task_id":"job-1","operation":"integer_sum","input":[1,2,3]}' | skeleton-jeeves-dispatch --directory /absolute/private-dispatch enqueue --id request-1
+    skeleton-jeeves-dispatch --directory /absolute/private-dispatch serve
+    skeleton-jeeves-dispatch --directory /absolute/private-dispatch command --id request-1
+    skeleton-jeeves-dispatch --directory /absolute/private-dispatch result --tenant owner --task job-1
+
+Use a new absolute directory with an existing trusted real parent. Initialization
+provisions separate random worker, inspector and local event credentials in
+private POSIX files, pins the complete policy to the durable run, and creates
+an explicit owner-only service lock. No credentials print. This is a same-UID
+local administrative interface, not a remote or multi-user sandbox. State and
+credentials are not encrypted; protect the directory and backups externally.
+POSIX ownership enforcement is mandatory; Windows is explicitly unsupported.
+
+The installed command accepts a durable JSON inbox, including exact retry-safe
+submission, dependency IDs, queued cancellation, singleton, UTC timer,
+local-operator event wait/signal, committed-effect reconciliation and stop.
+For example use fields timer_ms or event={"selector":"approve",
+"not_before_ms":...}; signal commands carry tenant, task_id, event_id, selector
+and an evidence JSON value. Signals assert a local operator event, not third-
+party verified truth. Acknowledgements are checked against the live writer in
+the same SQLite transaction; stable request identities handle process failure
+between task checkpoint and acknowledgement. The operator service derives
+ranked candidates from admitted durable metadata, never a caller-supplied
+priority observation. Admission and replay capacity, checkpoint retention,
+grants and real worker evidence are bounded. The private local service
+automatically executes admitted work, polls timers, propagates terminal
+dependency failures and reconciles committed local results. It does not
+auto-retry uncertain physical work. Graceful stop releases only the exact
+live ownership lease; crashes require genuine expiration/recovery.
+
+The foreground command is deployable under an operator-selected supervisor;
+the main app's default startup remains unchanged. Nine fixed compute
+operations execute as real subprocesses; native inference, external effectful
+tools, distributed execution and physical device migration are not included.
+The five new tests cover actual CLI child execution, restart/admission replay,
+tenant result boundaries, stale ack refusal, credential-policy seal and
+competing service process lock. Exact-head qualification is still required.

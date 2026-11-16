@@ -2577,3 +2577,165 @@ def test_managed_cancellation_propagates_dependencies_and_preserves_other_tenant
     for identity in ("parent", "child", "grandchild"):
         assert restored.task(identity).state is TaskState.CANCELLED
     assert restored.task("b").state is TaskState.QUEUED
+
+
+def test_installed_dispatcher_durable_operator_service_end_to_end(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import (
+        LocalDispatcherApplication, DispatcherRequestError,
+    )
+    from skeleton.testing.test_durable_run_store import Clock
+    from skeleton.state import StateConflict
+    clock = Clock()
+    now = [100]
+    root = tmp_path / "dispatcher"
+    app = LocalDispatcherApplication.initialize(
+        root, tenants=("a", "b"), operations=("integer_sum", "shortest_path"),
+        workers=2, max_jobs=16, clock_ms=lambda: now[0], store_clock=clock,
+    )
+    submit = {"kind": "submit", "tenant": "a", "task_id": "first",
+              "operation": "integer_sum", "input": [2, 5]}
+    initial = app.enqueue("req-first", submit)
+    assert initial["status"] == "pending"
+    assert app.enqueue("req-first", submit) == initial
+    with pytest.raises(DispatcherRequestError):
+        app.enqueue("req-first", dict(submit, input=[999]))
+    app.enqueue("req-timer", dict(submit, task_id="timer", input=[5, 5],
+                                 timer_ms=200, dependencies=["first"]))
+    app.enqueue("req-event", dict(submit, task_id="event", input=[3, 9],
+                                 event={"selector": "release", "not_before_ms": 100}))
+    app.enqueue("req-forbidden", dict(submit, task_id="forbidden", operation="sha256_text"))
+    app.start()
+    result = app.tick()
+    assert result.commands == 4 and result.task_id == "first"
+    assert app.inbox.command("req-first")["status"] == "accepted"
+    assert app.inbox.command("req-forbidden")["status"] == "rejected"
+    assert app.result("a", "first")["result"] == 7
+    with pytest.raises(DispatcherRequestError):
+        app.result("b", "first")
+    assert app.tick().disposition == "idle"
+    now[0] = 200
+    assert app.tick().task_id == "timer"
+    assert app.result("a", "timer")["result"] == 10
+    app.close()
+    restored = LocalDispatcherApplication(root, clock_ms=lambda: now[0], store_clock=clock)
+    restored.enqueue("signal", {"kind": "signal", "tenant": "a", "task_id": "event",
+                                "event_id": "operator-1", "selector": "release",
+                                "evidence": {"approved": True}})
+    restored.start()
+    assert restored.tick().task_id == "event"
+    assert restored.result("a", "event")["result"] == 12
+    restored.enqueue("halt", {"kind": "stop"})
+    assert restored.tick().stop_requested
+    restored.close()
+    assert not restored.status()["writer_present"]
+    assert restored.status()["worker_custody"]["completed"] == 3
+
+
+def test_dispatcher_inbox_crash_between_task_checkpoint_and_command_ack(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    from skeleton.testing.test_durable_run_store import Clock
+    clock = Clock()
+    root = tmp_path / "dispatcher"
+    app = LocalDispatcherApplication.initialize(
+        root, tenants=("a",), operations=("integer_sum",), max_jobs=8,
+        timeout_seconds=1, lease_seconds=20, clock_ms=lambda: 100, store_clock=clock,
+    )
+    app.enqueue("create", {"kind": "submit", "tenant": "a", "task_id": "job",
+                           "operation": "integer_sum", "input": [4, 6]})
+    first = app.start()
+    command = app.inbox.pending()[0]
+    assert app._apply(command) == {"task_id": "job", "submission": "durable"}
+    assert app.inbox.command("create")["status"] == "pending"
+    first.stop()
+    clock.advance(21)
+    recovered = LocalDispatcherApplication(root, clock_ms=lambda: 100, store_clock=clock)
+    recovered.start()
+    assert recovered.tick().task_id == "job"
+    assert recovered.inbox.command("create")["status"] == "accepted"
+    assert recovered.result("a", "job")["result"] == 10
+    assert recovered.custody.usage()["attempts"] == 1
+    recovered.close()
+
+
+def test_dispatcher_inbox_refuses_stale_acknowledgement(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    from skeleton.testing.test_durable_run_store import Clock
+    from skeleton.state import StateConflict
+    clock = Clock()
+    root = tmp_path / "dispatcher"
+    app = LocalDispatcherApplication.initialize(
+        root, tenants=("a",), operations=("integer_sum",), max_jobs=8,
+        timeout_seconds=1, lease_seconds=20, clock_ms=lambda: 100, store_clock=clock,
+    )
+    app.enqueue("stop", {"kind": "stop"})
+    first = app.start()
+    command = app.inbox.pending()[0]
+    first.stop()
+    clock.advance(21)
+    replacement = LocalDispatcherApplication(root, clock_ms=lambda: 100, store_clock=clock)
+    replacement.start()
+    with pytest.raises(StateConflict):
+        app.inbox.acknowledge(first.owner.owner_id, command, accepted=True,
+                              result={"stop": "requested"})
+    assert replacement.inbox.command("stop")["status"] == "pending"
+    assert replacement.tick().stop_requested
+    replacement.close()
+
+
+def test_dispatcher_private_policy_change_and_competing_service_lock(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    import json
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    from skeleton.automation.agents.swarm_durable import DurableSwarmError
+    root = tmp_path / "dispatcher"
+    app = LocalDispatcherApplication.initialize(
+        root, tenants=("a",), operations=("integer_sum",), max_jobs=8,
+    )
+    with app.exclusive_service():
+        with pytest.raises(DurableSwarmError, match="another"):
+            with app.exclusive_service():
+                pass
+    policy_file = root / "dispatcher-policy.json"
+    body = json.loads(policy_file.read_bytes())
+    body["max_jobs"] = 9
+    policy_file.write_text(json.dumps(body, sort_keys=True, separators=(",", ":")))
+    with pytest.raises(DurableSwarmError, match="policy"):
+        LocalDispatcherApplication(root)
+
+
+def test_dispatcher_real_foreground_cli_with_private_state(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    import json
+    import subprocess
+    import sys
+    root = tmp_path / "dispatcher"
+    base = [sys.executable, "-m", "skeleton.automation.agents.swarm_dispatch_app",
+            "--directory", str(root)]
+    def call(*args, value=None):
+        raw = None if value is None else json.dumps(value).encode()
+        execution = subprocess.run(base + list(args), input=raw, capture_output=True,
+                                   timeout=30, check=True)
+        return json.loads(execution.stdout)
+    assert call("init", "--tenant", "a", "--operation", "integer_sum",
+                "--workers", "1", "--max-jobs", "4")["policy"]["workers"] == 1
+    assert call("enqueue", "--id", "req", value={
+        "kind": "submit", "tenant": "a", "task_id": "job",
+        "operation": "integer_sum", "input": [20, 22],
+    })["status"] == "pending"
+    assert call("serve", "--max-cycles", "1")["cycles"] == 1
+    assert call("command", "--id", "req")["status"] == "accepted"
+    assert call("result", "--tenant", "a", "--task", "job")["result"] == 42
+    assert not call("status")["writer_present"]
