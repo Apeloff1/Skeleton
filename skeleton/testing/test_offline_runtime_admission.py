@@ -417,3 +417,27 @@ def test_scoped_pressure_provenance_pair_is_validated():
         replace(sample(), scoped_pressure="invented", scoped_observation_digest="a" * 64)
     recorded = replace(sample(), scoped_pressure="recovering", scoped_observation_digest="a" * 64)
     assert recorded.snapshot()["scoped_pressure"] == "recovering"
+
+
+def test_failed_offer_discards_warmed_recovery_state():
+    owner = controller()
+    offer(owner, 0, origin="local_probe")
+    candidate, reading = offer(owner, 1, origin="local_probe")
+    assert candidate["status"] == "candidate"
+    with pytest.raises(RuntimePreflightError):
+        owner.offer(reading, work(), now_ns=True)
+    assert not owner.status()["pending"]
+    assert owner.status()["hysteresis_workers"] == 0
+    recovered, _ = offer(owner, 2, origin="local_probe")
+    assert recovered["status"] == "no_grant"
+    recovered, _ = offer(owner, 3, origin="local_probe")
+    assert recovered["status"] == "candidate"
+
+
+def test_exact_expiry_instant_cannot_authorize_consumption():
+    owner = controller()
+    offer(owner, 0, origin="local_probe")
+    receipt, _ = offer(owner, 1, origin="local_probe")
+    with pytest.raises(RuntimePreflightError, match="stale or future"):
+        owner.consume(receipt, now_ns=receipt["expires_ns"])
+    assert not owner.status()["pending"]
