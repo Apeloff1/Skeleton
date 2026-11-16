@@ -926,6 +926,61 @@ class TinyTransformer:
         p = softmax(logits)
         loss = -math.log(max(p[target], 1e-12))
         dlog = [p[v] - (1.0 if v == target else 0.0) for v in range(self.V)]
+        self._apply_output_gradient(ids, y, caches, dlog, lr)
+        return loss
+
+    def _sgd_soft_target(
+        self, ids: List[int], target: int, teacher_logits: Sequence[float], *,
+        teacher_weight: float, lr: float,
+    ) -> float:
+        """Candidate-only hard/soft CE, using true teacher distribution.
+
+        Unit-temperature mixture: q=(1-alpha)*one_hot(target)+alpha*p_teacher.
+        Reuses the same canonical backpropagation as supervised SGD. The
+        teacher model is never passed to this layer. Unsupported accelerators
+        and routed graphs must be admitted separately; never fall back or
+        replace true teacher logits with fictitious scores.
+        """
+        if self._accel is not None or self.resident or self.device != "cpu" or self.use_mod:
+            raise ValueError("soft-target SGD requires the reference CPU graph")
+        if (not ids or len(ids)>self.ctx
+                or any(type(i) is not int or not 0<=i<self.V for i in ids)
+                or type(target) is not int or not 0<=target<self.V):
+            raise ValueError("invalid soft-target token input")
+        if len(teacher_logits)!=self.V or any(not math.isfinite(x) for x in teacher_logits):
+            raise ValueError("teacher logits must match the finite vocabulary")
+        if (isinstance(teacher_weight,bool) or not isinstance(teacher_weight,(float,int))
+                or not math.isfinite(teacher_weight) or not 0.0<=teacher_weight<=1.0
+                or isinstance(lr,bool) or not isinstance(lr,(float,int))
+                or not math.isfinite(lr) or not 0.0<lr<=1.0):
+            raise ValueError("invalid finite distillation weights")
+        teacher=softmax(list(teacher_logits))
+        if any(not math.isfinite(x) or x<0 for x in teacher):
+            raise ValueError("nonfinite teacher probabilities")
+        H,caches=self._forward(ids)
+        y=H[-1]
+        logits=self._unembed(y)
+        if any(not math.isfinite(x) for x in logits):
+            raise ValueError("nonfinite candidate logits")
+        p=softmax(logits)
+        alpha=float(teacher_weight)
+        q=[alpha*value+(1.0-alpha if i==target else 0.0)
+           for i,value in enumerate(teacher)]
+        # The clipped finite reported loss follows the historical CE floor;
+        # the actual probability gradient remains p-q.
+        loss=-math.fsum(q[i]*math.log(max(p[i],1e-12)) for i in range(self.V))
+        dlog=[p[i]-q[i] for i in range(self.V)]
+        if not math.isfinite(loss) or any(not math.isfinite(x) for x in dlog):
+            raise ValueError("nonfinite distillation loss or gradient")
+        self._apply_output_gradient(ids,y,caches,dlog,float(lr))
+        return loss
+
+    def _apply_output_gradient(
+        self, ids: Sequence[int], y: List[float], caches, dlog: List[float], lr: float,
+    ) -> None:
+        """Shared canonical output and transformer backpropagation."""
+        n = len(ids)
+        D = self.dim
         g2 = math.sqrt(sum(x * x for x in dlog))
         if g2 > 5.0:
             s = 5.0 / g2
@@ -954,7 +1009,6 @@ class TinyTransformer:
                 if self.position_mode != "rope":
                     self.P[t][d] -= lr * dx[d]
         self.steps += 1
-        return loss
 
     def fit(self, texts: Iterable[str], *, lr: float = 0.04, schedule: str = "const",
             interrupt: Callable[[], None] | None = None) -> int:
