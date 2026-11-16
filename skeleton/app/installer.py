@@ -156,11 +156,25 @@ def install_application(
     admin_password_file: Path | None = None,
     bundled_runtime: bool = False,
     runner: Runner = subprocess.run,
+    qualification_source_head: str | None = None,
+    qualification_require_protected: bool = False,
+    qualification_require_ai: bool = False,
 ) -> InstallReceipt:
     """Run the bounded installer pipeline and return a redacted receipt."""
 
     root = (root or find_repo_root()).resolve()
     phases: list[InstallPhase] = []
+
+    if (qualification_require_protected or qualification_require_ai) and qualification_source_head is None:
+        return InstallReceipt(root, (InstallPhase("qualification-input",False,"strict qualification requires an exact source pin"),))
+    if qualification_source_head is not None:
+        if not start:
+            return InstallReceipt(root, (InstallPhase("qualification-input",False,"strict qualification requires --start"),))
+        from skeleton.app.strict_install_qualification import QualificationDenied, assert_source_head
+        try:
+            assert_source_head(root,qualification_source_head)
+        except QualificationDenied:
+            return InstallReceipt(root, (InstallPhase("qualification-source",False,"reviewed checkout identity unavailable"),))
 
     if full and start:
         return InstallReceipt(
@@ -477,6 +491,18 @@ def install_application(
     if admitted_digest is not None and not _runtime_source_stable(root, admitted_digest):
         phases.append(_runtime_source_rejection())
 
+    if qualification_source_head is not None and all(p.ok or not p.required for p in phases):
+        from skeleton.app.strict_install_qualification import qualify_live_install
+        qualification = qualify_live_install(root, source_head=qualification_source_head,
+            require_protected=qualification_require_protected, require_ai=qualification_require_ai,
+            environ=admitted_process_env)
+        stable = admitted_digest is not None and _runtime_source_stable(root,admitted_digest)
+        phases.append(InstallPhase("strict-live-qualification",qualification["ok"] is True and stable,
+            "bounded multi-round application observation; " + qualification["code"]
+            + "; actual inference/device/release remain separately held"))
+        if not stable:
+            phases.append(_runtime_source_rejection())
+
     return InstallReceipt(root=root, phases=tuple(phases))
 
 
@@ -513,6 +539,9 @@ def configure_setup_parsers(subparsers: argparse._SubParsersAction) -> None:
         type=Path,
         help="private file containing a strong operator bootstrap password",
     )
+    install.add_argument("--qualification-source-head", help="require strict post-start observation of a pinned host checkout")
+    install.add_argument("--qualification-require-protected", action="store_true")
+    install.add_argument("--qualification-require-ai", action="store_true")
     install.add_argument("--json", action="store_true", dest="as_json")
 
 
@@ -587,6 +616,9 @@ def run_setup_command(command: str, args: argparse.Namespace, root: Path | None 
             root,
             install_python=not bool(args.skip_python),
             start=bool(args.start),
+            qualification_source_head=getattr(args,"qualification_source_head",None),
+            qualification_require_protected=bool(getattr(args,"qualification_require_protected",False)),
+            qualification_require_ai=bool(getattr(args,"qualification_require_ai",False)),
             full=bool(args.full),
             production=bool(args.production),
             hot=bool(args.hot),

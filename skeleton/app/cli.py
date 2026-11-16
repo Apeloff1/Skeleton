@@ -61,6 +61,14 @@ def _parser() -> argparse.ArgumentParser:
         help="private existing bearer-token file for authenticated --studio --live server readiness",
     )
 
+    qualify = sub.add_parser("qualify-install", help="observe strict live first-install acceptance against a pinned host checkout")
+    qualify.add_argument("--source-head", required=True)
+    qualify.add_argument("--passes", type=int, default=2)
+    qualify.add_argument("--require-protected", action="store_true")
+    qualify.add_argument("--require-ai", action="store_true",
+                         help="require selected provider availability, not inference qualification")
+    qualify.add_argument("--json", action="store_true", dest="as_json")
+
     sub.add_parser("mongo-preflight", help="observe guarded Mongo prerequisites; never activate inference")
 
     plan = sub.add_parser("plan", help="show dependency-aware application startup order")
@@ -654,6 +662,23 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         )
     if command == "check":
         return _print_checks(bool(args.runtime), bool(args.as_json))
+    if command == "qualify-install":
+        from skeleton.app.strict_install_qualification import QualificationDenied, qualify_live_install
+        try:
+            receipt = qualify_live_install(source_head=args.source_head, passes=args.passes,
+                require_protected=args.require_protected, require_ai=args.require_ai)
+        except (QualificationDenied, OSError, ValueError, TypeError):
+            print("strict install observation denied; invalid inputs")
+            return 2
+        if args.as_json:
+            print(json.dumps(receipt, indent=2, sort_keys=True))
+        else:
+            print("strict installation observation: " + receipt["code"])
+            for observation in receipt["rounds"]:
+                for lane in observation["lanes"]:
+                    print(f'round {observation["round"]}: {lane["name"]}: {lane["code"]}')
+            print("Actual inference, images, restore, device and release remain independently unqualified.")
+        return 0 if receipt["ok"] else 1
     if command == "doctor":
         from skeleton.app.first_install import first_install_report
 

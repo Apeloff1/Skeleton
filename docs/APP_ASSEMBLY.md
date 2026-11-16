@@ -894,3 +894,33 @@ process. It waits for actual UTC due times, writes every queue generation to
 a new immutable filename, and stops on retirement or the configured cycle
 cap. It is not an always-on service unless the operator runs it as one.
 No autonomous checkpoint training or live-model promotion is performed.
+
+
+## Strict installed-runtime observation
+
+After a reviewed source checkout has started the services, run:
+
+    python -m skeleton app qualify-install --source-head REVIEWED_SHA --json
+
+For a checkout-based installation, add
+--qualification-source-head REVIEWED_SHA to the existing install --start
+command to require the same observation before its successful exit. Optional
+--require-protected and --require-ai on qualify-install (or their
+--qualification-require-* installer equivalents) require observed protected
+writer custody and selected-provider availability respectively. They do not
+enable either service.
+
+The strict path checks setup/product HTML, exact public bootstrap contract,
+direct backend and engine identity, both aggregate routes, route inventory and
+selected-provider availability in at least two independent rounds. It binds
+the host source SHA and private configuration identity before and after each
+round, denies contradictory status bodies, requires consistent product
+attestation and rejects redirects, proxies and oversized/nonfinite JSON.
+A subprocess imposes a hard deadline even on slow-drip HTTP responses.
+The output has fixed finding codes and redacted bounded facts, never raw
+response bodies or private configuration digests.
+
+This is stronger than a socket health check but not signed image provenance,
+browser JavaScript execution, actual inference, storage restoration, Windows
+device acceptance or release qualification. The default setup UI recovery
+remains available and protected startup is not enabled by this command.

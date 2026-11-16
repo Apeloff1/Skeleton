@@ -114,6 +114,8 @@ jobs:
         run: python -m pytest -q --maxfail=1 skeleton/testing/test_gguf_token_bridge.py
       - name: Qualify sticky canonical writer binding
         run: python -m pytest -q --maxfail=1 skeleton/testing/test_sticky_canonical_writer.py skeleton/testing/test_canonical_writer_cutover.py
+      - name: Qualify strict first-install live identity and recovery boundaries
+        run: python -m pytest -q --maxfail=1 skeleton/testing/test_strict_install_qualification.py
       - name: Verify construction and provider-owner contracts
         run: |
           python scripts/check_architecture_map.py
