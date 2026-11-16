@@ -173,3 +173,65 @@ def test_existing_managed_writer_final_hash_failure_leaves_intent(tmp_path, monk
         writer.stage(identity, plan, paths)
     assert writer.inspect()["active_intent"]["plan_digest"] == plan.digest
     assert (root / "manifests" / (plan.digest + ".json")).exists()
+
+
+def test_live_session_revokes_pending_grant_after_managed_transaction_interrupt(tmp_path, monkeypatch):
+    import time
+    from skeleton.app.offline_runtime_session import OfflineRuntimeSession
+    from skeleton.app.offline_energy_hysteresis import HysteresisPolicy
+    from skeleton.testing.test_offline_runtime_admission import POLICY, work
+    root, writer, identity, plan, _ = setup(tmp_path)
+    monkeypatch.setattr("skeleton.app.offline_runtime_session.sample_hardware",
+                        lambda: sample(start=time.monotonic_ns() - 1000, origin="local_probe"))
+    session = OfflineRuntimeSession(
+        root, plan_digest=plan.digest, model_identity_digest=identity.identity_digest,
+        policy=POLICY, hysteresis=HysteresisPolicy(recovery_samples=2, recovery_cooldown_ns=0,
+                                                max_sample_age_ns=POLICY.sample_age_ns))
+    try:
+        session.offer(work())
+        grant = session.offer(work())["admission"]
+        assert grant["status"] == "candidate"
+        assert session.status()["last_metadata_fence_digest"]
+        other, next_plan, paths = prepare(tmp_path, b"interrupted")
+        paths[0].write_bytes(b"x" * paths[0].stat().st_size)
+        with pytest.raises(WeightShardStoreError):
+            writer.stage(other, next_plan, paths)
+        with pytest.raises(WeightShardStoreError, match="unresolved staging intent"):
+            session.consume(grant)
+        assert not session.status()["admission"]["pending"]
+        assert session.status()["last_metadata_fence_digest"] is None
+    finally:
+        session.close()
+
+
+def test_runtime_metadata_fence_detects_selected_manifest_substitution(tmp_path):
+    import json
+    from skeleton.ai.model_runtime.flgb_model_runtime import canonical_bytes
+    from skeleton.app.offline_runtime_preflight import revalidate_source_metadata
+    root, _, identity, plan, _ = setup(tmp_path)
+    policy = RuntimePolicy(verify_gguf_headers=False)
+    source = inspect_source(root, plan_digest=plan.digest, model_identity_digest=identity.identity_digest,
+                            policy=policy)
+    evidence = revalidate_source_metadata(root, source, policy)
+    assert evidence["scope"] == "managed_manifest_metadata"
+    assert not evidence["current_weight_bytes_rehashed"]
+    manifest = root / "manifests" / (plan.digest + ".json")
+    row = json.loads(manifest.read_bytes())
+    row["weights_digest"] = "0" * 64
+    manifest.write_bytes(canonical_bytes(row))
+    with pytest.raises(ValueError, match="managed source manifest changed"):
+        revalidate_source_metadata(root, source, policy)
+
+
+def test_runtime_metadata_fence_rejects_legacy_to_managed_transition(tmp_path):
+    from skeleton.app.offline_runtime_preflight import revalidate_source_metadata
+    root = tmp_path / "legacy"
+    store = WeightShardStore(root)
+    identity, plan, paths = prepare(tmp_path)
+    store.stage_plan(identity, plan, paths)
+    policy = RuntimePolicy(verify_gguf_headers=False)
+    source = inspect_source(root, plan_digest=plan.digest, model_identity_digest=identity.identity_digest,
+                            policy=policy)
+    WeightStoreDiskOwner(store, DiskAdmissionPolicy(1 << 20, minimum_free_bytes=0))
+    with pytest.raises(ValueError, match="managed source policy changed"):
+        revalidate_source_metadata(root, source, policy)
