@@ -242,6 +242,50 @@ class CampaignStore:
             chosen = head if revision is None else _integer(revision, 0, head)
             return self._verified(slot, source, chosen)
 
+    def fork(self, parent_slot: str, source: Any, parent_revision: int,
+             expected_digest: str, child_slot: str) -> dict:
+        """Atomically copy a verified historical prefix to a new independent slot.
+
+        Existing operation identities are scoped by slot and copied intact.
+        No original revision is deleted or rewritten. The returned ancestry
+        is an observation of this transaction, not a separately signed ledger.
+        Repeated forks to an existing child are rejected rather than inferred.
+        """
+        parent, child = _identity(parent_slot), _identity(child_slot)
+        _check(parent != child, "fork must use a distinct slot")
+        _check(type(expected_digest) is str and re.fullmatch("[0-9a-f]{64}", expected_digest) is not None,
+               "expected parent receipt digest required")
+        source_hash = digest(source)
+        with self._transaction():
+            head = self._slot(parent, source)
+            chosen = _integer(parent_revision, 0, head)
+            _check(self.db.execute("SELECT 1 FROM gf_campaign_slots_v1 WHERE slot=?", (child,)).fetchone()
+                   is None, "fork destination already exists")
+            _check(self.db.execute("SELECT COUNT(*) FROM gf_campaign_slots_v1").fetchone()[0] < MAX_SLOTS,
+                   "slot ceiling exceeded")
+            selected = self._verified(parent, source, chosen)
+            if selected["receipt"]["session_digest"] != expected_digest:
+                raise RevisionConflict("parent checkpoint digest mismatch")
+            total = 0
+            # Copy only the verified prefix, never the old branch's future.
+            self.db.execute(
+                "INSERT INTO gf_campaign_slots_v1(slot,source_digest,head) VALUES(?,?,?)",
+                (child, source_hash, chosen)
+            )
+            for revision in range(chosen + 1):
+                row = self._row(parent, revision)
+                receipt = self._verified(parent, source, revision)["receipt"]
+                total += len(row[5])
+                _check(total <= MAX_SLOT_BYTES, "fork prefix exceeds source byte ceiling")
+                self._insert(child, revision, row[1], row[2], row[3], receipt)
+            copied = self._verified(child, source, chosen)
+            _check(copied["receipt"] == selected["receipt"], "fork replay differs")
+            result = {"parent_slot": parent, "parent_revision": chosen,
+                      "parent_receipt_digest": expected_digest, "child": copied,
+                      "native_qualified": False, "release_qualified": False}
+            _encode(result)
+            return result
+
     def history(self, slot: str, source: Any) -> dict:
         """Audit the complete bounded chain from genesis, not just the current pair."""
         slot = _identity(slot)
