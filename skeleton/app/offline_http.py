@@ -153,7 +153,8 @@ class OfflineHTTPApplication:
 
     def __init__(self, backend: LocalDesktopModel, database: str | Path,
                  *, token: str, semantic_ranker=None, semantic_multihop=False,
-                 nli_verifier=None, specialist_registry=None, media_registry=None) -> None:
+                 nli_verifier=None, specialist_registry=None, media_registry=None,
+                 media_generator=None, prefetch_predictor=None) -> None:
         if not isinstance(token, str) or len(token) < 32:
             raise OfflineHTTPError(400, "a strong authorization token is required")
         # The generic offline desktop still supports native model fixtures.
@@ -202,7 +203,8 @@ class OfflineHTTPApplication:
             from skeleton.app.jeeves_reviewed_feedback import ReviewedFeedbackStore
             self.reviewed_feedback = ReviewedFeedbackStore(self._store, self.model_digest, self.tokenizer_digest)
             from skeleton.app.jeeves_competitive_service import CompetitiveService
-            self.competitive = CompetitiveService(self, specialists=specialist_registry, media=media_registry)
+            self.competitive = CompetitiveService(self, specialists=specialist_registry, media=media_registry,
+                                                  media_generator=media_generator,predictor=prefetch_predictor)
         except BaseException:
             if self.longform is not None:
                 self.longform.close()
@@ -1674,7 +1676,7 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         limit = (
             MAX_JSON_BYTES if path == "/v1/sessions/import"
             else MAX_JSON_BYTES if path == "/v1/knowledge/documents"
-            else MAX_MEDIA_ADVISORY_REQUEST_BYTES if path == "/v1/advisory/ingest" or path.endswith("/media-review")
+            else MAX_MEDIA_ADVISORY_REQUEST_BYTES if path == "/v1/advisory/ingest" or path.endswith(("/media-review","/media-generate"))
             else MAX_CHAT_REQUEST_BYTES
         )
         length = int(declared)
@@ -1971,7 +1973,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--specialist-config-sha256")
     parser.add_argument("--media-config", type=Path, help="pinned local image and audio classifier inventory")
     parser.add_argument("--media-config-sha256")
+    parser.add_argument("--media-generation-config",type=Path,help="pinned local vision/language and speech encoder-decoder bundles")
+    parser.add_argument("--media-generation-config-sha256")
+    parser.add_argument("--prefetch-predictor-config",type=Path,help="pinned local learned next-query predictor")
+    parser.add_argument("--prefetch-predictor-config-sha256")
     args = parser.parse_args(argv)
+    if (bool(args.media_generation_config)!=bool(args.media_generation_config_sha256) or
+            bool(args.prefetch_predictor_config)!=bool(args.prefetch_predictor_config_sha256)):
+        parser.error("media generator and forecast model configurations require exact file digests")
     if bool(args.specialist_config)!=bool(args.specialist_config_sha256) or bool(args.media_config)!=bool(args.media_config_sha256):
         parser.error("advanced local configuration and exact file digest must be supplied together")
     if bool(args.nli_config)!=bool(args.nli_config_sha256):
@@ -2007,9 +2016,17 @@ def main(argv: list[str] | None = None) -> int:
         if args.media_config is not None:
             from skeleton.app.jeeves_native_media import LocalMediaRegistry
             media=LocalMediaRegistry(args.media_config,args.media_config_sha256)
+        media_generator=predictor=None
+        if args.media_generation_config is not None:
+            from skeleton.app.jeeves_media_generation import GenerationMediaRegistry
+            media_generator=GenerationMediaRegistry(args.media_generation_config,args.media_generation_config_sha256)
+        if args.prefetch_predictor_config is not None:
+            from skeleton.app.jeeves_learned_prefetch import load_predictor
+            predictor=load_predictor(args.prefetch_predictor_config,args.prefetch_predictor_config_sha256)
         app = OfflineHTTPApplication(backend, db, token=token,semantic_ranker=ranker,
                                      semantic_multihop=args.semantic_multihop,nli_verifier=verifier,
-                                     specialist_registry=specialists,media_registry=media)
+                                     specialist_registry=specialists,media_registry=media,
+                                     media_generator=media_generator,prefetch_predictor=predictor)
         if args.semantic_index is not None:
             app.knowledge.attach_semantic_ann(args.semantic_index,args.semantic_index_sha256)
         if args.semantic_index_root is not None:
