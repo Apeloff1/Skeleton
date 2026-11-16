@@ -497,7 +497,9 @@ class WeightShardStore:
         # hashing a pathname, closing it, then reopening an unverified file.
         # The sealed-memory owner still hashes during its own immutable copy;
         # ordinary streams do not prevent concurrent writes by the store owner.
-        with ExitStack() as stack:
+        from .managed_weight_read import managed_weight_read
+
+        with managed_weight_read(self), ExitStack() as stack:
             streams: list[BinaryIO] = []
             for shard in plan.shards:
                 stream = stack.enter_context(
