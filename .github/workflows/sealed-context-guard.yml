@@ -44,12 +44,17 @@ on:
       - 'skeleton/ai/model_runtime/offline_inventory.py'
       - 'skeleton/ai/model_runtime/weight_shard_store.py'
       - 'skeleton/ai/model_runtime/weight_store_disk_owner.py'
+      - 'skeleton/ai/model_runtime/weight_store_transaction.py'
+      - 'skeleton/ai/model_runtime/weight_store_recovery.py'
+      - 'skeleton/ai/model_runtime/weight_store_cli.py'
       - 'skeleton/ai/model_runtime/sealed_weight_pages.py'
       - 'skeleton/ai/runtime/inference/lease_custody.py'
       - 'skeleton/testing/test_offline_runtime_admission.py'
       - 'skeleton/testing/test_offline_execution_custody.py'
       - 'skeleton/testing/test_offline_weight_inventory.py'
       - 'skeleton/testing/test_weight_store_disk_owner.py'
+      - 'skeleton/testing/test_weight_store_recovery.py'
+      - 'skeleton/testing/test_weight_store_cli.py'
       - 'skeleton/testing/test_measured_jeeves_deployment.py'
       - 'skeleton/testing/test_native_process_lease.py'
       - 'skeleton/testing/test_guarded_application_startup.py'
@@ -128,6 +133,8 @@ jobs:
             skeleton/testing/test_offline_execution_custody.py \
             skeleton/testing/test_offline_weight_inventory.py \
             skeleton/testing/test_weight_store_disk_owner.py \
+            skeleton/testing/test_weight_store_recovery.py \
+            skeleton/testing/test_weight_store_cli.py \
             skeleton/testing/test_measured_jeeves_deployment.py \
             skeleton/testing/test_native_process_lease.py \
             skeleton/testing/test_guarded_application_startup.py \
