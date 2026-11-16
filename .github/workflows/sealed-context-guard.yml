@@ -70,6 +70,9 @@ on:
       - 'skeleton/app/orphan_source_graph*.py'
       - 'skeleton/app/orphan_graph_ownership.py'
       - 'skeleton/app/recovered_evidence.py'
+      - 'skeleton/app/quest_trace_repair_cli.py'
+      - 'skeleton/ai/game_builder/quest_trace_*.py'
+      - 'skeleton/testing/test_recovered_quest_trace_repair.py'
       - 'skeleton/app/quest_playtest_analytics_cli.py'
       - 'skeleton/app/studio_frame_qualification_cli.py'
       - 'skeleton/app/scene_byte_qualification_cli.py'
@@ -263,6 +266,11 @@ jobs:
         env:
           PYTHONPATH: '.:backend'
         run: python -m pytest -q skeleton/testing/test_recovered_playtest_qualification.py tests/game_analytics/test_analytics.py tests/test_game_frontier_art_acceptance.py skeleton/testing/test_scene_bytes.py
+
+      - name: Recovered B038 B039 trace repair and provenance
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_quest_trace_repair.py skeleton/gameforge/batch_b039/test_self_repair.py skeleton/gameforge/batch_b039/test_route_adapter.py tests/test_gf_b038_provenance.py
 
       - name: Consumer share and Chroma custody regressions
         env:

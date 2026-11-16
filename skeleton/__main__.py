@@ -7,6 +7,7 @@ Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
     offline-runtime  Inspect pinned local weights and measured resource admission
     weight-store     Stage pinned weights and inspect cooperative disk/recovery custody
+    quest-trace-repair               Repair quest action traces under immutable source policy
     quest-playtest-analytics         Execute synthetic quest playtests and cohort analytics
     studio-frame-qualification       Evaluate pinned reference frame sequences
     scene-byte-qualification         Verify canonical scene byte transport and replay
@@ -1428,6 +1429,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         return recovered_main(rest)
     if cmd == "scene-byte-qualification":
         from skeleton.app.scene_byte_qualification_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "quest-trace-repair":
+        from skeleton.app.quest_trace_repair_cli import main as recovered_main
         return recovered_main(rest)
     if cmd == "app":
         from skeleton.app.cli import run_app_cli
