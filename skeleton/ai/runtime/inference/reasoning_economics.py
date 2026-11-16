@@ -56,8 +56,10 @@ class Observation:
     scope_sha256: str
     trial_sha256: str
     stage: str
-    input_tokens: int
-    output_tokens: int
+    input_ceiling: int
+    output_ceiling: int
+    actual_input_tokens: int
+    actual_output_tokens: int
     elapsed_ms: int
     queue_ms: int
     observed_at: int
@@ -68,13 +70,18 @@ class Observation:
         _pin(self.trial_sha256)
         if self.stage not in ("answer", "plan", "verify", "repair", "retrieve"):
             raise ValueError("unsupported stage")
-        _int(self.input_tokens, 1, 1_048_576)
-        _int(self.output_tokens, 1, 8192)
+        _int(self.input_ceiling, 1, 1_048_576)
+        _int(self.output_ceiling, 1, 8192)
+        _int(self.actual_input_tokens, 0, 1_048_576)
+        _int(self.actual_output_tokens, 0, 8192)
         _int(self.elapsed_ms, 1, 86_400_000)
         _int(self.queue_ms, 0, 86_400_000)
         _int(self.observed_at, 0, (1 << 53)-1)
         if type(self.success) is not bool:
             raise ValueError("explicit outcome required")
+        if self.success and (self.actual_input_tokens != self.input_ceiling
+                             or self.actual_output_tokens != self.output_ceiling):
+            raise ValueError("successful calibration must exercise the full requested shape")
 
 
 @dataclass(frozen=True, slots=True)
@@ -203,7 +210,7 @@ def propose(stages: tuple[Stage, ...], observations, *,
     held = {}
     costs = {}
     for s in ordered:
-        same = [o for o in usable if (o.stage, o.input_tokens, o.output_tokens) ==
+        same = [o for o in usable if (o.stage, o.input_ceiling, o.output_ceiling) ==
                 (s.kind, s.input_ceiling, s.output_ceiling)]
         if s.input_ceiling+s.output_ceiling > limits.context_tokens:
             costs[s.stage_id] = "context"
@@ -217,7 +224,8 @@ def propose(stages: tuple[Stage, ...], observations, *,
             estimate = (worst*(10000+limits.calibration_margin_bp)+9999)//10000
             costs[s.stage_id] = Reservation(s, estimate,
                 tuple(sorted(_hash([o.trial_sha256, o.scope_sha256, o.stage,
-                                    o.input_tokens, o.output_tokens, o.elapsed_ms,
+                                    o.input_ceiling, o.output_ceiling,
+                                    o.actual_input_tokens, o.actual_output_tokens, o.elapsed_ms,
                                     o.queue_ms, o.observed_at, o.success]) for o in same)))
 
     budget = limits.available_ms*(10000-limits.reserve_bp)//10000
