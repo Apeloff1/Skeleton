@@ -193,3 +193,100 @@ def test_decoder_streams_are_the_actual_verified_descriptors(tmp_path, monkeypat
             replacement.replace(object_path)
             assert streams[0].read() == payload
     assert all(stream.closed for stream in verified)
+
+
+def test_read_only_store_does_not_create_missing_layout(tmp_path):
+    from skeleton.ai.model_runtime.weight_shard_store import WeightShardStoreError
+    missing = tmp_path / "missing"
+    with pytest.raises(WeightShardStoreError, match="directory unavailable"):
+        WeightShardStore(missing, read_only=True)
+    assert not missing.exists()
+    missing.mkdir()
+    with pytest.raises(WeightShardStoreError, match="directory unavailable"):
+        WeightShardStore(missing, read_only=True)
+    assert list(missing.iterdir()) == []
+
+
+def test_read_only_store_refuses_staging_before_materializing_any_data(tmp_path):
+    from skeleton.ai.model_runtime.weight_shard_store import WeightShardStoreError
+    key, root = _stage(tmp_path)
+    store = WeightShardStore(root, read_only=True)
+    plan = store.load_plan(key)
+    checksum = sha256(b"real offline weights").hexdigest()
+    model = ModelIdentity("offline-test", "revision-1", "tiny", checksum, checksum, checksum)
+    original = sorted(str(path.relative_to(root)) for path in root.rglob("*"))
+    with pytest.raises(WeightShardStoreError, match="read-only"):
+        store.stage_plan(model, plan, {0: tmp_path / "weights.bin"})
+    assert sorted(str(path.relative_to(root)) for path in root.rglob("*")) == original
+    assert store.verified_paths(key)
+
+
+def test_missing_managed_directory_not_recreated_during_inspection(tmp_path):
+    from skeleton.ai.model_runtime.weight_shard_store import WeightShardStoreError
+    key, root = _stage(tmp_path)
+    store = WeightShardStore(root, read_only=True)
+    directory = root / "objects"
+    directory.rename(root / "removed-objects")
+    with pytest.raises(WeightShardStoreError, match="directory unavailable"):
+        store.verified_paths(key)
+    assert not directory.exists()
+
+
+def test_same_content_directory_substitution_rejected(tmp_path):
+    import shutil
+    from skeleton.ai.model_runtime.weight_shard_store import WeightShardStoreError
+    key, root = _stage(tmp_path)
+    store = WeightShardStore(root, read_only=True)
+    directory = root / "manifests"
+    previous = root / "previous-manifests"
+    directory.rename(previous)
+    shutil.copytree(previous, directory)
+    with pytest.raises(WeightShardStoreError, match="directory identity changed"):
+        store.load_plan(key)
+
+
+def test_symlinked_weight_bucket_cannot_be_used_as_canonical_source(tmp_path):
+    from skeleton.ai.model_runtime.weight_shard_store import WeightShardStoreError
+    key, root = _stage(tmp_path)
+    bucket = next((root / "objects").iterdir())
+    elsewhere = tmp_path / "outside-bucket"
+    bucket.rename(elsewhere)
+    try:
+        bucket.symlink_to(elsewhere, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlink creation unavailable")
+    store = WeightShardStore(root, read_only=True)
+    with pytest.raises(WeightShardStoreError, match="real non-reparse"):
+        store.verified_paths(key)
+    with pytest.raises(OfflineInventoryError, match="verification failed"):
+        inventory_offline_weights(root)
+
+
+def test_inventory_refuses_managed_directory_replacement_with_same_names(tmp_path, monkeypatch):
+    import shutil
+    _, root = _stage(tmp_path)
+    original = WeightShardStore.verified_paths
+
+    def replacing(self, key):
+        verified = original(self, key)
+        directory = root / "manifests"
+        backup = root / "displaced"
+        directory.rename(backup)
+        shutil.copytree(backup, directory)
+        return verified
+
+    monkeypatch.setattr(WeightShardStore, "verified_paths", replacing)
+    with pytest.raises(OfflineInventoryError, match="verification failed"):
+        inventory_offline_weights(root)
+
+
+def test_manifest_boolean_schema_version_is_not_integer_schema(tmp_path):
+    from skeleton.ai.model_runtime.flgb_model_runtime import canonical_bytes
+    from skeleton.ai.model_runtime.weight_shard_store import WeightShardStoreError
+    key, root = _stage(tmp_path)
+    manifest = root / "manifests" / (key + ".json")
+    record = json.loads(manifest.read_bytes())
+    record["schema_version"] = True
+    manifest.write_bytes(canonical_bytes(record))
+    with pytest.raises(WeightShardStoreError, match="invalid weight manifest shard declaration"):
+        WeightShardStore(root, read_only=True).load_plan(key)
