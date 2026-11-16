@@ -53,6 +53,10 @@ class OfflineAIError(ValueError):
     """The offline application cannot safely execute the requested action."""
 
 
+class OfflineContextBudgetError(OfflineAIError):
+    """The valid request cannot fit the admitted context window."""
+
+
 def load_native_checkpoint(source: str | Path) -> NativeRuntimeLocalModel:
     """Load exactly one native checkpoint, without fetching or training weights."""
     loaded = load_local_model_artifact(source)
@@ -245,31 +249,106 @@ class OfflineAISession:
             or not 1 <= max_output_tokens <= output_limit
         ):
             raise OfflineAIError("output-token budget exceeds the loaded model limit")
-        # Native has exact token counts; GGUF uses conservative UTF-8 bytes
-        # and delegates final token/context validation to llama.cpp.
         available = context_limit - max_output_tokens
+        if runtime is not None:
+            tokenizer = runtime.tokenizer
+            available = min(available, tokenizer.limits.max_tokens,
+                            runtime.limits.max_total_tokens-max_output_tokens)
         if available < 1:
-            raise OfflineAIError("checkpoint has insufficient context for this output budget")
-        history = self.history
-        while True:
-            request = LocalInferenceRequest(
-                prompt=prompt.strip(),
-                instructions=self.instructions,
-                history=history,
-                max_output_tokens=max_output_tokens,
+            raise OfflineContextBudgetError("checkpoint has insufficient context for this output budget")
+
+        def request_for(history):
+            return LocalInferenceRequest(
+                prompt=prompt.strip(), instructions=self.instructions,
+                history=history, max_output_tokens=max_output_tokens,
             )
-            observed = (
-                len(runtime.tokenizer.encode_ids(request.rendered_input))
-                if runtime is not None
-                else len(request.rendered_input.encode("utf-8")) + 16
-            )
-            if observed <= available:
-                return request, history
+
+        def cannot_fit(history):
             if not history:
-                raise OfflineAIError("message exceeds the selected model context; shorten it or reduce the output budget")
+                raise OfflineContextBudgetError("message exceeds the selected model context; shorten it or reduce the output budget")
             if require_full_history:
-                raise OfflineAIError("full conversation exceeds model context; reduce output tokens, shorten the message or explicitly allow older-turn trimming")
+                raise OfflineContextBudgetError("full conversation exceeds model context; reduce output tokens, shorten the message or explicitly allow older-turn trimming")
+
+        history = self.history
+        if runtime is None:
+            # For the conservative GGUF byte estimate, each history row adds
+            # exactly its rendered UTF-8 bytes plus one newline. Compute the
+            # longest suffix in one pass, not repeated full prompt encoding.
+            base = request_for(())
+            used = len(base.rendered_input.encode("utf-8")) + 16
+            if used > available:
+                cannot_fit(())
+            cursor = len(history)
+            while cursor:
+                left = max(0, cursor-2)
+                cost = sum(len((role + ": " + content + "\n").encode("utf-8"))
+                           for role, content in history[left:cursor])
+                if used + cost > available:
+                    break
+                used += cost
+                cursor = left
+            if cursor and require_full_history:
+                cannot_fit(history)
+            # An odd-length imported ephemeral history historically trims
+            # from its front in pairs; preserve that grouping when needed.
+            if len(history) % 2 and cursor % 2:
+                cursor += 1
+            selected = history[cursor:]
+            result = request_for(selected)
+            if len(result.rendered_input.encode("utf-8")) + 16 > available:
+                raise OfflineContextBudgetError("message exceeds the selected model context; shorten it or reduce the output budget")
+            return result, selected
+
+        from skeleton.ai.model_runtime.tokenization import TokenizerContractError
+        while True:
+            request = request_for(history)
+            rendered = request.rendered_input
+            if len(rendered) <= tokenizer.limits.max_chars:
+                try:
+                    observed = len(tokenizer.encode_ids(rendered))
+                except TokenizerContractError as exc:
+                    # Only the tokenizer's known numeric capacity rejection
+                    # can be repaired by trimming. Identity/encoding failures
+                    # must still be propagated, never disguised as pressure.
+                    if str(exc) != "token budget exceeded":
+                        raise
+                    observed = available + 1
+                if observed <= available:
+                    return request, history
+            cannot_fit(history)
             history = history[2:]
+
+    def prepare_grounded_evidence(self, prompt: str, request_digest: str,
+                                  hits: list[dict[str, Any]], max_output_tokens: int,
+                                  *, require_full_history: bool = False) -> dict[str, Any]:
+        """Fit exact source excerpts using the actual conversation admission.
+
+        Preserve every chosen source and its exact offsets. Try a finite
+        ordered ladder, favoring retained history then excerpt size.
+        Never silently substitute unrestricted search, shrink the requested
+        output budget, remove a source, or change the durable question.
+        """
+        from skeleton.app.offline_grounding import prepare_evidence
+        if type(require_full_history) is not bool:
+            raise OfflineAIError("full-history policy must be a boolean")
+        best = None
+        for width in (220, 160, 120, 80, 48):
+            manifest = prepare_evidence(prompt, request_digest, hits,
+                    self.model_digest, self.tokenizer_digest, excerpt_chars=width)
+            try:
+                _, retained = self._request(
+                    prompt.strip() + "\n\n" + manifest["context"], max_output_tokens,
+                    require_full_history=require_full_history,
+                )
+            except OfflineContextBudgetError:
+                continue
+            if len(retained) == len(self.history):
+                return manifest
+            if best is None or len(retained) > best[0]:
+                best = (len(retained), manifest)
+        if best is not None:
+            return best[1]
+        raise OfflineContextBudgetError("verified local sources cannot fit the selected context and output budget; shorten the question or reduce output tokens")
 
     def preview_context(self, prompt: str, max_output_tokens: int, *,
                         grounding_context: str | None = None) -> dict[str, Any]:
@@ -285,7 +364,7 @@ class OfflineAISession:
                     or not grounding_context.strip()
                     or len(grounding_context.encode("utf-8")) > 4_096):
                 raise OfflineAIError("invalid bounded source context")
-            rendered_prompt = prompt.strip() + "\\n\\n" + grounding_context
+            rendered_prompt = prompt.strip() + "\n\n" + grounding_context
         else:
             rendered_prompt = prompt
         request, retained = self._request(rendered_prompt, max_output_tokens)
@@ -1249,7 +1328,7 @@ class OfflineAIWindow:
                     session.resume(sid)
                     digest = _digest_request(prompt, GenerationConfig(max_new_tokens=budget))
                     if grounded:
-                        from skeleton.app.offline_grounding import grounded_request_digest, prepare_evidence
+                        from skeleton.app.offline_grounding import grounded_request_digest
                         digest = grounded_request_digest(digest)
                     replay = session.store.replay(sid, rid, digest)
                     if replay is not None:
@@ -1262,8 +1341,7 @@ class OfflineAIWindow:
                         hits = library.search(prompt, limit=2, diversify=True)
                         if not hits:
                             raise OfflineAIError("No local references match this question.")
-                        evidence = prepare_evidence(prompt, digest, hits, session.model_digest,
-                                                    session.tokenizer_digest)
+                        evidence = session.prepare_grounded_evidence(prompt, digest, hits, budget)
                 elif grounded:
                     raise OfflineAIError("Grounding requires a durable local conversation.")
 
