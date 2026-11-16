@@ -258,3 +258,30 @@ class NavigationFederation:
                 raise
         return {"removed_witnesses":len(rows),"more_possible":len(rows)==limit,
                 "network_authorized":False}
+
+
+async def application_call(application,scope,operation,**kwargs):
+    """Use the existing corpus owner-shard selector and bounded thread gate."""
+    from core.dragon_corpus_runtime import _bounded, _path
+    from core.dragon_crawler import CrawlerError, _plain, _utc, _now
+    from core.dragon_game_corpus import CatalogueHeld
+    import sqlite3
+    if operation not in {"publish","search","revoke","purge"}:
+        raise ValueError("navigation federation operation")
+    if operation=="publish":
+        session_id=kwargs["session_id"]
+        row=await application._owned(scope,session_id)
+        application._source_use(row)
+        if row["status"] not in {"completed","budget_exhausted"}:
+            raise CrawlerError("crawler_navigation_held","Complete or exhaust the crawl before retaining locator metadata.",409)
+        snapshot=_plain(application._custody_snapshot(row))
+        if (kwargs.pop("expected_snapshot_digest")!=snapshot["snapshot_digest"]
+                or _utc(row["consent_expires_at"])<=_now()):
+            raise CrawlerError("crawler_navigation_stale","Refresh the current authorized checkpoint.",409)
+        kwargs["snapshot"]=snapshot
+    def work():
+        return getattr(NavigationFederation(_path(scope=scope)),operation)(scope,**kwargs)
+    try:
+        return await _bounded(work)
+    except (OSError,sqlite3.Error,CatalogueHeld,TimeoutError) as exc:
+        raise CrawlerError("crawler_navigation_storage_held","The configured navigation catalogue is unavailable.",503) from exc
