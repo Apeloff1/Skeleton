@@ -280,7 +280,7 @@ class OfflineAISession:
                 cannot_fit(())
             cursor = len(history)
             while cursor:
-                left = max(0, cursor-2)
+                left = cursor-1 if cursor % 2 else max(0, cursor-2)
                 cost = sum(len((role + ": " + content + "\n").encode("utf-8"))
                            for role, content in history[left:cursor])
                 if used + cost > available:
@@ -289,10 +289,6 @@ class OfflineAISession:
                 cursor = left
             if cursor and require_full_history:
                 cannot_fit(history)
-            # An odd-length imported ephemeral history historically trims
-            # from its front in pairs; preserve that grouping when needed.
-            if len(history) % 2 and cursor % 2:
-                cursor += 1
             selected = history[cursor:]
             result = request_for(selected)
             if len(result.rendered_input.encode("utf-8")) + 16 > available:
