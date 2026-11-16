@@ -113,7 +113,8 @@ class OfflineRequestQueue:
         self._consumer = session.claim_consumer()
 
     def _open(self) -> None:
-        require(not self._closed and not self._poisoned, "request queue unavailable")
+        require(not self._closed and not self._poisoned and not self._session.status()["closed"],
+                "request queue unavailable")
 
     def submit(self, request: BatchRequest, *, timeout_ms: int) -> None:
         require(isinstance(request, BatchRequest), "canonical batch request required")
@@ -267,6 +268,10 @@ class OfflineRequestQueue:
                     self._retire(key, completed=True)
                     retired.append({"request_id": key, "terminal": "completed"})
         with self._lock:
+            if self._session.status()["closed"]:
+                self._closed = True
+                for row in self._requests.values():
+                    row.cancel.set()
             retired.extend(self._sweep(time.monotonic_ns()))
             advanced = {item["request_id"] for item in progressed if item["processed_tokens"]}
             for key, row in self._requests.items():
