@@ -185,7 +185,7 @@ class HardwareSample:
         integer(self.started_ns, 0, 2**63-1, "sample start")
         integer(self.finished_ns, self.started_ns, 2**63-1, "sample finish")
         require(self.origin in ("local_probe", "fixture"), "invalid sample origin")
-        require(self.scoped_pressure in (None, "normal", "elevated", "critical"),
+        require(self.scoped_pressure in (None, "normal", "recovering", "elevated", "critical"),
                 "invalid scoped serving pressure")
         require((self.scoped_pressure is None) == (self.scoped_observation_digest is None),
                 "incomplete scoped serving observation")
