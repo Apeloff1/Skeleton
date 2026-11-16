@@ -110,14 +110,16 @@ class NavigationFederation:
         rights = digest(_text(rights_reference,256))
         now = int(time.time()) if now is None else now
         checkpoint = _hash(snapshot["snapshot_digest"])
-        if digest({k:v for k,v in snapshot.items() if k != "snapshot_digest"}) != checkpoint:
+        from skeleton.ai.webcrawler.operations import _digest as checkpoint_digest
+        if checkpoint_digest({k:v for k,v in snapshot.items() if k != "snapshot_digest"}) != checkpoint:
             raise ValueError("navigation checkpoint integrity")
         binding = snapshot["binding"]
         if (binding["scope"] != scope or binding["consent"]["expires_at"] <= now
                 or binding["consent"]["source_rights_acknowledged"] is not True
                 or snapshot["state"] not in {"completed","budget_exhausted"}):
             raise ValueError("terminal current owner checkpoint required")
-        ledger = snapshot["discovery_backlog"]
+        from skeleton.ai.webcrawler.operations import CrawlRun
+        ledger = CrawlRun.from_snapshot(snapshot).snapshot()["discovery_backlog"]
         rows, omitted = [], 0
         for observed in ledger["records"].values():
             try:
