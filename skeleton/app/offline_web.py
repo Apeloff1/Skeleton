@@ -57,6 +57,12 @@ HTML = r"""<!doctype html>
           <button id="memory-list" class="small" disabled>Load saved notes</button>
           <button id="memory-more" class="small" disabled>More</button></div>
         <p id="memory-status" class="hint" aria-live="polite">Not loaded.</p>
+        <details>
+          <summary>Local response-quality feedback</summary>
+          <button id="quality-summary" type="button" class="small" disabled>Read recent feedback summary</button>
+          <pre id="quality-summary-text" aria-live="polite">No summary loaded.</pre>
+          <p class="hint">Explicit user ratings only; not a leaderboard, model training run or proof of correctness.</p>
+        </details>
         <details id="memory-vector-panel">
           <summary>Optional learned-vector recall</summary>
           <p class="hint">An owner-installed local word-vector asset is optional. Refresh derives note vectors; no remote queries, automatic installation, or language-model training.</p>
@@ -347,6 +353,46 @@ HTML = r"""<!doctype html>
           <button id="session-title-save" type="submit" class="primary">Save title</button></div>
       </form>
     </dialog>
+    <dialog id="quality-dialog" aria-labelledby="quality-title">
+      <h2 id="quality-title">Review this answer</h2>
+      <p id="quality-identity" class="hint"></p>
+      <pre id="quality-diagnostics" aria-live="polite"></pre>
+      <label for="quality-rating">Your rating</label>
+      <select id="quality-rating">
+        <option value="mixed">Mixed</option><option value="helpful">Helpful</option>
+        <option value="needs_improvement">Needs improvement</option>
+      </select>
+      <fieldset id="quality-flags">
+        <legend>Review priorities (optional; up to eight)</legend>
+        <label><input type="checkbox" value="incorrect"> Factual concerns</label>
+        <label><input type="checkbox" value="missed_instruction"> Missed instruction</label>
+        <label><input type="checkbox" value="incomplete"> Incomplete</label>
+        <label><input type="checkbox" value="irrelevant"> Irrelevant</label>
+        <label><input type="checkbox" value="too_verbose"> Too verbose</label>
+        <label><input type="checkbox" value="too_brief"> Too brief</label>
+        <label><input type="checkbox" value="poor_reasoning"> Reasoning issue</label>
+        <label><input type="checkbox" value="format"> Format</label>
+        <label><input type="checkbox" value="tone"> Tone</label>
+        <label><input type="checkbox" value="grounding"> Grounding</label>
+        <label><input type="checkbox" value="stale_context"> Stale context</label>
+        <label><input type="checkbox" value="unverified_actions"> Unverified actions</label>
+      </fieldset>
+      <label for="quality-note">Your review note (optional)</label>
+      <textarea id="quality-note" maxlength="768" rows="3"></textarea>
+      <label><input id="quality-approve" type="checkbox"> Save this rating locally for this exact answer.</label>
+      <div class="inline">
+        <button id="quality-save" type="button" class="primary">Save rating</button>
+        <button id="quality-delete" type="button" class="danger">Remove saved rating</button>
+      </div>
+      <p class="hint">For the latest saved turn only, prepare a visible follow-up using these review priorities. No new generation runs until you explicitly send it.</p>
+      <div class="inline">
+        <button id="quality-critique" type="button" class="small">Prepare critique</button>
+        <button id="quality-refine" type="button" class="small">Prepare refinement</button>
+        <button id="quality-verify" type="button" class="small">Prepare verification</button>
+      </div>
+      <p id="quality-result" aria-live="polite" class="hint"></p>
+      <div class="dialog-actions"><button id="quality-close" type="button">Close</button></div>
+    </dialog>
     <dialog id="reference-dialog" aria-labelledby="reference-title">
       <h2 id="reference-title">Local reference</h2><p id="reference-digest" class="hint"></p>
       <pre id="reference-text"></pre><div class="inline">
@@ -389,6 +435,7 @@ html,body{background:var(--canvas);color:var(--text)}button{font-size:12px;min-h
 #memory-panel input:not([type=checkbox]),#memory-panel select,#memory-panel textarea{width:100%;box-sizing:border-box;color:#edf0f8;background:#111925;border:1px solid #465575;border-radius:7px;padding:7px;font:inherit}#memory-panel label{display:block;margin:7px 0}#memory-panel label input[type=checkbox]{width:auto}#memory-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:165px;overflow:auto;font-size:11px}#memory-panel .memory-card{border:1px solid #34445e;border-radius:8px;padding:9px;margin:9px 0}#memory-panel .memory-card strong{overflow-wrap:anywhere}#memory-panel .memory-card .inline{margin-top:6px}
 .chat-richtext{white-space:normal;overflow-wrap:anywhere}.chat-richtext p,.chat-richtext blockquote{white-space:pre-wrap;line-height:1.58;margin:7px 0}.chat-richtext h3,.chat-richtext h4,.chat-richtext h5{font-weight:700;margin:16px 0 7px;font-size:inherit}.chat-richtext h3{font-size:1.24em}.chat-richtext h4{font-size:1.12em}.chat-richtext ul,.chat-richtext ol{white-space:normal;padding-left:24px;margin:9px 0}.chat-richtext li{margin:4px 0;white-space:pre-wrap}.chat-richtext blockquote{border-left:3px solid #50668b;padding-left:12px;color:#bdcbe0}.chat-richtext code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:#101723;border-radius:4px;padding:1px 4px;font-size:.91em}.chat-richtext .chat-code{background:#101723;border:1px solid #35435a;border-radius:8px;margin:10px 0;overflow:hidden}.chat-code-header{display:flex;align-items:center;justify-content:space-between;padding:5px 10px;background:#1e293b;color:#aebeda;font-size:11px}.chat-richtext pre{overflow:auto;white-space:pre;max-height:420px;margin:0;padding:12px;line-height:1.5}.chat-richtext pre code{padding:0;white-space:pre;background:transparent}.chat-table-scroll{overflow-x:auto;margin:9px 0}.chat-richtext table{border-collapse:collapse;min-width:220px;text-align:left;font-size:.92em}.chat-richtext th,.chat-richtext td{border:1px solid #3b4b65;padding:7px;vertical-align:top}.chat-richtext th{background:#263449}.chat-richtext hr{border:0;border-top:1px solid #42516b}
 #adaptive-context-panel{max-height:43vh;overflow:auto;overscroll-behavior:contain}#adaptive-context-panel select,#adaptive-context-panel input[type=number]{background:#101723;color:#edf0f8;border:1px solid #465575;border-radius:7px;padding:6px;font:inherit}#adaptive-context-panel select{display:block;width:100%;margin:5px 0}#adaptive-context-panel input[type=checkbox]{width:auto}#adaptive-context-panel label{display:block;margin:5px 0}#adaptive-context-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto;font-size:11px}#adaptive-context-panel button{margin-top:4px}
+#quality-dialog{max-width:650px}#quality-dialog label{display:block;margin:7px 0;font-size:12px}#quality-dialog select,#quality-dialog textarea{background:#101723;color:#e8efff;border:1px solid #425779;border-radius:7px;padding:7px;width:100%;font:inherit}#quality-dialog fieldset{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 12px;border:1px solid #425779;border-radius:8px;margin:10px 0;padding:10px}#quality-dialog fieldset legend{font-size:12px}#quality-dialog fieldset label{margin:3px 0}#quality-dialog pre{max-height:145px;overflow:auto}#quality-dialog .inline{flex-wrap:wrap}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 
 """
@@ -611,6 +658,15 @@ JAVASCRIPT = r"""'use strict';
       'adaptive-anchors','adaptive-dense','adaptive-plan']) get(id).disabled=adaptiveBlocked;
     get('adaptive-apply').disabled=adaptiveBlocked||!state.adaptivePlan;
     get('adaptive-send').disabled=adaptiveBlocked||!state.adaptivePlan||foreignLease||state.health?.ready!==true;
+    get('quality-summary').disabled=locked||working;
+    document.querySelectorAll('[data-quality-review]').forEach(el=>{el.disabled=locked||working;});
+    const reviewBlocked=locked||working||!state.qualityReview;
+    for(const id of ['quality-rating','quality-note','quality-approve','quality-save'])
+      get(id).disabled=reviewBlocked;
+    get('quality-delete').disabled=reviewBlocked||!state.qualityReview?.report.feedback;
+    get('quality-flags').disabled=reviewBlocked;
+    for(const id of ['quality-critique','quality-refine','quality-verify'])
+      get(id).disabled=reviewBlocked||!state.qualityReview?.report.can_prepare_followup;
     document.querySelectorAll('[data-rewrite]').forEach(el => {el.disabled=locked||working;});
     document.querySelectorAll('[data-memory-control]').forEach(el => {
       el.disabled = locked || working || (el.dataset.memoryControl === 'select' && el.dataset.expired === 'true');
@@ -674,6 +730,7 @@ JAVASCRIPT = r"""'use strict';
     clearCognition(true);
     resetMemoryWorkspace();
     resetAdaptiveWorkspace();
+    closeQualityReview();get('quality-summary-text').textContent='No summary loaded.';
     if (state.resourceTimer !== null) clearInterval(state.resourceTimer);
     state.resourceTimer = null;
     get('resource-monitor').textContent = 'Connect to inspect your device.';
@@ -994,6 +1051,14 @@ JAVASCRIPT = r"""'use strict';
       }
       if (message.role === 'assistant') {
         const index = completed++;
+        const review=document.createElement('button');review.type='button';review.className='small';
+        review.dataset.qualityReview='true';review.textContent='Review answer';
+        const reviewedSession=state.session,reviewedRevision=state.revision;
+        const question=state.messages[messageIndex-1]?.content;
+        review.addEventListener('click',()=>run(()=>openQualityReview({
+          sid:reviewedSession,revision:reviewedRevision,turn:index+1,question,raw:message.content,visible,
+        })));
+        actions.append(review);
         const fork = document.createElement('button'); fork.className = 'small';
         fork.textContent = 'Branch from here'; fork.dataset.fork = String(completed);
         const afterTurn = completed;
@@ -1098,6 +1163,7 @@ JAVASCRIPT = r"""'use strict';
     clearCognition(true);
     clearMemoryPreview();
     clearAdaptivePlan();
+    closeQualityReview();
     const current = state.session;
     if (current) state.drafts.set(current, get('prompt').value);
     const result = await api('GET', '/v1/sessions/' + id);
@@ -1624,6 +1690,145 @@ JAVASCRIPT = r"""'use strict';
     invalidateContextPreview(); sidebar(false); get('prompt').focus();
     status('Reviewed context added to visible draft. Send explicitly when ready.');
   }));
+  function qualityFlags() {
+    return Array.from(get('quality-flags').querySelectorAll('input:checked'),node=>node.value).sort();
+  }
+  function closeQualityReview() {
+    state.qualityReview=null;
+    get('quality-identity').textContent='';get('quality-diagnostics').textContent='';
+    get('quality-result').textContent='';get('quality-note').value='';
+    get('quality-approve').checked=false;get('quality-rating').value='mixed';
+    get('quality-flags').querySelectorAll('input').forEach(node=>{node.checked=false;});
+    if(get('quality-dialog').open)get('quality-dialog').close();
+  }
+  get('quality-close').addEventListener('click',closeQualityReview);
+  get('quality-dialog').addEventListener('close',()=>{
+    // A delayed close event from an older dialog may arrive after reopen.
+    if(!get('quality-dialog').open)state.qualityReview=null;
+    updateControls();
+  });
+  function exactReviewPin(a,b) {
+    return a&&b&&a.turn_revision===b.turn_revision&&a.question_sha256===b.question_sha256
+      &&a.raw_answer_sha256===b.raw_answer_sha256&&a.visible_answer_sha256===b.visible_answer_sha256;
+  }
+  function assertQualityFeedback(row,pin,sid) {
+    if(!row||row.schema!=='skeleton.jeeves.turn-feedback.v1'||row.session_id!==sid
+      ||row.model_digest!==state.health?.model_digest||row.tokenizer_digest!==state.health?.tokenizer_digest
+      ||!exactReviewPin(row.target,pin)||!['mixed','helpful','needs_improvement'].includes(row.rating)
+      ||!Number.isSafeInteger(row.version)||row.version<1||!/^[a-f0-9]{64}$/.test(row.sha256)
+      ||!Array.isArray(row.flags)||row.flags.length>8
+      ||typeof row.note!=='string'||bytes(row.note)>768)
+      throw new Error('Invalid exact-answer feedback receipt.');
+  }
+  async function openQualityReview(source) {
+    if(!state.connected||unresolved()||source.sid!==state.session||source.revision!==state.revision
+      ||typeof source.question!=='string'||typeof source.raw!=='string'||typeof source.visible!=='string')
+      throw new Error('Refresh the saved conversation before reviewing.');
+    closeQualityReview();
+    const epoch=state.epoch;
+    const pin={turn_revision:source.turn,question_sha256:await exactLocalSha256(source.question),
+      raw_answer_sha256:await exactLocalSha256(source.raw),visible_answer_sha256:await exactLocalSha256(source.visible)};
+    const report=await api('POST','/v1/sessions/'+source.sid+'/feedback-inspect',{pin});
+    if(epoch!==state.epoch||source.sid!==state.session||source.revision!==state.revision
+      ||report.schema!=='skeleton.jeeves.turn-review.v1'||report.session_id!==source.sid
+      ||report.session_revision!==source.revision||!exactReviewPin(report.target,pin)
+      ||report.model_digest!==state.health?.model_digest||report.tokenizer_digest!==state.health?.tokenizer_digest
+      ||report.read_only!==true||report.generation_performed!==false||report.semantic_quality_certified!==false
+      ||report.can_prepare_followup!==(source.turn===source.revision)
+      ||!report.shape_diagnostics||!Array.isArray(report.shape_diagnostics.findings)
+      ||report.shape_diagnostics.findings.length>8)
+      throw new Error('Saved review target or model changed.');
+    if(report.feedback!==null)assertQualityFeedback(report.feedback,pin,source.sid);
+    state.qualityReview={sid:source.sid,revision:source.revision,epoch,pin,report};
+    get('quality-identity').textContent='Turn '+source.turn+' · visible answer '+pin.visible_answer_sha256
+      +'\n'+(report.local_execution_receipt_digest?'Local runtime receipt retained.':'Historical/imported turn; no local execution receipt.');
+    const findings=report.shape_diagnostics.findings.map(row=>
+      String(row.id)+' · '+String(row.method)+(Number.isSafeInteger(row.observed)?' · observed '+row.observed:''));
+    get('quality-diagnostics').textContent=(findings.length?findings.join('\n'):'No bounded format cues detected.')
+      +'\nDeterministic hints only; factual accuracy and quality require human review.';
+    if(report.feedback){
+      get('quality-rating').value=report.feedback.rating;get('quality-note').value=report.feedback.note;
+      get('quality-flags').querySelectorAll('input').forEach(node=>{node.checked=report.feedback.flags.includes(node.value);});
+    }
+    get('quality-result').textContent=report.feedback?'Saved rating version '+report.feedback.version+'.':'No saved rating.';
+    get('quality-dialog').showModal();updateControls();
+  }
+  function reviewCurrent() {
+    const current=state.qualityReview;
+    if(!current||state.epoch!==current.epoch||state.session!==current.sid||state.revision!==current.revision)
+      throw new Error('Reviewed answer changed.');
+    return current;
+  }
+  function reviewFields() {
+    const flags=qualityFlags(),note=get('quality-note').value;
+    if(flags.length>8||bytes(note)>768)throw new Error('Select at most eight flags and a bounded review note.');
+    return {flags,note};
+  }
+  for(const id of ['quality-rating','quality-note','quality-flags'])
+    get(id).addEventListener('input',()=>{get('quality-approve').checked=false;});
+  get('quality-save').addEventListener('click',()=>run(async()=>{
+    const current=reviewCurrent(),fields=reviewFields();
+    if(!get('quality-approve').checked)throw new Error('Approve storing your exact rating first.');
+    const result=await api('POST','/v1/sessions/'+current.sid+'/feedback-save',{
+      pin:current.pin,rating:get('quality-rating').value,...fields,approved:true,
+      expected_feedback_sha256:current.report.feedback?.sha256||null,
+    });
+    if(reviewCurrent()!==current)return;
+    assertQualityFeedback(result,current.pin,current.sid);
+    current.report.feedback=result;get('quality-approve').checked=false;
+    get('quality-result').textContent='Saved rating version '+result.version+'. No training performed.';
+    status('Local feedback saved.');
+  }));
+  get('quality-delete').addEventListener('click',()=>run(async()=>{
+    const current=reviewCurrent();
+    if(!current.report.feedback||!window.confirm('Remove this local rating? The original answer will remain.'))return;
+    const result=await api('POST','/v1/sessions/'+current.sid+'/feedback-delete',{
+      pin:current.pin,expected_feedback_sha256:current.report.feedback.sha256,approved:true,
+    });
+    if(reviewCurrent()!==current)return;
+    if(result.deleted!==true||!exactReviewPin(result.target,current.pin))throw new Error('Invalid feedback deletion receipt.');
+    current.report.feedback=null;get('quality-approve').checked=false;
+    get('quality-result').textContent='Rating removed; answer unchanged.';
+  }));
+  async function prepareQualityFollowup(mode) {
+    const current=reviewCurrent();
+    if(!current.report.can_prepare_followup||current.pin.turn_revision!==state.revision)
+      throw new Error('Branch from this answer first if you want to refine an older turn.');
+    const fields=reviewFields();
+    if(get('prompt').value.trim()&&!window.confirm('Replace your current unsent draft with the review follow-up?'))return;
+    const result=await api('POST','/v1/sessions/'+current.sid+'/feedback-followup',{
+      pin:current.pin,mode,...fields,
+    });
+    if(reviewCurrent()!==current||result.schema!=='skeleton.jeeves.review-followup.v1'
+      ||result.session_id!==current.sid||result.session_revision!==current.revision
+      ||!exactReviewPin(result.target,current.pin)||result.mode!==mode
+      ||result.requires_full_history!==true||result.automatic_send!==false||result.generation_performed!==false
+      ||result.read_only!==true||typeof result.draft!=='string'||bytes(result.draft)>4096
+      ||await exactLocalSha256(result.draft)!==result.draft_sha256)
+      throw new Error('Invalid or stale review follow-up.');
+    if(epochChanged(current)||reviewCurrent()!==current)throw new Error('Review changed.');
+    get('prompt').value=result.draft;get('context-preserve').checked=true;
+    closeQualityReview();invalidateContextPreview();
+    get('prompt').focus();status('Review follow-up prepared. Full-history preflight is required; inspect grounding settings and send explicitly.');
+  }
+  function epochChanged(review){return state.epoch!==review.epoch||state.session!==review.sid||state.revision!==review.revision;}
+  for(const mode of ['critique','refine','verify'])
+    get('quality-'+mode).addEventListener('click',()=>run(()=>prepareQualityFollowup(mode)));
+  get('quality-summary').addEventListener('click',()=>run(async()=>{
+    const epoch=state.epoch;
+    const result=await api('POST','/v1/feedback/summary',{limit:40});
+    if(epoch!==state.epoch||result.model_digest!==state.health?.model_digest
+      ||result.tokenizer_digest!==state.health?.tokenizer_digest||result.human_feedback_only!==true
+      ||result.model_training_performed!==false||result.semantic_quality_certified!==false
+      ||!Number.isSafeInteger(result.reviewed_records)||result.reviewed_records<0||result.reviewed_records>40)
+      throw new Error('Invalid feedback summary.');
+    const lines=['Reviewed records '+result.reviewed_records+(result.truncated?' · bounded recent sample':''),
+      'Historical without runtime receipt '+result.without_execution_receipt,
+      'Unavailable '+result.unavailable_records];
+    for(const [name,count] of Object.entries(result.ratings||{}))lines.push(name+': '+count);
+    for(const [name,count] of Object.entries(result.flag_counts||{}))lines.push(name+': '+count);
+    get('quality-summary-text').textContent=lines.join('\n');
+  }));
   function clearAdaptivePlan() {
     state.adaptivePlan=null;
     get('adaptive-report').textContent='No adaptive plan.';
@@ -2104,7 +2309,7 @@ JAVASCRIPT = r"""'use strict';
       if (first && event.shiftKey && document.activeElement === first) {event.preventDefault(); last.focus();}
       else if (last && !event.shiftKey && document.activeElement === last) {event.preventDefault(); first.focus();}
     }
-    if (event.key === 'Escape' && !get('reference-dialog').open && !get('session-title-dialog').open) sidebar(false, true);
+    if (event.key === 'Escape' && !get('reference-dialog').open && !get('session-title-dialog').open && !get('quality-dialog').open) sidebar(false, true);
   });
   window.matchMedia('(max-width:720px)').addEventListener('change', () => {
     sidebar(get('shell').classList.contains('library-open'));
