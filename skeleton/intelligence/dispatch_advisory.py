@@ -340,3 +340,63 @@ def choose_shadow(tasks: Sequence[ShadowTask], *, slots: int) -> tuple[ShadowRec
                 ("fifo", "priority", "shortest", "fair_aging", "deadline")]
     return tuple(sorted(receipts, key=lambda r: (r.deadline_misses, r.max_wait_ms, r.p95_wait_ms,
                                                  r.total_wait_ms, r.policy)))
+
+
+@dataclass(frozen=True, slots=True)
+class MeasuredShadow:
+    policy: str
+    workload_sha256: str
+    timeline_sha256: str
+    samples_ns: tuple[int, ...]
+    median_ns: int
+    p95_ns: int
+    deadline_misses: int
+    p95_wait_ms: int
+    max_wait_ms: int
+
+
+def measure_shadow_policies(tasks: Sequence[ShadowTask], *, slots: int,
+                            repetitions: int = 5) -> tuple[MeasuredShadow, ...]:
+    """Measure local scheduler computation against the same immutable trace.
+
+    Report monotonic elapsed nanoseconds, not simulated task duration as
+    observed throughput. Rotate policy order between rounds and retain all
+    raw samples. Timeline consistency is checked across every repetition.
+    This is an internal same-process microbenchmark, not an external
+    competitor benchmark or a deployed worker throughput claim.
+    """
+    from time import perf_counter_ns
+
+    bounded_int(repetitions, "repetitions", 1, 20)
+    bounded_int(slots, "slots", 1, 256)
+    if not 1 <= len(tasks) <= 2048 or any(not isinstance(t,ShadowTask) for t in tasks):
+        raise DispatchPolicyError("invalid benchmark workload")
+    frozen = tuple(sorted(tasks,key=lambda t:(t.arrival_ms,t.ticket)))
+    if len({t.ticket for t in frozen}) != len(frozen):
+        raise DispatchPolicyError("duplicate benchmark task")
+    common = hashlib.sha256(json.dumps(
+        ["measured-shadow-v1",slots,[[t.ticket,t.tenant,t.arrival_ms,t.duration_ms,
+                                     t.priority,t.deadline_ms] for t in frozen]],
+        separators=(",",":"),ensure_ascii=True).encode()).hexdigest()
+    policies=("fifo","priority","shortest","fair_aging","deadline")
+    expected={p:shadow_schedule(frozen,slots=slots,policy=p) for p in policies}
+    timings={p:[] for p in policies}
+    for index in range(repetitions):
+        offset=index%len(policies)
+        for policy in policies[offset:]+policies[:offset]:
+            start=perf_counter_ns()
+            current=shadow_schedule(frozen,slots=slots,policy=policy)
+            elapsed=perf_counter_ns()-start
+            if elapsed<0 or current!=expected[policy]:
+                raise DispatchPolicyError("benchmark clock or deterministic replay mismatch")
+            timings[policy].append(elapsed)
+    rows=[]
+    for policy in policies:
+        receipt=expected[policy]
+        raw=tuple(timings[policy])
+        ordered=sorted(raw)
+        timeline_sha=hashlib.sha256(json.dumps(receipt.timeline,separators=(",",":")).encode()).hexdigest()
+        rows.append(MeasuredShadow(policy,common,timeline_sha,raw,ordered[(len(raw)-1)//2],
+                                   ordered[(95*len(raw)+99)//100-1],receipt.deadline_misses,
+                                   receipt.p95_wait_ms,receipt.max_wait_ms))
+    return tuple(rows)

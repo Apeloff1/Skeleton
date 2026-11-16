@@ -56,8 +56,8 @@ Further research queue (not yet verified): Restate, Oban, pg-boss, Faktory, Asyn
 | A32 | Compute-transfer overlap planning | StarPU / Legion | P |
 | A33 | Weighted resident shard split | Pekko / Orleans | P |
 | A34 | Bounded membership migration | Pekko | P |
-| A35 | Measured dispatch policy comparison | HPX / Taskflow | Open |
-| A36 | End-to-end mixed-workload qualification | All alternatives | Open |
+| A35 | Measured dispatch policy comparison | HPX / Taskflow | P |
+| A36 | End-to-end mixed-workload qualification | All alternatives | P |
 
 ## Wave A1: overlapping quota ceilings
 
@@ -154,3 +154,22 @@ The copy/compute pipeline proposes separate transfer and execution intervals
 only when a distinct copy engine has been verified; staging remains charged
 through work completion and deadlines/horizon remain enforced. None of these
 proposals moves bytes, activates workers, or claims actual GPU performance.
+
+## Wave A8: measured policy replay and mixed-workload source qualification
+
+The existing shadow scheduler can measure local policy-computation elapsed
+nanoseconds over the same pinned workload and rotate policy order across
+repetitions; raw samples, median, p95, trace identity and replay outcomes
+are retained. Wall-clock computation is distinct from simulated work.
+The integration test exercises real SQLite persistence, shared tenant
+quota, virtual worker partitions, ranked durable leasing, uncertain
+restart custody and atomic continuation publication. The verifier in
+this test is a fixture, not external effect authentication. No external
+competitor measurement, physical native execution, throughput advantage
+or product-wide qualification is claimed.
+
+All 36 alternative targets have a partial source implementation or
+qualification harness. A35/A36 remain measurement and qualification
+work, not completed competitor benchmarks. Original 72-target source
+register remains unchanged. Combined 108/108 partial source coverage;
+independent competitive qualification remains 0/108.

@@ -1533,3 +1533,63 @@ def test_alternative_copy_compute_overlap_respects_staging_and_deadlines():
     assert parallel.intervals[1].transfer_start_us==10
     assert not plan_compute_transfer_overlap(jobs,staging_bytes=0,dedicated_copy_verified=True,horizon_us=1000).intervals
     assert plan_compute_transfer_overlap(jobs,staging_bytes=20,dedicated_copy_verified=True,horizon_us=110).held==("b",)
+
+def test_alternative_measured_policy_comparison_reports_real_compute_samples():
+    from skeleton.intelligence.dispatch_advisory import ShadowTask, measure_shadow_policies
+    from dataclasses import asdict
+    import json
+    rows=tuple(ShadowTask(str(i),str(i%7),i//4,1+i%31,0 if i%13==0 else 50,
+                          i//4+80) for i in range(128))
+    results=measure_shadow_policies(rows,slots=8,repetitions=3)
+    assert len(results)==5 and len({r.workload_sha256 for r in results})==1
+    assert all(len(r.samples_ns)==3 and 0<=r.median_ns<=r.p95_ns for r in results)
+    assert all(len(r.timeline_sha256)==64 for r in results)
+    print("DISPATCH_INTERNAL_MICROBENCHMARK "+json.dumps([asdict(r) for r in results],sort_keys=True))
+
+
+def test_alternative_mixed_workload_recovery_with_real_sqlite_and_shared_quota(tmp_path):
+    from skeleton.automation.agents.swarm_broker import SwarmBroker
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, TaskState
+    from skeleton.automation.agents.swarm_tenant_broker import TenantSwarmBroker
+    from skeleton.automation.agents.swarm_ingress import SwarmIngressGovernor
+    from skeleton.automation.agents.swarm_quota import SharedQuota, Quota
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.automation.agents.swarm_durable import SwarmDurableBridge
+    from skeleton.testing.test_durable_run_store import make_store
+    from skeleton.intelligence.dispatch_policy import DispatchCandidate
+    runtime=HardenedSwarmRuntime(fenced=True,clock=lambda:10.0)
+    runtime.register_worker("root",capabilities={"code"},capacity=3)
+    runtime.register_virtual_worker("child","root",capabilities={"code"},capacity=2)
+    governor=SwarmIngressGovernor()
+    governor.configure_shared(SharedQuota("all",Quota(max_queued=8,max_leased=1)))
+    broker=TenantSwarmBroker(SwarmBroker(runtime,verify_worker=lambda *args: True),governor,verified_mode=True)
+    store=make_store(tmp_path)
+    store.create_run("mixed")
+    store.claim_run("mixed","owner",lease_seconds=60)
+    manager=SwarmRecoveryManager(max_checkpoints=4,delta_archive=True)
+    bridge=SwarmDurableBridge(store)
+    for tenant,task in (("t",SwarmTask("urgent",{},priority=0,required_capabilities=frozenset({"code"}))),
+                        ("u",SwarmTask("normal",{},priority=100))):
+        assert bridge.submit_unique_verified("mixed","owner",manager,broker,tenant,task)
+    tenant,attempt,_=bridge.lease_and_capture_verified("mixed","owner",manager,broker,
+        (DispatchCandidate("normal","u",100,0),DispatchCandidate("urgent","t",0,0)),now_ms=10000)
+    assert tenant=="t" and attempt.id=="urgent"
+    assert bridge.lease_and_capture_verified("mixed","owner",manager,broker,
+        (DispatchCandidate("normal","u",100,0),),now_ms=10000) is None
+    loaded=SwarmDurableBridge(make_store(tmp_path)).load("mixed")
+    recovered=loaded.restore_runtime()
+    restored_governor=governor.fork_empty()
+    replacement=TenantSwarmBroker(SwarmBroker(recovered,verify_worker=lambda *args:True),
+                                  restored_governor,verified_mode=True)
+    loaded.manager.restore_tenants(replacement)
+    assert recovered.task("urgent").effect_uncertain
+    assert restored_governor.quota.shared_snapshot()["all"]["leased"]==1
+    resumed=SwarmDurableBridge(make_store(tmp_path))
+    resumed.reconcile_and_enqueue_verified("mixed","owner",loaded.manager,replacement,"t","urgent",attempt.leased_to,
+        lease_token=attempt.lease_token,evidence_sha256="a"*64,
+        followups=(SwarmTask("followup",{},dependencies=("urgent",)),))
+    final=resumed.load("mixed").restore_runtime()
+    assert final.task("urgent").state is TaskState.SUCCEEDED
+    assert final.task("followup").state is TaskState.QUEUED and not final.blocked_dependencies("followup")
+    assert final.task("normal").state is TaskState.QUEUED

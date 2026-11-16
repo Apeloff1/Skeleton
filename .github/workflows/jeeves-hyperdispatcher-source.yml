@@ -38,5 +38,5 @@ jobs:
         with:
           python-version: '3.11'
       - run: python -m pip install --disable-pip-version-check --no-input -e . "pytest>=8,<9" "pytest-asyncio>=1.4.0,<2" "PyJWT==2.15.1" "zstandard==0.25.0" "PyYAML>=6,<7" "numpy>=2,<3" "Pillow>=13.0.0,<14"
-      - run: python -m pytest -q --noconftest skeleton/testing/test_jeeves_hyperdispatcher.py
+      - run: python -m pytest -q -rP --noconftest skeleton/testing/test_jeeves_hyperdispatcher.py
       - run: python scripts/check_ai_file_tree.py
