@@ -600,12 +600,12 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
         class AuthFailureDB(FakeDB):
             async def command(self, name):
                 if name == "connectionStatus":
-                    raise RuntimeError("mongodb://user:password@private")
+                    raise RuntimeError("mongodb://user:pass@private")
                 return await super().command(name)
         self.db = AuthFailureDB()
         result = await self.inspect()
         self.assertEqual(result["code"], "mongo_authenticated_session_unavailable")
-        self.assertNotIn("password", str(result))
+        self.assertNotIn("user:pass", str(result))
 
     async def test_primary_probe_error_redacted(self):
         self.db.error = RuntimeError("mongo://user:secret@private")
@@ -641,7 +641,7 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_database_mismatch_denied_before_any_mongo_connection(self):
         with patch.dict("os.environ", {
-            "MONGO_URL": "mongodb://secret:secret@mongo:27017",
+            "MONGO_URL": "mongodb://user:pass@mongo:27017",
             "DB_NAME": "tutolage",
             "SKL_CANONICAL_MONGO_DATABASE": "skeleton",
             "SKL_CANONICAL_TENANT_ID": "tenant",
@@ -659,7 +659,7 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_missing_engine_database_denied_without_mongo(self):
         with patch.dict("os.environ", {
-            "MONGO_URL": "mongodb://secret:secret@mongo:27017",
+            "MONGO_URL": "mongodb://user:pass@mongo:27017",
             "DB_NAME": "tutolage",
             "SKL_CANONICAL_MONGO_DATABASE": "",
             "SKL_CANONICAL_TENANT_ID": "tenant",
@@ -688,7 +688,7 @@ class ComposePreflightTests(unittest.IsolatedAsyncioTestCase):
     async def test_total_deadline_fails_closed_and_closes_client(self):
         from unittest.mock import AsyncMock, MagicMock
         with patch.dict("os.environ", {
-            "MONGO_URL": "mongodb://secret:secret@mongo:27017",
+            "MONGO_URL": "mongodb://user:pass@mongo:27017",
             "DB_NAME": "skeleton",
             "SKL_CANONICAL_MONGO_DATABASE": "skeleton",
             "SKL_CANONICAL_TENANT_ID": "tenant",

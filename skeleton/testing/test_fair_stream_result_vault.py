@@ -319,8 +319,9 @@ def test_wrong_receipt_digest_never_releases_plaintext(vault_dir):
 def test_closed_handle_is_not_reused(vault_dir):
     handle, vault = open_vault(vault_dir)
     handle.close()
-    with pytest.raises(SealedResultUnavailable, match="closed"):
+    with pytest.raises(SealedResultUnavailable, match="custody changed") as error:
         vault.run_and_commit(permit(), state())
+    assert "closed" in str(error.value.__cause__)
 
 
 def test_unauthorized_gpu_permit_rejected(vault_dir):
@@ -397,8 +398,13 @@ def test_late_result_trigger_denies_before_backend(vault_dir, temporary):
             trigger + " erase_result AFTER INSERT ON local_fair_stream_sealed_results "
             "BEGIN DELETE FROM local_fair_stream_sealed_results WHERE lease_id=NEW.lease_id; END"
         )
-        with pytest.raises(SealedResultUnavailable, match="schema"):
+        # Temporary SQLite objects are denied at the lower handle boundary;
+        # public error text deliberately does not reveal internal DB details.
+        expected = "custody changed" if temporary else "schema"
+        with pytest.raises(SealedResultUnavailable, match=expected) as error:
             vault.run_and_commit(permit(), state())
+        if temporary:
+            assert "temporary objects" in str(error.value.__cause__)
         assert backend.calls == 0
         assert handle.connection.execute(
             "SELECT COUNT(*) FROM main.local_fair_stream_sealed_results"

@@ -183,7 +183,12 @@ def test_checkpoint_cannot_forge_pending_lease_binding_with_recomputed_hash() ->
     queue.submit(request("a"))
     queue.plan(budget())
     state = queue.checkpoint()
-    state["pending"][0]["tokens"] += 1
+    # Keep quantities internally valid so denial exercises the lease identity,
+    # rather than merely exceeding the request token ceiling.
+    lease = state["pending"][0]
+    assert lease["tokens"] > 1
+    lease["tokens"] -= 1
+    lease["bytes_reserved"] -= 2
     state["digest"] = hashlib.sha256(json.dumps(
         {k: v for k, v in state.items() if k != "digest"},
         sort_keys=True, separators=(",", ":"), ensure_ascii=True,

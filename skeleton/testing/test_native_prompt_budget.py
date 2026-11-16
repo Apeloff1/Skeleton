@@ -134,7 +134,7 @@ def test_accounting_corruption_fails_closed():
         ledger.snapshot()
 
 
-@pytest.mark.parametrize("tenant", ["\\ud800", "", "bad\\nidentity"])
+@pytest.mark.parametrize("tenant", ["\ud800", "", "bad\nidentity"])
 def test_untrusted_tenant_identity_is_denied(tenant):
     ledger = PromptBudgetLedger(NativePromptBudget())
     with pytest.raises(PromptBudgetDenied):
