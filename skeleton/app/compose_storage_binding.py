@@ -119,7 +119,20 @@ def _json_observation(root, runner, command, environ, *, limit):
     return result
 
 
-def _resolved_model(config):
+def _reviewed_hot_parent(root, service, target, other, mount, *, hot):
+    # The canonical hot overlay has a read-only /app source bind and an
+    # explicit named /app/data volume. Compose mounts the more specific
+    # destination independently. Never grant the exception to an arbitrary
+    # source path, writable bind or another service.
+    if (not hot or service != "backend" or target != "/app/data" or other != "/app"
+            or mount.get("type") != "bind" or mount.get("read_only") is not True):
+        return False
+    source = mount.get("source")
+    return (type(source) is str and Path(source).is_absolute()
+            and Path(source).resolve() == (root / "backend").resolve())
+
+
+def _resolved_model(config, *, root=None, hot=False):
     project = config.get("name")
     _require(type(project) is str and _PROJECT.fullmatch(project) is not None,
              "compose_project_identity_invalid")
@@ -161,9 +174,11 @@ def _resolved_model(config):
             # files or another state mount; prohibit parents of canonical paths.
             for other in targets:
                 if other != target:
-                    _require(not target.startswith(other.rstrip("/") + "/")
-                             and not other.startswith(target.rstrip("/") + "/"),
-                             "compose_persistent_parent_mount")
+                    shadow = (target.startswith(other.rstrip("/") + "/")
+                              or other.startswith(target.rstrip("/") + "/"))
+                    _require(not shadow or (root is not None and _reviewed_hot_parent(
+                        root,service,target,other,targets[other],hot=hot)),
+                        "compose_persistent_parent_mount")
         for target, mount in targets.items():
             if mount.get("type") == "volume" and mount.get("source") in required_roles:
                 _require(_BINDINGS.get(service, {}).get(target) == mount["source"],
@@ -195,9 +210,16 @@ def _container_binding(payload, project, role, resolved, *, require_running=Fals
                  "existing_persistent_mount_mismatch")
         for other in targets:
             if other != target:
-                _require(not target.startswith(other.rstrip("/") + "/")
-                         and not other.startswith(target.rstrip("/") + "/"),
-                         "existing_persistent_mount_shadowed")
+                shadow = (target.startswith(other.rstrip("/") + "/")
+                          or other.startswith(target.rstrip("/") + "/"))
+                # Existing backend hot-reload containers can be stopped or
+                # re-created into production without treating their explicit
+                # writable child data mount as a foreign volume. This
+                # observes storage topology, not the bind's code provenance.
+                prior_hot = (role == "backend" and target == "/app/data" and other == "/app"
+                             and targets[other].get("Type") == "bind"
+                             and targets[other].get("RW") is False)
+                _require(not shadow or prior_hot, "existing_persistent_mount_shadowed")
     authority = {resolved[volume] for mounts in _BINDINGS.values() for volume in mounts.values()}
     for target,mount in targets.items():
         if mount.get("Type") == "volume" and mount.get("Name") in authority:
@@ -269,7 +291,8 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
             return _digest(identity)
 
         daemon_digest = daemon()
-        project, resolved = _resolved_model(inspect(render,_MAX_CONFIG))
+        hot = "docker-compose.hot.yml" in render
+        project, resolved = _resolved_model(inspect(render,_MAX_CONFIG),root=root,hot=hot)
         model_digest = _digest((project,resolved))
         if require_started:
             _require(previous is not None and previous.admitted is True
@@ -322,7 +345,7 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
                 "container_binding_changed")
         _require(names(volume_args) == all_volumes and names(container_args) == all_containers,
                  "docker_storage_inventory_changed")
-        _require(_resolved_model(inspect(render,_MAX_CONFIG)) == (project,resolved),
+        _require(_resolved_model(inspect(render,_MAX_CONFIG),root=root,hot=hot) == (project,resolved),
                  "compose_storage_model_changed")
         fence()
         _require(daemon() == daemon_digest, "docker_daemon_changed")

@@ -233,3 +233,35 @@ def test_volume_driver_options_deny_changed_storage_semantics(tmp_path):
     runner,_=fixture_runner(volumes=(PROJECT+"_mongo_data",),
                            volume_override={"options":{"device":"unreviewed"}})
     assert observe(tmp_path,runner).code=="existing_volume_driver_options_unqualified"
+
+
+@pytest.mark.parametrize("case",["reviewed","production","writable","wrong_source","nested_override"])
+def test_hot_overlay_preserves_only_reviewed_readonly_parent(tmp_path,case):
+    value=model()
+    mounts=value["services"]["backend"]["volumes"]
+    mount={"type":"bind","source":str(tmp_path/"backend"),"target":"/app","read_only":True}
+    mounts.append(mount)
+    if case=="writable":
+        mount["read_only"]=False
+    elif case=="wrong_source":
+        mount["source"]=str(tmp_path/"other")
+    elif case=="nested_override":
+        mounts.append({"type":"bind","source":str(tmp_path/"other"),"target":"/app/data/foreign"})
+    if case=="reviewed":
+        assert binding._resolved_model(value,root=tmp_path,hot=True)[0]==PROJECT
+    else:
+        with pytest.raises(binding.BindingDenied,match="compose_persistent_parent_mount"):
+            binding._resolved_model(value,root=tmp_path,hot=case!="production")
+
+
+@pytest.mark.parametrize("readonly",[True,False])
+def test_existing_backend_hot_mount_does_not_disguise_writable_authority(tmp_path,readonly):
+    value={"project":PROJECT,"service":"backend","id":"a"*64,"running":True,
+           "mounts":[{"Type":"volume","Name":PROJECT+"_backend_data","Destination":"/app/data","RW":True},
+                     {"Type":"bind","Destination":"/app","RW":not readonly}]}
+    resolved={role:PROJECT+"_"+role for role in binding.VOLUME_ROLES}
+    if readonly:
+        assert len(binding._container_binding(value,PROJECT,"backend",resolved))==64
+    else:
+        with pytest.raises(binding.BindingDenied,match="existing_persistent_mount_shadowed"):
+            binding._container_binding(value,PROJECT,"backend",resolved)

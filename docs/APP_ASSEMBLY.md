@@ -1177,3 +1177,10 @@ bindings. Container and volume metadata are sampled twice per observation.
 These are point-in-time metadata checks, not immutable volume identity,
 data-content validation, or proof against arbitrary external Docker races.
 The CLI --no-verify switch skips HTTP verification only, not storage custody.
+
+The reviewed hot-reload distinction is explicit: the backend source bind
+may cover /app only when the resolved model selects the local checkout's
+backend directory read-only and retains a separate writable /app/data
+volume. A previously running hot-reload backend can be replaced with a
+production container while retaining the named data volume. This storage
+exception does not attest the identity of code in an existing bind mount.
