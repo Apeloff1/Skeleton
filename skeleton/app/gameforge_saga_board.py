@@ -93,9 +93,24 @@ def _continuation(episode: dict, prior: list, summary: dict) -> tuple[str, list]
     if witness[:len(prior)] == prior:
         candidates.append((len(prior), "verified_witness_suffix"))
     else:
-        normalized = [action for action in prior if action.get("op") != "wait"]
-        matches = [i for i in range(len(witness) + 1)
-                   if [a for a in witness[:i] if a.get("op") != "wait"] == normalized]
+        def is_wait(action: dict) -> bool:
+            if action.get("op") == "round":
+                return action["action"].get("op") == "wait"
+            return action.get("op") == "wait"
+
+        normalized = [action for action in prior if not is_wait(action)]
+        # Avoid repeatedly copying each prefix of long multi-round ledgers.
+        matches = []
+        index = 0
+        if not normalized:
+            matches.append(0)
+        for offset, action in enumerate(witness, 1):
+            if not is_wait(action):
+                if index >= len(normalized) or normalized[index] != action:
+                    break
+                index += 1
+            if index == len(normalized):
+                matches.append(offset)
         candidates.extend((i, "verified_wait_splice") for i in reversed(matches[-4:]))
     for index, policy in candidates:
         suffix = witness[index:]
