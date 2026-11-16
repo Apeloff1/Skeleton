@@ -93,6 +93,8 @@ class PrecisionProfile:
                 "context_size","threads","batch_size","gpu_layers","model_id",
                 "kv_cache_location","kv_cache_type_k","kv_cache_type_v",
                 "kv_bytes_per_token","runtime_scratch_bytes","timeout_seconds",
+                "speculation_runtime_sha256","speculation_ngram","speculation_draft_tokens",
+                "speculation_min_hits","speculation_reserve_bytes",
                 "max_output_bytes","max_stderr_bytes","temperature",
                 "output_framing","reject_model_symlink","rehash_artifacts_each_run",
                 "runtime_libraries")},
