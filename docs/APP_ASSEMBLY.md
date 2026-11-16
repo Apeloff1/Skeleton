@@ -894,3 +894,422 @@ process. It waits for actual UTC due times, writes every queue generation to
 a new immutable filename, and stops on retirement or the configured cycle
 cap. It is not an always-on service unless the operator runs it as one.
 No autonomous checkpoint training or live-model promotion is performed.
+
+
+## Strict installed-runtime observation
+
+After a reviewed source checkout has started the services, run:
+
+    python -m skeleton app qualify-install --source-head REVIEWED_SHA --json
+
+For a checkout-based installation, add
+--qualification-source-head REVIEWED_SHA to the existing install --start
+command to require the same observation before its successful exit. Optional
+--require-protected and --require-ai on qualify-install (or their
+--qualification-require-* installer equivalents) require observed protected
+writer custody and selected-provider availability respectively. They do not
+enable either service.
+
+The strict path checks setup/product HTML, exact public bootstrap contract,
+direct backend and engine identity, both aggregate routes, route inventory and
+selected-provider availability in at least two independent rounds. It binds
+the host source SHA and private configuration identity before and after each
+round, denies contradictory status bodies, requires consistent product
+attestation and rejects redirects, proxies and oversized/nonfinite JSON.
+A subprocess imposes a hard deadline even on slow-drip HTTP responses.
+The output has fixed finding codes and redacted bounded facts, never raw
+response bodies or private configuration digests.
+
+This is stronger than a socket health check but not signed image provenance,
+browser JavaScript execution, actual inference, storage restoration, Windows
+device acceptance or release qualification. The default setup UI recovery
+remains available and protected startup is not enabled by this command.
+
+### Isolated corrected Chroma persistence qualification
+
+The corrected physical layout is independently tested by
+scripts/qualify_chroma_persistence.py --source-head REVIEWED_SHA
+--isolated-ci-fixture. It uses the exact pinned image ID, a uniquely
+generated local named volume mounted at /data, loopback-only ports and
+synthetic vector records. It checks collection identity, full vector/document/
+metadata equality, nearest-neighbor results, same-container restart,
+durable update/delete, and a genuinely new container with the same volume.
+Resource deletion is restricted to separately verified fixture ownership.
+The legacy full profile remains blocked until independently reviewed
+backup selection, restoration, real application integration and device
+qualification succeed. This fixture never starts or modifies legacy Chroma.
+
+### Recovery staging for the two historical Chroma stores
+
+After the complete legacy backup has been reviewed, observe both candidate
+inventories without selecting authority:
+
+    python scripts/stage_chroma_recovery.py --backup /private/backup --inspect-candidates
+
+An independent reviewer chooses exactly one store and signs StageApproval
+from the script, binding the full original manifest hash, selected inventory
+hash, exact reviewed source SHA, deployment, authority, selection and
+quiescence evidence hashes, and a validity window no longer than 30 minutes.
+Do not infer the authoritative store from file count, timestamps or size.
+The signer retains the private key outside the application.
+
+    python scripts/stage_chroma_recovery.py --backup /private/backup \
+      --output /private/staging/new-stage --plan /private/stage-plan.json \
+      --signature /private/stage-plan.sig --authority AUTHORITY --deployment DEPLOYMENT \
+      --source-head REVIEWED_SHA --operator-public-key-hex PUBLIC_KEY
+
+The stage parent must already be a private mode-0700 POSIX directory. The
+new stage holds only the selected store in data/ and a redacted receipt.
+Both original store copies are verified before and after the stage; every
+copied descriptor is checked against exact size and content pins. The
+staged SQLite is checked read-only for integrity, foreign keys and expected
+schema without repairing the original. An unresolved SQLite WAL/SHM/journal
+requires separate recovery; the tool intentionally refuses to ignore it.
+No replace, merge, live restore, graph integrity or full-profile acceptance
+is claimed. Use the isolated physical fixture for new-volume evidence and
+independently qualify a staged restore on the exact pinned Chroma image.
+
+
+### Persistent checkout installer recovery (POSIX)
+
+To retain each mutating phase across process interruption, create a private
+mode-0700 state directory outside the checkout and invoke the existing
+installer with --session-dir, --session-id and --session-source-head:
+
+    python scripts/install_app.py --production --start \
+      --session-dir /private/install-state --session-id first-install \
+      --session-source-head REVIEWED_SHA
+
+The same state directory excludes other cooperating installers of that
+checkout. Each setup, package, Compose and startup intent is fsynced before
+execution. Each outcome is appended with strict identity, sequence and
+hash-chain custody. Neither environment values, private fingerprints nor
+raw child errors are printed by the session observation.
+
+    python -m skeleton app inspect-install-session --session-dir /private/install-state \
+      --session-id first-install
+
+Resume an interrupted/blocked session only with the identical source SHA,
+options, state directory and ID plus --resume-session. The current private
+configuration must match the last recorded observation. Resume re-runs the
+normal idempotent installer, including validation, rather than trusting old
+passes or skipping uncertain stages. It never deletes images or volumes,
+reverts migrations or rotates secrets. If setup was interrupted after an
+unobserved .env change, preserve that file and independently reconcile before
+opening a new session. Explicit admin credentials and secret rotation are
+excluded from this recovery mode. Windows launcher behavior remains
+unchanged; this POSIX implementation is not a Windows ACL qualification.
+
+
+### New-install durable Chroma provisioning (operator-gated)
+
+After the exact-source disposable Chroma persistence job succeeds on the
+same image ID, independently review and pin its JSON receipt. The default
+stack must already have its canonical engine and local Compose network running.
+For genuinely new storage only, the separate provisioner creates the new
+named volume at /data and starts only its verified owned container:
+
+    python scripts/provision_fresh_chroma.py --source-head REVIEWED_SHA fresh \
+      --fixture /private/fixture.json --fixture-sha256 REVIEWED_FILE_SHA256 \
+      --port 8000 --journal /private/chroma/new-attempt.json
+
+The private journal is fsynced before creation. A distinct created receipt
+is committed before the first start. Existing legacy containers or volumes
+block the fresh path. Existing corrected deployments can be observed or
+started by exact created-receipt pin:
+
+    python scripts/provision_fresh_chroma.py --source-head REVIEWED_SHA inspect-existing \
+      --receipt /private/chroma/new-attempt.created.json --receipt-sha256 REVIEWED_FILE_SHA256
+    python scripts/provision_fresh_chroma.py --source-head REVIEWED_SHA start-existing \
+      --receipt /private/chroma/new-attempt.created.json --receipt-sha256 REVIEWED_FILE_SHA256
+
+The operator is responsible for independently authenticating the fixture
+and created receipts and selecting the appropriate local port. An uncertain
+attempt is never recreated automatically. Preserve all resources for review.
+The exact image, volume and container identities, bridge membership, loopback
+port and service alias are checked, but production application vector
+integration, legacy migration and release remain held. The old full-profile
+Compose definition remains unchanged and must not be used to recreate the
+corrected service. No production resources are touched by source qualification.
+
+
+### Exact image construction and independently approved runtime identity
+
+For a clean reviewed checkout, use a pre-existing private work parent outside
+the repository. This explicit operator build extracts only an exact Git
+archive, verifies source file identities before and after each image build,
+and builds isolated production candidate tags for the engine, backend and
+frontend. No existing service container, original installation image tag,
+or production volume is started or replaced.
+
+    python scripts/qualify_first_install_images.py --source-head REVIEWED_SHA build \
+      --work-parent /private/builds --receipt /private/builds/review.json \
+      --backend-origin http://127.0.0.1:8001 --engine-origin http://127.0.0.1:8010
+
+The archive is capped at 32 GiB and the ordinary source inventory at one
+million entries. Git archive export rules apply. Symlinks, special files,
+private configuration and missing required build inputs fail closed. The
+candidate workspace and successfully produced image IDs are preserved on
+interruption. This builder does not establish reproducible dependencies,
+sign images, use private registries or perform a hermetic build.
+
+Independent review creates an approval JSON with exactly schema
+(skeleton.application.first-install-image-approval.v1), source_head,
+build_receipt_sha256 (SHA-256 of the original receipt file), authority_id,
+project, review_evidence_sha256, issued_at and expires_at (integer Unix
+seconds, validity at most one hour). Sign the canonical sorted compact
+ASCII JSON prefixed by the bytes skeleton.first-install-image-approval.v1
+followed by a NUL byte, using the independently pinned Ed25519 key.
+The public key and signature are raw 32-byte and 64-byte files respectively,
+not embedded in the plan. This script never produces the signature.
+
+    python scripts/qualify_first_install_images.py --source-head REVIEWED_SHA prepare \
+      --build-receipt /private/builds/review.json --plan /private/approval.json \
+      --signature /private/approval.sig --public-key /private/authority.pub \
+      --authority REVIEWER --project PROJECT --frontend-port 8080 \
+      --output /private/reviewed-images.json
+
+The resulting Compose override contains only approved isolated image tags
+and pull_policy never. The operator must use the existing canonical
+production mode ports and configuration, the exact approved project, and
+--no-build with the override. No automatic container recreation is
+performed by this tool. The observe mode takes the same approval inputs
+without --output, and independently checks twice that all three running
+image IDs, container identities, loopback publications, expected persistent
+mounts, absence of source-shadowing mounts and canonical bridge ownership
+match the reviewed build. Both strict live application health and actual
+inference remain separate requirements. The receipt is not release or
+Windows/WSL2 qualification. Independent build approval authenticates the
+reviewed evidence, not an untrusted daemon or filesystem.
+
+
+
+### Interrupted lifecycle operations
+
+The installer, source CLI and Windows launcher share an OS-backed lifecycle
+lease and write a bounded, non-secret intent before invoking Compose start,
+stop or isolated setup-UI recovery. A signal, interrupted process, timeout,
+OS error or invalid exit receipt leaves that intent in place. Ordinary
+process completion clears only the matching intent. This is a local
+cooperating-client safety boundary, not a Docker daemon lock or proof of
+database consistency; Windows directory power-loss durability is not qualified.
+
+Inspect the previous operation without dispatching a new Docker command:
+
+```text
+python -m skeleton app runtime-recovery status
+SkeletonOffline.exe --runtime-recovery status
+```
+
+Check Docker Desktop or the selected Docker context and existing Compose
+project, confirm that no previous operation is still running, and inspect
+persistent data before acknowledging. The installed launcher also exposes
+**Interrupted Operation** and **Acknowledge Recovery**. Use the exact ID
+from the status receipt:
+
+```text
+python -m skeleton app runtime-recovery acknowledge OPERATION_ID --daemon-inspected
+SkeletonOffline.exe --runtime-recovery acknowledge OPERATION_ID --daemon-inspected
+```
+
+Acknowledgment records an explicit operator decision; it does not verify
+daemon idleness, retry startup, delete application data or certify readiness.
+A malformed or mismatched intent is intentionally preserved for manual
+investigation. Do not delete the lock or pending record to bypass custody.
+
+
+
+### Persistent identity on reinstall
+
+The installer and source setup command require a read-only selected-daemon
+storage inventory before generating missing persistent database/signing/sealing
+credentials. A deleted .env does not imply an empty Docker installation.
+Canonical volume suffixes, Compose volume role labels and fixed application
+container names are checked, including stopped containers; inventory changes
+or unverified Docker output deny new identity. No volume is created, mounted,
+deleted, inspected for contents or authenticated by this check. Existing
+credentials are preserved; restore the original private configuration rather
+than generating keys for old data. Explicit custom Mongo database paths,
+replica-set and authentication options are not normalized into a standalone
+bundled URI. This conservative policy may block another canonical stack in
+the same Docker context; independent migration/backup qualification is still
+required. Low-level offline configuration generation is not storage-qualified.
+
+
+Inspect the selected daemon using the source CLI or installed console:
+
+```text
+python -m skeleton app storage-custody
+SkeletonOffline.exe --storage-custody
+```
+
+The Windows launcher has a Storage Custody control exposing only canonical
+role identities. Process-level overrides for persistent database, sealing
+and signing identity must match the admitted private configuration; the
+installer rejects mismatches before its configuration publication or
+Compose startup. These are local installation rules; managed deployments
+using a separate secret-injection contract must qualify separately.
+
+
+
+### Resolved Compose storage binding
+
+Before local startup, the installer and source CLI render the exact pinned
+Compose model in private temporary capture. The resolved project, named
+local-volume definitions and authoritative mount targets must match the
+canonical storage roles. Existing fixed-name containers must have matching
+Compose project/service labels and writable authoritative volume mounts.
+Existing volumes must carry the matching project and role labels. Alternate
+canonical volumes, mount substitutions, foreign containers and changing
+inventory block startup rather than creating a new empty data plane. This
+deliberately requires review of legacy unlabeled or relocated volumes.
+No volume inspection includes database contents and no inspection runs a
+Docker mutation. The transient rendered config may contain credentials;
+it is not retained in the report. This is not secure erasure, database
+authentication, backup verification or a daemon-wide transaction.
+
+
+A successful Compose process exit triggers a second binding observation.
+The selected daemon identity and resolved storage model must still match,
+previously observed volume creation metadata must remain stable, and the
+four required application containers must be running with canonical
+bindings. Container and volume metadata are sampled twice per observation.
+These are point-in-time metadata checks, not immutable volume identity,
+data-content validation, or proof against arbitrary external Docker races.
+The CLI --no-verify switch skips HTTP verification only, not storage custody.
+
+The reviewed hot-reload distinction is explicit: the backend source bind
+may cover /app only when the resolved model selects the local checkout's
+backend directory read-only and retains a separate writable /app/data
+volume. A previously running hot-reload backend can be replaced with a
+production container while retaining the named data volume. This storage
+exception does not attest the identity of code in an existing bind mount.
+
+
+The same launch observation also checks all resolved host port mappings
+against the selected local installation and mode. Post-start observations
+compare each running service's actual TCP bindings and image ID to the
+resolved service image reference and observed local image tag. Public or
+unexpected port bindings and mismatched image tags deny readiness. A
+per-campaign keyed fingerprint covers the entire resolved Compose model,
+including build arguments and environment, without publishing secret-bearing
+config or fingerprint data. This does not establish registry trust, build
+provenance, image source parity, immutable volume identity or device readiness.
+
+Positive HTTP and critical-router qualification is now followed by a final
+read-only runtime continuity observation. Active container IDs, start
+timestamps, restart counts, image identities and ingress bindings must
+match the post-start observation. An observed restart or replacement
+invalidates the earlier HTTP evidence. The stricter optional live
+qualification gets the same final continuity check. This is sampled
+continuity, not continuous monitoring or physical-device certification.
+
+
+The App Foundation E2E stack now uses the shipping pre-start and post-start
+binding observers in its isolated CI project. This is separate from
+developer/consumer installation and only runs when the existing E2E job is
+admitted; draft, queued or skipped jobs are not evidence. The strict source
+qualification worker disables site startup and uses a new private bytecode
+cache prefix, so a checkout's cached bytecode cannot replace tracked Python
+source. Source and configuration are rechecked after inter-round delay
+before the next HTTP round. Neither change supersedes physical qualification.
+
+
+The real-Compose source contract also runs in the independent App Foundation
+E2E companion job. It renders development, production, custom production
+ports and the reviewed hot-reload overlay with disposable process-local
+fixture credentials. The source check requires exact browser build/runtime
+URLs, internal engine wiring, shared service credentials, Mongo inputs and
+dependency health fences. It does not start containers, exercise the live
+stack, or change the existing draft/live qualification admission rule.
+
+
+Frontend-only recovery now reuses the original pinned Compose render and
+prior daemon/storage identity after a failed full startup. It requires
+the exact no-dependencies frontend command, reobserves the running
+frontend image and ingress before probing /setup, and verifies that
+frontend's runtime identity again after the probe. Protected startup
+remains failed even if the diagnostic page answers. No Chroma migration
+or automatic data repair is authorized.
+
+
+Shutdown remains a non-destructive Compose stop including the legacy
+Chroma profile. Source CLI and Windows launcher now share a shutdown
+custody observer: identify the selected daemon and exact Compose project,
+require fixed-name container ownership, and check that previously observed
+container IDs and volume names still exist after stop. A successful exit
+does not alone certify shutdown. This is sampled metadata continuity,
+not backup or data-content validation. If project/configuration custody
+cannot be established, inspect Docker Desktop directly rather than
+removing persistent containers.
+
+
+Whole-application HTTP readiness requires exactly one successful receipt
+for each canonical frontend, backend, engine and aggregate application
+endpoint (plus Chroma only for the separately requested full observation).
+Each receipt must match the configured endpoint URL with an actual 2xx
+integer status and an explicit success boolean. Partial or duplicate
+inventory cannot finish a retry campaign or admit startup. Mongo has no
+public HTTP health route; its custody and dependency health are separate.
+
+
+Live status, smoke, Windows status and startup now retain a sticky
+configuration epoch through health collection. If a source mutation is
+observed, old receipts are discarded even if the file later contains the
+original bytes. The installer captures setup's output before invoking
+external phase observers, so an observer cannot substitute a new
+configuration and have it accepted as the original setup result.
+
+
+The local launch gate also checks the resolved and actual container isolation
+settings. Backend and engine require a read-only root, non-root execution,
+dropped capabilities, no-new-privileges and the bounded non-executable
+temporary filesystem. Canonical services use a project-owned local bridge;
+host namespaces, unreviewed device/capability grants and arbitrary host
+bind mounts are rejected. The actual bridge ID is sampled through runtime
+qualification, and Docker health must be healthy for Mongo, backend and
+engine at the final HTTP continuity observation. These settings do not
+attest host security, kernel integrity, registry trust or database contents.
+
+Actual host-bind destinations and read/write permissions must also match
+the reviewed model; arbitrary or writable model mounts cannot inherit the
+model's positive observation. Actual VM host-source path identity is not
+attested, because Docker Desktop can translate those paths. Conflicting
+tmpfs safety flags, root user aliases and explicitly disabled default
+security profiles are denied.
+
+
+The semantic wiring gate now runs with the independent Compose isolation
+contract on local installer startup, CLI startup, isolated frontend
+recovery and real-Compose source CI. It validates exact resolved
+credential propagation, private proxy bypass, local-only inference
+identity, protected application authentication, browser build/runtime
+origins, durable state paths, dependency health gates and canonical
+build contexts before a mutation. Only fixed failure codes leave the
+observer. This does not inspect running process credentials or prove
+source-to-image provenance.
+
+
+Local installation supports a bounded single-line dotenv literal format.
+Use literal UTF-8 and single quotes or doubled dollars for dollar-bearing
+secrets. Host-dependent expansion, unsupported quoted escapes, decoded
+controls and bare carriage returns are rejected without echoing values.
+Invalid nonplaceholder GameForge signing keys are preserved; restore
+a qualified identity instead of silently replacing it. Reconciliation
+of previously authenticated bundled database URIs requires the same
+storage guard as new persistent credentials. Shell overrides may not
+substitute stored JWT or engine service identity. Permission repair
+does not authorize intervening content changes.
+
+
+Install health and readiness HTTP use explicit direct HTTP/HTTPS handlers.
+Literal loopback origins connect to a numeric socket without resolving
+localhost through host DNS; the declared Host and TLS hostname are
+retained. Authenticated and public JSON readiness reject duplicate or
+conflicting length/transfer headers, unsupported content encoding,
+incomplete declared bodies, non-UTF-8 JSON and overdeep projections.
+The parent revalidates the private worker's exact receipt schema and
+source workers get an empty private bytecode cache prefix. The install
+IPC remains restricted to its fixed loopback endpoint inventory; generic
+explicit remote HTTPS inspection is separate. These checks do not prove
+the identity of a local listening process or Windows device readiness.

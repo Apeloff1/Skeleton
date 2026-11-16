@@ -329,7 +329,8 @@ def test_safe_mode_recovers_into_canonical_product_shell():
 
 
 def test_wait_for_application_retries_until_healthy(monkeypatch):
-    from skeleton.app.health import ProbeResult, wait_for_application
+    from skeleton.app.health import wait_for_application
+    from skeleton.testing.app_health_fixtures import fixture_probes
 
     calls = []
     sleeps = []
@@ -337,15 +338,7 @@ def test_wait_for_application_retries_until_healthy(monkeypatch):
     def fake_probe_application(*, manifest, full, timeout):
         calls.append((full, timeout))
         ok = len(calls) >= 3
-        return (
-            ProbeResult(
-                service="backend",
-                url="http://localhost:8001/api/health",
-                ok=ok,
-                status=200 if ok else None,
-                detail="healthy" if ok else "not ready",
-            ),
-        )
+        return fixture_probes(manifest=manifest,full=full,ok=ok)
 
     monkeypatch.setattr("skeleton.app.health.probe_application", fake_probe_application)
     monkeypatch.setattr("skeleton.app.health.time.sleep", lambda delay: sleeps.append(delay))
@@ -501,7 +494,8 @@ def test_live_status_reports_runtime_health_and_fails_closed(monkeypatch, capsys
     from skeleton.app.cli import run_app_cli
     from skeleton.app.health import ProbeResult
 
-    def fake_probe_application(*, manifest, full, timeout):
+    def fake_probe_application(*, manifest, full, timeout, admit):
+        assert admit() is True
         assert full is False
         assert timeout == 1.25
         return (
@@ -580,7 +574,7 @@ def test_application_probe_includes_aggregate_readiness(monkeypatch):
 
     def fake_probe_url(service, *, timeout):
         seen.append((service.name, service.health_path, timeout))
-        return ProbeResult(service.name, service.public_url, True, 200, "healthy")
+        return ProbeResult(service.name, service.public_url.rstrip("/") + "/" + service.health_path.lstrip("/"), True, 200, "healthy")
 
     def fake_probe_http(name, url, *, timeout):
         seen.append((name, url, timeout))
@@ -864,7 +858,7 @@ def test_full_profile_probes_custom_chroma_health(monkeypatch):
 
     def probe(service, *, timeout):
         seen.append((service.name, service.public_url, service.health_path))
-        return ProbeResult(service.name, service.public_url, True, 200, "healthy")
+        return ProbeResult(service.name, service.public_url.rstrip("/") + "/" + service.health_path.lstrip("/"), True, 200, "healthy")
 
     def http(name, url, *, timeout):
         return ProbeResult(name, url, True, 200, "healthy")
@@ -882,7 +876,7 @@ def test_optional_chroma_unavailability_fails_full_readiness_only(monkeypatch):
 
     def probe(service, *, timeout):
         ready = service.name != "chroma"
-        return ProbeResult(service.name, service.public_url, ready, 200 if ready else None, "observed")
+        return ProbeResult(service.name, service.public_url.rstrip("/") + "/" + service.health_path.lstrip("/"), ready, 200 if ready else None, "observed")
 
     monkeypatch.setattr("skeleton.app.health.probe_url", probe)
     monkeypatch.setattr(
@@ -890,7 +884,7 @@ def test_optional_chroma_unavailability_fails_full_readiness_only(monkeypatch):
         lambda name, url, *, timeout: ProbeResult(name, url, True, 200, "healthy"),
     )
     assert probes_ok(probe_application(full=False))
-    assert not probes_ok(probe_application(full=True))
+    assert not probes_ok(probe_application(full=True),full=True)
 
 def test_preflight_external_hostname_placeholder_text_is_not_a_secret(monkeypatch, tmp_path):
     from skeleton.app.assembly import preflight
@@ -1261,3 +1255,434 @@ def test_chroma_published_host_port_cannot_overlap_existing_service(
         runtime_manifest(root=tmp_path, environ={})
     with pytest.raises(ValueError, match="CHROMA_PORT"):
         public_service_urls(tmp_path, environ={})
+
+
+
+@pytest.mark.parametrize("payload", [
+    "JWT_SECRET=fixture\x00value\n",
+    "JWT_SECRET=fixture\x7fvalue\n",
+    "JWT_SECRET=one\u2028OTHER=two\n",
+    "JWT_SECRET=one\u0085OTHER=two\n",
+    "export JWT_SECRET=fixture\n",
+    "INVALID-KEY=fixture\n",
+    "JWT_SECRET\n",
+    "JWT_SECRET: fixture\n",
+    'JWT_SECRET="unterminated\n',
+    "JWT_SECRET='unterminated\n",
+    'JWT_SECRET="value" trailing\n',
+])
+def test_runtime_and_setup_refuse_unreviewed_env_syntax_without_echo(tmp_path, payload):
+    from skeleton.app.assembly import _read_dotenv
+    from skeleton.app.setup_runtime import _parse_env
+    source = tmp_path / ".env"
+    source.write_text(payload, encoding="utf-8")
+    for operation in (lambda: _read_dotenv(source), lambda: _parse_env(payload)):
+        with pytest.raises(ValueError, match="runtime .env") as error:
+            operation()
+        assert "fixture" not in str(error.value)
+    assert source.read_text(encoding="utf-8") == payload
+
+
+def test_runtime_and_setup_share_legacy_duplicates_and_quoted_comment_semantics(tmp_path):
+    from skeleton.app.assembly import _read_dotenv
+    from skeleton.app.setup_runtime import _parse_env
+    text = (
+        "# legacy duplicates retain last assignment\n"
+        "VALUE=first\n"
+        'VALUE="second # literal" # external comment\n'
+        "PORT=8080 # comment\n"
+        "EMPTY=\n"
+        "SINGLE='literal # value' # comment\n"
+    )
+    source = tmp_path / ".env"
+    source.write_text(text, encoding="utf-8")
+    expected = {"VALUE": "second # literal", "PORT": "8080",
+                "EMPTY": "", "SINGLE": "literal # value"}
+    assert _parse_env(text) == _read_dotenv(source) == expected
+
+
+def test_readonly_dotenv_rejects_same_inode_mutation(tmp_path, monkeypatch):
+    import os
+    from skeleton.app.assembly import _read_dotenv
+    source = tmp_path / ".env"
+    source.write_text("VALUE=first\n")
+    actual_fdopen = os.fdopen
+
+    class Reader:
+        def __init__(self, fd, mode):
+            self.handle = actual_fdopen(fd, mode)
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            self.handle.close()
+        def fileno(self):
+            return self.handle.fileno()
+        def read(self, size):
+            content = self.handle.read(size)
+            source.write_text("VALUE=other\n")
+            info = source.stat()
+            os.utime(source, ns=(info.st_atime_ns, info.st_mtime_ns + 2_000_000_000))
+            return content
+
+    monkeypatch.setattr(os, "fdopen", Reader)
+    with pytest.raises(ValueError, match="changed"):
+        _read_dotenv(source)
+
+
+@pytest.mark.parametrize("action", ["config", "up"])
+@pytest.mark.parametrize("hot", [False, True])
+def test_compose_installer_commands_select_exact_private_env_file(action, hot):
+    command = compose_command(action, install_env=True, hot=hot)
+    pos = command.index("--env-file")
+    assert command[pos:pos + 3] == ("--env-file", ".env", action)
+    assert command.count("--env-file") == 1
+    assert "--env-file" not in compose_command(action, hot=hot)
+
+
+@pytest.mark.parametrize("value", [None, 0, 1, "true"])
+def test_compose_install_env_switch_is_explicit_boolean(value):
+    with pytest.raises(ValueError, match="install_env"):
+        compose_command("config", install_env=value)
+
+
+def test_frontend_recovery_compose_never_starts_implicit_dependencies():
+    from dataclasses import replace
+    from skeleton.app.assembly import load_manifest
+    manifest = replace(load_manifest(), default_services=("frontend",), full_services=("frontend",))
+    command = compose_command("up", manifest=manifest, install_env=True, frontend_recovery=True)
+    assert "--no-deps" in command
+    assert command[-1] == "frontend"
+    assert "--no-deps" not in compose_command("up")
+
+
+@pytest.mark.parametrize("action,full,pinned", [
+    ("config", False, True), ("up", True, True), ("up", False, False),
+])
+def test_frontend_recovery_rejects_nonisolated_authority(action, full, pinned):
+    from dataclasses import replace
+    from skeleton.app.assembly import load_manifest
+    manifest = replace(load_manifest(), default_services=("frontend",), full_services=("frontend",))
+    with pytest.raises(ValueError, match="frontend recovery"):
+        compose_command(action, full=full, install_env=pinned, manifest=manifest, frontend_recovery=True)
+
+
+def test_frontend_recovery_rejects_full_canonical_graph():
+    with pytest.raises(ValueError, match="frontend recovery"):
+        compose_command("up", install_env=True, frontend_recovery=True)
+
+
+@pytest.mark.parametrize("status", [False, True, None, "0", 2**40])
+def test_host_command_rejects_malformed_exit_status(status):
+    from types import SimpleNamespace
+    from skeleton.app.preloader import _command_check
+    result = _command_check(["docker", "info"], code="host:docker", label="Docker",
+                            remediation="repair", runner=lambda *a, **k: SimpleNamespace(returncode=status))
+    assert result.ok is False
+    assert result.detail == "Docker returned invalid process status"
+
+
+
+def _prepare_cli_start(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from skeleton.app import cli
+    config = tmp_path / ".env"
+    config.write_text("FRONTEND_PORT=3000\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "find_repo_root", lambda: tmp_path)
+    from skeleton.app.compose_storage_binding import BindingReport
+    monkeypatch.setattr("skeleton.app.compose_storage_binding.observe_binding",
+                        lambda *a,**k: BindingReport(True,True,"fixture"))
+    monkeypatch.setattr(cli, "preflight", lambda *a, **k: ())
+    monkeypatch.setattr("skeleton.app.preloader.inspect_host", lambda *a, **k: SimpleNamespace(ready=True))
+    return config
+
+
+@pytest.mark.parametrize("options", [
+    ["--verify-attempts", "121"], ["--verify-attempts", "0"],
+    ["--verify-delay", "31"], ["--verify-delay", "nan"], ["--verify-delay", "inf"],
+])
+def test_cli_start_rejects_entire_invalid_probe_budget_before_mutation(tmp_path, monkeypatch, options):
+    from skeleton.app import cli
+    _prepare_cli_start(tmp_path, monkeypatch)
+    def forbidden(*a, **k):
+        pytest.fail("invalid startup budget reached preflight or mutation")
+    monkeypatch.setattr(cli, "preflight", forbidden)
+    monkeypatch.setattr(cli, "_run_compose", forbidden)
+    assert cli.run_app_cli(["up", *options]) == 2
+
+
+@pytest.mark.parametrize("stage", ["preflight", "manifest", "compose", "health", "registry"])
+def test_cli_start_cannot_qualify_changed_configuration(tmp_path, monkeypatch, stage):
+    from skeleton.app import cli
+    config = _prepare_cli_start(tmp_path, monkeypatch)
+    seen = []
+
+    def observe(name):
+        seen.append(name)
+        if stage == name:
+            config.write_text("FRONTEND_PORT=3300\n", encoding="utf-8")
+
+    real_manifest = cli.runtime_manifest
+    def preflight(*a, **k):
+        observe("preflight")
+        return ()
+    def manifest(*a, **k):
+        result = real_manifest(*a, **k)
+        observe("manifest")
+        return result
+    def compose(command, root, **kw):
+        assert "--env-file" in command
+        observe("compose")
+        return 0
+    def health(**kw):
+        from skeleton.testing.app_health_fixtures import fixture_probes
+        observe("health")
+        return fixture_probes(**kw)
+    def registry(*a, **k):
+        observe("registry")
+        return {"ready": True}
+
+    monkeypatch.setattr(cli, "preflight", preflight)
+    monkeypatch.setattr(cli, "runtime_manifest", manifest)
+    monkeypatch.setattr(cli, "_run_compose", compose)
+    monkeypatch.setattr("skeleton.app.health.wait_for_application", health)
+    monkeypatch.setattr("skeleton.app.first_install.critical_backend_route_report", registry)
+    assert cli.run_app_cli(["up"]) == 2
+    assert seen == ["preflight", "manifest", "compose", "health", "registry"][:seen.index(stage)+1]
+
+
+def test_cli_no_verify_does_not_bypass_configuration_epoch(tmp_path, monkeypatch):
+    from skeleton.app import cli
+    config = _prepare_cli_start(tmp_path, monkeypatch)
+    def compose(*a, **kw):
+        config.write_text("FRONTEND_PORT=3300\n")
+        return 0
+    monkeypatch.setattr(cli, "_run_compose", compose)
+    assert cli.run_app_cli(["up", "--no-verify"]) == 2
+
+
+@pytest.mark.parametrize("ready", [True, False])
+def test_cli_start_requires_critical_routes_not_only_healthy_socket(tmp_path, monkeypatch, ready):
+    from skeleton.app import cli
+    _prepare_cli_start(tmp_path, monkeypatch)
+    monkeypatch.setattr(cli, "_run_compose", lambda *a, **k: 0)
+    from skeleton.testing.app_health_fixtures import fixture_probes
+    monkeypatch.setattr("skeleton.app.health.wait_for_application", fixture_probes)
+    monkeypatch.setattr("skeleton.app.first_install.critical_backend_route_report", lambda *a, **k: {"ready": ready})
+    assert cli.run_app_cli(["up"]) == (0 if ready else 1)
+
+
+@pytest.mark.parametrize("status", [False, True, "0", None, -9, 2**40])
+def test_cli_compose_rejects_uncertain_process_status(tmp_path, monkeypatch, status):
+    from types import SimpleNamespace
+    from skeleton.app import cli
+    monkeypatch.setattr(cli.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=status))
+    assert cli._run_compose(("docker", "compose", "up"), tmp_path) == 1
+
+
+def test_cli_compose_pins_original_process_environment(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from skeleton.app import cli
+    captured = {"FRONTEND_PORT": "3000", "COMPOSE_ENV_FILES": "elsewhere.env",
+                "COMPOSE_REMOVE_ORPHANS": "1", "COMPOSE_PROFILES": "full"}
+    monkeypatch.setenv("FRONTEND_PORT", "3300")
+    def subprocess_run(*a, **kw):
+        env = kw["env"]
+        assert env["FRONTEND_PORT"] == "3000"
+        assert "COMPOSE_ENV_FILES" not in env
+        assert env["COMPOSE_REMOVE_ORPHANS"] == "0"
+        assert env["COMPOSE_PROFILES"] == ""
+        assert env["COMPOSE_DISABLE_ENV_FILE"] == "0"
+        return SimpleNamespace(returncode=0)
+    monkeypatch.setattr(cli.subprocess, "run", subprocess_run)
+    assert cli._run_compose(("docker", "compose", "--env-file", ".env", "up"), tmp_path,
+                            process_env=captured) == 0
+
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"min_free_bytes": 0}, {"min_free_bytes": True},
+    {"min_free_bytes": -1}, {"min_free_bytes": 12*1024**3+1},
+    {"recommended_free_bytes": 2**63}, {"recommended_free_bytes": float("nan")},
+    {"require_python": "yes"}, {"require_pip": 1},
+])
+def test_host_preloader_rejects_invalid_admission_inputs_before_inspection(monkeypatch, kwargs):
+    from skeleton.app import preloader
+    def forbidden(*a, **k):
+        pytest.fail("invalid host thresholds reached filesystem inspection")
+    monkeypatch.setattr(preloader, "find_repo_root", forbidden)
+    with pytest.raises(ValueError):
+        preloader.inspect_host(**kwargs)
+
+
+@pytest.mark.parametrize("timeout", [True, None, 0, -1, 31, float("inf"), float("nan")])
+def test_host_command_bounds_timeout_before_dispatch(timeout):
+    from skeleton.app.preloader import _command_check
+    def forbidden(*a, **k):
+        pytest.fail("invalid command timeout reached subprocess")
+    with pytest.raises(ValueError, match="timeout"):
+        _command_check(["docker"], code="host:docker", label="Docker",
+                       remediation="repair", runner=forbidden, timeout=timeout)
+
+
+def test_host_command_does_not_buffer_untrusted_diagnostics():
+    import subprocess
+    from skeleton.app.preloader import _command_check
+    def runner(args, **kw):
+        assert kw["stdin"] == kw["stdout"] == kw["stderr"] == subprocess.DEVNULL
+        assert "capture_output" not in kw
+        return subprocess.CompletedProcess(args, 0)
+    result = _command_check(["docker"], code="host:docker", label="Docker",
+                            remediation="repair", runner=runner)
+    assert result.ok
+
+
+@pytest.mark.parametrize("raw", ["1"*10000, "000001", "１２３", "65536", "+80", " 80"])
+def test_runtime_port_admission_rejects_unbounded_or_ambiguous_decimal(tmp_path, raw):
+    from skeleton.app.assembly import runtime_manifest
+    with pytest.raises(ValueError, match="FRONTEND_PORT must be an integer"):
+        runtime_manifest(root=tmp_path, environ={"FRONTEND_PORT": raw})
+
+
+@pytest.mark.parametrize("origin", [
+    "http://external.invalid:3000", "http://user:password@localhost:3000",
+    "http://localhost:3000/path", "http://localhost:3000?", "http://localhost:3000#",
+    "http://local%68ost:3000", "http://localhost", "http://localhost:0",
+])
+@pytest.mark.parametrize("override", [False, True])
+def test_runtime_manifest_does_not_adopt_untrusted_default_or_overridden_origin(tmp_path, origin, override):
+    from dataclasses import replace
+    from skeleton.app.assembly import runtime_manifest, load_manifest
+    manifest = load_manifest()
+    manifest = replace(manifest, services=tuple(
+        replace(item, public_url=origin) if item.name == "frontend" else item
+        for item in manifest.services
+    ))
+    with pytest.raises(ValueError, match="frontend"):
+        runtime_manifest(manifest, root=tmp_path,
+                         environ={"FRONTEND_PORT": "3300"} if override else {})
+
+
+
+@pytest.mark.parametrize("port",[8081,19000,19001,19002])
+def test_hot_overlay_reserves_only_numeric_loopback_ports(port):
+    root=find_repo_root(Path(__file__))
+    text=(root/"docker-compose.hot.yml").read_text(encoding="utf-8")
+    assert f'"127.0.0.1:{port}:{port}"' in text
+    assert f'"{port}:{port}"' not in text
+
+
+@pytest.mark.parametrize("origin",["http://localhost:8001","http://127.0.0.1:8001/"])
+def test_launch_network_allows_correct_explicit_local_browser_origins(tmp_path,origin):
+    from skeleton.app.assembly import launch_network_errors,runtime_manifest
+    env={"EXPO_PUBLIC_BACKEND_URL":origin,"EXPO_PUBLIC_SKELETON_URL":"http://localhost:8010",
+         "SKELETON_INTERNAL_URL":"http://skeleton:8001","CORS_ORIGINS":"http://localhost:3000"}
+    manifest=runtime_manifest(root=tmp_path,environ=env)
+    assert launch_network_errors(tmp_path,manifest=manifest,environ=env)==()
+
+
+@pytest.mark.parametrize("origin",["http://localhost:8002","https://localhost:8001","http://localhost:8001/api",
+                                  "http://user:private@localhost:8001","http://localhost:8001?",
+                                  "http://external.invalid:8001","http://localhost:8001#"])
+def test_launch_network_rejects_misbound_browser_origin_without_reflection(tmp_path,origin):
+    from skeleton.app.assembly import launch_network_errors,runtime_manifest
+    env={"EXPO_PUBLIC_BACKEND_URL":origin}
+    manifest=runtime_manifest(root=tmp_path,environ=env)
+    assert launch_network_errors(tmp_path,manifest=manifest,environ=env)==(
+        "EXPO_PUBLIC_BACKEND_URL must address the selected local application port",)
+
+
+@pytest.mark.parametrize("port",[8081,19000,19001,19002])
+@pytest.mark.parametrize("key",["FRONTEND_PORT","BACKEND_PORT","SKELETON_PORT","MONGO_PORT","CHROMA_PORT"])
+def test_hot_mode_detects_collision_with_every_configurable_port(tmp_path,port,key):
+    from skeleton.app.assembly import launch_network_errors,runtime_manifest
+    env={key:str(port)}
+    manifest=runtime_manifest(root=tmp_path,environ=env)
+    assert launch_network_errors(tmp_path,manifest=manifest,environ=env)==()
+    assert launch_network_errors(tmp_path,manifest=manifest,environ=env,hot=True)==(
+        "hot-reload ports overlap a canonical application port",)
+
+
+def test_local_launch_requires_explicit_cors_to_cover_selected_browser_origin(tmp_path):
+    from skeleton.app.assembly import launch_network_errors,runtime_manifest
+    env={"FRONTEND_PORT":"3300","CORS_ORIGINS":"http://localhost:3300,https://operator.example.invalid"}
+    manifest=runtime_manifest(root=tmp_path,environ=env)
+    assert launch_network_errors(tmp_path,manifest=manifest,environ=env)==()
+    assert launch_network_errors(tmp_path,manifest=manifest,
+        environ={**env,"CORS_ORIGINS":"http://localhost:3000"})
+    assert launch_network_errors(tmp_path,manifest=manifest,environ={**env,"CORS_ORIGINS":"*"})
+
+
+def test_cli_compose_lifecycle_output_is_bounded_and_redacted(tmp_path,monkeypatch):
+    import subprocess
+    from skeleton.app import cli
+    def runner(command,**kwargs):
+        assert kwargs["stdout"]==kwargs["stderr"]==kwargs["stdin"]==subprocess.DEVNULL
+        assert kwargs["timeout"]==1800
+        return subprocess.CompletedProcess(command,0)
+    monkeypatch.setattr(cli.subprocess,"run",runner)
+    assert cli._run_compose(("docker","compose","up"),tmp_path)==0
+
+
+
+@pytest.mark.parametrize("command",["status","smoke"])
+def test_readonly_cli_drops_health_evidence_after_configuration_epoch_loss(tmp_path,monkeypatch,capsys,command):
+    from skeleton.app import cli
+    from skeleton.testing.app_health_fixtures import fixture_probes
+    config=tmp_path/".env"
+    config.write_text("FRONTEND_PORT=3000\n")
+    monkeypatch.setattr(cli,"find_repo_root",lambda:tmp_path)
+    def probe(**kw):
+        assert kw["admit"]()
+        old=config.read_bytes()
+        config.write_text("FRONTEND_PORT=3300\n")
+        assert kw["admit"]() is False
+        config.write_bytes(old)
+        assert kw["admit"]() is False
+        return fixture_probes(**kw)
+    monkeypatch.setattr("skeleton.app.health.probe_application",probe)
+    monkeypatch.setattr("skeleton.app.health.wait_for_application",probe)
+    argv=["status","--live","--json"] if command=="status" else ["smoke","--json"]
+    assert cli.run_app_cli(argv)==1
+    result=json.loads(capsys.readouterr().out)
+    if command=="status":
+        result=result["runtime_health"]
+    assert result["ok"] is False and result["results"]==[]
+
+
+
+@pytest.mark.parametrize("payload", [
+    'PRIVATE="fixture\\nvalue"\n',
+    'PRIVATE="fixture\\rvalue"\n',
+    'PRIVATE="fixture\\tvalue"\n',
+    'PRIVATE="fixture\\u0000"\n',
+    'PRIVATE="fixture\\u0041"\n',
+    'PRIVATE="fixture\\q"\n',
+    'PRIVATE=$' + '{UNREVIEWED_SECRET:-fixture}\n',
+    'PRIVATE="$UNREVIEWED_SECRET"\n',
+    'PRIVATE=first\rOTHER=second\n',
+    'PRIVATE="fixture\tvalue"\n',
+])
+def test_dotenv_literal_boundary_rejects_ambiguous_or_controlled_values(payload):
+    from skeleton.app.assembly import _parse_dotenv_content
+    with pytest.raises(ValueError,match="runtime .env") as denied:
+        _parse_dotenv_content(payload)
+    assert "fixture" not in str(denied.value)
+    assert "UNREVIEWED_SECRET" not in str(denied.value)
+
+
+def test_dotenv_supported_literal_quoting_dollars_and_crlf():
+    from skeleton.app.assembly import _parse_dotenv_content
+    payload = (
+        "SINGLE='$VARIABLE # literal'\r\n"
+        'DOUBLE="$$VARIABLE and \\"quoted\\""\r\n'
+        'UNQUOTED=$$VARIABLE\t# external comment\r\n'
+        'PATH="C:\\\\local\\\\model"\r\n'
+        'BARE=literal$!\r\n'
+    )
+    assert _parse_dotenv_content(payload) == {
+        "SINGLE":"$VARIABLE # literal",
+        "DOUBLE":'$VARIABLE and "quoted"',
+        "UNQUOTED":"$VARIABLE",
+        "PATH":r"C:\local\model",
+        "BARE":"literal$!",
+    }

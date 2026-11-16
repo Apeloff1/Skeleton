@@ -27,10 +27,35 @@ _BUILD_CONTEXTS = (
     ("frontend", "frontend/Dockerfile", "frontend", "frontend/.dockerignore"),
 )
 # These rules constrain *source* admission, not container execution policy.
-_REQUIRED_IGNORES = (
-    (".env", ".env.*", "*.pem", "*.key"),
-    ("**/.env", "**/.env.*", "**/*.pem", "**/*.key"),
+# Require a terminal privacy fence instead of approximating Docker's complete
+# patternmatcher. Late exceptions may reopen protected files or their parents.
+_PRIVATE_NAMES = (
+    ".env", ".env.*", "..env.*", "*.pem", "*.key", "*.p12", "*.pfx", "*.crt", "*.cer",
+    "credentials*.json", "service-account*.json", ".runtime",
 )
+_RECURSIVE_IGNORES = tuple("**/" + name for name in _PRIVATE_NAMES)
+
+
+def _private_ignore_fence(source: str, *, frontend: bool) -> bool:
+    """Require every privacy rule after the final context re-inclusion."""
+    if "\x00" in source or "\\" in source:
+        return False
+    terminal: set[str] = set()
+    for physical in source.splitlines():
+        line = physical.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("!"):
+            terminal.clear()
+        else:
+            terminal.add(line.rstrip("/"))
+    required = _RECURSIVE_IGNORES + (_PRIVATE_NAMES if frontend else ())
+    return all(rule in terminal for rule in required)
+
+
+def _descriptor_stamp(info: os.stat_result) -> tuple[int, ...]:
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_nlink,
+            info.st_size, info.st_mtime_ns, info.st_ctime_ns)
 
 
 
@@ -46,17 +71,20 @@ def _bounded_source_text(path: Path) -> str:
         if (
             not stat.S_ISREG(opened.st_mode)
             or not stat.S_ISREG(current.st_mode)
-            or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)
+            or _descriptor_stamp(opened) != _descriptor_stamp(current)
             or (os.name != "nt" and opened.st_nlink != 1)
             or opened.st_size > MAX_DOCKERFILE_BYTES
         ):
             raise ValueError("unsafe or oversized build contract input")
         data = source.read(MAX_DOCKERFILE_BYTES + 1)
+        final = os.fstat(source.fileno())
         current = os.lstat(path)
         if (
-            len(data) > MAX_DOCKERFILE_BYTES
+            len(data) != opened.st_size
+            or len(data) > MAX_DOCKERFILE_BYTES
             or not stat.S_ISREG(current.st_mode)
-            or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)
+            or _descriptor_stamp(opened) != _descriptor_stamp(final)
+            or _descriptor_stamp(final) != _descriptor_stamp(current)
         ):
             raise ValueError("build contract input changed or exceeded budget")
     return data.decode("utf-8")
@@ -103,6 +131,9 @@ def _safe_existing_source(context: Path, candidate: Path) -> bool:
 
 def _copy_sources(line: str) -> tuple[str, ...] | None:
     """Extract supported literal COPY sources; None denotes malformed syntax."""
+    # Continuations are already handled; do not let shlex silently alter paths.
+    if "\\" in line or "\x00" in line:
+        return None
     try:
         tokens = shlex.split(line, comments=False, posix=True)
     except ValueError:
@@ -110,27 +141,194 @@ def _copy_sources(line: str) -> tuple[str, ...] | None:
     if not tokens or tokens[0].upper() != "COPY":
         return None
     arguments = tokens[1:]
+    flags: set[str] = set()
     while arguments and arguments[0].startswith("--"):
         flag = arguments.pop(0)
-        if flag.startswith("--from="):
-            # From-stage copies do not refer to the host source checkout.
-            return ()
-        if not flag.startswith(("--chown=", "--chmod=", "--link")):
+        key, sep, value = flag.partition("=")
+        if key in flags or key not in {"--from", "--chown", "--chmod", "--link"}:
             return None
+        if key == "--link":
+            if sep and value not in {"true", "false"}:
+                return None
+        elif not sep or not value:
+            return None
+        flags.add(key)
     if len(arguments) < 2:
         return None
     # JSON-array COPY is intentionally not used by the pinned installation
     # Dockerfiles; fail closed if a new syntax is introduced without review.
-    if arguments[0].startswith("["):
+    if arguments[0].startswith("[") or any(not arg for arg in arguments):
         return None
-    return tuple(arguments[:-1])
+    # Parse the entire instruction before allowing a stage-copy exemption.
+    return () if "--from" in flags else tuple(arguments[:-1])
+
+
+
+def _nginx_tokens(source: str):
+    """Lex the reviewed ingress subset, distinguishing punctuation from strings.
+
+    This is a source admission check, not a replacement for native nginx -t.
+    Quoted semicolons/braces, comments and escaped characters cannot fabricate
+    a second directive or hide a duplicate location from the structural walk.
+    """
+    token: list[str] = []
+    active = False
+    quote = None
+    escaped = False
+    comment = False
+    for char in source:
+        if comment:
+            if char == "\n":
+                comment = False
+            continue
+        if escaped:
+            token.extend(("\\", char))
+            escaped = False
+            active = True
+            continue
+        if char == "\\":
+            escaped = True
+            active = True
+            continue
+        if quote is not None:
+            if char == quote:
+                quote = None
+            else:
+                token.append(char)
+            continue
+        if char in ("'", '"'):
+            quote = char
+            active = True
+            continue
+        if char == "#" or char.isspace() or char in "{};":
+            if active:
+                yield "".join(token), False
+                token.clear()
+                active = False
+            if char == "#":
+                comment = True
+            elif char in "{};":
+                yield char, True
+            continue
+        if char == "\x00":
+            raise ValueError("NUL in ingress configuration")
+        token.append(char)
+        active = True
+    if quote is not None or escaped:
+        raise ValueError("unfinished ingress token")
+    if active:
+        yield "".join(token), False
+
+
+def nginx_ingress_errors(source: str) -> tuple[str, ...]:
+    """Validate the single-server installation ingress before any Docker run.
+
+    Native Nginx remains the grammar authority. The bounded source contract
+    deliberately refuses includes, nested locations and conflicting route
+    declarations in this one maintained configuration.
+    """
+    if (not isinstance(source, str) or "\x00" in source
+            or len(source.encode("utf-8", errors="replace")) > MAX_DOCKERFILE_BYTES):
+        return ("invalid or oversized production ingress",)
+    frames: list[tuple[str, ...]] = []
+    words: list[str] = []
+    locations: set[tuple[str, str]] = set()
+    setup: list[tuple[str, ...]] = []
+    health: list[tuple[str, ...]] = []
+    servers = 0
+    try:
+        for token, structural in _nginx_tokens(source):
+            if not structural:
+                words.append(token)
+                if len(words) > 512:
+                    raise ValueError("ingress directive exceeds token budget")
+                continue
+            if token == "}":
+                if words or not frames:
+                    raise ValueError("unbalanced ingress block")
+                frames.pop()
+                continue
+            if not words:
+                raise ValueError("empty ingress directive")
+            directive = tuple(words)
+            words.clear()
+            if directive[0] == "include":
+                return ("production ingress contains unreviewed include",)
+            route_frame = frames[-1] if frames else ()
+            protected_setup = route_frame == ("location", "=", "/setup")
+            protected_health = route_frame == ("location", "=", "/healthz")
+            if token == ";":
+                if protected_setup:
+                    setup.append(directive)
+                elif protected_health:
+                    health.append(directive)
+                continue
+            if protected_setup or protected_health:
+                return ("protected production ingress contains a nested block",)
+            if directive == ("server",):
+                if frames:
+                    raise ValueError("nested ingress server")
+                servers += 1
+            if directive[0] == "location":
+                if frames != [("server",)]:
+                    return ("production ingress contains a nested or foreign location",)
+                if len(directive) == 2:
+                    kind, path = "prefix", directive[1]
+                elif len(directive) == 3 and directive[1] in ("=", "^~", "~", "~*"):
+                    kind, path = directive[1], directive[2]
+                    if kind == "^~":
+                        kind = "prefix"
+                else:
+                    raise ValueError("unsupported ingress location")
+                if not path or kind in ("=", "prefix") and not path.startswith("/"):
+                    raise ValueError("unsupported ingress route")
+                identity = (kind, path)
+                if identity in locations:
+                    return ("duplicate production ingress location",)
+                locations.add(identity)
+            frames.append(directive)
+            if len(frames) > 16 or len(locations) > 256:
+                raise ValueError("production ingress structure exceeds budget")
+        if words or frames or servers != 1:
+            raise ValueError("unclosed or ambiguous production ingress")
+    except ValueError:
+        return ("malformed or unsupported production ingress configuration",)
+
+    issues: list[str] = []
+    if ("=", "/setup") not in locations:
+        issues.append("production ingress missing exact setup route")
+    if ("=", "/healthz") not in locations:
+        issues.append("production ingress missing exact health route")
+    if ("prefix", "/") not in locations:
+        issues.append("production ingress missing application root route")
+    exact_setup = ("try_files", "/setup.html", "/setup/index.html", "=404")
+    if [item for item in setup if item[0] == "try_files"] != [exact_setup]:
+        issues.append("production setup must serve its exported route or return 404")
+    if any(item[0] not in ("try_files", "add_header") for item in setup):
+        issues.append("production setup route has unreviewed directives")
+    expected_permissions = (
+        "add_header", "Permissions-Policy",
+        "camera=(), microphone=(), geolocation=()", "always",
+    )
+    expected_cache = ("add_header", "Cache-Control", "no-store", "always")
+    for expected in (expected_permissions, expected_cache):
+        relevant = [item for item in setup if item[0] == "add_header"
+                    and len(item) > 1 and item[1].lower() == expected[1].lower()]
+        if relevant != [expected]:
+            issues.append("production setup privacy or cache policy drift")
+    if [item for item in health if item[0] == "return"] != [("return", "200", r"ok\n")]:
+        issues.append("production health route must return its literal liveness response")
+    if any(item[0] not in ("return", "access_log", "add_header") for item in health):
+        issues.append("production health route has unreviewed directives")
+    return tuple(issues)
 
 
 def build_source_errors(root: Path) -> tuple[str, ...]:
     """Check source inputs and credential exclusions for all build contexts.
 
     Returns only bounded path/category errors; does not read source file
-    contents, shell output, credentials, model weights, or network resources.
+    contents except reviewed build/ingress contracts, shell output, credentials,
+    model weights, or network resources.
     """
     issues: list[str] = []
     root = root.resolve()
@@ -139,23 +337,23 @@ def build_source_errors(root: Path) -> tuple[str, ...]:
         source = root / dockerfile
         ignored = root / ignore_path
         try:
+            if not _safe_existing_source(root, source):
+                raise ValueError("unsafe Dockerfile path")
             instructions = _bounded_source_text(source).splitlines()
         except (OSError, UnicodeError, ValueError):
             issues.append(f"{scope}: Dockerfile missing, linked, oversized or unreadable")
             continue
         try:
-            ignore_lines = {
-                line.strip()
-                for line in _bounded_source_text(ignored).splitlines()
-                if line.strip() and not line.strip().startswith("#")
-            }
+            if not _safe_existing_source(root, ignored):
+                raise ValueError("unsafe Docker ignore path")
+            # Dockerfile-specific ignores take precedence over context ignores.
+            if scope == "frontend" and os.path.lexists(str(source) + ".dockerignore"):
+                raise ValueError("unreviewed Dockerfile-specific ignore override")
+            ignore_source = _bounded_source_text(ignored)
         except (OSError, UnicodeError, ValueError):
             issues.append(f"{scope}: missing or unsafe Docker context ignore file")
             continue
-        # The engine and backend use per-Dockerfile allowlists. The frontend
-        # uses a dedicated subtree and its own denylist.
-        required = _REQUIRED_IGNORES[0 if scope == "frontend" else 1]
-        if any(rule not in ignore_lines for rule in required):
+        if not _private_ignore_fence(ignore_source, frontend=scope == "frontend"):
             issues.append(f"{scope}: private runtime files are not excluded from Docker context")
 
         # Dockerfile lines can include backslash continuations. COPY sources
@@ -175,7 +373,11 @@ def build_source_errors(root: Path) -> tuple[str, ...]:
         if pending:
             issues.append(f"{scope}: incomplete Dockerfile line continuation")
         for line in logical:
-            if line.split(maxsplit=1)[0].upper() != "COPY":
+            instruction = line.split(maxsplit=1)[0].upper()
+            if instruction == "ADD":
+                issues.append(f"{scope}: unreviewed Docker ADD instruction")
+                continue
+            if instruction != "COPY":
                 continue
             sources = _copy_sources(line)
             if sources is None:
@@ -199,6 +401,25 @@ def build_source_errors(root: Path) -> tuple[str, ...]:
                     continue
                 if not all(_safe_existing_source(context, Path(match)) for match in matches):
                     issues.append(f"{scope}: Docker COPY input is linked or unsafe: {relative}")
+        # A production frontend must pass the bounded source ingress gate,
+        # before setup or install can alter operator state. Source-only fixture
+        # Dockerfiles without Nginx are not promoted to production evidence.
+        if scope == "frontend" and any(
+            line.lower().startswith("from nginx:") or
+            line.lower().startswith("from nginx@") or
+            (line.split(maxsplit=1)[0].upper() == "COPY"
+             and "nginx.conf" in (_copy_sources(line) or ()))
+            for line in logical
+        ):
+            ingress = context / "nginx.conf"
+            try:
+                if not _safe_existing_source(context, ingress):
+                    raise ValueError("unsafe production ingress")
+                ingress_source = _bounded_source_text(ingress)
+            except (OSError, UnicodeError, ValueError):
+                issues.append("frontend: production ingress missing, linked, oversized or unreadable")
+            else:
+                issues.extend("frontend: " + error for error in nginx_ingress_errors(ingress_source))
         if len(issues) >= MAX_DIAGNOSTICS:
             break
     if len(issues) > MAX_DIAGNOSTICS:

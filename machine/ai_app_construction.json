@@ -2892,6 +2892,22 @@
       "network_transport_owner": false,
       "sdk_client_owner": false,
       "discovery_edge_classes": []
+    },
+    {
+      "id": "independent-guard-reviewer",
+      "family": "none",
+      "role": "Separate application-pinned TLS and Ed25519 verdict transport; no model provider credentials, no authority from user text or provider fallback.",
+      "owner": "skeleton/ai/runtime/inference/signed_reviewer_client.py",
+      "credential_bearing": false,
+      "receipt_required": true,
+      "status": "library",
+      "surface_class": "independent_guard_reviewer_transport",
+      "credential_owner": false,
+      "network_transport_owner": true,
+      "sdk_client_owner": false,
+      "discovery_edge_classes": [
+        "network_transport"
+      ]
     }
   ],
   "request_lifecycle": [

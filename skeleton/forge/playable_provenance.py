@@ -1,13 +1,8 @@
-"""Deterministic source reconstruction for the native playable prototype.
+"""Exact source reconstruction for the active native prototype and portal.
 
-A self-consistent SHA-256 manifest alone is not a claim of *authored*
-gameplay: an arbitrary changed GDScript could be hashed again. This module
-reconstructs exact, known original-game source from the fixed registry and
-bounded cockpit edits, checks the selected startup/launcher path, and
-compares every path and receipt to that source.
-
-This is source convergence and integrity, not authentication or anti-cheat;
-an attacker able to modify this verifier is outside its scope.
+The v2 contract binds the actual bidirectional portal, project settings and
+generated native code, not the retired PlayableHub or an arbitrary digest.
+Source convergence is not native execution evidence or release authority.
 """
 from __future__ import annotations
 
@@ -16,90 +11,75 @@ import json
 from collections.abc import Mapping
 from typing import Any
 
-from skeleton.forge.archetype_content import (
-    PLAYABLE_LAUNCHER_PATH, _LAUNCHER_SCRIPT,
-    archetype_files, content_archetypes,
-)
+from skeleton.forge.archetype_content import archetype_files, content_archetypes, verify_archetype_content
+from skeleton.forge.playable_portal import SCRIPT_PATH, verify_playable_portal
 from skeleton.forge.playable_tuning import SOURCE_PATH
 from skeleton.forge.source_manifest import source_manifest
 
-SCHEMA = "skeleton.gameforge.playable_source.v1"
+SCHEMA = "skeleton.gameforge.playable_source.v2"
 
 
-def verify_playable_source(
-    files: Mapping[str, str], receipt: Mapping[str, Any],
-) -> bool:
-    """Require emitted game source to equal a reproducible authored build."""
+def _canonical(value: Any) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=True, allow_nan=False).encode("ascii")
+
+
+def build_playable_source_receipt(
+    files: dict[str, str], mode: str, *,
+    operator_axes: Mapping[str, float] | None = None,
+    start_in_prototype: bool = False,
+) -> dict[str, Any]:
+    """Reconstruct all governed native files after independent feature writers."""
+    if type(files) is not dict or type(mode) is not str or mode not in content_archetypes():
+        raise ValueError("invalid playable source inventory")
+    if type(start_in_prototype) is not bool:
+        raise ValueError("explicit playable startup selection required")
+    manifest = source_manifest(files)
+    if not verify_archetype_content(files, mode, operator_axes=operator_axes):
+        raise ValueError("native playable source differs from authored generator")
+    if not verify_playable_portal(files, mode, start_in_prototype=start_in_prototype):
+        raise ValueError("native playable portal or startup source invalid")
+    expected = archetype_files(mode, operator_axes=operator_axes)
+    owned = {path for path in files if path.casefold().startswith(
+        ("scenes/archetypes/", "scripts/archetypes/"))}
+    authored = {path for path in expected if path != SOURCE_PATH}
+    if owned != authored:
+        raise ValueError("unreviewed native prototype source in governed namespace")
+    paths = sorted(set(expected) | {SCRIPT_PATH, "project.godot"})
+    hashes = {path: manifest["files"][path] for path in paths}
+    scene = f"res://scenes/archetypes/{mode}/main.tscn"
+    receipt = {
+        "schema": SCHEMA, "mode": mode, "scene": scene,
+        "launch_scene": scene if start_in_prototype else None,
+        "launcher": SCRIPT_PATH, "source_files": hashes,
+        "source_sha256": hashlib.sha256(_canonical(hashes)).hexdigest(),
+        "native_execution_qualified": False,
+    }
+    if SOURCE_PATH in expected:
+        receipt["tuning"] = json.loads(expected[SOURCE_PATH])
+    return receipt
+
+
+def verify_playable_source(files: Mapping[str, str], receipt: Mapping[str, Any]) -> bool:
+    """Reconstruct the current contract; never promote a historical v1 receipt."""
     try:
-        if type(receipt) is not dict or type(files) is not dict:
-            return False
-        required = {
-            "schema", "mode", "scene", "launch_scene", "launcher",
-            "source_files", "source_sha256",
-        }
-        optional = {"tuning"}
-        if not required.issubset(receipt) or set(receipt) - required - optional:
-            return False
-        if receipt.get("schema") != SCHEMA:
+        if type(files) is not dict or type(receipt) is not dict or receipt.get("schema") != SCHEMA:
             return False
         mode = receipt["mode"]
-        if type(mode) is not str or mode not in content_archetypes():
-            return False
-        project = files.get("project.godot")
-        if type(project) is not str:
-            return False
+        launch = receipt["launch_scene"]
         scene = f"res://scenes/archetypes/{mode}/main.tscn"
-        if receipt.get("scene") != scene:
+        if launch is not None and launch != scene:
             return False
-        start = receipt["launch_scene"]
-        launcher = receipt["launcher"]
-        if (start is None) == (launcher is None):
-            return False
-        if start is not None:
-            if start != scene or project.count(f'run/main_scene="{scene}"') != 1:
-                return False
-            if PLAYABLE_LAUNCHER_PATH in files or "PlayableHub=" in project:
-                return False
-        else:
-            if launcher != PLAYABLE_LAUNCHER_PATH:
-                return False
-            if project.count('run/main_scene="res://scenes/levels/run_level.tscn"') != 1:
-                return False
-            if project.count(
-                'PlayableHub="*res://scripts/autoloads/playable_hub.gd"'
-            ) != 1:
-                return False
-
         tuning = receipt.get("tuning")
-        if tuning is not None:
-            if type(tuning) is not dict or type(tuning.get("axes")) is not dict:
-                return False
-            edits = tuning["axes"]
-        else:
-            edits = None
-        expected = archetype_files(mode, tuning=edits)
-        if tuning is None and SOURCE_PATH in files:
+        if tuning is not None and (type(tuning) is not dict or type(tuning.get("axes")) is not dict):
             return False
-        if tuning is not None:
-            if SOURCE_PATH not in expected or json.loads(expected[SOURCE_PATH]) != tuning:
-                return False
-        if launcher is not None:
-            expected[PLAYABLE_LAUNCHER_PATH] = _LAUNCHER_SCRIPT.replace(
-                "__MODE__", mode,
-            )
-        if any(files.get(path) != content for path, content in expected.items()):
-            return False
-
-        manifest = source_manifest(files)
-        source_files = {path: manifest["files"][path] for path in sorted(expected)}
-        if receipt.get("source_files") != source_files:
-            return False
-        digest = hashlib.sha256(json.dumps(
-            source_files, sort_keys=True, separators=(",", ":"),
-        ).encode("utf-8")).hexdigest()
-        return receipt.get("source_sha256") == digest
-    except (KeyError, TypeError, ValueError, OverflowError, AttributeError):
+        expected = build_playable_source_receipt(
+            files, mode, operator_axes=None if tuning is None else tuning["axes"],
+            start_in_prototype=launch is not None,
+        )
+        return _canonical(receipt) == _canonical(expected)
+    except (KeyError, TypeError, ValueError, RuntimeError, OverflowError, AttributeError, RecursionError):
         return False
 
 
-__all__ = ["SCHEMA", "verify_playable_source"]
+__all__ = ["SCHEMA", "build_playable_source_receipt", "verify_playable_source"]

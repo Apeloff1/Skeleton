@@ -307,24 +307,116 @@ def find_repo_root(start: Path | None = None) -> Path:
     raise FileNotFoundError("could not locate Skeleton repository root")
 
 
-def _dotenv_value(raw: str) -> str:
-    """Read ordinary values and the literal secret format written by setup."""
+def _literal_dollars(value: str) -> str:
+    """Decode escaped dollars, never evaluate host-dependent expansion."""
+    result = []
+    index = 0
+    while index < len(value):
+        char = value[index]
+        if char != "$":
+            result.append(char)
+            index += 1
+            continue
+        if value[index:index + 2] == "$$":
+            result.append("$")
+            index += 2
+            continue
+        following = value[index + 1:index + 2]
+        if following and (following == "{" or following == "_"
+                          or following.isascii() and following.isalpha()):
+            raise ValueError("runtime .env contains unsupported variable interpolation")
+        result.append("$")
+        index += 1
+    return "".join(result)
 
+
+def _dotenv_value(raw: str) -> str:
+    """Decode the maintained single-line literal subset, not a shell."""
     value = raw.strip()
     if len(value) >= 2 and value[0] == value[-1] == '"':
+        inner = value[1:-1]
+        i = 0
+        while i < len(inner):
+            if inner[i] == "\\":
+                if i + 1 >= len(inner) or inner[i + 1] not in ('"', "\\"):
+                    raise ValueError("runtime .env contains unsupported quoted escape")
+                i += 2
+            else:
+                i += 1
         try:
             decoded = json.loads(value)
         except ValueError:
-            pass  # Preserve compatibility with older non-JSON quoted values.
-        else:
-            if isinstance(decoded, str):
-                return decoded.replace("$$", "$")
-    if len(value) >= 2 and value[0] == value[-1] == "'":
-        return value[1:-1].replace("\\'", "'")
-    return value.split(" #", 1)[0].rstrip()
+            raise ValueError("runtime .env contains invalid quoted literal") from None
+        decoded = _literal_dollars(decoded)
+    elif len(value) >= 2 and value[0] == value[-1] == "'":
+        decoded = value[1:-1].replace("\\'", "'")
+    else:
+        decoded = _literal_dollars(re.split(r"[ \t]+#", value, maxsplit=1)[0].rstrip())
+    if any(ord(ch) < 32 or 127 <= ord(ch) < 160 or 0xD800 <= ord(ch) <= 0xDFFF
+           or ch in "\u2028\u2029" for ch in decoded):
+        raise ValueError("runtime .env contains unsupported decoded characters")
+    return decoded
 
 
 _MAX_DOTENV_BYTES = 256 * 1024
+_ENV_KEY = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z", re.ASCII)
+
+
+def _parse_dotenv_content(content: str) -> dict[str, str]:
+    """Parse the maintained single-line runtime assignment format.
+
+    Keep last-assignment semantics for legacy duplicate repair, but reject
+    syntax that the installer cannot review or preserve consistently.
+    Errors identify a category, never an operator's private line or value.
+    """
+    if type(content) is not str or len(content.encode("utf-8")) > _MAX_DOTENV_BYTES:
+        raise ValueError("runtime .env exceeds the 256 KiB input limit")
+    if any((ord(ch) < 32 and ch not in "\r\n\t") or ord(ch) == 127
+           or ch in "\u0085\u2028\u2029" for ch in content):
+        raise ValueError("runtime .env contains unsupported control or line separators")
+    content = content.replace("\r\n", "\n")
+    if "\r" in content:
+        raise ValueError("runtime .env contains unsupported carriage return")
+    values: dict[str, str] = {}
+    for raw_line in content.split("\n"):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            raise ValueError("runtime .env requires reviewed single-line assignments")
+        key, raw_value = line.split("=", 1)
+        key = key.strip()
+        if _ENV_KEY.fullmatch(key) is None:
+            raise ValueError("runtime .env contains an unsupported assignment key")
+        value = raw_value.strip()
+        if value.startswith(("'", '"')):
+            # Accept literal quoted values only when the quote actually
+            # closes on this line. Legacy quote syntax stays supported by
+            # the value decoder; multiline statements are not inferred.
+            quote = value[0]
+            escaped = False
+            closing = None
+            for index, char in enumerate(value[1:], 1):
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == quote:
+                    closing = index
+                    break
+            if closing is None:
+                raise ValueError("runtime .env contains an unterminated quoted assignment")
+            tail = value[closing + 1:]
+            if tail and not (tail[0].isspace() and tail.strip().startswith("#")):
+                raise ValueError("runtime .env contains an unsupported quoted assignment suffix")
+            value = value[:closing + 1]
+        values[key] = _dotenv_value(value)
+    return values
+
+
+def _dotenv_stamp(info: os.stat_result) -> tuple[int, ...]:
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid,
+            info.st_nlink, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
 
 
 def _read_dotenv(path: Path) -> dict[str, str]:
@@ -352,18 +444,20 @@ def _read_dotenv(path: Path) -> dict[str, str]:
             if (
                 not stat.S_ISREG(opened.st_mode)
                 or not stat.S_ISREG(named.st_mode)
-                or (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino)
+                or _dotenv_stamp(opened) != _dotenv_stamp(named)
                 or (os.name != "nt" and opened.st_nlink != 1)
             ):
                 raise ValueError("runtime .env must be a stable unlinked regular file")
             if opened.st_size > _MAX_DOTENV_BYTES:
                 raise ValueError("runtime .env exceeds the 256 KiB input limit")
             raw = stream.read(_MAX_DOTENV_BYTES + 1)
+            final = os.fstat(stream.fileno())
             current = os.lstat(path)
             if (
-                not stat.S_ISREG(current.st_mode)
-                or (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino)
+                len(raw) != opened.st_size
                 or len(raw) > _MAX_DOTENV_BYTES
+                or _dotenv_stamp(opened) != _dotenv_stamp(final)
+                or _dotenv_stamp(final) != _dotenv_stamp(current)
             ):
                 raise ValueError("runtime .env changed or exceeded the read limit")
     except OSError:
@@ -373,16 +467,7 @@ def _read_dotenv(path: Path) -> dict[str, str]:
     except UnicodeDecodeError:
         raise ValueError("runtime .env must contain UTF-8 text") from None
 
-    values: dict[str, str] = {}
-    for raw_line in content.splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        if key:
-            values[key] = _dotenv_value(value)
-    return values
+    return _parse_dotenv_content(content)
 
 
 def _runtime_env(root: Path, environ: Mapping[str, str] | None) -> dict[str, str]:
@@ -409,14 +494,16 @@ def runtime_manifest(
         "MONGO_PORT": "27017",
         "CHROMA_PORT": "8000",
     }
+    ports = {}
     for key, fallback in port_keys.items():
         raw = values.get(key, "") or fallback
-        if not raw.isascii() or not raw.isdigit() or not 1 <= int(raw) <= 65535:
+        # Bound decimal text before int(): huge strings must not leak a
+        # conversion exception or consume an unbounded parsing budget.
+        if (not 1 <= len(raw) <= 5 or not raw.isascii()
+                or not raw.isdigit() or not 1 <= int(raw) <= 65535):
             raise ValueError(f"{key} must be an integer from 1 to 65535")
-    public_ports = [
-        int(values.get(key, "") or port_keys[key])
-        for key in ("FRONTEND_PORT", "BACKEND_PORT", "SKELETON_PORT", "MONGO_PORT", "CHROMA_PORT")
-    ]
+        ports[key] = int(raw)
+    public_ports = list(ports.values())
     if len(public_ports) != len(set(public_ports)):
         raise ValueError("FRONTEND_PORT, BACKEND_PORT, SKELETON_PORT, MONGO_PORT and CHROMA_PORT must differ")
     services = []
@@ -428,20 +515,93 @@ def runtime_manifest(
             "chroma": "CHROMA_PORT",
         }.get(service.name)
         raw = values.get(key, "") if key else ""
-        if raw and service.public_url:
-            if not raw.isascii() or not raw.isdigit() or not 1 <= int(raw) <= 65535:
-                raise ValueError(f"{key} must be an integer from 1 to 65535")
-            url = urlsplit(service.public_url)
-            if url.scheme not in {"http", "https"} or url.hostname not in {"localhost", "127.0.0.1", "::1"}:
-                raise ValueError(f"{service.name} has a non-local public URL; port override rejected")
+        if key and service.public_url:
+            origin = service.public_url
+            if (len(origin) > 4096 or any(ord(ch) <= 32 or ord(ch) == 127 for ch in origin)
+                    or any(ch in origin for ch in ("?", "#", "%", chr(92)))):
+                raise ValueError(f"{service.name} has an invalid local public URL")
+            url = urlsplit(origin)
+            if (url.scheme not in {"http", "https"} or url.hostname not in {"localhost", "127.0.0.1", "::1"}
+                    or url.username is not None or url.password is not None
+                    or url.path not in {"", "/"} or not url.port):
+                raise ValueError(f"{service.name} has a non-local or invalid public URL")
+            if not raw:
+                services.append(service)
+                continue
             host = url.hostname
             if ":" in host:
                 host = "[" + host + "]"
             service = replace(
-                service, public_url=urlunsplit((url.scheme, f"{host}:{int(raw)}", url.path, "", ""))
+                service, public_url=urlunsplit((url.scheme, f"{host}:{ports[key]}", url.path, "", ""))
             )
         services.append(service)
     return replace(manifest, services=tuple(services))
+
+
+HOT_RELOAD_PORTS = frozenset((8081, 19000, 19001, 19002))
+
+
+def _local_http_origin(value: str, port: int) -> bool:
+    """Admit only the browser origin that can reach the declared host port."""
+    try:
+        if (type(value) is not str or not 1 <= len(value) <= 512
+                or any(ord(ch) <= 32 or ord(ch) >= 127 for ch in value)
+                or any(ch in value for ch in ("?", "#", "%", chr(92)))):
+            return False
+        parsed = urlsplit(value)
+        return (parsed.scheme == "http"
+                and parsed.hostname in {"localhost", "127.0.0.1"}
+                and parsed.port == port and parsed.path in {"", "/"}
+                and parsed.username is None and parsed.password is None)
+    except ValueError:
+        return False
+
+
+def launch_network_errors(
+    root: Path, *, manifest: AssemblyManifest, environ: Mapping[str, str] | None = None,
+    hot: bool = False,
+) -> tuple[str, ...]:
+    """Validate the canonical local installation's actual browser/engine wiring.
+
+    Runtime HTTP health on the expected host ports does not establish that the
+    browser bundle was configured to use those APIs. Stop before Compose if
+    its explicit build arguments would send the browser to a different host,
+    port, or ingress path. Preserve .env and provide only named diagnostics.
+    Remote/reverse-proxy deployments have a separate deployment contract.
+    """
+    if type(hot) is not bool:
+        raise ValueError("hot must be an explicit boolean")
+    values = _runtime_env(root, environ)
+    ports = {name: urlsplit(manifest.service(name).public_url).port
+             for name in ("frontend", "backend", "skeleton", "chroma")}
+    mongo_port = values.get("MONGO_PORT") or "27017"
+    if (type(mongo_port) is not str or not 1 <= len(mongo_port) <= 5
+            or not mongo_port.isascii() or not mongo_port.isdigit()
+            or not 1 <= int(mongo_port) <= 65535):
+        raise ValueError("MONGO_PORT is invalid")
+    from skeleton.app.storage_custody import persistent_override_errors
+    stored = _read_dotenv(root / ".env")
+    errors = list(persistent_override_errors(stored, os.environ if environ is None else environ))
+    if hot and HOT_RELOAD_PORTS.intersection((*ports.values(), int(mongo_port))):
+        errors.append("hot-reload ports overlap a canonical application port")
+    for key, service in (("EXPO_PUBLIC_BACKEND_URL", "backend"),
+                         ("EXPO_PUBLIC_SKELETON_URL", "skeleton")):
+        value = values.get(key, "")
+        if value and not _local_http_origin(value, ports[service]):
+            errors.append(key + " must address the selected local application port")
+    internal = values.get("SKELETON_INTERNAL_URL", "")
+    if internal and internal not in {"http://skeleton:8001", "http://skeleton:8001/"}:
+        errors.append("SKELETON_INTERNAL_URL must address the canonical Compose engine")
+    # Compose defaults to both localhost and numeric IPv4 origins. An explicit
+    # override must still admit the canonical browser URI, without changing
+    # the operator's chosen list or silently enabling wildcard credentials.
+    cors = values.get("CORS_ORIGINS", "")
+    if cors:
+        frontend_origin = manifest.service("frontend").public_url.rstrip("/")
+        origins = {item.strip() for item in cors.split(",") if item.strip()}
+        if frontend_origin not in origins or "*" in origins:
+            errors.append("CORS_ORIGINS must admit the canonical local frontend origin without a wildcard")
+    return tuple(errors)
 
 
 def public_service_urls(
@@ -806,14 +966,33 @@ def compose_command(
     follow: bool = False,
     service: str = "",
     hot: bool = False,
+    install_env: bool = False,
+    frontend_recovery: bool = False,
 ) -> tuple[str, ...]:
-    """Build a shell-free Docker Compose command for the unified app."""
+    """Build a shell-free Docker Compose command for the unified app.
+
+    The installer has already admitted its private configuration source.
+    Pin that exact relative env file in every installer Compose invocation.
+    """
+    if type(install_env) is not bool:
+        raise ValueError("install_env must be boolean")
 
     manifest = manifest or load_manifest()
     action = action.strip().lower()
+    if type(frontend_recovery) is not bool:
+        raise ValueError("frontend_recovery must be boolean")
+    if frontend_recovery and (
+        action != "up" or full or not install_env
+        or manifest.default_services != ("frontend",)
+        or manifest.full_services != ("frontend",)
+        or manifest.service("frontend").depends_on
+    ):
+        raise ValueError("frontend recovery requires an isolated frontend-only install plan")
     base = ["docker", "compose", "-f", manifest.compose_file]
     if hot:
         base.extend(["-f", manifest.hot_compose_file])
+    if install_env:
+        base.extend(["--env-file", ".env"])
 
     if action == "up":
         from skeleton.app.plan import build_plan
@@ -829,6 +1008,10 @@ def compose_command(
         for profile in profiles:
             base.extend(["--profile", profile])
         command = [*base, "up", "-d"]
+        if frontend_recovery:
+            # The actual Compose graph, not merely the in-memory plan, must
+            # be prevented from implicitly starting protected dependencies.
+            command.append("--no-deps")
         if build:
             command.append("--build")
         command.extend(plan.services)

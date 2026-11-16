@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import subprocess
 from collections.abc import Sequence
@@ -50,6 +51,8 @@ def _parser() -> argparse.ArgumentParser:
     )
     doctor.add_argument("--timeout", type=float, default=3.0, help="per-probe timeout, at most 10 seconds")
     doctor.add_argument("--json", action="store_true", dest="as_json")
+    doctor.add_argument("--require-ai", action="store_true",
+                        help="require --live and observed selected AI readiness for exit zero")
     doctor.add_argument(
         "--studio", action="store_true",
         help="inspect actual local SDK/core prerequisites separately from server readiness",
@@ -58,6 +61,20 @@ def _parser() -> argparse.ArgumentParser:
         "--auth-token-file", type=Path,
         help="private existing bearer-token file for authenticated --studio --live server readiness",
     )
+
+    qualify = sub.add_parser("qualify-install", help="observe strict live first-install acceptance against a pinned host checkout")
+    qualify.add_argument("--source-head", required=True)
+    qualify.add_argument("--passes", type=int, default=2)
+    qualify.add_argument("--require-protected", action="store_true")
+    qualify.add_argument("--require-ai", action="store_true",
+                         help="require selected provider availability, not inference qualification")
+    qualify.add_argument("--json", action="store_true", dest="as_json")
+
+    session = sub.add_parser("inspect-install-session", help="read redacted persistent install phase history")
+    session.add_argument("--session-dir", type=Path, required=True)
+    session.add_argument("--session-id", required=True)
+
+    sub.add_parser("mongo-preflight", help="observe guarded Mongo prerequisites; never activate inference")
 
     plan = sub.add_parser("plan", help="show dependency-aware application startup order")
     plan.add_argument("--full", action="store_true", help="include optional full-profile services")
@@ -132,7 +149,7 @@ def _parser() -> argparse.ArgumentParser:
     prepare.add_argument("--timeout", type=float, default=120.0)
     prepare.add_argument(
         "--runtime-profile",
-        choices=("raw", "llama-completion-chat", "qwen3-completion-chat"),
+        choices=("raw", "llama-completion-chat", "qwen3-completion-chat", "gguf-exact-token-bridge"),
         default="raw",
         help="operator-selected prompt/output protocol for the pinned local executable",
     )
@@ -312,7 +329,27 @@ def _parser() -> argparse.ArgumentParser:
     from skeleton.app.installer import configure_setup_parsers
 
     configure_setup_parsers(sub)
+    sub.add_parser("storage-custody", help="inspect persistent Docker storage without changing data")
+    sub.add_parser("runtime-recovery", help="inspect or acknowledge unresolved runtime operations")
     return parser
+
+
+def _diagnostic_admission(root):
+    """Latch loss of the exact private configuration epoch for one campaign."""
+    from skeleton.app.first_install import _configuration_epoch
+    epoch = _configuration_epoch(root)
+    valid = True
+
+    def admitted():
+        nonlocal valid
+        if valid:
+            try:
+                valid = _configuration_epoch(root) == epoch
+            except (OSError,ValueError,UnicodeError):
+                valid = False
+        return valid
+
+    return admitted
 
 
 def _print_status(
@@ -322,8 +359,20 @@ def _print_status(
     full: bool = False,
     timeout: float = 3.0,
 ) -> int:
+    if live and (type(timeout) not in (int,float) or not 0 < timeout <= 30
+                 or not math.isfinite(timeout)):
+        print("status timeout must be greater than zero and at most 30 seconds")
+        return 2
     try:
-        manifest = runtime_manifest()
+        if live:
+            root = find_repo_root()
+            captured = dict(os.environ)
+            admitted = _diagnostic_admission(root)
+            manifest = runtime_manifest(root=root,environ=captured)
+            if not admitted():
+                raise ValueError("runtime configuration changed")
+        else:
+            manifest = runtime_manifest()
     except (OSError, ValueError, UnicodeError):
         # Diagnostic output must not leak operator secrets or throw a traceback
         # when the .env source is oversized, linked, malformed or replaced.
@@ -341,13 +390,12 @@ def _print_status(
     live_ok: bool | None = None
 
     if live:
-        if timeout <= 0:
-            print("status timeout must be greater than zero")
-            return 2
         from skeleton.app.health import probe_application, probes_ok
 
-        live_results = probe_application(manifest=manifest, full=full, timeout=timeout)
-        live_ok = probes_ok(live_results)
+        live_results = probe_application(manifest=manifest,full=full,timeout=timeout,admit=admitted)
+        if not admitted():
+            live_results = ()
+        live_ok = probes_ok(live_results,manifest=manifest,full=full)
         payload["runtime_health"] = {
             "ok": live_ok,
             "full": full,
@@ -409,26 +457,62 @@ def _run_compose(
     root: Path,
     *,
     env_overrides: dict[str, str] | None = None,
+    process_env: dict[str, str] | None = None,
+    lease=None,
 ) -> int:
-    env = os.environ.copy()
+    env = dict(os.environ if process_env is None else process_env)
     if env_overrides:
         env.update(env_overrides)
     # An inherited Compose setting must not remove an older Chroma container
     # that is now an orphan and may own the only copy of writable /data.
     env["COMPOSE_REMOVE_ORPHANS"] = "0"
-    completed = subprocess.run(list(command), cwd=root, check=False, env=env)
-    return int(completed.returncode)
+    if "--env-file" in command:
+        from skeleton.app.runtime_operation import compose_operation_environment
+        env = compose_operation_environment(env)
+    try:
+        # Lifecycle subprocesses may print interpolated credentials or
+        # huge build output. Explicit logs/ps remain operator diagnostics.
+        mutation = "up" in command or "stop" in command or "config" in command
+        dispatch = subprocess.run
+        if lease is not None and ("up" in command or "stop" in command):
+            from skeleton.app.runtime_mutation import run_mutation
+            label = "compose-start" if "up" in command else "compose-stop"
+            def dispatch(*args, **kwargs):
+                return run_mutation(lease, label, subprocess.run, *args, **kwargs)
+        completed = dispatch(
+            list(command), cwd=root, check=False, env=env,
+            **({"stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL,
+                "stderr": subprocess.DEVNULL, "timeout": 1800 if "up" in command else 90}
+               if mutation else {}),
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        print("Compose operation failed: " + type(exc).__name__)
+        return 1
+    status = getattr(completed, "returncode", None)
+    if type(status) is not int or not 0 <= status <= 255:
+        print("Compose operation returned an uncertain process status")
+        return 1
+    return status
 
 
 def run_app_cli(argv: Sequence[str] | None = None) -> int:
     """Run the application assembly CLI and return a process-style exit code."""
 
     arguments = list(argv or ())
+    if arguments and arguments[0] == "storage-custody":
+        from skeleton.app.storage_custody import main as custody_main
+        return custody_main(arguments[1:], root=find_repo_root())
+    if arguments and arguments[0] == "runtime-recovery":
+        from skeleton.app.runtime_mutation import main as recovery_main
+        return recovery_main(arguments[1:], root=find_repo_root())
+    if arguments and arguments[0] == "mongo-preflight":
+        from skeleton.app.compose_guarded_preflight import main as mongo_preflight_main
+        return mongo_preflight_main(arguments[1:])
     # The original-game authoring CLI owns its own strict argument validation,
     # source-bound replay and exclusive save-custody rules. Do not duplicate
     # those operations in the assembly shell's argument parser.
     if arguments and arguments[0] == "game-project":
-        from scripts.game.game_project import main as game_project_main
+        from skeleton.ai.runtime.game_project_cli import main as game_project_main
         return game_project_main(arguments[1:])
     # The same pinned Jeeves candidate optimizer owns multidomain specialization.
     if arguments and arguments[0] == "training-modules":
@@ -647,8 +731,38 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         )
     if command == "check":
         return _print_checks(bool(args.runtime), bool(args.as_json))
+    if command == "inspect-install-session":
+        from skeleton.app.install_session import InstallSessionDenied, inspect_session
+        try:
+            report=inspect_session(args.session_dir,args.session_id)
+        except InstallSessionDenied:
+            print("install session inspection unavailable")
+            return 1
+        print(json.dumps(report,indent=2,sort_keys=True))
+        return 0
+    if command == "qualify-install":
+        from skeleton.app.strict_install_qualification import QualificationDenied, qualify_live_install
+        try:
+            receipt = qualify_live_install(source_head=args.source_head, passes=args.passes,
+                require_protected=args.require_protected, require_ai=args.require_ai)
+        except (QualificationDenied, OSError, ValueError, TypeError):
+            print("strict install observation denied; invalid inputs")
+            return 2
+        if args.as_json:
+            print(json.dumps(receipt, indent=2, sort_keys=True))
+        else:
+            print("strict installation observation: " + receipt["code"])
+            for observation in receipt["rounds"]:
+                for lane in observation["lanes"]:
+                    print(f'round {observation["round"]}: {lane["name"]}: {lane["code"]}')
+            print("Actual inference, images, restore, device and release remain independently unqualified.")
+        return 0 if receipt["ok"] else 1
     if command == "doctor":
         from skeleton.app.first_install import first_install_report
+
+        if args.require_ai and not args.live:
+            print("doctor --require-ai requires --live")
+            return 2
 
         try:
             report = first_install_report(
@@ -697,6 +811,8 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             and report["configuration_ready"]
             and report["services_ready"] is not False
         )
+        if args.require_ai:
+            ok = ok and report["services_ready"] is True and report.get("ai_ready") is True
         return 0 if ok else 1
     if command == "plan":
         from skeleton.app.plan import build_plan
@@ -1124,79 +1240,167 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             print("--production and --hot are mutually exclusive")
             return 2
         # Invalid verification budgets must never start containers first.
-        if args.verify_attempts < 1 or not 0 <= args.verify_delay <= 60:
-            print("startup verification requires positive attempts and delay from 0 to 60 seconds")
+        if not 1 <= args.verify_attempts <= 120 or not math.isfinite(args.verify_delay) or not 0 <= args.verify_delay <= 30:
+            print("startup verification requires 1 to 120 attempts and delay from 0 to 30 seconds")
             return 2
-        checks = preflight(root, runtime=True, manifest=manifest)
-        if not checks_ok(checks):
-            for check in checks:
-                if not check.ok and check.required:
-                    print(f"[FAIL] {check.message}")
-            print("application start aborted: runtime preflight failed")
-            return 1
-        from skeleton.app.preloader import inspect_host
-
-        host = inspect_host(root, require_pip=False)
-        if not host.ready:
-            for check in host.checks:
-                if check.required and not check.ok:
-                    print(f"[FAIL] {check.detail}; {check.remediation}")
-            return 1
+        from skeleton.app.runtime_operation import RuntimeOperationDenied, runtime_operation
         try:
-            manifest = runtime_manifest(manifest, root=root)
-        except (OSError, ValueError, UnicodeError):
-            print("application start aborted: runtime configuration changed or is unsafe")
-            return 2
-        mode = "production" if bool(args.production) else "development"
-        try:
-            startup_command = compose_command(
-                "up",
-                manifest=manifest,
-                full=bool(args.full),
-                build=not bool(args.no_build),
-                hot=bool(args.hot),
-            )
-        except ValueError as exc:
-            print(str(exc))
+            with runtime_operation(root, "start") as lease:
+                from skeleton.app.setup_runtime import runtime_source_fingerprint
+
+                process_env = dict(os.environ)
+                try:
+                    admitted = runtime_source_fingerprint(root)
+                except (OSError, ValueError, UnicodeError):
+                    print("application start aborted: private runtime configuration unavailable; run app setup first")
+                    return 2
+
+                epoch_valid = True
+
+                def source_stable():
+                    nonlocal epoch_valid
+                    if epoch_valid:
+                        try:
+                            epoch_valid = lease.current() and runtime_source_fingerprint(root) == admitted
+                        except (OSError, ValueError, UnicodeError):
+                            epoch_valid = False
+                    return epoch_valid
+
+                def changed():
+                    print("application start cannot be qualified: runtime configuration changed; preserve existing services and .env")
+                    return 2
+
+                checks = preflight(root, runtime=True, manifest=manifest, environ=process_env)
+                if not checks_ok(checks):
+                    for check in checks:
+                        if not check.ok and check.required:
+                            print(f"[FAIL] {check.message}")
+                    print("application start aborted: runtime preflight failed")
+                    return 1
+                if not source_stable():
+                    return changed()
+                from skeleton.app.preloader import inspect_host
+
+                host = inspect_host(root, require_pip=False)
+                if not host.ready:
+                    for check in host.checks:
+                        if check.required and not check.ok:
+                            print(f"[FAIL] {check.detail}; {check.remediation}")
+                    return 1
+                try:
+                    manifest = runtime_manifest(manifest, root=root, environ=process_env)
+                    from skeleton.app.assembly import launch_network_errors
+                    network_errors = launch_network_errors(
+                        root, manifest=manifest, environ=process_env, hot=bool(args.hot),
+                    )
+                except (OSError, ValueError, UnicodeError):
+                    print("application start aborted: runtime configuration changed or is unsafe")
+                    return 2
+                if network_errors:
+                    print("application start blocked: " + "; ".join(network_errors))
+                    return 2
+                mode = "production" if bool(args.production) else "development"
+                try:
+                    startup_command = compose_command(
+                        "up",
+                        manifest=manifest,
+                        full=bool(args.full),
+                        build=not bool(args.no_build),
+                        hot=bool(args.hot),
+                        install_env=True,
+                    )
+                except ValueError as exc:
+                    print(str(exc))
+                    return 1
+                if not source_stable():
+                    return changed()
+                from skeleton.app.compose_storage_binding import observe_binding
+                from skeleton.app.runtime_operation import compose_operation_environment
+                compose_env = compose_operation_environment(process_env, manifest.mode_env(mode))
+                binding = observe_binding(root, command=startup_command,
+                                          environ=compose_env, admit=source_stable)
+                if not binding.admitted:
+                    print("application start blocked: persistent storage binding not admitted: " + binding.code)
+                    return 1
+                if not source_stable():
+                    return changed()
+                exit_code = _run_compose(
+                    startup_command,
+                    root,
+                    env_overrides=manifest.mode_env(mode),
+                    process_env=process_env,
+                    lease=lease,
+                )
+                if not source_stable():
+                    return changed()
+                if exit_code:
+                    return exit_code
+                post = observe_binding(root, command=startup_command, environ=compose_env,
+                    admit=source_stable, previous=binding, require_started=True)
+                if not post.admitted:
+                    print("application start blocked: post-start persistent binding not admitted: " + post.code)
+                    return 1
+                if not source_stable():
+                    return changed()
+                if bool(args.no_verify):
+                    # Skips HTTP smoke only, never persistent storage custody.
+                    return 0
+
+                from skeleton.app.health import probes_ok, wait_for_application
+
+                try:
+                    results = wait_for_application(
+                        manifest=manifest,
+                        full=bool(args.full),
+                        timeout=3.0,
+                        attempts=int(args.verify_attempts),
+                        delay=float(args.verify_delay),
+                        admit=source_stable,
+                    )
+                except ValueError as exc:
+                    print(f"invalid startup verification budget: {exc}")
+                    return 2
+
+                if not source_stable():
+                    return changed()
+                for result in results:
+                    status = result.status if result.status is not None else "-"
+                    print(
+                        f"[{'PASS' if result.ok else 'FAIL'}] "
+                        f"{result.service:<10} status={status} {result.url} {result.detail}"
+                    )
+                if probes_ok(results,manifest=manifest,full=bool(args.full)):
+                    from skeleton.app.first_install import critical_backend_route_report
+                    registry = critical_backend_route_report(manifest.service("backend").public_url, timeout=3.0)
+                    if not source_stable():
+                        return changed()
+                    if registry["ready"] is not True:
+                        print("application start: critical API routers missing or unverified; inspect app doctor --live")
+                        return 1
+                    continuity = observe_binding(root, command=startup_command, environ=compose_env,
+                        admit=source_stable, previous=post, require_started=True,
+                        require_same_runtime=True)
+                    if not continuity.admitted:
+                        print("application readiness blocked: runtime continuity unverified: " + continuity.code)
+                        return 1
+                    if not source_stable():
+                        return changed()
+                    print("application services: ready; AI availability is reported separately by app doctor --live")
+                    return 0
+                print("application start: services launched but readiness verification failed")
+                return 1
+        except RuntimeOperationDenied as exc:
+            print("application start blocked: " + str(exc))
             return 1
-        exit_code = _run_compose(
-            startup_command,
-            root,
-            env_overrides=manifest.mode_env(mode),
-        )
-        if exit_code or bool(args.no_verify):
-            return exit_code
-
-        from skeleton.app.health import probes_ok, wait_for_application
-
-        try:
-            results = wait_for_application(
-                manifest=manifest,
-                full=bool(args.full),
-                timeout=3.0,
-                attempts=int(args.verify_attempts),
-                delay=float(args.verify_delay),
-            )
-        except ValueError as exc:
-            print(f"invalid startup verification budget: {exc}")
-            return 2
-
-        for result in results:
-            status = result.status if result.status is not None else "-"
-            print(
-                f"[{'PASS' if result.ok else 'FAIL'}] "
-                f"{result.service:<10} status={status} {result.url} {result.detail}"
-            )
-        if probes_ok(results):
-            print("application services: ready; AI availability is reported separately by app doctor --live")
-            return 0
-        print("application start: services launched but readiness verification failed")
-        return 1
     if command == "smoke":
         from skeleton.app.health import probes_ok, wait_for_application
 
         try:
-            manifest = runtime_manifest(manifest, root=root)
+            captured = dict(os.environ)
+            admitted = _diagnostic_admission(root)
+            manifest = runtime_manifest(manifest,root=root,environ=captured)
+            if not admitted():
+                raise ValueError("runtime configuration changed")
         except (OSError, ValueError, UnicodeError):
             message = "runtime configuration unsafe or unreadable; health probes were not sent"
             if bool(args.as_json):
@@ -1222,11 +1426,14 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 timeout=timeout,
                 attempts=attempts,
                 delay=delay,
+                admit=admitted,
             )
         except ValueError as exc:
             print(f"invalid smoke budget: {exc}")
             return 2
-        ok = probes_ok(results)
+        if not admitted():
+            results = ()
+        ok = probes_ok(results,manifest=manifest,full=bool(args.full))
         if bool(args.as_json):
             print(
                 json.dumps(
@@ -1249,7 +1456,19 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             print("application smoke: healthy" if ok else "application smoke: unhealthy")
         return 0 if ok else 1
     if command == "down":
-        return _run_compose(compose_command("down", manifest=manifest), root)
+        from skeleton.app.runtime_operation import RuntimeOperationDenied, runtime_operation
+        try:
+            with runtime_operation(root, "stop") as lease:
+                if not lease.current():
+                    return 1
+                from skeleton.app.compose_stop_custody import stop_owned_runtime
+                report=stop_owned_runtime(root,command=compose_command("down",manifest=manifest,install_env=True),
+                    environ=dict(os.environ),lease=lease)
+                print(report.detail)
+                return 0 if report.ok and lease.current() else 1
+        except RuntimeOperationDenied as exc:
+            print("application stop blocked: " + str(exc))
+            return 1
     if command == "ps":
         return _run_compose(compose_command("ps", manifest=manifest), root)
     if command == "logs":

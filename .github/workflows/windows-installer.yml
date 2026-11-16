@@ -35,6 +35,7 @@ jobs:
             /.dockerignore
             /.env.example
             /Dockerfile
+            /Dockerfile.dockerignore
             /README.md
             /docker-compose.yml
             /docker-compose.hot.yml
@@ -82,7 +83,7 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check "pytest>=8,<9" "pydantic>=2.14.0,<3" "pydantic-settings>=2.15.0,<3"
           python -m unittest scripts.windows.test_payload_zip
-          python -m pytest -q -ra skeleton/testing/test_windows_installer.py skeleton/testing/test_jeeves_multidomain.py skeleton/testing/test_jeeves_cinematic_simulation.py skeleton/testing/test_jeeves_adaptive_sim_training.py skeleton/testing/test_jeeves_capacity_growth.py skeleton/testing/test_jeeves_capability_replay.py skeleton/testing/test_jeeves_boomerang_queue.py
+          python -m pytest -q -ra skeleton/testing/test_windows_installer.py skeleton/testing/test_runtime_operation.py skeleton/testing/test_storage_custody.py skeleton/testing/test_compose_storage_binding.py skeleton/testing/test_compose_wiring.py skeleton/testing/test_compose_stop_custody.py skeleton/testing/test_install_probe_worker.py skeleton/testing/test_app_health_url_admission.py skeleton/testing/test_app_studio_readiness_proxy_custody.py skeleton/testing/test_jeeves_multidomain.py skeleton/testing/test_jeeves_cinematic_simulation.py skeleton/testing/test_jeeves_adaptive_sim_training.py skeleton/testing/test_jeeves_capacity_growth.py skeleton/testing/test_jeeves_capability_replay.py skeleton/testing/test_jeeves_boomerang_queue.py
 
       - name: Build installer
         shell: pwsh
@@ -179,6 +180,13 @@ jobs:
           $offlineHelp = Start-Process -FilePath $offlineConsole -ArgumentList @("--help") -Wait -PassThru
           if ($offlineHelp.ExitCode -ne 0) {
             throw "installed SkeletonOffline.exe help smoke exited $($offlineHelp.ExitCode)"
+          }
+
+          # Exercise the actual frozen readiness transport against an isolated
+          # local HTTP fixture. No Docker, external provider or real credential.
+          python scripts/windows/verify_frozen_install_probe.py --install-root $installDir
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed readiness worker acceptance failed"
           }
 
           $nativeSmoke = Start-Process -FilePath $launcher -ArgumentList @("--local-ai-smoke") -Wait -PassThru

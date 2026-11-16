@@ -147,6 +147,48 @@ function zipStore(entries: Entry[], totalBytes: number): Uint8Array {
   return data;
 }
 
+/** Source-only receipt custody. The async share boundary also hashes this subset. */
+export function nativeSourceInventory(payload: RunPayload): Record<string, string> | null {
+  const mode = payload.forge?.playable_archetype;
+  const receipt = payload.playable_source;
+  if (!mode && !receipt) return null;
+  if (typeof mode !== 'string' || !['combat_loop', 'crafting', 'extraction', 'pipeline',
+      'puzzle', 'racing', 'stealth', 'survival'].includes(mode)
+      || !receipt || receipt.schema !== 'skeleton.gameforge.playable_source.v2'
+      || receipt.mode !== mode || receipt.native_execution_qualified !== false
+      || receipt.launcher !== 'scripts/autoloads/playable_portal.gd'
+      || !/^[0-9a-f]{64}$/.test(receipt.source_sha256)) {
+    throw new Error('Godot playable source receipt is missing or invalid');
+  }
+  const scene = 'scenes/archetypes/' + mode + '/main.tscn';
+  if (receipt.scene !== 'res://' + scene
+      || (receipt.launch_scene !== null && receipt.launch_scene !== receipt.scene)) {
+    throw new Error('Godot playable scene selection differs from the source receipt');
+  }
+  const listed = payload.source_manifest?.files;
+  const project = payload.files?.['project.godot'];
+  const startup = receipt.launch_scene ?? 'res://scenes/levels/run_level.tscn';
+  if (typeof project !== 'string' || project.split(/\r?\n/).filter(line => line.startsWith('run/main_scene=')).length !== 1
+      || !project.split(/\r?\n/).includes('run/main_scene="' + startup + '"')) {
+    throw new Error('Godot playable startup does not match the source project');
+  }
+  const paths = [scene, 'scripts/archetypes/' + mode + '/player_controller.gd',
+    'scripts/archetypes/' + mode + '/core_loop.gd', receipt.launcher, 'project.godot'];
+  if (receipt.tuning != null) paths.push('data/playable_tuning.json');
+  if (!listed || !receipt.source_files || typeof receipt.source_files !== 'object'
+      || Array.isArray(receipt.source_files) || Object.keys(receipt.source_files).length !== paths.length
+      || paths.some(path => !Object.prototype.hasOwnProperty.call(receipt.source_files, path)
+        || !/^[0-9a-f]{64}$/.test(receipt.source_files[path]) || receipt.source_files[path] !== listed[path])) {
+    throw new Error('Godot playable receipt inventory differs from the source manifest');
+  }
+  const nativePaths = Object.keys(listed).filter(path => /^(scenes|scripts)\/archetypes\//.test(path.toLowerCase()));
+  if (nativePaths.length !== 3 || nativePaths.some(path => !paths.includes(path))
+      || (Object.prototype.hasOwnProperty.call(listed, 'data/playable_tuning.json') !== (receipt.tuning != null))) {
+    throw new Error('Godot playable source namespace contains unreviewed files');
+  }
+  return Object.fromEntries(paths.sort().map(path => [path, listed[path]]));
+}
+
 export function buildGodotSourceArchive(payload: RunPayload): GodotSourceArchive {
   if (!payload || payload.succeeded !== true) throw new Error('No successful forge run to export');
   if (!payload.source_export || payload.source_export.status !== 'ready') {
@@ -176,8 +218,10 @@ export function buildGodotSourceArchive(payload: RunPayload): GodotSourceArchive
       || Object.keys(listed).length !== files.length) {
     throw new Error('Manifest file inventory does not match the returned sources');
   }
+  nativeSourceInventory(payload);
   const entries: Entry[] = [];
   const casefoldedNames = new Set<string>();
+  const directoryNames = new Map<string, string>();
   let sourceBytes = 0;
   let archiveBytes = 22;
   for (const [name, body] of files) {
@@ -189,6 +233,16 @@ export function buildGodotSourceArchive(payload: RunPayload): GodotSourceArchive
     const foldedName = name.toLowerCase();
     if (casefoldedNames.has(foldedName)) {
       throw new Error('Case-colliding Godot project paths cannot be exported');
+    }
+    if (directoryNames.has(foldedName)) throw new Error('File-directory collision in Godot project paths');
+    const parts = name.split('/');
+    for (let depth = 1; depth < parts.length; depth++) {
+      const directory = parts.slice(0, depth).join('/');
+      const folded = directory.toLowerCase();
+      if (casefoldedNames.has(folded)) throw new Error('File-directory collision in Godot project paths');
+      const prior = directoryNames.get(folded);
+      if (prior !== undefined && prior !== directory) throw new Error('Case-colliding Godot project directories');
+      directoryNames.set(folded, directory);
     }
     casefoldedNames.add(foldedName);
     const encodedName = utf8(name, 240);

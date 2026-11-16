@@ -17,11 +17,14 @@ COPY scripts/patch-node-modules.js ./scripts/patch-node-modules.js
 COPY scripts/security/node-forge-rsa-verifier.cjs ./scripts/security/node-forge-rsa-verifier.cjs
 # Keep exact upstream RSA bytes and canonical-DER structure independently checked.
 COPY scripts/node-forge-rsa-custody.cjs ./scripts/node-forge-rsa-custody.cjs
+COPY scripts/node-forge-frozen-lock.cjs scripts/verify-node-forge-frozen-archive.cjs scripts/test-node-forge-frozen-lock.cjs ./scripts/
 COPY scripts/verify-no-release-npm-security.js scripts/verify-deepmerge-security.cjs ./scripts/
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
     yarn install --frozen-lockfile --non-interactive --ignore-scripts --network-concurrency 4 --network-timeout 120000 \
     && node ./scripts/patch-node-modules.js \
+    && node --test ./scripts/test-node-forge-frozen-lock.cjs \
+    && node ./scripts/verify-node-forge-frozen-archive.cjs \
     && node ./scripts/verify-no-release-npm-security.js \
     && yarn cache clean
 
@@ -48,7 +51,8 @@ ENV EXPO_PUBLIC_BACKEND_URL=$EXPO_PUBLIC_BACKEND_URL \
 COPY . .
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    node --test scripts/test-guarded-expo-export.cjs \
+    node --test scripts/test-node-forge-rsa-custody.cjs \
+    && node --test scripts/test-guarded-expo-export.cjs \
     && node scripts/guarded-expo-export.cjs \
     && echo "frontend-export-supervision-complete" \
     && test -s /app/dist/index.html \

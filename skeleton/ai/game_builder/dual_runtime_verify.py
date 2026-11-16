@@ -435,8 +435,13 @@ def verify_exported_package(
         # The replay must not attest a package whose non-manifest files were
         # replaced after the first digest pass. This is a bounded second
         # read bounded to the declared schema budget across the same pinned tree.
+        rechecked_bytes = len(release)
         for path, expected_digest in sorted(declared.items()):
-            if sha256(_read(fd, path, byte_budget)).hexdigest() != expected_digest:
+            if rechecked_bytes >= byte_budget:
+                raise DualRuntimeVerificationError("package source byte budget exceeded during replay")
+            verified = _read(fd, path, byte_budget - rechecked_bytes)
+            rechecked_bytes += len(verified)
+            if sha256(verified).hexdigest() != expected_digest:
                 raise DualRuntimeVerificationError("package source changed during replay")
         if _inventory(fd) != expected:
             raise DualRuntimeVerificationError("package entries changed during replay")

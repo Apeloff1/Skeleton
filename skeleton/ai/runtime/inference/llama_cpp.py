@@ -2052,8 +2052,8 @@ def build_llama_cpp_adapter(
     if type(require_guarded_inference) is not bool:
         raise LlamaCppRuntimeError("protected local mode must be explicit")
     if require_guarded_inference:
-        from .guarded_composition import ProtectedLocalComponents
-        if not isinstance(guarded_components, ProtectedLocalComponents):
+        from .guarded_composition import is_protected_component_source
+        if not is_protected_component_source(guarded_components):
             raise LlamaCppRuntimeError("protected local deployment lacks trusted components")
     elif guarded_components is not None:
         raise LlamaCppRuntimeError("protected components require enforced local mode")

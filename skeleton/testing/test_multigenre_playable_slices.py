@@ -54,16 +54,22 @@ def test_each_archetype_adds_real_scene_controller_and_winnable_loop(name):
     assert FAILED_MARKER in added[f"scripts/archetypes/{name}/core_loop.gd"]
     assert 'func _tick(' in added[f"scripts/archetypes/{name}/core_loop.gd"]
     assert 'func _physics_process(' in added[f"scripts/archetypes/{name}/player_controller.gd"]
-    assert 'func _draw()' in added[f"scripts/archetypes/{name}/player_controller.gd"]
-    assert 'arrows: move' in added[f"scripts/archetypes/{name}/core_loop.gd"]
-    assert "func _objective_text() -> String:" in added[f"scripts/archetypes/{name}/core_loop.gd"]
-    assert "_status.text" in added[f"scripts/archetypes/{name}/core_loop.gd"]
+    # v4 owns drawing, input translation and the accessible HUD in the
+    # scene loop rather than its CharacterBody2D movement controller.
+    loop = added[f"scripts/archetypes/{name}/core_loop.gd"]
+    assert "func _draw()" in loop
+    assert "Arrow keys or touch controls to move" in loop
+    assert "func _hud_status() -> String:" in loop
+    assert "hud_label.text" in loop
     controller = added[f"scripts/archetypes/{name}/player_controller.gd"]
     assert "Input.get_vector" in controller
-    assert "Input.action_press(action)" in controller
-    assert "Input.action_release(action)" in controller
-    assert "DisplayServer.is_touchscreen_available()" in controller
-    assert "_touch_controls.append" in controller
+    assert "Input.action_press(action)" in loop
+    assert "Input.action_release(action)" in loop
+    assert "DisplayServer.get_name()" in loop
+    assert 'controls.name = "TouchControls"' in loop
+    assert '"ui_accept", "USE"' in loop
+    assert "retry_button.pressed.connect" in loop
+    assert "player.set_physics_process(false)" in loop
     result = attach_archetype_content(original, name)
     assert original == before
     assert len(result) == len(original) + 3
@@ -94,8 +100,8 @@ def test_canonical_emit_can_make_each_mini_game_the_actual_launch_scene(name, mo
     assert f'run/main_scene="{expected}"' in ctx["files"]["project.godot"]
     assert "data/rooms.json" in ctx["files"]
     assert ctx["files"]["data/rooms.json"] == original["data/rooms.json"]
-    assert ctx["file_count"] == len(original) + 3
-    assert source_manifest(ctx["files"])["file_count"] == len(original) + 3
+    assert ctx["file_count"] == len(original) + 4
+    assert source_manifest(ctx["files"])["file_count"] == len(original) + 4
 
 
 def test_extra_scene_mode_preserves_normal_quest_compatible_startup(monkeypatch):
@@ -180,22 +186,24 @@ def test_backend_plays_explicit_mode_and_main_scene_only_when_requested(monkeypa
 
 @pytest.mark.parametrize("name", SUPPORTED)
 def test_bonus_mode_adds_reachable_in_game_launcher_without_rewriting_default_world(name):
-    from skeleton.forge.archetype_content import (
-        attach_playable_launcher, PLAYABLE_LAUNCHER_PATH,
+    from skeleton.forge.playable_portal import (
+        attach_playable_portal, verify_playable_portal, SCRIPT_PATH as PLAYABLE_LAUNCHER_PATH,
     )
     base = godot_files()
     scene = attach_archetype_content(base, name)
-    source = attach_playable_launcher(scene, name)
+    source, portal = attach_playable_portal(scene, name)
+    assert portal["return_supported"] is True
+    assert verify_playable_portal(source, name)
     assert len(source) == len(base) + 4
     assert source["data/rooms.json"] == base["data/rooms.json"]
-    assert source["project.godot"].count("PlayableHub=") == 1
+    assert source["project.godot"].count("PlayablePortal=") == 1
     assert 'run/main_scene="res://scenes/levels/run_level.tscn"' in source["project.godot"]
     assert PLAYABLE_LAUNCHER_PATH in source
     script = source[PLAYABLE_LAUNCHER_PATH]
     assert f'res://scenes/archetypes/{name}/main.tscn' in script
-    assert "get_tree().change_scene_to_file(target)" in script
+    assert "get_tree().change_scene_to_file(destination)" in script
     assert "get_tree().current_scene" in script
-    assert "ORIGINAL_WORLD" in script
+    assert "WORLD_SCENE" in script
     assert source_manifest(source)["file_count"] == len(source)
     ok, problems = check_ok(source)
     assert ok, problems
@@ -203,33 +211,33 @@ def test_bonus_mode_adds_reachable_in_game_launcher_without_rewriting_default_wo
 
 
 def test_launcher_rejects_source_collisions_and_unregistered_paths():
-    from skeleton.forge.archetype_content import (
-        attach_playable_launcher, PLAYABLE_LAUNCHER_PATH,
+    from skeleton.forge.playable_portal import (
+        attach_playable_portal, SCRIPT_PATH as PLAYABLE_LAUNCHER_PATH,
     )
     base = attach_archetype_content(godot_files(), "puzzle")
     with pytest.raises(ValueError):
-        attach_playable_launcher(base, "../../system")
+        attach_playable_portal(base, "../../system")
     with pytest.raises(ValueError):
-        attach_playable_launcher(godot_files(), "puzzle")
-    source = attach_playable_launcher(base, "puzzle")
+        attach_playable_portal(godot_files(), "puzzle")
+    source, _ = attach_playable_portal(base, "puzzle")
     with pytest.raises(ValueError):
-        attach_playable_launcher(source, "puzzle")
+        attach_playable_portal(source, "puzzle")
     changed = dict(base)
     changed[PLAYABLE_LAUNCHER_PATH] = "extends Node"
     with pytest.raises(ValueError):
-        attach_playable_launcher(changed, "puzzle")
+        attach_playable_portal(changed, "puzzle")
     changed = dict(base)
     changed["project.godot"] = changed["project.godot"].replace(
-        "[autoload]\n", "[autoload]\nPlayableHub=\"*res://unknown.gd\"\n"
+        "[autoload]\n", "[autoload]\nPlayablePortal=\"*res://unknown.gd\"\n"
     )
     with pytest.raises(ValueError):
-        attach_playable_launcher(changed, "puzzle")
+        attach_playable_portal(changed, "puzzle")
 
 
 def test_pipeline_bonus_launcher_and_quest_are_composed_without_clobbering(monkeypatch):
     from skeleton.context import pipeline
     from skeleton.ai.game_builder.godot_quest_bridge import verify_native_quest
-    from skeleton.forge.archetype_content import PLAYABLE_LAUNCHER_PATH
+    from skeleton.forge.playable_portal import SCRIPT_PATH as PLAYABLE_LAUNCHER_PATH
     monkeypatch.setattr(pipeline, "_commit", lambda *args, **kwargs: None)
     ctx = {
         "era": "extraction_now", "target": "godot",
@@ -243,7 +251,7 @@ def test_pipeline_bonus_launcher_and_quest_are_composed_without_clobbering(monke
     files = ctx["files"]
     assert PLAYABLE_LAUNCHER_PATH in files
     assert ctx["playable_launcher"] == PLAYABLE_LAUNCHER_PATH
-    assert "PlayableHub=" in files["project.godot"]
+    assert "PlayablePortal=" in files["project.godot"]
     assert "QuestRuntime=" in files["project.godot"]
     assert verify_native_quest(files)
     assert ctx["native_quest_receipt"]["steps"] == 2
@@ -254,7 +262,7 @@ def test_pipeline_bonus_launcher_and_quest_are_composed_without_clobbering(monke
 
 def test_playable_receipt_binds_exact_scripts_and_godot_launcher(monkeypatch):
     from skeleton.context import pipeline
-    from skeleton.forge.archetype_content import PLAYABLE_LAUNCHER_PATH
+    from skeleton.forge.playable_portal import SCRIPT_PATH as PLAYABLE_LAUNCHER_PATH
     import hashlib
 
     monkeypatch.setattr(pipeline, "_commit", lambda *args, **kwargs: None)
@@ -267,7 +275,7 @@ def test_playable_receipt_binds_exact_scripts_and_godot_launcher(monkeypatch):
         }
         pipeline._stage_emit(ctx)
         receipt = ctx["playable_receipt"]
-        assert receipt["schema"] == "skeleton.gameforge.playable_source.v1"
+        assert receipt["schema"] == "skeleton.gameforge.playable_source.v2"
         assert receipt["mode"] == "puzzle"
         assert receipt["scene"] == "res://scenes/archetypes/puzzle/main.tscn"
         assert receipt["launch_scene"] == receipt["scene"] if launch else receipt["launch_scene"] is None
@@ -275,7 +283,9 @@ def test_playable_receipt_binds_exact_scripts_and_godot_launcher(monkeypatch):
         assert receipt["source_files"] == {
             path: hashes[path] for path in sorted(receipt["source_files"])
         }
-        assert receipt["launcher"] == (None if launch else PLAYABLE_LAUNCHER_PATH)
+        assert receipt["launcher"] == PLAYABLE_LAUNCHER_PATH
+        assert receipt["native_execution_qualified"] is False
+        assert "project.godot" in receipt["source_files"]
         expected = hashlib.sha256(json.dumps(
             receipt["source_files"], sort_keys=True, separators=(",", ":"),
         ).encode("utf-8")).hexdigest()
@@ -300,7 +310,7 @@ def test_explicit_tempo_slider_changes_actual_controller_source_for_all_modes(mo
     from skeleton.forge.playable_tuning import SOURCE_PATH, SCHEMA
 
     pristine = archetype_files(mode)
-    tuned = archetype_files(mode, tuning={"tempo": 1.0, "spectacle": 0.9})
+    tuned = archetype_files(mode, operator_axes={"tempo": 1.0, "spectacle": 0.9})
     controller = f"scripts/archetypes/{mode}/player_controller.gd"
     assert tuned[controller] != pristine[controller]
     assert "@export var speed: float = " in tuned[controller]
@@ -313,25 +323,25 @@ def test_explicit_tempo_slider_changes_actual_controller_source_for_all_modes(mo
     assert receipt["mapped_axes"] == ["tempo"]
     assert receipt["unmapped_axes"] == ["spectacle"]
     assert receipt["applied"]["player.speed"] > 0
-    assert tuned == archetype_files(mode, tuning={"spectacle": 0.9, "tempo": 1})
+    assert tuned == archetype_files(mode, operator_axes={"spectacle": 0.9, "tempo": 1})
     assert pristine == archetype_files(mode)
     ok, errors = check_ok(tuned)
     assert ok, errors
 
 
 @pytest.mark.parametrize("mode,axis,target,constant", [
-    ("extraction", "risk", "extraction.heat_per_second", "const HEAT_PER_SECOND := 7.50"),
+    ("extraction", "risk", "extraction.heat_per_second", "const HEAT_PER_SECOND := 10.00"),
     ("racing", "risk", "racing.time_limit_seconds", "const TIME_LIMIT := 36.00"),
     ("stealth", "risk", "stealth.detection_radius", "const DETECTION_RADIUS := 80.00"),
     ("survival", "scarcity", "survival.hydration_drain_per_second", "const DRAIN_PER_SECOND := 3.00"),
-    ("combat_loop", "lethality", "combat_loop.starting_hp", "var player_hp: int = 75"),
+    ("combat_loop", "lethality", "combat_loop.contact_damage", "const CONTACT_DAMAGE := 5"),
 ])
 def test_risk_scarcity_lethality_knobs_really_change_the_specific_game_logic(
     mode, axis, target, constant,
 ):
     from skeleton.forge.playable_tuning import SOURCE_PATH
 
-    files = archetype_files(mode, tuning={axis: 1.0})
+    files = archetype_files(mode, operator_axes={axis: 1.0})
     path = f"scripts/archetypes/{mode}/core_loop.gd"
     assert constant in files[path]
     assert files[path] != archetype_files(mode)[path]
@@ -358,10 +368,10 @@ def test_cockpit_sparse_tuning_is_bounded_and_does_not_execute_untrusted_values(
     ]
     for axes in invalid + [[], "", False, 0]:
         with pytest.raises(ValueError):
-            archetype_files("racing", tuning=axes)
+            archetype_files("racing", operator_axes=axes)
     assert SOURCE_PATH not in archetype_files("racing")
-    assert SOURCE_PATH not in archetype_files("racing", tuning={})
-    assert archetype_files("racing", tuning={}) == archetype_files("racing")
+    assert SOURCE_PATH not in archetype_files("racing", operator_axes={})
+    assert archetype_files("racing", operator_axes={}) == archetype_files("racing")
 
 
 def test_tuning_collides_closed_on_existing_source_and_does_not_mutate_inputs():
@@ -369,17 +379,17 @@ def test_tuning_collides_closed_on_existing_source_and_does_not_mutate_inputs():
 
     files = godot_files()
     original = deepcopy(files)
-    source = attach_archetype_content(files, "survival", tuning={"tempo": 0.8})
+    source = attach_archetype_content(files, "survival", operator_axes={"tempo": 0.8})
     assert files == original
     assert SOURCE_PATH in source
     assert source_manifest(source)["files"][SOURCE_PATH]
     # Different authored tuning is never silently overwritten.
     with pytest.raises(ValueError, match="collides"):
-        attach_archetype_content(source, "survival", tuning={"tempo": 0.1})
+        attach_archetype_content(source, "survival", operator_axes={"tempo": 0.1})
     collision = dict(files)
     collision[SOURCE_PATH] = "untrusted"
     with pytest.raises(ValueError, match="collides"):
-        attach_archetype_content(collision, "survival", tuning={"risk": 0.9})
+        attach_archetype_content(collision, "survival", operator_axes={"risk": 0.9})
 
 
 def test_full_galaxy_tensor_and_quest_can_compile_one_tuned_playable_bundle(monkeypatch):
@@ -411,7 +421,8 @@ def test_full_galaxy_tensor_and_quest_can_compile_one_tuned_playable_bundle(monk
     assert json.loads(generated[ARTIFACT_PATH]) == profile
     assert ctx["playable_tuning"]["applied"]["player.speed"] > 0
     assert ctx["playable_tuning"]["applied"]["survival.hydration_drain_per_second"] > 0
-    assert ctx["playable_tuning"]["unmapped_axes"] == ["risk"]
+    assert ctx["playable_tuning"]["unmapped_axes"] == []
+    assert ctx["playable_tuning"]["applied"]["survival.exposure_drain_per_second"] > 0
     manifest = source_manifest(generated)
     assert len(generated) == ctx["file_count"] == manifest["file_count"]
     assert ctx["playable_receipt"]["tuning"] == json.loads(generated[SOURCE_PATH])
@@ -505,7 +516,7 @@ def test_tuning_receipt_and_launcher_cannot_be_rebound_to_other_prototype(monkey
     altered = dict(files)
     altered[receipt["launcher"]] += "\n# actor-swapped"
     assert not verify_playable_source(altered, receipt)
-    assert not verify_playable_source(files, {"schema": "skeleton.gameforge.playable_source.v1"})
+    assert not verify_playable_source(files, {"schema": "skeleton.gameforge.playable_source.v2"})
 
 
 
@@ -533,7 +544,7 @@ def test_godot_static_controller_type_keeps_dynamic_custom_fields_explicit(mode)
 
 @pytest.mark.parametrize("mode", SUPPORTED)
 def test_tuning_does_not_restore_unknown_static_player_member_access(mode):
-    emitted = archetype_files(mode, tuning={"tempo": 0.87})
+    emitted = archetype_files(mode, operator_axes={"tempo": 0.87})
     loop = emitted[f"scripts/archetypes/{mode}/core_loop.gd"]
     assert "player.autopilot_target" not in loop
     assert "player.autopilot" not in loop
@@ -542,9 +553,9 @@ def test_tuning_does_not_restore_unknown_static_player_member_access(mode):
 
 
 @pytest.mark.parametrize("mode,source_key,expected", [
-    ("combat_loop", "combat_loop.waves", (2, 3, 4)),
+    ("combat_loop", "combat_loop.waves", (2, 4, 5)),
     ("racing", "racing.goal_laps", (2, 3, 4)),
-    ("pipeline", "pipeline.shipment_quota", (2, 4, 6)),
+    ("pipeline", "pipeline.shipment_quota", (2, 5, 8)),
 ])
 def test_progression_depth_changes_native_completion_quotas(mode, source_key, expected):
     from skeleton.forge.playable_tuning import SOURCE_PATH
@@ -555,14 +566,14 @@ def test_progression_depth_changes_native_completion_quotas(mode, source_key, ex
     }[mode]
     original = archetype_files(mode)
     for knob, count in zip((0, 0.5, 1), expected):
-        bundle = archetype_files(mode, tuning={"grind": knob})
+        bundle = archetype_files(mode, operator_axes={"grind": knob})
         loop = bundle[f"scripts/archetypes/{mode}/core_loop.gd"]
         assert f"const {constant} := {count}" in loop
         tuning = json.loads(bundle[SOURCE_PATH])
         assert tuning["applied"][source_key] == float(count)
         assert tuning["mapped_axes"] == ["grind"]
         assert tuning["unmapped_axes"] == []
-        assert bundle == archetype_files(mode, tuning={"grind": knob})
+        assert bundle == archetype_files(mode, operator_axes={"grind": knob})
         valid, errors = check_ok(bundle)
         assert valid, (mode, knob, errors)
     assert SOURCE_PATH not in original
@@ -576,7 +587,7 @@ def test_mystery_axis_changes_real_native_hint_visibility(mode, flag, source_key
     from skeleton.forge.playable_tuning import SOURCE_PATH
     normal = archetype_files(mode)
     for knob, expected in ((0, True), (0.65, True), (0.67, False), (1, False)):
-        generated = archetype_files(mode, tuning={"opacity": knob})
+        generated = archetype_files(mode, operator_axes={"opacity": knob})
         loop = generated[f"scripts/archetypes/{mode}/core_loop.gd"]
         assert f"const {flag} := {str(expected).lower()}" in loop
         receipt = json.loads(generated[SOURCE_PATH])
@@ -591,15 +602,103 @@ def test_mystery_axis_changes_real_native_hint_visibility(mode, flag, source_key
 def test_extra_cockpit_axes_remain_auditable_not_silent_gameplay_claims():
     from skeleton.forge.playable_tuning import SOURCE_PATH
     for mode in SUPPORTED:
-        built = archetype_files(mode, tuning={
+        built = archetype_files(mode, operator_axes={
             "opacity": 1, "grind": 1, "authorial": 0.6, "agency": 0.3,
         })
         receipt = json.loads(built[SOURCE_PATH])
         mapped = set(receipt["mapped_axes"])
         assert "authorial" not in mapped
-        assert "agency" not in mapped
+        assert "agency" in mapped
         assert receipt["unmapped_axes"] == sorted(
             set(receipt["axes"]) - mapped
         )
         # The normal provenance verifier reconstructs every altered template.
         assert receipt["mode"] == mode
+
+
+def test_bidirectional_startup_receipt_refuses_unreviewed_source_and_legacy_claim(monkeypatch):
+    from skeleton.context import pipeline
+    from skeleton.forge.playable_provenance import verify_playable_source
+    from skeleton.forge.playable_portal import SCRIPT_PATH
+    import hashlib
+
+    monkeypatch.setattr(pipeline, "_commit", lambda *args, **kwargs: None)
+    ctx = {"era": "extraction_now", "target": "godot", "files": godot_files(),
+           "project_root": None, "playtest_mode": "off", "playable_content": True,
+           "playable_archetype_selection": "puzzle", "playable_main_scene": True}
+    pipeline._stage_emit(ctx)
+    source, receipt = ctx["files"], ctx["playable_receipt"]
+    assert verify_playable_source(source, receipt)
+    for key, replacement in (
+        ("schema", "skeleton.gameforge.playable_source.v1"),
+        ("native_execution_qualified", True), ("launcher", None),
+    ):
+        rejected = dict(receipt, **{key: replacement})
+        assert not verify_playable_source(source, rejected)
+    for path, change in (
+        (SCRIPT_PATH, lambda text: text + "\n# unreviewed"),
+        ("project.godot", lambda text: text + '\nrun/main_scene="res://other.tscn"'),
+        ("scripts/archetypes/puzzle/extra.gd", lambda text: "extends Node"),
+    ):
+        altered = dict(source)
+        altered[path] = change(altered.get(path, ""))
+        forged = deepcopy(receipt)
+        hashes = source_manifest(altered)["files"]
+        forged["source_files"] = {key: hashes[key] for key in receipt["source_files"]}
+        forged["source_sha256"] = hashlib.sha256(json.dumps(
+            forged["source_files"], sort_keys=True, separators=(",", ":"),
+        ).encode("utf-8")).hexdigest()
+        assert not verify_playable_source(altered, forged)
+
+
+@pytest.mark.parametrize("mutation", [
+    lambda p: p.replace("[application]", '[application]\nrun/main_scene = "res://foreign.tscn"'),
+    lambda p: p.replace("[autoload]", '[autoload]\nPlayablePortal = "*res://foreign.gd"'),
+    lambda p: p.replace("[autoload]", "[foreign]"),
+    lambda p: p + "\n[application]\nconfig/name=\"Other\"\n",
+    lambda p: p.replace('run/main_scene="', ';run/main_scene="', 1),
+])
+def test_portal_rejects_shadowed_and_misplaced_project_settings(mutation):
+    from skeleton.forge.playable_portal import attach_playable_portal, verify_playable_portal
+    from skeleton.forge.playable_provenance import build_playable_source_receipt
+    base = attach_archetype_content(godot_files(), "puzzle")
+    files, _ = attach_playable_portal(base, "puzzle")
+    assert verify_playable_portal(files, "puzzle")
+    changed = dict(files)
+    changed["project.godot"] = mutation(files["project.godot"])
+    assert not verify_playable_portal(changed, "puzzle")
+    with pytest.raises(ValueError):
+        build_playable_source_receipt(changed, "puzzle")
+
+
+@pytest.mark.parametrize("extra", [
+    {"data": "file", "data/rooms.json": "{}"},
+    {"data/rooms.json": "{}", "data": "file"},
+    {"Data/one.txt": "one", "data/two.txt": "two"},
+    {"scripts/.hidden.gd": "extends Node"},
+    {"scripts/NUL.gd": "extends Node"},
+    {"scripts/name?.gd": "extends Node"},
+    {"forge_manifest.json/extra.txt": "reserved"},
+    {"scripts/" + "a" * 121 + ".gd": "extends Node"},
+    {"scripts/broken.gd": "\ud800"},
+])
+def test_generated_source_rejects_nonportable_tree_before_projection(tmp_path, extra):
+    from skeleton.forge.projector import write_project
+    source = {"project.godot": "config_version=5\n", **extra}
+    destination = tmp_path / "never-created"
+    with pytest.raises(ValueError):
+        source_manifest(source)
+    with pytest.raises(ValueError):
+        write_project(destination, source)
+    assert not destination.exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_source_projection_preserves_valid_nested_unicode_payload(tmp_path):
+    from skeleton.forge.projector import write_project
+    source = {"project.godot": "config_version=5\n", "Data/room.txt": "雪🌊"}
+    target = tmp_path / "portable"
+    receipt = source_manifest(source)
+    projected = write_project(target, source)
+    assert projected["source_sha256"] == receipt["sha256"]
+    assert (target / "Data/room.txt").read_bytes() == source["Data/room.txt"].encode("utf-8")

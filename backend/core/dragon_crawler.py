@@ -34,6 +34,39 @@ MAX_AUTO_SECONDS = 3600
 MAX_SOURCE_AGE_SECONDS = 86400
 MAX_SOURCE_POLICIES = 64
 TERMINAL_STATES = {"completed", "budget_exhausted", "cancelled", "deleted"}
+CRAWLER_SESSION_INDEXES = (
+    (("tenant_id", ASCENDING), ("owner_id", ASCENDING), ("_id", DESCENDING)),
+    (("status", ASCENDING), ("lease_until", ASCENDING)),
+    (("automation.enabled", ASCENDING), ("automation.next_run_at", ASCENDING)),
+)
+
+
+def _required_indexes_observed(inventory: object) -> bool:
+    """Only full, visible, non-TTL indexes with the required key order qualify."""
+    if not isinstance(inventory, Mapping) or len(inventory) > 256:
+        return False
+    observed = set()
+    for entry in inventory.values():
+        if not isinstance(entry, Mapping):
+            return False
+        keys = entry.get("key")
+        if not isinstance(keys, (list, tuple)) or len(keys) > 32:
+            return False
+        normalized = []
+        for pair in keys:
+            if (not isinstance(pair, (list, tuple)) or len(pair) != 2
+                    or type(pair[0]) is not str
+                    or type(pair[1]) not in (int, str)):
+                return False
+            normalized.append(tuple(pair))
+        if (entry.get("hidden", False) is not False
+                or entry.get("sparse", False) is not False
+                or entry.get("unique", False) is not False
+                or "partialFilterExpression" in entry
+                or "expireAfterSeconds" in entry):
+            continue
+        observed.add(tuple(normalized))
+    return all(keys in observed for keys in CRAWLER_SESSION_INDEXES)
 
 
 class CrawlerError(RuntimeError):
@@ -127,21 +160,28 @@ class DragonCrawlerApplication:
 
     async def ensure_indexes(self):
         if not self._indexes_ready:
-            await self.sessions.create_index(
-                [("tenant_id", ASCENDING), ("owner_id", ASCENDING), ("_id", DESCENDING)]
-            )
-            await self.sessions.create_index([("status", ASCENDING), ("lease_until", ASCENDING)])
-            await self.sessions.create_index(
-                [("automation.enabled", ASCENDING), ("automation.next_run_at", ASCENDING)]
-            )
+            for keys in CRAWLER_SESSION_INDEXES:
+                await self.sessions.create_index(list(keys))
             self._indexes_ready = True
+
+    async def observe_indexes(self) -> bool:
+        # GET readiness must never create collections/indexes or set a cache
+        # that authorizes a subsequent write. Observe current Mongo metadata.
+        inventory = await asyncio.wait_for(
+            self.sessions.index_information(maxTimeMS=2000), timeout=2,
+        )
+        return _required_indexes_observed(inventory)
 
     async def readiness(self) -> dict[str, Any]:
         available, code, message = False, "crawler_storage_unavailable", "Crawler storage is unavailable."
         try:
             _core()
             await asyncio.wait_for(self.database.command("ping", maxTimeMS=2000), timeout=2)
-            await self.ensure_indexes()
+            if not await self.observe_indexes():
+                return self._readiness_payload(
+                    False, "crawler_indexes_unavailable",
+                    "Required crawler storage indexes are not observed. Inspect backend initialization.",
+                )
             if self.engine is None:
                 code, message = (
                     "crawler_admission_unconfigured",

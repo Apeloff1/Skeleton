@@ -42,6 +42,7 @@ def test_bundled_preloader_does_not_probe_system_pip(monkeypatch, tmp_path):
 
 
 def test_bundled_installer_disables_external_python_requirements(monkeypatch, tmp_path):
+    (tmp_path / ".env").write_text("FRONTEND_PORT=3000\n", encoding="utf-8")
     captured = {}
 
     def fake_preload(root, **kwargs):
@@ -519,6 +520,7 @@ def test_open_app_uses_configured_frontend_port(monkeypatch, tmp_path):
 
 
 def test_docker_stop_failure_never_echoes_credentials(monkeypatch, tmp_path):
+    _mock_stop_observations(tmp_path,monkeypatch)
     from skeleton.app import windows_launcher as launcher
 
     secret = "sensitive-compose-secret"
@@ -535,6 +537,7 @@ def test_docker_stop_failure_never_echoes_credentials(monkeypatch, tmp_path):
 
 
 def test_windows_stop_preserves_containers_and_chroma_writable_data(monkeypatch, tmp_path):
+    _mock_stop_observations(tmp_path,monkeypatch)
     from skeleton.app import windows_launcher as launcher
 
     calls = []
@@ -617,6 +620,7 @@ def test_host_preloader_never_echoes_docker_daemon_credentials(monkeypatch, tmp_
 
 
 def test_windows_stop_command_raised_error_does_not_show_sensitive_text(monkeypatch, tmp_path):
+    _mock_stop_observations(tmp_path,monkeypatch)
     from skeleton.app import windows_launcher as launcher
 
     def runner(command, **kwargs):
@@ -721,3 +725,105 @@ def test_open_app_denies_nonlocal_or_credentialed_setup_urls(monkeypatch, host):
     allowed, detail = launcher.open_running_application()
     assert allowed is False
     assert "local HTTP endpoint" in detail
+
+
+def test_windows_hidden_runner_forwards_preloader_stdin(monkeypatch,tmp_path):
+    from skeleton.app import windows_launcher as launcher
+    from skeleton.app.preloader import _command_check
+    def child(command,**kwargs):
+        assert kwargs["stdin"] == subprocess.DEVNULL
+        assert kwargs["stdout"] == subprocess.DEVNULL
+        assert kwargs["stderr"] == subprocess.DEVNULL
+        assert kwargs["shell"] is False
+        return subprocess.CompletedProcess(command,0)
+    monkeypatch.setattr(launcher.subprocess,"run",child)
+    assert _command_check(["docker","info"],code="host:docker",label="Docker",
+                          remediation="repair",runner=launcher._hidden_runner).ok
+
+
+@pytest.mark.parametrize("port", [0, 65536])
+def test_windowed_probe_acceptance_rejects_invalid_port_before_transport(monkeypatch,tmp_path,port):
+    from skeleton.app import windows_launcher as launcher
+    monkeypatch.setattr("skeleton.app.first_install.critical_backend_route_report",
+                        lambda *a,**k: pytest.fail("invalid port reached transport"))
+    args=launcher.parser().parse_args(["--verify-install-probe",str(port)])
+    assert launcher._headless(args,tmp_path)==2
+
+
+@pytest.mark.parametrize("observed,ready,expected", [(True,True,0),(True,False,1),(False,True,1)])
+def test_windowed_probe_acceptance_requires_public_mount_evidence(monkeypatch,tmp_path,observed,ready,expected):
+    from skeleton.app import windows_launcher as launcher
+    def registry(base,**kwargs):
+        assert base=="http://127.0.0.1:32123"
+        assert kwargs["timeout"]==5
+        return {"observed":observed,"ready":ready}
+    monkeypatch.setattr("skeleton.app.first_install.critical_backend_route_report",registry)
+    args=launcher.parser().parse_args(["--verify-install-probe","32123"])
+    assert launcher._headless(args,tmp_path)==expected
+
+
+@pytest.mark.parametrize("status",[False,True,None,"0",-9,2**40])
+def test_windows_stop_never_claims_uncertain_completion(tmp_path,monkeypatch,status):
+    _mock_stop_observations(tmp_path,monkeypatch)
+    from skeleton.app import windows_launcher as launcher
+    monkeypatch.setattr(launcher,"_hidden_runner",
+                        lambda *a,**k: SimpleNamespace(returncode=status))
+    ok,detail=launcher.stop_runtime(tmp_path)
+    assert ok is False
+    assert "uncertain" in detail
+
+
+def test_windows_stop_serializes_against_installer(tmp_path,monkeypatch):
+    from skeleton.app import windows_launcher as launcher
+    from skeleton.app.runtime_operation import runtime_operation
+    monkeypatch.setattr(launcher,"_hidden_runner",
+                        lambda *a,**k: pytest.fail("contended stop reached Docker"))
+    with runtime_operation(tmp_path,"install"):
+        ok,detail=launcher.stop_runtime(tmp_path)
+    assert ok is False and "another installation operation" in detail
+
+
+
+def test_browser_does_not_open_after_configuration_change_in_setup_probe(tmp_path,monkeypatch):
+    from skeleton.app import windows_launcher as launcher
+    config=tmp_path/".env"
+    config.write_text("FRONTEND_PORT=3000\n")
+    def probe(*a,**k):
+        config.write_text("FRONTEND_PORT=3300\n")
+        return SimpleNamespace(ok=True,status=200,detail="ready")
+    monkeypatch.setattr(launcher,"probe_local_setup",probe)
+    monkeypatch.setattr(launcher.webbrowser,"open",
+                        lambda *a,**k: pytest.fail("stale setup target reached browser"))
+    ok,message=launcher.open_running_application(tmp_path)
+    assert not ok and "configuration changed" in message
+
+
+@pytest.mark.parametrize("registry_ready",[True,False])
+def test_windows_runtime_status_requires_backend_route_evidence(tmp_path,monkeypatch,registry_ready):
+    from skeleton.app import windows_launcher as launcher
+    from skeleton.app.health import ProbeResult
+    config=tmp_path/".env"
+    config.write_text("BACKEND_PORT=8400\n")
+    from skeleton.testing.app_health_fixtures import fixture_probes
+    monkeypatch.setattr(launcher,"probe_application",fixture_probes)
+    def registry(base,**kwargs):
+        assert base=="http://localhost:8400"
+        return {"ready":registry_ready}
+    monkeypatch.setattr("skeleton.app.first_install.critical_backend_route_report",registry)
+    ok,message=launcher.runtime_status(tmp_path)
+    assert ok is registry_ready
+    assert ("Critical API routers" in message) is (not registry_ready)
+
+
+
+def _mock_stop_observations(root,monkeypatch):
+    from skeleton.app.compose_stop_custody import StopSnapshot
+    (root/".env").write_text("FRONTEND_PORT=3000\n")
+    calls=[]
+    def observe(*a,**k):
+        calls.append(1)
+        running=len(calls)==1
+        return StopSnapshot("fixture-daemon","fixture",(
+            ("tutolage-backend","a"*64,"running" if running else "exited",running),
+        ),frozenset({"fixture_backend_data"}))
+    monkeypatch.setattr("skeleton.app.compose_stop_custody.observe_stop",observe)

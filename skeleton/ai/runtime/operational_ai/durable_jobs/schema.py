@@ -2,16 +2,26 @@
 from __future__ import annotations
 import sqlite3
 from .errors import deny
+from .transaction import TransactionGate
 
 VERSION = 1
 STATES = ("pending","running","completed","failed","held","cancelled","cancel_requested")
 
 
 def ensure_schema(db: sqlite3.Connection) -> None:
+    if db.in_transaction:
+        deny("schema-foreign-transaction")
+    db.execute("PRAGMA foreign_keys=ON")
+    if db.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
+        deny("schema-foreign-keys-disabled")
+    with TransactionGate(db).exclusive():
+        _ensure_schema_transaction(db)
+
+
+def _ensure_schema_transaction(db: sqlite3.Connection) -> None:
     current = db.execute("PRAGMA user_version").fetchone()[0]
     if current not in (0,VERSION):
         deny("schema-version-unsupported")
-    db.execute("PRAGMA foreign_keys=ON")
     db.execute("""CREATE TABLE IF NOT EXISTS ai_durable_jobs(
         job_id TEXT PRIMARY KEY,
         tenant TEXT NOT NULL,
@@ -54,6 +64,10 @@ def ensure_schema(db: sqlite3.Connection) -> None:
        previous_sha TEXT NOT NULL,
        event_sha TEXT NOT NULL
     )""")
+    db.execute("""CREATE INDEX IF NOT EXISTS ai_job_audit_binding_idx
+       ON ai_job_audit(job_id,kind,seq)""")
+    db.execute("""CREATE INDEX IF NOT EXISTS ai_job_owner_state_idx
+       ON ai_durable_jobs(tenant,user_id,model_sha,tokenizer_sha,state,next_eligible_ms)""")
     db.execute("""CREATE TABLE IF NOT EXISTS ai_job_state(
        singleton INTEGER PRIMARY KEY CHECK(singleton=1),
        audit_sha TEXT NOT NULL,

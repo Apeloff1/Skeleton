@@ -17,6 +17,10 @@ on:
       - "Dockerfile"
       - "Dockerfile.dockerignore"
       - "docker-compose.yml"
+      - "docker-compose.hot.yml"
+      - "scripts/ci_first_install_runtime_binding.py"
+      - "scripts/ci_first_install_compose_model.py"
+      - "tests/test_ci_first_install_runtime_binding.py"
       - "pyproject.toml"
       - "requirements.txt"
       - "tests/e2e/**"
@@ -32,6 +36,10 @@ on:
       - "Dockerfile"
       - "Dockerfile.dockerignore"
       - "docker-compose.yml"
+      - "docker-compose.hot.yml"
+      - "scripts/ci_first_install_runtime_binding.py"
+      - "scripts/ci_first_install_compose_model.py"
+      - "tests/test_ci_first_install_runtime_binding.py"
       - "pyproject.toml"
       - "requirements.txt"
       - "tests/e2e/**"
@@ -130,14 +138,19 @@ jobs:
           BUILDKIT_PROGRESS: plain
         run: docker compose -f docker-compose.yml build frontend
 
+      - name: Validate real production Nginx configuration before startup
+        timeout-minutes: 2
+        run: docker compose -f docker-compose.yml run --rm --no-deps frontend nginx -t
+
       - name: Build engine and backend images
         timeout-minutes: 15
         env:
           BUILDKIT_PROGRESS: plain
         run: docker compose -f docker-compose.yml build skeleton backend
 
-      - name: Start stack
-        run: docker compose -f docker-compose.yml up -d mongo skeleton backend frontend
+      - name: Start isolated stack with shipping runtime and storage qualification
+        timeout-minutes: 12
+        run: python scripts/ci_first_install_runtime_binding.py
 
       - name: Wait for backend /api/health and frontend /healthz
         timeout-minutes: 8
@@ -157,6 +170,9 @@ jobs:
           }
           wait_for "${SKELETON_E2E_BASE_URL}/api/health" backend
           wait_for "${SKELETON_E2E_WEB_URL}/healthz" frontend
+          # Exact /setup must exist separately from the fallback SPA document.
+          curl --fail --silent --show-error --max-time 10 "${SKELETON_E2E_WEB_URL}/setup" -o "$RUNNER_TEMP/setup-document.html"
+          test -s "$RUNNER_TEMP/setup-document.html"
           docker compose -f docker-compose.yml ps
 
       - name: Set up Node 24
@@ -253,6 +269,9 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
       - name: Test bounded install and fail-closed retry contract
         run: python -m unittest discover -s tests -p test_ci_playwright_install.py -q
+      - name: Qualify real Compose render across local installation modes
+        timeout-minutes: 2
+        run: python scripts/ci_first_install_compose_model.py
 
   apple-metal-multisync:
     name: Apple M1 Metal Multi-Sync Qualification

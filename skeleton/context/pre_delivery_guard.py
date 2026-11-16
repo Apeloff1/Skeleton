@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from contextlib import nullcontext
-from contextvars import copy_context
+from contextvars import ContextVar, copy_context
 import asyncio
 import hashlib
 import json
@@ -35,6 +35,14 @@ _DOMAIN = b"skeleton.local.pre_delivery.merkle.v1\x00"
 _MAX_PART_BYTES = 4 * 1024 * 1024
 _MAX_PARTS = 2002
 _DIGEST = re.compile(r"[0-9a-f]{64}\Z")
+_native_verification_cancel: ContextVar[threading.Event | None] = ContextVar(
+    "skeleton_native_verification_cancel", default=None,
+)
+
+
+def native_verification_cancel_event() -> threading.Event | None:
+    """Cooperative stop signal owned by the current bounded native worker."""
+    return _native_verification_cancel.get()
 
 
 def _hash(data: bytes) -> str:
@@ -249,8 +257,10 @@ class GuardedLocalInference:
     def __init__(
         self, engine: Any, *,
         reviewer: BoundedAdversarialReviewer,
+        review_async: Callable[[str, str], Awaitable[Any]] | None = None,
         tokenize: Callable[[str], Sequence[int]] | None = None,
         detokenize: Callable[[Sequence[int]], str] | None = None,
+        roundtrip: Callable[[str], tuple[Sequence[int], str]] | None = None,
         sampler_support: Callable[[Any, DeliveryContract], bool] | None = None,
         projection_attestor: Callable[[Any, str, str], bool] | None = None,
         tokenizer_identity_attestor: Callable[[], bool] | None = None,
@@ -272,8 +282,14 @@ class GuardedLocalInference:
             raise SealedContextError("native verification timeout must be finite and within 30 seconds")
         self.engine = engine
         self.reviewer = reviewer
+        if review_async is not None and not callable(review_async):
+            raise SealedContextError("async reviewer must be callable")
+        self._review_async = review_async
         self.tokenize = tokenize
         self.detokenize = detokenize
+        if roundtrip is not None and not callable(roundtrip):
+            raise SealedContextError("native roundtrip verification must be callable")
+        self._roundtrip = roundtrip
         self.sampler_support = sampler_support
         self.projection_attestor = projection_attestor
         self.tokenizer_identity_attestor = tokenizer_identity_attestor
@@ -308,6 +324,29 @@ class GuardedLocalInference:
             raise SealedContextBoundaryError("native tokenizer identity verification unavailable") from None
         if verified is not True:
             raise SealedContextIntegrityError("native tokenizer identity changed")
+
+    def _verified_native_roundtrip(self, rendered: str) -> tuple[str, bytes]:
+        """Hash the exact IDs and verify the byte echo without retaining tokens."""
+        if self._roundtrip is not None:
+            evidence = self._native_callback(self._roundtrip, rendered)
+            if type(evidence) is not tuple or len(evidence) != 2:
+                raise SealedContextIntegrityError("native tokenizer roundtrip evidence malformed")
+            tokens, decoded = evidence
+            if type(tokens) is not tuple:
+                raise SealedContextIntegrityError("native roundtrip token vector must be immutable")
+        else:
+            if self.tokenize is None or self.detokenize is None:
+                raise SealedContextBoundaryError("native tokenizer echo verification is not configured")
+            tokens = self._native_callback(self.tokenize, rendered)
+            # Retain the historical validate-before-decode behavior.
+            digest = _token_id_digest(tokens)
+            decoded = self._native_callback(self.detokenize, tokens)
+            if type(decoded) is not str:
+                raise SealedContextIntegrityError("native tokenizer roundtrip evidence malformed")
+            return digest, decoded.encode("utf-8", errors="strict")
+        if type(decoded) is not str:
+            raise SealedContextIntegrityError("native tokenizer roundtrip evidence malformed")
+        return _token_id_digest(tokens), decoded.encode("utf-8", errors="strict")
 
     def _preflight_evidence(
         self, request: Any, *, snapshot: TrustedContextSnapshot,
@@ -355,9 +394,8 @@ class GuardedLocalInference:
         if self.require_token_echo and (self.tokenize is None or self.detokenize is None):
             raise SealedContextBoundaryError("native tokenizer echo verification is not configured")
         if self.tokenize is not None and self.detokenize is not None:
-            tokens = self._native_callback(self.tokenize, rendered)
-            token_sequence_digest = _token_id_digest(tokens)
-            if self._native_callback(self.detokenize, tokens).encode("utf-8", errors="strict") != encoded:
+            token_sequence_digest, echoed = self._verified_native_roundtrip(rendered)
+            if echoed != encoded:
                 raise SealedContextIntegrityError("native tokenizer round trip changed input bytes")
             token_digest = _hash(encoded)
         untrusted = "\n".join(text for _, text in request.history) + "\n" + request.prompt
@@ -428,10 +466,20 @@ class GuardedLocalInference:
         loop = asyncio.get_running_loop()
         future: asyncio.Future[tuple[bool, Any]] = loop.create_future()
         context = copy_context()
+        cancel = threading.Event()
+
+        def cancellable_operation() -> Any:
+            token = _native_verification_cancel.set(cancel)
+            try:
+                if cancel.is_set():
+                    raise SealedContextBoundaryError("native verification cancelled")
+                return operation()
+            finally:
+                _native_verification_cancel.reset(token)
 
         def run() -> None:
             try:
-                result = (True, context.run(operation))
+                result = (True, context.run(cancellable_operation))
             except BaseException as exc:
                 result = (False, exc)
             finally:
@@ -458,7 +506,13 @@ class GuardedLocalInference:
         try:
             ok, value = await asyncio.wait_for(asyncio.shield(future), timeout=timeout)
         except TimeoutError as exc:
+            cancel.set()
+            future.cancel()
             raise SealedContextBoundaryError("native verification timed out") from exc
+        except asyncio.CancelledError:
+            cancel.set()
+            future.cancel()
+            raise
         if not ok:
             if isinstance(value, SealedContextError):
                 raise value
@@ -469,6 +523,22 @@ class GuardedLocalInference:
         if not self._review_slot.acquire(blocking=False):
             raise SealedContextBoundaryError("adversarial reviewer is busy")
         reviewer = self.reviewer
+        async_review = self._review_async
+        if async_review is not None:
+            try:
+                async with asyncio.timeout(timeout):
+                    verdict = await async_review(evidence.untrusted_text, evidence.untrusted_sha256)
+                    if self._review_async is not async_review or self.reviewer is not reviewer:
+                        raise SealedContextIntegrityError("adversarial reviewer changed during admission")
+                    return reviewer, verdict
+            except TimeoutError:
+                raise SealedContextBoundaryError("adversarial reviewer timed out") from None
+            except SealedContextError:
+                raise
+            except Exception:
+                raise SealedContextBoundaryError("adversarial reviewer unavailable") from None
+            finally:
+                self._review_slot.release()
         loop = asyncio.get_running_loop()
         future: asyncio.Future[Any] = loop.create_future()
 
@@ -556,10 +626,10 @@ class GuardedLocalInference:
         if admitted_token_ids is not None:
             if self.tokenize is None or self.detokenize is None:
                 raise SealedContextBoundaryError("admitted tokenizer is no longer available")
-            after_tokens = self._native_callback(self.tokenize, after_rendered)
-            if _token_id_digest(after_tokens) != admitted_token_ids:
+            after_ids, after_echo = self._verified_native_roundtrip(after_rendered)
+            if after_ids != admitted_token_ids:
                 raise SealedContextIntegrityError("native token ID sequence changed during inference")
-            if self._native_callback(self.detokenize, after_tokens).encode("utf-8", errors="strict") != after_bytes:
+            if after_echo != after_bytes:
                 raise SealedContextIntegrityError("native tokenizer echo changed during inference")
         if callable(native_renderer) and after_rendered != request.rendered_input:
             if self.projection_attestor is None or self._native_callback(
@@ -643,6 +713,9 @@ class GuardedLocalInference:
         # worker slot. The engine's task-bound permit explicitly allows a
         # context-copied worker to prepare, but never to dispatch inference.
         prepare = getattr(self.engine, "prepare_input", None)
+        exact_tokens = getattr(self.engine.model, "requires_exact_guard_tokens", False) is True
+        if exact_tokens and not callable(prepare):
+            raise SealedContextBoundaryError("exact-token backend lacks guarded preparation")
         if callable(prepare):
             with verified_scope():
                 prepared = await self._bounded_native_call(
@@ -652,6 +725,13 @@ class GuardedLocalInference:
                     ),
                     remaining_timeout(self.native_timeout_seconds),
                 )
+            if exact_tokens:
+                # The physical vector must be exactly the independently reviewed
+                # one, not merely another sequence that decodes to the same text.
+                if (prepared is None or type(getattr(prepared, "token_sequence", None)) is not tuple
+                        or evidence.token_sequence_digest is None
+                        or _token_id_digest(prepared.token_sequence) != evidence.token_sequence_digest):
+                    raise SealedContextIntegrityError("prepared native IDs differ from reviewed token sequence")
             if prepared is not None:
                 engine_options["prepared_input"] = prepared
 

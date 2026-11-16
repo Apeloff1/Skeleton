@@ -1,20 +1,15 @@
 name: Foundation cache and realtime qualification
 
+# Required by the existing Merge Readiness admission; execution remains real.
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - '.github/workflows/foundation-cache-realtime-qualification.yml'
-      - 'frontend/src/foundation/**'
-      - 'frontend/scripts/app-foundation/**'
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: foundation-cache-realtime-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: foundation-cache-realtime-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   foundation:

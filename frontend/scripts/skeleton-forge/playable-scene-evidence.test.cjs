@@ -38,8 +38,10 @@ test('both status and passed flag are required before any runtime badge is green
     status: 'passed', passed: true, scene: 'scenes/archetypes/pipeline/main.tscn',
   });
   assert.equal(Run.playableSceneView(confirmed).state, 'passed');
-  assert.equal(Run.playableSceneView(confirmed).tone, 'ok');
-  assert.equal(Run.playtestView(payload(null, { status: 'passed', passed: true })).tone, 'ok');
+  assert.equal(Run.playableSceneView(confirmed).tone, 'warn');
+  assert.equal(Run.playtestView(payload(null, { status: 'passed', passed: true })).tone, 'warn');
+  assert.equal(Run.playableSceneView(payload({ status: 'passed', passed: true, verified: true, scene: 'scenes/archetypes/pipeline/main.tscn' })).tone, 'ok');
+  assert.equal(Run.playtestView(payload(null, { status: 'passed', passed: true, verified: true })).tone, 'ok');
 });
 
 test('unavailable Godot is warning and failures cannot be presented as valid gameplay', () => {
@@ -140,4 +142,64 @@ test('mechanical tuning receipt identifies only axes actually implemented in God
     ...tuned, playable_mechanics: { ...tuned.playable_mechanics, source_verified: false },
   } })));
   assert.match(unverified, /Source tuning not verified/);
+});
+
+
+function nativeTuningPayload() {
+  const p = payload(null);
+  const native = {
+    'scenes/archetypes/pipeline/main.tscn': 'a'.repeat(64),
+    'scripts/archetypes/pipeline/player_controller.gd': 'b'.repeat(64),
+    'scripts/archetypes/pipeline/core_loop.gd': 'c'.repeat(64),
+  };
+  return { ...p, playable_mechanics: {
+    archetype: 'pipeline', source_verified: true, applied_axes: { grind: 1 },
+  }, playable_tuning: {
+    schema: 'skeleton.gameforge.playable_tuning.v1', mode: 'pipeline',
+    axes: { grind: 1, authorial: 0.5 }, applied: { 'pipeline.shipment_quota': 8 },
+    mapped_axes: ['grind'], unmapped_axes: ['authorial'],
+  }, galaxy_playable_controls: {
+    schema: 'skeleton.gameforge.galaxy_playable_controls.v1', mode: 'pipeline',
+    profile_sha256: 'd'.repeat(64), active_matrix_dials: 5, mapped_matrix_dials: 1,
+    unmapped_matrix_dials: 4, source_verified: true, native_execution_qualified: false,
+    effective_axes: { grind: 1, authorial: 0.5 }, native_sources: native,
+    tuning_receipt_sha256: 'e'.repeat(64),
+    axes: [{ axis: 'grind', requested: 0.8, effective: 1, authority: 'forge_override',
+      sources: [{ path: 'mechanics_matrix.building.count', value: 800 }] }],
+  }, source_manifest: { files: { ...native, 'data/playable_tuning.json': 'e'.repeat(64) } } };
+}
+test('native effect panel shows concrete values and Galaxy override authority', () => {
+  const result = nativeTuningPayload();
+  const screen = text(render(h(Panel, { phase: 'done', payload: result })));
+  assert.match(screen, /Generated gameplay controls/);
+  assert.match(screen, /Shipment quota/);
+  assert.match(screen, /Design only: authorial/);
+  assert.match(screen, /1 \/ 5 active dials connected/);
+  assert.match(screen, /grind · Forge override/);
+  assert.match(screen, /80% → 100%/);
+  assert.match(screen, /not device or player acceptance/);
+});
+for (const [name, change] of [
+  ['foreign mode', p => p.playable_tuning.mode = 'racing'],
+  ['unknown effect', p => p.playable_tuning.applied['pipeline.fake'] = 100],
+  ['overlapping axes', p => p.playable_tuning.unmapped_axes.push('grind')],
+  ['inconsistent mechanics', p => p.playable_mechanics.applied_axes.grind = 0],
+  ['foreign digest', p => p.source_manifest.files['data/playable_tuning.json'] = 'f'.repeat(64)],
+  ['invented acceptance', p => p.galaxy_playable_controls.native_execution_qualified = true],
+  ['inconsistent counts', p => p.galaxy_playable_controls.unmapped_matrix_dials = 5],
+  ['foreign vote', p => p.galaxy_playable_controls.axes[0].sources[0].path = '../private'],
+]) {
+  test('native control panel refuses ' + name, () => {
+    const p = nativeTuningPayload(); change(p);
+    const screen = text(render(h(Panel, { phase: 'done', payload: p })));
+    assert.match(screen, /Native control evidence is missing or inconsistent/);
+    assert.doesNotMatch(screen, /Shipment quota/);
+    assert.doesNotMatch(screen, /Forge override/);
+  });
+}
+
+test('wrong native scene never inherits a successful engine badge', () => {
+  const report = { status: 'passed', passed: true, verified: true, scene: 'scenes/archetypes/racing/main.tscn' };
+  assert.equal(Run.playableSceneView(payload(report)).state, 'failed');
+  assert.equal(Run.playableSceneView(payload({ ...report, scene: undefined })).tone, 'warn');
 });

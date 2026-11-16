@@ -11,16 +11,23 @@ import json
 import math
 import os
 import platform
+import re
 import stat
+from http.client import HTTPException
 import subprocess
 import sys
 import tempfile
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
+
+from skeleton.app.health import _http_error_status, _response_metadata
+from skeleton.app.install_http_transport import (
+    DirectHTTPHandler, DirectHTTPSHandler, FramingDenied, response_length, checked_body,
+)
 
 MAX_OUTPUT = 2 * 1024**2
 LOCAL_SECONDS = 20
@@ -162,7 +169,7 @@ def _inspect_host(root: Path, values: Mapping[str, str]) -> dict[str, object]:
             raw = output.read(MAX_OUTPUT + 1)
         if len(raw) > MAX_OUTPUT:
             return {"observed": False, "code": "local_inventory_exceeds_capacity"}
-        result = json.loads(raw, parse_constant=_nonfinite)
+        result = _decode_json(raw)
         if not isinstance(result, dict):
             return {"observed": False, "code": "local_inventory_protocol_invalid"}
         return {"observed": True, **result}
@@ -176,15 +183,73 @@ def _nonfinite(value: str) -> None:
     raise ValueError("readiness JSON must be finite")
 
 
+def _unique_fields(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate readiness JSON field")
+        result[key] = value
+    return result
+
+
+def _finite_float(value):
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError("nonfinite readiness JSON number")
+    return parsed
+
+
+def _decode_json(raw):
+    if type(raw) is bytes:
+        raw=raw.decode("utf-8","strict")
+    return json.loads(raw, object_pairs_hook=_unique_fields,
+                      parse_constant=_nonfinite, parse_float=_finite_float)
+
+
+def _contains_token(value, token):
+    # JSON escapes may hide literal credential bytes in the transport.
+    # Walk decoded keys and values as well; cap traversal independently.
+    pending = [(value, 0)]
+    visited = 0
+    while pending:
+        item, depth = pending.pop()
+        visited += 1
+        if depth > 64 or visited > 200_000:
+            raise ValueError("readiness object exceeds traversal budget")
+        if isinstance(item, str):
+            if token is not None and token in item:
+                return True
+        elif isinstance(item, dict):
+            pending.extend((entry, depth + 1) for entry in item)
+            pending.extend((entry, depth + 1) for entry in item.values())
+        elif isinstance(item, list):
+            pending.extend((entry, depth + 1) for entry in item)
+    return False
+
+
+def _token_valid(token):
+    return (type(token) is str and 16 <= len(token) <= 8192
+            and token.isascii()
+            and all(char.isalnum() or char in "._~-+" for char in token))
+
+
+def _token_stamp(info):
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid,
+            info.st_nlink, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+
+
 def _private_token(path: Path) -> str:
-    descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
+    if path.is_symlink():
+        raise ValueError("auth token file must not be linked")
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0)
+                         | getattr(os, "O_NOFOLLOW", 0))
     with os.fdopen(descriptor, "rb") as stream:
         details = os.fstat(stream.fileno())
         named = os.lstat(path)
         if (
             not stat.S_ISREG(details.st_mode)
             or not stat.S_ISREG(named.st_mode)
-            or (details.st_dev, details.st_ino) != (named.st_dev, named.st_ino)
+            or _token_stamp(details) != _token_stamp(named)
             or details.st_size > 8192
             or (os.name != "nt" and (
                 details.st_nlink != 1
@@ -197,10 +262,12 @@ def _private_token(path: Path) -> str:
             )
         raw = stream.read(8193)
         current = os.lstat(path)
-        if (current.st_dev, current.st_ino) != (details.st_dev, details.st_ino) or not stat.S_ISREG(current.st_mode):
+        if (len(raw) != details.st_size
+                or _token_stamp(details) != _token_stamp(os.fstat(stream.fileno()))
+                or _token_stamp(details) != _token_stamp(current)):
             raise ValueError("auth token file identity changed during read")
     token = raw.decode("ascii").removesuffix("\n").removesuffix("\r")
-    if not 16 <= len(token) <= 8192 or any(not (char.isalnum() or char in "._~-+") for char in token):
+    if not _token_valid(token):
         raise ValueError("auth token file must contain one bounded bearer token")
     return token
 
@@ -221,6 +288,19 @@ def _server_snapshot(
 ) -> dict[str, object]:
     if type(max_response_bytes) is not int or not 0 < max_response_bytes <= MAX_OUTPUT:
         raise ValueError("readiness response limit must be positive and at most two MiB")
+    if (type(timeout) not in (int, float) or not 0 < timeout <= 10
+            or not math.isfinite(timeout)):
+        raise ValueError("readiness timeout is outside the admitted budget")
+    if (type(base) is not str or not 1 <= len(base) <= 4096
+            or any(ord(ch) <= 32 or ord(ch) == 127 for ch in base)
+            or any(ch in base for ch in ("?", "#", "%", "\\"))):
+        raise ValueError("invalid readiness origin")
+    if (type(endpoint) is not str or len(endpoint) > 512
+            or re.fullmatch(r"/[A-Za-z0-9_/-]+", endpoint) is None
+            or "//" in endpoint):
+        raise ValueError("invalid readiness endpoint")
+    if token is not None and not _token_valid(token):
+        raise ValueError("invalid readiness bearer token")
     parts = urlsplit(base)
     loopback = parts.hostname == "localhost"
     try:
@@ -233,28 +313,47 @@ def _server_snapshot(
         or parts.query
         or parts.fragment
         or not parts.hostname
+        or parts.path not in {"", "/"}
+        or parts.port == 0
         or not (parts.scheme == "https" or (parts.scheme == "http" and (loopback or token is None)))
     ):
         raise ValueError("authenticated readiness requires HTTPS or loopback HTTP without URL credentials")
-    headers = {"User-Agent": "skeleton-app-doctor/1"}
+    headers = {"User-Agent": "skeleton-app-doctor/1", "Accept":"application/json",
+               "Accept-Encoding":"identity","Connection":"close"}
     if token is not None:
         headers["Authorization"] = "Bearer " + token
     request = Request(base.rstrip("/") + endpoint, headers=headers)
     try:
-        # Local diagnostics must never send bearer tokens or private readiness
-        # requests through inherited HTTP(S)_PROXY/ALL_PROXY settings.
-        # The opener is per-request; global urllib configuration is unchanged.
-        opener = (
-            build_opener(ProxyHandler({}), _NoRedirect())
-            if loopback else build_opener(_NoRedirect())
-        )
+        # Direct diagnostic requests do not inherit ambient proxies, even
+        # when an operator deliberately selects an HTTPS external origin.
+        opener = build_opener(ProxyHandler({}), _NoRedirect(),DirectHTTPHandler(),DirectHTTPSHandler())
         with opener.open(request, timeout=timeout) as response:
+            metadata = _response_metadata(response)
+            if metadata is None or not 200 <= metadata[0] < 300 or metadata[1] != request.full_url:
+                return {"observed": False, "code": "server_inventory_protocol_invalid"}
+            headers = getattr(response, "headers", None)
+            values = headers.get_all("Content-Type") if headers is not None else None
+            if (not isinstance(values, list) or len(values) != 1
+                    or not isinstance(values[0], str)
+                    or headers.get_content_type() != "application/json"):
+                return {"observed": False, "code": "server_inventory_protocol_invalid"}
+            try:
+                expected_length=response_length(headers,limit=max_response_bytes)
+            except FramingDenied:
+                return {"observed":False,"code":"server_inventory_protocol_invalid"}
             raw = response.read(max_response_bytes + 1)
+        if not isinstance(raw, bytes):
+            return {"observed": False, "code": "server_inventory_protocol_invalid"}
         if len(raw) > max_response_bytes:
             return {"observed": False, "code": "server_inventory_exceeds_capacity"}
         if token is not None and token.encode("ascii") in raw:
             return {"observed": False, "code": "server_inventory_returned_credential"}
-        result = json.loads(raw, parse_constant=_nonfinite)
+        try:
+            result = _decode_json(checked_body(raw,expected_length=expected_length,limit=max_response_bytes))
+            if _contains_token(result, token):
+                return {"observed": False, "code": "server_inventory_returned_credential"}
+        except (ValueError, RecursionError, UnicodeError):
+            return {"observed": False, "code": "server_inventory_protocol_invalid"}
         if not isinstance(result, dict) or (schema is not None and result.get("schema_version") != schema):
             return {"observed": False, "code": "server_inventory_protocol_invalid"}
         return {
@@ -267,41 +366,78 @@ def _server_snapshot(
             "report": result,
         }
     except HTTPError as exc:
+        status = _http_error_status(exc)
         return {
             "observed": False,
             "code": (
-                "server_authorization_required" if exc.code in {401, 403} else "server_inventory_unavailable"
+                "server_authorization_required" if status in {401, 403} else "server_inventory_unavailable"
             ),
-            "http_status": exc.code,
+            "http_status": status,
         }
-    except (OSError, URLError, ValueError, RecursionError):
+    except (OSError, URLError, HTTPException, ValueError, RecursionError, UnicodeError):
         return {"observed": False, "code": "server_inventory_unavailable"}
+
+
+_SERVER_FAILURES=frozenset((
+    "server_inventory_protocol_invalid","server_inventory_exceeds_capacity",
+    "server_inventory_returned_credential","server_authorization_required",
+    "server_inventory_unavailable",
+))
+
+
+def _validate_server_receipt(value, *, token, schema):
+    """Re-admit private child output; never forward arbitrary envelope fields."""
+    invalid={"observed":False,"code":"server_inventory_protocol_invalid"}
+    if type(value) is not dict or type(value.get("observed")) is not bool:
+        return invalid
+    if value["observed"]:
+        if set(value)!={"observed","scope","report"} or type(value["report"]) is not dict:
+            return invalid
+        scope=("Authenticated backend runtime; separate from CLI host." if token is not None
+               else "Public backend readiness; no authentication or model execution.")
+        if value["scope"]!=scope or (schema is not None and value["report"].get("schema_version")!=schema):
+            return invalid
+        return {"observed":True,"scope":scope,"report":value["report"]}
+    if set(value) not in ({"observed","code"},{"observed","code","http_status"}):
+        return invalid
+    code=value.get("code")
+    if type(code) is not str or code not in _SERVER_FAILURES:
+        return invalid
+    result={"observed":False,"code":code}
+    if "http_status" in value:
+        status=value["http_status"]
+        if status is not None and (type(status) is not int or not 100<=status<=599):
+            return invalid
+        result["http_status"]=status
+    return result
 
 
 def _bounded_server(root, base, token, timeout, *, endpoint, schema, max_response_bytes=MAX_OUTPUT):
     """A slow HTTP peer cannot retain a caller thread beyond the probe budget."""
+    if (type(timeout) not in (int,float) or not 0 < timeout <= 10
+            or not math.isfinite(timeout)
+            or type(max_response_bytes) is not int or not 0 < max_response_bytes <= MAX_OUTPUT):
+        return {"observed":False,"code":"server_inventory_protocol_invalid"}
     environment = {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8"}
     for key in (
-        "HTTP_PROXY",
-        "HTTPS_PROXY",
-        "ALL_PROXY",
-        "NO_PROXY",
-        "http_proxy",
-        "https_proxy",
-        "all_proxy",
-        "no_proxy",
+        "SYSTEMROOT",
+        "WINDIR",
+        "TEMP",
+        "TMP",
         "SSL_CERT_FILE",
         "SSL_CERT_DIR",
     ):
         if key in os.environ:
             environment[key] = os.environ[key]
-    code = (
-        "import sys,json;sys.path.insert(0," + repr(str(root)) + ");"
-        "from skeleton.app.studio_readiness import _server_snapshot;"
-        "args=json.loads(sys.stdin.buffer.read(65537));"
-        "print(json.dumps(_server_snapshot(**args),ensure_ascii=False,allow_nan=False))"
-    )
-    command = [sys.executable, "-I", "-B", "-c", code]
+    from skeleton.app.install_probe_worker import worker_command, decode_request
+    try:
+        command = worker_command(root)
+    except (OSError, ValueError):
+        return {"observed": False, "code": "server_inventory_unavailable"}
+    if getattr(sys, "frozen", False):
+        # A sibling PyInstaller executable is a fresh application, not a
+        # multiprocessing child of the windowed bootloader.
+        environment["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
     if platform.system() == "Linux" and Path("/usr/bin/prlimit").is_file():
         command = [
             "/usr/bin/prlimit",
@@ -322,7 +458,14 @@ def _bounded_server(root, base, token, timeout, *, endpoint, schema, max_respons
         }
     ).encode()
     try:
-        with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as error:
+        # Validate the same closed packet contract before launching a child,
+        # then isolate source imports from existing checkout bytecode.
+        decode_request(payload)
+        with (tempfile.TemporaryDirectory(prefix="skeleton-probe-pyc-") as cache,
+              tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as error):
+            if not getattr(sys,"frozen",False):
+                index=command.index("-c")
+                command[index:index]=["-X","pycache_prefix="+cache]
             child = subprocess.run(
                 command,
                 input=payload,
@@ -330,21 +473,23 @@ def _bounded_server(root, base, token, timeout, *, endpoint, schema, max_respons
                 stderr=error,
                 env=environment,
                 cwd=root,
-                timeout=timeout,
+                # Budget bootloader extraction separately from the fixed HTTP
+                # socket timeout; the entire frozen child still has a hard deadline.
+                timeout=timeout + (45 if getattr(sys, "frozen", False) else 0),
                 check=False,
+                **({"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)}
+                   if os.name == "nt" and getattr(sys, "frozen", False) else {}),
             )
-            if child.returncode:
+            if type(child.returncode) is not int or child.returncode != 0:
                 return {"observed": False, "code": "server_inventory_unavailable"}
             output.seek(0)
             raw = output.read(MAX_OUTPUT + 1)
         if len(raw) > MAX_OUTPUT:
             return {"observed": False, "code": "server_inventory_exceeds_capacity"}
-        value = json.loads(raw, parse_constant=_nonfinite)
-        return (
-            value
-            if isinstance(value, dict)
-            else {"observed": False, "code": "server_inventory_protocol_invalid"}
-        )
+        value = _decode_json(raw)
+        if ((token is not None and token.encode("ascii") in raw) or _contains_token(value,token)):
+            return {"observed":False,"code":"server_inventory_returned_credential"}
+        return _validate_server_receipt(value,token=token,schema=schema)
     except subprocess.TimeoutExpired:
         return {"observed": False, "code": "server_inventory_deadline_exceeded"}
     except (OSError, ValueError, RecursionError):
@@ -359,70 +504,74 @@ def studio_readiness_report(
     live: bool = False,
     timeout: float = 3.0,
     auth_token_file: Path | None = None,
+    admit_live: Callable[[], bool] | None = None,
 ) -> dict[str, object]:
     if type(live) is not bool:
         raise TypeError("live inspection must be an explicit boolean")
     if (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
-        or not math.isfinite(timeout)
         or not 0 < timeout <= 10
+        or not math.isfinite(timeout)
     ):
         raise ValueError("studio probe timeout must be finite and at most 10 seconds")
     if auth_token_file is not None and not live:
         raise ValueError("--auth-token-file requires --live")
-    token = _private_token(auth_token_file) if auth_token_file is not None else None
-    server = (
-        _bounded_server(
-            root,
-            backend_url,
-            token,
-            timeout,
-            endpoint="/api/game-studio-health",
-            schema="skeleton.game.studio_readiness.v1",
-        )
-        if live and token
-        else {
-            "observed": False,
-            "code": "authenticated_server_probe_not_requested",
-            "readiness_path": "/api/game-studio-health",
-        }
+    token = None
+    stamp = None
+    admitted = True
+    if auth_token_file is not None:
+        if admit_live is not None and admit_live() is not True:
+            admitted = False
+        else:
+            stamp = _token_stamp(auth_token_file.lstat())
+            token = _private_token(auth_token_file)
+            admitted = _token_stamp(auth_token_file.lstat()) == stamp
+
+    def current():
+        nonlocal admitted
+        if not admitted:
+            return False
+        try:
+            if admit_live is not None and admit_live() is not True:
+                admitted = False
+            if token is not None:
+                admitted = (admitted and _token_stamp(auth_token_file.lstat()) == stamp
+                            and _private_token(auth_token_file) == token
+                            and _token_stamp(auth_token_file.lstat()) == stamp)
+        except (OSError, ValueError, UnicodeError):
+            admitted = False
+        return admitted
+
+    def denied(endpoint):
+        return {"observed": False, "code": "authenticated_readiness_epoch_changed",
+                "readiness_path": endpoint}
+
+    def probe(endpoint, schema):
+        if not live or auth_token_file is None:
+            return {"observed": False, "code": "authenticated_server_probe_not_requested",
+                    "readiness_path": endpoint}
+        if token is None or not current():
+            return denied(endpoint)
+        result = _bounded_server(root, backend_url, token, timeout,
+                                 endpoint=endpoint, schema=schema)
+        return result if current() else denied(endpoint)
+
+    lanes = (
+        ("/api/game-studio-health", "skeleton.game.studio_readiness.v1"),
+        ("/api/dragon-academy/runtime/readiness", "skeleton.dragon.runtime_readiness.v1"),
+        ("/api/dragon-academy/crawler/readiness", "skeleton.dragon.crawler_readiness.v1"),
     )
-    server["dragon_runtime"] = (
-        _bounded_server(
-            root,
-            backend_url,
-            token,
-            timeout,
-            endpoint="/api/dragon-academy/runtime/readiness",
-            schema="skeleton.dragon.runtime_readiness.v1",
-        )
-        if live and token
-        else {
-            "observed": False,
-            "code": "authenticated_server_probe_not_requested",
-            "readiness_path": "/api/dragon-academy/runtime/readiness",
-        }
-    )
-    server["crawler"] = (
-        _bounded_server(
-            root,
-            backend_url,
-            token,
-            timeout,
-            endpoint="/api/dragon-academy/crawler/readiness",
-            schema="skeleton.dragon.crawler_readiness.v1",
-        )
-        if live and token
-        else {
-            "observed": False,
-            "code": "authenticated_server_probe_not_requested",
-            "readiness_path": "/api/dragon-academy/crawler/readiness",
-        }
-    )
+    observations = [probe(endpoint, schema) for endpoint, schema in lanes]
+    local = _inspect_host(root, values)
+    if live and auth_token_file is not None and not current():
+        observations = [denied(endpoint) for endpoint, _ in lanes]
+    server, dragon, crawler = observations
+    server["dragon_runtime"] = dragon
+    server["crawler"] = crawler
     return {
         "schema_version": "skeleton.application.studio_installation_report.v1",
-        "local_host": _inspect_host(root, values),
+        "local_host": local,
         "server": server,
         "operator_commands": [
             "python scripts/install_game_desktop_toolchains.py --help",

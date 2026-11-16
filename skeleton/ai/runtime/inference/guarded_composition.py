@@ -32,8 +32,17 @@ class ProtectedLocalComponents:
     verify_native_tokenizer: Callable[[Any, Callable[..., Any], Callable[..., Any]], bool]
     sampler_support: Callable[[Any, Any], bool]
     projection_attestor: Callable[[Any, str, str], bool]
+    roundtrip: Callable[[str], tuple[Sequence[int], str]] | None = None
+    attest_source: Callable[..., Any] | None = None
+    review_async: Callable[..., Any] | None = None
 
     def __post_init__(self) -> None:
+        if self.review_async is not None and not callable(self.review_async):
+            raise ProviderPolicyError("protected local async review must be callable")
+        if self.attest_source is not None and not callable(self.attest_source):
+            raise ProviderPolicyError("protected local source attestation must be callable")
+        if self.roundtrip is not None and not callable(self.roundtrip):
+            raise ProviderPolicyError("protected local roundtrip must be callable")
         if not callable(getattr(self.snapshots, "resolve", None)):
             raise ProviderPolicyError("protected local deployment lacks trusted snapshot authority")
         for name in (
@@ -44,9 +53,52 @@ class ProtectedLocalComponents:
                 raise ProviderPolicyError("protected local deployment lacks " + name)
 
 
+@dataclass(frozen=True, slots=True)
+class ProtectedLocalComponentFactory:
+    """Deployer-owned per-backend guard constructor.
+
+    A registry must build components only after it has loaded the real model.
+    The snapshot reader is independently supplied and may be rebound by the
+    trusted server before loading any model; a result cannot replace it.
+    """
+
+    snapshots: TrustedSnapshotReader
+    build: Callable[[Any, TrustedSnapshotReader], ProtectedLocalComponents]
+
+    def __post_init__(self) -> None:
+        if not callable(getattr(self.snapshots, "resolve", None)) or not callable(self.build):
+            raise ProviderPolicyError("trusted local component factory is incomplete")
+
+    def for_backend(self, backend: Any) -> ProtectedLocalComponents:
+        try:
+            components = self.build(backend, self.snapshots)
+        except Exception:
+            raise ProviderPolicyError("trusted local component factory rejected backend") from None
+        if (type(components) is not ProtectedLocalComponents
+                or components.snapshots is not self.snapshots):
+            raise ProviderPolicyError("trusted local component factory changed snapshot authority")
+        return components
+
+
+def is_protected_component_source(value: object) -> bool:
+    return type(value) in (ProtectedLocalComponents, ProtectedLocalComponentFactory)
+
+
+def resolve_protected_components(
+    source: ProtectedLocalComponents | ProtectedLocalComponentFactory, backend: Any,
+) -> ProtectedLocalComponents:
+    if type(source) is ProtectedLocalComponentFactory:
+        return source.for_backend(backend)
+    if type(source) is not ProtectedLocalComponents:
+        raise ProviderPolicyError("trusted local protection dependencies are missing")
+    return source
+
+
 def compose_protected_local_adapter(
-    engine: LocalInferenceEngine, *, components: ProtectedLocalComponents,
+    engine: LocalInferenceEngine, *,
+    components: ProtectedLocalComponents | ProtectedLocalComponentFactory,
     default_seed: int = 0, artifact_status: dict[str, object] | None = None,
+    activation_gate: Any | None = None,
 ) -> LocalModelAdapter:
     """Fail closed unless one protected engine has an attested native tokenizer.
 
@@ -56,8 +108,7 @@ def compose_protected_local_adapter(
     """
     if not isinstance(engine, LocalInferenceEngine) or not engine.require_guarded_context:
         raise ProviderPolicyError("protected deployment requires engine-level execution fencing")
-    if not isinstance(components, ProtectedLocalComponents):
-        raise ProviderPolicyError("trusted local protection dependencies are missing")
+    components = resolve_protected_components(components, engine.model)
     try:
         verified = components.verify_native_tokenizer(
             engine.model, components.tokenize, components.detokenize,
@@ -67,17 +118,25 @@ def compose_protected_local_adapter(
     if verified is not True:
         raise ProviderPolicyError("active model tokenizer identity was not verified")
     guard = GuardedLocalInference(
-        engine, reviewer=components.reviewer,
+        engine, reviewer=components.reviewer, review_async=components.review_async,
         tokenize=components.tokenize,
         detokenize=components.detokenize,
+        roundtrip=components.roundtrip,
         sampler_support=components.sampler_support,
         projection_attestor=components.projection_attestor,
         tokenizer_identity_attestor=lambda: components.verify_native_tokenizer(
             engine.model, components.tokenize, components.detokenize,
         ),
         require_token_echo=True,
+        # Exact GGUF performs independently pinned whole-artifact reads and
+        # native vocabulary subprocess calls, not only in-memory callbacks.
+        # The outer serving deadline is still enforced at every phase.
+        native_timeout_seconds=30.0 if getattr(engine.model, "requires_exact_guard_tokens", False) is True else 5.0,
     )
-    service = CanonicalGuardedLocalService(guard, snapshots=components.snapshots)
+    service = CanonicalGuardedLocalService(
+        guard, snapshots=components.snapshots, activation_gate=activation_gate,
+        attest_source=components.attest_source,
+    )
     return LocalModelAdapter(
         engine, default_seed=default_seed, artifact_status=artifact_status,
         guarded_service=service, require_guarded_inference=True,

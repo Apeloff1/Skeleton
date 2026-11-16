@@ -105,3 +105,136 @@ A staged result is never treated as an already committed result. If admission
 completion fails after a terminal result commits, current maintenance scans
 nonterminal executions and does not independently retry completion; a durable
 completion outbox or equivalent reconciliation remains required.
+
+
+## Candidate guarded Mongo observation (2026-11-16)
+
+For an already running, operator-provisioned replica set and an explicitly chosen
+existing shared epoch database, each deployed service can perform a read-only
+observation using its own existing credentials. Keep the backend's application
+database and the engine's memory database separate; this command does not rename,
+move, copy, initialize or modify either. It does not establish writer fencing.
+
+Supply a private UTF-8 JSON file outside the repository containing exactly
+"tenant_id", "actor_id", and "context_id" string fields (at most 4096 bytes).
+Use the same intended actor scope and existing epoch database in each command.
+For example, from the repository root on a configured Docker host:
+
+    docker compose exec -T backend python -m skeleton.app.compose_guarded_preflight --source backend --shared-epoch-database canonical_witness --scope-stdin --summary < /private/actor-scope.json
+    docker compose exec -T skeleton python -m skeleton.app.compose_guarded_preflight --source engine --shared-epoch-database canonical_witness --scope-stdin --summary < /private/actor-scope.json
+
+Replace the illustrative witness database name and file path with the actual
+operator-provisioned ones. The app CLI also exposes the same command as
+"python -m skeleton app mongo-preflight". There is no credential in argv, no
+automatic provisioning, and no raw Mongo response or actor identity in output.
+An independently observed single-source stable epoch is not evidence that the
+two services share the same physical cluster, writer authority or policy. Both
+commands deliberately return 2 even when an observation is complete; they are
+not an activation or service-readiness check. Existing database backup,
+authenticated replica configuration, quiescent migration, independent reviewer,
+pinned policy and exact active model/tokenizer custody remain mandatory.
+
+
+## Registry-owned native component factories (candidate)
+
+The trusted composition root may supply a ProtectedLocalComponentFactory
+instead of prebinding one backend instance. The provider registry, catalog and
+GGUF deployment loader preserve this source until the concrete backend exists.
+Canonical startup replaces the factory's snapshot reader with the durable
+per-execution reader before constructing the registry. Each loaded backend
+must acquire its own exact tokenizer binding; foreign or swapped component
+sources are rejected.
+
+make_pinned_native_guard_factory admits only NativeTransformerModel and
+NativeRuntimeLocalModel (checkpoint-backed), with independently supplied
+model ID, model/runtime/tokenizer SHA-256 pins and a signed reviewer. It
+does not admit the current llama.cpp CLI's UTF-8 estimate as an exact
+tokenizer. No production bootstrap or physical model qualification is
+implied by this composition seam.
+
+
+## Explicit trusted native startup and strict consumer doctor
+
+Trusted application code can construct TrustedNativeStartup with its actual
+live Mongo conversation and memory owners, one installed canonical source
+epoch, independent signed reviewer, policy SHA-256 and native model pins,
+then pass it directly to create_app(trusted_protected_bootstrap=...). This
+path validates collection and client identity, read-only stable replica
+and authentication observations, known writer inventory, and atomic server
+configuration before the actual registry constructs each backend.
+The placeholder snapshot reader deliberately denies every request until
+canonical execution binding is installed. Externally owned resources remain
+the deployer's responsibility; drain the application before closing them.
+
+This does not provision a replica set, migrate old data, qualify remote
+writer custody or enable the default standalone Docker deployment.
+For an already running installation, run:
+
+    python -m skeleton app doctor --live --require-ai --json
+
+Exit zero requires observed service/routes and selected AI availability;
+it is not evidence of generation, independent quality, or hardware success.
+Default doctor remains usable for diagnosing a shell whose AI is blocked.
+
+
+## Exact-token GGUF bridge (CPU source candidate)
+
+Build scripts/native/gguf_token_bridge against the reviewed llama.cpp
+b11429 commit d81235049384534c167caea52b85a694f6103d14.
+
+From trusted operator code or the CLI, prepare a NEW deployment manifest:
+
+    python -m skeleton app prepare-local-model --runtime-profile gguf-exact-token-bridge --executable /private/build/gguf-bridge/skeleton-gguf-token-bridge --model /private/model.gguf --output /private/exact-gguf.json --model-id jeeves --context-size 4096
+
+The factory supports explicit llama.cpp-token-bridge-v1 deployment kind only
+with protected components and independently reviewed model/runtime/tokenizer
+pins. This differs from the default provisioner's historical llama-cli
+manifest: it is CPU-only POSIX and raw greedy text. It does not advertise
+tool calls, chat templates, arbitrary sampling, GPU or Windows process
+custody. The helper retokenizes the actual prompt, compares the admitted
+IDs, and passes them directly to llama_decode; the host compares prepared
+IDs to the guard's independently reviewed token-sequence digest and
+verifies the consumed-ID receipt and output-token echo. Source and
+fixture tests do not constitute compiled native or physical-device proof.
+Do not change existing deployment hashes or guard configuration to enable
+this candidate. Repeated artifact hashing and vocab-only loads require
+measured performance qualification, not assumed throughput.
+
+
+## Real pinned GGUF CPU qualification
+
+The separate exact-gguf-physical-cpu-qualification workflow builds the bridge
+against the exact upstream commit and downloads only the existing pinned
+Qwen3 0.6B Q8_0 recipe on relevant pull-request changes. It verifies real
+native tokenization (including Unicode, whitespace and literal marker text),
+prepared ID custody, actual CPU generation, deterministic physical replay,
+cancelled and altered input denial, and subprocess quiescence. It records
+only bounded hashes, counts, elapsed times and held scope; no generated
+text, private prompt, paths or raw token lists. The binary SHA in this
+workflow binds the freshly built helper to the run, not an independent
+release signer. Source checkout/compile receipts alone do not qualify it.
+
+For an existing reviewed helper and pinned local model, explicitly run:
+
+    python scripts/qualify_exact_gguf_bridge.py --executable /private/bridge --executable-sha256 SHA256 --source-head HEAD_SHA --model /private/Qwen3-0.6B-Q8_0.gguf --output /private/cpu-evidence.json
+
+No download occurs with --model. This is direct native CPU qualification,
+not production activation, independent reviewer trust, live Mongo, chat
+quality, GPU, Windows or release evidence. Wait for genuine exact-head
+execution results before relying on it.
+
+
+## Disposable authenticated Mongo epoch integration qualification
+
+The separate isolated-mongo-epoch-qualification workflow exercises the
+production epoch class using the existing pinned Mongo image, a new
+single-member replica set, random fixture-only credentials, explicit
+readWrite/read roles, loopback-only ephemeral port and tmpfs data directories.
+It never consumes deployment environment URIs, existing volumes, or actual
+application records. It checks signed fixture-only insert/revocation,
+linearizable reads across clients, exclusive writer admission, majority
+payload acknowledgement, independent actor progress, child task denial,
+nested failure quarantine, real BSON Int64 and read-only role enforcement.
+It removes the exact label-bound container before emitting a bounded receipt.
+No real application migration, data backup, multi-member failover, all-writer
+custody, production activation or release claim follows.

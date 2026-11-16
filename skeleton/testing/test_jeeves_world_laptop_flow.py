@@ -208,7 +208,7 @@ def test_readonly_prompt_to_typed_jeeves_proposal_never_persists(tmp_path):
     assert response["world_digest"] == digest(response["result"]["world"])
 
 
-def test_laptop_session_create_rejects_revision_between_verify_and_write(tmp_path, monkeypatch):
+def test_laptop_session_create_rejects_unreviewed_revision_before_locked_proof(tmp_path, monkeypatch):
     flow, _, _, _ = ready(tmp_path)
     original = flow.sessions.create
 
@@ -220,12 +220,12 @@ def test_laptop_session_create_rejects_revision_between_verify_and_write(tmp_pat
         return original(world_id, slot, **kwargs)
 
     monkeypatch.setattr(flow.sessions, "create", concurrent_edit)
-    reject("session_world_lease_mismatch",
+    reject("review_stale_source",
            lambda: flow.create_session("lighthouse", "raced"))
     assert not (tmp_path / "lighthouse.raced.session.json").exists()
 
 
-def test_laptop_session_choose_rejects_revision_between_verify_and_write(tmp_path, monkeypatch):
+def test_laptop_session_choose_rejects_unreviewed_revision_before_locked_proof(tmp_path, monkeypatch):
     flow, _, _, _ = ready(tmp_path)
     initial = flow.create_session("lighthouse", "raced")
     path = tmp_path / "lighthouse.raced.session.json"
@@ -240,12 +240,12 @@ def test_laptop_session_choose_rejects_revision_between_verify_and_write(tmp_pat
         return original(world_id, slot, choice_id, expected_digest, **kwargs)
 
     monkeypatch.setattr(flow.sessions, "choose", concurrent_edit)
-    reject("session_world_lease_mismatch", lambda: flow.choose(
+    reject("review_stale_source", lambda: flow.choose(
         "lighthouse", "raced", "rescue", initial["session_digest"]))
     assert path.read_bytes() == before
 
 
-def test_session_read_and_export_fail_if_source_changes_after_laptop_proof(tmp_path, monkeypatch):
+def test_session_read_fails_if_source_changes_before_locked_laptop_proof(tmp_path, monkeypatch):
     flow, _, _, _ = ready(tmp_path)
     flow.create_session("lighthouse", "raced")
     original = flow.sessions.inspect
@@ -258,7 +258,7 @@ def test_session_read_and_export_fail_if_source_changes_after_laptop_proof(tmp_p
         return original(world_id, slot, **kwargs)
 
     monkeypatch.setattr(flow.sessions, "inspect", concurrent_edit)
-    reject("session_world_lease_mismatch",
+    reject("review_stale_source",
            lambda: flow.inspect_session("lighthouse", "raced"))
 
 
@@ -422,22 +422,45 @@ def test_laptop_diagnostic_distinguishes_unavailable_custody_at_each_stage(
     """Read-only diagnostics never prescribe source repair for lease permissions."""
     flow, _, _, _ = ready(tmp_path)
     flow.create_session("lighthouse", "player")
-    original = LaptopFlow._lock
+    import errno
+    import os
+    original = os.open
     calls = 0
 
-    def intermittent_lease(fd, world_id):
+    def intermittent_lease(path, flags, *args, **kwargs):
         nonlocal calls
-        calls += 1
-        if calls == failure_stage:
-            raise CanonError("lease_unavailable")
-        return original(fd, world_id)
+        # SessionStore and LaptopFlow acquire the same world lease through
+        # independent methods. Inject at the real exclusive open boundary.
+        if path == "lighthouse.lock" and flags & os.O_EXCL:
+            calls += 1
+            if calls == failure_stage:
+                raise PermissionError(errno.EACCES, "lease unavailable")
+        return original(path, flags, *args, **kwargs)
 
-    monkeypatch.setattr(LaptopFlow, "_lock", staticmethod(intermittent_lease))
+    monkeypatch.setattr(os, "open", intermittent_lease)
     report = flow.diagnose("lighthouse", "player")
     assert report["next_action"] == (
         "inspect_custody_permissions_without_removing_foreign_locks")
-    assert any(
-        stage.get("error") == "lease_unavailable"
-        for stage in report["checks"].values()
-    )
+    expected_stage = ("source", "builder", "session", "acceptance")[failure_stage - 1]
+    assert calls == failure_stage
+    assert report["checks"][expected_stage] == {"ok": False, "error": "lease_unavailable"}
+    assert not (tmp_path / "lighthouse.lock").exists()
+
+
+def test_session_source_proof_excludes_world_writer(tmp_path, monkeypatch):
+    flow, _, _, _ = ready(tmp_path)
+    original = flow._session_guard
+    observed = []
+
+    def guard(fd, world_id):
+        original(fd, world_id)
+        world = flow.worlds.read(world_id)
+        changed = dict(world, prompt=world["prompt"] + " denied concurrent edit")
+        reject("lease_busy", lambda: flow.worlds.publish(changed, expected_digest=digest(world)))
+        observed.append(world_id)
+
+    monkeypatch.setattr(flow, "_session_guard", guard)
+    created = flow.create_session("lighthouse", "atomic")
+    assert created["revision"] == 0
+    assert observed == ["lighthouse"]
     assert not (tmp_path / "lighthouse.lock").exists()

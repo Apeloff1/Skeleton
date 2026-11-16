@@ -8,12 +8,13 @@ Non-invertible tokenizer mappings still fail closed per prompt in preflight.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from skeleton.context.pre_delivery_guard import BoundedAdversarialReviewer
 from skeleton.provider_runtime import ProviderPolicyError
 
-from .guarded_composition import ProtectedLocalComponents
+from .guarded_composition import ProtectedLocalComponents, ProtectedLocalComponentFactory
 from .guarded_service import TrustedSnapshotReader
 from .native_transformer import NativeTransformerModel
 
@@ -30,6 +31,12 @@ def native_transformer_guard_components(
     """
     if type(backend) is not NativeTransformerModel:
         raise ProviderPolicyError("native guarded activation requires the exact transformer backend")
+    return _exact_native_components(backend, snapshots=snapshots, reviewer=reviewer)
+
+
+def _exact_native_components(
+    backend: Any, *, snapshots: TrustedSnapshotReader, reviewer: BoundedAdversarialReviewer,
+) -> ProtectedLocalComponents:
     if not callable(getattr(snapshots, "resolve", None)) or not callable(reviewer):
         raise ProviderPolicyError("native guarded activation requires application-owned authorities")
     try:
@@ -74,6 +81,138 @@ def native_transformer_guard_components(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class NativeGuardPins:
+    """Independently reviewed identity for one loaded native model."""
+    model_id: str
+    model_digest: str
+    runtime_digest: str
+    tokenizer_digest: str
+
+    def __post_init__(self) -> None:
+        if (type(self.model_id) is not str or not 1 <= len(self.model_id) <= 256
+                or self.model_id != self.model_id.strip()
+                or any(ord(ch) < 32 or ord(ch) == 127 for ch in self.model_id)):
+            raise ProviderPolicyError("native guard model pin invalid")
+        for digest in (self.model_digest, self.runtime_digest, self.tokenizer_digest):
+            if (type(digest) is not str or len(digest) != 64
+                    or any(ch not in "0123456789abcdef" for ch in digest)):
+                raise ProviderPolicyError("native guard artifact pin invalid")
+
+
+def make_pinned_native_guard_factory(
+    *, snapshots: TrustedSnapshotReader, reviewer: Any,
+    pins: tuple[NativeGuardPins, ...],
+    require_scoped_attestation: bool = False,
+) -> ProtectedLocalComponentFactory:
+    """Bind each eligible native backend created by the actual provider registry.
+
+    No generic tokenizer, GGUF CLI byte estimate or unsupported artifact is
+    treated as native evidence. Pins are independent deployment inputs;
+    they must not be derived from whatever model happened to load.
+    """
+    from .native_runtime import NativeRuntimeLocalModel
+    from .gguf_token_bridge import GgufTokenBridgeModel
+    from .signed_reviewer_client import SignedReviewerClient
+    from .reviewer_custody import ReviewerTrustAnchor, ReviewerCustodyVerifier
+    if type(require_scoped_attestation) is not bool:
+        raise ProviderPolicyError("scoped reviewer policy invalid")
+    if (type(reviewer) is not SignedReviewerClient
+            or type(getattr(reviewer, "_anchor", None)) is not ReviewerTrustAnchor):
+        raise ProviderPolicyError("pinned independent reviewer required")
+    anchor = reviewer._anchor
+    if (type(pins) is not tuple or not 1 <= len(pins) <= 32
+            or any(type(pin) is not NativeGuardPins for pin in pins)):
+        raise ProviderPolicyError("native guard pin inventory invalid")
+    by_id = {pin.model_id: pin for pin in pins}
+    if len(by_id) != len(pins):
+        raise ProviderPolicyError("duplicate native guard model pins")
+
+    def build(backend: Any, reader: TrustedSnapshotReader) -> ProtectedLocalComponents:
+        if type(backend) not in (NativeTransformerModel, NativeRuntimeLocalModel, GgufTokenBridgeModel):
+            raise ProviderPolicyError("loaded backend lacks admitted exact native tokenizer")
+        if type(getattr(backend, "model_id", None)) is not str:
+            raise ProviderPolicyError("native guard model identity invalid")
+        pin = by_id.get(backend.model_id)
+        if pin is None or reviewer._anchor != anchor:
+            raise ProviderPolicyError("native guard model or reviewer pin unavailable")
+        if type(backend) is GgufTokenBridgeModel:
+            backend.assert_identity()
+            encode, decode, roundtrip = backend.encode_ids, backend.decode_ids, backend.roundtrip_ids
+            if (getattr(encode, "__func__", None) is not GgufTokenBridgeModel.encode_ids
+                    or getattr(decode, "__func__", None) is not GgufTokenBridgeModel.decode_ids
+                    or getattr(roundtrip, "__func__", None) is not GgufTokenBridgeModel.roundtrip_ids):
+                raise ProviderPolicyError("exact GGUF tokenizer methods were replaced")
+
+            def bridge_verify(active, encoder, decoder):
+                if active is not backend or encoder is not encode or decoder is not decode:
+                    return False
+                try:
+                    backend.assert_identity()
+                    return (getattr(backend.encode_ids, "__func__", None) is getattr(encode, "__func__", None)
+                            and getattr(backend.decode_ids, "__func__", None) is getattr(decode, "__func__", None)
+                            and getattr(backend.roundtrip_ids, "__func__", None) is getattr(roundtrip, "__func__", None))
+                except Exception:
+                    return False
+
+            components = ProtectedLocalComponents(
+                snapshots=reader, reviewer=reviewer, tokenize=encode, detokenize=decode,
+                roundtrip=roundtrip,
+                verify_native_tokenizer=bridge_verify,
+                sampler_support=lambda *_: False, projection_attestor=lambda *_: False,
+            )
+            get_tokenizer_digest = lambda: backend.tokenizer_digest
+        else:
+            components = _exact_native_components(backend, snapshots=reader, reviewer=reviewer)
+            get_tokenizer_digest = lambda: backend.runtime.tokenizer.digest
+        expected = (pin.model_digest, pin.runtime_digest, pin.tokenizer_digest)
+        try:
+            observed = (backend.model_digest, backend.runtime_digest, get_tokenizer_digest())
+            if observed != expected:
+                raise ProviderPolicyError("loaded native backend differs from operator pins")
+        except Exception:
+            raise ProviderPolicyError("loaded native backend differs from operator pins") from None
+        from dataclasses import replace
+        verify = components.verify_native_tokenizer
+
+        def pinned_verifier(active: Any, encoder: Any, decoder: Any) -> bool:
+            try:
+                return (reviewer._anchor == anchor
+                        and backend.model_id == pin.model_id
+                        and verify(active, encoder, decoder)
+                        and (backend.model_digest, backend.runtime_digest,
+                             get_tokenizer_digest()) == expected)
+            except Exception:
+                return False
+
+        attest = None
+        if require_scoped_attestation:
+            from .engine_submission_snapshot import ScopedEngineCompiledSnapshotReader
+            if type(reader) is not ScopedEngineCompiledSnapshotReader:
+                raise ProviderPolicyError("trusted scoped execution snapshot reader required")
+            verifier = ReviewerCustodyVerifier(reviewer=reviewer,
+                authority_id=anchor.authority_id, trust_anchor=anchor)
+
+            async def attest(*, snapshot, request_digest):
+                if reviewer._anchor != anchor or getattr(reviewer, "_closed", True) is not False:
+                    raise ProviderPolicyError("independent reviewer authority changed")
+                await reader.attest_reviewer(verifier=verifier, pin=pin, snapshot=snapshot,
+                                             request_digest=request_digest)
+
+        async def signed_review(text, context_sha256):
+            if reviewer._anchor != anchor or getattr(reviewer, "_closed", True) is not False:
+                raise ProviderPolicyError("independent reviewer authority changed")
+            verdict = await SignedReviewerClient.review_async(reviewer, text, context_sha256)
+            if reviewer._anchor != anchor or getattr(reviewer, "_closed", True) is not False:
+                raise ProviderPolicyError("independent reviewer authority changed")
+            return verdict
+
+        return replace(components, verify_native_tokenizer=pinned_verifier, attest_source=attest,
+                       review_async=signed_review)
+
+    return ProtectedLocalComponentFactory(snapshots=snapshots, build=build)
+
+
 def build_guarded_native_transformer_adapter(
     runtime: Any, *,
     snapshots: TrustedSnapshotReader,
@@ -99,4 +238,5 @@ def build_guarded_native_transformer_adapter(
     )
 
 
-__all__ = ["native_transformer_guard_components", "build_guarded_native_transformer_adapter"]
+__all__ = ["native_transformer_guard_components", "build_guarded_native_transformer_adapter",
+           "NativeGuardPins", "make_pinned_native_guard_factory"]

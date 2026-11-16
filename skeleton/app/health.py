@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Mapping
+from typing import Callable, Mapping
 import math
+import re
 import time
+from http.client import HTTPException
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 from skeleton.app.assembly import AssemblyManifest, ServiceSpec, load_manifest
+from skeleton.app.install_http_transport import DirectHTTPHandler, DirectHTTPSHandler
 
 
 @dataclass(frozen=True)
@@ -42,18 +45,46 @@ def _open_direct_health(request: Request, *, timeout: float):
         def redirect_request(self, request, fp, code, msg, headers, newurl):
             return None
 
-    return build_opener(ProxyHandler({}), RejectRedirect()).open(request, timeout=timeout)
+    return build_opener(ProxyHandler({}), RejectRedirect(),
+                        DirectHTTPHandler(), DirectHTTPSHandler()).open(request, timeout=timeout)
+
+
+def _response_metadata(response) -> tuple[int, str] | None:
+    """Never coerce or default an unobserved transport status or URL."""
+    status = getattr(response, "status", None)
+    geturl = getattr(response, "geturl", None)
+    if type(status) is not int or not 100 <= status <= 599 or not callable(geturl):
+        return None
+    effective = geturl()
+    if not isinstance(effective, str) or not effective:
+        return None
+    return status, effective
+
+
+def _http_error_status(error: HTTPError) -> int | None:
+    # HTTPError is also a file-like response. Close it even when malformed;
+    # repeated cold-start retries must not accumulate open error responses.
+    try:
+        status = error.code
+        return status if type(status) is int and 100 <= status <= 599 else None
+    finally:
+        try:
+            error.close()
+        except (OSError, HTTPException, ValueError):
+            pass
 
 
 def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
     """Probe one health endpoint with no proxy or redirect side effects."""
 
-    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0 or timeout > 30:
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 0 < timeout <= 30 or not math.isfinite(timeout):
         raise ValueError("health probe timeout must be finite and within (0, 30] seconds")
     try:
         # Reject non-string and whitespace/control characters before urllib parsing.
         # urllib strips some control bytes, which can change the actual target.
-        if not isinstance(url, str) or not url or any(ord(ch) <= 32 or ord(ch) == 127 for ch in url):
+        if (not isinstance(url, str) or not url or len(url) > 4096
+                or any(ord(ch) <= 32 or ord(ch) == 127 for ch in url)
+                or "?" in url or "#" in url):
             raise ValueError("invalid health target characters")
         target = urlsplit(url)
         valid = (
@@ -80,26 +111,15 @@ def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
         with _open_direct_health(request, timeout=timeout) as response:
             # A missing or malformed transport status is never an implicit 200.
             # The final URL must be supplied by the transport, not assumed.
-            raw_status = getattr(response, "status", None)
-            geturl = getattr(response, "geturl", None)
-            if (
-                isinstance(raw_status, bool)
-                or not isinstance(raw_status, int)
-                or not 100 <= raw_status <= 599
-                or not callable(geturl)
-            ):
+            metadata = _response_metadata(response)
+            if metadata is None:
                 return ProbeResult(
                     service=name, url=url, ok=False, status=None,
                     detail="health transport returned invalid response metadata",
                 )
-            status = raw_status
-            effective_url = geturl()
-            if not isinstance(effective_url, str):
-                return ProbeResult(
-                    service=name, url=url, ok=False, status=None,
-                    detail="health transport returned invalid response metadata",
-                )
-            response.read(256)
+            status, effective_url = metadata
+            # Liveness is a status-only contract. Do not read a potentially
+            # slow or unbounded body; strict product readiness is separate.
         ok = 200 <= status < 300 and effective_url == url
         detail = (
             "healthy"
@@ -118,15 +138,16 @@ def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
             detail=detail,
         )
     except HTTPError as exc:
-        code = int(exc.code)
+        code = _http_error_status(exc)
         return ProbeResult(
             service=name,
             url=url,
             ok=False,
             status=code,
-            detail="health endpoint redirected" if 300 <= code < 400 else f"HTTP error {code}",
+            detail=("health transport returned invalid response metadata" if code is None
+                    else "health endpoint redirected" if 300 <= code < 400 else f"HTTP error {code}"),
         )
-    except (URLError, TimeoutError, OSError) as exc:
+    except (URLError, TimeoutError, OSError, HTTPException, ValueError, UnicodeError) as exc:
         return ProbeResult(
             service=name,
             url=url,
@@ -146,13 +167,11 @@ def probe_local_setup(service: ServiceSpec, *, timeout: float = 2.0) -> ProbeRes
     a local 302 must never cause a second request to an attacker-controlled
     URL. Only a direct 2xx response from the declared local origin counts.
     """
-    from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
-
     if (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
-        or not math.isfinite(timeout)
         or not 0 < timeout <= 10
+        or not math.isfinite(timeout)
     ):
         raise ValueError("setup probe timeout must be finite and within (0, 10] seconds")
     # Reject invalid targets here as well as in the Windows launcher, so a
@@ -163,7 +182,9 @@ def probe_local_setup(service: ServiceSpec, *, timeout: float = 2.0) -> ProbeRes
         if (
             not isinstance(service.public_url, str)
             or not service.public_url
+            or len(service.public_url) > 4096
             or any(ord(ch) <= 32 or ord(ch) == 127 for ch in service.public_url)
+            or any(ch in service.public_url for ch in ("?", "#", "%", chr(92)))
         ):
             raise ValueError("invalid setup origin")
         parts = urlsplit(service.public_url)
@@ -187,24 +208,37 @@ def probe_local_setup(service: ServiceSpec, *, timeout: float = 2.0) -> ProbeRes
         )
     url = service.public_url.rstrip("/") + "/setup"
 
-    class RejectRedirect(HTTPRedirectHandler):
-        def redirect_request(self, request, fp, code, msg, headers, newurl):
-            return None
-
-    opener = build_opener(ProxyHandler({}), RejectRedirect())
     request = Request(url, headers={"User-Agent": "skeleton-setup-probe/1"})
     try:
-        with opener.open(request, timeout=timeout) as response:
-            status = int(getattr(response, "status", 200))
-            effective = response.geturl()
-            content_type = response.headers.get_content_type().lower()
+        with _open_direct_health(request, timeout=timeout) as response:
+            metadata = _response_metadata(response)
+            if metadata is None:
+                return ProbeResult(service.name, url, False, None,
+                                   "setup transport returned invalid response metadata")
+            status, effective = metadata
+            if not 200 <= status < 300 or effective != url:
+                return ProbeResult(service.name, url, False, status,
+                                   "setup endpoint did not answer directly")
+            headers = getattr(response, "headers", None)
+            content_types = getattr(headers, "get_all", None)
+            get_content_type = getattr(headers, "get_content_type", None)
+            if not callable(content_types) or not callable(get_content_type):
+                return ProbeResult(service.name, url, False, status,
+                                   "setup transport returned invalid content metadata")
+            values = content_types("Content-Type")
+            if (not isinstance(values, list) or len(values) != 1
+                    or not isinstance(values[0], str)
+                    or get_content_type() != "text/html"):
+                return ProbeResult(service.name, url, False, status,
+                                   "setup endpoint did not answer directly")
             sample = response.read(512)
         # A local port can be occupied by a different process that returns
         # HTTP 200. Only an HTML document may admit the setup browser, never
         # a JSON health response or empty generic success payload.
         html_document = (
-            content_type == "text/html"
-            and sample.lstrip().lower().startswith(b"<!doctype html")
+            isinstance(sample, bytes)
+            and len(sample) <= 512
+            and re.match(rb"\s*<!doctype\s+html\s*>", sample, re.IGNORECASE) is not None
         )
         ok = 200 <= status < 300 and effective == url and html_document
         return ProbeResult(
@@ -212,12 +246,13 @@ def probe_local_setup(service: ServiceSpec, *, timeout: float = 2.0) -> ProbeRes
             detail="healthy" if ok else "setup endpoint did not answer directly",
         )
     except HTTPError as exc:
-        status = int(exc.code)
+        status = _http_error_status(exc)
         return ProbeResult(
             service=service.name, url=url, ok=False, status=status,
-            detail="health endpoint redirected" if 300 <= status < 400 else f"HTTP error {status}",
+            detail=("setup transport returned invalid response metadata" if status is None
+                    else "health endpoint redirected" if 300 <= status < 400 else f"HTTP error {status}"),
         )
-    except (URLError, TimeoutError, OSError) as exc:
+    except (URLError, TimeoutError, OSError, HTTPException, ValueError, UnicodeError) as exc:
         return ProbeResult(
             service=service.name, url=url, ok=False, status=None,
             detail=f"{type(exc).__name__}: setup endpoint unreachable",
@@ -238,16 +273,28 @@ def probe_url(service: ServiceSpec, *, timeout: float = 3.0) -> ProbeResult:
     url = service.public_url.rstrip("/") + "/" + service.health_path.lstrip("/")
     return probe_http(service.name, url, timeout=timeout)
 
+def _admitted(admit: Callable[[], bool] | None) -> bool:
+    if admit is None:
+        return True
+    try:
+        return admit() is True
+    except (OSError, ValueError, RuntimeError, UnicodeError):
+        return False
+
+
 def probe_application(
     *,
     manifest: AssemblyManifest | None = None,
     full: bool = False,
     timeout: float = 3.0,
     public_url_overrides: Mapping[str, str] | None = None,
+    admit: Callable[[], bool] | None = None,
 ) -> tuple[ProbeResult, ...]:
     """Probe the actual host-facing URLs for the active assembly profile."""
 
     manifest = manifest or load_manifest()
+    if not _admitted(admit):
+        return ()
     active = set(manifest.full_services if full else manifest.default_services)
     results = []
     for service in manifest.services:
@@ -257,17 +304,73 @@ def probe_application(
             continue
         configured_url = (public_url_overrides or {}).get(service.name)
         effective = replace(service, public_url=configured_url) if configured_url else service
+        if not _admitted(admit):
+            return ()
         results.append(probe_url(effective, timeout=timeout))
+        if not _admitted(admit):
+            return ()
 
     backend = manifest.service("backend")
     backend_url = (public_url_overrides or {}).get("backend", backend.public_url)
     ready_url = backend_url.rstrip("/") + manifest.contract_path("ready")
+    if not _admitted(admit):
+        return ()
     results.append(probe_http("application", ready_url, timeout=timeout))
-    return tuple(results)
+    return tuple(results) if _admitted(admit) else ()
 
 
-def probes_ok(results: tuple[ProbeResult, ...]) -> bool:
-    return bool(results) and all(result.ok for result in results)
+def readiness_targets(
+    manifest: AssemblyManifest, *, full: bool=False,
+    public_url_overrides: Mapping[str,str] | None=None,
+) -> dict[str,str]:
+    """Exact expected health evidence, excluding the non-HTTP Mongo service."""
+    if type(full) is not bool:
+        raise ValueError("readiness profile must be explicit")
+    overrides = public_url_overrides or {}
+    roles = {"frontend", "backend", "skeleton"}
+    if full:
+        roles.add("chroma")
+    active = set(manifest.full_services if full else manifest.default_services)
+    if not roles.issubset(active) or set(overrides).difference(manifest.service_names):
+        raise ValueError("readiness service inventory invalid")
+    targets = {}
+    for role in sorted(roles):
+        service = manifest.service(role)
+        origin = overrides.get(role, service.public_url)
+        if type(origin) is not str or not origin or not service.health_path:
+            raise ValueError("readiness endpoint missing")
+        targets[role] = origin.rstrip("/") + "/" + service.health_path.lstrip("/")
+    backend = overrides.get("backend", manifest.service("backend").public_url)
+    targets["application"] = backend.rstrip("/") + manifest.contract_path("ready")
+    if len(set(targets.values())) != len(targets):
+        raise ValueError("readiness endpoint collision")
+    return targets
+
+
+def probes_ok(results: tuple[ProbeResult, ...], *, manifest: AssemblyManifest | None=None,
+              full: bool=False, public_url_overrides: Mapping[str,str] | None=None) -> bool:
+    """Admit complete, one-to-one, exact-URL positive HTTP evidence.
+
+    No caller may promote a partial list, duplicate role, different port,
+    fabricated truthy flag or missing status to whole-application readiness.
+    This is liveness/readiness transport evidence, not AI or device proof.
+    """
+    try:
+        expected = readiness_targets(manifest or load_manifest(),full=full,
+                                     public_url_overrides=public_url_overrides)
+        if type(results) not in (tuple,list) or len(results) != len(expected):
+            return False
+        seen = set()
+        for row in results:
+            if (type(row) is not ProbeResult or type(row.service) is not str
+                    or row.service not in expected or row.service in seen
+                    or row.url != expected[row.service] or row.ok is not True
+                    or type(row.status) is not int or not 200 <= row.status < 300):
+                return False
+            seen.add(row.service)
+        return seen == set(expected)
+    except (OSError,ValueError,KeyError,TypeError,AttributeError):
+        return False
 
 
 def wait_for_application(
@@ -278,28 +381,41 @@ def wait_for_application(
     attempts: int = 10,
     delay: float = 1.0,
     public_url_overrides: Mapping[str, str] | None = None,
+    admit: Callable[[], bool] | None = None,
 ) -> tuple[ProbeResult, ...]:
     """Retry whole-application probes until healthy or the budget is exhausted."""
 
     if not isinstance(attempts, int) or isinstance(attempts, bool) or not 1 <= attempts <= 120:
         raise ValueError("attempts must be an integer between 1 and 120")
-    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or not 0 < timeout <= 30:
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 0 < timeout <= 30 or not math.isfinite(timeout):
         raise ValueError("timeout must be finite and within (0, 30] seconds")
-    if isinstance(delay, bool) or not isinstance(delay, (int, float)) or not math.isfinite(delay) or not 0 <= delay <= 30:
+    if isinstance(delay, bool) or not isinstance(delay, (int, float)) or not 0 <= delay <= 30 or not math.isfinite(delay):
         raise ValueError("delay must be finite and within [0, 30] seconds")
 
     manifest = manifest or load_manifest()
     latest: tuple[ProbeResult, ...] = ()
+    # Latch a refused epoch across the complete retry campaign. No subsequent
+    # successful observation can rehabilitate evidence collected across it.
+    valid = True
+
+    def still_admitted():
+        nonlocal valid
+        valid = valid and _admitted(admit)
+        return valid
+
     for attempt in range(attempts):
-        if public_url_overrides is None:
-            latest = probe_application(manifest=manifest, full=full, timeout=timeout)
-        else:
-            latest = probe_application(
-                manifest=manifest, full=full, timeout=timeout,
-                public_url_overrides=public_url_overrides,
-            )
-        if probes_ok(latest):
+        if not still_admitted():
+            return ()
+        options = {}
+        if public_url_overrides is not None:
+            options["public_url_overrides"] = public_url_overrides
+        if admit is not None:
+            options["admit"] = still_admitted
+        latest = probe_application(manifest=manifest, full=full, timeout=timeout, **options)
+        if not still_admitted():
+            return ()
+        if probes_ok(latest,manifest=manifest,full=full,public_url_overrides=public_url_overrides):
             return latest
         if attempt + 1 < attempts and delay:
             time.sleep(delay)
-    return latest
+    return latest if still_admitted() else ()

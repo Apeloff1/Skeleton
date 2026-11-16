@@ -1,0 +1,39 @@
+name: Isolated Chroma persistence qualification
+
+# Standalone PR admission is consolidated under Merge Readiness.
+# Every real qualification job retains its existing execution contract.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: isolated-chroma-persistence-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  durable_named_volume:
+    name: Exact-head isolated Chroma /data restart and recreate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Execute disposable pinned image and volume qualification
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          umask 077
+          python scripts/qualify_chroma_persistence.py --source-head "$EXPECTED_HEAD" --isolated-ci-fixture > "$RUNNER_TEMP/chroma-persistence.json"
+          sha256sum "$RUNNER_TEMP/chroma-persistence.json"
+      - name: Retain successful exact-head physical receipt
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: chroma-persistence-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/chroma-persistence.json
+          if-no-files-found: error
+          retention-days: 30

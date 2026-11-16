@@ -26,7 +26,16 @@
     "backend/Dockerfile.dockerignore",
     "frontend/Dockerfile",
     "skeleton/app/studio_readiness.py",
-    "scripts/install_game_desktop_toolchains.py"
+    "scripts/install_game_desktop_toolchains.py",
+    "skeleton/app/strict_install_qualification.py",
+    "scripts/qualify_chroma_persistence.py",
+    "scripts/stage_chroma_recovery.py",
+    "skeleton/app/protected_stack.py",
+    "scripts/start_protected_stack.py",
+    "skeleton/app/install_session.py",
+    "scripts/provision_fresh_chroma.py",
+    "deploy/chroma/durable.compose.yml",
+    "scripts/qualify_first_install_images.py"
   ],
   "services": [
     "mongo",
@@ -41,7 +50,8 @@
     "preflight": "python -m skeleton app check --runtime",
     "diagnostics": "python -m skeleton app doctor --live --json",
     "launch": "python -m skeleton app up",
-    "stop": "python -m skeleton app down"
+    "stop": "python -m skeleton app down",
+    "strict_observation": "python -m skeleton app qualify-install --source-head REVIEWED_SHA --json"
   },
   "invariants": [
     "Reuse the existing application assembly, Docker Compose supervisor, provider boundary and canonical data stores; create no service or model executor.",
@@ -64,7 +74,14 @@
     "The existing Curiosity owner uses the declared backend_data volume via CURIOSITY_DATA_ROOT=/app/data/curiosity rather than the read-only source tree. Minimal installation keeps its automatic idle research disabled unless explicitly enabled.",
     "Compose forwards the existing DB_NAME setting to core.databases, keeping the configured CORE_DB Mongo namespace authoritative instead of silently ignoring operator database selection.",
     "Both uppercase and lowercase NO_PROXY explicitly include Compose service and loopback hosts while retaining operator bypass entries, so inherited proxy settings cannot intercept private authenticated backend-to-engine traffic. External proxy configuration remains available to its existing owners.",
-    "The production Nginx loopback health probe explicitly disables wget proxy use; external proxy configuration cannot turn a healthy local listener into a false health failure."
+    "The production Nginx loopback health probe explicitly disables wget proxy use; external proxy configuration cannot turn a healthy local listener into a false health failure.",
+    "Strict checkout qualification binds multiple independent direct HTTP observations to the admitted host SHA and private environment identity; service observation never grants image, inference, restore, browser, device or release evidence.",
+    "The pinned isolated Chroma physical fixture uses /data, verifies logical mutations through restart and container replacement, and preserves the legacy full-profile hold.",
+    "Historical Chroma recovery stages only an independently signed selected backup lane into a new private directory and never modifies or merges the legacy stores.",
+    "The explicit protected co-hosted launcher independently verifies signed model and reviewer pins, shares actual backend canonical owners with the engine on one event loop, and drains the engine before closing the shared Mongo client.",
+    "The optional persistent POSIX installer session records every mutation intent before dispatch, preserves uncertain attempts, and revalidates existing source and configuration before replay without destructive rollback.",
+    "Fresh durable Chroma creation requires pinned exact-head physical fixture evidence, excludes historical resources and preserves both creation intent and exact created identities before start.",
+    "Isolated exact-Git-archive production builds use distinct candidate tags and independent approval binds observed immutable image IDs; two exact running-container observations do not substitute for actual inference or release evidence."
   ],
   "diagnostic_report": {
     "schema_version": "skeleton.application.first_install_report.v1",

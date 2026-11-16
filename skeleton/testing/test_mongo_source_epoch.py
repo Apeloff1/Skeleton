@@ -20,7 +20,7 @@ class Collection:
             if record["_id"] in self.records:
                 raise ValueError("duplicate")
             self.records[record["_id"]] = dict(record)
-        return SimpleNamespace(inserted_id=record["_id"])
+        return SimpleNamespace(inserted_id=record["_id"], acknowledged=True)
 
     async def find_one(self, query, **kwargs):
         async with self.lock:
@@ -41,6 +41,16 @@ class Collection:
 
 
 class Database:
+    name = "canonical"
+
+    async def command(self, name):
+        if name == "hello":
+            return {"setName": "rs0", "isWritablePrimary": True}
+        if name == "connectionStatus":
+            return {"authInfo": {"authenticatedUsers": [{"db": "admin", "user": "test"}],
+                                 "authenticatedUserRoles": [{"db": self.name, "role": "readWrite"}]}}
+        raise AssertionError("unexpected test command")
+
     def __init__(self):
         self.collection = Collection()
         self.received = None
@@ -59,8 +69,14 @@ class Database:
         return self.collection
 
 
-def epoch():
-    return MongoCanonicalSourceEpoch(Database())
+async def _fixture_authorize_migration(**binding):
+    assert binding["purpose"] == "quiescent-initial-epoch-v1"
+    return True
+
+
+def epoch(database=None):
+    return MongoCanonicalSourceEpoch(database or Database(),
+                                    migration_authorizer=_fixture_authorize_migration)
 
 
 async def read(owner, tenant="tenant", actor="actor", context="context"):
@@ -90,7 +106,7 @@ async def test_durable_writer_epoch_requires_operator_migration_and_is_monotonic
 @pytest.mark.asyncio
 async def test_epoch_reader_uses_linearizable_primary_and_a_server_deadline():
     database = Database()
-    owner = MongoCanonicalSourceEpoch(database)
+    owner = epoch(database)
     await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
     original = database.collection.find_one
     options = []
@@ -106,7 +122,7 @@ async def test_epoch_reader_uses_linearizable_primary_and_a_server_deadline():
 @pytest.mark.asyncio
 async def test_linearizable_read_unavailable_fails_closed_without_weak_fallback():
     database = Database()
-    owner = MongoCanonicalSourceEpoch(database)
+    owner = epoch(database)
     await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
     async def unavailable(*args, **kwargs):
         raise RuntimeError("private Mongo connection details")
@@ -121,7 +137,7 @@ async def test_linearizable_read_deadline_fails_closed(monkeypatch):
     import skeleton.persistence.mongo_source_epoch as source_epoch
 
     database = Database()
-    owner = MongoCanonicalSourceEpoch(database)
+    owner = epoch(database)
     await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
     entered = asyncio.Event()
     async def stalled(*args, **kwargs):
@@ -137,8 +153,8 @@ async def test_linearizable_read_deadline_fails_closed(monkeypatch):
 @pytest.mark.asyncio
 async def test_independent_owner_instances_observe_the_same_inflight_writer():
     database = Database()
-    conversation_owner = MongoCanonicalSourceEpoch(database)
-    memory_owner = MongoCanonicalSourceEpoch(database)
+    conversation_owner = epoch(database)
+    memory_owner = epoch(database)
     await conversation_owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
     async with conversation_owner.writer(tenant_id="tenant", actor_id="actor"):
         with pytest.raises(MongoSourceEpochError, match="writing"):
@@ -169,7 +185,7 @@ async def test_stale_majority_snapshot_cannot_hide_an_active_writer():
             return collection
 
     database = LaggingDatabase()
-    owner = MongoCanonicalSourceEpoch(database)
+    owner = epoch(database)
     await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
     database.stale = dict(next(iter(database.collection.records.values())))
     async with owner.writer(tenant_id="tenant", actor_id="actor"):
@@ -184,7 +200,7 @@ async def test_stale_majority_snapshot_cannot_hide_an_active_writer():
 @pytest.mark.asyncio
 async def test_epoch_read_cancellation_preserves_task_custody():
     database = Database()
-    owner = MongoCanonicalSourceEpoch(database)
+    owner = epoch(database)
     await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
     entered = asyncio.Event()
     observed = []
@@ -527,3 +543,147 @@ async def test_memento_publish_and_retirement_require_canonical_actor_epoch():
     with pytest.raises(MongoSourceEpochError, match="thread missing"):
         await mongo.retire_thread(tenant_id="tenant", owner_id="actor", thread_id=None)
     assert await read(owner) == 2
+
+
+@pytest.mark.asyncio
+async def test_real_bson_int64_epoch_round_trip_and_exact_cas():
+    from bson.int64 import Int64
+    owner = epoch()
+    await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    row = next(iter(owner._collection.records.values()))
+    row["epoch"] = Int64(1 << 34)
+    assert type(await read(owner)) is int
+    calls = []
+    original = owner._collection.find_one_and_update
+
+    async def observed(query, update, **kwargs):
+        calls.append(dict(query))
+        result = await original(query, update, **kwargs)
+        if result is not None:
+            result["epoch"] = Int64(result["epoch"])
+        return result
+
+    owner._collection.find_one_and_update = observed
+    async with owner.writer(tenant_id="tenant", actor_id="actor"):
+        owner.require_actor_writer(tenant_id="tenant", actor_id="actor")
+    assert await read(owner) == (1 << 34) + 2
+    assert [call["epoch"] for call in calls] == [1 << 34, (1 << 34) + 1]
+
+
+@pytest.mark.asyncio
+async def test_epoch_exhaustion_denies_before_any_mutation():
+    from bson.int64 import Int64
+    from unittest.mock import AsyncMock
+    owner = epoch()
+    await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    row = next(iter(owner._collection.records.values()))
+    row["epoch"] = Int64((1 << 63) - 2)
+    owner._collection.find_one_and_update = AsyncMock()
+    with pytest.raises(MongoSourceEpochError, match="admission unavailable"):
+        async with owner.writer(tenant_id="tenant", actor_id="actor"):
+            pytest.fail("exhausted epoch admitted")
+    owner._collection.find_one_and_update.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field,value", [
+    ("_id", "foreign"), ("tenant_id", "foreign"), ("actor_id", "foreign"),
+    ("phase", "writing"), ("writer_token", "residual"), ("epoch", True),
+    ("epoch", 4.0), ("epoch", (1 << 63)), ("epoch", 3),
+])
+async def test_corrupt_read_response_cannot_supply_writer_authority(field, value):
+    from unittest.mock import AsyncMock
+    owner = epoch()
+    await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    row = dict(next(iter(owner._collection.records.values())))
+    row[field] = value
+    owner._reader.find_one = AsyncMock(return_value=row)
+    owner._collection.find_one_and_update = AsyncMock()
+    with pytest.raises(MongoSourceEpochError):
+        await read(owner)
+    with pytest.raises(MongoSourceEpochError):
+        async with owner.writer(tenant_id="tenant", actor_id="actor"):
+            pytest.fail("corrupt epoch admitted")
+    owner._collection.find_one_and_update.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_exact_admission_cas_cannot_claim_new_generation():
+    owner = epoch()
+    await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    original = owner._collection.find_one_and_update
+
+    async def race(query, update, **kwargs):
+        row = next(iter(owner._collection.records.values()))
+        row["epoch"] += 2  # a different actor transaction completed
+        return await original(query, update, **kwargs)
+
+    owner._collection.find_one_and_update = race
+    with pytest.raises(MongoSourceEpochError, match="not owned"):
+        async with owner.writer(tenant_id="tenant", actor_id="actor"):
+            pytest.fail("stale preflight admitted")
+    assert await read(owner) == 4
+
+
+@pytest.mark.asyncio
+async def test_caught_nested_mutation_failure_poisoned_outer_writer():
+    owner = epoch()
+    await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    with pytest.raises(MongoSourceEpochError, match="quarantined"):
+        async with owner.writer(tenant_id="tenant", actor_id="actor"):
+            with pytest.raises(ValueError):
+                async with owner.writer(tenant_id="tenant", actor_id="actor"):
+                    raise ValueError("partial nested mutation")
+            with pytest.raises(MongoSourceEpochError):
+                owner.require_actor_writer(tenant_id="tenant", actor_id="actor")
+            with pytest.raises(MongoSourceEpochError):
+                async with owner.writer(tenant_id="tenant", actor_id="actor"):
+                    pytest.fail("poisoned nested writer admitted")
+    with pytest.raises(MongoSourceEpochError, match="writing"):
+        await read(owner)
+
+
+@pytest.mark.asyncio
+async def test_mutation_response_cannot_claim_foreign_actor():
+    owner = epoch()
+    await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    original = owner._collection.find_one_and_update
+
+    async def corrupt(query, update, **kwargs):
+        row = await original(query, update, **kwargs)
+        if row is not None:
+            row["actor_id"] = "foreign"
+        return row
+
+    owner._collection.find_one_and_update = corrupt
+    with pytest.raises(MongoSourceEpochError, match="not owned"):
+        async with owner.writer(tenant_id="tenant", actor_id="actor"):
+            pytest.fail("foreign response admitted")
+    with pytest.raises(MongoSourceEpochError, match="writing"):
+        await read(owner)
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_completion_does_not_retry_or_claim_rollback(monkeypatch):
+    import skeleton.persistence.mongo_source_epoch as module
+    owner = epoch()
+    await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    original = owner._collection.find_one_and_update
+    completion_attempts = 0
+
+    async def ambiguous(query, update, **kwargs):
+        nonlocal completion_attempts
+        result = await original(query, update, **kwargs)
+        if query["phase"] == "writing":
+            completion_attempts += 1
+            raise TimeoutError("secret driver reply")
+        return result
+
+    owner._collection.find_one_and_update = ambiguous
+    with pytest.raises(MongoSourceEpochError, match="uncertain epoch") as error:
+        async with owner.writer(tenant_id="tenant", actor_id="actor"):
+            pass
+    assert completion_attempts == 1
+    assert error.value.__cause__ is None
+    assert "secret" not in str(error.value)
+    assert await read(owner) == 4  # actual committed state was not reset

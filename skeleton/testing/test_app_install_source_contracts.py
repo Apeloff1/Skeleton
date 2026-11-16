@@ -14,6 +14,7 @@ from skeleton.app.install_source_contracts import (
     _copy_sources,
     _source_path_error,
     build_source_errors,
+    nginx_ingress_errors,
 )
 
 
@@ -48,13 +49,18 @@ def _fixture(root: Path) -> None:
         "COPY scripts/asset.js ./scripts/\n",
         encoding="utf-8",
     )
-    private_globs = "**/.env\n**/.env.*\n**/*.pem\n**/*.key\n"
+    private_names = (
+        ".env", ".env.*", "..env.*", "*.pem", "*.key", "*.p12", "*.pfx", "*.crt", "*.cer",
+        "credentials*.json", "service-account*.json", ".runtime",
+    )
+    private_globs = "".join(f"**/{name}\n" for name in private_names)
     (root / "Dockerfile.dockerignore").write_text(private_globs, encoding="utf-8")
     (root / "backend" / "Dockerfile.dockerignore").write_text(
         private_globs, encoding="utf-8"
     )
     (root / "frontend" / ".dockerignore").write_text(
-        ".env\n.env.*\n*.pem\n*.key\n", encoding="utf-8"
+        "".join(f"{name}\n" for name in private_names) + private_globs,
+        encoding="utf-8"
     )
 
 
@@ -243,3 +249,165 @@ def test_status_cli_returns_redacted_error_for_invalid_config(monkeypatch, tmp_p
     assert report["ok"] is False
     assert report["code"] == "runtime_configuration_unavailable"
     assert "BBBB" not in repr(report)
+
+
+# The deployed frontend previously exited before healthz because seven exact
+# /setup blocks survived repeated source-preserving integration.
+_INGRESS = r'''
+server {
+    # location = /setup { ignored comment
+    location = /setup {
+        try_files /setup.html /setup/index.html =404;
+        add_header Cache-Control "no-store" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        add_header Content-Security-Policy "frame-ancestors 'self'; base-uri 'self'; object-src 'none'" always;
+    }
+    location = /healthz { return 200 "ok\n"; }
+    location / { try_files $uri /index.html; }
+}
+'''
+
+
+def _production_fixture(root):
+    _fixture(root)
+    dockerfile = root / "frontend" / "Dockerfile"
+    dockerfile.write_text(dockerfile.read_text(encoding="utf-8")
+                          + "FROM nginx:1.31-alpine AS production\n"
+                          + "COPY nginx.conf /etc/nginx/conf.d/default.conf\n",
+                          encoding="utf-8")
+    (root / "frontend" / "nginx.conf").write_text(_INGRESS, encoding="utf-8")
+
+
+def test_production_ingress_accepts_reviewed_exact_setup_and_literal_health(tmp_path):
+    _production_fixture(tmp_path)
+    assert build_source_errors(tmp_path) == ()
+    assert nginx_ingress_errors(_INGRESS) == ()
+
+
+@pytest.mark.parametrize("duplicate", [
+    'location = /setup { return 200 "not setup"; }',
+    'location\n  =\n  "/setup"\n  { return 200 "not setup"; }',
+    'location = /healthz { return 200 "not healthy"; }',
+    'location ^~ / { return 200 "duplicate prefix"; }',
+])
+def test_production_ingress_rejects_duplicate_location_before_install(tmp_path, duplicate):
+    _production_fixture(tmp_path)
+    path = tmp_path / "frontend" / "nginx.conf"
+    path.write_text(_INGRESS.rsplit("}", 1)[0] + duplicate + "\n}", encoding="utf-8")
+    assert any("duplicate production ingress location" in issue
+               for issue in build_source_errors(tmp_path))
+
+
+@pytest.mark.parametrize("source,reason", [
+    (_INGRESS.replace("=404", "/index.html"), "exported route or return 404"),
+    (_INGRESS.replace("camera=()", "camera=(self)"), "privacy or cache policy drift"),
+    (_INGRESS.replace('add_header Cache-Control "no-store" always;',
+                      'add_header Cache-Control "no-store";'), "privacy or cache policy drift"),
+    (_INGRESS.replace('add_header Cache-Control "no-store" always;',
+                      'add_header Cache-Control "no-store" always;\n        add_header Cache-Control "public" always;'),
+     "privacy or cache policy drift"),
+    (_INGRESS.replace('add_header Cache-Control "no-store" always;', ""),
+     "privacy or cache policy drift"),
+    (_INGRESS.replace("location = /setup", "location /setup"), "missing exact setup"),
+    (_INGRESS.replace('return 200 "ok\\n";', 'return 200 "wrong";'), "literal liveness"),
+    (_INGRESS.replace("server {", "server {\ninclude alternate.conf;"), "unreviewed include"),
+    (_INGRESS.replace("\n    location = /setup {", "\n    location = /setup {\n        if ($uri) { return 200; }"),
+     "nested block"),
+    (_INGRESS + "}", "malformed"),
+    (_INGRESS + "'unterminated", "malformed"),
+])
+def test_ingress_policy_refuses_unreviewed_mutations(source, reason):
+    assert any(reason in issue for issue in nginx_ingress_errors(source))
+
+
+def test_production_ingress_rejects_missing_config(tmp_path):
+    _production_fixture(tmp_path)
+    (tmp_path / "frontend" / "nginx.conf").unlink()
+    assert any("production ingress missing" in issue for issue in build_source_errors(tmp_path))
+
+
+def test_production_ingress_rejects_oversized_config(tmp_path):
+    _production_fixture(tmp_path)
+    (tmp_path / "frontend" / "nginx.conf").write_bytes(b"x" * (128 * 1024 + 1))
+    assert any("production ingress missing" in issue for issue in build_source_errors(tmp_path))
+
+
+def test_repository_ingress_preserves_one_exact_setup_location():
+    root = find_repo_root(Path(__file__))
+    source = (root / "frontend" / "nginx.conf").read_text(encoding="utf-8")
+    assert nginx_ingress_errors(source) == ()
+
+
+@pytest.mark.parametrize("ignore", [
+    "Dockerfile.dockerignore",
+    "backend/Dockerfile.dockerignore",
+    "frontend/.dockerignore",
+])
+@pytest.mark.parametrize("exception", ["!**", "!skeleton/**", "!**/.env", "!**/.runtime/"])
+def test_context_privacy_fence_refuses_late_reinclusion(tmp_path, ignore, exception):
+    _fixture(tmp_path)
+    path = tmp_path / ignore
+    path.write_text(path.read_text() + exception + "\n")
+    assert any("private runtime files" in item for item in build_source_errors(tmp_path))
+
+
+def test_context_privacy_fence_accepts_reinclusion_before_complete_fence(tmp_path):
+    _fixture(tmp_path)
+    path = tmp_path / "Dockerfile.dockerignore"
+    path.write_text("**\n!skeleton/**\n" + path.read_text())
+    assert build_source_errors(tmp_path) == ()
+
+
+@pytest.mark.parametrize("rule", ["**/.env", "**/*.pfx", "**/credentials*.json", "**/.runtime"])
+def test_frontend_nested_private_material_must_be_excluded(tmp_path, rule):
+    _fixture(tmp_path)
+    path = tmp_path / "frontend" / ".dockerignore"
+    path.write_text(path.read_text().replace(rule + "\n", ""))
+    assert any("private runtime files" in item for item in build_source_errors(tmp_path))
+
+
+def test_frontend_dockerfile_specific_ignore_cannot_shadow_reviewed_policy(tmp_path):
+    _fixture(tmp_path)
+    (tmp_path / "frontend" / "Dockerfile.dockerignore").write_text("node_modules\n")
+    assert any("unsafe Docker context ignore" in item for item in build_source_errors(tmp_path))
+
+
+@pytest.mark.parametrize("line", [
+    "COPY --from=builder --unknown=x /opt/venv /opt/venv",
+    "COPY --from=builder",
+    "COPY --from= /opt/venv /opt/venv",
+    "COPY --from=builder --from=other /opt/venv /opt/venv",
+    "COPY --link-malformed pyproject.toml ./",
+    "COPY --link=maybe pyproject.toml ./",
+    r"COPY ..\secret ./",
+    "COPY '' ./",
+])
+def test_stage_and_host_copy_parser_rejects_ambiguous_instructions(line):
+    assert _copy_sources(line) is None
+
+
+@pytest.mark.parametrize("instruction", [
+    "ADD https://example.invalid/archive.tar.gz /app/",
+    "ADD pyproject.toml ./",
+])
+def test_unreviewed_add_cannot_bypass_source_admission(tmp_path, instruction):
+    _fixture(tmp_path)
+    path = tmp_path / "Dockerfile"
+    path.write_text(path.read_text() + instruction + "\n")
+    assert any("unreviewed Docker ADD" in item for item in build_source_errors(tmp_path))
+
+
+def test_ingress_refuses_nul_even_inside_comment_or_quoted_string():
+    for source in (_INGRESS + "# hidden\x00\n", _INGRESS.replace("no-store", "no-store\x00")):
+        assert nginx_ingress_errors(source)
+
+
+
+@pytest.mark.parametrize("ignore", [
+    "Dockerfile.dockerignore", "backend/Dockerfile.dockerignore", "frontend/.dockerignore",
+])
+def test_legacy_double_dot_secret_staging_must_remain_excluded(tmp_path, ignore):
+    _fixture(tmp_path)
+    path = tmp_path / ignore
+    path.write_text(path.read_text().replace("**/..env.*\n", ""))
+    assert any("private runtime files" in error for error in build_source_errors(tmp_path))

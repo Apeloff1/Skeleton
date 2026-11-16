@@ -45,7 +45,9 @@ class NativeJobBridge:
         if not callable(clock_ms):
             deny("bridge-clock-required")
         started=require_int(clock_ms(),0,2**63-1,"clock")
-        claim=self.store.claim(worker_id,now_ms=started,target_job_id=target_job_id)
+        actor=self.service.actor
+        scope=(actor.tenant,actor.user,actor.model_digest,actor.tokenizer_digest)
+        claim=self.store.claim(worker_id,now_ms=started,target_job_id=target_job_id,worker_scope=scope)
         if claim is None:
             return None
         try:

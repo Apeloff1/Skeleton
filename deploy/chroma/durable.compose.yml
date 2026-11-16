@@ -1,0 +1,30 @@
+# Independently gated new installations only. Never use as a legacy migration overlay.
+services:
+  chroma:
+    image: chromadb/chroma:latest@sha256:1e0b73a187a28757c572acba508c46f48c9e8b0acaf5c20e6d95cdedce1acdf6
+    container_name: tutolage-chroma
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${SKELETON_CHROMA_DURABLE_PORT:?explicit port required}:8000"
+    environment:
+      ANONYMIZED_TELEMETRY: "FALSE"
+    labels:
+      org.skeleton.chroma-provision: "${SKELETON_CHROMA_PROVISION_TOKEN:?provision token required}"
+    volumes:
+      - type: volume
+        source: chroma_durable_data
+        target: /data
+    networks:
+      tutolage:
+        aliases:
+          - chroma
+networks:
+  tutolage:
+    external: true
+    name: "${SKELETON_CHROMA_NETWORK:?existing network required}"
+volumes:
+  chroma_durable_data:
+    name: "${SKELETON_CHROMA_VOLUME:?new volume required}"
+    driver: local
+    labels:
+      org.skeleton.chroma-provision: "${SKELETON_CHROMA_PROVISION_TOKEN:?provision token required}"

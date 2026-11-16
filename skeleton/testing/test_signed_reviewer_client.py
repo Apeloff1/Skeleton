@@ -1,0 +1,306 @@
+"""Signed reviewer transport fixtures; no live independent signer is claimed."""
+from __future__ import annotations
+
+import base64
+import hashlib
+import json
+import ssl
+import unittest
+from unittest.mock import patch
+
+import httpx
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from skeleton.ai.runtime.inference.reviewer_custody import (
+    ReviewerCustodyError, ReviewerTrustAnchor, ReviewerCustodyVerifier,
+)
+from skeleton.ai.runtime.inference.signed_reviewer_client import (
+    SignedReviewerClient, canonical_verdict,
+)
+
+
+class SignedReviewerTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.key = Ed25519PrivateKey.generate()
+        self.anchor = ReviewerTrustAnchor(
+            "reviewer-prod", "separate-reviewer-domain",
+            self.key.public_key().public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw,
+            ),
+        )
+        self.context = ssl.create_default_context()
+        self.mode = "allow"
+        self.calls = []
+        self.client = None
+
+    async def asyncTearDown(self):
+        if self.client is not None:
+            await self.client.aclose()
+
+    @staticmethod
+    def raw_response(status, *, content=b"", headers=None, json_value=None):
+        # Do not pre-decode hostile compression or consume the raw body.
+        if json_value is not None:
+            content = json.dumps(json_value).encode("utf-8")
+        return httpx.Response(status, headers=headers, stream=httpx.ByteStream(content))
+
+    def respond(self, request):
+        self.calls.append(request.url.path)
+        if request.url.path == "/v1/attest":
+            return self.raw_response(200, content=self.key.sign(request.content))
+        if request.url.path != "/v1/review":
+            return self.raw_response(404)
+        data = json.loads(request.content)
+        fields = {
+            "schema": "skeleton.guard.signed-review.v1",
+            "nonce": data["nonce"],
+            "context_sha256": data["context_sha256"],
+            "reviewer_id": "reviewer-prod",
+            "allowed": self.mode != "deny",
+            "reason_code": "approved" if self.mode != "deny" else "unsafe",
+        }
+        signature = self.key.sign(canonical_verdict(fields))
+        if self.mode == "duplicate":
+            # A syntactically valid JSON object can have two conflicting
+            # policy fields. Never let the parser silently choose the last.
+            encoded = json.dumps(fields, separators=(",", ":"))
+            encoded = encoded[:-1] + ',"allowed":false,"signature":"' + (
+                base64.b64encode(signature).decode()
+            ) + '"}'
+            return self.raw_response(200, content=encoded.encode())
+        if self.mode == "nonfinite":
+            encoded = json.dumps(fields, separators=(",", ":"))
+            encoded = encoded[:-1] + ',"extra":NaN,"signature":"' + (
+                base64.b64encode(signature).decode()
+            ) + '"}'
+            return self.raw_response(200, content=encoded.encode())
+        if self.mode == "replay":
+            fields["nonce"] = "stale"
+        if self.mode == "digest":
+            fields["context_sha256"] = "0" * 64
+        if self.mode == "unsigned":
+            signature = b"invalid"
+        if self.mode == "oversize":
+            return self.raw_response(200, content=b"x" * 8193)
+        if self.mode == "redirect":
+            return self.raw_response(302, headers={"Location": "https://other.invalid"})
+        if self.mode == "compressed":
+            return self.raw_response(200, content=b"compressed", headers={"Content-Encoding": "gzip"})
+        if self.mode == "declared_oversize":
+            return self.raw_response(200, content=b"{}", headers={"Content-Length": "99999999"})
+        fields["signature"] = base64.b64encode(signature).decode()
+        return self.raw_response(200, json_value=fields)
+
+    def make(self):
+        transport = httpx.MockTransport(self.respond)
+        original_sync = httpx.Client
+        original_async = httpx.AsyncClient
+        with patch(
+            "skeleton.ai.runtime.inference.signed_reviewer_client.httpx.Client",
+            side_effect=lambda **kwargs: original_sync(transport=transport, **kwargs),
+        ), patch(
+            "skeleton.ai.runtime.inference.signed_reviewer_client.httpx.AsyncClient",
+            side_effect=lambda **kwargs: original_async(transport=transport, **kwargs),
+        ):
+            self.client = SignedReviewerClient(
+                base_url="https://reviewer.internal",
+                trust_anchor=self.anchor, tls_context=self.context,
+            )
+        return self.client
+
+    async def test_review_and_attestation_same_signer(self):
+        client = self.make()
+        text = "untrusted source"
+        digest = hashlib.sha256(text.encode()).hexdigest()
+        verdict = client(text, digest)
+        self.assertTrue(verdict.allowed)
+        self.assertEqual(verdict.context_sha256, digest)
+        verifier = ReviewerCustodyVerifier(
+            reviewer=client, authority_id="reviewer-prod",
+            trust_anchor=self.anchor,
+        )
+        await verifier.verify(
+            tenant_id="tenant", actor_id="owner", context_id="context",
+            epoch=2, model_digest="a" * 64, runtime_digest="b" * 64,
+            tokenizer_digest="c" * 64,
+        )
+        self.assertEqual(self.calls, ["/v1/review", "/v1/attest"])
+
+    async def test_signed_deny_not_promoted(self):
+        self.mode = "deny"
+        client = self.make()
+        text = "bad instructions"
+        verdict = client(text, hashlib.sha256(text.encode()).hexdigest())
+        self.assertIs(verdict.allowed, False)
+        self.assertEqual(verdict.reason_code, "unsafe")
+
+    async def test_replay_forgery_oversize_and_redirect_denied(self):
+        client = self.make()
+        text = "source"
+        digest = hashlib.sha256(text.encode()).hexdigest()
+        for mode in ("replay", "digest", "unsigned", "oversize", "redirect", "compressed", "declared_oversize", "duplicate", "nonfinite"):
+            with self.subTest(mode=mode):
+                self.mode = mode
+                with self.assertRaises(ReviewerCustodyError):
+                    client(text, digest)
+
+    async def test_total_sync_review_deadline_denies_signed_response(self):
+        client = self.make()
+        digest = hashlib.sha256(b"source").hexdigest()
+        # The signed verdict is valid, but arrives beyond the wall-clock
+        # budget. A valid signature never overrides a timeout.
+        with patch(
+            "skeleton.ai.runtime.inference.signed_reviewer_client._now",
+            side_effect=[1.0, 10.0],
+        ):
+            with self.assertRaisesRegex(ReviewerCustodyError, "deadline"):
+                client("source", digest)
+
+    async def test_total_async_attestation_deadline_denies_signature(self):
+        client = self.make()
+        with patch(
+            "skeleton.ai.runtime.inference.signed_reviewer_client._now",
+            side_effect=[1.0, 10.0],
+        ):
+            with self.assertRaisesRegex(ReviewerCustodyError, "deadline"):
+                await client.attest_challenge(b"valid challenge")
+
+    async def test_compressed_attestation_response_denied(self):
+        client = self.make()
+        original = client._async
+        async def cannot_produce_signature(request):
+            return self.raw_response(
+                200, content=b"not a signature",
+                headers={"Content-Encoding": "gzip"},
+            )
+        await original.aclose()
+        client._async = httpx.AsyncClient(transport=httpx.MockTransport(cannot_produce_signature))
+        with self.assertRaisesRegex(ReviewerCustodyError, "encoded"):
+            await client.attest_challenge(b"valid challenge")
+
+    async def test_input_digest_and_size_bound(self):
+        client = self.make()
+        with self.assertRaises(ReviewerCustodyError):
+            client("source", "0" * 64)
+        with self.assertRaises(ReviewerCustodyError):
+            client("x" * 1_048_577, "0" * 64)
+        self.assertEqual(self.calls, [])
+
+    async def test_https_and_tls_required(self):
+        for url in (
+            "http://reviewer.internal", "https://user:secret@reviewer.internal",
+            "https://reviewer.internal/path", "https://reviewer.internal?secret=yes",
+        ):
+            with self.subTest(url=url), self.assertRaises(ReviewerCustodyError):
+                SignedReviewerClient(
+                    base_url=url, trust_anchor=self.anchor,
+                    tls_context=self.context,
+                )
+        insecure = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        insecure.check_hostname = False
+        insecure.verify_mode = ssl.CERT_NONE
+        with self.assertRaises(ReviewerCustodyError):
+            SignedReviewerClient(
+                base_url="https://reviewer.internal",
+                trust_anchor=self.anchor, tls_context=insecure,
+            )
+
+    async def test_closed_client_does_not_send_requests(self):
+        client = self.make()
+        await client.aclose()
+        await client.aclose()
+        with self.assertRaisesRegex(ReviewerCustodyError, "closed"):
+            await client.attest_challenge(b"challenge")
+        text = "source"
+        with self.assertRaisesRegex(ReviewerCustodyError, "closed"):
+            client(text, hashlib.sha256(text.encode()).hexdigest())
+        self.assertEqual(self.calls, [])
+
+    async def test_endpoint_control_characters_denied(self):
+        for url in ("https://reviewer.internal\n", " https://reviewer.internal",
+                    "https://reviewer.internal\t", "https://reviewer.internal/ "):
+            with self.subTest(url=url), self.assertRaises(ReviewerCustodyError):
+                SignedReviewerClient(base_url=url, trust_anchor=self.anchor, tls_context=self.context)
+
+    async def test_bad_attestation_input_denied(self):
+        client = self.make()
+        for payload in (b"", b"x" * 4097):
+            with self.assertRaises(ReviewerCustodyError):
+                await client.attest_challenge(payload)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class AsyncSignedReviewerTests(SignedReviewerTests):
+    async def test_async_signed_allow_and_deny(self):
+        client = self.make()
+        digest = hashlib.sha256(b"source").hexdigest()
+        self.assertIs((await client.review_async("source", digest)).allowed, True)
+        self.mode = "deny"
+        self.assertIs((await client.review_async("source", digest)).allowed, False)
+
+    async def test_async_review_wire_forgery_denied(self):
+        client = self.make()
+        digest = hashlib.sha256(b"source").hexdigest()
+        for mode in ("replay", "digest", "unsigned", "oversize", "redirect",
+                     "compressed", "declared_oversize", "duplicate", "nonfinite"):
+            self.mode = mode
+            with self.subTest(mode=mode), self.assertRaises(ReviewerCustodyError):
+                await client.review_async("source", digest)
+
+    async def test_stalled_async_stream_is_cancelled_on_total_deadline(self):
+        import asyncio
+        client = self.make()
+        await client._async.aclose()
+        client._timeout_seconds = 0.05
+        closed = asyncio.Event()
+
+        class Stall(httpx.AsyncByteStream):
+            async def __aiter__(self):
+                try:
+                    yield b"{"
+                    await asyncio.sleep(10)
+                finally:
+                    closed.set()
+            async def aclose(self):
+                closed.set()
+
+        async def respond(request):
+            return httpx.Response(200, stream=Stall())
+
+        client._async = httpx.AsyncClient(transport=httpx.MockTransport(respond))
+        with self.assertRaisesRegex(ReviewerCustodyError, "deadline"):
+            await client.review_async("source", hashlib.sha256(b"source").hexdigest())
+        self.assertTrue(closed.is_set())
+
+    async def test_external_cancel_propagates_and_releases_stream(self):
+        import asyncio
+        client = self.make()
+        await client._async.aclose()
+        entered, closed = asyncio.Event(), asyncio.Event()
+
+        class Stall(httpx.AsyncByteStream):
+            async def __aiter__(self):
+                try:
+                    entered.set()
+                    await asyncio.sleep(10)
+                    yield b"{}"
+                finally:
+                    closed.set()
+            async def aclose(self):
+                closed.set()
+
+        async def respond(request):
+            return httpx.Response(200, stream=Stall())
+
+        client._async = httpx.AsyncClient(transport=httpx.MockTransport(respond))
+        task = asyncio.create_task(client.review_async("source", hashlib.sha256(b"source").hexdigest()))
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        task.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await task
+        self.assertTrue(closed.is_set())

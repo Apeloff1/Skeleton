@@ -3,13 +3,15 @@
  * Legacy GameForge axes, quest option and answered beats are carried unmodified when
  * visiting Galaxy, and restored when returning. Galaxy matrices remain Galaxy-owned.
  */
-import { STEPS, reachable, type QuestionnaireState } from './questionnaire';
+import { STEPS, PLAYABLE_SLICES, reachable, type QuestionnaireState } from './questionnaire';
+import { GALAXY_PROFILE_SCHEMA, galaxyPrefill, normaliseGalaxyProfile, type GalaxyProfile } from './galaxyHandoff';
 import { DESIGN_AXES } from './instruments';
 import { GALAXY_CHOICES, mappedBriefGenre } from './galaxyGenres';
 import { GENRE_CHOICES } from './genreCatalog';
 
 export const CREATOR_BRIDGE_SCHEMA = 'skeleton.creator.handoff.v1' as const;
 export const CREATOR_BRIDGE_TTL_MS = 20 * 60 * 1000;
+export const CREATOR_BRIDGE_MAX_CHARS = 500_000;
 
 export type CreatorBridgeTarget = 'galaxy' | 'forge' | 'studio';
 export interface CreatorBridgeDraft {
@@ -26,9 +28,10 @@ export interface CreatorBridgeDraft {
   beats: Record<string, string>;
   instruments: Record<string, number>;
   galaxyGenre: string | null;
+  galaxyProfile?: GalaxyProfile | null;
   options: QuestionnaireState['options'];
   quest: { enabled: boolean; length: number };
-  playable: { enabled: boolean };
+  playable: { enabled: boolean; mode?: string; launch?: boolean };
   playtest: 'off' | 'auto' | 'require';
   sourceExport: { enabled: boolean };
 }
@@ -36,6 +39,7 @@ export interface GalaxyBridgeSelection {
   title: string;
   vision: string;
   genreId: string | null;
+  profile?: GalaxyProfile;
 }
 
 const availableGenres = new Set(GENRE_CHOICES);
@@ -103,6 +107,12 @@ export function parseCreatorBridge(
     }
   }
   const genre = typeof input.galaxyGenre === 'string' && galaxyIds.has(input.galaxyGenre) ? input.galaxyGenre : null;
+  let galaxyProfile: GalaxyProfile | null = null;
+  if (input.galaxyProfile != null) {
+    const envelope = record(input.galaxyProfile);
+    if (!envelope || envelope.schema !== GALAXY_PROFILE_SCHEMA) return null;
+    try { galaxyProfile = normaliseGalaxyProfile(envelope.config); } catch { return null; }
+  }
   const options = record(input.options) ?? {};
   const originalTarget = options.target === 'json' ? 'json' : 'godot';
   const archetype = typeof options.archetype === 'string' &&
@@ -114,15 +124,20 @@ export function parseCreatorBridge(
   const rawExport = record(input.sourceExport);
   const rawPlayable = record(input.playable);
   const rawQuest = record(input.quest);
+  if (rawPlayable && ((rawPlayable.mode !== undefined && !PLAYABLE_SLICES.some(x => x.id === rawPlayable.mode))
+      || (rawPlayable.launch !== undefined && typeof rawPlayable.launch !== 'boolean'))) return null;
+  if (rawPlayable?.launch && (rawPlayable.enabled !== true || rawQuest?.enabled === true)) return null;
   const length = rawQuest && Number.isInteger(rawQuest.length) &&
     (rawQuest.length as number) >= 1 && (rawQuest.length as number) <= 8 ? rawQuest.length as number : 3;
   return {
     schema: CREATOR_BRIDGE_SCHEMA, target, createdMs: input.createdMs,
     studioProjectId, studioProjectUpdatedAt,
-    step, vision, brief, beats, instruments, galaxyGenre: genre,
+    step, vision, brief, beats, instruments, galaxyGenre: genre, galaxyProfile,
     options: { archetype, target: originalTarget, era, generation },
     quest: { enabled: rawQuest?.enabled === true, length },
-    playable: { enabled: rawPlayable?.enabled === true },
+    playable: { enabled: rawPlayable?.enabled === true,
+      ...(typeof rawPlayable?.mode === 'string' ? { mode: rawPlayable.mode } : {}),
+      ...(typeof rawPlayable?.launch === 'boolean' ? { launch: rawPlayable.launch } : {}) },
     playtest,
     sourceExport: { enabled: rawExport?.enabled === true },
   };
@@ -140,7 +155,7 @@ export function handoffFromForge(
     studioProjectId: admittedOrigin?.studioProjectId ?? null,
     studioProjectUpdatedAt: admittedOrigin?.studioProjectUpdatedAt ?? null,
     step: state.step, vision: state.vision, brief: state.brief, beats: state.beats,
-    instruments: state.instruments, galaxyGenre: state.galaxyGenre,
+    instruments: state.instruments, galaxyGenre: state.galaxyGenre, galaxyProfile: state.galaxyProfile,
     options: state.options, quest: state.quest,
     playable: state.playable, playtest: state.playtest,
     sourceExport: state.sourceExport,
@@ -182,14 +197,16 @@ export function handoffFromGalaxy(
   } else if (canonicalToken && availableGenres.has(canonicalToken)) {
     brief.genre = canonicalToken;
   }
-  const vision = cleanText(selection.vision, 4000).trim() ||
+  const transferred = selection.profile ? galaxyPrefill(selection.profile) : null;
+  if (transferred && transferred.profile.config.genre !== selectedId) throw new Error('Galaxy profile genre does not match transfer selection');
+  const vision = transferred?.vision || cleanText(selection.vision, 4000).trim() ||
     cleanText(selection.title, 160).trim() || previous?.vision || '';
   const raw = {
     schema: CREATOR_BRIDGE_SCHEMA, target: 'forge', createdMs: now,
     studioProjectId: previous?.studioProjectId ?? null,
     studioProjectUpdatedAt: previous?.studioProjectUpdatedAt ?? null,
-    step: previous?.step ?? 'brief', vision, brief, beats: previous?.beats ?? {}, instruments: previous?.instruments ?? {},
-    galaxyGenre: genre, options: previous?.options ?? { archetype: 'auto', target: 'godot', era: null, generation: null },
+    step: transferred ? 'options' : previous?.step ?? 'brief', vision, brief, beats: previous?.beats ?? {}, instruments: { ...transferred?.axes, ...previous?.instruments },
+    galaxyGenre: genre, galaxyProfile: transferred?.profile ?? (selectedId ? null : previous?.galaxyProfile ?? null), options: previous?.options ?? { archetype: 'auto', target: 'godot', era: null, generation: null },
     quest: previous?.quest ?? { enabled: false, length: 3 },
     playable: previous?.playable ?? { enabled: false },
     playtest: previous?.playtest ?? 'off',
@@ -205,7 +222,7 @@ export function forgeStateFromHandoff(raw: CreatorBridgeDraft, now: number = Dat
   if (!draft) return null;
   const restored: QuestionnaireState = {
     step: draft.step, vision: draft.vision, brief: draft.brief, beats: draft.beats,
-    instruments: draft.instruments, galaxyGenre: draft.galaxyGenre,
+    instruments: draft.instruments, galaxyGenre: draft.galaxyGenre, galaxyProfile: draft.galaxyProfile,
     options: draft.options, quest: draft.quest,
     playable: draft.playable,
     playtest: draft.playtest,

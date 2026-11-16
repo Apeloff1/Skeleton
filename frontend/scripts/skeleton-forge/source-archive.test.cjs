@@ -154,3 +154,71 @@ test('run panel only reveals the local share action for a successful, prepared s
   assert.match(code, /Sharing\.shareAsync\(/);
   assert.match(code, /owner|stillCurrent/);
 });
+
+
+test('portable ZIP rejects file-directory and case-aliased parent conflicts', () => {
+  for (const [a,b] of [['assets','assets/child.txt'], ['Assets/a.txt','assets/b.txt'],
+    ['Assets','assets/nested/file.txt'], ['assets/deep','assets/deep/x.txt']]) {
+    assert.throws(() => Archive.buildGodotSourceArchive(fixture({
+      'project.godot': 'config_version=5', [a]: 'first', [b]: 'second',
+    })), /collision|Case-colliding/);
+  }
+});
+test('share custody snapshots files before async hashing and deletes only owned cache files', () => {
+  const code = fs.readFileSync(path.resolve(__dirname, '../../src/skeletonForge/shareSourceArchive.ts'), 'utf8');
+  assert.match(code, /Object.freeze\(\{ \.\.\.payload.files!/);
+  assert.match(code, /Object.freeze\(\{ \.\.\.payload.source_manifest!.files!/);
+  assert.ok(code.indexOf('Object.freeze(') < code.indexOf("await import('expo-crypto')"));
+  assert.match(code, /if \(created && file.exists\) file.delete\(\)/);
+});
+
+
+test('export snapshot is the same input used for ZIP construction and hashing', () => {
+  const code = fs.readFileSync(path.resolve(__dirname, '../../src/skeletonForge/shareSourceArchive.ts'), 'utf8');
+  assert.ok(code.indexOf('const files = Object.freeze') < code.indexOf('buildGodotSourceArchive(snapshot)'));
+  assert.match(code, /source_manifest: \{ \.\.\.payload.source_manifest, files: expected \}/);
+  assert.match(code, /Crypto.digestStringAsync\(digest, files\[path\]\)/);
+});
+test('export lifecycle fences unmount, account rotation and stale failure callbacks', () => {
+  const code = fs.readFileSync(path.resolve(__dirname, '../../src/skeletonForge/components/ForgeCockpitScreen.tsx'), 'utf8');
+  assert.match(code, /subscribeAuthChanges\(\(\) => \{/);
+  assert.match(code, /runOwnerEpoch.current = null/);
+  assert.match(code, /exportMounted.current = false/);
+  assert.match(code, /const current = \(\) => exportMounted.current && ownerEpoch === getAuthEpoch\(\)/);
+  assert.match(code, /if \(!current\(\)\) return;\s+const message/);
+});
+
+
+test('portable export exposes its full independently retainable source identity', () => {
+  const p = fixture();
+  const html = render(h(Panel, { phase: 'done', payload: p }));
+  assert.match(html, /data-testid="run-full-source-digest"/);
+  assert.ok(text(html).includes(p.source_manifest.sha256));
+  assert.match(text(html), /verify or reopen the ZIP later/);
+});
+
+test('portable playable source requires the exact new receipt and project startup', () => {
+  const mode = 'puzzle';
+  const scene = 'scenes/archetypes/puzzle/main.tscn';
+  const launcher = 'scripts/autoloads/playable_portal.gd';
+  const native = [scene, 'scripts/archetypes/puzzle/player_controller.gd',
+    'scripts/archetypes/puzzle/core_loop.gd', launcher, 'project.godot'];
+  const p = fixture({
+    'project.godot': 'config_version=5\nrun/main_scene="res://scenes/archetypes/puzzle/main.tscn"\n',
+    [scene]: '[gd_scene load_steps=1 format=3]\n',
+    [native[1]]: 'extends CharacterBody2D\n',
+    [native[2]]: 'extends Node2D\n',
+    [launcher]: 'extends CanvasLayer\n',
+  });
+  p.forge.playable_archetype = mode;
+  assert.throws(() => Archive.buildGodotSourceArchive(p), /playable source receipt/);
+  const subset = Object.fromEntries(native.sort().map(path => [path, p.source_manifest.files[path]]));
+  p.playable_source = { schema: 'skeleton.gameforge.playable_source.v2', mode, scene: 'res://' + scene,
+    launch_scene: 'res://' + scene, launcher, source_files: subset,
+    source_sha256: SHA(JSON.stringify(subset)), native_execution_qualified: false };
+  assert.equal(Archive.buildGodotSourceArchive(p).fileCount, 5);
+  for (const patch of [{mode: 'racing'}, {native_execution_qualified: true}, {launch_scene: null},
+    {source_files: {...subset, 'project.godot': 'f'.repeat(64)}}]) {
+    assert.throws(() => Archive.buildGodotSourceArchive({...p, playable_source: {...p.playable_source, ...patch}}), /playable/);
+  }
+});

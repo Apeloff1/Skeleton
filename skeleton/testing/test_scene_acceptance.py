@@ -62,7 +62,7 @@ def test_tiny_search_budget_is_inconclusive_not_failed() -> None:
     ("report_digest", "0" * 64),
     ("release_qualified", True),
     ("holds", []),
-    ("ending_proofs", {}),
+    ("ending_proofs", {"won": {"phase": "won"}}),
     ("victory_route", {}),
 ])
 def test_tampered_report_is_never_trusted(field, change) -> None:
@@ -72,6 +72,37 @@ def test_tampered_report_is_never_trusted(field, change) -> None:
     forged[field] = change
     assert forged != report, "tamper regression must alter actual evidence"
     with pytest.raises(SceneTravelError):
+        verify_acceptance(forged)
+
+
+@pytest.mark.parametrize("field,change", [
+    ("release_qualified", 0),
+    ("state_budget", 1024.0),
+    ("depth_budget", 64.0),
+])
+def test_numeric_aliases_do_not_verify_as_canonical_evidence(field, change) -> None:
+    world, _ = original_demo()
+    original = accept_scene(world)
+    forged = copy.deepcopy(original)
+    forged[field] = change
+    assert forged == original  # Python equality alone is insufficient.
+    with pytest.raises(SceneTravelError):
+        verify_acceptance(forged)
+
+
+def test_nested_boolean_alias_and_oversized_report_rejected() -> None:
+    from skeleton.game.gameplay.scene_acceptance import MAX_REPORT_BYTES
+
+    world, _ = original_demo()
+    original = accept_scene(world, max_states=1)
+    forged = copy.deepcopy(original)
+    forged["audit"]["budget_exhausted"] = 1
+    assert forged == original
+    with pytest.raises(SceneTravelError, match="proof mismatch"):
+        verify_acceptance(forged)
+    forged = copy.deepcopy(original)
+    forged["holds"] = ["x" * MAX_REPORT_BYTES]
+    with pytest.raises(SceneTravelError, match="budget"):
         verify_acceptance(forged)
 
 

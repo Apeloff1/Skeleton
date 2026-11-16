@@ -6,11 +6,11 @@
   "objective": "Measure Python program interpretation and finite logical inference python_trace case 15",
   "steps": [
     {
-      "prompt": "Mentally run this Python 3 program without executing external code. Return exactly what the print call emits on one line. Program:\ntext = \"planet\"\nprint(text[2:5])",
+      "prompt": "Mentally run this Python 3 program without executing external code. Return exactly what the print call emits on one line. Program:\ntext = \"harbor\"\nprint(text[-4:-1])",
       "checks": [
         {
           "kind": "exact",
-          "expected": "ane"
+          "expected": "rbo"
         }
       ],
       "intermediate": false

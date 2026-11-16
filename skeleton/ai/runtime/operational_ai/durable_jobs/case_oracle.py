@@ -40,7 +40,7 @@ def make_spec(name:str="job_1",*,owner:JobIdentity=OWNER,
               request_id:str|None=None,question:str="Explain this text.",
               created_ms:int=1000,expires_ms:int=10000,
               priority:int=0,dependencies:tuple=())->JobSpec:
-    return JobSpec(name,request_id or name,owner,question,
+    return JobSpec(name,name if request_id is None else request_id,owner,question,
                    created_ms,expires_ms,priority,dependencies)
 
 
@@ -48,10 +48,10 @@ def make_result(spec:JobSpec,*,text:str="Real service fixture receipt.",
                 output_sha:str|None=None,model_sha:str|None=None,
                 tokenizer_sha:str|None=None,request_id:str|None=None,
                 output_tokens:int=8)->JobResult:
-    return JobResult(text,output_sha or sha256(text.encode("utf-8")),
-                     model_sha or spec.owner.model_sha256,
-                     tokenizer_sha or spec.owner.tokenizer_sha256,
-                     11,output_tokens,request_id or spec.request_id)
+    return JobResult(text,sha256(text.encode("utf-8")) if output_sha is None else output_sha,
+                     spec.owner.model_sha256 if model_sha is None else model_sha,
+                     spec.owner.tokenizer_sha256 if tokenizer_sha is None else tokenizer_sha,
+                     11,output_tokens,spec.request_id if request_id is None else request_id)
 
 
 def _do(domain:str,p:dict[str,Any])->dict:
@@ -81,7 +81,9 @@ def _do(domain:str,p:dict[str,Any])->dict:
         return {"state":view["state"]}
 
     if domain=="submission":
-        store=make_store()
+        # Exercise the intrinsic one-hour JobSpec ceiling; policy-specific
+        # deadline restrictions are covered independently by real store tests.
+        store=make_store(WorkLimits(deadline_ms=3600000))
         spec=make_spec(
             name=p["job_id"],request_id=p["request_id"],
             question=p["question"],created_ms=p["created_ms"],expires_ms=p["expires_ms"],
@@ -133,7 +135,7 @@ def _do(domain:str,p:dict[str,Any])->dict:
             tokenizer_sha=p["tokenizer_sha"],request_id=p["request_id"],
             output_tokens=p["generated_tokens"],
         )
-        result=replace(result,output_sha256=p["output_sha"]) if p["output_sha"] else result
+        result=replace(result,output_sha256=p["output_sha"]) if p["output_sha"] is not None else result
         committed=store.finish(claim,result,now_ms=p["now_ms"])
         if p["repeat"]:
             committed=store.finish(claim,result,now_ms=p["now_ms"])

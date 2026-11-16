@@ -9,7 +9,7 @@ tombstone semantics. Derived vector/graph indexes may rebuild from this state.
 from __future__ import annotations
 
 from skeleton.persistence.mongo_source_epoch import (
-    fence_memory_commit, fence_memory_tombstone,
+    fence_memory_commit, fence_memory_tombstone, configured_canonical_epoch,
 )
 
 from dataclasses import dataclass
@@ -1087,7 +1087,7 @@ class MongoMemoryRepository:
 
     def _require_canonical_writer(self, *, tenant_id: str, actor_id: str) -> None:
         """Require the actor-scoped epoch for internal Mongo source mutations."""
-        epoch = self.canonical_source_epoch
+        epoch = configured_canonical_epoch(self)
         if epoch is not None:
             epoch.require_actor_writer(tenant_id=tenant_id, actor_id=actor_id)
 

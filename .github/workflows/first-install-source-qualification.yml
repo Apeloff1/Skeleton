@@ -67,9 +67,116 @@ jobs:
             skeleton/testing/test_app_offline_install_reconciliation.py \
             skeleton/testing/test_first_install_required_routes.py \
             skeleton/testing/test_windows_installer.py
+      - name: Qualify guarded Mongo observation and deployed-source scope custody
+        run: |
+          python -m pytest -q --maxfail=1 \
+            skeleton/testing/test_compose_authentication_boundary_regression.py \
+            skeleton/testing/test_compose_explicit_null_role_boundary.py \
+            skeleton/testing/test_compose_final_observation_custody.py \
+            skeleton/testing/test_compose_guarded_preflight.py \
+            skeleton/testing/test_compose_hello_message_boundary.py \
+            skeleton/testing/test_compose_load_balanced_authority.py \
+            skeleton/testing/test_compose_mongo_first_run_status.py \
+            skeleton/testing/test_compose_mongo_topology_custody.py \
+            skeleton/testing/test_compose_null_primary_role_boundary.py \
+            skeleton/testing/test_compose_null_proxy_authority.py \
+            skeleton/testing/test_compose_null_topology_authority.py \
+            skeleton/testing/test_compose_primary_membership_regression.py \
+            skeleton/testing/test_compose_primary_topology_scalar_boundaries.py \
+            skeleton/testing/test_compose_router_ghost_topology_fencing.py \
+            skeleton/testing/test_compose_terminal_authority_failures.py \
+            skeleton/testing/test_compose_terminal_topology.py \
+            skeleton/testing/test_guarded_mongo_operator.py
+      - name: Qualify canonical Mongo epoch CAS and failure custody
+        run: |
+          python -m pytest -q -p pytest_asyncio.plugin --maxfail=1 \
+            skeleton/testing/test_mongo_source_epoch.py \
+            skeleton/testing/test_mongo_epoch_operator_approval.py \
+            skeleton/testing/test_mongo_memento_repository.py \
+            skeleton/testing/test_sealed_memento_witness.py
+      - name: Qualify signed reviewer custody and guarded activation
+        run: |
+          python -m pytest -q --maxfail=1 \
+            skeleton/testing/test_compose_activation_role_custody.py \
+            skeleton/testing/test_compose_guarded_activation.py \
+            skeleton/testing/test_compose_guarded_service.py \
+            skeleton/testing/test_compose_missing_role_inventory.py \
+            skeleton/testing/test_compose_revocation_window_regression.py \
+            skeleton/testing/test_reviewer_custody.py \
+            skeleton/testing/test_signed_reviewer_client.py
+      - name: Qualify exact loaded-backend guard factory
+        run: |
+          python -m pytest -q --maxfail=1 \
+            skeleton/testing/test_native_guard_binding.py \
+            skeleton/testing/test_guarded_backend_component_factory.py \
+            skeleton/testing/test_trusted_native_startup.py
+      - name: Qualify exact GGUF binary protocol and host custody
+        run: python -m pytest -q --maxfail=1 skeleton/testing/test_gguf_token_bridge.py
+      - name: Qualify sticky canonical writer binding
+        run: python -m pytest -q --maxfail=1 skeleton/testing/test_sticky_canonical_writer.py skeleton/testing/test_canonical_writer_cutover.py
+      - name: Qualify strict first-install live identity and recovery boundaries
+        run: python -m pytest -q --maxfail=1 skeleton/testing/test_strict_install_qualification.py
+      - name: Qualify Chroma isolated fixture ownership and persistence receipt boundaries
+        run: python -m pytest -q --maxfail=1 skeleton/testing/test_chroma_persistence_qualification.py
+      - name: Qualify signed Chroma recovery staging and independent source custody
+        run: python -m pytest -q --maxfail=1 skeleton/testing/test_chroma_recovery_stage.py
+      - name: Qualify signed co-hosted native startup lifecycle
+        run: python -m pytest -q --maxfail=1 skeleton/testing/test_protected_stack.py
+      - name: Qualify persistent installer intent and interrupted recovery custody
+        run: python -m pytest -q --maxfail=1 skeleton/testing/test_install_session.py
+      - name: Qualify fresh durable Chroma provision and preserved-resource recovery
+        run: python -m pytest -q --maxfail=1 skeleton/testing/test_provision_fresh_chroma.py
+      - name: Qualify reviewed image archive, approval and running identity boundaries
+        run: python -m pytest -q --maxfail=1 skeleton/testing/test_qualify_first_install_images.py
       - name: Verify construction and provider-owner contracts
         run: |
           python scripts/check_architecture_map.py
           python scripts/check_ai_app_construction.py
           python scripts/check_capability_interfaces.py
           python scripts/check_provider_bootstrap.py
+
+  exact_gguf_bridge_compile:
+    name: Exact-head CPU GGUF bridge compile and malformed-frame qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact candidate without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify exact candidate identity
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Checkout reviewed upstream llama.cpp source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ggml-org/llama.cpp
+          ref: d81235049384534c167caea52b85a694f6103d14
+          path: .qualification/llama.cpp
+          persist-credentials: false
+      - name: Compile CPU-only token bridge against exact upstream
+        run: |
+          set -eu
+          test "$(git -C .qualification/llama.cpp rev-parse HEAD)" = d81235049384534c167caea52b85a694f6103d14
+          cmake -S scripts/native/gguf_token_bridge -B "$RUNNER_TEMP/gguf-bridge-build" -DLLAMA_CPP_SOURCE="$GITHUB_WORKSPACE/.qualification/llama.cpp" -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$RUNNER_TEMP/gguf-bridge-build" --target skeleton-gguf-token-bridge --parallel 2
+      - name: Reject malformed native invocation and frame without model loading
+        run: |
+          set -eu
+          bridge="$RUNNER_TEMP/gguf-bridge-build/skeleton-gguf-token-bridge"
+          work="$(mktemp -d)"
+          trap 'rm -rf -- "$work"' EXIT
+          status=0
+          "$bridge" > "$work/stdout" 2> "$work/stderr" || status=$?
+          test "$status" -eq 2
+          test ! -s "$work/stdout"
+          printf 'BAD!' > "$work/input"
+          status=0
+          "$bridge" encode "$work/nonexistent.gguf" "$work/input" "$work/output" 128 1 1 0 > "$work/stdout" 2> "$work/stderr" || status=$?
+          test "$status" -eq 2
+          test ! -e "$work/output"
+          test ! -s "$work/stdout"
+          sha256sum "$bridge"
+          echo "Compile and malformed-input evidence only; no model inference or device acceptance."

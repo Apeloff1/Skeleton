@@ -1,0 +1,51 @@
+# Candidate systemd unit. Install manually under independent administration.
+# No app filesystem, Mongo credential, model directory or signer private key
+# is embedded in this unit. Do not enable until operator preflight passes.
+[Unit]
+Description=Skeleton independent exact-policy reviewer
+After=network-online.target
+Wants=network-online.target
+ConditionPathIsDirectory=/opt/skeleton-reviewer
+ConditionPathExists=/etc/skeleton-reviewer/operator.env
+
+[Service]
+Type=simple
+User=skeleton-reviewer
+Group=skeleton-reviewer
+WorkingDirectory=/opt/skeleton-reviewer
+EnvironmentFile=/etc/skeleton-reviewer/operator.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONNOUSERSITE=1
+ExecStartPre=/opt/skeleton-reviewer/venv/bin/python -m scripts.serve_independent_reviewer --validate-only --bind ${REVIEWER_BIND} --port ${REVIEWER_PORT} --policy /etc/skeleton-reviewer/policy.json --policy-sha256 ${REVIEWER_POLICY_SHA256} --signing-key /etc/skeleton-reviewer/signer.raw --signer-public-key-sha256 ${REVIEWER_SIGNER_SHA256} --tls-cert /etc/skeleton-reviewer/server.pem --tls-cert-sha256 ${REVIEWER_CERT_SHA256} --tls-key /etc/skeleton-reviewer/server.key --client-ca /etc/skeleton-reviewer/client-ca.pem --client-ca-sha256 ${REVIEWER_CA_SHA256} --replay-database /var/lib/skeleton-reviewer/replay.sqlite3 --replay-ledger-id ${REVIEWER_LEDGER_ID}
+ExecStart=/opt/skeleton-reviewer/venv/bin/python -m scripts.serve_independent_reviewer --bind ${REVIEWER_BIND} --port ${REVIEWER_PORT} --policy /etc/skeleton-reviewer/policy.json --policy-sha256 ${REVIEWER_POLICY_SHA256} --signing-key /etc/skeleton-reviewer/signer.raw --signer-public-key-sha256 ${REVIEWER_SIGNER_SHA256} --tls-cert /etc/skeleton-reviewer/server.pem --tls-cert-sha256 ${REVIEWER_CERT_SHA256} --tls-key /etc/skeleton-reviewer/server.key --client-ca /etc/skeleton-reviewer/client-ca.pem --client-ca-sha256 ${REVIEWER_CA_SHA256} --replay-database /var/lib/skeleton-reviewer/replay.sqlite3 --replay-ledger-id ${REVIEWER_LEDGER_ID}
+StateDirectory=skeleton-reviewer
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_UNIX
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/var/lib/skeleton-reviewer
+LimitCORE=0
+LimitNOFILE=128
+TasksMax=40
+MemoryMax=256M
+CPUQuota=200%
+TimeoutStopSec=20
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

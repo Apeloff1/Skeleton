@@ -218,6 +218,8 @@ def test_installer_skip_python_runs_bounded_validation(tmp_path, monkeypatch):
     commands = []
 
     def runner(command, **kwargs):
+        if command[1] in {"volume", "ps"}:
+            return subprocess.CompletedProcess(command, 0)
         commands.append(tuple(command))
         return subprocess.CompletedProcess(command, 0, stdout="valid\n", stderr="")
 
@@ -275,7 +277,11 @@ def test_setup_preserves_external_mongo_when_local_credentials_are_repaired(tmp_
 
 
 def test_installer_validates_compose_with_start_mode_environment(tmp_path, monkeypatch):
+    (tmp_path / ".env").write_text("FRONTEND_PORT=3000\n", encoding="utf-8")
     monkeypatch.setenv("COMPOSE_REMOVE_ORPHANS", "1")
+    monkeypatch.setenv("COMPOSE_ENV_FILES", "external.env")
+    monkeypatch.setenv("COMPOSE_DISABLE_ENV_FILE", "1")
+    monkeypatch.setenv("COMPOSE_PROFILES", "full")
     report = PreloadReport(
         root=tmp_path,
         platform="test",
@@ -304,6 +310,10 @@ def test_installer_validates_compose_with_start_mode_environment(tmp_path, monke
     assert env["FRONTEND_CONTAINER_PORT"] == "8080"
     assert env["NODE_ENV"] == "production"
     assert env["COMPOSE_REMOVE_ORPHANS"] == "0"
+    assert env["COMPOSE_DISABLE_ENV_FILE"] == "0"
+    assert env["COMPOSE_PROFILES"] == ""
+    assert "COMPOSE_ENV_FILES" not in env
+    assert command[-4:-2] == ("--env-file", ".env")
 
 @pytest.mark.parametrize(
     ("host", "srv"),
@@ -429,6 +439,9 @@ def test_generic_secret_rotation_keeps_persistent_mongodb_credentials(tmp_path):
 
 
 def test_first_install_build_output_is_discarded_instead_of_retained_in_memory(tmp_path, monkeypatch):
+    from skeleton.app.compose_storage_binding import BindingReport
+    monkeypatch.setattr("skeleton.app.compose_storage_binding.observe_binding",
+                        lambda *a,**k: BindingReport(True,True,"fixture"))
     from skeleton.app.installer import install_application
 
     (tmp_path / ".env").write_text("FRONTEND_PORT=3000\n", encoding="utf-8")
@@ -487,9 +500,12 @@ def test_first_install_build_output_is_discarded_instead_of_retained_in_memory(t
 def test_clean_first_install_checks_critical_routes_on_default_and_custom_ports(
     tmp_path, monkeypatch, env_text, expected_backend_url
 ):
+    from skeleton.app.compose_storage_binding import BindingReport
+    monkeypatch.setattr("skeleton.app.compose_storage_binding.observe_binding",
+                        lambda *a,**k: BindingReport(True,True,"fixture"))
     """Healthy first startup must not crash when no explicit port override exists."""
 
-    from skeleton.app.health import ProbeResult
+    from skeleton.testing.app_health_fixtures import fixture_probes
 
     # A clean .env.example does not declare any public host port overrides.
     # Keep ambient developer/CI ports from changing that first-install case.
@@ -515,9 +531,7 @@ def test_clean_first_install_checks_critical_routes_on_default_and_custom_ports(
     )
     monkeypatch.setattr(
         "skeleton.app.health.wait_for_application",
-        lambda **kwargs: (
-            ProbeResult("backend", expected_backend_url, True, 200, "healthy"),
-        ),
+        lambda **kwargs: fixture_probes(**kwargs),
     )
     observed_urls = []
 
@@ -662,3 +676,339 @@ def test_setup_invalid_existing_signer_is_visible_in_install_receipt(tmp_path):
     receipt = _setup_phase(result)
     assert "GF_KEYHOLDER_SEED must be exactly 32 bytes" in receipt.detail
     assert "invalid-operator-seed" not in receipt.detail
+
+
+
+def test_atomic_env_staging_is_inside_both_new_and_legacy_privacy_fences(tmp_path, monkeypatch):
+    import os
+    from skeleton.app import setup_runtime
+
+    destination = tmp_path / ".env"
+    destination.write_text("PRIVATE_VALUE=original\n", encoding="utf-8")
+    original_replace = os.replace
+    observed = []
+
+    def checked_replace(source, target):
+        from pathlib import Path
+        source = Path(source)
+        observed.append(source.name)
+        assert source.name.startswith(".env.")
+        assert not source.name.startswith("..env.")
+        assert source.name.endswith(".tmp")
+        return original_replace(source, target)
+
+    monkeypatch.setattr(os, "replace", checked_replace)
+    setup_runtime._atomic_write(destination, "PRIVATE_VALUE=fixture\n")
+    assert len(observed) == 1
+    assert destination.read_text() == "PRIVATE_VALUE=fixture\n"
+    assert list(tmp_path.iterdir()) == [destination]
+
+
+def test_existing_runtime_read_rejects_same_inode_content_mutation(tmp_path, monkeypatch):
+    import os
+    from skeleton.app import setup_runtime
+
+    source = tmp_path / ".env"
+    source.write_text("VALUE=first\n")
+    if os.name != "nt":
+        source.chmod(0o600)
+    actual_fdopen = os.fdopen
+
+    class MutatingReader:
+        def __init__(self, fd, mode):
+            self.handle = actual_fdopen(fd, mode)
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            self.handle.close()
+        def fileno(self):
+            return self.handle.fileno()
+        def read(self, size):
+            result = self.handle.read(size)
+            source.write_text("VALUE=other\n")
+            # Force a distinguishable metadata epoch even on coarse clocks.
+            info = source.stat()
+            os.utime(source, ns=(info.st_atime_ns, info.st_mtime_ns + 2_000_000_000))
+            return result
+
+    monkeypatch.setattr(os, "fdopen", MutatingReader)
+    with pytest.raises(ValueError, match="identity changed"):
+        setup_runtime._read_existing_env(source)
+
+
+def test_private_runtime_read_preserves_inode_and_repairs_mode(tmp_path):
+    import os
+    from skeleton.app import setup_runtime
+    if os.name == "nt":
+        pytest.skip("POSIX file mode")
+    source = tmp_path / ".env"
+    source.write_text("VALUE=stable\n")
+    source.chmod(0o644)
+    before = source.stat()
+    text, repaired = setup_runtime._read_existing_env(source, private=True)
+    assert (text, repaired) == ("VALUE=stable\n", True)
+    after = source.stat()
+    assert before.st_ino == after.st_ino
+    assert after.st_mode & 0o777 == 0o600
+
+
+
+def test_setup_does_not_publish_generated_configuration_over_read_limit(tmp_path, monkeypatch):
+    from skeleton.app import setup_runtime
+    destination = tmp_path / ".env"
+    # Valid input within the bound; adding the missing runtime secrets would
+    # exceed it. Setup must preserve the source and avoid model provisioning.
+    text = "# " + "x" * (256 * 1024 - 4) + "\n"
+    destination.write_text(text, encoding="utf-8")
+    def forbidden(*args, **kwargs):
+        pytest.fail("invalid configuration must not prepare the model directory")
+    monkeypatch.setattr(setup_runtime, "_prepare_model_directory", forbidden)
+    with pytest.raises(ValueError, match="256 KiB"):
+        setup_runtime.ensure_runtime_environment(tmp_path)
+    assert destination.read_text(encoding="utf-8") == text
+
+
+@pytest.mark.parametrize("text", ["VALUE=one\x00two\n", 'VALUE="unfinished\n',
+                                  "COMMENT=" + "x" * (256 * 1024)])
+def test_atomic_write_refuses_unreadable_runtime_before_staging(tmp_path, text):
+    from skeleton.app import setup_runtime
+    destination = tmp_path / ".env"
+    destination.write_text("VALUE=original\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="runtime .env"):
+        setup_runtime._atomic_write(destination, text)
+    assert destination.read_text(encoding="utf-8") == "VALUE=original\n"
+    assert list(tmp_path.iterdir()) == [destination]
+
+
+
+@pytest.mark.parametrize("mutation", ["replace", "inplace", "delete", "create"])
+def test_setup_never_overwrites_observed_concurrent_operator_edit(tmp_path, monkeypatch, mutation):
+    import os
+    from skeleton.app import setup_runtime as setup
+    destination = tmp_path / ".env"
+    original = "JWT_SECRET=initial-fixture\n"
+    changed = "JWT_SECRET=operator-owned-new-fixture\n"
+    if mutation != "create":
+        destination.write_text(original)
+    def concurrent_change(root, values):
+        if mutation == "replace":
+            replacement = tmp_path / "replacement"
+            replacement.write_text(changed)
+            os.replace(replacement, destination)
+        elif mutation == "delete":
+            destination.unlink()
+        else:
+            destination.write_text(changed)
+        return False
+    monkeypatch.setattr(setup, "_prepare_model_directory", concurrent_change)
+    with pytest.raises(ValueError, match="changed since admission"):
+        setup.ensure_runtime_environment(tmp_path)
+    if mutation == "delete":
+        assert not destination.exists()
+    else:
+        assert destination.read_text() == changed
+    assert not list(tmp_path.glob(".env.*.tmp"))
+
+
+def test_atomic_first_creation_does_not_replace_concurrent_file_at_publication(tmp_path, monkeypatch):
+    import os
+    from skeleton.app import setup_runtime as setup
+    destination = tmp_path / ".env"
+    if os.name == "nt":
+        original = os.rename
+        def competing(source, target):
+            destination.write_text("VALUE=operator\n")
+            return original(source, target)
+        monkeypatch.setattr(os, "rename", competing)
+    else:
+        original = os.link
+        def competing(source, target, **kwargs):
+            destination.write_text("VALUE=operator\n")
+            return original(source, target, **kwargs)
+        monkeypatch.setattr(os, "link", competing)
+    with pytest.raises(FileExistsError):
+        setup._atomic_write(destination, "VALUE=generated\n", expected_stamp=None)
+    assert destination.read_text() == "VALUE=operator\n"
+    assert not list(tmp_path.glob(".env.*.tmp"))
+
+
+def test_atomic_staging_revalidates_existing_destination_after_fsync(tmp_path, monkeypatch):
+    import os
+    from skeleton.app import setup_runtime as setup
+    destination = tmp_path / ".env"
+    destination.write_text("VALUE=original\n")
+    original = os.fsync
+    changed = False
+    def mutate(fd):
+        nonlocal changed
+        original(fd)
+        if not changed:
+            changed = True
+            destination.write_text("VALUE=operator\n")
+    monkeypatch.setattr(os, "fsync", mutate)
+    with pytest.raises(ValueError, match="changed since admission"):
+        setup._atomic_write(destination, "VALUE=generated\n")
+    assert destination.read_text() == "VALUE=operator\n"
+    assert not list(tmp_path.glob(".env.*.tmp"))
+
+
+def test_atomic_first_publication_leaves_single_private_inode(tmp_path):
+    import os
+    from skeleton.app import setup_runtime as setup
+    destination = tmp_path / ".env"
+    setup._atomic_write(destination, "VALUE=complete\n", expected_stamp=None)
+    assert destination.read_bytes() == b"VALUE=complete\n"
+    assert list(tmp_path.iterdir()) == [destination]
+    if os.name != "nt":
+        assert destination.stat().st_nlink == 1
+        assert destination.stat().st_mode & 0o777 == 0o600
+
+
+def test_admin_password_rejects_same_inode_mutation_during_read(tmp_path, monkeypatch):
+    import os
+    from skeleton.app import setup_runtime as setup
+    path = tmp_path / "password"
+    path.write_text("original-password-1234\n")
+    path.chmod(0o600)
+    original = os.fdopen
+    class Reader:
+        def __init__(self,fd,mode):
+            self.handle=original(fd,mode)
+        def __enter__(self):
+            return self
+        def __exit__(self,*args):
+            self.handle.close()
+        def fileno(self):
+            return self.handle.fileno()
+        def read(self,size):
+            old=self.handle.read(size)
+            path.write_text("modified-password-1234\n")
+            current=path.stat()
+            os.utime(path,ns=(current.st_atime_ns,current.st_mtime_ns+2_000_000_000))
+            return old
+    monkeypatch.setattr(os,"fdopen",Reader)
+    with pytest.raises(ValueError,match="identity changed"):
+        setup._operator_admin("owner@example.invalid",path)
+
+
+
+@pytest.mark.parametrize("query",["replicaSet=rs0&authSource=admin","authSource=other","tls=true"])
+def test_setup_never_rewrites_explicit_local_mongo_topology(tmp_path,query):
+    uri=_test_mongo_uri("admin","fixture-old","mongo:27017","tutolage")+"?"+query
+    env=tmp_path/".env"
+    env.write_text("MONGO_INITDB_ROOT_PASSWORD=stable-root-fixture\nMONGO_URL="+uri+"\n")
+    ensure_runtime_environment(tmp_path)
+    assert _read_values(env)["MONGO_URL"]==uri
+
+
+def test_guard_refusal_preserves_original_persistent_configuration(tmp_path):
+    from skeleton.app.storage_custody import StorageCustodyDenied
+    env=tmp_path/".env"
+    original="MONGO_INITDB_ROOT_PASSWORD=stable-root-fixture\nGF_KEYHOLDER_SEED=\n"
+    env.write_text(original)
+    def deny():
+        raise StorageCustodyDenied("Existing application storage detected")
+    with pytest.raises(StorageCustodyDenied):
+        ensure_runtime_environment(tmp_path,storage_guard=deny)
+    assert env.read_text()==original
+    assert not (tmp_path/"data"/"local-ai").exists()
+
+
+def test_fresh_setup_guard_runs_before_private_publication(tmp_path):
+    calls=[]
+    def guard():
+        assert not (tmp_path/".env").exists()
+        assert not (tmp_path/"data"/"local-ai").exists()
+        calls.append("observed")
+    result=ensure_runtime_environment(tmp_path,storage_guard=guard)
+    assert result.created and calls==["observed"]
+    ensure_runtime_environment(tmp_path,storage_guard=lambda:pytest.fail("stable secrets regenerated"))
+
+
+def test_install_blocks_storage_conflict_before_compose_or_new_credentials(tmp_path,monkeypatch):
+    from skeleton.app.storage_custody import StorageCustodyDenied
+    report=PreloadReport(tmp_path,"test","3.11",(PreloadCheck("host:ready",True,"ready"),))
+    monkeypatch.setattr("skeleton.app.installer.inspect_host",lambda *a,**k:report)
+    def runner(command,**kwargs):
+        assert command[1] in {"volume","ps"}
+        if command[1]=="volume" and "--filter" not in command:
+            kwargs["stdout"].write(b"old_install_mongo_data\n")
+        return subprocess.CompletedProcess(command,0)
+    receipt=install_application(tmp_path,start=True,install_python=False,runner=runner)
+    assert not receipt.ok and receipt.phases[-1].name=="setup-runtime"
+    assert "Existing application storage" in receipt.phases[-1].detail
+    assert not (tmp_path/".env").exists()
+
+
+
+def test_setup_environment_guard_runs_before_storage_and_publication(tmp_path):
+    from skeleton.app.storage_custody import require_persistent_environment, StorageCustodyDenied
+    with pytest.raises(StorageCustodyDenied,match="GF_SEAL_SECRET"):
+        ensure_runtime_environment(
+            tmp_path, storage_guard=lambda:pytest.fail("conflicting identity reached Docker"),
+            environment_guard=lambda stored:require_persistent_environment(stored,{"GF_SEAL_SECRET":"other"}),
+        )
+    assert not (tmp_path/".env").exists()
+    assert not (tmp_path/"data"/"local-ai").exists()
+
+
+def test_installer_external_identity_override_denied_even_with_valid_source(tmp_path,monkeypatch):
+    ensure_runtime_environment(tmp_path)
+    config=tmp_path/".env"
+    previous=config.read_bytes()
+    monkeypatch.setenv("GF_SEAL_SECRET","other-persistent-key")
+    report=PreloadReport(tmp_path,"fixture","3.11",(PreloadCheck("host:ready",True,"ready"),))
+    monkeypatch.setattr("skeleton.app.installer.inspect_host",lambda *a,**k:report)
+    receipt=install_application(tmp_path,start=True,install_python=False,
+        runner=lambda *a,**k:pytest.fail("conflicting persistent identity reached Docker"))
+    assert not receipt.ok and receipt.phases[-1].name=="setup-runtime"
+    assert "GF_SEAL_SECRET" in receipt.phases[-1].detail
+    assert "other-persistent-key" not in repr(receipt.to_dict())
+    assert config.read_bytes()==previous
+
+
+
+def test_existing_invalid_gameforge_identity_is_preserved_not_rotated(tmp_path):
+    from skeleton.app import setup_runtime as setup
+    p=tmp_path/".env"
+    setup.ensure_runtime_environment(tmp_path)
+    p.write_text(setup._replace_env_value(p.read_text(),"GAMEFORGE_JWT_SECRET","short-existing-key"))
+    result=setup.ensure_runtime_environment(tmp_path,rotate_secrets=True,
+        storage_guard=lambda:pytest.fail("nonplaceholder persistent identity must not be regenerated"))
+    assert setup._parse_env(p.read_text())["GAMEFORGE_JWT_SECRET"]=="short-existing-key"
+    assert "GAMEFORGE_JWT_SECRET" in result.preserved_keys
+    assert any("restore a qualified value" in w for w in result.warnings)
+
+
+def test_existing_authenticated_uri_reconciliation_requires_storage_custody(tmp_path):
+    from skeleton.app import setup_runtime as setup
+    from skeleton.app.storage_custody import StorageCustodyDenied
+    p=tmp_path/".env"
+    setup.ensure_runtime_environment(tmp_path)
+    original=setup._replace_env_value(p.read_text(),"MONGO_URL",
+        _test_mongo_uri("admin","previous-password","mongo:27017","tutolage"))
+    p.write_text(original)
+    def deny():
+        assert p.read_text()==original
+        raise StorageCustodyDenied("existing storage")
+    with pytest.raises(StorageCustodyDenied,match="existing storage"):
+        setup.ensure_runtime_environment(tmp_path,storage_guard=deny)
+    assert p.read_text()==original
+
+
+def test_setup_detects_same_inode_content_change_before_permission_repair(tmp_path,monkeypatch):
+    import os
+    from skeleton.app import setup_runtime as setup
+    if os.name=="nt":
+        pytest.skip("POSIX permission repair")
+    p=tmp_path/".env"
+    p.write_text("MONGO_INITDB_ROOT_PASSWORD=old-value\n")
+    p.chmod(0o644)
+    real=setup._read_existing_env
+    def changed(path,**kwargs):
+        path.write_text("MONGO_INITDB_ROOT_PASSWORD=operator-new-value\n")
+        return real(path,**kwargs)
+    monkeypatch.setattr(setup,"_read_existing_env",changed)
+    with pytest.raises(ValueError,match="changed before setup input admission"):
+        setup.ensure_runtime_environment(tmp_path)
+    assert p.read_text()=="MONGO_INITDB_ROOT_PASSWORD=operator-new-value\n"

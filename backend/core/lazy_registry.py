@@ -48,6 +48,7 @@ _LOADERS = {
     'core.calibration_ledger': lambda: importlib.import_module('core.calibration_ledger'),
     'core.canonical_json': lambda: importlib.import_module('core.canonical_json'),
     'core.canonical_memory': lambda: importlib.import_module('core.canonical_memory'),
+    'core.canonical_writer_startup': lambda: importlib.import_module('core.canonical_writer_startup'),
     'core.canonical_product_policy': lambda: importlib.import_module('core.canonical_product_policy'),
     'core.capability_readiness': lambda: importlib.import_module('core.capability_readiness'),
     'core.character_profile': lambda: importlib.import_module('core.character_profile'),

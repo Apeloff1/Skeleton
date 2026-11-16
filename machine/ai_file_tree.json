@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "4ddf9ea536b0592e47463984837c15166dc8d927",
+      "source_git_object_sha": "fdf1fe5b553de008c412124b1aba3f4a4460d1fb",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -98,7 +98,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/runtime/provider_runtime.py",
       "kind": "file",
-      "source_git_object_sha": "4ddf9ea536b0592e47463984837c15166dc8d927",
+      "source_git_object_sha": "fdf1fe5b553de008c412124b1aba3f4a4460d1fb",
       "role": "Existing legacy runtime import alias for the canonical credential-bearing provider runtime; a non-owning compatibility facade.",
       "work_package_refs": [
         "WP-W05",
@@ -241,7 +241,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "ed1d92c4f7cd7d59734c9d4c08a4b70290284bcc",
+      "source_git_object_sha": "e7a9aaf996d78061d6bd94053e5ea8fdbdb66e17",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -309,7 +309,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "03b81d2b3f4718efb188109c165ee259107e7ed6",
+      "source_git_object_sha": "43974310ce81853ef1b622581329d43fd972428e",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -539,7 +539,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "382084558d9b30e8a7da7121a2a468698da59226",
+      "source_git_object_sha": "c13c5a492df15ba7eb91b0e0731d1547d824c72f",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -614,7 +614,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "7d075832d19ca878887db2bb1f37528037463523",
+      "source_git_object_sha": "a53593660e03fba8052a30ccf1b0aa1712a51e3b",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -1293,7 +1293,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "0ea69a5070897e3f7bb6f71fdb6e8c12a318ff52",
+      "source_git_object_sha": "8cd2c2ec3737d25e74431f0f3a7bfcc1e3377ec8",
       "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
@@ -1523,7 +1523,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "75e317be4c83b355084f5606e9b48dc0438caca2",
+      "source_git_object_sha": "1711eec160693e73ce0df725fd56a9d1b9ba5553",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -2936,7 +2936,7 @@
       "source": "skeleton/learning/school",
       "destination": "skeleton/ai/learning/school",
       "kind": "tree",
-      "source_git_object_sha": "0089891575b363bb0e4f80cccc16dab7ed40702b",
+      "source_git_object_sha": "350002143ba77d95682f5e84dcc26e0f11071dcd",
       "role": "Curriculum, assessment, tutoring, code-intelligence, and learning-control modules deepen the existing controlled-learning owner.",
       "work_package_refs": [
         "WP-W28"
@@ -5320,7 +5320,7 @@
       "source": "skeleton/provenance",
       "destination": "skeleton/ai/runtime/provenance",
       "kind": "tree",
-      "source_git_object_sha": "881e96383c0294584b6740262390d2a8068603c3",
+      "source_git_object_sha": "589e8c10c75e700fccd5fb7ca33af9f8e1a72fd7",
       "role": "Canonical append-only provenance and event-evidence parent with independently governed Chronicle history.",
       "work_package_refs": [
         "WP-W03",
@@ -6338,7 +6338,7 @@
     "signed_at_utc": null,
     "git_sha": null,
     "evidence_refs": [],
-    "statement": "Pending fresh implementation signoff for the reconciled 182-mapping current-main payload after exact-head CI and full object/parity audit.",
+    "statement": "Pending fresh implementation signoff for the reconciled 183-mapping current-main payload after exact-head CI and full object/parity audit.",
     "signature_method": null
   },
   "verification_signoff": {
@@ -6663,7 +6663,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "182_mapping_plus_181_native_owner_staged_mirror_reconciled_pending_exact_head_ci_and_independent_cutover_verification",
+  "validation_state": "183_mapping_plus_181_native_owner_staged_mirror_reconciled_pending_exact_head_ci_and_independent_cutover_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -6778,6 +6778,11 @@
       "path": "skeleton/acquired",
       "owner": "quarantine/provenance",
       "reason": "mixed acquired-source quarantine; only explicitly assigned files move after characterization and provenance preservation"
+    },
+    {
+      "path": "skeleton/admission",
+      "owner": "security-plane local admission ledger",
+      "reason": "Host-local transactional push admission and lease custody remain outside AI runtime ownership; remote expected-head CAS is independently mandatory."
     },
     {
       "path": "skeleton/agents",
@@ -7676,8 +7681,8 @@
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
     "note": "TREE-030 canonicalized School under skeleton/learning/school, retained skeleton/school as an explicitly classified compatibility boundary, preserved exact AI School parity, and left acquired.py as the only AIFT-LEARNING overlay.",
-    "current_mapping_count": 182,
-    "audit_scope_status": "validated historical line extended_to_177_requires_full_exact_head_refresh",
+    "current_mapping_count": 183,
+    "audit_scope_status": "reconciled_source_identities_pending_full_exact_head_refresh",
     "pending_mapping_ids": [
       "AIFT-V2B-GAMEFORGE-AGENTS",
       "AIFT-V2B-GAMEFORGE-JEEVES",
@@ -7826,11 +7831,11 @@
   },
   "pre_move_readiness": {
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
-    "governed_mapping_count": 182,
+    "governed_mapping_count": 183,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 164,
+    "retained_outside_ai_tree_count": 166,
     "batch_counts": {
-      "B3-owner-sensitive": 11,
+      "B3-owner-sensitive": 12,
       "B1-core-runtime": 71,
       "B2-domain-build": 14,
       "B4-research-quarantine": 58,

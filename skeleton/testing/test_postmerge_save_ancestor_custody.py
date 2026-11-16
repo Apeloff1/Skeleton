@@ -241,18 +241,75 @@ class SaveSlotAncestorCustodyTests(unittest.TestCase):
     def test_streamed_encoder_stops_before_oversized_snapshot_is_walked(self):
         from skeleton.game.gameplay import offline_grid_save_slot as module
 
-        class MalformedHugeList(list):
-            def __iter__(self):
-                yield "a" * 128
-                raise AssertionError("unbounded serialization walked further")
-
         with tempfile.TemporaryDirectory() as tmp:
             slot = Path(tmp) / "slot.json"
             with patch.object(module, "MAX_SAVE_BYTES", 64):
                 with self.assertRaisesRegex(SaveSlotError, "byte budget"):
-                    write_slot(slot, MalformedHugeList())
+                    write_slot(slot, ["a" * 128])
             self.assertFalse(slot.exists())
             self.assertEqual(list(Path(tmp).glob(".campaign-*.tmp")), [])
+
+    def test_hostile_container_hooks_never_execute(self):
+        class HostileList(list):
+            def __iter__(self):
+                raise AssertionError("untrusted iterator")
+            def __len__(self):
+                raise AssertionError("untrusted length")
+        class HostileString(str):
+            def __len__(self):
+                raise AssertionError("untrusted length")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            slot = Path(tmp) / "slot.json"
+            write_slot(slot, {"tick": 1})
+            for value in (HostileList(), {"value": HostileString("x")}):
+                with self.assertRaisesRegex(SaveSlotError, "snapshot type"):
+                    write_slot(slot, value)
+                self.assertEqual(read_slot(slot), {"tick": 1})
+
+    def test_cycles_depth_and_oversized_keys_fail_before_publication(self):
+        from skeleton.game.gameplay import offline_grid_save_slot as module
+        cycle = []
+        cycle.append(cycle)
+        nested = 0
+        for _ in range(module.MAX_SAVE_DEPTH + 2):
+            nested = [nested]
+        with tempfile.TemporaryDirectory() as tmp:
+            slot = Path(tmp) / "slot.json"
+            for value, reason in ((cycle, "cyclic"), (nested, "nesting budget")):
+                with self.subTest(reason=reason), self.assertRaisesRegex(SaveSlotError, reason):
+                    write_slot(slot, value)
+            with patch.object(module, "MAX_SAVE_BYTES", 64):
+                with self.assertRaisesRegex(SaveSlotError, "byte budget"):
+                    write_slot(slot, {"x" * 128: 1})
+            self.assertFalse(slot.exists())
+            self.assertEqual(list(Path(tmp).glob(".campaign-*.tmp")), [])
+
+    def test_reader_rejects_depth_unicode_and_alternative_encodings(self):
+        from skeleton.game.gameplay import offline_grid_save_slot as module
+
+        with tempfile.TemporaryDirectory() as tmp:
+            slot = Path(tmp) / "slot.json"
+            invalid = (
+                (b"[" * (module.MAX_SAVE_DEPTH + 1) + b"0" +
+                 b"]" * (module.MAX_SAVE_DEPTH + 1), "nesting budget"),
+                (b'{"name":"\\ud800"}', "Unicode"),
+                (b'{"\\udfff":1}', "Unicode"),
+                ('{"tick":1}'.encode("utf-16"), "encoding"),
+            )
+            for raw, reason in invalid:
+                with self.subTest(reason=reason):
+                    slot.write_bytes(raw)
+                    with self.assertRaisesRegex(SaveSlotError, reason):
+                        read_slot(slot)
+                    self.assertEqual(slot.read_bytes(), raw)
+            valid = {"name": "雪🚀", "tick": 7}
+            write_slot(slot, valid)
+            self.assertEqual(read_slot(slot), valid)
+            for value in ({"name": "\ud800"}, {"\udfff": 1}):
+                with self.assertRaisesRegex(SaveSlotError, "Unicode"):
+                    write_slot(slot, value)
+                self.assertEqual(read_slot(slot), valid)
 
     def test_writer_uses_bounded_streaming_not_monolithic_json_dumps(self):
         from skeleton.game.gameplay import offline_grid_save_slot as module

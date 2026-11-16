@@ -675,9 +675,9 @@ class ServerState:
         application owner. Neither model output nor an API request can select
         these dependencies. Never replace a running guard after activation.
         """
-        from skeleton.ai.runtime.inference.guarded_composition import ProtectedLocalComponents
+        from skeleton.ai.runtime.inference.guarded_composition import is_protected_component_source
 
-        if not isinstance(components, ProtectedLocalComponents):
+        if not is_protected_component_source(components):
             raise TypeError("engine local guard requires trusted application components")
         if (self.engine_execution_coordinator is not None
                 or self.engine_execution_service is not None
@@ -685,6 +685,35 @@ class ServerState:
             raise RuntimeError("engine local guard must be configured before startup")
         if self._engine_local_guard_components is not None:
             raise RuntimeError("engine local guard may not be rebound")
+        self._engine_local_guard_components = components
+
+    async def install_trusted_native_startup(self, startup: Any) -> None:
+        """API-owned binding port for a deployer composition already in process."""
+        await _install_trusted_native_startup(self, startup)
+
+    def configure_engine_protected_native_startup(
+        self, *, components: Any, conversation: Any, memory: Any,
+        shared_epoch: Any, memory_namespace: str, policy_sha256: str,
+    ) -> None:
+        """Install the trusted startup source tuple and guard as one state change."""
+        from skeleton.ai.runtime.inference.guarded_composition import ProtectedLocalComponentFactory
+
+        if type(components) is not ProtectedLocalComponentFactory:
+            raise TypeError("native startup requires exact-backend component factory")
+        if (self.engine_execution_service is not None
+                or self.engine_execution_coordinator is not None
+                or self._engine_shutdown_pending
+                or self._engine_local_guard_components is not None
+                or getattr(self, "_engine_canonical_sources", None) is not None
+                or getattr(self, "_engine_canonical_mongo_owners", None) is not None):
+            raise RuntimeError("trusted native startup is already bound or running")
+        # configure_engine_canonical_mongo_owners performs all tuple validation
+        # before its final assignment. Both assignments are synchronous; no
+        # provider construction can observe a partially installed tuple.
+        self.configure_engine_canonical_mongo_owners(
+            conversation=conversation, memory=memory, shared_epoch=shared_epoch,
+            memory_namespace=memory_namespace, policy_sha256=policy_sha256,
+        )
         self._engine_local_guard_components = components
 
     def configure_engine_canonical_sources(self, *, factory: Any, policy_sha256: str) -> None:
@@ -1285,6 +1314,34 @@ async def _close_realtime(app: Any) -> None:
         await hub.aclose()
 
 
+async def _install_trusted_native_startup(state: ServerState, startup: Any) -> None:
+    """Bind one deployer-owned prepared native composition to the exact API state."""
+    from skeleton.app.trusted_native_startup import NativeStartupBlocked, TrustedNativeStartup
+
+    if type(state) is not ServerState or type(startup) is not TrustedNativeStartup:
+        raise NativeStartupBlocked("canonical server startup state and composition required")
+    if (state.engine_execution_service is not None
+            or state.engine_execution_coordinator is not None
+            or state._engine_shutdown_pending
+            or state._engine_local_guard_components is not None
+            or getattr(state, "_engine_canonical_sources", None) is not None
+            or getattr(state, "_engine_canonical_mongo_owners", None) is not None):
+        raise NativeStartupBlocked("native startup must precede service construction")
+    try:
+        components = await startup.prepare()
+        # The state method rechecks admission after the asynchronous preparation.
+        # No user or model supplied callback can substitute the actual state.
+        state.configure_engine_protected_native_startup(
+            components=components, conversation=startup.conversation,
+            memory=startup.memory, shared_epoch=startup.epoch,
+            memory_namespace=startup.memory_namespace, policy_sha256=startup.policy_sha256,
+        )
+    except NativeStartupBlocked:
+        raise
+    except Exception:
+        raise NativeStartupBlocked("trusted native startup authority unavailable") from None
+
+
 async def _run_trusted_protected_bootstrap(state: ServerState, bootstrap: Any) -> None:
     """Allow deployer-owned native and canonical Mongo authorities before engine startup.
 
@@ -1295,18 +1352,27 @@ async def _run_trusted_protected_bootstrap(state: ServerState, bootstrap: Any) -
     """
     if bootstrap is None:
         return
-    if not callable(bootstrap):
-        raise TypeError("trusted protected bootstrap must be callable")
+    from skeleton.app.trusted_native_startup import TrustedNativeStartup
+
+    if type(state) is not ServerState:
+        raise TypeError("protected bootstrap requires canonical server state")
+    if isinstance(bootstrap, TrustedNativeStartup) and type(bootstrap) is not TrustedNativeStartup:
+        raise TypeError("protected native composition must be exact")
+    if type(bootstrap) is not TrustedNativeStartup and not callable(bootstrap):
+        raise TypeError("trusted protected bootstrap must be callable or exact native composition")
     if (state.engine_execution_service is not None
             or state.engine_execution_coordinator is not None
             or state._engine_shutdown_pending):
         raise RuntimeError("protected bootstrap must precede engine startup")
     from inspect import isawaitable
 
-    result = bootstrap(state)
-    if isawaitable(result):
-        await result
-    elif result is not None:
+    if type(bootstrap) is TrustedNativeStartup:
+        result = await _install_trusted_native_startup(state, bootstrap)
+    else:
+        result = bootstrap(state)
+        if isawaitable(result):
+            result = await result
+    if result is not None:
         raise TypeError("protected bootstrap must not return an authority")
     mongo_owners = getattr(state, "_engine_canonical_mongo_owners", None)
     if (state._engine_local_guard_components is None

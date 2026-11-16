@@ -40,7 +40,7 @@ from skeleton.contracts.conversation import (
     ConversationThread,
     ConversationThreadState,
 )
-from skeleton.persistence.mongo_source_epoch import fence_conversation_write
+from skeleton.persistence.mongo_source_epoch import fence_conversation_write, configured_canonical_epoch
 from skeleton.persistence.conversation_repository import (
     ConversationConflict,
     ConversationNotFound,
@@ -569,7 +569,7 @@ class MongoConversationAuthority:
     ) -> Mapping[str, Any]:
         """Delete one conversation plus its explicitly linked governed records."""
 
-        if getattr(self, "canonical_source_epoch", None) is not None:
+        if configured_canonical_epoch(self) is not None:
             # This operation may cascade to OTHER actors and storage owners.
             # An actor-scoped epoch does not prove their deletion custody.
             raise ConversationStorageUnavailable(
@@ -686,7 +686,7 @@ class MongoConversationAuthority:
     ) -> Mapping[str, Any]:
         """Execute one tenant retention plan across engine and conversation owners."""
 
-        if getattr(self, "canonical_source_epoch", None) is not None:
+        if configured_canonical_epoch(self) is not None:
             raise ConversationStorageUnavailable(
                 "protected tenant retention requires a cross-owner retirement fence"
             )
@@ -801,7 +801,7 @@ class MongoConversationAuthority:
         record_ids: tuple[str, ...] | None = None,
         reason: str = "tenant-request",
     ) -> Mapping[str, Any]:
-        if getattr(self, "canonical_source_epoch", None) is not None:
+        if configured_canonical_epoch(self) is not None:
             raise ConversationStorageUnavailable(
                 "protected governed deletion requires a cross-owner retirement fence"
             )
@@ -1358,7 +1358,7 @@ class MongoConversationAuthority:
         # Recovery updates the canonical message and thread collections. Even
         # internal callers must hold this actor's durable writer epoch; a
         # future read/replay caller cannot silently bypass public decorators.
-        epoch = getattr(self, "canonical_source_epoch", None)
+        epoch = configured_canonical_epoch(self)
         if epoch is not None:
             epoch.require_actor_writer(tenant_id=tenant_id, actor_id=owner_id)
 
@@ -2066,7 +2066,7 @@ class MongoConversationAuthority:
         after_sequence: int = 0,
         limit: int = 100,
     ) -> tuple[ConversationMessage, ...]:
-        if getattr(self, "canonical_source_epoch", None) is not None:
+        if configured_canonical_epoch(self) is not None:
             thread = await self.get_thread(
                 thread_id, tenant_id=tenant_id, owner_id=owner_id,
             )
@@ -2108,7 +2108,7 @@ class MongoConversationAuthority:
     ) -> tuple[ConversationMessage, ...]:
         # Protected source reads must not perform opportunistic writes outside
         # the writer epoch. Normal conversation owners retain WAL recovery.
-        if getattr(self, "canonical_source_epoch", None) is not None:
+        if configured_canonical_epoch(self) is not None:
             thread = await self.get_thread(
                 thread_id, tenant_id=tenant_id, owner_id=owner_id,
             )
@@ -2901,7 +2901,7 @@ class MongoConversationAuthority:
         ):
             raise ValueError("expected_thread_version must be a positive integer")
         for _attempt in range(3):
-            if getattr(self, "canonical_source_epoch", None) is not None:
+            if configured_canonical_epoch(self) is not None:
                 thread = await self.get_thread(
                     thread_id, tenant_id=tenant_id, owner_id=owner_id,
                 )

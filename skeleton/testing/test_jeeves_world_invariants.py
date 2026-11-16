@@ -53,7 +53,17 @@ def test_exhaustive_proof_replay_and_determinism(tmp_path):
     assert all(row["status"] == "passed" for row in report["rules"])
     other = copy.deepcopy(source)
     other["choices"].reverse()
-    assert prove_invariants(spec, other) == report
+    # Exact source-order custody is separate from deterministic reachability.
+    assert digest(other) != digest(source)
+    with pytest.raises(CanonError, match="invariant_world_lease_mismatch"):
+        prove_invariants(spec, other)
+    WorldStore(tmp_path).publish(other, expected_digest=digest(source))
+    other_spec = store.propose("guarded", rules())
+    other_report = prove_invariants(other_spec, other)
+    assert other_report["world_digest"] == digest(other)
+    assert other_report["suite_digest"] == digest(other_spec)
+    for key in ("states_explored", "transitions_explored", "rules", "complete"):
+        assert other_report[key] == report[key]
 
 
 def test_violation_witness_replays_actual_flag_state(tmp_path):

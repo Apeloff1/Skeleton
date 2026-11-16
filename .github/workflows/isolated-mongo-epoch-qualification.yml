@@ -1,0 +1,40 @@
+name: Isolated Mongo replica epoch qualification
+
+# Standalone PR admission is consolidated under Merge Readiness.
+# Every real qualification job retains its existing execution contract.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: isolated-mongo-epoch-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  authenticated_replica:
+    name: Exact-head isolated authenticated Mongo replica epoch and CAS
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Verify candidate source identity
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Set up supported Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install pinned Mongo driver and signature dependencies
+        run: python -m pip install --disable-pip-version-check --no-input 'pymongo==4.19.0' 'cryptography>=50.0.2,<51'
+      - name: Execute disposable authenticated replica qualification
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          PYTHONPATH: ".:backend"
+        run: python scripts/qualify_isolated_mongo_epoch.py --isolated-ci-fixture --source-head "$EXPECTED_HEAD"

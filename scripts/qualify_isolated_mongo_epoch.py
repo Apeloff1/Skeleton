@@ -1,0 +1,546 @@
+"""Disposable authenticated Mongo replica-set qualification, not migration.
+
+No external Mongo URI or existing volume is accepted. Launches a fresh pinned
+Mongo container on the local Unix Docker daemon, uses tmpfs and a loopback-only
+ephemeral published port, and removes that exact owned container before
+printing a scoped receipt. Never install this fixture in production.
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+from contextlib import asynccontextmanager
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import secrets
+import subprocess
+import sys
+import time
+from uuid import uuid4
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from bson.int64 import Int64
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from pymongo import AsyncMongoClient
+from pymongo.write_concern import WriteConcern
+
+from skeleton.app.compose_guarded_preflight import inspect_compose_mongo_epoch
+from skeleton.app.canonical_writer_cutover import (
+    CanonicalWriterCutover, VerifiedWriterCutover, WriterCutoverDenied,
+    inspect_writer_inventory, qualify_writer_cutover, _observe,
+    WriterDeploymentRetirement, reserve_writer_deployment, inspect_writer_deployment,
+    verify_writer_deployment, retire_writer_deployment,
+)
+from skeleton.persistence.mongo_epoch_operator import EpochApproval, EpochOperatorAuthorization
+from skeleton.persistence.mongo_source_epoch import MongoCanonicalSourceEpoch, MongoSourceEpochError
+
+IMAGE = "mongo:7.0.41@sha256:b096b4cb9269f3ebcf363be63f1c50920f786879d03a1890347a3bf33f1f0df0"
+DOCKER = ["docker", "--host", "unix:///var/run/docker.sock"]
+SCHEMA = "skeleton.mongo.isolated_replica_qualification.v4"
+_SHA = re.compile(r"[0-9a-f]{40}\Z")
+_ID = re.compile(r"[0-9a-f]{64}\Z")
+_START = """set -eu
+umask 077
+head -c 756 /dev/urandom | base64 -w 0 > /tmp/skeleton-fixture-key
+chown mongodb:mongodb /tmp/skeleton-fixture-key
+chmod 400 /tmp/skeleton-fixture-key
+exec /usr/local/bin/docker-entrypoint.sh mongod --replSet skeleton_fixture --bind_ip_all --keyFile /tmp/skeleton-fixture-key
+"""
+
+
+class QualificationError(RuntimeError):
+    pass
+
+
+def require(condition, why):
+    if condition is not True:
+        raise QualificationError(why)
+
+
+def _docker(*args, data=None, timeout=30, check=True):
+    # Do not inherit DOCKER_HOST, contexts, CLI configuration or credentials
+    # from an application's environment. Public image acquisition only.
+    env = {"PATH": os.defpath, "HOME": "/tmp", "LANG": "C.UTF-8"}
+    result = subprocess.run([*DOCKER, *args], input=data, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, env=env, timeout=timeout, check=False)
+    if check and result.returncode:
+        raise QualificationError("isolated Docker operation failed")
+    return result
+
+
+def _shell(cid, script=None, *, evaluate=None, check=True):
+    args = ["exec", "-i", cid, "mongosh", "--quiet", "--norc"]
+    if evaluate is not None:
+        return _docker(*args, "--eval", evaluate, check=check)
+    return _docker(*args, "--file", "/dev/stdin",
+                   data=script.encode("utf-8"), check=check)
+
+
+def _wait_shell(cid, expression, seconds=75):
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if _shell(cid, evaluate=expression, check=False).returncode == 0:
+            return
+        time.sleep(1)
+    raise QualificationError("isolated Mongo readiness timed out")
+
+
+def _j(value):
+    return json.dumps(value, ensure_ascii=True, separators=(",", ":"))
+
+
+def _source_head(head):
+    require(type(head) is str and _SHA.fullmatch(head) is not None, "source identity invalid")
+    observed = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                              check=True, timeout=10, text=True).stdout.strip()
+    require(observed == head, "source identity changed")
+
+
+def _client(port, *, user=None, password=None, database=None):
+    opts = dict(host="127.0.0.1", port=port, directConnection=True,
+                replicaSet="skeleton_fixture", serverSelectionTimeoutMS=5000,
+                connectTimeoutMS=3000, socketTimeoutMS=5000,
+                maxPoolSize=2, retryReads=False, retryWrites=False)
+    if user is not None:
+        opts.update(username=user, password=password, authSource=database)
+    return AsyncMongoClient(**opts)
+
+
+def _approval(signer, database, actor, *, epoch=None):
+    now = int(time.time())
+    approval = EpochApproval(
+        authority_id="disposable-ci-only", deployment_id=database,
+        approval_id=uuid4().hex, database_name=database,
+        tenant_id="fixture-tenant", actor_id=actor,
+        purpose="quiescent-initial-epoch-v1" if epoch is None else "terminal-actor-revocation-v1",
+        issued_at=now-1, expires_at=now+120,
+        expected_epoch=epoch, reason_code=None if epoch is None else "operator-revoke",
+        # Explicit fixture evidence digests; no real backup or production
+        # quiescence/writer-inventory claim.
+        backup_sha256=hashlib.sha256(b"disposable-empty-fixture").hexdigest(),
+        quiescence_sha256=hashlib.sha256(b"isolated-fixture").hexdigest(),
+        writer_inventory_sha256=hashlib.sha256(b"fixture-writers-only").hexdigest(),
+    )
+    return EpochOperatorAuthorization(
+        approval=approval, signature=signer.sign(approval.canonical_bytes()),
+        authority_id=approval.authority_id, deployment_id=approval.deployment_id,
+        public_key=signer.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw),
+    )
+
+
+def _scope(actor):
+    return {"tenant_id": "fixture-tenant", "actor_id": actor}
+
+
+async def _read(owner, actor):
+    return await owner.read_epoch(**_scope(actor), context_id="fixture-context")
+
+
+async def _deny(awaitable):
+    try:
+        await awaitable
+    except MongoSourceEpochError:
+        return
+    raise QualificationError("unsafe epoch operation was admitted")
+
+
+async def _competing_writer(owner, actor):
+    async with owner.writer(**_scope(actor)):
+        raise QualificationError("concurrent writer acquired occupied epoch")
+
+
+async def _deny_cutover(awaitable):
+    try:
+        await awaitable
+    except WriterCutoverDenied:
+        return
+    raise QualificationError("unsafe canonical cutover was admitted")
+
+
+def _fixture_collections(db):
+    return {
+        "threads": db["conversation_threads"],
+        "messages": db["conversation_messages"],
+        "records": db["canonical_memory_records"],
+        "revisions": db["canonical_memory_revisions"],
+        "projection_outbox": db["canonical_memory_projection_outbox"],
+        "idempotency": db["canonical_memory_idempotency"],
+    }
+
+
+async def _fixture_deployment_latch(approval, signer, owner, peer, reader):
+    from dataclasses import replace
+    def signed_at(instant,**updates):
+        plan=replace(approval.plan,issued_at=instant,**updates)
+        return VerifiedWriterCutover(plan,signer.sign(plan.canonical_bytes()),
+            plan.authority_id,plan.deployment_id,plan.source_head,approval.public_key)
+
+    now=int(time.time())
+    first=signed_at(now-10)
+    other=signed_at(now-9)
+    require((await inspect_writer_deployment(epoch=owner))["state"]=="ABSENT",
+            "fresh fixture latch not absent")
+
+    # Independent clients contend on the same fixed row, not a local lock.
+    async def attempt(candidate,epoch):
+        try:
+            return await reserve_writer_deployment(candidate,epoch=epoch)
+        except WriterCutoverDenied:
+            return None
+    reservations=await asyncio.gather(attempt(first,owner),attempt(other,peer))
+    require(sum(item is not None for item in reservations)==1,
+            "shared latch admitted zero or multiple clients")
+    active=next(item for item in reservations if item is not None)
+    require(active["generation"]==1, "unexpected initial latch generation")
+    await verify_writer_deployment(epoch=owner,reservation=active)
+    await verify_writer_deployment(epoch=peer,reservation=active)
+    await _deny_cutover(reserve_writer_deployment(signed_at(now-8),epoch=owner))
+    await _deny_cutover(reserve_writer_deployment(signed_at(now-8),epoch=reader))
+    guarded=MongoCanonicalSourceEpoch(owner._database)
+    await guarded.bind_deployment_latch(active)
+    require(await _read(guarded,"actor-a")==2,"active latch denied valid reader")
+
+    plan=WriterDeploymentRetirement(
+        authority_id=first.authority_id,deployment_id=first.deployment_id,
+        source_head=first.source_head,database_name=owner._database.name,
+        active_latch_sha256=active["latch_sha256"],
+        shutdown_evidence_sha256=hashlib.sha256(b"disposable-fixture-offline-only").hexdigest(),
+        issued_at=now-5,expires_at=now+120)
+    pins=dict(epoch=peer,authority_id=plan.authority_id,deployment_id=plan.deployment_id,
+              source_head=plan.source_head,public_key=approval.public_key)
+    sig=signer.sign(plan.canonical_bytes())
+    await _deny_cutover(retire_writer_deployment(plan,b"x"*64,**pins))
+    require((await inspect_writer_deployment(epoch=owner))["latch_sha256"]==active["latch_sha256"],
+            "invalid retirement changed active reservation")
+    retired=await retire_writer_deployment(plan,sig,**pins)
+    require(retired["state"]=="RETIRED" and retired["generation"]==2,
+            "signed fixture retirement failed")
+    await _deny_cutover(retire_writer_deployment(plan,sig,**pins))
+    await _deny_cutover(reserve_writer_deployment(first,epoch=owner))
+    await _deny_cutover(reserve_writer_deployment(other,epoch=peer))
+    await _deny(_read(guarded,"actor-a"))
+    await _deny(_competing_writer(guarded,"actor-a"))
+    await _deny_cutover(reserve_writer_deployment(signed_at(now-1),epoch=peer))
+    next_active=await reserve_writer_deployment(signed_at(now-1,predecessor_generation=2,
+        predecessor_latch_sha256=retired["latch_sha256"]),epoch=peer)
+    require(next_active["generation"]==3,"new approval did not advance latch generation")
+    await _deny(_read(guarded,"actor-a"))
+    require(await _read(owner,"actor-a")==2,"rejected stale writer modified epoch")
+    return {"real_cross_client_singleton_latch_race":True,
+            "real_signed_retirement_and_stale_approval_denial":True,
+            "stale_process_latch_quarantine_even_after_new_generation":True}
+
+
+async def _fixture_cutover(head, signer, owner, peer, reader, db, peerdb, read_db):
+    """Qualify the real Mongo projection/aggregation/linearizable scan seam."""
+    handles = _fixture_collections(db)
+    peer_handles = _fixture_collections(peerdb)
+    read_handles = _fixture_collections(read_db)
+    tenant, actor = "fixture-tenant", "actor-a"
+    common = {"repository_namespace":"memory","memory_id":"memory-a",
+              "tenant_id":tenant,"namespace":"qualification"}
+    root = {**common,"subject_id":actor,"version":Int64(2)}
+    snap = {key:value for key,value in root.items() if key!="repository_namespace"}
+    seed = {
+        "threads":{"_id":"thread-a","thread_id":"thread-a","tenant_id":tenant,
+                   "owner_id":actor,"version":2,"message_sequence":1},
+        "messages":{"_id":"message-a","message_id":"message-a","thread_id":"thread-a",
+                    "sequence":1,"_commit_state":"committed",
+                    "content":"fixture payload deliberately excluded from metadata inventory"},
+        "records":root,
+        "revisions":{**common,"version":Int64(2),"record":dict(snap)},
+        "projection_outbox":{**common,"event_id":"event-a","memory_version":Int64(2),
+                             "action":"upsert","published_at":None,"record":dict(snap)},
+        "idempotency":{**common,"idempotency_key":"request-a","request_digest":"d"*64,
+                       "status":"committed","result":dict(snap)},
+    }
+    # Only the freshly created fixture namespace is mutated; these are not
+    # deployment migration operations and never run against a supplied URI.
+    for lane, row in seed.items():
+        result = await handles[lane].with_options(
+            write_concern=WriteConcern(w="majority", j=True, wtimeout=10000)
+        ).insert_one(row)
+        require(result.acknowledged is True, "cutover fixture seed not acknowledged")
+    async def inspect(epoch, collections):
+        return await inspect_writer_inventory(epoch=epoch, collections=collections,
+                                              repository_namespace="memory")
+    async def admit(approval, epoch=owner, collections=handles):
+        return await qualify_writer_cutover(approval, epoch=epoch, collections=collections,
+                                            repository_namespace="memory")
+    async def approve():
+        receipt = await inspect(owner, handles)
+        topology, principals = await _observe(db)
+        now = int(time.time())
+        evidence = lambda name: hashlib.sha256(("isolated-ci-only:"+name).encode()).hexdigest()
+        plan = CanonicalWriterCutover(
+            authority_id="disposable-ci-only", deployment_id=db.name, source_head=head,
+            database_name=db.name, replica_set=topology[0], voting_hosts=topology[3],
+            principal_inventory=principals, issued_at=now-1, expires_at=now+120,
+            epoch_count=receipt["epoch_count"], source_scope_count=receipt["source_scope_count"],
+            inventory_sha256=receipt["inventory_sha256"], backup_sha256=evidence("backup"),
+            quiescence_sha256=evidence("quiescence"),
+            external_writer_retirement_sha256=evidence("retirement"),
+            storage_provenance_sha256=evidence("storage"),
+            predecessor_generation=0,predecessor_latch_sha256=None,
+        )
+        return VerifiedWriterCutover(plan, signer.sign(plan.canonical_bytes()),
+                                     plan.authority_id, plan.deployment_id, head,
+                                     signer.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw))
+    receipt = await inspect(owner, handles)
+    require(receipt["local_collection_counts"] == dict.fromkeys(handles,1)
+            and receipt["epoch_count"] == 2 and receipt["source_scope_count"] == 1
+            and receipt["writer_cutover_authorized"] is False
+            and receipt["writes_performed"] is False
+            and "fixture payload" not in json.dumps(receipt),
+            "real cutover observation leaked payload or granted authority")
+    approval = await approve()
+    first = await admit(approval)
+    require(first.digest == receipt["inventory_sha256"], "real signed graph digest mismatch")
+    peer_result = await admit(approval, peer, peer_handles)
+    require(peer_result == first, "identical authenticated peer disagreed")
+    await _deny_cutover(admit(approval, reader, read_handles))
+    await _deny_cutover(admit(approval, owner, peer_handles))
+    checks = {"real_signed_six_collection_graph_and_same_principal_peer":True,
+              "different_principal_and_foreign_client_handles_denied":True}
+    # Corrupt one structural boundary at a time from a separate authenticated
+    # client, require both observer and signed startup to fail, restore exact
+    # metadata, then qualify the same original approval.
+    cases = (
+        ("messages", {"_id":"message-a"}, {"_commit_state":"prepared"}, {"_commit_state":"committed"}),
+        ("messages", {"_id":"message-a"}, {"thread_id":"orphan"}, {"thread_id":"thread-a"}),
+        ("revisions", {"memory_id":"memory-a"}, {"record.subject_id":"other"}, {"record.subject_id":actor}),
+        ("idempotency", {"memory_id":"memory-a"}, {"status":"pending"}, {"status":"committed"}),
+    )
+    for lane, query, broken, repaired in cases:
+        coll = peer_handles[lane].with_options(
+            write_concern=WriteConcern(w="majority", j=True, wtimeout=10000))
+        changed = await coll.update_one(query, {"$set":broken})
+        require(changed.matched_count == 1 and changed.modified_count == 1, "fixture corruption not applied")
+        await _deny_cutover(inspect(owner, handles))
+        await _deny_cutover(admit(approval))
+        restored = await coll.update_one(query, {"$set":repaired})
+        require(restored.modified_count == 1, "fixture corruption not restored")
+        require((await admit(approval)).digest == first.digest, "fixture graph restoration mismatch")
+    checks["real_orphan_prepared_cross_subject_and_pending_denial"] = True
+    # A structurally valid publication-state mutation changes the signed
+    # inventory even though the graph remains valid for read-only inspection.
+    coll = peer_handles["projection_outbox"].with_options(
+        write_concern=WriteConcern(w="majority", j=True, wtimeout=10000))
+    changed = await coll.update_one({"event_id":"event-a"},
+                                    {"$set":{"published_at":"2026-01-01T00:00:00Z"}})
+    require(changed.modified_count == 1, "fixture publication state not changed")
+    observed = await inspect(owner, handles)
+    require(observed["inventory_sha256"] != first.digest, "changed graph reused old digest")
+    await _deny_cutover(admit(approval))
+    require((await admit(await approve())).digest == observed["inventory_sha256"],
+            "fresh independent graph approval did not qualify")
+    restored = await coll.update_one({"event_id":"event-a"},{"$set":{"published_at":None}})
+    require(restored.modified_count == 1, "fixture publication state not restored")
+    require((await admit(approval)).digest == first.digest, "original graph restoration mismatch")
+    checks["valid_metadata_change_requires_new_signed_approval"] = True
+    # No increment: the remaining physical CAS tests below depend on the
+    # pre-existing generations. Assert graph qualification itself was read-only.
+    require(await _read(owner, "actor-a") == 2 and await _read(owner, "actor-b") == 2,
+            "cutover qualification unexpectedly modified an epoch")
+    for collection in handles.values():
+        require(await collection.count_documents({}) == 1, "cutover fixture row count changed")
+    checks["cutover_admission_does_not_mutate_epoch_or_row_inventory"] = True
+    checks.update(await _fixture_deployment_latch(approval,signer,owner,peer,reader))
+    return checks
+
+
+async def _check_epochs(head, port, dbname, writer_secret, reader_secret):
+    signer = Ed25519PrivateKey.generate()
+    clients = [
+        _client(port, user="fixture_writer", password=writer_secret, database=dbname),
+        _client(port, user="fixture_writer", password=writer_secret, database=dbname),
+        _client(port, user="fixture_reader", password=reader_secret, database=dbname),
+        _client(port),
+    ]
+    checks = {}
+    try:
+        db, peerdb, read_db, unauth = [client[dbname] for client in clients]
+        owner = MongoCanonicalSourceEpoch(db, migration_authorizer=_approval(signer, dbname, "actor-a"))
+        peer = MongoCanonicalSourceEpoch(peerdb, migration_authorizer=_approval(signer, dbname, "actor-b"))
+        reader = MongoCanonicalSourceEpoch(read_db)
+        pre = await inspect_compose_mongo_epoch(db, **_scope("actor-a"), context_id="fixture-context")
+        require(pre["canonical_actor_epoch_stable_observed"] is False, "missing epoch admitted")
+        await _deny(MongoCanonicalSourceEpoch(db).provision_migration_epoch(**_scope("actor-a")))
+        await owner.provision_migration_epoch(**_scope("actor-a"))
+        await peer.provision_migration_epoch(**_scope("actor-b"))
+        require(await _read(owner, "actor-a") == 2 and await _read(reader, "actor-a") == 2,
+                "initial epoch readback mismatch")
+        checks["signed_insert_and_cross_client_linearizable_read"] = True
+
+        observed = await inspect_compose_mongo_epoch(read_db, **_scope("actor-a"), context_id="fixture-context")
+        require(observed["mongo_replica_set_primary_observed"] is True
+                and observed["mongo_authenticated_session_observed"] is True
+                and observed["canonical_actor_epoch_stable_observed"] is True
+                and observed["guarded_local_ai_ready"] is False and observed["writes_performed"] is False,
+                "preflight observation scope invalid")
+        denied = await inspect_compose_mongo_epoch(unauth, **_scope("actor-a"), context_id="fixture-context")
+        require(denied["mongo_authenticated_session_observed"] is False
+                and denied["canonical_actor_epoch_stable_observed"] is False,
+                "unauthenticated preflight admitted")
+        checks["authenticated_read_only_observation"] = True
+        checks.update(await _fixture_cutover(head, signer, owner, peer, reader, db, peerdb, read_db))
+
+        async with owner.writer(**_scope("actor-a")):
+            owner.require_actor_writer(**_scope("actor-a"))
+            await _deny(_read(peer, "actor-a"))
+            await _deny(_competing_writer(peer, "actor-a"))
+            active = await inspect_compose_mongo_epoch(read_db, **_scope("actor-a"), context_id="fixture-context")
+            require(active["canonical_actor_epoch_stable_observed"] is False, "active writer falsely stable")
+            # Fixture payload only; majority acknowledgement before STABLE.
+            payload = db.get_collection("qualification_payloads", write_concern=WriteConcern(w="majority"))
+            inserted = await payload.insert_one({"_id":"fixture-a","value":1})
+            require(inserted.acknowledged is True, "fixture mutation not acknowledged")
+            async with peer.writer(**_scope("actor-b")):
+                peer.require_actor_writer(**_scope("actor-b"))
+            async def inherited():
+                try:
+                    owner.require_actor_writer(**_scope("actor-a"))
+                except MongoSourceEpochError:
+                    return
+                raise QualificationError("inherited child writer admitted")
+            await asyncio.create_task(inherited())
+        require(await _read(reader, "actor-a") == 4 and await _read(reader, "actor-b") == 4,
+                "stable generation mismatch")
+        checks["exclusive_writer_and_independent_actor_progress"] = True
+        checks["majority_payload_then_stable_and_task_fencing"] = True
+
+        await _deny(_competing_writer(reader, "actor-a"))
+        require(await _read(reader, "actor-a") == 4, "read-only role changed epoch")
+        checks["read_only_principal_cannot_write"] = True
+
+        # A failed nested mutation leaves B quarantined, never reset.
+        async def poison():
+            async with peer.writer(**_scope("actor-b")):
+                try:
+                    async with peer.writer(**_scope("actor-b")):
+                        raise ValueError("fixture mutation failed")
+                except ValueError:
+                    pass
+        await _deny(poison())
+        await _deny(_read(reader, "actor-b"))
+        replay_b = MongoCanonicalSourceEpoch(peerdb, migration_authorizer=_approval(signer, dbname, "actor-b"))
+        await _deny(replay_b.provision_migration_epoch(**_scope("actor-b")))
+        checks["nested_failure_quarantine_and_no_reset"] = True
+
+        # A real BSON int64 is seeded only inside this disposable namespace.
+        key = owner._key("fixture-tenant", "actor-long")
+        inserted = await owner._collection.insert_one({
+            "_id": key, **_scope("actor-long"), "phase": "stable",
+            "epoch": Int64(1 << 31), "writer_token": None,
+        })
+        require(inserted.acknowledged is True, "int64 fixture not acknowledged")
+        require(await _read(reader, "actor-long") == 1 << 31, "real BSON Int64 not normalized")
+        async with owner.writer(**_scope("actor-long")):
+            pass
+        long_row = await owner._collection.find_one({"_id": key})
+        require(type(long_row["epoch"]) is Int64 and int(long_row["epoch"]) == (1 << 31) + 2,
+                "BSON Int64 generation lost")
+        checks["real_bson_int64_generation"] = True
+
+        revoker = MongoCanonicalSourceEpoch(db, revocation_authorizer=_approval(signer, dbname, "actor-a", epoch=4))
+        require(await revoker.revoke_actor(**_scope("actor-a"), expected_epoch=4,
+                                          reason_code="operator-revoke") == 5,
+                "terminal revocation generation mismatch")
+        await _deny(_read(reader, "actor-a"))
+        await _deny(_competing_writer(peer, "actor-a"))
+        restarted = MongoCanonicalSourceEpoch(peerdb, migration_authorizer=_approval(signer, dbname, "actor-a"))
+        await _deny(restarted.provision_migration_epoch(**_scope("actor-a")))
+        checks["signed_terminal_revocation_and_restart_denial"] = True
+
+        require(await owner._collection.count_documents({}) == 3, "unexpected epoch inventory")
+        require(await db["qualification_payloads"].count_documents({}) == 1, "unexpected payload inventory")
+        checks["disposable_fixture_inventory_exact"] = True
+        return checks
+    finally:
+        for client in clients:
+            await client.close()
+
+
+def run(head):
+    _source_head(head)
+    suffix = uuid4().hex
+    name = "skeleton-epoch-fixture-" + suffix
+    dbname = "qualification_epoch_" + suffix
+    label = "org.skeleton.isolated-epoch=" + suffix
+    cid = None
+    started = time.monotonic()
+    try:
+        created = _docker(
+            "run", "--detach", "--rm", "--name", name, "--label", label,
+            "--publish", "127.0.0.1::27017", "--tmpfs", "/data/db:rw,nosuid,nodev,size=768m",
+            "--tmpfs", "/data/configdb:rw,nosuid,nodev,size=64m",
+            "--memory", "2g", "--cpus", "2", "--entrypoint", "/bin/sh",
+            IMAGE, "-c", _START, timeout=180,
+        ).stdout.decode("ascii").strip()
+        require(_ID.fullmatch(created) is not None, "fixture container identity invalid")
+        cid = created
+        _wait_shell(cid, "quit(db.hello().ok === 1 ? 0 : 1)")
+        _shell(cid, evaluate='rs.initiate({_id:"skeleton_fixture",members:[{_id:0,host:"localhost:27017"}]})')
+        _wait_shell(cid, "quit(db.hello().isWritablePrimary === true ? 0 : 1)")
+        root, writer, reader = (secrets.token_hex(32) for _ in range(3))
+        js = f"""const admin=db.getSiblingDB("admin");
+admin.createUser({{user:"fixture_admin",pwd:{_j(root)},roles:["root"]}});
+admin.auth("fixture_admin",{_j(root)});
+const test=db.getSiblingDB({_j(dbname)});
+test.createUser({{user:"fixture_writer",pwd:{_j(writer)},roles:[{{role:"readWrite",db:{_j(dbname)}}}]}});
+test.createUser({{user:"fixture_reader",pwd:{_j(reader)},roles:[{{role:"read",db:{_j(dbname)}}}]}});
+"""
+        _shell(cid, script=js)
+        mapping = _docker("port", cid, "27017/tcp").stdout.decode("ascii").strip()
+        match = re.fullmatch(r"127\.0\.0\.1:([0-9]{1,5})", mapping)
+        require(match is not None, "fixture is not loopback-only")
+        port = int(match.group(1))
+        require(1 <= port <= 65535, "invalid fixture port")
+        checks = asyncio.run(_check_epochs(head, port, dbname, writer, reader))
+    finally:
+        # Only the uniquely generated, label-bound container may be removed.
+        inspected = _docker("inspect", "--format", "{{.Id}} {{index .Config.Labels \"org.skeleton.isolated-epoch\"}}",
+                            name, check=False)
+        if inspected.returncode == 0:
+            parts = inspected.stdout.decode("ascii").strip().split()
+            require(len(parts) == 2 and _ID.fullmatch(parts[0]) is not None
+                    and parts[1] == suffix and (cid is None or parts[0] == cid),
+                    "fixture cleanup ownership mismatch")
+            _docker("rm", "--force", parts[0], timeout=30)
+        require(_docker("inspect", name, check=False).returncode != 0, "fixture cleanup failed")
+    _source_head(head)
+    receipt = {
+        "schema": SCHEMA, "source_head": head, "image": IMAGE,
+        "scope": "disposable_authenticated_single_member_replica",
+        "checks": checks, "fixture_removed": True,
+        "elapsed_ms": round((time.monotonic()-started)*1000, 3),
+        "held": ["production_migration", "external_writer_coverage", "multi_member_failover",
+                 "independent_reviewer", "distributed_startup", "release"],
+    }
+    receipt["receipt_sha256"] = hashlib.sha256(
+        json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return receipt
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source-head", required=True)
+    parser.add_argument("--isolated-ci-fixture", required=True, action="store_true")
+    args = parser.parse_args(argv)
+    try:
+        print(json.dumps(run(args.source_head), sort_keys=True))
+        return 0
+    except Exception:
+        print("Disposable authenticated Mongo qualification failed; no passing evidence.", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -397,6 +397,80 @@ class ScopedEngineCompiledSnapshotReader:
         )
 
 
+    async def attest_reviewer(self, *, verifier, pin, snapshot, request_digest):
+        """Bind reviewer liveness to the real durable actor and source epoch.
+
+        The snapshot revision is an opaque combined version, not a Mongo
+        writer epoch. Obtain the actual linearizable epoch independently.
+        Only the task owning this exact execution may ask for attestation.
+        """
+        from skeleton.context.pre_delivery_guard import TrustedContextSnapshot
+        from skeleton.persistence.mongo_source_epoch import MongoCanonicalSourceEpoch
+        from .canonical_execution_source_factory import CanonicalExecutionSourceFactory
+        from .reviewer_custody import ReviewerCustodyVerifier
+        from .native_guard_binding import NativeGuardPins
+
+        bound = self._scope.get()
+        factory = self._source_authority_factory
+        if (bound is None or bound.owner_task is not asyncio.current_task()
+                or type(snapshot) is not TrustedContextSnapshot
+                or snapshot.tenant_id != bound.tenant_id
+                or snapshot.context_id != bound.context_id
+                or bound.request_digest != request_digest
+                or type(factory) is not CanonicalExecutionSourceFactory
+                or type(factory.shared_epoch) is not MongoCanonicalSourceEpoch
+                or type(verifier) is not ReviewerCustodyVerifier
+                or type(pin) is not NativeGuardPins):
+            raise SealedContextBoundaryError("reviewer execution custody unavailable")
+        epoch = factory.shared_epoch
+
+        async def owner():
+            stored, execution = await asyncio.to_thread(
+                EngineSubmissionCompiledInputLoader._read_owned, self._service, bound.execution_id,
+            )
+            if stored is None or execution is None:
+                raise SealedContextBoundaryError("reviewer durable owner missing")
+            command = stored.command
+            operation, handoff = command.operation, command.compiled_context
+            if (operation.tenant_id != bound.tenant_id
+                    or not isinstance(operation.actor_id, str) or not operation.actor_id
+                    or handoff.tenant_id != bound.tenant_id
+                    or handoff.context_id != bound.context_id
+                    or handoff.execution_id != bound.execution_id
+                    or execution.request.execution_id != bound.execution_id
+                    or execution.request.identity_digest != command.execution_request.identity_digest
+                    or execution.operation_id != operation.operation_id
+                    or execution.cancellation_requested or execution.terminal
+                    or type(execution.version) is not int or execution.version < 1):
+                raise SealedContextBoundaryError("reviewer durable owner changed")
+            return (operation.actor_id, execution.version, handoff.handoff_digest,
+                    getattr(command, "submission_digest", None))
+
+        try:
+            first = await owner()
+            scope = dict(tenant_id=bound.tenant_id, actor_id=first[0], context_id=bound.context_id)
+            before = await epoch.read_epoch(**scope)
+            if type(before) is not int or before < 2 or before % 2:
+                raise SealedContextBoundaryError("reviewer source epoch unavailable")
+            await verifier.verify(**scope, epoch=before, model_digest=pin.model_digest,
+                                  runtime_digest=pin.runtime_digest, tokenizer_digest=pin.tokenizer_digest)
+            # The network challenge is another suspension window. Check the
+            # durable owner, source projection and epoch again after it.
+            if await owner() != first:
+                raise SealedContextBoundaryError("reviewer durable owner changed")
+            current = await self.resolve(tenant_scope_id=bound.tenant_id,
+                context_id=bound.context_id, request_digest=request_digest)
+            after = await epoch.read_epoch(**scope)
+            if (current != snapshot or before != after or self._scope.get() is not bound
+                    or self._source_authority_factory is not factory or factory.shared_epoch is not epoch
+                    or await owner() != first):
+                raise SealedContextIntegrityError("reviewer source custody changed")
+        except (SealedContextBoundaryError, SealedContextIntegrityError):
+            raise
+        except Exception:
+            raise SealedContextBoundaryError("independent scoped reviewer attestation unavailable") from None
+
+
 __all__ = [
     "CurrentSourceCustody", "CurrentSourceAuthority",
     "EngineSubmissionCompiledInputLoader",

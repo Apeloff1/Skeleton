@@ -13,8 +13,7 @@ def status(store:JobStore,job_id:str,owner:JobIdentity)->dict:
     if type(store) is not JobStore:
         deny("dependency-store")
     require_id(job_id,"job")
-    parents=store.dependencies(job_id,owner)
-    own=store.inspect(job_id,owner)
+    own,parents=store.dependency_snapshot(job_id,owner)
     ready=all(parent["state"]==SUCCESS for parent in parents)
     blocked=any(parent["state"] in ("failed","cancelled","held") for parent in parents)
     return {

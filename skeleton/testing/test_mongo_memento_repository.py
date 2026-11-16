@@ -177,11 +177,14 @@ def fake_pymongo(monkeypatch):
     pymongo = ModuleType("pymongo")
     read = ModuleType("pymongo.read_concern")
     write = ModuleType("pymongo.write_concern")
+    preferences = ModuleType("pymongo.read_preferences")
+    preferences.ReadPreference = SimpleNamespace(PRIMARY=SimpleNamespace(name="Primary"))
     read.ReadConcern = lambda level: SimpleNamespace(level=level)
     write.WriteConcern = lambda w, **kwargs: SimpleNamespace(w=w, document={"w": w, **kwargs})
     monkeypatch.setitem(sys.modules, "pymongo", pymongo)
     monkeypatch.setitem(sys.modules, "pymongo.read_concern", read)
     monkeypatch.setitem(sys.modules, "pymongo.write_concern", write)
+    monkeypatch.setitem(sys.modules, "pymongo.read_preferences", preferences)
 
 
 @pytest.fixture
@@ -406,12 +409,12 @@ def test_witness_configured_canonical_owner_denies_legacy_publication(suite):
 def test_protected_memento_publish_replay_and_erasure_participate_in_actor_epoch(suite, monkeypatch):
     """Witnessed frame transactions and tombstones share actor writer custody."""
     from skeleton.persistence.mongo_source_epoch import (
-        MongoCanonicalSourceEpoch, MongoSourceEpochError,
+        MongoSourceEpochError,
     )
     from skeleton.persistence.sealed_memento_witness import (
         WitnessedMongoMementoAuthority, WitnessPosition, _binding_digest,
     )
-    from skeleton.testing.test_mongo_source_epoch import Database
+    from skeleton.testing.test_mongo_source_epoch import epoch
     import pymongo
 
     monkeypatch.setattr(
@@ -419,7 +422,7 @@ def test_protected_memento_publish_replay_and_erasure_participate_in_actor_epoch
         raising=False,
     )
     conversation, mongo, archive, _ = suite
-    writer_epoch = MongoCanonicalSourceEpoch(Database())
+    writer_epoch = epoch()
     conversation.canonical_source_epoch = writer_epoch
     scope = _binding_digest(archive)
 
@@ -446,7 +449,7 @@ def test_protected_memento_publish_replay_and_erasure_participate_in_actor_epoch
         wire, expected = archive.seal(
             MementoRecord(1, "user", b"initial"), previous=previous,
         )
-        with pytest.raises(MongoSourceEpochError, match="writer epoch not owned"):
+        with pytest.raises(MongoSourceEpochError, match="writer epoch not owned|admission unavailable"):
             await guarded.publish(
                 archive=archive, expected_head=previous,
                 expected_thread_version=3, stream="user", ciphertext=wire,

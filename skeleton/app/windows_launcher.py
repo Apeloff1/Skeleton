@@ -47,6 +47,7 @@ def _hidden_runner(
     env=None,
     stdout=None,
     stderr=None,
+    stdin=None,
 ):
     """Run an argument-vector child process without a Windows console flash."""
 
@@ -61,6 +62,7 @@ def _hidden_runner(
         env=env,
         stdout=stdout,
         stderr=stderr,
+        stdin=stdin,
         shell=False,
         creationflags=creationflags,
     )
@@ -143,33 +145,55 @@ def start_runtime(
 
 def stop_runtime(root: Path | None = None) -> tuple[bool, str]:
     root = (root or installation_root()).resolve()
+    from skeleton.app.runtime_operation import RuntimeOperationDenied, runtime_operation
+    from skeleton.app.compose_stop_custody import stop_owned_runtime
     try:
-        completed = _hidden_runner(
-            list(compose_command("down", manifest=load_manifest())),
-            cwd=root,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=90,
-            env={**os.environ, "COMPOSE_REMOVE_ORPHANS": "0"},
-        )
-    except (OSError, subprocess.SubprocessError) as exc:
+        with runtime_operation(root, "stop") as lease:
+            report=stop_owned_runtime(root,command=compose_command("down",manifest=load_manifest(),install_env=True),
+                                      environ=dict(os.environ),runner=_hidden_runner,lease=lease)
+            if not lease.current():
+                return False, "Runtime operation custody changed; inspect existing services"
+            return report.ok,report.detail
+    except RuntimeOperationDenied as exc:
+        return False, "Stop blocked: " + str(exc)
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
         return False, f"Unable to stop services: {type(exc).__name__}; check Docker Desktop"
-    if completed.returncode == 0:
-        return True, "Skeleton services stopped."
-    # Docker may echo environment values in diagnostics. Do not surface
-    # unredacted child stderr/stdout in the installed GUI or CLI.
-    return False, f"Stop command failed with exit {completed.returncode}"
 
 
 def runtime_status(root: Path | None = None) -> tuple[bool, str]:
     root = (root or installation_root()).resolve()
     try:
+        from skeleton.app.first_install import _configuration_epoch, critical_backend_route_report
+        captured = dict(os.environ)
+        epoch = _configuration_epoch(root)
+        valid = True
+
+        def admitted():
+            nonlocal valid
+            if valid:
+                try:
+                    valid = _configuration_epoch(root) == epoch
+                except (OSError,ValueError,UnicodeError):
+                    valid = False
+            return valid
+
         manifest = load_manifest()
-        urls = public_service_urls(root, manifest=manifest)
+        urls = public_service_urls(root, manifest=manifest, environ=captured)
+        if not admitted():
+            return False, "Runtime configuration changed; retry diagnostics"
         results = probe_application(
             manifest=manifest, timeout=2.0, public_url_overrides=urls,
+            admit=admitted,
         )
+        if not admitted():
+            return False, "Runtime configuration changed; retry diagnostics"
+        complete = probes_ok(results,manifest=manifest,public_url_overrides=urls)
+        ready = complete
+        if ready:
+            backend = urls.get("backend", manifest.service("backend").public_url)
+            ready = critical_backend_route_report(backend, timeout=3.0)["ready"] is True
+            if not admitted():
+                return False, "Runtime configuration changed; retry diagnostics"
     except Exception as exc:
         return False, f"Runtime probe failed: {type(exc).__name__}; check local port configuration"
     if not results:
@@ -179,7 +203,9 @@ def runtime_status(root: Path | None = None) -> tuple[bool, str]:
         state = "ONLINE" if result.ok else "OFFLINE"
         status = result.status if result.status is not None else "-"
         lines.append(f"[{state}] {result.service}: HTTP {status} — {result.detail}")
-    return probes_ok(results), "\n".join(lines)
+    if complete and not ready:
+        lines.append("[OFFLINE] Critical API routers missing or unverified")
+    return ready, "\n".join(lines)
 
 
 def open_running_application(root: Path | None = None) -> tuple[bool, str]:
@@ -190,12 +216,19 @@ def open_running_application(root: Path | None = None) -> tuple[bool, str]:
     browser launch; runtime_status remains the separate whole-app diagnostic.
     """
     try:
+        from skeleton.app.first_install import _configuration_epoch
         root = (root or installation_root()).resolve()
+        captured = dict(os.environ)
+        epoch = _configuration_epoch(root)
         manifest = load_manifest()
         frontend = manifest.service("frontend")
-        app_url = public_service_urls(root, manifest=manifest).get(
+        app_url = public_service_urls(root, manifest=manifest, environ=captured).get(
             "frontend", frontend.public_url
         )
+        if (type(app_url) is not str or not app_url or len(app_url) > 4096
+                or any(ord(ch) <= 32 or ord(ch) >= 127 for ch in app_url)
+                or any(ch in app_url for ch in ("?", "#", "%", chr(92)))):
+            return False, "Setup UI address must be a local HTTP endpoint"
         parsed = urlsplit(app_url)
         if (
             parsed.scheme != "http"
@@ -211,10 +244,14 @@ def open_running_application(root: Path | None = None) -> tuple[bool, str]:
             return False, "Setup UI address must be a local HTTP endpoint"
         # Probe the actual exported setup route, not just a generic SPA root
         # that could return 200 while the first-run page is unavailable.
+        if _configuration_epoch(root) != epoch:
+            return False, "Setup UI configuration changed; retry diagnostics"
         frontend_probe = probe_local_setup(
             replace(frontend, public_url=app_url, health_path="/setup"),
             timeout=2.0,
         )
+        if _configuration_epoch(root) != epoch:
+            return False, "Setup UI configuration changed; retry diagnostics"
     except (OSError, ValueError, KeyError) as exc:
         # Never echo operator environment values or failing URL to the GUI.
         return False, f"Setup UI probe failed: {type(exc).__name__}"
@@ -226,6 +263,8 @@ def open_running_application(root: Path | None = None) -> tuple[bool, str]:
             "Inspect frontend container logs."
         )
     try:
+        if _configuration_epoch(root) != epoch:
+            return False, "Setup UI configuration changed; retry diagnostics"
         opened = webbrowser.open(app_url.rstrip("/") + "/setup")
     except (OSError, ValueError, webbrowser.Error) as exc:
         return False, f"Setup UI is reachable; browser failed: {type(exc).__name__}"
@@ -290,6 +329,12 @@ class WindowsLauncher:
         self._add_button(buttons, "Open App", self.open_app)
         self._add_button(buttons, "Local AI (offline)", self.local_ai)
         self._add_button(buttons, "Stop", self.stop)
+
+        recovery_buttons = ttk.Frame(outer)
+        recovery_buttons.pack(fill="x", pady=(0, 12))
+        self._add_button(recovery_buttons, "Storage Custody", self.inspect_storage)
+        self._add_button(recovery_buttons, "Interrupted Operation", self.inspect_recovery)
+        self._add_button(recovery_buttons, "Acknowledge Recovery", self.acknowledge_recovery)
 
         offline_buttons = ttk.Frame(outer)
         offline_buttons.pack(fill="x", pady=(0, 12))
@@ -390,6 +435,58 @@ class WindowsLauncher:
                     pass
 
         threading.Thread(target=worker, name="skeleton-windows-launcher", daemon=True).start()
+
+    def inspect_storage(self) -> None:
+        from skeleton.app.storage_custody import observe_storage
+        def work():
+            result = observe_storage(self.app_root, runner=_hidden_runner)
+            if not result.observed:
+                return False, "Selected Docker storage inventory unverified; preserve private configuration."
+            if result.new_credentials_permitted:
+                return True, "No canonical storage or containers observed in the selected daemon. No database or backup qualification."
+            return True, (
+                "Existing canonical storage observed. Preserve original persistent credentials."
+                + "\nVolume roles: " + (", ".join(result.volume_roles) or "none observed")
+                + "\nContainer roles: " + (", ".join(result.container_roles) or "none observed")
+                + "\nNo database data was read or modified."
+            )
+        self._run_worker("Inspecting storage custody…", work, lambda result: result[1])
+
+    def inspect_recovery(self) -> None:
+        from skeleton.app.runtime_mutation import recovery_status
+        def work():
+            result = recovery_status(self.app_root)
+            if not result["pending"]:
+                return True, "No unresolved runtime mutation intent."
+            return False, (
+                "Interrupted runtime operation: " + result["mutation"]
+                + "\nOperation ID: " + result["operation_id"]
+                + "\nInspect Docker Desktop, running jobs, the selected project and persistent data."
+                + "\nDo not acknowledge until you have checked the previous operation."
+            )
+        self._run_worker("Inspecting recovery…", work, lambda result: result[1])
+
+    def acknowledge_recovery(self) -> None:
+        from tkinter import simpledialog, messagebox
+        from skeleton.app.runtime_mutation import acknowledge
+        operation_id = simpledialog.askstring(
+            "Recovery acknowledgment", "Enter the exact operation ID from Interrupted Operation:",
+            parent=self.window,
+        )
+        if operation_id is None:
+            return
+        confirmed = messagebox.askyesno(
+            "Confirm manual inspection",
+            "Have you inspected Docker Desktop, the previous operation, selected project and "
+            "persistent data? Acknowledgment does not prove the daemon is idle or retry automatically.",
+            parent=self.window,
+        )
+        if not confirmed:
+            return
+        def work():
+            acknowledge(self.app_root, operation_id.strip(), daemon_inspected=True)
+            return True, "Exact recovery intent acknowledged. No Docker operation was started."
+        self._run_worker("Acknowledging recovery…", work, lambda result: result[1])
 
     def system_check(self) -> None:
         self._run_worker(
@@ -764,6 +861,20 @@ class WindowsLauncher:
 
 
 def _headless(args: argparse.Namespace, root: Path) -> int:
+    probe_port = getattr(args, "verify_install_probe", None)
+    if probe_port is not None:
+        # Explicit acceptance path for the installed windowed executable.
+        # Numeric loopback, no authorization or arbitrary path, no writes.
+        if type(probe_port) is not int or not 1 <= probe_port <= 65535:
+            return 2
+        from skeleton.app.first_install import critical_backend_route_report
+        try:
+            observation = critical_backend_route_report(
+                f"http://127.0.0.1:{probe_port}", timeout=5,
+            )
+            return 0 if observation["observed"] is True and observation["ready"] is True else 1
+        except (OSError, ValueError, KeyError, TypeError):
+            return 1
     if args.local_ai_dataset_smoke:
         from skeleton.app.local_ai_dataset import smoke_offline_native_dataset
         try:
@@ -848,6 +959,8 @@ def _headless(args: argparse.Namespace, root: Path) -> int:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(prog="Skeleton.exe")
     mode = result.add_mutually_exclusive_group()
+    mode.add_argument("--verify-install-probe", type=int, metavar="PORT",
+                      help="verify local read-only installed readiness transport against the supplied loopback port")
     mode.add_argument("--verify-payload", action="store_true",
                       help="verify installed application source payload without Docker")
     mode.add_argument("--check", action="store_true")
