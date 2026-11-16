@@ -48,6 +48,7 @@ on:
       - 'skeleton/ai/model_runtime/weight_store_recovery.py'
       - 'skeleton/ai/model_runtime/weight_store_cli.py'
       - 'skeleton/ai/model_runtime/weight_store_scrub.py'
+      - 'skeleton/ai/model_runtime/weight_store_range.py'
       - 'skeleton/ai/model_runtime/managed_weight_read.py'
       - 'skeleton/ai/model_runtime/flgb_model_runtime.py'
       - 'skeleton/ai/model_runtime/device_placement.py'
@@ -61,6 +62,7 @@ on:
       - 'skeleton/testing/test_weight_store_recovery.py'
       - 'skeleton/testing/test_weight_store_cli.py'
       - 'skeleton/testing/test_weight_store_scrub.py'
+      - 'skeleton/testing/test_weight_store_range.py'
       - 'skeleton/testing/test_managed_weight_custody.py'
       - 'skeleton/testing/test_sealed_weight_pages.py'
       - 'skeleton/testing/test_nvml_memory_probe.py'
@@ -145,6 +147,7 @@ jobs:
             skeleton/testing/test_weight_store_recovery.py \
             skeleton/testing/test_weight_store_cli.py \
             skeleton/testing/test_weight_store_scrub.py \
+            skeleton/testing/test_weight_store_range.py \
             skeleton/testing/test_managed_weight_custody.py \
             skeleton/testing/test_sealed_weight_pages.py \
             skeleton/testing/test_nvml_memory_probe.py \
