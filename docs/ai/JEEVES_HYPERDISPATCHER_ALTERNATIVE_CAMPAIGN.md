@@ -262,3 +262,23 @@ with insufficient authorization followed by successful durable publication
 with distinct action receipts. Key custody and the actual independent
 physical evidence validator remain externally provisioned.
 
+## Wave A13: end-to-end local owner dispatch cycle
+
+HostDispatchService connects the executable timer driver to canonical ranked
+durable leasing, a supplied authenticated worker transport and evidence-bound
+completion. It publishes/readbacks the lease before handing off immutable
+payload bytes; the transport executes outside the scheduler locks and may
+receive each attempt only once through that cycle. Any transport exception or
+malformed reply durably holds the original attempt as uncertain, preserving
+worker and tenant capacity. Signed outcomes use the actual verifier; invalid
+or ambiguous acknowledgements stop the owner and require archive restoration.
+The cycle is nonreentrant and admits only an explicit authorized candidate
+set. Regressions exercise the complete local SQLite timer-to-transport-to-
+signed-outcome route, plus transport loss and no repeated launch.
+
+This completes the in-process owner execution path, not the application
+deployment. A host must connect its actual worker transport, durable immutable
+receipt resolver, physical evidence validator, run lease renewal and service
+tick. The test signer/validator is synthetic; no native GPU/cluster/device
+or independent comparative result is claimed.
+

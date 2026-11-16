@@ -378,6 +378,38 @@ class SwarmDurableBridge:
                 raise DurableSwarmError("reconciliation stopped; restore durable custody") from exc
 
 
+
+    def hold_transport_unknown(
+        self, run_id: str, owner_id: str, manager: SwarmRecoveryManager,
+        broker: TenantSwarmBroker, tenant: str, task_id: str, *,
+        worker_id: str, lease_token: str,
+    ) -> tuple[SwarmTask, DurableSwarmCapture]:
+        """A failed handoff is not evidence that the physical effect stopped.
+
+        Even when a transport supplies no authenticated response, the trusted
+        owner can conservatively preserve capacity and exact attempt custody.
+        This path never returns successful completion or permits retry.
+        """
+        tenant, task_id = broker._tenant(tenant), broker._task_id(task_id)
+        runtime = broker.broker.runtime
+        with broker._lock, broker.broker._completion_lock, runtime._lock, manager._lock:
+            resident = broker._verified_resident(tenant, task_id)
+            if (not runtime.fenced or resident.leased_to != worker_id
+                    or resident.lease_token != lease_token
+                    or broker.ingress.phase(tenant, task_id) != "leased"
+                    or (resident.state is not TaskState.LEASED and not resident.effect_uncertain)):
+                raise DurableSwarmError("transport attempt custody changed")
+            try:
+                if not resident.effect_uncertain:
+                    resident = runtime._hold_uncertain(
+                        resident, reason="transport acknowledgement uncertain",
+                    )
+                return resident, self._capture_checked(run_id, owner_id, manager, broker)
+            except Exception as exc:
+                broker.retire()
+                raise DurableSwarmError("transport custody uncertain; restore durable archive") from exc
+
+
     def load(self, run_id: str) -> DurableSwarmRecovery | None:
         """Load and verify the latest durable swarm archive for an outer run."""
         resume = self.store.resume_state(run_id)
@@ -820,4 +852,121 @@ class HostWorkerAuthority:
             # Malformed evidence, unavailable custody or a failing independent
             # validator may never open a verified execution boundary.
             return False
+
+@dataclass(frozen=True, slots=True)
+class HostDispatchAttempt:
+    """Immutable transport handoff created only after durable lease readback."""
+
+    run_id: str
+    tenant: str
+    task_id: str
+    worker_id: str
+    lease_token: str
+    payload_json: bytes
+
+    def payload(self) -> dict[str, object]:
+        import json
+        # Transport receives an independent copy; never the resident map.
+        return json.loads(self.payload_json)
+
+
+@dataclass(frozen=True, slots=True)
+class HostTransportReply:
+    outcome: str
+    evidence_sha256: str
+
+    def __post_init__(self) -> None:
+        if self.outcome not in ("success", "uncertain"):
+            raise DurableSwarmError("invalid transport outcome")
+        _wait_digest(self.evidence_sha256)
+
+
+@dataclass(frozen=True, slots=True)
+class HostDispatchCycle:
+    timers_woken: tuple[str, ...]
+    task_id: str | None
+    disposition: str
+    evidence_sha256: str | None = None
+
+
+class HostDispatchService:
+    """Local trusted owner execution loop over the canonical dispatch path.
+
+    A cycle wakes due timers, publishes at most one exact authorized lease,
+    calls the host-owned transport once, verifies its receipt and commits an
+    outcome. No runtime/broker locks are held while the transport executes.
+    The supplied transport is responsible for its own bounded I/O, actual
+    worker launch/cancellation, durable receipt custody and independent
+    evidence publication. This service never starts hidden threads or grants
+    model-generated tasks authority. The outer host must hold its run lease.
+    """
+
+    def __init__(self, wait_driver: HostWaitDriver, *,
+                 transport: Callable[[HostDispatchAttempt], HostTransportReply]) -> None:
+        from threading import Lock
+        if not isinstance(wait_driver, HostWaitDriver) or not callable(transport):
+            raise DurableSwarmError("invalid host dispatch service configuration")
+        authority = wait_driver.broker.broker._verify_worker
+        if not isinstance(authority, HostWorkerAuthority) or authority.run_id != wait_driver.run_id:
+            raise DurableSwarmError("host dispatch requires run-bound worker evidence authority")
+        self.wait_driver = wait_driver
+        self._transport = transport
+        self._cycle_lock = Lock()
+
+    def cycle(self, candidates: tuple, *, now_ms: int,
+              timer_limit: int = 64) -> HostDispatchCycle:
+        from skeleton.intelligence.dispatch_policy import DispatchCandidate, bounded_int, MAX_CANDIDATES
+        if (type(candidates) is not tuple or len(candidates) > MAX_CANDIDATES
+                or any(not isinstance(candidate, DispatchCandidate) for candidate in candidates)):
+            raise DurableSwarmError("invalid authorized dispatch candidate batch")
+        bounded_int(now_ms, "dispatch time")
+        if not self._cycle_lock.acquire(blocking=False):
+            raise DurableSwarmError("host dispatch cycle already active")
+        try:
+            owner = self.wait_driver
+            timers = owner.poll_due_timers(limit=timer_limit)
+            selection = owner.bridge.lease_and_capture_verified(
+                owner.run_id, owner.owner_id, owner.manager, owner.broker,
+                candidates, now_ms=now_ms,
+            )
+            if selection is None:
+                return HostDispatchCycle(timers, None, "idle")
+            tenant, task, _capture = selection
+            # This is an owned lease returned after checkpoint/readback. Any
+            # preparation or transport error must retain the original attempt.
+            if task.leased_to is None or task.lease_token is None:
+                owner.broker.retire()
+                raise DurableSwarmError("durable attempt missing its transport identity")
+            try:
+                payload = dict(task.payload)
+                payload.pop(_HOST_WAIT_FIELD, None)
+                attempt = HostDispatchAttempt(
+                    owner.run_id, tenant, task.id, task.leased_to, task.lease_token,
+                    _wait_bytes(payload),
+                )
+                reply = self._transport(attempt)
+                if type(reply) is not HostTransportReply:
+                    raise DurableSwarmError("transport did not return an evidence receipt")
+            except Exception:
+                owner.bridge.hold_transport_unknown(
+                    owner.run_id, owner.owner_id, owner.manager, owner.broker,
+                    tenant, task.id, worker_id=task.leased_to,
+                    lease_token=task.lease_token,
+                )
+                return HostDispatchCycle(timers, task.id, "transport-unknown")
+            # Invalid/expired evidence or ambiguous storage acknowledgement
+            # causes finish_and_capture_verified to retire the owner. Restore
+            # from the durable pre-execution archive; never re-call transport.
+            result, _ = owner.bridge.finish_and_capture_verified(
+                owner.run_id, owner.owner_id, owner.manager, owner.broker,
+                tenant, task.id, worker_id=task.leased_to, lease_token=task.lease_token,
+                outcome=reply.outcome, evidence_sha256=reply.evidence_sha256,
+            )
+            return HostDispatchCycle(
+                timers, task.id,
+                "uncertain" if result.effect_uncertain else "completed",
+                reply.evidence_sha256,
+            )
+        finally:
+            self._cycle_lock.release()
 

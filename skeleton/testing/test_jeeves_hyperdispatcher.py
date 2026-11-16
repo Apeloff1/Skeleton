@@ -2080,3 +2080,90 @@ def test_host_worker_authority_refuses_cross_issuer_key_reuse_and_cross_scope_ro
             HostWorkerAuthority("run", grants=grants, resolve=lambda digest: None,
                                 validate_evidence=lambda receipt, evidence: True)
 
+
+def _signed_host_service_fixture(tmp_path, *, transport, clock):
+    from skeleton.automation.agents.swarm_durable import (
+        HostDispatchService, HostWaitDriver, HostWorkerAuthority, SwarmDurableBridge,
+    )
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.testing.test_durable_run_store import make_store
+    custody = {}
+    authority = HostWorkerAuthority(
+        "service", grants={("worker", "w"): (b"w" * 32, frozenset({"success"}))},
+        resolve=custody.get, validate_evidence=lambda receipt, raw: raw == b"checked result",
+    )
+    runtime, broker = _verified_dispatch_fixture(verify_worker=authority)
+    store = make_store(tmp_path)
+    store.create_run("service")
+    store.claim_run("service", "owner", lease_seconds=60)
+    bridge = SwarmDurableBridge(store)
+    manager = SwarmRecoveryManager(delta_archive=True)
+    driver = HostWaitDriver(bridge, "service", "owner", manager, broker,
+                            source_keys={}, clock_ms=clock)
+    service = HostDispatchService(driver, transport=lambda attempt: transport(attempt, custody, bridge))
+    return runtime, broker, bridge, manager, driver, service
+
+
+def test_host_service_wakes_timer_leases_durably_and_commits_signed_worker_output(tmp_path):
+    from hashlib import sha256
+    from skeleton.automation.agents.swarm_durable import HostWaitIntent, HostWorkerReceipt, HostTransportReply
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, TaskState
+    from skeleton.intelligence.dispatch_policy import DispatchCandidate
+    now, handoffs = [10], []
+
+    def transport(attempt, custody, bridge):
+        assert attempt.payload() == {"job": "test"}
+        # A separate read of the actual durable archive sees the same attempt
+        # before physical execution. Recovery classifies it as uncertain.
+        stored = bridge.load("service").restore_runtime().task(attempt.task_id)
+        assert stored.effect_uncertain and stored.lease_token == attempt.lease_token
+        handoffs.append(attempt.task_id)
+        data = b"checked result"
+        receipt = HostWorkerReceipt.issue(
+            run_id=attempt.run_id, issuer="worker", worker_id=attempt.worker_id,
+            task_id=attempt.task_id, lease_token=attempt.lease_token,
+            action="success", artifact_sha256=sha256(data).hexdigest(), issuer_key=b"w" * 32,
+        )
+        custody[receipt.digest] = (receipt, data)
+        return HostTransportReply("success", receipt.digest)
+
+    runtime, broker, bridge, manager, driver, service = _signed_host_service_fixture(
+        tmp_path, transport=transport, clock=lambda: now[0],
+    )
+    intent = HostWaitIntent("service", "a", "deferred", "timer", "host-clock", "deadline", 20)
+    assert driver.submit(intent, SwarmTask("deferred", {"job": "test"}))
+    candidates = (DispatchCandidate("deferred", "a", 100, 0),)
+    assert service.cycle(candidates, now_ms=10000).disposition == "idle"
+    assert not handoffs
+    now[0] = 20
+    complete = service.cycle(candidates, now_ms=10000)
+    assert complete.timers_woken == ("deferred",) and complete.disposition == "completed"
+    assert handoffs == ["deferred"]
+    assert complete.evidence_sha256
+    assert bridge.load("service").restore_runtime().task("deferred").state is TaskState.SUCCEEDED
+    assert service.cycle(candidates, now_ms=10000).disposition == "idle"
+    assert handoffs == ["deferred"]
+
+
+def test_host_service_transport_exception_preserves_exact_uncertain_custody(tmp_path):
+    from skeleton.automation.agents.swarm_runtime import SwarmTask
+    from skeleton.intelligence.dispatch_policy import DispatchCandidate
+    handoffs = []
+
+    def transport(attempt, custody, bridge):
+        handoffs.append(attempt.lease_token)
+        raise OSError("simulated connection loss after physical handoff")
+
+    runtime, broker, bridge, manager, driver, service = _signed_host_service_fixture(
+        tmp_path, transport=transport, clock=lambda: 50,
+    )
+    bridge.submit_unique_verified("service", "owner", manager, broker, "a", SwarmTask("work", {}))
+    candidates = (DispatchCandidate("work", "a", 100, 0),)
+    unknown = service.cycle(candidates, now_ms=10000)
+    assert unknown.disposition == "transport-unknown" and unknown.evidence_sha256 is None
+    stored = bridge.load("service").restore_runtime().task("work")
+    assert stored.effect_uncertain and stored.lease_token == handoffs[0]
+    assert broker.ingress.phase("a", "work") == "leased"
+    assert service.cycle(candidates, now_ms=10000).disposition == "idle"
+    assert len(handoffs) == 1
+
