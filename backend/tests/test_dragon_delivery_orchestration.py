@@ -28,8 +28,8 @@ class LocalDeliveryTests(unittest.TestCase):
     def test_import_queue_finite_replay_and_single_owner_runner(self):
         store=ExportJobs(self.root/"jobs.sqlite3",create=True)
         manifest=self.root/"manifest.json"
-        report={"entries":[{}]}
-        with patch("core.dragon_export_jobs.qualify_manifest",return_value=([],report)),patch(
+        report={"entries":[{"rows":1}]}
+        with patch("core.dragon_export_jobs._bound_manifest"),patch("core.dragon_export_jobs.qualify_manifest",return_value=([],report)),patch(
                 "core.dragon_export_jobs.time.time",return_value=100):
             a=store.enqueue(SCOPE,manifest,expected_sha="a"*64,execution_seconds=300,rights_acknowledged=True)
             b=store.enqueue(SCOPE,manifest,expected_sha="a"*64,execution_seconds=3600,rights_acknowledged=True)
@@ -39,17 +39,17 @@ class LocalDeliveryTests(unittest.TestCase):
             kwargs["authorize"]()
             self.assertEqual(store.pulse(SCOPE,graph_factory=Mock())["state"],"drain_required")
             return {"manifest_sha256":"a"*64,"settlements":[]}
-        with patch("core.dragon_export_jobs.time.time",return_value=101),patch(
+        with patch("core.dragon_export_jobs._bound_manifest"),patch("core.dragon_export_jobs.time.time",return_value=101),patch(
                 "core.dragon_export_jobs.apply_manifest",side_effect=apply):
             self.assertEqual(store.pulse(OTHER,graph_factory=Mock())["state"],"idle")
             self.assertEqual(store.pulse(SCOPE,graph_factory=Mock())["state"],"sealed")
 
     def test_import_expiry_and_explicit_resume(self):
         store=ExportJobs(self.root/"jobs.sqlite3",create=True)
-        with patch("core.dragon_export_jobs.qualify_manifest",return_value=([],{"entries":[{}]})),patch(
+        with patch("core.dragon_export_jobs._bound_manifest"),patch("core.dragon_export_jobs.qualify_manifest",return_value=([],{"entries":[{"rows":1}]})),patch(
                 "core.dragon_export_jobs.time.time",return_value=100):
             job=store.enqueue(SCOPE,self.root/"m.json",expected_sha="a"*64,execution_seconds=60,rights_acknowledged=True)
-        with patch("core.dragon_export_jobs.time.time",return_value=101),patch(
+        with patch("core.dragon_export_jobs._bound_manifest"),patch("core.dragon_export_jobs.time.time",return_value=101),patch(
                 "core.dragon_export_jobs.apply_manifest",side_effect=ValueError("fixture")):
             self.assertEqual(store.pulse(SCOPE,graph_factory=Mock())["state"],"held")
             with self.assertRaises(ValueError):store.resume(SCOPE,job["id"])
@@ -57,6 +57,17 @@ class LocalDeliveryTests(unittest.TestCase):
         with patch("core.dragon_export_jobs.time.time",return_value=160),patch("core.dragon_export_jobs.apply_manifest") as apply:
             self.assertEqual(store.pulse(SCOPE,graph_factory=Mock())["state"],"idle")
             apply.assert_not_called()
+
+    def test_cancelled_import_stops_before_canonical_graph_work(self):
+        store=ExportJobs(self.root/"jobs.sqlite3",create=True)
+        with patch("core.dragon_export_jobs._bound_manifest"),patch(
+                "core.dragon_export_jobs.qualify_manifest",return_value=([],{"entries":[{"rows":1}]})):
+            store.enqueue(SCOPE,self.root/"m.json",expected_sha="a"*64,
+                          execution_seconds=300,rights_acknowledged=True)
+        with patch("core.dragon_export_jobs.apply_manifest") as apply:
+            result=store.pulse(SCOPE,graph_factory=Mock(),cancelled=lambda:True)
+        self.assertEqual(result["state"],"held")
+        apply.assert_not_called()
 
     def test_raw_retention_exact_bytes_scope_and_expiry(self):
         store=RawExportCustody(self.root/"raw.sqlite3",create=True)
@@ -124,6 +135,21 @@ class LocalDeliveryTests(unittest.TestCase):
         self.assertEqual(backup.verify(dest),result)
         (dest/"application-artifacts"/"0001.backup").write_bytes(b"altered")
         with self.assertRaises(custody.DeploymentHeld):backup.verify(dest)
+
+
+class DeliverySchedulerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_disabled_scheduler_never_opens_local_artifacts(self):
+        from core.dragon_export_jobs import scheduler_pulse
+        with patch.dict(os.environ,{},clear=True),patch("core.dragon_export_jobs._read_json") as read:
+            self.assertFalse((await scheduler_pulse())["configured"])
+            read.assert_not_called()
+
+    async def test_incomplete_configuration_holds_without_file_access(self):
+        from core.dragon_export_jobs import scheduler_pulse
+        with patch.dict(os.environ,{"SKL_DRAGON_DELIVERY_SCHEDULER":"1"},clear=True),patch(
+                "core.dragon_export_jobs._read_json") as read:
+            self.assertTrue((await scheduler_pulse())["failed"])
+            read.assert_not_called()
 
 
 class RegistryConnectorTests(unittest.IsolatedAsyncioTestCase):
