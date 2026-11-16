@@ -121,18 +121,12 @@ class TrustedNativeStartup:
                 or len(set(pin.model_id for pin in self.pins)) != len(self.pins)):
             raise NativeStartupBlocked("unique independently reviewed native model pins required")
 
-    async def __call__(self, state: Any) -> None:
-        from skeleton.api.server import ServerState
+    async def prepare(self):
+        """Prepare guarded components without depending on a transport state.
 
-        if type(state) is not ServerState:
-            raise NativeStartupBlocked("canonical server startup state required")
-        if (state.engine_execution_service is not None
-                or state.engine_execution_coordinator is not None
-                or state._engine_shutdown_pending
-                or state._engine_local_guard_components is not None
-                or getattr(state, "_engine_canonical_sources", None) is not None
-                or getattr(state, "_engine_canonical_mongo_owners", None) is not None):
-            raise NativeStartupBlocked("native startup must precede service construction")
+        The API composition root owns exact state admission and atomic binding.
+        This method cannot install, start, or publish a native execution service.
+        """
         try:
             _validate_layout(self.epoch, self.conversation, self.memory)
             initial = await _observe_primary(self.epoch)
@@ -144,11 +138,7 @@ class TrustedNativeStartup:
             if initial != final or getattr(self.reviewer, "_closed", True) is not False:
                 raise NativeStartupBlocked("native startup authority changed")
             _validate_layout(self.epoch, self.conversation, self.memory)
-            state.configure_engine_protected_native_startup(
-                components=components, conversation=self.conversation,
-                memory=self.memory, shared_epoch=self.epoch,
-                memory_namespace=self.memory_namespace, policy_sha256=self.policy_sha256,
-            )
+            return components
         except NativeStartupBlocked:
             raise
         except Exception:

@@ -7,7 +7,9 @@ from unittest.mock import patch
 
 import pytest
 
-from skeleton.api.server import ServerState, _run_trusted_protected_bootstrap
+from skeleton.api.server import (
+    ServerState, _install_trusted_native_startup, _run_trusted_protected_bootstrap,
+)
 from skeleton.app.trusted_native_startup import NativeStartupBlocked, TrustedNativeStartup
 from skeleton.ai.runtime.inference.native_guard_binding import NativeGuardPins
 from skeleton.ai.runtime.inference.reviewer_custody import ReviewerTrustAnchor
@@ -52,7 +54,7 @@ def fixture():
 
 def install(startup, state):
     with patch("skeleton.app.trusted_native_startup.verify_canonical_source_writer_inventory"):
-        asyncio.run(startup(state))
+        asyncio.run(_install_trusted_native_startup(state, startup))
 
 
 def test_startup_installs_exact_tuple_once_without_executing_model():
@@ -115,6 +117,36 @@ def test_topology_changes_at_final_probe_deny_startup():
     with pytest.raises(NativeStartupBlocked):
         install(startup, state)
     assert state._engine_local_guard_components is None
+
+
+def test_noncanonical_state_denied_before_mongo_or_factory():
+    startup, database = fixture()
+    class ForeignState(ServerState):
+        pass
+    with patch.object(database, "command", side_effect=AssertionError("unexpected Mongo I/O")):
+        for state in (object(), ForeignState()):
+            with pytest.raises(NativeStartupBlocked, match="canonical server startup state"):
+                asyncio.run(_install_trusted_native_startup(state, startup))
+
+
+def test_native_prepare_cannot_publish_or_install_a_state():
+    startup, _ = fixture()
+    state = ServerState()
+    with patch("skeleton.app.trusted_native_startup.verify_canonical_source_writer_inventory"):
+        components = asyncio.run(startup.prepare())
+    assert components is not None
+    assert state._engine_local_guard_components is None
+    assert state.engine_execution_service is None
+
+
+def test_exact_composition_dispatches_through_api_boundary():
+    startup, _ = fixture()
+    state = ServerState()
+    from unittest.mock import AsyncMock
+    with patch("skeleton.api.server._install_trusted_native_startup", new_callable=AsyncMock) as bind:
+        with pytest.raises(RuntimeError, match="requires native guard"):
+            asyncio.run(_run_trusted_protected_bootstrap(state, startup))
+        bind.assert_awaited_once_with(state, startup)
 
 
 def test_async_bootstrap_cannot_return_authority():

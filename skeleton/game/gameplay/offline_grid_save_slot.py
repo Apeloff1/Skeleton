@@ -17,6 +17,10 @@ import sys
 from pathlib import Path
 
 MAX_SAVE_BYTES = 2_000_000
+MAX_SAVE_DEPTH = 128
+# Capture the original platform capability identities. Fault-injection wrappers
+# around os.open/stat must exercise the guarded operation, not fake a missing OS.
+_DIR_FD_PRIMITIVES = (os.open, os.stat, os.rename, os.unlink)
 
 
 class SaveSlotError(ValueError):
@@ -67,6 +71,67 @@ def _decode(payload: bytes) -> object:
         raise SaveSlotError("invalid replay snapshot encoding") from exc
 
 
+def _admit_snapshot(snapshot: object) -> None:
+    """Bound the plain JSON tree before the encoder allocates escaped strings.
+
+    Exact built-ins avoid custom iteration, equality, string conversion and
+    inconsistent length hooks. A lower byte bound rejects huge strings and
+    collections without traversing them, while the encoder remains the exact
+    byte-budget authority. No caller-supplied subclass is executed.
+    """
+    remaining = MAX_SAVE_BYTES
+    active: set[int] = set()
+
+    def charge(amount: int) -> None:
+        nonlocal remaining
+        if amount > remaining:
+            raise SaveSlotError("save exceeds byte budget")
+        remaining -= amount
+
+    def visit(value: object, depth: int) -> None:
+        if depth > MAX_SAVE_DEPTH:
+            raise SaveSlotError("save exceeds nesting budget")
+        kind = type(value)
+        if kind is str:
+            charge(len(value) + 2)
+        elif kind is bool:
+            charge(4 if value else 5)
+        elif value is None:
+            charge(4)
+        elif kind is int:
+            charge(max(1, (value.bit_length() - 1) // 4) + (value < 0))
+        elif kind is float:
+            if not math.isfinite(value):
+                raise SaveSlotError("non-finite save value")
+            charge(1)
+        elif kind in (list, tuple, dict):
+            size = len(value)
+            charge(2 + max(0, size - 1))
+            # Each element occupies at least a single JSON byte.
+            if size > remaining:
+                raise SaveSlotError("save exceeds byte budget")
+            identity = id(value)
+            if identity in active:
+                raise SaveSlotError("cyclic replay snapshot")
+            active.add(identity)
+            try:
+                if kind is dict:
+                    for key, item in value.items():
+                        if type(key) is not str:
+                            raise SaveSlotError("save record keys must be plain strings")
+                        charge(len(key) + 3)
+                        visit(item, depth + 1)
+                else:
+                    for item in value:
+                        visit(item, depth + 1)
+            finally:
+                active.remove(identity)
+        else:
+            raise SaveSlotError("invalid replay snapshot type")
+
+    visit(snapshot, 0)
+
+
 def _encode(snapshot: object) -> bytes:
     """Encode incrementally under the save budget, not after a huge allocation.
 
@@ -75,6 +140,7 @@ def _encode(snapshot: object) -> bytes:
     JSONEncoder chunks allows bounded publication admission before allocation
     grows beyond MAX_SAVE_BYTES, while preserving canonical serialization.
     """
+    _admit_snapshot(snapshot)
     buf = bytearray()
     try:
         encoder = json.JSONEncoder(
@@ -119,7 +185,7 @@ def _open_parent(path: Path) -> tuple[int, Path]:
     if (not hasattr(os, "supports_dir_fd") or not hasattr(os, "O_NOFOLLOW")
             or not hasattr(os, "O_DIRECTORY")
             or not all(fn in os.supports_dir_fd for fn in
-                       (os.open, os.stat, os.rename, os.unlink))):
+                       _DIR_FD_PRIMITIVES)):
         raise SaveSlotError("descriptor-relative saves unavailable on this platform")
     parent = path.parent.absolute()
     parts = parent.parts

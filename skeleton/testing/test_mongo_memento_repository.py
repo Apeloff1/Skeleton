@@ -177,11 +177,14 @@ def fake_pymongo(monkeypatch):
     pymongo = ModuleType("pymongo")
     read = ModuleType("pymongo.read_concern")
     write = ModuleType("pymongo.write_concern")
+    preferences = ModuleType("pymongo.read_preferences")
+    preferences.ReadPreference = SimpleNamespace(PRIMARY=SimpleNamespace(name="Primary"))
     read.ReadConcern = lambda level: SimpleNamespace(level=level)
     write.WriteConcern = lambda w, **kwargs: SimpleNamespace(w=w, document={"w": w, **kwargs})
     monkeypatch.setitem(sys.modules, "pymongo", pymongo)
     monkeypatch.setitem(sys.modules, "pymongo.read_concern", read)
     monkeypatch.setitem(sys.modules, "pymongo.write_concern", write)
+    monkeypatch.setitem(sys.modules, "pymongo.read_preferences", preferences)
 
 
 @pytest.fixture
