@@ -36,7 +36,7 @@ from .structured_discovery import (
 )
 from .frontier_scheduler import choose_frontier
 from .navigation_backlog import (
-    new_backlog, observe, count as count_discovery, pending_rows,
+    new_backlog, observe, count as count_discovery, pending_rows, record_for,
     retire as retire_discovery, validate as validate_backlog,
     projection as backlog_projection, remember as remember_discourse,
     deliberate as deliberate_navigation,
@@ -765,7 +765,7 @@ class CrawlRun:
                 count_discovery(ledger, "outside_policy")
             return False
         observed = (observe(ledger, url=url, parent=parent_url, depth=depth, kind=relation)
-                    if record else ledger["records"].get(url))
+                    if record else record_for(ledger, url))
         if depth > self.request.max_depth:
             if record:
                 count_discovery(ledger, "depth_held")
@@ -861,7 +861,9 @@ class CrawlRun:
             "frontier_count": len(state["frontier"]),
             "navigation_backlog": backlog_projection(state["discovery_backlog"],
                 frontier=state["frontier"], seen=state["seen"], max_depth=self.request.max_depth),
-            "next_ready_at": min(ready) if ready else None,
+            "next_ready_at": min(ready) if ready else min((
+                max(row["ready_at"], state["host_ready"].get(urlsplit(row["url"]).hostname, 0))
+                for row in pending_rows(state["discovery_backlog"])), default=None),
             "source_count": len(state["sources"]),
             "instruction_security": incident_summary(state["instruction_incidents"]),
             "acquisition_readiness": acquisition_readiness(
@@ -1747,6 +1749,8 @@ class CrawlRun:
                     if event is None:
                         self._state = before
                         break
+                    if not self._state["frontier"]:
+                        self._replenish_frontier(time.time())
                     if not self._state["frontier"] and not pending_rows(self._state["discovery_backlog"]):
                         self._state["state"] = "completed"
                         self._state["stop_reason"] = "frontier_drained"
