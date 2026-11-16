@@ -282,3 +282,31 @@ receipt resolver, physical evidence validator, run lease renewal and service
 tick. The test signer/validator is synthetic; no native GPU/cluster/device
 or independent comparative result is claimed.
 
+## Wave A14: physical local worker and durable signed evidence custody
+
+SQLiteWorkerCustody owns a separate evidence journal (not a second scheduler).
+An atomic exact attempt tombstone and bounded logical storage reservation
+precede physical launch. Concurrent repeats cannot start the same token;
+a started attempt with no committed receipt remains uncertain forever until
+explicit recovery. Result publication binds the immutable signed receipt and
+artifact in one transaction and verifies readback. Reopen preserves custody
+and policy ceilings, while mismatched identities, changed receipts, capacity
+exhaustion and non-private storage fail closed. The journal is not encrypted
+or a distributed service; the trusted host owns directory and backup policy.
+
+LocalSubprocessTransport actually executes an isolated Python interpreter with
+a fixed program for three bounded pure operations: text SHA-256, integer sum,
+and canonical JSON SHA-256. Tenant/worker grants are explicit. No task can
+select arbitrary commands, executables or shell arguments. The host verifies
+the returned result independently before signing; the broker validates
+recomputed semantics against the persisted admitted input after SQLite
+readback. The exact same signed receipt can be read after restart without
+rerunning the physical process. An incomplete attempt never re-launches.
+Four regressions cover real child execution, durable end-to-end dispatch,
+concurrent tombstones, conflicting evidence, capacity and uncertain replay.
+
+This is actual local CPU work within the explicit operation scope, not
+general code/tool execution, production model inference, process sandboxing,
+or deployment qualification. Physical disk headroom, encryption, external
+receipt intake, orchestration startup, lease renewal and independent
+competitive measurements remain open.

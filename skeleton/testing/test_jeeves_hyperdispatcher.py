@@ -2167,3 +2167,153 @@ def test_host_service_transport_exception_preserves_exact_uncertain_custody(tmp_
     assert service.cycle(candidates, now_ms=10000).disposition == "idle"
     assert len(handoffs) == 1
 
+
+def _private_worker_directory(tmp_path):
+    directory = tmp_path / "worker-custody"
+    directory.mkdir(mode=0o700)
+    return directory
+
+
+def test_sqlite_worker_custody_atomic_start_and_immutable_reopen(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from hashlib import sha256
+    from skeleton.automation.agents.swarm_durable import (
+        SQLiteWorkerCustody, HostDispatchAttempt, HostWorkerReceipt, DurableSwarmError,
+    )
+    directory = _private_worker_directory(tmp_path)
+    store = SQLiteWorkerCustody(directory, max_attempts=2)
+    attempt = HostDispatchAttempt("run", "a", "task", "w", "a" * 32, b"{}")
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        wins = list(pool.map(lambda _: store.begin(attempt), range(8)))
+    assert wins.count(True) == 1
+    reopened = SQLiteWorkerCustody(directory, max_attempts=2)
+    assert not reopened.begin(attempt)
+    assert reopened.lookup("run", attempt.lease_token).receipt_sha256 is None
+    with pytest.raises(DurableSwarmError, match="identity"):
+        reopened.begin(replace(attempt, tenant="other"))
+    data = b"exact evidence"
+    receipt = HostWorkerReceipt.issue(
+        run_id="run", issuer="worker", worker_id="w", task_id="task",
+        lease_token=attempt.lease_token, action="success",
+        artifact_sha256=sha256(data).hexdigest(), issuer_key=b"k" * 32,
+    )
+    assert reopened.finish(attempt, receipt, data) == receipt.digest
+    assert store.finish(attempt, receipt, data) == receipt.digest
+    assert store.resolve(receipt.digest) == (receipt, data)
+    assert store.lookup("run", attempt.lease_token).receipt_sha256 == receipt.digest
+    with pytest.raises(DurableSwarmError, match="match"):
+        store.finish(attempt, receipt, data + b"!")
+    changed = HostWorkerReceipt.issue(
+        run_id="run", issuer="worker", worker_id="w", task_id="task",
+        lease_token=attempt.lease_token, action="success",
+        artifact_sha256=sha256(b"different").hexdigest(), issuer_key=b"k" * 32,
+    )
+    with pytest.raises(DurableSwarmError, match="conflict"):
+        store.finish(attempt, changed, b"different")
+    assert store.begin(replace(attempt, lease_token="b" * 32))
+    with pytest.raises(DurableSwarmError, match="capacity"):
+        store.begin(replace(attempt, lease_token="c" * 32))
+    with pytest.raises(DurableSwarmError, match="policy"):
+        SQLiteWorkerCustody(directory, max_attempts=3)
+    assert store.usage()["uncertain"] == 1
+
+
+def test_local_subprocess_transport_real_jobs_and_restart_readback(tmp_path):
+    from hashlib import sha256
+    from skeleton.automation.agents.swarm_durable import (
+        SQLiteWorkerCustody, LocalSubprocessTransport, LocalWorkerEvidenceValidator,
+        HostWorkerAuthority, HostDispatchAttempt,
+    )
+    import json
+    directory = _private_worker_directory(tmp_path)
+    store = SQLiteWorkerCustody(directory)
+    options = dict(grants={("a", "w"): frozenset({"sha256_text", "integer_sum", "json_sha256"})},
+                   worker_signers={"w": ("worker", b"w" * 32)})
+    transport = LocalSubprocessTransport(store, **options)
+    expected = [
+        ({"operation": "sha256_text", "input": "test"}, sha256(b"test").hexdigest()),
+        ({"operation": "integer_sum", "input": [1, -9, 13]}, 5),
+        ({"operation": "json_sha256", "input": {"b": 1, "a": 2}},
+         sha256(b'{"a":2,"b":1}').hexdigest()),
+    ]
+    for i, (payload, result) in enumerate(expected):
+        raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        attempt = HostDispatchAttempt("run", "a", f"task-{i}", "w", str(i) * 32, raw)
+        reply = transport(attempt)
+        reopened = SQLiteWorkerCustody(directory)
+        receipt, artifact = reopened.resolve(reply.evidence_sha256)
+        assert json.loads(artifact)["result"] == result
+        verifier = HostWorkerAuthority("run", grants={
+            ("worker", "w"): (b"w" * 32, frozenset({"success"})),
+        }, resolve=reopened.resolve, validate_evidence=LocalWorkerEvidenceValidator(reopened))
+        assert verifier("w", attempt.task_id, attempt.lease_token, "success", receipt.digest)
+        restarted = LocalSubprocessTransport(reopened, **options)
+        assert restarted(attempt) == reply
+    assert store.usage()["completed"] == 3
+
+
+def test_local_subprocess_transport_refuses_unapproved_and_uncertain_replay(tmp_path, monkeypatch):
+    from skeleton.automation.agents.swarm_durable import (
+        SQLiteWorkerCustody, LocalSubprocessTransport, HostDispatchAttempt, DurableSwarmError,
+    )
+    import subprocess
+    store = SQLiteWorkerCustody(_private_worker_directory(tmp_path))
+    transport = LocalSubprocessTransport(
+        store, grants={("a", "w"): frozenset({"integer_sum"})},
+        worker_signers={"w": ("worker", b"w" * 32)},
+    )
+    calls = []
+    def lost(*args, **kwargs):
+        calls.append(1)
+        raise subprocess.TimeoutExpired("fixed worker", 1)
+    monkeypatch.setattr(subprocess, "run", lost)
+    attempt = HostDispatchAttempt("run", "a", "task", "w", "a" * 32,
+                                  b'{"input":[1,2],"operation":"integer_sum"}')
+    with pytest.raises(DurableSwarmError):
+        transport(replace(attempt, tenant="other"))
+    with pytest.raises(DurableSwarmError):
+        transport(replace(attempt, payload_json=b'{"input":"whoami","operation":"shell"}'))
+    assert not calls and store.usage()["attempts"] == 0
+    with pytest.raises(subprocess.TimeoutExpired):
+        transport(attempt)
+    with pytest.raises(DurableSwarmError, match="uncertain"):
+        transport(attempt)
+    assert len(calls) == 1 and store.usage()["uncertain"] == 1
+
+
+def test_local_subprocess_full_dispatch_and_persistent_evidence(tmp_path):
+    from skeleton.automation.agents.swarm_durable import (
+        SQLiteWorkerCustody, LocalSubprocessTransport, LocalWorkerEvidenceValidator,
+        HostWorkerAuthority, HostWaitDriver, HostDispatchService, SwarmDurableBridge,
+    )
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, TaskState
+    from skeleton.intelligence.dispatch_policy import DispatchCandidate
+    from skeleton.testing.test_durable_run_store import make_store
+    directory = _private_worker_directory(tmp_path)
+    custody = SQLiteWorkerCustody(directory)
+    verifier = HostWorkerAuthority("actual-run", grants={
+        ("worker", "w"): (b"w" * 32, frozenset({"success"})),
+    }, resolve=custody.resolve, validate_evidence=LocalWorkerEvidenceValidator(custody))
+    runtime, broker = _verified_dispatch_fixture(verify_worker=verifier)
+    store = make_store(tmp_path)
+    store.create_run("actual-run")
+    store.claim_run("actual-run", "owner", lease_seconds=60)
+    bridge = SwarmDurableBridge(store)
+    manager = SwarmRecoveryManager(delta_archive=True)
+    driver = HostWaitDriver(bridge, "actual-run", "owner", manager, broker,
+                            source_keys={}, clock_ms=lambda: 50)
+    transport = LocalSubprocessTransport(
+        custody, grants={("a", "w"): frozenset({"integer_sum"})},
+        worker_signers={"w": ("worker", b"w" * 32)},
+    )
+    service = HostDispatchService(driver, transport=transport)
+    bridge.submit_unique_verified("actual-run", "owner", manager, broker, "a",
+                                  SwarmTask("actual-task", {"operation": "integer_sum", "input": [4, 9]}))
+    report = service.cycle((DispatchCandidate("actual-task", "a", 100, 0),), now_ms=10000)
+    assert report.disposition == "completed" and report.evidence_sha256
+    assert SwarmDurableBridge(make_store(tmp_path)).load("actual-run").restore_runtime().task("actual-task").state is TaskState.SUCCEEDED
+    reopened = SQLiteWorkerCustody(directory)
+    receipt, artifact = reopened.resolve(report.evidence_sha256)
+    assert LocalWorkerEvidenceValidator(reopened)(receipt, artifact)
+    assert reopened.usage()["completed"] == 1

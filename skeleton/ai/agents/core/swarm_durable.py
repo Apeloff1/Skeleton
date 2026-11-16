@@ -970,3 +970,427 @@ class HostDispatchService:
         finally:
             self._cycle_lock.release()
 
+@dataclass(frozen=True, slots=True)
+class LocalAttemptRecord:
+    attempt: HostDispatchAttempt
+    receipt_sha256: str | None
+
+
+def _check_local_attempt(attempt: HostDispatchAttempt) -> None:
+    import json
+    if type(attempt) is not HostDispatchAttempt:
+        raise DurableSwarmError("invalid local attempt")
+    for value in (attempt.run_id, attempt.tenant, attempt.task_id, attempt.worker_id):
+        _wait_identifier(value)
+    if (type(attempt.lease_token) is not str or len(attempt.lease_token) != 32
+            or any(char not in "0123456789abcdef" for char in attempt.lease_token)
+            or type(attempt.payload_json) is not bytes
+            or not 1 <= len(attempt.payload_json) <= 65536):
+        raise DurableSwarmError("invalid local attempt payload or token")
+    try:
+        value = json.loads(attempt.payload_json)
+        if type(value) is not dict or _wait_bytes(value) != attempt.payload_json:
+            raise DurableSwarmError("noncanonical local attempt")
+    except (ValueError, TypeError, RecursionError) as exc:
+        raise DurableSwarmError("invalid local attempt JSON") from exc
+
+
+class SQLiteWorkerCustody:
+    """Bounded local evidence journal; not a second scheduler.
+
+    The host supplies a dedicated private directory. SQLite serializes
+    publication across processes. A committed start tombstone precedes
+    physical execution and is never automatically removed or retried.
+    Completed attempts atomically bind receipt and evidence bytes.
+    """
+
+    def __init__(self, directory, *, max_attempts: int = 10000,
+                 max_bytes: int = 256 * 1024 * 1024,
+                 max_artifact_bytes: int = 65536) -> None:
+        import os
+        import stat
+        from pathlib import Path
+        if (type(max_attempts) is not int or not 1 <= max_attempts <= 1_000_000
+                or type(max_bytes) is not int or not 1024 <= max_bytes <= 64 * 1024**3
+                or type(max_artifact_bytes) is not int
+                or not 128 <= max_artifact_bytes <= min(max_bytes, 16 * 1024**2)):
+            raise DurableSwarmError("invalid local custody capacity")
+        root = Path(directory)
+        if not root.is_absolute() or root.is_symlink() or not root.is_dir():
+            raise DurableSwarmError("local custody requires a trusted absolute directory")
+        root_stat = root.stat()
+        if os.name == "posix" and (root_stat.st_uid != os.getuid() or root_stat.st_mode & 0o077):
+            raise DurableSwarmError("local custody directory is not private")
+        self.directory = root.resolve(strict=True)
+        self.path = self.directory / "worker-custody.sqlite3"
+        try:
+            fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError:
+            pass
+        else:
+            os.close(fd)
+        self._check_path()
+        self.max_attempts = max_attempts
+        self.max_bytes = max_bytes
+        self.max_artifact_bytes = max_artifact_bytes
+        from contextlib import closing
+        with closing(self._connect()) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                version = conn.execute("PRAGMA user_version").fetchone()[0]
+                if version not in (0, 1):
+                    raise DurableSwarmError("unsupported worker custody schema")
+                if version == 0:
+                    existing = conn.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table'"
+                    ).fetchall()
+                    if existing:
+                        raise DurableSwarmError("unrecognized worker custody database")
+                    conn.execute("""
+                        CREATE TABLE custody_limits (
+                            id INTEGER PRIMARY KEY CHECK(id=1),
+                            max_attempts INTEGER NOT NULL,
+                            max_bytes INTEGER NOT NULL,
+                            max_artifact_bytes INTEGER NOT NULL
+                        )
+                    """)
+                    conn.execute("""
+                        CREATE TABLE attempts (
+                            run_id TEXT NOT NULL, lease_token TEXT NOT NULL,
+                            tenant TEXT NOT NULL, task_id TEXT NOT NULL,
+                            worker_id TEXT NOT NULL, payload BLOB NOT NULL,
+                            charge INTEGER NOT NULL CHECK(charge>0),
+                            receipt_digest TEXT UNIQUE, receipt BLOB, artifact BLOB,
+                            PRIMARY KEY (run_id, lease_token),
+                            CHECK ((receipt_digest IS NULL AND receipt IS NULL AND artifact IS NULL)
+                                OR (receipt_digest IS NOT NULL AND receipt IS NOT NULL
+                                    AND artifact IS NOT NULL))
+                        ) WITHOUT ROWID
+                    """)
+                    conn.execute("CREATE INDEX attempts_task ON attempts(run_id, task_id)")
+                    conn.execute("INSERT INTO custody_limits VALUES (1,?,?,?)",
+                                 (max_attempts, max_bytes, max_artifact_bytes))
+                    conn.execute("PRAGMA user_version=1")
+                limits = conn.execute(
+                    "SELECT max_attempts,max_bytes,max_artifact_bytes FROM custody_limits WHERE id=1"
+                ).fetchone()
+                if limits != (max_attempts, max_bytes, max_artifact_bytes):
+                    raise DurableSwarmError("worker custody capacity policy changed")
+                conn.commit()
+            except BaseException:
+                conn.rollback()
+                raise
+
+    def _check_path(self) -> None:
+        import os
+        import stat
+        info = self.path.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise DurableSwarmError("worker custody file must be a private regular file")
+        if os.name == "posix" and (info.st_uid != os.getuid() or info.st_mode & 0o077):
+            raise DurableSwarmError("worker custody file permissions refused")
+
+    def _connect(self):
+        import sqlite3
+        self._check_path()
+        conn = sqlite3.connect(self.path, timeout=5.0, isolation_level=None)
+        try:
+            conn.execute("PRAGMA synchronous=FULL")
+            conn.execute("PRAGMA trusted_schema=OFF")
+            return conn
+        except BaseException:
+            conn.close()
+            raise
+
+    def begin(self, attempt: HostDispatchAttempt) -> bool:
+        """Reserve evidence capacity and write the start tombstone first.
+
+        False means this token was already started, even if no outcome is
+        known. Never launch again from False. Logical reservation is not
+        a guarantee of available physical disk space.
+        """
+        from contextlib import closing
+        _check_local_attempt(attempt)
+        charge = len(attempt.payload_json) + self.max_artifact_bytes + 4096
+        with closing(self._connect()) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = conn.execute(
+                    "SELECT tenant,task_id,worker_id,payload FROM attempts "
+                    "WHERE run_id=? AND lease_token=?", (attempt.run_id, attempt.lease_token)
+                ).fetchone()
+                identity = (attempt.tenant, attempt.task_id, attempt.worker_id, attempt.payload_json)
+                if row is not None:
+                    if row != identity:
+                        raise DurableSwarmError("attempt tombstone identity conflict")
+                    conn.commit()
+                    return False
+                count, occupied = conn.execute(
+                    "SELECT count(*),coalesce(sum(charge),0) FROM attempts"
+                ).fetchone()
+                if count >= self.max_attempts or occupied + charge > self.max_bytes:
+                    raise DurableSwarmError("worker evidence custody capacity exhausted")
+                conn.execute(
+                    "INSERT INTO attempts(run_id,lease_token,tenant,task_id,worker_id,payload,charge)"
+                    " VALUES (?,?,?,?,?,?,?)",
+                    (attempt.run_id, attempt.lease_token, *identity, charge),
+                )
+                conn.commit()
+                return True
+            except BaseException:
+                conn.rollback()
+                raise
+
+    def finish(self, attempt: HostDispatchAttempt, receipt: HostWorkerReceipt,
+               artifact: bytes) -> str:
+        """Atomically publish the exact result; repeated identical writes are inert."""
+        from contextlib import closing
+        from dataclasses import asdict
+        from hashlib import sha256
+        _check_local_attempt(attempt)
+        if (type(receipt) is not HostWorkerReceipt or type(artifact) is not bytes
+                or not 1 <= len(artifact) <= self.max_artifact_bytes
+                or (receipt.run_id, receipt.worker_id, receipt.task_id, receipt.lease_token)
+                != (attempt.run_id, attempt.worker_id, attempt.task_id, attempt.lease_token)
+                or receipt.action not in ("success", "uncertain")
+                or sha256(artifact).hexdigest() != receipt.artifact_sha256):
+            raise DurableSwarmError("worker result does not match its exact attempt")
+        encoded = _wait_bytes(asdict(receipt))
+        if len(encoded) > 4096:
+            raise DurableSwarmError("worker receipt exceeds reservation")
+        digest = receipt.digest
+        with closing(self._connect()) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = conn.execute(
+                    "SELECT tenant,task_id,worker_id,payload,receipt_digest,receipt,artifact "
+                    "FROM attempts WHERE run_id=? AND lease_token=?",
+                    (attempt.run_id, attempt.lease_token),
+                ).fetchone()
+                if row is None or row[:4] != (
+                        attempt.tenant, attempt.task_id, attempt.worker_id, attempt.payload_json):
+                    raise DurableSwarmError("worker start custody missing or mismatched")
+                if row[4] is not None:
+                    if row[4:] != (digest, encoded, artifact):
+                        raise DurableSwarmError("immutable worker result conflict")
+                else:
+                    conn.execute(
+                        "UPDATE attempts SET receipt_digest=?,receipt=?,artifact=? "
+                        "WHERE run_id=? AND lease_token=? AND receipt_digest IS NULL",
+                        (digest, encoded, artifact, attempt.run_id, attempt.lease_token),
+                    )
+                conn.commit()
+            except BaseException:
+                conn.rollback()
+                raise
+        if self.resolve(digest) != (receipt, artifact):
+            raise DurableSwarmError("worker result readback mismatch")
+        return digest
+
+    def resolve(self, digest: str) -> tuple[HostWorkerReceipt, bytes] | None:
+        from contextlib import closing
+        from hashlib import sha256
+        import json
+        _wait_digest(digest)
+        with closing(self._connect()) as conn:
+            row = conn.execute(
+                "SELECT run_id,lease_token,worker_id,task_id,receipt,artifact FROM attempts "
+                "WHERE receipt_digest=? AND length(receipt)<=4096 AND length(artifact)<=?",
+                (digest, self.max_artifact_bytes),
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            receipt = HostWorkerReceipt(**json.loads(row[4]))
+            artifact = row[5]
+            if (type(artifact) is not bytes or receipt.digest != digest
+                    or receipt.artifact_sha256 != sha256(artifact).hexdigest()
+                    or (receipt.run_id, receipt.lease_token, receipt.worker_id, receipt.task_id)
+                    != row[:4]):
+                return None
+            return receipt, artifact
+        except (TypeError, ValueError, DurableSwarmError):
+            return None
+
+    def lookup(self, run_id: str, lease_token: str) -> LocalAttemptRecord | None:
+        from contextlib import closing
+        _wait_identifier(run_id)
+        if (type(lease_token) is not str or len(lease_token) != 32
+                or any(char not in "0123456789abcdef" for char in lease_token)):
+            raise DurableSwarmError("invalid local attempt lookup token")
+        with closing(self._connect()) as conn:
+            row = conn.execute(
+                "SELECT tenant,task_id,worker_id,payload,receipt_digest FROM attempts "
+                "WHERE run_id=? AND lease_token=? AND length(payload)<=65536",
+                (run_id, lease_token),
+            ).fetchone()
+        if row is None:
+            return None
+        attempt = HostDispatchAttempt(run_id, row[0], row[1], row[2], lease_token, row[3])
+        _check_local_attempt(attempt)
+        if row[4] is not None:
+            _wait_digest(row[4])
+        return LocalAttemptRecord(attempt, row[4])
+
+    def usage(self) -> dict[str, int]:
+        from contextlib import closing
+        with closing(self._connect()) as conn:
+            count, charge, completed = conn.execute(
+                "SELECT count(*),coalesce(sum(charge),0),count(receipt_digest) FROM attempts"
+            ).fetchone()
+        return {"attempts": count, "reserved_bytes": charge,
+                "completed": completed, "uncertain": count - completed}
+
+
+_LOCAL_OPERATIONS = frozenset({"sha256_text", "integer_sum", "json_sha256"})
+
+
+def _local_reference(payload: dict[str, object]) -> object:
+    """Independent owner-side semantic validation for bounded pure operations."""
+    from hashlib import sha256
+    if type(payload) is not dict or set(payload) != {"operation", "input"}:
+        raise DurableSwarmError("invalid local operation request")
+    operation, value = payload["operation"], payload["input"]
+    if type(operation) is not str or operation not in _LOCAL_OPERATIONS:
+        raise DurableSwarmError("local operation not approved")
+    if operation == "sha256_text":
+        if type(value) is not str:
+            raise DurableSwarmError("text digest requires text")
+        return sha256(value.encode("utf-8")).hexdigest()
+    if operation == "integer_sum":
+        if (type(value) is not list or len(value) > 8192
+                or any(type(item) is not int or abs(item) > 2**53 for item in value)):
+            raise DurableSwarmError("invalid bounded integer input")
+        result = 0
+        for item in value:
+            result += item
+        return result
+    if type(value) not in (dict, list):
+        raise DurableSwarmError("JSON digest requires object or array")
+    return sha256(_wait_bytes(value)).hexdigest()
+
+
+# The interpreter program is constant, never constructed from a task. There
+# is no shell, arbitrary command, dynamic import or untrusted executable.
+_LOCAL_WORKER_PROGRAM = """
+import hashlib, json, sys
+request = json.loads(sys.stdin.buffer.read(65537))
+operation, value = request["operation"], request["input"]
+if operation == "sha256_text":
+    result = hashlib.sha256(value.encode("utf-8")).hexdigest()
+elif operation == "integer_sum":
+    result = sum(value)
+elif operation == "json_sha256":
+    raw = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
+    result = hashlib.sha256(raw.encode("ascii")).hexdigest()
+else:
+    raise ValueError("operation unavailable")
+sys.stdout.write(json.dumps(result, ensure_ascii=True, allow_nan=False))
+"""
+
+
+class LocalWorkerEvidenceValidator:
+    """Recompute pure job semantics from persisted admitted input, not claims."""
+
+    def __init__(self, custody: SQLiteWorkerCustody) -> None:
+        self.custody = custody
+
+    def __call__(self, receipt: HostWorkerReceipt, artifact: bytes) -> bool:
+        import json
+        from hashlib import sha256
+        if receipt.action != "success":
+            return False
+        record = self.custody.lookup(receipt.run_id, receipt.lease_token)
+        if record is None or record.receipt_sha256 != receipt.digest:
+            return False
+        attempt = record.attempt
+        if (attempt.task_id, attempt.worker_id) != (receipt.task_id, receipt.worker_id):
+            return False
+        expected = {"version": 1,
+                    "payload_sha256": sha256(attempt.payload_json).hexdigest(),
+                    "result": _local_reference(attempt.payload())}
+        return artifact == _wait_bytes(expected)
+
+
+class LocalSubprocessTransport:
+    """Real bounded process execution for explicitly granted local pure jobs.
+
+    Uses a host-owned interpreter and a fixed worker program. This is not a
+    sandbox for arbitrary code, a model runner, or an external tool executor.
+    Uncertain transport outcomes are held by HostDispatchService.
+    """
+
+    def __init__(self, custody: SQLiteWorkerCustody, *,
+                 grants: dict[tuple[str, str], frozenset[str]],
+                 worker_signers: dict[str, tuple[str, bytes]],
+                 timeout_seconds: float = 5.0) -> None:
+        import math
+        if (type(grants) is not dict or len(grants) > 4096
+                or type(worker_signers) is not dict or len(worker_signers) > 4096
+                or type(timeout_seconds) not in (int, float)
+                or not math.isfinite(timeout_seconds) or not 0 < timeout_seconds <= 60):
+            raise DurableSwarmError("invalid local transport configuration")
+        self.custody = custody
+        self._grants = {}
+        self._signers = {}
+        for worker, signer in worker_signers.items():
+            if type(signer) is not tuple or len(signer) != 2:
+                raise DurableSwarmError("invalid local worker signer")
+            issuer, key = signer
+            _validate_wait_key(key)
+            self._signers[_wait_identifier(worker)] = (_wait_identifier(issuer), key)
+        for scope, operations in grants.items():
+            if type(scope) is not tuple or len(scope) != 2:
+                raise DurableSwarmError("invalid local transport scope")
+            tenant, worker = scope
+            if (worker not in self._signers or type(operations) is not frozenset
+                    or not operations or not operations.issubset(_LOCAL_OPERATIONS)):
+                raise DurableSwarmError("invalid local operation grant")
+            self._grants[(_wait_identifier(tenant), _wait_identifier(worker))] = operations
+        self.timeout_seconds = timeout_seconds
+
+    def __call__(self, attempt: HostDispatchAttempt) -> HostTransportReply:
+        import json
+        import os
+        import subprocess
+        import sys
+        from hashlib import sha256
+        _check_local_attempt(attempt)
+        payload = attempt.payload()
+        expected = _local_reference(payload)
+        if payload["operation"] not in self._grants.get((attempt.tenant, attempt.worker_id), ()):
+            raise DurableSwarmError("local operation not granted for tenant and worker")
+        if not self.custody.begin(attempt):
+            previous = self.custody.lookup(attempt.run_id, attempt.lease_token)
+            if previous is None or previous.receipt_sha256 is None:
+                raise DurableSwarmError("existing local attempt has uncertain effects")
+            resolved = self.custody.resolve(previous.receipt_sha256)
+            if resolved is None:
+                raise DurableSwarmError("existing local result custody is invalid")
+            return HostTransportReply(resolved[0].action, previous.receipt_sha256)
+        env = {}
+        if os.name == "nt" and "SystemRoot" in os.environ:
+            env["SystemRoot"] = os.environ["SystemRoot"]
+        result = subprocess.run(
+            [sys.executable, "-I", "-S", "-c", _LOCAL_WORKER_PROGRAM],
+            input=attempt.payload_json, capture_output=True, timeout=self.timeout_seconds,
+            cwd=self.custody.directory, env=env, shell=False, close_fds=True, check=False,
+        )
+        # The fixed worker program produces only a bounded scalar. A modified
+        # interpreter is outside the trusted host boundary.
+        if result.returncode != 0 or len(result.stdout) > 256 or result.stderr:
+            raise DurableSwarmError("local worker process failed")
+        value = json.loads(result.stdout)
+        if type(value) is not type(expected) or value != expected:
+            raise DurableSwarmError("local worker result failed independent verification")
+        artifact = _wait_bytes({"version": 1,
+                                "payload_sha256": sha256(attempt.payload_json).hexdigest(),
+                                "result": value})
+        issuer, key = self._signers[attempt.worker_id]
+        receipt = HostWorkerReceipt.issue(
+            run_id=attempt.run_id, issuer=issuer, worker_id=attempt.worker_id,
+            task_id=attempt.task_id, lease_token=attempt.lease_token, action="success",
+            artifact_sha256=sha256(artifact).hexdigest(), issuer_key=key,
+        )
+        digest = self.custody.finish(attempt, receipt, artifact)
+        return HostTransportReply("success", digest)
