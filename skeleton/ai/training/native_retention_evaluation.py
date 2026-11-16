@@ -19,6 +19,7 @@ from skeleton.cortex.transformer import KVCache
 
 from .flgb_training_runtime import DatasetRevision, DatasetRights, digest_json, require_digest, require_id
 from .shadow_candidate_gate import ImprovementAxis, ImprovementDirection
+from .contamination_scan import MaterializedExample, OverlapPolicy, scan_materialized_overlap
 
 _MAX_CASES = 256
 _MAX_STEPS = 16384
@@ -114,6 +115,7 @@ class RetentionReport:
     policy_sha256: str
     corpus_sha256: str
     training_inventory_sha256: str
+    contamination_evidence_sha256: str
     observations: tuple[CaseMeasurement,...]
     axes: tuple[ImprovementAxis,...]
     holds: tuple[str,...]
@@ -150,7 +152,9 @@ def evaluate_retention(
     rights: DatasetRights, expected_baseline_sha256: str,
     expected_candidate_sha256: str, training_item_sha256: frozenset[str],
     expected_training_inventory_sha256: str,
+    training_examples: tuple[MaterializedExample,...],
     policy: RetentionPolicy, deadline: float,
+    overlap_policy: OverlapPolicy=OverlapPolicy(),
     interrupt: Callable[[],None] | None = None,
 ) -> RetentionReport:
     """Measure actual logits and heldout targets via the canonical native graph.
@@ -195,6 +199,13 @@ def evaluate_retention(
         if time.monotonic()>=deadline:
             raise TimeoutError("native retention evaluation deadline")
     poll()
+    overlap=scan_materialized_overlap(training_examples,
+            tuple(MaterializedExample(c.content_sha256,c.text) for c in cases),
+            policy=overlap_policy,interrupt=poll)
+    if overlap.training_inventory_sha256!=inventory:
+        raise ValueError("materialized training inventory does not equal pinned inventory")
+    if overlap.review_required:
+        raise ValueError("heldout lexical contamination requires independent review")
     base_binding, candidate_binding=_binding(baseline),_binding(candidate)
     for runtime in (baseline,candidate):
         runtime.assert_model_unchanged()
@@ -301,12 +312,13 @@ def evaluate_retention(
         "baseline_limits":baseline.limits.to_dict(),"candidate_limits":candidate.limits.to_dict(),
         "dataset":dataset.digest,"rights":rights.digest,"policy":policy.identity,
         "corpus":pinned_corpus,"training_inventory":inventory,
+        "contamination_evidence":overlap.evidence_sha256,
         "observations":[{k:getattr(r,k) for k in r.__dataclass_fields__} for r in records],
         "axes":[axis.as_dict() for axis in axes],"holds":sorted(holds),
     })
     return RetentionReport(expected_baseline_sha256,expected_candidate_sha256,
                            dataset.digest,policy.identity,pinned_corpus,inventory,
-                           records,tuple(axes),tuple(sorted(holds)),evidence)
+                           overlap.evidence_sha256,records,tuple(axes),tuple(sorted(holds)),evidence)
 
 
 __all__=["RetentionCase","RetentionPolicy","CaseMeasurement","RetentionReport","corpus_digest","evaluate_retention"]
