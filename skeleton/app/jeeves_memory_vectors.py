@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections import Counter
 from hashlib import sha256
+from functools import lru_cache
 import json
 import math
 import os
@@ -38,6 +39,9 @@ MAX_WORDS = 128
 MAX_INDEX_PAGE = 128
 MAX_SEARCH_CANDIDATES = 4096
 MAX_RESULTS = 20
+LSH_BANDS = 6
+LSH_BITS = 8
+LSH_VERSION = "skeleton.jeeves.dense-lsh.v1"
 _SHA = re.compile(r"[a-f0-9]{64}\Z")
 _TOKEN = re.compile(r"[^\W_]+", re.UNICODE)
 _STOP = frozenset("a an and are as at be by can do for from have how i in is it me my of on or so that the this to was we what when where which who will with you your".split())
@@ -118,6 +122,48 @@ def _read_line(handle: BinaryIO, digest, consumed: int) -> tuple[bytes,int]:
     return raw,consumed+len(raw)
 
 
+@lru_cache(maxsize=16)
+def _planes(dimensions: int) -> tuple[tuple[int,...],...]:
+    """Deterministic ubiquitous signed random projections; no mutable RNG.
+
+    Hash expansion is versioned, independent of Python random implementations.
+    Sign projections are independent of the underlying word vector asset.
+    """
+    planes=[]
+    for plane in range(LSH_BANDS*LSH_BITS):
+        bits=[]
+        block=0
+        while len(bits)<dimensions:
+            raw=sha256(f"{LSH_VERSION}:{dimensions}:{plane}:{block}".encode("ascii")).digest()
+            for byte in raw:
+                bits.extend(1 if byte&(1<<bit) else -1 for bit in range(8))
+            block+=1
+        planes.append(tuple(bits[:dimensions]))
+    return tuple(planes)
+
+
+def _signatures(values: tuple[float,...]) -> tuple[int,...]:
+    planes=_planes(len(values))
+    signatures=[]
+    for band in range(LSH_BANDS):
+        value=0
+        for bit in range(LSH_BITS):
+            projection=math.fsum(a*b for a,b in zip(values,planes[band*LSH_BITS+bit]))
+            if projection>=0:
+                value|=1<<bit
+        signatures.append(value)
+    return tuple(signatures)
+
+
+def _probes(values: tuple[float,...]) -> tuple[tuple[int,int,int],...]:
+    """Exact bucket priority 4, one-bit neighbors priority 1."""
+    result=[]
+    for band,signature in enumerate(_signatures(values)):
+        result.append((band,signature,4))
+        result.extend((band,signature^(1<<bit),1) for bit in range(LSH_BITS))
+    return tuple(result)
+
+
 class MemoryVectorIndex:
     """Word vectors and derived note vectors in the canonical local DB.
 
@@ -151,6 +197,16 @@ class MemoryVectorIndex:
                 memory_sha256 TEXT NOT NULL, vector BLOB, vector_sha256 TEXT,
                 token_count INTEGER NOT NULL, covered_count INTEGER NOT NULL
             )""")
+            self.store._db.execute("""CREATE TABLE IF NOT EXISTS jeeves_memory_vector_buckets (
+                memory_id TEXT NOT NULL REFERENCES jeeves_memory_vectors(memory_id)
+                    ON DELETE CASCADE,
+                asset_sha256 TEXT NOT NULL,
+                band INTEGER NOT NULL CHECK(band>=0 AND band<6),
+                signature INTEGER NOT NULL CHECK(signature>=0 AND signature<256),
+                PRIMARY KEY(memory_id,band)
+            ) WITHOUT ROWID""")
+            self.store._db.execute("""CREATE INDEX IF NOT EXISTS jeeves_memory_vector_bucket_lookup
+                ON jeeves_memory_vector_buckets(asset_sha256,band,signature,memory_id)""")
 
     def _bank(self) -> dict|None:
         row=self.store._db.execute(
@@ -160,7 +216,8 @@ class MemoryVectorIndex:
         if row is None:
             return None
         asset,name,dim,vocab=row
-        if (not MIN_DIM<=dim<=MAX_DIM or not 1<=vocab<=MAX_VOCAB
+        if (type(dim) is not int or type(vocab) is not int
+                or not MIN_DIM<=dim<=MAX_DIM or not 1<=vocab<=MAX_VOCAB
                 or type(name) is not str or not name or len(name.encode("utf-8"))>200):
             raise MemoryRejected("stored encoder metadata invalid")
         return {"asset_sha256":_sha(asset),"model_name":name,
@@ -183,14 +240,17 @@ class MemoryVectorIndex:
                     "ON m.memory_id=v.memory_id WHERE m.model_digest=? AND m.tokenizer_digest=? "
                     "AND (m.expires_at IS NULL OR m.expires_at>?) "
                     "AND v.asset_sha256=? AND v.memory_revision=m.revision "
-                    "AND v.memory_sha256=m.content_sha256",
-                    (*scope,int(time.time()),bank["asset_sha256"]),
+                    "AND v.memory_sha256=m.content_sha256 "
+                    "AND (v.vector IS NULL OR (SELECT count(*) FROM jeeves_memory_vector_buckets b "
+                    "WHERE b.memory_id=v.memory_id AND b.asset_sha256=v.asset_sha256)=?)",
+                    (*scope,int(time.time()),bank["asset_sha256"],LSH_BANDS),
                 ).fetchone()
             return {"schema":INDEX_SCHEMA,"bank":bank,"active_memories":active,
                     "indexed_active_memories":indexed,"covered_active_memories":covered,
                     "index_complete_snapshot":bank is not None and indexed==active,
                     "model_digest":scope[0],"tokenizer_digest":scope[1],
                     "encoder_kind":"static-learned-word-vector-mean-pooling",
+                    "candidate_index":LSH_VERSION,
                     "remote_calls":False,"semantic_quality_certified":False}
 
     def install(self,path: Path,expected_sha256: str,*,approved: bool,
@@ -345,6 +405,14 @@ class MemoryVectorIndex:
                     (mid,expected_asset,record["revision"],record["sha256"],raw,
                      _blob_digest(raw) if raw is not None else None,tokens,covered),
                 )
+                self.store._db.execute(
+                    "DELETE FROM jeeves_memory_vector_buckets WHERE memory_id=?",(mid,))
+                if raw is not None:
+                    self.store._db.executemany(
+                        "INSERT INTO jeeves_memory_vector_buckets VALUES(?,?,?,?)",
+                        [(mid,expected_asset,band,signature) for band,signature in
+                         enumerate(_signatures(_unpack(raw,bank["dimensions"])))],
+                    )
                 embedded+=raw is not None
             return {"asset_sha256":expected_asset,"processed":min(len(rows),limit),
                     "embedded":embedded,"next_cursor":rows[limit-1][0] if len(rows)>limit else None,
@@ -371,21 +439,58 @@ class MemoryVectorIndex:
                         "candidate_limit_reached":False,"semantic_quality_certified":False}
             query_vec=_unpack(raw,bank["dimensions"])
             where="" if kinds is None else " AND m.kind IN ("+",".join("?" for _ in kinds)+")"
-            rows=self.store._db.execute(
-                "SELECT v.memory_id,v.vector,v.vector_sha256,v.token_count,v.covered_count "
-                "FROM jeeves_memory_vectors v JOIN jeeves_approved_memory m ON m.memory_id=v.memory_id "
-                "WHERE m.model_digest=? AND m.tokenizer_digest=? "
+            base_where=(
+                "m.model_digest=? AND m.tokenizer_digest=? "
                 "AND (m.expires_at IS NULL OR m.expires_at>?) AND v.asset_sha256=? "
                 "AND v.memory_revision=m.revision AND v.memory_sha256=m.content_sha256 "
-                "AND v.vector IS NOT NULL"+where+" ORDER BY v.memory_id LIMIT ?",
-                (*self.memory.scope,now,bank["asset_sha256"],*(kinds or []),MAX_SEARCH_CANDIDATES+1),
-            ).fetchall()
+                "AND v.vector IS NOT NULL"+where+
+                " AND (SELECT count(*) FROM jeeves_memory_vector_buckets z "
+                "WHERE z.memory_id=v.memory_id AND z.asset_sha256=v.asset_sha256)=?"
+            )
+            params=(*self.memory.scope,now,bank["asset_sha256"],*(kinds or []),LSH_BANDS)
+            eligible=self.store._db.execute(
+                "SELECT count(*) FROM jeeves_memory_vectors v JOIN jeeves_approved_memory m "
+                "ON m.memory_id=v.memory_id WHERE "+base_where,params,
+            ).fetchone()[0]
+            exact=eligible<=MAX_SEARCH_CANDIDATES
+            if exact:
+                rows=self.store._db.execute(
+                    "SELECT v.memory_id,v.vector,v.vector_sha256,v.token_count,v.covered_count "
+                    "FROM jeeves_memory_vectors v JOIN jeeves_approved_memory m ON m.memory_id=v.memory_id "
+                    "WHERE "+base_where+" ORDER BY v.memory_id LIMIT ?",
+                    (*params,MAX_SEARCH_CANDIDATES+1),
+                ).fetchall()
+            else:
+                probes=_probes(query_vec)
+                marks=",".join("(?,?,?)" for _ in probes)
+                # A multiprobe LSH candidate stage scales beyond arbitrary
+                # first-ID scanning; true cosine is still used on all finalists.
+                rows=self.store._db.execute(
+                    "WITH probes(band,signature,weight) AS (VALUES "+marks+"), "
+                    "candidates AS (SELECT v.memory_id,SUM(p.weight) AS priority "
+                    "FROM probes p JOIN jeeves_memory_vector_buckets b "
+                    "ON b.band=p.band AND b.signature=p.signature "
+                    "JOIN jeeves_memory_vectors v ON v.memory_id=b.memory_id "
+                    "JOIN jeeves_approved_memory m ON m.memory_id=v.memory_id "
+                    "WHERE b.asset_sha256=v.asset_sha256 AND "+base_where+
+                    " GROUP BY v.memory_id ORDER BY priority DESC,v.memory_id LIMIT ?) "
+                    "SELECT v.memory_id,v.vector,v.vector_sha256,v.token_count,v.covered_count "
+                    "FROM candidates c JOIN jeeves_memory_vectors v ON v.memory_id=c.memory_id "
+                    "ORDER BY c.priority DESC,v.memory_id",
+                    (*(x for probe in probes for x in probe),*params,MAX_SEARCH_CANDIDATES+1),
+                ).fetchall()
             scored=[]
             for mid,blob,digest,tokens,count in rows[:MAX_SEARCH_CANDIDATES]:
                 if (_blob_digest(blob)!=digest or type(tokens) is not int or type(count) is not int
                         or not 0<count<=tokens<=MAX_WORDS):
                     raise MemoryRejected("cached vector custody mismatch")
                 values=_unpack(blob,bank["dimensions"])
+                bucket_rows=self.store._db.execute(
+                    "SELECT band,signature FROM jeeves_memory_vector_buckets WHERE memory_id=? "
+                    "AND asset_sha256=? ORDER BY band",(mid,bank["asset_sha256"]),
+                ).fetchall()
+                if bucket_rows!=list(enumerate(_signatures(values))):
+                    raise MemoryRejected("derived vector bucket integrity mismatch")
                 cosine=math.fsum(a*b for a,b in zip(query_vec,values))
                 if cosine>=0.30:
                     scored.append((cosine,mid,count,tokens))
@@ -405,7 +510,9 @@ class MemoryVectorIndex:
             status=self.status()
             return {"records":records,"enabled":True,"asset_sha256":bank["asset_sha256"],
                     "word_count":words,"covered_words":covered,
-                    "candidate_limit_reached":len(rows)>MAX_SEARCH_CANDIDATES,
+                    "candidate_limit_reached":not exact or len(rows)>MAX_SEARCH_CANDIDATES,
+                    "eligible_vectors":eligible,"scanned_vectors":min(len(rows),MAX_SEARCH_CANDIDATES),
+                    "exhaustive_vector_scan":exact,"candidate_method":"exact-cosine" if exact else "multiprobe-lsh-then-cosine",
                     "indexed_active_memories":status["indexed_active_memories"],
                     "active_memories":status["active_memories"],
                     "index_complete_snapshot":status["index_complete_snapshot"],
