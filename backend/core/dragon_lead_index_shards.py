@@ -137,10 +137,14 @@ def enroll(graph,scope,*,acknowledged=False,reset=False):
     if acknowledged is not True or type(reset) is not bool:raise ValueError("metadata index acknowledgement")
     owner=owner_key(scope);_root()
     from core.dragon_graph_authority import active
+    from core.dragon_projection_relocation import permit
+    from core.dragon_graph_deployment import DeploymentHeld
     with graph._db() as db:
         if active(db):raise ValueError("derived projection redundant in canonical graph mode")
         db.execute("BEGIN IMMEDIATE")
         try:
+            try:permit(db,"nodes",_root())
+            except DeploymentHeld as exc:raise IndexHeld("projection relocation held") from exc
             if not db.execute("SELECT 1 FROM lead_owner WHERE owner=?",(owner,)).fetchone():
                 raise LookupError("lead owner missing")
             row=db.execute("SELECT epoch FROM lead_index_enrollment WHERE owner=?",(owner,)).fetchone()
@@ -228,7 +232,12 @@ def _pulse_lane(src,owner,epoch,lane):
 
 def pulse(graph):
     """Advance one enrolled owner/lane per maintenance invocation."""
-    _root()
+    target=_root()
+    from core.dragon_projection_relocation import advance
+    from core.dragon_graph_deployment import DeploymentHeld
+    try:rotation=advance(graph,"nodes",target)
+    except DeploymentHeld as exc:raise IndexHeld("projection relocation held") from exc
+    if rotation is not None:return rotation
     now=int(time.time())
     with graph._db() as db:
         db.execute("BEGIN IMMEDIATE")
@@ -272,6 +281,10 @@ def lookup(db,owner,terms,*,state,family,host,lower,cutoff,limit):
 
     Caller must hold a source read transaction to fence all ten revisions.
     """
+    from core.dragon_projection_relocation import permit
+    from core.dragon_graph_deployment import DeploymentHeld
+    try:permit(db,"nodes",_root())
+    except DeploymentHeld as exc:raise IndexHeld("projection relocation held") from exc
     if not terms:raise IndexHeld("text query required")
     row=db.execute("SELECT epoch FROM lead_index_enrollment WHERE owner=?",(owner,)).fetchone()
     if not row:raise IndexHeld("owner projection not enrolled")
