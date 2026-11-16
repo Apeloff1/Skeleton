@@ -401,7 +401,8 @@ class CohostedStackSupervisor:
         p=self.launch.plan
         startup=TrustedNativeStartup(conversation,memory,epoch,self.reviewer,p.models,
                                      p.policy_sha256,p.memory_namespace)
-        await startup(state)
+        # The API owns exact-state admission; the application owns the plan.
+        await state.install_trusted_native_startup(startup)
 
     async def after_binding(self,runtime):
         self.launch.verify()

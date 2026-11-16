@@ -143,6 +143,40 @@ class FakeServer:
         self.events.append(self.name+"-drained")
 
 
+def test_cohost_bootstrap_uses_api_owned_native_installation_port(monkeypatch):
+    from skeleton.api.server import ServerState
+    launch = launch_fixture()
+    owner, memory, epoch, reviewer = object(), object(), object(), object()
+    writer = SimpleNamespace(repository=memory)
+    state = ServerState()
+    attestation = AsyncMock()
+    monkeypatch.setattr(s, "_attest_startup", attestation)
+    composition = object()
+    observed = []
+
+    def make(*args):
+        observed.append(args)
+        return composition
+
+    monkeypatch.setattr(s, "TrustedNativeStartup", make)
+    install = AsyncMock()
+    monkeypatch.setattr(state, "install_trusted_native_startup", install)
+
+    async def run():
+        supervisor = s.CohostedStackSupervisor(
+            launch, reviewer, object(), object(), lambda: state, object(),
+            object(), asyncio.Event(),
+        )
+        supervisor.runtime = (owner, memory, writer, epoch)
+        await supervisor._bootstrap(state)
+
+    asyncio.run(run())
+    attestation.assert_awaited_once_with(launch, reviewer, epoch)
+    assert observed == [(owner, memory, epoch, reviewer, launch.plan.models,
+                         launch.plan.policy_sha256, launch.plan.memory_namespace)]
+    install.assert_awaited_once_with(composition)
+
+
 def test_two_server_order_and_shared_owner_identity(monkeypatch):
     launch=launch_fixture()
     events=[]

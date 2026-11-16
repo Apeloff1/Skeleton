@@ -56,7 +56,7 @@ class RouterGhostTopologyFencing(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(db.calls, ["hello"])
 
     async def test_router_claims_never_reach_epoch(self):
-        for msg in ("isdbgrid", 1, True, [], {}, object()):
+        for msg in ("isdbgrid", "", 1, True, [], {}, object()):
             with self.subTest(msg=repr(msg)):
                 hello = dict(self.hello, msg=msg)
                 self.assertIsNone(_trusted_topology(hello))
@@ -74,7 +74,7 @@ class RouterGhostTopologyFencing(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(baseline)
         self.assertEqual(
             baseline,
-            _trusted_topology(dict(self.hello, isreplicaset=False, msg="")),
+            _trusted_topology(dict(self.hello, isreplicaset=False, msg="replica-member")),
         )
 
     async def test_mongos_with_ghost_false_is_still_denied(self):

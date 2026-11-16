@@ -687,6 +687,10 @@ class ServerState:
             raise RuntimeError("engine local guard may not be rebound")
         self._engine_local_guard_components = components
 
+    async def install_trusted_native_startup(self, startup: Any) -> None:
+        """API-owned binding port for a deployer composition already in process."""
+        await _install_trusted_native_startup(self, startup)
+
     def configure_engine_protected_native_startup(
         self, *, components: Any, conversation: Any, memory: Any,
         shared_epoch: Any, memory_namespace: str, policy_sha256: str,
