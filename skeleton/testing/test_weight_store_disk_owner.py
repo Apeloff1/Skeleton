@@ -82,10 +82,11 @@ def test_space_reserve_and_entry_budget_refuse_before_ingestion(tmp_path, monkey
     with pytest.raises(WeightShardStoreError, match="free-byte reserve"):
         owner.stage(identity, plan, paths)
     assert not list(store.objects.iterdir())
-    entries = WeightStoreDiskOwner(store, DiskAdmissionPolicy(1 << 20, minimum_free_bytes=0, maximum_entries=2))
+    separate = WeightShardStore(tmp_path / "entry-store")
+    entries = WeightStoreDiskOwner(separate, DiskAdmissionPolicy(1 << 20, minimum_free_bytes=0, maximum_entries=2))
     with pytest.raises(WeightShardStoreError, match="prospective"):
         entries.stage(identity, plan, paths)
-    assert not list(store.manifests.iterdir())
+    assert not list(separate.manifests.iterdir())
 
 
 def test_interrupted_temporary_file_requires_explicit_operator_review(tmp_path):
@@ -136,3 +137,74 @@ def test_failed_source_leaves_no_published_manifest(tmp_path):
         owner.stage(identity, plan, paths)
     assert not list(store.manifests.iterdir())
     assert owner.inspect()["inventory"]["object_bytes"] == 0
+
+
+def test_provisioned_store_refuses_legacy_write_and_mismatched_policy(tmp_path):
+    store = WeightShardStore(tmp_path / "store")
+    policy = DiskAdmissionPolicy(1 << 20, minimum_free_bytes=0)
+    owner = WeightStoreDiskOwner(store, policy)
+    identity, plan, paths = prepare(tmp_path)
+    with pytest.raises(WeightShardStoreError, match="cooperative disk owner"):
+        WeightShardStore(store.root).stage_plan(identity, plan, paths)
+    with pytest.raises(WeightShardStoreError, match="differs from persisted"):
+        WeightStoreDiskOwner(WeightShardStore(store.root),
+                             DiskAdmissionPolicy(2 << 20, minimum_free_bytes=0))
+    assert owner.stage(identity, plan, paths)[0] == plan.digest
+    reopened = WeightStoreDiskOwner(WeightShardStore(store.root, read_only=True),
+                                    policy, initialize=False)
+    assert reopened.inspect()["active_intent"] is None
+    assert reopened.inspect()["last_outcome"]["outcome"] == "committed"
+
+
+def test_lock_replacement_is_refused_even_by_a_new_owner(tmp_path):
+    store = WeightShardStore(tmp_path / "store")
+    policy = DiskAdmissionPolicy(1 << 20, minimum_free_bytes=0)
+    WeightStoreDiskOwner(store, policy)
+    old = store.root / ".weight-stage.lock"
+    replacement = store.root / "replacement"
+    replacement.touch(mode=0o600)
+    replacement.replace(old)
+    with pytest.raises(WeightShardStoreError, match="differs from persisted"):
+        WeightStoreDiskOwner(WeightShardStore(store.root), policy)
+
+
+def test_missing_provisioned_lock_is_not_recreated(tmp_path):
+    store = WeightShardStore(tmp_path / "store")
+    policy = DiskAdmissionPolicy(1 << 20, minimum_free_bytes=0)
+    WeightStoreDiskOwner(store, policy)
+    lock = store.root / ".weight-stage.lock"
+    lock.unlink()
+    with pytest.raises((WeightShardStoreError, FileNotFoundError)):
+        WeightStoreDiskOwner(WeightShardStore(store.root), policy)
+    assert not lock.exists()
+    identity, plan, paths = prepare(tmp_path)
+    with pytest.raises(WeightShardStoreError, match="cooperative disk owner"):
+        store.stage_plan(identity, plan, paths)
+
+
+def test_invalid_declaration_is_refused_before_intent(tmp_path):
+    store = WeightShardStore(tmp_path / "store")
+    owner = WeightStoreDiskOwner(store, DiskAdmissionPolicy(1 << 20, minimum_free_bytes=0))
+    identity, plan, _ = prepare(tmp_path)
+    with pytest.raises(WeightShardStoreError, match="source index"):
+        owner.stage(identity, plan, {})
+    assert owner.inspect()["active_intent"] is None
+
+
+def test_later_staging_error_leaves_exact_durable_intent(tmp_path):
+    store = WeightShardStore(tmp_path / "store")
+    policy = DiskAdmissionPolicy(1 << 20, minimum_free_bytes=0)
+    owner = WeightStoreDiskOwner(store, policy)
+    identity, plan, paths = prepare(tmp_path)
+    good = paths[0].read_bytes()
+    paths[0].write_bytes(b"x" * len(good))
+    with pytest.raises(WeightShardStoreError):
+        owner.stage(identity, plan, paths)
+    intent = owner.inspect()["active_intent"]
+    assert intent["plan_digest"] == plan.digest
+    assert intent["model_identity_digest"] == identity.identity_digest
+    paths[0].write_bytes(good)
+    another = WeightStoreDiskOwner(WeightShardStore(store.root), policy)
+    assert another.inspect()["active_intent"] == intent
+    with pytest.raises(WeightShardStoreError, match="unresolved staging intent"):
+        another.stage(identity, plan, paths)
