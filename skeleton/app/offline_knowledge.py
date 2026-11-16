@@ -7,6 +7,7 @@ Explicit operator-selected files use safe, no-follow regular-file admission.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 import codecs
 from hashlib import sha256
@@ -240,14 +241,19 @@ class OfflineKnowledgeLibrary:
             len(payload), write=True, storage_path=self._storage_path
         )
         digest = sha256(payload).hexdigest()
-        pieces = self._chunks(content)
-        if not any(_terms(piece[2]) for piece in pieces):
+        del payload
+        chunk_count = 0
+        searchable = False
+        for _, _, piece in self._iter_chunks(content):
+            chunk_count += 1
+            searchable = searchable or bool(_terms(piece))
+        if not searchable:
             raise RuntimeContractError("reference document has no searchable terms")
         with self.store._transaction():
             # Duplicate admissions must not launder a corrupted stored source
             # into an apparently verified result. Validate all existing
             # source/offset/hash records before changing or reusing the index.
-            self._verified_snapshot()
+            self._verified_search_pass(None, consume=lambda _: None)
             row = self.store._db.execute(
                 "SELECT document_id, title FROM offline_documents "
                 "WHERE model_digest=? AND tokenizer_digest=? AND content_digest=?",
@@ -256,7 +262,7 @@ class OfflineKnowledgeLibrary:
             if row is not None:
                 return {
                     "document_id": row[0], "title": row[1], "sha256": digest,
-                    "chunk_count": len(pieces), "reused": True,
+                    "chunk_count": chunk_count, "reused": True,
                 }
             # Local document and chunk counts follow available storage, not
             # hardcoded public-hosting quotas. Database errors roll back.
@@ -268,12 +274,12 @@ class OfflineKnowledgeLibrary:
             )
             self.store._db.executemany(
                 "INSERT INTO offline_document_chunks VALUES (?, ?, ?, ?, ?)",
-                [(doc_id, index, start, end, piece)
-                 for index, (start, end, piece) in enumerate(pieces)],
+                ((doc_id, index, start, end, piece)
+                 for index, (start, end, piece) in enumerate(self._iter_chunks(content))),
             )
             return {
                 "document_id": doc_id, "title": title.strip(), "sha256": digest,
-                "chunk_count": len(pieces), "reused": False,
+                "chunk_count": chunk_count, "reused": False,
             }
 
     def _verified_snapshot(self) -> tuple[list[tuple[Any, ...]], list[tuple[Any, ...]]]:
@@ -341,12 +347,13 @@ class OfflineKnowledgeLibrary:
         return documents, chunks
 
     def list_documents(self) -> list[dict[str, Any]]:
-        documents, _ = self._verified_snapshot()
-        return [
-            {"document_id": row[0], "title": row[1], "sha256": row[2],
-             "character_count": len(row[3]), "created_ns": row[4]}
-            for row in documents
-        ]
+        documents = []
+        def metadata(row):
+            documents.append({"document_id": row[0], "title": row[1], "sha256": row[2],
+                              "character_count": len(row[3]), "created_ns": row[4]})
+        with self._read_snapshot():
+            self._verified_search_pass(None, consume=lambda _: None, on_document=metadata)
+        return sorted(documents, key=lambda row: (-row["created_ns"], row["document_id"]))
 
     def delete(self, document_id: str) -> None:
         if (not isinstance(document_id, str) or not 8 <= len(document_id) <= 100
@@ -366,17 +373,34 @@ class OfflineKnowledgeLibrary:
         """Return the exact verified source for inspection or private export."""
         if not isinstance(document_id, str) or len(document_id) > 100:
             raise RuntimeContractError("invalid reference document id")
-        documents, _ = self._verified_snapshot()
-        for row in documents:
+        result = None
+        def collect(row):
+            nonlocal result
             if row[0] == document_id:
-                return {
+                result = {
                     "document_id": row[0], "title": row[1], "sha256": row[2],
                     "text": row[3], "created_ns": str(row[4]),
                     "size_bytes": len(row[3].encode("utf-8")),
                 }
-        raise RuntimeContractError("unknown local reference document")
+        with self._read_snapshot():
+            self._verified_search_pass(None, consume=lambda _: None, on_document=collect)
+        if result is None:
+            raise RuntimeContractError("unknown local reference document")
+        return result
 
-    def _verified_search_pass(self, selected, *, consume):
+    @contextmanager
+    def _read_snapshot(self):
+        with self.store._lock:
+            own_snapshot = not self.store._db.in_transaction
+            if own_snapshot:
+                self.store._db.execute("BEGIN")
+            try:
+                yield
+            finally:
+                if own_snapshot:
+                    self.store._db.execute("ROLLBACK")
+
+    def _verified_search_pass(self, selected, *, consume, on_document=None):
         """Verify a complete model scope one source at a time under one snapshot.
 
         The caller owns the read transaction/lock. Source content and chunk
@@ -393,13 +417,13 @@ class OfflineKnowledgeLibrary:
             for doc_id, size in rows:
                 _require_local_headroom(int(size) * 2, storage_path=self._storage_path)
                 doc = self.store._db.execute(
-                    "SELECT title, content_digest, content_text FROM offline_documents "
+                    "SELECT title, content_digest, content_text, created_ns FROM offline_documents "
                     "WHERE document_id=? AND model_digest=? AND tokenizer_digest=?",
                     (doc_id, *scope),
                 ).fetchone()
                 if doc is None:
                     raise RuntimeContractError("reference source vanished inside snapshot")
-                title, digest, source = doc
+                title, digest, source, created = doc
                 payload = self._validate(title, source)
                 if sha256(payload).hexdigest() != _identity(digest, "document digest"):
                     raise RuntimeContractError("reference source hash mismatch")
@@ -428,6 +452,8 @@ class OfflineKnowledgeLibrary:
                         raise RuntimeContractError("reference source index contains extra passages")
                 finally:
                     indexed.close()
+                if on_document is not None and include:
+                    on_document((doc_id, title, digest, source, created))
                 del source, doc
         finally:
             rows.close()
@@ -496,17 +522,28 @@ class OfflineKnowledgeLibrary:
             if len(best) > limit:
                 best.pop()
 
-        with self.store._lock:
-            own_snapshot = not self.store._db.in_transaction
-            if own_snapshot:
-                self.store._db.execute("BEGIN")
-            try:
-                self._verified_search_pass(selected, consume=count)
-                if terms and n:
-                    self._verified_search_pass(selected, consume=score)
-            finally:
-                if own_snapshot:
-                    self.store._db.execute("ROLLBACK")
+        with self._read_snapshot():
+            self._verified_search_pass(selected, consume=count)
+            if terms and n:
+                # The first pass verified every relevant source and every
+                # indexed slice in this SAME SQLite snapshot. Re-read the
+                # joined rows without rehashing documents or regenerating
+                # chunk boundaries. No unverified ranking shortcut survives
+                # across transactions or calls.
+                records = self.store._db.execute(
+                    "SELECT c.document_id, d.title, d.content_digest, "
+                    "c.ordinal, c.char_start, c.char_end, c.content "
+                    "FROM offline_documents d JOIN offline_document_chunks c "
+                    "ON d.document_id=c.document_id WHERE d.model_digest=? "
+                    "AND d.tokenizer_digest=? ORDER BY c.document_id, c.ordinal",
+                    (self.model_digest, self.tokenizer_digest),
+                )
+                try:
+                    for row in records:
+                        if selected is None or row[0] in selected:
+                            score(row)
+                finally:
+                    records.close()
         return [hit.to_dict() for hit in best]
 
 
