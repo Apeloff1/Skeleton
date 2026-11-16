@@ -361,3 +361,53 @@ def test_large_unicode_result_uses_compact_custody_digest():
     assert first.receipt["output_digest"] != second.receipt["output_digest"]
     assert len(first.receipt["receipt_digest"]) == 64
     assert payload[:100] not in str(first.receipt)
+
+
+def test_expired_source_inspection_revokes_pending_grant_before_consumption(tmp_path, monkeypatch):
+    from skeleton.testing.test_offline_runtime_admission import work
+    store, key, model_identity = stage(tmp_path)
+    clock = [1_000_000_000]
+    monkeypatch.setattr("skeleton.app.offline_runtime_session.time.monotonic_ns", lambda: clock[0])
+    monkeypatch.setattr("skeleton.app.offline_runtime_session.sample_hardware",
+                        lambda: sample(start=clock[0] - 1, origin="local_probe"))
+    session = OfflineRuntimeSession(
+        store, plan_digest=key, model_identity_digest=model_identity, policy=POLICY,
+        maximum_source_age_ns=100,
+        hysteresis=HysteresisPolicy(recovery_samples=2, recovery_cooldown_ns=0,
+                                    max_sample_age_ns=POLICY.sample_age_ns),
+    )
+    owner = session.claim_consumer()
+    clock[0] += 10
+    session.offer(work(), consumer=owner)
+    clock[0] += 10
+    grant = session.offer(work(), consumer=owner)["admission"]
+    assert grant["status"] == "candidate"
+    clock[0] += 100
+    assert not session.status()["source_inspection_fresh"]
+    with pytest.raises(RuntimePreflightError, match="source inspection expired"):
+        session.consume(grant, consumer=owner)
+    assert not session.status()["admission"]["pending"]
+    with pytest.raises(RuntimePreflightError, match="source inspection expired"):
+        session.offer(work(), consumer=owner)
+    assert session.revalidate_source(consumer=owner)["source_status"] == "reinspected"
+    assert session.status()["source_inspection_fresh"]
+    clock[0] += 10
+    assert session.offer(work(), consumer=owner)["admission"]["status"] == "no_grant"
+    clock[0] += 10
+    assert session.offer(work(), consumer=owner)["admission"]["status"] == "candidate"
+    session.close()
+
+
+def test_queue_reinspection_requires_no_live_or_pending_requests(tmp_path, monkeypatch):
+    queue, executor = make_queue(tmp_path, monkeypatch)
+    try:
+        assert queue.revalidate_source()["source_status"] == "reinspected"
+        queue.submit(BatchRequest("pending", 2, 2), timeout_ms=10000)
+        with pytest.raises(RuntimePreflightError, match="idle request queue"):
+            queue.revalidate_source()
+        assert queue.cancel("pending")
+        queue.tick()
+        assert executor.calls == []
+        assert queue.revalidate_source()["source_status"] == "reinspected"
+    finally:
+        queue.close()
