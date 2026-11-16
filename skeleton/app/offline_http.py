@@ -655,6 +655,43 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(405, "unsupported local API method")
         if body is None:
             body = {}
+        if path == "/v1/dragon/navigation-discourse" and method == "POST":
+            from skeleton.ai.webcrawler.navigation_semantics import (
+                validate_packet, role_prompt, parse_rank, make_advice,
+            )
+            from skeleton.ai.jeeves_local_policy import primary_model_id
+            _fields(body, {"packet", "approved"}, {"packet", "approved"})
+            if body["approved"] is not True or getattr(self.backend, "model_id", None) != primary_model_id():
+                raise OfflineHTTPError(403, "explicit local Jeeves discourse approval required")
+            packet = body["packet"]
+            ids = validate_packet(packet)
+            ranks, receipts = [], []
+            # Use the existing public session/turn authority for both calls:
+            # real native inference, model identity, SQLite receipts and
+            # single-executor lease. Distinct contexts prevent role leakage.
+            # A single primary model is used for both role turns.
+            for role in ("jeeves", "dragon"):
+                prompt = role_prompt(packet, role, ranks[0] if ranks else None)
+                _, session = self.dispatch("POST", "/v1/sessions",
+                    {"system": "You are a bounded local navigation ranking role. Output only a JSON array."})
+                sid = session["session_id"]
+                rid = "dragon-nav-" + role
+                _, result = self.dispatch("POST", "/v1/sessions/" + sid + "/turn",
+                    {"message": prompt, "request_id": rid,
+                     "max_output_tokens": min(96, self.default_output_tokens),
+                     "require_full_history": True})
+                execution = result.get("local_execution_receipt")
+                if (result.get("model_digest") != self.model_digest
+                        or not isinstance(execution, dict)
+                        or execution.get("output_sha256") != result.get("output_digest")):
+                    raise OfflineHTTPError(503, "local navigation execution receipt unavailable")
+                ranks.append(parse_rank(result["text"], len(ids)))
+                receipts.append({"role": role, "session_id": sid, "request_id": rid,
+                    "execution_receipt_digest": execution["execution_receipt_digest"],
+                    "output_digest": result["output_digest"]})
+            return 200, {"advice": make_advice(packet, *ranks),
+                         "model_digest": self.model_digest, "role_receipts": receipts,
+                         "single_local_model_two_roles": True, "network_authorized": False}
         if path == "/v1/resources" and method == "GET":
             try:
                 return 200, self.resource_fabric.monitor()
