@@ -1208,6 +1208,8 @@ class NativeLLMRuntime:
             device_policy=device_policy,
         )
         runtime = cls(model, limits=limits, device_policy=policy)
+        if not hmac.compare_digest(runtime.model_digest, checkpoint["model_digest"]):
+            raise RuntimeContractError("restored graph differs from admitted checkpoint weights")
         try:
             runtime.tokenizer.assert_checkpoint_matches(tokenizer_checkpoint)
         except TokenizerContractError as exc:
