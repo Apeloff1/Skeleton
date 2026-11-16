@@ -341,6 +341,8 @@ class LeadGraph:
             independent_reviews=enabled(db) if partitioned else False
             from core.dragon_graph_structural import enabled as structural_enabled
             independent_structure=structural_enabled(db) if partitioned else False
+            from core.dragon_graph_multi_batch import enabled as multi_enabled,MAX_PENDING
+            concurrent_batches=multi_enabled(db) if independent_structure else False
             record=db.execute("""SELECT enabled,bootstrap_revision,bootstrap_cursor,bootstrapped,nodes,edges,snapshots,due
                 FROM lead_owner WHERE owner=?""",(owner,)).fetchone()
         result=dict(record) if record else {"enabled":0,"bootstrap_revision":None,"bootstrap_cursor":0,"bootstrapped":0,"nodes":0,"edges":0,"snapshots":0,"due":0}
@@ -351,6 +353,7 @@ class LeadGraph:
                 "canonical_write_lanes":LEAD_LANES if partitioned else 1,"coordinated_writer":True,
                 "independent_review_writers":LEAD_LANES if independent_reviews else 0,
                 "independent_structural_writers":LEAD_LANES if independent_structure else 0,
+                "concurrent_root_batch_cap":MAX_PENDING if concurrent_batches else 1,
                 "network_authorized":False,"physical_capacity_verified":False}
 
     def bootstrap_pulse(self):
