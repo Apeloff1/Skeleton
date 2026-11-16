@@ -67,6 +67,8 @@ on:
       - 'skeleton/__main__.py'
       - 'setup.cfg'
       - 'skeleton/app/orphan_cli_audit.py'
+      - 'skeleton/app/orphan_source_graph*.py'
+      - 'skeleton/testing/test_orphan_source_graph.py'
       - 'skeleton/ai/game_builder/offline_portfolio*.py'
       - 'skeleton/ai/game_builder/offline_export_batch.py'
       - 'skeleton/testing/test_offline_portfolio.py'
@@ -192,6 +194,11 @@ jobs:
         env:
           PYTHONPATH: '.:backend'
         run: python -m pytest -q skeleton/testing/test_offline_portfolio.py skeleton/testing/test_offline_export_batch.py
+
+      - name: Static orphan dependency planning regressions
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_orphan_source_graph.py
 
       - name: Consumer share and Chroma custody regressions
         env:

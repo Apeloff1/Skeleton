@@ -7,6 +7,7 @@ Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
     offline-runtime  Inspect pinned local weights and measured resource admission
     weight-store     Stage pinned weights and inspect cooperative disk/recovery custody
+    orphan-source-graph           Dependency-order possible source orphans without imports
     studio-portfolio-verify       Replay-qualify independently pinned game cohorts
     jeeves-desktop-campaign-delivery   Explicit campaign source delivery
     jeeves-desktop-capsule-transport   Approved capsule export and import
@@ -1277,6 +1278,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "studio-portfolio-verify":
         from skeleton.ai.game_builder.offline_portfolio_cli import main as portfolio_main
         return portfolio_main(rest)
+    if cmd == "orphan-source-graph":
+        from skeleton.app.orphan_source_graph_cli import main as orphan_graph_main
+        return orphan_graph_main(rest)
     if cmd == "app":
         from skeleton.app.cli import run_app_cli
         return run_app_cli(rest)

@@ -25,6 +25,7 @@ _SUPPORTED = frozenset({
     "skeleton.game_builder.dual_runtime_verification.v1",
     "skeleton.game_builder.offline_export_batch_receipt.v1",
     "skeleton.game_builder.offline_export_batch_delta.v1",
+    "skeleton.game_builder.offline_portfolio_receipt.v1",
 })
 
 
@@ -67,6 +68,11 @@ def inspect_verified_receipt(
         elif payload.get("offline_gameplay_reexecuted") is not True:
             raise ReceiptInspectionError("game replay evidence missing")
         recorded_digest = payload.get("receipt_digest")
+        if kind == "skeleton.game_builder.offline_portfolio_receipt.v1":
+            if (type(recorded_digest) is not str or not _HEX.fullmatch(recorded_digest)
+                    or payload.get("atomic_source_snapshot") is not False
+                    or payload.get("godot_executed") is not False):
+                raise ReceiptInspectionError("invalid portfolio historical evidence")
         if recorded_digest is not None:
             body = {key: value for key, value in payload.items()
                     if key != "receipt_digest"}
