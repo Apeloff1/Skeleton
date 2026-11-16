@@ -37,7 +37,9 @@ from .structured_discovery import (
 from .frontier_scheduler import choose_frontier
 from .dragon_companion import build_companion, companion_style
 from .dragon_curriculum_trace import decision_receipt, validate_receipt, trace_summary
-from .adaptive_navigation import access_denied_hold, origin_health, restorative_wait
+from .adaptive_navigation import (
+    access_denied_hold, access_interstitial_reason, origin_health, restorative_wait,
+)
 from .acquisition_feedback import (host_economics, portfolio_summary, quantize_latency,
                                    settled_observation, validate_measurements)
 from .frontier_circuit import evaluate_frontier_candidate, navigation_hazard
@@ -1191,6 +1193,22 @@ class CrawlRun:
             )
         now = time.time()
         state["host_ready"][host] = max(state["host_ready"][host], now + delay)
+        # A challenge can arrive disguised as a successful document or redirect.
+        # The transport has already charged this response; do not retry it,
+        # parse it, enqueue its links, or extend authority to another route.
+        interstitial = access_interstitial_reason(
+            response.status, response.headers, response.body,
+        )
+        if interstitial is not None:
+            horizon = state["binding"]["consent"]["expires_at"]
+            for held_host in {host, p.hostname}:
+                state["host_ready"][held_host] = max(
+                    state["host_ready"].get(held_host, 0), horizon,
+                )
+            self._finish_item(item)
+            return self._event(
+                "rejected", now=now, url=fetch_url, reason=interstitial,
+            )
         if response.status in _REDIRECTS:
             chain = robots["redirects"] if needs_robots else item["redirects"]
             try:
