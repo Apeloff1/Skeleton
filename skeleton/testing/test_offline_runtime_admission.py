@@ -337,3 +337,31 @@ def test_gpu_aggregate_drift_rejected_and_source_label_not_published():
                             original.inventory_digest, plan, ())
     assert "/private/model/path" not in json.dumps(redacted.snapshot())
     assert redacted.snapshot()["shards"][0]["source_label_digest"] == digest(shard.source)
+
+
+def test_nonadvancing_offer_clock_and_invalid_consume_revoke_grants():
+    owner = controller()
+    initial, _ = offer(owner, 0, origin="local_probe")
+    grant, reading = offer(owner, 1, origin="local_probe")
+    assert grant["status"] == "candidate"
+    with pytest.raises(RuntimePreflightError, match="consumption timestamp"):
+        owner.consume(grant, now_ns=True)
+    with pytest.raises(RuntimePreflightError, match="no pending"):
+        owner.consume(grant, now_ns=reading.finished_ns)
+    newer = sample(start=reading.started_ns + 1, origin="local_probe")
+    invalid = owner.offer(newer, work(), now_ns=reading.finished_ns)["admission"]
+    assert invalid["status"] == "no_grant"
+    assert "nonadvancing_offer_clock" in invalid["blockers"]
+
+
+def test_runtime_policy_and_source_bindings_cannot_be_reassigned():
+    owner = controller()
+    with pytest.raises(AttributeError):
+        owner.policy = replace(POLICY, maximum_workers=256)
+    with pytest.raises(AttributeError):
+        owner.source = source((GIB,))
+    from skeleton.ai.model_runtime.iteration_scheduler import IterationWork
+    malformed = (IterationWork("typed", "prefill", 2),)
+    reading = sample()
+    with pytest.raises(RuntimePreflightError, match="typed iteration work and phase"):
+        owner.offer(reading, malformed, now_ns=reading.finished_ns)
