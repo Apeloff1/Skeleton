@@ -118,6 +118,9 @@ _MANAGED_LONG_FLAGS = {
     "--threads",
     "--batch-size",
     "--gpu-layers",
+    "--n-gpu-layers",
+    "--temperature",
+    "--predict",
     "--kv-offload",
     "--no-kv-offload",
     "--cache-type-k",
@@ -152,13 +155,25 @@ _REMOTE_ACQUISITION_FLAGS = {
     "--url",
     "--download",
     "--hf-repo-v",
+    "--docker-repo",
+    "--gpt-oss-20b-default",
+    "--gpt-oss-120b-default",
+    "--vision-gemma-4b-default",
+    "--vision-gemma-12b-default",
     "--hf-token",
     "--rpc",
     "--rpc-server",
     "--host",
     "--port",
 }
-_REMOTE_ACQUISITION_SHORT_FLAGS = ("-hf", "-hfr", "-hff", "-hfv", "-hft")
+_REMOTE_ACQUISITION_SHORT_FLAGS = ("-hf", "-hfr", "-hff", "-hfv", "-hft", "-mu", "-dr")
+_UNBOUND_ARTIFACT_FLAGS = {
+    "--lora", "--lora-scaled", "--control-vector", "--control-vector-scaled",
+    "--control-vector-layer-range", "--shard", "--ple", "--mmproj", "--mmproj-url",
+    "--prompt-cache", "--prompt-cache-all", "--prompt-cache-ro", "--log-file",
+    "--override-kv", "--override-tensor", "--override-tensors",
+}
+_UNBOUND_ARTIFACT_SHORT_FLAGS = ("-lora", "-ot", "-mmproj")
 
 
 class LlamaCppRuntimeError(RuntimeError):
@@ -385,6 +400,17 @@ class LlamaCppConfig:
             } or any(item == flag or item.startswith(flag + "=")
                      for flag in ("-md", "-hfd", "-hfrd", "-lcs", "-lcd"))):
                 raise ValueError("extra_args may not activate unmanaged speculation")
+            if (option in _UNBOUND_ARTIFACT_FLAGS
+                    or any(item == flag or item.startswith(flag + "=")
+                           for flag in _UNBOUND_ARTIFACT_SHORT_FLAGS)):
+                raise ValueError("extra_args may not introduce unpinned weights or persistent prompt state")
+            # Older binary aliases must not bypass the managed default-off
+            # speculative configuration even if modern releases remove them.
+            if option in {"--draft", "--draft-n", "--draft-max", "--draft-min",
+                          "--draft-n-min", "--draft-p-min", "--draft-p-split",
+                          "--device-draft", "--gpu-layers-draft", "--n-gpu-layers-draft",
+                          "--cache-type-k-draft", "--cache-type-v-draft"}:
+                raise ValueError("extra_args may not activate unmanaged speculation aliases")
             managed = option in _MANAGED_LONG_FLAGS
             if not item.startswith("--"):
                 managed = managed or any(
