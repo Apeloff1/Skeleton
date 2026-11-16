@@ -231,3 +231,31 @@ def projection(ledger, *, frontier, seen, max_depth):
             "counts": dict(ledger["counts"]), "max_records": MAX_RECORDS,
             "max_bytes": MAX_BYTES, "last_discourse": ledger["last_discourse"],
             "inventory_complete": False, "authority": "advisory_only"}
+
+
+def browse_page(ledger, *, frontier, seen, max_depth, after=0, limit=32):
+    """Ordinal pagination over one immutable snapshot; links are never fetched."""
+    if type(after) is not int or not 0 <= after <= 1_000_000_000:
+        raise ValueError("invalid navigation cursor")
+    if type(limit) is not int or not 1 <= limit <= 32:
+        raise ValueError("invalid navigation page size")
+    active = {u for row in frontier for u in (row["url"], row["original_url"])}
+    visited = set(seen)
+    rows = sorted((row for row in ledger["records"].values() if row["ordinal"] > after),
+                  key=lambda row: row["ordinal"])
+    selected = []
+    for row in rows:
+        if len(selected) >= limit:
+            break
+        url = row["url"]
+        phase = ("visited" if url in visited else "active" if url in active else
+                 "depth_held" if row["depth"] > max_depth else
+                 "pending" if row["pending"] else "observed_only")
+        candidate = {**row, "phase": phase, "navigation_authorized": False}
+        if len(_encoded([*selected, candidate])) > 256 * 1024:
+            break
+        selected.append(candidate)
+    next_after = selected[-1]["ordinal"] if selected and len(selected) < len(rows) else None
+    return {"targets": selected, "next_after": next_after,
+            "summary": projection(ledger, frontier=frontier, seen=seen, max_depth=max_depth),
+            "network_authorized": False}
