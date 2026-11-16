@@ -8,7 +8,7 @@ verification.
 """
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 import threading
 import time
@@ -19,7 +19,7 @@ from skeleton.ai.runtime.inference.llama_cpp import LlamaCppModel
 from skeleton.ai.runtime.inference.local import LocalModelAdapter
 from skeleton.app.offline_runtime_preflight import (
     ModelSource, RuntimePolicy, canonical, digest, identity, inspect_source,
-    plan_preflight, require, sample_hardware,
+    plan_preflight, require, sample_hardware, integer,
 )
 
 SCHEMA = "skeleton.offline.measured-llama-cpu.v1"
@@ -122,9 +122,11 @@ class MeasuredLlamaCpuGate:
 
 
 def build_measured_guarded_deployment(
-    manifest_path: Path, *, manifest_digest: str, store_path: Path,
+    manifest_path: Path, *, manifest_digest: str, manifest_sha256: str,
+    maximum_deployment_bytes: int, store_path: Path,
     plan_digest: str, model_identity_digest: str,
     policy: RuntimePolicy, components: ProtectedLocalComponents,
+    default_seed: int = 0, max_queue_size: int = 256, max_batch_size: int = 256,
 ) -> tuple[LocalModelAdapter, MeasuredLlamaCpuGate]:
     """Trusted startup composition; callers route through the protected adapter.
 
@@ -134,18 +136,22 @@ def build_measured_guarded_deployment(
     Cache is disabled and concurrency is one for this initial CPU profile.
     """
     identity(manifest_digest, "deployment digest")
+    identity(manifest_sha256, "raw deployment manifest SHA")
+    integer(maximum_deployment_bytes, 1, 1 << 40, "deployment byte limit")
     require(isinstance(components, ProtectedLocalComponents), "trusted protection components required")
     require(isinstance(policy, RuntimePolicy) and policy.backend == "cpu" and policy.verify_gguf_headers,
             "measured protected CPU policy required")
-    deployment = LocalModelDeployment.load(manifest_path)
+    deployment = LocalModelDeployment.load(manifest_path, expected_sha256=manifest_sha256,
+                                          max_artifact_bytes=maximum_deployment_bytes)
     require(deployment.manifest_digest == manifest_digest, "independent deployment pin mismatch")
     source = inspect_source(store_path, plan_digest=plan_digest,
                             model_identity_digest=model_identity_digest, policy=policy)
     require(len(source.plan.shards) == 1 and
             source.plan.shards[0].digest == deployment.model_sha256,
             "deployment and independently verified store disagree")
-    adapter = deployment.adapter(cache_size=0, rehash_artifacts_each_run=True,
-                                 max_concurrency=1, require_guarded_inference=True,
+    adapter = deployment.adapter(cache_size=0, default_seed=default_seed, rehash_artifacts_each_run=True,
+                                 max_concurrency=1, max_queue_size=max_queue_size,
+                                 max_batch_size=max_batch_size, require_guarded_inference=True,
                                  guarded_components=components)
     require(adapter.require_guarded_inference and adapter.guarded_service is not None,
             "protected adapter is required")
@@ -154,3 +160,37 @@ def build_measured_guarded_deployment(
     # process spawn. It rejects hook replacement or late installation.
     adapter.engine.model.install_prelaunch_resource_guard(gate)
     return adapter, gate
+
+
+@dataclass(frozen=True, slots=True)
+class MeasuredLocalDeployment:
+    """Trusted startup-only configuration, not an environment or request parser."""
+
+    manifest_digest: str
+    manifest_sha256: str
+    maximum_deployment_bytes: int
+    store_path: Path
+    plan_digest: str
+    model_identity_digest: str
+    policy: RuntimePolicy
+
+    def __post_init__(self) -> None:
+        for name in ("manifest_digest", "manifest_sha256", "plan_digest", "model_identity_digest"):
+            identity(getattr(self, name), name)
+        integer(self.maximum_deployment_bytes, 1, 1 << 40, "deployment byte limit")
+        require(isinstance(self.store_path, Path) and self.store_path.is_absolute(),
+                "explicit absolute weight store path required")
+        require(isinstance(self.policy, RuntimePolicy) and self.policy.backend == "cpu"
+                and self.policy.verify_gguf_headers, "measured protected CPU policy required")
+
+    def activate(self, manifest_path: str | Path, *, components: ProtectedLocalComponents,
+                 default_seed: int, max_queue_size: int, max_batch_size: int
+                 ) -> tuple[LocalModelAdapter, MeasuredLlamaCpuGate]:
+        return build_measured_guarded_deployment(
+            Path(manifest_path), manifest_digest=self.manifest_digest,
+            manifest_sha256=self.manifest_sha256, maximum_deployment_bytes=self.maximum_deployment_bytes,
+            store_path=self.store_path, plan_digest=self.plan_digest,
+            model_identity_digest=self.model_identity_digest, policy=self.policy,
+            components=components, default_seed=default_seed,
+            max_queue_size=max_queue_size, max_batch_size=max_batch_size,
+        )
