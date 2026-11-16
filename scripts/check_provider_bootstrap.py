@@ -476,30 +476,86 @@ def _discover_credential_bearing_ai_surfaces(repo_root: Path) -> set[str]:
     }
 
 
+_DOCKER_HEREDOC = re.compile(
+    r"""<<(-?)(?:'([A-Za-z_][A-Za-z_0-9]*)'|"([A-Za-z_][A-Za-z_0-9]*)"|([A-Za-z_][A-Za-z_0-9]*))(?=$|[ \t])"""
+)
+
+
+def _docker_static_instructions(docker: str) -> tuple[list[str], bool]:
+    """Read a conservative Dockerfile subset without interpreting script bodies.
+
+    Supported source-custody declarations use ordinary backslash continuation
+    and one RUN heredoc with a complete simple delimiter. Unsupported heredoc
+    syntax, an unterminated instruction/body, or an alternate escape directive
+    cannot produce positive materialization evidence. In particular, the
+    terminator is compared to the physical line, stripping only leading tabs
+    when the opener explicitly selects <<-. Never normalize the body first.
+    """
+    instructions: list[str] = []
+    if not isinstance(docker, str) or len(docker) > 16 * 1024**2:
+        return instructions, False
+    if any(ord(char) < 32 and char not in "\r\n\t" for char in docker):
+        return instructions, False
+    # CRLF is a physical line ending; bare CR is ambiguous.
+    docker = docker.replace("\r\n", "\n")
+    if "\r" in docker:
+        return instructions, False
+    pending: list[str] = []
+    heredoc_end: str | None = None
+    strip_tabs = False
+    for line in docker.split("\n"):
+        if heredoc_end is not None:
+            candidate = line.lstrip("\t") if strip_tabs else line
+            if candidate == heredoc_end:
+                heredoc_end = None
+                strip_tabs = False
+            continue
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            if re.match(r"^#\s*escape\s*=", stripped, re.IGNORECASE):
+                if not re.fullmatch(r"#\s*escape\s*=\s*\\", stripped, re.IGNORECASE):
+                    return instructions, False
+            continue
+        if not stripped:
+            continue
+        # Docker continuation removes the escape and physical newline.
+        # A trailing doubled escape is intentionally unsupported for any
+        # custody declaration rather than guessed as a continuation.
+        trailing = len(stripped) - len(stripped.rstrip("\\"))
+        if trailing > 1:
+            return instructions, False
+        if trailing == 1:
+            if "<<" in stripped:
+                return instructions, False
+            pending.append(stripped[:-1])
+            continue
+        physical = " ".join([*pending, stripped])
+        had_continuation = bool(pending)
+        pending.clear()
+        if "<<" in physical:
+            # Do not recognize a prefix of END-DOC, END#DOC or a concatenated
+            # quoted word as the delimiter. Reject here strings, multiple
+            # heredocs and ambiguous quoted/escaped constructs as a whole.
+            if had_continuation or physical.count("<<") != 1:
+                return instructions, False
+            pos = physical.index("<<")
+            prefix = physical[:pos]
+            marker = _DOCKER_HEREDOC.match(physical, pos)
+            if (not marker or not re.match(r"^RUN(?:\s|$)", physical, re.IGNORECASE)
+                    or not prefix or prefix[-1] not in " \t"
+                    or any(char in prefix for char in "'\"\\\x60")
+                    or physical[marker.end():].strip()):
+                return instructions, False
+            heredoc_end = next(value for value in marker.groups()[1:] if value is not None)
+            strip_tabs = marker.group(1) == "-"
+        instructions.append(" ".join(physical.split()))
+    return instructions, heredoc_end is None and not pending
+
+
 def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
     """Track actual COPY custody through static named-stage inheritance."""
-    # A Dockerfile heredoc body is opaque to the Docker instruction parser.
-    # In particular, Python 'from ... import ...' is not a new FROM stage.
-    instructions = []
-    heredoc_end = None
-    for line in docker.replace("\\\n", " ").splitlines():
-        stripped = line.strip()
-        if heredoc_end is not None:
-            if stripped == heredoc_end:
-                heredoc_end = None
-            continue
-        if not stripped or stripped.startswith("#"):
-            continue
-        instruction = " ".join(stripped.split())
-        instructions.append(instruction)
-        marker = re.search(
-            r"<<-?(?:'([^']+)'|\"([^\"]+)\"|([A-Za-z_][A-Za-z_0-9]*))",
-            instruction,
-        )
-        if marker:
-            heredoc_end = next(value for value in marker.groups() if value)
-    if heredoc_end is not None:
-        # An unterminated source stage cannot establish materialization.
+    instructions, complete = _docker_static_instructions(docker)
+    if not complete:
         return instructions, []
     stages, named = [], {}
     current = None
