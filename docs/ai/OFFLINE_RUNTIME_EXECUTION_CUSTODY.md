@@ -739,3 +739,70 @@ are selected through the existing sealed-context qualification gate.
 No Windows locking, physical device execution, real disk-full or
 power-loss qualification, cryptographically authenticated historical
 audit transcript, or exact-head test success is claimed.
+
+
+## Verified publication durability and qualification reconciliation
+
+Managed staging now requires successful POSIX synchronization of the
+verified object descriptors, their bucket directories, the objects
+directory, the exact pinned manifest descriptor, the manifests directory,
+and the store root before a successful outcome can be durably recorded.
+New bucket creation is synchronized in its parent, and temporary-name
+removal is synchronized after immutable link publication. Existing
+objects are verified and synchronized as part of the exact staged plan;
+shared digests do not require repeated durability reads. The final
+manifest pin, object identities and disk accounting are checked again
+before acknowledgement. A failed synchronization keeps the transaction
+intent unresolved; no successful outcome is fabricated.
+
+Recovery acknowledgement admits and hashes the complete physical catalog
+as before, then synchronizes admitted object descriptors and exact
+manifest bytes under the same cooperating writer slot. It revalidates
+the complete catalog identity and records a distinct durability digest
+before clearing the intent. Neither path provides power-loss evidence,
+drive cache guarantees, Windows locking or filesystem-wide isolation.
+The durability contract is conditional on the filesystem honoring
+successful fsync operations. Test fixtures inject synchronization
+failure and verify that the intent and retained data survive the
+failed acknowledgement.
+
+The preceding exact head
+`d14983fac66d45a847c333df1714911e572bef30` exposed five failed
+qualification workflows. Sealed Context Guard and the archived
+GameForge Python lane stopped at stale AI-tree summary counts and
+unclassified local guarded admission. Backend Quality independently
+reported that missing machine placement. The reconciliation updates
+the live counts (183 mappings, 181 native owners, 166 retained roots)
+and explicitly retains local guarded admission with application
+runtime ownership. Historical object audit and unsigned cutover
+status remain historical and unsigned. No cutover is authorized.
+
+The Jeeves source qualification reported seven failed Docker
+materialization parser cases. Static instruction parsing now preserves
+physical heredoc body lines, accepts only the supported simple complete
+RUN delimiter form, refuses ambiguous or incomplete declarations,
+distinguishes actual stage aliases from synthetic display names, and
+normalizes static working directories without granting dynamic COPY
+custody. Repository Dockerfiles still require exact-head validation.
+This is not a replacement for Docker build or live container evidence.
+
+The workflow input gate reported ten credential-shaped test-fixture
+URI findings. Explicit synthetic test-only placeholder credentials now
+replace those literals; redaction, parsing and network-boundary
+assertions remain. The secret hygiene scanner and its policy are
+unchanged. Confirmed real credential exposure would separately require
+revocation and rotation.
+
+The archived GameForge frontend lane stopped at node-forge RSA source
+custody. The reviewed no-write install hook and regression sources from
+PR #5421 are reconciled without changing the frozen lockfile, upstream
+SHA pin, canonical DER anchors or hostile signature probes. The
+independent frozen archive verifier is exercised in the existing
+frontend qualification lane. Pristine package bytes must independently
+match the reviewed pin. A mismatch is a hard review hold, never a
+reason to update the pin or bypass a security check.
+
+All earlier native device, protected runtime, physical storage,
+security, backend integration, Windows/WSL2, Docker, release and merge
+holds remain until independently qualifying evidence exists at the
+applicable final head.
