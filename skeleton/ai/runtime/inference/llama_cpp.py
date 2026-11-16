@@ -1136,6 +1136,8 @@ class LlamaCppModel:
                 raise LlamaCppRuntimeError(
                     "resource adaptation cannot activate GPU KV offloading"
                 )
+        if profile.speculation_runtime_sha256 is not None and profile.gpu_layers != 0:
+            raise LlamaCppRuntimeError("speculative profile cannot change its CPU-only placement")
         for field in ("gpu_layers", "threads", "batch_size"):
             original = getattr(self.config, field)
             proposed = getattr(profile, field)
@@ -1587,6 +1589,8 @@ class LlamaCppModel:
                 raise LlamaCppRuntimeError("initial speculative profile excludes tool/schema generation")
             if self._runtime.sha256 != self.config.speculation_runtime_sha256:
                 raise LlamaCppRuntimeError("speculative runtime identity changed")
+            if self.config.speculation_ngram + self.config.speculation_draft_tokens >= self._effective_context():
+                raise LlamaCppRuntimeError("speculation exceeds admitted trained context")
             command.extend((
                 "--spec-type", "ngram-simple",
                 "--spec-ngram-simple-size-n", str(self.config.speculation_ngram),
