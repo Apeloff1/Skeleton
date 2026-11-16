@@ -920,6 +920,12 @@ class NativeLLMRuntime:
             checkpoint_digest=checkpoint["digest"],
         )
 
+    def generate_reconstructed_context(self, spool, checkpoint_digest: str, question: str,
+                                       config: GenerationConfig, policy, *, interrupt=None):
+        """Explicit offline operator context reconstruction with exact source receipt."""
+        from .context_reconstruction import reconstruct
+        return reconstruct(self, spool, checkpoint_digest, question, config, policy, interrupt=interrupt)
+
     def generate_sequence(
         self,
         sequence: TokenSequence,
