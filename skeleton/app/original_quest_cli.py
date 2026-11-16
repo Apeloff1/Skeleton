@@ -189,7 +189,8 @@ def build_receipt(request: Any) -> dict[str, Any]:
     result = {"schema": RECEIPT_SCHEMA, "source_digest": source_digest,
               "artifact": artifact, "abstract_replay_verified": True,
               "native_qualified": False, "release_qualified": False}
-    _encode(result)
+    # A successfully built receipt must fit through the same verify envelope.
+    _encode({"request": request, "receipt": result})
     return result
 
 
