@@ -56,6 +56,10 @@ on:
       - "skeleton/testing/test_jeeves_native_precision_calibration.py"
       - "skeleton/ai/runtime/inference/private_prefill.py"
       - "skeleton/testing/test_jeeves_local_advantage_vii.py"
+      - "skeleton/cortex/bpe.py"
+      - "skeleton/ai/runtime/cortex/bpe.py"
+      - "skeleton/ai/model_runtime/decode_acceleration.py"
+      - "skeleton/testing/test_jeeves_competitive_compute_viii.py"
       - "machine/ai_file_tree.json"
       - "skeleton/testing/test_jeeves_measured_tuning.py"
       - "skeleton/testing/test_jeeves_evidence_packing.py"
@@ -154,6 +158,7 @@ jobs:
           skeleton/testing/test_jeeves_native_adapter_learning.py
           skeleton/testing/test_jeeves_native_precision_calibration.py
           skeleton/testing/test_jeeves_local_advantage_vii.py
+          skeleton/testing/test_jeeves_competitive_compute_viii.py
       - name: Verify Docker materialization source-boundary parsing
         run: python -m unittest discover -s tests -p 'test_docker_materialization_parser.py' -v
       - name: Compile first-install operator entrypoints
