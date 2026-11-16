@@ -1055,6 +1055,30 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
         ))
         return snapshot, revoked
 
+    async def navigation_inventory(self, scope: dict[str, str], identifier: str, *,
+                                   snapshot_digest: str | None = None,
+                                   after: int = 0, limit: int = 32) -> dict:
+        """Owner-fenced, current-consent metadata projection of one checkpoint."""
+        from skeleton.ai.webcrawler.navigation_backlog import browse_page
+        row = await self._owned(scope, identifier)
+        self._source_use(row)
+        _, run_type = _core()
+        runtime = run_type.from_snapshot(_plain(self._custody_snapshot(row)))
+        snapshot = runtime.snapshot()
+        current = snapshot["snapshot_digest"]
+        if (after and snapshot_digest is None) or (snapshot_digest is not None and snapshot_digest != current):
+            raise CrawlerError("crawler_navigation_checkpoint_changed",
+                               "Navigation checkpoint changed; restart pagination.", 409)
+        try:
+            page = browse_page(snapshot["discovery_backlog"],
+                               frontier=snapshot["frontier"], seen=snapshot["seen"],
+                               max_depth=runtime.request.max_depth, after=after, limit=limit)
+        except (ValueError, TypeError) as exc:
+            raise CrawlerError("crawler_navigation_invalid",
+                               "Invalid navigation inventory page.", 422) from exc
+        return {"ok": True, "session_id": identifier, "snapshot_digest": current,
+                "read_only": True, **page}
+
     async def campaign_inspection(
         self, scope: dict[str, str], identifier: str,
     ) -> dict[str, Any]:
