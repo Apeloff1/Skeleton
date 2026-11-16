@@ -34,7 +34,7 @@ def _private_file(path: Path) -> None:
 
 
 @contextmanager
-def open_workspace(path: Path, *, create: bool) -> Iterator[CampaignStore]:
+def open_workspace(path: Path, *, create: bool, expedition: bool = False) -> Iterator[CampaignStore]:
     """Trusted operator-specified local directory; no JSON-derived path or URI."""
     target = path.expanduser().absolute()
     parent = target.parent
@@ -69,7 +69,11 @@ def open_workspace(path: Path, *, create: bool) -> Iterator[CampaignStore]:
     try:
         db.execute("PRAGMA synchronous = FULL")
         db.execute("PRAGMA trusted_schema = OFF")
-        yield CampaignStore(db, initialize=create)
+        if expedition:
+            from skeleton.app.gameforge_expedition_store import ExpeditionStore
+            yield ExpeditionStore(db, initialize=create)
+        else:
+            yield CampaignStore(db, initialize=create)
     finally:
         db.close()
 
