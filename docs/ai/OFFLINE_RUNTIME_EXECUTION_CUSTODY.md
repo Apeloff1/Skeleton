@@ -134,3 +134,38 @@ Focused regression sources cover aggregate rejection before reads,
 oversized sparse manifests, symlink rejection, inventory drift, descriptor
 replacement and concurrent queue closure. These cases have not yet been
 executed against the final branch head.
+
+
+## Scoped admission and mid-copy fences
+
+The local hardware collector now intersects the standalone host memory
+probe with the canonical serving owner's process-scoped allocation
+headroom (including nested Linux cgroup and Windows commit constraints).
+An unavailable scoped memory counter does not become unrestricted memory.
+Each real observation includes the canonical pressure classification and
+digest; critical pressure blocks ordinary offline placement and iteration,
+not just the guarded native startup route. Fixture-only pure planning still
+accepts explicitly constructed observations and is not physical evidence.
+
+The sealed-page owner accepts an optional trusted progress checkpoint.
+It checks before copying, before exceeding each 64 MiB interval, and at
+the exact completed byte total before publishing any mapping. The
+offline custody wrapper uses this checkpoint to remeasure pressure and
+reserve the remaining copy separately from downstream placement and
+worker headroom. Rejection closes all unpublished resources. These are
+allocation admission checks, not an OS reservation or interrupt for a
+blocked filesystem write.
+
+If a caller leaves an exported memoryview alive, the corresponding mmap
+cannot be forcibly closed. Cleanup nevertheless attempts every other
+mapping and original memfd descriptor; it raises an explicit incomplete
+cleanup error instead of claiming successful release.
+
+The existing sealed-context workflow includes the offline admission,
+execution custody, inventory, measured deployment and native lease
+regressions in its additive guarded regression step. No existing required
+checks or merge holds are relaxed. The offline console entrypoint is present
+in both supported root metadata sources. The governed server mirror has
+been synchronized without replacing the two credential-bearing provider
+facades. Full CI, physical cgroup/commit/thermal qualification and actual
+native model execution are not established by these source changes.
