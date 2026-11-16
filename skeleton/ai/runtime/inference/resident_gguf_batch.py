@@ -9,6 +9,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, wait
 from dataclasses import asdict, dataclass, field
 import hashlib
+import hmac
 import http.client
 import json
 import os
@@ -172,6 +173,49 @@ class NativeResidentTuning:
                                         separators=(",", ":"), allow_nan=False).encode()).hexdigest()
 
 
+_AFFINITY_BLOCK = 32
+_AFFINITY_RESERVE = 8 * 1024**2
+
+
+def _prefix_fingerprints(tokens, key):
+    """Session-keyed complete blocks; no retained raw prompt or public digest."""
+    return tuple(hmac.digest(key, struct.pack("<32I", *tokens[i:i+_AFFINITY_BLOCK]),
+                             "sha256")
+                 for i in range(0, len(tokens)-_AFFINITY_BLOCK+1, _AFFINITY_BLOCK))
+
+
+def _match_prefix_slots(requests, previous, available):
+    """Bounded deterministic longest-prefix-first exclusive slot assignment.
+
+    Scores are hints from accepted input blocks, not observed native cache hits.
+    Empty and partial blocks do not qualify. No cross-session or shared cache.
+    """
+    if not 1 <= len(requests) <= len(available) <= 32 or len(set(available)) != len(available):
+        raise ValueError("invalid available prefix slot capacity")
+    edges = []
+    for index, blocks in enumerate(requests):
+        for slot in available:
+            count = 0
+            for a, b in zip(blocks, previous.get(slot, ())):
+                if not hmac.compare_digest(a, b):
+                    break
+                count += 1
+            if count:
+                edges.append((-count, index, slot))
+    assigned = {}
+    remaining = set(available)
+    for negative, index, slot in sorted(edges):
+        if index not in assigned and slot in remaining:
+            assigned[index] = (slot, -negative*_AFFINITY_BLOCK)
+            remaining.remove(slot)
+    for index in range(len(requests)):
+        if index not in assigned:
+            slot = index if index in remaining else min(remaining)
+            assigned[index] = (slot, 0)
+            remaining.remove(slot)
+    return tuple(assigned[index] for index in range(len(requests)))
+
+
 @dataclass(frozen=True, slots=True)
 class ResidentBatchPolicy:
     slots: int
@@ -186,10 +230,13 @@ class ResidentBatchPolicy:
     max_batches: int = 128
     slot_spill_bytes: int = 0
     tuning: NativeResidentTuning = field(default_factory=NativeResidentTuning)
+    prefix_affinity: bool = False
 
     def __post_init__(self):
         if type(self.tuning) is not NativeResidentTuning:
             raise TypeError("immutable typed tuning required")
+        if type(self.prefix_affinity) is not bool or (self.prefix_affinity and not self.slot_spill_bytes):
+            raise ValueError("prefix affinity requires explicit private slot spill mode")
         bounds = (
             (self.slots, 2, 32), (self.context_per_slot, 128, 131072),
             (self.gpu_layers, 1, 4096), (self.max_memory_bytes, 1, 1024**4),
@@ -241,6 +288,8 @@ class ResidentGGUFBatch:
             raise ValueError("resident batch requires known conservative KV geometry")
         self._estimate = model.total_model_bytes + model.config.runtime_scratch_bytes + (
             policy.slots * policy.context_per_slot * kv) + policy.tuning.additional_memory_bytes
+        if policy.prefix_affinity:
+            self._estimate += _AFFINITY_RESERVE
         if self._estimate > policy.max_memory_bytes:
             raise MemoryError("aggregate model/KV/scratch estimate exceeds operator budget")
         self._proc = None
@@ -265,6 +314,8 @@ class ResidentGGUFBatch:
         self._disk_temp = None
         self._live_slots = set()
         self._spilled = {}
+        self._affinity_key = secrets.token_bytes(32) if policy.prefix_affinity else None
+        self._prefixes = {}
 
     def _assert_source(self):
         self._model.assert_identity()
@@ -441,7 +492,7 @@ class ResidentGGUFBatch:
                 raise ValueError("explicit deterministic uint32 seed required")
             if type(reuse_cache) is not bool or (reuse_cache and not self._spill_temp):
                 raise ValueError("cache reuse requires explicit private slot spill mode")
-            if self._spill_temp and any(i in self._spilled for i in range(len(prompts))):
+            if self._spill_temp and not (p.prefix_affinity and reuse_cache) and any(i in self._spilled for i in range(len(prompts))):
                 raise RuntimeError("restore or discard a spilled slot before reuse")
             self._assert_source()
             deadline = min(self._deadline, time.monotonic() + p.timeout_seconds)
@@ -450,14 +501,21 @@ class ResidentGGUFBatch:
             tokenization_seconds = time.monotonic() - began
             if any(len(tokens) + max_new_tokens > p.context_per_slot for tokens in tokenized):
                 raise ValueError("native tokenized prompt exceeds private slot context")
+            fingerprints = ([_prefix_fingerprints(tokens, self._affinity_key) for tokens in tokenized]
+                            if p.prefix_affinity else None)
+            assignment = tuple((i, 0) for i in range(len(prompts)))
+            if p.prefix_affinity and reuse_cache:
+                available = tuple(i for i in range(p.slots) if i not in self._spilled)
+                assignment = _match_prefix_slots(fingerprints, self._prefixes, available)
             barrier = threading.Barrier(len(prompts))
             def one(index, tokens):
+                slot, estimated_prefix = assignment[index]
                 barrier.wait(timeout=max(0.01, deadline-time.monotonic()))
                 payload = {"prompt": tokens, "n_predict": max_new_tokens,
                     "seed": seed, "temperature": 0.0, "stream": False,
                     "cache_prompt": reuse_cache, "return_tokens": True}
                 if self._spill_temp:
-                    payload["id_slot"] = index
+                    payload["id_slot"] = slot
                 request_began = time.monotonic()
                 row = self._call("/completion", payload, deadline=deadline)
                 request_seconds = time.monotonic() - request_began
@@ -468,7 +526,8 @@ class ResidentGGUFBatch:
                     or len(ids) > max_new_tokens or any(type(t) is not int or not 0 <= t <= 2**31-1 for t in ids)):
                     raise LlamaCppRuntimeError("invalid native completion payload")
                 return {"text": output, "token_ids": ids, "stop_type": row["stop_type"],
-                        "input_tokens": len(tokens), "slot": index if self._spill_temp else None,
+                        "input_tokens": len(tokens), "slot": slot if self._spill_temp else None,
+                        "estimated_prefix_affinity_tokens": estimated_prefix,
                         "completion_wall_seconds": request_seconds}
             executor = ThreadPoolExecutor(max_workers=len(prompts))
             futures = [executor.submit(one, index, tokens) for index, tokens in enumerate(tokenized)]
@@ -480,7 +539,9 @@ class ResidentGGUFBatch:
                 self._assert_source()
                 self._batches += 1
                 if self._spill_temp:
-                    self._live_slots.update(range(len(rows)))
+                    self._live_slots.update(slot for slot, _ in assignment)
+                    if fingerprints is not None:
+                        self._prefixes.update({slot: fingerprints[i] for i, (slot, _) in enumerate(assignment)})
                 elapsed = time.monotonic() - began
                 generated = sum(len(row["token_ids"]) for row in rows)
                 return {"model_sha256": self._model.model_digest, "server_sha256": self._server.sha256,
@@ -652,6 +713,7 @@ class ResidentGGUFBatch:
                 raise RuntimeError("unknown native spill slot")
             self._spilled[slot]["path"].unlink()
             del self._spilled[slot]
+            self._prefixes.pop(slot, None)
 
     def close(self):
         with self._lock:
@@ -672,6 +734,8 @@ class ResidentGGUFBatch:
                 self._disk_temp.cleanup()
             self._spilled.clear()
             self._live_slots.clear()
+            self._prefixes.clear()
+            self._affinity_key = None
             self._logs.clear()
             self._key = None
 
