@@ -189,7 +189,7 @@ class ResidentGGUFBatch:
 
     def _call(self, endpoint, payload=None, *, deadline):
         if endpoint not in {"/health", "/tokenize", "/completion"}:
-            slot = re.fullmatch(r"/slots/([0-9]+)\\?action=(save|restore|erase)", endpoint)
+            slot = re.fullmatch(r"/slots/([0-9]+)\?action=(save|restore|erase)", endpoint)
             if not self._spill_temp or not slot or not 0 <= int(slot.group(1)) < self._policy.slots:
                 raise ValueError("unapproved native endpoint")
         if self._proc is None or self._proc.poll() is not None or self._socket is None:

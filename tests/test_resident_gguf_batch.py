@@ -91,6 +91,8 @@ endpoint = sys.argv[sys.argv.index("--host")+1]
 key = open(sys.argv[sys.argv.index("--api-key-file")+1]).read().strip()
 barrier = threading.Barrier(2)
 class Handler(http.server.BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
     def send(self, value):
         raw = json.dumps(value).encode()
         self.send_response(200)
@@ -139,3 +141,19 @@ with Server(endpoint, Handler) as server:
         assert session._proc.pid==pid
     assert session._proc.poll() is not None
     # This fixture intentionally prints a synthetic offload log; not GPU qualification.
+
+
+def test_native_slot_endpoint_allowlist():
+    from types import SimpleNamespace
+    from skeleton.ai.runtime.inference.llama_cpp import LlamaCppRuntimeError
+    from skeleton.ai.runtime.inference.resident_gguf_batch import ResidentGGUFBatch
+    session = object.__new__(ResidentGGUFBatch)
+    session._spill_temp = object()
+    session._policy = SimpleNamespace(slots=2)
+    session._proc = None
+    for action in ("save", "restore", "erase"):
+        with pytest.raises(LlamaCppRuntimeError, match="child unavailable"):
+            session._call(f"/slots/1?action={action}", {}, deadline=0)
+    for endpoint in ("/slots/2?action=save", "/slots/1action=save", "/slots/1?action=delete", "/slots/0?action=save&extra=1"):
+        with pytest.raises(ValueError, match="unapproved native endpoint"):
+            session._call(endpoint, {}, deadline=0)
