@@ -177,3 +177,5 @@ inventories return 3, malformed input 2. No source is written or imported.
 Test source: `skeleton/testing/test_recovered_desktop_commands.py`.
 Independent test and install execution remain required. No merge,
 release, device or native qualification is claimed.
+
+The existing Sealed Context Guard now includes an additive focused regression step for all three recovered command suites and explicit source triggers. The inventory also includes explicitly referenced owners whose filenames do not follow a CLI naming convention, and distinguishes entry versus candidate scan ceilings. This is source validation selection, not an executed gate.

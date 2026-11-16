@@ -64,6 +64,12 @@ on:
       - 'skeleton/testing/test_weight_store_scrub.py'
       - 'skeleton/testing/test_weight_store_range.py'
       - 'skeleton/testing/test_managed_weight_custody.py'
+      - 'skeleton/__main__.py'
+      - 'setup.cfg'
+      - 'skeleton/app/orphan_cli_audit.py'
+      - 'skeleton/testing/test_recovered_installed_commands.py'
+      - 'skeleton/testing/test_recovered_runtime_commands.py'
+      - 'skeleton/testing/test_recovered_desktop_commands.py'
       - 'skeleton/testing/test_sealed_weight_pages.py'
       - 'skeleton/testing/test_nvml_memory_probe.py'
       - 'skeleton/testing/test_measured_jeeves_deployment.py'
@@ -169,6 +175,15 @@ jobs:
             skeleton/testing/test_delivery_regex.py \
             skeleton/testing/test_mongo_memento_repository.py \
             skeleton/testing/test_sealed_*.py
+
+      - name: Recovered installed command ownership regressions
+        env:
+          PYTHONPATH: '.:backend'
+        run: |
+          python -m pytest -q \
+            skeleton/testing/test_recovered_installed_commands.py \
+            skeleton/testing/test_recovered_runtime_commands.py \
+            skeleton/testing/test_recovered_desktop_commands.py
 
       - name: Consumer share and Chroma custody regressions
         env:

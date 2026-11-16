@@ -89,7 +89,10 @@ class _ReadBudget:
 
 def _metadata(root: Path, reader: _ReadBudget):
     modern = tomllib.loads(reader.read(root / "pyproject.toml").decode("utf-8"))
-    scripts = modern.get("project", {}).get("scripts", {})
+    project = modern.get("project", {})
+    if not isinstance(project, dict):
+        raise AuditError("invalid project metadata")
+    scripts = project.get("scripts", {})
     if not isinstance(scripts, dict) or not all(
         isinstance(k, str) and isinstance(v, str) for k, v in scripts.items()
     ):
@@ -163,12 +166,17 @@ def scan(root: Path, *, budget: ScanBudget = ScanBudget()) -> dict:
         raise AuditError("skeleton source root must be a real directory")
     reader = _ReadBudget(budget)
     modern, legacy, root_imports = _metadata(root, reader)
+    # Explicit metadata/import references may identify owners with names other than *_cli.py.
+    referenced_modules = set(root_imports)
+    referenced_modules.update(value.split(":", 1)[0] for value in modern.values())
+    referenced_modules.update(value.split(":", 1)[0] for value in legacy.values())
     pending = [package]
     records: list[Candidate] = []
     issues: list[dict] = []
     seen = 0
     candidates = 0
     complete = True
+    limit_reason = None
     skipped_links = 0
     while pending and complete:
         directory = pending.pop()
@@ -181,6 +189,7 @@ def scan(root: Path, *, budget: ScanBudget = ScanBudget()) -> dict:
                     seen += 1
                     if seen > budget.max_entries:
                         complete = False
+                        limit_reason = "max_entries"
                         break
                     children.append(child)
             if not complete:
@@ -196,14 +205,18 @@ def scan(root: Path, *, budget: ScanBudget = ScanBudget()) -> dict:
                     continue
                 if not child.is_file(follow_symlinks=False):
                     continue
-                if not (child.name in ("cli.py", "__main__.py") or child.name.endswith("_cli.py")):
+                module = _module(path, root)
+                if not child.name.endswith(".py") or not (
+                    child.name in ("cli.py", "__main__.py") or child.name.endswith("_cli.py")
+                    or module in referenced_modules
+                ):
                     continue
                 candidates += 1
                 if candidates > budget.max_candidates:
                     complete = False
+                    limit_reason = "max_candidates"
                     break
                 relative = path.relative_to(root).as_posix()
-                module = _module(path, root)
                 if not module:
                     issues.append({"path": relative, "reason": "invalid_module_path"})
                     continue
@@ -232,7 +245,8 @@ def scan(root: Path, *, budget: ScanBudget = ScanBudget()) -> dict:
     return {
         "schema": "skeleton.installed-cli-source-audit.v1",
         "complete": complete and not issues and not skipped_links,
-        "entry_limit_reached": not complete,
+        "entry_limit_reached": limit_reason == "max_entries",
+        "limit_reason": limit_reason,
         "entries_observed": min(seen, budget.max_entries),
         "candidate_paths_observed": min(candidates, budget.max_candidates),
         "source_bytes_read": reader.consumed,
@@ -257,7 +271,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         result = scan(args.root, budget=ScanBudget(args.max_entries, args.max_candidates,
                                                    args.max_file_bytes, args.max_total_bytes))
-    except (AuditError, OSError, SyntaxError, UnicodeError, KeyError, configparser.Error) as error:
+    except (ValueError, OSError, SyntaxError, UnicodeError, KeyError, configparser.Error) as error:
         print(json.dumps({"error": type(error).__name__, "complete": False}), file=sys.stderr)
         return 2
     if args.candidates_only:

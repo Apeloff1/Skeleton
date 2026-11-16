@@ -120,3 +120,33 @@ def test_audit_command_real_cli_reports_incomplete(tmp_path, capsys):
     response = json.loads(capsys.readouterr().out)
     assert all(c["classification"].startswith("unregistered_") or
                c["classification"] == "metadata_drift" for c in response["candidates"])
+
+
+def test_explicitly_bound_non_cli_filename_is_included(tmp_path):
+    root = fixture_root(tmp_path)
+    owner = root / "skeleton" / "custom_owner.py"
+    owner.write_text("def main(argv=None): pass\n", encoding="utf-8")
+    with (root / "pyproject.toml").open("a", encoding="utf-8") as stream:
+        stream.write('custom = "skeleton.custom_owner:main"\n')
+    with (root / "setup.cfg").open("a", encoding="utf-8") as stream:
+        stream.write("  custom = skeleton.custom_owner:main\n")
+    result = scan(root)
+    record, = [item for item in result["candidates"]
+               if item["module"] == "skeleton.custom_owner"]
+    assert record["classification"] == "console_only"
+
+
+def test_candidate_ceiling_has_distinct_reason(tmp_path):
+    root = fixture_root(tmp_path)
+    result = scan(root, budget=ScanBudget(max_candidates=1))
+    assert not result["complete"]
+    assert result["limit_reason"] == "max_candidates"
+    assert not result["entry_limit_reached"]
+
+
+def test_invalid_toml_is_structured_rejection(tmp_path, capsys):
+    root = fixture_root(tmp_path)
+    (root / "pyproject.toml").write_text("[project.scripts", encoding="utf-8")
+    assert main(["orphan-cli-audit", "--root", str(root)]) == 2
+    import json
+    assert json.loads(capsys.readouterr().err)["complete"] is False
