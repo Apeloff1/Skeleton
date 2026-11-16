@@ -158,6 +158,49 @@ class LocalKnowledgeHit:
         }
 
 
+def _diverse_grounding_hits(ranked: list[LocalKnowledgeHit], limit: int) -> list[LocalKnowledgeHit]:
+    """Reduce only clear redundancy, preserving the best matching passage.
+
+    Relevance-first with an explicit replacement floor. Do not classify
+    similar-but-different facts as duplicates: contradictory statements may
+    differ by only one word. Use exact normalized passage equivalence or
+    strong overlap of verified offsets within the same source revision.
+    """
+    if limit <= 1 or len(ranked) <= limit:
+        return ranked[:limit]
+    normalized = { (hit.document_id, hit.chunk_index):
+                   unicodedata.normalize("NFKC", hit.passage).casefold().strip()
+                   for hit in ranked }
+
+    def redundant(a, b):
+        # Across sources do not collapse case-sensitive or Unicode-distinct
+        # evidence (e.g. technical identifiers). Exact bytes only.
+        if a.passage == b.passage:
+            return True
+        if a.document_id != b.document_id or a.sha256 != b.sha256:
+            return False
+        overlap = max(0, min(a.char_end,b.char_end)-max(a.char_start,b.char_start))
+        shorter = min(a.char_end-a.char_start,b.char_end-b.char_start)
+        return (shorter > 0 and overlap * 4 >= shorter * 3
+                or normalized[(a.document_id,a.chunk_index)] == normalized[(b.document_id,b.chunk_index)])
+
+    chosen = []
+    remaining = list(ranked)
+    while remaining and len(chosen) < limit:
+        first = remaining[0]
+        if any(redundant(first, prior) for prior in chosen):
+            # Only substitute a still relevant nonredundant passage; weak
+            # candidates cannot displace the original nearest result.
+            alternative = next((hit for hit in remaining[1:]
+                               if hit.score >= first.score * 0.70
+                               and not any(redundant(hit, prior) for prior in chosen)), None)
+            if alternative is not None:
+                first = alternative
+        chosen.append(first)
+        remaining.remove(first)
+    return chosen
+
+
 class OfflineKnowledgeLibrary:
     """Model-scoped documents stored in the existing local SQLite DB."""
 
@@ -461,12 +504,13 @@ class OfflineKnowledgeLibrary:
             raise RuntimeContractError("selected local grounding source is unavailable")
 
     def search(self, query: str, *, limit: int = 6,
-               document_ids: tuple[str, ...] | list[str] | None = None
+               document_ids: tuple[str, ...] | list[str] | None = None,
+               diversify: bool = False,
                ) -> list[dict[str, Any]]:
         """Exact two-pass search with bounded retained ranking state.
 
         Every source and indexed slice remains verified inside a single read
-        snapshot. Only one document and at most `limit` scored passages are
+        snapshot. Only one document and at most 48 scored passages are
         retained in Python. No stale result cache or new index authority is
         introduced. Work remains linear in total corpus size per pass.
         """
@@ -475,6 +519,9 @@ class OfflineKnowledgeLibrary:
             raise RuntimeContractError("invalid local reference query")
         if type(limit) is not int or not 1 <= limit <= 12:
             raise RuntimeContractError("invalid reference search limit")
+        if type(diversify) is not bool:
+            raise RuntimeContractError("explicit grounding diversity policy required")
+        pool_limit = min(48, limit * 4) if diversify else limit
         from .offline_grounding import normalized_document_scope
         normalized = normalized_document_scope(document_ids)
         selected = None if normalized is None else set(normalized)
@@ -519,7 +566,7 @@ class OfflineKnowledgeLibrary:
             )
             best.append(hit)
             best.sort(key=lambda x: (-x.score, x.document_id, x.chunk_index))
-            if len(best) > limit:
+            if len(best) > pool_limit:
                 best.pop()
 
         with self._read_snapshot():
@@ -544,7 +591,8 @@ class OfflineKnowledgeLibrary:
                             score(row)
                 finally:
                     records.close()
-        return [hit.to_dict() for hit in best]
+        selected_hits = _diverse_grounding_hits(best, limit) if diversify else best
+        return [hit.to_dict() for hit in selected_hits]
 
 
 __all__ = [
