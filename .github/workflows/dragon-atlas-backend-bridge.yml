@@ -127,6 +127,16 @@ jobs:
           python -m py_compile backend/core/dragon_registry_connector.py backend/core/dragon_export_jobs.py backend/core/dragon_raw_export_custody.py backend/core/dragon_application_backup.py backend/core/dragon_capacity_qualification.py
           python -m unittest discover -s backend/tests -p 'test_dragon_delivery_orchestration.py' -v
 
+      - name: Official API grants, raw body custody and independent ingestion qualification
+        timeout-minutes: 6
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python -m py_compile backend/core/dragon_authorized_api.py backend/core/dragon_backup_discovery.py backend/core/dragon_ingestion_qualification.py backend/core/dragon_raw_export_custody.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_authorized_delivery.py' -v
+
       - name: Canonical physical graph and independent writer qualification
         timeout-minutes: 8
         env:
