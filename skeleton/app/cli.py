@@ -366,7 +366,7 @@ def _print_status(
         from skeleton.app.health import probe_application, probes_ok
 
         live_results = probe_application(manifest=manifest, full=full, timeout=timeout)
-        live_ok = probes_ok(live_results)
+        live_ok = probes_ok(live_results,manifest=manifest,full=full)
         payload["runtime_health"] = {
             "ok": live_ok,
             "full": full,
@@ -1335,7 +1335,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                         f"[{'PASS' if result.ok else 'FAIL'}] "
                         f"{result.service:<10} status={status} {result.url} {result.detail}"
                     )
-                if probes_ok(results):
+                if probes_ok(results,manifest=manifest,full=bool(args.full)):
                     from skeleton.app.first_install import critical_backend_route_report
                     registry = critical_backend_route_report(manifest.service("backend").public_url, timeout=3.0)
                     if not source_stable():
@@ -1392,7 +1392,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         except ValueError as exc:
             print(f"invalid smoke budget: {exc}")
             return 2
-        ok = probes_ok(results)
+        ok = probes_ok(results,manifest=manifest,full=bool(args.full))
         if bool(args.as_json):
             print(
                 json.dumps(

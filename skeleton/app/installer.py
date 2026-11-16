@@ -604,7 +604,7 @@ def install_application(
             if admitted_digest is None or not source_stable():
                 phases.append(_runtime_source_rejection())
                 return InstallReceipt(root=root, phases=tuple(phases))
-            healthy = probes_ok(results)
+            healthy = probes_ok(results,manifest=manifest,full=full,public_url_overrides=host_urls)
             failed = [result.service for result in results if not result.ok]
             phases.append(
                 InstallPhase(
@@ -613,7 +613,7 @@ def install_application(
                     (
                         "application runtime is healthy"
                         if healthy
-                        else "readiness probes failed: " + ", ".join(failed)
+                        else "readiness incomplete or failed: " + (", ".join(failed) or "exact endpoint evidence missing")
                     ),
                 )
             )

@@ -505,7 +505,7 @@ def test_clean_first_install_checks_critical_routes_on_default_and_custom_ports(
                         lambda *a,**k: BindingReport(True,True,"fixture"))
     """Healthy first startup must not crash when no explicit port override exists."""
 
-    from skeleton.app.health import ProbeResult
+    from skeleton.testing.app_health_fixtures import fixture_probes
 
     # A clean .env.example does not declare any public host port overrides.
     # Keep ambient developer/CI ports from changing that first-install case.
@@ -531,9 +531,7 @@ def test_clean_first_install_checks_critical_routes_on_default_and_custom_ports(
     )
     monkeypatch.setattr(
         "skeleton.app.health.wait_for_application",
-        lambda **kwargs: (
-            ProbeResult("backend", expected_backend_url, True, 200, "healthy"),
-        ),
+        lambda **kwargs: fixture_probes(**kwargs),
     )
     observed_urls = []
 

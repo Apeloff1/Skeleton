@@ -172,10 +172,12 @@ def runtime_status(root: Path | None = None) -> tuple[bool, str]:
             return False, "Runtime configuration changed; retry diagnostics"
         results = probe_application(
             manifest=manifest, timeout=2.0, public_url_overrides=urls,
+            admit=lambda: _configuration_epoch(root)==epoch,
         )
         if _configuration_epoch(root) != epoch:
             return False, "Runtime configuration changed; retry diagnostics"
-        ready = probes_ok(results)
+        complete = probes_ok(results,manifest=manifest,public_url_overrides=urls)
+        ready = complete
         if ready:
             backend = urls.get("backend", manifest.service("backend").public_url)
             ready = critical_backend_route_report(backend, timeout=3.0)["ready"] is True
@@ -190,7 +192,7 @@ def runtime_status(root: Path | None = None) -> tuple[bool, str]:
         state = "ONLINE" if result.ok else "OFFLINE"
         status = result.status if result.status is not None else "-"
         lines.append(f"[{state}] {result.service}: HTTP {status} — {result.detail}")
-    if probes_ok(results) and not ready:
+    if complete and not ready:
         lines.append("[OFFLINE] Critical API routers missing or unverified")
     return ready, "\n".join(lines)
 

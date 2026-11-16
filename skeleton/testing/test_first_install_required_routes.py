@@ -55,7 +55,7 @@ def _doctor(monkeypatch, tmp_path, critical, *, providers=None, health_hook=None
 
     monkeypatch.setattr(install, "runtime_manifest", runtime_manifest)
     monkeypatch.setattr(health, "probe_application", probe_application)
-    monkeypatch.setattr(health, "probes_ok", lambda probes: True)
+    monkeypatch.setattr(health, "probes_ok", lambda probes, **kwargs: True)
 
     def bounded(url, *, timeout, max_response_bytes=65536):
         if url.endswith("/api/health/registry"):
@@ -199,7 +199,7 @@ def _install_with_routes(monkeypatch, tmp_path, *, ready, backend_override=True,
         {"backend": "http://127.0.0.1:8001"} if backend_override else {}
     ))
     monkeypatch.setattr(health, "wait_for_application", lambda **kw: ())
-    monkeypatch.setattr(health, "probes_ok", lambda results: True)
+    monkeypatch.setattr(health, "probes_ok", lambda results, **kwargs: True)
     def route_report(url, **kwargs):
         if observed_urls is not None:
             observed_urls.append(url)

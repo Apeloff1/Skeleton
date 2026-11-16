@@ -329,3 +329,71 @@ def test_admission_requires_exact_boolean_not_truthy_value(monkeypatch):
     from skeleton.app import health
     monkeypatch.setattr(health,"probe_url",lambda *a,**k:pytest.fail("truthy admission accepted"))
     assert health.probe_application(admit=lambda:1)==()
+
+
+
+@pytest.mark.parametrize("fault",["none","missing","duplicate","extra","wrong_url","false","truthy","missing_status","redirect","bool_status","fake_row","wrong_full_profile"])
+def test_readiness_requires_complete_exact_endpoint_evidence(fault):
+    from dataclasses import replace
+    from types import SimpleNamespace
+    from skeleton.app.health import ProbeResult, probes_ok
+    from skeleton.testing.app_health_fixtures import fixture_probes
+    from skeleton.app.assembly import load_manifest
+    manifest=load_manifest()
+    rows=list(fixture_probes(manifest=manifest))
+    assert {r.service:r.url for r in rows}=={
+        "frontend":"http://localhost:3000/",
+        "backend":"http://localhost:8001/api/health/ready",
+        "skeleton":"http://localhost:8010/api/v1/health/live",
+        "application":"http://localhost:8001/api/app/ready"}
+    if fault=="missing":
+        rows.pop()
+    elif fault=="duplicate":
+        rows[-1]=rows[0]
+    elif fault=="extra":
+        rows.append(ProbeResult("foreign","http://localhost:8099",True,200,"fixture"))
+    elif fault=="wrong_url":
+        rows[0]=replace(rows[0],url="http://localhost:9999/api/health/ready")
+    elif fault=="false":
+        rows[0]=replace(rows[0],ok=False)
+    elif fault=="truthy":
+        rows[0]=replace(rows[0],ok=1)
+    elif fault=="missing_status":
+        rows[0]=replace(rows[0],status=None)
+    elif fault=="redirect":
+        rows[0]=replace(rows[0],status=302)
+    elif fault=="bool_status":
+        rows[0]=replace(rows[0],status=True)
+    elif fault=="fake_row":
+        rows[0]=SimpleNamespace(**rows[0].to_dict())
+    assert probes_ok(tuple(rows),manifest=manifest,full=fault=="wrong_full_profile") is (fault=="none")
+
+
+def test_runtime_health_receipts_are_bound_to_custom_port_overrides():
+    from skeleton.app.health import probes_ok
+    from skeleton.testing.app_health_fixtures import fixture_probes
+    ports={"frontend":"http://localhost:3400","backend":"http://localhost:8401"}
+    rows=fixture_probes(public_url_overrides=ports)
+    assert probes_ok(rows,public_url_overrides=ports)
+    assert not probes_ok(rows)
+    assert not probes_ok(rows,public_url_overrides={"frontend":"http://localhost:3500"})
+
+
+@pytest.mark.parametrize("field",["timeout","delay"])
+def test_large_integer_retry_budget_is_bounded_before_conversion(field):
+    from skeleton.app.health import wait_for_application
+    with pytest.raises(ValueError):
+        wait_for_application(**{field:2**10000})
+
+
+def test_partial_success_round_does_not_end_retry_campaign(monkeypatch):
+    from skeleton.app import health
+    from skeleton.testing.app_health_fixtures import fixture_probes
+    calls=[]
+    def probe(**kw):
+        calls.append(1)
+        rows=fixture_probes(**kw)
+        return rows[:1] if len(calls)==1 else rows
+    monkeypatch.setattr(health,"probe_application",probe)
+    result=health.wait_for_application(attempts=2,delay=0)
+    assert len(calls)==2 and health.probes_ok(result)

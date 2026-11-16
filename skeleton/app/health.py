@@ -75,7 +75,7 @@ def _http_error_status(error: HTTPError) -> int | None:
 def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
     """Probe one health endpoint with no proxy or redirect side effects."""
 
-    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0 or timeout > 30:
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 0 < timeout <= 30 or not math.isfinite(timeout):
         raise ValueError("health probe timeout must be finite and within (0, 30] seconds")
     try:
         # Reject non-string and whitespace/control characters before urllib parsing.
@@ -168,8 +168,8 @@ def probe_local_setup(service: ServiceSpec, *, timeout: float = 2.0) -> ProbeRes
     if (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
-        or not math.isfinite(timeout)
         or not 0 < timeout <= 10
+        or not math.isfinite(timeout)
     ):
         raise ValueError("setup probe timeout must be finite and within (0, 10] seconds")
     # Reject invalid targets here as well as in the Windows launcher, so a
@@ -317,9 +317,58 @@ def probe_application(
     return tuple(results) if _admitted(admit) else ()
 
 
-def probes_ok(results: tuple[ProbeResult, ...]) -> bool:
-    return (bool(results)
-            and all(result.ok is True for result in results))
+def readiness_targets(
+    manifest: AssemblyManifest, *, full: bool=False,
+    public_url_overrides: Mapping[str,str] | None=None,
+) -> dict[str,str]:
+    """Exact expected health evidence, excluding the non-HTTP Mongo service."""
+    if type(full) is not bool:
+        raise ValueError("readiness profile must be explicit")
+    overrides = public_url_overrides or {}
+    roles = {"frontend", "backend", "skeleton"}
+    if full:
+        roles.add("chroma")
+    active = set(manifest.full_services if full else manifest.default_services)
+    if not roles.issubset(active) or set(overrides).difference(manifest.service_names):
+        raise ValueError("readiness service inventory invalid")
+    targets = {}
+    for role in sorted(roles):
+        service = manifest.service(role)
+        origin = overrides.get(role, service.public_url)
+        if type(origin) is not str or not origin or not service.health_path:
+            raise ValueError("readiness endpoint missing")
+        targets[role] = origin.rstrip("/") + "/" + service.health_path.lstrip("/")
+    backend = overrides.get("backend", manifest.service("backend").public_url)
+    targets["application"] = backend.rstrip("/") + manifest.contract_path("ready")
+    if len(set(targets.values())) != len(targets):
+        raise ValueError("readiness endpoint collision")
+    return targets
+
+
+def probes_ok(results: tuple[ProbeResult, ...], *, manifest: AssemblyManifest | None=None,
+              full: bool=False, public_url_overrides: Mapping[str,str] | None=None) -> bool:
+    """Admit complete, one-to-one, exact-URL positive HTTP evidence.
+
+    No caller may promote a partial list, duplicate role, different port,
+    fabricated truthy flag or missing status to whole-application readiness.
+    This is liveness/readiness transport evidence, not AI or device proof.
+    """
+    try:
+        expected = readiness_targets(manifest or load_manifest(),full=full,
+                                     public_url_overrides=public_url_overrides)
+        if type(results) not in (tuple,list) or len(results) != len(expected):
+            return False
+        seen = set()
+        for row in results:
+            if (type(row) is not ProbeResult or type(row.service) is not str
+                    or row.service not in expected or row.service in seen
+                    or row.url != expected[row.service] or row.ok is not True
+                    or type(row.status) is not int or not 200 <= row.status < 300):
+                return False
+            seen.add(row.service)
+        return seen == set(expected)
+    except (OSError,ValueError,KeyError,TypeError,AttributeError):
+        return False
 
 
 def wait_for_application(
@@ -336,9 +385,9 @@ def wait_for_application(
 
     if not isinstance(attempts, int) or isinstance(attempts, bool) or not 1 <= attempts <= 120:
         raise ValueError("attempts must be an integer between 1 and 120")
-    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or not 0 < timeout <= 30:
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 0 < timeout <= 30 or not math.isfinite(timeout):
         raise ValueError("timeout must be finite and within (0, 30] seconds")
-    if isinstance(delay, bool) or not isinstance(delay, (int, float)) or not math.isfinite(delay) or not 0 <= delay <= 30:
+    if isinstance(delay, bool) or not isinstance(delay, (int, float)) or not 0 <= delay <= 30 or not math.isfinite(delay):
         raise ValueError("delay must be finite and within [0, 30] seconds")
 
     manifest = manifest or load_manifest()
@@ -363,7 +412,7 @@ def wait_for_application(
         latest = probe_application(manifest=manifest, full=full, timeout=timeout, **options)
         if not still_admitted():
             return ()
-        if probes_ok(latest):
+        if probes_ok(latest,manifest=manifest,full=full,public_url_overrides=public_url_overrides):
             return latest
         if attempt + 1 < attempts and delay:
             time.sleep(delay)

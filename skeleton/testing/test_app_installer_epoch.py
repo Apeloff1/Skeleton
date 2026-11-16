@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from skeleton.app import installer
+from skeleton.testing.app_health_fixtures import fixture_probes
 from skeleton.app.preloader import PreloadCheck, PreloadReport
 from skeleton.app.setup_runtime import SetupResult, runtime_source_fingerprint
 
@@ -243,9 +244,7 @@ def test_unchanged_runtime_epoch_permits_focused_readiness_and_route_validation(
 
     monkeypatch.setattr(
         "skeleton.app.health.wait_for_application",
-        lambda **kwargs: (
-            ProbeResult("backend", "http://localhost:8001", True, 200, "healthy"),
-        ),
+        lambda **kwargs: fixture_probes(**kwargs),
     )
     called = []
     monkeypatch.setattr(
@@ -452,9 +451,7 @@ def test_installer_binds_frontend_probe_to_admitted_environment(
 
     def wait_for_health(**kwargs):
         observed.append(dict(kwargs["public_url_overrides"]))
-        return (ProbeResult(
-            "backend", "http://localhost:8001", True, 200, "healthy",
-        ),)
+        return fixture_probes(**kwargs)
 
     monkeypatch.setattr("skeleton.app.health.wait_for_application", wait_for_health)
     monkeypatch.setattr(
@@ -491,9 +488,7 @@ def test_install_manifest_resolution_cannot_change_later_probe_epoch(
 
     def wait_for_health(**kwargs):
         observed.append(kwargs["public_url_overrides"].get("frontend"))
-        return (ProbeResult(
-            "backend", "http://localhost:8001", True, 200, "healthy",
-        ),)
+        return fixture_probes(**kwargs)
 
     monkeypatch.setattr("skeleton.app.health.wait_for_application", wait_for_health)
     monkeypatch.setattr(
@@ -529,9 +524,7 @@ def test_preflight_and_startup_share_exact_process_environment(
 
     def probe(**kwargs):
         seen.append(("probe", kwargs["public_url_overrides"]["frontend"]))
-        return (ProbeResult(
-            "backend", "http://localhost:8001", True, 200, "healthy",
-        ),)
+        return fixture_probes(**kwargs)
 
     monkeypatch.setattr("skeleton.app.health.wait_for_application", probe)
     monkeypatch.setattr(

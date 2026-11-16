@@ -804,8 +804,8 @@ def test_windows_runtime_status_requires_backend_route_evidence(tmp_path,monkeyp
     from skeleton.app.health import ProbeResult
     config=tmp_path/".env"
     config.write_text("BACKEND_PORT=8400\n")
-    monkeypatch.setattr(launcher,"probe_application",
-        lambda **kw:(ProbeResult("backend","http://localhost:8400/api/health/ready",True,200,"healthy"),))
+    from skeleton.testing.app_health_fixtures import fixture_probes
+    monkeypatch.setattr(launcher,"probe_application",fixture_probes)
     def registry(base,**kwargs):
         assert base=="http://localhost:8400"
         return {"ready":registry_ready}

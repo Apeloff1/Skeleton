@@ -1242,3 +1242,12 @@ does not alone certify shutdown. This is sampled metadata continuity,
 not backup or data-content validation. If project/configuration custody
 cannot be established, inspect Docker Desktop directly rather than
 removing persistent containers.
+
+
+Whole-application HTTP readiness requires exactly one successful receipt
+for each canonical frontend, backend, engine and aggregate application
+endpoint (plus Chroma only for the separately requested full observation).
+Each receipt must match the configured endpoint URL with an actual 2xx
+integer status and an explicit success boolean. Partial or duplicate
+inventory cannot finish a retry campaign or admit startup. Mongo has no
+public HTTP health route; its custody and dependency health are separate.

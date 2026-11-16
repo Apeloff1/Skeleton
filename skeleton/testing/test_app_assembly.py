@@ -329,7 +329,8 @@ def test_safe_mode_recovers_into_canonical_product_shell():
 
 
 def test_wait_for_application_retries_until_healthy(monkeypatch):
-    from skeleton.app.health import ProbeResult, wait_for_application
+    from skeleton.app.health import wait_for_application
+    from skeleton.testing.app_health_fixtures import fixture_probes
 
     calls = []
     sleeps = []
@@ -337,15 +338,7 @@ def test_wait_for_application_retries_until_healthy(monkeypatch):
     def fake_probe_application(*, manifest, full, timeout):
         calls.append((full, timeout))
         ok = len(calls) >= 3
-        return (
-            ProbeResult(
-                service="backend",
-                url="http://localhost:8001/api/health",
-                ok=ok,
-                status=200 if ok else None,
-                detail="healthy" if ok else "not ready",
-            ),
-        )
+        return fixture_probes(manifest=manifest,full=full,ok=ok)
 
     monkeypatch.setattr("skeleton.app.health.probe_application", fake_probe_application)
     monkeypatch.setattr("skeleton.app.health.time.sleep", lambda delay: sleeps.append(delay))
@@ -580,7 +573,7 @@ def test_application_probe_includes_aggregate_readiness(monkeypatch):
 
     def fake_probe_url(service, *, timeout):
         seen.append((service.name, service.health_path, timeout))
-        return ProbeResult(service.name, service.public_url, True, 200, "healthy")
+        return ProbeResult(service.name, service.public_url.rstrip("/") + "/" + service.health_path.lstrip("/"), True, 200, "healthy")
 
     def fake_probe_http(name, url, *, timeout):
         seen.append((name, url, timeout))
@@ -864,7 +857,7 @@ def test_full_profile_probes_custom_chroma_health(monkeypatch):
 
     def probe(service, *, timeout):
         seen.append((service.name, service.public_url, service.health_path))
-        return ProbeResult(service.name, service.public_url, True, 200, "healthy")
+        return ProbeResult(service.name, service.public_url.rstrip("/") + "/" + service.health_path.lstrip("/"), True, 200, "healthy")
 
     def http(name, url, *, timeout):
         return ProbeResult(name, url, True, 200, "healthy")
@@ -882,7 +875,7 @@ def test_optional_chroma_unavailability_fails_full_readiness_only(monkeypatch):
 
     def probe(service, *, timeout):
         ready = service.name != "chroma"
-        return ProbeResult(service.name, service.public_url, ready, 200 if ready else None, "observed")
+        return ProbeResult(service.name, service.public_url.rstrip("/") + "/" + service.health_path.lstrip("/"), ready, 200 if ready else None, "observed")
 
     monkeypatch.setattr("skeleton.app.health.probe_url", probe)
     monkeypatch.setattr(
@@ -890,7 +883,7 @@ def test_optional_chroma_unavailability_fails_full_readiness_only(monkeypatch):
         lambda name, url, *, timeout: ProbeResult(name, url, True, 200, "healthy"),
     )
     assert probes_ok(probe_application(full=False))
-    assert not probes_ok(probe_application(full=True))
+    assert not probes_ok(probe_application(full=True),full=True)
 
 def test_preflight_external_hostname_placeholder_text_is_not_a_secret(monkeypatch, tmp_path):
     from skeleton.app.assembly import preflight
@@ -1441,8 +1434,9 @@ def test_cli_start_cannot_qualify_changed_configuration(tmp_path, monkeypatch, s
         observe("compose")
         return 0
     def health(**kw):
+        from skeleton.testing.app_health_fixtures import fixture_probes
         observe("health")
-        return (ProbeResult("backend", "http://localhost:8001/api/health", True, 200, "ok"),)
+        return fixture_probes(**kw)
     def registry(*a, **k):
         observe("registry")
         return {"ready": True}
@@ -1472,9 +1466,8 @@ def test_cli_start_requires_critical_routes_not_only_healthy_socket(tmp_path, mo
     from skeleton.app.health import ProbeResult
     _prepare_cli_start(tmp_path, monkeypatch)
     monkeypatch.setattr(cli, "_run_compose", lambda *a, **k: 0)
-    monkeypatch.setattr("skeleton.app.health.wait_for_application", lambda **k: (
-        ProbeResult("backend", "http://localhost:8001/api/health", True, 200, "ok"),
-    ))
+    from skeleton.testing.app_health_fixtures import fixture_probes
+    monkeypatch.setattr("skeleton.app.health.wait_for_application", fixture_probes)
     monkeypatch.setattr("skeleton.app.first_install.critical_backend_route_report", lambda *a, **k: {"ready": ready})
     assert cli.run_app_cli(["up"]) == (0 if ready else 1)
 
