@@ -974,7 +974,16 @@ class TinyTransformer:
         self.fitted += len(corpus)
         return n
 
-    def logprob(self, text: str, *, cached: bool = False) -> float:
+    def logprob(self, text: str, *, cached: bool = False,
+                interrupt: Callable[[], None] | None = None) -> float:
+        """Mean teacher-forced logprob; no full normalized vocab allocation.
+
+        Preserve the historical softmax floor, summation order and result.
+        Optional polling lets a governed training scorer honor its deadline
+        inside a long sample, not only between corpus documents.
+        """
+        if interrupt is not None:
+            interrupt()
         ids = self._ids(text)
         if len(ids) < 2:
             return math.log(1.0 / max(1, self.V))
@@ -982,10 +991,19 @@ class TinyTransformer:
         n = 0
         cache = KVCache(self.n_layers, self.ctx) if (cached and not self.use_mod) else None
         for i in range(1, len(ids)):
+            if interrupt is not None:
+                interrupt()
             window = ids[max(0, i - self.ctx):i]
-            logits = self._logits_window(window, cache) if cache is not None else self._logits(window)
-            p = softmax(logits)
-            lp += math.log(max(p[ids[i]], 1e-12))
+            if interrupt is None:
+                logits = self._logits_window(window, cache) if cache is not None else self._logits(window)
+            else:
+                logits = (self._logits_window(window, cache, interrupt=interrupt)
+                          if cache is not None else self._logits(window, interrupt=interrupt))
+                interrupt()
+            maximum = max(logits)
+            denom = sum(math.exp(x - maximum) for x in logits) or 1.0
+            target = math.exp(logits[ids[i]] - maximum) / denom
+            lp += math.log(max(target, 1e-12))
             n += 1
         return lp / max(1, n)
 
