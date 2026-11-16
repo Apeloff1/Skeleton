@@ -1675,7 +1675,7 @@ def test_alternative_wake_commits_before_lease_and_survives_sqlite_reopen(tmp_pa
                 intent_sha256="a"*64,receipt_sha256="b"*64,verify_wake=lambda *args:False)
     assert runtime.dispatch_blocked("deferred")
     bridge.wake_and_capture_verified("wait","owner",manager,broker,"a","deferred",
-                intent_sha256="a"*64,receipt_sha256="b"*64",verify_wake=lambda *args:True)
+                intent_sha256="a"*64,receipt_sha256="b"*64,verify_wake=lambda *args:True)
     restored=SwarmDurableBridge(make_store(tmp_path)).load("wait").restore_runtime()
     assert not restored.dispatch_blocked("deferred")
     assert restored.task("deferred").wake_receipt_sha256=="b"*64
