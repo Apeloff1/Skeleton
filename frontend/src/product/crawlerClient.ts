@@ -234,6 +234,9 @@ export type CrawlSession = {
   duplicate_evidence?: CrawlDuplicateEvidence; checkpoint_recovery?: CrawlCheckpointRecovery;
   acquisition_economics?: CrawlAcquisitionEconomics;
   acquisition_readiness?: CrawlAcquisitionReadiness;
+  publisher_intent?: { schema: 'skeleton.dragon.publisher-intent.v1'; method: PublisherIntakeMethod;
+    intent_digest: string; operator_acknowledged: true; publisher_verified: false;
+    license_verified: false; network_authority_expanded: false };
   companion?: DragonCompanion;
   curriculum_trace?: DragonCurriculumTrace;
   archive_grant?: DragonArchiveGrant; treasury_watch?: DragonTreasuryWatch|null; watch_managed?: boolean;
@@ -415,6 +418,17 @@ function session(value: CrawlSession, expectedId?: string): CrawlSession {
   for (const field of ['requests', 'bytes', 'documents', 'failures'] as const) if (!integer(value.counters[field], 33554432)) invalid('The crawler counters are incomplete.');
   if (value.instruction_security !== undefined && !validInstructionSecurity(value.instruction_security, value.counters.requests)) invalid('The crawler instruction incident custody is invalid.');
   if (value.adaptive_origin_health !== undefined && !validOriginHealth(value.adaptive_origin_health)) invalid('The crawler origin health projection is invalid.');
+  if (value.publisher_intent !== undefined) {
+    const intent = value.publisher_intent;
+    if (!intent || intent.schema !== 'skeleton.dragon.publisher-intent.v1'
+      || !PUBLISHER_INTAKE_METHODS.includes(intent.method)
+      || !HASH.test(intent.intent_digest) || intent.operator_acknowledged !== true
+      || intent.publisher_verified !== false || intent.license_verified !== false
+      || intent.network_authority_expanded !== false || value.seeds.length !== 1
+      || value.limits.max_requests !== 8 || value.limits.max_documents !== 1
+      || value.limits.max_depth !== 0 || value.limits.max_total_bytes !== 2097152)
+      invalid('Invalid verified publisher intent projection.');
+  }
   if (value.acquisition_readiness !== undefined) {
     const r = value.acquisition_readiness;
     if (!r || r.schema !== 'skeleton.dragon.acquisition-readiness.v1'
