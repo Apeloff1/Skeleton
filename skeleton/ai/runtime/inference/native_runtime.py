@@ -27,6 +27,8 @@ from skeleton.ai.model_runtime import (
     RuntimeUsage,
 )
 from skeleton.ai.model_runtime.runtime_contracts import RUNTIME_SCHEMA, digest_json
+from skeleton.ai.model_runtime.native_llm_runtime import GenerationStream
+from .private_prefill import PrivatePrefillPool
 from skeleton.ai.model_runtime.tokenization import TokenSequence, TokenizerContractError
 from skeleton.skills.tool_contract import (
     ToolContractError,
@@ -260,6 +262,18 @@ class NativeRuntimeLocalModel:
         self._runtime_digest = identity.identity_digest
         self._tokenizer_digest = runtime.tokenizer.digest
         self._preparation_issuer = object()
+        # Only trusted, explicit host registrations activate the pool.
+        # Anonymous provider calls never retain or reuse another scope.
+        self._private_prefill = PrivatePrefillPool(runtime)
+
+    def register_private_prefill(self, owner: str, session: str) -> None:
+        self._private_prefill.register(owner, session)
+
+    def forget_private_prefill(self, owner: str, session: str | None = None) -> None:
+        self._private_prefill.forget(owner, session)
+
+    def private_prefill_statistics(self) -> dict[str, int]:
+        return self._private_prefill.stats()
 
     @property
     def model_digest(self) -> str:
@@ -759,6 +773,7 @@ class NativeRuntimeLocalModel:
             if cancel.is_set():
                 raise LocalInferenceCancelled("native local inference cancelled")
 
+        prefix_lease = None
         try:
             prompt_sequence = prepared.token_sequence
             input_tokens = len(prompt_sequence.token_ids)
@@ -769,7 +784,20 @@ class NativeRuntimeLocalModel:
             audit = _NativeStreamAudit(self.runtime, prompt_sequence, config)
             # stream_sequence admits the exact sequence used for accounting;
             # native string stops finish normally with real usage and receipt.
-            with self.runtime.stream_sequence(prompt_sequence, config, interrupt=interrupt) as stream:
+            # Exact host scope, prepared token identity and native profile
+            # govern reuse. No result cache, no approximate text match.
+            if not request.tools and request.structured_output_schema is None:
+                prefix_lease = self._private_prefill.checkout(
+                    prepared.scope_digest, execution_profile, prompt_sequence.token_ids,
+                )
+            stream_handle = (
+                self.runtime.stream_sequence(prompt_sequence, config, interrupt=interrupt)
+                if prefix_lease is None else GenerationStream(self.runtime._stream_sequence_impl(
+                    prompt_sequence, config, interrupt=interrupt,
+                    _private_cpu_cache=prefix_lease.cache,
+                ))
+            )
+            with stream_handle as stream:
                 for event in stream:
                     interrupt()
                     audit.observe(event)
@@ -842,6 +870,11 @@ class NativeRuntimeLocalModel:
             ).encode("ascii")
         ).hexdigest()
         interrupt()
+        if prefix_lease is not None and finish_reason in {"completed", "length"}:
+            self._private_prefill.publish(
+                prefix_lease, prompt_sequence.token_ids + tuple(result.generated_ids),
+                execution_profile,
+            )
         return LocalInferenceResult(
             text=text,
             model_id=self.model_id,
