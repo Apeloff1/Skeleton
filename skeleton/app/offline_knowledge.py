@@ -173,6 +173,7 @@ class OfflineKnowledgeLibrary:
         self.tokenizer_digest = _identity(tokenizer_digest, "tokenizer digest")
         self._semantic_ranker=semantic_ranker
         self._semantic_cache=None
+        self._semantic_ann=None
         if semantic_ranker is not None:
             from skeleton.retrieval.semantic_long_context import ContextualRanker
             from skeleton.retrieval.semantic_vector_cache import DerivedVectorCache
@@ -285,12 +286,18 @@ class OfflineKnowledgeLibrary:
                 "chunk_count": len(pieces), "reused": False,
             }
 
-    def _verified_snapshot(self) -> tuple[list[tuple[Any, ...]], list[tuple[Any, ...]]]:
+    def _verified_snapshot(self, document_ids=None) -> tuple[list[tuple[Any, ...]], list[tuple[Any, ...]]]:
         """Verify documents AND source chunks from one SQLite read snapshot.
 
         Never advertise a citation unless the indexed text is provably an
         exact slice of the stored document whose SHA-256 matches the source.
         """
+        selected=tuple(document_ids) if document_ids is not None else ()
+        if document_ids is not None and (not selected or len(selected)>256 or len(set(selected))!=len(selected)):
+            raise RuntimeContractError("bounded explicit source snapshot required")
+        where=(" AND document_id IN ("+",".join("?" for _ in selected)+")") if selected else ""
+        joined=(" AND d.document_id IN ("+",".join("?" for _ in selected)+")") if selected else ""
+        params=(self.model_digest,self.tokenizer_digest,*selected)
         with self.store._lock:
             own_snapshot = not self.store._db.in_transaction
             if own_snapshot:
@@ -301,8 +308,8 @@ class OfflineKnowledgeLibrary:
                 source_bytes = self.store._db.execute(
                     "SELECT COALESCE(SUM(LENGTH(CAST(content_text AS BLOB))),0) "
                     "FROM offline_documents "
-                    "WHERE model_digest=? AND tokenizer_digest=?",
-                    (self.model_digest, self.tokenizer_digest),
+                    "WHERE model_digest=? AND tokenizer_digest=?"+where,
+                    params,
                 ).fetchone()[0]
                 _require_local_headroom(
                     int(source_bytes) * 2, storage_path=self._storage_path
@@ -310,22 +317,24 @@ class OfflineKnowledgeLibrary:
                 documents = self.store._db.execute(
                     "SELECT document_id, title, content_digest, content_text, "
                     "created_ns FROM offline_documents "
-                    "WHERE model_digest=? AND tokenizer_digest=? "
-                    "ORDER BY created_ns DESC, document_id",
-                    (self.model_digest, self.tokenizer_digest),
+                    "WHERE model_digest=? AND tokenizer_digest=?"+where+
+                    " ORDER BY created_ns DESC, document_id",
+                    params,
                 ).fetchall()
                 chunks = self.store._db.execute(
                     "SELECT c.document_id, d.title, d.content_digest, "
                     "c.ordinal, c.char_start, c.char_end, c.content "
                     "FROM offline_documents d JOIN offline_document_chunks c "
                     "ON d.document_id=c.document_id "
-                    "WHERE d.model_digest=? AND d.tokenizer_digest=? "
-                    "ORDER BY d.document_id, c.ordinal",
-                    (self.model_digest, self.tokenizer_digest),
+                    "WHERE d.model_digest=? AND d.tokenizer_digest=?"+joined+
+                    " ORDER BY d.document_id, c.ordinal",
+                    params,
                 ).fetchall()
             finally:
                 if own_snapshot:
                     self.store._db.execute("ROLLBACK")
+        if selected and {row[0] for row in documents}!=set(selected):
+            raise RuntimeContractError("selected local grounding source is unavailable")
         by_document: dict[str, list[tuple[Any, ...]]] = {}
         for chunk in chunks:
             by_document.setdefault(chunk[0], []).append(chunk)
@@ -406,7 +415,9 @@ class OfflineKnowledgeLibrary:
         terms = _terms(query)
         if not terms and selected is None and self._semantic_ranker is None:
             return []
-        documents, records = self._verified_snapshot()
+        if self._semantic_ann is not None:
+            return self._ann_search(query,limit=limit,selected=selected,evidence_excerpt=evidence_excerpt)
+        documents, records = self._verified_snapshot(selected)
         if selected is not None:
             known = {row[0] for row in documents}
             if not set(selected).issubset(known):
@@ -474,7 +485,7 @@ class OfflineKnowledgeLibrary:
                         start,end=self._semantic_ranker.evidence_excerpt(query,row,max_chars=MAX_EXCERPT_CHARS)
                     results.append(LocalKnowledgeHit(row.source_id,titles[row.source_id],row.revision,row.ordinal,
                                                      row.start+start,row.start+end,row.text[start:end],score).to_dict())
-                observed,_=self._verified_snapshot()
+                observed,_=self._verified_snapshot(selected)
                 if selected is not None:
                     observed=[row for row in observed if row[0] in set(selected)]
                 if [(x[0],x[1],x[2],x[4]) for x in observed]!=[(x[0],x[1],x[2],x[4]) for x in documents]:
@@ -484,6 +495,133 @@ class OfflineKnowledgeLibrary:
             except (ValueError,MemoryError,OSError) as exc:
                 raise RuntimeContractError("bounded learned semantic retrieval failed") from exc
         return results
+
+    def semantic_source_snapshot(self):
+        """Streaming, scope-bound inventory identity; source bytes verified on use."""
+        import json
+        h=sha256(("offline-ann-v1:"+self.model_digest+":"+self.tokenizer_digest).encode())
+        db=self.store._db
+        with self.store._lock:
+            cursor=db.execute("""SELECT document_id,title,content_digest,created_ns,
+                LENGTH(CAST(content_text AS BLOB))
+                FROM offline_documents WHERE model_digest=? AND tokenizer_digest=?
+                ORDER BY document_id""",(self.model_digest,self.tokenizer_digest))
+            for row in cursor:
+                raw=json.dumps(list(row),ensure_ascii=False,separators=(",",":"),allow_nan=False).encode()
+                h.update(len(raw).to_bytes(8,"big"))
+                h.update(raw)
+        return h.hexdigest()
+
+    def build_semantic_ann(self,root,name,policy,*,interrupt=None):
+        """Publish a private generation from one canonical SQLite read snapshot."""
+        from skeleton.retrieval.disk_semantic_ann import build_generation,DiskANNPolicy
+        from skeleton.retrieval.semantic_long_context import document_spans
+        if self._semantic_ranker is None or not isinstance(policy,DiskANNPolicy):
+            raise RuntimeContractError("explicit local learned ranker and ANN policy required")
+        ranker=self._semantic_ranker
+        db=self.store._db
+        with self.store._lock:
+            if db.in_transaction:
+                raise RuntimeContractError("ANN generation requires exclusive read snapshot")
+            db.execute("BEGIN")
+            try:
+                snapshot=self.semantic_source_snapshot()
+                def rows():
+                    cursor=db.execute("""SELECT document_id FROM offline_documents
+                      WHERE model_digest=? AND tokenizer_digest=? ORDER BY document_id""",
+                      (self.model_digest,self.tokenizer_digest))
+                    for (source_id,) in cursor:
+                        if interrupt:interrupt()
+                        docs,chunks=self._verified_snapshot([source_id])
+                        doc=docs[0]
+                        pieces=((r[3],r[4],r[5],r[6]) for r in chunks)
+                        batch=[]
+                        for span in document_spans(doc[0],doc[2],doc[3],pieces,ranker.policy):
+                            batch.append(span)
+                            if len(batch)==128:
+                                vectors,_=ranker._features(batch,None,interrupt)
+                                for leaf in batch:yield leaf,vectors[leaf.identity]
+                                batch.clear()
+                        if batch:
+                            vectors,_=ranker._features(batch,None,interrupt)
+                            for leaf in batch:yield leaf,vectors[leaf.identity]
+                receipt=build_generation(root,name,rows(),space=ranker.identity,
+                    source_snapshot=snapshot,dimension=ranker.encoder.policy.dimension,
+                    policy=policy,interrupt=interrupt)
+            finally:
+                db.execute("ROLLBACK")
+            if self.semantic_source_snapshot()!=snapshot:
+                # Immutable build remains historical but cannot activate.
+                raise RuntimeContractError("source changed during ANN build; generation is historical only")
+        return receipt
+
+    def attach_semantic_ann(self,root,manifest_sha256):
+        from skeleton.retrieval.disk_semantic_ann import DiskANN
+        if self._semantic_ranker is None:
+            raise RuntimeContractError("ANN requires an explicitly configured learned encoder")
+        index=DiskANN(root,manifest_sha256,expected_space=self._semantic_ranker.identity,
+                      expected_snapshot=self.semantic_source_snapshot())
+        if index.dimension!=self._semantic_ranker.encoder.policy.dimension:
+            raise RuntimeContractError("ANN encoder dimension mismatch")
+        self._semantic_ann=index
+
+    def _ann_search(self,query,*,limit,selected,evidence_excerpt):
+        from skeleton.retrieval.semantic_long_context import document_spans
+        index=self._semantic_ann
+        ranker=self._semantic_ranker
+        with self.store._lock:
+            try:
+                if self.semantic_source_snapshot()!=index.snapshot:
+                    raise RuntimeContractError("semantic ANN generation stale; explicit rebuild required")
+                if selected is not None:
+                    chosen=set(selected)
+                    placeholders=",".join("?" for _ in chosen)
+                    observed={r[0] for r in self.store._db.execute(
+                        "SELECT document_id FROM offline_documents WHERE model_digest=? AND tokenizer_digest=? AND document_id IN ("+placeholders+")",
+                        (self.model_digest,self.tokenizer_digest,*sorted(chosen)))}
+                    if observed!=chosen:
+                        raise RuntimeContractError("selected local grounding source is unavailable")
+                q=ranker.encoder.query(query,segments=16)
+                candidates,proof=index.search(query,q.dense,allowed_source_ids=selected,
+                   limit=min(index.policy.global_candidate_limit,ranker.policy.candidate_pool,256))
+                if not candidates:
+                    if self.semantic_source_snapshot()!=index.snapshot:
+                        raise RuntimeContractError("semantic ANN generation stale")
+                    return []
+                by_doc={}
+                for c in candidates:
+                    by_doc.setdefault(c.source_id,[]).append(c)
+                spans=[]
+                titles={}
+                for source_id,rows in by_doc.items():
+                    docs,chunks=self._verified_snapshot([source_id])
+                    doc=docs[0]
+                    wanted={r.ordinal:r for r in rows}
+                    titles[source_id]=doc[1]
+                    for leaf in document_spans(doc[0],doc[2],doc[3],
+                        ((r[3],r[4],r[5],r[6]) for r in chunks if r[3] in wanted),ranker.policy):
+                        c=wanted.pop(leaf.ordinal)
+                        if (leaf.identity!=c.span_sha256 or leaf.revision!=c.source_revision or
+                            leaf.start!=c.start or leaf.end!=c.end):
+                            raise RuntimeContractError("ANN candidate source custody mismatch")
+                        spans.append(leaf)
+                    if wanted:
+                        raise RuntimeContractError("ANN candidate source was withdrawn")
+                ranked,_=ranker.search(query,spans,limit=min(limit,ranker.policy.candidate_pool),cache=self._semantic_cache)
+                result=[]
+                for row,score in ranked:
+                    start,end=0,len(row.text)
+                    if evidence_excerpt:
+                        from .offline_grounding import MAX_EXCERPT_CHARS
+                        start,end=ranker.evidence_excerpt(query,row,max_chars=MAX_EXCERPT_CHARS)
+                    result.append(LocalKnowledgeHit(row.source_id,titles[row.source_id],row.revision,row.ordinal,
+                                row.start+start,row.start+end,row.text[start:end],score).to_dict())
+                if self.semantic_source_snapshot()!=index.snapshot:
+                    if self._semantic_cache is not None:self._semantic_cache.invalidate()
+                    raise RuntimeContractError("semantic ANN authority changed during retrieval")
+                return result
+            except (ValueError,MemoryError,OSError) as exc:
+                raise RuntimeContractError("bounded disk semantic retrieval failed") from exc
 
 
 __all__ = [

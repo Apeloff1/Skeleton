@@ -1551,9 +1551,13 @@ def main(argv: list[str] | None = None) -> int:
                         help="open the local workspace after binding; token remains in its private file")
     parser.add_argument("--semantic-config",type=Path,help="explicit pinned local learned encoder config")
     parser.add_argument("--semantic-config-sha256")
+    parser.add_argument("--semantic-index",type=Path)
+    parser.add_argument("--semantic-index-sha256")
     args = parser.parse_args(argv)
     if bool(args.semantic_config)!=bool(args.semantic_config_sha256):
         parser.error("semantic configuration and exact file digest must be supplied together")
+    if bool(args.semantic_index)!=bool(args.semantic_index_sha256) or (args.semantic_index and not args.semantic_config):
+        parser.error("semantic index requires exact index digest and configured local encoder")
     app = None
     token_created = False
     token_identity: tuple[int, int, int, int] | None = None
@@ -1569,6 +1573,8 @@ def main(argv: list[str] | None = None) -> int:
             from skeleton.retrieval.semantic_config import load_semantic_ranker
             ranker=load_semantic_ranker(args.semantic_config,args.semantic_config_sha256)
         app = OfflineHTTPApplication(backend, db, token=token,semantic_ranker=ranker)
+        if args.semantic_index is not None:
+            app.knowledge.attach_semantic_ann(args.semantic_index,args.semantic_index_sha256)
         # Bind before creating private credentials: a conflicting port must
         # not leave behind an unused secret file on the user's disk.
         with LocalOnlyHTTPServer(app, port=args.port) as server:

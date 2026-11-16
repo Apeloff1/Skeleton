@@ -49,6 +49,8 @@ class DiskANNPolicy:
                         (self.query_timeout_seconds,1,300)):
             if type(v) is not int or not lo<=v<=hi:
                 raise ValueError("invalid local disk ANN policy")
+        if self.bands*self.probes*self.bucket_limit+self.max_anchor_terms*self.bucket_limit>262144 or self.shards*self.shard_candidate_limit>262144:
+            raise ValueError("aggregate ANN candidate workspace outside bounds")
         if self.probes>self.bits+1 or self.shard_candidate_limit<self.bucket_limit:
             raise ValueError("invalid ANN multi-probe/candidate geometry")
 
@@ -330,7 +332,8 @@ class DiskANN:
                 score=float(np.clip(vector@q,-1,1))
                 results.append(ANNCandidate(*row[:6],score,candidates[rid][1]))
             self._assert_identity(entry)
-            return results,exhausted,len(candidates)
+            results.sort(key=lambda row:(-row.anchor_matches,-row.cosine,row.span_sha256))
+            return results[:p.global_candidate_limit],exhausted,len(candidates)
         finally:db.close()
 
     def search(self,query,vector,*,allowed_source_ids=None,limit=None):
