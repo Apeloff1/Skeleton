@@ -3,7 +3,7 @@
  * console hooks into ForgeCockpitView, and handles cross-panel handoffs.
  */
 import React from 'react';
-import { getAuthEpoch } from '../../auth/gameforgeAuth';
+import { getAuthEpoch, subscribeAuthChanges } from '../../auth/gameforgeAuth';
 import { shareGodotSourceArchive } from '../shareSourceArchive';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { buildRunRequest, INITIAL_STATE, questionnaireReducer, STEPS, stepIndex, type QuestionnaireState } from '../questionnaire';
@@ -79,6 +79,22 @@ export default function ForgeCockpitScreen({ initialTab = null, initialQuestionn
   const [exportBusy, setExportBusy] = React.useState(false);
   const [exportError, setExportError] = React.useState<string | null>(null);
   const exportLock = React.useRef(false);
+  const exportMounted = React.useRef(false);
+  React.useEffect(() => {
+    exportMounted.current = true;
+    const unsubscribe = subscribeAuthChanges(() => {
+      runOwnerEpoch.current = null;
+      runGeneration.current += 1;
+      setExportError(null);
+      // An open OS share sheet cannot be revoked. Lock remains held until
+      // the original operation settles, but no stale error is published.
+    });
+    return () => {
+      exportMounted.current = false;
+      runGeneration.current += 1;
+      unsubscribe();
+    };
+  }, []);
 
   const startRun = React.useCallback((req: RunRequest) => {
     runOwnerEpoch.current = getAuthEpoch();
@@ -89,7 +105,7 @@ export default function ForgeCockpitScreen({ initialTab = null, initialQuestionn
   }, [run.start]);
 
   const exportGodot = React.useCallback(() => {
-    if (exportLock.current || run.phase !== 'done' || run.payload?.succeeded !== true
+    if (!exportMounted.current || exportLock.current || run.phase !== 'done' || run.payload?.succeeded !== true
         || run.payload?.source_export?.status !== 'ready') return;
     const atStart = runGeneration.current;
     const ownerEpoch = runOwnerEpoch.current;
@@ -100,15 +116,16 @@ export default function ForgeCockpitScreen({ initialTab = null, initialQuestionn
     exportLock.current = true;
     setExportBusy(true);
     setExportError(null);
-    void shareGodotSourceArchive(run.payload, () =>
-      ownerEpoch === getAuthEpoch() && atStart === runGeneration.current
-    ).catch((error: unknown) => {
+    const current = () => exportMounted.current && ownerEpoch === getAuthEpoch()
+      && atStart === runGeneration.current;
+    void shareGodotSourceArchive(run.payload, current).catch((error: unknown) => {
+      if (!current()) return;
       const message = error instanceof Error ? error.message : '';
       setExportError(message.startsWith('Godot ') || message.startsWith('Device ')
         ? message.slice(0, 180) : 'Could not save or share the source archive on this device.');
     }).finally(() => {
       exportLock.current = false;
-      setExportBusy(false);
+      if (exportMounted.current) setExportBusy(false);
     });
   }, [run.phase, run.payload]);
 

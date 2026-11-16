@@ -73,14 +73,14 @@ export const PLAYABLE_SLICES = [
 ] as const;
 
 export const PLAYABLE_TUNING_EFFECTS: Record<string, readonly string[]> = {
-  extraction: ['Tempo: movement', 'Risk: heat', 'Scarcity: heat budget', 'Agency: pickup range'],
+  extraction: ['Tempo: movement', 'Risk: heat', 'Scarcity: heat budget', 'Agency: pickup range', 'Progression depth: cache count'],
   combat_loop: ['Tempo: movement', 'Lethality: contact damage', 'Agency: attack range', 'Progression depth: waves'],
-  pipeline: ['Tempo: movement', 'Risk: frame budget', 'Agency: interaction range', 'Progression depth: deliveries'],
-  puzzle: ['Tempo: movement', 'Mystery: switch hints'],
-  racing: ['Tempo: movement', 'Risk: time limit', 'Progression depth: laps'],
-  survival: ['Tempo: movement', 'Scarcity: hydration'],
-  stealth: ['Tempo: movement', 'Risk: guard radius', 'Mystery: guard visibility'],
-  crafting: ['Tempo: movement'],
+  pipeline: ['Tempo: movement', 'Risk: frame budget', 'Agency: interaction range', 'Progression depth: deliveries', 'Scarcity: cargo capacity'],
+  puzzle: ['Tempo: movement', 'Mystery: switch hints', 'Agency: switch range', 'Progression depth: switches'],
+  racing: ['Tempo: top speed', 'Risk: time limit', 'Progression depth: laps', 'Agency: checkpoint range', 'Scarcity: boost recharge'],
+  survival: ['Tempo: movement', 'Scarcity: hydration', 'Risk: exposure drain', 'Agency: pickup range', 'Progression depth: supplies'],
+  stealth: ['Tempo: movement', 'Risk: guard radius', 'Lethality: detection pressure', 'Mystery: guard visibility', 'Agency: interaction range', 'Progression depth: intel'],
+  crafting: ['Tempo: movement', 'Progression depth: materials', 'Agency: work range', 'Risk: assembly duration'],
 };
 
 export const VISION_MAX = 4000;
@@ -243,7 +243,9 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
       if (action.value && (!state.playable?.enabled || state.quest?.enabled || state.options.target !== 'godot')) return state;
       return { ...state, playable: { enabled: false, ...state.playable, launch: action.value === true } };
     case 'setPlaytestMode':
-      return { ...state, playtest: ['off', 'auto', 'require'].includes(action.value) ? action.value : 'off' };
+      if (action.value !== 'off' && state.options.target !== 'godot') return state;
+      if (!['off', 'auto', 'require'].includes(action.value)) return state;
+      return state.playtest === action.value ? state : { ...state, playtest: action.value };
     case 'setQuestEnabled':
       return { ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, enabled: action.value === true },
         playable: action.value && state.playable?.launch ? { ...state.playable, launch: false } : state.playable };

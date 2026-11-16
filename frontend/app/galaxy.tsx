@@ -13,7 +13,7 @@
  */
 import React from 'react';
 import { getAuthEpoch, subscribeAuthChanges } from '../src/auth/gameforgeAuth';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet, Text, Pressable } from 'react-native';
 import { useRouter, useNavigation } from 'expo-router';
 import { lazyDefault, LazyMount } from '../src/utils/lazyMount';
 const GalaxyStudioFactoryModal = lazyDefault(() => import('../src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal'));
@@ -21,6 +21,7 @@ import theme from '../src/theme/tokens';
 import { loadGalaxyDraft, type GalaxyDraftSnapshot } from '../src/features/GalaxyStudioFactory/draftCustody';
 import { handoffFromGalaxy, type CreatorBridgeDraft, type GalaxyBridgeSelection } from '../src/skeletonForge/creatorBridge';
 import { consumeCreatorBridge, storeCreatorBridge } from '../src/skeletonForge/creatorBridgeStorage';
+import { recoverCreatorRoute } from '../src/skeletonForge/creatorRouteRecovery';
 
 export default function GalaxyRoute() {
   const router = useRouter();
@@ -31,6 +32,8 @@ export default function GalaxyRoute() {
   const [authEpoch, setAuthEpoch] = React.useState(() => getAuthEpoch());
   const [loadedAuthEpoch, setLoadedAuthEpoch] = React.useState<number | null>(null);
   const [handoffError, setHandoffError] = React.useState<string | null>(null);
+  const [recoveryError, setRecoveryError] = React.useState(false);
+  const [recoveryAttempt, setRecoveryAttempt] = React.useState(0);
 
   React.useEffect(() => subscribeAuthChanges(() => setAuthEpoch(getAuthEpoch())), []);
 
@@ -41,21 +44,21 @@ export default function GalaxyRoute() {
     setIncoming(null);
     setSavedGalaxy(null);
     setHandoffError(null);
-    void Promise.all([
-      consumeCreatorBridge('galaxy').catch(() => null),
-      loadGalaxyDraft().catch(() => null),
-    ]).then(([draft, saved]) => {
-      if (!mounted) return;
-      setIncoming(draft);
-      setSavedGalaxy(saved);
-    }).finally(() => {
-      if (mounted && getAuthEpoch() === authEpoch) {
+    setRecoveryError(false);
+    const isCurrent = () => mounted && getAuthEpoch() === authEpoch;
+    void recoverCreatorRoute(loadGalaxyDraft, () => consumeCreatorBridge('galaxy', authEpoch, isCurrent), isCurrent)
+      .then(({ handoff, draft }) => {
+        if (!isCurrent()) return;
+        setIncoming(handoff);
+        setSavedGalaxy(draft);
         setLoadedAuthEpoch(authEpoch);
         setReady(true);
-      }
-    });
+      })
+      .catch(() => {
+        if (isCurrent()) setRecoveryError(true);
+      });
     return () => { mounted = false; };
-  }, [authEpoch]);
+  }, [authEpoch, recoveryAttempt]);
 
   const continueInForge = React.useCallback(async (selection: GalaxyBridgeSelection): Promise<void> => {
     try {
@@ -107,6 +110,13 @@ export default function GalaxyRoute() {
 
   return (
     <View style={styles.root} testID="galaxy-studio-route">
+      {!ready && !recoveryError ? <Text accessibilityRole="progressbar" style={{ color: '#FBBF24', padding: 12 }}>Restoring saved creator state…</Text> : null}
+      {recoveryError ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Retry creator draft recovery"
+          onPress={() => { setRecoveryError(false); setRecoveryAttempt(value => value + 1); }}>
+          <Text style={{ color: '#FBBF24', padding: 12 }}>Saved creator state is unavailable. Retry recovery.</Text>
+        </Pressable>
+      ) : null}
       {handoffError ? <Text accessibilityRole="alert" style={{ color: '#FBBF24' }}>{handoffError}</Text> : null}
       {ready && loadedAuthEpoch === authEpoch ? (
         <LazyMount><GalaxyStudioFactoryModal key={authEpoch} visible={true} onClose={close}

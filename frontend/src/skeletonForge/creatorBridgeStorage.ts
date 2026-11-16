@@ -84,10 +84,13 @@ async function removeObserved(
 export async function withCreatorBridge<T>(
   target: CreatorBridgeTarget,
   commit: (draft: CreatorBridgeDraft) => Promise<T>,
+  expectedEpoch: number = getAuthEpoch(),
 ): Promise<T | null> {
+  if (getAuthEpoch() !== expectedEpoch) throw new Error('Account changed before Studio handoff scope');
   const scope = await creatorStorageScope(KEY);
+  if (getAuthEpoch() !== expectedEpoch) throw new Error('Account changed during Studio handoff scope');
   return serializeKey(scope.key, async () => {
-    if (!scope.stillCurrent()) throw new Error('Account changed before Studio handoff read');
+    if (getAuthEpoch() !== expectedEpoch || !scope.stillCurrent()) throw new Error('Account changed before Studio handoff read');
     const raw = await AsyncStorage.getItem(scope.key);
     if (!scope.stillCurrent()) throw new Error('Account changed during Studio handoff read');
     if (!raw) return null;
@@ -120,29 +123,36 @@ export async function withCreatorBridge<T>(
   });
 }
 
-export async function consumeCreatorBridge(target: CreatorBridgeTarget): Promise<CreatorBridgeDraft | null> {
+export async function consumeCreatorBridge(
+  target: CreatorBridgeTarget, expectedEpoch: number = getAuthEpoch(),
+  receiverCurrent: () => boolean = () => true,
+): Promise<CreatorBridgeDraft | null> {
+  const epochCurrent = () => getAuthEpoch() === expectedEpoch && receiverCurrent();
+  if (!epochCurrent()) throw new Error('Account changed or creator receiver superseded before handoff scope');
   const scope = await creatorStorageScope(KEY);
+  if (!epochCurrent()) throw new Error('Account changed or creator receiver superseded during handoff scope');
+  const current = () => epochCurrent() && scope.stillCurrent();
   return serializeKey(scope.key, async () => {
-    if (!scope.stillCurrent()) throw new Error('Account changed before reading creator handoff');
+    if (!current()) throw new Error('Account changed or creator receiver superseded before reading handoff');
     const raw = await AsyncStorage.getItem(scope.key);
-    if (!scope.stillCurrent()) throw new Error('Account changed while reading the creator handoff');
+    if (!current()) throw new Error('Account changed or creator receiver superseded while reading handoff');
     if (!raw || raw.length > CREATOR_BRIDGE_MAX_CHARS) {
-      if (raw) await removeObserved(scope.key, raw, scope.stillCurrent, false);
+      if (raw) await removeObserved(scope.key, raw, current, false);
       return null;
     }
     let parsed: unknown;
     try { parsed = JSON.parse(raw); }
-    catch { await removeObserved(scope.key, raw, scope.stillCurrent, false); return null; }
+    catch { await removeObserved(scope.key, raw, current, false); return null; }
     const envelope = parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
       ? parsed as Record<string, unknown> : null;
     if (!envelope || envelope.schema !== CREATOR_BRIDGE_SCHEMA) {
-      await removeObserved(scope.key, raw, scope.stillCurrent, false);
+      await removeObserved(scope.key, raw, current, false);
       return null;
     }
     // A wrong-direction reader must not consume someone else's valid handoff.
     if (envelope.target !== target) return null;
     const valid = parseCreatorBridge(parsed, target);
-    await removeObserved(scope.key, raw, scope.stillCurrent, valid !== null);
+    await removeObserved(scope.key, raw, current, valid !== null);
     return valid;
   });
 }

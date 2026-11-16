@@ -203,7 +203,45 @@ export interface RunPayload {
     schema?: string; scene?: string; script?: string; source_sha256?: string;
     return_supported?: boolean; headless_inert?: boolean; sealed?: boolean;
   };
+  /** Source reconstruction receipt, never native execution proof. */
+  playable_source?: {
+    schema: 'skeleton.gameforge.playable_source.v2';
+    mode: string;
+    scene: string;
+    launch_scene: string | null;
+    launcher: string;
+    source_files: Record<string, string>;
+    source_sha256: string;
+    native_execution_qualified: false;
+    tuning?: RunPayload['playable_tuning'];
+  };
   operator_axes?: Record<string, number>;
+  /** Source-verified Galaxy matrix -> native gameplay tuning, not device acceptance. */
+  galaxy_playable_controls?: {
+    schema: 'skeleton.gameforge.galaxy_playable_controls.v1';
+    mode: string;
+    profile_sha256: string;
+    active_matrix_dials: number;
+    mapped_matrix_dials: number;
+    unmapped_matrix_dials: number;
+    axes: { axis: string; requested: number; effective: number;
+      authority: 'forge_override' | 'galaxy_matrix';
+      sources: { path: string; value: number }[] }[];
+    effective_axes: Record<string, number>;
+    native_sources: Record<string, string>;
+    tuning_receipt_sha256?: string;
+    source_verified: boolean;
+    native_execution_qualified: false;
+  };
+  /** Sparse, source-verified native scalar effects; unmapped axes are explicit. */
+  playable_tuning?: {
+    schema: 'skeleton.gameforge.playable_tuning.v1';
+    mode: string;
+    axes: Record<string, number>;
+    applied: Record<string, number>;
+    mapped_axes: string[];
+    unmapped_axes: string[];
+  };
   /** Mechanical controls actually written into the native playable script. */
   playable_mechanics?: {
     schema?: 'skeleton.forge.playable_mechanics.v1';
