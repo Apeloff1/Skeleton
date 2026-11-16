@@ -183,3 +183,53 @@ def test_roundtrip_denies_nonidentical_echo(tmp_path, monkeypatch):
         b"SKG1" + _pack_ids((1,)) + _text(b"foreign")))
     with pytest.raises(LlamaCppRuntimeError, match="round-trip"):
         model.roundtrip_ids("private")
+
+
+@pytest.mark.skipif(not __import__("sys").platform.startswith("linux"), reason="Linux memfd only")
+def test_linux_descriptor_frame_denies_input_mutation_and_seals_response(tmp_path):
+    import fcntl
+    from skeleton.ai.runtime.inference.gguf_private_transport import private_frame
+    model, _, _ = fixture(tmp_path)
+    with private_frame(model.runtime_artifact, model.model_artifact, b"SKG1private", lambda: None) as frame:
+        assert frame.source.startswith("/proc/self/fd/")
+        assert frame.model.startswith("/proc/self/fd/")
+        assert list(frame.base.iterdir()) == []
+        input_fd = int(frame.source.rsplit("/", 1)[1])
+        output_fd = int(frame.target.rsplit("/", 1)[1])
+        flags = fcntl.fcntl(input_fd, fcntl.F_GET_SEALS)
+        assert flags & fcntl.F_SEAL_WRITE
+        with pytest.raises(OSError):
+            os.pwrite(input_fd, b"modified", 0)
+        os.write(output_fd, b"SKG1")
+        assert frame.read(32) == b"SKG1"
+        with pytest.raises(OSError):
+            os.pwrite(output_fd, b"changed", 0)
+    for fd in (input_fd, output_fd):
+        with pytest.raises(OSError):
+            os.fstat(fd)
+
+
+@pytest.mark.skipif(not __import__("sys").platform.startswith("linux"), reason="Linux memfd only")
+def test_descriptor_rejects_path_replacement_even_with_old_inode_open(tmp_path):
+    from skeleton.ai.runtime.inference.gguf_private_transport import private_frame
+    model, _, weights = fixture(tmp_path)
+    with private_frame(model.runtime_artifact, model.model_artifact, b"SKG1", lambda: None) as frame:
+        original = weights.read_bytes()
+        replacement = weights.with_suffix(".new")
+        replacement.write_bytes(original)
+        os.replace(replacement, weights)
+        assert open(frame.model, "rb").read() == original
+        with pytest.raises(LlamaCppRuntimeError):
+            frame.verify(lambda: None)
+
+
+@pytest.mark.skipif(not __import__("sys").platform.startswith("linux"), reason="Linux memfd only")
+def test_memfd_failure_never_downgrades_to_named_frames(tmp_path, monkeypatch):
+    from skeleton.ai.runtime.inference.gguf_private_transport import private_frame
+    model, _, _ = fixture(tmp_path)
+    def unavailable(*args, **kwargs):
+        raise OSError("fixture unavailable")
+    monkeypatch.setattr(os, "memfd_create", unavailable)
+    with pytest.raises(LlamaCppRuntimeError, match="descriptor"):
+        with private_frame(model.runtime_artifact, model.model_artifact, b"SKG1", lambda: None):
+            pytest.fail("unexpected downgrade")

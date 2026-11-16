@@ -6,13 +6,13 @@ import os
 from pathlib import Path
 import struct
 import subprocess
-import tempfile
 import threading
 import time
 from dataclasses import replace
 
 from .llama_cpp import LlamaCppConfig, LlamaCppModel, LlamaCppRuntimeError, _digest
 from .lease_custody import gguf_child_pass_fds
+from .gguf_private_transport import private_frame, linux_descriptor_custody
 from .local import (
     LocalInferenceCancelled, LocalInferenceEngine, LocalInferenceRequest,
     LocalInferenceResult, LocalPreparedInput,
@@ -136,10 +136,16 @@ class GgufTokenBridgeModel(LlamaCppModel):
         _compatible(profile)
         super().activate_prelaunch_resource_profile(profile)
 
+    def _effective_environment(self):
+        # No ambient dynamic-loader or GPU overrides for the CPU-only bridge.
+        return {k: v for k, v in super()._effective_environment().items() if k in ("PATH", "OMP_NUM_THREADS")}
+
     def execution_snapshot(self):
         result = super().execution_snapshot()
         result.update(token_transport_kind=BRIDGE_RUNTIME_KIND,
-                      exact_token_admission=True, cpu_only=True)
+                      exact_token_admission=True, cpu_only=True,
+                      private_transport=("linux_sealed_memfd" if linux_descriptor_custody() else "posix_named_private_file"),
+                      immutable_storage_verified=False)
         return result
 
     def generation_limits(self):
@@ -190,79 +196,77 @@ class GgufTokenBridgeModel(LlamaCppModel):
             _compatible(self.config)
             if not self.config.rehash_artifacts_each_run:
                 raise _fail("exact GGUF artifact rehash required")
-            self._assert_artifacts_stable(interrupt=interrupt)
-            with tempfile.TemporaryDirectory(prefix="skeleton-gguf-exact-") as directory:
-                base = Path(directory)
-                source, target, stderr = base / "request.bin", base / "response.bin", base / "stderr.bin"
-                with source.open("xb") as stream:
-                    os.fchmod(stream.fileno(), 0o600)
-                    stream.write(_MAGIC + payload)
-                with target.open("xb") as stream:
-                    os.fchmod(stream.fileno(), 0o600)
-                with stderr.open("xb") as err:
-                    os.fchmod(err.fileno(), 0o600)
-                    release, process = None, None
+            if not linux_descriptor_custody() or self.config.runtime_libraries:
+                self._assert_artifacts_stable(interrupt=interrupt)
+            else:
+                self.check_readiness()
+            with private_frame(self._runtime, self._model, _MAGIC + payload, interrupt) as frame:
+                profile = self.execution_profile_digest
+                release, process = None, None
+                with self._process_lock:
+                    self._inference_admitted = True
+                    self._spawning_processes += 1
+                try:
+                    guard = self._resource_preflight
+                    if guard is not None:
+                        with self._process_lock:
+                            self._resource_preflight_checks += 1
+                        guard()
+                    factory = self._resource_lease_factory
+                    if factory is not None:
+                        release = factory()
+                        if not callable(release):
+                            raise _fail("native GGUF lease custody unavailable")
+                    interrupt()
+                    process = subprocess.Popen(
+                        [frame.executable, operation, frame.model, str(frame.source), str(frame.target),
+                         str(self._effective_context()), str(self.config.threads or 1),
+                         str(self.config.batch_size or 128), str(completion)],
+                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=frame.stderr,
+                        cwd=frame.base, env=self._child_environment(frame.base), shell=False,
+                        start_new_session=True, close_fds=True,
+                        pass_fds=tuple(sorted(set(gguf_child_pass_fds() + frame.pass_fds))),
+                    )
                     with self._process_lock:
-                        self._inference_admitted = True
-                        self._spawning_processes += 1
-                    try:
-                        guard = self._resource_preflight
-                        if guard is not None:
-                            with self._process_lock:
-                                self._resource_preflight_checks += 1
-                            guard()
-                        factory = self._resource_lease_factory
-                        if factory is not None:
-                            release = factory()
-                            if not callable(release):
-                                raise _fail("native GGUF lease custody unavailable")
+                        self._active_processes.add(process.pid)
+                        self._processes_started += 1
+                finally:
+                    with self._process_lock:
+                        self._spawning_processes -= 1
+                    if process is None and callable(release):
+                        release()
+                try:
+                    while True:
                         interrupt()
-                        process = subprocess.Popen(
-                            [self._runtime.path, operation, self._model.path, str(source), str(target),
-                             str(self._effective_context()), str(self.config.threads or 1),
-                             str(self.config.batch_size or 128), str(completion)],
-                            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=err,
-                            cwd=base, env=self._child_environment(base), shell=False,
-                            start_new_session=True, close_fds=True, pass_fds=gguf_child_pass_fds(),
-                        )
-                        with self._process_lock:
-                            self._active_processes.add(process.pid)
-                            self._processes_started += 1
-                    finally:
-                        with self._process_lock:
-                            self._spawning_processes -= 1
-                        if process is None and callable(release):
-                            release()
-                    try:
-                        while True:
-                            interrupt()
-                            if (target.stat().st_size > _MAX_FRAME
-                                    or stderr.stat().st_size > self.config.max_stderr_bytes):
-                                raise _fail("GGUF bridge output exceeds bounded custody")
-                            if process.poll() is not None:
-                                break
-                            time.sleep(0.025)
-                        if process.returncode != 0:
-                            raise _fail("GGUF bridge rejected native execution")
+                        output_size, stderr_size = frame.sizes()
+                        if output_size > _MAX_FRAME or stderr_size > self.config.max_stderr_bytes:
+                            raise _fail("GGUF bridge output exceeds bounded custody")
+                        if process.poll() is not None:
+                            break
+                        time.sleep(0.025)
+                    if process.returncode != 0:
+                        raise _fail("GGUF bridge rejected native execution")
+                    frame.verify(interrupt)
+                    if not linux_descriptor_custody() or self.config.runtime_libraries:
                         self._assert_artifacts_stable(interrupt=interrupt)
-                        with target.open("rb") as stream:
-                            frame = stream.read(_MAX_FRAME + 1)
-                        return _Frame(frame)
+                    if self.execution_profile_digest != profile:
+                        raise _fail("exact GGUF execution profile changed")
+                    return _Frame(frame.read(_MAX_FRAME))
+                finally:
+                    with self._process_lock:
+                        self._draining_processes.add(process.pid)
+                        if process.poll() is None:
+                            self._termination_requests += 1
+                    try:
+                        self._terminate(process)
+                        process.wait()
                     finally:
                         with self._process_lock:
-                            self._draining_processes.add(process.pid)
-                            if process.poll() is None:
-                                self._termination_requests += 1
-                        try:
-                            self._terminate(process)
-                            process.wait()
-                        finally:
-                            with self._process_lock:
-                                self._draining_processes.discard(process.pid)
-                                self._active_processes.discard(process.pid)
-                                self._processes_exited += 1
-                            if callable(release):
-                                release()
+                            self._draining_processes.discard(process.pid)
+                            self._active_processes.discard(process.pid)
+                            self._processes_exited += 1
+                        if callable(release):
+                            release()
         except (OSError, UnicodeError):
             raise _fail("GGUF bridge transport unavailable") from None
         finally:

@@ -28,3 +28,11 @@ The roundtrip operation returns both the exact token vector and detokenized text
 from one vocabulary load. Native output file size and core dumps are bounded
 with POSIX resource limits. The host still validates all frame lengths and echo
 bytes. No throughput improvement is claimed until a physical benchmark runs.
+
+Linux transport now pins executable and model descriptors, hashes the actual
+opened bytes before and after execution, seals input memfd against writes and
+seals response after the worker exits. Linux refuses to fall back to named
+prompt files if memfd/procfs/sealing is unavailable. Other POSIX hosts retain
+the private named-file path, not descriptor custody. This does not attest
+system loader closure, immutable storage, swap exclusion or physical device
+behavior; these remain independent qualification requirements.
