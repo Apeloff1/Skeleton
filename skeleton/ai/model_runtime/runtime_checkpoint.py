@@ -87,15 +87,32 @@ def _digest_and_size(value: Mapping[str, Any], *, maximum: int | None = None) ->
     return sha256(raw).hexdigest(), len(raw)
 
 
-def portable_model_snapshot(model: TinyTransformer) -> dict[str, Any]:
+def _capture_model_snapshot(model: TinyTransformer) -> dict[str, Any]:
     raw = model.snapshot()
     if not isinstance(raw, dict):
         raise RuntimeContractError("model snapshot must be a mapping")
     snapshot = dict(raw)
     snapshot.pop("device", None)
     snapshot.pop("resident", None)
-    _digest_and_size(snapshot)
     return snapshot
+
+
+def portable_model_snapshot(model: TinyTransformer) -> dict[str, Any]:
+    snapshot = _capture_model_snapshot(model)
+    _digest_and_size(snapshot)  # preserve public encodability contract
+    return snapshot
+
+
+def capture_validated_model(model: TinyTransformer) -> tuple[dict[str, Any], str]:
+    """Single observation of the copied graph, with all original checks.
+
+    Callers that require BOTH shape verification and canonical digest use
+    this path instead of separately encoding the same portable snapshot
+    twice. No cached/remembered hash stands in for current weight bytes.
+    """
+    snapshot = _capture_model_snapshot(model)
+    validate_model_snapshot(snapshot)
+    return snapshot, _digest_and_size(snapshot)[0]
 
 
 def snapshot_digest(snapshot: Mapping[str, Any]) -> str:
@@ -236,9 +253,7 @@ def make_checkpoint(
     limits: RuntimeLimits,
     device_policy: DevicePolicy,
 ) -> Mapping[str, Any]:
-    snapshot = portable_model_snapshot(model)
-    validate_model_snapshot(snapshot)
-    observed_model_digest = snapshot_digest(snapshot)
+    snapshot, observed_model_digest = capture_validated_model(model)
     if not hmac.compare_digest(observed_model_digest, model_digest):
         raise RuntimeContractError("model mutated before checkpoint")
     body = {
@@ -397,6 +412,7 @@ def restore_components(
 
 
 __all__ = [
+    "capture_validated_model",
     "checkpoint_json",
     "logical_bytes",
     "make_checkpoint",
