@@ -179,7 +179,7 @@ class WeightShardStore:
         return self.manifests / (digest + ".json")
 
     @staticmethod
-    def _write_once(path: Path, content: bytes) -> None:
+    def _write_once(path: Path, content: bytes, *, reserve_write: Callable[[int], None] | None = None) -> None:
         if not 1 <= len(content) <= _MAX_MANIFEST_BYTES:
             raise WeightShardStoreError("weight manifest exceeds byte bounds")
         path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -189,6 +189,8 @@ class WeightShardStore:
             if _read_manifest(path) != content:
                 raise WeightShardStoreError("existing content-addressed manifest is inconsistent")
             return
+        if reserve_write is not None:
+            reserve_write(len(content))
         tmp = path.with_name("." + path.name + "." + uuid4().hex + ".tmp")
         try:
             with os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as stream:
@@ -348,9 +350,10 @@ class WeightShardStore:
         for shard in plan.shards:
             self._ingest(shard, source_paths[shard.index], reserve_write=reserve_write)
         self.assert_layout()
-        if _write_checkpoint is not None:
-            _write_checkpoint(len(encoded) if not target_manifest.exists() else 0)
-        self._write_once(target_manifest, encoded)
+        if _write_checkpoint is None:
+            self._write_once(target_manifest, encoded)
+        else:
+            self._write_once(target_manifest, encoded, reserve_write=_write_checkpoint)
         self.assert_layout()
         return plan.digest
 
