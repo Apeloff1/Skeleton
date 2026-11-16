@@ -3204,3 +3204,36 @@ def test_actual_jeeves_application_runtime_dispatch_binding_and_cli(tmp_path):
     with pytest.raises(JeevesHostRuntimeError, match="closed"):
         runtime.dispatch_request(context=context, action="result", request_id="inspect",
                                  arguments={"task_id": "local"})
+
+
+def test_dispatcher_archive_rollover_preserves_strict_delta_and_monotonic_outer_boundary(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    import sqlite3
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "archive-anchor", tenants=("a",), operations=("integer_sum",),
+        workers=1, max_jobs=1, history_jobs=5,
+    )
+    app.start()
+    initial = app.managed.owner.manager.store.latest().sequence
+    app.enqueue("one", {"kind": "submit", "tenant": "a", "task_id": "job",
+                         "operation": "integer_sum", "input": [9]})
+    assert app.tick().archived_tasks == ("job",)
+    current = app.store.resume_state("local-hyperdispatcher-v1").checkpoint
+    anchor = SwarmRecoveryManager.from_archive(current.state)
+    assert anchor.delta_archive
+    assert len(anchor.store.history()) == 1
+    assert anchor.store.latest().sequence > initial
+    assert anchor.restore_latest().task("job") is None
+    sealed = app.archive.get("job")
+    with sqlite3.connect(app.store.path) as conn:
+        row = conn.execute("SELECT revision,state_json FROM checkpoints WHERE checkpoint_id=?",
+                           (sealed.source_checkpoint_id,)).fetchone()
+    assert row is not None and row[0] < current.revision
+    predecessor = SwarmRecoveryManager.from_archive_bytes(row[1].encode())
+    assert predecessor.restore_latest().task("job").state.value == "succeeded"
+    assert app.result("a", "job")["result"] == 9
+    app.close()

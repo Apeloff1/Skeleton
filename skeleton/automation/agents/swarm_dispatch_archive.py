@@ -372,15 +372,42 @@ class SQLiteDispatcherArchive:
                 except BaseException:
                     owner.broker.retire()
                     raise
-                try:
-                    for task in selected:
-                        if not runtime.forget(task.id):
-                            raise DurableSwarmError("terminal history residency disappeared")
-                        del owner.broker._terminal_tenants[task.id]
-                    owner.bridge._capture_checked(self.run_id, owner.owner_id, owner.manager, owner.broker)
-                except BaseException:
-                    # The durable predecessor still contains the tasks. An
-                    # exact retry after recovery reuses the sealed history.
-                    owner.broker.retire()
-                    raise
+                # The ordinary verified delta codec prohibits disappearing
+                # identities within a journal. Publish an explicit new full
+                # anchor, not a weakened delta transition. The predecessor
+                # remains an independently checksummed outer SQL checkpoint.
+                # Every removed identity has been sealed and read back above.
+                manager = owner.manager
+                with manager.store._lock, manager.tenant_store._lock:
+                    prior_runtime = manager.store.history()
+                    prior_tenants = manager.tenant_store.history()
+                    prior_sequence = manager.store._sequence
+                    try:
+                        for task in selected:
+                            if not runtime.forget(task.id):
+                                raise DurableSwarmError("terminal history residency disappeared")
+                            del owner.broker._terminal_tenants[task.id]
+                        # Keep the existing manager, retention ceiling and
+                        # monotonic sequence. Only its old journal segment
+                        # is closed; never reset the sequence or rewrite the
+                        # previous committed outer checkpoint.
+                        manager.store._items.clear()
+                        manager.tenant_store._items.clear()
+                        capture = owner.bridge._capture_checked(
+                            self.run_id, owner.owner_id, manager, owner.broker,
+                        )
+                        if (capture.swarm_sequence <= prior_sequence
+                                or manager.store.sequences() != (capture.swarm_sequence,)
+                                or manager.tenant_store.sequences() != (capture.swarm_sequence,)):
+                            raise DurableSwarmError("terminal history anchor publication mismatch")
+                    except BaseException:
+                        # A possibly committed anchor must never be undone
+                        # in SQL. Retire the owner; restart verifies the last
+                        # actual outer checkpoint and sealed history.
+                        manager.store._items.clear()
+                        manager.store._items.extend(prior_runtime)
+                        manager.tenant_store._items.clear()
+                        manager.tenant_store._items.extend(prior_tenants)
+                        owner.broker.retire()
+                        raise
                 return tuple(task.id for task in selected)

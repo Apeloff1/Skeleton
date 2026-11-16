@@ -525,3 +525,17 @@ operator-managed, and no new public API route or automatic startup is enabled.
 Regressions cover two project scopes with identical client IDs, denial and
 priority boundaries, and the real canonical application CLI-to-job-to-result
 path. This is a local authenticated host binding, not a remote cluster.
+
+### A22 qualification repair: sealed journal rollover
+
+A23 exact-head CI exposed four terminal-history tests failing because the
+ordinary verified delta codec intentionally forbids losing tenant ownership
+identities inside a journal. Compaction now closes that journal segment only
+after every forgotten identity is sealed in its separate terminal archive and
+verified by readback, retaining the durable predecessor outer checkpoint.
+It publishes a new single-full-anchor segment using the same manager,
+monotonic sequence, tenant policy, and retention ceiling. The generic delta
+encoder and replay guard remain unchanged. A failed/ambiguous publication
+retires the generation and does not undo SQL commits. Startup audits archived
+identity seals and counts before admitting new tasks. Added a regression
+checking the full anchor and independently reconstructible predecessor.

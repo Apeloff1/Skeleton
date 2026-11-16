@@ -577,6 +577,10 @@ class LocalDispatcherApplication:
         if self.managed is not None:
             raise DurableSwarmError("application service already started")
         policy = self.policy
+        # Revalidate all sealed archived identities before admitting new work;
+        # a missing/tampered row must fail closed rather than permit reuse.
+        if self.archive is not None:
+            self.archive.audit()
         signers = {policy.worker_id(index): (policy.worker_issuer(index), key)
                    for index, key in enumerate(policy.worker_keys)}
         pure_operations = policy.operations & _LOCAL_OPERATIONS
