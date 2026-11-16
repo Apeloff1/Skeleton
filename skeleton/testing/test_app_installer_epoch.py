@@ -792,3 +792,39 @@ def test_uncertain_start_blocks_second_install_before_preflight(tmp_path,monkeyp
     monkeypatch.setattr(installer,"inspect_host",lambda *a,**k:pytest.fail("second install reached preflight"))
     second=installer.install_application(tmp_path,start=True,install_python=False,runner=runner)
     assert not second.ok and second.phases[0].name=="runtime-operation"
+
+
+
+def test_failed_start_storage_drift_blocks_frontend_recovery(tmp_path,monkeypatch):
+    from skeleton.app.compose_storage_binding import BindingReport
+    _prepare(monkeypatch,tmp_path)
+    observations=[]
+    def binding(*args,**kwargs):
+        observations.append(kwargs)
+        return BindingReport(True,not kwargs.get("previous"),"fixture_drift")
+    monkeypatch.setattr("skeleton.app.compose_storage_binding.observe_binding",binding)
+    commands=[]
+    def runner(command,**kwargs):
+        commands.append(tuple(command))
+        return subprocess.CompletedProcess(command,1 if "up" in command else 0)
+    receipt=installer.install_application(tmp_path,start=True,install_python=False,runner=runner)
+    assert not receipt.ok
+    assert len([c for c in commands if "up" in c])==1
+    assert len(observations)==2
+    assert receipt.phases[-1].name=="setup-ui-recovery"
+    assert "no recovery mutation attempted" in receipt.phases[-1].detail
+
+
+def test_recovered_frontend_never_probes_unqualified_runtime(tmp_path,monkeypatch):
+    from skeleton.app.compose_storage_binding import BindingReport
+    _prepare(monkeypatch,tmp_path)
+    def binding(*args,**kwargs):
+        return BindingReport(True,not kwargs.get("require_frontend"),"fixture_frontend_drift")
+    monkeypatch.setattr("skeleton.app.compose_storage_binding.observe_binding",binding)
+    monkeypatch.setattr("skeleton.app.health.probe_local_setup",
+        lambda *a,**k:pytest.fail("unqualified frontend reached HTTP"))
+    def runner(command,**kwargs):
+        return subprocess.CompletedProcess(command,1 if "up" in command and "--no-deps" not in command else 0)
+    receipt=installer.install_application(tmp_path,start=True,install_python=False,runner=runner)
+    assert not receipt.ok
+    assert receipt.phases[-1].name=="setup-ui-recovery" and not receipt.phases[-1].ok

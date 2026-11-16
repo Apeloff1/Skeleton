@@ -378,3 +378,64 @@ def test_missing_or_invalid_runtime_epoch_is_not_qualified(tmp_path,override):
     after,_=fixture_runner(volumes=tuple(PROJECT+"_"+r for r in binding.VOLUME_ROLES),
         containers=tuple("tutolage-"+r for r in binding._ACTIVE_ROLES),container_override=override)
     assert observe(tmp_path,after,previous=previous,require_started=True).code=="running_container_epoch_unverified"
+
+
+
+@pytest.mark.parametrize("suffix,expected", [
+    (("up","-d","--no-deps","frontend"),True),
+    (("up","-d","frontend"),False),
+    (("up","-d","--no-deps","backend"),False),
+    (("up","-d","--no-deps","frontend","mongo"),False),
+    (("up","-d","--no-deps","--force-recreate","frontend"),False),
+])
+def test_recovery_command_scope_matches_original_render(suffix,expected):
+    assert binding.recovery_render_matches(COMMAND,COMMAND[:6]+suffix) is expected
+
+
+@pytest.mark.parametrize("fault",["none","daemon","removed_volume","new_model"])
+def test_recovery_preflight_rebinds_failed_start_to_original_authority(tmp_path,fault):
+    original,_=fixture_runner(volumes=(PROJECT+"_mongo_data",))
+    before=observe(tmp_path,original)
+    assert before.admitted
+    opts={"volumes":(PROJECT+"_mongo_data",PROJECT+"_backend_data")}
+    if fault=="daemon":
+        opts["daemon"]="other-daemon"
+    elif fault=="removed_volume":
+        opts["volumes"]=()
+    elif fault=="new_model":
+        value=model()
+        value["services"]["backend"]["environment"]={"FIXTURE":"not-original"}
+        opts["resolved"]=value
+    after,_=fixture_runner(**opts)
+    result=observe(tmp_path,after,previous=before)
+    assert result.admitted is (fault=="none")
+
+
+def test_frontend_recovery_requires_only_frontend_but_never_certifies_full_stack(tmp_path):
+    before,_=fixture_runner(volumes=(PROJECT+"_mongo_data",))
+    first=observe(tmp_path,before)
+    after,_=fixture_runner(volumes=(PROJECT+"_mongo_data",),containers=("tutolage-frontend",))
+    result=observe(tmp_path,after,previous=first,require_frontend=True)
+    assert result.admitted
+    assert tuple(dict(result.identity.active_runtime_digests))==("frontend",)
+    assert not observe(tmp_path,after,previous=first,require_started=True).admitted
+
+
+@pytest.mark.parametrize("override",[
+    {"id":"b"*64},{"restart_count":1},{"started_at":"2026-02-01T12:00:00Z"},
+])
+def test_setup_recovery_availability_cannot_inherit_stale_frontend_probe(tmp_path,override):
+    before,_=fixture_runner()
+    first=observe(tmp_path,before)
+    after,_=fixture_runner(containers=("tutolage-frontend",))
+    recovered=observe(tmp_path,after,previous=first,require_frontend=True)
+    assert recovered.admitted
+    changed,_=fixture_runner(containers=("tutolage-frontend",),container_override=override)
+    final=observe(tmp_path,changed,previous=recovered,require_frontend=True,require_same_runtime=True)
+    assert final.code=="runtime_epoch_changed_during_qualification"
+
+
+def test_frontend_recovery_never_accepts_other_compose_project_prefix():
+    recovery=("docker","compose","-f","docker-compose.yml","-p","other",
+              "--env-file",".env","up","-d","--no-deps","frontend")
+    assert not binding.recovery_render_matches(COMMAND,recovery)

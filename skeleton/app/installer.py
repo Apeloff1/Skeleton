@@ -493,10 +493,25 @@ def install_application(
                     "up", manifest=diagnostic_manifest, hot=hot,
                     install_env=True, frontend_recovery=True,
                 )
+                from skeleton.app.compose_storage_binding import recovery_render_matches
                 intent("setup-ui-recovery")
                 if not source_stable():
                     phases.append(_runtime_source_rejection())
                     return InstallReceipt(root, tuple(phases))
+                if not recovery_render_matches(command, recovery_command):
+                    phases.append(InstallPhase("setup-ui-recovery",False,
+                        "isolated recovery command differs from the admitted Compose model",
+                        required=False))
+                    return InstallReceipt(root,tuple(phases))
+                recovery_before = observe_binding(root, command=command, environ=compose_env,
+                    runner=runner, admit=source_stable, previous=binding)
+                if not recovery_before.admitted or not source_stable():
+                    phases.append(InstallPhase("setup-ui-recovery",False,
+                        "storage or daemon continuity unavailable after failed startup: "
+                        + recovery_before.code + "; no recovery mutation attempted",
+                        required=False))
+                    return InstallReceipt(root,tuple(phases))
+
                 def recovery_runner(*args, **kwargs):
                     return run_mutation(lease, "setup-ui-recovery", runner, *args, **kwargs)
 
@@ -511,6 +526,14 @@ def install_application(
                 if admitted_digest is None or not source_stable():
                     phases.append(_runtime_source_rejection())
                     return InstallReceipt(root=root, phases=tuple(phases))
+                if recovery.ok:
+                    recovery_after = observe_binding(root, command=command, environ=compose_env,
+                        runner=runner, admit=source_stable, previous=recovery_before,
+                        require_frontend=True)
+                    if not recovery_after.admitted:
+                        recovery = InstallPhase("setup-ui-recovery",False,
+                            "recovery runtime identity unverified: " + recovery_after.code,
+                            required=False)
                 phases.append(
                     InstallPhase(
                         "setup-ui-recovery", recovery.ok,
@@ -535,13 +558,19 @@ def install_application(
                     if admitted_digest is None or not source_stable():
                         phases.append(_runtime_source_rejection())
                         return InstallReceipt(root=root, phases=tuple(phases))
+                    available = probe.ok is True
+                    if available:
+                        recovery_final = observe_binding(root, command=command, environ=compose_env,
+                            runner=runner, admit=source_stable, previous=recovery_after,
+                            require_frontend=True, require_same_runtime=True)
+                        available = recovery_final.admitted and source_stable()
                     phases.append(
                         InstallPhase(
-                            "setup-ui-availability", probe.ok,
+                            "setup-ui-availability", available,
                             (
                                 "local setup route answered directly; backend and AI remain unavailable"
-                                if probe.ok
-                                else "setup route unavailable; inspect frontend logs"
+                                if available
+                                else "setup route or recovery runtime continuity unavailable; inspect frontend logs"
                             ),
                             required=False,
                         )

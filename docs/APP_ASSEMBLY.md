@@ -1222,3 +1222,12 @@ fixture credentials. The source check requires exact browser build/runtime
 URLs, internal engine wiring, shared service credentials, Mongo inputs and
 dependency health fences. It does not start containers, exercise the live
 stack, or change the existing draft/live qualification admission rule.
+
+
+Frontend-only recovery now reuses the original pinned Compose render and
+prior daemon/storage identity after a failed full startup. It requires
+the exact no-dependencies frontend command, reobserves the running
+frontend image and ingress before probing /setup, and verifies that
+frontend's runtime identity again after the probe. Protected startup
+remains failed even if the diagnostic page answers. No Chroma migration
+or automatic data repair is authorized.

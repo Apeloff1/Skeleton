@@ -271,7 +271,8 @@ def _render_command(command):
 def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=subprocess.run,
                     admit=None, previous: BindingReport | None=None,
                     require_started: bool=False,
-                    require_same_runtime: bool=False) -> BindingReport:
+                    require_same_runtime: bool=False,
+                    require_frontend: bool=False) -> BindingReport:
     """Observe intended and existing storage, then recheck inventory and epoch."""
     root = Path(root).resolve()
     copied = dict(environ)
@@ -295,7 +296,12 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
     try:
         render = _render_command(command)
         _require(type(require_started) is bool and type(require_same_runtime) is bool
-                 and (not require_same_runtime or require_started), "binding_mode_invalid")
+                 and type(require_frontend) is bool
+                 and not (require_started and require_frontend)
+                 and (not require_same_runtime or require_started or require_frontend),
+                 "binding_mode_invalid")
+        active_roles = _ACTIVE_ROLES if require_started else ("frontend",) if require_frontend else ()
+        _require(not active_roles or previous is not None, "prior_binding_unverified")
         def daemon():
             data = inspect(["docker","info","--format",'{"id":{{json .ID}}}'],_MAX_INSPECT)
             identity = data.get("id")
@@ -311,8 +317,10 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
         project, resolved = _resolved_model(config,root=root,hot=hot)
         values = _runtime_env(root,copied)
         expected_runtime = model_identity(config,values=values,hot=hot)
-        key = (previous.identity.model_key if require_started and previous is not None
-               and previous.identity is not None else secrets.token_bytes(32))
+        if previous is not None:
+            _require(type(previous) is BindingReport and previous.admitted is True
+                     and previous.identity is not None, "prior_binding_unverified")
+        key = previous.identity.model_key if previous is not None else secrets.token_bytes(32)
 
         def model_mac(value):
             raw = json.dumps(value,sort_keys=True,separators=(",",":"),
@@ -324,9 +332,7 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
         # Neither the raw model nor its keyed fingerprint is published.
         model_digest = model_mac(config)
         del config,values
-        if require_started:
-            _require(previous is not None and previous.admitted is True
-                     and previous.identity is not None, "prior_binding_unverified")
+        if previous is not None:
             _require(previous.identity.daemon_digest == daemon_digest
                      and previous.identity.model_digest == model_digest,
                      "launch_daemon_or_storage_model_changed")
@@ -351,10 +357,12 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
                      "running_container_epoch_unverified")
             return _digest((payload["id"],started,restarts,image_id,ports))
 
+        if active_roles:
+            _require(all("tutolage-"+role in all_containers for role in active_roles),
+                     "required_runtime_storage_not_observed")
         if require_started:
-            _require(all("tutolage-"+role in all_containers for role in _ACTIVE_ROLES)
-                     and all(resolved[role] in all_volumes
-                             for mounts in _BINDINGS.values() for role in mounts.values()),
+            _require(all(resolved[role] in all_volumes
+                         for mounts in _BINDINGS.values() for role in mounts.values()),
                      "required_runtime_storage_not_observed")
         for role, expected in resolved.items():
             # Legacy suffix matches and Compose-labeled volumes both imply
@@ -375,16 +383,16 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
                 payload = inspect(["docker","container","inspect","--format",
                                    _CONTAINER_TEMPLATE,name],_MAX_INSPECT)
                 container_digests[role] = _container_binding(payload,project,role,resolved,
-                    require_running=require_started and role in _ACTIVE_ROLES)
-                if require_started and role in _ACTIVE_ROLES:
+                    require_running=role in active_roles)
+                if role in active_roles:
                     runtime_digests[role] = observe_runtime(role,payload)
                 existing_containers += 1
-        if require_started:
+        if previous is not None:
             for role, digest in previous.identity.volume_digests:
                 _require(volume_digests.get(role) == digest, "previous_persistent_volume_changed")
         if require_same_runtime:
             _require(dict(previous.identity.active_runtime_digests) == runtime_digests
-                     and set(runtime_digests) == set(_ACTIVE_ROLES),
+                     and set(runtime_digests) == set(active_roles),
                      "runtime_epoch_changed_during_qualification")
         for role, digest in volume_digests.items():
             payload = inspect(["docker","volume","inspect","--format",_VOLUME_TEMPLATE,resolved[role]],_MAX_INSPECT)
@@ -393,7 +401,7 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
             payload = inspect(["docker","container","inspect","--format",_CONTAINER_TEMPLATE,
                                "tutolage-"+role],_MAX_INSPECT)
             _require(_container_binding(payload,project,role,resolved,
-                require_running=require_started and role in _ACTIVE_ROLES) == digest,
+                require_running=role in active_roles) == digest,
                 "container_binding_changed")
             if role in runtime_digests:
                 _require(observe_runtime(role,payload)==runtime_digests[role],
@@ -416,3 +424,19 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
     except (StorageCustodyDenied,OSError,ValueError,TypeError,KeyError,IndexError,
             RecursionError,subprocess.SubprocessError):
         return BindingReport(False,False,"binding_observation_unavailable")
+
+
+
+def recovery_render_matches(start_command, recovery_command):
+    """Admit only the canonical independently startable frontend recovery."""
+    try:
+        original=tuple(start_command)
+        recovery=tuple(recovery_command)
+        _require(_render_command(original)==_render_command(recovery),
+                 "recovery_compose_model_mismatch")
+        offset=recovery.index("up")
+        _require(recovery[offset:]==("up","-d","--no-deps","frontend"),
+                 "recovery_command_scope_invalid")
+        return True
+    except (BindingDenied,ValueError,TypeError):
+        return False
