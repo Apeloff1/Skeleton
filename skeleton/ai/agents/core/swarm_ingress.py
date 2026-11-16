@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 from threading import RLock
+from collections.abc import Callable
+from time import monotonic
+from math import isfinite
 
 from skeleton.automation.agents.swarm_fairness import FairShareLedger
 from skeleton.automation.agents.swarm_quota import Quota, QuotaExceeded, QuotaLedger, SharedQuota
@@ -20,6 +23,19 @@ class IngressDecision:
     rate_remaining: float
 
 
+@dataclass(frozen=True, slots=True)
+class DispatchRatePolicy:
+    capacity: int
+    refill_per_second: float
+
+    def __post_init__(self) -> None:
+        if type(self.capacity) is not int or not 1 <= self.capacity <= 100000:
+            raise ValueError("invalid dispatch burst")
+        if (isinstance(self.refill_per_second, bool) or not isinstance(self.refill_per_second, (int,float))
+                or not isfinite(self.refill_per_second) or not 0 < self.refill_per_second <= 100000):
+            raise ValueError("invalid dispatch rate")
+
+
 class SwarmIngressGovernor:
     """Coordinates rate, quota and fair-share state under one transaction boundary."""
 
@@ -29,6 +45,8 @@ class SwarmIngressGovernor:
         rate_capacity: float = 100.0,
         rate_refill_per_second: float = 10.0,
         default_quota: Quota | None = None,
+        dispatch_rate: DispatchRatePolicy | None = None,
+        dispatch_clock: Callable[[], float] = monotonic,
     ) -> None:
         self.rate = TokenBucketLimiter(capacity=rate_capacity, refill_per_second=rate_refill_per_second)
         self.quota = QuotaLedger(default_quota)
@@ -36,6 +54,40 @@ class SwarmIngressGovernor:
         self._lock = RLock()
         self._payload_by_task: dict[tuple[str, str], int] = {}
         self._phase_by_task: dict[tuple[str, str], str] = {}
+        if dispatch_rate is not None and not isinstance(dispatch_rate, DispatchRatePolicy):
+            raise TypeError("invalid dispatch rate policy")
+        if not callable(dispatch_clock):
+            raise TypeError("invalid dispatch clock")
+        self.dispatch_rate = dispatch_rate
+        self._dispatch_clock = dispatch_clock
+        self._start_tokens: dict[str, tuple[float, float]] = {}
+
+    def try_start(self, tenant: str) -> bool:
+        """Non-discarding dequeue throttle; waiting jobs remain accounted.
+
+        Cold starts have zero credit, preventing a restart from minting a new
+        burst. A failed lease attempt conservatively spends its credit.
+        """
+        tenant = self._tenant(tenant)
+        policy = self.dispatch_rate
+        if policy is None:
+            return True
+        with self._lock:
+            now = self._dispatch_clock()
+            if isinstance(now, bool) or not isinstance(now,(float,int)) or not isfinite(now):
+                raise ValueError("invalid dispatch clock sample")
+            if tenant not in self._start_tokens:
+                if len(self._start_tokens) >= 100000:
+                    return False
+                self._start_tokens[tenant] = (0.0,float(now))
+                return False
+            tokens, previous = self._start_tokens[tenant]
+            if now < previous:
+                return False
+            tokens = min(policy.capacity, tokens + (now - previous)*policy.refill_per_second)
+            permitted = tokens >= 1.0
+            self._start_tokens[tenant] = (tokens - 1.0 if permitted else tokens, float(now))
+            return permitted
 
     @staticmethod
     def _tenant(tenant: str) -> str:
@@ -79,6 +131,8 @@ class SwarmIngressGovernor:
                 rate_capacity=self.rate.capacity,
                 rate_refill_per_second=self.rate.refill_per_second,
                 default_quota=self.quota.default,
+                dispatch_rate=self.dispatch_rate,
+                dispatch_clock=self._dispatch_clock,
             )
             clone.fairness.default_weight = self.fairness.default_weight
             for tenant in sorted(set(limits) | set(weights)):

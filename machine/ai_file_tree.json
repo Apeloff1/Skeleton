@@ -422,7 +422,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "ce68e32a0b371b668d3a9177f9d942a138add33a",
+      "source_git_object_sha": "795f02305cc276f6cc2855aeaf8eabd7b3a6156c",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -707,7 +707,7 @@
       "source": "skeleton/automation/agents",
       "destination": "skeleton/ai/agents/core",
       "kind": "tree",
-      "source_git_object_sha": "c3b6e97207d161abc64aff82ca8a06942d284c62",
+      "source_git_object_sha": "52296ae6e564cd430ab46c13c286afdeb894659c",
       "role": "canonical agent/swarm execution runtime under automation ownership",
       "work_package_refs": [
         "WP-W00",
@@ -766,7 +766,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "0db0f43b42eb5a933684645728aafa6a8eeaff94",
+      "source_git_object_sha": "d9c5a38e739a0b5faa6f553a50bb5a65fa927bc7",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",

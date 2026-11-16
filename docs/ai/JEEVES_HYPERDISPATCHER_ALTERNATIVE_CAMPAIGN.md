@@ -27,13 +27,13 @@ Further research queue (not yet verified): Restate, Oban, pg-boss, Faktory, Asyn
 | A03 | Shared dependency or service quota | Inngest | P |
 | A04 | Atomic multi-ceiling transitions | Trigger.dev | P |
 | A05 | Policy-preserving restore accounting | DBOS / River | P |
-| A06 | Keyed singleton ownership | Inngest / Restate | Open |
-| A07 | Quiet-window debounce | Inngest | Open |
-| A08 | Maximum-wait coalescing | Inngest | Open |
-| A09 | Rate-shaped dequeue | DBOS | Open |
-| A10 | Non-discarding throttle | Inngest | Open |
-| A11 | Event correlation wakeup | Restate / Inngest | Open |
-| A12 | Durable timers and waits | Restate / DBOS | Open |
+| A06 | Keyed singleton ownership | Inngest / Restate | P |
+| A07 | Quiet-window debounce | Inngest | P |
+| A08 | Maximum-wait coalescing | Inngest | P |
+| A09 | Rate-shaped dequeue | DBOS | P |
+| A10 | Non-discarding throttle | Inngest | P |
+| A11 | Event correlation wakeup | Restate / Inngest | P |
+| A12 | Durable timers and waits | Restate / DBOS | P |
 | A13 | Atomic outcome plus enqueue | River | Open |
 | A14 | Transactional unique job identity | River / Oban | Open |
 | A15 | Versioned activation identity | Orleans | P |
@@ -86,3 +86,16 @@ demand, held capacity, delegated descendants and protected identities. The exist
 worker registry removes an idle logical worker only after a trusted stop verifier
 and exact generation revalidation. No external process is stopped or started
 by these methods. Zero-ready is a trusted host assertion, not a live probe.
+
+## Wave A3: rate-shaped dequeue and event coordination
+
+The existing verified tenant broker uses an optional host-configured start-rate
+policy before publishing an attempt. Excess work stays queued with intact
+quota; every process-local start-credit bucket begins empty, including restore,
+and backward clock samples grant no credit. Failed attempts conservatively
+spend credit. This is not a globally coordinated distributed rate limiter.
+The event-coordination helper proposes bounded keyed windows, exact replay
+identity, non-discarding quiet-window coalescence with hard maximum wait,
+singleton eligibility against active or uncertain ownership, and generation-
+bound event/timeout wake proposals. It does not claim durable singleton locks,
+timer delivery, transactional event ingestion or actual wake publication.

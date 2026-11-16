@@ -292,6 +292,8 @@ class TenantSwarmBroker:
             task = self._verified_resident(tenant, task_id)
             if task.state is not TaskState.QUEUED or self.ingress.phase(tenant, task_id) != "queued":
                 return None
+            if runtime.blocked_dependencies(task_id) or not self.ingress.try_start(tenant):
+                return None
             self.ingress.mark_leased(tenant, task_id)
             try:
                 result = self.broker.lease_authorized(task_id)

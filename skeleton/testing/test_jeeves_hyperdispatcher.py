@@ -1282,3 +1282,66 @@ def test_alternative_uncertain_capacity_cannot_be_scaled_away():
     rec=AutoscalePolicy(min_slots=0,max_slots=5).recommend(runtime)
     assert rec.current_slots==1 and rec.desired_slots==1
     assert not propose_idle_retirements(runtime,desired_slots=0,idle_seconds=5)
+
+def test_alternative_dequeue_throttle_never_discards_waiting_tasks():
+    from skeleton.automation.agents.swarm_ingress import SwarmIngressGovernor, DispatchRatePolicy
+    from skeleton.automation.agents.swarm_broker import SwarmBroker
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, TaskState
+    from skeleton.automation.agents.swarm_tenant_broker import TenantSwarmBroker
+    now=[1.0]
+    runtime=HardenedSwarmRuntime(fenced=True,clock=lambda:now[0])
+    runtime.register_worker("w",capacity=2)
+    ingress=SwarmIngressGovernor(dispatch_rate=DispatchRatePolicy(1,1),dispatch_clock=lambda:now[0])
+    broker=TenantSwarmBroker(SwarmBroker(runtime,verify_worker=lambda *args:False),ingress,verified_mode=True)
+    broker.submit_verified_queued("t",SwarmTask("a",{}))
+    broker.submit_verified_queued("t",SwarmTask("b",{}))
+    assert broker.lease_verified("t","a") is None
+    now[0]=2.0
+    assert broker.lease_verified("t","a").id=="a"
+    assert broker.lease_verified("t","b") is None
+    assert runtime.task("b").state is TaskState.QUEUED
+    assert ingress.phase("t","b")=="queued"
+    now[0]=3.0
+    assert broker.lease_verified("t","b").id=="b"
+    clone=ingress.fork_empty()
+    assert not clone.try_start("t")
+    now[0]=2.0
+    assert not clone.try_start("t")
+
+
+def test_alternative_event_windows_have_hard_wait_and_tenant_isolation():
+    from skeleton.intelligence.dispatch_events import EventRecord, WindowPolicy, coalesce_events
+    a=EventRecord("a","t","s","k","a"*64,"b"*64,0,1)
+    rows=[a,replace(a,event_id="b",arrival_ms=4),replace(a,event_id="c",arrival_ms=8),
+          replace(a,event_id="d",arrival_ms=12),replace(a,tenant_id="other")]
+    plan=coalesce_events(rows,WindowPolicy(5,10,10,100),now_ms=12)
+    t=[p for p in plan if p.scope[0]=="t"]
+    assert t[0].event_ids==("a","b","c") and t[0].ready_ms==10 and t[0].ready
+    assert t[1].event_ids==("d",) and not t[1].ready
+    assert coalesce_events(rows+[a],WindowPolicy(5,10,10,100),now_ms=12)==plan
+    with pytest.raises(DispatchPolicyError):
+        coalesce_events(rows+[replace(a,payload_sha256="c"*64)],WindowPolicy(5,10,10,100),now_ms=12)
+
+
+def test_alternative_singleton_holds_uncertain_ownership():
+    from skeleton.intelligence.dispatch_events import EventRecord, WindowPolicy, coalesce_events, SingletonObservation, singleton_eligible
+    a=EventRecord("a","t","s","k","a"*64,"b"*64,0,1)
+    window=coalesce_events([a],WindowPolicy(1,2,10,100),now_ms=3)[0]
+    held=SingletonObservation("t","k","a"*64,"previous",1,"uncertain")
+    assert not singleton_eligible(window,[held],generation=1)
+    assert singleton_eligible(window,[replace(held,phase="released")],generation=1)
+    assert singleton_eligible(window,[replace(held,tenant_id="other")],generation=1)
+    with pytest.raises(DispatchPolicyError):
+        singleton_eligible(window,[held],generation=2)
+
+
+def test_alternative_event_wait_correlation_preserves_timeout_and_scope():
+    from skeleton.intelligence.dispatch_events import EventRecord, WaitIntent, correlate_waits
+    a=EventRecord("a","t","s","k","a"*64,"b"*64,5,1)
+    wait=WaitIntent("task","t","s","k","a"*64,1,2,10)
+    assert correlate_waits([wait],[a],generation=1,now_ms=12)[0].disposition=="event"
+    assert correlate_waits([wait],[replace(a,arrival_ms=10)],generation=1,now_ms=12)[0].disposition=="timeout"
+    assert correlate_waits([wait],[replace(a,tenant_id="other")],generation=1,now_ms=9)[0].disposition=="waiting"
+    with pytest.raises(DispatchPolicyError):
+        correlate_waits([wait],[a],generation=2,now_ms=12)
