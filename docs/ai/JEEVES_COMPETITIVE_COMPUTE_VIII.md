@@ -67,7 +67,7 @@ the old execution path; cancellation discards unreturned work.
 Physical execution order can differ under explicit opt-in. This is
 sequential shared-prefill work reduction, not fused GPU batching or
 concurrent decode. It is not enabled by default for unrelated callers.
- 
+
 ## 5. Rolling sampling penalties and incremental stop search
 
 The real decoder maintains exact recent-token counts via a bounded deque
