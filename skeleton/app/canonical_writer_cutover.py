@@ -29,7 +29,7 @@ from skeleton.persistence.mongo_source_epoch import (
     MongoCanonicalSourceEpoch, _verified_epoch_record,
 )
 
-_DOMAIN = b"skeleton.canonical-writer-cutover.v2\0"
+_DOMAIN = b"skeleton.canonical-writer-cutover.v3\0"
 _SHA = re.compile(r"[0-9a-f]{40}\Z", re.ASCII)
 _HEX = re.compile(r"[0-9a-f]{64}\Z", re.ASCII)
 _ID = re.compile(r"[A-Za-z0-9_.:-]{1,128}\Z", re.ASCII)
@@ -89,6 +89,8 @@ class CanonicalWriterCutover:
     quiescence_sha256: str
     external_writer_retirement_sha256: str
     storage_provenance_sha256: str
+    predecessor_generation: int
+    predecessor_latch_sha256: str | None
 
     def __post_init__(self):
         _require(all(type(v) is str and _ID.fullmatch(v) is not None
@@ -118,6 +120,11 @@ class CanonicalWriterCutover:
         _require(all(_digest(v) for v in (self.inventory_sha256, self.backup_sha256,
                  self.quiescence_sha256, self.external_writer_retirement_sha256,
                  self.storage_provenance_sha256)))
+        _require(type(self.predecessor_generation) is int
+                 and 0 <= self.predecessor_generation < (1<<63)-2
+                 and self.predecessor_generation % 2 == 0
+                 and ((self.predecessor_generation == 0 and self.predecessor_latch_sha256 is None)
+                      or (self.predecessor_generation > 0 and _digest(self.predecessor_latch_sha256))))
 
     def document(self):
         return {f.name: getattr(self, f.name) for f in fields(self)}
@@ -538,9 +545,10 @@ _LATCH_COLLECTION = "canonical_writer_deployment_latch"
 _LATCH_ID = "canonical-writer-single-deployment-v1"
 _LATCH_FIELDS = frozenset(("_id","schema","state","generation","highwater",
                            "deployment_id","authority_id","source_head",
-                           "approval_sha256","quiescence_sha256"))
-_LATCH_SCHEMA = "skeleton.canonical-writer-deployment-latch.v1"
-_RETIRE_DOMAIN = b"skeleton.canonical-writer-deployment-retirement.v1\0"
+                           "approval_sha256","quiescence_sha256","authority_key_sha256",
+                           "predecessor_latch_sha256"))
+_LATCH_SCHEMA = "skeleton.canonical-writer-deployment-latch.v2"
+_RETIRE_DOMAIN = b"skeleton.canonical-writer-deployment-retirement.v2\0"
 
 
 @dataclass(frozen=True, slots=True)
@@ -602,15 +610,18 @@ def _latch_row(row):
              and type(row["deployment_id"]) is str and _ID.fullmatch(row["deployment_id"]) is not None
              and type(row["authority_id"]) is str and _ID.fullmatch(row["authority_id"]) is not None
              and type(row["source_head"]) is str and _SHA.fullmatch(row["source_head"]) is not None
-             and _digest(row["approval_sha256"]) and _digest(row["quiescence_sha256"]))
+             and _digest(row["approval_sha256"]) and _digest(row["quiescence_sha256"])
+             and _digest(row["authority_key_sha256"]))
     generation = _number(row["generation"])
     highwater = _number(row["highwater"])
-    _require((generation % 2 == 1) == (row["state"] == "ACTIVE"))
+    _require((generation % 2 == 1) == (row["state"] == "ACTIVE")
+             and ((generation == 1 and row["predecessor_latch_sha256"] is None)
+                  or (generation > 1 and _digest(row["predecessor_latch_sha256"]))))
     return {**row,"generation":generation,"highwater":highwater}
 
 
 def _latch_digest(row):
-    return hashlib.sha256(b"skeleton.canonical-writer-latch-row.v1\0"+_canonical(_latch_row(row))).hexdigest()
+    return hashlib.sha256(b"skeleton.canonical-writer-latch-row.v2\0"+_canonical(_latch_row(row))).hexdigest()
 
 
 def _latch_handles(database):
@@ -668,8 +679,16 @@ async def reserve_writer_deployment(approval, *, epoch):
             _match_observation(plan,observed,database)
             writer,reader = _latch_handles(database)
             previous = await _read_latch(reader)
-            if previous is not None:
-                _require(previous["state"] == "RETIRED"
+            authority_key = hashlib.sha256(approval.public_key).hexdigest()
+            # A new approval must bind an independently retained predecessor,
+            # not blindly accept whichever older snapshot Mongo exposes.
+            if previous is None:
+                _require(plan.predecessor_generation == 0 and plan.predecessor_latch_sha256 is None)
+            else:
+                _require(previous["generation"] == plan.predecessor_generation
+                         and _latch_digest(previous) == plan.predecessor_latch_sha256
+                         and previous["authority_key_sha256"] == authority_key
+                         and previous["state"] == "RETIRED"
                          and previous["deployment_id"] == plan.deployment_id
                          and previous["authority_id"] == plan.authority_id
                          and plan.issued_at > previous["highwater"]
@@ -681,6 +700,8 @@ async def reserve_writer_deployment(approval, *, epoch):
                 "authority_id":plan.authority_id,"source_head":plan.source_head,
                 "approval_sha256":hashlib.sha256(plan.canonical_bytes()).hexdigest(),
                 "quiescence_sha256":plan.quiescence_sha256,
+                "authority_key_sha256":authority_key,
+                "predecessor_latch_sha256":plan.predecessor_latch_sha256,
             }
             approval.verify()
             result = await _publish_latch(writer,reader,previous,current)
@@ -707,6 +728,8 @@ async def inspect_writer_deployment(*, epoch):
                     "state":"ABSENT" if row is None else row["state"],
                     "generation":0 if row is None else row["generation"],
                     "latch_sha256":None if row is None else _latch_digest(row),
+                    "authority_key_sha256":None if row is None else row["authority_key_sha256"],
+                    "predecessor_latch_sha256":None if row is None else row["predecessor_latch_sha256"],
                     "writes_performed":False,"guarded_local_ai_ready":False}
     except WriterCutoverDenied:
         raise
@@ -746,11 +769,13 @@ async def retire_writer_deployment(plan,signature,*,epoch,authority_id,deploymen
             _require(previous is not None and previous["state"] == "ACTIVE"
                      and previous["deployment_id"] == deployment_id
                      and previous["authority_id"] == authority_id
+                     and previous["authority_key_sha256"] == hashlib.sha256(public_key).hexdigest()
                      and _latch_digest(previous) == plan.active_latch_sha256
                      and plan.issued_at > previous["highwater"]
                      and previous["generation"] < (1<<63)-1)
             current = {**previous,"state":"RETIRED","generation":previous["generation"]+1,
-                       "highwater":plan.issued_at,"quiescence_sha256":plan.shutdown_evidence_sha256}
+                       "highwater":plan.issued_at,"quiescence_sha256":plan.shutdown_evidence_sha256,
+                       "predecessor_latch_sha256":plan.active_latch_sha256}
             verify()
             result = await _publish_latch(writer,reader,previous,current)
             _require(observed == await _observe(db))

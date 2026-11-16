@@ -140,3 +140,19 @@ The process also retains a separate required-pin identity. Loss or replacement
 of the installed pin quarantines the process even if the original tuple is
 later restored. This protects known application-owned paths, not arbitrary
 code execution inside the backend process.
+
+
+### Independently retained predecessor and signing-key continuity
+
+The v3 cutover signature requires predecessor_generation and
+predecessor_latch_sha256. Only an independently verified first deployment
+may use 0 and null. A restart must bind the exact last retired generation and
+digest retained outside the Mongo restore domain. The v2 latch stores the
+authority public-key SHA-256 and the prior row digest on every transition;
+retirement and startup both reject an alternate key even under the same
+authority name. A signature from an older domain or a v1 latch row is denied.
+Existing v1 state needs a reviewed offline migration, never an automatic
+reset. Record every successful retirement receipt independently before issuing
+another activation. This is detection relative to an independently retained
+checkpoint, not physical anti-rollback if the independent evidence and
+database are restored together or the signer deliberately approves genesis.

@@ -86,7 +86,10 @@ def expected_inventory():
     return CutoverInventory(((KEY,2),),scopes,digest,counts)
 
 
-def signed(inventory=None,**updates):
+_FIXTURE_SIGNER = Ed25519PrivateKey.generate()
+
+
+def signed(inventory=None,*,signer=None,**updates):
     inventory = inventory or expected_inventory()
     now = int(time.time())
     data = dict(authority_id="operator",deployment_id="fixture",source_head="a"*40,
@@ -94,10 +97,11 @@ def signed(inventory=None,**updates):
        principal_inventory=PRINCIPALS, issued_at=now-1,expires_at=now+300,
        epoch_count=len(inventory.epochs),source_scope_count=len(inventory.source_scopes),
        inventory_sha256=inventory.digest,backup_sha256="b"*64,quiescence_sha256="c"*64,
-       external_writer_retirement_sha256="d"*64,storage_provenance_sha256="e"*64)
+       external_writer_retirement_sha256="d"*64,storage_provenance_sha256="e"*64,
+       predecessor_generation=0,predecessor_latch_sha256=None)
     data.update(updates)
     plan=CanonicalWriterCutover(**data)
-    key=Ed25519PrivateKey.generate()
+    key=signer or _FIXTURE_SIGNER
     return VerifiedWriterCutover(plan,key.sign(plan.canonical_bytes()),"operator","fixture","a"*40,
                                  key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw))
 
@@ -380,7 +384,7 @@ def latch_fixture():
     return epoch,coll
 
 
-def retirement(epoch,approval,digest,**updates):
+def retirement(epoch,approval,digest,*,signer=None,**updates):
     from skeleton.app.canonical_writer_cutover import WriterDeploymentRetirement
     values=dict(authority_id=approval.authority_id,deployment_id=approval.deployment_id,
                 source_head=approval.source_head,database_name=epoch._database.name,
@@ -388,7 +392,7 @@ def retirement(epoch,approval,digest,**updates):
                 issued_at=int(time.time())-1,expires_at=int(time.time())+120)
     values.update(updates)
     plan=WriterDeploymentRetirement(**values)
-    key=Ed25519PrivateKey.generate()
+    key=signer or _FIXTURE_SIGNER
     return plan,key.sign(plan.canonical_bytes()),dict(
         epoch=epoch,authority_id=plan.authority_id,deployment_id=plan.deployment_id,
         source_head=plan.source_head,public_key=key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw))
@@ -418,7 +422,8 @@ def test_database_latch_retirement_and_monotonic_approval_highwater():
             await retire_writer_deployment(p,s,**k)
         with pytest.raises(WriterCutoverDenied):
             await reserve_writer_deployment(first,epoch=epoch)
-        again=await reserve_writer_deployment(signed(issued_at=now-1),epoch=epoch)
+        again=await reserve_writer_deployment(signed(issued_at=now-1,predecessor_generation=2,
+            predecessor_latch_sha256=retired["latch_sha256"]),epoch=epoch)
         assert again["generation"]==3
         assert coll.row["state"]=="ACTIVE"
     asyncio.run(run())
@@ -483,10 +488,11 @@ def test_process_reservation_becomes_sticky_denial_after_retirement():
         with pytest.raises(MongoSourceEpochError):
             await epoch.bind_deployment_latch(reservation)
         p,s,k=retirement(epoch,first,reservation["latch_sha256"],issued_at=now-2)
-        await retire_writer_deployment(p,s,**k)
+        retired=await retire_writer_deployment(p,s,**k)
         with pytest.raises(MongoSourceEpochError):
             await epoch._assert_deployment_latch()
-        next_reservation=await reserve_writer_deployment(signed(issued_at=now-1),epoch=epoch)
+        next_reservation=await reserve_writer_deployment(signed(issued_at=now-1,predecessor_generation=2,
+            predecessor_latch_sha256=retired["latch_sha256"]),epoch=epoch)
         assert next_reservation["generation"]==3
         with pytest.raises(MongoSourceEpochError):
             await epoch.bind_deployment_latch(next_reservation)
@@ -515,4 +521,51 @@ def test_local_pin_tampering_cannot_restore_legacy_unbound_mode(replacement):
         epoch._deployment_latch_pin=original
         with pytest.raises(MongoSourceEpochError):
             await epoch._assert_deployment_latch()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("generation,digest",[(True,None),(1,"a"*64),(0,"a"*64),(2,None),(2,"0"*64)])
+def test_signed_predecessor_schema_denies_invalid_generations(generation,digest):
+    with pytest.raises(WriterCutoverDenied):
+        signed(predecessor_generation=generation,predecessor_latch_sha256=digest)
+
+
+def test_signed_predecessor_and_signer_continuity_against_restored_snapshots():
+    from skeleton.app.canonical_writer_cutover import (
+        reserve_writer_deployment,retire_writer_deployment,inspect_writer_deployment,
+    )
+    epoch,coll=latch_fixture()
+    now=int(time.time())
+    first=signed(issued_at=now-8)
+    foreign=Ed25519PrivateKey.generate()
+    async def run():
+        active=await reserve_writer_deployment(first,epoch=epoch)
+        active_row=dict(coll.row)
+        p,s,k=retirement(epoch,first,active["latch_sha256"],signer=foreign,issued_at=now-6)
+        with pytest.raises(WriterCutoverDenied):
+            await retire_writer_deployment(p,s,**k)
+        assert coll.row==active_row
+        p,s,k=retirement(epoch,first,active["latch_sha256"],issued_at=now-6)
+        retired=await retire_writer_deployment(p,s,**k)
+        retired_row=dict(coll.row)
+        args=dict(issued_at=now-2,predecessor_generation=2,predecessor_latch_sha256=retired["latch_sha256"])
+        candidate=signed(**args)
+        for invalid in (signed(issued_at=now-2),signed(**{**args,"predecessor_latch_sha256":"8"*64}),
+                        signed(signer=foreign,**args)):
+            with pytest.raises(WriterCutoverDenied):
+                await reserve_writer_deployment(invalid,epoch=epoch)
+            assert coll.row==retired_row
+        # A freshly signed non-genesis approval cannot accept a deleted or
+        # restored older latch. Restore fixture state only to finish the test.
+        for rolled_back in (None,active_row):
+            coll.row=rolled_back
+            with pytest.raises(WriterCutoverDenied):
+                await reserve_writer_deployment(candidate,epoch=epoch)
+            assert coll.row==rolled_back
+        coll.row=retired_row
+        receipt=await inspect_writer_deployment(epoch=epoch)
+        assert receipt["predecessor_latch_sha256"]==active["latch_sha256"]
+        next_active=await reserve_writer_deployment(candidate,epoch=epoch)
+        assert next_active["generation"]==3
+        assert coll.row["predecessor_latch_sha256"]==retired["latch_sha256"]
     asyncio.run(run())

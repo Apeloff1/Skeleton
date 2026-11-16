@@ -42,7 +42,7 @@ from skeleton.persistence.mongo_source_epoch import MongoCanonicalSourceEpoch, M
 
 IMAGE = "mongo:7.0.41@sha256:b096b4cb9269f3ebcf363be63f1c50920f786879d03a1890347a3bf33f1f0df0"
 DOCKER = ["docker", "--host", "unix:///var/run/docker.sock"]
-SCHEMA = "skeleton.mongo.isolated_replica_qualification.v3"
+SCHEMA = "skeleton.mongo.isolated_replica_qualification.v4"
 _SHA = re.compile(r"[0-9a-f]{40}\Z")
 _ID = re.compile(r"[0-9a-f]{64}\Z")
 _START = """set -eu
@@ -177,8 +177,8 @@ def _fixture_collections(db):
 
 async def _fixture_deployment_latch(approval, signer, owner, peer, reader):
     from dataclasses import replace
-    def signed_at(instant):
-        plan=replace(approval.plan,issued_at=instant)
+    def signed_at(instant,**updates):
+        plan=replace(approval.plan,issued_at=instant,**updates)
         return VerifiedWriterCutover(plan,signer.sign(plan.canonical_bytes()),
             plan.authority_id,plan.deployment_id,plan.source_head,approval.public_key)
 
@@ -227,7 +227,9 @@ async def _fixture_deployment_latch(approval, signer, owner, peer, reader):
     await _deny_cutover(reserve_writer_deployment(other,epoch=peer))
     await _deny(_read(guarded,"actor-a"))
     await _deny(_competing_writer(guarded,"actor-a"))
-    next_active=await reserve_writer_deployment(signed_at(now-1),epoch=peer)
+    await _deny_cutover(reserve_writer_deployment(signed_at(now-1),epoch=peer))
+    next_active=await reserve_writer_deployment(signed_at(now-1,predecessor_generation=2,
+        predecessor_latch_sha256=retired["latch_sha256"]),epoch=peer)
     require(next_active["generation"]==3,"new approval did not advance latch generation")
     await _deny(_read(guarded,"actor-a"))
     require(await _read(owner,"actor-a")==2,"rejected stale writer modified epoch")
@@ -286,6 +288,7 @@ async def _fixture_cutover(head, signer, owner, peer, reader, db, peerdb, read_d
             quiescence_sha256=evidence("quiescence"),
             external_writer_retirement_sha256=evidence("retirement"),
             storage_provenance_sha256=evidence("storage"),
+            predecessor_generation=0,predecessor_latch_sha256=None,
         )
         return VerifiedWriterCutover(plan, signer.sign(plan.canonical_bytes()),
                                      plan.authority_id, plan.deployment_id, head,
