@@ -55,7 +55,7 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 12 | Task fusion | Open |
 | 13 | Dynamic decomposition | Open |
 | 14 | Starvation prevention | P |
-| 15 | Adaptive batching | Open |
+| 15 | Adaptive batching | P |
 | 16 | Semantic classification | Open |
 | 17 | Model-directed worker selection | Open |
 | 18 | Specialist discovery | Open |
@@ -71,21 +71,21 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 28 | Mission replanning | Open |
 | 29 | Tool-chain optimization | Open |
 | 30 | Redundant reasoning elimination | Open |
-| 31 | CPU/GPU balancing | Open |
-| 32 | Unified memory | Open |
-| 33 | NUMA placement | Open |
+| 31 | CPU/GPU balancing | P |
+| 32 | Unified memory | P |
+| 33 | NUMA placement | P |
 | 34 | GPU topology | Open |
-| 35 | Thermal scheduling | Open |
-| 36 | Energy scheduling | Open |
-| 37 | Bandwidth optimization | Open |
+| 35 | Thermal scheduling | P |
+| 36 | Energy scheduling | P |
+| 37 | Bandwidth optimization | P |
 | 38 | Model preloading | Open |
 | 39 | KV affinity | P |
-| 40 | Prefill/decode separation | Open |
+| 40 | Prefill/decode separation | P |
 | 41 | Token-level admission | P |
 | 42 | Cross-device migration | Open |
 | 43 | Pressure relief | Open |
-| 44 | Storage-aware dispatch | Open |
-| 45 | Heterogeneous accelerators | Open |
+| 44 | Storage-aware dispatch | P |
+| 45 | Heterogeneous accelerators | P |
 | 46 | Event-sourced execution | Open |
 | 47 | Deterministic replay | P |
 | 48 | Partitioned journals | Open |
@@ -103,7 +103,7 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 60 | Version migration | P |
 | 61 | Shadow scheduling | P |
 | 62 | Counterfactual scheduling | P |
-| 63 | Negative capability cache | Open |
+| 63 | Negative capability cache | P |
 | 64 | Speculative reservations | Open |
 | 65 | Dependency collapse | Open |
 | 66 | Execution locality | P |
@@ -244,3 +244,25 @@ it until quota/accounting and transport authorization are qualified. This is
 a host integration interface, not a deployed transport credential scheme.
 The legacy control plane now leases the exact selected task rather than the
 unrelated highest-priority task from its worker queue.
+
+## Wave 8: heterogeneous hardware and inference batching proposals
+
+Ray Serve dynamic batching and model multiplexing inspire token-, memory- and
+padding-budget microbatch proposals, with separate tenant/model/tokenizer/adapter/
+policy/precision/phase identities, hard deadlines and protected priority lanes.
+For native inference this is a planning kernel only, not actual fused device
+execution. Device ranking filters generation-tagged observations by RAM, VRAM,
+unified memory, compute, I/O, bandwidth, thermal and power headroom; affinity,
+cache locality and estimated energy rank eligible devices. Capacity must be
+revalidated by its physical owner, and aliased memory remains an owner concern.
+Kubernetes-style queueing hints inspire scoped negative capability observation
+invalidation; deterministic two-choice sampling is available for eligible pools.
+
+Research: https://docs.ray.io/en/latest/serve/advanced-guides/dyn-req-batch.html
+https://docs.ray.io/en/latest/serve/model-multiplexing.html
+https://docs.ray.io/en/latest/serve/llm/architecture/routing-policies.html
+https://kubernetes.io/docs/concepts/scheduling-eviction/scheduling-framework/
+
+New partial source targets: 15, 31, 32, 33, 35, 36, 37, 40, 44, 45, 63.
+Physical allocation, measured GPU batching, true shared memory custody, device
+migration, generation invalidation wiring and scale benchmarks remain open.

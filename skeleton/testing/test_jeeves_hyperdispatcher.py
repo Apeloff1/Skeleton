@@ -550,3 +550,62 @@ def test_control_plane_leases_requested_task_not_other_priority_head():
     control.submit(SwarmTask("specific", {}, priority=100))
     assert control.lease_best("specific").id == "specific"
     assert runtime.task("urgent").state is TaskState.QUEUED
+
+def test_batch_planning_isolates_model_tenant_phase_and_protected_work():
+    from skeleton.intelligence.dispatch_hardware import BatchIdentity, BatchDemand, BatchLimits, plan_batches
+    ident = BatchIdentity("t", "a"*64, "b"*64, "c"*64, "d"*64, "q4", "decode")
+    demand = BatchDemand("a", ident, 0, 100, 50, 4, 10, 8, 10)
+    bounds = BatchLimits(2, 8, 30, 20, 10, 40)
+    rows = [demand, replace(demand, task_id="b"), replace(demand, task_id="c", identity=replace(ident, tenant_id="other")),
+            replace(demand, task_id="d", identity=replace(ident, phase="prefill")),
+            replace(demand, task_id="e", priority=0)]
+    plan = plan_batches(rows, bounds, now_ms=1)
+    assert plan == plan_batches(list(reversed(rows)), bounds, now_ms=1)
+    assert plan.batches[0].tasks == ("e",)
+    assert plan.batches[0].dispatch_now
+    pairs = [p for p in plan.batches if len(p.tasks) == 2]
+    assert len(pairs) == 1 and pairs[0].tasks == ("a", "b") and pairs[0].dispatch_now
+    assert all(not p.dispatch_now for p in plan.batches if p.tasks in {("c",), ("d",)})
+
+
+def test_batch_planning_memory_padding_and_deadline_bounds():
+    from skeleton.intelligence.dispatch_hardware import BatchIdentity, BatchDemand, BatchLimits, plan_batches
+    ident = BatchIdentity("t", "a"*64, "b"*64, "c"*64, "d"*64, "q4", "prefill")
+    a = BatchDemand("a", ident, 0, 40, 30, 2, 10, 15, 9)
+    bounds = BatchLimits(8, 20, 100, 20, 30, 40)
+    b = replace(a, task_id="b", context_tokens=4)
+    c = replace(a, task_id="c", deadline_ms=5)
+    d = replace(a, task_id="d", tokens=21)
+    plan = plan_batches([a, b, c, d], bounds, now_ms=1)
+    assert plan.rejected == (("c", "deadline_or_service_budget"), ("d", "oversize"))
+    assert len(plan.batches) == 2 and all(p.padded_tokens <= 20 for p in plan.batches)
+    assert plan_batches([a], bounds, now_ms=30).batches[0].dispatch_now
+
+
+def test_device_ranking_filters_resource_pressure_topology_thermal_and_age():
+    from skeleton.intelligence.dispatch_hardware import DeviceObservation, DeviceDemand, rank_devices
+    node = DeviceObservation("n", "gpu0", "numa0", "cuda", frozenset({"fp16"}),
+                             1, 10, 100, 100, 100, 100, 100, 100, 100, 50000,
+                             frozenset({"a"*64}))
+    demand = DeviceDemand("task", "a"*64, frozenset({"cuda"}), frozenset({"fp16"}),
+                          50, 50, 0, 20, 20, 10, 200, 70000, "numa0", 1000)
+    devices = [replace(node, device_id="gpu1", cached_models=frozenset()),
+               node, replace(node, device_id="hot", thermal_millic=71000),
+               replace(node, device_id="oom", free_device_bytes=51),
+               replace(node, device_id="wrong", accelerator="metal")]
+    result = rank_devices(demand, devices, now_ms=11)
+    assert [d.device_id for d in result] == ["gpu0", "gpu1"]
+    assert result[0].energy_estimate_mj == 100
+    assert not rank_devices(demand, devices, now_ms=5011)
+
+
+def test_negative_capability_invalidation_and_two_choice():
+    from skeleton.intelligence.dispatch_hardware import CapabilityMiss, should_requeue, two_choice_indices
+    miss = CapabilityMiss("t", frozenset({"cuda"}), 5, 100)
+    args = dict(tenant_id="t", requirements=frozenset({"cuda"}), now_ms=50, generation=6)
+    assert not should_requeue(miss, changed_capabilities=frozenset({"metal"}), **args)
+    assert should_requeue(miss, changed_capabilities=frozenset({"cuda"}), **args)
+    assert should_requeue(miss, changed_capabilities=frozenset(), **(args | {"now_ms":100}))
+    assert should_requeue(miss, changed_capabilities=frozenset(), **(args | {"tenant_id":"other"}))
+    assert len(set(two_choice_indices("task", 4, 2))) == 2
+    assert two_choice_indices("task", 4, 1) == (0,)

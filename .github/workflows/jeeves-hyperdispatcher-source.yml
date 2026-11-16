@@ -4,6 +4,7 @@ on:
     paths:
       - 'skeleton/intelligence/dispatch_policy.py'
       - 'skeleton/intelligence/dispatch_advisory.py'
+      - 'skeleton/intelligence/dispatch_hardware.py'
       - 'skeleton/kernel/global_resource_scheduler.py'
       - 'skeleton/automation/agents/swarm_*.py'
       - 'skeleton/ai/agents/core/swarm_*.py'
