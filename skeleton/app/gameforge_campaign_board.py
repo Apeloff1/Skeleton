@@ -13,6 +13,7 @@ from skeleton.app.gameforge_campaign import _admit, digest, verify_session
 from skeleton.app.gameforge_campaign_assist import plan_completion
 from skeleton.app.gameforge_quest_bridge import _steps
 from skeleton.app.original_quest_cli import _encode, _require
+from skeleton.gameforge.errors import GameForgeError
 
 BOARD_SCHEMA = "skeleton.gameforge.campaign.board.v1"
 COMPARISON_SCHEMA = "skeleton.gameforge.campaign.comparison.v1"
@@ -168,3 +169,18 @@ def render_html(source: Any, checkpoint: Any) -> str:
     )
     _require(len(html.encode("utf-8")) <= MAX_HTML_BYTES, "HTML board too large")
     return html
+
+
+def verify_board(source: Any, checkpoint: Any, submitted: Any) -> bool:
+    try:
+        return _encode(submitted) == _encode(board(source, checkpoint))
+    except (GameForgeError, ValueError, TypeError, KeyError, OverflowError, RecursionError):
+        return False
+
+
+def verify_comparison(source: Any, left: Any, right: Any, submitted: Any) -> bool:
+    try:
+        return _encode(submitted) == _encode(compare_branches(
+            source, left, right, max_expansions=submitted["search_budget_per_branch"]))
+    except (GameForgeError, ValueError, TypeError, KeyError, OverflowError, RecursionError):
+        return False
