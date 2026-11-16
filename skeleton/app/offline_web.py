@@ -269,7 +269,7 @@ HTML = r"""<!doctype html>
     </details>
     <details id="campaign-panel" class="grounding-preview">
       <summary>Durable multi-step reasoning campaign</summary>
-      <p class="hint">Author up to 12 independent steps. Each dispatch requires approval. Dependencies enforce order, not automatic output injection. Campaign results are separately stored in the local chat database and tied to this conversation revision.</p>
+      <p class="hint">Author up to 12 independent steps. Each dispatch requires approval. Optional sources are explicit {document_id, sha256} pins; history_policy may be recent or relevance. Dependencies enforce order, not automatic output injection. Campaign results are separately stored and are not removed by deleting a source document.</p>
       <label for="campaign-id">Campaign ID</label><input id="campaign-id" maxlength="64" placeholder="project-review">
       <label for="campaign-plan">Step graph (JSON array)</label>
       <textarea id="campaign-plan" rows="6" maxlength="24000" placeholder='[{"id":"inspect","depends_on":[],"message":"Review the constraints","max_output_tokens":32,"adaptive":{"max_attempts":2,"maximum_reserved_tokens":64,"language":"auto","contract":{"kind":"review"}}}]'></textarea>
@@ -1606,6 +1606,20 @@ JAVASCRIPT = r"""'use strict';
         !sha.test(report.report_sha256))
       throw new Error('Invalid local deliberation report.');
     const lines = [];
+    const suppliedSources = new Map();
+    if (!Array.isArray(report.evidence_sources) || report.evidence_sources.length > 3 ||
+        (!grounded && report.evidence_sources.length) || (grounded && !report.evidence_sources.length))
+      throw new Error('Invalid supplied source scope.');
+    for (const item of report.evidence_sources) {
+      if (!item || typeof item.citation !== 'string' || suppliedSources.has(item.citation) ||
+          typeof item.passage !== 'string' || Array.from(item.passage).length > 220 ||
+          (scope.length && !scope.includes(item.document_id)) || !sha.test(item.document_sha256) ||
+          !Number.isSafeInteger(item.char_start) || item.char_start < 0 ||
+          !Number.isSafeInteger(item.char_end) || item.char_end-item.char_start !== Array.from(item.passage).length ||
+          item.passage_sha256 !== await exactLocalSha256(item.passage))
+        throw new Error('Invalid supplied source receipt.');
+      suppliedSources.set(item.citation, item);
+    }
     let produced = 0;
     for (const [index, candidate] of report.candidates.entries()) {
       if (candidate.strategy !== ['direct', 'counterpoint', 'decompose', 'recompute'][index] ||
@@ -1639,6 +1653,13 @@ JAVASCRIPT = r"""'use strict';
           if (!Number.isSafeInteger(turn.turn_index) || turn.turn_index <= previous ||
               turn.turn_index >= packing.total_turns || !sha.test(turn.pair_sha256))
             throw new Error('Invalid selected conversation turn.');
+          const pair = messages.slice(turn.turn_index*2, turn.turn_index*2+2).map(row => [row.role,row.content]);
+          if (pair.length !== 2 || pair[0][0] !== 'user' || pair[1][0] !== 'assistant' ||
+              pair.some(row => typeof row[1] !== 'string'))
+            throw new Error('Selected history pair is unavailable.');
+          const canonical = JSON.stringify(pair).replace(/[\u007f-\uffff]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4,'0'));
+          if (await exactLocalSha256(canonical) !== turn.pair_sha256)
+            throw new Error('Selected history pair identity changed.');
           previous = turn.turn_index;
         }
         lines.push('Context: ' + packing.selected_turns.length + ' original turns retained; ' +
@@ -1663,6 +1684,12 @@ JAVASCRIPT = r"""'use strict';
               item.quote_sha256 !== await exactLocalSha256(item.quote) ||
               originals.quotes[index].quote !== item.quote || originals.quotes[index].citation !== item.citation)
             throw new Error('Quote proof mismatch.');
+          const source = suppliedSources.get(item.citation);
+          if (!source || source.document_id !== item.document_id ||
+              source.document_sha256 !== item.document_sha256 ||
+              item.start < source.char_start || item.end > source.char_end ||
+              Array.from(source.passage).slice(item.start-source.char_start,item.end-source.char_start).join('') !== item.quote)
+            throw new Error('Quotation does not match supplied passage.');
           distinct.add(item.document_id);
           lines.push('Verified literal quote: ' + item.citation + ' [' + item.start + '–' + item.end + ']');
         }
@@ -1672,6 +1699,24 @@ JAVASCRIPT = r"""'use strict';
       lines.push(candidate.strategy.toUpperCase() + ' — ' + candidate.output_tokens + ' tokens',
         candidate.text, 'Execution receipt: ' + candidate.execution_receipt_digest, '');
     }
+    const challenge = report.candidate_challenge;
+    if (!challenge || challenge.schema !== 'skeleton.jeeves.candidate-challenge.v1' ||
+        challenge.semantic_contradiction_verified !== false || challenge.winner_selected !== false ||
+        !sha.test(challenge.receipt_sha256) ||
+        JSON.stringify(challenge.candidate_sha256) !== JSON.stringify(report.candidates.map(c => c.output_sha256)) ||
+        !Array.isArray(challenge.numeric_disagreements) || challenge.numeric_disagreements.length > 96)
+      throw new Error('Invalid structural candidate comparison.');
+    for (const disagreement of challenge.numeric_disagreements) {
+      for (const span of [disagreement.left, disagreement.right]) {
+        const candidate = report.candidates[span?.candidate_index];
+        if (!candidate || !Number.isSafeInteger(span.start) || !Number.isSafeInteger(span.end) ||
+            span.start < 0 || span.end <= span.start || span.end > Array.from(candidate.text).length ||
+            span.segment_sha256 !== await exactLocalSha256(Array.from(candidate.text).slice(span.start, span.end).join('')))
+          throw new Error('Candidate disagreement span mismatch.');
+      }
+    }
+    lines.push('Structural challenge: ' + challenge.numeric_disagreements.length +
+      ' numeric literal differences in shared templates; not semantic contradictions.');
     if (report.actual_total_output_tokens !== produced ||
         epoch !== state.epoch || !state.connected || state.session !== session ||
         state.revision !== revision || get('prompt').value.trim() !== message ||
@@ -1709,7 +1754,7 @@ JAVASCRIPT = r"""'use strict';
     await previewLocalContext(message, max_output_tokens,
       grounded, get('context-preserve').checked);
   }));
-  ['grounded', 'context-preserve', 'budget'].forEach(id =>
+  ['grounded', 'context-preserve', 'budget', 'review-history-policy', 'adaptive-mode', 'quote-minimum', 'quote-sources'].forEach(id =>
     get(id).addEventListener('change', invalidateContextPreview));
   async function submit(retry = false) {
     const epoch = state.epoch;
