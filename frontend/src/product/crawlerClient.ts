@@ -247,6 +247,16 @@ export type CrawlSession = {
     protocol_verified: false; publisher_verified: false; license_verified: false;
     source_use_authorized: false; network_executed: false;
   };
+  publisher_archive_preflight?: {
+    schema: 'skeleton.dragon.publisher-archive-preflight.v1';
+    state: 'checkpoint_unwitnessed' | 'terminal_capture_required' | 'restriction_review_required' |
+      'no_retained_capture' | 'representation_review_required' | 'archive_policy_held' |
+      'explicit_archive_grant_required';
+    snapshot_digest: string; retained_captures: number; archive_policy_candidates: number;
+    terminal_capture: boolean; checkpoint_witnessed: boolean;
+    archive_grant_issued: false; raw_dataset_verified: false;
+    source_use_authorized: false; network_executed: false;
+  };
   companion?: DragonCompanion;
   curriculum_trace?: DragonCurriculumTrace;
   archive_grant?: DragonArchiveGrant; treasury_watch?: DragonTreasuryWatch|null; watch_managed?: boolean;
@@ -453,6 +463,23 @@ function session(value: CrawlSession, expectedId?: string): CrawlSession {
       || r.declared_type_matches + r.other_declared_types + r.inferred_or_unknown_types !== r.retained_captures
       || !integer(r.discovery_observations, r.settled_requests) || !integer(r.denial_statuses, r.settled_requests)
       || !integer(r.rejected_observations, r.settled_requests)) invalid('Invalid publisher capture review projection.');
+  }
+  if (value.publisher_archive_preflight !== undefined) {
+    const p = value.publisher_archive_preflight;
+    if (!p || !value.publisher_intent || !value.publisher_capture_review
+      || p.schema !== 'skeleton.dragon.publisher-archive-preflight.v1'
+      || !['checkpoint_unwitnessed','terminal_capture_required','restriction_review_required',
+        'no_retained_capture','representation_review_required','archive_policy_held',
+        'explicit_archive_grant_required'].includes(p.state)
+      || !HASH.test(p.snapshot_digest) || p.retained_captures !== value.source_count
+      || !integer(p.archive_policy_candidates, p.retained_captures)
+      || typeof p.terminal_capture !== 'boolean' || typeof p.checkpoint_witnessed !== 'boolean'
+      || p.archive_grant_issued !== false || p.raw_dataset_verified !== false
+      || p.source_use_authorized !== false || p.network_executed !== false
+      || (p.state === 'explicit_archive_grant_required' &&
+        (!p.checkpoint_witnessed || !p.terminal_capture || !p.retained_captures
+          || p.archive_policy_candidates !== p.retained_captures)))
+      invalid('Invalid publisher archive preflight projection.');
   }
   if (value.acquisition_readiness !== undefined) {
     const r = value.acquisition_readiness;
