@@ -354,5 +354,57 @@ class PublisherIntentCustodyTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(_publisher_intent_projection(SCOPE, row))
 
 
+class PublisherCaptureReviewTests(unittest.TestCase):
+    def snapshot(self, *, mime=None, inferred=False, observations=(), expiry=200):
+        sources = {}
+        if mime is not None:
+            sources["fixture"] = {"content_type": mime, "provenance": {
+                "declared_content_type": mime, "mime_inferred": inferred},
+                "text": "fixture_private_text"}
+        return {"binding": {"consent": {"expires_at": expiry}},
+                "sources": sources, "acquisition_measurements": list(observations)}
+
+    def test_declared_matches_are_not_protocol_or_rights_verification(self):
+        from core.dragon_crawler import _publisher_capture_review
+        cases = (("public_api", "application/json"), ("publisher_feed", "application/rss+xml"),
+                 ("open_dataset_manifest", "text/csv"), ("licensed_public_export", "application/pdf"))
+        for method, mime in cases:
+            with self.subTest(method=method):
+                r = _publisher_capture_review({"method": method}, self.snapshot(mime=mime), now=100)
+                self.assertEqual(r["state"], "declared_type_match_only")
+                self.assertEqual(r["declared_type_matches"], 1)
+                for field in ("protocol_verified", "publisher_verified", "license_verified",
+                              "source_use_authorized", "network_executed"):
+                    self.assertIs(r[field], False)
+                self.assertNotIn("fixture_private_text", str(r))
+
+    def test_inferred_and_mismatched_representations_require_review(self):
+        from core.dragon_crawler import _publisher_capture_review
+        for mime, inferred in (("text/html", False), ("application/json", True)):
+            r = _publisher_capture_review({"method": "public_api"},
+                                          self.snapshot(mime=mime, inferred=inferred), now=100)
+            self.assertEqual(r["state"], "representation_review_required")
+            self.assertEqual(r["declared_type_matches"], 0)
+            self.assertEqual(r["other_declared_types"] + r["inferred_or_unknown_types"], 1)
+
+    def test_discovery_only_and_restriction_precedence(self):
+        from core.dragon_crawler import _publisher_capture_review
+        intent = {"method": "publisher_feed"}
+        snap = self.snapshot(observations=[{"kind": "discovered", "status": 200}])
+        self.assertEqual(_publisher_capture_review(intent, snap, now=100)["state"],
+                         "discovery_metadata_only")
+        snap["acquisition_measurements"].append({"kind": "rejected", "status": 403})
+        self.assertEqual(_publisher_capture_review(intent, snap, now=100)["state"],
+                         "restriction_observed")
+        self.assertEqual(_publisher_capture_review(intent, snap, now=200)["state"],
+                         "consent_expired")
+
+    def test_empty_review_has_no_implied_permission(self):
+        from core.dragon_crawler import _publisher_capture_review
+        r = _publisher_capture_review({"method": "public_api"}, self.snapshot(), now=100)
+        self.assertEqual(r["state"], "no_reviewable_capture")
+        self.assertFalse(r["source_use_authorized"])
+
+
 if __name__ == "__main__":
     unittest.main()
