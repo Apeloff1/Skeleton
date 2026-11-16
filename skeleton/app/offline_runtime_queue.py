@@ -116,6 +116,14 @@ class OfflineRequestQueue:
         require(not self._closed and not self._poisoned and not self._session.status()["closed"],
                 "request queue unavailable")
 
+    def revalidate_source(self) -> dict:
+        """Require the entire cooperative queue to be idle before rescanning."""
+        with self._lock:
+            self._open()
+            require(not self._requests and not self._iteration_lock.locked(),
+                    "source reinspection requires an idle request queue")
+            return self._session.revalidate_source(consumer=self._consumer)
+
     def submit(self, request: BatchRequest, *, timeout_ms: int) -> None:
         require(isinstance(request, BatchRequest), "canonical batch request required")
         integer(timeout_ms, 1, 86_400_000, "request timeout")
