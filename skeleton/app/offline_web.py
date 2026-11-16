@@ -63,6 +63,17 @@ HTML = r"""<!doctype html>
           <pre id="quality-summary-text" aria-live="polite">No summary loaded.</pre>
           <p class="hint">Explicit user ratings only; not a leaderboard, model training run or proof of correctness.</p>
         </details>
+        <details id="memory-transformer-panel">
+          <summary>Local transformer semantic recall</summary>
+          <p class="hint">Use an explicitly installed sentence encoder. Search ranks approved notes; selecting results never grants automatic inclusion.</p>
+          <pre id="memory-transformer-state" aria-live="polite">Encoder status not checked.</pre>
+          <div class="inline">
+            <button id="memory-transformer-status" class="small" disabled>Inspect encoder</button>
+            <button id="memory-transformer-start" class="small" disabled>Build index page</button>
+            <button id="memory-transformer-more" class="small" disabled>Next index page</button>
+            <button id="memory-transformer-search" class="small" disabled>Semantic search</button>
+          </div>
+        </details>
         <details id="memory-vector-panel">
           <summary>Optional learned-vector recall</summary>
           <p class="hint">An owner-installed local word-vector asset is optional. Refresh derives note vectors; no remote queries, automatic installation, or language-model training.</p>
@@ -675,6 +686,10 @@ JAVASCRIPT = r"""'use strict';
     get('memory-compose').disabled = locked || working || !state.session || !state.memorySelected?.size;
     get('memory-apply').disabled = locked || working || !state.memoryPreview;
     get('memory-detach').disabled = locked || working || !state.memorySource;
+    get('memory-transformer-status').disabled=locked||working;
+    get('memory-transformer-start').disabled=locked||working||!state.transformerStatus?.bank;
+    get('memory-transformer-more').disabled=locked||working||!state.transformerStatus?.bank||!state.transformerCursor;
+    get('memory-transformer-search').disabled=locked||working||!state.transformerStatus?.bank;
     get('memory-vector-status').disabled=locked||working;
     get('memory-vector-start').disabled=locked||working||!state.vectorStatus?.bank;
     get('memory-vector-more').disabled=locked||working||!state.vectorStatus?.bank||!state.vectorCursor;
@@ -1622,6 +1637,7 @@ JAVASCRIPT = r"""'use strict';
       const meta = document.createElement('p'); meta.className = 'hint';
       meta.textContent = row.kind + ' · revision ' + row.revision + (row.active ? '' : ' · expired')
         + (row.source ? ' · conversation-linked' : '') + (row.tags.length ? ' · ' + row.tags.join(', ') : '');
+      if(typeof row.cosine==='number'&&Number.isFinite(row.cosine))meta.textContent+=' · cosine '+row.cosine.toFixed(4);
       const note = document.createElement('pre'); note.textContent = row.text;
       const label = document.createElement('label');
       const check = document.createElement('input');
@@ -1629,7 +1645,7 @@ JAVASCRIPT = r"""'use strict';
       check.dataset.expired = String(!row.active);
       check.checked = state.memorySelected?.has(row.memory_id) || false;
       check.addEventListener('change', () => {
-        clearMemoryPreview();
+        clearMemoryPreview(); clearDeliberation();
         if (!state.connected || unresolved() || state.busy || !row.active) {check.checked = false; return;}
         if (check.checked && state.memorySelected.size >= 4) {check.checked = false; status('Select at most four notes.'); return;}
         if (check.checked) state.memorySelected.set(row.memory_id, memoryPin(row));
@@ -1654,7 +1670,7 @@ JAVASCRIPT = r"""'use strict';
     updateControls();
   }
   async function loadMemory(more, search) {
-    clearMemoryPreview();
+    clearMemoryPreview(); clearDeliberation();
     const epoch = state.epoch;
     const term = get('memory-query').value.trim();
     if (search && (!term || bytes(term)>1024)) throw new Error('Enter a bounded memory search.');
@@ -1896,6 +1912,8 @@ JAVASCRIPT = r"""'use strict';
   }
   function resetAdaptiveWorkspace() {
     clearAdaptivePlan();
+    state.transformerStatus=null;state.transformerCursor=null;
+    get('memory-transformer-state').textContent='Encoder status not checked.';
     state.vectorStatus=null;state.vectorCursor=null;
     get('memory-vector-state').textContent='Encoder status not checked.';
     get('adaptive-profile').value='neutral';
@@ -1903,6 +1921,79 @@ JAVASCRIPT = r"""'use strict';
     get('adaptive-anchors').checked=true;get('adaptive-dense').checked=false;
     for(const option of get('adaptive-kinds').options) option.selected=true;
   }
+  function validateTransformerStatus(result) {
+    const sha=/^[a-f0-9]{64}$/;
+    if(!result||result.schema!=='skeleton.jeeves.transformer-memory-index.v1'
+      ||result.model_digest!==state.health?.model_digest||result.tokenizer_digest!==state.health?.tokenizer_digest
+      ||result.remote_calls!==false||result.semantic_quality_certified!==false
+      ||!Number.isSafeInteger(result.active_memories)||result.active_memories<0
+      ||!Number.isSafeInteger(result.indexed_active_memories)||result.indexed_active_memories<0
+      ||result.indexed_active_memories>result.active_memories
+      ||(result.bank!==null&&(!result.bank||!sha.test(result.bank.encoder_identity)
+        ||!Number.isSafeInteger(result.bank.dimensions)||result.bank.dimensions<4||result.bank.dimensions>1536)))
+      throw new Error('Invalid local transformer status.');
+  }
+  async function refreshTransformerStatus(message=''){
+    const epoch=state.epoch,result=await api('POST','/v1/memory-transformer/status',{});
+    if(epoch!==state.epoch||!state.connected)throw new Error('Workspace locked.');
+    validateTransformerStatus(result);
+    if(state.transformerStatus?.bank?.encoder_identity!==result.bank?.encoder_identity)state.transformerCursor=null;
+    state.transformerStatus=result;
+    get('memory-transformer-state').textContent=result.bank
+      ?'Pinned encoder '+result.bank.encoder_identity+'\n'+result.bank.dimensions+' dimensions'
+        +'\nIndexed active notes '+result.indexed_active_memories+'/'+result.active_memories
+        +'\nStatus is not a runtime readiness check or semantic-quality certification.'
+      :'No sentence encoder installed. Lexical recall remains available.';
+    if(message)get('memory-transformer-state').textContent+='\n'+message;
+    updateControls();
+  }
+  async function refreshTransformerPage(first){
+    const bank=state.transformerStatus?.bank,epoch=state.epoch;
+    if(!bank||(!first&&!state.transformerCursor))throw new Error('Inspect the installed encoder first.');
+    const cursor=first?null:state.transformerCursor;
+    const result=await api('POST','/v1/memory-transformer/refresh',{
+      expected_encoder:bank.encoder_identity,approved:true,limit:16,...(cursor?{cursor}:{}),
+    });
+    if(epoch!==state.epoch||!state.connected)throw new Error('Workspace locked.');
+    if(result.encoder_identity!==bank.encoder_identity||!Number.isSafeInteger(result.processed)
+      ||result.processed<0||result.processed>16
+      ||(result.next_cursor!==null&&!/^[A-Za-z0-9_-]{8,100}$/.test(result.next_cursor)))
+      throw new Error('Invalid transformer index receipt.');
+    state.transformerCursor=result.next_cursor;
+    clearAdaptivePlan();clearDeliberation();
+    await refreshTransformerStatus('Last page: '+result.processed+' encoded.'
+      +(state.transformerCursor?' More pages available.':' End of this keyset scan.'));
+  }
+  async function searchTransformer(){
+    const bank=state.transformerStatus?.bank,epoch=state.epoch,query=get('memory-query').value.trim();
+    if(!bank||!query||bytes(query)>1024)throw new Error('Inspect the encoder and enter a bounded query.');
+    const result=await api('POST','/v1/memory-transformer/search',{query,limit:20});
+    if(epoch!==state.epoch||!state.connected)throw new Error('Workspace locked.');
+    if(result.enabled!==true||result.encoder_identity!==bank.encoder_identity
+      ||result.model_digest!==state.health?.model_digest||result.tokenizer_digest!==state.health?.tokenizer_digest
+      ||result.remote_calls!==false||result.semantic_quality_certified!==false
+      ||!Array.isArray(result.records)||result.records.length>20
+      ||typeof result.exhaustive_vector_scan!=='boolean'
+      ||!Number.isSafeInteger(result.scanned_vectors)||result.scanned_vectors<0)
+      throw new Error('Invalid semantic recall response; inspect encoder again.');
+    for(const row of result.records){
+      assertMemoryRow(row);
+      if(!row.active||row.encoder_identity!==bank.encoder_identity
+        ||!Number.isFinite(row.cosine)||row.cosine< -1||row.cosine>1)
+        throw new Error('Invalid semantic recall record.');
+    }
+    clearMemoryPreview();clearDeliberation();
+    state.memoryRows=new Map();state.memorySelected=new Map();state.memoryCursor=null;
+    for(const row of result.records)state.memoryRows.set(row.memory_id,row);
+    get('memory-status').textContent=result.records.length+' semantic matches · '+result.scanned_vectors
+      +' vectors scored · '+(result.exhaustive_vector_scan?'exact eligible scan':'approximate candidates')
+      +' · select notes explicitly';
+    renderMemory();
+  }
+  get('memory-transformer-status').addEventListener('click',()=>run(()=>refreshTransformerStatus()));
+  get('memory-transformer-start').addEventListener('click',()=>run(()=>refreshTransformerPage(true)));
+  get('memory-transformer-more').addEventListener('click',()=>run(()=>refreshTransformerPage(false)));
+  get('memory-transformer-search').addEventListener('click',()=>run(()=>searchTransformer()));
   function validateVectorStatus(result) {
     const sha=/^[a-f0-9]{64}$/;
     if(!result||result.schema!=='skeleton.jeeves.memory-vector-index.v1'
