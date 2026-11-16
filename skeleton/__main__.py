@@ -5,6 +5,7 @@ Usage:
 
 Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
+    offline-runtime  Inspect pinned local weights and measured resource admission
     deploy      Validated self-host profiles, diagnostics, package/units and guarded boot
     ready       Organism readiness, optional --fix/--walk and bounded -n
     product     Live operator product and policy card
@@ -925,6 +926,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     cmd = args[0]
     rest = args[1:]
+    if cmd == "offline-runtime":
+        from skeleton.app.offline_runtime_cli import main as offline_runtime_main
+        return offline_runtime_main(rest)
     if cmd == "app":
         from skeleton.app.cli import run_app_cli
         return run_app_cli(rest)
