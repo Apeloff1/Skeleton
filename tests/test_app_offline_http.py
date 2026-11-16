@@ -78,6 +78,17 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
             conn.close()
         return status, json.loads(raw_response), headers_received
 
+    def test_cognitive_extension_routes_share_local_bearer_boundary(self) -> None:
+        for endpoint in ("memory-preview", "memory-save", "deliberation-review"):
+            code, _, _ = self._request(
+                "POST", "/v1/sessions/unknown-session/" + endpoint, {},
+                authorized=False,
+            )
+            self.assertEqual(code, 401)
+        code, _, _ = self._request("POST", "/v1/knowledge/research-review", {},
+                                   authorized=False)
+        self.assertEqual(code, 401)
+
     def test_mac_longform_virtual_memory_requires_approval_and_verifies_pages(self) -> None:
         root = self.folder / "longform-books"
         root.mkdir()
