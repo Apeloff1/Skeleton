@@ -210,6 +210,13 @@ def _replay(data: dict, campaign: dict, steps: list, gates: dict, episodes: dict
                     reason = "alternate_ending"
                 elif harbor_state["tick"] >= episode["source"]["max_ticks"]:
                     reason = "tick_budget_exhausted"
+                elif oid in missions and any(
+                    mission["id"] in episode["required_missions"]
+                    and mission["id"] not in missions[oid]["completed"]
+                    and harbor_state["tick"] >= mission["deadline"]
+                    for mission in episode["mission_board"]["missions"]
+                ):
+                    reason = "required_mission_deadline_missed"
                 elif not dialogue_ready:
                     reason = "dialogue_grant_missing"
                 elif not local:
