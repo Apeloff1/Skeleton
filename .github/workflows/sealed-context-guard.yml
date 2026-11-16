@@ -47,6 +47,11 @@ on:
       - 'skeleton/ai/model_runtime/weight_store_transaction.py'
       - 'skeleton/ai/model_runtime/weight_store_recovery.py'
       - 'skeleton/ai/model_runtime/weight_store_cli.py'
+      - 'skeleton/ai/model_runtime/weight_store_scrub.py'
+      - 'skeleton/ai/model_runtime/managed_weight_read.py'
+      - 'skeleton/ai/model_runtime/flgb_model_runtime.py'
+      - 'skeleton/ai/model_runtime/device_placement.py'
+      - 'skeleton/ai/model_runtime/nvml_memory_probe.py'
       - 'skeleton/ai/model_runtime/sealed_weight_pages.py'
       - 'skeleton/ai/runtime/inference/lease_custody.py'
       - 'skeleton/testing/test_offline_runtime_admission.py'
@@ -55,6 +60,10 @@ on:
       - 'skeleton/testing/test_weight_store_disk_owner.py'
       - 'skeleton/testing/test_weight_store_recovery.py'
       - 'skeleton/testing/test_weight_store_cli.py'
+      - 'skeleton/testing/test_weight_store_scrub.py'
+      - 'skeleton/testing/test_managed_weight_custody.py'
+      - 'skeleton/testing/test_sealed_weight_pages.py'
+      - 'skeleton/testing/test_nvml_memory_probe.py'
       - 'skeleton/testing/test_measured_jeeves_deployment.py'
       - 'skeleton/testing/test_native_process_lease.py'
       - 'skeleton/testing/test_guarded_application_startup.py'
@@ -135,6 +144,10 @@ jobs:
             skeleton/testing/test_weight_store_disk_owner.py \
             skeleton/testing/test_weight_store_recovery.py \
             skeleton/testing/test_weight_store_cli.py \
+            skeleton/testing/test_weight_store_scrub.py \
+            skeleton/testing/test_managed_weight_custody.py \
+            skeleton/testing/test_sealed_weight_pages.py \
+            skeleton/testing/test_nvml_memory_probe.py \
             skeleton/testing/test_measured_jeeves_deployment.py \
             skeleton/testing/test_native_process_lease.py \
             skeleton/testing/test_guarded_application_startup.py \
