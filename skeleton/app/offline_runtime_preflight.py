@@ -318,9 +318,41 @@ def plan_preflight(source: ModelSource, sample: HardwareSample, policy: RuntimeP
     if sample.memory.total_bytes and sample.memory.available_bytes is not None:
         host_fraction = 1.0 - max(0, sample.memory.available_bytes - host_weights) / sample.memory.total_bytes
     gpu_fraction = None
+    gpu_pressure_rows = []
+    gpu_pressure_basis = "not_applicable" if policy.backend == "cpu" else "unavailable"
     if policy.backend != "cpu" and sample.gpu.status == "measured" and sample.gpu.measured_total_bytes:
-        gpu_weights = sum(row["bytes"] for row in placements if row["device_id"] != "host-cpu")
-        gpu_fraction = 1.0 - max(0, sample.gpu.measured_free_bytes - gpu_weights) / sample.gpu.measured_total_bytes
+        allocated = {}
+        for row in placements:
+            device_id = row["device_id"]
+            if device_id != "host-cpu":
+                allocated[device_id] = allocated.get(device_id, 0) + row["bytes"]
+        if sample.gpu.observations:
+            # Aggregate headroom can conceal a nearly saturated selected
+            # device behind an idle, unrelated GPU. Conversely, saturation
+            # on an unused GPU should not throttle a valid packing.
+            for observation in sample.gpu.observations:
+                weight_bytes = allocated.get(observation.device_id, 0)
+                if not weight_bytes:
+                    continue
+                remaining = observation.free_bytes - weight_bytes
+                require(remaining >= policy.device_reserve_bytes,
+                        "placement exceeds measured per-device reserve")
+                projected = 1.0 - remaining / observation.total_bytes
+                gpu_pressure_rows.append({
+                    "device_id": observation.device_id,
+                    "weight_bytes": weight_bytes,
+                    "projected_free_bytes": remaining,
+                    "projected_occupancy": projected,
+                })
+            if gpu_pressure_rows:
+                gpu_fraction = max(row["projected_occupancy"] for row in gpu_pressure_rows)
+                gpu_pressure_basis = "selected_device_maximum"
+        elif sample.origin == "fixture":
+            # Legacy pure-planning fixtures lack physical device totals.
+            # Never promote aggregate-only evidence into a live GPU grant.
+            gpu_weights = sum(allocated.values())
+            gpu_fraction = 1.0 - max(0, sample.gpu.measured_free_bytes - gpu_weights) / sample.gpu.measured_total_bytes
+            gpu_pressure_basis = "fixture_aggregate_only"
     if policy.backend != "cpu" and gpu_fraction is None:
         blockers.append("gpu_pressure_unavailable")
     fractions = [v for v in (host_fraction, gpu_fraction) if v is not None]
@@ -333,6 +365,7 @@ def plan_preflight(source: ModelSource, sample: HardwareSample, policy: RuntimeP
             "placement_status": placement_status, "placement": placements, "devices": devices,
             "host_weight_bytes": host_weights, "cpu_plan": asdict(cpu), "energy_plan": asdict(energy),
             "pressure_fraction": pressure, "pressure_basis": "projected_memory_occupancy_not_psi",
+            "gpu_pressure_basis": gpu_pressure_basis, "gpu_pressure": gpu_pressure_rows,
             "worker_ceiling": workers, "blockers": blockers,
             "status": "candidate" if workers else "blocked",
             "evidence_origin": sample.origin, "model_activation": "not_performed",
