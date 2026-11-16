@@ -82,6 +82,15 @@ jobs:
           python -m unittest discover -s backend/tests -p 'test_dragon_sanctuary_boundary.py' -v
           python -m unittest discover -s backend/tests -p 'test_dragon_treasury_boundary.py' -v
 
+      - name: Offline dataset federation and signature custody
+        timeout-minutes: 5
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m py_compile backend/core/dragon_dataset_ingest.py backend/core/dragon_lead_ingest.py backend/core/dragon_offline_dataset_handoff.py backend/core/dragon_publisher_export_proof.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_lead_graph.py' -v
+
       - name: Canonical physical graph and independent writer qualification
         timeout-minutes: 8
         env:
