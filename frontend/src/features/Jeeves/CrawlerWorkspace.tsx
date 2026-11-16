@@ -278,6 +278,12 @@ function CrawlerContent() {
           <Text style={s.label}>Publisher intake · {label(active.publisher_intent.method)}</Text>
           <Text style={s.small}>Consent-bound operator intent recorded. Publisher identity, licensing and protocol compliance are not independently verified.</Text>
           <Text selectable style={s.small}>Intent receipt: {active.publisher_intent.intent_digest}</Text>
+          {active.publisher_capture_review && <>
+            <Text style={s.label}>Capture review · {label(active.publisher_capture_review.state)}</Text>
+            <Text style={s.small}>{active.publisher_capture_review.retained_captures} retained · {active.publisher_capture_review.declared_type_matches} declared representation matches · {active.publisher_capture_review.discovery_observations} discovery observations</Text>
+            <Text style={s.small}>{active.publisher_capture_review.denial_statuses} denial statuses · {active.publisher_capture_review.rejected_observations} rejected outcomes</Text>
+            <Text style={s.small}>Metadata review only. No protocol, access rights, license, or source-use authorization verified.</Text>
+          </>}
         </View>}
         <Text style={s.small}>{active.consent_current ? `Capture consent valid until ${new Date(active.consent_expires_at).toLocaleString()}` : 'Capture consent expired. Inspect retained records or create a new authorized crawl.'}</Text>
         <Text style={s.message}>Measured downloads: {bytes(active.counters.bytes)} / {bytes(active.limits.max_total_bytes)}</Text>
