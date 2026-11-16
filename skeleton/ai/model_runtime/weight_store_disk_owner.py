@@ -99,8 +99,20 @@ class WeightStoreDiskOwner:
         # Establish one persistent byte/entry/free-space policy under the
         # same shared slot. A later process cannot choose a larger cap.
         with self._owned() as (directory_fd, fd):
+            if initialize:
+                self._require_no_control_temps()
             self._bind_policy(directory_fd, initialize=initialize)
             self._inspect_lock(directory_fd, fd)
+
+    def _require_no_control_temps(self) -> None:
+        # Bound the root control namespace scan separately from the accounted
+        # object/manifest inventory. Never silently delete abandoned controls.
+        with os.scandir(self._store.root) as listing:
+            for index, item in enumerate(listing, start=1):
+                if index > 4096:
+                    raise WeightShardStoreError("weight-store control namespace exceeds entry ceiling")
+                if item.name.startswith("..weight-stage-") and item.name.endswith(".tmp"):
+                    raise WeightShardStoreError("interrupted staging control publication; recovery review required")
 
     def _policy_bytes(self) -> bytes:
         return canonical_bytes({"schema": "skeleton.weight-disk-policy.v1",
@@ -276,6 +288,7 @@ class WeightStoreDiskOwner:
         """Hold exclusive cooperating custody through final manifest publication."""
         self._store._require_write()
         with self._owned() as (directory_fd, fd):
+            self._require_no_control_temps()
             if read_intent(directory_fd, self._policy_sha256) is not None:
                 raise WeightShardStoreError("unresolved staging intent; recovery review required")
             before = self._scan()
@@ -317,7 +330,9 @@ class WeightStoreDiskOwner:
                 raise WeightShardStoreError("prospective disk inventory entry ceiling exceeded")
             if demand > remaining:
                 raise WeightShardStoreError("cooperative store byte ceiling exceeded")
-            if shutil.disk_usage(self._store.root).free < self._policy.minimum_free_bytes + demand:
+            # Control records have their own 64 KiB each bound and are not
+            # part of the model-object accounting. Preserve room for both.
+            if shutil.disk_usage(self._store.root).free < self._policy.minimum_free_bytes + demand + 2 * 64 * 1024:
                 raise WeightShardStoreError("filesystem free-byte reserve unavailable")
             intent = begin_intent(
                 directory_fd, policy_sha256=self._policy_sha256,
