@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from dataclasses import asdict
 import threading
-import time
 from typing import Any
 
 from skeleton.ai.model_runtime.iteration_scheduler import (
@@ -49,7 +48,8 @@ def parse_work(raw: Any) -> tuple[IterationWork, ...]:
 
 def _work_rows(work: tuple[IterationWork, ...]) -> list:
     require(type(work) is tuple and len(work) <= MAX_WORK_ITEMS, "bounded iteration work required")
-    require(all(isinstance(row, IterationWork) for row in work), "typed iteration work required")
+    require(all(isinstance(row, IterationWork) and isinstance(row.phase, InferencePhase)
+                for row in work), "typed iteration work and phase required")
     rows = [{"request_id": row.request_id, "phase": row.phase.value,
              "remaining_tokens": row.remaining_tokens, "priority": row.priority,
              "age": row.age} for row in work]
@@ -95,21 +95,31 @@ class RuntimeAdmission:
                  hysteresis_policy: HysteresisPolicy | None = None) -> None:
         require(isinstance(source, ModelSource) and isinstance(policy, RuntimePolicy),
                 "validated source and policy required")
-        self.source = source
-        self.policy = policy
+        self._source = source
+        self._policy = policy
         self._source_digest = digest(source.snapshot())
         self._hysteresis = EnergyHysteresis(hysteresis_policy)
         self._sequence = 0
         self._last_sample = None
+        self._last_offer_ns = None
         self._last_origin = None
         self._pending = None
         self._lock = threading.RLock()
+
+    @property
+    def source(self) -> ModelSource:
+        return self._source
+
+    @property
+    def policy(self) -> RuntimePolicy:
+        return self._policy
 
     def offer(self, sample: HardwareSample, work: tuple[IterationWork, ...], *,
               now_ns: int) -> dict:
         with self._lock:
             # A new offer always invalidates the previous unconsumed proposal.
             self._pending = None
+            integer(now_ns, 0, 2**63-1, "offer timestamp")
             _work_rows(work)
             require(digest(self.source.snapshot()) == self._source_digest,
                     "selected source evidence changed")
@@ -120,7 +130,8 @@ class RuntimeAdmission:
                 self._last_sample = None
             self._last_origin = sample.origin
             chronological = self._last_sample is None or sample.started_ns > self._last_sample
-            if not chronological or preflight["blockers"]:
+            clock_advances = self._last_offer_ns is None or now_ns > self._last_offer_ns
+            if not chronological or not clock_advances or preflight["blockers"]:
                 self._hysteresis = EnergyHysteresis(self._hysteresis.policy)
                 hysteresis = None
                 workers = 0
@@ -132,13 +143,17 @@ class RuntimeAdmission:
                                                   sampled_ns=sample.started_ns)
                 hysteresis = asdict(observed)
                 workers = min(preflight["worker_ceiling"], observed.admitted_workers)
-            if chronological and preflight["fresh"]:
+            if clock_advances:
+                self._last_offer_ns = now_ns
+            if chronological and clock_advances and preflight["fresh"]:
                 self._last_sample = sample.started_ns
             result = _plan(work, preflight, workers, self.policy)
             self._sequence += 1
             blockers = list(preflight["blockers"])
             if not chronological:
                 blockers.append("replayed_or_nonadvancing_hardware_sample")
+            if not clock_advances:
+                blockers.append("nonadvancing_offer_clock")
             if not workers and not blockers:
                 blockers.append("recovery_hysteresis")
             body = {"schema": SCHEMA, "sequence": self._sequence,
@@ -162,9 +177,9 @@ class RuntimeAdmission:
     def consume(self, receipt: dict, *, now_ns: int) -> tuple[dict, ...]:
         """Consume exactly one local-probe proposal; never issue a new one."""
         with self._lock:
-            integer(now_ns, 0, 2**63-1, "consumption timestamp")
             pending = self._pending
             self._pending = None  # any failed consumption also invalidates it
+            integer(now_ns, 0, 2**63-1, "consumption timestamp")
             require(pending is not None, "no pending iteration proposal")
             require(type(receipt) is dict and canonical(receipt) == canonical(pending),
                     "proposal differs from exact pending admission")
