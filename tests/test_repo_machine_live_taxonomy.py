@@ -176,3 +176,20 @@ def test_game_provider_environment_remains_explicitly_source_retained() -> None:
     assert "game-environment" in retained[0]["owner"]
     assert "outside credential-provider AI tree" in retained[0]["reason"]
     assert all(record.get("source") != source for record in manifest["mappings"])
+
+
+def test_local_guarded_admission_retains_application_runtime_ownership() -> None:
+    import json
+
+    config = load_machine_config(ROOT)
+    placement = placement_for_path(config, "skeleton/admission/__init__.py")
+    assert (placement.zone, placement.owner, placement.lifecycle) == (
+        "application", "application-runtime", "canonical"
+    )
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    retained = [row for row in manifest["retained_outside_ai_tree"]
+                if row.get("path") == "skeleton/admission"]
+    assert len(retained) == 1
+    assert "admission" in retained[0]["owner"]
+    assert all(row.get("source") != "skeleton/admission" for row in manifest["mappings"])
+    assert manifest["pre_move_readiness"]["governed_mapping_count"] == len(manifest["mappings"])
