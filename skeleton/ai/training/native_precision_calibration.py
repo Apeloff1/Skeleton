@@ -17,7 +17,7 @@ from typing import Callable
 
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
 
-from .contamination_scan import MaterializedExample
+from .contamination_scan import MaterializedExample, scan_materialized_overlap
 from .flgb_training_runtime import DatasetRevision, DatasetRights, digest_json, require_digest
 from .native_retention_evaluation import RetentionCase, RetentionPolicy, corpus_digest, evaluate_retention
 
@@ -252,7 +252,15 @@ def calibrate_native_precision(
     final_digest=digest_json(sorted(final_holdout_sha256))
     if final_digest!=expected_final_holdout_sha256:
         raise ValueError("final holdout inventory changed")
-    corpus_digest(cases)
+    if (dataset.dataset_id!=rights.dataset_id or dataset.rights_digest!=rights.digest
+            or dataset.content_digest!=corpus_digest(cases)):
+        raise ValueError("calibration dataset revision or rights identity mismatch")
+    if not 1<=len(training_item_sha256)<=4096:
+        raise ValueError("bounded complete materialized training inventory required")
+    for item in training_item_sha256:
+        require_digest(item,"training item")
+    if digest_json(sorted(training_item_sha256))!=expected_training_inventory_sha256:
+        raise ValueError("training inventory identity mismatch")
     if final_holdout_sha256.intersection(c.content_sha256 for c in cases) or final_holdout_sha256.intersection(training_item_sha256):
         raise ValueError("calibration or training contaminates reserved final holdout")
     if isinstance(deadline,bool) or not isinstance(deadline,(float,int)) or not math.isfinite(deadline):
@@ -263,6 +271,10 @@ def calibrate_native_precision(
         if time.monotonic()>=deadline:
             raise TimeoutError("native precision calibration deadline exceeded")
     poll()
+    overlap=scan_materialized_overlap(training_examples,
+            tuple(MaterializedExample(c.content_sha256,c.text) for c in cases),interrupt=poll)
+    if overlap.training_inventory_sha256!=expected_training_inventory_sha256 or overlap.review_required:
+        raise ValueError("calibration training inventory or contamination hold")
     baseline.assert_model_unchanged()
     baseline.tokenizer.assert_unchanged()
     model=baseline.model
@@ -284,7 +296,13 @@ def calibrate_native_precision(
     if (any(not 0<v<=policy.max_values for v in counts.values())
             or sum(counts.values())*(len(policy.bit_widths)+1)>policy.max_total_values):
         raise ValueError("precision weight work exceeded")
-    steps=sum(max(0,len(baseline.encode(c.text).token_ids)-1) for c in cases)
+    steps=0
+    for case in cases:
+        poll()
+        ids=baseline.encode(case.text).token_ids
+        if not 2<=len(ids)<=min(retention_policy.max_case_tokens,baseline.limits.max_context):
+            raise ValueError("calibration input exceeds non-sliding token admission")
+        steps+=len(ids)-1
     if steps>retention_policy.max_steps or steps*trial_limit>policy.max_total_evaluation_steps:
         raise ValueError("precision evaluation work exceeded")
     cp=baseline.checkpoint()
@@ -352,6 +370,7 @@ def calibrate_native_precision(
         "final_holdout":final_digest,"policy":policy.digest,
         "evaluation_policy":retention_policy.identity,
         "training_inventory":expected_training_inventory_sha256,
+        "contamination_evidence":overlap.evidence_sha256,
         "trials":[{k:getattr(row,k) for k in row.__dataclass_fields__} for row in trials],
         "proposed_bits":proposed,"combined_model":combined_id,
         "combined_evaluation":combined_eval,"codec_bytes":combined_size,
