@@ -113,7 +113,7 @@ jobs:
       - name: Qualify exact GGUF binary protocol and host custody
         run: python -m pytest -q --maxfail=1 skeleton/testing/test_gguf_token_bridge.py
       - name: Qualify sticky canonical writer binding
-        run: python -m pytest -q --maxfail=1 skeleton/testing/test_sticky_canonical_writer.py
+        run: python -m pytest -q --maxfail=1 skeleton/testing/test_sticky_canonical_writer.py skeleton/testing/test_canonical_writer_cutover.py
       - name: Verify construction and provider-owner contracts
         run: |
           python scripts/check_architecture_map.py

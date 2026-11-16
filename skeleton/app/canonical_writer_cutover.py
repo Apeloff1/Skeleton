@@ -331,5 +331,32 @@ async def qualify_writer_cutover(approval, *, epoch, threads, records):
         raise WriterCutoverDenied("live canonical writer inventory unavailable") from None
 
 
+async def inspect_writer_inventory(*, epoch, threads, records):
+    """Read-only operator inventory evidence; never creates an approval."""
+    _require(type(epoch) is MongoCanonicalSourceEpoch)
+    db = epoch._database
+    for collection, name in ((threads,"conversation_threads"),(records,"canonical_memory_records"),
+                             (epoch._collection,"canonical_source_epochs")):
+        _require(collection.name == name and collection.database.name == db.name
+                 and collection.database.client is db.client)
+    try:
+        async with asyncio.timeout(_SCAN_TIMEOUT):
+            first_topology = await _observe(db)
+            first = await _inventory(epoch, threads=threads, records=records,
+                                     maximum=_MAX_ACTORS, verify_linearizable=True)
+            second = await _inventory(epoch, threads=threads, records=records,
+                                      maximum=_MAX_ACTORS, verify_linearizable=False)
+            _require(first == second and first_topology == await _observe(db))
+            return {"schema":"skeleton.canonical-writer-observation.v1",
+                    "epoch_count":len(first.epochs), "source_scope_count":len(first.source_scopes),
+                    "inventory_sha256":first.digest, "stable_primary_observed":True,
+                    "writes_performed":False, "writer_cutover_authorized":False,
+                    "guarded_local_ai_ready":False}
+    except WriterCutoverDenied:
+        raise
+    except Exception:
+        raise WriterCutoverDenied("canonical writer inventory unavailable") from None
+
+
 __all__ = ["CanonicalWriterCutover", "VerifiedWriterCutover", "CutoverInventory",
-           "WriterCutoverDenied", "qualify_writer_cutover"]
+           "WriterCutoverDenied", "qualify_writer_cutover", "inspect_writer_inventory"]

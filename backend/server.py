@@ -2246,6 +2246,9 @@ _runtime_lifecycle = RuntimeServiceLifecycle("backend")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Protected writer cutover must precede every fail-soft boot path.
+    from core.canonical_writer_startup import install_before_lifespan
+    await install_before_lifespan(app)
     # Bind Dragon only to the application's existing trusted scheduler, consent
     # policy and research authority; absent configuration remains fail-closed.
     from core.dragon_runtime_bridge import mount_configured_dragon_runtime
