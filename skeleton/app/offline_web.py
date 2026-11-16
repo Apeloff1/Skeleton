@@ -285,6 +285,35 @@ HTML = r"""<!doctype html>
       <button id="campaign-inspect" class="small" disabled>Inspect existing graph</button>
       <div id="campaign-result" aria-live="polite"></div>
       <button id="campaign-delete" class="small" disabled>Delete inspected campaign</button>
+      <details id="campaign-batch-panel">
+        <summary>Execute an approved bounded batch</summary>
+        <p class="minor">Run up to four explicitly ordered pre-authored steps, stopping if any dependency fails or execution becomes uncertain. A lost response is inspected, never automatically retried.</p>
+        <label for="campaign-batch-id">Batch identifier</label><input id="campaign-batch-id" maxlength="64">
+        <label for="campaign-batch-steps">Ordered step IDs (comma-separated)</label><input id="campaign-batch-steps" maxlength="260">
+        <label for="campaign-batch-budget">Maximum reserved output tokens</label><input id="campaign-batch-budget" type="number" min="1" max="2048" value="128">
+        <button id="campaign-batch-run" class="small" disabled>Approve exact batch and run</button>
+        <button id="campaign-batch-inspect" class="small" disabled>Inspect batch receipt</button>
+        <button id="campaign-batch-abandon" class="small" disabled>Mark uncertain batch abandoned (not cancellation)</button>
+        <pre id="campaign-batch-result" aria-live="polite"></pre>
+      </details>
+    </details>
+    <details id="feedback-panel" class="grounding-preview">
+      <summary>Reviewed feedback &amp; local specialization dataset</summary>
+      <p class="minor">Save a preference about an exact committed turn. Training enrollment is separate and requires your rights attestation. Export prepares inputs only; never changes weights. Deleting this chat removes its saved feedback, not previously exported copies.</p>
+      <label for="feedback-turn">Committed turn number (starting at 1)</label><input id="feedback-turn" type="number" min="1" value="1">
+      <label for="feedback-id">Feedback identifier</label><input id="feedback-id" maxlength="64">
+      <label for="feedback-preference">Preference</label><select id="feedback-preference"><option value="preferred">Prefer answer</option><option value="rejected">Reject answer</option><option value="corrected">Provide exact correction</option></select>
+      <label for="feedback-correction">Correction (only for corrected answers)</label><textarea id="feedback-correction" rows="3" maxlength="8192"></textarea>
+      <label><input type="checkbox" id="feedback-training"> Explicitly enroll in local specialization dataset</label>
+      <label for="feedback-rights">SHA-256 of separately reviewed rights evidence (required for enrollment)</label><input id="feedback-rights" maxlength="64">
+      <button id="feedback-save" class="small" disabled>Approve exact turn feedback</button>
+      <button id="feedback-list" class="small" disabled>Inspect saved feedback</button>
+      <div id="feedback-result" aria-live="polite"></div>
+      <label for="feedback-dataset">Dataset identifier</label><input id="feedback-dataset" maxlength="64">
+      <label for="feedback-train">Training feedback IDs (comma-separated)</label><input id="feedback-train" maxlength="4096">
+      <label for="feedback-heldout">Held-out feedback IDs (comma-separated)</label><input id="feedback-heldout" maxlength="4096">
+      <button id="feedback-export" class="small" disabled>Approve and download specialization inputs</button>
+      <pre id="feedback-export-result" aria-live="polite"></pre>
     </details>
     <details id="context-grounding-preview" class="grounding-preview" hidden>
       <summary>Local grounding passages selected by preview — untrusted text</summary>
@@ -351,6 +380,11 @@ html,body{background:var(--canvas);color:var(--text)}button{font-size:12px;min-h
 .advanced-reasoning-options select,.advanced-reasoning-options input:not([type=checkbox]){max-width:100%}
 .advanced-reasoning-options .inline{align-items:stretch}
 .advanced-reasoning-options .inline button{white-space:normal}
+#feedback-panel,#campaign-panel{max-width:100%;min-width:0}
+#feedback-panel[open],#campaign-panel[open]{max-height:30dvh;overflow:auto;overscroll-behavior:contain}
+#feedback-panel input:not([type=checkbox]),#feedback-panel textarea,#campaign-panel input,#campaign-panel textarea{max-width:100%}
+#feedback-panel label,#campaign-panel label{display:block;overflow-wrap:anywhere}
+#campaign-batch-result,#feedback-result pre,#feedback-export-result{white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:720px){.advanced-reasoning-options[open]{max-height:22dvh}.composer-submit{flex-wrap:nowrap}.composer-submit #send{flex:1;min-width:0}.composer-submit #context-preview{flex:0 0 auto}.composer-submit button{white-space:normal}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 
@@ -559,6 +593,14 @@ JAVASCRIPT = r"""'use strict';
       get(id).disabled = locked || working || !state.session;
     });
     get('campaign-delete').disabled = locked || working || !state.session || !inspectedCampaign;
+    ['campaign-batch-id','campaign-batch-steps','campaign-batch-budget','campaign-batch-inspect',
+      'feedback-turn','feedback-id','feedback-preference','feedback-correction','feedback-training','feedback-rights',
+      'feedback-save','feedback-list','feedback-dataset','feedback-train','feedback-heldout','feedback-export'].forEach(id => {
+      get(id).disabled = locked || working || !state.session;
+    });
+    get('campaign-batch-run').disabled = locked || working || !inspectedCampaign || foreignLease || state.health?.ready !== true;
+    get('campaign-batch-abandon').disabled = locked || working || !inspectedBatch || inspectedBatch.status !== 'running';
+    get('feedback-result').querySelectorAll('button').forEach(button => {button.disabled = locked || working;});
     get('campaign-result').querySelectorAll('button').forEach(button => {
       button.disabled = locked || working || !state.session ||
         (button.dataset.generation === '1' && (foreignLease || state.health?.ready !== true));
@@ -655,6 +697,16 @@ JAVASCRIPT = r"""'use strict';
     clearGroundingPreview();
     get('campaign-id').value = '';
     get('campaign-plan').value = '';
+    ['campaign-batch-id','campaign-batch-steps','feedback-id','feedback-correction','feedback-rights',
+      'feedback-dataset','feedback-train','feedback-heldout'].forEach(id => {get(id).value = '';});
+    get('feedback-training').checked = false;
+    get('feedback-turn').value = '1';
+    get('feedback-preference').value = 'preferred';
+    get('campaign-batch-budget').value = '128';
+    clearFeedbackView();
+    get('feedback-panel').open = false;
+    get('campaign-batch-panel').open = false;
+    get('campaign-panel').open = false;
     get('campaign-budget').value = '256';
     get('adaptive-expression').value = '';
     get('adaptive-mode').value = 'off';
@@ -716,7 +768,7 @@ JAVASCRIPT = r"""'use strict';
     // Long file ingestion may stream for hours. Abort only on an explicit
     // workspace lock; the durable import ID allows post-disconnect recovery.
     const timer = path === '/v1/resources/longform/ingest' ? null :
-      setTimeout(cancel, (path.endsWith('/deliberation-review') || path.endsWith('/campaign-advance')) ? 60000 : 15000);
+      setTimeout(cancel, path.endsWith('/campaign-batch-run') ? 210000 : (path.endsWith('/deliberation-review') || path.endsWith('/campaign-advance')) ? 85000 : 15000);
     let response;
     try {
       response = await fetch(path, {
@@ -1102,7 +1154,15 @@ JAVASCRIPT = r"""'use strict';
   let reviewedMemory = null;
   let verifierCapability = null;
   let inspectedCampaign = null;
+  let inspectedBatch = null;
+  function clearFeedbackView() {
+    get('feedback-result').replaceChildren();
+    get('feedback-export-result').textContent = '';
+  }
   function clearCampaignView() {
+    inspectedBatch = null;
+    get('campaign-batch-result').textContent = '';
+    get('campaign-batch-abandon').disabled = true;
     inspectedCampaign = null;
     get('campaign-result').replaceChildren();
     get('campaign-delete').disabled = true;
@@ -1120,6 +1180,7 @@ JAVASCRIPT = r"""'use strict';
     get('deliberation-result').textContent = '';
     get('adaptive-artifacts').replaceChildren();
     clearCampaignView();
+    clearFeedbackView();
     get('research-panel').hidden = true;
     get('research-panel').open = false;
     get('research-trace').textContent = '';
@@ -1521,6 +1582,142 @@ JAVASCRIPT = r"""'use strict';
     });
     if (result.deleted_campaign_id !== ctx.cid) throw new Error('Deletion was not confirmed.');
     clearCampaignView(); status('Campaign deleted. Conversation unchanged.');
+  }));
+  function batchContext() {
+    const ctx = campaignContext(), bid = get('campaign-batch-id').value.trim();
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(bid)) throw new Error('Enter an explicit batch identifier.');
+    return {...ctx,bid};
+  }
+  function showBatch(ctx,result) {
+    if (!sameCampaign(ctx) || ctx.bid !== get('campaign-batch-id').value.trim() ||
+        result.batch?.schema !== 'skeleton.jeeves.campaign-batch.v1' ||
+        result.batch.session_id !== ctx.sid || result.batch.campaign_id !== ctx.cid ||
+        result.batch.approval?.batch_id !== ctx.bid ||
+        result.batch.automatic_restart !== false || result.batch.tool_execution_authorized !== false ||
+        result.automatic_restart !== false || result.external_tool_execution !== false ||
+        !/^[0-9a-f]{64}$/.test(result.batch.approval_sha256))
+      throw new Error('Batch receipt identity changed.');
+    showCampaign(ctx,result.campaign);
+    inspectedBatch=result.batch;
+    get('campaign-batch-result').textContent=JSON.stringify(result.batch,null,2);
+    updateControls();
+  }
+  get('campaign-batch-id').addEventListener('input', () => {
+    inspectedBatch=null; get('campaign-batch-result').textContent=''; updateControls();
+  });
+  get('campaign-batch-run').addEventListener('click', () => run(async () => {
+    const ctx=batchContext(),graph=inspectedCampaign;
+    if (!graph || graph.campaign_id!==ctx.cid || graph.session_snapshot_stale)
+      throw new Error('Inspect current campaign before approving a batch.');
+    const steps=get('campaign-batch-steps').value.split(',').map(v=>v.trim()).filter(Boolean);
+    if (!steps.length || steps.length>4 || new Set(steps).size!==steps.length)
+      throw new Error('Enter one to four distinct ordered steps.');
+    const budget=Number(get('campaign-batch-budget').value);
+    if (!Number.isSafeInteger(budget) || budget<1 || budget>2048)
+      throw new Error('Invalid batch token ceiling.');
+    try {
+      showBatch(ctx,await campaignCall(ctx,'batch-run',{
+        batch_id:ctx.bid, plan_sha256:graph.plan_sha256,expected_revision:graph.revision,
+        steps,maximum_reserved_tokens:budget,maximum_seconds:180,approved:true
+      }));
+    } catch(error) {
+      clearCampaignView();
+      throw new Error('Batch outcome unconfirmed. Inspect its identifier; do not retry automatically. '+error.message);
+    }
+  }));
+  get('campaign-batch-inspect').addEventListener('click', () => run(async () => {
+    const ctx=batchContext();
+    showBatch(ctx,await campaignCall(ctx,'batch-inspect',{batch_id:ctx.bid}));
+  }));
+  get('campaign-batch-abandon').addEventListener('click', () => run(async () => {
+    const ctx=batchContext(),row=inspectedBatch;
+    if (!row || row.approval.batch_id!==ctx.bid || row.status!=='running')
+      throw new Error('Inspect the uncertain batch first.');
+    showBatch(ctx,await campaignCall(ctx,'batch-abandon',{
+      batch_id:ctx.bid,approval_sha256:row.approval_sha256,approved:true
+    }));
+  }));
+  function feedbackContext() {
+    if (!state.session) throw new Error('Select a conversation.');
+    return {sid:state.session,revision:state.revision,epoch:state.epoch};
+  }
+  function feedbackCurrent(ctx) {
+    return state.connected && state.session===ctx.sid && state.revision===ctx.revision && state.epoch===ctx.epoch;
+  }
+  async function feedbackCall(ctx,action,data) {
+    const result=await api('POST','/v1/sessions/'+ctx.sid+'/feedback-'+action,data);
+    if (!feedbackCurrent(ctx)) throw new Error('Conversation changed; inspect feedback again.');
+    return result;
+  }
+  function showFeedback(ctx,result) {
+    if (!feedbackCurrent(ctx) || result.schema!=='skeleton.jeeves.reviewed-feedback.v1' ||
+        result.session_id!==ctx.sid || result.revision!==ctx.revision ||
+        result.training_performed!==false || !Array.isArray(result.examples) || result.examples.length>256)
+      throw new Error('Feedback list identity invalid.');
+    const root=get('feedback-result'); root.replaceChildren();
+    for (const row of result.examples) {
+      if (row.session_id!==ctx.sid || row.model_digest!==state.health?.model_digest ||
+          row.tokenizer_digest!==state.health?.tokenizer_digest || row.preference_only!==true ||
+          row.automatic_training!==false || !/^[0-9a-f]{64}$/.test(row.feedback_sha256))
+        throw new Error('Invalid reviewed feedback record.');
+      const detail=document.createElement('details'), title=document.createElement('summary');
+      title.textContent=row.feedback_id+' — turn '+(row.turn_index+1)+' — '+row.preference;
+      const info=document.createElement('pre'); info.textContent=JSON.stringify(row,null,2);
+      const remove=document.createElement('button'); remove.textContent='Delete this feedback';
+      remove.addEventListener('click',()=>run(async()=>{
+        if (!feedbackCurrent(ctx)) throw new Error('Inspect current conversation.');
+        const deleted=await feedbackCall(ctx,'delete',{
+          feedback_id:row.feedback_id,expected_sha256:row.feedback_sha256,approved:true});
+        if (deleted.deleted_feedback_id!==row.feedback_id) throw new Error('Deletion unconfirmed.');
+        showFeedback(ctx,await feedbackCall(ctx,'list',{}));
+      }));
+      detail.append(title,info,remove); root.append(detail);
+    }
+    updateControls();
+  }
+  get('feedback-list').addEventListener('click',()=>run(async()=>{
+    const ctx=feedbackContext();showFeedback(ctx,await feedbackCall(ctx,'list',{}));
+  }));
+  get('feedback-save').addEventListener('click',()=>run(async()=>{
+    const ctx=feedbackContext(), turn=Number(get('feedback-turn').value)-1;
+    const messages=state.messages.filter(row=>row.role!=='system');
+    const user=messages[turn*2],assistant=messages[turn*2+1];
+    if (!Number.isSafeInteger(turn)||turn<0||user?.role!=='user'||assistant?.role!=='assistant')
+      throw new Error('Select an existing complete turn.');
+    const preference=get('feedback-preference').value;
+    const id=get('feedback-id').value.trim();
+    if(!/^[A-Za-z0-9_-]{1,64}$/.test(id)) throw new Error('Enter feedback identifier.');
+    const training=get('feedback-training').checked;
+    const rights=get('feedback-rights').value.trim();
+    if(training&&!/^[0-9a-f]{64}$/.test(rights)) throw new Error('Explicit rights evidence digest required.');
+    const result=await feedbackCall(ctx,'save',{
+      feedback_id:id,expected_revision:ctx.revision,turn_index:turn,
+      prompt_sha256:await exactLocalSha256(user.content),answer_sha256:await exactLocalSha256(assistant.content),
+      preference,correction:preference==='corrected'?get('feedback-correction').value:'',
+      training_allowed:training,...(training?{rights_evidence_sha256:rights}:{}),approved:true
+    });
+    if(result.feedback_id!==id||result.automatic_training!==false) throw new Error('Feedback save unconfirmed.');
+    get('feedback-correction').value='';get('feedback-training').checked=false;get('feedback-rights').value='';
+    showFeedback(ctx,await feedbackCall(ctx,'list',{}));
+  }));
+  get('feedback-export').addEventListener('click',()=>run(async()=>{
+    const ctx=feedbackContext(),dataset=get('feedback-dataset').value.trim();
+    const ids=id=>get(id).value.split(',').map(v=>v.trim()).filter(Boolean);
+    if(!/^[A-Za-z0-9_-]{1,64}$/.test(dataset)) throw new Error('Valid dataset identifier required.');
+    const result=await feedbackCall(ctx,'export',{
+      expected_revision:ctx.revision,dataset_id:dataset,training_ids:ids('feedback-train'),
+      heldout_ids:ids('feedback-heldout'),approved:true
+    });
+    if(result.schema!=='skeleton.jeeves.specialization-input.v1'||result.session_id!==ctx.sid||
+       result.source_revision!==ctx.revision||result.training_performed!==false||
+       result.activation_authorized!==false||!Array.isArray(result.train)||!Array.isArray(result.heldout)||
+       !/^[0-9a-f]{64}$/.test(result.export_sha256))
+      throw new Error('Dataset export receipt invalid.');
+    const url=URL.createObjectURL(new Blob([JSON.stringify(result,null,2)],{type:'application/json'}));
+    const a=document.createElement('a'); a.href=url;a.download=dataset+'.jeeves-specialization.json';
+    document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    get('feedback-export-result').textContent='Prepared '+result.train.length+' training and '+
+      result.heldout.length+' holdout rows. No training or activation performed. Export '+result.export_sha256;
   }));
   function renderReviewArtifact(data, kind) {
     if (!data || data.kind !== kind || typeof data.title !== 'string' || data.title.length > 120)
