@@ -57,7 +57,7 @@ def _file_hash(path,root):
     if path.resolve(strict=True)!=path or not path.is_relative_to(root):
         raise DeploymentHeld("inventory path escaped")
     before=path.lstat()
-    if not stat.S_ISREG(before.st_mode) or before.st_nlink!=1:
+    if not stat.S_ISREG(before.st_mode) or before.st_nlink!=1 or not 0<=before.st_size<=MAX_BYTES:
         raise DeploymentHeld("unsupported inventory object")
     fd=os.open(path,os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_NONBLOCK",0))
     try:
@@ -89,12 +89,16 @@ def _walk(root):
                 entries.append(entry.name)
         for name in sorted(entries):
             child=folder/name;info=child.lstat()
-            if stat.S_ISDIR(info.st_mode):yield from visit(child,depth+1)
+            relative=child.relative_to(root).as_posix()
+            if len(relative.encode("utf-8"))>4096:raise DeploymentHeld("inventory path bound")
+            mode=stat.S_IMODE(info.st_mode)
+            if stat.S_ISDIR(info.st_mode):
+                yield relative,"directory",mode,0,hashlib.sha256(b"directory").hexdigest()
+                yield from visit(child,depth+1)
             elif stat.S_ISREG(info.st_mode):
                 size,h=_file_hash(child,root)
-                relative=child.relative_to(root).as_posix()
-                if len(relative.encode("utf-8"))>4096:raise DeploymentHeld("inventory path bound")
-                yield relative,size,h
+                if _witness(child.lstat())!=_witness(info):raise DeploymentHeld("inventory metadata changed")
+                yield relative,"file",mode,size,h
             else:raise DeploymentHeld("symlink, device or other special object requires explicit review")
         if _witness(folder.lstat())!=_witness(before):raise DeploymentHeld("inventory directory changed during scan")
     yield from visit(root,0)
@@ -110,25 +114,29 @@ def discover(plan_path,ledger,*,expected_plan_sha,offline_acknowledged):
     if any(ledger==root or ledger.is_relative_to(root) or plan_path.is_relative_to(root) for _,root in roots):
         raise ValueError("inventory control files must be outside scanned roots")
     _private(ledger,create=True)
-    count=total=0;chain="0"*64;summary=[]
+    count=directories=total=0;chain="0"*64;summary=[]
     with _open(ledger) as db:
-        db.executescript("""CREATE TABLE inventory(root TEXT NOT NULL,relative TEXT NOT NULL,bytes INTEGER NOT NULL,
-            sha256 TEXT NOT NULL,PRIMARY KEY(root,relative)) WITHOUT ROWID;
+        db.executescript("""CREATE TABLE inventory(root TEXT NOT NULL,relative TEXT NOT NULL,kind TEXT NOT NULL,
+            mode INTEGER NOT NULL,bytes INTEGER NOT NULL,sha256 TEXT NOT NULL,
+            PRIMARY KEY(root,relative)) WITHOUT ROWID;
             CREATE TABLE publication(singleton INTEGER PRIMARY KEY CHECK(singleton=1),receipt TEXT NOT NULL);""")
         db.execute("BEGIN IMMEDIATE")
         for entry,root in sorted(roots,key=lambda x:x[0]["id"]):
-            local_count=local_bytes=0
-            for relative,size,h in _walk(root):
-                count+=1;total+=size;local_count+=1;local_bytes+=size
-                if count>MAX_FILES or total>MAX_BYTES:raise DeploymentHeld("inventory ceiling; partition explicitly")
-                db.execute("INSERT INTO inventory VALUES(?,?,?,?)",(entry["id"],relative,size,h))
-                chain=hashlib.sha256(_json([chain,entry["id"],relative,size,h])).hexdigest()
-            summary.append({"id":entry["id"],"plane":entry["plane"],"files":local_count,"bytes":local_bytes})
+            local_count=local_directories=local_bytes=0
+            for relative,kind,mode,size,h in _walk(root):
+                if kind=="file":count+=1;local_count+=1
+                else:directories+=1;local_directories+=1
+                total+=size;local_bytes+=size
+                if count+directories>MAX_FILES or total>MAX_BYTES:raise DeploymentHeld("inventory ceiling; partition explicitly")
+                db.execute("INSERT INTO inventory VALUES(?,?,?,?,?,?)",(entry["id"],relative,kind,mode,size,h))
+                chain=hashlib.sha256(_json([chain,entry["id"],relative,kind,mode,size,h])).hexdigest()
+            summary.append({"id":entry["id"],"plane":entry["plane"],"files":local_count,
+                            "directories":local_directories,"bytes":local_bytes})
         if hashlib.sha256(_json(_read_json(plan_path))).hexdigest()!=plan_sha:
             raise DeploymentHeld("root catalogue changed")
         covered={r["plane"] for r in summary}
         result={"schema":SCHEMA,"plan_sha256":plan_sha,"inventory_digest":chain,
-                "files":count,"bytes":total,"roots":summary,
+                "files":count,"directories":directories,"bytes":total,"roots":summary,
                 "missing_planes":sorted(REQUIRED-covered),"unclassified_roots":sum(r["plane"]=="unclassified" for r in summary),
                 "declared_roots_scanned":True,"all_application_roots_proven":False,
                 "external_service_state_proven":False,"backup_created":False}
@@ -152,20 +160,24 @@ def verify_mirror(ledger,plan_path,*,expected_inventory_digest,offline_acknowled
         expected={r["id"]:r["plane"] for r in receipt["roots"]}
         if {x["id"]:x["plane"] for x,_ in roots}!=expected:
             raise DeploymentHeld("mirror root catalogue differs")
-        chain="0"*64;count=total=0
+        chain="0"*64;count=directories=total=0
         for entry,root in sorted(roots,key=lambda x:x[0]["id"]):
             local=0
-            for relative,size,h in _walk(root):
-                count+=1;local+=1;total+=size
-                if count>MAX_FILES or total>MAX_BYTES:raise DeploymentHeld("mirror inventory ceiling")
-                match=db.execute("SELECT bytes,sha256 FROM inventory WHERE root=? AND relative=?",(entry["id"],relative)).fetchone()
-                if match is None or tuple(match)!=(size,h):raise DeploymentHeld("mirror file differs or is unexpected")
-                chain=hashlib.sha256(_json([chain,entry["id"],relative,size,h])).hexdigest()
+            for relative,kind,mode,size,h in _walk(root):
+                if kind=="file":count+=1
+                else:directories+=1
+                local+=1;total+=size
+                if count+directories>MAX_FILES or total>MAX_BYTES:raise DeploymentHeld("mirror inventory ceiling")
+                match=db.execute("SELECT kind,mode,bytes,sha256 FROM inventory WHERE root=? AND relative=?",
+                                 (entry["id"],relative)).fetchone()
+                if match is None or tuple(match)!=(kind,mode,size,h):
+                    raise DeploymentHeld("mirror entry differs or is unexpected")
+                chain=hashlib.sha256(_json([chain,entry["id"],relative,kind,mode,size,h])).hexdigest()
             if local!=db.execute("SELECT COUNT(*) FROM inventory WHERE root=?",(entry["id"],)).fetchone()[0]:
                 raise DeploymentHeld("mirror files missing")
-        if (chain,count,total)!=(expected_inventory_digest,receipt["files"],receipt["bytes"]):
+        if (chain,count,directories,total)!=(expected_inventory_digest,receipt["files"],receipt["directories"],receipt["bytes"]):
             raise DeploymentHeld("mirror aggregate differs")
-    return {"inventory_digest":chain,"files":count,"bytes":total,"declared_mirror_verified":True,
+    return {"inventory_digest":chain,"files":count,"directories":directories,"bytes":total,"declared_mirror_verified":True,
             "full_application_recovery_verified":False}
 
 
