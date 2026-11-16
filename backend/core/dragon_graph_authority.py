@@ -414,6 +414,8 @@ def qualify(root,*,full=False):
                 _verify_graph(db);_verify_directory(db)
                 from core.dragon_graph_direct_writer import verify
                 verify(db)
+                from core.dragon_graph_multi_batch import verify as verify_multi
+                verify_multi(db)
             db.execute("COMMIT")
         except BaseException:
             if db.in_transaction:db.execute("ROLLBACK")

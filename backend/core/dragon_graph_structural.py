@@ -550,6 +550,10 @@ def apply_lane(root,sequence,plan_sha,index):
             concurrent=multi.enabled(policy)
             if concurrent:multi.assert_fence(policy)
             item=_pending(policy,sequence)
+            if item is None and concurrent:
+                terminal=multi.terminal(policy,sequence,plan_sha)
+                policy.execute("COMMIT")
+                return {"lane":index,"already_terminal":True,"aborted":terminal["aborted"]}
             if item is None or item[0]["sequence"]!=sequence or item[1]!=plan_sha:
                 raise a.GraphHeld("structural reservation superseded")
             if policy.execute("PRAGMA journal_mode").fetchone()[0].lower()!="delete":
@@ -741,41 +745,106 @@ def pulse(root,mode="catalogue"):
         raise CatalogueHeld("structural batch held; retry durable plan") from exc
 
 
-def recover(root):
-    """Resume a committed reservation only; never create new work."""
-    try:
-        with _open(Path(root)) as db:
-            db.execute("BEGIN")
-            if multi.enabled(db):
-                multi.assert_fence(db)
-                items=[_pending(db,row["sequence"]) for row in multi.rows(db)]
-            else:
-                item=_pending(db);items=[item] if item else []
-            db.execute("COMMIT")
-        if len(items)<=1:return _run(root,items[0] if items else None)
-        # Recovery can make progress on healthy reservations even if another
-        # owner is held. Limit nested lane pools to two batches at a time.
-        def resume(item):
-            try:return {"sequence":item[0]["sequence"],**_run(root,item)}
+def _items(root):
+    with _open(Path(root)) as db:
+        db.execute("BEGIN")
+        if multi.enabled(db):
+            multi.assert_fence(db)
+            items=[_pending(db,row["sequence"]) for row in multi.rows(db)]
+        else:
+            item=_pending(db);items=[item] if item else []
+        db.execute("COMMIT")
+    return items
+
+
+def _execute_many(root,items):
+    """One lane pool per root, then serialized root settlement.
+
+    Lane groups execute in parallel; distinct owner batches sharing a lane
+    run sequentially inside that group's worker. Do not contend for a root
+    write lock while this scheduler's lane writers still hold policy reads.
+    """
+    groups={};receipts={};failures=set()
+    for plan,witness in items:
+        seq=plan["sequence"];receipts[seq]=[]
+        for lane in plan["lanes"]:
+            groups.setdefault(int(lane),[]).append((seq,witness))
+    def work(group):
+        index,jobs=group;result=[]
+        for sequence,witness in jobs:
+            try:result.append((sequence,apply_lane(root,sequence,witness,index)))
             except (a.GraphHeld,ShardHeld,sqlite3.Error,OSError,CatalogueHeld):
-                return {"sequence":item[0]["sequence"],"held":True,"network_executed":False}
-        with ThreadPoolExecutor(max_workers=2,thread_name_prefix="dragon-batch-recovery") as pool:
-            results=list(pool.map(resume,items))
-        return {"batches":results,"processed":sum(r.get("processed",0) for r in results),
-                "held_batches":sum(r.get("held") is True for r in results),"network_executed":False}
+                result.append((sequence,{"lane":index,"held":True}))
+        return result
+    if groups:
+        with ThreadPoolExecutor(max_workers=min(WORKERS,len(groups)),thread_name_prefix="dragon-multi-lane") as pool:
+            for outcome in pool.map(work,sorted(groups.items())):
+                for sequence,receipt in outcome:
+                    receipts[sequence].append(receipt)
+                    if receipt.get("held"):failures.add(sequence)
+    results=[]
+    for plan,witness in items:
+        seq=plan["sequence"]
+        if seq in failures:
+            results.append({"sequence":seq,"mode":plan["mode"],"held":True,"lane_receipts":receipts[seq]})
+            continue
+        try:
+            value=settle(root,seq,witness)
+            results.append({"sequence":seq,"mode":plan["mode"],**value,"lane_receipts":receipts[seq]})
+        except (a.GraphHeld,ShardHeld,sqlite3.Error,OSError,CatalogueHeld):
+            results.append({"sequence":seq,"mode":plan["mode"],"held":True,"lane_receipts":receipts[seq]})
+    return {"batches":results,"processed":sum(r.get("processed",0) for r in results),
+            "held_batches":sum(r.get("held") is True for r in results),
+            "parallel_batch_scheduler":True,"network_executed":False}
+
+
+def recover(root):
+    """Resume committed reservations only; never create new work."""
+    try:
+        items=_items(root)
+        if len(items)<=1:return _run(root,items[0] if items else None)
+        return _execute_many(root,items)
     except (a.GraphHeld,ShardHeld,sqlite3.Error,OSError) as exc:
         raise CatalogueHeld("structural recovery held") from exc
 
 
+def pulse_many(root):
+    """Admit bounded new owner batches, then advance all outstanding lanes."""
+    try:
+        from core.dragon_release_queue import ReleaseQueue
+        with ReleaseQueue(Path(root))._db():pass
+        with _open(Path(root)) as db:
+            if not multi.enabled(db):raise CatalogueHeld("multi-batch scheduler not installed")
+        # Rotate by persistent global admission sequence to avoid always
+        # preferring a bootstrap owner over a ready release or expansion.
+        state=status(root);modes=("catalogue","expansion","bootstrap")
+        start=state["sequence"]%len(modes)
+        admitted=0
+        for attempt in range(multi.MAX_PENDING):
+            if len(status(root)["pending_batches"])>=multi.MAX_PENDING:break
+            mode=modes[(start+attempt)%len(modes)]
+            try:
+                if reserve(root,mode) is not None:admitted+=1
+            except (CatalogueHeld,a.GraphHeld,ShardHeld,sqlite3.Error,OSError,ValueError):
+                continue
+        items=_items(root)
+        return {"admitted_batches":admitted,**_execute_many(root,items)}
+    except (a.GraphHeld,ShardHeld,sqlite3.Error,OSError) as exc:
+        raise CatalogueHeld("multi-batch maintenance held") from exc
+
+
 def status(root):
     with _open(Path(root)) as db:
-        if not enabled(db):return {"configured":False}
+        db.execute("BEGIN")
+        if not enabled(db):
+            db.execute("COMMIT");return {"configured":False}
         row=db.execute("SELECT sequence,state,sha256 FROM main.dragon_graph_structural WHERE singleton=1").fetchone()
         concurrent=multi.enabled(db)
         if concurrent:
             multi.assert_fence(db)
             pending=[{"sequence":r["sequence"],"mode":r["mode"],"plan_sha":r["sha256"]} for r in multi.rows(db)]
         else:pending=[]
+        db.execute("COMMIT")
         return {"configured":True,"sequence":row[0],"state":row[1],"plan_sha":row[2],
                 "multi_batch_enabled":concurrent,"max_pending_batches":multi.MAX_PENDING if concurrent else 1,
                 "pending_batches":pending,"physical_writers":a.LANES,"network_authorized":False}

@@ -192,17 +192,25 @@ async def pulse_game_datasets():
 def _pulse_graph_root(path):
     """Run one isolated local owner-root's bounded maintenance batch."""
     from core.dragon_lead_graph import LeadGraph
-    from core.dragon_graph_structural import configured,status,recover
+    from core.dragon_graph_structural import configured,status,recover,pulse_many
     from core.dragon_owner_shards import ShardHeld
     from core.dragon_graph_authority import GraphHeld
     graph=LeadGraph(path);results={}
     try:
-        if configured(graph.path) and status(graph.path)["state"]=="pending":
-            try:results["structural_recovery"]=recover(graph.path)
+        state=status(graph.path) if configured(graph.path) else {}
+        if state.get("multi_batch_enabled"):
+            try:results["structural_batches"]=pulse_many(graph.path)
             except (CatalogueHeld,ValueError,sqlite3.Error,OSError,GraphHeld,ShardHeld):
-                return {"structural_recovery":{"held":True},"network_executed":False}
-        for key,operation in (("bootstrap",graph.bootstrap_pulse),("catalogue",graph.catalogue_pulse),
-                              ("bundle",graph.bundle_pulse),("expansion",graph.expansion_pulse)):
+                return {"structural_batches":{"held":True},"network_executed":False}
+            operations=(("bundle",graph.bundle_pulse),) if status(graph.path)["state"]=="idle" else ()
+        else:
+            if state.get("state")=="pending":
+                try:results["structural_recovery"]=recover(graph.path)
+                except (CatalogueHeld,ValueError,sqlite3.Error,OSError,GraphHeld,ShardHeld):
+                    return {"structural_recovery":{"held":True},"network_executed":False}
+            operations=(("bootstrap",graph.bootstrap_pulse),("catalogue",graph.catalogue_pulse),
+                        ("bundle",graph.bundle_pulse),("expansion",graph.expansion_pulse))
+        for key,operation in operations:
             try:results[key]=operation()
             except (CatalogueHeld,ValueError,sqlite3.Error,OSError,GraphHeld,ShardHeld):
                 results[key]={"held":True,"reason":"lead_maintenance_held","network_executed":False}

@@ -149,3 +149,19 @@ def finish(db,plan,witness,*,aborted=False):
     fence(db)
     if db.execute("UPDATE main.dragon_graph_authority SET commit_sequence=commit_sequence+1 WHERE singleton=1").rowcount!=1:
         raise a.GraphHeld("root commit fence missing")
+
+
+def verify(db):
+    """Idle-state audit: no orphan lane receipts or reserved owner keys."""
+    if not enabled(db):return
+    assert_fence(db)
+    if rows(db):raise a.GraphHeld("finish pending structural batches before full graph audit")
+    if owners(db):raise a.GraphHeld("orphan structural owner reservations")
+    if db.execute("SELECT COUNT(*) FROM main.structural_terminal").fetchone()[0]>TERMINAL_RETENTION:
+        raise a.GraphHeld("terminal replay cache bound")
+    seq=db.execute("SELECT sequence FROM main.dragon_graph_structural WHERE singleton=1").fetchone()[0]
+    if db.execute("SELECT 1 FROM main.structural_terminal WHERE sequence>? OR sequence<=0 OR length(sha256)<>64 LIMIT 1",(seq,)).fetchone():
+        raise a.GraphHeld("terminal sequence differs")
+    for i in range(a.LANES):
+        if db.execute("SELECT 1 FROM "+a._alias(i)+".structural_receipts LIMIT 1").fetchone():
+            raise a.GraphHeld("orphan lane structural receipt")
