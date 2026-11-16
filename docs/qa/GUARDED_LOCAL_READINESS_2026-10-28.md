@@ -222,3 +222,19 @@ No download occurs with --model. This is direct native CPU qualification,
 not production activation, independent reviewer trust, live Mongo, chat
 quality, GPU, Windows or release evidence. Wait for genuine exact-head
 execution results before relying on it.
+
+
+## Disposable authenticated Mongo epoch integration qualification
+
+The separate isolated-mongo-epoch-qualification workflow exercises the
+production epoch class using the existing pinned Mongo image, a new
+single-member replica set, random fixture-only credentials, explicit
+readWrite/read roles, loopback-only ephemeral port and tmpfs data directories.
+It never consumes deployment environment URIs, existing volumes, or actual
+application records. It checks signed fixture-only insert/revocation,
+linearizable reads across clients, exclusive writer admission, majority
+payload acknowledgement, independent actor progress, child task denial,
+nested failure quarantine, real BSON Int64 and read-only role enforcement.
+It removes the exact label-bound container before emitting a bounded receipt.
+No real application migration, data backup, multi-member failover, all-writer
+custody, production activation or release claim follows.
