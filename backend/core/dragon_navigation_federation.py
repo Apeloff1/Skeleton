@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 
 from core.dragon_game_corpus import GameCorpus, source_url
 from core.dragon_hoarder_bulk import owner_key
+from core import dragon_navigation_graph as graph
 from skeleton.ai.webcrawler.frontier_circuit import navigation_hazard
 from skeleton.ai.webcrawler.navigation_semantics import words, concepts, CONCEPTS, semantic_features
 
@@ -91,7 +92,7 @@ class NavigationFederation:
         if write and shutil.disk_usage(self.corpus.path.parent).free < RESERVE:
             raise OSError("navigation federation storage reserve held")
         with self.corpus._db() as db:
-            db.executescript(SCHEMA)
+            db.executescript(SCHEMA + graph.SCHEMA)
             deadline = time.monotonic() + 15
             db.set_progress_handler(lambda: int(time.monotonic() > deadline), 10000)
             try:
@@ -157,6 +158,9 @@ class NavigationFederation:
                             raise ValueError("navigation locator collision")
                     db.execute("INSERT INTO navigation_witnesses VALUES(?,?,?,?,?,?)",
                                (owner,grant,identifier,row["ordinal"],row["observations"],row["kind"]))
+                for identifier,url,_ in rows:
+                    graph.index_node(db,owner,identifier,url)
+                graph.publish_edges(db,owner,grant,rows)
                 stored = db.execute("SELECT * FROM navigation_grants WHERE owner=? AND grant_id=?",
                                     (owner,grant)).fetchone()
                 db.execute("COMMIT")
@@ -226,6 +230,47 @@ class NavigationFederation:
                 "candidate_metadata_only":True,"network_authorized":False,
                 "global_completeness_claimed":False}
 
+    def topology(self,scope,*,target,direction="children",after=None,limit=32,now=None):
+        with self._db() as db:
+            return graph.neighbors(db,owner_key(scope),target,direction=direction,after=after,
+                limit=limit,now=int(time.time()) if now is None else now)
+
+    def shortlist(self,scope,*,query,host=None,limit=48,now=None):
+        with self._db() as db:
+            db.execute("BEGIN")
+            return graph.retrieve(db,owner_key(scope),query=query,host=host,limit=limit,
+                now=int(time.time()) if now is None else now)
+
+    def portfolio(self,scope,*,query,limit=12,now=None):
+        with self._db() as db:
+            db.execute("BEGIN")
+            return graph.portfolio(db,owner_key(scope),query=query,limit=limit,
+                now=int(time.time()) if now is None else now)
+
+    def reindex(self,scope,*,after=None,limit=100):
+        with self._db(write=True) as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                receipt=graph.reindex(db,owner_key(scope),after=after,limit=limit)
+                db.execute("COMMIT")
+                return receipt
+            except BaseException:
+                if db.in_transaction:db.execute("ROLLBACK")
+                raise
+
+    def review(self,scope,*,target,state,reason,expected_revision,next_review,now=None):
+        with self._db(write=True) as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                receipt=graph.review(db,owner_key(scope),target,state=state,reason=reason,
+                    expected_revision=expected_revision,next_review=next_review,
+                    now=int(time.time()) if now is None else now)
+                db.execute("COMMIT")
+                return receipt
+            except BaseException:
+                if db.in_transaction:db.execute("ROLLBACK")
+                raise
+
     def revoke(self,scope,grant):
         owner=owner_key(scope);grant=_hash(grant)
         with self._db() as db:
@@ -266,7 +311,7 @@ async def application_call(application,scope,operation,**kwargs):
     from core.dragon_crawler import CrawlerError, _plain, _utc, _now
     from core.dragon_game_corpus import CatalogueHeld
     import sqlite3
-    if operation not in {"publish","search","revoke","purge"}:
+    if operation not in {"publish","search","revoke","purge","topology","shortlist","portfolio","reindex","review"}:
         raise ValueError("navigation federation operation")
     if operation=="publish":
         session_id=kwargs["session_id"]
