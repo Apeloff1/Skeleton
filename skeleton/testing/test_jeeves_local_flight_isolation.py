@@ -6,7 +6,7 @@ import unittest
 
 from skeleton.ai.runtime.inference.local import (
     CallableLocalModel, LocalInferenceEngine, LocalInferenceRequest,
-    LocalInferenceResult,
+    LocalInferenceResult, LocalInferenceCancelled,
 )
 from skeleton.provider_runtime import ProviderPolicyError
 
@@ -84,7 +84,13 @@ class FlightIsolationTests(unittest.IsolatedAsyncioTestCase):
         two=self.generate(work_class="interactive")
         await self.until(lambda:self.flights()==2)
         self.release.set()
-        await asyncio.gather(one,two)
+        # Foreground work may intentionally preempt an already running
+        # background worker. The interactive result must not inherit that
+        # cancellation or share the background leader's physical output.
+        background, interactive = await asyncio.gather(one,two,return_exceptions=True)
+        self.assertTrue(isinstance(background,(LocalInferenceResult,LocalInferenceCancelled)))
+        self.assertIsInstance(interactive,LocalInferenceResult)
+        self.assertEqual(interactive.text,"ok")
         self.assertEqual(self.calls,2)
 
     async def test_distinct_explicit_deadlines_cannot_share_leader_failure(self):
