@@ -133,6 +133,11 @@ class LocalModelDeployment:
     kv_cache_location: str = "backend"
     kv_cache_type_k: str | None = None
     kv_cache_type_v: str | None = None
+    speculation_runtime_sha256: str | None = None
+    speculation_ngram: int = 0
+    speculation_draft_tokens: int = 0
+    speculation_min_hits: int = 0
+    speculation_reserve_bytes: int = 0
 
     @classmethod
     def load(
@@ -225,6 +230,8 @@ class LocalModelDeployment:
             "kv_cache_location",
             "kv_cache_type_k",
             "kv_cache_type_v",
+            "speculation_runtime_sha256", "speculation_ngram", "speculation_draft_tokens",
+            "speculation_min_hits", "speculation_reserve_bytes",
             "temperature",
             "extra_args",
             "output_framing",
@@ -254,6 +261,11 @@ class LocalModelDeployment:
                 kv_cache_location=config.get("kv_cache_location", "backend"),
                 kv_cache_type_k=config.get("kv_cache_type_k"),
                 kv_cache_type_v=config.get("kv_cache_type_v"),
+                speculation_runtime_sha256=config.get("speculation_runtime_sha256"),
+                speculation_ngram=config.get("speculation_ngram", 0),
+                speculation_draft_tokens=config.get("speculation_draft_tokens", 0),
+                speculation_min_hits=config.get("speculation_min_hits", 0),
+                speculation_reserve_bytes=config.get("speculation_reserve_bytes", 0),
                 temperature=config.get("temperature", 0.0),
                 extra_args=tuple(extra_args),
                 output_framing=config.get("output_framing", "raw"),
@@ -269,6 +281,9 @@ class LocalModelDeployment:
             library_paths = {executable.parent / name for name, _ in validated.runtime_libraries}
             if library_paths.intersection({executable, model, resolved_manifest}):
                 raise LocalModelDeploymentError("runtime libraries cannot overlap deployment artifacts")
+        if (validated.speculation_runtime_sha256 is not None
+                and validated.speculation_runtime_sha256 != executable_digest):
+            raise LocalModelDeploymentError("speculation executable differs from deployment runtime pin")
         if _sha256_file(executable) != executable_digest:
             raise LocalModelDeploymentError("runtime executable digest mismatch")
         if _sha256_file(model) != model_digest:
@@ -298,6 +313,11 @@ class LocalModelDeployment:
             kv_cache_location=validated.kv_cache_location,
             kv_cache_type_k=validated.kv_cache_type_k,
             kv_cache_type_v=validated.kv_cache_type_v,
+            speculation_runtime_sha256=validated.speculation_runtime_sha256,
+            speculation_ngram=validated.speculation_ngram,
+            speculation_draft_tokens=validated.speculation_draft_tokens,
+            speculation_min_hits=validated.speculation_min_hits,
+            speculation_reserve_bytes=validated.speculation_reserve_bytes,
             temperature=float(validated.temperature),
             extra_args=validated.extra_args,
             output_framing=validated.output_framing,
@@ -356,6 +376,11 @@ class LocalModelDeployment:
             kv_cache_location=self.kv_cache_location,
             kv_cache_type_k=self.kv_cache_type_k,
             kv_cache_type_v=self.kv_cache_type_v,
+            speculation_runtime_sha256=self.speculation_runtime_sha256,
+            speculation_ngram=self.speculation_ngram,
+            speculation_draft_tokens=self.speculation_draft_tokens,
+            speculation_min_hits=self.speculation_min_hits,
+            speculation_reserve_bytes=self.speculation_reserve_bytes,
             temperature=self.temperature,
             extra_args=self.extra_args,
             output_framing=self.output_framing,
@@ -427,6 +452,11 @@ def create_local_model_deployment(
     kv_cache_location: str = "backend",
     kv_cache_type_k: str | None = None,
     kv_cache_type_v: str | None = None,
+    speculation_runtime_sha256: str | None = None,
+    speculation_ngram: int = 0,
+    speculation_draft_tokens: int = 0,
+    speculation_min_hits: int = 0,
+    speculation_reserve_bytes: int = 0,
     timeout_seconds: float = 120.0,
     output_framing: str = "raw",
     runtime_profile: str = "raw",
@@ -476,6 +506,11 @@ def create_local_model_deployment(
         kv_cache_location=kv_cache_location,
         kv_cache_type_k=kv_cache_type_k,
         kv_cache_type_v=kv_cache_type_v,
+        speculation_runtime_sha256=speculation_runtime_sha256,
+        speculation_ngram=speculation_ngram,
+        speculation_draft_tokens=speculation_draft_tokens,
+        speculation_min_hits=speculation_min_hits,
+        speculation_reserve_bytes=speculation_reserve_bytes,
         timeout_seconds=timeout_seconds,
         output_framing=output_framing,
         reject_model_symlink=True,
@@ -511,6 +546,10 @@ def create_local_model_deployment(
         value = getattr(validated, key)
         if value is not None:
             payload["config"][key] = value
+    if validated.speculation_runtime_sha256 is not None:
+        for key in ("speculation_runtime_sha256", "speculation_ngram", "speculation_draft_tokens",
+                    "speculation_min_hits", "speculation_reserve_bytes"):
+            payload["config"][key] = getattr(validated, key)
     if completion_profile:
         payload["config"]["batch_size"] = validated.batch_size
     candidate: Path | None = None
