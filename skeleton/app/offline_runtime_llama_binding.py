@@ -26,6 +26,7 @@ from skeleton.ai.runtime.inference.local import LocalModelAdapter, sample_servin
 from skeleton.app.offline_runtime_preflight import (
     ModelSource, RuntimePolicy, RuntimePreflightError, canonical, digest, identity, inspect_source,
     plan_preflight, require, sample_hardware, integer, intersect_scoped_headroom,
+    revalidate_source_metadata,
 )
 
 SCHEMA = "skeleton.offline.measured-llama-cpu.v1"
@@ -41,7 +42,7 @@ class MeasuredLlamaCpuGate:
     """
 
     def __init__(self, backend: LlamaCppModel, source: ModelSource,
-                 policy: RuntimePolicy) -> None:
+                 policy: RuntimePolicy, *, store_path: Path | None = None) -> None:
         require(type(backend) is LlamaCppModel, "canonical llama.cpp backend required")
         require(isinstance(source, ModelSource) and isinstance(policy, RuntimePolicy),
                 "verified source and explicit runtime policy required")
@@ -73,6 +74,10 @@ class MeasuredLlamaCpuGate:
         scratch = config.runtime_scratch_bytes
         self._base_policy = policy
         self._policy = replace(policy, host_reserve_bytes=policy.host_reserve_bytes + kv_reserve + scratch)
+        require(store_path is None or isinstance(store_path, Path), "trusted weight store path required")
+        require(source.managed_policy_sha256 is None or store_path is not None,
+                "managed native source requires store custody path")
+        self._store_path = store_path
         self._source = source
         self._backend = backend
         self._source_digest = digest(source.snapshot())
@@ -135,6 +140,8 @@ class MeasuredLlamaCpuGate:
 
     def _collect(self):
         self._check_profile()
+        if self._store_path is not None:
+            revalidate_source_metadata(self._store_path, self._source, self._base_policy)
         reading = sample_hardware()
         require(reading.origin == "local_probe", "real local probe required")
         # The canonical inference engine probe follows nested cgroups,
@@ -305,7 +312,7 @@ def build_measured_guarded_deployment(
                                  guarded_components=components)
     require(adapter.require_guarded_inference and adapter.guarded_service is not None,
             "protected adapter is required")
-    gate = MeasuredLlamaCpuGate(adapter.engine.model, source, policy)
+    gate = MeasuredLlamaCpuGate(adapter.engine.model, source, policy, store_path=store_path)
     # The native backend already calls this before prompt handling AND at
     # process spawn. It rejects hook replacement or late installation.
     adapter.engine.model.install_prelaunch_resource_guard(gate)
@@ -372,7 +379,7 @@ class MeasuredLocalDeployment:
             backend.assert_identity()
             require(backend.runtime_digest == deployment.executable_sha256,
                     "native runtime differs from pinned deployment")
-            gate = MeasuredLlamaCpuGate(backend, source, self.policy)
+            gate = MeasuredLlamaCpuGate(backend, source, self.policy, store_path=self.store_path)
         except (LocalModelDeploymentError, LlamaCppRuntimeError) as exc:
             raise RuntimePreflightError("deployment source or profile unavailable") from exc
         try:
