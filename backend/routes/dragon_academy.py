@@ -2681,6 +2681,7 @@ class CrawlerNavigationRetention(CrawlerRequest):
 
 
 class CrawlerNavigationAdvice(CrawlerRequest):
+    as_of: int = Field(ge=0,le=1000000000000,strict=True)
     snapshot_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
     packet_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
     jeeves_rank: list[str] = Field(min_length=1, max_length=12)
