@@ -53,7 +53,7 @@ def _integer(value,lo,hi):
 
 
 def normalize_plan(value):
-    if type(value) is not dict or set(value)!={"actions","maximum_calls","maximum_seconds"}:
+    if type(value) is not dict or set(value) not in ({"actions","maximum_calls","maximum_seconds"},{"actions","maximum_calls","maximum_seconds","selector"}):
         raise ToolCampaignError("explicit closed tool plan required")
     budget=_integer(value["maximum_calls"],1,MAX_EXECUTION)
     seconds=_integer(value["maximum_seconds"],1,45)
@@ -106,7 +106,11 @@ def normalize_plan(value):
             raise ToolCampaignError("tool is outside closed read-only registry")
         row={"id":node,"kind":kind,"arguments":clean,"depends_on":deps,"condition":dict(condition)}
         rows.append(row);known[node]=row
-    return {"actions":rows,"maximum_calls":budget,"maximum_seconds":seconds}
+    result={"actions":rows,"maximum_calls":budget,"maximum_seconds":seconds}
+    if "selector" in value:
+        from skeleton.app.jeeves_model_tool_selector import validate_selector
+        result["selector"]=validate_selector(value["selector"],known)
+    return result
 
 
 class LocalToolCampaign:
@@ -210,7 +214,8 @@ class LocalToolCampaign:
                  "plan":plan,"plan_sha256":pin,"source_pins":source_pins,
                  "status":"running","calls":0,"results":{},"active_action":None,
                  "stop_reason":None,"network_called":False,"knowledge_modified":False,
-                 "transcript_committed":False,"model_generated_tool_arguments":False}
+                 "transcript_committed":False,"model_generated_tool_arguments":False,
+                 "model_directed_selection":"selector" in plan,"selector_receipts":[]}
             self._write(row,True)
             return row,True
 
@@ -249,36 +254,85 @@ class LocalToolCampaign:
         return {"hit_count":len(citations),"citations":citations,
                 "semantic_truth_verified":False,"source_content_is_instruction":False}
 
-    def run(self,sid,cid,revision,plan):
+    def run(self,sid,cid,revision,plan,*,selector=None):
+        plan=normalize_plan(plan)
+        if ("selector" in plan)!=(selector is not None):
+            raise ToolCampaignError("model selector authority mismatch")
+        if selector is not None and not callable(selector):
+            raise ToolCampaignError("invalid local model selector")
         row,created=self.begin(sid,cid,revision,plan)
         if not created:
             return {**self.inspect(sid,cid),"replayed":True}
         deadline=time.monotonic()+row["plan"]["maximum_seconds"]
         reason="all_actions_resolved"
         try:
-            for action in row["plan"]["actions"]:
-                node=action["id"]
+            while True:
                 if time.monotonic()>=deadline:
                     reason="cooperative_deadline_before_next_action";break
                 self._recheck(sid,row)
-                dependencies=[row["results"].get(d) for d in action["depends_on"]]
-                condition=action["condition"]
-                eligible=all(r is not None and r["status"]=="succeeded" for r in dependencies)
-                if eligible and condition["kind"]!="always":
-                    prior=row["results"][condition["action"]]["result"]["hit_count"]
-                    eligible=(prior>0)==(condition["kind"]=="has_hits")
-                if not eligible:
+                pending=[a for a in row["plan"]["actions"] if a["id"] not in row["results"]]
+                if not pending:
+                    break
+                ready=[]
+                skipped=[]
+                for action in pending:
+                    dependencies=[row["results"].get(d) for d in action["depends_on"]]
+                    if not all(r is not None for r in dependencies):
+                        continue
+                    eligible=all(r["status"]=="succeeded" for r in dependencies)
+                    condition=action["condition"]
+                    if eligible and condition["kind"]!="always":
+                        prior=row["results"][condition["action"]]["result"]["hit_count"]
+                        eligible=(prior>0)==(condition["kind"]=="has_hits")
+                    if eligible:
+                        ready.append(action)
+                    else:
+                        skipped.append(action["id"])
+                if skipped:
                     def skip(current):
-                        current["results"][node]={"status":"skipped","reason":"dependency_or_condition"}
+                        for node in skipped:
+                            current["results"][node]={"status":"skipped","reason":"dependency_or_condition"}
                     row=self._mutate(sid,cid,skip)
                     continue
+                if not ready:
+                    raise ToolCampaignConflict("no ready action in approved dependency graph")
                 if row["calls"]>=row["plan"]["maximum_calls"]:
                     reason="tool_call_budget";break
+                decision=None
+                if selector is None:
+                    action=ready[0]
+                else:
+                    if len(row.get("selector_receipts",[]))>=plan["selector"]["maximum_decisions"]:
+                        reason="model_decision_budget";break
+                    decision=selector(ready,row,deadline)
+                    self._recheck(sid,row)
+                    if (type(decision) is not dict or decision.get("plan_sha256")!=row["plan_sha256"]
+                            or decision.get("ready_actions")!=[a["id"] for a in ready]
+                            or decision.get("model_digest")!=self.model_digest
+                            or decision.get("tokenizer_digest")!=self.tokenizer_digest
+                            or decision.get("authority_expanded") is not False
+                            or decision.get("new_arguments_generated") is not False
+                            or decision.get("model_graph_executed") is not True
+                            or decision.get("receipt_sha256")!=digest({k:v for k,v in decision.items() if k!="receipt_sha256"})):
+                        raise ToolCampaignConflict("unbound model selection receipt")
+                    selected=decision["selected_action"]
+                    if selected is None:
+                        def stop_selection(current):
+                            current.setdefault("selector_receipts",[]).append(decision)
+                        row=self._mutate(sid,cid,stop_selection)
+                        reason="model_selected_stop";break
+                    options={a["id"]:a for a in ready}
+                    if selected not in options:
+                        raise ToolCampaignConflict("selection escaped approved ready actions")
+                    action=options[selected]
+                node=action["id"]
                 def claim(current):
                     if current["active_action"] is not None:
                         raise ToolCampaignConflict("unresolved tool claim")
                     current["active_action"]=node
                     current["calls"]+=1
+                    if decision is not None:
+                        current.setdefault("selector_receipts",[]).append(decision)
                 row=self._mutate(sid,cid,claim)
                 result=self._execute(action,row)
                 self._recheck(sid,row)
