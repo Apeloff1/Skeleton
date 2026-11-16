@@ -254,3 +254,29 @@ def test_queue_close_reports_inflight_until_executor_releases(tmp_path, monkeypa
     with pytest.raises(RuntimePreflightError):
         queue.tick()
     assert not queue.status()["poisoned"]
+
+
+def test_sealed_runtime_rechecks_pressure_during_copy(tmp_path, monkeypatch):
+    if not hasattr(os, "memfd_create"):
+        pytest.skip("Linux memfd unavailable")
+    payload = b"real sealed source bytes"
+    checksum = sha256(payload).hexdigest()
+    model = ModelIdentity("test", "v1", "tiny", checksum, checksum, checksum)
+    plan = WeightLoadPlan(model.identity_digest, (WeightShard(0, checksum, len(payload), "local"),), len(payload))
+    path = tmp_path / "source.bin"
+    path.write_bytes(payload)
+    store = tmp_path / "store"
+    key = WeightShardStore(store).stage_plan(model, plan, {0: path})
+    checks = []
+
+    def telemetry():
+        checks.append(True)
+        return sample(start=time.monotonic_ns() - 1000, origin="local_probe",
+                      temperature=45 if len(checks) <= 2 else 95)
+
+    monkeypatch.setattr("skeleton.app.offline_runtime_custody.sample_hardware", telemetry)
+    with pytest.raises(RuntimePreflightError, match="resource pressure during sealed copy"):
+        with sealed_cpu_custody(store, plan_digest=key, model=model, policy=POLICY,
+                                maximum_sealed_bytes=len(payload)):
+            pytest.fail("pressure-denied sealed source published")
+    assert len(checks) == 3
