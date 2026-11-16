@@ -9,6 +9,7 @@ not a bag. No ModelPort.
 from __future__ import annotations
 
 import math
+from heapq import nsmallest
 from typing import Callable, List, Tuple
 
 Vec = List[float]
@@ -230,6 +231,55 @@ def cached_mha(q: Vec, K: Mat, V: Mat, n_heads: int = 1) -> Tuple[Vec, List[Vec]
     return row, As
 
 
+def cached_mha_context(
+    q: Vec, K: Mat, V: Mat, n_heads: int = 1, *,
+    interrupt: Callable[[], None] | None = None,
+) -> Vec:
+    """Inference-only attention without copying the resident KV bank by head.
+
+    For normal rectangular full-width banks, preserve exactly the original
+    score and weighted accumulation order. Retain one head's scores and
+    probabilities at a time, never all head probabilities. The legacy
+    general-purpose attention API still returns its weights for callers
+    needing introspection or training. Cancellation never publishes a partial
+    context. This is not sparse or approximate attention.
+    """
+    if type(n_heads) is not int or n_heads < 1 or len(q) % n_heads:
+        raise ValueError("invalid cached attention head geometry")
+    width = len(q)
+    if not width or len(K) != len(V):
+        raise ValueError("invalid cached attention bank geometry")
+    if not K:
+        return zeros(width)
+    # The cache owner has rectangular tensors; explicitly reject malformed
+    # external banks rather than change the semantics of valid inputs.
+    for row_idx, (key, value) in enumerate(zip(K, V)):
+        if interrupt is not None and row_idx % 128 == 0:
+            interrupt()
+        if len(key) != width or len(value) != width:
+            raise ValueError("cached attention row width mismatch")
+    dh = width // n_heads
+    inv = 1.0 / math.sqrt(dh)
+    out = zeros(width)
+    for h in range(n_heads):
+        if interrupt is not None:
+            interrupt()
+        lo, hi = h * dh, (h + 1) * dh
+        scores = []
+        for row_idx, key in enumerate(K):
+            if interrupt is not None and row_idx % 128 == 0:
+                interrupt()
+            scores.append(sum(q[i] * key[i] for i in range(lo, hi)) * inv)
+        weights = softmax(scores)
+        del scores
+        for row_idx, (weight, value) in enumerate(zip(weights, V)):
+            if interrupt is not None and row_idx % 128 == 0:
+                interrupt()
+            for i in range(lo, hi):
+                out[i] += weight * value[i]
+    return out
+
+
 def sample_logits(
     logits: Vec,
     rng,
@@ -264,7 +314,12 @@ def sample_logits(
     p = softmax(scaled)
     k = int(top_k or 0)
     if 0 < k < n:
-        keep = set(sorted(range(n), key=lambda i: -p[i])[:k])
+        # Stable ties use the original lower token index, just as full
+        # stable sorting did. For small k this avoids an O(vocab) sorted
+        # index array and reduces selection to O(vocab log k).
+        order = (nsmallest(k, range(n), key=lambda i: (-p[i], i))
+                 if k * 8 < n else sorted(range(n), key=lambda i: -p[i])[:k])
+        keep = set(order)
         p = [p[i] if i in keep else 0.0 for i in range(n)]
         s = sum(p) or 1.0
         p = [x / s for x in p]
