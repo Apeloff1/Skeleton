@@ -343,6 +343,7 @@ html,body{background:var(--canvas);color:var(--text)}button{font-size:12px;min-h
 @media(min-width:721px) and (max-width:1100px){.shell{grid-template-columns:285px minmax(0,1fr)}.sidebar{padding:20px 14px}.topbar{padding:21px 24px 17px;flex-wrap:wrap}.conversation-heading{flex-basis:100%}.conversation-toolbar{padding:9px 24px}.intro{padding:28px}.composer{width:calc(100% - 40px)}.keyboard-hint{display:none}}
 @media(max-width:720px){.topbar{padding:13px 14px 10px;gap:9px}.topbar .conversation-heading{order:3;flex-basis:100%;min-width:0}.topbar h1{font-size:20px}.topbar p{font-size:9px}.topbar .indicator{margin-left:auto}.model-tools{font-size:10px}.model-tools>summary{padding:7px 8px}.model-tools .indicator{margin-left:0}.model-tools>div{right:0;width:min(260px,82vw)}.conversation-toolbar{padding:7px 12px;gap:6px;flex-wrap:wrap}.conversation-toolbar #revision{font-size:9px}.conversation-toolbar .hint{font-size:9px}.conversation-actions{gap:3px}.conversation-actions button{min-height:30px;padding:5px 7px;font-size:10px}.intro{padding:20px 22px;overflow:auto}.intro .glow{width:43px;height:43px;border-radius:14px;font-size:27px;margin-bottom:17px}.intro h2{font-size:28px;margin-bottom:12px}.intro p{font-size:12px;line-height:1.7}.intro .minor{font-size:10px;margin-top:14px;padding-top:10px}.getting-started{margin:14px 0;gap:7px;font-size:11px}.getting-started b{width:19px;height:19px}.composer{width:calc(100% - 20px);padding:11px;border-radius:12px}.composer textarea{min-height:62px;max-height:22vh;padding:10px;font-size:13px}.composer-submit{gap:6px;margin-top:6px}.composer-submit .keyboard-hint{display:none}.composer-submit button{font-size:11px;min-height:34px}.generation-options{margin-top:5px}.generation-options .bottom{gap:10px}.generation-options label{font-size:10px}.context-report{padding:6px 12px;font-size:9px;max-height:44px;overflow:auto}.status{padding:6px 12px 9px;font-size:10px;max-height:56px;overflow:auto}.messages{padding:16px 12px;gap:14px}.message{padding:14px;max-width:97%;font-size:13px}.transcript-tools{margin:2px}.sidebar{padding:18px 15px}.sidebar .sessions{max-height:29vh;min-height:120px}.sidebar .knowledge-section{max-height:none}.workspace-section{padding:13px 0}.brand{margin-bottom:17px}.brand #sidebar-close{min-height:32px}.shell.library-open .main{pointer-events:none}.sidebar-close:focus-visible{outline-offset:2px}}
 #memory-panel input:not([type=checkbox]),#memory-panel select,#memory-panel textarea{width:100%;box-sizing:border-box;color:#edf0f8;background:#111925;border:1px solid #465575;border-radius:7px;padding:7px;font:inherit}#memory-panel label{display:block;margin:7px 0}#memory-panel label input[type=checkbox]{width:auto}#memory-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:165px;overflow:auto;font-size:11px}#memory-panel .memory-card{border:1px solid #34445e;border-radius:8px;padding:9px;margin:9px 0}#memory-panel .memory-card strong{overflow-wrap:anywhere}#memory-panel .memory-card .inline{margin-top:6px}
+.chat-richtext{white-space:normal;overflow-wrap:anywhere}.chat-richtext p,.chat-richtext blockquote{white-space:pre-wrap;line-height:1.58;margin:7px 0}.chat-richtext h3,.chat-richtext h4,.chat-richtext h5{font-weight:700;margin:16px 0 7px;font-size:inherit}.chat-richtext h3{font-size:1.24em}.chat-richtext h4{font-size:1.12em}.chat-richtext ul,.chat-richtext ol{white-space:normal;padding-left:24px;margin:9px 0}.chat-richtext li{margin:4px 0;white-space:pre-wrap}.chat-richtext blockquote{border-left:3px solid #50668b;padding-left:12px;color:#bdcbe0}.chat-richtext code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:#101723;border-radius:4px;padding:1px 4px;font-size:.91em}.chat-richtext .chat-code{background:#101723;border:1px solid #35435a;border-radius:8px;margin:10px 0;overflow:hidden}.chat-code-header{display:flex;align-items:center;justify-content:space-between;padding:5px 10px;background:#1e293b;color:#aebeda;font-size:11px}.chat-richtext pre{overflow:auto;white-space:pre;max-height:420px;margin:0;padding:12px;line-height:1.5}.chat-richtext pre code{padding:0;white-space:pre;background:transparent}.chat-table-scroll{overflow-x:auto;margin:9px 0}.chat-richtext table{border-collapse:collapse;min-width:220px;text-align:left;font-size:.92em}.chat-richtext th,.chat-richtext td{border:1px solid #3b4b65;padding:7px;vertical-align:top}.chat-richtext th{background:#263449}.chat-richtext hr{border:0;border-top:1px solid #42516b}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 
 """
@@ -557,6 +558,7 @@ JAVASCRIPT = r"""'use strict';
     get('memory-compose').disabled = locked || working || !state.session || !state.memorySelected?.size;
     get('memory-apply').disabled = locked || working || !state.memoryPreview;
     get('memory-detach').disabled = locked || working || !state.memorySource;
+    document.querySelectorAll('[data-rewrite]').forEach(el => {el.disabled=locked||working;});
     document.querySelectorAll('[data-memory-control]').forEach(el => {
       el.disabled = locked || working || (el.dataset.memoryControl === 'select' && el.dataset.expired === 'true');
     });
@@ -761,22 +763,180 @@ JAVASCRIPT = r"""'use strict';
     });
     return lines.join('\n');
   }
+  // BEGIN JEEVES_SAFE_CHAT_RENDERER
+  function inlineChatText(parent, text) {
+    // Only literal text nodes and fixed element names, never HTML or URLs.
+    const pattern = /(\x60[^\x60\n]{1,512}\x60|\*\*[^*\n]{1,512}\*\*)/g;
+    let offset=0;
+    for (const match of text.matchAll(pattern)) {
+      parent.append(document.createTextNode(text.slice(offset,match.index)));
+      const token=match[0];
+      const node=document.createElement(token.startsWith('**')?'strong':'code');
+      node.textContent=token.startsWith('**')?token.slice(2,-2):token.slice(1,-1);
+      parent.append(node); offset=match.index+token.length;
+    }
+    parent.append(document.createTextNode(text.slice(offset)));
+  }
+  function chatTableCells(line) {
+    if (!line.includes('|') || line.includes('\\|') || line.length>4096) return null;
+    const cells=line.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(c=>c.trim());
+    return cells.length>=2 && cells.length<=12 ? cells : null;
+  }
+  function renderChatBody(target, raw, copyCode) {
+    // No user-controlled tag names, attributes, URLs, SVG, HTML parser, or
+    // executable Markdown extensions. Raw source remains available separately.
+    target.replaceChildren();
+    if (typeof raw!=='string') return;
+    if (raw.length>262144 || raw.split('\n',4002).length>4000) {
+      target.textContent=raw; return;
+    }
+    const lines=raw.replace(/\r\n?/g,'\n').split('\n');
+    let i=0, nodes=0;
+    const append=node=>{target.append(node);nodes++;};
+    const simple=(tag,text)=>{
+      const n=document.createElement(tag);inlineChatText(n,text);append(n);return n;
+    };
+    while (i<lines.length) {
+      if (nodes>=1200) {
+        // Preserve the remaining text verbatim rather than silently dropping it.
+        const rest=document.createElement('pre');rest.textContent=lines.slice(i).join('\n');append(rest);break;
+      }
+      const line=lines[i];
+      if (!line.trim()) {i++;continue;}
+      const fence=/^\s{0,3}(\x60{3,}|~{3,})([A-Za-z0-9_.+-]{0,40})\s*$/.exec(line);
+      if (fence) {
+        const start=++i, marker=fence[1][0], count=fence[1].length;
+        while (i<lines.length) {
+          const close=/^\s{0,3}(\x60{3,}|~{3,})\s*$/.exec(lines[i]);
+          if (close && close[1][0]===marker && close[1].length>=count) break;
+          i++;
+        }
+        const code=lines.slice(start,i).join('\n');
+        const wrapped=document.createElement('div');wrapped.className='chat-code';
+        const bar=document.createElement('div');bar.className='chat-code-header';
+        const name=document.createElement('span');
+        name.textContent=(fence[2]||'Code')+(i===lines.length?' · unclosed fence':'');
+        const button=document.createElement('button');button.type='button';button.className='small';
+        button.textContent='Copy code';button.addEventListener('click',()=>copyCode(code));
+        bar.append(name,button);
+        const pre=document.createElement('pre'), literal=document.createElement('code');
+        literal.textContent=code;pre.append(literal);wrapped.append(bar,pre);append(wrapped);
+        if (i<lines.length) i++;
+        continue;
+      }
+      const heading=/^(#{1,3})\s+(.+)$/.exec(line);
+      if (heading) {simple(['h3','h4','h5'][heading[1].length-1],heading[2]);i++;continue;}
+      if (/^\s*(?:---+|\*\*\*+|___+)\s*$/.test(line)) {append(document.createElement('hr'));i++;continue;}
+      const head=chatTableCells(line), delimiter=i+1<lines.length?chatTableCells(lines[i+1]):null;
+      if (head && delimiter && head.length===delimiter.length && delimiter.every(x=>/^:?-{3,}:?$/.test(x))) {
+        const wrapper=document.createElement('div');wrapper.className='chat-table-scroll';
+        const table=document.createElement('table'), thead=document.createElement('thead'), tr=document.createElement('tr');
+        for (const cell of head) {const th=document.createElement('th');th.scope='col';inlineChatText(th,cell);tr.append(th);}
+        thead.append(tr);table.append(thead);const tbody=document.createElement('tbody');i+=2;
+        let count=0;
+        while(i<lines.length && count<100) {
+          const cells=chatTableCells(lines[i]);
+          if (!cells || cells.length!==head.length) break;
+          const row=document.createElement('tr');
+          for(const cell of cells){const td=document.createElement('td');inlineChatText(td,cell);row.append(td);}
+          tbody.append(row);i++;count++;
+        }
+        table.append(tbody);wrapper.append(table);append(wrapper);continue;
+      }
+      const bullet=/^\s{0,3}[-*+]\s+(.+)$/.exec(line), number=/^\s{0,3}\d{1,6}[.)]\s+(.+)$/.exec(line);
+      if (bullet||number) {
+        const list=document.createElement(bullet?'ul':'ol');
+        if(number) list.start=Number(/^\s{0,3}(\d{1,6})/.exec(line)[1]);
+        const regex=bullet?/^\s{0,3}[-*+]\s+(.+)$/:/^\s{0,3}\d{1,6}[.)]\s+(.+)$/;
+        let count=0;
+        while(i<lines.length && count<200) {
+          const match=regex.exec(lines[i]);if(!match)break;
+          const li=document.createElement('li');inlineChatText(li,match[1]);list.append(li);i++;count++;
+        }
+        append(list);continue;
+      }
+      if (/^\s{0,3}>\s?/.test(line)) {
+        const fragment=[];
+        while(i<lines.length && /^\s{0,3}>\s?/.test(lines[i]) && fragment.length<200)
+          fragment.push(lines[i++].replace(/^\s{0,3}>\s?/,''));
+        simple('blockquote',fragment.join('\n'));continue;
+      }
+      // Keep ordinary line breaks; do not merge across a possible next
+      // block boundary. This also leaves all links and HTML as inert text.
+      simple('p',line);i++;
+    }
+  }
+  // END JEEVES_SAFE_CHAT_RENDERER
+
+  async function branchDraft({sourceSession,sourceRevision,userIndex,afterTurn,question}) {
+    if (!state.connected || unresolved() || state.session!==sourceSession
+      || state.revision!==sourceRevision || state.messages[userIndex]?.role!=='user'
+      || state.messages[userIndex].content!==question)
+      throw new Error('Conversation changed. Refresh before editing a branch.');
+    const epoch=state.epoch;
+    const parent=await api('GET','/v1/sessions/'+sourceSession);
+    if (state.epoch!==epoch || state.session!==sourceSession || parent.session_id!==sourceSession
+      || parent.revision!==sourceRevision || !Array.isArray(parent.messages)
+      || parent.messages[userIndex]?.role!=='user' || parent.messages[userIndex].content!==question)
+      throw new Error('Saved source conversation changed. No branch created.');
+    // Stored conversations are append-only. The fork boundary excludes
+    // the selected question and answer; no existing conversation is rewritten.
+    const systemCount=parent.messages[0]?.role==='system'?1:0;
+    if (systemCount+2*afterTurn!==userIndex) throw new Error('Invalid branch boundary.');
+    const expectedPrefix=parent.messages.slice(0,userIndex);
+    const child=await api('POST','/v1/sessions/'+sourceSession+'/fork',{after_turn:afterTurn});
+    if(child.source_session_id!==sourceSession || child.revision!==afterTurn || child.session_id===sourceSession)
+      throw new Error('Invalid branch receipt; inspect saved conversations.');
+    const verified=await api('GET','/v1/sessions/'+child.session_id);
+    if (state.epoch!==epoch || verified.session_id!==child.session_id || verified.revision!==afterTurn
+      || JSON.stringify(verified.messages)!==JSON.stringify(expectedPrefix))
+      throw new Error('Branch readback mismatch. No prompt was applied.');
+    await selectSession(child.session_id);
+    if (state.epoch!==epoch || state.session!==child.session_id || state.revision!==afterTurn)
+      throw new Error('Selected branch changed. No prompt was applied.');
+    get('prompt').value=question;
+    invalidateContextPreview();sidebar(false);get('prompt').focus();
+    status('Original preserved. Edit or send this separate branch draft; review context and evidence before sending.');
+  }
   function showMessages() {
     const list = get('messages'); list.replaceChildren();
     get('intro').hidden = state.messages.length > 0;
     let completed = 0;
-    state.messages.forEach(message => {
+    state.messages.forEach((message, messageIndex) => {
       const card = document.createElement('article');
       card.className = 'message ' + (message.role === 'user' ? 'user' : 'assistant');
       const header = document.createElement('header');
       const faith = message.role === 'assistant' ? state.faithfulness[completed] : null;
       const visible = faith?.published_text || message.content;
       header.textContent = message.role === 'user' ? 'YOU' : message.role === 'system' ? 'CONVERSATION INSTRUCTIONS' : (faith && visible !== message.content ? 'GROUNDED ANSWER' : 'LOCAL MODEL');
-      const content = document.createElement('div'); content.textContent = visible;
+      const content = document.createElement('div');
+      if (message.role==='assistant') {
+        content.className='chat-richtext';
+        renderChatBody(content,visible,code=>void copy(code));
+      } else content.textContent=visible;
       card.append(header, content);
       const actions = document.createElement('div'); actions.className = 'message-actions';
       const copyButton = document.createElement('button'); copyButton.className = 'small'; copyButton.textContent = 'Copy';
       copyButton.addEventListener('click', () => void copy(visible)); actions.append(copyButton);
+      if (message.role==='assistant') {
+        const raw=document.createElement('button');raw.type='button';raw.className='small';raw.textContent='Show raw text';
+        let plain=false;
+        raw.addEventListener('click',()=>{
+          plain=!plain;raw.textContent=plain?'Show formatted':'Show raw text';
+          if(plain){content.className='';content.textContent=visible;}
+          else {content.className='chat-richtext';renderChatBody(content,visible,code=>void copy(code));}
+        });
+        actions.append(raw);
+      }
+      if (message.role==='user' || (message.role==='assistant' && state.messages[messageIndex-1]?.role==='user')) {
+        const userIndex=message.role==='user'?messageIndex:messageIndex-1;
+        const original=state.messages[userIndex].content;
+        const sourceSession=state.session,sourceRevision=state.revision,afterTurn=completed;
+        const edit=document.createElement('button');edit.type='button';edit.className='small';
+        edit.dataset.rewrite='true';edit.textContent=message.role==='user'?'Edit in new branch':'Retry in new branch';
+        edit.addEventListener('click',()=>run(()=>branchDraft({sourceSession,sourceRevision,userIndex,afterTurn,question:original})));
+        actions.append(edit);
+      }
       if (message.role === 'assistant') {
         const index = completed++;
         const fork = document.createElement('button'); fork.className = 'small';
