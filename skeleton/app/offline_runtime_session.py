@@ -61,7 +61,7 @@ class OfflineRuntimeSession:
     def _source_fresh(self, now_ns: int) -> bool:
         age = now_ns - self._verified_ns
         return age >= 0 and (self._maximum_source_age_ns is None or
-                             age <= self._maximum_source_age_ns)
+                             age < self._maximum_source_age_ns)
 
     def _require_fresh_source(self, now_ns: int) -> None:
         if not self._source_fresh(now_ns):
