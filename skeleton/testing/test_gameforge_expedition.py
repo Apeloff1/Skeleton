@@ -62,9 +62,10 @@ def rehash(value, key):
     value[key] = hashlib.sha256(canonical({k: v for k, v in value.items() if k != key})).hexdigest()
 
 
-def invoke(command, value):
+def invoke(command, value, database=None):
     out, err = io.StringIO(), io.StringIO()
-    code = main([command], stdin=io.BytesIO(canonical(value)), stdout=out, stderr=err)
+    args = [command] + (["--database", str(database)] if database is not None else [])
+    code = main(args, stdin=io.BytesIO(canonical(value)), stdout=out, stderr=err)
     return code, json.loads(out.getvalue()) if out.getvalue() else None, err.getvalue()
 
 
