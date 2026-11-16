@@ -79,7 +79,10 @@ def inventory_offline_weights(
     except OSError as exc:
         raise OfflineInventoryError("cannot enumerate offline weight manifests") from exc
 
-    store = WeightShardStore(path, maximum_bytes=max_weight_bytes)
+    try:
+        store = WeightShardStore(path, maximum_bytes=max_weight_bytes, read_only=True)
+    except WeightShardStoreError as exc:
+        raise OfflineInventoryError("offline weight store layout unavailable") from exc
     verified: list[VerifiedOfflineWeightPlan] = []
     # Admit the entire declared byte budget before opening any weight object.
     # Otherwise N individually valid plans can force N huge reads before
