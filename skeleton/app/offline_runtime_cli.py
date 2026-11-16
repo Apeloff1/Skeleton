@@ -58,6 +58,7 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
     parser.add_argument("--backend", choices=("cpu", "cuda", "hybrid"), default="cpu")
     parser.add_argument("--source-budget-mib", type=int, default=131072)
     parser.add_argument("--max-inventory-entries", type=int, default=64)
+    parser.add_argument("--require-scrub-sha256", help="Independently pinned completed managed scrub campaign")
     parser.add_argument("--skip-gguf-framing", action="store_true",
                         help="Explicit opaque-weight inspection; no GGUF framing qualification")
     parser.add_argument("--max-workers", type=int, default=8)
@@ -89,6 +90,7 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
             interactive_cpu_reserve=args.interactive_cpu_reserve,
             maximum_tokens=args.token_budget, prefill_quantum=args.prefill_quantum,
             sample_age_ns=args.sample_age_ms * 1_000_000,
+            required_scrub_digest=args.require_scrub_sha256,
         )
         deployment_inputs = (args.deployment, args.manifest_sha256, args.manifest_digest,
                              args.deployment_budget_mib)
