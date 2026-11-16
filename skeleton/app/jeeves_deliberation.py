@@ -24,6 +24,11 @@ _STRATEGIES = (
     ("direct", "Review approach: answer the request directly and identify key assumptions."),
     ("counterpoint", "Review approach: examine an alternative explanation or solution; identify uncertainty and failure modes."),
 )
+_ADAPTIVE_STRATEGIES = _STRATEGIES + (
+    ("decompose", "Review approach: decompose the task into independently checkable subproblems before finalizing."),
+    ("recompute", "Review approach: independently recompute the result and check the explicit output contract."),
+)
+
 
 
 def _hash(text):
@@ -60,7 +65,7 @@ def _comparison(candidates):
 
 async def deliberate(backend, question, *, history, instructions, revision,
                      model_digest, tokenizer_digest, output_tokens,
-                     require_full_history, evidence=None, recheck=None):
+                     require_full_history, evidence=None, recheck=None, adaptive=None):
     """Execute both strategies with a shared cooperative wall/token budget.
 
     The HTTP owner holds the existing single-model lease and checks the
@@ -79,9 +84,34 @@ async def deliberate(backend, question, *, history, instructions, revision,
         raise OfflineAIError("deliberation model identity changed")
     question = question.strip()
     context = None if evidence is None else evidence["context"]
+    policy = None
+    if adaptive is not None:
+        from skeleton.app.jeeves_constraints import normalize_policy, prompt_suffix, assess, digest
+        try:
+            policy = normalize_policy(adaptive, output_tokens)
+        except ValueError as exc:
+            raise OfflineAIError("invalid adaptive reasoning policy") from exc
     candidates = []
+    reserved = 0
+    stop_reason = "strategy_limit"
     deadline = time.monotonic() + MAX_SECONDS
-    for mode, suffix in _STRATEGIES:
+    strategies = _STRATEGIES if policy is None else _ADAPTIVE_STRATEGIES[:policy["max_attempts"]]
+    total_budget = MAX_TOTAL_TOKENS if policy is None else policy["maximum_reserved_tokens"]
+    for mode, suffix in strategies:
+        if reserved + output_tokens > total_budget:
+            stop_reason = "token_budget"
+            break
+        if policy is not None:
+            suffix += prompt_suffix(policy)
+            # Only a fixed verifier diagnostic may guide the next independent
+            # attempt. Never use candidate output as an instruction.
+            if candidates and policy["contract"]["kind"] != "review":
+                previous = candidates[-1]["verification"]["code"]
+                if previous not in ("numeric_mismatch", "invalid_numeric_format",
+                                    "invalid_artifact_schema"):
+                    raise OfflineAIError("unexpected verifier diagnostic")
+                suffix += " Prior independent verification failed (" + previous + "). Recompute independently."
+        reserved += output_tokens
         recheck()
         remaining = deadline - time.monotonic()
         if remaining <= 0:
@@ -123,19 +153,43 @@ async def deliberate(backend, question, *, history, instructions, revision,
             "citation_audit": None if evidence is None else audit_answer_citations(answer.text, evidence),
             "faithfulness": None if evidence is None else audit_answer_faithfulness(answer.text, evidence),
         }
+        if policy is not None:
+            row["verification"] = assess(answer.text, policy["contract"])
         candidates.append(row)
+        if policy is not None and row["verification"]["passed"]:
+            stop_reason = "explicit_contract_passed"
+            break
     recheck()
+    if not candidates:
+        raise OfflineAIError("no admitted reasoning candidate")
+    comparison = _comparison(candidates) if policy is None else {
+        "identical_output": len({row["output_sha256"] for row in candidates}) == 1,
+        "candidate_count": len(candidates), "distinct_strategy_count": len(candidates),
+        "independent_model_count": 1, "answer_selected": False,
+        "semantic_truth_verified": False,
+        "selection_authority": "operator-review-only",
+    }
     report = {
         "schema": SCHEMA, "question_sha256": _hash(question), "session_revision": revision,
         "model_digest": model_digest, "tokenizer_digest": tokenizer_digest,
         "candidate_output_budget": output_tokens,
-        "reserved_total_output_tokens": 2*output_tokens,
+        "reserved_total_output_tokens": reserved,
         "actual_total_output_tokens": sum(row["output_tokens"] for row in candidates),
         "require_full_history": require_full_history, "generation_performed": True,
         "grounding_context_sha256": None if evidence is None else evidence["context_sha256"],
-        "candidates": candidates, "comparison": _comparison(candidates),
+        "candidates": candidates, "comparison": comparison,
         "transcript_committed": False, "tool_execution_authorized": False,
         "automatic_retry": False, "memory_saved": False,
     }
+    if policy is not None:
+        report["schema"] = "skeleton.jeeves.adaptive-review.v1"
+        report["adaptive"] = {
+            "policy": policy, "policy_sha256": digest(policy),
+            "stop_reason": stop_reason,
+            "maximum_reserved_tokens": total_budget,
+            "attempts": len(candidates),
+            "contract_passed": any(row["verification"]["passed"] for row in candidates),
+            "contract_scope_only": True, "candidate_text_reinjected": False,
+        }
     report["report_sha256"] = _hash(_stable(report))
     return report
