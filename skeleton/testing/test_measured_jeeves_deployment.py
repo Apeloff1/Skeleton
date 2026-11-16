@@ -22,13 +22,13 @@ import pytest
 from skeleton.ai.model_runtime.flgb_model_runtime import WeightLoadPlan, WeightShard
 from skeleton.ai.runtime.inference.adaptive_serving import ServingResources
 from skeleton.ai.runtime.inference.deployment import (
-    LocalModelDeployment, LocalModelDeploymentError, create_local_model_deployment,
+    LocalModelDeploymentError, create_local_model_deployment,
 )
 from skeleton.ai.runtime.inference.guarded_composition import ProtectedLocalComponents
 from skeleton.ai.runtime.inference.llama_cpp import LlamaCppModel, LlamaCppRuntimeError
 from skeleton.ai.runtime.inference.local import LocalInferenceRequest
 from skeleton.app.offline_runtime_llama_binding import (
-    MeasuredLlamaCpuGate, MeasuredLocalDeployment, build_measured_guarded_deployment,
+    MeasuredLlamaCpuGate, MeasuredLocalDeployment,
 )
 from skeleton.app.offline_runtime_preflight import ModelSource, RuntimePreflightError
 from skeleton.provider_runtime import ProviderRegistry, ProviderUnavailableError, ProviderPolicyError
@@ -207,6 +207,8 @@ def test_provider_registry_activates_existing_protected_jeeves_route(authored, m
     with pytest.raises(ProviderPolicyError):
         asyncio.run(active.engine.generate(LocalInferenceRequest("hello")))
     asyncio.run(active.close())
+    assert registry.measured_local_status()["closed"]
+    assert not active.available
 
 
 @pytest.mark.parametrize("variable,value", [
