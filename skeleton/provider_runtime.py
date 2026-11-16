@@ -3170,9 +3170,11 @@ class _GovernedLocalAdapter(ProviderAdapter):
     provider_id = "local"
 
     def __init__(
-        self, adapter: ProviderAdapter, *, admission_runtime: AdmissionRuntime, timeout_seconds: float
+        self, adapter: ProviderAdapter, *, admission_runtime: AdmissionRuntime, timeout_seconds: float,
+        measured_local_gate: Any | None = None,
     ) -> None:
         self._adapter = adapter
+        self._measured_local_gate = measured_local_gate
         self.model = adapter.model
         self.admission_runtime = admission_runtime
         self.timeout_seconds = timeout_seconds
@@ -3197,6 +3199,8 @@ class _GovernedLocalAdapter(ProviderAdapter):
     def available(self) -> bool:
         try:
             self._ensure_architecture()
+            if self._measured_local_gate is not None and self._measured_local_gate.status()["closed"]:
+                return False
             return self.model == self._adapter.model and self._adapter.available
         except (OSError, ValueError, RuntimeError, TypeError, AttributeError):
             return False
@@ -3227,9 +3231,13 @@ class _GovernedLocalAdapter(ProviderAdapter):
         except (OSError, ValueError, RuntimeError, TypeError, AttributeError) as exc:
             raise ProviderUnavailableError("local artifact identity drift") from exc
         result["available"] = self.available
+        if self._measured_local_gate is not None:
+            result["measured_local_admission"] = self._measured_local_gate.status()
         return result
 
     async def close(self, *, cancel_running: bool = True) -> None:
+        if self._measured_local_gate is not None:
+            self._measured_local_gate.close()
         await self._adapter.close(cancel_running=cancel_running)
 
     async def generate(self, request: ProviderRequest) -> ProviderResponse:
@@ -3570,9 +3578,10 @@ class ProviderRegistry:
                 )
             local_admission = admission_runtime or AdmissionRuntime()
 
-            def guarded(adapter: ProviderAdapter) -> ProviderAdapter:
+            def guarded(adapter: ProviderAdapter, *, measured_gate: Any | None = None) -> ProviderAdapter:
                 return _GovernedLocalAdapter(
-                    adapter, admission_runtime=local_admission, timeout_seconds=timeout
+                    adapter, admission_runtime=local_admission, timeout_seconds=timeout,
+                    measured_local_gate=measured_gate,
                 )
 
             if catalog_path:
@@ -3632,13 +3641,13 @@ class ProviderRegistry:
                             guarded_components=guarded_components,
                             **capacity,
                         )
-                except (LocalModelDeploymentError, ProviderPolicyError, OSError, TypeError, ValueError) as exc:
+                except (LocalModelDeploymentError, ProviderPolicyError, OSError, TypeError, ValueError, RuntimeError) as exc:
                     raise ProviderUnavailableError("local provider deployment failed activation") from exc
                 if jeeves_local_only and adapter.model != "jeeves":
                     if measured_gate is not None:
                         measured_gate.close()
                     raise ProviderUnavailableError("The pinned deployment model identity is not jeeves")
-                registry = cls([guarded(adapter)], active="local")
+                registry = cls([guarded(adapter, measured_gate=measured_gate)], active="local")
                 registry._measured_local_gate = measured_gate
                 return registry
             try:
