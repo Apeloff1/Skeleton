@@ -205,6 +205,14 @@ class LeadReview(Request):
     interval_seconds: int = Field(default=604800,ge=900,le=7776000,strict=True)
 
 
+class LeadReviewBatchItem(LeadReview):
+    lead: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class LeadReviewBatch(Request):
+    items: list[LeadReviewBatchItem] = Field(min_length=1,max_length=32)
+
+
 class LeadTargetRegistration(Request):
     projection: Literal["steam","modrinth","locator"]
     rights_ref: str = Field(min_length=1,max_length=128)
@@ -803,6 +811,11 @@ def register_knowledge_routes(router):
     async def lead_graph_review(lead:str,body:LeadReview,user:dict=Depends(get_current_user)):
         from core.dragon_corpus_runtime import lead_graph_call
         return await corpus_runtime_call(lead_graph_call(editor(user),"review",lead,**body.model_dump()))
+
+    @router.post("/knowledge/game-corpus/lead-graph/review-batch")
+    async def lead_graph_review_batch(body:LeadReviewBatch,user:dict=Depends(get_current_user)):
+        from core.dragon_corpus_runtime import lead_graph_call
+        return await corpus_runtime_call(lead_graph_call(editor(user),"review_batch",**body.model_dump()))
 
     @router.get("/knowledge/game-corpus/lead-graph/dataset-candidates")
     async def lead_dataset_candidates(response:Response,after:str|None=Query(None,max_length=64),
