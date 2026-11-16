@@ -14,7 +14,7 @@ import math
 import re
 import unicodedata
 
-from .learned_embeddings import LocalContextEncoder, SpanEmbedding, _digest
+from .learned_embeddings import LocalContextEncoder, LocalPairReranker, SpanEmbedding, _digest
 
 _WORD=re.compile(r"[^\W_]+(?:[-_.:][^\W_]+)*",re.UNICODE)
 
@@ -120,14 +120,16 @@ def _as_embedding(raw,dimension,segments):
 
 
 class ContextualRanker:
-    def __init__(self,encoder:LocalContextEncoder,policy:SemanticPolicy=SemanticPolicy()):
+    def __init__(self,encoder:LocalContextEncoder,policy:SemanticPolicy=SemanticPolicy(),*,reranker=None):
         if not isinstance(encoder,LocalContextEncoder) or not isinstance(policy,SemanticPolicy):
             raise TypeError("pinned learned encoder and retrieval policy required")
-        self.encoder,self.policy=encoder,policy
+        if reranker is not None and not isinstance(reranker,LocalPairReranker):
+            raise TypeError("explicit local pinned cross-encoder required")
+        self.encoder,self.policy,self.reranker=encoder,policy,reranker
 
     @property
     def identity(self):
-        return _digest([self.encoder.identity,self.policy.digest,"skeleton.hybrid-context.v1"])
+        return _digest([self.encoder.identity,self.policy.digest,"skeleton.hybrid-context.v1",self.reranker.identity if self.reranker else None])
 
     def _features(self,spans,cache,interrupt):
         p=self.policy
@@ -250,6 +252,18 @@ class ContextualRanker:
         scale=max(rank_sum.values())
         base={i:0.44*(float(cosine[i])+1)/2+0.30*(maxsim[i]+1)/2+
             0.20*rank_sum[i]/scale+0.06*(parent[i]+1)/2 for i in expanded}
+        cross={}
+        if self.reranker is not None:
+            shortlist=sorted(expanded,key=lambda i:(-exact[i],-base[i],keys[i]))[:self.reranker.policy.max_pairs]
+            if interrupt:interrupt()
+            observed=self.reranker.score(query,[spans[i].text for i in shortlist])
+            if len(observed)!=len(shortlist):
+                raise RuntimeError("cross-encoder result count mismatch")
+            cross=dict(zip(shortlist,observed))
+            # Rerank the evaluated shortlist only. Unscored candidates are
+            # not promoted using an invented neutral model score.
+            expanded=set(shortlist)
+            for i in shortlist:base[i]=0.55*base[i]+0.45*cross[i]
         selected=[]
         scores={}
         remaining=set(expanded)
@@ -278,7 +292,10 @@ class ContextualRanker:
                  "source_span_count":len(spans),"encoded_calls":calls,"candidate_count":len(expanded),
                  "selected":[{"span_sha256":keys[i],"source_revision":spans[i].revision,
                               "ordinal":spans[i].ordinal,"dense_cosine":float(cosine[i]),
-                              "late_interaction":maxsim[i],"anchor_matches":exact[i]} for i in selected],
+                              "late_interaction":maxsim[i],"anchor_matches":exact[i],
+                              "cross_encoder_score":cross.get(i)} for i in selected],
+                 "cross_encoder_sha256":self.reranker.identity if self.reranker else None,
+                 "cross_encoder_pairs":len(cross),
                  "semantic_entailment_verified":False}
         receipt["receipt_sha256"]=_digest(receipt)
         return rows,receipt
