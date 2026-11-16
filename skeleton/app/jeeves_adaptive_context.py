@@ -62,11 +62,12 @@ class ContextPolicy:
     profile: str
     use_recent_anchors: bool
     withhold_conflicts: bool
+    use_vector_recall: bool
 
     @classmethod
     def parse(cls, obj: Any) -> "ContextPolicy":
         fields = {"kinds", "max_records", "max_bytes", "profile",
-                  "use_recent_anchors", "withhold_conflicts"}
+                  "use_recent_anchors", "withhold_conflicts", "use_vector_recall"}
         if type(obj) is not dict or set(obj) != fields:
             raise MemoryRejected("invalid context policy shape")
         kinds = obj["kinds"]
@@ -80,16 +81,18 @@ class ContextPolicy:
                 or type(obj["profile"]) is not str or obj["profile"] not in _PROFILES
                 or type(obj["use_recent_anchors"]) is not bool
                 or type(obj["withhold_conflicts"]) is not bool
+                or type(obj["use_vector_recall"]) is not bool
                 or obj["withhold_conflicts"] is not True):
             raise MemoryRejected("invalid context policy bounds")
         return cls(tuple(sorted(kinds)), maximum, budget, obj["profile"],
-                   obj["use_recent_anchors"], obj["withhold_conflicts"])
+                   obj["use_recent_anchors"], obj["withhold_conflicts"], obj["use_vector_recall"])
 
     def as_dict(self) -> dict[str, Any]:
         return {"kinds": list(self.kinds), "max_records": self.max_records,
                 "max_bytes": self.max_bytes, "profile": self.profile,
                 "use_recent_anchors": self.use_recent_anchors,
-                "withhold_conflicts": self.withhold_conflicts}
+                "withhold_conflicts": self.withhold_conflicts,
+                "use_vector_recall": self.use_vector_recall}
 
     @property
     def digest(self) -> str:
@@ -286,6 +289,53 @@ def _bridges(memory: ApprovedMemory, entries: list[dict], policy: ContextPolicy)
     return list(by_id.values()), truncated
 
 
+def _dense(memory, vector_index, query, anchors, entries, policy):
+    """Fuse only same-scope, source-pinned dense candidates into lexical pool."""
+    if not policy.use_vector_recall:
+        return entries, {"requested": False, "enabled": False}, False
+    if vector_index is None or vector_index.memory is not memory:
+        raise MemoryRejected("selected vector recall unavailable")
+    status=vector_index.status()
+    bank=status["bank"]
+    summary={"requested":True,"enabled":bank is not None,
+             "asset_sha256":bank["asset_sha256"] if bank else None,
+             "active_memories":status["active_memories"],
+             "indexed_active_memories":status["indexed_active_memories"],
+             "index_complete_snapshot":status["index_complete_snapshot"],
+             "queries_with_coverage":0}
+    if bank is None or not policy.kinds or policy.max_records==0:
+        return entries,summary,False
+    by_id={x["record"]["memory_id"]:x for x in entries}
+    truncated=False
+    for index,text in enumerate([query]+[a["query"] for a in anchors]):
+        result=vector_index.search(_prefix_bytes(text,MAX_QUERY_BYTES),limit=18,kinds=list(policy.kinds))
+        truncated |= result["candidate_limit_reached"]
+        count=result.get("word_count",0)
+        coverage=result.get("covered_words",0)/max(1,count)
+        if coverage<0.25:
+            continue
+        summary["queries_with_coverage"]+=1
+        if result.get("asset_sha256")!=summary["asset_sha256"]:
+            raise MemoryConflict("encoder changed within planning snapshot")
+        for row in result["records"]:
+            cosine=row["cosine"]
+            if cosine<0.65 or row["encoder_word_coverage"]<0.25:
+                continue
+            mid=row["memory_id"]
+            record={k:v for k,v in row.items() if k not in {"cosine","encoder_word_coverage"}}
+            if mid not in by_id:
+                if len(by_id)>=MAX_POOL:
+                    truncated=True;continue
+                by_id[mid]={"record":record,"score":0.0,"query_matches":0,
+                            "words":set(),"direct":False}
+            elif _pin(by_id[mid]["record"])!=_pin(row):
+                raise MemoryConflict("dense candidate changed")
+            entry=by_id[mid]
+            entry["dense_score"]=max(entry.get("dense_score",0.0),cosine)
+            entry["score"]+=cosine*4.0/(index+1)**0.5
+    return list(by_id.values()),summary,truncated
+
+
 def _score(entry: dict, query_words: frozenset[str]) -> float:
     record = entry["record"]
     matched = entry["words"]
@@ -330,6 +380,7 @@ def plan_context(*, memory: ApprovedMemory, draft: str, policy: ContextPolicy,
                  session_id: str, session_revision: int, messages: list[dict],
                  output_tokens: int, strict: bool,
                  estimate: Callable[[str, int], dict],
+                 vector_index=None,
                  estimate_rejected: tuple[type[Exception], ...] = (MemoryRejected,)) -> dict:
     """Source-pinned bounded MMR packing with real model-window estimator.
 
@@ -353,6 +404,8 @@ def plan_context(*, memory: ApprovedMemory, draft: str, policy: ContextPolicy,
         if policy.use_recent_anchors:
             entries, bridge_truncated = _bridges(memory, entries, policy)
             truncated |= bridge_truncated
+        entries, dense_summary, dense_truncated = _dense(memory,vector_index,draft,anchor_rows,entries,policy)
+        truncated |= dense_truncated
         groups = conflict_groups(e["record"] for e in entries)
         blocked = {mid for group in groups for mid in group["memory_ids"]}
         words = _words(draft)
@@ -383,7 +436,8 @@ def plan_context(*, memory: ApprovedMemory, draft: str, policy: ContextPolicy,
                 okay = False
             if not okay:
                 effective = ContextPolicy(policy.kinds,policy.max_records,policy.max_bytes,
-                                          "neutral",policy.use_recent_anchors,policy.withhold_conflicts)
+                                          "neutral",policy.use_recent_anchors,policy.withhold_conflicts,
+                                          policy.use_vector_recall)
                 current, report = draft, base
             else:
                 report = profile_report
@@ -430,14 +484,17 @@ def plan_context(*, memory: ApprovedMemory, draft: str, policy: ContextPolicy,
             "selected":pins,
             "selection_details":[{"pin":_pin(e["record"]),"label":e["record"]["label"],
                 "kind":e["record"]["kind"],"direct":e["direct"],
-                "bridge":e.get("bridge"),"matched_words":sorted(e["words"]),
+                "bridge":e.get("bridge"),"dense_cosine":e.get("dense_score"),
+                "matched_words":sorted(e["words"]),
                 "utility":round(e["utility"],6)} for e in selected],
             "possible_conflicts":groups,"excluded":excluded,"candidate_scan_truncated":truncated,
             "candidate_count":len(entries),"evaluations":evaluations,
             "anchors":[{k:v for k,v in a.items() if k!="query"} for a in anchor_rows],
             "baseline_accounting":base,"accounting":report,
             "read_only":True,"generation_performed":False,"automatic_injection":False,
-            "semantic_model_used":False,"preview_is_admission_proof":False,
+            "dense_recall":dense_summary,
+            "semantic_model_used":dense_summary.get("queries_with_coverage",0)>0,
+            "semantic_quality_certified":False,"preview_is_admission_proof":False,
         }
         receipt["plan_sha256"]=_digest(_stable(receipt))
         return receipt
