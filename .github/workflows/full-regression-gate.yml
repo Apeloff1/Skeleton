@@ -450,7 +450,9 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: '3.11.16'
+          # 3.11.16 is source-only on this Windows runner. The 3.13.17
+          # x64 build is published in actions/python-versions and remains pinned.
+          python-version: '3.13.17'
       - name: Install focused test dependency
         run: python -m pip install --disable-pip-version-check 'pytest>=8,<9'
       - name: Execute Windows Job Object subprocess regressions

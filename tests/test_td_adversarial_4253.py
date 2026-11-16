@@ -62,8 +62,11 @@ def test_heartbeat_cannot_grow_meta_past_cap():
 def _scrub(p):
     clean, n = PayloadSecretGuard().scrub(p); return json.dumps(clean), n
 
+MOCK_HEADER_VALUE = "abc123def456"  # deterministic, never a live API credential
+
+
 @pytest.mark.parametrize("payload", [
-    {"X-API-KEY": "abc123def456"}, {"x-Api-Key": "abc123def456"}, {"XApiKey": "abc123def456"},
+    {"X-API-KEY": MOCK_HEADER_VALUE}, {"x-Api-Key": MOCK_HEADER_VALUE}, {"XApiKey": MOCK_HEADER_VALUE},
     {"note": urllib.parse.quote(urllib.parse.quote("token=" + GH))},
     {"note": urllib.parse.quote(urllib.parse.quote(GH))},
     {"note": '{"\\u0074oken": "abc123def456"}'},
@@ -73,7 +76,7 @@ def _scrub(p):
 ])
 def test_secret_variants(payload):
     s, n = _scrub(payload)
-    assert n >= 1 and GH not in s and "hunter2" not in s and "abc123def456" not in s, s
+    assert n >= 1 and GH not in s and "hunter2" not in s and MOCK_HEADER_VALUE not in s, s
 
 def test_bytes_refused():
     with pytest.raises(Exception):

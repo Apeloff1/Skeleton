@@ -1,0 +1,2 @@
+# One historical generic-api-key false positive, independently verified as three identical deterministic redaction test fixtures at the named commit and line. No current or future credential match is exempted.
+3cfecf089a8a4e6cfb1c10352cd06f54abfa5c91:tests/test_td_adversarial_4253.py:generic-api-key:66
