@@ -389,13 +389,57 @@ class MongoCanonicalSourceEpoch:
 
 
 
+def configured_canonical_epoch(owner: Any) -> Any:
+    """Resolve the epoch without permitting an installed owner to downgrade.
+
+    Legacy owners may have no binding. Once protected startup binds an exact
+    owner, loss or replacement is a hard failure on every known write surface.
+    This is a process-owned invariant, not protection against arbitrary Python
+    code execution or independent clients with Mongo write credentials.
+    """
+    epoch = getattr(owner, "canonical_source_epoch", None)
+    required = getattr(owner, "_required_canonical_source_epoch", None)
+    if required is not None and (type(required) is not MongoCanonicalSourceEpoch
+                                 or epoch is not required):
+        raise MongoSourceEpochError("protected canonical writer epoch binding changed")
+    return epoch
+
+
+def bind_required_canonical_writers(*, conversation: Any, memory: Any, epoch: Any) -> None:
+    """Install one sticky authority at trusted startup before accepting work.
+
+    Validation failures leave both owners fenced/blocked rather than
+    restoring an optional legacy mode. A failed deployment must restart and
+    reconcile, never clear this marker in a live process.
+    """
+    if type(epoch) is not MongoCanonicalSourceEpoch:
+        raise MongoSourceEpochError("protected writer requires canonical epoch")
+    from core.conversations import MongoConversationAuthority
+    from skeleton.persistence.memory_repository import MongoMemoryRepository
+    if type(conversation) is not MongoConversationAuthority or type(memory) is not MongoMemoryRepository:
+        raise MongoSourceEpochError("protected writer requires exact canonical owners")
+    for owner in (conversation, memory):
+        existing = configured_canonical_epoch(owner)
+        if existing is not None and existing is not epoch:
+            raise MongoSourceEpochError("canonical writer already bound")
+        if getattr(owner, "_required_canonical_source_epoch", None) is not None:
+            raise MongoSourceEpochError("protected writer binding already installed")
+    # No await or user callback between these assignments: install the deny
+    # marker first on both actual owners, then the shared authority.
+    conversation._required_canonical_source_epoch = epoch
+    memory._required_canonical_source_epoch = epoch
+    conversation.canonical_source_epoch = epoch
+    memory.canonical_source_epoch = epoch
+    verify_canonical_source_writer_inventory(conversation=conversation, memory=memory, epoch=epoch)
+
+
 def fence_conversation_write(method):
     """Apply configured writer fencing to real conversation mutation entrypoints."""
     from functools import wraps
 
     @wraps(method)
     async def guarded(self, *args, **kwargs):
-        epoch = getattr(self, "canonical_source_epoch", None)
+        epoch = configured_canonical_epoch(self)
         if epoch is None:
             return await method(self, *args, **kwargs)
         tenant_id, actor_id = kwargs.get("tenant_id"), kwargs.get("owner_id")
@@ -414,7 +458,7 @@ def fence_memory_commit(method):
 
     @wraps(method)
     async def guarded(self, proposal, *args, **kwargs):
-        epoch = getattr(self, "canonical_source_epoch", None)
+        epoch = configured_canonical_epoch(self)
         if epoch is None:
             return await method(self, proposal, *args, **kwargs)
         from skeleton.contracts.memory_record import MemoryWriteProposal
@@ -434,7 +478,7 @@ def fence_memory_tombstone(method):
 
     @wraps(method)
     async def guarded(self, memory_id, *args, **kwargs):
-        epoch = getattr(self, "canonical_source_epoch", None)
+        epoch = configured_canonical_epoch(self)
         if epoch is None:
             return await method(self, memory_id, *args, **kwargs)
         tenant_id = kwargs.get("tenant_id")
@@ -465,7 +509,7 @@ async def _witnessed_memento_handoff(
     *, mongo: Any, witness: Any, tenant_id: str, actor_id: str,
 ):
     conversation = getattr(mongo, "conversation", None)
-    epoch = getattr(conversation, "canonical_source_epoch", None)
+    epoch = configured_canonical_epoch(conversation)
     if epoch is None:
         yield
         return
@@ -496,7 +540,7 @@ def fence_memento_write(method):
     @wraps(method)
     async def guarded(self, *args, **kwargs):
         conversation = getattr(self, "conversation", None)
-        epoch = getattr(conversation, "canonical_source_epoch", None)
+        epoch = configured_canonical_epoch(conversation)
         if epoch is None:
             return await method(self, *args, **kwargs)
         if "archive" in kwargs:
@@ -590,8 +634,8 @@ def verify_canonical_source_writer_inventory(*, conversation: Any, memory: Any, 
         raise MongoSourceEpochError("canonical conversation must be production Mongo authority")
     if type(memory) is not MongoMemoryRepository:
         raise MongoSourceEpochError("canonical memory must be production Mongo repository")
-    if (conversation.canonical_source_epoch is not epoch
-            or memory.canonical_source_epoch is not epoch):
+    if (configured_canonical_epoch(conversation) is not epoch
+            or configured_canonical_epoch(memory) is not epoch):
         raise MongoSourceEpochError("canonical owners must share one installed epoch")
 
     for name in _CONVERSATION_WRITER_METHODS:
@@ -630,4 +674,5 @@ __all__ = [
     "MongoSourceEpochError", "MongoCanonicalSourceEpoch", "fence_conversation_write",
     "fence_memory_commit", "fence_memory_tombstone",
     "verify_canonical_source_writer_inventory", "fence_memento_write",
+    "configured_canonical_epoch", "bind_required_canonical_writers",
 ]

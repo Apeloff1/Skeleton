@@ -112,6 +112,8 @@ jobs:
             skeleton/testing/test_trusted_native_startup.py
       - name: Qualify exact GGUF binary protocol and host custody
         run: python -m pytest -q --maxfail=1 skeleton/testing/test_gguf_token_bridge.py
+      - name: Qualify sticky canonical writer binding
+        run: python -m pytest -q --maxfail=1 skeleton/testing/test_sticky_canonical_writer.py
       - name: Verify construction and provider-owner contracts
         run: |
           python scripts/check_architecture_map.py
