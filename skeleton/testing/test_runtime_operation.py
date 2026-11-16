@@ -34,7 +34,7 @@ def test_lock_survives_exception_and_keeps_inode(tmp_path):
 def test_cross_process_contention_and_process_exit_release(tmp_path):
     code=("from pathlib import Path; from skeleton.app.runtime_operation import runtime_operation; "
           "import sys; "
-          "lease=runtime_operation(Path(sys.argv[1]),'install',wait_seconds=0); "
+          "lease=runtime_operation(Path(sys.argv[1]),'install',wait_seconds=5); "
           "lease.__enter__(); print('held',flush=True); sys.stdin.read(1)")
     repo=Path(__file__).resolve().parents[2]
     child=subprocess.Popen([sys.executable,"-c",code,str(tmp_path)],cwd=repo,

@@ -324,6 +324,10 @@ def install_application(
             manifest = runtime_manifest(
                 manifest, root=root, environ=admitted_process_env,
             )
+            from skeleton.app.assembly import launch_network_errors
+            network_errors = launch_network_errors(
+                root, manifest=manifest, environ=admitted_process_env, hot=hot,
+            )
         except (OSError, ValueError, UnicodeError):
             phases.append(
                 InstallPhase(
@@ -334,6 +338,10 @@ def install_application(
             return InstallReceipt(root=root, phases=tuple(phases))
         if admitted_digest is not None and not source_stable():
             phases.append(_runtime_source_rejection())
+            return InstallReceipt(root=root, phases=tuple(phases))
+
+        if network_errors:
+            phases.append(InstallPhase("runtime-manifest", False, "; ".join(network_errors)))
             return InstallReceipt(root=root, phases=tuple(phases))
 
         # Validate precisely the configuration used for startup. The production

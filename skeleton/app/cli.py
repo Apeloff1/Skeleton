@@ -438,7 +438,15 @@ def _run_compose(
         from skeleton.app.runtime_operation import compose_operation_environment
         env = compose_operation_environment(env)
     try:
-        completed = subprocess.run(list(command), cwd=root, check=False, env=env)
+        # Lifecycle subprocesses may print interpolated credentials or
+        # huge build output. Explicit logs/ps remain operator diagnostics.
+        mutation = "up" in command or "stop" in command or "config" in command
+        completed = subprocess.run(
+            list(command), cwd=root, check=False, env=env,
+            **({"stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL,
+                "stderr": subprocess.DEVNULL, "timeout": 1800 if "up" in command else 90}
+               if mutation else {}),
+        )
     except (OSError, subprocess.SubprocessError) as exc:
         print("Compose operation failed: " + type(exc).__name__)
         return 1
@@ -1232,8 +1240,15 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                     return 1
                 try:
                     manifest = runtime_manifest(manifest, root=root, environ=process_env)
+                    from skeleton.app.assembly import launch_network_errors
+                    network_errors = launch_network_errors(
+                        root, manifest=manifest, environ=process_env, hot=bool(args.hot),
+                    )
                 except (OSError, ValueError, UnicodeError):
                     print("application start aborted: runtime configuration changed or is unsafe")
+                    return 2
+                if network_errors:
+                    print("application start blocked: " + "; ".join(network_errors))
                     return 2
                 mode = "production" if bool(args.production) else "development"
                 try:

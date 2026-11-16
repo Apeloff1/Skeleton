@@ -777,3 +777,35 @@ def test_windows_stop_serializes_against_installer(tmp_path,monkeypatch):
     with runtime_operation(tmp_path,"install"):
         ok,detail=launcher.stop_runtime(tmp_path)
     assert ok is False and "another installation operation" in detail
+
+
+
+def test_browser_does_not_open_after_configuration_change_in_setup_probe(tmp_path,monkeypatch):
+    from skeleton.app import windows_launcher as launcher
+    config=tmp_path/".env"
+    config.write_text("FRONTEND_PORT=3000\n")
+    def probe(*a,**k):
+        config.write_text("FRONTEND_PORT=3300\n")
+        return SimpleNamespace(ok=True,status=200,detail="ready")
+    monkeypatch.setattr(launcher,"probe_local_setup",probe)
+    monkeypatch.setattr(launcher.webbrowser,"open",
+                        lambda *a,**k: pytest.fail("stale setup target reached browser"))
+    ok,message=launcher.open_running_application(tmp_path)
+    assert not ok and "configuration changed" in message
+
+
+@pytest.mark.parametrize("registry_ready",[True,False])
+def test_windows_runtime_status_requires_backend_route_evidence(tmp_path,monkeypatch,registry_ready):
+    from skeleton.app import windows_launcher as launcher
+    from skeleton.app.health import ProbeResult
+    config=tmp_path/".env"
+    config.write_text("BACKEND_PORT=8400\n")
+    monkeypatch.setattr(launcher,"probe_application",
+        lambda **kw:(ProbeResult("backend","http://localhost:8400/api/health/ready",True,200,"healthy"),))
+    def registry(base,**kwargs):
+        assert base=="http://localhost:8400"
+        return {"ready":registry_ready}
+    monkeypatch.setattr("skeleton.app.first_install.critical_backend_route_report",registry)
+    ok,message=launcher.runtime_status(tmp_path)
+    assert ok is registry_ready
+    assert ("Critical API routers" in message) is (not registry_ready)

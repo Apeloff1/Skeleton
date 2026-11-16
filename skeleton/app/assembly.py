@@ -501,6 +501,70 @@ def runtime_manifest(
     return replace(manifest, services=tuple(services))
 
 
+HOT_RELOAD_PORTS = frozenset((8081, 19000, 19001, 19002))
+
+
+def _local_http_origin(value: str, port: int) -> bool:
+    """Admit only the browser origin that can reach the declared host port."""
+    try:
+        if (type(value) is not str or not 1 <= len(value) <= 512
+                or any(ord(ch) <= 32 or ord(ch) >= 127 for ch in value)
+                or any(ch in value for ch in ("?", "#", "%", chr(92)))):
+            return False
+        parsed = urlsplit(value)
+        return (parsed.scheme == "http"
+                and parsed.hostname in {"localhost", "127.0.0.1"}
+                and parsed.port == port and parsed.path in {"", "/"}
+                and parsed.username is None and parsed.password is None)
+    except ValueError:
+        return False
+
+
+def launch_network_errors(
+    root: Path, *, manifest: AssemblyManifest, environ: Mapping[str, str] | None = None,
+    hot: bool = False,
+) -> tuple[str, ...]:
+    """Validate the canonical local installation's actual browser/engine wiring.
+
+    Runtime HTTP health on the expected host ports does not establish that the
+    browser bundle was configured to use those APIs. Stop before Compose if
+    its explicit build arguments would send the browser to a different host,
+    port, or ingress path. Preserve .env and provide only named diagnostics.
+    Remote/reverse-proxy deployments have a separate deployment contract.
+    """
+    if type(hot) is not bool:
+        raise ValueError("hot must be an explicit boolean")
+    values = _runtime_env(root, environ)
+    ports = {name: urlsplit(manifest.service(name).public_url).port
+             for name in ("frontend", "backend", "skeleton", "chroma")}
+    mongo_port = values.get("MONGO_PORT") or "27017"
+    if (type(mongo_port) is not str or not 1 <= len(mongo_port) <= 5
+            or not mongo_port.isascii() or not mongo_port.isdigit()
+            or not 1 <= int(mongo_port) <= 65535):
+        raise ValueError("MONGO_PORT is invalid")
+    errors = []
+    if hot and HOT_RELOAD_PORTS.intersection((*ports.values(), int(mongo_port))):
+        errors.append("hot-reload ports overlap a canonical application port")
+    for key, service in (("EXPO_PUBLIC_BACKEND_URL", "backend"),
+                         ("EXPO_PUBLIC_SKELETON_URL", "skeleton")):
+        value = values.get(key, "")
+        if value and not _local_http_origin(value, ports[service]):
+            errors.append(key + " must address the selected local application port")
+    internal = values.get("SKELETON_INTERNAL_URL", "")
+    if internal and internal not in {"http://skeleton:8001", "http://skeleton:8001/"}:
+        errors.append("SKELETON_INTERNAL_URL must address the canonical Compose engine")
+    # Compose defaults to both localhost and numeric IPv4 origins. An explicit
+    # override must still admit the canonical browser URI, without changing
+    # the operator's chosen list or silently enabling wildcard credentials.
+    cors = values.get("CORS_ORIGINS", "")
+    if cors:
+        frontend_origin = manifest.service("frontend").public_url.rstrip("/")
+        origins = {item.strip() for item in cors.split(",") if item.strip()}
+        if frontend_origin not in origins or "*" in origins:
+            errors.append("CORS_ORIGINS must admit the canonical local frontend origin without a wildcard")
+    return tuple(errors)
+
+
 def public_service_urls(
     root: Path,
     *,

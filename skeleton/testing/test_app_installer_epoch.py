@@ -742,3 +742,30 @@ def test_install_revalidates_operation_custody_after_start_intent(tmp_path,monke
                                           runner=runner,phase_observer=Observer())
     assert seen==["config"]
     assert not receipt.ok and receipt.phases[-1].name=="start"
+
+
+
+@pytest.mark.parametrize("setting", [
+    "EXPO_PUBLIC_BACKEND_URL=http://localhost:9000",
+    "EXPO_PUBLIC_SKELETON_URL=https://example.invalid",
+    "SKELETON_INTERNAL_URL=http://outside.invalid:8001",
+    "CORS_ORIGINS=https://operator.example.invalid",
+])
+def test_installer_stops_before_compose_when_browser_wiring_is_wrong(tmp_path,monkeypatch,setting):
+    config=_prepare(monkeypatch,tmp_path)
+    config.write_text(config.read_text()+setting+"\n")
+    _forbid_network(monkeypatch)
+    receipt=installer.install_application(tmp_path,start=True,install_python=False,
+        runner=lambda *a,**k: pytest.fail("invalid endpoint wiring reached Compose"))
+    assert not receipt.ok and receipt.phases[-1].name=="runtime-manifest"
+    assert "example.invalid" not in repr(receipt.to_dict())
+    assert setting in config.read_text()
+
+
+def test_installer_rejects_hot_reload_collision_before_compose(tmp_path,monkeypatch):
+    config=_prepare(monkeypatch,tmp_path)
+    config.write_text("FRONTEND_PORT=8081\n")
+    receipt=installer.install_application(tmp_path,start=True,hot=True,install_python=False,
+        runner=lambda *a,**k: pytest.fail("overlapping hot ports reached Compose"))
+    assert not receipt.ok and receipt.phases[-1].name=="runtime-manifest"
+    assert "hot-reload ports" in receipt.phases[-1].detail

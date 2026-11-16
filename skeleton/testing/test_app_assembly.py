@@ -1565,3 +1565,64 @@ def test_runtime_manifest_does_not_adopt_untrusted_default_or_overridden_origin(
     with pytest.raises(ValueError, match="frontend"):
         runtime_manifest(manifest, root=tmp_path,
                          environ={"FRONTEND_PORT": "3300"} if override else {})
+
+
+
+@pytest.mark.parametrize("port",[8081,19000,19001,19002])
+def test_hot_overlay_reserves_only_numeric_loopback_ports(port):
+    root=find_repo_root(Path(__file__))
+    text=(root/"docker-compose.hot.yml").read_text(encoding="utf-8")
+    assert f'"127.0.0.1:{port}:{port}"' in text
+    assert f'"{port}:{port}"' not in text
+
+
+@pytest.mark.parametrize("origin",["http://localhost:8001","http://127.0.0.1:8001/"])
+def test_launch_network_allows_correct_explicit_local_browser_origins(tmp_path,origin):
+    from skeleton.app.assembly import launch_network_errors,runtime_manifest
+    env={"EXPO_PUBLIC_BACKEND_URL":origin,"EXPO_PUBLIC_SKELETON_URL":"http://localhost:8010",
+         "SKELETON_INTERNAL_URL":"http://skeleton:8001","CORS_ORIGINS":"http://localhost:3000"}
+    manifest=runtime_manifest(root=tmp_path,environ=env)
+    assert launch_network_errors(tmp_path,manifest=manifest,environ=env)==()
+
+
+@pytest.mark.parametrize("origin",["http://localhost:8002","https://localhost:8001","http://localhost:8001/api",
+                                  "http://user:private@localhost:8001","http://localhost:8001?",
+                                  "http://external.invalid:8001","http://localhost:8001#"])
+def test_launch_network_rejects_misbound_browser_origin_without_reflection(tmp_path,origin):
+    from skeleton.app.assembly import launch_network_errors,runtime_manifest
+    env={"EXPO_PUBLIC_BACKEND_URL":origin}
+    manifest=runtime_manifest(root=tmp_path,environ=env)
+    assert launch_network_errors(tmp_path,manifest=manifest,environ=env)==(
+        "EXPO_PUBLIC_BACKEND_URL must address the selected local application port",)
+
+
+@pytest.mark.parametrize("port",[8081,19000,19001,19002])
+@pytest.mark.parametrize("key",["FRONTEND_PORT","BACKEND_PORT","SKELETON_PORT","MONGO_PORT","CHROMA_PORT"])
+def test_hot_mode_detects_collision_with_every_configurable_port(tmp_path,port,key):
+    from skeleton.app.assembly import launch_network_errors,runtime_manifest
+    env={key:str(port)}
+    manifest=runtime_manifest(root=tmp_path,environ=env)
+    assert launch_network_errors(tmp_path,manifest=manifest,environ=env)==()
+    assert launch_network_errors(tmp_path,manifest=manifest,environ=env,hot=True)==(
+        "hot-reload ports overlap a canonical application port",)
+
+
+def test_local_launch_requires_explicit_cors_to_cover_selected_browser_origin(tmp_path):
+    from skeleton.app.assembly import launch_network_errors,runtime_manifest
+    env={"FRONTEND_PORT":"3300","CORS_ORIGINS":"http://localhost:3300,https://operator.example.invalid"}
+    manifest=runtime_manifest(root=tmp_path,environ=env)
+    assert launch_network_errors(tmp_path,manifest=manifest,environ=env)==()
+    assert launch_network_errors(tmp_path,manifest=manifest,
+        environ={**env,"CORS_ORIGINS":"http://localhost:3000"})
+    assert launch_network_errors(tmp_path,manifest=manifest,environ={**env,"CORS_ORIGINS":"*"})
+
+
+def test_cli_compose_lifecycle_output_is_bounded_and_redacted(tmp_path,monkeypatch):
+    import subprocess
+    from skeleton.app import cli
+    def runner(command,**kwargs):
+        assert kwargs["stdout"]==kwargs["stderr"]==kwargs["stdin"]==subprocess.DEVNULL
+        assert kwargs["timeout"]==1800
+        return subprocess.CompletedProcess(command,0)
+    monkeypatch.setattr(cli.subprocess,"run",runner)
+    assert cli._run_compose(("docker","compose","up"),tmp_path)==0

@@ -175,11 +175,24 @@ def stop_runtime(root: Path | None = None) -> tuple[bool, str]:
 def runtime_status(root: Path | None = None) -> tuple[bool, str]:
     root = (root or installation_root()).resolve()
     try:
+        from skeleton.app.first_install import _configuration_epoch, critical_backend_route_report
+        captured = dict(os.environ)
+        epoch = _configuration_epoch(root)
         manifest = load_manifest()
-        urls = public_service_urls(root, manifest=manifest)
+        urls = public_service_urls(root, manifest=manifest, environ=captured)
+        if _configuration_epoch(root) != epoch:
+            return False, "Runtime configuration changed; retry diagnostics"
         results = probe_application(
             manifest=manifest, timeout=2.0, public_url_overrides=urls,
         )
+        if _configuration_epoch(root) != epoch:
+            return False, "Runtime configuration changed; retry diagnostics"
+        ready = probes_ok(results)
+        if ready:
+            backend = urls.get("backend", manifest.service("backend").public_url)
+            ready = critical_backend_route_report(backend, timeout=3.0)["ready"] is True
+            if _configuration_epoch(root) != epoch:
+                return False, "Runtime configuration changed; retry diagnostics"
     except Exception as exc:
         return False, f"Runtime probe failed: {type(exc).__name__}; check local port configuration"
     if not results:
@@ -189,7 +202,9 @@ def runtime_status(root: Path | None = None) -> tuple[bool, str]:
         state = "ONLINE" if result.ok else "OFFLINE"
         status = result.status if result.status is not None else "-"
         lines.append(f"[{state}] {result.service}: HTTP {status} — {result.detail}")
-    return probes_ok(results), "\n".join(lines)
+    if probes_ok(results) and not ready:
+        lines.append("[OFFLINE] Critical API routers missing or unverified")
+    return ready, "\n".join(lines)
 
 
 def open_running_application(root: Path | None = None) -> tuple[bool, str]:
@@ -200,12 +215,19 @@ def open_running_application(root: Path | None = None) -> tuple[bool, str]:
     browser launch; runtime_status remains the separate whole-app diagnostic.
     """
     try:
+        from skeleton.app.first_install import _configuration_epoch
         root = (root or installation_root()).resolve()
+        captured = dict(os.environ)
+        epoch = _configuration_epoch(root)
         manifest = load_manifest()
         frontend = manifest.service("frontend")
-        app_url = public_service_urls(root, manifest=manifest).get(
+        app_url = public_service_urls(root, manifest=manifest, environ=captured).get(
             "frontend", frontend.public_url
         )
+        if (type(app_url) is not str or not app_url or len(app_url) > 4096
+                or any(ord(ch) <= 32 or ord(ch) >= 127 for ch in app_url)
+                or any(ch in app_url for ch in ("?", "#", "%", chr(92)))):
+            return False, "Setup UI address must be a local HTTP endpoint"
         parsed = urlsplit(app_url)
         if (
             parsed.scheme != "http"
@@ -221,10 +243,14 @@ def open_running_application(root: Path | None = None) -> tuple[bool, str]:
             return False, "Setup UI address must be a local HTTP endpoint"
         # Probe the actual exported setup route, not just a generic SPA root
         # that could return 200 while the first-run page is unavailable.
+        if _configuration_epoch(root) != epoch:
+            return False, "Setup UI configuration changed; retry diagnostics"
         frontend_probe = probe_local_setup(
             replace(frontend, public_url=app_url, health_path="/setup"),
             timeout=2.0,
         )
+        if _configuration_epoch(root) != epoch:
+            return False, "Setup UI configuration changed; retry diagnostics"
     except (OSError, ValueError, KeyError) as exc:
         # Never echo operator environment values or failing URL to the GUI.
         return False, f"Setup UI probe failed: {type(exc).__name__}"
@@ -236,6 +262,8 @@ def open_running_application(root: Path | None = None) -> tuple[bool, str]:
             "Inspect frontend container logs."
         )
     try:
+        if _configuration_epoch(root) != epoch:
+            return False, "Setup UI configuration changed; retry diagnostics"
         opened = webbrowser.open(app_url.rstrip("/") + "/setup")
     except (OSError, ValueError, webbrowser.Error) as exc:
         return False, f"Setup UI is reachable; browser failed: {type(exc).__name__}"
