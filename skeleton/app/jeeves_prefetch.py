@@ -65,6 +65,10 @@ class PredictiveReferenceCache:
         self._cache=OrderedDict()
         self._lock=threading.RLock()
         self._bytes=0
+        self._hits=0
+        self._misses=0
+        self._warmups=0
+        self._invalidated=0
 
     def _scope(self,scope):
         normalized=normalized_document_scope(scope)
@@ -109,11 +113,16 @@ class PredictiveReferenceCache:
                     or source[2]!=row["title"] or source[1][row["char_start"]:row["char_end"]]!=row["passage"]):
                 raise ValueError("prefetch result no longer matches exact source")
 
-    def warm(self,sid,revision,messages,candidates,scope,*,maximum_queries=2,search,recheck):
+    def warm(self,sid,revision,messages,candidates,scope,*,maximum_queries=2,search,recheck,predictor=None):
         scope=self._scope(scope)
         if type(maximum_queries) is not int or not 1<=maximum_queries<=MAX_WARM or not callable(search) or not callable(recheck):
             raise ValueError("invalid prefetch budget")
-        ranked=rank_questions(messages,candidates)
+        forecast=None
+        if predictor is None:
+            ranked=rank_questions(messages,candidates)
+        else:
+            from skeleton.app.jeeves_learned_prefetch import learned_rank
+            ranked,forecast=learned_rank(messages,candidates,predictor)
         snapshot=self._snapshot(scope)
         pin=self._pin(snapshot)
         receipts=[]
@@ -138,6 +147,7 @@ class PredictiveReferenceCache:
                 # strings, credentials, generated text or arbitrary objects.
                 self._cache[key]=(time.monotonic()+TTL_SECONDS,payload,size)
                 self._bytes+=size
+                self._warmups+=1
                 self._prune()
             receipts.append({"query_sha256":sha256(question.encode()).hexdigest(),
                 "prediction_score":score,"hit_count":len(hits),"source_snapshot_sha256":pin,
@@ -146,7 +156,8 @@ class PredictiveReferenceCache:
             "session_revision":revision,"selected_document_ids":list(scope),
             "candidate_count":len(ranked),"warmed":receipts,
             "maximum_queries":maximum_queries,"ttl_seconds":TTL_SECONDS,
-            "forecast_method":"recency_weighted_lexical_candidate_ranking",
+            "forecast_method":"recency_weighted_lexical_candidate_ranking" if forecast is None else "pinned_neural_cross_encoder_next_query",
+            "learned_forecast":forecast,
             "generation_performed":False,"network_called":False,"transcript_committed":False}
         report["receipt_sha256"]=digest(report)
         return report
@@ -161,14 +172,24 @@ class PredictiveReferenceCache:
             self._prune()
             record=self._cache.get(key)
             if record is None:
+                self._misses+=1
                 return None
             # Single use avoids stale reuse across multiple generations.
             self._evict(key)
         payload=json.loads(record[1])
-        current=self._snapshot(scope)
-        if payload["snapshot"]!=self._pin(current):
-            return None
-        self._verify_hits(payload["hits"],current,scope)
+        try:
+            current=self._snapshot(scope)
+            if payload["snapshot"]!=self._pin(current):
+                with self._lock:
+                    self._invalidated+=1
+                return None
+            self._verify_hits(payload["hits"],current,scope)
+        except Exception:
+            with self._lock:
+                self._invalidated+=1
+            raise
+        with self._lock:
+            self._hits+=1
         return payload["hits"]
 
     def clear(self):
@@ -181,4 +202,6 @@ class PredictiveReferenceCache:
             self._prune()
             return {"entries":len(self._cache),"bytes":self._bytes,
                     "maximum_entries":MAX_ENTRIES,"maximum_bytes":MAX_CACHE_BYTES,
+                    "warmups":self._warmups,"verified_consumptions":self._hits,
+                    "cache_misses":self._misses,"source_invalidations":self._invalidated,
                     "predictions_certified":False,"latency_gain_certified":False}
