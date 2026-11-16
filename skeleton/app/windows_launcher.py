@@ -333,6 +333,7 @@ class WindowsLauncher:
 
         recovery_buttons = ttk.Frame(outer)
         recovery_buttons.pack(fill="x", pady=(0, 12))
+        self._add_button(recovery_buttons, "Storage Custody", self.inspect_storage)
         self._add_button(recovery_buttons, "Interrupted Operation", self.inspect_recovery)
         self._add_button(recovery_buttons, "Acknowledge Recovery", self.acknowledge_recovery)
 
@@ -435,6 +436,22 @@ class WindowsLauncher:
                     pass
 
         threading.Thread(target=worker, name="skeleton-windows-launcher", daemon=True).start()
+
+    def inspect_storage(self) -> None:
+        from skeleton.app.storage_custody import observe_storage
+        def work():
+            result = observe_storage(self.app_root, runner=_hidden_runner)
+            if not result.observed:
+                return False, "Selected Docker storage inventory unverified; preserve private configuration."
+            if result.new_credentials_permitted:
+                return True, "No canonical storage or containers observed in the selected daemon. No database or backup qualification."
+            return True, (
+                "Existing canonical storage observed. Preserve original persistent credentials."
+                + "\nVolume roles: " + (", ".join(result.volume_roles) or "none observed")
+                + "\nContainer roles: " + (", ".join(result.container_roles) or "none observed")
+                + "\nNo database data was read or modified."
+            )
+        self._run_worker("Inspecting storage custody…", work, lambda result: result[1])
 
     def inspect_recovery(self) -> None:
         from skeleton.app.runtime_mutation import recovery_status

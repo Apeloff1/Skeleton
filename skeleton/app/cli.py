@@ -329,6 +329,8 @@ def _parser() -> argparse.ArgumentParser:
     from skeleton.app.installer import configure_setup_parsers
 
     configure_setup_parsers(sub)
+    sub.add_parser("storage-custody", help="inspect persistent Docker storage without changing data")
+    sub.add_parser("runtime-recovery", help="inspect or acknowledge unresolved runtime operations")
     return parser
 
 
@@ -468,6 +470,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     """Run the application assembly CLI and return a process-style exit code."""
 
     arguments = list(argv or ())
+    if arguments and arguments[0] == "storage-custody":
+        from skeleton.app.storage_custody import main as custody_main
+        return custody_main(arguments[1:], root=find_repo_root())
     if arguments and arguments[0] == "runtime-recovery":
         from skeleton.app.runtime_mutation import main as recovery_main
         return recovery_main(arguments[1:], root=find_repo_root())

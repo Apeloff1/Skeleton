@@ -23,6 +23,13 @@ DURABLE_KEYS = frozenset({
     "MONGO_INITDB_ROOT_PASSWORD", "MONGO_INITDB_ROOT_USERNAME",
     "GAMEFORGE_JWT_SECRET", "GF_SEAL_SECRET", "GF_KEYHOLDER_SEED", "SKELETON_MASTER_SECRET",
 })
+# Environment overrides can silently replace the stored identity because
+# Compose gives shell variables precedence over the explicit env file.
+_PERSISTENT_OVERRIDES = DURABLE_KEYS | {
+    "MONGO_URL", "SKL_MONGO_URI", "DB_NAME", "MONGO_INITDB_DATABASE",
+}
+_DEFAULTS = {"MONGO_INITDB_ROOT_USERNAME":"admin", "DB_NAME":"tutolage",
+             "MONGO_INITDB_DATABASE":"tutolage"}
 _MAX_BYTES = 1024 * 1024
 _MAX_ROWS = 8192
 _NAME = re.compile(rb"[A-Za-z0-9][A-Za-z0-9_.-]{0,254}\Z")
@@ -122,6 +129,21 @@ def require_new_storage_identity(root: Path, *, runner=subprocess.run, environ=N
             "Existing application storage or containers detected; restore original persistent credentials before setup"
         )
     return observation
+
+
+def persistent_override_errors(stored: Mapping[str,str], environ: Mapping[str,str]):
+    """Report only configuration-key identities, never credential values."""
+    return tuple(
+        key + " must match the admitted private configuration"
+        for key in sorted(_PERSISTENT_OVERRIDES)
+        if key in environ and environ[key] != (stored.get(key) or _DEFAULTS.get(key, ""))
+    )
+
+
+def require_persistent_environment(stored, environ):
+    errors = persistent_override_errors(stored, environ)
+    if errors:
+        raise StorageCustodyDenied("; ".join(errors))
 
 
 def main(argv, *, root: Path):

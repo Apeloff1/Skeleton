@@ -542,7 +542,9 @@ def launch_network_errors(
             or not mongo_port.isascii() or not mongo_port.isdigit()
             or not 1 <= int(mongo_port) <= 65535):
         raise ValueError("MONGO_PORT is invalid")
-    errors = []
+    from skeleton.app.storage_custody import persistent_override_errors
+    stored = _read_dotenv(root / ".env")
+    errors = list(persistent_override_errors(stored, os.environ if environ is None else environ))
     if hot and HOT_RELOAD_PORTS.intersection((*ports.values(), int(mongo_port))):
         errors.append("hot-reload ports overlap a canonical application port")
     for key, service in (("EXPO_PUBLIC_BACKEND_URL", "backend"),

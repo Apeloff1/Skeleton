@@ -94,3 +94,42 @@ def test_observation_pins_process_environment_and_does_not_report_context(tmp_pa
     assert report.new_credentials_permitted
     assert calls==["operator-private-context"]*9
     assert "operator-private-context" not in repr(report.to_dict())
+
+
+
+@pytest.mark.parametrize("key",sorted(custody._PERSISTENT_OVERRIDES))
+def test_persistent_identity_override_is_denied_without_reflecting_values(key):
+    private="private-value-never-in-diagnostic"
+    stored={key:"operator-stored"}
+    errors=custody.persistent_override_errors(stored,{key:private})
+    assert errors==(key+" must match the admitted private configuration",)
+    assert private not in repr(errors)
+    assert custody.persistent_override_errors(stored,{key:"operator-stored"})==()
+    assert custody.persistent_override_errors(stored,{})==()
+
+
+@pytest.mark.parametrize("key,value",sorted(custody._DEFAULTS.items()))
+def test_canonical_default_does_not_create_a_false_override_error(key,value):
+    assert custody.persistent_override_errors({}, {key:value})==()
+
+
+def test_source_custody_status_cli_is_a_read_only_projection(tmp_path,monkeypatch,capsys):
+    from skeleton.app import cli
+    import json
+    monkeypatch.setattr(cli,"find_repo_root",lambda:tmp_path)
+    monkeypatch.setattr(custody,"observe_storage",
+        lambda root:custody.StorageObservation(True,("mongo_data",),()))
+    assert cli.run_app_cli(["storage-custody"])==0
+    report=json.loads(capsys.readouterr().out)
+    assert report["volume_roles"]==["mongo_data"]
+    assert report["storage_modified"] is False
+    assert report["new_credentials_permitted"] is False
+
+
+def test_local_launch_rejects_durable_environment_conflict(tmp_path):
+    from skeleton.app.assembly import launch_network_errors,runtime_manifest
+    (tmp_path/".env").write_text("GF_SEAL_SECRET=fixture-stored\n")
+    captured={"GF_SEAL_SECRET":"fixture-replacement"}
+    manifest=runtime_manifest(root=tmp_path,environ=captured)
+    assert launch_network_errors(tmp_path,manifest=manifest,environ=captured)==(
+        "GF_SEAL_SECRET must match the admitted private configuration",)

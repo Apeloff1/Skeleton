@@ -543,6 +543,7 @@ def _ensure_runtime_environment_locked(
     admin_email: str | None = None,
     admin_password_file: Path | None = None,
     storage_guard=None,
+    environment_guard=None,
 ) -> SetupResult:
     """Create or repair .env without overwriting valid existing values."""
 
@@ -756,6 +757,9 @@ def _ensure_runtime_environment_locked(
     # observation of the selected Docker daemon. The low-level library also
     # supports offline fixture generation when no guard is provided.
     from skeleton.app.storage_custody import DURABLE_KEYS
+    if environment_guard is not None:
+        environment_guard(dict(published))
+        _require_configuration_destination(env_path, admitted_stamp)
     if storage_guard is not None and DURABLE_KEYS.intersection(configured):
         storage_guard()
         _require_configuration_destination(env_path, admitted_stamp)
@@ -785,6 +789,7 @@ def ensure_runtime_environment(
     admin_email: str | None = None,
     admin_password_file: Path | None = None,
     storage_guard=None,
+    environment_guard=None,
 ) -> SetupResult:
     """Cross-process, fail-closed runtime bootstrap with stable secret custody."""
     root = (root or find_repo_root()).resolve()
@@ -795,4 +800,5 @@ def ensure_runtime_environment(
             admin_email=admin_email,
             admin_password_file=admin_password_file,
             storage_guard=storage_guard,
+            environment_guard=environment_guard,
         )

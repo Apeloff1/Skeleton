@@ -934,3 +934,30 @@ def test_install_blocks_storage_conflict_before_compose_or_new_credentials(tmp_p
     assert not receipt.ok and receipt.phases[-1].name=="setup-runtime"
     assert "Existing application storage" in receipt.phases[-1].detail
     assert not (tmp_path/".env").exists()
+
+
+
+def test_setup_environment_guard_runs_before_storage_and_publication(tmp_path):
+    from skeleton.app.storage_custody import require_persistent_environment, StorageCustodyDenied
+    with pytest.raises(StorageCustodyDenied,match="GF_SEAL_SECRET"):
+        ensure_runtime_environment(
+            tmp_path, storage_guard=lambda:pytest.fail("conflicting identity reached Docker"),
+            environment_guard=lambda stored:require_persistent_environment(stored,{"GF_SEAL_SECRET":"other"}),
+        )
+    assert not (tmp_path/".env").exists()
+    assert not (tmp_path/"data"/"local-ai").exists()
+
+
+def test_installer_external_identity_override_denied_even_with_valid_source(tmp_path,monkeypatch):
+    ensure_runtime_environment(tmp_path)
+    config=tmp_path/".env"
+    previous=config.read_bytes()
+    monkeypatch.setenv("GF_SEAL_SECRET","other-persistent-key")
+    report=PreloadReport(tmp_path,"fixture","3.11",(PreloadCheck("host:ready",True,"ready"),))
+    monkeypatch.setattr("skeleton.app.installer.inspect_host",lambda *a,**k:report)
+    receipt=install_application(tmp_path,start=True,install_python=False,
+        runner=lambda *a,**k:pytest.fail("conflicting persistent identity reached Docker"))
+    assert not receipt.ok and receipt.phases[-1].name=="setup-runtime"
+    assert "GF_SEAL_SECRET" in receipt.phases[-1].detail
+    assert "other-persistent-key" not in repr(receipt.to_dict())
+    assert config.read_bytes()==previous

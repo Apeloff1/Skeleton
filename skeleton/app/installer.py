@@ -210,7 +210,9 @@ def install_application(
     )
 
     def run_pipeline(lease):
-        from skeleton.app.storage_custody import StorageCustodyDenied, require_new_storage_identity
+        from skeleton.app.storage_custody import (
+            StorageCustodyDenied, require_new_storage_identity, require_persistent_environment,
+        )
         # Match the selected Docker context for credential custody and launch.
         admitted_process_env = dict(os.environ)
         preload = inspect_host(
@@ -239,6 +241,7 @@ def install_application(
                 storage_guard=lambda: require_new_storage_identity(
                     root, runner=runner, environ=admitted_process_env,
                 ),
+                environment_guard=lambda values: require_persistent_environment(values, admitted_process_env),
             )
         except StorageCustodyDenied as exc:
             phases.append(InstallPhase("setup-runtime", False, str(exc)))
@@ -710,7 +713,7 @@ def run_setup_command(command: str, args: argparse.Namespace, root: Path | None 
         return _print_preload(inspect_host(root), as_json=bool(args.as_json))
     if command == "setup":
         from skeleton.app.runtime_operation import RuntimeOperationDenied, runtime_operation
-        from skeleton.app.storage_custody import require_new_storage_identity
+        from skeleton.app.storage_custody import require_new_storage_identity, require_persistent_environment
         captured = dict(os.environ)
         try:
             with runtime_operation(root, "setup") as lease:
@@ -722,6 +725,7 @@ def run_setup_command(command: str, args: argparse.Namespace, root: Path | None 
                     admin_email=getattr(args, "admin_email", None),
                     admin_password_file=getattr(args, "admin_password_file", None),
                     storage_guard=lambda: require_new_storage_identity(root, environ=captured),
+                    environment_guard=lambda values: require_persistent_environment(values, captured),
                 )
                 if not lease.current():
                     raise RuntimeOperationDenied("runtime operation custody changed")

@@ -1134,3 +1134,18 @@ replica-set and authentication options are not normalized into a standalone
 bundled URI. This conservative policy may block another canonical stack in
 the same Docker context; independent migration/backup qualification is still
 required. Low-level offline configuration generation is not storage-qualified.
+
+
+Inspect the selected daemon using the source CLI or installed console:
+
+```text
+python -m skeleton app storage-custody
+SkeletonOffline.exe --storage-custody
+```
+
+The Windows launcher has a Storage Custody control exposing only canonical
+role identities. Process-level overrides for persistent database, sealing
+and signing identity must match the admitted private configuration; the
+installer rejects mismatches before its configuration publication or
+Compose startup. These are local installation rules; managed deployments
+using a separate secret-injection contract must qualify separately.
