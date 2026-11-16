@@ -224,11 +224,17 @@ HTML = r"""<!doctype html>
       <div class="composer-submit">
         <span class="hint keyboard-hint">Ctrl / ⌘ + Enter to send</span>
         <button id="context-preview" class="small" disabled>Preview context</button>
+        <button id="cognitive-preview" class="small" disabled>Review reasoning plan</button>
         <button id="send" class="primary">Generate locally ↗</button>
         <button id="retry-turn" class="secondary" hidden>Retry original turn</button>
       </div>
     </div>
     <div id="context-report" class="context-report" role="status" aria-live="polite">Context budget not checked. Full-history mode refuses generation rather than silently dropping older turns.</div>
+    <details id="cognitive-panel" class="grounding-preview" hidden>
+      <summary>Reasoning plan and prior user messages — review only</summary>
+      <p class="hint">Local heuristic planning, exact historical excerpts and lexical source coverage. Nothing is sent, saved, learned, or automatically injected.</p>
+      <pre id="cognitive-result" aria-live="polite"></pre>
+    </details>
     <details id="context-grounding-preview" class="grounding-preview" hidden>
       <summary>Local grounding passages selected by preview — untrusted text</summary>
       <p id="context-grounding-identity" class="hint"></p>
@@ -484,6 +490,7 @@ JAVASCRIPT = r"""'use strict';
         [...state.selectedKnowledgeIds].some(id => !state.availableKnowledgeIds.has(id)));
     if (scopeBlocked) get('send').disabled = true;
     get('context-preview').disabled = locked || working || !state.session || scopeBlocked;
+    get('cognitive-preview').disabled = get('context-preview').disabled;
     get('knowledge-scope-reset').disabled = locked || working;
     document.querySelectorAll('.knowledge-scope-picker').forEach(node => {
       node.disabled = locked || working;
@@ -1004,6 +1011,9 @@ JAVASCRIPT = r"""'use strict';
     }
   }
   function clearGroundingPreview() {
+    get('cognitive-panel').hidden = true;
+    get('cognitive-panel').open = false;
+    get('cognitive-result').textContent = '';
     get('context-grounding-citations').replaceChildren();
     get('context-grounding-identity').textContent = '';
     get('context-grounding-preview').hidden = true;
@@ -1015,7 +1025,7 @@ JAVASCRIPT = r"""'use strict';
     display.classList.remove('warning');
     display.textContent = 'Question, evidence, output budget or policy changed. Preview again; strict retention is enforced independently at generation.';
   }
-  async function previewLocalContext(message, max_output_tokens, grounded, require_full_history) {
+  async function previewLocalContext(message, max_output_tokens, grounded, require_full_history, cognitive = false) {
     if (!state.session) throw new Error('Select a conversation first.');
     const epoch = state.epoch;
     const revision = state.revision;
@@ -1023,6 +1033,7 @@ JAVASCRIPT = r"""'use strict';
     const scope = selectedGroundingScope(grounded);
     const payload = await api('POST', '/v1/sessions/' + state.session + '/context-preview', {
       message, max_output_tokens, grounded, require_full_history,
+      ...(cognitive ? {cognitive: true} : {}),
       ...(scope.length ? {document_ids: scope} : {}),
     });
     if (state.epoch !== epoch || !state.connected) throw new Error('Workspace disconnected.');
@@ -1115,8 +1126,78 @@ JAVASCRIPT = r"""'use strict';
       (payload.gguf_final_tokenizer_admission_required ? ' (GGUF tokenizer rechecks at native spawn)' : '') +
       (allowed ? ' · admissible by requested retention policy' :
         ' · NOT ADMISSIBLE: uncheck full-history requirement only if you explicitly accept trimming.');
+    if (cognitive) {
+      const plan = payload.cognitive_preview;
+      const sha = /^[0-9a-f]{64}$/;
+      if (!plan || plan.schema !== 'skeleton.jeeves.cognitive-preview.v1' ||
+          plan.read_only !== true || plan.generation_performed !== false ||
+          plan.tool_execution_authorized !== false || plan.memory_saved !== false ||
+          plan.prompt_modified !== false || plan.model_quality_measured !== false ||
+          plan.session_revision !== revision || plan.model_digest !== payload.model_digest ||
+          plan.question_sha256 !== await exactLocalSha256(message) ||
+          !sha.test(plan.preview_sha256) ||
+          !['brief', 'standard', 'deep'].includes(plan.suggested_effort) ||
+          !Array.isArray(plan.suggested_specializations) || plan.suggested_specializations.length > 3 ||
+          !Array.isArray(plan.workflow) || plan.workflow.length > 9 ||
+          !Array.isArray(plan.request_spans) || plan.request_spans.length > 8 ||
+          !Array.isArray(plan.memory?.matches) || plan.memory.matches.length > 6 ||
+          plan.memory.automatically_injected !== false ||
+          plan.evidence?.semantic_entailment_verified !== false) {
+        throw new Error('Invalid review-only cognitive plan.');
+      }
+      const questionChars = Array.from(message);
+      const lines = ['Suggested effort: ' + plan.suggested_effort,
+        'Suggested specialization: ' + plan.suggested_specializations.join(', '),
+        'Unreserved context units: ' + plan.budget?.unreserved_units,
+        '', 'Exact request fragments:'];
+      for (const part of plan.request_spans) {
+        if (!Number.isSafeInteger(part.start) || !Number.isSafeInteger(part.end) ||
+            part.start < 0 || part.end <= part.start || part.end > questionChars.length ||
+            part.text !== questionChars.slice(part.start, part.end).join('') ||
+            part.sha256 !== await exactLocalSha256(part.text))
+          throw new Error('A request fragment changed.');
+        lines.push('• ' + part.text);
+      }
+      lines.push('', 'Suggested workflow (no permissions granted):');
+      for (const step of plan.workflow) {
+        if (step.authority !== 'advice-only' || typeof step.stage !== 'string' || step.stage.length > 80)
+          throw new Error('Invalid workflow stage.');
+        lines.push('• ' + step.stage.replaceAll('_', ' '));
+      }
+      lines.push('', 'Prior user messages (verify before reusing):');
+      for (const row of plan.memory.matches) {
+        if (row.role !== 'user' || row.authority !== 'historical-user-text-review-only' ||
+            !sha.test(row.source_sha256) || typeof row.text !== 'string' ||
+            !Number.isSafeInteger(row.message_index) || row.message_index < 0 ||
+            !Number.isSafeInteger(row.start) || !Number.isSafeInteger(row.end) ||
+            row.start < 0 || row.end - row.start !== Array.from(row.text).length ||
+            Array.from(row.text).length > 420 || row.sha256 !== await exactLocalSha256(row.text))
+          throw new Error('A historical excerpt changed.');
+        lines.push('• Message ' + (row.message_index + 1) + ': ' + row.text);
+      }
+      if (!plan.memory.matches.length) lines.push('No matching prior user text in the bounded scan.');
+      if (plan.memory.scan_truncated) lines.push('Older messages were outside the recall scan.');
+      lines.push('', 'Evidence: ' + plan.evidence.status + ' · not semantic verification.');
+      if (epoch !== state.epoch || !state.connected || state.revision !== revision ||
+          state.session !== payload.session_id || get('prompt').value.trim() !== message ||
+          Number(get('budget').value) !== max_output_tokens ||
+          get('grounded').checked !== grounded || get('context-preserve').checked !== require_full_history ||
+          scopeVersion !== state.knowledgeScopeVersion)
+        throw new Error('The reasoning plan is stale. Request a new review.');
+      get('cognitive-result').textContent = lines.join('\n');
+      get('cognitive-panel').hidden = false;
+      get('cognitive-panel').open = true;
+    }
     return payload;
   }
+  get('cognitive-preview').addEventListener('click', () => run(async () => {
+    const message = get('prompt').value.trim();
+    const budget = Number(get('budget').value);
+    if (!message || !Number.isSafeInteger(budget))
+      throw new Error('Enter a message and output budget first.');
+    await previewLocalContext(message, budget, get('grounded').checked,
+      get('context-preserve').checked, true);
+  }));
   get('context-preview').addEventListener('click', () => run(async () => {
     const message = get('prompt').value.trim();
     const grounded = get('grounded').checked;
