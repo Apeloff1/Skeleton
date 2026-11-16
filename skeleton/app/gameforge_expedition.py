@@ -90,6 +90,7 @@ def _replay(data: dict, campaign: dict, steps: list, gates: dict, episodes: dict
     loc = world["start"]
     resolved = 0
     projected = []
+    authorized: set[str] = set()
     # Dialogue authorization is replayed at every portal admission; otherwise
     # its original owner checks the complete projected ledger at the end.
     episode_actions: dict[str, list] = {key: [] for key in episodes}
@@ -104,10 +105,12 @@ def _replay(data: dict, campaign: dict, steps: list, gates: dict, episodes: dict
             item = _object(event, {"type", "objective", "action"})
             _require(item["objective"] == oid and oid in episodes and loc == current["location"],
                      "episode is not the active local objective")
-            if oid in gates:
+            if oid in gates and oid not in authorized:
                 prior = play_campaign(data["campaign"], projected)
                 _require(_gate_open(gates[oid], prior["state"]["dialogues"]),
                          "episode requires the authored dialogue grant first")
+                # A canonically ended conversation cannot be reopened or revoke its grant.
+                authorized.add(oid)
             normalized = harbor.normalize_action(item["action"])
             states[oid] = harbor.step(episodes[oid]["source"], states[oid], normalized)
             episode_actions[oid].append(normalized)
