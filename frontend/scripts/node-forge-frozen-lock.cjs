@@ -55,7 +55,7 @@ function parseFrozenForgeLock(bytes) {
   assert.ok(!/[\x00\r](?!\n)/.test(text) && !text.includes('\x00'), 'invalid lockfile control bytes');
   const lines = text.split(/\r?\n/);
   const headers = lines.map((line, index) => ({ line, index }))
-    .filter(({ line }) => /^[^ \t#].*node-forge@/.test(line));
+    .filter(({ line }) => /^(?![ \t#]).*node-forge@/.test(line));
   assert.equal(headers.length, 1, 'expected one unambiguous node-forge selector');
   assert.equal(headers[0].line, 'node-forge@^1.3.3:', 'unreviewed frozen selector');
   const fields = [];
