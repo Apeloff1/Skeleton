@@ -226,6 +226,7 @@ HTML = r"""<!doctype html>
         <button id="context-preview" class="small" disabled>Preview context</button>
         <button id="cognitive-preview" class="small" disabled>Review reasoning plan</button>
         <button id="deliberation-review" class="small" disabled>Generate two review candidates (no save)</button>
+        <button id="research-review" class="small" disabled>Research local references (multi-hop)</button>
         <button id="send" class="primary">Generate locally ↗</button>
         <button id="retry-turn" class="secondary" hidden>Retry original turn</button>
       </div>
@@ -241,6 +242,11 @@ HTML = r"""<!doctype html>
       <pre id="memory-review" aria-live="polite"></pre>
       <button id="memory-save" type="button" class="small" disabled>Approve and save this independent memory copy</button>
       <p class="hint">Deleting the original chat will not delete a saved memory. Remove the copy in the reference library. Saved memories are never automatically applied.</p>
+    </details>
+    <details id="research-panel" class="grounding-preview" hidden>
+      <summary>Multi-hop local research — evidence only</summary>
+      <pre id="research-trace" aria-live="polite"></pre>
+      <div id="research-sources"></div>
     </details>
     <details id="deliberation-panel" class="grounding-preview" hidden>
       <summary>Local reasoning candidates — not independently verified</summary>
@@ -504,6 +510,7 @@ JAVASCRIPT = r"""'use strict';
     get('context-preview').disabled = locked || working || !state.session || scopeBlocked;
     get('cognitive-preview').disabled = get('context-preview').disabled;
     get('deliberation-review').disabled = get('context-preview').disabled || foreignLease || state.health?.ready !== true;
+    get('research-review').disabled = locked || working || !state.session;
     get('memory-kind').disabled = locked || working;
     get('memory-save').disabled = locked || working || !reviewedMemory;
     get('memory-choices').querySelectorAll('button').forEach(node => {node.disabled = locked || working;});
@@ -1038,6 +1045,10 @@ JAVASCRIPT = r"""'use strict';
     get('deliberation-panel').hidden = true;
     get('deliberation-panel').open = false;
     get('deliberation-result').textContent = '';
+    get('research-panel').hidden = true;
+    get('research-panel').open = false;
+    get('research-trace').textContent = '';
+    get('research-sources').replaceChildren();
     get('cognitive-panel').hidden = true;
     get('cognitive-panel').open = false;
     get('cognitive-result').textContent = '';
@@ -1271,6 +1282,66 @@ JAVASCRIPT = r"""'use strict';
     clearMemoryReview();
     await loadDocuments();
     status('Approved memory saved to the reference library. It is not automatically applied.');
+  }));
+  get('research-review').addEventListener('click', () => run(async () => {
+    const query = get('prompt').value.trim();
+    if (!query || new TextEncoder().encode(query).length > 1024)
+      throw new Error('Enter a local research query of at most 1024 UTF-8 bytes.');
+    const scope = selectedGroundingScope(true);
+    const epoch = state.epoch, session = state.session, revision = state.revision;
+    const scopeVersion = state.knowledgeScopeVersion;
+    clearGroundingPreview();
+    const result = await api('POST', '/v1/knowledge/research-review', {
+      query, approved: true, ...(scope.length ? {document_ids: scope} : {})
+    });
+    const sha = /^[0-9a-f]{64}$/;
+    if (result.schema !== 'skeleton.jeeves.local-research-review.v1' ||
+        result.question_sha256 !== await exactLocalSha256(query) ||
+        result.generation_performed !== false || result.network_called !== false ||
+        result.semantic_entailment_verified !== false || result.memory_saved !== false ||
+        !['lexical', 'learned'].includes(result.ranking) ||
+        JSON.stringify(result.document_scope) !== JSON.stringify(scope.length ? scope : null) ||
+        !Array.isArray(result.sources) || result.sources.length > 3 ||
+        result.trace?.schema !== 'skeleton.evidence-walk.v1' ||
+        result.trace.semantic_entailment_verified !== false ||
+        !Array.isArray(result.trace.queries) || result.trace.queries.length > 6)
+      throw new Error('The local research report is invalid.');
+    const cards = [];
+    for (const row of result.sources) {
+      if (!row || (scope.length && !scope.includes(row.document_id)) ||
+          typeof row.title !== 'string' || typeof row.passage !== 'string' ||
+          typeof row.citation !== 'string' || !sha.test(row.document_sha256) ||
+          !Number.isSafeInteger(row.char_start) || !Number.isSafeInteger(row.char_end) ||
+          row.char_start < 0 || row.char_end - row.char_start !== Array.from(row.passage).length ||
+          Array.from(row.passage).length > 600 ||
+          !row.citation.startsWith('local:' + row.document_id + ':') ||
+          row.passage_sha256 !== await exactLocalSha256(row.passage))
+        throw new Error('A research source could not be verified.');
+      const article = document.createElement('article');
+      article.className = 'grounding-passage';
+      const title = document.createElement('strong'); title.textContent = row.title;
+      const label = document.createElement('code'); label.textContent = row.citation;
+      const passage = document.createElement('pre'); passage.textContent = row.passage;
+      article.append(title, label, passage); cards.push(article);
+    }
+    const lines = ['Ranking: ' + result.ranking + ' · no model generation', 'Queries and evidence links:'];
+    for (const row of result.trace.queries) {
+      if (!sha.test(row.query_sha256) || !Number.isSafeInteger(row.hop) ||
+          row.hop < 0 || row.hop > 2 || !Array.isArray(row.citations) ||
+          row.citations.length > 6 || (row.parent_citation !== null && typeof row.parent_citation !== 'string'))
+        throw new Error('Invalid research query trace.');
+      lines.push('Hop ' + row.hop + ' · ' + row.citations.length + ' matches · query ' + row.query_sha256);
+      if (row.parent_citation) lines.push('From ' + row.parent_citation);
+    }
+    if (epoch !== state.epoch || !state.connected || state.session !== session ||
+        state.revision !== revision || get('prompt').value.trim() !== query ||
+        scopeVersion !== state.knowledgeScopeVersion ||
+        JSON.stringify(scope) !== JSON.stringify(selectedGroundingScope(true)))
+      throw new Error('The research report no longer matches the selected query and scope.');
+    get('research-sources').replaceChildren(...cards);
+    get('research-trace').textContent = lines.join('\n') + '\nNo semantic truth certification.';
+    get('research-panel').hidden = false; get('research-panel').open = true;
+    status(cards.length ? 'Local research completed. Review exact source passages.' : 'No local reference evidence found.');
   }));
   get('deliberation-review').addEventListener('click', () => run(async () => {
     const message = get('prompt').value.trim();
