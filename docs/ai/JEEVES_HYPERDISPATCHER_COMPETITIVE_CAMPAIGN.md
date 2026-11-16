@@ -174,6 +174,31 @@ transactional transfer boundaries); https://kubernetes.io/docs/concepts/scheduli
 59; no event-sourced durable swarm store is claimed, so these remain partial
 or open until the exact target-specific evidence exists.
 
+## Wave 5: durable promotion identity, queue drainage and attempt fencing
+
+The existing SQLite pressure schema receives an additive receipt table, with
+FULL synchronous connections, exact owner/scope/request/kind/manifest identity,
+same-transaction lease publication, restart-visible replay, terminal tombstones
+and a finite per-scope receipt ceiling. A request whose promotion committed
+but response was lost returns the same still-live lease IDs. A completed,
+expired or partially released group is never regranted under that request ID.
+Unknown physical effects still require reconciliation by the executor; receipt
+replay is not permission to rerun the task.
+
+All new queue and lease generations use collision-resistant random identifiers,
+including the legacy direct APIs. Existing live rows remain readable and
+retries of currently live rows remain stable. Queue saturation now blocks NEW
+normal admission but no longer blocks eligible queued work from draining when
+execution capacity is free. Replacement policy checks tenant-level existing
+usage as well as global totals. Receipt retention intentionally fails closed;
+no unbounded or unsafe TTL deletion and no production-scale retention claim.
+
+Partial target IDs additionally grounded: 46 (committed receipt log, not full event
+sourcing), 47 (exact promotion replay), 50 (no regrant on known committed
+identity, not external exactly-once effect), 51 (atomic lease/receipt publication),
+54 (checkpoint restore holds), 58 (single DB fencing, not distributed consensus),
+59 (bounded swarm heap compaction only, journal compaction remains open).
+
 ## Qualification and rollback
 
 Run the focused test file, existing shared pressure tests, and every AGENTS.md
@@ -183,5 +208,4 @@ clock jumps, cross-tenant denial, stale ticket and lease rejection, actual physi
 workers, and pressure tests. No physical capacity or latency claim from this wave.
 Logical group slots are not Ray-style distributed physical allocation. Ranking
 currently scans a bounded authorized set; scale qualification and indexed next
-selection are follow-up work. Roll back the whole reviewed commit; no schema
-migration was introduced. Existing queue rows and callers remain compatible.
+selection are follow-up work. Roll back the whole reviewed commit; the new pressure receipt table is additive; preserve receipt tombstones and do not activate legacy writers that could reopen already committed identities. Existing queue rows and callers remain compatible.

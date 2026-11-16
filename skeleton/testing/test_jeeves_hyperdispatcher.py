@@ -370,3 +370,65 @@ def test_fenced_swarm_worker_failure_without_no_effect_confirmation_holds():
     held = runtime.fail("w", "a", "opaque external failure", lease_token=lease.lease_token)
     assert held.effect_uncertain and runtime.worker("w").available == 0
     assert "opaque external failure" not in (held.last_error or "")
+
+def test_durable_group_receipt_survives_restart_and_rejects_terminal_replay(tmp_path):
+    state = ledger(tmp_path)
+    a = state.enqueue("jeeves", "a", "a", priority=5, now=1)
+    b = state.enqueue("jeeves", "b", "b", priority=5, now=1)
+    group = state.promote_group("jeeves", "worker", authorized_tickets=(a, b), now=2, request_id="group")
+    restarted = SqliteSharedPressureLedger(state.path)
+    assert restarted.promote_group("jeeves", "worker", authorized_tickets=(b, a), now=3, request_id="group") == group
+    with pytest.raises(SharedPressureConflict, match="identity"):
+        restarted.promote_group("jeeves", "other", authorized_tickets=(a, b), now=3, request_id="group")
+    with pytest.raises(SharedPressureConflict, match="identity"):
+        restarted.promote_ranked("jeeves", "worker", authorized_tickets=(a, b), now=3, request_id="group")
+    restarted.release(group[0].lease_id, "worker")
+    with pytest.raises(SharedPressureConflict, match="no longer fully live"):
+        restarted.promote_group("jeeves", "worker", authorized_tickets=(a, b), now=3, request_id="group")
+
+
+def test_ranked_receipt_two_connections_same_request(tmp_path):
+    state = ledger(tmp_path, concurrency=1, tenant=1)
+    ticket = state.enqueue("jeeves", "a", "a", priority=5, now=1)
+    other = SqliteSharedPressureLedger(state.path)
+    def promote(db):
+        return db.promote_ranked("jeeves", "w", authorized_tickets=(ticket,), now=2, request_id="request")
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(promote, (state, other)))
+    assert results[0] == results[1] and results[0] is not None
+    assert other.snapshot("jeeves", now=2).active == 1
+
+
+def test_legacy_lease_and_ticket_reuse_fenced_even_same_clock(tmp_path):
+    state = ledger(tmp_path)
+    first = state.acquire("jeeves", "a", "a", "w", priority=5, now=1)
+    state.release(first.lease_id, "w")
+    second = state.acquire("jeeves", "a", "a", "w", priority=5, now=1)
+    assert second.lease_id != first.lease_id
+    with pytest.raises(SharedPressureError):
+        state.release(first.lease_id, "w")
+    ticket = state.enqueue("jeeves", "b", "b", priority=5, now=1)
+    state.dequeue(ticket.ticket_id)
+    new_ticket = state.enqueue("jeeves", "b", "b", priority=5, now=1)
+    assert new_ticket.ticket_id != ticket.ticket_id
+    with pytest.raises(SharedPressureError):
+        state.promote(ticket.ticket_id, "w", now=2)
+
+
+def test_full_queue_can_drain_already_admitted_normal_work(tmp_path):
+    state = SqliteSharedPressureLedger(tmp_path / "pressure.sqlite")
+    state.configure(SharedPressurePolicy("jeeves", 4, 4, 4, 4, 0.5))
+    normal = state.enqueue("jeeves", "a", "normal", priority=100, now=1)
+    state.enqueue("jeeves", "a", "urgent1", priority=5, now=1)
+    state.enqueue("jeeves", "a", "urgent2", priority=5, now=1)
+    state.enqueue("jeeves", "a", "urgent3", priority=5, now=1)
+    assert not state.decide("jeeves", "a", priority=100, now=2).admitted
+    assert state.promote_ranked("jeeves", "w", authorized_tickets=(normal,), now=2) is not None
+
+
+def test_replacement_pressure_policy_preserves_existing_tenant_cap(tmp_path):
+    state = ledger(tmp_path)
+    state.acquire("jeeves", "a", "a", "w", priority=5)
+    state.acquire("jeeves", "a", "b", "w", priority=5)
+    with pytest.raises(SharedPressureConflict, match="tenant pressure"):
+        state.configure(SharedPressurePolicy("jeeves", 4, 32, 1, 16, 1.0), replace=True)
