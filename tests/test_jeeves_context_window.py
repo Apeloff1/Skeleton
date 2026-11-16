@@ -906,3 +906,143 @@ def test_adaptive_browser_controls_render_inert_artifacts():
     assert "el.textContent = value" in JAVASCRIPT
     assert "get('adaptive-artifacts').replaceChildren()" in JAVASCRIPT
     assert "policyMatches()" in JAVASCRIPT
+
+
+
+def _campaign_step(node, parents=(), question="hello", tokens=4):
+    return {"id": node, "depends_on": list(parents), "message": question,
+            "max_output_tokens": tokens,
+            "adaptive": _adaptive_policy(total=tokens, attempts=1)}
+
+
+def test_real_campaign_executes_dependency_graph_and_replays_after_reopen(tmp_path):
+    path = tmp_path / "campaign-real.sqlite3"
+    app = OfflineHTTPApplication(native_model(), path, token="t"*64)
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        route = "/v1/sessions/" + created["session_id"]
+        before = app.dispatch("GET", route)[1]
+        graph = {"campaign_id": "demo", "expected_session_revision": 0, "approved": True,
+                 "steps": [_campaign_step("second", ("first",)), _campaign_step("first")],
+                 "maximum_reserved_tokens": 8}
+        code, state = app.dispatch("POST", route + "/campaign-create", graph)
+        assert code == 201 and state["ready_steps"] == ["first"]
+        assert app.dispatch("POST", route + "/campaign-create", graph)[0] == 200
+        advance = {"campaign_id": "demo", "step_id": "second", "operation_id": "op-second",
+                   "expected_revision": 0, "approved": True}
+        with pytest.raises(OfflineHTTPError) as exc:
+            app.dispatch("POST", route + "/campaign-advance", advance)
+        assert exc.value.status == 409
+        first = advance | {"step_id": "first", "operation_id": "op-first"}
+        code, state = app.dispatch("POST", route + "/campaign-advance", first)
+        assert code == 200 and state["revision"] == 2
+        assert state["ready_steps"] == ["second"]
+        report = state["statuses"]["first"]["report"]
+        assert report["generation_performed"] is True
+        assert report["candidates"][0]["text"].strip()
+        assert state["reserved_tokens"] == 4
+        assert app.dispatch("GET", route)[1] == before
+    finally:
+        app.close()
+    app = OfflineHTTPApplication(native_model(), path, token="t"*64)
+    try:
+        _, reopened = app.dispatch("POST", route + "/campaign-inspect", {"campaign_id": "demo"})
+        assert reopened["statuses"]["first"]["report"] == report
+        _, replay = app.dispatch("POST", route + "/campaign-advance", first)
+        assert replay == reopened
+        _, done = app.dispatch("POST", route + "/campaign-advance", advance | {"expected_revision": 2})
+        assert done["all_steps_complete"] is True
+        assert done["reserved_tokens"] == 8
+        assert done["revision"] == 4
+        assert app.dispatch("GET", route)[1] == before
+        assert done["dependency_output_injected"] is False
+        _, deleted = app.dispatch("POST", route + "/campaign-delete",
+                                  {"campaign_id": "demo", "expected_revision": 4, "approved": True})
+        assert deleted["transcript_deleted"] is False
+        assert app.dispatch("GET", route)[1] == before
+    finally:
+        app.close()
+
+
+@pytest.mark.parametrize("steps,ceiling", [
+    ([_campaign_step("a", ("b",)), _campaign_step("b", ("a",))], 8),
+    ([_campaign_step("a", ("missing",))], 8),
+    ([_campaign_step("a"), _campaign_step("a")], 8),
+    ([_campaign_step("a"), _campaign_step("b")], 7),
+    ([_campaign_step("a")|{"tool": "shell"}], 8),
+])
+def test_campaign_rejects_cycles_bad_dependencies_duplicate_ids_and_ceiling(steps, ceiling):
+    from skeleton.app.jeeves_review_campaign import normalize_plan, CampaignRejected
+    with pytest.raises(CampaignRejected):
+        normalize_plan(steps, ceiling)
+
+
+def test_campaign_unconfirmed_claim_is_persistent_and_abandon_never_retries(tmp_path):
+    path = tmp_path / "campaign-recover.sqlite3"
+    app = OfflineHTTPApplication(native_model(), path, token="t"*64)
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        sid = created["session_id"]
+        route = "/v1/sessions/" + sid
+        app.dispatch("POST", route + "/campaign-create", {
+            "campaign_id": "recovery", "expected_session_revision": 0, "approved": True,
+            "steps": [_campaign_step("a"), _campaign_step("b", ("a",))],
+            "maximum_reserved_tokens": 8,
+        })
+        claim, spec = app.review_campaigns.claim(sid, "recovery", "a", "op-a", 0)
+        assert spec["id"] == "a" and claim["ready_steps"] == []
+        assert claim["statuses"]["a"]["status"] == "running"
+    finally:
+        app.close()
+    app = OfflineHTTPApplication(native_model(), path, token="t"*64)
+    try:
+        body = {"campaign_id": "recovery", "step_id": "a", "operation_id": "op-a",
+                "expected_revision": 1, "approved": True}
+        with pytest.raises(OfflineHTTPError) as exc:
+            app.dispatch("POST", route + "/campaign-advance", body)
+        assert exc.value.status == 409
+        _, state = app.dispatch("POST", route + "/campaign-abandon", body)
+        assert state["statuses"]["a"]["status"] == "abandoned_unconfirmed"
+        assert state["reserved_tokens"] == 4 and state["ready_steps"] == []
+        _, replay = app.dispatch("POST", route + "/campaign-advance", body)
+        assert replay == state
+        assert app.dispatch("GET", route)[1]["revision"] == 0
+    finally:
+        app.close()
+
+
+def test_campaign_rejects_unapproved_mutations_and_forged_result(tmp_path):
+    from skeleton.app.jeeves_review_campaign import CampaignConflict
+    app = OfflineHTTPApplication(native_model(), tmp_path / "campaign-fence.sqlite3", token="t"*64)
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        sid = created["session_id"]
+        route = "/v1/sessions/" + sid
+        graph = {"campaign_id": "fence", "expected_session_revision": 0,
+                 "approved": False, "steps": [_campaign_step("a")],
+                 "maximum_reserved_tokens": 4}
+        with pytest.raises(OfflineHTTPError) as exc:
+            app.dispatch("POST", route + "/campaign-create", graph)
+        assert exc.value.status == 403
+        app.dispatch("POST", route + "/campaign-create", graph | {"approved": True})
+        app.review_campaigns.claim(sid, "fence", "a", "op", 0)
+        with pytest.raises(CampaignConflict):
+            app.review_campaigns.settle(sid, "fence", "a", "op", {"generation_performed": True})
+        assert app.review_campaigns.inspect(sid, "fence")["statuses"]["a"]["status"] == "running"
+        settled = app.review_campaigns.settle(sid, "fence", "a", "op")
+        assert settled["statuses"]["a"]["status"] == "execution_unconfirmed"
+        assert settled["reserved_tokens"] == 4
+        assert "report" not in settled["statuses"]["a"]
+    finally:
+        app.close()
+
+
+def test_campaign_browser_routes_are_explicit_and_local():
+    from skeleton.app.offline_web import HTML, JAVASCRIPT
+    for item in ("campaign-id", "campaign-plan", "campaign-create", "campaign-inspect",
+                 "campaign-result", "campaign-delete"):
+        assert f'id="{item}"' in HTML
+    assert "dependency_output_injected !== false" in JAVASCRIPT
+    assert "result.textContent = JSON.stringify(row.report, null, 2)" in JAVASCRIPT
+    assert "Mark claim abandoned (does not cancel or retry)" in JAVASCRIPT
+    assert "get('campaign-plan').value = '';" in JAVASCRIPT
