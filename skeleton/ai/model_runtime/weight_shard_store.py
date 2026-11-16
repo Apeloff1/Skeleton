@@ -8,7 +8,7 @@ responsibility; shadow bytes never become production weights implicitly.
 """
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import asdict
 from hashlib import sha256
 import json
@@ -77,19 +77,23 @@ def _read_manifest(path: Path) -> bytes:
         return raw
 
 
-def _hash_file(path: Path, *, maximum: int) -> tuple[str, int]:
+def _hash_stream(stream: BinaryIO, *, maximum: int) -> tuple[str, int]:
     digest = sha256()
     size = 0
-    with _bounded_regular_reader(path, maximum) as stream:
-        while True:
-            chunk = stream.read(min(_CHUNK_SIZE, maximum - size + 1))
-            if not chunk:
-                break
-            size += len(chunk)
-            if size > maximum:
-                raise WeightShardStoreError("weight object exceeds manifest byte budget")
-            digest.update(chunk)
+    while True:
+        chunk = stream.read(min(_CHUNK_SIZE, maximum - size + 1))
+        if not chunk:
+            break
+        size += len(chunk)
+        if size > maximum:
+            raise WeightShardStoreError("weight object exceeds manifest byte budget")
+        digest.update(chunk)
     return digest.hexdigest(), size
+
+
+def _hash_file(path: Path, *, maximum: int) -> tuple[str, int]:
+    with _bounded_regular_reader(path, maximum) as stream:
+        return _hash_stream(stream, maximum=maximum)
 
 
 class WeightShardStore:
@@ -224,8 +228,8 @@ class WeightShardStore:
         self._write_once(self._manifest_path(plan.digest), canonical_bytes(manifest))
         return plan.digest
 
-    def load_plan(self, plan_digest: str) -> WeightLoadPlan:
-        """Reconstruct a committed plan without trusting caller-supplied paths."""
+    def _load_plan_manifest(self, plan_digest: str) -> tuple[WeightLoadPlan, dict]:
+        """Reconstruct a plan and its identity fields from one bounded read."""
         path = self._manifest_path(plan_digest)
         try:
             raw = _read_manifest(path)
@@ -250,7 +254,11 @@ class WeightShardStore:
             raise WeightShardStoreError("malformed weight shard manifest") from exc
         if plan.digest != plan_digest or plan.expected_total_bytes > self.maximum_bytes:
             raise WeightShardStoreError("weight manifest digest or budget mismatch")
-        return plan
+        return plan, manifest
+
+    def load_plan(self, plan_digest: str) -> WeightLoadPlan:
+        """Reconstruct a committed plan without trusting caller-supplied paths."""
+        return self._load_plan_manifest(plan_digest)[0]
 
     def verified_paths(self, plan_digest: str) -> tuple[Path, ...]:
         """Return only shards that still match their immutable content identity."""
@@ -286,22 +294,27 @@ class WeightShardStore:
         """Open verified, ordered shard streams for an explicit model decoder."""
         if not isinstance(model_identity, ModelIdentity):
             raise WeightShardStoreError("model identity required for weight loading")
-        plan = self.load_plan(plan_digest)
+        plan, data = self._load_plan_manifest(plan_digest)
         if plan.model_identity_digest != model_identity.identity_digest:
             raise WeightShardStoreError("requested model is not bound to this weight plan")
-        raw = self._manifest_path(plan_digest).read_bytes()
-        data = json.loads(raw)
         if data["weights_digest"] != model_identity.weights_digest:
             raise WeightShardStoreError("weights identity mismatch")
-        paths = self.verified_paths(plan_digest)
-        streams: list[BinaryIO] = []
-        try:
-            for path in paths:
-                streams.append(path.open("rb"))
+        # Verify the actual streams delivered to the decoder rather than
+        # hashing a pathname, closing it, then reopening an unverified file.
+        # The sealed-memory owner still hashes during its own immutable copy;
+        # ordinary streams do not prevent concurrent writes by the store owner.
+        with ExitStack() as stack:
+            streams: list[BinaryIO] = []
+            for shard in plan.shards:
+                stream = stack.enter_context(
+                    _bounded_regular_reader(self._object_path(shard.digest), shard.bytes)
+                )
+                observed, size = _hash_stream(stream, maximum=shard.bytes)
+                if observed != shard.digest or size != shard.bytes:
+                    raise WeightShardStoreError("stored weight object changed since admission")
+                stream.seek(0)
+                streams.append(stream)
             yield tuple(streams)
-        finally:
-            for stream in reversed(streams):
-                stream.close()
 
 
 __all__ = ["WeightShardStoreError", "WeightShardStore"]
