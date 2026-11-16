@@ -259,3 +259,81 @@ class TenfoldLeadQuotaTests(TestCase):
             self.assertEqual(graph.status(OWNER)["nodes"],1)
             self.assertEqual(graph.status(OWNER)["edges"],1)
             self.assertFalse(graph.status(OWNER)["physical_graph_sharding"])
+
+
+class OfflineExportInspectionTests(TestCase):
+    def setUp(self):
+        self.directory=TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.path=Path(self.directory.name)/"input.csv"
+
+    def fixture(self):
+        raw=b"AppID,Name\n10000001,Alpha\n10000002,Beta\n"
+        self.path.write_bytes(raw)
+        return hashlib.sha256(raw).hexdigest()
+
+    def test_inspect_is_graph_free_and_exact_hash_bound(self):
+        from core.dragon_lead_ingest import inspect_export
+        expected=self.fixture()
+        with patch("core.dragon_lead_ingest.LeadGraph",side_effect=AssertionError("graph must stay closed")):
+            result=inspect_export(self.path,"steam-csv","steam",expected_sha=expected)
+        self.assertEqual(result["input_sha256"],expected)
+        self.assertTrue(result["expected_sha_matched"])
+        self.assertEqual(result["rows"],2)
+        self.assertEqual(result["pages"],1)
+        for field in ("network_executed","graph_written","license_verified","source_rights_verified"):
+            self.assertIs(result[field],False)
+
+    def test_hash_mismatch_precedes_any_projection(self):
+        from core.dragon_lead_ingest import qualify
+        self.fixture()
+        with patch("core.dragon_lead_ingest.pages",side_effect=AssertionError("must not parse")):
+            with self.assertRaisesRegex(ValueError,"SHA-256 differs"):
+                qualify(self.path,"steam-csv","steam",expected_sha="0"*64)
+
+    def test_unsupported_and_cross_projection_modes_fail_before_io(self):
+        from core.dragon_lead_ingest import inspect_export
+        for format,projection in (("unknown","steam"),("steam-csv","locator"),
+                                  ("normalized-jsonl","unknown")):
+            with self.subTest(format=format,projection=projection):
+                with self.assertRaises(ValueError):
+                    inspect_export(self.path,format,projection)
+
+    def test_raw_byte_drift_blocks_graph_begin(self):
+        from core.dragon_lead_ingest import ingest
+        from unittest.mock import Mock
+        expected=self.fixture()
+        graph=Mock()
+        # Model mutation despite an unchanged filesystem witness.
+        with patch("core.dragon_lead_ingest._source_hash",side_effect=[expected,"0"*64]):
+            with self.assertRaisesRegex(ValueError,"changed during qualification"):
+                ingest(graph,OWNER,path=self.path,format="steam-csv",projection="steam",
+                       target="steam-fronkon",rights_reference="fixture",grant_seconds=86400)
+        graph.begin.assert_not_called()
+
+    def test_normalized_page_revalidation_precedes_writes(self):
+        from core.dragon_lead_ingest import qualify
+        self.fixture()
+        with patch("core.dragon_lead_ingest.steam_csv",return_value=iter([{"appid":"garbage","title":"Bad"}])):
+            with self.assertRaises(ValueError):
+                qualify(self.path,"steam-csv","steam")
+
+    def test_modrinth_export_rejects_duplicate_keys_and_nonfinite_numbers(self):
+        from core.dragon_lead_ingest import modrinth_json
+        from io import BytesIO
+        for raw in (b'{"hits":[],"hits":[]}',b'{"hits":[],"score":NaN}'):
+            with self.assertRaises(ValueError):
+                list(modrinth_json(BytesIO(raw)))
+
+    def test_cli_inspection_does_not_require_or_open_owner_storage(self):
+        from core.dragon_lead_ingest import main
+        from contextlib import redirect_stdout
+        from io import StringIO
+        self.fixture()
+        output=StringIO()
+        with patch("core.dragon_lead_ingest.LeadGraph",side_effect=AssertionError("storage opened")):
+            with redirect_stdout(output):
+                status=main(["--inspect-only","--input",str(self.path),"--format","steam-csv"])
+        self.assertEqual(status,0)
+        self.assertFalse(json.loads(output.getvalue())["graph_written"])
+
