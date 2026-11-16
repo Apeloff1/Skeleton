@@ -47,12 +47,16 @@ def _check(condition: bool, message: str) -> None:
 class CampaignStore:
     """Single private SQLite workspace, with independent request on every call."""
 
-    def __init__(self, db: sqlite3.Connection) -> None:
+    def __init__(self, db: sqlite3.Connection, *, initialize: bool = True) -> None:
         _check(isinstance(db, sqlite3.Connection), "SQLite connection required")
         self.db = db
         _check(not db.in_transaction, "store requires its own transaction boundary")
         db.execute("PRAGMA foreign_keys = ON")
         _check(db.execute("PRAGMA foreign_keys").fetchone()[0] == 1, "foreign keys unavailable")
+        if not initialize:
+            names = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type=\'table\' AND name IN (?,?)", ("gf_campaign_slots_v1", "gf_campaign_revisions_v1"))}
+            _check(names == {"gf_campaign_slots_v1", "gf_campaign_revisions_v1"}, "campaign journal schema missing")
+            return
         with self._transaction():
             db.execute("""
                 CREATE TABLE IF NOT EXISTS gf_campaign_slots_v1 (
@@ -95,7 +99,8 @@ class CampaignStore:
 
     def _row(self, slot: str, revision: int) -> tuple:
         row = self.db.execute("""
-            SELECT revision, operation, request_digest, previous_digest, receipt_digest, receipt
+            SELECT revision, operation, request_digest, previous_digest, receipt_digest,
+                   CASE WHEN length(receipt) <= 2097152 THEN receipt ELSE NULL END
             FROM gf_campaign_revisions_v1 WHERE slot=? AND revision=?
         """, (slot, revision)).fetchone()
         _check(row is not None, "revision missing")
@@ -238,11 +243,17 @@ class CampaignStore:
             rows = self.db.execute("""
                 SELECT revision, operation, request_digest, previous_digest, receipt_digest, receipt
                 FROM gf_campaign_revisions_v1 WHERE slot=? ORDER BY revision
-            """, (slot,)).fetchmany(MAX_REVISIONS + 1)
-            _check(len(rows) == head + 1, "revision count and head mismatch")
+            """, (slot,))
+            count = 0
+            retained_bytes = 0
             previous = None
             entries = []
             for revision, row in enumerate(rows):
+                count += 1
+                _check(count <= head + 1 and count <= MAX_REVISIONS, "revision count and head mismatch")
+                _check(type(row[5]) is bytes, "invalid history receipt bytes")
+                retained_bytes += len(row[5])
+                _check(retained_bytes <= MAX_SLOT_BYTES, "history exceeds logical byte limit")
                 _check(row[0] == revision, "noncontiguous revision chain")
                 receipt = self._decode(source, row)
                 if previous is None:
@@ -260,5 +271,6 @@ class CampaignStore:
                                 "receipt_digest": receipt["session_digest"],
                                 "action_count": len(receipt["actions"])})
                 previous = receipt
+            _check(count == head + 1, "revision count and head mismatch")
             return {"slot": slot, "head": head, "revisions": entries,
                     "native_qualified": False, "release_qualified": False}
