@@ -208,3 +208,30 @@ The source regressions include exclusive ownership, competing adapters,
 deadline-bound wait, compact Unicode custody digests, expiry before
 consumption and idle-only reinspection. Tests remain subject to
 exact-head CI, independent runtime qualification and all existing holds.
+
+
+## Bounded nonproductive work and expiry
+
+The cooperative queue has an explicit `max_stalled_slices` policy
+(default 8, bounded from 1 through 1024). Only dispatched slices
+returning zero tokens without a terminal result count toward this
+limit; scheduling deferral and pressure-induced no-grant iterations
+do not. Actual token progress resets the consecutive counter. When the
+limit is reached, cancellation and executor release precede return of
+the logical KV slot and the request is retired as stalled, not as a
+successful result. Successfully confirmed executor releases are not
+repeated if subsequent scheduler bookkeeping fails. A release that
+raises is still unconfirmed and needs the existing explicit cleanup
+path. This cannot interrupt a permanently blocked executor.
+
+Both cooperative and whole-request paths intersect the consumed grant's
+exclusive expiry with the operator-configured source inspection
+expiry, if present, and with the request's deadline. A result returned
+at or after that deadline is not successful publication. An observation
+that raises during admission now clears pending proposals and warmed
+energy recovery state. No receipt can be consumed at its exact expiry.
+
+Added focused regression sources for malformed offer recovery, exact
+expiry, stalled resident slot release and source-bound deadline
+calculation. No new physical executor capability or qualification is
+claimed.
