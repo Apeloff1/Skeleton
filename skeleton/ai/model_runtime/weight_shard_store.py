@@ -362,17 +362,39 @@ class WeightShardStore:
         self.assert_layout()
         return tuple(paths)
 
+    def bound_model_manifest(self, plan_digest: str, *, model_identity: ModelIdentity,
+                             expected_manifest_sha256: str | None = None
+                             ) -> tuple[WeightLoadPlan, str, int]:
+        """Read the full committed manifest once and bind both identity fields."""
+        if not isinstance(model_identity, ModelIdentity):
+            raise WeightShardStoreError("model identity required for weight loading")
+        plan, data = self._load_plan_manifest(plan_digest)
+        if plan.model_identity_digest != model_identity.identity_digest:
+            raise WeightShardStoreError("requested model is not bound to this weight plan")
+        if data["weights_digest"] != model_identity.weights_digest:
+            raise WeightShardStoreError("weights identity mismatch")
+        raw = canonical_bytes(data)
+        observed = sha256(raw).hexdigest()
+        if expected_manifest_sha256 is not None:
+            require_digest(expected_manifest_sha256, "expected_manifest_sha256")
+            if observed != expected_manifest_sha256:
+                raise WeightShardStoreError("weight manifest identity changed")
+        return plan, observed, len(raw)
+
     @contextmanager
     def open_sealed_pages(
         self, plan_digest: str, *, model_identity: ModelIdentity, max_bytes: int,
         progress_check: Callable[[int, int], None] | None = None,
+        expected_manifest_sha256: str | None = None,
+        max_mappings: int = 256,
     ) -> Iterator[tuple[object, ...]]:
         """Publish Linux read-only shared pages only after full shard verification."""
         from .sealed_weight_pages import open_sealed_weight_pages
 
         with open_sealed_weight_pages(
             self, plan_digest, model_identity=model_identity, max_bytes=max_bytes,
-            progress_check=progress_check,
+            progress_check=progress_check, expected_manifest_sha256=expected_manifest_sha256,
+            max_mappings=max_mappings,
         ) as pages:
             yield pages
 
@@ -383,11 +405,8 @@ class WeightShardStore:
         """Open verified, ordered shard streams for an explicit model decoder."""
         if not isinstance(model_identity, ModelIdentity):
             raise WeightShardStoreError("model identity required for weight loading")
-        plan, data = self._load_plan_manifest(plan_digest)
-        if plan.model_identity_digest != model_identity.identity_digest:
-            raise WeightShardStoreError("requested model is not bound to this weight plan")
-        if data["weights_digest"] != model_identity.weights_digest:
-            raise WeightShardStoreError("weights identity mismatch")
+        plan, manifest_sha, manifest_size = self.bound_model_manifest(
+            plan_digest, model_identity=model_identity)
         # Verify the actual streams delivered to the decoder rather than
         # hashing a pathname, closing it, then reopening an unverified file.
         # The sealed-memory owner still hashes during its own immutable copy;
@@ -404,8 +423,14 @@ class WeightShardStore:
                 stream.seek(0)
                 streams.append(stream)
             self.assert_layout()
+            _, observed, _ = self.manifest_evidence(plan_digest, maximum=manifest_size)
+            if observed != manifest_sha:
+                raise WeightShardStoreError("weight manifest identity changed before decoder publication")
             yield tuple(streams)
             self.assert_layout()
+            _, observed, _ = self.manifest_evidence(plan_digest, maximum=manifest_size)
+            if observed != manifest_sha:
+                raise WeightShardStoreError("weight manifest identity changed during decoder use")
 
 
 __all__ = ["WeightShardStoreError", "WeightShardStore"]
