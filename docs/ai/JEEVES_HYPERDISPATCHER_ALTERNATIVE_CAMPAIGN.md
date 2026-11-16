@@ -625,3 +625,23 @@ queued/unadmitted cancellation, interrupted cancellation, uncertain effects
 and the separately authorized host workflow-cancel action. The graph creation
 collision scan is bounded by the configured inbox ceiling but is linear in
 historical commands; production-scale latency remains to be measured.
+
+## Wave A27: indexed ingress ledger and pre-transport proof
+
+A one-time transactional migration builds the valid historical task index
+and exact logical command/manifest capacity counters. New standalone and
+graph submission reserve capacity, index their canonical identities and
+publish all bytes in a single transaction; conflict rollback includes
+capacity accounting. Graph collision lookup is bounded by graph size using
+the task index, not by historical command count. The explicit audit-ingress
+command streams and independently revalidates the inbox, manifest seals,
+member and cancellation records, indexed task identities and counters.
+Startup runs the audit before acquiring the real worker owner. At physical
+candidate derivation, every queued task is bound to its exact admitted
+command, immutable input or verified lineage, ownership, priority, graph
+manifest, cancellation state and acknowledged admission. A captured but
+unacknowledged task cannot physically execute through the installed service.
+The five added regressions cover transactional retry/conflict accounting,
+migration, corruption refusal, lost admission acknowledgements and
+post-admission graph manifest tampering. Logical counters and indexed
+admission do not certify physical storage capacity or throughput.

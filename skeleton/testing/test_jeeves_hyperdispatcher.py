@@ -3725,3 +3725,128 @@ def test_workflow_host_graph_cancellation_requires_its_own_scope_grant(tmp_path)
                             arguments={"workflow_id": "flow"})
     assert state["workflow_state"] == "cancelled" and app.custody.usage()["attempts"] == 0
     app.close()
+
+
+def test_ingress_ledger_atomic_retry_and_graph_collisions_preserve_exact_totals(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication, DispatcherRequestError
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "ledger", tenants=("a",), operations=("integer_sum",),
+        workers=1, max_jobs=4, clock_ms=lambda: 100,
+    )
+    malformed = {"kind": "submit", "tenant": "a", "task_id": ["invalid"],
+                 "operation": "integer_sum", "input": [1]}
+    app.enqueue("invalid", malformed)
+    initial = app.inbox.audit()
+    assert initial["verified_commands"] == 1 and initial["verified_indexed_tasks"] == 0
+    standalone = {"kind": "submit", "tenant": "a", "task_id": "reserved",
+                  "operation": "integer_sum", "input": [2]}
+    app.enqueue("existing", standalone)
+    before = app.inbox.audit()
+    with pytest.raises(DispatcherRequestError, match="identity"):
+        app.enqueue_workflow("a", "conflict", {"deadline_ms": 1000, "jobs": [
+            _workflow_node("fresh", "fresh", [3]), _workflow_node("colliding", "reserved", [4]),
+        ]})
+    assert app.inbox.audit() == before
+    graph = {"deadline_ms": 1000, "jobs": [_workflow_node("fresh", "fresh", [3])]}
+    receipt = app.enqueue_workflow("a", "valid", graph)
+    after = app.inbox.audit()
+    assert after["verified_commands"] == 3 and after["verified_workflows"] == 1
+    assert after["verified_indexed_tasks"] == after["verified_commands"]-1
+    assert app.enqueue_workflow("a", "valid", graph) == receipt
+    assert app.enqueue("existing", standalone)["status"] == "pending"
+    assert app.inbox.audit() == after
+
+
+def test_ingress_index_and_ledger_migration_preserves_sealed_graph_and_retries(tmp_path):
+    import os
+    import sqlite3
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "old", tenants=("a",), operations=("integer_sum",),
+        max_jobs=4, clock_ms=lambda: 100,
+    )
+    graph = {"deadline_ms": 1000, "jobs": [_workflow_node("r", "job", [7])]}
+    expected = app.enqueue_workflow("a", "flow", graph)
+    audit = app.inbox.audit()
+    with sqlite3.connect(app.store.path) as conn:
+        conn.execute("DROP TABLE hyperdispatcher_submit_index")
+        conn.execute("DROP TABLE hyperdispatcher_ingress_totals")
+    reopened = LocalDispatcherApplication(app.directory, clock_ms=lambda: 100)
+    assert reopened.inbox.audit() == audit
+    assert reopened.enqueue_workflow("a", "flow", graph) == expected
+    reopened.start()
+    assert reopened.tick().disposition == "completed"
+    assert reopened.result("a", "job")["result"] == 7
+    reopened.close()
+
+
+def test_ingress_ledger_corruption_detected_before_new_owner_admits_work(tmp_path):
+    import os
+    import sqlite3
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    from skeleton.automation.agents.swarm_durable import DurableSwarmError
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "broken", tenants=("a",), operations=("integer_sum",), max_jobs=4,
+    )
+    app.enqueue("r", {"kind": "submit", "tenant": "a", "task_id": "job",
+                      "operation": "integer_sum", "input": [1]})
+    with sqlite3.connect(app.store.path) as conn:
+        conn.execute("UPDATE hyperdispatcher_ingress_totals SET reserved_bytes=reserved_bytes-1")
+    with pytest.raises(DurableSwarmError, match="audit totals"):
+        app.start()
+    assert app.custody.usage()["attempts"] == 0
+    assert app.store.get_run("local-hyperdispatcher-v1").worker_id is None
+
+
+def test_dispatch_candidate_requires_exact_ack_before_physical_launch(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "ack", tenants=("a",), operations=("integer_sum",),
+        workers=1, max_jobs=4, clock_ms=lambda: 100,
+    )
+    app.enqueue("first", {"kind": "submit", "tenant": "a", "task_id": "job",
+                          "operation": "integer_sum", "input": [12]})
+    app.start()
+    lost_ack = app.inbox.pending()[0]
+    assert app._apply(lost_ack)["submission"] == "durable"
+    assert app._candidates(100) == ()
+    assert app.custody.usage()["attempts"] == 0
+    assert app.tick().task_id == "job"
+    assert app.result("a", "job")["result"] == 12
+    app.close()
+
+
+def test_dispatch_candidate_refuses_changed_workflow_manifest_before_transport(tmp_path):
+    import os
+    import sqlite3
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    from skeleton.automation.agents.swarm_durable import DurableSwarmError
+    now = [100]
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "manifest", tenants=("a",), operations=("integer_sum",),
+        workers=1, max_jobs=4, clock_ms=lambda: now[0],
+    )
+    app.enqueue_workflow("a", "flow", {"deadline_ms": 1000,
+                         "jobs": [_workflow_node("r", "job", [1], timer_ms=200)]})
+    app.start()
+    assert app.tick().disposition == "idle"
+    with sqlite3.connect(app.store.path) as conn:
+        conn.execute("UPDATE hyperdispatcher_workflows SET manifest=? WHERE workflow_id=?",
+                     (b"{}", "flow"))
+    now[0] = 200
+    with pytest.raises(DurableSwarmError, match="seal mismatch"):
+        app.tick()
+    assert app.custody.usage()["attempts"] == 0
+    app.managed.stop()

@@ -306,6 +306,7 @@ class DispatcherInbox:
                     ) WITHOUT ROWID
                 """)
                 self._install_workflow_control(conn)
+                self._install_ingress_ledger(conn)
                 conn.execute(
                     "INSERT OR IGNORE INTO hyperdispatcher_inbox_policy VALUES (?,?,?,?,?)",
                     (_RUN_ID, _VERSION, policy.digest, self.max_commands, self.max_bytes),
@@ -362,6 +363,158 @@ class DispatcherInbox:
                                   node["request_id"], node["task_id"]))
 
     @staticmethod
+    def _indexable_task(body: dict) -> str | None:
+        task = body.get("task_id")
+        if body.get("kind") != "submit" or type(task) is not str:
+            return None
+        try:
+            return _identifier(task)
+        except DispatcherRequestError:
+            # Preserve invalid historical submissions for normal rejection;
+            # they cannot reserve a valid canonical scheduler identity.
+            return None
+
+    def _install_ingress_ledger(self, conn) -> None:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS hyperdispatcher_ingress_totals (
+                run_id TEXT PRIMARY KEY REFERENCES runs(run_id),
+                version INTEGER NOT NULL,
+                commands INTEGER NOT NULL CHECK(commands>=0),
+                workflows INTEGER NOT NULL CHECK(workflows>=0),
+                reserved_bytes INTEGER NOT NULL CHECK(reserved_bytes>=0)
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS hyperdispatcher_submit_index (
+                run_id TEXT NOT NULL, request_id TEXT NOT NULL,
+                task_id TEXT NOT NULL, command_sha256 TEXT NOT NULL,
+                PRIMARY KEY(run_id,request_id),
+                FOREIGN KEY(run_id,request_id) REFERENCES hyperdispatcher_inbox(run_id,request_id)
+            ) WITHOUT ROWID
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS hyperdispatcher_submit_task "
+                     "ON hyperdispatcher_submit_index(run_id,task_id)")
+        if conn.execute("SELECT 1 FROM hyperdispatcher_ingress_totals WHERE run_id=?",
+                        (_RUN_ID,)).fetchone() is not None:
+            self._ledger(conn)
+            return
+        # One transactional migration scans historical commands exactly once.
+        # Future publishers perform only bounded indexed lookups and increments.
+        commands = reserved = workflows = 0
+        for row in conn.execute("SELECT * FROM hyperdispatcher_inbox WHERE run_id=? ORDER BY sequence",
+                                (_RUN_ID,)):
+            command = self._decode(row)
+            if row["charge"] != len(row["body"]) + _MAX_RESULT_BYTES + 512:
+                raise DurableSwarmError("historical inbox charge mismatch")
+            task = self._indexable_task(command.body)
+            if task is not None:
+                conn.execute("INSERT INTO hyperdispatcher_submit_index VALUES (?,?,?,?)",
+                             (_RUN_ID, command.request_id, task, command.request_sha256))
+            commands += 1
+            reserved += row["charge"]
+            if commands > self.max_commands or reserved > self.max_bytes:
+                raise DurableSwarmError("historical inbox exceeds provisioned capacity")
+        for row in conn.execute("SELECT * FROM hyperdispatcher_workflows WHERE run_id=?", (_RUN_ID,)):
+            self._workflow_row(conn, row)
+            workflows += 1
+            reserved += row["charge"]
+            if reserved > self.max_bytes or workflows > commands:
+                raise DurableSwarmError("historical workflows exceed provisioned capacity")
+        conn.execute("INSERT INTO hyperdispatcher_ingress_totals VALUES (?,1,?,?,?)",
+                     (_RUN_ID, commands, workflows, reserved))
+
+    def _ledger(self, conn) -> tuple[int, int, int]:
+        row = conn.execute(
+            "SELECT version,commands,workflows,reserved_bytes FROM hyperdispatcher_ingress_totals WHERE run_id=?",
+            (_RUN_ID,),
+        ).fetchone()
+        if (row is None or row["version"] != 1
+                or not 0 <= row["workflows"] <= row["commands"] <= self.max_commands
+                or not 0 <= row["reserved_bytes"] <= self.max_bytes):
+            raise DurableSwarmError("ingress ledger missing or outside sealed capacity")
+        return row["commands"], row["workflows"], row["reserved_bytes"]
+
+    def _reserve(self, conn, *, commands: int, workflows: int, charge: int) -> None:
+        before_commands, before_workflows, occupied = self._ledger(conn)
+        if before_commands + commands > self.max_commands or occupied + charge > self.max_bytes:
+            raise DispatcherRequestError("durable ingress capacity exhausted")
+        updated = conn.execute(
+            "UPDATE hyperdispatcher_ingress_totals SET commands=?,workflows=?,reserved_bytes=? "
+            "WHERE run_id=? AND commands=? AND workflows=? AND reserved_bytes=?",
+            (before_commands+commands, before_workflows+workflows, occupied+charge,
+             _RUN_ID, before_commands, before_workflows, occupied),
+        ).rowcount
+        if updated != 1:
+            raise DurableSwarmError("ingress capacity ledger changed during transaction")
+
+    def _index_submit(self, conn, request_id: str, body: dict, digest: str) -> None:
+        task = self._indexable_task(body)
+        if task is not None:
+            conn.execute("INSERT INTO hyperdispatcher_submit_index VALUES (?,?,?,?)",
+                         (_RUN_ID, request_id, task, digest))
+
+    def _verify_submit_index(self, conn, command: InboxCommand) -> None:
+        expected = self._indexable_task(command.body)
+        row = conn.execute(
+            "SELECT task_id,command_sha256 FROM hyperdispatcher_submit_index WHERE run_id=? AND request_id=?",
+            (_RUN_ID, command.request_id),
+        ).fetchone()
+        if expected is None:
+            if row is not None:
+                raise DurableSwarmError("non-submit command has an indexed task")
+        elif row is None or tuple(row) != (expected, command.request_sha256):
+            raise DurableSwarmError("durable submit identity index mismatch")
+
+    def audit(self) -> dict[str, int]:
+        """Stream the full immutable ingress, manifests, indexes and totals."""
+        with closing(self.store._connect()) as conn:
+            conn.execute("BEGIN")
+            try:
+                expected = self._ledger(conn)
+                commands = workflows = reserved = indexed = members = cancellations = 0
+                for row in conn.execute("SELECT * FROM hyperdispatcher_inbox WHERE run_id=? ORDER BY sequence",
+                                        (_RUN_ID,)):
+                    command = self._decode(row)
+                    self._verify_submit_index(conn, command)
+                    self._public_row(row)
+                    if row["charge"] != len(row["body"]) + _MAX_RESULT_BYTES + 512:
+                        raise DurableSwarmError("inbox byte accounting mismatch")
+                    if row["result"] is not None and len(row["result"]) > _MAX_RESULT_BYTES:
+                        raise DurableSwarmError("inbox acknowledgement exceeds charge")
+                    commands += 1
+                    reserved += row["charge"]
+                    indexed += int(self._indexable_task(command.body) is not None)
+                    if commands > self.max_commands or reserved > self.max_bytes:
+                        raise DurableSwarmError("inbox audit exceeded configured limits")
+                for row in conn.execute("SELECT * FROM hyperdispatcher_workflows WHERE run_id=?", (_RUN_ID,)):
+                    graph = self._workflow_row(conn, row)
+                    reserved += row["charge"]
+                    workflows += 1
+                    members += len(graph["jobs"])
+                    cancellation = conn.execute(
+                        "SELECT * FROM hyperdispatcher_workflow_cancellations "
+                        "WHERE run_id=? AND tenant=? AND workflow_id=?",
+                        (_RUN_ID, graph["tenant"], graph["workflow_id"]),
+                    ).fetchone()
+                    if cancellation is not None:
+                        self._cancel_record(conn, cancellation, graph)
+                        cancellations += 1
+                actual = (
+                    conn.execute("SELECT count(*) FROM hyperdispatcher_submit_index WHERE run_id=?", (_RUN_ID,)).fetchone()[0],
+                    conn.execute("SELECT count(*) FROM hyperdispatcher_workflow_members WHERE run_id=?", (_RUN_ID,)).fetchone()[0],
+                    conn.execute("SELECT count(*) FROM hyperdispatcher_workflow_cancellations WHERE run_id=?", (_RUN_ID,)).fetchone()[0],
+                )
+                if (commands, workflows, reserved) != expected or actual != (indexed, members, cancellations):
+                    raise DurableSwarmError("ingress audit totals or index mismatch")
+                conn.commit()
+                return {"verified_commands": commands, "verified_workflows": workflows,
+                        "verified_members": members, "verified_indexed_tasks": indexed,
+                        "verified_cancellations": cancellations, "reserved_bytes": reserved}
+            except BaseException:
+                conn.rollback()
+                raise
+
+    @staticmethod
     def _public_row(row) -> dict:
         result = None if row["result"] is None else _json_object(row["result"])
         return {"sequence": row["sequence"], "request_id": row["request_id"],
@@ -394,16 +547,7 @@ class DispatcherInbox:
                     ).fetchone()
                     if claim is not None:
                         raise DispatcherRequestError("task identity reserved by workflow")
-                count, reserved = conn.execute(
-                    "SELECT count(*),coalesce(sum(charge),0) "
-                    "FROM hyperdispatcher_inbox WHERE run_id=?", (_RUN_ID,),
-                ).fetchone()
-                reserved += conn.execute(
-                    "SELECT coalesce(sum(charge),0) FROM hyperdispatcher_workflows WHERE run_id=?",
-                    (_RUN_ID,),
-                ).fetchone()[0]
-                if count >= self.max_commands or reserved + charge > self.max_bytes:
-                    raise DispatcherRequestError("durable command capacity exhausted")
+                self._reserve(conn, commands=1, workflows=0, charge=charge)
                 stamp = _wait_time(self.clock_ms())
                 conn.execute(
                     "INSERT INTO hyperdispatcher_inbox "
@@ -411,6 +555,7 @@ class DispatcherInbox:
                     "VALUES (?,?,?,?,?,?,'pending')",
                     (_RUN_ID, request_id, digest, stamp, encoded, charge),
                 )
+                self._index_submit(conn, request_id, body, digest)
                 row = conn.execute(
                     "SELECT * FROM hyperdispatcher_inbox WHERE run_id=? AND request_id=?",
                     (_RUN_ID, request_id),
@@ -527,16 +672,7 @@ class DispatcherInbox:
                 stamp = _wait_time(self.clock_ms())
                 if not stamp < plan.deadline_ms <= stamp + MAX_BINDING_WAIT_MS:
                     raise DispatcherRequestError("workflow deadline outside admission interval")
-                count, occupied = conn.execute(
-                    "SELECT count(*),coalesce(sum(charge),0) FROM hyperdispatcher_inbox WHERE run_id=?",
-                    (_RUN_ID,),
-                ).fetchone()
-                occupied += conn.execute(
-                    "SELECT coalesce(sum(charge),0) FROM hyperdispatcher_workflows WHERE run_id=?",
-                    (_RUN_ID,),
-                ).fetchone()[0]
-                if count + len(prepared) > self.max_commands or occupied + total > self.max_bytes:
-                    raise DispatcherRequestError("atomic workflow ingress capacity exhausted")
+                self._reserve(conn, commands=len(prepared), workflows=1, charge=total)
                 # Refuse all overlapping standalone or other workflow
                 # requests. Never adopt a partial prior publication.
                 for request_id, _, _, _ in prepared:
@@ -544,17 +680,20 @@ class DispatcherInbox:
                             "SELECT 1 FROM hyperdispatcher_inbox WHERE run_id=? AND request_id=?",
                             (_RUN_ID, request_id)).fetchone() is not None:
                         raise DispatcherRequestError("workflow request identity already exists")
-                # Task IDs are globally unique in the canonical scheduler.
-                # Reject collisions at graph creation, not after half the
-                # graph has already executed. JSON1 is not required: every
-                # existing submit row is decoded with its canonical hash.
-                desired = {item.body["task_id"] for item in plan.commands}
-                for existing in conn.execute(
-                        "SELECT sequence,request_id,request_sha256,submitted_ms,body "
-                        "FROM hyperdispatcher_inbox WHERE run_id=?", (_RUN_ID,)):
-                    previous_command = self._decode(existing)
-                    if (previous_command.body.get("kind") == "submit"
-                            and previous_command.body.get("task_id") in desired):
+                # The migration indexed every valid historical submit.
+                # Check only the up-to-32 new task identities under this
+                # publication transaction, not the entire command history.
+                for item in plan.commands:
+                    task_id = item.body["task_id"]
+                    existing = conn.execute(
+                        "SELECT i.* FROM hyperdispatcher_submit_index s "
+                        "JOIN hyperdispatcher_inbox i ON i.run_id=s.run_id AND i.request_id=s.request_id "
+                        "WHERE s.run_id=? AND s.task_id=? LIMIT 1",
+                        (_RUN_ID, task_id),
+                    ).fetchone()
+                    if existing is not None:
+                        prior = self._decode(existing)
+                        self._verify_submit_index(conn, prior)
                         raise DispatcherRequestError("workflow task identity already exists")
                 for request_id, command_digest, data, charge in prepared:
                     conn.execute(
@@ -569,6 +708,7 @@ class DispatcherInbox:
                      self._workflow_seal(raw, stamp), stamp, len(raw)+512),
                 )
                 for item in plan.commands:
+                    self._index_submit(conn, item.request_id, item.body, item.digest)
                     conn.execute("INSERT INTO hyperdispatcher_workflow_members VALUES (?,?,?,?,?)",
                                  (_RUN_ID, plan.tenant, plan.workflow_id, item.request_id,
                                   item.body["task_id"]))
@@ -589,14 +729,16 @@ class DispatcherInbox:
             conn.execute("BEGIN")
             try:
                 claim = conn.execute(
-                    "SELECT * FROM hyperdispatcher_workflow_members WHERE run_id=? AND task_id=?",
-                    (_RUN_ID, command.body["task_id"]),
+                    "SELECT * FROM hyperdispatcher_workflow_members WHERE run_id=? AND (task_id=? OR request_id=?)",
+                    (_RUN_ID, command.body["task_id"], command.request_id),
                 ).fetchone()
                 if claim is None:
                     conn.commit()
                     return None
                 if claim["request_id"] != command.request_id:
                     raise DispatcherRequestError("task identity reserved by another workflow request")
+                if claim["task_id"] != command.body["task_id"]:
+                    raise DurableSwarmError("workflow member task identity changed")
                 row = conn.execute(
                     "SELECT * FROM hyperdispatcher_workflows WHERE run_id=? AND tenant=? AND workflow_id=?",
                     (_RUN_ID, claim["tenant"], claim["workflow_id"]),
@@ -982,6 +1124,7 @@ class LocalDispatcherApplication:
         # a missing/tampered row must fail closed rather than permit reuse.
         if self.archive is not None:
             self.archive.audit()
+        self.inbox.audit()
         signers = {policy.worker_id(index): (policy.worker_issuer(index), key)
                    for index, key in enumerate(policy.worker_keys)}
         pure_operations = policy.operations & _LOCAL_OPERATIONS
@@ -1551,6 +1694,32 @@ class LocalDispatcherApplication:
             created = _wait_time(metadata["enqueued_ms"])
             if created > now_ms:
                 raise DurableSwarmError("dispatcher clock moved behind admitted job")
+            found = self.inbox.record(metadata["request_id"])
+            if found is None:
+                raise DurableSwarmError("queued task lacks durable admission command")
+            command, status, acknowledgement = found
+            body = command.body
+            if (command.request_sha256 != metadata["request_sha256"]
+                    or command.submitted_ms != created or body.get("kind") != "submit"
+                    or body.get("task_id") != task.id or body.get("tenant") != tenant
+                    or body.get("operation") != task.payload.get("operation")
+                    or body.get("priority", 100) != task.priority):
+                raise DurableSwarmError("queued task admission identity changed")
+            if bool({"bindings", "prerequisites"} & set(body)) != ("binding_receipts" in metadata):
+                raise DurableSwarmError("queued task lineage inventory changed")
+            if "binding_receipts" in metadata:
+                self._verify_lineage(tenant, runtime._task_record(task))
+            elif _wait_bytes(body["input"]) != _wait_bytes(task.payload.get("input")):
+                raise DurableSwarmError("queued task input differs from admitted command")
+            graph = self.inbox.workflow_member(command)
+            if graph is not None and self.inbox.cancellation(tenant, graph["workflow_id"]) is not None:
+                raise DurableSwarmError("cancelled workflow retains a dispatchable task")
+            if status == "pending":
+                # Admission may have been captured just before owner loss.
+                # The inbox must acknowledge exact replay before dispatch.
+                continue
+            if status != "accepted" or acknowledgement != {"task_id": task.id, "submission": "durable"}:
+                raise DurableSwarmError("queued task admission acknowledgement invalid")
             rows.append(DispatchCandidate(task.id, tenant, task.priority, created))
         return tuple(rows)
 
@@ -1806,6 +1975,7 @@ def main(argv: list[str] | None = None) -> int:
     result.add_argument("--task", required=True)
     sub.add_parser("status")
     sub.add_parser("audit-history", help="stream and verify every retained terminal history row")
+    sub.add_parser("audit-ingress", help="stream and verify durable commands, graph seals and capacity ledger")
     serve = sub.add_parser("serve", help="run the actual foreground dispatcher")
     serve.add_argument("--poll", type=float, default=0.25)
     serve.add_argument("--max-cycles", type=int)
@@ -1849,6 +2019,8 @@ def main(argv: list[str] | None = None) -> int:
             _print(app.result(args.tenant, args.task))
         elif args.action == "status":
             _print(app.status())
+        elif args.action == "audit-ingress":
+            _print(app.inbox.audit())
         elif args.action == "audit-history":
             if app.archive is None:
                 raise DispatcherRequestError("rolling terminal history not provisioned")
