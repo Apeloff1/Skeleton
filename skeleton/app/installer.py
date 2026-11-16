@@ -255,19 +255,25 @@ def install_application(
                 )
             )
             return InstallReceipt(root=root, phases=tuple(phases))
-        phases.append(_setup_phase(setup))
-        for warning in setup.warnings:
-            phases.append(InstallPhase("configuration-note", True, warning, required=False))
-
-        # Validation-only installs also consume private configuration. Bind the
-        # exact bytes immediately after setup, before pip or Compose can run.
+        # Capture the actual setup output before an external phase observer can
+        # alter its bytes. Preserve the setup observation even when the epoch
+        # cannot be admitted, but never use the observer's replacement.
         try:
             admitted_digest = runtime_source_fingerprint(root)
-        except (OSError, ValueError, UnicodeError):
-            phases.append(_runtime_source_rejection())
-            return InstallReceipt(root=root, phases=tuple(phases))
+        except (OSError,ValueError,UnicodeError):
+            admitted_digest = None
+        phases.append(_setup_phase(setup))
+        for warning in setup.warnings:
+            phases.append(InstallPhase("configuration-note",True,warning,required=False))
+
+        epoch_valid = admitted_digest is not None
+
         def source_stable():
-            return lease.current() and _runtime_source_stable(root, admitted_digest)
+            nonlocal epoch_valid
+            if epoch_valid:
+                epoch_valid = (admitted_digest is not None and lease.current()
+                               and _runtime_source_stable(root,admitted_digest))
+            return epoch_valid
 
         if not source_stable():
             phases.append(_runtime_source_rejection())

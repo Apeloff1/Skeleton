@@ -240,7 +240,6 @@ def test_unchanged_runtime_epoch_permits_focused_readiness_and_route_validation(
     tmp_path, monkeypatch
 ):
     _prepare(monkeypatch, tmp_path)
-    from skeleton.app.health import ProbeResult
 
     monkeypatch.setattr(
         "skeleton.app.health.wait_for_application",
@@ -438,7 +437,6 @@ def test_installer_binds_frontend_probe_to_admitted_environment(
 ):
     _prepare(monkeypatch, tmp_path)
     monkeypatch.setenv("FRONTEND_PORT", "3100")
-    from skeleton.app.health import ProbeResult
 
     observed = []
     commands = []
@@ -484,7 +482,6 @@ def test_install_manifest_resolution_cannot_change_later_probe_epoch(
         return manifest
 
     monkeypatch.setattr(installer, "runtime_manifest", changing_manifest)
-    from skeleton.app.health import ProbeResult
 
     def wait_for_health(**kwargs):
         observed.append(kwargs["public_url_overrides"].get("frontend"))
@@ -509,7 +506,6 @@ def test_preflight_and_startup_share_exact_process_environment(
     _prepare(monkeypatch, tmp_path)
     monkeypatch.setenv("FRONTEND_PORT", "3100")
     seen = []
-    from skeleton.app.health import ProbeResult
 
     def mutating_preflight(*args, **kwargs):
         seen.append(("preflight", kwargs["environ"]["FRONTEND_PORT"]))
@@ -828,3 +824,38 @@ def test_recovered_frontend_never_probes_unqualified_runtime(tmp_path,monkeypatc
     receipt=installer.install_application(tmp_path,start=True,install_python=False,runner=runner)
     assert not receipt.ok
     assert receipt.phases[-1].name=="setup-ui-recovery" and not receipt.phases[-1].ok
+
+
+
+def test_phase_observer_cannot_substitute_new_configuration_after_setup(tmp_path,monkeypatch):
+    config=_prepare(monkeypatch,tmp_path)
+    phases=[]
+    class Observer:
+        def begin_phase(self,name):
+            phases.append(("intent",name))
+        def complete_phase(self,phase):
+            phases.append(("result",phase.name))
+            if phase.name=="setup-runtime":
+                config.write_text("FRONTEND_PORT=3300\n")
+    receipt=installer.install_application(tmp_path,start=True,install_python=False,
+        runner=lambda *a,**k:pytest.fail("substituted configuration reached subprocess"),
+        phase_observer=Observer())
+    assert not receipt.ok
+    assert receipt.phases[-1].name=="runtime-source-epoch"
+    assert ("intent","start") not in phases
+
+
+def test_start_readiness_rejects_epoch_once_even_if_config_is_restored(tmp_path,monkeypatch):
+    config=_prepare(monkeypatch,tmp_path)
+    def health(**kwargs):
+        original=config.read_bytes()
+        config.write_text("FRONTEND_PORT=3300\n")
+        assert kwargs["admit"]() is False
+        config.write_bytes(original)
+        assert kwargs["admit"]() is False
+        return fixture_probes(**kwargs)
+    monkeypatch.setattr("skeleton.app.health.wait_for_application",health)
+    monkeypatch.setattr("skeleton.app.first_install.critical_backend_route_report",
+                        lambda *a,**k:pytest.fail("stale runtime reached registry"))
+    receipt=installer.install_application(tmp_path,start=True,install_python=False,runner=lambda c,**kw:_completed(c))
+    assert not receipt.ok and receipt.phases[-1].name=="runtime-source-epoch"

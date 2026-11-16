@@ -1251,3 +1251,11 @@ Each receipt must match the configured endpoint URL with an actual 2xx
 integer status and an explicit success boolean. Partial or duplicate
 inventory cannot finish a retry campaign or admit startup. Mongo has no
 public HTTP health route; its custody and dependency health are separate.
+
+
+Live status, smoke, Windows status and startup now retain a sticky
+configuration epoch through health collection. If a source mutation is
+observed, old receipts are discarded even if the file later contains the
+original bytes. The installer captures setup's output before invoking
+external phase observers, so an observer cannot substitute a new
+configuration and have it accepted as the original setup result.

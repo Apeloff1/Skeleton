@@ -494,7 +494,8 @@ def test_live_status_reports_runtime_health_and_fails_closed(monkeypatch, capsys
     from skeleton.app.cli import run_app_cli
     from skeleton.app.health import ProbeResult
 
-    def fake_probe_application(*, manifest, full, timeout):
+    def fake_probe_application(*, manifest, full, timeout, admit):
+        assert admit() is True
         assert full is False
         assert timeout == 1.25
         return (
@@ -1412,7 +1413,6 @@ def test_cli_start_rejects_entire_invalid_probe_budget_before_mutation(tmp_path,
 @pytest.mark.parametrize("stage", ["preflight", "manifest", "compose", "health", "registry"])
 def test_cli_start_cannot_qualify_changed_configuration(tmp_path, monkeypatch, stage):
     from skeleton.app import cli
-    from skeleton.app.health import ProbeResult
     config = _prepare_cli_start(tmp_path, monkeypatch)
     seen = []
 
@@ -1463,7 +1463,6 @@ def test_cli_no_verify_does_not_bypass_configuration_epoch(tmp_path, monkeypatch
 @pytest.mark.parametrize("ready", [True, False])
 def test_cli_start_requires_critical_routes_not_only_healthy_socket(tmp_path, monkeypatch, ready):
     from skeleton.app import cli
-    from skeleton.app.health import ProbeResult
     _prepare_cli_start(tmp_path, monkeypatch)
     monkeypatch.setattr(cli, "_run_compose", lambda *a, **k: 0)
     from skeleton.testing.app_health_fixtures import fixture_probes
@@ -1622,3 +1621,29 @@ def test_cli_compose_lifecycle_output_is_bounded_and_redacted(tmp_path,monkeypat
         return subprocess.CompletedProcess(command,0)
     monkeypatch.setattr(cli.subprocess,"run",runner)
     assert cli._run_compose(("docker","compose","up"),tmp_path)==0
+
+
+
+@pytest.mark.parametrize("command",["status","smoke"])
+def test_readonly_cli_drops_health_evidence_after_configuration_epoch_loss(tmp_path,monkeypatch,capsys,command):
+    from skeleton.app import cli
+    from skeleton.testing.app_health_fixtures import fixture_probes
+    config=tmp_path/".env"
+    config.write_text("FRONTEND_PORT=3000\n")
+    monkeypatch.setattr(cli,"find_repo_root",lambda:tmp_path)
+    def probe(**kw):
+        assert kw["admit"]()
+        old=config.read_bytes()
+        config.write_text("FRONTEND_PORT=3300\n")
+        assert kw["admit"]() is False
+        config.write_bytes(old)
+        assert kw["admit"]() is False
+        return fixture_probes(**kw)
+    monkeypatch.setattr("skeleton.app.health.probe_application",probe)
+    monkeypatch.setattr("skeleton.app.health.wait_for_application",probe)
+    argv=["status","--live","--json"] if command=="status" else ["smoke","--json"]
+    assert cli.run_app_cli(argv)==1
+    result=json.loads(capsys.readouterr().out)
+    if command=="status":
+        result=result["runtime_health"]
+    assert result["ok"] is False and result["results"]==[]

@@ -334,6 +334,24 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _diagnostic_admission(root):
+    """Latch loss of the exact private configuration epoch for one campaign."""
+    from skeleton.app.first_install import _configuration_epoch
+    epoch = _configuration_epoch(root)
+    valid = True
+
+    def admitted():
+        nonlocal valid
+        if valid:
+            try:
+                valid = _configuration_epoch(root) == epoch
+            except (OSError,ValueError,UnicodeError):
+                valid = False
+        return valid
+
+    return admitted
+
+
 def _print_status(
     as_json: bool,
     *,
@@ -341,8 +359,20 @@ def _print_status(
     full: bool = False,
     timeout: float = 3.0,
 ) -> int:
+    if live and (type(timeout) not in (int,float) or not 0 < timeout <= 30
+                 or not math.isfinite(timeout)):
+        print("status timeout must be greater than zero and at most 30 seconds")
+        return 2
     try:
-        manifest = runtime_manifest()
+        if live:
+            root = find_repo_root()
+            captured = dict(os.environ)
+            admitted = _diagnostic_admission(root)
+            manifest = runtime_manifest(root=root,environ=captured)
+            if not admitted():
+                raise ValueError("runtime configuration changed")
+        else:
+            manifest = runtime_manifest()
     except (OSError, ValueError, UnicodeError):
         # Diagnostic output must not leak operator secrets or throw a traceback
         # when the .env source is oversized, linked, malformed or replaced.
@@ -360,12 +390,11 @@ def _print_status(
     live_ok: bool | None = None
 
     if live:
-        if timeout <= 0:
-            print("status timeout must be greater than zero")
-            return 2
         from skeleton.app.health import probe_application, probes_ok
 
-        live_results = probe_application(manifest=manifest, full=full, timeout=timeout)
+        live_results = probe_application(manifest=manifest,full=full,timeout=timeout,admit=admitted)
+        if not admitted():
+            live_results = ()
         live_ok = probes_ok(live_results,manifest=manifest,full=full)
         payload["runtime_health"] = {
             "ok": live_ok,
@@ -1226,11 +1255,16 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                     print("application start aborted: private runtime configuration unavailable; run app setup first")
                     return 2
 
+                epoch_valid = True
+
                 def source_stable():
-                    try:
-                        return lease.current() and runtime_source_fingerprint(root) == admitted
-                    except (OSError, ValueError, UnicodeError):
-                        return False
+                    nonlocal epoch_valid
+                    if epoch_valid:
+                        try:
+                            epoch_valid = lease.current() and runtime_source_fingerprint(root) == admitted
+                        except (OSError, ValueError, UnicodeError):
+                            epoch_valid = False
+                    return epoch_valid
 
                 def changed():
                     print("application start cannot be qualified: runtime configuration changed; preserve existing services and .env")
@@ -1362,7 +1396,11 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         from skeleton.app.health import probes_ok, wait_for_application
 
         try:
-            manifest = runtime_manifest(manifest, root=root)
+            captured = dict(os.environ)
+            admitted = _diagnostic_admission(root)
+            manifest = runtime_manifest(manifest,root=root,environ=captured)
+            if not admitted():
+                raise ValueError("runtime configuration changed")
         except (OSError, ValueError, UnicodeError):
             message = "runtime configuration unsafe or unreadable; health probes were not sent"
             if bool(args.as_json):
@@ -1388,10 +1426,13 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 timeout=timeout,
                 attempts=attempts,
                 delay=delay,
+                admit=admitted,
             )
         except ValueError as exc:
             print(f"invalid smoke budget: {exc}")
             return 2
+        if not admitted():
+            results = ()
         ok = probes_ok(results,manifest=manifest,full=bool(args.full))
         if bool(args.as_json):
             print(

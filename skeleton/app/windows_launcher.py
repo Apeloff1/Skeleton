@@ -166,22 +166,33 @@ def runtime_status(root: Path | None = None) -> tuple[bool, str]:
         from skeleton.app.first_install import _configuration_epoch, critical_backend_route_report
         captured = dict(os.environ)
         epoch = _configuration_epoch(root)
+        valid = True
+
+        def admitted():
+            nonlocal valid
+            if valid:
+                try:
+                    valid = _configuration_epoch(root) == epoch
+                except (OSError,ValueError,UnicodeError):
+                    valid = False
+            return valid
+
         manifest = load_manifest()
         urls = public_service_urls(root, manifest=manifest, environ=captured)
-        if _configuration_epoch(root) != epoch:
+        if not admitted():
             return False, "Runtime configuration changed; retry diagnostics"
         results = probe_application(
             manifest=manifest, timeout=2.0, public_url_overrides=urls,
-            admit=lambda: _configuration_epoch(root)==epoch,
+            admit=admitted,
         )
-        if _configuration_epoch(root) != epoch:
+        if not admitted():
             return False, "Runtime configuration changed; retry diagnostics"
         complete = probes_ok(results,manifest=manifest,public_url_overrides=urls)
         ready = complete
         if ready:
             backend = urls.get("backend", manifest.service("backend").public_url)
             ready = critical_backend_route_report(backend, timeout=3.0)["ready"] is True
-            if _configuration_epoch(root) != epoch:
+            if not admitted():
                 return False, "Runtime configuration changed; retry diagnostics"
     except Exception as exc:
         return False, f"Runtime probe failed: {type(exc).__name__}; check local port configuration"
