@@ -153,7 +153,7 @@ def inspect_source(root: Path, *, plan_digest: str, model_identity_digest: str,
     matches = [row for row in inventory["models"] if row["plan_digest"] == plan_digest]
     require(len(matches) == 1 and matches[0]["model_identity_digest"] == model_identity_digest,
             "requested plan is not in verified inventory under pinned identity")
-    store = WeightShardStore(root, maximum_bytes=policy.maximum_source_bytes)
+    store = WeightShardStore(root, maximum_bytes=policy.maximum_source_bytes, read_only=True)
     plan = store.load_plan(plan_digest)
     paths = store.verified_paths(plan_digest)
     require(plan.model_identity_digest == model_identity_digest
