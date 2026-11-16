@@ -20,7 +20,8 @@ from urllib.parse import unquote, urlsplit
 from .frontier_coverage import build_coverage_index, score_indexed_candidate
 from .adaptive_navigation import adaptive_priority, origin_health
 from .information_portfolio import build_information_portfolio, marginal_yield
-from .dragon_companion import CompanionProfile, companion_priority
+from .dragon_companion import CompanionProfile
+from .navigation_backlog import deliberate
 
 
 _TOKEN = re.compile(r"[a-z0-9]{2,64}")
@@ -41,6 +42,7 @@ class FrontierDecision:
     actual_dispatch_authorized: bool = False
     curriculum_base_score: float | None = None
     curriculum_quest: str | None = None
+    discourse: dict | None = None
 
 
 def _lexical_terms(text: str) -> frozenset[str]:
@@ -109,6 +111,7 @@ def choose_frontier(
     if not eligible:
         return None, None
     curriculum_base = None
+    discourse = None
     if strategy == "fifo":
         index, row, host, overlap, score, _due = eligible[0]
     elif strategy == "balanced":
@@ -144,10 +147,12 @@ def choose_frontier(
                     health_by_host[candidate[2]] = origin_health(events, candidate[2])
                 score = adaptive_priority(score, health_by_host[candidate[2]], coverage_cost=False)
             base = score
+            exchange = None
             if strategy.startswith("companion"):
-                score = companion_priority(row, profile=companion, base=score, query=query)
-            ranked.append((score, due, ordinal, candidate, base))
-        _coverage, _due, _ordinal, selected, base = min(
+                exchange = deliberate(row, profile=companion, base=score, query=query)
+                score = exchange.final_priority
+            ranked.append((score, due, ordinal, candidate, base, exchange))
+        _coverage, _due, _ordinal, selected, base, exchange = min(
             ranked, key=lambda x: (
                 -x[0], x[1], x[3][2], x[3][1]["url"], x[2],
             ),
@@ -156,6 +161,7 @@ def choose_frontier(
         score = _coverage
         if strategy.startswith("companion"):
             curriculum_base = base
+            discourse = exchange.receipt()
     return row, FrontierDecision(
         url=row["url"], host=host, eligible_urls=len(eligible),
         host_captured_documents=counted[host],
@@ -163,4 +169,5 @@ def choose_frontier(
         fairness_score=score, algorithm=strategy,
         curriculum_base_score=curriculum_base,
         curriculum_quest=companion.quest if curriculum_base is not None else None,
+        discourse=discourse,
     )
