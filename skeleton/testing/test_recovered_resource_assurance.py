@@ -101,3 +101,12 @@ def test_installed_help(route,capsys):
         main([route,"--help"])
     assert e.value.code==0
     assert "usage:" in capsys.readouterr().out.lower()
+
+
+def test_unknown_memory_never_accumulates_recovery_credit():
+    gate=AdmissionGate(AdmissionPolicy())
+    for n in (10,20,30):
+        assert gate.step(sample(n,memory=None),now_ns=n)["workers"]==0
+    for n in (40,50):
+        assert gate.step(sample(n),now_ns=n)["workers"]==0
+    assert gate.step(sample(60),now_ns=60)["workers"]==1

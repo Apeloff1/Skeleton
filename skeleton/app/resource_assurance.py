@@ -93,6 +93,11 @@ class AdmissionGate:
             return {"workers": 0, "reason": "stale_or_overlapping_probe",
                     "measurement_digest": digest(asdict(sample))}
         self.last_observation = sample.observed_ns
+        if sample.memory.available_bytes is None:
+            self.hysteresis = EnergyHysteresis(self.hysteresis.policy)
+            return {"workers": 0, "reason": "memory_observation_missing",
+                    "measurement_digest": digest(asdict(sample)),
+                    "measured_memory_available": False, "sample_ns": sample.observed_ns}
         cpu = plan_cpu_workers(
             sample.cpu, sample.memory, operator_max_workers=self.policy.max_workers,
             bytes_per_worker=self.policy.per_worker_mib*MIB,
@@ -102,11 +107,8 @@ class AdmissionGate:
         )
         energy = plan_energy_workers(cpu, sample.power, policy=EnergyPolicy())
         gate = self.hysteresis.step(energy, now_ns=now_ns, sampled_ns=sample.observed_ns)
-        # Missing memory cannot authorize even one suite. Other telemetry is
-        # bounded conservatively by the canonical CPU and energy owners.
-        workers = gate.admitted_workers if sample.memory.available_bytes is not None else 0
-        return {"workers":workers,"reason":gate.reason if workers else (
-                    "memory_observation_missing" if sample.memory.available_bytes is None else gate.reason),
+        workers = gate.admitted_workers
+        return {"workers":workers,"reason":gate.reason,
                 "cpu_plan_digest":cpu.digest,"energy_plan_digest":energy.digest,
                 "hysteresis_digest":gate.digest,"measurement_digest":digest(asdict(sample)),
                 "measured_memory_available":sample.memory.available_bytes is not None,

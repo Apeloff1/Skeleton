@@ -7,6 +7,9 @@ Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
     offline-runtime  Inspect pinned local weights and measured resource admission
     weight-store     Stage pinned weights and inspect cooperative disk/recovery custody
+    quest-playtest-analytics         Execute synthetic quest playtests and cohort analytics
+    studio-frame-qualification       Evaluate pinned reference frame sequences
+    scene-byte-qualification         Verify canonical scene byte transport and replay
     offline-cpu-budget               Inspect local CPU and memory admission
     offline-energy-budget            Inspect local energy and thermal admission
     resource-assurance               Execute resource-gated local assurance waves
@@ -1416,6 +1419,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         return recovered_main(rest)
     if cmd == "gguf-source-preflight":
         from skeleton.app.gguf_source_preflight_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "quest-playtest-analytics":
+        from skeleton.app.quest_playtest_analytics_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-frame-qualification":
+        from skeleton.app.studio_frame_qualification_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "scene-byte-qualification":
+        from skeleton.app.scene_byte_qualification_cli import main as recovered_main
         return recovered_main(rest)
     if cmd == "app":
         from skeleton.app.cli import run_app_cli

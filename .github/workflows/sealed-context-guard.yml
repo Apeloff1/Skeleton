@@ -70,6 +70,13 @@ on:
       - 'skeleton/app/orphan_source_graph*.py'
       - 'skeleton/app/orphan_graph_ownership.py'
       - 'skeleton/app/recovered_evidence.py'
+      - 'skeleton/app/quest_playtest_analytics_cli.py'
+      - 'skeleton/app/studio_frame_qualification_cli.py'
+      - 'skeleton/app/scene_byte_qualification_cli.py'
+      - 'skeleton/ai/game_builder/quest_playtest_analytics.py'
+      - 'skeleton/game/studio_frame_qualification.py'
+      - 'skeleton/game/gameplay/scene_byte_qualification.py'
+      - 'skeleton/testing/test_recovered_playtest_qualification.py'
       - 'skeleton/app/resource_assurance*.py'
       - 'skeleton/app/gguf_source_preflight_cli.py'
       - 'skeleton/testing/test_recovered_resource_assurance.py'
@@ -251,6 +258,11 @@ jobs:
         env:
           PYTHONPATH: '.:backend'
         run: python -m pytest -q skeleton/testing/test_recovered_resource_assurance.py skeleton/testing/test_offline_cpu_budget.py skeleton/testing/test_offline_energy_budget.py tests/test_native_gguf_preflight.py
+
+      - name: Recovered synthetic playtest, frame and scene custody qualification
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_playtest_qualification.py tests/game_analytics/test_analytics.py tests/test_game_frontier_art_acceptance.py skeleton/testing/test_scene_bytes.py
 
       - name: Consumer share and Chroma custody regressions
         env:
