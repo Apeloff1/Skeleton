@@ -971,6 +971,8 @@ class LlamaCppModel:
         self._resource_preflight: Callable[[], None] | None = None
         self._resource_preflight_bound = False
         self._resource_preflight_checks = 0
+        self._running_resource_monitor: Callable[[], None] | None = None
+        self._running_resource_checks = 0
         self._resource_lease_factory: Callable[[], Callable[[], None]] | None = None
         self._resource_lease_bound = False
         self._last_kv_observation: dict[str, Any] | None = None
@@ -1083,6 +1085,20 @@ class LlamaCppModel:
             self._resource_preflight = guard
             self._resource_preflight_bound = True
 
+    def install_running_resource_monitor(self, monitor: Callable[[], None]) -> None:
+        """Bind separate running-work checks before the first admission.
+
+        Existing resource guards retain their historic live-check behavior
+        unless the trusted composition installs this explicit monitor.
+        """
+        if not callable(monitor):
+            raise TypeError("running resource monitor must be callable")
+        with self._process_lock:
+            if (not self._resource_preflight_bound or self._running_resource_monitor is not None
+                    or self._inference_admitted or self._processes_started or self._spawning_processes):
+                raise LlamaCppRuntimeError("running resource monitor cannot change after admission")
+            self._running_resource_monitor = monitor
+
     def install_resource_lease_factory(
         self, factory: Callable[[], Callable[[], None]],
     ) -> None:
@@ -1193,6 +1209,8 @@ class LlamaCppModel:
                 "system_library_closure_verified": False,
                 "resource_preflight_bound": self._resource_preflight_bound,
                 "resource_preflight_checks": self._resource_preflight_checks,
+                "running_resource_monitor_bound": self._running_resource_monitor is not None,
+                "running_resource_checks": self._running_resource_checks,
             }
 
     def reap_unconfirmed_cleanup(self) -> dict[str, int]:
@@ -1712,6 +1730,7 @@ class LlamaCppModel:
                 raise LlamaCppRuntimeError("previous native cleanup remains unconfirmed")
             self._inference_admitted = True
             resource_guard = self._resource_preflight
+            running_monitor = self._running_resource_monitor or resource_guard
             lease_factory = getattr(self, "_resource_lease_factory", None)
             if resource_guard is not None:
                 self._resource_preflight_checks += 1
@@ -1775,6 +1794,8 @@ class LlamaCppModel:
             with stdout_file.open("wb") as stdout_handle, stderr_file.open("wb") as stderr_handle:
                 release_lease: Callable[[], None] | None = None
                 with self._process_lock:
+                    if self._unconfirmed_cleanup:
+                        raise LlamaCppRuntimeError("previous native cleanup remains unconfirmed")
                     self._spawning_processes += 1
                 try:
                     # GGUF identity rehash and prompt preparation may take
@@ -1818,9 +1839,8 @@ class LlamaCppModel:
                         shell=False,
                         start_new_session=(os.name != "nt"),
                         close_fds=True,
-                        # The sole nonsecret FD passed to the POSIX child is
-                        # the already-held kernel inference lease, if one was
-                        # bound by an authenticated local HTTP workspace.
+                        # Inherit only the explicitly held nonsecret HTTP
+                        # and native resource lease descriptors.
                         # An orphaned model process must retain that SAME
                         # flock after an abrupt Python parent death, blocking
                         # a replacement server from launching a second GGUF.
@@ -1902,12 +1922,15 @@ class LlamaCppModel:
                         if cancel.is_set():
                             raise LocalInferenceCancelled("local generation cancelled")
                         now = time.monotonic()
-                        if resource_guard is not None and now >= next_resource_sample:
+                        if running_monitor is not None and now >= next_resource_sample:
                             with self._process_lock:
-                                self._resource_preflight_checks += 1
-                            # Explicitly deny rather than silently altering
-                            # the launched model's tensor/KV residence.
-                            resource_guard()
+                                self._running_resource_checks += 1
+                                if running_monitor is resource_guard:
+                                    self._resource_preflight_checks += 1
+                            # A running monitor checks sustainment, not an
+                            # additional full model allocation. Legacy owners
+                            # still receive their originally bound callback.
+                            running_monitor()
                             next_resource_sample = time.monotonic() + 1.0
                         if now - started > float(self.config.timeout_seconds):
                             timed_out = True
@@ -1955,8 +1978,9 @@ class LlamaCppModel:
                         # A termination request is not a death receipt. If
                         # reaping or pipe cleanup raised, retain the process
                         # handle, lease and accounting for explicit recovery.
-                        confirmed = process.poll() is not None and not any(pump.is_alive() for pump in pumps)
+                        confirmed = False
                         try:
+                            confirmed = process.poll() is not None and not any(pump.is_alive() for pump in pumps)
                             if confirmed and release_lease is not None:
                                 release_lease()
                         except BaseException:
@@ -1971,6 +1995,10 @@ class LlamaCppModel:
                                 else:
                                     self._draining_processes.add(process.pid)
                                     self._unconfirmed_cleanup[process.pid] = (process, tuple(pumps), release_lease)
+                with self._process_lock:
+                    cleanup_pending = process.pid in self._unconfirmed_cleanup
+                if cleanup_pending:
+                    raise LlamaCppRuntimeError("local native cleanup remains unconfirmed")
                 return_code = process.poll()
                 if return_code is None:
                     raise LlamaCppRuntimeError("local runtime could not be terminated")
