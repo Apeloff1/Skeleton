@@ -20,6 +20,7 @@ import signal
 import stat
 import struct
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -43,6 +44,10 @@ from .local import (
     LocalInferenceResult,
     LocalModelAdapter,
     LocalToolCall,
+    _cgroup_ancestors,
+    _cpu_set_size,
+    _linux_cgroup_paths,
+    _resource_text,
 )
 
 _COMPLETION_EOG_TRAILERS = (" [end of text]\n\n\n", " [end of text]\n")
@@ -487,6 +492,89 @@ def estimate_gqa_kv_bytes_per_token(
     )
 
 
+def _consumer_cgroup_bounds(
+    memory: int,
+    cores: int,
+    groups: Mapping[str, tuple[str, str]],
+    read: Callable[[str], str],
+) -> tuple[int, int]:
+    """Intersect the existing process-local mount topology with all caps.
+
+    This helper is observational and does not increase supplied host limits.
+    Missing controller knobs at a parent are legitimate; malformed present
+    knobs, absent required usage counters and unbounded ancestry fail closed.
+    """
+    if type(memory) is not int or memory <= 0 or type(cores) is not int or cores <= 0:
+        raise ValueError("positive host ceilings required")
+
+    def optional(directory: str, name: str) -> str | None:
+        try:
+            return read(os.path.join(directory, name))
+        except FileNotFoundError:
+            return None
+
+    def cpu_quota(quota: int, period: int) -> int:
+        if quota <= 0 or period <= 0:
+            raise ValueError("invalid CPU controller quota")
+        return max(1, (quota + period - 1) // period)
+
+    unified = groups.get("v2")
+    memory_group = unified or groups.get("memory")
+    if memory_group is not None:
+        for directory in _cgroup_ancestors(*memory_group):
+            name = "memory.max" if unified else "memory.limit_in_bytes"
+            maximum = optional(directory, name)
+            if maximum is None or maximum == "max":
+                continue
+            limit = int(maximum)
+            if limit < 0:
+                raise ValueError("invalid cgroup memory maximum")
+            # Linux v1 reports a page-aligned enormous sentinel for unlimited.
+            if not unified and limit >= 1 << 60:
+                continue
+            used = int(read(os.path.join(
+                directory, "memory.current" if unified else "memory.usage_in_bytes",
+            )))
+            if used < 0:
+                raise ValueError("invalid cgroup memory usage")
+            memory = min(memory, max(0, limit - used))
+
+    cpu_group = unified or groups.get("cpu")
+    if cpu_group is not None:
+        for directory in _cgroup_ancestors(*cpu_group):
+            if unified:
+                raw = optional(directory, "cpu.max")
+                if raw is not None:
+                    quota, period = raw.split()
+                    period_value = int(period)
+                    if period_value <= 0:
+                        raise ValueError("invalid CPU controller period")
+                    if quota != "max":
+                        cores = min(cores, cpu_quota(int(quota), period_value))
+            else:
+                raw = optional(directory, "cpu.cfs_quota_us")
+                if raw is not None:
+                    quota = int(raw)
+                    period = int(read(os.path.join(directory, "cpu.cfs_period_us")))
+                    if period <= 0 or quota < -1 or quota == 0:
+                        raise ValueError("invalid CPU controller accounting")
+                    if quota != -1:
+                        cores = min(cores, cpu_quota(quota, period))
+
+    cpuset_group = unified or groups.get("cpuset")
+    if cpuset_group is not None:
+        for directory in _cgroup_ancestors(*cpuset_group):
+            name = "cpuset.cpus.effective" if unified else "cpuset.effective_cpus"
+            raw = optional(directory, name)
+            if raw is None:
+                raw = optional(directory, "cpuset.cpus")
+            if raw:
+                count = _cpu_set_size(raw)
+                if count is not None:
+                    cores = min(cores, count)
+    return memory, cores
+
+
 def detect_consumer_hardware_budget(
     *,
     kv_bytes_per_token: int,
@@ -498,7 +586,7 @@ def detect_consumer_hardware_budget(
 
     psutil, when installed, works on Windows, macOS and Linux. On Linux
     /proc/meminfo and /proc/cpuinfo allow a standard-library-only fallback.
-    Cgroup v2 memory and CPU quotas and process affinity tighten the budget.
+    Process-local cgroup v1/v2 ancestor limits and affinity tighten the budget.
     Optional explicit overrides support constrained and headless deployments.
     """
 
@@ -552,34 +640,22 @@ def detect_consumer_hardware_budget(
     memory = positive(memory, "available RAM")
     cores = positive(cores, "physical CPU count")
 
-    # Linux containers may see the entire host's RAM from psutil or /proc.
-    # The effective budget cannot exceed unallocated cgroup allowance.
-    cgroup = Path("/sys/fs/cgroup")
-    try:
-        max_text = (cgroup / "memory.max").read_text(encoding="ascii").strip()
-        if max_text != "max":
-            mem_limit = int(max_text)
-            mem_current = int((cgroup / "memory.current").read_text(encoding="ascii"))
-            if mem_limit <= 0 or mem_current < 0:
-                raise LlamaCppRuntimeError("invalid cgroup memory accounting")
-            memory = min(memory, max(0, mem_limit - mem_current))
-    except (OSError, ValueError):
-        pass
-    # Container CPU quotas can be smaller than visible physical core count.
+    # Respect affinity and every visible controller ancestor, not merely
+    # the host root cgroup. A malformed active limit is a hold, not permission
+    # to allocate host RAM inside a restricted container.
     try:
         if hasattr(os, "sched_getaffinity"):
             cores = min(cores, len(os.sched_getaffinity(0)))
     except OSError:
-        pass
-    try:
-        quota_text, period_text = (cgroup / "cpu.max").read_text(encoding="ascii").split()
-        if quota_text != "max":
-            quota, period = int(quota_text), int(period_text)
-            if quota <= 0 or period <= 0:
-                raise LlamaCppRuntimeError("invalid cgroup CPU quota")
-            cores = min(cores, max(1, (quota + period - 1) // period))
-    except (OSError, ValueError):
-        pass
+        if sys.platform.startswith("linux"):
+            raise LlamaCppRuntimeError("cannot determine effective CPU affinity")
+    if sys.platform.startswith("linux"):
+        try:
+            memory, cores = _consumer_cgroup_bounds(
+                memory, cores, _linux_cgroup_paths(), _resource_text,
+            )
+        except (OSError, ValueError, KeyError) as exc:
+            raise LlamaCppRuntimeError("cannot resolve effective consumer cgroup limits") from exc
     return ConsumerHardwareBudget(
         ram_bytes=positive(memory, "effective available RAM"),
         physical_cpu_cores=positive(cores, "effective CPU cores"),
