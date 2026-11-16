@@ -524,8 +524,8 @@ class SharedAcquisitionStripeTests(unittest.IsolatedAsyncioTestCase):
             query, mutation = call.args
             self.assertEqual(query["_id"], slot)
             self.assertEqual(query["kind"], ACQUISITION_STRIPE_KIND)
-            self.assertIn({"$expr": {"$lte": ["$lease_until", "$NOW"]}}, query["$or"])
-            self.assertEqual(mutation[0]["$set"]["lease_until"], {"$add": ["$NOW", LEASE_SECONDS*1000]})
+            self.assertIn({"$expr": {"$lte": ["$lease_until", "$$NOW"]}}, query["$or"])
+            self.assertEqual(mutation[0]["$set"]["lease_until"], {"$add": ["$$NOW", LEASE_SECONDS*1000]})
             self.assertEqual(mutation[0]["$set"]["worker_token"], {"$literal": "token"})
             self.assertNotIn("owner_id", query)
             self.assertNotIn("example", str(mutation))
@@ -534,7 +534,7 @@ class SharedAcquisitionStripeTests(unittest.IsolatedAsyncioTestCase):
         query = app.limits.count_documents.await_args.args[0]
         self.assertEqual(query["_id"], {"$in": list(slots)})
         self.assertEqual(query["worker_token"], "token")
-        self.assertEqual(query["$expr"], {"$gt": ["$lease_until", {"$add": ["$NOW", 15000]}]})
+        self.assertEqual(query["$expr"], {"$gt": ["$lease_until", {"$add": ["$$NOW", 15000]}]})
 
     async def test_shared_contention_denies_entire_slice(self):
         app = self.make_app()
