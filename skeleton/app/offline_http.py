@@ -832,7 +832,7 @@ class OfflineHTTPApplication:
                 "max_turn_tickets": MAX_TURN_TICKETS,
                 "active_turn": active_turn,
                 "context_tokens": context_tokens,
-                "max_output_tokens": min(output_tokens, max(1, context_tokens - 1)),
+                "max_output_tokens": min(8192, output_tokens, max(1, context_tokens - 1)),
                 "message_bytes": 4096,
                 "grounded_query_bytes": 1024,
             }
@@ -1086,7 +1086,7 @@ class OfflineHTTPApplication:
                            else self.backend.config.context_size or 4096)
                 output = (self.backend.runtime.limits.max_new_tokens
                           if hasattr(self.backend, "runtime") else 8192)
-                maximum = min(output, max(1, context - 1))
+                maximum = min(8192, output, max(1, context - 1))
                 report = preview(
                     message=message, snapshots=snapshots,
                     max_output_tokens=maximum,
