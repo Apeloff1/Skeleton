@@ -225,3 +225,39 @@ def test_recovery_physical_budget_admits_orphans_before_hashing(tmp_path, monkey
             review_digest=review["digest"], maximum_verified_weight_bytes=len(payload) - 1,
         )
     assert owner.inspect()["active_intent"] is not None
+
+
+def test_recovery_synchronization_failure_does_not_clear_intent(tmp_path, monkeypatch):
+    from skeleton.ai.model_runtime import weight_store_scrub as scrub
+
+    owner, _, _, _ = failed_intent(tmp_path)
+    payload = b"retained valid object"
+    digest = sha256(payload).hexdigest()
+    bucket = owner._store.objects / digest[:2]
+    bucket.mkdir(exist_ok=True)
+    target = bucket / digest
+    target.write_bytes(payload)
+    review = review_weight_store(owner)
+    original = scrub.sync_verified_recovery_catalog
+
+    def fail(owner, catalog, policy):
+        with monkeypatch.context() as patch:
+            def reject(fd):
+                raise OSError("injected recovery sync failure")
+            patch.setattr(scrub.os, "fsync", reject)
+            return original(owner, catalog, policy)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(scrub, "sync_verified_recovery_catalog", fail)
+        with pytest.raises((WeightShardStoreError, OSError)):
+            ack(owner, review)
+    assert owner.inspect()["active_intent"]["digest"] == review["active_intent"]["digest"]
+    assert target.read_bytes() == payload
+    # No namespace/content mutation occurred during the failed fence.
+    observed = review_weight_store(owner)
+    assert observed["digest"] == review["digest"]
+    result = ack(owner, observed)
+    assert result["evidence"]["fsync_completed"]
+    assert result["evidence"]["physical_power_loss_qualified"] is False
+    assert result["evidence"]["verified_physical_bytes"] == len(payload)
+    assert owner.inspect()["active_intent"] is None
