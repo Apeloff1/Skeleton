@@ -207,7 +207,12 @@ def main() -> int:
     )
 
     require(
-        '"requests==2.32.5"' in quality_security,
+        "node --test frontend/scripts/test-node-forge-frozen-lock.cjs" in quality_security,
+        "frozen node-forge offline custody contracts must run in the existing security lane",
+        failures,
+    )
+    require(
+        '"requests==2.34.2"' in quality_security,
         "security origin-guard source tests require pinned requests dependency",
         failures,
     )

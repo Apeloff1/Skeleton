@@ -24,3 +24,23 @@ def test_partial_duplicate_and_substituted_inventories_fail_closed():
                     (replace(items[0], completion="wrong"), *items[1:])):
         with pytest.raises(CandidateRejected):
             verify_all(invalid)
+
+
+def test_reordered_original_catalog_preserves_exact_identity():
+    items = tuple(iter_examples())
+    forward = verify_all(items)
+    assert verify_all(tuple(reversed(items))) == forward
+
+
+@pytest.mark.parametrize("field,value", [
+    ("prompt", "Compute 1 plus 2"),
+    ("completion", "foreign completion"),
+    ("group_id", "foreign_group"),
+])
+def test_source_changes_with_same_record_identifier_are_rejected(field, value):
+    items = tuple(iter_examples())
+    changed = replace(items[0], **{field: value})
+    assert changed.item_id == items[0].item_id
+    assert changed.source_digest != items[0].source_digest
+    with pytest.raises(CandidateRejected, match="oracle-source-identity"):
+        verify_all((changed, *items[1:]))
