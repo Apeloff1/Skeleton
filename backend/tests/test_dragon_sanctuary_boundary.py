@@ -101,5 +101,74 @@ class SanctuaryBoundaryTests(unittest.IsolatedAsyncioTestCase):
         app.sessions.update_one.assert_not_awaited()
 
 
+
+class AcquisitionHoldCatalogTests(unittest.IsolatedAsyncioTestCase):
+    def hold_fixture(self):
+        transport = ScriptedFetcher({
+            BASE+"/robots.txt": (200, "text/plain", ROBOTS, {}),
+            BASE+"/first": (403, "text/html", b"", {}),
+        })
+        run, at = make_run(transport, strategy="companion")
+        step(run, at+1)
+        step(run, at+4)
+        snapshot = run.snapshot()
+        binding = snapshot["binding"]
+        row = {"_id": "hold", **SCOPE, "status": "ready", "version": 3,
+               "consent_expires_at": datetime.fromtimestamp(binding["consent"]["expires_at"], timezone.utc),
+               "consent": binding["consent"], "request": binding["request"],
+               "request_digest": binding["request_digest"], **checkpoint_fields(snapshot)}
+        return row, datetime.fromtimestamp(at+5, timezone.utc)
+
+    def app_for(self, rows, changed=False):
+        app = object.__new__(DragonCrawlerApplication)
+        app.sessions = Mock()
+        cursor = app.sessions.find.return_value
+        cursor.sort.return_value = cursor
+        cursor.limit.return_value = cursor
+        cursor.max_time_ms.return_value = cursor
+        refs = [{"_id": r["_id"], "version": r["version"]} for r in rows]
+        cursor.to_list = AsyncMock(side_effect=[refs, [] if changed else refs])
+        app.sessions.find_one = AsyncMock(side_effect=rows)
+        app.sessions.update_one = AsyncMock()
+        return app
+
+    async def test_two_witnessed_grants_aggregate_without_writes_or_urls(self):
+        row, now = self.hold_fixture()
+        duplicate = {**row, "_id": "hold2"}
+        app = self.app_for([row, duplicate])
+        with patch("core.dragon_crawler._now", return_value=now):
+            result = await app.acquisition_hold_catalog(SCOPE)
+        self.assertEqual(result["qualified_sessions"], 2)
+        self.assertEqual(result["holds"][0]["observed_grants"], 2)
+        self.assertEqual(result["holds"][0]["denial_statuses"], 2)
+        self.assertFalse(result["dispatch_lock"])
+        self.assertFalse(result["network_executed"])
+        self.assertNotIn("/first", str(result))
+        for call in app.sessions.find_one.await_args_list:
+            self.assertEqual(call.args[0]["owner_id"], SCOPE["owner_id"])
+            self.assertEqual(call.args[0]["tenant_id"], SCOPE["tenant_id"])
+        app.sessions.update_one.assert_not_awaited()
+
+    async def test_wrong_scope_binding_or_missing_witness_is_excluded(self):
+        row, now = self.hold_fixture()
+        bad = {**row, "request_digest": "0"*64}
+        unwitnessed = {**row, "_id": "other", "checkpoint_identity": None}
+        app = self.app_for([bad, unwitnessed])
+        with patch("core.dragon_crawler._now", return_value=now):
+            result = await app.acquisition_hold_catalog(SCOPE)
+        self.assertEqual(result["excluded_sessions"], 2)
+        self.assertEqual(result["holds"], [])
+        app.sessions.update_one.assert_not_awaited()
+
+    async def test_catalogue_change_fails_closed(self):
+        row, now = self.hold_fixture()
+        app = self.app_for([row], changed=True)
+        with patch("core.dragon_crawler._now", return_value=now):
+            with self.assertRaises(CrawlerError) as caught:
+                await app.acquisition_hold_catalog(SCOPE)
+        self.assertEqual(caught.exception.code, "crawler_hold_catalog_changed")
+        app.sessions.update_one.assert_not_awaited()
+
+
 if __name__ == "__main__":
     unittest.main()
