@@ -141,3 +141,70 @@ def test_outstanding_memoryview_does_not_skip_other_page_cleanup(tmp_path):
         if view is not None:
             view.release()
             pages[1].close()
+
+
+def test_mapping_ceiling_refuses_before_platform_probe(tmp_path, monkeypatch):
+    from skeleton.ai.model_runtime import sealed_weight_pages as owner
+    store, identity, key = _stage(tmp_path, (b"a", b"b"))
+    monkeypatch.setattr(owner, "_require_sealing", lambda: pytest.fail("allocation before mapping admission"))
+    with pytest.raises(SealedWeightPagesError, match="mapping ceiling"):
+        with store.open_sealed_pages(key, model_identity=identity, max_bytes=8, max_mappings=1):
+            pytest.fail("over-limit mapping published")
+
+
+@linux_sealing
+def test_sealed_loader_owns_only_one_source_descriptor_and_copies_once(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+    store, identity, key = _stage(tmp_path, (b"alpha", b"beta", b"gamma"))
+    original = store._object_reader
+    opened = []
+    active = 0
+
+    @contextmanager
+    def observe(shard):
+        nonlocal active
+        active += 1
+        opened.append(shard.index)
+        try:
+            assert active == 1
+            with original(shard) as stream:
+                yield stream
+        finally:
+            active -= 1
+
+    monkeypatch.setattr(store, "_object_reader", observe)
+    monkeypatch.setattr(store, "open_verified",
+                        lambda *args, **kwargs: pytest.fail("eager source prehash invoked"))
+    with store.open_sealed_pages(key, model_identity=identity, max_bytes=32) as pages:
+        assert opened == [0, 1, 2] and active == 0
+        assert tuple(bytes(page) for page in pages) == (b"alpha", b"beta", b"gamma")
+
+
+@linux_sealing
+def test_manifest_pin_rejects_mutation_before_sealed_publication(tmp_path):
+    import json
+    from skeleton.ai.model_runtime.flgb_model_runtime import canonical_bytes
+    store, identity, key = _stage(tmp_path, (b"one", b"two"))
+    _, pin, _ = store.manifest_evidence(key)
+    manifest = store.manifests / (key + ".json")
+
+    def checkpoint(copied, total):
+        if copied == total:
+            record = json.loads(manifest.read_bytes())
+            record["weights_digest"] = "0" * 64
+            manifest.write_bytes(canonical_bytes(record))
+
+    with pytest.raises(SealedWeightPagesError, match="manifest identity changed"):
+        with store.open_sealed_pages(key, model_identity=identity, max_bytes=32,
+                                     expected_manifest_sha256=pin, progress_check=checkpoint):
+            pytest.fail("changed manifest published")
+
+
+def test_independent_manifest_pin_refuses_before_native_platform_probe(tmp_path, monkeypatch):
+    from skeleton.ai.model_runtime import sealed_weight_pages as owner
+    store, identity, key = _stage(tmp_path, (b"payload",))
+    monkeypatch.setattr(owner, "_require_sealing", lambda: pytest.fail("unverified manifest reached native owner"))
+    with pytest.raises(SealedWeightPagesError, match="manifest identity unavailable"):
+        with store.open_sealed_pages(key, model_identity=identity, max_bytes=64,
+                                     expected_manifest_sha256="0" * 64):
+            pytest.fail("wrong manifest pin accepted")
