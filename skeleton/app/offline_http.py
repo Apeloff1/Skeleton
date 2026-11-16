@@ -1037,7 +1037,10 @@ class OfflineHTTPApplication:
             # Local-only read-only estimate; the actual new turn still
             # validates full-history retention and GGUF native admission.
             _fields(body, {"message", "max_output_tokens", "grounded",
-                           "require_full_history", "document_ids"}, {"message"})
+                           "require_full_history", "document_ids", "cognitive"}, {"message"})
+            cognitive = body.get("cognitive", False)
+            if type(cognitive) is not bool:
+                raise OfflineHTTPError(400, "cognitive preview policy must be boolean")
             message = body["message"]
             if (not isinstance(message, str) or not message.strip()
                     or len(message.encode("utf-8")) > 4096):
@@ -1094,6 +1097,28 @@ class OfflineHTTPApplication:
                         report["fits_full_history"] or not strict
                     )
                     report["preview_is_admission_proof"] = False
+                    if cognitive:
+                        from skeleton.app.jeeves_cognitive import build_preview
+                        rows = saved.transcript.to_list()
+                        expected = tuple((row["role"], row["content"]) for row in rows
+                                         if row["role"] != "system")
+                        system = next((row["content"] for row in rows
+                                       if row["role"] == "system"), "")
+                        if expected != session.history or system != session.instructions:
+                            raise OfflineHTTPError(409, "conversation changed during cognitive preview")
+                        try:
+                            report["cognitive_preview"] = build_preview(
+                                message.strip(), rows, session_revision=saved.revision,
+                                model_digest=self.model_digest, tokenizer_digest=self.tokenizer_digest,
+                                context_report=report, manifest=manifest,
+                            )
+                        except ValueError:
+                            raise OfflineHTTPError(422, "cognitive preview could not be verified") from None
+                        # This is advice only. Recheck the current snapshot, and
+                        # do not attach any of these historical excerpts to inference.
+                        current = session.store.load(sid, self.model_digest, self.tokenizer_digest)
+                        if current.revision != saved.revision or current.transcript.to_list() != rows:
+                            raise OfflineHTTPError(409, "conversation changed during cognitive preview")
                     report["grounding_preview"] = (
                         None if manifest is None else {
                             "schema": "skeleton.jeeves.local-grounding-preview.v1",
