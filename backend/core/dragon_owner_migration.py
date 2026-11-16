@@ -180,9 +180,15 @@ def migrate(base,plane,scope,destination,*,offline_acknowledged=False):
     if type(destination) is not int or not 1<=destination<LANES:raise ValueError("destination lane")
     base,_=_private(base)
     with _open(base) as src:
+        if plane=="corpus" and _table(src,"dragon_graph_authority"):
+            raise ShardHeld("canonical graph topology requires coherent multi-file migration")
         layout=_layout(src,plane)
         if layout is None:raise ShardHeld("provision topology first")
         target=_target(base,plane,layout,destination)
+        if plane=="corpus":
+            with _open(target) as probe:
+                if _table(probe,"dragon_graph_authority"):
+                    raise ShardHeld("canonical graph destination requires coherent multi-file migration")
         src.execute(JOURNAL)
         _initialize(src,plane)
         prior=src.execute("SELECT * FROM dragon_owner_migrations WHERE plane=? AND owner=?",(plane,owner)).fetchone()
@@ -207,6 +213,8 @@ def migrate(base,plane,scope,destination,*,offline_acknowledged=False):
             if src.in_transaction:src.execute("ROLLBACK")
             raise
         with _open(target) as dst:
+            if plane=="corpus" and _table(dst,"dragon_graph_authority"):
+                raise ShardHeld("canonical graph destination requires coherent multi-file migration")
             _initialize(dst,plane)
             src.execute("BEGIN IMMEDIATE")
             try:

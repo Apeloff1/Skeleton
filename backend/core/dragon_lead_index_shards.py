@@ -136,7 +136,9 @@ def enroll(graph,scope,*,acknowledged=False,reset=False):
     """Explicit operator opt-in; source generation is never reused after reset."""
     if acknowledged is not True or type(reset) is not bool:raise ValueError("metadata index acknowledgement")
     owner=owner_key(scope);_root()
+    from core.dragon_graph_authority import active
     with graph._db() as db:
+        if active(db):raise ValueError("derived projection redundant in canonical graph mode")
         db.execute("BEGIN IMMEDIATE")
         try:
             if not db.execute("SELECT 1 FROM lead_owner WHERE owner=?",(owner,)).fetchone():

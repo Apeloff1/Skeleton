@@ -24,6 +24,7 @@ from core.dragon_dataset_library import target,_library
 from core.dragon_mod_seed_catalogue import STEAM_ROUTES,APPID,_canonical_locator
 from core.dragon_lead_index_shards import SOURCE_SCHEMA as INDEX_SCHEMA
 from core.dragon_lead_edge_shards import SOURCE_SCHEMA as EDGE_SCHEMA
+from core import dragon_graph_authority as authority
 
 LEAD_LANES=10
 NODES_PER_LANE=20_000_000
@@ -150,9 +151,10 @@ def _lane_counts(db,owner,lane):
     # Lazy indexed migration of existing owner rows; one lane at a time.
     # Runs inside the caller's transaction; previous binaries must be stopped.
     low,high=lane_bounds(lane)
-    nodes=db.execute("SELECT COUNT(*) FROM lead_nodes WHERE owner=? AND id>=? AND id<?",
+    node_table,edge_table,_=authority.tables(db,low.ljust(64,"0"))
+    nodes=db.execute("SELECT COUNT(*) FROM "+node_table+" WHERE owner=? AND id>=? AND id<?",
         (owner,low,high)).fetchone()[0]
-    edges=db.execute("SELECT COUNT(*) FROM lead_edges WHERE owner=? AND child>=? AND child<?",
+    edges=db.execute("SELECT COUNT(*) FROM "+edge_table+" WHERE owner=? AND child>=? AND child<?",
         (owner,low,high)).fetchone()[0]
     db.execute("INSERT INTO lead_lane_counts VALUES(?,?,?,?)",(owner,lane,nodes,edges))
     return {"nodes":nodes,"edges":edges}
@@ -255,8 +257,15 @@ class LeadGraph:
     @contextmanager
     def _db(self):
         with self.corpus._db() as db:
-            db.executescript(SCHEMA)
-            yield db
+            from core.dragon_owner_shards import ShardHeld
+            try:
+                if not authority.attach(db,self.path):db.executescript(SCHEMA)
+            except (authority.GraphHeld,ShardHeld,OSError) as exc:raise CatalogueHeld("canonical graph topology held") from exc
+            try:yield db
+            except authority.GraphHeld as exc:raise CatalogueHeld("canonical graph operation held") from exc
+
+    def authority_mode(self):
+        with self.corpus._db() as db:return authority.active(db)
 
     def configure(self,scope,*,enabled,acknowledged):
         if type(enabled) is not bool or acknowledged is not True:raise ValueError("metadata-only acknowledgement")
@@ -288,35 +297,31 @@ class LeadGraph:
         witness=_id(witness);identifier=lead_id(url)
         if parent!=ZERO:
             _id(parent)
-            if not db.execute("SELECT 1 FROM lead_nodes WHERE owner=? AND id=?",(owner,parent)).fetchone():
+            parent_table,_,_=authority.tables(db,parent)
+            if not db.execute("SELECT 1 FROM "+parent_table+" WHERE owner=? AND id=?",(owner,parent)).fetchone():
                 raise ValueError("lead parent not owned")
         caps=self._enabled(db,owner)
-        node=db.execute("SELECT id FROM lead_nodes WHERE owner=? AND id=?",(owner,identifier)).fetchone()
+        node_table,edge_table,_=authority.tables(db,identifier)
+        node=db.execute("SELECT id FROM "+node_table+" WHERE owner=? AND id=?",(owner,identifier)).fetchone()
         spec=SOURCE_CLASSES[kind]
         lane=lead_lane(identifier)
         lane_counts=_lane_counts(db,owner,lane)
         if node is None:
             if caps["nodes"]>=MAX_NODES or lane_counts["nodes"]>=NODES_PER_LANE:raise CatalogueHeld("lead node quota")
-            db.execute("""INSERT INTO lead_nodes(owner,id,url,host,title,kind,family,first_seen,last_seen,next_review,observations,state)
-                VALUES(?,?,?,?,?,?,?,?,?,?,0,'candidate')""",
-                (owner,identifier,url,urlsplit(url).hostname,title,kind,spec.family,now,now,now))
-            db.execute("INSERT INTO lead_fts(owner,id,title,url,kind,family) VALUES(?,?,?,?,?,?)",
-                (owner,identifier,title,url,kind,spec.family))
+            authority.insert_node(db,(owner,identifier,url,urlsplit(url).hostname,title,kind,spec.family,now,now,now))
             db.execute("UPDATE lead_owner SET nodes=nodes+1 WHERE owner=?",(owner,))
             db.execute("UPDATE lead_lane_counts SET nodes=nodes+1 WHERE owner=? AND lane=?",(owner,lane))
         eid=digest([parent,identifier,relation,subject,kind,title,witness,snapshot])
-        edge=db.execute("SELECT 1 FROM lead_edges WHERE owner=? AND id=?",(owner,eid)).fetchone()
+        edge=db.execute("SELECT 1 FROM "+edge_table+" WHERE owner=? AND id=?",(owner,eid)).fetchone()
         if edge is None:
             if caps["edges"]>=MAX_EDGES or lane_counts["edges"]>=EDGES_PER_LANE:raise CatalogueHeld("lead evidence quota")
-            db.execute("INSERT INTO lead_edges VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-                (owner,eid,parent,identifier,relation,subject,kind,title,witness,snapshot,now,now))
+            authority.insert_edge(db,(owner,eid,parent,identifier,relation,subject,kind,title,witness,snapshot,now,now))
             db.execute("UPDATE lead_owner SET edges=edges+1 WHERE owner=?",(owner,))
             db.execute("UPDATE lead_lane_counts SET edges=edges+1 WHERE owner=? AND lane=?",(owner,lane))
-            db.execute("UPDATE lead_nodes SET observations=observations+1,last_seen=MAX(last_seen,?) WHERE owner=? AND id=?",
-                (now,owner,identifier))
+            authority.touch_node(db,owner,identifier,now,observation=True)
         else:
-            db.execute("UPDATE lead_edges SET last_seen=MAX(last_seen,?) WHERE owner=? AND id=?",(now,owner,eid))
-            db.execute("UPDATE lead_nodes SET last_seen=MAX(last_seen,?) WHERE owner=? AND id=?",(now,owner,identifier))
+            authority.touch_edge(db,owner,eid,identifier,now)
+            authority.touch_node(db,owner,identifier,now)
         if kind in DATASET_KINDS:
             db.execute("""INSERT INTO lead_dataset_candidates VALUES(?,?,?,?)
                 ON CONFLICT(owner,lead) DO UPDATE SET last_seen=MAX(last_seen,excluded.last_seen)""",
@@ -326,13 +331,15 @@ class LeadGraph:
     def status(self,scope):
         owner=owner_key(scope);revision,seed=bootstrap_inventory()
         with self._db() as db:
+            partitioned=authority.active(db)
             record=db.execute("""SELECT enabled,bootstrap_revision,bootstrap_cursor,bootstrapped,nodes,edges,snapshots,due
                 FROM lead_owner WHERE owner=?""",(owner,)).fetchone()
         result=dict(record) if record else {"enabled":0,"bootstrap_revision":None,"bootstrap_cursor":0,"bootstrapped":0,"nodes":0,"edges":0,"snapshots":0,"due":0}
         return {**result,"bootstrap_target_rows":len(seed),"available_seed_revision":revision,
                 "growth_floor":147020,"growth_floor_met":result["nodes"]>=147020,
                 "architecture_node_cap":MAX_NODES,"architecture_evidence_cap":MAX_EDGES,
-                "logical_quota_lanes":LEAD_LANES,"physical_graph_sharding":False,
+                "logical_quota_lanes":LEAD_LANES,"physical_graph_sharding":partitioned,
+                "canonical_write_lanes":LEAD_LANES if partitioned else 1,"coordinated_writer":True,
                 "network_authorized":False,"physical_capacity_verified":False}
 
     def bootstrap_pulse(self):
@@ -748,7 +755,15 @@ class LeadGraph:
         physical=False
         with self._db() as db:
             import os
-            if terms and os.getenv("SKL_DRAGON_LEAD_INDEX_ROOT","").strip():
+            if authority.active(db):
+                db.execute("BEGIN")
+                try:
+                    rows=authority.page(db,owner,terms,state=state,family=family,host=host,lower=lower,cutoff=cutoff,limit=limit)
+                    db.execute("COMMIT");physical=True
+                except BaseException:
+                    if db.in_transaction:db.execute("ROLLBACK")
+                    raise
+            elif terms and os.getenv("SKL_DRAGON_LEAD_INDEX_ROOT","").strip():
                 from core.dragon_lead_index_shards import lookup,IndexHeld
                 from core.dragon_owner_shards import ShardHeld
                 db.execute("BEGIN")
@@ -774,7 +789,18 @@ class LeadGraph:
         physical=False
         with self._db() as db:
             import os
-            if os.getenv("SKL_DRAGON_LEAD_EDGE_ROOT","").strip():
+            if authority.active(db):
+                db.execute("BEGIN")
+                try:
+                    authority.read_fence(db)
+                    node_table,_,_=authority.tables(db,lead)
+                    if not db.execute("SELECT 1 FROM "+node_table+" WHERE owner=? AND id=?",(owner,lead)).fetchone():raise LookupError("lead missing")
+                    rows=db.execute("SELECT e.*,s.state AS snapshot_state,s.expires_at AS snapshot_expires_at FROM lead_edges e LEFT JOIN lead_snapshots s ON s.owner=e.owner AND s.id=e.snapshot WHERE e.owner=? AND e."+field+"=? AND e.id>? ORDER BY e.id LIMIT ?",(owner,lead,lower,limit+1)).fetchall()
+                    db.execute("COMMIT");physical=True
+                except BaseException:
+                    if db.in_transaction:db.execute("ROLLBACK")
+                    raise
+            elif os.getenv("SKL_DRAGON_LEAD_EDGE_ROOT","").strip():
                 from core.dragon_lead_edge_shards import lookup,EdgeHeld
                 from core.dragon_owner_shards import ShardHeld
                 db.execute("BEGIN")
@@ -805,8 +831,7 @@ class LeadGraph:
                 if prior:
                     if prior["decision"]!=decision or prior["reason"]!=witness:raise CatalogueHeld("lead review replay differs")
                 else:
-                    updated=db.execute("UPDATE lead_nodes SET state=?,next_review=? WHERE owner=? AND id=?",
-                        (decision,now+interval_seconds,owner,lead))
+                    updated=authority.review_node(db,owner,lead,decision,now+interval_seconds)
                     if updated.rowcount!=1:raise LookupError("lead missing")
                     db.execute("INSERT INTO lead_review_events VALUES(?,?,?,?,?,?)",(owner,identity,lead,decision,witness,now))
                 db.execute("COMMIT")

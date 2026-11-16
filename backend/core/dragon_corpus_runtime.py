@@ -202,13 +202,14 @@ async def pulse_lead_graph():
                 try:results[key]=operation()
                 except (CatalogueHeld,ValueError,sqlite3.Error,OSError):
                     results[key]={"held":True,"reason":"lead_maintenance_held","network_executed":False}
-            if os.getenv("SKL_DRAGON_LEAD_INDEX_ROOT","").strip():
+            canonical_lanes=graph.authority_mode()
+            if not canonical_lanes and os.getenv("SKL_DRAGON_LEAD_INDEX_ROOT","").strip():
                 from core.dragon_lead_index_shards import pulse,IndexHeld
                 from core.dragon_owner_shards import ShardHeld
                 try:results["physical_index"]=pulse(graph)
                 except (IndexHeld,ShardHeld,ValueError,sqlite3.Error,OSError):
                     results["physical_index"]={"held":True,"network_executed":False}
-            if os.getenv("SKL_DRAGON_LEAD_EDGE_ROOT","").strip():
+            if not canonical_lanes and os.getenv("SKL_DRAGON_LEAD_EDGE_ROOT","").strip():
                 from core.dragon_lead_edge_shards import pulse,EdgeHeld
                 from core.dragon_owner_shards import ShardHeld
                 try:results["physical_edges"]=pulse(graph)

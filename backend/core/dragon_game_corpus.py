@@ -186,13 +186,14 @@ class GameCorpus:
 
     @contextmanager
     def _db(self):
-        db = sqlite3.connect(self.path, timeout=5, isolation_level=None)
+        db = sqlite3.connect(self.path, timeout=5, isolation_level=None, uri=True)
         db.row_factory = sqlite3.Row
         try:
             db.execute("PRAGMA foreign_keys=ON")
             db.execute("PRAGMA busy_timeout=5000")
-            db.execute("PRAGMA journal_mode=WAL")
-            db.execute("PRAGMA synchronous=FULL")
+            from core.dragon_graph_authority import configure_connection,GraphHeld
+            try:configure_connection(db)
+            except GraphHeld as exc:raise CatalogueHeld("canonical graph journal held") from exc
             db.executescript(SCHEMA)
             yield db
         finally:
