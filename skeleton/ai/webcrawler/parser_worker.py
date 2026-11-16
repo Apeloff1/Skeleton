@@ -91,12 +91,12 @@ def _parse(meta: dict, body: bytes) -> tuple[str, dict | None]:
             response = FetchResponse(meta["url"], meta["status"],
                                      {"content-type": meta["media"]}, body, meta["fetched_at"])
             doc = extract_document(response, meta["canonical_url"],
-                                   max_links=256, max_text_chars=meta["max_chars"],
+                                   max_links=1024, max_text_chars=meta["max_chars"],
                                    link_base_url=meta["url"])
             if doc is None:
                 return "empty", None
             return "ok", {"title": doc.title, "text": doc.text,
-                          "links": list(doc.links[:256]),
+                          "links": list(doc.links[:1024]),
                           "truncated": doc.provenance.get("parser_text_truncated") is True,
                           "structural_projection": doc.provenance.get("structural_projection")}
         if mode in {"sitemap", "discovery"}:
@@ -112,10 +112,10 @@ def _parse(meta: dict, body: bytes) -> tuple[str, dict | None]:
                                  max_response_bytes=meta["max_bytes"])
             if mode == "sitemap":
                 item = parse_plaintext_sitemap(body, document_url=meta["url"],
-                                               policy=policy, max_links=256, max_entries=1024)
+                                               policy=policy, max_links=1024, max_entries=4096)
             else:
                 item = parse_structured_discovery(body, media_type=meta["media"],
-                    document_url=meta["url"], policy=policy, max_links=256, max_entries=1024)
+                    document_url=meta["url"], policy=policy, max_links=1024, max_entries=4096)
             return "ok", {"kind": item.kind, "links": list(item.links),
                           "examined": item.examined_entries, "discarded": item.discarded_entries,
                           "capped": item.capped}
