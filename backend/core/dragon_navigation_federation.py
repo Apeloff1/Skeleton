@@ -161,6 +161,7 @@ class NavigationFederation:
                 for identifier,url,_ in rows:
                     graph.index_node(db,owner,identifier,url)
                 graph.publish_edges(db,owner,grant,rows)
+                graph.publish_outcomes(db,owner,grant,rows,snapshot)
                 stored = db.execute("SELECT * FROM navigation_grants WHERE owner=? AND grant_id=?",
                                     (owner,grant)).fetchone()
                 db.execute("COMMIT")
@@ -235,16 +236,22 @@ class NavigationFederation:
             return graph.neighbors(db,owner_key(scope),target,direction=direction,after=after,
                 limit=limit,now=int(time.time()) if now is None else now)
 
-    def shortlist(self,scope,*,query,host=None,limit=48,now=None):
+    def shortlist(self,scope,*,query,host=None,limit=48,due_only=False,now=None):
         with self._db() as db:
             db.execute("BEGIN")
-            return graph.retrieve(db,owner_key(scope),query=query,host=host,limit=limit,
+            return graph.retrieve(db,owner_key(scope),query=query,host=host,limit=limit,due_only=due_only,
                 now=int(time.time()) if now is None else now)
 
     def portfolio(self,scope,*,query,limit=12,now=None):
         with self._db() as db:
             db.execute("BEGIN")
             return graph.portfolio(db,owner_key(scope),query=query,limit=limit,
+                now=int(time.time()) if now is None else now)
+
+    def trail(self,scope,*,root,query,depth=3,beam=24,now=None):
+        with self._db() as db:
+            db.execute("BEGIN")
+            return graph.trail(db,owner_key(scope),root=root,query=query,depth=depth,beam=beam,
                 now=int(time.time()) if now is None else now)
 
     def reindex(self,scope,*,after=None,limit=100):
@@ -311,7 +318,7 @@ async def application_call(application,scope,operation,**kwargs):
     from core.dragon_crawler import CrawlerError, _plain, _utc, _now
     from core.dragon_game_corpus import CatalogueHeld
     import sqlite3
-    if operation not in {"publish","search","revoke","purge","topology","shortlist","portfolio","reindex","review"}:
+    if operation not in {"publish","search","revoke","purge","topology","shortlist","portfolio","trail","reindex","review"}:
         raise ValueError("navigation federation operation")
     if operation=="publish":
         session_id=kwargs["session_id"]
