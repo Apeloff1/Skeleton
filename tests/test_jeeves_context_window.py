@@ -201,7 +201,8 @@ def test_live_browser_exposes_context_preflight_and_strict_dispatch_contract():
         assert f'id="{name}"' in HTML
     assert 'id="context-preserve" type="checkbox" checked' in HTML
     assert "/context-preview" in JAVASCRIPT
-    assert "previewLocalContext(message, max_output_tokens, grounded, require_full_history)" in JAVASCRIPT
+    assert "previewLocalContext(message, max_output_tokens, grounded, require_full_history, cognitive = false)" in JAVASCRIPT
+    assert "cognitive ? {cognitive: true} : {}" in JAVASCRIPT
     assert "payload.may_submit_under_policy === true" in JAVASCRIPT
     assert "request = {session_id: state.session, message, grounded, max_output_tokens," in JAVASCRIPT
     assert "original.require_full_history === require_full_history" in JAVASCRIPT
@@ -739,3 +740,169 @@ def test_local_research_review_no_evidence_is_not_generation(tmp_path):
         assert report["generation_performed"] is False
     finally:
         app.close()
+
+
+
+@pytest.mark.parametrize("expression,answer", [
+    ("(17+5)*3/2", "33"),
+    ("1/3 + 1/6", "0.5"),
+    ("2**-4", "1/16"),
+    ("-(3-7)*2", "8"),
+    ("1/3", "1/3"),
+])
+def test_adaptive_exact_rational_arithmetic(expression, answer):
+    from skeleton.app.jeeves_constraints import assess, digest
+    contract = {"kind": "arithmetic", "expression": expression}
+    row = assess(answer, contract)
+    assert row["passed"] is True and row["code"] == "exact_arithmetic_match"
+    assert row["semantic_truth_verified"] is False
+    assert row["verifier_sha256"] == digest({k: v for k, v in row.items()
+                                               if k != "verifier_sha256"})
+    assert not assess("999999", contract)["passed"]
+
+
+@pytest.mark.parametrize("expression", [
+    "__import__('os')", "2**100", "1/0", "2**(2**16)", "1//2",
+    "1.5", "0**-1", "1"*250, "(1+"*35 + "1" + ")"*35,
+])
+def test_adaptive_rational_refuses_unsafe_or_unbounded_arithmetic(expression):
+    from skeleton.app.jeeves_constraints import rational
+    with pytest.raises(ValueError):
+        rational(expression)
+
+
+@pytest.mark.parametrize("artifact_kind,text", [
+    ("table", '{"kind":"table","title":"Plan","columns":["Stage"],"rows":[["Review"]]}'),
+    ("checklist", '{"kind":"checklist","title":"Plan","items":["Inspect","Review"]}'),
+    ("series", '{"kind":"series","title":"Measurements","unit":"ms","points":[{"label":"A","value":12.5}]}'),
+])
+def test_adaptive_inert_artifact_validates_only_schema(artifact_kind, text):
+    from skeleton.app.jeeves_constraints import assess
+    row = assess(text, {"kind": "artifact", "artifact_kind": artifact_kind})
+    assert row["passed"] is True
+    assert row["code"] == "schema_valid_not_fact_checked"
+    assert row["semantic_truth_verified"] is False
+    assert row["artifact"]["kind"] == artifact_kind
+
+
+@pytest.mark.parametrize("artifact_kind,text", [
+    ("table", '{"kind":"table","title":"a","title":"b","columns":["a"],"rows":[["x"]]}'),
+    ("table", '{"kind":"table","title":"x","columns":["a","b"],"rows":[["x"]]}'),
+    ("checklist", '{"kind":"checklist","title":"x","items":["y"],"execute":"command"}'),
+    ("series", '{"kind":"series","title":"x","unit":"m","points":[{"label":"A","value":1e999}]}'),
+    ("series", '{"kind":"series","title":"x","unit":"m","points":[{"label":"A","value":true}]}'),
+    ("series", '{"kind":"series","title":"x","unit":"m","points":[{"label":"A","value":NaN}]}'),
+    ("series", '{"kind":"series","title":"x","unit":"m","points":[{"label":"A","value":1},{"label":"A","value":2}]}'),
+    ("checklist", '{"kind":"checklist","title":"x","items":[] }'),
+])
+def test_adaptive_artifact_fail_closed(artifact_kind, text):
+    from skeleton.app.jeeves_constraints import assess
+    row = assess(text, {"kind": "artifact", "artifact_kind": artifact_kind})
+    assert row["passed"] is False and row["artifact"] is None
+    assert row["code"] == "invalid_artifact_schema"
+
+
+def _adaptive_policy(kind="review", total=12, attempts=4):
+    return {"max_attempts": attempts, "maximum_reserved_tokens": total,
+            "language": "nb", "contract": {"kind": kind}}
+
+
+def test_adaptive_native_review_cap_is_real_and_does_not_commit(tmp_path):
+    app = OfflineHTTPApplication(native_model(), tmp_path / "adaptive-real.sqlite3", token="t"*64)
+    try:
+        _, created = app.dispatch("POST", "/v1/sessions", {})
+        route = "/v1/sessions/" + created["session_id"]
+        before = app.dispatch("GET", route)[1]
+        _, report = app.dispatch("POST", route + "/deliberation-review", {
+            "message": "hello", "expected_revision": 0, "approved": True,
+            "max_output_tokens": 4, "adaptive": _adaptive_policy(total=9),
+        })
+        assert report["schema"] == "skeleton.jeeves.adaptive-review.v1"
+        assert report["adaptive"]["stop_reason"] == "token_budget"
+        assert report["adaptive"]["attempts"] == 2
+        assert report["reserved_total_output_tokens"] == 8
+        assert report["actual_total_output_tokens"] <= 8
+        assert report["adaptive"]["contract_passed"] is False
+        assert all(c["verification"]["code"] == "review_required" for c in report["candidates"])
+        assert all("Norwegian Bokmål" in c["strategy_text"] for c in report["candidates"])
+        assert app.dispatch("GET", route)[1] == before
+        assert app._active_session is None
+    finally:
+        app.close()
+
+
+def test_adaptive_verifier_feedback_uses_codes_not_candidate_text(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+    from skeleton.app import jeeves_deliberation as module
+    model, tokenizer = "a"*64, "b"*64
+    prompts = []
+    class ControlledSession:
+        tokenizer_digest = tokenizer
+        history = ()
+        instructions = ""
+        def __init__(self, backend):
+            pass
+        def preview_context(self, prompt, tokens, **kwargs):
+            return {"fits_full_history": True, "retained_history_messages": 0}
+        async def ask(self, prompt, **kwargs):
+            prompts.append(prompt)
+            response = "UNTRUSTED_MODEL_OUTPUT_999" if len(prompts) == 1 else "42"
+            return SimpleNamespace(model_digest=model, execution_receipt_digest="c"*64,
+                                   output_tokens=2, input_tokens=4, text=response)
+    monkeypatch.setattr(module, "OfflineAISession", ControlledSession)
+    policy = _adaptive_policy("arithmetic", total=16)
+    policy["contract"]["expression"] = "6*7"
+    report = asyncio.run(module.deliberate(
+        SimpleNamespace(model_digest=model), "Compute the result", history=(),
+        instructions="", revision=0, model_digest=model, tokenizer_digest=tokenizer,
+        output_tokens=4, require_full_history=True, adaptive=policy, recheck=lambda: None,
+    ))
+    assert len(prompts) == 2
+    assert "invalid_numeric_format" in prompts[1]
+    assert "UNTRUSTED_MODEL_OUTPUT_999" not in prompts[1]
+    assert report["adaptive"]["stop_reason"] == "explicit_contract_passed"
+    assert report["adaptive"]["contract_passed"] is True
+    assert report["reserved_total_output_tokens"] == 8
+    assert report["comparison"]["answer_selected"] is False
+    assert not report["comparison"]["semantic_truth_verified"]
+
+
+@pytest.mark.parametrize("policy", [
+    {"max_attempts": 5, "maximum_reserved_tokens": 16, "language": "en", "contract": {"kind":"review"}},
+    {"max_attempts": True, "maximum_reserved_tokens": 16, "language": "en", "contract": {"kind":"review"}},
+    {"max_attempts": 2, "maximum_reserved_tokens": 3, "language": "en", "contract": {"kind":"review"}},
+    {"max_attempts": 2, "maximum_reserved_tokens": 16, "language": "custom", "contract": {"kind":"review"}},
+    {"max_attempts": 2, "maximum_reserved_tokens": 16, "language": "en", "contract": {"kind":"arithmetic","expression":"1/0"}},
+    {"max_attempts": 2, "maximum_reserved_tokens": 16, "language": "en", "contract": {"kind":"artifact","artifact_kind":"html"}},
+])
+def test_adaptive_policy_rejects_invalid_inputs_before_dispatch(policy):
+    from skeleton.app.jeeves_constraints import normalize_policy
+    with pytest.raises(ValueError):
+        normalize_policy(policy, 4)
+
+
+@pytest.mark.parametrize("question,role", [
+    ("Sammenlign kilder og verifiser bevis", "research"),
+    ("Planlegg arkitektur og avhengigheter", "planning"),
+    ("Beregn resultatet", "analysis"),
+    ("Implementieren und debuggen", "code"),
+    ("比较来源并验证证据", "research"),
+    ("ゲームのクエストを設計", "game"),
+    ("بحث مقارنة مصادر", "research"),
+])
+def test_multilingual_cognitive_role_cues(question, role):
+    from skeleton.app.jeeves_cognitive import _roles
+    assert role in _roles(question)
+
+
+def test_adaptive_browser_controls_render_inert_artifacts():
+    from skeleton.app.offline_web import HTML, JAVASCRIPT
+    for item in ("adaptive-mode", "adaptive-attempts", "adaptive-total",
+                 "adaptive-language", "adaptive-expression", "adaptive-artifacts"):
+        assert f'id="{item}"' in HTML
+    assert "skeleton.jeeves.adaptive-review.v1" in JAVASCRIPT
+    assert "label.prepend(box)" in JAVASCRIPT
+    assert "el.textContent = value" in JAVASCRIPT
+    assert "get('adaptive-artifacts').replaceChildren()" in JAVASCRIPT
+    assert "policyMatches()" in JAVASCRIPT
