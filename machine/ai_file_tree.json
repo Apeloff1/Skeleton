@@ -1602,7 +1602,7 @@
       "source": "skeleton/cortex",
       "destination": "skeleton/ai/runtime/cortex",
       "kind": "tree",
-      "source_git_object_sha": "636e26d456cf7c0a7ea92ebab076e5013c1892b5",
+      "source_git_object_sha": "3bb7e0b0c76a798e7c3b98b7b628db8e6ac53d8f",
       "role": "owned-model cognition, model interchange, routing, multimodal and learning runtime",
       "work_package_refs": [
         "WP-W05",
