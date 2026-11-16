@@ -4198,6 +4198,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                     "checkpoint_replica": "",
                     "checkpoint_repair": "",
                     "request": "",
+                    "publisher_creation": "",
                     "consent": "",
                     "operations": "",
                     "last_event": "",
