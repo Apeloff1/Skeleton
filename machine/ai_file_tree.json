@@ -539,7 +539,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "382084558d9b30e8a7da7121a2a468698da59226",
+      "source_git_object_sha": "d8ba29ae574b829a768be0907e0e7bdf69f96c0f",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -1293,7 +1293,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "0ea69a5070897e3f7bb6f71fdb6e8c12a318ff52",
+      "source_git_object_sha": "8cd2c2ec3737d25e74431f0f3a7bfcc1e3377ec8",
       "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
@@ -2936,7 +2936,7 @@
       "source": "skeleton/learning/school",
       "destination": "skeleton/ai/learning/school",
       "kind": "tree",
-      "source_git_object_sha": "0089891575b363bb0e4f80cccc16dab7ed40702b",
+      "source_git_object_sha": "350002143ba77d95682f5e84dcc26e0f11071dcd",
       "role": "Curriculum, assessment, tutoring, code-intelligence, and learning-control modules deepen the existing controlled-learning owner.",
       "work_package_refs": [
         "WP-W28"
@@ -5320,7 +5320,7 @@
       "source": "skeleton/provenance",
       "destination": "skeleton/ai/runtime/provenance",
       "kind": "tree",
-      "source_git_object_sha": "881e96383c0294584b6740262390d2a8068603c3",
+      "source_git_object_sha": "589e8c10c75e700fccd5fb7ca33af9f8e1a72fd7",
       "role": "Canonical append-only provenance and event-evidence parent with independently governed Chronicle history.",
       "work_package_refs": [
         "WP-W03",
