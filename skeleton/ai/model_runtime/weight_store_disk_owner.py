@@ -120,6 +120,8 @@ class WeightStoreDiskOwner:
         """Bound enumeration; count all files, not only referenced objects."""
         self._store.assert_layout()
         objects = manifests = buckets = entries = object_bytes = manifest_bytes = 0
+        if any(path.stat().st_dev != self._root_inode[0] for path in (self._store.objects, self._store.manifests)):
+            raise WeightShardStoreError("disk admission requires a single store filesystem")
 
         def count() -> None:
             nonlocal entries
@@ -131,7 +133,8 @@ class WeightStoreDiskOwner:
             for bucket in listing:
                 count()
                 bucket_info = bucket.stat(follow_symlinks=False)
-                if not _BUCKET.fullmatch(bucket.name) or not _directory(bucket_info):
+                if (not _BUCKET.fullmatch(bucket.name) or not _directory(bucket_info)
+                        or bucket_info.st_dev != self._root_inode[0]):
                     raise WeightShardStoreError("unexpected object bucket; recovery review required")
                 buckets += 1
                 with os.scandir(bucket.path) as children:
@@ -139,7 +142,8 @@ class WeightStoreDiskOwner:
                         count()
                         info = item.stat(follow_symlinks=False)
                         if (not _HEX.fullmatch(item.name) or item.name[:2] != bucket.name
-                                or not _regular(info) or info.st_size <= 0):
+                                or not _regular(info) or info.st_size <= 0
+                                or info.st_dev != self._root_inode[0]):
                             raise WeightShardStoreError("unexpected weight object; recovery review required")
                         objects += 1
                         object_bytes += info.st_size
@@ -149,7 +153,9 @@ class WeightStoreDiskOwner:
             for item in listing:
                 count()
                 info = item.stat(follow_symlinks=False)
-                if not _MANIFEST.fullmatch(item.name) or not _regular(info) or not 1 <= info.st_size <= 16 * 1024**2:
+                if (not _MANIFEST.fullmatch(item.name) or not _regular(info)
+                        or not 1 <= info.st_size <= 16 * 1024**2
+                        or info.st_dev != self._root_inode[0]):
                     raise WeightShardStoreError("unexpected manifest; recovery review required")
                 manifests += 1
                 manifest_bytes += info.st_size
@@ -208,6 +214,10 @@ class WeightStoreDiskOwner:
                     absent[shard.digest] = shard.bytes
             metadata = 0 if self._store._manifest_path(plan.digest).exists() else len(manifest)
             demand = sum(absent.values()) + metadata
+            new_buckets = {key[:2] for key in absent if not (self._store.objects / key[:2]).exists()}
+            new_entries = len(absent) + len(new_buckets) + int(bool(metadata))
+            if before["entries"] + new_entries > self._policy.maximum_entries:
+                raise WeightShardStoreError("prospective disk inventory entry ceiling exceeded")
             if demand > remaining:
                 raise WeightShardStoreError("cooperative store byte ceiling exceeded")
             if shutil.disk_usage(self._store.root).free < self._policy.minimum_free_bytes + demand:
@@ -219,7 +229,7 @@ class WeightStoreDiskOwner:
             self._inspect_lock(directory_fd, fd)
             free = shutil.disk_usage(self._store.root).free
             if (after["accounted_bytes"] > self._policy.maximum_store_bytes
-                    or after["accounted_bytes"] > before["accounted_bytes"] + charged
+                    or after["accounted_bytes"] != before["accounted_bytes"] + charged
                     or free < self._policy.minimum_free_bytes):
                 raise WeightShardStoreError("post-publication disk accounting requires operator review")
             body = {"schema": "skeleton.weight-disk-stage.v1", "plan_digest": key,
