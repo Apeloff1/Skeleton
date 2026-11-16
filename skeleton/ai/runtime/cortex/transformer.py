@@ -49,6 +49,24 @@ def _copy_mat(m: List[List[float]]) -> List[List[float]]:
     return [list(row) for row in m]
 
 
+def _poll_matvec(W: List[List[float]], v: List[float],
+                 interrupt: Callable[[], None] | None) -> List[float]:
+    """Cancellation checkpoints inside large CPU projections.
+
+    Each row uses the original dot summation. No altered accumulation,
+    partial projection publication, approximation or new dependency.
+    """
+    if interrupt is None or len(W) <= 128:
+        if interrupt is not None:
+            interrupt()
+        return matvec(W, v)
+    out = []
+    for start in range(0, len(W), 128):
+        interrupt()
+        out.extend(matvec(W[start:start+128], v))
+    return out
+
+
 class TransformerBlock:
     """One Pre-LN residual block: X + Attn(LN(X)) then X + FFN(LN(X))."""
 
@@ -187,6 +205,44 @@ class TransformerBlock:
         }
         return Y, cache
 
+    def forward_inference(
+        self, X: List[List[float]], n_heads: int, *,
+        last_only: bool = False, interrupt: Callable[[], None] | None = None,
+    ) -> List[List[float]]:
+        """Exact causal forward without backward activation storage.
+
+        Each earlier layer still produces every position. The final layer
+        can project only its last query: earlier positions contribute K/V,
+        but their Q, attention results, output matrices and FFNs cannot
+        influence the last position within this same causal block.
+        """
+        if not X:
+            return []
+        keys: List[List[float]] = []
+        values: List[List[float]] = []
+        if last_only:
+            for pos, row in enumerate(X[:-1]):
+                if interrupt is not None:
+                    interrupt()
+                normalized, _, _ = self._norm(row, self.ln1_g, self.ln1_b)
+                keys.append(apply_rope(
+                    _poll_matvec(self.Wk, normalized, interrupt), pos,
+                ))
+                values.append(_poll_matvec(self.Wv, normalized, interrupt))
+            return [self.step(X[-1], keys, values, n_heads, len(X)-1,
+                              interrupt=interrupt)]
+
+        # Streaming full-layer inference: keep only the returned hidden
+        # rows and the current layer's K/V, rather than all Q, normalized
+        # input, attention, residual, gate, and feed-forward temporaries.
+        outputs = []
+        for pos, row in enumerate(X):
+            if interrupt is not None:
+                interrupt()
+            outputs.append(self.step(row, keys, values, n_heads, pos,
+                                     interrupt=interrupt))
+        return outputs
+
     def forward_shallow(self, X: List[List[float]], n_heads: int):
         """Attention residual only — MoD shallow path (no FFN)."""
         n = len(X)
@@ -320,9 +376,9 @@ class TransformerBlock:
     ) -> List[float]:
         """One-token decode step, storing keys already rotated at their position."""
         y, _, _ = self._norm(x, self.ln1_g, self.ln1_b)
-        q = matvec(self.Wq, y)
-        k = matvec(self.Wk, y)
-        v = matvec(self.Wv, y)
+        q = _poll_matvec(self.Wq, y, interrupt)
+        k = _poll_matvec(self.Wk, y, interrupt)
+        v = _poll_matvec(self.Wv, y, interrupt)
         # Store already-rotated keys once: re-rotating every historical key
         # on each token makes incremental decode needlessly quadratic in RoPE
         # work. Window shifts reset the cache, preserving absolute parity
@@ -331,15 +387,20 @@ class TransformerBlock:
         Vs.append(v)
         q_rope = apply_rope(q, pos)
         c = cached_mha_context(q_rope, Ks, Vs, n_heads, interrupt=interrupt)
-        attn = matvec(self.Wo, c)
+        attn = _poll_matvec(self.Wo, c, interrupt)
         u = add(x, attn)
         if self.d_ff:
             un, _, _ = self._norm(u, self.ln2_g, self.ln2_b)
             if self.ffn_kind == "swiglu":
-                z, _, _ = swiglu(un, self.W1, self.Wu, self.b1, self.bu)
+                if interrupt is None:
+                    z, _, _ = swiglu(un, self.W1, self.Wu, self.b1, self.bu)
+                else:
+                    gate = add(_poll_matvec(self.W1, un, interrupt), self.b1)
+                    up = add(_poll_matvec(self.Wu, un, interrupt), self.bu)
+                    z = [v * u for v, u in zip(silu(gate), up)]
             else:
-                z = gelu(add(matvec(self.W1, un), self.b1))
-            ff = add(matvec(self.W2, z), self.b2)
+                z = gelu(add(_poll_matvec(self.W1, un, interrupt), self.b1))
+            ff = add(_poll_matvec(self.W2, z, interrupt), self.b2)
             return add(u, ff)
         return u
 
@@ -713,8 +774,27 @@ class TinyTransformer:
                 self._accel = None
                 self.resident = False
                 self.device = "cpu"
-        H, _ = self._forward(ids, retain_cache=False, interrupt=interrupt)
+        if (len(ids) >= 16 and type(self) is TinyTransformer and not self.use_mod
+                and self._accel is None and self.layers
+                and "_forward" not in self.__dict__
+                and all(type(layer) is TransformerBlock and "forward" not in layer.__dict__
+                        and "step" not in layer.__dict__ for layer in self.layers)):
+            # Exact last-query optimization only on the standard reference
+            # graph; keep custom/routed graphs on the canonical full path.
+            H = self._encode(ids)
+            for index, layer in enumerate(self.layers):
+                if interrupt is not None:
+                    interrupt()
+                H = layer.forward_inference(
+                    H, self.n_heads, last_only=index==len(self.layers)-1,
+                    interrupt=interrupt,
+                )
+        else:
+            H, _ = self._forward(ids, retain_cache=False, interrupt=interrupt)
         y = H[-1] if H else zeros(self.dim)
+        if interrupt is not None and type(self) is TinyTransformer and "_unembed" not in self.__dict__:
+            W = self.E if self.tied else self.Wout
+            return add(_poll_matvec(W, list(y), interrupt), self.bout)
         return self._unembed(y)
 
     def _step(
