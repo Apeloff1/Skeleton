@@ -30,6 +30,7 @@ on:
       - "skeleton/ai/runtime/inference/reasoning_economics.py"
       - "skeleton/ai/runtime/inference/kv_precision_qualification.py"
       - "skeleton/ai/runtime/inference/local_speculation.py"
+      - "skeleton/ai/runtime/inference/native_speculation_qualification.py"
       - "skeleton/testing/test_jeeves_measured_tuning.py"
       - "skeleton/testing/test_jeeves_evidence_packing.py"
       - "skeleton/testing/test_jeeves_reasoning_economics.py"
@@ -39,6 +40,7 @@ on:
       - "skeleton/testing/test_jeeves_local_speculation.py"
       - "skeleton/testing/test_jeeves_kv_precision_qualification.py"
       - "skeleton/testing/test_jeeves_native_speculation_config.py"
+      - "skeleton/testing/test_jeeves_native_speculation_qualification.py"
       - "skeleton/testing/test_jeeves_evidence_rank_fusion.py"
       - "tests/test_jeeves_local_lease.py"
       - "skeleton/ai/model_runtime/offline_chat.py"
@@ -120,6 +122,7 @@ jobs:
           skeleton/testing/test_jeeves_local_speculation.py
           skeleton/testing/test_jeeves_kv_precision_qualification.py
           skeleton/testing/test_jeeves_native_speculation_config.py
+          skeleton/testing/test_jeeves_native_speculation_qualification.py
           skeleton/testing/test_jeeves_evidence_rank_fusion.py
       - name: Verify local-only chat receipts, guard policy, provisioning and secret-safe legacy refusal
         env:
