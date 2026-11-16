@@ -46,6 +46,17 @@ export default function CrawlerInstructionSecurityPanel({ session }: { session: 
           <Text style={s.small}>{health.successes} useful outcomes · {health.failures} failures · {health.rejections} rejections</Text>
           <Text style={s.small}>{health.evidence_count ? 'Smoothed success estimate: ' + Math.round(health.posterior_success * 100) + '%' : 'No observed dispatch outcomes yet'}. {health.failure_streak ? 'Consecutive recent failures: ' + health.failure_streak + '.' : ''}</Text>
         </View>)}
+    {session.acquisition_readiness && <View style={s.check}>
+      <Text style={s.label}>Acquisition readiness</Text>
+      <Text style={s.small}>Observed status counts across {session.acquisition_readiness.settled_requests} settled requests. A hold is not proof of its cause.</Text>
+      {session.acquisition_readiness.hosts.map(h => <View key={h.host} style={s.check}>
+        <Text style={s.label}>{h.host} · {h.state.replaceAll('_', ' ')}</Text>
+        <Text style={s.small}>{h.queued} queued · {h.denial_statuses} denial responses · {h.throttle_statuses} throttle responses · {h.rejected_success_statuses} rejected successful-status responses</Text>
+        {h.state === 'held_for_grant' && <Text style={s.error}>No automatic requests under the current grant.</Text>}
+        {h.state === 'cooldown' && <Text style={s.small}>Not before {h.host_ready_at <= 8640000000 ? new Date(h.host_ready_at * 1000).toISOString() : 'the committed hold deadline'}; all other checks still apply.</Text>}
+      </View>)}
+      <Text style={s.small}>Independent research intake options: publisher-approved API, licensed export, open dataset, or owner-supplied file. Confirm access, usage rights, provenance and retention separately before initiating an independent intake. Do not use a different route to retrieve denied material.</Text>
+    </View>}
     {economics && <View style={s.check}>
       <Text style={s.label}>Acquisition efficiency and pacing</Text>
       <Text style={s.small}>{economics.settled_requests} settled requests · {Math.round(economics.charged_bytes / 1024)} KiB observed · {Math.round(economics.uncertain_bytes / 1024)} KiB conservatively reserved</Text>

@@ -214,6 +214,15 @@ export type DragonTreasury = {
   earliest_source_expiry: number | null; latest_observed_only: true; source_text_returned: false;
   network_executed: false; training_permission: false; fresh_consent_required: true;
 };
+export type CrawlAcquisitionReadiness = {
+  schema: 'skeleton.dragon.acquisition-readiness.v1';
+  hosts: { host: string; state: 'consent_expired' | 'held_for_grant' | 'cooldown' | 'no_host_hold';
+    host_ready_at: number; settled: number; denial_statuses: number; throttle_statuses: number;
+    rejected_success_statuses: number; queued: number }[];
+  settled_requests: number; queued: number;
+  network_authority_expanded: false; reason_inferred: false;
+  independent_intake_requires_new_authorization: true;
+};
 export type CrawlSession = {
   session_id: string; title: string; status: 'queued' | 'ready' | 'running' | 'paused' | 'completed' | 'cancelled' | 'budget_exhausted' | 'failed' | 'interrupted';
   state?: string; version: number; created_at: string; updated_at: string; seeds: string[];
@@ -224,6 +233,30 @@ export type CrawlSession = {
   instruction_security?: CrawlInstructionSecurity; adaptive_origin_health?: Record<string, CrawlOriginHealth>;
   duplicate_evidence?: CrawlDuplicateEvidence; checkpoint_recovery?: CrawlCheckpointRecovery;
   acquisition_economics?: CrawlAcquisitionEconomics;
+  acquisition_readiness?: CrawlAcquisitionReadiness;
+  publisher_intent?: { schema: 'skeleton.dragon.publisher-intent.v1'; method: PublisherIntakeMethod;
+    intent_digest: string; operator_acknowledged: true; publisher_verified: false;
+    license_verified: false; network_authority_expanded: false };
+  publisher_capture_review?: {
+    schema: 'skeleton.dragon.publisher-capture-review.v1';
+    state: 'consent_expired' | 'restriction_observed' | 'representation_review_required' |
+      'declared_type_match_only' | 'discovery_metadata_only' | 'no_reviewable_capture';
+    settled_requests: number; retained_captures: number; declared_type_matches: number;
+    other_declared_types: number; inferred_or_unknown_types: number;
+    discovery_observations: number; denial_statuses: number; rejected_observations: number;
+    protocol_verified: false; publisher_verified: false; license_verified: false;
+    source_use_authorized: false; network_executed: false;
+  };
+  publisher_archive_preflight?: {
+    schema: 'skeleton.dragon.publisher-archive-preflight.v1';
+    state: 'checkpoint_unwitnessed' | 'terminal_capture_required' | 'restriction_review_required' |
+      'no_retained_capture' | 'representation_review_required' | 'archive_policy_held' |
+      'explicit_archive_grant_required';
+    snapshot_digest: string; retained_captures: number; archive_policy_candidates: number;
+    terminal_capture: boolean; checkpoint_witnessed: boolean;
+    archive_grant_issued: false; raw_dataset_verified: false;
+    source_use_authorized: false; network_executed: false;
+  };
   companion?: DragonCompanion;
   curriculum_trace?: DragonCurriculumTrace;
   archive_grant?: DragonArchiveGrant; treasury_watch?: DragonTreasuryWatch|null; watch_managed?: boolean;
@@ -405,6 +438,72 @@ function session(value: CrawlSession, expectedId?: string): CrawlSession {
   for (const field of ['requests', 'bytes', 'documents', 'failures'] as const) if (!integer(value.counters[field], 33554432)) invalid('The crawler counters are incomplete.');
   if (value.instruction_security !== undefined && !validInstructionSecurity(value.instruction_security, value.counters.requests)) invalid('The crawler instruction incident custody is invalid.');
   if (value.adaptive_origin_health !== undefined && !validOriginHealth(value.adaptive_origin_health)) invalid('The crawler origin health projection is invalid.');
+  if (value.publisher_intent !== undefined) {
+    const intent = value.publisher_intent;
+    if (!intent || intent.schema !== 'skeleton.dragon.publisher-intent.v1'
+      || !PUBLISHER_INTAKE_METHODS.includes(intent.method)
+      || !HASH.test(intent.intent_digest) || intent.operator_acknowledged !== true
+      || intent.publisher_verified !== false || intent.license_verified !== false
+      || intent.network_authority_expanded !== false || value.seeds.length !== 1
+      || value.limits.max_requests !== 8 || value.limits.max_documents !== 1
+      || value.limits.max_depth !== 0 || value.limits.max_total_bytes !== 2097152)
+      invalid('Invalid verified publisher intent projection.');
+  }
+  if (value.publisher_capture_review !== undefined) {
+    const r = value.publisher_capture_review;
+    if (!r || !value.publisher_intent || r.schema !== 'skeleton.dragon.publisher-capture-review.v1'
+      || !['consent_expired','restriction_observed','representation_review_required','declared_type_match_only',
+        'discovery_metadata_only','no_reviewable_capture'].includes(r.state)
+      || r.protocol_verified !== false || r.publisher_verified !== false || r.license_verified !== false
+      || r.source_use_authorized !== false || r.network_executed !== false
+      || !integer(r.settled_requests, value.counters.requests) || r.retained_captures !== value.source_count
+      || !integer(r.declared_type_matches, r.retained_captures)
+      || !integer(r.other_declared_types, r.retained_captures)
+      || !integer(r.inferred_or_unknown_types, r.retained_captures)
+      || r.declared_type_matches + r.other_declared_types + r.inferred_or_unknown_types !== r.retained_captures
+      || !integer(r.discovery_observations, r.settled_requests) || !integer(r.denial_statuses, r.settled_requests)
+      || !integer(r.rejected_observations, r.settled_requests)) invalid('Invalid publisher capture review projection.');
+  }
+  if (value.publisher_archive_preflight !== undefined) {
+    const p = value.publisher_archive_preflight;
+    if (!p || !value.publisher_intent || !value.publisher_capture_review
+      || p.schema !== 'skeleton.dragon.publisher-archive-preflight.v1'
+      || !['checkpoint_unwitnessed','terminal_capture_required','restriction_review_required',
+        'no_retained_capture','representation_review_required','archive_policy_held',
+        'explicit_archive_grant_required'].includes(p.state)
+      || !HASH.test(p.snapshot_digest) || p.retained_captures !== value.source_count
+      || !integer(p.archive_policy_candidates, p.retained_captures)
+      || typeof p.terminal_capture !== 'boolean' || typeof p.checkpoint_witnessed !== 'boolean'
+      || p.archive_grant_issued !== false || p.raw_dataset_verified !== false
+      || p.source_use_authorized !== false || p.network_executed !== false
+      || (p.state === 'explicit_archive_grant_required' &&
+        (!p.checkpoint_witnessed || !p.terminal_capture || !p.retained_captures
+          || p.archive_policy_candidates !== p.retained_captures)))
+      invalid('Invalid publisher archive preflight projection.');
+  }
+  if (value.acquisition_readiness !== undefined) {
+    const r = value.acquisition_readiness;
+    if (!r || r.schema !== 'skeleton.dragon.acquisition-readiness.v1'
+      || r.network_authority_expanded !== false || r.reason_inferred !== false
+      || r.independent_intake_requires_new_authorization !== true
+      || !Array.isArray(r.hosts) || r.hosts.length > 16
+      || !integer(r.settled_requests, value.counters.requests)
+      || r.queued !== value.frontier_count) invalid('Invalid acquisition readiness receipt.');
+    let settled = 0, queued = 0;
+    const hosts = new Set<string>();
+    for (const h of r.hosts) {
+      if (!h || typeof h.host !== 'string' || !/^[a-z0-9][a-z0-9.-]{0,252}$/.test(h.host) || hosts.has(h.host)
+        || !['consent_expired','held_for_grant','cooldown','no_host_hold'].includes(h.state)
+        || typeof h.host_ready_at !== 'number' || !Number.isFinite(h.host_ready_at) || h.host_ready_at < 0 || h.host_ready_at > 1e12
+        || !integer(h.settled, r.settled_requests) || !integer(h.queued, r.queued)
+        || !integer(h.denial_statuses, h.settled) || !integer(h.throttle_statuses, h.settled)
+        || !integer(h.rejected_success_statuses, h.settled)
+        || h.denial_statuses + h.throttle_statuses + h.rejected_success_statuses > h.settled
+        || (h.state === 'consent_expired') === value.consent_current) invalid('Invalid host readiness receipt.');
+      hosts.add(h.host); settled += h.settled; queued += h.queued;
+    }
+    if (settled !== r.settled_requests || queued !== r.queued) invalid('Acquisition readiness accounting differs.');
+  }
   if (value.acquisition_economics !== undefined) {
     const e = value.acquisition_economics;
     const finite = (n: unknown, max: number) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= max;
@@ -908,6 +1007,37 @@ export async function getDragonSanctuary(signal?: AbortSignal): Promise<DragonSa
     || p.training_permission !== false || p.network_authority_expanded !== false) invalid('Invalid current-consent sanctuary projection.');
   return p;
 }
+export type AcquisitionHoldCatalog = {
+  ok: true; schema: 'skeleton.dragon.acquisition-holds.v1'; as_of: number;
+  qualified_sessions: number; excluded_sessions: number; capacity_reached: boolean;
+  holds: {host: string; observed_grants: number; latest_grant_expiry: number;
+    denial_statuses: number; rejected_success_statuses: number}[];
+  reason_inferred: false; network_executed: false; dispatch_lock: false; network_authority_expanded: false;
+};
+
+export async function getAcquisitionHoldCatalog(signal?: AbortSignal): Promise<AcquisitionHoldCatalog> {
+  const result = await read(api.get<AcquisitionHoldCatalog>(ROOT + '/acquisition-holds', options(signal)),
+    getAuthToken(), 'The owner acquisition restriction catalogue could not be observed.');
+  if (!result || result.ok !== true || result.schema !== 'skeleton.dragon.acquisition-holds.v1'
+    || !Number.isFinite(result.as_of) || result.as_of < 0 || result.as_of > 8640000000
+    || !integer(result.qualified_sessions, 32) || !integer(result.excluded_sessions, 32)
+    || result.qualified_sessions + result.excluded_sessions > 32
+    || typeof result.capacity_reached !== 'boolean' || result.reason_inferred !== false
+    || result.network_executed !== false || result.dispatch_lock !== false || result.network_authority_expanded !== false
+    || !Array.isArray(result.holds) || result.holds.length > 512
+    || result.holds.some(h => !h || typeof h.host !== 'string' || !/^[a-z0-9][a-z0-9.-]{0,252}$/.test(h.host)
+      || !integer(h.observed_grants, result.qualified_sessions) || h.observed_grants < 1
+      || !Number.isFinite(h.latest_grant_expiry) || h.latest_grant_expiry <= result.as_of
+      || h.latest_grant_expiry > 8640000000
+      || !integer(h.denial_statuses, h.observed_grants * 128)
+      || !integer(h.rejected_success_statuses, h.observed_grants * 128)
+      || h.denial_statuses + h.rejected_success_statuses > h.observed_grants * 128)
+    || new Set(result.holds.map(h => h.host)).size !== result.holds.length) {
+    invalid('Invalid owner acquisition restriction catalogue.');
+  }
+  return result;
+}
+
 export async function getCrawlerReadiness(signal?: AbortSignal): Promise<CrawlerReadiness> {
   const value = await read(api.get<CrawlerReadiness>(ROOT + '/readiness', options(signal)), getAuthToken(), 'Crawler readiness is unavailable.');
   if (!value || typeof value.available !== 'boolean' || typeof value.configured !== 'boolean' || typeof value.message !== 'string' || !value.capabilities || !value.limits) invalid('The crawler readiness projection is invalid.');
@@ -920,6 +1050,28 @@ export async function listCrawls(cursor?: string, signal?: AbortSignal): Promise
 }
 export async function getCrawl(id: string, signal?: AbortSignal): Promise<CrawlSession> {
   const value = await read(api.get<{ session: CrawlSession }>(ROOT + '/sessions/' + identifier(id), options(signal)), getAuthToken(), 'The crawler session could not be refreshed.'); return session(value.session, id);
+}
+export const PUBLISHER_INTAKE_METHODS = ['public_api', 'publisher_feed', 'open_dataset_manifest', 'licensed_public_export'] as const;
+export type PublisherIntakeMethod = typeof PUBLISHER_INTAKE_METHODS[number];
+export type PublisherIntake = {
+  idempotency_key: string; endpoint: string; method: PublisherIntakeMethod;
+  consent: true; rights_acknowledged: true; publisher_permission_acknowledged: true;
+  independent_resource_acknowledged: true;
+};
+export async function createPublisherIntake(body: PublisherIntake, signal?: AbortSignal): Promise<CrawlSession> {
+  let endpoint: URL;
+  try { endpoint = new URL(body.endpoint); } catch {
+    throw new ChatClientError('Enter one complete publisher-approved HTTPS resource.', { kind: 'validation' });
+  }
+  if (!PUBLISHER_INTAKE_METHODS.includes(body.method) || endpoint.protocol !== 'https:'
+    || endpoint.username || endpoint.password || endpoint.search || endpoint.hash || endpoint.port
+    || body.endpoint.length > 2048 || endpoint.href !== body.endpoint
+    || body.consent !== true || body.rights_acknowledged !== true
+    || body.publisher_permission_acknowledged !== true || body.independent_resource_acknowledged !== true) {
+    throw new ChatClientError('Confirm separate access permission for a canonical public HTTPS resource without credentials or query parameters.', { kind: 'validation' });
+  }
+  const value = await read(api.post<{session: CrawlSession}>(ROOT + '/publisher-intake', body, options(signal)), getAuthToken(), 'Publisher intake was not confirmed. Retry the same request to check its outcome.');
+  return session(value.session);
 }
 export async function createCrawl(body: CrawlCreate, signal?: AbortSignal): Promise<CrawlSession> {
   if (body.frontier_strategy !== undefined && !['fifo', 'balanced', 'coverage', 'companion', 'companion_curiosity', 'companion_scholar', 'companion_guardian'].includes(body.frontier_strategy)) throw new ChatClientError('Choose a canonical bounded frontier scheduling strategy.', { kind: 'validation' });

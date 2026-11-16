@@ -126,6 +126,15 @@ def _percentile(values: list[float], fraction: float) -> float:
     return sorted(values)[max(0, math.ceil(len(values) * fraction) - 1)]
 
 
+def _negative_outcome(row: dict) -> bool:
+    # A successful HTTP envelope is not a successful acquisition. An
+    # interstitial, denied source-use outcome or rejected representation
+    # must not earn positive reliability or accelerate subsequent pacing.
+    return (row["kind"] in _FAILURE
+            or row["kind"] in {"rejected", "source_rights_restricted"}
+            or row["status"] is None or row["status"] >= 400)
+
+
 def host_economics(rows: list[dict], host: str, *, floor: float = .25) -> HostEconomics:
     if (not isinstance(rows, list) or len(rows) > MAX_OBSERVATIONS
             or not isinstance(host, str) or not _HOST.fullmatch(host)
@@ -138,10 +147,9 @@ def host_economics(rows: list[dict], host: str, *, floor: float = .25) -> HostEc
     recent = samples[-16:]
     durations = [row["latency_bucket"] * LATENCY_QUANTUM for row in recent
                  if row["latency_bucket"] is not None]
-    successful = sum(row["status"] is not None and 200 <= row["status"] < 400
-                     for row in recent)
-    failure = sum(row["kind"] in _FAILURE or row["status"] is None
-                  or row["status"] >= 400 for row in recent)
+    successful = sum(not _negative_outcome(row)
+                     and 200 <= row["status"] < 400 for row in recent)
+    failure = sum(_negative_outcome(row) for row in recent)
     content_rows = [row for row in recent if row["kind"] not in {"robots", "redirect"}]
     novelty = sum(row["kind"] in _USEFUL for row in content_rows)
     reliability = (2 + successful) / (4 + len(recent))
@@ -158,7 +166,7 @@ def host_economics(rows: list[dict], host: str, *, floor: float = .25) -> HostEc
         # not speed the crawler up. Robust tail latency and multiplicative
         # increase avoid punishing a host with bursts after one fast result.
         target = max(floor, 1.25 * max(0., mean - LATENCY_QUANTUM))
-        if row["kind"] in _FAILURE or row["status"] is None or row["status"] >= 400:
+        if _negative_outcome(row):
             delay = max(delay, min(MAX_PACING, delay * 1.5), target)
         else:
             delay = max(floor, .85 * delay + .15 * target)
