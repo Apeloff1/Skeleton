@@ -267,6 +267,45 @@ class JournalState:
     pending: str | None=None
     failed_required: bool=False
     phase_results: tuple=()
+    interrupted_phase: str | None=None
+
+
+def _successful_phases(options, results):
+    """A positive receipt must cover the selected installer path in order.
+
+    Journal custody records observations, not independent runtime or device
+    evidence. Missing, repeated, downgraded or out-of-order positive phases
+    must never make even that limited observation appear complete.
+    """
+    if (options["production"] and options["hot"]
+            or options["start"] and options["full"]
+            or options["require_strict"] and not options["start"]
+            or (options["require_protected"] or options["require_ai"])
+                and not options["require_strict"]):
+        return False
+    expected = [
+        ("preload", True, True),
+        ("setup-runtime", True, True),
+        ("python-install", True, options["install_python"]),
+        ("runtime-preflight", True, True),
+        ("compose-config", True, True),
+    ]
+    if options["start"]:
+        expected.extend((name, True, True) for name in
+                        ("start", "readiness", "critical-api-routes"))
+    if options["require_strict"]:
+        expected.append(("strict-live-qualification", True, True))
+    # Only setup-runtime may emit zero or more informational configuration
+    # notes. Optional failures or other extra phases are not on a pass path.
+    observed = list(results)
+    if observed[:2] != expected[:2]:
+        return False
+    index = 2
+    while index < len(observed) and observed[index][0] == "configuration-note":
+        if observed[index] != ("configuration-note", True, False):
+            return False
+        index += 1
+    return observed[index:] == expected[2:]
 
 
 def _reduce(rows):
@@ -311,9 +350,14 @@ def _reduce(rows):
         elif kind=="ATTEMPT_END":
             require(state.active)
             if data["outcome"]=="passed":
-                require(state.pending is None and not state.failed_required)
+                require(state.pending is None and not state.failed_required
+                        and _successful_phases(state.options,state.phase_results),
+                        "successful install receipt is incomplete or inconsistent")
             if data["outcome"]=="blocked":
-                require(state.pending is None)
+                require(state.pending is None and state.failed_required,
+                        "blocked install receipt has no required failure")
+            if data["outcome"]=="interrupted":
+                state.interrupted_phase=state.pending
             state.outcome=data["outcome"]
             state.active=False
             state.pending=None
@@ -417,6 +461,7 @@ class InstallSession:
         # which did not enter the recorder list.
         observed=self.state.phase_results
         actual=tuple((phase.name,phase.ok,phase.required) for phase in receipt.phases)
+        require(receipt.root==self.root,"installer receipt checkout identity changed")
         require(actual[:len(observed)]==observed,"installer phase journal diverged")
         for phase in receipt.phases[len(observed):]:
             self.complete_phase(phase)
@@ -428,7 +473,9 @@ class InstallSession:
         s=self.state
         return {"schema":_REPORT,"session_id":self.id,"source_head":s.source_head,
                 "attempt":s.attempt,"active_or_interrupted":s.active,
-                "outcome":s.outcome,"uncertain_phase":s.pending,
+                "outcome":s.outcome,"uncertain_phase":s.pending if s.active else (
+                    s.interrupted_phase if s.outcome=="interrupted" else None),
+                "last_interrupted_phase":s.interrupted_phase,
                 "phase_results":[{"name":name,"ok":ok,"required":required}
                                  for name,ok,required in s.phase_results],
                 "journal_head_sha256":_event_digest(self.rows[-1]),
@@ -483,7 +530,9 @@ def inspect_session(directory,session_id):
             require(first==_scan(fd,session_id),"install session changed during inspection")
             return {"schema":_REPORT,"session_id":session_id,"source_head":state.source_head,
                     "attempt":state.attempt,"active_or_interrupted":state.active,
-                    "outcome":state.outcome,"uncertain_phase":state.pending,
+                    "outcome":state.outcome,"uncertain_phase":state.pending if state.active else (
+                        state.interrupted_phase if state.outcome=="interrupted" else None),
+                    "last_interrupted_phase":state.interrupted_phase,
                     "phase_results":[{"name":n,"ok":o,"required":r} for n,o,r in state.phase_results],
                     "journal_head_sha256":_event_digest(first[-1]),
                     "configuration_observed_but_redacted":True,

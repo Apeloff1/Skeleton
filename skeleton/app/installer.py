@@ -50,7 +50,8 @@ class InstallReceipt:
 
     @property
     def ok(self) -> bool:
-        return all(phase.ok or not phase.required for phase in self.phases)
+        # An empty receipt is not a successful installation.
+        return bool(self.phases) and all(phase.ok or not phase.required for phase in self.phases)
 
     def to_dict(self) -> dict[str, object]:
         return {

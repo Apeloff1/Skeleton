@@ -51,16 +51,13 @@ def test_interrupt_then_replay_existing_idempotent_pipeline(tmp_path,monkeypatch
     assert prior["active_or_interrupted"] and prior["uncertain_phase"]=="start"
     with s.open_session(root,directory,"one",HEAD,options(),resume=True) as session:
         assert session.state.attempt==2
-        session.begin_phase("setup-runtime")
-        phase=InstallPhase("setup-runtime",True,"existing")
-        session.complete_phase(phase)
-        session.begin_phase("start")
-        started=InstallPhase("start",True,"started")
-        session.complete_phase(started)
-        session.finish(InstallReceipt(root,(phase,started)))
+        phases=successful_pipeline(session,root)
+        session.finish(InstallReceipt(root,tuple(phases)))
     result=s.inspect_session(directory,"one")
     assert result["outcome"]=="passed" and not result["active_or_interrupted"]
     assert result["attempt"]==2 and result["runtime_requalified"] is False
+    assert result["last_interrupted_phase"]=="start"
+    assert result["uncertain_phase"] is None
     records=[json.loads(path.read_bytes()) for path in directory.glob("install-one-*.json")]
     assert any(r["kind"]=="ATTEMPT_END" and r["data"]["outcome"]=="interrupted" for r in records)
     assert all("not-for-receipts" not in path.read_text() for path in directory.glob("*.json"))
@@ -159,3 +156,109 @@ def test_no_new_session_when_directory_is_world_accessible(tmp_path,monkeypatch)
         with s.open_session(root,directory,"one",HEAD,options()):
             pytest.fail("public journal directory accepted")
     assert not list(directory.iterdir())
+
+
+def successful_pipeline(session,root,*,strict=False,start=True,python=False,notes=()):
+    phases=[
+        InstallPhase("preload",True,"host"),
+        InstallPhase("setup-runtime",True,"config"),
+        *[InstallPhase("configuration-note",True,note,required=False) for note in notes],
+        InstallPhase("python-install",True,"python",required=python),
+        InstallPhase("runtime-preflight",True,"preflight"),
+        InstallPhase("compose-config",True,"compose"),
+    ]
+    if start:
+        phases.extend(InstallPhase(name,True,"live")
+                      for name in ("start","readiness","critical-api-routes"))
+    if strict:
+        phases.append(InstallPhase("strict-live-qualification",True,"strict"))
+    for phase in phases:
+        if phase.name in s._INTENTS and (phase.name!="python-install" or python):
+            session.begin_phase(phase.name)
+        if phase.name=="setup-runtime" and not (root/".env").exists():
+            (root/".env").write_text("private")
+        session.complete_phase(phase)
+    return phases
+
+
+@pytest.mark.parametrize("start,strict,python",[
+    (False,False,False),(False,False,True),(True,False,False),
+    (True,True,True),(True,True,False),
+])
+def test_complete_selected_install_path(tmp_path,monkeypatch,start,strict,python):
+    root,directory=fixture(tmp_path,monkeypatch)
+    opts=options(start=start,require_strict=strict,install_python=python)
+    with s.open_session(root,directory,"one",HEAD,opts) as session:
+        phases=successful_pipeline(session,root,start=start,strict=strict,python=python,
+                                   notes=("redacted", "also redacted"))
+        session.finish(InstallReceipt(root,tuple(phases)))
+    result=s.inspect_session(directory,"one")
+    assert result["outcome"]=="passed"
+    assert result["runtime_requalified"] is False
+    assert result["release_qualified"] is False
+
+
+@pytest.mark.parametrize("missing",[
+    "preload","setup-runtime","python-install","runtime-preflight",
+    "compose-config","start","readiness","critical-api-routes","strict-live-qualification",
+])
+def test_successful_reducer_rejects_every_missing_required_observation(missing):
+    opts=options(require_strict=True,install_python=True)
+    names=("preload","setup-runtime","python-install","runtime-preflight",
+           "compose-config","start","readiness","critical-api-routes","strict-live-qualification")
+    results=tuple((name,True,True) for name in names if name!=missing)
+    assert not s._successful_phases(opts,results)
+
+
+@pytest.mark.parametrize("mutation",["duplicate","out_of_order","downgraded",
+                                      "optional_failure","extra","missing_note_authority"])
+def test_success_path_refuses_divergent_transcript(mutation):
+    opts=options(install_python=True)
+    results=[(n,True,True) for n in ("preload","setup-runtime","python-install",
+             "runtime-preflight","compose-config","start","readiness","critical-api-routes")]
+    if mutation=="duplicate":
+        results.insert(1,results[0])
+    elif mutation=="out_of_order":
+        results[-1],results[-2]=results[-2],results[-1]
+    elif mutation=="downgraded":
+        results[2]=("python-install",True,False)
+    elif mutation=="optional_failure":
+        results.insert(2,("configuration-note",False,False))
+    elif mutation=="extra":
+        results.append(("strict-live-qualification",True,True))
+    else:
+        results.insert(2,("configuration-note",True,True))
+    assert not s._successful_phases(opts,tuple(results))
+
+
+def test_truncated_positive_receipt_cannot_publish_terminal_success(tmp_path,monkeypatch):
+    root,directory=fixture(tmp_path,monkeypatch)
+    with s.open_session(root,directory,"one",HEAD,options()) as session:
+        phase=setup(session,root)
+        with pytest.raises(s.InstallSessionDenied,match="incomplete or inconsistent"):
+            session.finish(InstallReceipt(root,(phase,)))
+    assert s.inspect_session(directory,"one")["active_or_interrupted"]
+
+
+def test_empty_receipt_is_not_success(tmp_path):
+    assert InstallReceipt(tmp_path,()).ok is False
+
+
+def test_receipt_must_belong_to_session_checkout(tmp_path,monkeypatch):
+    root,directory=fixture(tmp_path,monkeypatch)
+    with s.open_session(root,directory,"one",HEAD,options()) as session:
+        phases=successful_pipeline(session,root)
+        with pytest.raises(s.InstallSessionDenied,match="checkout identity"):
+            session.finish(InstallReceipt(tmp_path,tuple(phases)))
+
+
+def test_interrupted_terminal_retains_uncertain_phase(tmp_path,monkeypatch):
+    root,directory=fixture(tmp_path,monkeypatch)
+    with s.open_session(root,directory,"one",HEAD,options()) as session:
+        setup(session,root)
+        session.begin_phase("start")
+        session._append("ATTEMPT_END",{"outcome":"interrupted"})
+    result=s.inspect_session(directory,"one")
+    assert result["outcome"]=="interrupted"
+    assert result["uncertain_phase"]=="start"
+    assert result["last_interrupted_phase"]=="start"
