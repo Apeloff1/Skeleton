@@ -266,6 +266,14 @@ class SocketBoundFetcher:
             out_headers = {key.lower(): value for key, value in response_headers}
             _coalesce_bounded_link_headers(response_headers, out_headers)
             _coalesce_bounded_xrobots_headers(response_headers, out_headers)
+            # A repeated cache policy or Vary must preserve the restrictive
+            # member. Never permit public retention based on last-value-wins.
+            for field in ("cache-control","vary"):
+                fields=[v for k,v in response_headers if k.lower()==field]
+                if fields:
+                    combined=", ".join(fields)
+                    out_headers[field]=combined if len(combined)<=8192 else (
+                        "no-store, private" if field=="cache-control" else "*")
             # Preserve restrictive access signals across repeated headers.
             # Last-value-wins normalization must not erase an explicit hold.
             if any(key.lower() == "cf-mitigated" and value.strip().lower() == "challenge"
