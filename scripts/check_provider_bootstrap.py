@@ -559,15 +559,38 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
         return instructions, []
     stages, named = [], {}
     current = None
+    display_names = set()
     for index, instruction in enumerate(instructions):
         parts = instruction.split()
         command = parts[0].upper()
         if command == "FROM":
+            operands = parts[1:]
+            if operands and operands[0].startswith("--platform="):
+                if not operands[0][len("--platform="):]:
+                    return instructions, []
+                operands = operands[1:]
+            if len(operands) not in (1, 3):
+                return instructions, []
+            base = operands[0]
+            # Dollar expressions in a base image are permitted only as
+            # unresolved external images. They never inherit local custody.
+            if not re.fullmatch(r"[A-Za-z0-9_.:/@{}$+\-]+", base) or base.startswith("-"):
+                return instructions, []
+            alias = None
+            if len(operands) == 3:
+                if operands[1].upper() != "AS" or not re.fullmatch(r"[a-z][a-z0-9_.-]*", operands[2]):
+                    return instructions, []
+                alias = operands[2]
+            name = alias if alias is not None else f"stage-{len(stages)}"
+            if name in display_names:
+                return instructions, []
+            display_names.add(name)
             if current is not None:
                 current["end"] = index
-            base = next((part for part in parts[1:] if not part.startswith("--")), "")
-            parent = named.get(base)
-            name = parts[-1] if len(parts) >= 4 and parts[-2].upper() == "AS" else f"stage-{len(stages)}"
+            # Only explicit, previously declared aliases act as parents.
+            # Generated display names must never establish COPY custody
+            # for an unrelated external image named e.g. stage-0.
+            parent = named.get(base) if "$" not in base else None
             current = {
                 "name": name,
                 "base": base,
@@ -577,13 +600,21 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
                 "copies": list(parent["copies"]) if parent else [],
             }
             stages.append(current)
-            named[name] = current
-        elif current is not None and command == "WORKDIR" and len(parts) == 2:
+            if alias is not None:
+                named[alias] = current
+        elif command == "WORKDIR":
+            if current is None or len(parts) != 2:
+                return instructions, []
             value = parts[1]
-            current["workdir"] = (
-                value if value.startswith("/") else current["workdir"].rstrip("/") + "/" + value
-            )
-        elif current is not None and command == "COPY":
+            # Environment-dependent or quoted paths cannot establish static
+            # custody. Normalize only an unambiguous POSIX directory path.
+            if not re.fullmatch(r"[A-Za-z0-9_./+\-]+", value):
+                return instructions, []
+            joined = value if value.startswith("/") else current["workdir"].rstrip("/") + "/" + value
+            current["workdir"] = "/" + posixpath.normpath(joined).lstrip("/")
+        elif command == "COPY":
+            if current is None:
+                return instructions, []
             current["copies"].append((instruction, current["workdir"]))
     return instructions, stages
 
