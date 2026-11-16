@@ -22,6 +22,8 @@ from skeleton.ai.model_runtime.device_placement import (
 from skeleton.ai.model_runtime.flgb_model_runtime import WeightLoadPlan
 from skeleton.ai.model_runtime.offline_inventory import inventory_offline_weights
 from skeleton.ai.model_runtime.weight_shard_store import WeightShardStore
+from skeleton.ai.model_runtime.managed_weight_read import managed_weight_read
+from skeleton.ai.model_runtime.weight_store_scrub import require_completed_weight_scrub
 from skeleton.app.offline_cpu_budget import (
     CpuTopology, MemoryTopology, plan_cpu_workers, probe_cpu_topology,
     probe_memory_topology,
@@ -86,6 +88,7 @@ class RuntimePolicy:
     maximum_tokens: int = 2048
     prefill_quantum: int = 512
     sample_age_ns: int = 5 * 10**9
+    required_scrub_digest: str | None = None
 
     def __post_init__(self) -> None:
         require(self.backend in ("cpu", "cuda", "hybrid"), "invalid backend policy")
@@ -104,6 +107,8 @@ class RuntimePolicy:
         ):
             integer(getattr(self, name), low, high, name)
         require(self.prefill_quantum <= self.maximum_tokens, "prefill exceeds token ceiling")
+        if self.required_scrub_digest is not None:
+            identity(self.required_scrub_digest, "required completed scrub digest")
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,6 +120,8 @@ class ModelSource:
     headers: tuple[dict, ...]
     manifest_sha256: str | None = None
     manifest_bytes: int | None = None
+    managed_policy_sha256: str | None = None
+    scrub_observation_digest: str | None = None
 
     def __post_init__(self) -> None:
         for key in ("plan_digest", "model_identity_digest", "inventory_digest"):
@@ -128,6 +135,11 @@ class ModelSource:
         if self.manifest_sha256 is not None:
             identity(self.manifest_sha256, "selected manifest SHA")
             integer(self.manifest_bytes, 1, 16 * MIB, "selected manifest bytes")
+        if self.managed_policy_sha256 is not None:
+            identity(self.managed_policy_sha256, "managed policy SHA")
+        if self.scrub_observation_digest is not None:
+            require(self.managed_policy_sha256 is not None, "scrub evidence requires managed source")
+            identity(self.scrub_observation_digest, "scrub observation digest")
         require(type(self.headers) is tuple and len(self.headers) in (0, len(self.plan.shards)),
                 "incomplete GGUF framing set")
         for shard, header in zip(self.plan.shards, self.headers):
@@ -147,6 +159,8 @@ class ModelSource:
                             "source_label_digest": digest(row.source)} for row in self.plan.shards],
                 "gguf_headers": [dict(row) for row in self.headers],
                 "manifest_sha256": self.manifest_sha256, "manifest_bytes": self.manifest_bytes,
+                "managed_policy_sha256": self.managed_policy_sha256,
+                "scrub_observation_digest": self.scrub_observation_digest,
                 "tensor_validation": "not_assessed", "activation": "not_performed"}
 
 
@@ -156,12 +170,26 @@ def inspect_source(root: Path, *, plan_digest: str, model_identity_digest: str,
     identity(plan_digest, "plan digest")
     identity(model_identity_digest, "model identity")
     require(isinstance(policy, RuntimePolicy), "runtime policy required")
-    inventory = inventory_offline_weights(root, max_entries=policy.maximum_inventory_entries,
+    store = WeightShardStore(root, maximum_bytes=policy.maximum_source_bytes, read_only=True)
+    with managed_weight_read(store) as owner:
+        observed_scrub = None
+        if policy.required_scrub_digest is not None:
+            require(owner is not None, "required scrub evidence needs a managed store")
+            observed_scrub = require_completed_weight_scrub(owner, campaign_digest=policy.required_scrub_digest)
+        return _inspect_bound_source(store, plan_digest, model_identity_digest, policy,
+                                     owner._policy_sha256 if owner is not None else None,
+                                     observed_scrub["digest"] if observed_scrub is not None else None)
+
+
+def _inspect_bound_source(store: WeightShardStore, plan_digest: str, model_identity_digest: str,
+                          policy: RuntimePolicy, managed_policy_sha256: str | None,
+                          scrub_observation_digest: str | None) -> ModelSource:
+    inventory = inventory_offline_weights(store.root, max_entries=policy.maximum_inventory_entries,
                                           max_weight_bytes=policy.maximum_source_bytes)
     matches = [row for row in inventory["models"] if row["plan_digest"] == plan_digest]
     require(len(matches) == 1 and matches[0]["model_identity_digest"] == model_identity_digest,
             "requested plan is not in verified inventory under pinned identity")
-    store = WeightShardStore(root, maximum_bytes=policy.maximum_source_bytes, read_only=True)
+    store.assert_layout()
     match = matches[0]
     plan, manifest_sha, manifest_bytes = store.manifest_evidence(
         plan_digest, maximum=match["manifest_bytes"]
@@ -181,7 +209,7 @@ def inspect_source(root: Path, *, plan_digest: str, model_identity_digest: str,
     require(final_sha == manifest_sha and final_size == manifest_bytes,
             "selected manifest identity changed during inspection")
     return ModelSource(plan_digest, model_identity_digest, inventory["digest"], plan, headers,
-                       manifest_sha, manifest_bytes)
+                       manifest_sha, manifest_bytes, managed_policy_sha256, scrub_observation_digest)
 
 
 @dataclass(frozen=True, slots=True)
