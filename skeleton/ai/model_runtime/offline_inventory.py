@@ -63,10 +63,14 @@ def inventory_offline_weights(
         raise OfflineInventoryError("invalid offline inventory entry limit")
     if type(max_weight_bytes) is not int or not 1 <= max_weight_bytes < 1 << 63:
         raise OfflineInventoryError("invalid offline inventory byte limit")
-    path = Path(root)
+    path = Path(root).absolute()
     _directory(path)
     _directory(path / "manifests")
     _directory(path / "objects")
+    try:
+        store = WeightShardStore(path, maximum_bytes=max_weight_bytes, read_only=True)
+    except WeightShardStoreError as exc:
+        raise OfflineInventoryError("offline weight store layout unavailable") from exc
     try:
         with os.scandir(path / "manifests") as listing:
             names: list[str] = []
@@ -79,10 +83,6 @@ def inventory_offline_weights(
     except OSError as exc:
         raise OfflineInventoryError("cannot enumerate offline weight manifests") from exc
 
-    try:
-        store = WeightShardStore(path, maximum_bytes=max_weight_bytes, read_only=True)
-    except WeightShardStoreError as exc:
-        raise OfflineInventoryError("offline weight store layout unavailable") from exc
     verified: list[VerifiedOfflineWeightPlan] = []
     # Admit the entire declared byte budget before opening any weight object.
     # Otherwise N individually valid plans can force N huge reads before
@@ -118,6 +118,7 @@ def inventory_offline_weights(
                 observed.append(item.name)
         if sorted(observed) != sorted(names):
             raise OfflineInventoryError("offline inventory changed during verification")
+        store.assert_layout()
     except OfflineInventoryError:
         raise
     except (WeightShardStoreError, OSError, ValueError) as exc:
