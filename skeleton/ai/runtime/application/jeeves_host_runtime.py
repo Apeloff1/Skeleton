@@ -59,6 +59,168 @@ class JeevesHostContext:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class JeevesDispatchAuthorization:
+    """Exact host permission question; model/request bytes supply no authority."""
+
+    context: JeevesHostContext
+    action: str
+    request_id: str
+    arguments_json: bytes
+    dispatcher_policy_sha256: str
+
+    @property
+    def digest(self) -> str:
+        return sha256(json.dumps({
+            "scope": [self.context.tenant_id, self.context.project_id,
+                      self.context.principal_id, self.context.run_id, self.context.trace_id],
+            "action": self.action, "request_id": self.request_id,
+            "arguments_sha256": sha256(self.arguments_json).hexdigest(),
+            "dispatcher_policy_sha256": self.dispatcher_policy_sha256,
+        }, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("ascii")).hexdigest()
+
+
+class JeevesDispatcherGateway:
+    """Run-scoped application host client for the actual private dispatcher inbox.
+
+    The enclosing host authenticates the context and supplies its real
+    authorizer. This is neither a public HTTP route nor a model tool grant.
+    Request IDs, task IDs, singleton scope and dependency IDs are derived
+    from the exact authenticated tenant/project/principal/run, with separate
+    domain tags. Global service stop, key access and policy mutation cannot
+    be requested through this gateway.
+    """
+
+    _ACTIONS = frozenset({"submit", "cancel", "signal", "reconcile", "command", "result"})
+
+    def __init__(self, *, directory: str | Path, policy_sha256: str,
+                 scope: JeevesHostContext,
+                 authorize: Callable[[JeevesDispatchAuthorization], bool]) -> None:
+        from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+        if (not isinstance(scope, JeevesHostContext) or not callable(authorize)
+                or type(policy_sha256) is not str or len(policy_sha256) != 64
+                or any(ch not in "0123456789abcdef" for ch in policy_sha256)):
+            raise JeevesHostRuntimeError("dispatcher binding requires exact policy and authorization")
+        self._directory = Path(directory)
+        self._scope = scope
+        self._policy_sha256 = policy_sha256
+        self._authorize = authorize
+        app = LocalDispatcherApplication(self._directory)
+        if app.policy.digest != policy_sha256 or scope.tenant_id not in app.policy.tenants:
+            raise JeevesHostRuntimeError("dispatcher policy or tenant not provisioned")
+        info = app.store.path.stat()
+        self._database_identity = (info.st_dev, info.st_ino)
+
+    @staticmethod
+    def _identifier(value: object) -> str:
+        if (type(value) is not str or not 1 <= len(value) <= 192
+                or value.strip() != value
+                or any(ord(ch) < 33 or ord(ch) > 126 for ch in value)):
+            raise JeevesHostRuntimeError("dispatcher client identifier must be bounded ASCII")
+        return value
+
+    @staticmethod
+    def _namespace(context: JeevesHostContext) -> tuple[str, str, str, str]:
+        return (context.tenant_id, context.project_id, context.principal_id, context.run_id)
+
+    def _scoped(self, domain: str, value: object) -> str:
+        value = self._identifier(value)
+        material = json.dumps(
+            ["skeleton.jeeves.dispatch.scope.v1", domain, *self._namespace(self._scope), value],
+            ensure_ascii=True, separators=(",", ":"), allow_nan=False,
+        ).encode("ascii")
+        return "app-" + domain + "-" + sha256(material).hexdigest()
+
+    def _app(self):
+        from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+        app = LocalDispatcherApplication(self._directory)
+        info = app.store.path.stat()
+        if (app.policy.digest != self._policy_sha256
+                or self._scope.tenant_id not in app.policy.tenants
+                or (info.st_dev, info.st_ino) != self._database_identity):
+            raise JeevesHostRuntimeError("dispatcher binding identity changed")
+        return app
+
+    def execute(self, *, context: JeevesHostContext, action: str,
+                request_id: str, arguments: Mapping[str, Any]) -> dict:
+        from skeleton.automation.agents.swarm_dispatch_app import _canonical, _json_object
+        if (not isinstance(context, JeevesHostContext)
+                or self._namespace(context) != self._namespace(self._scope)):
+            raise JeevesHostRuntimeError("dispatcher request crossed authenticated run scope")
+        request_id = self._identifier(request_id)
+        if (type(action) is not str or action not in self._ACTIONS
+                or type(arguments) is not dict):
+            raise JeevesHostRuntimeError("unsupported dispatcher host request")
+        # Round-trip immutable exact bytes. The authorizer receives those
+        # bytes, never a mutable dictionary it can accidentally rewrite.
+        canonical = _canonical(arguments)
+        supplied = _json_object(canonical)
+        body: dict[str, Any] = {}
+        tenant = self._scope.tenant_id
+        if action == "submit":
+            required = {"task_id", "operation", "input"}
+            optional = {"priority", "dependencies", "singleton", "timer_ms", "event"}
+            if not required.issubset(supplied) or not set(supplied).issubset(required | optional):
+                raise JeevesHostRuntimeError("invalid host submission properties")
+            operation = self._identifier(supplied["operation"])
+            priority = supplied.get("priority", 100)
+            # Reserved urgent lanes belong to the dispatcher administrator,
+            # never to an application caller or a generated task argument.
+            if type(priority) is not int or not 50 <= priority <= 1000:
+                raise JeevesHostRuntimeError("host priority outside granted background lanes")
+            deps = supplied.get("dependencies", [])
+            if (type(deps) is not list or len(deps) > 32
+                    or any(type(dep) is not str for dep in deps) or len(set(deps)) != len(deps)):
+                raise JeevesHostRuntimeError("invalid host dependency set")
+            body = {"kind": "submit", "tenant": tenant,
+                    "task_id": self._scoped("task", supplied["task_id"]),
+                    "operation": operation, "input": supplied["input"],
+                    "priority": priority,
+                    "dependencies": [self._scoped("task", dep) for dep in deps]}
+            if "singleton" in supplied:
+                body["singleton"] = self._scoped("singleton", supplied["singleton"])
+            for field in ("timer_ms", "event"):
+                if field in supplied:
+                    body[field] = supplied[field]
+        elif action == "command":
+            if set(supplied) != {"request_id"}:
+                raise JeevesHostRuntimeError("exact client request identity required")
+            self._identifier(supplied["request_id"])
+        elif action == "signal":
+            if set(supplied) != {"task_id", "event_id", "selector", "evidence"}:
+                raise JeevesHostRuntimeError("invalid host event request")
+            body = {"kind": "signal", "tenant": tenant,
+                    "task_id": self._scoped("task", supplied["task_id"]),
+                    "event_id": self._scoped("event", supplied["event_id"]),
+                    "selector": self._identifier(supplied["selector"]),
+                    "evidence": supplied["evidence"]}
+        else:
+            if set(supplied) != {"task_id"}:
+                raise JeevesHostRuntimeError("exact client task identity required")
+            body = {"kind": action, "tenant": tenant,
+                    "task_id": self._scoped("task", supplied["task_id"])}
+        authorization = JeevesDispatchAuthorization(
+            context, action, request_id, canonical, self._policy_sha256,
+        )
+        try:
+            permitted = self._authorize(authorization)
+        except Exception:
+            raise JeevesHostRuntimeError("dispatcher host authorization unavailable") from None
+        if permitted is not True:
+            raise JeevesHostRuntimeError("dispatcher host authorization denied")
+        # Re-open the same provisioned policy and inode before every
+        # authorized operation. Authentication never opens a new service.
+        app = self._app()
+        if action == "command":
+            found = app.inbox.command(self._scoped("request", supplied["request_id"]))
+            return {"found": found is not None, "command": found}
+        if action == "result":
+            return app.result(tenant, body["task_id"])
+        if action == "submit" and body["operation"] not in app.policy.operations:
+            raise JeevesHostRuntimeError("operation not provisioned by dispatcher")
+        return app.enqueue(self._scoped("request", request_id), body)
+
+
 class JeevesApplicationRuntime:
     """Host-facing interface: explicit grants, source awareness and durable state."""
 
@@ -83,12 +245,23 @@ class JeevesApplicationRuntime:
         idle_verify_result: Callable[..., bool] | None = None,
         idle_telemetry_probe: Callable[..., Any] | None = None,
         idle_policy: Any = None,
+        dispatcher_directory: str | Path | None = None,
+        dispatcher_policy_sha256: str | None = None,
+        dispatcher_authorize: Callable[[JeevesDispatchAuthorization], bool] | None = None,
     ) -> None:
         if not isinstance(scope, JeevesHostContext):
             raise JeevesHostRuntimeError("authenticated JeevesHostContext required")
         self.scope = scope
         self._lock = RLock()
         self._closed = False
+        flags = (dispatcher_directory is not None, dispatcher_policy_sha256 is not None,
+                 dispatcher_authorize is not None)
+        if any(flags) and not all(flags):
+            raise JeevesHostRuntimeError("dispatcher binding requires all three host provisions")
+        self._dispatch_gateway = None if not all(flags) else JeevesDispatcherGateway(
+            directory=dispatcher_directory, policy_sha256=dispatcher_policy_sha256,
+            scope=scope, authorize=dispatcher_authorize,
+        )
         self.workbench = JeevesWorkbench(
             root=root, state_directory=state_directory,
             tenant_id=scope.tenant_id, project_id=scope.project_id,
@@ -159,6 +332,20 @@ class JeevesApplicationRuntime:
                 tool_context, grants=grants,
             )
 
+    def dispatch_request(
+        self, *, context: JeevesHostContext, action: str, request_id: str,
+        arguments: Mapping[str, Any],
+    ) -> dict:
+        """Send one exact, host-authorized request to the installed dispatcher."""
+        with self._lock:
+            self._require_live()
+            self._context(context)
+            if self._dispatch_gateway is None:
+                raise JeevesHostRuntimeError("dispatcher not bound to this application runtime")
+            return self._dispatch_gateway.execute(
+                context=context, action=action, request_id=request_id, arguments=arguments,
+            )
+
     def status(self) -> dict[str, Any]:
         """Safe, bounded control-plane snapshot with no source or secret values."""
         with self._lock:
@@ -212,6 +399,9 @@ class JeevesApplicationRuntime:
                 },
                 "runtime_availability": "requires host readiness and execution grants",
                 "weights_loaded_by_jeeves": False,
+                **({"dispatcher": {"bound": True, "scope": "authenticated-run",
+                                   "execution": "external-local-service"}}
+                   if self._dispatch_gateway is not None else {}),
             }
 
     def stage_candidate_model_release(
@@ -363,4 +553,5 @@ class JeevesApplicationRuntime:
 
 __all__ = [
     "JeevesHostRuntimeError", "JeevesHostContext", "JeevesApplicationRuntime",
+    "JeevesDispatchAuthorization", "JeevesDispatcherGateway",
 ]

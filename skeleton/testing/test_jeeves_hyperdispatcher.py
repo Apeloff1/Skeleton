@@ -3112,3 +3112,95 @@ def test_dispatcher_history_keeps_live_parent_until_all_references_finish(tmp_pa
     assert app.result("a", "child")["result"] == 2
     assert app.result("a", "parent")["result"] == 1
     app.close()
+
+
+def test_authenticated_jeeves_dispatcher_gateway_runs_real_jobs_and_scopes_identities(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from skeleton.app.runtime.jeeves_host_runtime import (
+        JeevesHostContext, JeevesDispatcherGateway, JeevesHostRuntimeError,
+    )
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "dispatcher", tenants=("tenant",), operations=("integer_sum",),
+        workers=2, max_jobs=8,
+    )
+    scope = JeevesHostContext("tenant", "project", "principal", "run", "trace")
+    other = JeevesHostContext("tenant", "other-project", "principal", "run", "trace")
+    authorized = []
+    def allow(question):
+        authorized.append(question)
+        return question.action != "cancel"
+    gateway = JeevesDispatcherGateway(directory=app.directory, policy_sha256=app.policy.digest,
+                                     scope=scope, authorize=allow)
+    other_gateway = JeevesDispatcherGateway(directory=app.directory, policy_sha256=app.policy.digest,
+                                           scope=other, authorize=allow)
+    job = {"task_id": "job", "operation": "integer_sum", "input": [8, 9]}
+    initial = gateway.execute(context=scope, action="submit", request_id="request", arguments=job)
+    assert initial["status"] == "pending"
+    assert gateway.execute(context=scope, action="submit", request_id="request", arguments=job) == initial
+    other_gateway.execute(context=other, action="submit", request_id="request",
+                          arguments=dict(job, input=[5, 6]))
+    with pytest.raises(JeevesHostRuntimeError, match="scope"):
+        gateway.execute(context=other, action="result", request_id="read", arguments={"task_id": "job"})
+    with pytest.raises(JeevesHostRuntimeError, match="denied"):
+        gateway.execute(context=scope, action="cancel", request_id="cancel", arguments={"task_id": "job"})
+    with pytest.raises(JeevesHostRuntimeError, match="priority"):
+        gateway.execute(context=scope, action="submit", request_id="urgent",
+                        arguments=dict(job, priority=0))
+    with pytest.raises(JeevesHostRuntimeError, match="unsupported"):
+        gateway.execute(context=scope, action="stop", request_id="halt", arguments={})
+    assert all(len(row.digest) == 64 for row in authorized)
+    app.start()
+    assert app.tick().disposition == "completed"
+    first = gateway.execute(context=scope, action="result", request_id="read", arguments={"task_id": "job"})
+    second = other_gateway.execute(context=other, action="result", request_id="read", arguments={"task_id": "job"})
+    assert first["result"] == 17 and second["result"] == 11
+    assert first["task_id"] != second["task_id"]
+    assert gateway.execute(context=scope, action="command", request_id="inspect",
+                           arguments={"request_id": "request"})["command"]["status"] == "accepted"
+    app.close()
+
+
+def test_actual_jeeves_application_runtime_dispatch_binding_and_cli(tmp_path):
+    import os
+    if os.name != "posix":
+        pytest.skip("POSIX private-directory qualification")
+    from pathlib import Path
+    from skeleton.app.runtime.jeeves_host_runtime import (
+        JeevesApplicationRuntime, JeevesHostContext, JeevesHostRuntimeError,
+    )
+    from skeleton.automation.agents.swarm_dispatch_app import LocalDispatcherApplication
+    from skeleton.app.cli import _parser, run_app_cli
+    app = LocalDispatcherApplication.initialize(
+        tmp_path / "dispatcher", tenants=("a",), operations=("integer_sum",), max_jobs=4,
+    )
+    context = JeevesHostContext("a", "project", "principal", "run", "trace")
+    repo_root = Path(__file__).resolve().parents[2]
+    options = dict(root=repo_root, state_directory=tmp_path / "workbench",
+                   scope=context, read_authorize=lambda *a, **kw: False,
+                   orchestration_authorize=lambda *a, **kw: False)
+    with pytest.raises(JeevesHostRuntimeError, match="three host"):
+        JeevesApplicationRuntime(**options, dispatcher_directory=app.directory)
+    with JeevesApplicationRuntime(
+        **options, dispatcher_directory=app.directory,
+        dispatcher_policy_sha256=app.policy.digest,
+        dispatcher_authorize=lambda question: question.action in ("submit", "result"),
+    ) as runtime:
+        accepted = runtime.dispatch_request(
+            context=context, action="submit", request_id="create",
+            arguments={"task_id": "local", "operation": "integer_sum", "input": [19, 23]},
+        )
+        assert accepted["status"] == "pending"
+        # The workbench routes to the real installed service owner, not a
+        # hidden in-process executor. Canonical app CLI starts that owner.
+        assert "dispatch" in _parser().format_help()
+        assert run_app_cli(["dispatch", "--directory", str(app.directory),
+                            "serve", "--max-cycles", "1"]) == 0
+        result = runtime.dispatch_request(context=context, action="result", request_id="inspect",
+                                          arguments={"task_id": "local"})
+        assert result["result"] == 42
+    with pytest.raises(JeevesHostRuntimeError, match="closed"):
+        runtime.dispatch_request(context=context, action="result", request_id="inspect",
+                                 arguments={"task_id": "local"})

@@ -503,3 +503,25 @@ limits remain explicit: no physical disk guarantee, indefinite retention or
 cross-host archive claim. Four regression tests cover rolling beyond the live
 window, dependency retention, archive/capture crash recovery, tenant refusal,
 tampering, historical capacity and no duplicate physical execution.
+
+## Wave A23: canonical application host integration
+
+The installed command is accessible directly through python -m skeleton app
+dispatch with its existing complete argument contract. JeevesApplicationRuntime
+also accepts three explicit host provisions: dispatcher_directory,
+dispatcher_policy_sha256 and dispatcher_authorize. They must be supplied
+together. The authenticated host can now call dispatch_request with exact
+context, action, request identity and arguments, using the real durable
+dispatcher inbox and result custody. The gateway derives independent opaque
+identities by authenticated tenant/project/principal/run for jobs, requests,
+dependencies, singleton keys, and events. It rechecks sealed policy and
+database inode on each authorized operation. The explicit authorizer receives
+immutable exact request bytes and the authenticated context. No permission is
+derived from prompts or generated actions. Every read is also authorized;
+protected priority lanes, global stop, credential/policy changes, foreign
+scope and unknown actions are refused. The workbench never starts another
+scheduler or executor. Actual foreground service execution remains explicitly
+operator-managed, and no new public API route or automatic startup is enabled.
+Regressions cover two project scopes with identical client IDs, denial and
+priority boundaries, and the real canonical application CLI-to-job-to-result
+path. This is a local authenticated host binding, not a remote cluster.

@@ -293,6 +293,7 @@ def _parser() -> argparse.ArgumentParser:
                    help="play and replay-verify a deterministic offline encounter (play-combat --help)")
     sub.add_parser("chat", add_help=False, help="open durable native/GGUF terminal chat (chat --help)")
     sub.add_parser("serve-local-ai", add_help=False, help="open the authenticated offline AI workspace (serve-local-ai --help)")
+    sub.add_parser("dispatch", add_help=False, help="run the durable local Jeeves dispatcher (dispatch --help)")
     sub.add_parser("down", help="stop the assembled application")
     sub.add_parser("ps", help="show assembled service state")
 
@@ -585,6 +586,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     if arguments and arguments[0] == "chat":
         from skeleton.app.offline_chat_cli import main as chat_main
         return chat_main(arguments[1:])
+    if arguments and arguments[0] == "dispatch":
+        from skeleton.automation.agents.swarm_dispatch_app import main as dispatcher_main
+        return dispatcher_main(arguments[1:])
     if arguments and arguments[0] == "serve-local-ai":
         from skeleton.app.offline_http import main as serve_main
         return serve_main(arguments[1:])
