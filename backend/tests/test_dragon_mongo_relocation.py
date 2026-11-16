@@ -163,3 +163,94 @@ class MongoIntegrationTests(TestCase):
         self.target[move.COLLECTIONS[0]].insert_one({"_id":"unexpected"})
         with self.assertRaises(move.RelocationHeld):move.verify(self.source,self.target,offline_acknowledged=True)
         self.assertEqual(move._state(self.target)["phase"],"copying")
+
+
+class SplitAuthorityCutoverTests(IsolatedAsyncioTestCase):
+    async def test_original_coordination_uuid_and_old_worker_custody(self):
+        from unittest.mock import AsyncMock, MagicMock, Mock
+        value=receipt()
+        source=MagicMock()
+        source.name=value["source_db"]
+        source.command=AsyncMock(return_value={"cursor":{"firstBatch":[{
+            "type":"collection","options":{},
+            "info":{"uuid":Binary(bytes.fromhex(value["source"]["dragon_crawler_commands"]["uuid"]))}
+        }]}})
+        store=Mock()
+        store.find_one=AsyncMock(return_value=None)
+        source.__getitem__.return_value=store
+        self.assertTrue(await cutover.verify_source_coordination(source,value))
+        store.find_one.return_value={"_id":"legacy-worker"}
+        with self.assertRaises(move.RelocationHeld):
+            await cutover.verify_source_coordination(source,value)
+        store.find_one.return_value=None
+        source.command.return_value["cursor"]["firstBatch"][0]["info"]["uuid"]=Binary(bytes.fromhex("f"*32))
+        with self.assertRaises(move.RelocationHeld):
+            await cutover.verify_source_coordination(source,value)
+
+    async def test_application_cutover_holds_until_verified_and_preserves_pinned_store(self):
+        from unittest.mock import AsyncMock, Mock
+        from core.dragon_crawler import DragonCrawlerApplication,CrawlerError
+        app=object.__new__(DragonCrawlerApplication)
+        app._cutover_requested=True
+        app._cutover_active=False
+        app._mongo_client=None
+        app._workers={}
+        app.database=Mock()
+        app._sessions=Mock()
+        app._limits=Mock()
+        original=Mock()
+        app._coordination_limits=original
+        target={"dragon_crawler_sessions":Mock(),"dragon_crawler_commands":Mock()}
+        with self.assertRaises(CrawlerError):
+            _=app.sessions
+        with self.assertRaises(CrawlerError):
+            _=app.limits
+        with patch("core.dragon_mongo_cutover.activate",new_callable=AsyncMock,
+                   side_effect=move.RelocationHeld("fixture")):
+            with self.assertRaises(CrawlerError):
+                await app.activate_mongo_cutover()
+        self.assertFalse(app._cutover_active)
+        with patch("core.dragon_mongo_cutover.activate",new_callable=AsyncMock,
+                   return_value=(Mock(),target)) as activate:
+            self.assertTrue((await app.activate_mongo_cutover())["active"])
+            self.assertTrue((await app.activate_mongo_cutover())["active"])
+            activate.assert_awaited_once()
+        self.assertIs(app.sessions,target["dragon_crawler_sessions"])
+        self.assertIs(app.limits,target["dragon_crawler_commands"])
+        self.assertIs(app._acquisition_store(),original)
+
+    async def test_no_activation_while_worker_handle_exists(self):
+        from unittest.mock import AsyncMock,Mock
+        from core.dragon_crawler import DragonCrawlerApplication,CrawlerError
+        app=object.__new__(DragonCrawlerApplication)
+        app._cutover_requested=True
+        app._cutover_active=False
+        app._workers={"worker":Mock()}
+        with patch("core.dragon_mongo_cutover.activate",new_callable=AsyncMock) as activate:
+            with self.assertRaises(CrawlerError):
+                await app.activate_mongo_cutover()
+        activate.assert_not_awaited()
+
+
+class PrivateReceiptTests(TestCase):
+    def test_exclusive_canonical_receipt_and_symlink_refusal(self):
+        from core.dragon_mongo_receipt import _read_json,_new_json,DeploymentHeld
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp).resolve()
+            path=root/"receipt.json"
+            value=receipt()
+            _new_json(path,value)
+            self.assertEqual(_read_json(path),value)
+            with self.assertRaises(FileExistsError):
+                _new_json(path,value)
+            alias=root/"alias.json"
+            try:
+                alias.symlink_to(path)
+            except (OSError,NotImplementedError):
+                self.skipTest("symlink fixture unavailable")
+            with self.assertRaises(DeploymentHeld):
+                _read_json(alias)
+            path.write_bytes(b'{"x":1,"x":1}')
+            with self.assertRaises(DeploymentHeld):
+                _read_json(path)
+
