@@ -337,3 +337,101 @@ class OfflineExportInspectionTests(TestCase):
         self.assertEqual(status,0)
         self.assertFalse(json.loads(output.getvalue())["graph_written"])
 
+
+class StrictLocalTabularExportTests(TestCase):
+    def test_steam_tsv_matches_csv_projection(self):
+        from io import BytesIO
+        from core.dragon_lead_ingest import steam_csv
+        csv_rows=list(steam_csv(BytesIO(b'AppID,Name,Notes\r\n1001,"Alpha, Beta","one\ntwo"\r\n')))
+        tsv_rows=list(steam_csv(BytesIO(b'AppID\tName\tNotes\r\n1001\t"Alpha, Beta"\t"one\ntwo"\r\n'),delimiter="\t"))
+        self.assertEqual(csv_rows,tsv_rows)
+        self.assertEqual(tsv_rows,[{"appid":"1001","title":"Alpha, Beta"}])
+
+    def test_wikidata_tsv_and_locator_tsv_match_canonical_schema(self):
+        from io import BytesIO
+        from core.dragon_lead_ingest import wikidata_csv,locator_csv
+        rows=list(wikidata_csv(BytesIO(b"item\titemLabel\nhttps://www.wikidata.org/entity/Q1234\tA game\n"),delimiter="\t"))
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]["subject"],"wikidata:Q1234")
+        link=list(locator_csv(BytesIO(b"url\ttitle\tkind\tsubject\nhttps://www.wikidata.org/wiki/Q1234\tA game\tcross_database_identifiers\twikidata:Q1234\n"),delimiter="\t"))
+        self.assertEqual(link,rows)
+
+    def test_malformed_rows_and_ambiguous_headers_rejected(self):
+        from io import BytesIO
+        from core.dragon_lead_ingest import steam_csv
+        for raw in (b"AppID,Name,Other\n1001,A\n",b"AppID,Name\n1001,A,B\n",
+                    b"AppID,Name,name\n1001,A,A\n",b"AppID,Name\n1001,\"unterminated\n",
+                    b"AppID,Name,\n1001,A,B\n"):
+            with self.subTest(raw=raw):
+                with self.assertRaises(ValueError):
+                    list(steam_csv(BytesIO(raw)))
+
+    def test_logical_multiline_record_cap_and_limit_restoration(self):
+        import csv
+        from io import BytesIO
+        from core.dragon_lead_ingest import steam_csv
+        before=csv.field_size_limit()
+        raw=BytesIO(b'AppID,Name,Note\n1001,A,"123456789\n123456789\n123456789"\n')
+        with patch("core.dragon_lead_ingest.MAX_RECORD_CHARS",30):
+            with self.assertRaisesRegex(ValueError,"logical record"):
+                list(steam_csv(raw))
+        self.assertEqual(csv.field_size_limit(),before)
+        self.assertFalse(raw.closed)
+
+    def test_tsv_qualification_preserves_projection_page_chain(self):
+        from core.dragon_lead_ingest import inspect_export
+        with TemporaryDirectory() as directory:
+            csv_path=Path(directory)/"games.csv"
+            tsv_path=Path(directory)/"games.tsv"
+            csv_path.write_bytes(b"AppID,Name\n1001,Alpha\n1002,Beta\n")
+            tsv_path.write_bytes(b"AppID\tName\n1001\tAlpha\n1002\tBeta\n")
+            a=inspect_export(csv_path,"steam-csv","steam")
+            b=inspect_export(tsv_path,"steam-tsv","steam")
+            self.assertEqual(a["page_chain"],b["page_chain"])
+            self.assertNotEqual(a["input_sha256"],b["input_sha256"])
+
+
+class LocalVersionedDatasetIntegrityTests(TestCase):
+    def test_jsonl_plan_witnesses_entire_file(self):
+        from core.dragon_dataset_ingest import plan
+        with TemporaryDirectory() as directory:
+            path=Path(directory)/"records.jsonl"
+            raw=b'{"_key":1,"name":"Fixture"}\n'
+            path.write_bytes(raw)
+            expected=hashlib.sha256(raw).hexdigest()
+            receipt=plan(path,expected_sha=expected)
+            self.assertEqual(receipt["input_sha256"],expected)
+            self.assertTrue(receipt["expected_sha_matched"])
+            self.assertEqual(receipt["expected_rows"],1)
+            with self.assertRaisesRegex(ValueError,"SHA-256 differs"):
+                plan(path,expected_sha="0"*64)
+
+    def test_zip_container_identity_is_distinct_from_member_chain(self):
+        import zipfile
+        from core.dragon_dataset_ingest import plan
+        with TemporaryDirectory() as directory:
+            path=Path(directory)/"data.zip"
+            with zipfile.ZipFile(path,"w") as archive:
+                archive.writestr("rows.jsonl",b'{"_key":1,"name":"Fixture"}\n')
+                archive.writestr("notes.txt",b"version one")
+            a=plan(path,"rows.jsonl")
+            with zipfile.ZipFile(path,"w") as archive:
+                archive.writestr("rows.jsonl",b'{"_key":1,"name":"Fixture"}\n')
+                archive.writestr("notes.txt",b"version two")
+            b=plan(path,"rows.jsonl")
+            self.assertEqual(a["expected_chain"],b["expected_chain"])
+            self.assertNotEqual(a["input_sha256"],b["input_sha256"])
+
+    def test_mutated_container_fails_before_version_reservation(self):
+        from core.dragon_dataset_ingest import ingest
+        from unittest.mock import Mock
+        with TemporaryDirectory() as directory:
+            path=Path(directory)/"records.jsonl"
+            path.write_bytes(b'{"_key":1,"name":"Fixture"}\n')
+            shard=Mock()
+            with patch("core.dragon_dataset_ingest.raw_sha256",side_effect=["a"*64,"b"*64]):
+                with self.assertRaisesRegex(ValueError,"changed during projection"):
+                    ingest(shard,path,dataset="fixture",source="fixture",observation_digest="c"*64,
+                           label="fixture",rights_acknowledged=True)
+            shard.begin.assert_not_called()
+
