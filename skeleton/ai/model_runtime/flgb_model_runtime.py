@@ -229,8 +229,11 @@ class WeightLoadPlan:
 
     def __post_init__(self) -> None:
         require_digest(self.model_identity_digest, "model_identity_digest")
-        if not self.shards or len(self.shards) > MAX_WEIGHT_SHARDS:
+        if not isinstance(self.shards, (tuple, list)) or not self.shards or len(self.shards) > MAX_WEIGHT_SHARDS:
             raise ModelRuntimeError("weight shard count out of bounds")
+        # Detach caller-owned lists before any digest or durable transaction
+        # is computed. A frozen dataclass alone cannot freeze list contents.
+        object.__setattr__(self, "shards", tuple(self.shards))
         for index, shard in enumerate(self.shards):
             if not isinstance(shard, WeightShard) or shard.index != index:
                 raise ModelRuntimeError("weight shards must be contiguous and ordered")
