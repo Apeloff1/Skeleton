@@ -261,7 +261,9 @@ def acknowledge_weight_store_recovery(owner: WeightStoreDiskOwner, *,
     acknowledged. The operator must resolve those separately and rerun review.
     """
     from .flgb_model_runtime import MAX_WEIGHT_BYTES, require_digest
-    from .weight_store_scrub import ScrubPolicy, _catalog, verify_unreferenced_catalog_objects
+    from .weight_store_scrub import (
+        ScrubPolicy, _catalog, sync_verified_recovery_catalog, verify_unreferenced_catalog_objects,
+    )
 
     require_digest(intent_digest, "recovery intent digest")
     require_digest(review_digest, "recovery review digest")
@@ -325,6 +327,7 @@ def acknowledge_weight_store_recovery(owner: WeightStoreDiskOwner, *,
             raise WeightShardStoreError("recovery still exceeds persisted disk ceiling")
         # Preserve the exact review before clearing the control record.
         # The full object inventory is bound by digest, not copied to the journal.
+        durability = sync_verified_recovery_catalog(owner, catalog, scrub_policy)
         current = _review_locked(owner, policy, directory_fd, fd)
         if current["digest"] != review_digest:
             raise WeightShardStoreError("recovery evidence changed during physical verification")
@@ -339,6 +342,8 @@ def acknowledge_weight_store_recovery(owner: WeightStoreDiskOwner, *,
                 "verified_physical_objects": len(catalog.objects),
                 "verified_physical_bytes": catalog.total_bytes,
                 "unreferenced_verification_digest": orphan["digest"],
+                "durability_digest": durability["digest"],
+                "fsync_completed": True, "physical_power_loss_qualified": False,
                 "unreferenced_candidates": review["unreferenced_candidates"],
                 "weight_mutation_performed": False, "deletion_authorized": False,
             },
