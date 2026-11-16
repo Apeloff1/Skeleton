@@ -319,3 +319,42 @@ changes. Existing inventory receipts change because the covered evidence
 has expanded; persisted prior inspection digests must be explicitly
 revalidated rather than silently accepted. Physical GPU execution,
 native device mapping and exact-head test results remain outstanding.
+
+
+## Sequential sealed loading and staged byte admission
+
+Selected-source receipts now carry the independently observed complete
+manifest SHA-256 and byte count. The sealed loader binds that manifest
+to both model identity fields, checks its byte and mapping bounds,
+then verifies each shard while copying directly from its owned source
+descriptor into a private memfd. It no longer opens every source
+descriptor simultaneously or conducts a separate full prehash inside
+the sealed-copy owner. The earlier inventory/source inspection still
+performs its own verification. Each original memfd descriptor is closed
+after mapping and sealing; Python's mapping can retain its own
+descriptor. All mappings remain private until the whole copy and final
+manifest check succeed. Ordinary verified decoder streams also check
+manifest identity before publication and after synchronous use.
+
+The default sealed mapping ceiling is 256, configurable up to 4096
+by the trusted caller. This is a logical bound, not a promise that an OS
+descriptor limit, physical memory quota or mapping limit will permit it.
+Progress checkpoints and thermal/resource checks remain in force.
+No unsealed fallback is provided.
+
+Staging now validates manifest serialization, existing manifest
+consistency, source indices and duplicate digest size declarations
+before ingesting new objects. The optional `maximum_new_bytes` argument
+counts distinct absent content-addressed objects, not repeated logical
+shard references. Existing objects are verified; a zero new-byte
+allowance permits an already-present model without approving missing
+objects. This per-operation preflight is not a shared disk quota or
+a durable concurrent-writer reservation. Valid CAS objects from a
+partially failed later ingestion can remain unreferenced; manifests
+are published only after the full plan verifies. No automatic deletion
+or garbage collection is introduced.
+
+Focused regressions cover mapping ceilings, sequential source ownership,
+manifest drift at copy completion, distinct absent-byte limits and
+pre-ingest manifest bounds. Actual platform qualification and all
+required exact-head checks remain outstanding.
