@@ -5364,6 +5364,8 @@ async def recover_crawler_runs(*, limit: int = 16) -> dict:
     # Independent lead maintenance runs even if another archive lane is held.
     from core.dragon_corpus_runtime import pulse_lead_graph
     result["lead_graph"]=await pulse_lead_graph()
+    from core.dragon_export_jobs import scheduler_pulse
+    result["local_delivery"]=await scheduler_pulse()
     return result
 
 
