@@ -81,23 +81,42 @@ def inventory_offline_weights(
 
     store = WeightShardStore(path, maximum_bytes=max_weight_bytes)
     verified: list[VerifiedOfflineWeightPlan] = []
+    # Admit the entire declared byte budget before opening any weight object.
+    # Otherwise N individually valid plans can force N huge reads before
+    # the original post-read aggregate check reports exhaustion.
+    declared = []
     cumulative = 0
-    for name in sorted(names):
-        digest = name[:-5]
-        try:
+    try:
+        for name in sorted(names):
+            digest = name[:-5]
             plan = store.load_plan(digest)
-            # Recheck the physical objects: a manifest is not proof of local bytes.
+            cumulative += plan.expected_total_bytes
+            if cumulative > max_weight_bytes:
+                raise OfflineInventoryError("aggregate offline weights exceed byte budget")
+            declared.append((digest, plan))
+        for digest, plan in declared:
             paths = store.verified_paths(digest)
-        except (WeightShardStoreError, OSError, ValueError) as exc:
-            raise OfflineInventoryError("offline weight manifest or object verification failed") from exc
-        if len(paths) != len(plan.shards):
-            raise OfflineInventoryError("verified shard count mismatch")
-        cumulative += plan.expected_total_bytes
-        if cumulative > max_weight_bytes:
-            raise OfflineInventoryError("aggregate offline weights exceed byte budget")
-        verified.append(VerifiedOfflineWeightPlan(
-            digest, plan.model_identity_digest, len(paths), plan.expected_total_bytes
-        ))
+            # Recheck the manifest used for object verification. No partial
+            # inventory is returned if the claimed plan changed.
+            if store.load_plan(digest) != plan or len(paths) != len(plan.shards):
+                raise OfflineInventoryError("verified plan identity or shard count mismatch")
+            verified.append(VerifiedOfflineWeightPlan(
+                digest, plan.model_identity_digest, len(paths), plan.expected_total_bytes
+            ))
+        with os.scandir(path / "manifests") as listing:
+            observed = []
+            for item in listing:
+                if len(observed) >= max_entries:
+                    raise OfflineInventoryError("offline inventory changed during verification")
+                if not _MANIFEST.fullmatch(item.name) or not item.is_file(follow_symlinks=False):
+                    raise OfflineInventoryError("offline inventory changed during verification")
+                observed.append(item.name)
+        if sorted(observed) != sorted(names):
+            raise OfflineInventoryError("offline inventory changed during verification")
+    except OfflineInventoryError:
+        raise
+    except (WeightShardStoreError, OSError, ValueError) as exc:
+        raise OfflineInventoryError("offline weight manifest or object verification failed") from exc
     rows = [asdict(item) for item in verified]
     body: dict[str, object] = {
         "schema": "skeleton.ai.offline-weight-inventory.v1",
