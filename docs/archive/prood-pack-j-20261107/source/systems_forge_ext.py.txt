@@ -871,4 +871,3 @@ EXTRA_SYSTEMS: list[dict] = [
         "consequence": "info_gained ally_or_enemy quest_branch reputation_shift unlock_path combat_avoided story_divergence systemic",
         "intent": "rpg_social_depth detective_interrogation persuasion_fantasy verbal_dueling evidence_gameplay narrative_branching skill_check balanced"}},
 ]
-
