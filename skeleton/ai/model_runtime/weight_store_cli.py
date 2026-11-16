@@ -21,7 +21,9 @@ from .flgb_model_runtime import (
 )
 from .weight_shard_store import WeightShardStore, WeightShardStoreError
 from .weight_store_disk_owner import DiskAdmissionPolicy, WeightStoreDiskOwner
-from .weight_store_recovery import RecoveryReviewPolicy, review_weight_store
+from .weight_store_recovery import (
+    RecoveryReviewPolicy, acknowledge_weight_store_recovery, review_weight_store,
+)
 
 _MAX_REQUEST_BYTES = 16 * 1024**2
 _MAX_OUTPUT_BYTES = 8 * 1024**2
@@ -101,7 +103,7 @@ def read_stage_request(stream: BinaryIO, *, request_sha256: str,
 def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
          stdout: TextIO | None = None, stderr: TextIO | None = None) -> int:
     parser = argparse.ArgumentParser(description="Cooperating offline weight store administration")
-    parser.add_argument("command", choices=("stage", "inspect", "recovery-review"))
+    parser.add_argument("command", choices=("stage", "inspect", "recovery-review", "acknowledge-recovery"))
     parser.add_argument("--store", type=Path, required=True)
     parser.add_argument("--maximum-store-bytes", type=int, required=True)
     parser.add_argument("--maximum-plan-bytes", type=int, default=MAX_WEIGHT_BYTES)
@@ -114,6 +116,9 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
     parser.add_argument("--review-metadata-bytes", type=int, default=64 * 1024**2)
     parser.add_argument("--review-references", type=int, default=262_144)
     parser.add_argument("--review-details", type=int, default=256)
+    parser.add_argument("--intent-sha256")
+    parser.add_argument("--review-sha256")
+    parser.add_argument("--maximum-verified-weight-bytes", type=int)
     parser.add_argument("--require-clean", action="store_true",
                         help="Exit 3 for a completed review containing anomalies")
     args = parser.parse_args(argv)
@@ -127,6 +132,9 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
         if not 1 <= args.maximum_plan_bytes <= MAX_WEIGHT_BYTES:
             raise WeightShardStoreError("invalid independent logical plan ceiling")
         pins = (args.request_sha256, args.model_identity_sha256, args.plan_sha256)
+        recovery_pins = (args.intent_sha256, args.review_sha256, args.maximum_verified_weight_bytes)
+        if args.command != "acknowledge-recovery" and any(value is not None for value in recovery_pins):
+            raise WeightShardStoreError("recovery pins require acknowledge-recovery")
         if args.command == "stage":
             if not all(value is not None for value in pins) or args.require_clean:
                 raise WeightShardStoreError("stage requires three independent pins")
@@ -152,17 +160,28 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
                 raise WeightShardStoreError("staging pins require stage command")
             if args.require_clean and args.command != "recovery-review":
                 raise WeightShardStoreError("require-clean applies only to recovery-review")
-            store = WeightShardStore(args.store, maximum_bytes=args.maximum_plan_bytes, read_only=True)
+            acknowledge = args.command == "acknowledge-recovery"
+            if acknowledge and not all(value is not None for value in recovery_pins):
+                raise WeightShardStoreError("acknowledge-recovery requires explicit evidence pins and verification ceiling")
+            store = WeightShardStore(args.store, maximum_bytes=args.maximum_plan_bytes,
+                                     read_only=not acknowledge, create=False)
             owner = WeightStoreDiskOwner(store, policy, initialize=False)
             if args.command == "inspect":
                 result = owner.inspect()
             else:
-                result = review_weight_store(owner, RecoveryReviewPolicy(
+                review_policy = RecoveryReviewPolicy(
                     maximum_entries=args.review_entries,
                     maximum_metadata_bytes=args.review_metadata_bytes,
                     maximum_references=args.review_references,
                     maximum_details=args.review_details,
-                ))
+                )
+                if acknowledge:
+                    result = acknowledge_weight_store_recovery(
+                        owner, intent_digest=recovery_pins[0], review_digest=recovery_pins[1],
+                        maximum_verified_weight_bytes=recovery_pins[2], policy=review_policy,
+                    )
+                else:
+                    result = review_weight_store(owner, review_policy)
         encoded = canonical_bytes(result)
         if len(encoded) > _MAX_OUTPUT_BYTES:
             raise WeightShardStoreError("administrative receipt exceeds byte bounds")
