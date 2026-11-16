@@ -1182,3 +1182,56 @@ def test_delta_archive_persists_through_existing_sqlite_run_store(tmp_path):
     recovered=result.restore_runtime()
     assert recovered.task("a").lease_token==attempt.lease_token
     assert recovered.task("a").effect_uncertain
+
+def test_alternative_shared_quota_atomic_overlap_and_reconfiguration():
+    from skeleton.automation.agents.swarm_quota import Quota, QuotaLedger, QuotaExceeded, SharedQuota
+    ledger = QuotaLedger()
+    ledger.configure_shared(SharedQuota("all", Quota(max_queued=4, max_leased=2)))
+    ledger.configure_shared(SharedQuota("service", Quota(max_queued=3, max_leased=1), frozenset({"a","b"})))
+    ledger.reserve("a", queued=1)
+    ledger.reserve("b", queued=1)
+    ledger.reserve("c", queued=1)
+    ledger.reserve("a", queued=-1, leased=1)
+    before = (ledger.snapshot(),ledger.shared_snapshot())
+    with pytest.raises(QuotaExceeded):
+        ledger.reserve("b", queued=-1, leased=1)
+    assert (ledger.snapshot(),ledger.shared_snapshot()) == before
+    ledger.reserve("c", queued=-1, leased=1)
+    with pytest.raises(QuotaExceeded):
+        ledger.configure_shared(SharedQuota("all", Quota(max_leased=1)))
+    assert ledger.shared_snapshot()["all"]["leased"]==2
+    ledger.release("a",leased=1)
+    ledger.reserve("b",queued=-1,leased=1)
+    assert ledger.shared_snapshot()["service"]["leased"]==1
+
+
+def test_alternative_shared_quota_preserved_on_ingress_restore():
+    from skeleton.automation.agents.swarm_ingress import SwarmIngressGovernor
+    from skeleton.automation.agents.swarm_quota import Quota, SharedQuota, QuotaExceeded
+    ingress=SwarmIngressGovernor()
+    ingress.configure_shared(SharedQuota("all",Quota(max_leased=1)))
+    ingress.restore_task("a","x",{},phase="leased")
+    empty=ingress.fork_empty()
+    assert empty.quota.configured_shared()==ingress.quota.configured_shared()
+    empty.restore_task("a","x",{},phase="leased")
+    with pytest.raises(QuotaExceeded):
+        empty.restore_task("b","y",{},phase="leased")
+    assert empty.phase("b","y") is None
+    assert empty.quota.shared_snapshot()["all"]["leased"]==1
+
+
+def test_alternative_shared_quota_serializes_competing_tenants():
+    from concurrent.futures import ThreadPoolExecutor
+    from skeleton.automation.agents.swarm_quota import Quota, QuotaLedger, SharedQuota, QuotaExceeded
+    ledger=QuotaLedger()
+    ledger.configure_shared(SharedQuota("all",Quota(max_leased=3)))
+    def reserve(index):
+        try:
+            ledger.reserve(str(index),leased=1)
+            return True
+        except QuotaExceeded:
+            return False
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        result=list(pool.map(reserve,range(64)))
+    assert sum(result)==3
+    assert ledger.shared_snapshot()["all"]["leased"]==3

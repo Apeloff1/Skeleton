@@ -7,7 +7,7 @@ import json
 from threading import RLock
 
 from skeleton.automation.agents.swarm_fairness import FairShareLedger
-from skeleton.automation.agents.swarm_quota import Quota, QuotaExceeded, QuotaLedger
+from skeleton.automation.agents.swarm_quota import Quota, QuotaExceeded, QuotaLedger, SharedQuota
 from skeleton.automation.agents.swarm_rate_limit import TokenBucketLimiter
 
 
@@ -66,6 +66,10 @@ class SwarmIngressGovernor:
             if weight is not None:
                 self.fairness.configure(tenant, weight=weight)
 
+    def configure_shared(self, policy: SharedQuota) -> None:
+        with self._lock:
+            self.quota.configure_shared(policy)
+
     def fork_empty(self) -> "SwarmIngressGovernor":
         """Clone admission policy without carrying live rate, quota, or task accounting."""
         with self._lock:
@@ -83,6 +87,8 @@ class SwarmIngressGovernor:
                     quota=limits.get(tenant),
                     weight=weights.get(tenant),
                 )
+            for policy in self.quota.configured_shared():
+                clone.configure_shared(policy)
             return clone
 
     def admit(self, tenant: str, task_id: str, payload: object, *, cost: float = 1.0) -> IngressDecision:
@@ -205,6 +211,7 @@ class SwarmIngressGovernor:
         with self._lock:
             return {
                 "quota": self.quota.snapshot(),
+                "shared_quota": self.quota.shared_snapshot(),
                 "fairness": self.fairness.snapshot(),
                 "rate": self.rate.snapshot(),
                 "accounted_tasks": len(self._phase_by_task),
