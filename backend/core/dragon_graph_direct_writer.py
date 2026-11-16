@@ -47,6 +47,15 @@ def enabled(db):
     return True
 
 
+def configured(root):
+    """Read-only mode discovery; legacy databases need not satisfy new private-path checks."""
+    path=Path(root).absolute()
+    if not path.exists():return False
+    db=sqlite3.connect(path.as_uri()+"?mode=ro",uri=True,timeout=5,isolation_level=None)
+    try:return enabled(db)
+    finally:db.close()
+
+
 def publish_marker(db,epoch):
     db.execute(ROOT_SCHEMA)
     db.execute("INSERT INTO main.dragon_graph_direct_writer VALUES(1,?,?)",(VERSION,epoch))
@@ -79,9 +88,9 @@ def install(root,*,offline_acknowledged=False):
 
 
 @contextmanager
-def _lane_db(root,layout,index):
+def _lane_db(root,layout,index,root_identity):
     path,identity=_private(Path(layout["paths"][index]))
-    if identity==_private(root)[1]:raise authority.GraphHeld("lane aliases root")
+    if _private(root)[1]!=root_identity or identity==root_identity:raise authority.GraphHeld("lane aliases root or root replaced")
     with _open(path) as db:
         if _private(path)[1]!=identity:raise authority.GraphHeld("lane replaced")
         if db.execute("PRAGMA journal_mode").fetchone()[0].lower()!="delete":
@@ -96,7 +105,8 @@ def _lane_db(root,layout,index):
             if not db.execute("SELECT 1 FROM writer_state WHERE singleton=1").fetchone():
                 raise authority.GraphHeld("lane writer state missing")
             yield db
-            if _private(path)[1]!=identity:raise authority.GraphHeld("lane replaced before commit")
+            if _private(path)[1]!=identity or _private(root)[1]!=root_identity:
+                raise authority.GraphHeld("graph root or lane replaced before commit")
             db.execute("COMMIT")
         except BaseException:
             if db.in_transaction:db.execute("ROLLBACK")
@@ -113,7 +123,7 @@ def review(root,owner,lead,*,identity,witness,decision,now,due):
         raise ValueError("review identity")
     if decision not in {"candidate","held","retired"} or type(now) is not int or type(due) is not int or not 900<=due-now<=90*86400:
         raise ValueError("review bounds")
-    root=Path(root)
+    root,root_identity=_private(Path(root))
     with _open(root) as policy:
         policy.execute("BEGIN")
         try:
@@ -128,7 +138,7 @@ def review(root,owner,lead,*,identity,witness,decision,now,due):
                 raise LookupError("lead missing")
             prior=policy.execute("SELECT lead,decision,reason FROM lead_review_events WHERE owner=? AND id=?",(owner,identity)).fetchone()
             index=authority.lane(lead)
-            with _lane_db(root,layout,index) as db:
+            with _lane_db(root,layout,index,root_identity) as db:
                 node=db.execute("SELECT state,next_review FROM nodes WHERE owner=? AND id=?",(owner,lead)).fetchone()
                 if not node:raise authority.GraphHeld("canonical node missing from selected lane")
                 local=db.execute("SELECT lead,decision,witness FROM review_events WHERE owner=? AND id=?",(owner,identity)).fetchone()

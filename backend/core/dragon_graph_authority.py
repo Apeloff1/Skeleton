@@ -74,7 +74,8 @@ def _alias(index):
 def active(db):
     row=db.execute("SELECT 1 FROM main.sqlite_master WHERE type='table' AND name='dragon_graph_authority'").fetchone()
     if row is None:
-        if os.getenv("SKL_DRAGON_CANONICAL_GRAPH_REQUIRED")=="1":raise GraphHeld("canonical graph topology missing")
+        if os.getenv("SKL_DRAGON_CANONICAL_GRAPH_REQUIRED")=="1" or any(_table(db,name) for name in ("lead_node_directory","dragon_graph_direct_writer")):
+            raise GraphHeld("canonical graph topology missing")
         return False
     if db.execute("SELECT 1 FROM main.dragon_graph_authority WHERE singleton=1").fetchone() is None:
         raise GraphHeld("canonical graph topology incomplete")

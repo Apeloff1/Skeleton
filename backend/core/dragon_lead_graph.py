@@ -826,11 +826,14 @@ class LeadGraph:
         if decision not in {"candidate","held","retired"}:raise ValueError("lead disposition")
         interval_seconds=_int(interval_seconds,900,90*86400);now=int(time.time())
         identity=digest([lead,operation]);witness=digest([decision,reason,interval_seconds])
-        from core.dragon_graph_direct_writer import review as direct_review
+        from core.dragon_graph_direct_writer import configured,review as direct_review
         from core.dragon_owner_shards import ShardHeld
         # Existing non-provisioned stores retain the original transaction path.
         try:
-            result=direct_review(self.path,owner,lead,identity=identity,witness=witness,decision=decision,now=now,due=now+interval_seconds)
+            result=None
+            if configured(self.path):
+                result=direct_review(self.path,owner,lead,identity=identity,witness=witness,decision=decision,now=now,due=now+interval_seconds)
+                if result is None:raise authority.GraphHeld("direct writer enrollment changed")
         except (authority.GraphHeld,ShardHeld,sqlite3.Error,OSError) as exc:
             raise CatalogueHeld("canonical review writer held") from exc
         if result is not None:return result
