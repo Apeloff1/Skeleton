@@ -38,7 +38,8 @@ from .frontier_scheduler import choose_frontier
 from .dragon_companion import build_companion, companion_style
 from .dragon_curriculum_trace import decision_receipt, validate_receipt, trace_summary
 from .adaptive_navigation import (
-    access_denied_hold, access_interstitial_reason, origin_health, restorative_wait,
+    access_denied_hold, access_interstitial_reason, acquisition_readiness,
+    origin_health, restorative_wait,
 )
 from .acquisition_feedback import (host_economics, portfolio_summary, quantize_latency,
                                    settled_observation, validate_measurements)
@@ -802,6 +803,12 @@ class CrawlRun:
             "next_ready_at": min(ready) if ready else None,
             "source_count": len(state["sources"]),
             "instruction_security": incident_summary(state["instruction_incidents"]),
+            "acquisition_readiness": acquisition_readiness(
+                measurements=state["acquisition_measurements"],
+                host_ready=state["host_ready"], allowed_hosts=self.request.allowed_hosts,
+                frontier=state["frontier"], now=now,
+                expires_at=state["binding"]["consent"]["expires_at"],
+            ),
             "duplicate_evidence": alias_summary(state["source_aliases"]),
             "companion": self._companion(now, due=bool(ready and min(ready) <= now)).projection,
             "curriculum_trace": trace_summary(state["acquisition_measurements"]),
