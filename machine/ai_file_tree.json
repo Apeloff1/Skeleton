@@ -5849,6 +5849,7 @@
         "mirror_room_evaluation.py",
         "model_release_journal.py",
         "native_adapter_learning.py",
+        "native_precision_calibration.py",
         "native_retention_evaluation.py",
         "offline_foundations.py",
         "project_learning.py",
