@@ -1056,6 +1056,7 @@ JAVASCRIPT = r"""'use strict';
     get('deliberation-panel').hidden = true;
     get('deliberation-panel').open = false;
     get('deliberation-result').textContent = '';
+    get('adaptive-artifacts').replaceChildren();
     get('research-panel').hidden = true;
     get('research-panel').open = false;
     get('research-trace').textContent = '';
