@@ -14,6 +14,7 @@ from typing import Iterator, Any
 
 from skeleton.ai.model_runtime.flgb_model_runtime import ModelIdentity
 from skeleton.ai.model_runtime.weight_shard_store import WeightShardStore
+from skeleton.ai.model_runtime.managed_weight_read import managed_weight_read
 from skeleton.app.offline_runtime_preflight import (
     RuntimePolicy, digest, inspect_source, integer, plan_preflight, require,
     sample_hardware,
@@ -37,7 +38,20 @@ def sealed_cpu_custody(store_path: Path, *, plan_digest: str, model: ModelIdenti
     require(policy.backend == "cpu", "sealed CPU custody does not qualify GPU placement")
     maximum = integer(maximum_sealed_bytes, 1, policy.maximum_source_bytes, "sealed byte ceiling")
     mapping_limit = integer(maximum_mappings, 1, 4096, "sealed mapping ceiling")
-    source = inspect_source(store_path, plan_digest=plan_digest,
+    store = WeightShardStore(store_path, maximum_bytes=policy.maximum_source_bytes, read_only=True)
+    # Keep the same cooperating slot from source inspection through sealed
+    # consumer acknowledgement. Nested read guards are shared, not writers.
+    with managed_weight_read(store):
+        with _sealed_cpu_custody(store, plan_digest=plan_digest, model=model,
+                                 policy=policy, maximum=maximum, mapping_limit=mapping_limit) as result:
+            yield result
+
+
+@contextmanager
+def _sealed_cpu_custody(store: WeightShardStore, *, plan_digest: str, model: ModelIdentity,
+                        policy: RuntimePolicy, maximum: int,
+                        mapping_limit: int) -> Iterator[tuple[tuple[Any, ...], dict]]:
+    source = inspect_source(store.root, plan_digest=plan_digest,
                             model_identity_digest=model.identity_digest, policy=policy)
     size = source.plan.expected_total_bytes
     require(source.manifest_sha256 is not None, "selected manifest pin required for sealed custody")
@@ -48,7 +62,6 @@ def sealed_cpu_custody(store_path: Path, *, plan_digest: str, model: ModelIdenti
     require(before.origin == "local_probe", "real local probe required for sealed custody")
     first = plan_preflight(source, before, copying_policy, now_ns=time.monotonic_ns())
     require(first["status"] == "candidate", "insufficient headroom for sealed copy")
-    store = WeightShardStore(store_path, maximum_bytes=policy.maximum_source_bytes, read_only=True)
     checks = 0
     last_copied = 0
     last_digest = None
