@@ -23,6 +23,7 @@ from core.dragon_hoarder_bulk import owner_key
 from core.dragon_dataset_library import target,_library
 from core.dragon_mod_seed_catalogue import STEAM_ROUTES,APPID,_canonical_locator
 from core.dragon_lead_index_shards import SOURCE_SCHEMA as INDEX_SCHEMA
+from core.dragon_lead_edge_shards import SOURCE_SCHEMA as EDGE_SCHEMA
 
 LEAD_LANES=10
 NODES_PER_LANE=20_000_000
@@ -116,7 +117,7 @@ CREATE TABLE IF NOT EXISTS lead_review_events(
  PRIMARY KEY(owner,id),FOREIGN KEY(owner,lead) REFERENCES lead_nodes(owner,id)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS lead_review_history ON lead_review_events(owner,lead,created_at,id);
-"""+INDEX_SCHEMA
+"""+INDEX_SCHEMA+EDGE_SCHEMA
 STATES={"candidate","held","retired"}
 DATASET_KINDS={"dataset_manifest","dataset_checksum_manifest","public_jsonl_dataset","public_csv_dataset","public_parquet_dataset","public_sqlite_dataset","public_data_export","static_data_export","static_data_schema","dataset_version_history","public_metadata_bulk_export","research_dataset_catalogue","public_data_endpoint"}
 RELATIONS={"seed","dataset_target","dataset_projection","feed_discovery","catalogue_observation"}
@@ -769,11 +770,26 @@ class LeadGraph:
         owner=owner_key(scope);lead=_id(lead);_int(limit,1,100)
         if direction not in {"children","parents"}:raise ValueError("lead edge direction")
         field="parent" if direction=="children" else "child"
+        lower=_id(after) if after else ""
+        physical=False
         with self._db() as db:
-            if not db.execute("SELECT 1 FROM lead_nodes WHERE owner=? AND id=?",(owner,lead)).fetchone():raise LookupError("lead missing")
-            rows=db.execute("SELECT e.*,s.state AS snapshot_state,s.expires_at AS snapshot_expires_at FROM lead_edges e LEFT JOIN lead_snapshots s ON s.owner=e.owner AND s.id=e.snapshot WHERE e.owner=? AND e."+field+"=? AND e.id>? ORDER BY e.id LIMIT ?",
-                (owner,lead,_id(after) if after else "",limit+1)).fetchall()
+            import os
+            if os.getenv("SKL_DRAGON_LEAD_EDGE_ROOT","").strip():
+                from core.dragon_lead_edge_shards import lookup,EdgeHeld
+                from core.dragon_owner_shards import ShardHeld
+                db.execute("BEGIN")
+                try:
+                    if not db.execute("SELECT 1 FROM lead_nodes WHERE owner=? AND id=?",(owner,lead)).fetchone():raise LookupError("lead missing")
+                    rows=lookup(db,owner,lead,field=field,lower=lower,limit=limit)
+                    db.execute("COMMIT");physical=True
+                except (EdgeHeld,ShardHeld,sqlite3.Error,OSError,ValueError):
+                    if db.in_transaction:db.execute("ROLLBACK")
+            if not physical:
+                if not db.execute("SELECT 1 FROM lead_nodes WHERE owner=? AND id=?",(owner,lead)).fetchone():raise LookupError("lead missing")
+                rows=db.execute("SELECT e.*,s.state AS snapshot_state,s.expires_at AS snapshot_expires_at FROM lead_edges e LEFT JOIN lead_snapshots s ON s.owner=e.owner AND s.id=e.snapshot WHERE e.owner=? AND e."+field+"=? AND e.id>? ORDER BY e.id LIMIT ?",
+                    (owner,lead,lower,limit+1)).fetchall()
         return {"edges":[dict(r) for r in rows[:limit]],"next_cursor":rows[limit-1]["id"] if len(rows)>limit else None,
+                "physical_edge_shards_used":physical,
                 "candidate_only":True,"network_authorized":False}
 
     def review(self,scope,lead,*,decision,reason,operation,interval_seconds=604800):
