@@ -742,9 +742,11 @@ class OfflineHTTPAcceptanceTests(unittest.TestCase):
         original = LocalInferenceEngine.generate
         captured = []
 
-        async def observing(engine, request):
+        async def observing(engine, request, **scope):
             captured.append(request)
-            return await original(engine, request)
+            self.assertEqual(scope.get("scope_id"), sid)
+            self.assertTrue(scope.get("tenant_scope_id"))
+            return await original(engine, request, **scope)
 
         with patch.object(LocalInferenceEngine, "generate", observing):
             st, response, _ = self._request(
