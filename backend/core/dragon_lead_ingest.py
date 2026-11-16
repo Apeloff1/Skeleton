@@ -253,25 +253,37 @@ def ingest(graph,scope,*,path,format,projection,target,rights_reference,grant_se
 
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--target",required=True)
+    parser.add_argument("--target")
+    parser.add_argument("--inspect-only",action="store_true",help="Validate local bytes and projection without opening a graph")
     parser.add_argument("--format",choices=["steam-csv","steam-parquet","steam-json","modrinth-json","wikidata-csv","locator-csv","normalized-jsonl"],required=True)
     parser.add_argument("--projection",choices=["steam","modrinth","locator"],default="steam")
     parser.add_argument("--input",type=Path,required=True)
     parser.add_argument("--expected-sha",default=None)
-    parser.add_argument("--tenant",required=True)
-    parser.add_argument("--owner",required=True)
-    parser.add_argument("--rights-reference",required=True)
+    parser.add_argument("--tenant")
+    parser.add_argument("--owner")
+    parser.add_argument("--rights-reference")
     parser.add_argument("--grant-seconds",type=int,default=7*86400)
     parser.add_argument("--acknowledge-metadata-rights",action="store_true")
     args=parser.parse_args(argv)
+    try:
+        _validate_format(args.format,args.projection)
+        _expected_hash(args.expected_sha)
+    except ValueError as exc:
+        parser.error(str(exc))
+    path=args.input.expanduser().absolute()
+    if args.inspect_only:
+        if any(value is not None for value in (args.target,args.tenant,args.owner,args.rights_reference)) or args.acknowledge_metadata_rights:
+            parser.error("inspection is read-only; omit graph target, scope and import grants")
+        print(json.dumps(inspect_export(path,args.format,args.projection,expected_sha=args.expected_sha),sort_keys=True))
+        return 0
+    if not all((args.target,args.tenant,args.owner,args.rights_reference)):
+        parser.error("import requires target, tenant, owner and rights reference")
     if not args.acknowledge_metadata_rights:parser.error("explicit metadata rights acknowledgement required")
-    expected={"steam-csv":"steam","steam-parquet":"steam","steam-json":"steam","modrinth-json":"modrinth","wikidata-csv":"locator","locator-csv":"locator"}
-    if args.format in expected and args.projection!=expected[args.format]:parser.error("input format and projection differ")
     scope={"tenant_id":args.tenant,"owner_id":args.owner}
     graph=LeadGraph(_path(scope=scope,create=os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1"))
     # The graph must have been enabled by its owner/editor. No automatic
     # permission, source grant, or activation of live crawling.
-    receipt=ingest(graph,scope,path=args.input.expanduser().absolute(),format=args.format,
+    receipt=ingest(graph,scope,path=path,format=args.format,
                    projection=args.projection,target=args.target,rights_reference=args.rights_reference,
                    grant_seconds=args.grant_seconds,expected_sha=args.expected_sha)
     print(json.dumps(receipt,sort_keys=True))
