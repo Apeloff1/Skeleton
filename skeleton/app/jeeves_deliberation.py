@@ -65,7 +65,8 @@ def _comparison(candidates):
 
 async def deliberate(backend, question, *, history, instructions, revision,
                      model_digest, tokenizer_digest, output_tokens,
-                     require_full_history, evidence=None, recheck=None, adaptive=None):
+                     require_full_history, evidence=None, recheck=None, adaptive=None,
+                     history_policy="recent"):
     """Execute both strategies with a shared cooperative wall/token budget.
 
     The HTTP owner holds the existing single-model lease and checks the
@@ -80,6 +81,8 @@ async def deliberate(backend, question, *, history, instructions, revision,
             or not _pin(model_digest) or not _pin(tokenizer_digest)
             or type(require_full_history) is not bool or not callable(recheck)):
         raise OfflineAIError("invalid bounded deliberation request")
+    if history_policy not in ("recent", "relevance") or (history_policy == "relevance" and require_full_history):
+        raise OfflineAIError("relevance packing requires explicit lossy review context")
     if backend.model_digest != model_digest:
         raise OfflineAIError("deliberation model identity changed")
     question = question.strip()
@@ -91,6 +94,12 @@ async def deliberate(backend, question, *, history, instructions, revision,
             policy = normalize_policy(adaptive, output_tokens)
         except ValueError as exc:
             raise OfflineAIError("invalid adaptive reasoning policy") from exc
+    if policy is not None and policy["contract"]["kind"] == "source_quotes":
+        if evidence is None:
+            raise OfflineAIError("exact source quote contract requires grounded review")
+        origins = {c["document_id"] for c in evidence["citations"]}
+        if len(origins) < policy["contract"]["minimum_distinct_sources"]:
+            raise OfflineAIError("insufficient admitted source diversity")
     candidates = []
     reserved = 0
     stop_reason = "strategy_limit"
@@ -108,7 +117,7 @@ async def deliberate(backend, question, *, history, instructions, revision,
             if candidates and policy["contract"]["kind"] != "review":
                 previous = candidates[-1]["verification"]["code"]
                 if previous not in ("numeric_mismatch", "invalid_numeric_format",
-                                    "invalid_artifact_schema"):
+                                    "invalid_artifact_schema", "invalid_source_quotes"):
                     raise OfflineAIError("unexpected verifier diagnostic")
                 suffix += " Prior independent verification failed (" + previous + "). Recompute independently."
         reserved += output_tokens
@@ -122,8 +131,23 @@ async def deliberate(backend, question, *, history, instructions, revision,
         session.history = history
         session.instructions = instructions
         prompt = _request(question, suffix)
+        packing = None
+        if history_policy == "relevance":
+            from skeleton.app.jeeves_history_pack import pack_history
+            def fits(trial):
+                session.history = trial
+                try:
+                    trial_report = session.preview_context(prompt, output_tokens, grounding_context=context)
+                except OfflineAIError:
+                    return False
+                return trial_report["fits_full_history"] is True
+            try:
+                selected, packing = pack_history(question, history, fits=fits)
+            except ValueError as exc:
+                raise OfflineAIError("relevance context admission failed") from exc
+            session.history = selected
         preview = session.preview_context(prompt, output_tokens, grounding_context=context)
-        if require_full_history and not preview["fits_full_history"]:
+        if (require_full_history or history_policy == "relevance") and not preview["fits_full_history"]:
             raise OfflineAIError("deliberation cannot fit full conversation context")
         # Separate ephemeral session per candidate: no candidate-generated
         # history or mutated instructions enter the second inference.
@@ -132,7 +156,7 @@ async def deliberate(backend, question, *, history, instructions, revision,
             raise TimeoutError("deliberation deadline exceeded")
         answer = await asyncio.wait_for(session.ask(
             prompt, max_output_tokens=output_tokens, grounding_context=context,
-            require_full_history=require_full_history,
+            require_full_history=require_full_history or history_policy == "relevance",
         ), timeout=remaining)
         recheck()
         if time.monotonic() > deadline:
@@ -153,8 +177,10 @@ async def deliberate(backend, question, *, history, instructions, revision,
             "citation_audit": None if evidence is None else audit_answer_citations(answer.text, evidence),
             "faithfulness": None if evidence is None else audit_answer_faithfulness(answer.text, evidence),
         }
+        if packing is not None:
+            row["history_packing"] = packing
         if policy is not None:
-            row["verification"] = assess(answer.text, policy["contract"])
+            row["verification"] = assess(answer.text, policy["contract"], evidence=evidence)
         candidates.append(row)
         if policy is not None and row["verification"]["passed"]:
             stop_reason = "explicit_contract_passed"
@@ -176,6 +202,7 @@ async def deliberate(backend, question, *, history, instructions, revision,
         "reserved_total_output_tokens": reserved,
         "actual_total_output_tokens": sum(row["output_tokens"] for row in candidates),
         "require_full_history": require_full_history, "generation_performed": True,
+        "history_policy": history_policy,
         "grounding_context_sha256": None if evidence is None else evidence["context_sha256"],
         "candidates": candidates, "comparison": comparison,
         "transcript_committed": False, "tool_execution_authorized": False,
