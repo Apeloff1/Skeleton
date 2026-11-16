@@ -461,5 +461,28 @@ class PublisherArchivePreflightTests(unittest.TestCase):
         self.assertEqual(result["state"], "archive_policy_held")
 
 
+class PublisherErasureTests(unittest.IsolatedAsyncioTestCase):
+    async def test_owner_tombstone_removes_endpoint_bearing_receipt(self):
+        app = object.__new__(DragonCrawlerApplication)
+        app.sessions = Mock()
+        app.sessions.find_one = AsyncMock(return_value={
+            "_id": "publisher", **SCOPE, "version": 7,
+            "publisher_creation": {"body": {"seeds": ["https://example.com/private-metadata"]}},
+        })
+        app.sessions.update_one = AsyncMock(return_value=Mock(modified_count=1))
+        app.limits = Mock()
+        app.limits.update_one = AsyncMock(return_value=Mock(matched_count=1))
+        app._drain = AsyncMock(return_value={"active": False})
+        result = await app.delete(SCOPE, "publisher", {
+            "idempotency_key": "erase-publisher-fixture", "expected_version": 7,
+        })
+        self.assertEqual(result["status"], "deleted")
+        predicate, mutation = app.sessions.update_one.await_args.args
+        self.assertEqual(predicate, {"_id": "publisher", **SCOPE, "version": 7})
+        self.assertEqual(mutation["$unset"]["publisher_creation"], "")
+        self.assertEqual(mutation["$unset"]["snapshot"], "")
+        self.assertNotIn("private-metadata", str(mutation))
+
+
 if __name__ == "__main__":
     unittest.main()
