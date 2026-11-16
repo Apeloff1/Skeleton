@@ -34,13 +34,15 @@ from skeleton.app.compose_guarded_preflight import inspect_compose_mongo_epoch
 from skeleton.app.canonical_writer_cutover import (
     CanonicalWriterCutover, VerifiedWriterCutover, WriterCutoverDenied,
     inspect_writer_inventory, qualify_writer_cutover, _observe,
+    WriterDeploymentRetirement, reserve_writer_deployment, inspect_writer_deployment,
+    verify_writer_deployment, retire_writer_deployment,
 )
 from skeleton.persistence.mongo_epoch_operator import EpochApproval, EpochOperatorAuthorization
 from skeleton.persistence.mongo_source_epoch import MongoCanonicalSourceEpoch, MongoSourceEpochError
 
 IMAGE = "mongo:7.0.41@sha256:b096b4cb9269f3ebcf363be63f1c50920f786879d03a1890347a3bf33f1f0df0"
 DOCKER = ["docker", "--host", "unix:///var/run/docker.sock"]
-SCHEMA = "skeleton.mongo.isolated_replica_qualification.v2"
+SCHEMA = "skeleton.mongo.isolated_replica_qualification.v3"
 _SHA = re.compile(r"[0-9a-f]{40}\Z")
 _ID = re.compile(r"[0-9a-f]{64}\Z")
 _START = """set -eu
@@ -173,6 +175,67 @@ def _fixture_collections(db):
     }
 
 
+async def _fixture_deployment_latch(approval, signer, owner, peer, reader):
+    from dataclasses import replace
+    def signed_at(instant):
+        plan=replace(approval.plan,issued_at=instant)
+        return VerifiedWriterCutover(plan,signer.sign(plan.canonical_bytes()),
+            plan.authority_id,plan.deployment_id,plan.source_head,approval.public_key)
+
+    now=int(time.time())
+    first=signed_at(now-10)
+    other=signed_at(now-9)
+    require((await inspect_writer_deployment(epoch=owner))["state"]=="ABSENT",
+            "fresh fixture latch not absent")
+
+    # Independent clients contend on the same fixed row, not a local lock.
+    async def attempt(candidate,epoch):
+        try:
+            return await reserve_writer_deployment(candidate,epoch=epoch)
+        except WriterCutoverDenied:
+            return None
+    reservations=await asyncio.gather(attempt(first,owner),attempt(other,peer))
+    require(sum(item is not None for item in reservations)==1,
+            "shared latch admitted zero or multiple clients")
+    active=next(item for item in reservations if item is not None)
+    require(active["generation"]==1, "unexpected initial latch generation")
+    await verify_writer_deployment(epoch=owner,reservation=active)
+    await verify_writer_deployment(epoch=peer,reservation=active)
+    await _deny_cutover(reserve_writer_deployment(signed_at(now-8),epoch=owner))
+    await _deny_cutover(reserve_writer_deployment(signed_at(now-8),epoch=reader))
+    guarded=MongoCanonicalSourceEpoch(owner._database)
+    await guarded.bind_deployment_latch(active)
+    require(await _read(guarded,"actor-a")==2,"active latch denied valid reader")
+
+    plan=WriterDeploymentRetirement(
+        authority_id=first.authority_id,deployment_id=first.deployment_id,
+        source_head=first.source_head,database_name=owner._database.name,
+        active_latch_sha256=active["latch_sha256"],
+        shutdown_evidence_sha256=hashlib.sha256(b"disposable-fixture-offline-only").hexdigest(),
+        issued_at=now-5,expires_at=now+120)
+    pins=dict(epoch=peer,authority_id=plan.authority_id,deployment_id=plan.deployment_id,
+              source_head=plan.source_head,public_key=approval.public_key)
+    sig=signer.sign(plan.canonical_bytes())
+    await _deny_cutover(retire_writer_deployment(plan,b"x"*64,**pins))
+    require((await inspect_writer_deployment(epoch=owner))["latch_sha256"]==active["latch_sha256"],
+            "invalid retirement changed active reservation")
+    retired=await retire_writer_deployment(plan,sig,**pins)
+    require(retired["state"]=="RETIRED" and retired["generation"]==2,
+            "signed fixture retirement failed")
+    await _deny_cutover(retire_writer_deployment(plan,sig,**pins))
+    await _deny_cutover(reserve_writer_deployment(first,epoch=owner))
+    await _deny_cutover(reserve_writer_deployment(other,epoch=peer))
+    await _deny(_read(guarded,"actor-a"))
+    await _deny(_competing_writer(guarded,"actor-a"))
+    next_active=await reserve_writer_deployment(signed_at(now-1),epoch=peer)
+    require(next_active["generation"]==3,"new approval did not advance latch generation")
+    await _deny(_read(guarded,"actor-a"))
+    require(await _read(owner,"actor-a")==2,"rejected stale writer modified epoch")
+    return {"real_cross_client_singleton_latch_race":True,
+            "real_signed_retirement_and_stale_approval_denial":True,
+            "stale_process_latch_quarantine_even_after_new_generation":True}
+
+
 async def _fixture_cutover(head, signer, owner, peer, reader, db, peerdb, read_db):
     """Qualify the real Mongo projection/aggregation/linearizable scan seam."""
     handles = _fixture_collections(db)
@@ -286,6 +349,7 @@ async def _fixture_cutover(head, signer, owner, peer, reader, db, peerdb, read_d
     for collection in handles.values():
         require(await collection.count_documents({}) == 1, "cutover fixture row count changed")
     checks["cutover_admission_does_not_mutate_epoch_or_row_inventory"] = True
+    checks.update(await _fixture_deployment_latch(approval,signer,owner,peer,reader))
     return checks
 
 

@@ -113,6 +113,8 @@ class MongoCanonicalSourceEpoch:
         self._database = database
         self._migration_authorizer = migration_authorizer
         self._revocation_authorizer = revocation_authorizer
+        self._deployment_latch_pin = None
+        self._deployment_latch_failed = False
         self._collection = collection
         self._reader = reader
         self._active: ContextVar[_BoundWriter | None] = ContextVar(
@@ -134,10 +136,50 @@ class MongoCanonicalSourceEpoch:
             .encode("utf-8")
         ).hexdigest()
 
+    async def bind_deployment_latch(self, reservation: dict) -> None:
+        """Install a process-owned, non-replaceable shared startup reservation.
+
+        Only the trusted backend startup calls this after signed cutover and
+        durable publication. No HTTP or model output can bind it.
+        """
+        if (getattr(self, "_deployment_latch_pin", None) is not None
+                or getattr(self, "_deployment_latch_failed", False)
+                or type(reservation) is not dict
+                or set(reservation) != {"generation","latch_sha256"}
+                or type(reservation["generation"]) is not int
+                or not 1 <= reservation["generation"] < (1 << 63)
+                or reservation["generation"] % 2 != 1
+                or type(reservation["latch_sha256"]) is not str):
+            raise MongoSourceEpochError("canonical writer deployment pin invalid")
+        self._deployment_latch_pin = (reservation["generation"],reservation["latch_sha256"])
+        await self._assert_deployment_latch()
+
+    async def _assert_deployment_latch(self) -> None:
+        if getattr(self, "_deployment_latch_failed", False):
+            raise MongoSourceEpochError("canonical writer deployment reservation quarantined")
+        pin = getattr(self, "_deployment_latch_pin", None)
+        if pin is None:
+            return
+        try:
+            from skeleton.app.canonical_writer_cutover import verify_writer_deployment
+            await verify_writer_deployment(epoch=self, reservation={
+                "generation":pin[0],"latch_sha256":pin[1],
+            })
+            if (self._deployment_latch_pin is not pin
+                    or self._deployment_latch_failed):
+                raise MongoSourceEpochError("canonical writer deployment pin changed")
+        except asyncio.CancelledError:
+            self._deployment_latch_failed = True
+            raise
+        except Exception:
+            self._deployment_latch_failed = True
+            raise MongoSourceEpochError("canonical writer deployment reservation lost") from None
+
     async def read_epoch(self, *, tenant_id: str, actor_id: str, context_id: str) -> int:
         # Scope includes context for callers, but the epoch deliberately fences
         # ALL contexts for one actor: memory mutations affect every conversation.
         self._key(tenant_id, context_id)
+        await self._assert_deployment_latch()
         key = self._key(tenant_id, actor_id)
         try:
             # Keep cancellation/task identity intact and bound both Mongo's
@@ -157,6 +199,7 @@ class MongoCanonicalSourceEpoch:
         )
         if number is None:
             raise MongoSourceEpochError("canonical source epoch missing, writing or quarantined")
+        await self._assert_deployment_latch()
         return number
 
     async def _operator_snapshot(self) -> tuple[object, ...]:
@@ -318,7 +361,9 @@ class MongoCanonicalSourceEpoch:
             if active.poisoned:
                 raise MongoSourceEpochError("canonical writer scope is quarantined")
             try:
+                await self._assert_deployment_latch()
                 yield
+                await self._assert_deployment_latch()
             except BaseException:
                 # Even a caught nested failure may have partially mutated data.
                 active.poisoned = True
@@ -359,7 +404,10 @@ class MongoCanonicalSourceEpoch:
         custody = _BoundWriter(tenant_id, actor_id, task, token)
         scope = self._active.set(custody)
         try:
+            # If lost after durable actor admission, leave WRITING quarantined.
+            await self._assert_deployment_latch()
             yield
+            await self._assert_deployment_latch()
             if custody.poisoned:
                 raise MongoSourceEpochError("canonical writer scope is quarantined")
             try:
@@ -382,6 +430,7 @@ class MongoCanonicalSourceEpoch:
             )
             if closed_number != acquired_number + 1:
                 raise MongoSourceEpochError("canonical writer CAS lost; reconcile uncertain epoch")
+            await self._assert_deployment_latch()
         finally:
             # An exception in protected mutation leaves the epoch WRITING.
             # A completion-ack failure is uncertain, not evidence of rollback.

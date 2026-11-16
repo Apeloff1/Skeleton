@@ -120,3 +120,18 @@ The latch excludes cooperating startup attempts; it does not fence arbitrary
 direct clients, continuously attest an already-running backend, prove external
 shutdown evidence, prevent database snapshot rollback, or authorize inference.
 Those remain independent holds. The default legacy install is unchanged.
+
+
+The reservation is also pinned into the actual backend epoch object. Known
+actor-epoch reads and nested/outer writer boundaries revalidate the exact
+active generation. Loss, cancellation or ambiguous observation quarantines
+that process rather than allowing a rebind. If the latch changes after actor
+admission but before the final CAS, the actor remains WRITING. This is a
+boundary check, not an atomic cross-collection transaction; retirement still
+requires independently verified shutdown, not a live release. Both canonical
+and compatibility epoch source paths are modified identically.
+
+The isolated authenticated Mongo v3 harness races separate clients against the
+singleton latch, verifies signed retirement and replay denial, then verifies
+a process pinned to the retired generation remains quarantined when a newer
+generation starts. No production latch is written by that isolated harness.

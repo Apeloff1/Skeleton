@@ -468,3 +468,28 @@ def test_malformed_existing_latch_denies_instead_of_overwriting():
     with pytest.raises(WriterCutoverDenied):
         asyncio.run(reserve_writer_deployment(signed(),epoch=epoch))
     assert coll.row=={"_id":"canonical-writer-single-deployment-v1","state":"RETIRED"}
+
+
+def test_process_reservation_becomes_sticky_denial_after_retirement():
+    from skeleton.app.canonical_writer_cutover import reserve_writer_deployment,retire_writer_deployment
+    from skeleton.persistence.mongo_source_epoch import MongoSourceEpochError
+    epoch,coll=latch_fixture()
+    now=int(time.time())
+    first=signed(issued_at=now-4)
+    async def run():
+        reservation=await reserve_writer_deployment(first,epoch=epoch)
+        await epoch.bind_deployment_latch(reservation)
+        await epoch._assert_deployment_latch()
+        with pytest.raises(MongoSourceEpochError):
+            await epoch.bind_deployment_latch(reservation)
+        p,s,k=retirement(epoch,first,reservation["latch_sha256"],issued_at=now-2)
+        await retire_writer_deployment(p,s,**k)
+        with pytest.raises(MongoSourceEpochError):
+            await epoch._assert_deployment_latch()
+        next_reservation=await reserve_writer_deployment(signed(issued_at=now-1),epoch=epoch)
+        assert next_reservation["generation"]==3
+        with pytest.raises(MongoSourceEpochError):
+            await epoch.bind_deployment_latch(next_reservation)
+        with pytest.raises(MongoSourceEpochError):
+            await epoch._assert_deployment_latch()
+    asyncio.run(run())

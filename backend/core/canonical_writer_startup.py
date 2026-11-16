@@ -74,6 +74,7 @@ async def install_before_lifespan(app):
         if confirmed != inventory:
             raise WriterCutoverDenied("canonical inventory changed during shared reservation")
         await verify_writer_deployment(epoch=epoch, reservation=reservation)
+        await epoch.bind_deployment_latch(reservation)
         # No await between final signed/live admission and sticky binding.
         # A failed binding does not roll back to unprotected owners.
         approval.verify()
@@ -87,6 +88,7 @@ async def install_before_lifespan(app):
             "local_collection_counts": dict(inventory.collection_counts),
             "known_local_writer_binding_installed": True,
             "shared_startup_reservation": reservation,
+            "known_writer_reservation_revalidation_installed": True,
             "distributed_writer_fencing_verified": False,
             "external_writer_coverage_verified": False,
             "guarded_local_ai_ready": False,
