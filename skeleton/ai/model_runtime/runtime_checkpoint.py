@@ -8,7 +8,7 @@ import math
 from typing import Any, Mapping
 
 from skeleton.cortex.bpe import BytePairEncoder
-from skeleton.cortex.transformer import TinyTransformer
+from skeleton.cortex.transformer import TinyTransformer, TransformerBlock
 
 from .flgb_model_runtime import canonical_bytes
 from .runtime_contracts import (
@@ -428,6 +428,79 @@ def validate_checkpoint(checkpoint: Mapping[str, Any]) -> dict[str, Any]:
     return body
 
 
+def _restore_complete_reference_graph(snapshot: Mapping[str, Any]) -> TinyTransformer:
+    """Load a previously validated complete CPU graph without random init.
+
+    The historical restore constructs random full-size tensors, replaces
+    them with checkpoint weights, and builds every layer twice. For the
+    canonical non-routed format, construct only the detached actual
+    weights. Legacy/custom/MoD formats retain their original loader.
+    Called exclusively after checkpoint, shape and resource admission.
+    """
+    expected = {
+        "dim", "ctx", "n_heads", "n_layers", "d_ff", "fitted", "steps",
+        "tied", "norm", "ffn_kind", "itos", "E", "P", "Wq", "Wk", "Wv",
+        "Wo", "Wout", "bout", "W1", "b1", "W2", "b2", "layers",
+        "use_mod", "mod",
+    }
+    if (not expected <= set(snapshot)
+            or set(snapshot) - expected - {"position_mode", "special_tokens"}
+            or snapshot["use_mod"] is not False or snapshot["mod"] is not None
+            or type(snapshot["tied"]) is not bool
+            or snapshot["dim"] < 4 or snapshot["ctx"] < 2
+            or len(snapshot["itos"]) < 2):
+        return TinyTransformer.from_snapshot(dict(snapshot))
+    matrices = ("Wq", "Wk", "Wv", "Wo", "W1", "Wu", "W2")
+    vectors = ("ln1_g", "ln1_b", "ln2_g", "ln2_b", "b1", "bu", "b2")
+    layer_keys = set(matrices + vectors + ("dim", "d_ff", "norm", "ffn_kind"))
+    if any(set(layer) != layer_keys or layer["dim"] != snapshot["dim"]
+           or any(type(layer[name]) is not list for name in matrices + vectors)
+           for layer in snapshot["layers"]):
+        return TinyTransformer.from_snapshot(dict(snapshot))
+
+    # Mirrored first-layer fields and tied projection must agree before any
+    # graph allocation. These are represented redundantly by the old schema.
+    for key in ("Wq", "Wk", "Wv", "Wo", "W1", "W2", "b1", "b2"):
+        if snapshot[key] != snapshot["layers"][0][key]:
+            raise RuntimeContractError("checkpoint first-layer aliases disagree")
+    if snapshot["tied"] and snapshot["E"] != snapshot["Wout"]:
+        raise RuntimeContractError("checkpoint tied projection disagrees with embedding")
+
+    def matrix(value):
+        # Float conversion matches the historical loader, without initializing
+        # a throwaway matrix or aliasing mutable rows from the caller.
+        return [list(map(float, row)) for row in value]
+
+    model = TinyTransformer.__new__(TinyTransformer)
+    model.itos = list(snapshot["itos"])
+    model.stoi = {token: i for i, token in enumerate(model.itos)}
+    model.unk = 0
+    for name, value in snapshot.get("special_tokens", {}).items():
+        setattr(model, name, value)
+    for name in ("dim", "ctx", "n_heads", "n_layers", "d_ff",
+                 "fitted", "steps", "norm", "ffn_kind", "tied"):
+        setattr(model, name, snapshot[name])
+    model.position_mode = snapshot.get("position_mode", "learned_rope")
+    model.device, model.requested, model.resident = "cpu", "cpu", False
+    model._accel = None
+    model.use_mod, model.mod = False, None
+    model.E = matrix(snapshot["E"])
+    model.P = matrix(snapshot["P"])
+    model.Wout = model.E if model.tied else matrix(snapshot["Wout"])
+    model.bout = list(map(float, snapshot["bout"]))
+    model.layers = []
+    for source in snapshot["layers"]:
+        layer = TransformerBlock.__new__(TransformerBlock)
+        layer.dim, layer.d_ff = model.dim, model.d_ff
+        layer.norm, layer.ffn_kind = model.norm, model.ffn_kind
+        for name in matrices:
+            setattr(layer, name, matrix(source[name]))
+        for name in vectors:
+            setattr(layer, name, list(map(float, source[name])))
+        model.layers.append(layer)
+    return model
+
+
 def restore_components(
     checkpoint: Mapping[str, Any],
     *,
@@ -478,7 +551,7 @@ def restore_components(
         device_policy = validated_policy
 
     # Validate resource and policy declarations before constructing the graph.
-    model = TinyTransformer.from_snapshot(dict(body["model"]))
+    model = _restore_complete_reference_graph(body["model"])
     if bpe_snapshot is not None:
         model.bpe = BytePairEncoder.from_snapshot(dict(bpe_snapshot))
     return model, limits, device_policy, tokenizer_checkpoint, body["architecture"]
