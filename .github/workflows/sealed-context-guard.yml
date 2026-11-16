@@ -80,6 +80,9 @@ on:
       - 'skeleton/game/simulation/fixed_input_replay.py'
       - 'skeleton/app/fixed_input_replay_cli.py'
       - 'skeleton/app/recovered_save_qualification.py'
+      - 'skeleton/persistence/game_save_sqlite.py'
+      - 'skeleton/ai/runtime/persistence/game_save_sqlite.py'
+      - 'skeleton/testing/test_recovered_sqlite_transactions.py'
       - 'skeleton/testing/test_recovered_fixed_input.py'
       - 'skeleton/app/synthesized_quest_cli.py'
       - 'skeleton/app/gameforge_quest_qualification.py'
@@ -234,7 +237,7 @@ jobs:
       - name: Recovered fixed-step replay and local SQLite save custody
         env:
           PYTHONPATH: '.:backend'
-        run: python -m pytest -q skeleton/testing/test_recovered_fixed_input.py tests/test_game_fixed_clock_v6.py tests/test_game_input_collision.py tests/game_builder/test_project_bundle_save.py tests/game_builder/test_project_bundle_history.py
+        run: python -m pytest -q skeleton/testing/test_recovered_fixed_input.py skeleton/testing/test_recovered_sqlite_transactions.py tests/test_game_fixed_clock_v6.py tests/test_game_input_collision.py tests/game_builder/test_project_bundle_save.py tests/game_builder/test_project_bundle_history.py
 
       - name: Recovered AI source assurance and operator routes
         env:
