@@ -153,7 +153,7 @@ class OfflineHTTPApplication:
 
     def __init__(self, backend: LocalDesktopModel, database: str | Path,
                  *, token: str, semantic_ranker=None, semantic_multihop=False,
-                 nli_verifier=None) -> None:
+                 nli_verifier=None, specialist_registry=None, media_registry=None) -> None:
         if not isinstance(token, str) or len(token) < 32:
             raise OfflineHTTPError(400, "a strong authorization token is required")
         # The generic offline desktop still supports native model fixtures.
@@ -201,6 +201,8 @@ class OfflineHTTPApplication:
             self.campaign_batches = CampaignBatchController(self.review_campaigns)
             from skeleton.app.jeeves_reviewed_feedback import ReviewedFeedbackStore
             self.reviewed_feedback = ReviewedFeedbackStore(self._store, self.model_digest, self.tokenizer_digest)
+            from skeleton.app.jeeves_competitive_service import CompetitiveService
+            self.competitive = CompetitiveService(self, specialists=specialist_registry, media=media_registry)
         except BaseException:
             if self.longform is not None:
                 self.longform.close()
@@ -265,6 +267,7 @@ class OfflineHTTPApplication:
         with self._lock:
             if self.longform is not None:
                 self.longform.close()
+            self.competitive.clear()
             if self.nli_verifier is not None:
                 self.nli_verifier.clear_cache()
             self._store.close()
@@ -541,6 +544,13 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(409, "committed local turn changed during recovery")
         return committed["result"]
 
+    def _turn_grounding_hits(self,sid,revision,text,document_ids):
+        if document_ids is not None and self.competitive.status()["predictive_prefetch_available"]:
+            warmed = self.competitive.prefetch.consume(sid,revision,text,document_ids)
+            if warmed is not None:
+                return warmed
+        return self._grounding_hits(text,document_ids)
+
     def _grounding_hits(self,text,document_ids):
         if self._semantic_multihop:
             rows,_proof=self.knowledge.search_multihop(text,document_ids=document_ids,limit=3)
@@ -680,7 +690,7 @@ class OfflineHTTPApplication:
                                     hits.append(hit)
                             hits = (hits+remaining)[:3]
                         else:
-                            hits = self._grounding_hits(message.strip(), scope)
+                            hits = self._turn_grounding_hits(sid,revision,message.strip(),scope)
                         if not hits:
                             raise OfflineHTTPError(422, "no local reference passages match this question")
                         digest = _strict_context_digest(scoped_grounded_request_digest(
@@ -774,7 +784,7 @@ class OfflineHTTPApplication:
         # Runtime evidence and SQLite must attest the same strict policy.
         digest = _strict_context_digest(digest, strict)
         with self._lock:
-            self._session(session_id)
+            saved_session = self._session(session_id)
             replay = self._store.replay(session_id, rid, digest)
             if replay is not None:
                 return self._replayed_result(session_id, rid, digest)
@@ -786,7 +796,7 @@ class OfflineHTTPApplication:
                 if len(text.encode("utf-8")) > 1024:
                     raise OfflineHTTPError(400, "grounded query exceeds 1024 bytes")
                 try:
-                    hits = self._grounding_hits(text,document_ids)
+                    hits = self._turn_grounding_hits(session_id,saved_session.revision,text,document_ids)
                 except RuntimeContractError:
                     raise OfflineHTTPError(422, "selected local reference unavailable") from None
                 if not hits:
@@ -1033,6 +1043,8 @@ class OfflineHTTPApplication:
                 "message_bytes": 4096,
                 "grounded_query_bytes": 1024,
             }
+        if path == "/v1/competitive/status" and method == "GET":
+            return 200, self.competitive.status()
         if path == "/v1/verification/status" and method == "GET":
             verifier = self.nli_verifier
             return 200, {"schema": "skeleton.jeeves.verification-status.v1",
@@ -1304,6 +1316,9 @@ class OfflineHTTPApplication:
                  if key != "expected_metadata_revision"},
                 expected_metadata_revision=body.get("expected_metadata_revision"),
             )
+        from skeleton.app.jeeves_competitive_service import ACTIONS as competitive_actions
+        if tail in competitive_actions and method == "POST":
+            return 200, self.competitive.dispatch(sid,tail,body)
         if tail == "deliberation-review" and method == "POST":
             return 200, self._deliberation_review(sid, body)
         if tail in {"campaign-create", "campaign-inspect", "campaign-advance",
@@ -1659,7 +1674,7 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         limit = (
             MAX_JSON_BYTES if path == "/v1/sessions/import"
             else MAX_JSON_BYTES if path == "/v1/knowledge/documents"
-            else MAX_MEDIA_ADVISORY_REQUEST_BYTES if path == "/v1/advisory/ingest"
+            else MAX_MEDIA_ADVISORY_REQUEST_BYTES if path == "/v1/advisory/ingest" or path.endswith("/media-review")
             else MAX_CHAT_REQUEST_BYTES
         )
         length = int(declared)
@@ -1952,7 +1967,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--semantic-multihop",action="store_true")
     parser.add_argument("--nli-config", type=Path, help="explicit SHA-pinned local NLI classifier configuration")
     parser.add_argument("--nli-config-sha256")
+    parser.add_argument("--specialist-config", type=Path, help="pinned independent native review generator inventory")
+    parser.add_argument("--specialist-config-sha256")
+    parser.add_argument("--media-config", type=Path, help="pinned local image and audio classifier inventory")
+    parser.add_argument("--media-config-sha256")
     args = parser.parse_args(argv)
+    if bool(args.specialist_config)!=bool(args.specialist_config_sha256) or bool(args.media_config)!=bool(args.media_config_sha256):
+        parser.error("advanced local configuration and exact file digest must be supplied together")
     if bool(args.nli_config)!=bool(args.nli_config_sha256):
         parser.error("NLI configuration and exact file digest must be supplied together")
     if bool(args.semantic_config)!=bool(args.semantic_config_sha256):
@@ -1979,8 +2000,16 @@ def main(argv: list[str] | None = None) -> int:
         if args.nli_config is not None:
             from skeleton.app.jeeves_nli import load_nli_config
             verifier = load_nli_config(args.nli_config, args.nli_config_sha256)
+        specialists=media=None
+        if args.specialist_config is not None:
+            from skeleton.app.jeeves_ensemble import SpecialistRegistry
+            specialists=SpecialistRegistry(args.specialist_config,args.specialist_config_sha256)
+        if args.media_config is not None:
+            from skeleton.app.jeeves_native_media import LocalMediaRegistry
+            media=LocalMediaRegistry(args.media_config,args.media_config_sha256)
         app = OfflineHTTPApplication(backend, db, token=token,semantic_ranker=ranker,
-                                     semantic_multihop=args.semantic_multihop,nli_verifier=verifier)
+                                     semantic_multihop=args.semantic_multihop,nli_verifier=verifier,
+                                     specialist_registry=specialists,media_registry=media)
         if args.semantic_index is not None:
             app.knowledge.attach_semantic_ann(args.semantic_index,args.semantic_index_sha256)
         if args.semantic_index_root is not None:
