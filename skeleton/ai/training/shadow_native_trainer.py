@@ -30,6 +30,7 @@ from .shadow_idle_training import (
 )
 from .shadow_weight_intake import ShadowKnowledge
 from .shadow_weights import ShadowWeightError
+from .native_adapter_learning import NativeAdapterPolicy, fit_native_output_adapter
 
 _MAX_TEXT_BYTES = 4 * 1024 * 1024
 _MAX_LINE_BYTES = 16 * 1024
@@ -46,6 +47,7 @@ class ShadowNativeTrainingPolicy:
     learning_rate_ppm: int = 20_000
     teacher_retention_ppm: int = 0
     teacher_min_target_probability_ppm: int = 100_000
+    adapter_policy: NativeAdapterPolicy | None = None
 
     def __post_init__(self) -> None:
         values = (
@@ -60,6 +62,16 @@ class ShadowNativeTrainingPolicy:
         for name, value, minimum, maximum in values:
             if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
                 raise ShadowWeightError(f"invalid native shadow training {name}")
+
+        if self.adapter_policy is not None:
+            if type(self.adapter_policy) is not NativeAdapterPolicy:
+                raise ShadowWeightError("typed native adapter training policy required")
+            if self.teacher_retention_ppm:
+                raise ShadowWeightError("choose one native weight update mode")
+            if self.adapter_policy.maximum_steps > self.maximum_steps:
+                raise ShadowWeightError("adapter budget exceeds shadow training admission")
+            if self.adapter_policy.learning_rate_ppm != self.learning_rate_ppm:
+                raise ShadowWeightError("adapter learning rate differs from shadow admission")
 
     @property
     def digest(self) -> str:
@@ -78,6 +90,8 @@ class ShadowNativeTrainingPolicy:
                 "weight_ppm": self.teacher_retention_ppm,
                 "minimum_target_probability_ppm": self.teacher_min_target_probability_ppm,
             }
+        if self.adapter_policy is not None:
+            payload["native_adapter_policy"] = self.adapter_policy.digest
         return digest_json(payload)
 
 
@@ -231,7 +245,7 @@ class ShadowNativeTrainer:
         if self.champion.model_digest != item.base_model_digest:
             raise ShadowTrainingRejected("training-champion-drift")
         self.champion.assert_model_unchanged()
-        if self.policy.teacher_retention_ppm and (self.champion.device.actual != "cpu"
+        if (self.policy.teacher_retention_ppm or self.policy.adapter_policy is not None) and (self.champion.device.actual != "cpu"
                 or self.champion.device.resident or self.champion.model._accel is not None
                 or self.champion.model.use_mod):
             raise ShadowTrainingRejected("teacher-retention-requires-admitted-cpu-graph")
@@ -285,19 +299,29 @@ class ShadowNativeTrainer:
         )
         steps = 0
         soft_steps = 0
+        adapter_report = None
         chunk_size = self.policy.lines_per_heartbeat
-        for offset in range(0, len(corpus), chunk_size):
+        if self.policy.adapter_policy is not None:
             session.heartbeat()
-            batch = corpus[offset:offset + chunk_size]
-            if self.policy.teacher_retention_ppm:
-                added, distilled = self._fit_retention_batch(model, batch, session)
-                steps += added
-                soft_steps += distilled
-            else:
-                steps += model.model.fit(
-                    batch, lr=self.policy.learning_rate_ppm / 1_000_000,
-                    schedule="cosine", interrupt=session.require_idle,
-                )
+            adapter_report = fit_native_output_adapter(
+                model, corpus, policy=self.policy.adapter_policy,
+                expected_base_digest=item.base_model_digest,
+                interrupt=session.require_idle, heartbeat=session.heartbeat,
+            )
+            steps = adapter_report.optimizer_steps
+        else:
+            for offset in range(0, len(corpus), chunk_size):
+                session.heartbeat()
+                batch = corpus[offset:offset + chunk_size]
+                if self.policy.teacher_retention_ppm:
+                    added, distilled = self._fit_retention_batch(model, batch, session)
+                    steps += added
+                    soft_steps += distilled
+                else:
+                    steps += model.model.fit(
+                        batch, lr=self.policy.learning_rate_ppm / 1_000_000,
+                        schedule="cosine", interrupt=session.require_idle,
+                    )
         session.require_idle()
         if steps != estimated_steps:
             raise ShadowWeightError("actual native SGD steps differ from admission budget")
@@ -321,7 +345,13 @@ class ShadowNativeTrainer:
             sequence=1,
             weights_digest=trained.model_digest,
             optimizer_digest=digest_json({
-                "optimizer": "sgd-no-momentum", "steps": steps,
+                "optimizer": "native-output-lora" if adapter_report is not None else "sgd-no-momentum", "steps": steps,
+                **({"adapter_receipt": adapter_report.receipt_digest,
+                    "factor_digest": adapter_report.factor_digest,
+                    "merged_projection_digest": adapter_report.merged_projection_digest,
+                    "rank": adapter_report.final_rank,
+                    "trainable_parameters": adapter_report.trainable_parameters}
+                   if adapter_report is not None else {}),
                 "learning_rate_ppm": self.policy.learning_rate_ppm,
                 **({
                     "teacher_model_digest": item.base_model_digest,
@@ -330,7 +360,9 @@ class ShadowNativeTrainer:
                 } if self.policy.teacher_retention_ppm else {}),
             }),
             rng_digest=digest_json({
-                "mode": "deterministic-sgd", "batch_count":
+                "mode": "deterministic-output-lora" if adapter_report is not None else "deterministic-sgd",
+                **({"adapter_seed": self.policy.adapter_policy.seed} if adapter_report is not None else {}),
+                "batch_count":
                 (len(corpus) + chunk_size - 1) // chunk_size,
             }),
             prior_checkpoint_digest=genesis.digest,
