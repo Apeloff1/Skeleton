@@ -134,3 +134,66 @@ def test_no_unknown_resource_or_duplicate_dimension():
     with pytest.raises(DispatchPolicyError):
         ResourceVector((("gpu", 1), ("gpu", 2)))
     assert not ResourceVector((("gpu", 1),)).fits(ResourceVector((("cpu", 8),)))
+
+
+def test_route_cache_pressure_and_identity():
+    from skeleton.intelligence.dispatch_advisory import RouteDemand, RouteWorker, choose_route
+
+    digest = "a" * 64
+    tokens = "b" * 64
+    demand = RouteDemand("tenant", digest, tokens, frozenset({"cuda"}), 80, 20)
+    resident = RouteWorker("a", "tenant", digest, tokens, frozenset({"cuda"}), 100, 5, 80, 10, 1, True)
+    idle = replace(resident, worker="b", queued_tokens=0, resident_prefix_tokens=0)
+    assert choose_route(demand, [idle, resident], now_ms=11).worker == "a"
+    assert choose_route(demand, [idle, replace(resident, queued_tokens=1000)], now_ms=11).worker == "b"
+    assert choose_route(demand, [replace(resident, free_tokens=99)], now_ms=11) is None
+    assert choose_route(demand, [replace(resident, tenant="other")], now_ms=11) is None
+    assert choose_route(demand, [replace(resident, tokenizer_sha256="c" * 64)], now_ms=11) is None
+    assert choose_route(demand, [resident], now_ms=5011) is None
+    assert choose_route(demand, [resident], now_ms=9) is None
+
+
+def test_steal_requires_unstarted_and_transfer_gain():
+    from skeleton.intelligence.dispatch_advisory import StealObservation, propose_steal
+
+    row = StealObservation("task", "a", "b", "tenant", 100, 20, 50, 10, 5, 1, 2, True, True)
+    assert propose_steal([row]) == row
+    assert propose_steal([replace(row, not_started=False)]) is None
+    assert propose_steal([replace(row, compatible=False)]) is None
+    assert propose_steal([replace(row, transfer_ms=90)]) is None
+
+
+def test_retry_never_repeats_unknown_effect():
+    from skeleton.intelligence.dispatch_advisory import retry_proposal
+
+    args = dict(attempt=1, maximum_attempts=3, remaining_ms=30000)
+    retry = retry_proposal("task", outcome="confirmed-no-effect", **args)
+    assert retry == retry_proposal("task", outcome="confirmed-no-effect", **args)
+    assert retry.disposition == "retry" and 1000 <= retry.delay_ms <= 1250
+    assert retry_proposal("task", outcome="unknown-effect", **args).disposition == "reconcile"
+    assert retry_proposal("task", outcome="permanent", **args).disposition == "quarantine"
+    assert retry_proposal("task", outcome="confirmed-no-effect", **(args | {"remaining_ms": 1})).disposition == "deadline"
+
+
+def test_duration_estimates_conservative_sparse_and_observed():
+    from skeleton.intelligence.dispatch_advisory import estimate_duration
+
+    assert estimate_duration([1, 100], fallback_ms=50).conservative_ms == 100
+    e = estimate_duration(list(range(1, 101)), fallback_ms=25)
+    assert e.samples == 100 and e.median_ms == 50 and e.conservative_ms == 95
+
+
+def test_shadow_schedule_reproducible_and_protected():
+    from skeleton.intelligence.dispatch_advisory import ShadowTask, shadow_schedule, choose_shadow
+
+    rows = [ShadowTask("long", "a", 0, 50, 50),
+            ShadowTask("short", "b", 0, 2, 50, 5),
+            ShadowTask("critical", "c", 0, 1, 5)]
+    baseline = shadow_schedule(rows, slots=1, policy="fifo")
+    optimized = shadow_schedule(rows, slots=1, policy="deadline")
+    assert baseline.timeline[0][0] == optimized.timeline[0][0] == "critical"
+    assert baseline.deadline_misses == 1 and optimized.deadline_misses == 0
+    assert optimized == shadow_schedule(list(reversed(rows)), slots=1, policy="deadline")
+    assert len(choose_shadow(rows, slots=1)) == 5
+    overlap = shadow_schedule(rows, slots=2, policy="deadline")
+    assert overlap.timeline[1][1] == 0

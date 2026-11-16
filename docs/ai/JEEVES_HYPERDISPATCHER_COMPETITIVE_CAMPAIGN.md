@@ -114,6 +114,30 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 71 | Scheduler portfolios | Open |
 | 72 | Virtual workers | Open |
 
+## Wave 2: advisory routing and counterfactual evaluation
+
+SGLang-inspired cache vs queue-aware routing uses exact model/tokenizer and tenant
+identity, fresh generation-tagged worker observations and full token reservations.
+Dask-inspired work stealing proposals reject running work and unprofitable moves.
+NATS-style bounded failure handling differentiates proven no-effect retries from
+unknown side effects, which always require reconciliation. An empirical duration
+estimator gives conservative order-statistic predictions, and a finite discrete
+event simulation compares FIFO, priority, shortest, fair aging and deadline
+policies by deadline misses and waiting distributions. Source traces are hashed;
+they are not observed production benchmarks or automatic policy promotion.
+
+Research:
+- https://distributed.dask.org/en/stable/work-stealing.html
+- https://github.com/nats-io/nats.docs/blob/master/nats-concepts/jetstream/consumers.md
+- https://github.com/sgl-project/sglang/blob/main/sgl-model-gateway/src/policies/cache_aware.rs
+
+Additional partial source targets: 09 (stealing proposal), 26 (empirical
+duration prediction), 39 (cache-aware routing), 41 (token reservation proposal),
+55 (quarantine decision), 56 (retry budget), 61 and 62 (shadow/counterfactual),
+68 (uncertainty margin), 71 (portfolio comparison). Actual worker transfer,
+inference cache proof, broker persistence, learned production routing, durable
+acknowledgment and policy activation remain open.
+
 ## Qualification and rollback
 
 Run the focused test file, existing shared pressure tests, and every AGENTS.md
