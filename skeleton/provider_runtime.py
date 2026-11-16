@@ -3406,6 +3406,7 @@ class ProviderRegistry:
         self._architecture_loader = architecture_loader
         self._architecture_receipts: dict[str, ProviderArchitectureReceipt] = {}
         self._failover_adapter: FailoverProviderAdapter | None = None
+        self._measured_local_gate: Any | None = None
 
     @classmethod
     def from_env(
@@ -3415,12 +3416,14 @@ class ProviderRegistry:
         retain_unavailable: bool = False,
         guarded_components: Any | None = None,
         require_guarded_local: bool | None = None,
+        measured_local_deployment: Any | None = None,
     ) -> ProviderRegistry:
         try:
             return cls._from_env(
                 admission_runtime=admission_runtime,
                 guarded_components=guarded_components,
                 require_guarded_local=require_guarded_local,
+                measured_local_deployment=measured_local_deployment,
             )
         except ProviderUnavailableError as exc:
             if not retain_unavailable or os.getenv("AI_PROVIDER", "openai").strip().lower() != "local":
@@ -3458,6 +3461,7 @@ class ProviderRegistry:
         admission_runtime: AdmissionRuntime | None = None,
         guarded_components: Any | None = None,
         require_guarded_local: bool | None = None,
+        measured_local_deployment: Any | None = None,
     ) -> ProviderRegistry:
         # Jeeves primary chat is a pinned, local, TEXT-generation model.
         # Reject a hosted active provider before constructing any SDK/client.
@@ -3471,6 +3475,15 @@ class ProviderRegistry:
         except JeevesLocalPolicyError as exc:
             raise ProviderUnavailableError("Jeeves local-only provider configuration is invalid") from exc
         active = os.getenv("AI_PROVIDER", "openai").strip().lower() or "openai"
+        if measured_local_deployment is not None:
+            # Trusted startup dependency only. No environment string, model
+            # text or ProviderRequest can select this activation contract.
+            from skeleton.app.offline_runtime_llama_binding import MeasuredLocalDeployment
+            if type(measured_local_deployment) is not MeasuredLocalDeployment or active != "local":
+                raise ProviderUnavailableError("measured deployment requires trusted local configuration")
+            if require_guarded_local is False:
+                raise ProviderUnavailableError("measured deployment cannot disable local protection")
+            require_guarded_local = True
         raw_guard = os.getenv("AI_LOCAL_GUARD_REQUIRED", "").strip().lower()
         if jeeves_local_only and (raw_guard in {"0", "false"} or require_guarded_local is False):
             raise _LocalGuardUnavailable(
@@ -3548,6 +3561,13 @@ class ProviderRegistry:
             cache_size, default_seed = _local_model_configuration(
                 default_cache_size=0 if catalog_path or deployment_path else 128
             )
+            if measured_local_deployment is not None and (
+                not deployment_path or not guarded_required or cache_size != 0
+                or capacity["max_concurrency"] != 1
+            ):
+                raise ProviderUnavailableError(
+                    "measured deployment requires protected single-concurrency GGUF with cache disabled"
+                )
             local_admission = admission_runtime or AdmissionRuntime()
 
             def guarded(adapter: ProviderAdapter) -> ProviderAdapter:
@@ -3594,20 +3614,33 @@ class ProviderRegistry:
                         load_local_model_adapter,
                     )
 
-                    adapter = load_local_model_adapter(
-                        deployment_path,
-                        cache_size=cache_size,
-                        default_seed=default_seed,
-                        rehash_artifacts_each_run=True,
-                        require_guarded_inference=guarded_required,
-                        guarded_components=guarded_components,
-                        **capacity,
-                    )
+                    measured_gate = None
+                    if measured_local_deployment is not None:
+                        adapter, measured_gate = measured_local_deployment.activate(
+                            deployment_path, components=guarded_components,
+                            default_seed=default_seed,
+                            max_queue_size=capacity["max_queue_size"],
+                            max_batch_size=capacity["max_batch_size"],
+                        )
+                    else:
+                        adapter = load_local_model_adapter(
+                            deployment_path,
+                            cache_size=cache_size,
+                            default_seed=default_seed,
+                            rehash_artifacts_each_run=True,
+                            require_guarded_inference=guarded_required,
+                            guarded_components=guarded_components,
+                            **capacity,
+                        )
                 except (LocalModelDeploymentError, ProviderPolicyError, OSError, TypeError, ValueError) as exc:
                     raise ProviderUnavailableError("local provider deployment failed activation") from exc
                 if jeeves_local_only and adapter.model != "jeeves":
+                    if measured_gate is not None:
+                        measured_gate.close()
                     raise ProviderUnavailableError("The pinned deployment model identity is not jeeves")
-                return cls([guarded(adapter)], active="local")
+                registry = cls([guarded(adapter)], active="local")
+                registry._measured_local_gate = measured_gate
+                return registry
             try:
                 from skeleton.ai.runtime.inference import (
                     LocalInferenceEngine,
@@ -3806,6 +3839,12 @@ class ProviderRegistry:
             "fallback_providers": list(self._fallback_ids),
             "routing": routing,
         }
+
+    def measured_local_status(self) -> dict[str, Any] | None:
+        """Report installed optional native admission evidence without probing."""
+        if self._measured_local_gate is None:
+            return None
+        return self._measured_local_gate.status()
 
     def runtime_serving_engines(self) -> tuple[Any, ...]:
         """Return registered local serving owners, without activating a route.
