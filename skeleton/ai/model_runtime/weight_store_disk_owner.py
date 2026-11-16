@@ -151,6 +151,13 @@ class WeightStoreDiskOwner:
                 if item.name.startswith("..weight-stage-") and item.name.endswith(".tmp"):
                     raise WeightShardStoreError("interrupted staging control publication; recovery review required")
 
+    def _require_control_space(self, *, records: int = 1) -> None:
+        """Reserve room for bounded durable control publication, not a quota."""
+        if type(records) is not int or not 1 <= records <= 4:
+            raise WeightShardStoreError("invalid control record reserve count")
+        if shutil.disk_usage(self._store.root).free < self._policy.minimum_free_bytes + records * 64 * 1024:
+            raise WeightShardStoreError("filesystem free-byte reserve unavailable for control publication")
+
     def _policy_bytes(self) -> bytes:
         return canonical_bytes({"schema": "skeleton.weight-disk-policy.v1",
                                 "lock_inode": list(self._lock_inode),
@@ -318,7 +325,7 @@ class WeightStoreDiskOwner:
                     "inventory": observed,
                     "filesystem_free_bytes": free,
                     "active_intent": read_intent(directory_fd, self._policy_sha256),
-                    "last_outcome": read_last(directory_fd),
+                    "last_outcome": read_last(directory_fd, self._policy_sha256),
                     "hard_quota": False,
                     "cooperative_only": True}
             return {**body, "digest": sha256(canonical_bytes(body)).hexdigest()}
@@ -331,6 +338,7 @@ class WeightStoreDiskOwner:
             self._require_no_control_temps()
             if read_intent(directory_fd, self._policy_sha256) is not None:
                 raise WeightShardStoreError("unresolved staging intent; recovery review required")
+            read_last(directory_fd, self._policy_sha256)
             before = self._scan()
             charged = 0
             if before["accounted_bytes"] > self._policy.maximum_store_bytes:
@@ -401,6 +409,7 @@ class WeightStoreDiskOwner:
             # the staged object bytes after the temporary publication boundary.
             self._store.verified_paths(key, expected_manifest_sha256=actual_manifest_sha)
             self._inspect_lock(directory_fd, fd)
+            self._require_control_space()
             outcome = finish_intent(
                 directory_fd, policy_sha256=self._policy_sha256,
                 intent_digest=intent["digest"], outcome="committed", evidence=receipt,
