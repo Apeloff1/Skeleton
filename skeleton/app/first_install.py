@@ -166,8 +166,8 @@ def first_install_report(
     if (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
-        or not math.isfinite(timeout)
         or not 0 < timeout <= 10
+        or not math.isfinite(timeout)
     ):
         raise ValueError("doctor timeout must be finite and greater than zero, at most 10 seconds")
     if auth_token_file is not None and not (studio and live):

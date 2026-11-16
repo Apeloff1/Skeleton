@@ -46,7 +46,10 @@ def qualify(root, *, environ, runner=subprocess.run, observe=observe_binding):
         os.fsync(handle.fileno())
     try:
         manifest=load_manifest()
-        captured=compose_operation_environment(environ,manifest.mode_env("production"))
+        # Match the preceding E2E build steps exactly: the browser image
+        # is production, while the backend retains its existing job target.
+        # Do not relabel a prebuilt development backend as production.
+        captured=compose_operation_environment(environ)
         # The workflow has already built all required images, just as its
         # independent production Nginx test expects. Do not rebuild here.
         command=compose_command("up",manifest=manifest,build=False,install_env=True)

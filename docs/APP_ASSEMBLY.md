@@ -1213,3 +1213,12 @@ qualification worker disables site startup and uses a new private bytecode
 cache prefix, so a checkout's cached bytecode cannot replace tracked Python
 source. Source and configuration are rechecked after inter-round delay
 before the next HTTP round. Neither change supersedes physical qualification.
+
+
+The real-Compose source contract also runs in the independent App Foundation
+E2E companion job. It renders development, production, custom production
+ports and the reviewed hot-reload overlay with disposable process-local
+fixture credentials. The source check requires exact browser build/runtime
+URLs, internal engine wiring, shared service credentials, Mongo inputs and
+dependency health fences. It does not start containers, exercise the live
+stack, or change the existing draft/live qualification admission rule.

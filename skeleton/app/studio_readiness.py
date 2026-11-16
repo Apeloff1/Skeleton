@@ -283,8 +283,8 @@ def _server_snapshot(
 ) -> dict[str, object]:
     if type(max_response_bytes) is not int or not 0 < max_response_bytes <= MAX_OUTPUT:
         raise ValueError("readiness response limit must be positive and at most two MiB")
-    if (type(timeout) not in (int, float) or not math.isfinite(timeout)
-            or not 0 < timeout <= 10):
+    if (type(timeout) not in (int, float) or not 0 < timeout <= 10
+            or not math.isfinite(timeout)):
         raise ValueError("readiness timeout is outside the admitted budget")
     if (type(base) is not str or not 1 <= len(base) <= 4096
             or any(ord(ch) <= 32 or ord(ch) == 127 for ch in base)
@@ -370,6 +370,10 @@ def _server_snapshot(
 
 def _bounded_server(root, base, token, timeout, *, endpoint, schema, max_response_bytes=MAX_OUTPUT):
     """A slow HTTP peer cannot retain a caller thread beyond the probe budget."""
+    if (type(timeout) not in (int,float) or not 0 < timeout <= 10
+            or not math.isfinite(timeout)
+            or type(max_response_bytes) is not int or not 0 < max_response_bytes <= MAX_OUTPUT):
+        return {"observed":False,"code":"server_inventory_protocol_invalid"}
     environment = {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8"}
     for key in (
         "SYSTEMROOT",
