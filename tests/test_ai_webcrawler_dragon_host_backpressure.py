@@ -518,5 +518,53 @@ class AcquisitionReadinessTests(unittest.TestCase):
         self.assertEqual(r["hosts"][0]["state"], "held_for_grant")
 
 
+class RedirectDenialConservationTests(unittest.TestCase):
+    def test_terminal_robots_denial_holds_original_and_redirected_authority(self):
+        for status, headers in ((403, {}), (451, {}), (200, {"cf-mitigated": "challenge"})):
+            with self.subTest(status=status):
+                class DeniedRobots(ThrottleFetcher):
+                    def fetch_once(self, url, *, user_agent, max_bytes):
+                        if url == "https://example.com/robots.txt":
+                            self.calls.append(url)
+                            return FetchResponse(url, 302, {
+                                "location": "https://example.org/robots.txt"}, b"", time.time())
+                        if url == "https://example.org/robots.txt":
+                            self.calls.append(url)
+                            return FetchResponse(url, status, headers, b"", time.time())
+                        return super().fetch_once(url, user_agent=user_agent, max_bytes=max_bytes)
+                fixture = CanonicalThrottleTests()
+                fetcher = DeniedRobots()
+                run, at = fixture.create(fetcher, hosts=("example.com", "example.org"))
+                fixture.tick(run, at + 1)
+                fixture.tick(run, at + 2)
+                snapshot = run.snapshot()
+                for host in ("example.com", "example.org"):
+                    self.assertGreaterEqual(snapshot["host_ready"][host], at + 3600)
+                resumed = CrawlRun.from_snapshot(snapshot, fetcher=fetcher)
+                fixture.tick(resumed, at + 300)
+                self.assertEqual(len(fetcher.calls), 2)
+                self.assertEqual(resumed.status()["source_count"], 0)
+
+
+class AccessOutcomeEconomicsTests(unittest.TestCase):
+    def test_rejected_success_http_status_cannot_improve_reliability_or_reduce_delay(self):
+        from skeleton.ai.webcrawler.acquisition_feedback import host_economics, settled_observation
+
+        def observation(kind, status):
+            return settled_observation(request=1, url="https://example.com/first",
+                kind=kind, status=status, latency_bucket=1, charged_bytes=0,
+                uncertain_bytes=0, event_sequence=1)
+
+        good = host_economics([observation("discovered", 200)], "example.com", floor=1)
+        for kind, status in (("rejected", 200), ("rejected", 302),
+                             ("source_rights_restricted", 200), ("rejected", 403)):
+            with self.subTest(kind=kind, status=status):
+                poor = host_economics([observation(kind, status)], "example.com", floor=1)
+                self.assertEqual(poor.successes, 0)
+                self.assertEqual(poor.failures, 1)
+                self.assertLess(poor.reliability, good.reliability)
+                self.assertGreaterEqual(poor.conservative_delay, good.conservative_delay)
+
+
 if __name__ == "__main__":
     unittest.main()
