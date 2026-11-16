@@ -284,6 +284,11 @@ function CrawlerContent() {
             <Text style={s.small}>{active.publisher_capture_review.denial_statuses} denial statuses · {active.publisher_capture_review.rejected_observations} rejected outcomes</Text>
             <Text style={s.small}>Metadata review only. No protocol, access rights, license, or source-use authorization verified.</Text>
           </>}
+          {active.publisher_archive_preflight && <>
+            <Text style={s.label}>Hoarder archive preflight · {label(active.publisher_archive_preflight.state)}</Text>
+            <Text style={s.small}>{active.publisher_archive_preflight.archive_policy_candidates} of {active.publisher_archive_preflight.retained_captures} retained captures satisfy the archive predicate. Checkpoint {active.publisher_archive_preflight.checkpoint_witnessed ? 'witnessed' : 'unwitnessed'}.</Text>
+            <Text style={s.small}>Separate archive acknowledgement is required. Raw dataset bytes and reuse rights are not verified by this preflight.</Text>
+          </>}
         </View>}
         <Text style={s.small}>{active.consent_current ? `Capture consent valid until ${new Date(active.consent_expires_at).toLocaleString()}` : 'Capture consent expired. Inspect retained records or create a new authorized crawl.'}</Text>
         <Text style={s.message}>Measured downloads: {bytes(active.counters.bytes)} / {bytes(active.limits.max_total_bytes)}</Text>
