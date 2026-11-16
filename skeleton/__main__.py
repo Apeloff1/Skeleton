@@ -7,6 +7,7 @@ Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
     offline-runtime  Inspect pinned local weights and measured resource admission
     weight-store     Stage pinned weights and inspect cooperative disk/recovery custody
+    emulator-lens-work-queue       Source-pinned Jeeves/Dragon/adversary review queue
     frontier-campaign-archive      Durable candidate campaign source replay and history
     grounded-quest-qualify           Execute signed-route quest and navigation qualification
     quest-trace-repair               Repair quest action traces under immutable source policy
@@ -1440,6 +1441,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         return recovered_main(rest)
     if cmd == "frontier-campaign-archive":
         from skeleton.app.frontier_campaign_archive_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "emulator-lens-work-queue":
+        from skeleton.app.emulator_lens_queue_cli import main as recovered_main
         return recovered_main(rest)
     if cmd == "app":
         from skeleton.app.cli import run_app_cli
