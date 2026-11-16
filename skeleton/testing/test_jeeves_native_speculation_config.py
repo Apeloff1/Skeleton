@@ -99,6 +99,34 @@ class NativeSpeculationConfigTests(unittest.TestCase):
             with self.subTest(args=args),self.assertRaises(ValueError):
                 replace(BASE,extra_args=args)
 
+    def test_explicit_sampler_profile_reaches_native_command(self):
+        model=self.fixture(BASE)
+        args=model._command(Path("prompt"),LocalInferenceRequest(
+            "hi",temperature=.7,top_k=17,top_p=.9,min_p=.03,repetition_penalty=1.15))
+        for key,value in (("--temp","0.7"),("--top-k","17"),("--top-p","0.9"),
+                          ("--min-p","0.03"),("--repeat-penalty","1.15")):
+            self.assertEqual(args[args.index(key)+1],value)
+
+    def test_default_sampler_preserves_deployment_options(self):
+        model=self.fixture(replace(BASE,temperature=.35,extra_args=("--top-k","18")))
+        args=model._command(Path("prompt"),LocalInferenceRequest("hi"))
+        self.assertEqual(args[args.index("--temp")+1],"0.35")
+        self.assertEqual(args.count("--top-k"),1)
+        self.assertEqual(args[args.index("--top-k")+1],"18")
+
+    def test_explicit_sampler_conflict_and_speculation_hold(self):
+        model=self.fixture(replace(BASE,extra_args=("--top-k=18",)))
+        with self.assertRaisesRegex(LlamaCppRuntimeError,"conflicts"):
+            model._command(Path("prompt"),LocalInferenceRequest("hi",temperature=.5))
+        spec=self.fixture(replace(BASE,**SPEC))
+        with self.assertRaisesRegex(LlamaCppRuntimeError,"greedy"):
+            spec._command(Path("prompt"),LocalInferenceRequest("hi",temperature=.5))
+
+    def test_cli_top_k_integer_bound(self):
+        with self.assertRaisesRegex(LlamaCppRuntimeError,"top_k"):
+            self.fixture(BASE)._command(Path("prompt"),
+                  LocalInferenceRequest("hi",top_k=2**31))
+
     def test_trained_context_is_independent_ceiling(self):
         obj=self.fixture(replace(BASE,**SPEC))
         obj._serving_metadata=GgufServingMetadata(architecture="llama",context_length=16)
