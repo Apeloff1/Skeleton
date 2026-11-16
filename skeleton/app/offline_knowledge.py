@@ -207,8 +207,7 @@ class OfflineKnowledgeLibrary:
         return payload
 
     @staticmethod
-    def _chunks(content: str) -> list[tuple[int, int, str]]:
-        rows: list[tuple[int, int, str]] = []
+    def _iter_chunks(content: str):
         start = 0
         while start < len(content):
             end = min(len(content), start + _CHUNK_CHARS)
@@ -218,11 +217,14 @@ class OfflineKnowledgeLibrary:
                     end = boundary
             if end <= start:
                 raise RuntimeContractError("invalid reference chunk boundary")
-            rows.append((start, end, content[start:end]))
+            yield start, end, content[start:end]
             if end == len(content):
                 break
             start = max(start + 1, end - _CHUNK_OVERLAP)
-        return rows
+
+    @staticmethod
+    def _chunks(content: str) -> list[tuple[int, int, str]]:
+        return list(OfflineKnowledgeLibrary._iter_chunks(content))
 
     def add_text(self, title: str, content: str) -> dict[str, Any]:
         import secrets
@@ -374,61 +376,138 @@ class OfflineKnowledgeLibrary:
                 }
         raise RuntimeContractError("unknown local reference document")
 
+    def _verified_search_pass(self, selected, *, consume):
+        """Verify a complete model scope one source at a time under one snapshot.
+
+        The caller owns the read transaction/lock. Source content and chunk
+        provenance are never trusted merely because SQL matched a term.
+        """
+        scope = (self.model_digest, self.tokenizer_digest)
+        rows = self.store._db.execute(
+            "SELECT document_id, LENGTH(CAST(content_text AS BLOB)) "
+            "FROM offline_documents WHERE model_digest=? AND tokenizer_digest=? "
+            "ORDER BY document_id", scope,
+        )
+        found = set()  # only requested IDs, never one entry per corpus document
+        try:
+            for doc_id, size in rows:
+                _require_local_headroom(int(size) * 2, storage_path=self._storage_path)
+                doc = self.store._db.execute(
+                    "SELECT title, content_digest, content_text FROM offline_documents "
+                    "WHERE document_id=? AND model_digest=? AND tokenizer_digest=?",
+                    (doc_id, *scope),
+                ).fetchone()
+                if doc is None:
+                    raise RuntimeContractError("reference source vanished inside snapshot")
+                title, digest, source = doc
+                payload = self._validate(title, source)
+                if sha256(payload).hexdigest() != _identity(digest, "document digest"):
+                    raise RuntimeContractError("reference source hash mismatch")
+                del payload
+                include = selected is None or doc_id in selected
+                if selected is not None and include:
+                    found.add(doc_id)
+                indexed = self.store._db.execute(
+                    "SELECT ordinal, char_start, char_end, content "
+                    "FROM offline_document_chunks WHERE document_id=? ORDER BY ordinal",
+                    (doc_id,),
+                )
+                try:
+                    for n, (start, end, passage) in enumerate(self._iter_chunks(source)):
+                        actual = indexed.fetchone()
+                        if actual is None:
+                            raise RuntimeContractError("reference source index is incomplete")
+                        if (type(actual[0]) is not int or actual[0] != n
+                                or type(actual[1]) is not int or actual[1] != start
+                                or type(actual[2]) is not int or actual[2] != end
+                                or actual[3] != passage):
+                            raise RuntimeContractError("reference passage provenance mismatch")
+                        if include:
+                            consume((doc_id, title, digest, n, start, end, passage))
+                    if indexed.fetchone() is not None:
+                        raise RuntimeContractError("reference source index contains extra passages")
+                finally:
+                    indexed.close()
+                del source, doc
+        finally:
+            rows.close()
+        if selected is not None and found != selected:
+            raise RuntimeContractError("selected local grounding source is unavailable")
+
     def search(self, query: str, *, limit: int = 6,
                document_ids: tuple[str, ...] | list[str] | None = None
                ) -> list[dict[str, Any]]:
+        """Exact two-pass search with bounded retained ranking state.
+
+        Every source and indexed slice remains verified inside a single read
+        snapshot. Only one document and at most `limit` scored passages are
+        retained in Python. No stale result cache or new index authority is
+        introduced. Work remains linear in total corpus size per pass.
+        """
         if (not isinstance(query, str) or not query.strip()
                 or len(query.encode("utf-8")) > MAX_QUERY_BYTES):
             raise RuntimeContractError("invalid local reference query")
         if type(limit) is not int or not 1 <= limit <= 12:
             raise RuntimeContractError("invalid reference search limit")
-        # Do not fall back to the entire library if an explicitly selected
-        # source was withdrawn, deleted or belongs to another model identity.
         from .offline_grounding import normalized_document_scope
-        selected = normalized_document_scope(document_ids)
+        normalized = normalized_document_scope(document_ids)
+        selected = None if normalized is None else set(normalized)
         terms = _terms(query)
         if not terms and selected is None:
             return []
-        documents, records = self._verified_snapshot()
-        if selected is not None:
-            known = {row[0] for row in documents}
-            if not set(selected).issubset(known):
-                raise RuntimeContractError("selected local grounding source is unavailable")
-            selected_set = set(selected)
-            records = [row for row in records if row[0] in selected_set]
-        if not terms:
-            return []
-        corpus: list[tuple[tuple[Any, ...], set[str], dict[str, int]]] = []
         df = {term: 0 for term in terms}
-        for row in records:
-            words = _TERMS.findall(unicodedata.normalize("NFKC", row[6]).casefold())
+        n = 0
+        best: list[LocalKnowledgeHit] = []
+        query_lower = unicodedata.normalize("NFKC", query.strip()).casefold()
+
+        def frequencies(row):
+            text = unicodedata.normalize("NFKC", row[6]).casefold()
             freqs: dict[str, int] = {}
-            for term in words:
-                if term in df:
-                    freqs[term] = freqs.get(term, 0) + 1
+            for token in _TERMS.findall(text):
+                if token in df:
+                    freqs[token] = freqs.get(token, 0) + 1
+            return text, freqs
+
+        def count(row):
+            nonlocal n
+            n += 1
+            _, freqs = frequencies(row)
             for token in freqs:
                 df[token] += 1
-            corpus.append((row, set(freqs), freqs))
-        n = len(corpus)
-        scored: list[LocalKnowledgeHit] = []
-        query_lower = unicodedata.normalize("NFKC", query.strip()).casefold()
-        for row, present, freqs in corpus:
-            if not present:
-                continue
-            score = sum(
+
+        def score(row):
+            text, freqs = frequencies(row)
+            if not freqs:
+                return
+            value = sum(
                 (1.0 + math.log1p(freqs[token]))
                 * math.log1p((n + 1) / (df[token] + 0.5))
-                for token in present
+                for token in sorted(freqs)
             )
-            if query_lower in unicodedata.normalize("NFKC", row[6]).casefold():
-                score += 2.0
-            scored.append(LocalKnowledgeHit(
+            if query_lower in text:
+                value += 2.0
+            hit = LocalKnowledgeHit(
                 document_id=row[0], title=row[1], sha256=row[2],
                 chunk_index=row[3], char_start=row[4], char_end=row[5],
-                passage=row[6], score=score,
-            ))
-        scored.sort(key=lambda hit: (-hit.score, hit.document_id, hit.chunk_index))
-        return [hit.to_dict() for hit in scored[:limit]]
+                passage=row[6], score=value,
+            )
+            best.append(hit)
+            best.sort(key=lambda x: (-x.score, x.document_id, x.chunk_index))
+            if len(best) > limit:
+                best.pop()
+
+        with self.store._lock:
+            own_snapshot = not self.store._db.in_transaction
+            if own_snapshot:
+                self.store._db.execute("BEGIN")
+            try:
+                self._verified_search_pass(selected, consume=count)
+                if terms and n:
+                    self._verified_search_pass(selected, consume=score)
+            finally:
+                if own_snapshot:
+                    self.store._db.execute("ROLLBACK")
+        return [hit.to_dict() for hit in best]
 
 
 __all__ = [
