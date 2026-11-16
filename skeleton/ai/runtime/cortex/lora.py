@@ -159,7 +159,7 @@ class LoRABank:
                 window = ids[max(0, i - ctx):i]
                 if not window:
                     continue
-                hidden, _ = lm._forward(window, retain_cache=False)
+                hidden, _ = lm._forward(window)
                 if not hidden:
                     continue
                 y = list(hidden[-1])
