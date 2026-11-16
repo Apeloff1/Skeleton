@@ -26,6 +26,7 @@ from core.dragon_game_corpus import CatalogueHeld
 
 VERSION=1
 MAX_JOBS=32
+MAX_BOOTSTRAP_ROWS=128
 MAX_RECORDS=512
 MAX_PLAN_BYTES=4*1024**2
 WORKERS=4
@@ -119,7 +120,7 @@ def _pending(db):
     if not isinstance(raw,str) or not 1<=len(raw.encode())<=MAX_PLAN_BYTES or hashlib.sha256(raw.encode()).hexdigest()!=row["sha256"]:
         raise a.GraphHeld("structural journal witness differs")
     plan=json.loads(raw)
-    if (not isinstance(plan,dict) or plan.get("sequence")!=row["sequence"] or plan.get("mode") not in {"catalogue","expansion"}
+    if (not isinstance(plan,dict) or plan.get("sequence")!=row["sequence"] or plan.get("mode") not in {"catalogue","expansion","bootstrap"}
             or not isinstance(plan.get("lanes"),dict) or len(plan["lanes"])>a.LANES or not isinstance(plan.get("jobs"),list)
             or not 1<=len(plan["jobs"])<=MAX_JOBS):
         raise a.GraphHeld("structural journal shape differs")
@@ -170,8 +171,8 @@ def _reserve_row(db,work,owner,row,parent,relation,witness,now):
 
 def reserve(root,mode):
     from core.dragon_lead_graph import (_schema_row,_locator,source_url,clean,digest,APPID,
-                                       ZERO,project,_quota_disk)
-    if mode not in {"catalogue","expansion"}:raise ValueError("structural mode")
+                                       ZERO,project,_quota_disk,bootstrap_inventory)
+    if mode not in {"catalogue","expansion","bootstrap"}:raise ValueError("structural mode")
     root=Path(root);_quota_disk(root)
     with a._probe_connection(root) as db:
         db.execute("BEGIN IMMEDIATE")
@@ -181,7 +182,16 @@ def reserve(root,mode):
                 db.execute("COMMIT");return previous
             seq=db.execute("SELECT sequence FROM main.dragon_graph_structural WHERE singleton=1").fetchone()[0]+1
             now=int(time.time())
-            if mode=="catalogue":
+            bootstrap=None
+            if mode=="bootstrap":
+                revision,inventory=bootstrap_inventory()
+                record=db.execute("""SELECT * FROM lead_owner WHERE enabled=1 AND due<=?
+                    AND (bootstrap_revision IS NULL OR bootstrap_revision<>? OR bootstrapped=0)
+                    ORDER BY due,owner LIMIT 1""",(now,revision)).fetchone()
+                if record is None:
+                    db.execute("COMMIT");return None
+                jobs=[]
+            elif mode=="catalogue":
                 jobs=db.execute("""SELECT j.owner,j.id,j.payload,j.batch,o.scope_json FROM lead_release_outbox q
                   JOIN release_jobs j ON j.owner=q.owner AND j.id=q.id
                   JOIN lead_owner o ON o.owner=q.owner
@@ -193,6 +203,19 @@ def reserve(root,mode):
                   ORDER BY j.created_at,j.owner,j.id LIMIT 16""").fetchall()
             work={"nodes":{},"edges":{},"owner_deltas":{},"deltas":{},"candidates":set(),"expansions":[]}
             planned=[]
+            if mode=="bootstrap":
+                owner=record["owner"]
+                if owner_key(json.loads(record["scope_json"]))!=owner:raise a.GraphHeld("bootstrap owner witness differs")
+                offset=record["bootstrap_cursor"] if record["bootstrap_revision"]==revision else 0
+                if type(offset) is not int or not 0<=offset<=len(inventory):raise a.GraphHeld("bootstrap cursor differs")
+                selected=inventory[offset:offset+MAX_BOOTSTRAP_ROWS]
+                for url,title,kind,subject,relation,source_revision,source_id in selected:
+                    _reserve_row(db,work,owner,_schema_row(url,title[:256],kind,subject),ZERO,relation,
+                                 digest([source_revision,source_id]),now)
+                cursor=offset+len(selected)
+                bootstrap={"owner":owner,"revision":revision,"cursor":cursor,"complete":cursor>=len(inventory),
+                           "processed":len(selected),"inventory_rows":len(inventory)}
+                planned.append({"owner":owner,"id":revision,"witness":_sha(dict(record)),"state":"done"})
             for raw in jobs:
                 job=dict(raw);owner=job["owner"];trial=deepcopy(work)
                 try:
@@ -223,7 +246,7 @@ def reserve(root,mode):
                 for pair in work[kind].values():
                     index=a.lane(pair[1][1] if kind=="nodes" else pair[1][3])
                     lanes.setdefault(str(index),{"nodes":[],"edges":[]})[kind].append(pair)
-            plan={"sequence":seq,"mode":mode,"now":now,"jobs":planned,"lanes":lanes,
+            plan={"sequence":seq,"mode":mode,"now":now,"jobs":planned,"lanes":lanes,"bootstrap":bootstrap,
                   "deltas":[[owner,index,*delta] for (owner,index),delta in sorted(work["deltas"].items())],
                   "candidates":[list(x) for x in sorted(work["candidates"])],"expansions":work["expansions"]}
             raw=_serialize(plan);witness=hashlib.sha256(raw.encode()).hexdigest()
@@ -321,7 +344,9 @@ def apply_lane(root,sequence,plan_sha,index):
 
 
 def _job_row(db,mode,owner,identifier):
-    if mode=="catalogue":
+    if mode=="bootstrap":
+        row=db.execute("SELECT * FROM main.lead_owner WHERE owner=?",(owner,)).fetchone()
+    elif mode=="catalogue":
         row=db.execute("""SELECT j.owner,j.id,j.payload,j.batch,o.scope_json FROM lead_release_outbox q
            JOIN release_jobs j ON j.owner=q.owner AND j.id=q.id JOIN lead_owner o ON o.owner=q.owner
            WHERE q.owner=? AND q.id=? AND q.state='queued' AND j.state='done'""",(owner,identifier)).fetchone()
@@ -368,16 +393,24 @@ def settle(root,sequence,plan_sha):
                            (owner,identifier,plan["now"],plan["now"]))
             for expansion in plan["expansions"]:
                 db.execute("INSERT OR IGNORE INTO lead_expand_jobs VALUES(?,?,?,?,?,?,?,?,?)",expansion)
-            table="lead_release_outbox" if plan["mode"]=="catalogue" else "lead_expand_jobs"
-            for job in plan["jobs"]:
-                if db.execute("UPDATE "+table+" SET state=? WHERE owner=? AND id=? AND state='queued'",
-                              (job["state"],job["owner"],job["id"])).rowcount!=1:raise a.GraphHeld("job settlement differs")
+            if plan["mode"]=="bootstrap":
+                cursor=plan["bootstrap"]
+                if db.execute("""UPDATE lead_owner SET bootstrap_revision=?,bootstrap_cursor=?,bootstrapped=?,due=?
+                    WHERE owner=?""",(cursor["revision"],cursor["cursor"],int(cursor["complete"]),plan["now"]+1,cursor["owner"])).rowcount!=1:
+                    raise a.GraphHeld("bootstrap cursor settlement differs")
+            else:
+                table="lead_release_outbox" if plan["mode"]=="catalogue" else "lead_expand_jobs"
+                for job in plan["jobs"]:
+                    if db.execute("UPDATE "+table+" SET state=? WHERE owner=? AND id=? AND state='queued'",
+                                  (job["state"],job["owner"],job["id"])).rowcount!=1:raise a.GraphHeld("job settlement differs")
             a._fence(db)
             db.execute("COMMIT")
         except BaseException:
             if db.in_transaction:db.execute("ROLLBACK")
             raise
-    return {"processed":sum(j["state"]=="done" for j in plan["jobs"]),
+    bootstrap=plan["bootstrap"]
+    return {"processed":bootstrap["processed"] if bootstrap else sum(j["state"]=="done" for j in plan["jobs"]),
+            **({"bootstrap_complete":bootstrap["complete"]} if bootstrap else {}),
             "held":sum(j["state"]=="held" for j in plan["jobs"]),"mode":plan["mode"],
             "sequence":sequence,"physical_lanes":len(plan["lanes"]),"network_executed":False}
 

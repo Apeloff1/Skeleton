@@ -354,6 +354,8 @@ class LeadGraph:
                 "network_authorized":False,"physical_capacity_verified":False}
 
     def bootstrap_pulse(self):
+        from core.dragon_graph_structural import configured,pulse
+        if configured(self.path):return pulse(self.path,"bootstrap")
         revision,inventory=bootstrap_inventory();now=int(time.time())
         _quota_disk(self.path)
         with self._db() as db:

@@ -173,3 +173,29 @@ class StructuralWriterTests(TestCase):
         with self.assertRaises(CatalogueHeld):structural.recover(self.base)
         self.assertEqual(structural.status(self.base)["state"],"pending")
         self.assertEqual(self.graph.authority_mode(),True)
+
+
+    def test_bootstrap_inventory_parallel_cursor_and_recovery(self):
+        rows=[]
+        for index in (1,3,5,7,9):
+            appid,url=self.source(index)
+            rows.append((url,"Seed Fixture "+appid,"storefront","steam:"+appid,"seed","rev",appid))
+        revision=digest(rows)
+        # Select one enabled owner deterministically; both owners retain
+        # independent bootstrap cursors, so disable the second fixture.
+        self.graph.configure(OTHER,enabled=False,acknowledged=True)
+        with patch("core.dragon_lead_graph.bootstrap_inventory",return_value=(revision,rows)):
+            plan,witness=structural.reserve(self.base,"bootstrap")
+            self.assertEqual(plan["bootstrap"]["cursor"],5)
+            self.assertEqual(len(plan["lanes"]),5)
+            structural.apply_lane(self.base,plan["sequence"],witness,1)
+            with self.assertRaises(CatalogueHeld):self.graph.page(OWNER)
+            result=structural.recover(self.base)
+            self.assertEqual(result["processed"],5)
+            self.assertTrue(result["bootstrap_complete"])
+            state=self.graph.status(OWNER)
+            self.assertEqual(state["bootstrap_cursor"],5)
+            self.assertEqual(state["nodes"],5)
+            self.assertEqual(state["edges"],5)
+            self.assertEqual(self.graph.bootstrap_pulse()["processed"],0)
+        self.assertTrue(qualify(self.base,full=True)["full_integrity_audit"])
