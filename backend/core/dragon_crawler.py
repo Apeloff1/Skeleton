@@ -126,8 +126,12 @@ def _safe_error(exc: BaseException) -> str:
 class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,DragonExhaustiveVectorMixin,DragonCurrentVectorMixin,DragonDenseArchiveMixin,DragonDeepArchiveMixin,DragonVaultMixin):
     def __init__(self, database=core_db):
         self.database = database
-        self.sessions = database["dragon_crawler_sessions"]
-        self.limits = database["dragon_crawler_commands"]
+        from core.dragon_mongo_cutover import requested
+        self._cutover_requested = database is core_db and requested()
+        self._cutover_active = False
+        self._mongo_client = None
+        self._sessions = database["dragon_crawler_sessions"]
+        self._limits = database["dragon_crawler_commands"]
         try:
             self.engine = EngineClient.from_env()
         except EngineClientError:
@@ -136,6 +140,41 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
         self._resource_governor = ResourceGovernor(MAX_CONCURRENT_SLICES)
         # Handles only: Mongo owns intent, reservations, leases and snapshots.
         self._workers: dict[str, tuple[threading.Event, asyncio.Future]] = {}
+
+    @property
+    def sessions(self):
+        if self._cutover_requested and not self._cutover_active:
+            raise CrawlerError("crawler_mongo_cutover_held","Dragon dedicated authority is not qualified.",503)
+        return self._sessions
+
+    @sessions.setter
+    def sessions(self,value):
+        self._sessions=value
+
+    @property
+    def limits(self):
+        if self._cutover_requested and not self._cutover_active:
+            raise CrawlerError("crawler_mongo_cutover_held","Dragon dedicated authority is not qualified.",503)
+        return self._limits
+
+    @limits.setter
+    def limits(self,value):
+        self._limits=value
+
+    async def activate_mongo_cutover(self):
+        if not self._cutover_requested:return {"configured":False}
+        from core.dragon_mongo_cutover import activate
+        self._cutover_active=False
+        try:
+            client,target=await activate(self.database,self._mongo_client)
+        except Exception:
+            raise CrawlerError("crawler_mongo_cutover_held","Dragon dedicated authority is not qualified.",503) from None
+        self._mongo_client=client
+        self._sessions=target["dragon_crawler_sessions"]
+        self._limits=target["dragon_crawler_commands"]
+        self._indexes_ready=False
+        self._cutover_active=True
+        return {"configured":True,"active":True}
 
     async def ensure_indexes(self):
         if not self._indexes_ready:
@@ -211,6 +250,10 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                 "crawler_runtime_unavailable",
                 "Install the canonical crawler runtime with the application.",
             )
+        except CrawlerError as exc:
+            if exc.code=="crawler_mongo_cutover_held":
+                code=exc.code;message="Dragon dedicated authority is held; no legacy fallback."
+            else:raise
         except (PyMongoError, TimeoutError):
             pass
         return self._readiness_payload(available, code, message)
@@ -234,7 +277,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                 if available
                 else "Run first-install diagnostics and configure CORE_DB and canonical engine storage admission."
             ),
-            "storage_authority": "CORE_DB Mongo",
+            "storage_authority": "dedicated Dragon Mongo" if self._cutover_active else ("held dedicated Dragon Mongo" if self._cutover_requested else "CORE_DB Mongo"),
             "network_reachability_verified": False,
             "capabilities": {
                 "manual_crawl": available,

@@ -22,7 +22,7 @@ from pymongo.errors import DuplicateKeyError,PyMongoError
 from pymongo.read_concern import ReadConcern
 from pymongo.write_concern import WriteConcern
 
-from core.dragon_graph_deployment import _ack,_dir,_new_json,_read_json
+from core.dragon_graph_deployment import _ack,_dir,_new_json,_read_json,_json,DeploymentHeld
 
 
 COLLECTIONS=("dragon_crawler_sessions","dragon_crawler_commands")
@@ -81,7 +81,7 @@ def _metadata(db,name):
 
 
 def _raw(db,name):
-    return db.get_collection(name,codec_options=RAW,read_concern=ReadConcern("local"),
+    return db.get_collection(name,codec_options=RAW,read_concern=ReadConcern("majority"),
                              write_concern=WriteConcern(w="majority",j=True,wtimeout=15000))
 
 
@@ -118,7 +118,11 @@ def _source_state(source):
 
 
 def _fresh_target(target):
-    if target.list_collection_names():raise RelocationHeld("destination database must be empty on first preparation")
+    names=set(target.list_collection_names())
+    if names=={JOURNAL} and target[JOURNAL].find_one({}) is None:
+        _metadata(target,JOURNAL)
+        return
+    if names:raise RelocationHeld("destination database must be empty on first preparation")
     target.create_collection(JOURNAL)
 
 
@@ -262,7 +266,7 @@ def verify(source,target,*,offline_acknowledged=False):
     if _source_state(source)!=state["source"]:raise RelocationHeld("source changed during final verification")
     receipt={"version":1,"source_db":source.name,"target_db":target.name,
              "source":state["source"],"target":state["target"],"verified":True}
-    witness=_digest(receipt)
+    witness=hashlib.sha256(_json(receipt)).hexdigest()
     result=_journal(target).update_one({"_id":MARKER,"phase":{"$in":["copying","verified"]}},
                                       {"$set":{"phase":"verified","receipt_sha":witness}})
     if result.matched_count!=1:raise RelocationHeld("verification publication raced")
@@ -307,7 +311,7 @@ def main():
                         if _read_json(path)!=value:raise RelocationHeld("existing receipt differs")
                     else:_new_json(path,value)
             print(json.dumps(value,sort_keys=True))
-    except (PyMongoError,RelocationHeld,ValueError,OSError) as exc:
+    except (PyMongoError,RelocationHeld,DeploymentHeld,ValueError,OSError) as exc:
         # Mongo exceptions may expose connection endpoints or payload values.
         # Only the class is emitted; no source records, URI or credentials.
         p.exit(1,"Dragon relocation held: "+type(exc).__name__+"\n")
