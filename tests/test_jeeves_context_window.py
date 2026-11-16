@@ -414,3 +414,79 @@ def test_real_context_cognitive_preview_opt_in_and_no_second_generation(tmp_path
         assert error.value.status == 400
     finally:
         app.close()
+
+
+def _paired_calibration_fixture():
+    from scripts.evaluate_jeeves_calibration import _hash
+    profiles = []
+    for seed in ("c", "d"):
+        pair = {"model_sha256": seed*64, "policy_sha256": "e"*64}
+        profiles.append({**pair, "profile_sha256": _hash(pair)})
+    a, b = [p["profile_sha256"] for p in profiles]
+    cases = []
+    for i in range(20):
+        cases.append({
+            "case_sha256": sha256(str(i).encode()).hexdigest(),
+            "stratum": "code" if i < 10 else "reasoning",
+            "results": {
+                a: {"response_sha256": "1"*64, "confidence_ppm": 500_000,
+                    "correct": i < 10, "abstained": False, "elapsed_ms": 10},
+                b: {"response_sha256": "2"*64, "confidence_ppm": 900_000 if i < 15 else 0,
+                    "correct": i < 15, "abstained": i >= 15, "elapsed_ms": 12},
+            },
+        })
+    return {"holdout_sha256": "a"*64, "evaluator_sha256": "b"*64,
+            "profiles": profiles, "cases": cases}
+
+
+def test_paired_calibration_distinguishes_accuracy_coverage_and_uncertainty():
+    from scripts.evaluate_jeeves_calibration import evaluate, _hash
+    fixture = _paired_calibration_fixture()
+    report = evaluate(fixture)
+    a, b = [p["profile_sha256"] for p in fixture["profiles"]]
+    left, right = report["overall"][a], report["overall"][b]
+    assert left["all_case_accuracy"] == .5
+    assert left["brier_answered"] == .25
+    assert left["ece10_answered"] == 0
+    assert right["all_case_accuracy"] == .75
+    assert right["coverage"] == .75
+    assert right["answered_accuracy"] == 1
+    assert right["brier_answered"] == pytest.approx(.01)
+    assert right["ece10_answered"] == pytest.approx(.1)
+    assert right["risk_coverage"][-1]["selective_accuracy"] is None
+    assert report["paired"]["right_only_correct"] == 5
+    assert report["paired"]["mcnemar_two_sided_exact_p"] == .0625
+    assert report["strata"]["reasoning"][b]["coverage"] == .5
+    assert report["production_quality_certified"] is False
+    assert report["activation_authorized"] is False
+    assert report["report_sha256"] == _hash({
+        k: v for k, v in report.items() if k != "report_sha256"})
+
+
+def test_paired_calibration_fails_closed_on_missing_pairs_and_invalid_labels():
+    from scripts.evaluate_jeeves_calibration import evaluate
+    fixture = _paired_calibration_fixture()
+    a = fixture["profiles"][0]["profile_sha256"]
+    fixture["cases"][0]["results"][a]["correct"] = 1
+    with pytest.raises(ValueError):
+        evaluate(fixture)
+    fixture["cases"][0]["results"][a]["correct"] = True
+    del fixture["cases"][0]["results"][a]
+    with pytest.raises(ValueError, match="complete paired"):
+        evaluate(fixture)
+    fixture = _paired_calibration_fixture()
+    fixture["evaluator_sha256"] = fixture["profiles"][0]["model_sha256"]
+    with pytest.raises(ValueError, match="separately"):
+        evaluate(fixture)
+
+
+def test_paired_calibration_rejects_changed_bytes_duplicate_keys_and_nonfinite(tmp_path):
+    from scripts.evaluate_jeeves_calibration import load_pinned
+    destination = tmp_path / "calibration.json"
+    for raw in (b'{"x":1,"x":2}', b'{"x":NaN}'):
+        destination.write_bytes(raw)
+        with pytest.raises(ValueError):
+            load_pinned(destination, sha256(raw).hexdigest())
+    destination.write_bytes(b"{}")
+    with pytest.raises(ValueError, match="identity"):
+        load_pinned(destination, "a"*64)
