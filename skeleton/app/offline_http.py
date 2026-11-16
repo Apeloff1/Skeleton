@@ -1024,6 +1024,52 @@ class OfflineHTTPApplication:
                  if key != "expected_metadata_revision"},
                 expected_metadata_revision=body.get("expected_metadata_revision"),
             )
+        if tail == "cognition-preview" and method == "POST":
+            # Explicit, same-model conversation selection. Never create an
+            # inferred memory, mutate a transcript, or grant execution.
+            from skeleton.app.jeeves_chat_cognition import (
+                CognitionRejected, SessionSnapshot, checked_text,
+                preview, session_ids,
+            )
+            _fields(body, {"message", "grounded", "recall_session_ids"}, {"message"})
+            try:
+                message = checked_text(body["message"])
+                grounded = body.get("grounded", False)
+                if type(grounded) is not bool:
+                    raise CognitionRejected("invalid grounding flag")
+                if grounded and len(message.encode("utf-8")) > 1024:
+                    raise CognitionRejected("grounded question exceeds query budget")
+                extra = session_ids(body.get("recall_session_ids", []))
+                if sid in extra:
+                    raise CognitionRejected("current conversation already selected")
+                # One SQLite snapshot binds excerpts and revisions together
+                # even when another process is committing a conversation.
+                with self._store.read_snapshot():
+                    snapshots = []
+                    for selected in (sid, *extra):
+                        stored = self._session(selected)
+                        snapshots.append(SessionSnapshot(
+                            selected, stored.revision, stored.transcript.to_list()
+                        ))
+                context = (self.backend.runtime.limits.max_context
+                           if hasattr(self.backend, "runtime")
+                           else self.backend.config.context_size or 4096)
+                output = (self.backend.runtime.limits.max_new_tokens
+                          if hasattr(self.backend, "runtime") else 8192)
+                maximum = min(output, max(1, context - 1))
+                report = preview(
+                    message=message, snapshots=snapshots,
+                    max_output_tokens=maximum,
+                    default_output_tokens=min(maximum, self.default_output_tokens),
+                    grounded=grounded,
+                )
+                return 200, {
+                    **report, "model_digest": self.model_digest,
+                    "tokenizer_digest": self.tokenizer_digest,
+                    "preview_is_admission_proof": False,
+                }
+            except CognitionRejected:
+                raise OfflineHTTPError(400, "invalid bounded cognition preview") from None
         if tail == "context-preview" and method == "POST":
             # Local-only read-only estimate; the actual new turn still
             # validates full-history retention and GGUF native admission.
