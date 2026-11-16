@@ -209,3 +209,48 @@ def test_whole_request_never_dispatches_partial_token_reservation(tmp_path, monk
             await engine.close()
 
     asyncio.run(run())
+
+
+def test_queue_close_reports_inflight_until_executor_releases(tmp_path, monkeypatch):
+    queue, executor = make_queue(tmp_path, monkeypatch, max_active=1)
+    queue.submit(BatchRequest("running", 2, 2), timeout_ms=10000)
+    queue.tick()
+    entered = threading.Event()
+    resume = threading.Event()
+    errors = []
+
+    def blocked(*, request_id, phase, tokens, deadline_ns, cancel):
+        entered.set()
+        assert resume.wait(5)
+        assert cancel.is_set()
+        return Progress(request_id, phase, tokens)
+
+    executor.run_slice = blocked
+
+    def worker():
+        try:
+            queue.tick()
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    try:
+        assert entered.wait(5)
+        queue.close()
+        pending = queue.status()
+        assert pending["closed"] and pending["iteration_in_progress"]
+        assert not pending["drain_complete"]
+        assert pending["capacity"]["kv_used_bytes"] > 0
+        assert executor.releases == []
+    finally:
+        resume.set()
+        thread.join(timeout=5)
+    assert not thread.is_alive()
+    assert not errors
+    assert queue.status()["drain_complete"]
+    assert queue.status()["capacity"]["kv_used_bytes"] == 0
+    assert executor.releases == ["running"]
+    with pytest.raises(RuntimePreflightError):
+        queue.tick()
+    assert not queue.status()["poisoned"]
