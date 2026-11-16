@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from contextlib import nullcontext
 from hashlib import sha256
 import json
 from threading import RLock
@@ -121,15 +122,37 @@ class SwarmRecoveryManager:
 
     def checkpoint(self, runtime: SwarmRuntime, tenant_broker: TenantSwarmBroker | None = None) -> int:
         """Capture runtime and tenant ownership transactionally at one sequence."""
-        with self._lock:
+        if tenant_broker is not None and tenant_broker.broker.runtime is not runtime:
+            raise ValueError("tenant broker is bound to another runtime")
+        if runtime.fenced and (tenant_broker is None or not tenant_broker.verified_mode):
+            raise ValueError("fenced checkpoint requires verified tenant custody")
+        tenant_lock = tenant_broker._lock if tenant_broker is not None else nullcontext()
+        runtime_lock = getattr(runtime, "_lock", None) or nullcontext()
+        # The same lock order as verified tenant dispatch; paired capture may
+        # not interleave with a lease publication or tenant quota transition.
+        with tenant_lock, runtime_lock, self._lock:
+            if tenant_broker is not None and tenant_broker.verified_mode:
+                tenant_broker._assert_active()
+                if any(tenant_broker.reconcile().values()):
+                    raise ValueError("verified tenant accounting must be reconciled before capture")
+                for task in runtime.tasks():
+                    if tenant_broker.tenant_for(task.id) is None:
+                        raise ValueError("unaccounted verified task cannot be checkpointed")
+            old_runtime = self.store.history()
+            old_tenants = self.tenant_store.history()
             checkpoint = self.store.capture(runtime)
             if tenant_broker is None:
                 return checkpoint.sequence
             try:
                 self.tenant_store.capture(checkpoint.sequence, tenant_broker)
             except Exception:
-                self.store.discard(checkpoint.sequence)
-                self.tenant_store.discard(checkpoint.sequence)
+                # An append can evict the oldest record. Discard alone is not
+                # a rollback when the retention ring has reached capacity.
+                with self.store._lock, self.tenant_store._lock:
+                    self.store._items.clear()
+                    self.store._items.extend(old_runtime)
+                    self.tenant_store._items.clear()
+                    self.tenant_store._items.extend(old_tenants)
                 raise
             return checkpoint.sequence
 
@@ -273,7 +296,7 @@ class SwarmRecoveryManager:
         sequence: int | None = None,
     ) -> TenantRepairResult | None:
         """Restore tenant ownership for a runtime checkpoint when sidecar metadata exists."""
-        with self._lock:
+        with tenant_broker._lock, self._lock:
             target_sequence = sequence
             if target_sequence is None:
                 latest = self.store.latest()

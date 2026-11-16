@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 from skeleton.automation.agents.swarm_recovery import RECOVERY_ARCHIVE_VERSION, SwarmRecoveryManager
-from skeleton.automation.agents.swarm_runtime import SwarmRuntime
+from skeleton.automation.agents.swarm_runtime import SwarmRuntime, SwarmTask, TaskState
 from skeleton.automation.agents.swarm_tenant_broker import TenantSwarmBroker
 from skeleton.state import CheckpointRecord, ResumeState
 
@@ -55,7 +55,7 @@ class DurableSwarmRecovery:
     resume: ResumeState
 
     def restore_runtime(self):
-        """Restore the latest retained swarm runtime, requeuing persisted leases."""
+        """Restore legacy leases or hold fenced attempts for reconciliation."""
         return self.manager.restore_latest()
 
 
@@ -114,19 +114,65 @@ class SwarmDurableBridge:
         if tenant_broker is not None and not isinstance(tenant_broker, TenantSwarmBroker):
             raise TypeError("tenant_broker must be a TenantSwarmBroker or None")
 
-        sequence = manager.checkpoint(runtime, tenant_broker)
-        try:
-            checkpoint = self.persist(
-                run_id,
-                worker_id,
-                manager,
-                after_step_id=after_step_id,
-            )
-        except Exception:
-            manager.store.discard(sequence)
-            manager.tenant_store.discard(sequence)
-            raise
-        return DurableSwarmCapture(sequence, checkpoint)
+        # Keep old retained snapshots even when an append evicts a ring entry.
+        # Hold the owner locks across storage publication, not model execution.
+        from contextlib import nullcontext
+        tenant_lock = tenant_broker._lock if tenant_broker is not None else nullcontext()
+        runtime_lock = getattr(runtime, "_lock", None) or nullcontext()
+        with tenant_lock, runtime_lock, manager._lock:
+            prior_runtime = manager.store.history()
+            prior_tenants = manager.tenant_store.history()
+            sequence = manager.checkpoint(runtime, tenant_broker)
+            try:
+                checkpoint = self.persist(
+                    run_id, worker_id, manager, after_step_id=after_step_id,
+                )
+            except Exception:
+                with manager.store._lock, manager.tenant_store._lock:
+                    manager.store._items.clear()
+                    manager.store._items.extend(prior_runtime)
+                    manager.tenant_store._items.clear()
+                    manager.tenant_store._items.extend(prior_tenants)
+                raise
+            return DurableSwarmCapture(sequence, checkpoint)
+
+    def lease_and_capture_verified(self, run_id: str, worker_id: str,
+                                   manager: SwarmRecoveryManager,
+                                   tenant_broker: TenantSwarmBroker,
+                                   candidates: tuple, *, now_ms: int
+                                   ) -> tuple[str, SwarmTask, DurableSwarmCapture] | None:
+        """Trusted owner boundary: commit the lease before returning its token.
+
+        The existing durable run store must already own the exclusive run
+        writer lease. No independent distributed writer election is supplied.
+        If storage or its acknowledgement is uncertain, retire this broker
+        generation and retain the task's worker and tenant custody; never
+        publish the lease to a worker or automatically replay the task.
+        """
+        if not tenant_broker.verified_mode:
+            raise DurableSwarmError("verified tenant custody required")
+        runtime = tenant_broker.broker.runtime
+        with tenant_broker._lock, runtime._lock, manager._lock:
+            tenant_broker._assert_verified()
+            selected = tenant_broker.lease_ranked_verified(candidates, now_ms=now_ms)
+            if selected is None:
+                return None
+            tenant, task = selected
+            try:
+                capture = self.capture(run_id, worker_id, manager, runtime,
+                                       tenant_broker=tenant_broker)
+                latest = self.store.resume_state(run_id).checkpoint
+                if (latest is None or latest.state_version != RECOVERY_ARCHIVE_VERSION
+                        or manager._json_bytes(latest.state) != manager._json_bytes(capture.checkpoint.state)
+                        or manager._json_bytes(latest.state) != manager._json_bytes(manager.export_archive())):
+                    raise DurableSwarmError("durable attempt publication readback mismatch")
+            except Exception as exc:
+                resident = runtime.task(task.id)
+                if resident is not None and resident.state is TaskState.LEASED:
+                    runtime._hold_uncertain(resident, reason="durable dispatch acknowledgement uncertain")
+                tenant_broker.retire()
+                raise DurableSwarmError("verified dispatch stopped; reconcile durable custody") from exc
+            return tenant, task, capture
 
     def load(self, run_id: str) -> DurableSwarmRecovery | None:
         """Load and verify the latest durable swarm archive for an outer run."""

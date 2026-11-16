@@ -324,3 +324,22 @@ and deadline capacity, never writes or unknown-effect tasks.
 New partial targets: 10, 28, 30, 52, 53, 64, 65, 67, 69.
 No live graph rewrite, speculative execution, compensation execution or
 distributed deadlock resolution is enabled by these proposal functions.
+
+## Wave 12: existing tenant authority and durable dispatch publication
+
+The ranked scheduler now drives exact leasing through the verified tenant broker,
+not merely an advisory ranking. It validates the explicitly authorized candidate
+set against registered tenant, priority, dependency state and quota, honors
+protected priority and weighted active shares, and retains supervisor eligibility.
+The existing recovery manager captures tenant/runtime state under aligned locks;
+fenced state requires paired tenant custody. The durable bridge can issue a
+ranked attempt only after the existing run store commits and reads back its
+archive. Storage failure or ambiguous acknowledgement retires that broker
+generation and retains uncertain worker/tenant slots without returning a token.
+Full history-ring rollback preserves evicted records on failed capture.
+The caller must already hold the canonical run-writer lease. No remote cluster,
+external exactly-once effect or production durable store benchmark is claimed.
+
+Current source register: 54/72 partially implemented targets, not 54 completed.
+New live integration strengthens previously partial targets 1, 2, 4, 14, 49,
+51 and 54. Remaining source gaps and all competitive qualification remain open.

@@ -10,6 +10,7 @@ from skeleton.automation.agents.swarm_broker import CompletionResult, SwarmBroke
 from skeleton.automation.agents.swarm_ingress import IngressDecision, SwarmIngressGovernor
 from skeleton.automation.agents.swarm_lease_rollback import rollback_exact_lease
 from skeleton.automation.agents.swarm_runtime import AdmissionError, LeaseError, SwarmTask, TaskState
+from skeleton.automation.agents.swarm_quota import QuotaExceeded
 
 TERMINAL_STATES = {TaskState.SUCCEEDED, TaskState.DEAD, TaskState.CANCELLED, TaskState.FAILED}
 
@@ -302,6 +303,59 @@ class TenantSwarmBroker:
             if result is None:
                 self.ingress.mark_requeued(tenant, task_id)
             return result
+
+    def lease_ranked_verified(self, candidates: tuple, *, now_ms: int,
+                              aging_interval_ms: int = 30_000) -> tuple[str, SwarmTask] | None:
+        """Rank an explicitly host-authorized set, then lease through this owner.
+
+        Scheduling observations cannot change an admitted task's tenant or
+        priority. Every reservation uses existing tenant quota, supervisor
+        health/capability checks, and exact runtime leasing. The caller must
+        authenticate the supplied observation set before calling.
+        """
+        from skeleton.intelligence.dispatch_policy import DispatchCandidate, rank_candidates
+
+        if type(candidates) is not tuple or len(candidates) > 4096:
+            raise AdmissionError("invalid authorized dispatch candidate set")
+        runtime = self.broker.runtime
+        with self._lock, runtime._lock:
+            self._assert_verified()
+            seen: set[str] = set()
+            active: dict[str, int] = {}
+            eligible: list[DispatchCandidate] = []
+            by_id: dict[str, DispatchCandidate] = {}
+            for candidate in candidates:
+                if not isinstance(candidate, DispatchCandidate) or candidate.ticket_id in seen:
+                    raise AdmissionError("invalid or duplicate dispatch observation")
+                seen.add(candidate.ticket_id)
+                if self.tenant_for(candidate.ticket_id) != candidate.tenant_id:
+                    raise AdmissionError("dispatch observation tenant mismatch")
+                task = runtime.task(candidate.ticket_id)
+                if task is None or task.priority != candidate.priority:
+                    raise AdmissionError("dispatch observation identity mismatch")
+                if task.state is not TaskState.QUEUED or runtime.blocked_dependencies(task.id):
+                    continue
+                if self.ingress.phase(candidate.tenant_id, task.id) != "queued":
+                    raise AdmissionError("queued tenant quota missing")
+                usage = self.ingress.quota.usage(candidate.tenant_id)
+                if usage.leased >= self.ingress.quota.limit(candidate.tenant_id).max_leased:
+                    continue
+                active[candidate.tenant_id] = usage.leased
+                by_id[task.id] = candidate
+                eligible.append(candidate)
+            configured = self.ingress.fairness.configured_weights()
+            weights = {tenant: min(1000, configured.get(tenant, self.ingress.fairness.default_weight))
+                       for tenant in active}
+            for entry in rank_candidates(eligible, now_ms=now_ms, tenant_active=active,
+                                         tenant_weights=weights, aging_interval_ms=aging_interval_ms):
+                candidate = by_id[entry.ticket_id]
+                try:
+                    lease = self.lease_verified(candidate.tenant_id, candidate.ticket_id)
+                except QuotaExceeded:
+                    continue
+                if lease is not None:
+                    return candidate.tenant_id, lease
+            return None
 
     def _sync_verified_outcome(self, tenant: str, task: SwarmTask) -> None:
         if task.effect_uncertain:

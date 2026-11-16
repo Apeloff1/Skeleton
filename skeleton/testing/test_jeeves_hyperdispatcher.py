@@ -807,3 +807,89 @@ def test_speculative_hedge_rejects_effectful_and_unbudgeted_work():
     assert not propose_hedge(replace(o, spare_units=1))
     assert not propose_hedge(replace(o, alternative_domain="a"))
     assert not propose_hedge(replace(o, deadline_remaining_ms=59))
+
+def _verified_dispatch_fixture():
+    from skeleton.automation.agents.swarm_broker import SwarmBroker
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_runtime import SwarmTask
+    from skeleton.automation.agents.swarm_tenant_broker import TenantSwarmBroker
+    runtime = HardenedSwarmRuntime(fenced=True, clock=lambda: 10.0)
+    runtime.register_worker("w", capacity=2)
+    broker = TenantSwarmBroker(SwarmBroker(runtime, verify_worker=lambda *args: False), verified_mode=True)
+    broker.submit_verified_queued("a", SwarmTask("a", {}, priority=100))
+    broker.submit_verified_queued("b", SwarmTask("b", {}, priority=0))
+    return runtime, broker
+
+
+def test_ranked_verified_dispatch_preserves_authorized_set_and_priority():
+    from skeleton.automation.agents.swarm_runtime import AdmissionError, TaskState
+    from skeleton.intelligence.dispatch_policy import DispatchCandidate
+    runtime, broker = _verified_dispatch_fixture()
+    a = DispatchCandidate("a", "a", 100, 0)
+    b = DispatchCandidate("b", "b", 0, 0)
+    with pytest.raises(AdmissionError):
+        broker.lease_ranked_verified((replace(a, priority=0),), now_ms=10_000)
+    with pytest.raises(AdmissionError):
+        broker.lease_ranked_verified((replace(a, tenant_id="b"),), now_ms=10_000)
+    tenant, task = broker.lease_ranked_verified((a, b), now_ms=10_000)
+    assert tenant == "b" and task.id == "b"
+    assert runtime.task("a").state is TaskState.QUEUED
+    assert broker.lease_ranked_verified((b,), now_ms=10_000) is None
+
+
+class _DispatcherCheckpointFixture:
+    """Instrumented store double: not physical SQLite qualification."""
+    def __init__(self):
+        self.latest = None
+        self.fail = False
+
+    def checkpoint(self, run_id, state, *, worker_id, after_step_id=None, state_version=1):
+        from types import SimpleNamespace
+        import json
+        if self.fail:
+            raise OSError("deliberate fixture storage failure")
+        self.latest = SimpleNamespace(state=json.loads(json.dumps(state)), state_version=state_version)
+        return self.latest
+
+    def resume_state(self, run_id):
+        from types import SimpleNamespace
+        return SimpleNamespace(checkpoint=self.latest)
+
+
+def test_verified_dispatch_token_return_requires_durable_readback():
+    from skeleton.automation.agents.swarm_durable import SwarmDurableBridge
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.intelligence.dispatch_policy import DispatchCandidate
+    runtime, broker = _verified_dispatch_fixture()
+    store = _DispatcherCheckpointFixture()
+    manager = SwarmRecoveryManager(max_checkpoints=1)
+    bridge = SwarmDurableBridge(store)
+    tenant, lease, capture = bridge.lease_and_capture_verified(
+        "run", "owner", manager, broker, (DispatchCandidate("a", "a", 100, 0),), now_ms=10_000)
+    assert tenant == "a" and lease.lease_token
+    assert capture.checkpoint is store.latest
+    restored = SwarmRecoveryManager.from_archive(store.latest.state).restore_latest()
+    assert restored.task("a").effect_uncertain
+    assert restored.task("a").lease_token == lease.lease_token
+
+
+def test_failed_durable_dispatch_holds_capacity_and_preserves_full_ring():
+    from skeleton.automation.agents.swarm_durable import SwarmDurableBridge, DurableSwarmError
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.automation.agents.swarm_runtime import AdmissionError
+    from skeleton.intelligence.dispatch_policy import DispatchCandidate
+    runtime, broker = _verified_dispatch_fixture()
+    store = _DispatcherCheckpointFixture()
+    manager = SwarmRecoveryManager(max_checkpoints=1)
+    bridge = SwarmDurableBridge(store)
+    initial = bridge.capture("run", "owner", manager, runtime, tenant_broker=broker)
+    store.fail = True
+    with pytest.raises(DurableSwarmError):
+        bridge.lease_and_capture_verified("run", "owner", manager, broker,
+            (DispatchCandidate("a", "a", 100, 0),), now_ms=10_000)
+    assert manager.store.sequences() == (initial.swarm_sequence,)
+    assert manager.tenant_store.sequences() == (initial.swarm_sequence,)
+    assert runtime.task("a").effect_uncertain and broker.is_retired()
+    assert broker.ingress.quota.usage("a").leased == 1
+    with pytest.raises(AdmissionError):
+        broker.lease_verified("b", "b")
