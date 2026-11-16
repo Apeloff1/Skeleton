@@ -15,8 +15,12 @@ import time
 
 from skeleton.ai.runtime.inference.deployment import LocalModelDeployment
 from skeleton.ai.runtime.inference.guarded_composition import ProtectedLocalComponents
-from skeleton.ai.runtime.inference.llama_cpp import LlamaCppModel
-from skeleton.ai.runtime.inference.local import LocalModelAdapter
+from skeleton.ai.runtime.inference.llama_cpp import (
+    COMPLETION_CHAT_FLAGS, QWEN3_COMPLETION_CHAT_TEMPLATE, LlamaCppModel,
+)
+from skeleton.ai.runtime.inference.adaptive_serving import AdaptiveServingController
+from skeleton.app.offline_cpu_budget import MemoryTopology
+from skeleton.ai.runtime.inference.local import LocalModelAdapter, sample_serving_resources
 from skeleton.app.offline_runtime_preflight import (
     ModelSource, RuntimePolicy, canonical, digest, identity, inspect_source,
     plan_preflight, require, sample_hardware, integer,
@@ -42,8 +46,12 @@ class MeasuredLlamaCpuGate:
         require(policy.backend == "cpu" and policy.verify_gguf_headers,
                 "measured native gate requires CPU and GGUF framing")
         config = backend.config
-        require(config.gpu_layers == 0 and config.kv_cache_location in ("backend", "cpu"),
+        require(config.gpu_layers == 0 and config.kv_cache_location in ("backend", "host"),
                 "measured CPU gate cannot authorize device offload")
+        permitted = ((), tuple(COMPLETION_CHAT_FLAGS),
+                     tuple(COMPLETION_CHAT_FLAGS) + ("--chat-template", QWEN3_COMPLETION_CHAT_TEMPLATE))
+        require(config.extra_args in permitted and not config.environment,
+                "measured CPU gate requires a fixed native argument profile")
         require(config.threads is not None and config.context_size is not None,
                 "explicit native thread and context limits required")
         require(config.rehash_artifacts_each_run,
@@ -88,20 +96,42 @@ class MeasuredLlamaCpuGate:
                     "native execution profile changed")
             reading = sample_hardware()
             require(reading.origin == "local_probe", "real local probe required")
+            # The canonical inference engine probe follows nested cgroups,
+            # Windows commit limits and pressure signals. Do not count host
+            # free memory that its scoped probe cannot actually allocate.
+            serving = sample_serving_resources()
+            scoped = serving.allocation_headroom_bytes
+            available = reading.memory.available_bytes
+            if scoped is None or available is None or serving.available_memory_bytes is None:
+                available = None
+            else:
+                available = min(scoped, available)
+            reading = replace(reading, memory=MemoryTopology(
+                reading.memory.total_bytes, available, "intersection-with-serving-headroom"))
             now = time.monotonic_ns()
             planned = plan_preflight(self._source, reading, self._policy, now_ns=now)
+            # Fresh classification per invocation: the canonical controller
+            # throttles consecutive samples internally, which must not hide
+            # a critical observation at the actual child-spawn boundary.
+            pressure = AdaptiveServingController(1)
+            pressure.update(serving, now=now / 1_000_000_000, queued=0)
             # Treat the canonical energy-reduced worker ceiling as a
             # conservative maximum for native threads. An already activated
             # runtime must not silently rewrite its pinned execution profile.
-            admitted = planned["status"] == "candidate" and planned["worker_ceiling"] >= self._threads
+            admitted = (planned["status"] == "candidate" and planned["worker_ceiling"] >= self._threads
+                        and pressure.level != "critical")
             self._sequence += 1
             blockers = list(planned["blockers"])
+            if pressure.level == "critical":
+                blockers.append("canonical_serving_" + pressure.reason)
             if planned["worker_ceiling"] < self._threads:
                 blockers.append("native_thread_ceiling_exceeded")
             body = {"schema": SCHEMA, "sequence": self._sequence,
                     "source_digest": self._source_digest, "model_digest": self._model_digest,
                     "runtime_digest": self._runtime_digest, "execution_profile_digest": self._profile,
                     "preflight_digest": planned["preflight_digest"], "checked_ns": now,
+                    "serving_observation_digest": digest(serving.as_dict()),
+                    "serving_pressure": pressure.level, "serving_reason": pressure.reason,
                     "threads": self._threads, "worker_ceiling": planned["worker_ceiling"],
                     "kv_reserve_bytes": self._kv_reserve, "scratch_reserve_bytes": self._scratch,
                     "blockers": blockers, "status": "candidate" if admitted else "blocked",
