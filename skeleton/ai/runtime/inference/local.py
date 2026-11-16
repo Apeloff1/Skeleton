@@ -2349,7 +2349,6 @@ class LocalInferenceEngine:
                 "ttl_seconds": serving["policy"]["cache_ttl_seconds"],
                 "evictions": self._cache_evictions,
                 "expirations": self._cache_expirations,
-                "expiry_sweeps": self._cache_expiry_sweeps,
                 "identity_invalidations": self._identity_invalidations,
                 "singleflight_active": len(self._singleflight),
                 "singleflight_hits": self._singleflight_hits,
