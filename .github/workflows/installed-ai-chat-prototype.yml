@@ -91,6 +91,8 @@ on:
       - "skeleton/app/jeeves_cognitive.py"
       - "skeleton/app/jeeves_reviewed_memory.py"
       - "skeleton/app/jeeves_deliberation.py"
+      - "skeleton/app/jeeves_constraints.py"
+      - "skeleton/app/jeeves_review_campaign.py"
       - "scripts/evaluate_jeeves_calibration.py"
       - "tests/test_jeeves_document_scope.py"
       - "skeleton/app/offline_knowledge.py"
