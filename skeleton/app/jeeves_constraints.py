@@ -189,6 +189,56 @@ def artifact(text, requested_kind):
     return value
 
 
+def exact_source_quotes(text, evidence, contract):
+    """Verify literal, scoped quotations; never certify source truth or completeness."""
+    if type(evidence) is not dict or type(evidence.get("citations")) is not list:
+        raise ValueError("explicit grounded evidence is required")
+    sources = {}
+    for row in evidence["citations"]:
+        citation, passage = row["citation"], row["passage"]
+        if (citation in sources or type(passage) is not str
+                or text_digest(passage) != row["passage_sha256"]):
+            raise ValueError("source passage integrity mismatch")
+        sources[citation] = row
+    value = _json(text)
+    if type(value) is not dict or set(value) != {"quotes"}:
+        raise ValueError("exact quote object required")
+    quotes = value["quotes"]
+    if type(quotes) is not list or not contract["minimum_quotes"] <= len(quotes) <= 4:
+        raise ValueError("quote count outside contract")
+    seen, spans, origins = set(), [], set()
+    for item in quotes:
+        if type(item) is not dict or set(item) != {"citation", "quote"}:
+            raise ValueError("quote schema mismatch")
+        citation, quote = item["citation"], item["quote"]
+        if type(citation) is not str or citation not in sources:
+            raise ValueError("quote citation outside admitted scope")
+        _text(quote, 220)
+        if len(quote.strip()) < 8 or quote != quote.strip():
+            raise ValueError("quote lacks exact bounded content")
+        source = sources[citation]
+        offset = source["passage"].find(quote)
+        if offset < 0 or source["passage"].find(quote, offset+1) != -1:
+            raise ValueError("quote absent or ambiguous within passage")
+        identity = (source["document_id"], source["char_start"]+offset)
+        if identity in seen or any(
+            span["document_id"] == source["document_id"] and
+            identity[1] < span["end"] and span["start"] < identity[1]+len(quote)
+            for span in spans):
+            raise ValueError("duplicate or overlapping quote")
+        seen.add(identity)
+        origins.add(source["document_id"])
+        spans.append({"citation": citation, "document_id": source["document_id"],
+                      "document_sha256": source["document_sha256"],
+                      "start": identity[1], "end": identity[1]+len(quote),
+                      "quote": quote, "quote_sha256": text_digest(quote)})
+    if len(origins) < contract["minimum_distinct_sources"]:
+        raise ValueError("source diversity requirement unmet")
+    return {"quotes": spans, "distinct_document_count": len(origins),
+            "literal_identity_verified": True, "source_truth_verified": False,
+            "answer_completeness_verified": False}
+
+
 def normalize_policy(value, candidate_tokens):
     if (type(value) is not dict or set(value) != {
         "max_attempts", "maximum_reserved_tokens", "language", "contract"
@@ -207,6 +257,10 @@ def normalize_policy(value, candidate_tokens):
         pass
     elif kind == "arithmetic" and set(contract) == {"kind", "expression"}:
         rational(contract["expression"])
+    elif kind == "source_quotes" and set(contract) == {"kind", "minimum_quotes", "minimum_distinct_sources"}:
+        q, d = contract["minimum_quotes"], contract["minimum_distinct_sources"]
+        if type(q) is not int or type(d) is not int or not 1 <= d <= q <= 4:
+            raise ValueError("invalid quote count or source diversity")
     elif kind == "artifact" and set(contract) == {"kind", "artifact_kind"}:
         if type(contract["artifact_kind"]) is not str or contract["artifact_kind"] not in ARTIFACT_KINDS:
             raise ValueError("unsupported artifact contract")
@@ -226,6 +280,10 @@ def prompt_suffix(policy):
         # extracted from arbitrary prose or a previous model response.
         suffix += (" Return only the exact numeric result of this expression: "
                    + contract["expression"] + ". No explanation.")
+    elif kind == "source_quotes":
+        suffix += (' Return only JSON {"quotes":[{"citation":"exact supplied identifier","quote":"exact contiguous source text"}]}. '
+                   "Use at least " + str(contract["minimum_quotes"]) + " nonoverlapping quotations from at least "
+                   + str(contract["minimum_distinct_sources"]) + " distinct supplied documents. No paraphrases.")
     elif kind == "artifact":
         geometry = {
             "table": '{"kind":"table","title":"...","columns":["..."],"rows":[["..."]]}',
@@ -236,7 +294,7 @@ def prompt_suffix(policy):
     return suffix
 
 
-def assess(text, contract):
+def assess(text, contract, *, evidence=None):
     """Independent check of correctness *only* for the explicit contract."""
     _text(text, 16384)
     kind = contract["kind"]
@@ -250,11 +308,16 @@ def assess(text, contract):
             actual = _decimal_answer(text)
             verdict["passed"] = actual == expected
             verdict["code"] = "exact_arithmetic_match" if actual == expected else "numeric_mismatch"
+        elif kind == "source_quotes":
+            verdict["quote_verification"] = exact_source_quotes(text, evidence, contract)
+            verdict["passed"] = True
+            verdict["code"] = "literal_quotes_match_not_fact_checked"
         elif kind == "artifact":
             verdict["artifact"] = artifact(text, contract["artifact_kind"])
             verdict["passed"] = True
             verdict["code"] = "schema_valid_not_fact_checked"
     except (ValueError, UnicodeError):
-        verdict["code"] = "invalid_numeric_format" if kind == "arithmetic" else "invalid_artifact_schema"
+        verdict["code"] = {"arithmetic": "invalid_numeric_format",
+                           "source_quotes": "invalid_source_quotes"}.get(kind, "invalid_artifact_schema")
     verdict["verifier_sha256"] = digest(verdict)
     return verdict
