@@ -47,7 +47,11 @@ def read_work(stream: BinaryIO) -> tuple:
 def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
          stdout: TextIO | None = None, stderr: TextIO | None = None) -> int:
     parser = argparse.ArgumentParser(description="Offline model source and measured resource admission")
-    parser.add_argument("command", choices=("preflight", "iteration-plan"))
+    parser.add_argument("command", choices=("preflight", "iteration-plan", "deployment-check"))
+    parser.add_argument("--deployment", type=Path)
+    parser.add_argument("--manifest-sha256")
+    parser.add_argument("--manifest-digest")
+    parser.add_argument("--deployment-budget-mib", type=int)
     parser.add_argument("--store", type=Path, required=True)
     parser.add_argument("--plan-sha", required=True)
     parser.add_argument("--model-identity-sha", required=True)
@@ -86,6 +90,24 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
             maximum_tokens=args.token_budget, prefill_quantum=args.prefill_quantum,
             sample_age_ns=args.sample_age_ms * 1_000_000,
         )
+        deployment_inputs = (args.deployment, args.manifest_sha256, args.manifest_digest,
+                             args.deployment_budget_mib)
+        if args.command == "deployment-check":
+            if any(value is None for value in deployment_inputs):
+                raise ValueError("deployment check requires all four independent deployment inputs")
+            from skeleton.app.offline_runtime_llama_binding import MeasuredLocalDeployment
+
+            spec = MeasuredLocalDeployment(
+                manifest_digest=args.manifest_digest, manifest_sha256=args.manifest_sha256,
+                maximum_deployment_bytes=args.deployment_budget_mib * MIB,
+                store_path=args.store, plan_digest=args.plan_sha,
+                model_identity_digest=args.model_identity_sha, policy=policy,
+            )
+            result = spec.inspect(args.deployment)
+            outgoing.write(canonical(result).decode("ascii") + "\n")
+            return 3 if args.require_candidate and result["status"] != "candidate" else 0
+        if any(value is not None for value in deployment_inputs):
+            raise ValueError("deployment inputs require deployment-check")
         # Validate work before expensive inspection; no request text is accepted.
         work = read_work(incoming) if args.command == "iteration-plan" else ()
         source = inspect_source(args.store, plan_digest=args.plan_sha,
