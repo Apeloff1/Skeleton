@@ -93,3 +93,19 @@ def test_physical_cuda_fused_path_when_explicit_device_exists():
     result=generate(target,draft,"hello world",cfg,require_gpu=True,workspace_bytes=64*1024**2)
     assert result["target_graph_modes"]==["cuda_fused_sdpa_required"]
     assert len(result["generated_ids"])==4
+
+
+
+def test_paired_hardware_diagnostic_uses_real_generation_and_no_promotion():
+    from scripts.qualify_jeeves_speculation import qualify
+    target,draft=runtime(),runtime(17)
+    report=qualify(target,draft,["hello world"],config=GenerationConfig(
+        max_new_tokens=2,temperature=0,use_cache=False),
+        block=2,seeds=8,require_gpu=False,workspace_bytes=1024**2)
+    assert report["serial"]["cases"]==report["speculative"]["cases"]==8
+    assert report["greedy_exact_token_parity"] is True
+    assert report["cases"][0]["first_token_total_variation_empirical"]==0
+    assert report["target_device_receipt"]["actual"]=="cpu"
+    assert report["observed_wall_speed_ratio"]>0
+    assert report["activation_authorized"] is False
+    assert report["production_quality_certified"] is False
