@@ -51,6 +51,7 @@ class _BindingIdentity:
     # guessing oracle even if an in-memory identity is accidentally logged.
     model_key: bytes
     active_runtime_digests: tuple[tuple[str, str], ...]
+    network_digest: str | None
 # Emit only the relevant labels and mount metadata. Never inspect Config.Env.
 _CONTAINER_TEMPLATE = (
     '{"project":{{json (index .Config.Labels "com.docker.compose.project")}},'
@@ -58,7 +59,25 @@ _CONTAINER_TEMPLATE = (
     '"id":{{json .Id}},"running":{{json .State.Running}},'
     '"image_id":{{json .Image}},"image_ref":{{json .Config.Image}},'
     '"started_at":{{json .State.StartedAt}},"restart_count":{{json .RestartCount}},'
-    '"ports":{{json .NetworkSettings.Ports}},"mounts":{{json .Mounts}}}'
+    '"ports":{{json .NetworkSettings.Ports}},"mounts":{{json .Mounts}},'
+    '"health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}null{{end}},'
+    '"isolation":{"privileged":{{json .HostConfig.Privileged}},'
+    '"pid_mode":{{json .HostConfig.PidMode}},"ipc_mode":{{json .HostConfig.IpcMode}},'
+    '"uts_mode":{{json .HostConfig.UTSMode}},"cap_add":{{json .HostConfig.CapAdd}},'
+    '"devices":{{json .HostConfig.Devices}},"device_requests":{{json .HostConfig.DeviceRequests}},'
+    '"device_cgroup_rules":{{json .HostConfig.DeviceCgroupRules}},'
+    '"network_mode":{{json .HostConfig.NetworkMode}},'
+    '"networks":[{{ $first := true }}{{range $name, $value := .NetworkSettings.Networks}}'
+    '{{if not $first}},{{end}}{{json $name}}{{$first = false}}{{end}}],'
+    '"read_only":{{json .HostConfig.ReadonlyRootfs}},'
+    '"cap_drop":{{json .HostConfig.CapDrop}},"security_opt":{{json .HostConfig.SecurityOpt}},'
+    '"user":{{json .Config.User}},"tmpfs":{{json .HostConfig.Tmpfs}}}}'
+)
+_NETWORK_TEMPLATE = (
+    '{"id":{{json .Id}},"name":{{json .Name}},'
+    '"project":{{json (index .Labels "com.docker.compose.project")}},'
+    '"role":{{json (index .Labels "com.docker.compose.network")}},'
+    '"driver":{{json .Driver}},"scope":{{json .Scope}},"ingress":{{json .Ingress}}}'
 )
 _VOLUME_TEMPLATE = (
     '{"project":{{json (index .Labels "com.docker.compose.project")}},'
@@ -87,6 +106,7 @@ class BindingReport:
             "storage_modified":False,
             "runtime_image_provenance_verified":False,
             "source_to_image_verified":False,
+            "host_security_verified":False,
         }
 
 
@@ -317,6 +337,8 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
         project, resolved = _resolved_model(config,root=root,hot=hot)
         values = _runtime_env(root,copied)
         expected_runtime = model_identity(config,values=values,hot=hot)
+        from skeleton.app.compose_security_contract import model_security, live_security, network_security
+        isolation = model_security(config,root=root,hot=hot)
         if previous is not None:
             _require(type(previous) is BindingReport and previous.admitted is True
                      and previous.identity is not None, "prior_binding_unverified")
@@ -343,9 +365,20 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
         container_digests = {}
         runtime_digests = {}
 
+        def network_digest():
+            expected = project+"_tutolage"
+            payload = inspect(["docker","network","inspect","--format",_NETWORK_TEMPLATE,expected],_MAX_INSPECT)
+            return _digest(network_security(payload,project,expected))
+
+        live_network = network_digest() if active_roles else None
+        if require_same_runtime:
+            _require(previous.identity.network_digest == live_network,"runtime_bridge_changed")
+
         def observe_runtime(role,payload):
             expected = expected_runtime[role]
             image_id,ports = actual_identity(payload,expected)
+            isolation_evidence = live_security(payload,isolation[role],
+                require_healthy=require_same_runtime and role in ("mongo","skeleton","backend"))
             tagged = inspect(["docker","image","inspect","--format",'{"id":{{json .Id}}}',
                               expected.image],_MAX_INSPECT)
             verify_image(tagged,image_id)
@@ -355,7 +388,7 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
                      and not started.startswith("0001-")
                      and type(restarts) is int and 0 <= restarts <= 2**31-1,
                      "running_container_epoch_unverified")
-            return _digest((payload["id"],started,restarts,image_id,ports))
+            return _digest((payload["id"],started,restarts,image_id,ports,isolation_evidence))
 
         if active_roles:
             _require(all("tutolage-"+role in all_containers for role in active_roles),
@@ -414,9 +447,11 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
                  "compose_storage_model_changed")
         del reloaded
         fence()
+        if active_roles:
+            _require(network_digest()==live_network,"runtime_bridge_changed")
         _require(daemon() == daemon_digest, "docker_daemon_changed")
         identity = _BindingIdentity(daemon_digest,model_digest,tuple(sorted(volume_digests.items())),
-                                    key,tuple(sorted(runtime_digests.items())))
+                                    key,tuple(sorted(runtime_digests.items())),live_network)
         return BindingReport(True,True,"binding_observed",existing_containers,existing_volumes,identity)
     except (BindingDenied, RuntimeIdentityDenied) as exc:
         # All BindingDenied codes are fixed internal identifiers.

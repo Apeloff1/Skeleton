@@ -19,6 +19,7 @@ sys.path.insert(0, str(_ROOT))
 
 from skeleton.app.assembly import compose_command, load_manifest
 from skeleton.app.compose_runtime_identity import model_identity
+from skeleton.app.compose_security_contract import model_security
 from skeleton.app.compose_storage_binding import _json_observation, _render_command, _resolved_model
 from skeleton.app.runtime_operation import compose_operation_environment
 
@@ -107,6 +108,7 @@ def qualify(root, *, runner=subprocess.run):
             model=_json_observation(root,runner,_render_command(command),env,limit=2*1024*1024)
             _resolved_model(model,root=root,hot=hot)
             expected=model_identity(model,values=env,hot=hot)
+            model_security(model,root=root,hot=hot)
             _check_wiring(model,env,expected)
             passed.append(label)
         return {"schema":"skeleton.app.compose_source_render_qualification.v1","ok":True,

@@ -157,6 +157,7 @@
     "skeleton/app/storage_custody.py",
     "skeleton/app/compose_storage_binding.py",
     "skeleton/app/compose_runtime_identity.py",
+    "skeleton/app/compose_security_contract.py",
     "skeleton/app/compose_stop_custody.py",
     "skeleton/app/install_probe_worker.py",
     "skeleton/api/server.py",

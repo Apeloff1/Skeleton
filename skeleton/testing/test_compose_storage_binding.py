@@ -7,6 +7,7 @@ import pytest
 
 from skeleton.app import compose_storage_binding as binding
 from skeleton.app import compose_runtime_identity as runtime
+from skeleton.app import compose_security_contract as isolation
 
 PROJECT="fixture"
 COMMAND=("docker","compose","-f","docker-compose.yml","--env-file",".env",
@@ -14,7 +15,7 @@ COMMAND=("docker","compose","-f","docker-compose.yml","--env-file",".env",
 
 
 def model():
-    value = {"name":PROJECT,
+    value = {"name":PROJECT,"networks":{"tutolage":{"name":PROJECT+"_tutolage","driver":"bridge"}},
             "volumes":{role:{"name":PROJECT+"_"+role,"driver":"local"}
                        for role in binding.VOLUME_ROLES},
             "services":{role:{"container_name":"tutolage-"+role,
@@ -25,6 +26,14 @@ def model():
         _,published,target=runtime.HOST_DEFAULTS[role]
         spec["ports"]=[{"host_ip":"127.0.0.1","target":target,
                         "published":str(published),"protocol":"tcp"}]
+        spec["networks"]={"tutolage":None}
+        if role in ("backend","skeleton"):
+            spec.update(read_only=True,cap_drop=["ALL"],security_opt=["no-new-privileges:true"],
+                        tmpfs=["/tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777"])
+        if role=="skeleton":
+            from pathlib import Path
+            spec["volumes"].append({"type":"bind","source":str(Path.cwd().resolve()/"data"/"local-ai"),
+                                    "target":"/app/local-ai","read_only":True})
         if role in ("mongo","chroma"):
             spec["image"]=role+":"+ "fixture@sha256:"+"b"*64
     return value
@@ -33,7 +42,8 @@ def model():
 def fixture_runner(*, resolved=None, volumes=(), containers=(), container_override=None,
                    volume_override=None, fail_on=None, drift=False, changed_model=False,
                    daemon="fixture-daemon", container_running=True, created="2026-01-01T12:00:00Z",
-                   image_tag_mismatch=False, model_env_drift=False):
+                   image_tag_mismatch=False, model_env_drift=False, network_override=None,
+                   isolation_override=None, health="healthy"):
     payload=model() if resolved is None else resolved
     calls=[]
     def runner(command,**kw):
@@ -53,6 +63,11 @@ def fixture_runner(*, resolved=None, volumes=(), containers=(), container_overri
             if model_env_drift and sum(c[1]=="compose" for c in calls)>1:
                 value["services"]["backend"]["environment"]={"PRIVATE_FIXTURE":"different"}
             raw=json.dumps(value).encode()
+        elif command[1:3]==["network","inspect"]:
+            network={"id":"e"*64,"name":PROJECT+"_tutolage","project":PROJECT,
+                     "role":"tutolage","driver":"bridge","scope":"local","ingress":False}
+            network.update(network_override or {})
+            raw=json.dumps(network).encode()
         elif command[1:3]==["image","inspect"]:
             raw=json.dumps({"id":"sha256:"+("c" if image_tag_mismatch else "d")*64}).encode()
         elif command[1:3]==["volume","ls"]:
@@ -82,6 +97,16 @@ def fixture_runner(*, resolved=None, volumes=(), containers=(), container_overri
                          started_at="2026-01-01T12:00:00.000000000Z",restart_count=0,
                          image_ref=payload["services"][role].get("image",PROJECT+"-"+role),
                          ports={str(target)+"/tcp":[{"HostIp":"127.0.0.1","HostPort":str(published)}]})
+            protected=role in ("backend","skeleton")
+            spec={"privileged":False,"pid_mode":"","ipc_mode":"private","uts_mode":"",
+                  "cap_add":None,"devices":[],"device_requests":None,"device_cgroup_rules":None,
+                  "network_mode":PROJECT+"_tutolage","networks":[PROJECT+"_tutolage"],
+                  "read_only":protected,"cap_drop":["ALL"] if protected else None,
+                  "security_opt":["no-new-privileges=true"] if protected else None,
+                  "user":"appuser" if protected else "",
+                  "tmpfs":{"/tmp":"rw,noexec,nosuid,nodev,size=67108864,mode=1777"} if protected else None}
+            spec.update(isolation_override or {})
+            value.update(isolation=spec,health=health)
             if container_override:
                 value.update(container_override)
             raw=json.dumps(value).encode()
@@ -439,3 +464,84 @@ def test_frontend_recovery_never_accepts_other_compose_project_prefix():
     recovery=("docker","compose","-f","docker-compose.yml","-p","other",
               "--env-file",".env","up","-d","--no-deps","frontend")
     assert not binding.recovery_render_matches(COMMAND,recovery)
+
+
+
+@pytest.mark.parametrize("fault",[
+    "privileged","host_pid","host_network","device","capability","rw_root","missing_nnp",
+    "tmpfs_exec","tmpfs_unbounded","root_user","socket","foreign_network","wrong_driver",
+])
+def test_model_security_denies_unreviewed_host_authority(tmp_path,fault):
+    config=model()
+    backend=config["services"]["backend"]
+    if fault=="privileged":
+        backend["privileged"]=True
+    elif fault=="host_pid":
+        backend["pid"]="host"
+    elif fault=="host_network":
+        backend["network_mode"]="host"
+    elif fault=="device":
+        backend["devices"]=["/dev/sda"]
+    elif fault=="capability":
+        backend["cap_add"]=["SYS_ADMIN"]
+    elif fault=="rw_root":
+        backend["read_only"]=False
+    elif fault=="missing_nnp":
+        backend["security_opt"]=[]
+    elif fault=="tmpfs_exec":
+        backend["tmpfs"]=["/tmp:rw,exec,nosuid,nodev,size=64m"]
+    elif fault=="tmpfs_unbounded":
+        backend["tmpfs"]=["/tmp:rw,noexec,nosuid,nodev"]
+    elif fault=="root_user":
+        backend["user"]="0"
+    elif fault=="socket":
+        backend["volumes"].append({"type":"bind","source":"/var/run/docker.sock",
+                                   "target":"/var/run/docker.sock","read_only":False})
+    elif fault=="foreign_network":
+        backend["networks"]={"other":None}
+    else:
+        config["networks"]["tutolage"]["driver"]="host"
+    runner,_=fixture_runner(resolved=config)
+    assert not observe(tmp_path,runner).admitted
+
+
+@pytest.mark.parametrize("override",[
+    {"privileged":True},{"pid_mode":"host"},{"ipc_mode":"host"},{"cap_add":["SYS_ADMIN"]},
+    {"devices":[{}]},{"networks":["foreign"]},{"network_mode":"host"},{"read_only":False},
+    {"user":"root"},{"security_opt":[]},{"tmpfs":{"/tmp":"rw,size=64m"}},
+])
+def test_actual_isolation_not_inferred_from_rendered_config(tmp_path,override):
+    before,_=fixture_runner()
+    first=observe(tmp_path,before)
+    assert first.admitted
+    runner,_=fixture_runner(volumes=tuple(PROJECT+"_"+r for r in binding.VOLUME_ROLES),
+        containers=tuple("tutolage-"+r for r in binding._ACTIVE_ROLES),isolation_override=override)
+    assert not observe(tmp_path,runner,previous=first,require_started=True).admitted
+
+
+@pytest.mark.parametrize("override",[
+    {"driver":"host"},{"project":"foreign"},{"scope":"global"},{"ingress":True},
+])
+def test_running_network_must_be_owned_local_bridge(tmp_path,override):
+    original,_=fixture_runner()
+    first=observe(tmp_path,original)
+    runner,_=fixture_runner(volumes=tuple(PROJECT+"_"+r for r in binding.VOLUME_ROLES),
+        containers=tuple("tutolage-"+r for r in binding._ACTIVE_ROLES),network_override=override)
+    assert observe(tmp_path,runner,previous=first,require_started=True).code=="runtime_bridge_ownership_unverified"
+
+
+def test_replaced_bridge_or_unhealthy_daemon_invalidates_http_continuity(tmp_path):
+    original,_=fixture_runner()
+    first=observe(tmp_path,original)
+    options={"volumes":tuple(PROJECT+"_"+r for r in binding.VOLUME_ROLES),
+             "containers":tuple("tutolage-"+r for r in binding._ACTIVE_ROLES)}
+    started,_=fixture_runner(**options,health="starting")
+    post=observe(tmp_path,started,previous=first,require_started=True)
+    assert post.admitted
+    for change,code in [({"network_override":{"id":"f"*64}},"runtime_bridge_changed"),
+                        ({"health":"unhealthy"},"runtime_daemon_health_unverified")]:
+        runner,_=fixture_runner(**options,**change)
+        final=observe(tmp_path,runner,previous=post,require_started=True,require_same_runtime=True)
+        assert final.code==code
+    runner,_=fixture_runner(**options)
+    assert observe(tmp_path,runner,previous=post,require_started=True,require_same_runtime=True).admitted

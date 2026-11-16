@@ -1259,3 +1259,14 @@ observed, old receipts are discarded even if the file later contains the
 original bytes. The installer captures setup's output before invoking
 external phase observers, so an observer cannot substitute a new
 configuration and have it accepted as the original setup result.
+
+
+The local launch gate also checks the resolved and actual container isolation
+settings. Backend and engine require a read-only root, non-root execution,
+dropped capabilities, no-new-privileges and the bounded non-executable
+temporary filesystem. Canonical services use a project-owned local bridge;
+host namespaces, unreviewed device/capability grants and arbitrary host
+bind mounts are rejected. The actual bridge ID is sampled through runtime
+qualification, and Docker health must be healthy for Mongo, backend and
+engine at the final HTTP continuity observation. These settings do not
+attest host security, kernel integrity, registry trust or database contents.
