@@ -318,6 +318,7 @@ class LocalToolCampaign:
                     selected=decision["selected_action"]
                     if selected is None:
                         def stop_selection(current):
+                            self._recheck(sid,current)
                             current.setdefault("selector_receipts",[]).append(decision)
                         row=self._mutate(sid,cid,stop_selection)
                         reason="model_selected_stop";break
@@ -327,6 +328,7 @@ class LocalToolCampaign:
                     action=options[selected]
                 node=action["id"]
                 def claim(current):
+                    self._recheck(sid,current)
                     if current["active_action"] is not None:
                         raise ToolCampaignConflict("unresolved tool claim")
                     current["active_action"]=node
@@ -337,6 +339,7 @@ class LocalToolCampaign:
                 result=self._execute(action,row)
                 self._recheck(sid,row)
                 def settle(current):
+                    self._recheck(sid,current)
                     if current["active_action"]!=node:
                         raise ToolCampaignConflict("tool claim withdrawn")
                     current["results"][node]={"status":"succeeded","result":result,
