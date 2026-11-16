@@ -52,7 +52,9 @@ def plan_expedition(source: Any, checkpoint: Any, *, dialogue_budget: int = 1024
                 prefix = [row["action"] for row in checkpoint["actions"]
                           if row["type"] == "harbor" and row["objective"] == oid]
                 local = recover_local(ep["source"], prefix, ep["ending"],
-                                      witness=ep["witness"], max_states=local_budget)
+                                      witness=ep["witness"], max_states=local_budget,
+                                      mission_board=ep.get("mission_board"),
+                                      required_missions=ep.get("required_missions"))
                 local_results[oid] = local
                 if local["status"] not in {"already_completed", "completion_witness"}:
                     status = "local_" + local["status"]
@@ -123,6 +125,13 @@ def compare_expeditions(source: Any, left: Any, right: Any, *,
             "inventory_delta": {k: new["inventory"].get(k, 0) - old["inventory"].get(k, 0)
                                 for k in sorted(items)},
         }
+
+    for oid, row in outcomes.items():
+        if "missions" in ls["episodes"][oid]:
+            first, second = ls["episodes"][oid]["missions"], rs["episodes"][oid]["missions"]
+            row["mission_outcomes"] = {"left_completed": first["completed"],
+                                       "right_completed": second["completed"],
+                                       "points_delta": second["points"] - first["points"]}
 
     def totals(rows: list) -> dict:
         result: dict[str, int] = {}
