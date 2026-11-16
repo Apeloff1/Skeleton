@@ -159,11 +159,22 @@ def install_application(
     qualification_source_head: str | None = None,
     qualification_require_protected: bool = False,
     qualification_require_ai: bool = False,
+    phase_observer=None,
 ) -> InstallReceipt:
     """Run the bounded installer pipeline and return a redacted receipt."""
 
     root = (root or find_repo_root()).resolve()
-    phases: list[InstallPhase] = []
+    class PhaseList(list):
+        def append(self, phase):
+            if phase_observer is not None:
+                phase_observer.complete_phase(phase)
+            super().append(phase)
+
+    phases: list[InstallPhase] = PhaseList()
+
+    def intent(name):
+        if phase_observer is not None:
+            phase_observer.begin_phase(name)
 
     if (qualification_require_protected or qualification_require_ai) and qualification_source_head is None:
         return InstallReceipt(root, (InstallPhase("qualification-input",False,"strict qualification requires an exact source pin"),))
@@ -198,6 +209,7 @@ def install_application(
     if not phases[-1].ok:
         return InstallReceipt(root=root, phases=tuple(phases))
 
+    intent("setup-runtime")
     try:
         setup = ensure_runtime_environment(
             root,
@@ -219,6 +231,7 @@ def install_application(
         phases.append(InstallPhase("configuration-note", True, warning, required=False))
 
     if install_python:
+        intent("python-install")
         python_phase = _run(
             [sys.executable, "-m", "pip", "install", "-e", "."],
             root=root,
@@ -302,6 +315,7 @@ def install_application(
     # frontend uses port 8080, unlike the default development Compose model.
     mode = "production" if production else "development"
     compose_env = {**admitted_process_env, **manifest.mode_env(mode), "COMPOSE_REMOVE_ORPHANS": "0"}
+    intent("compose-config")
     compose_validate = _run(
         compose_command("config", manifest=manifest, full=full, hot=hot),
         root=root,
@@ -341,6 +355,7 @@ def install_application(
     except ValueError as exc:
         phases.append(InstallPhase("start", False, str(exc)))
         return InstallReceipt(root=root, phases=tuple(phases))
+    intent("start")
     try:
         completed = runner(
             list(command),
@@ -383,6 +398,7 @@ def install_application(
                 default_services=("frontend",),
                 full_services=("frontend",),
             )
+            intent("setup-ui-recovery")
             recovery = _run(
                 compose_command("up", manifest=diagnostic_manifest, hot=hot),
                 root=root,
@@ -539,6 +555,10 @@ def configure_setup_parsers(subparsers: argparse._SubParsersAction) -> None:
         type=Path,
         help="private file containing a strong operator bootstrap password",
     )
+    install.add_argument("--session-dir", type=Path, help="existing private POSIX directory outside checkout for persistent install phase custody")
+    install.add_argument("--session-id", help="explicit install session ID; generated for a new session if omitted")
+    install.add_argument("--session-source-head", help="exact reviewed checkout SHA for persistent phase custody")
+    install.add_argument("--resume-session", action="store_true", help="revalidate and replay the same interrupted installation without automatic rollback")
     install.add_argument("--qualification-source-head", help="require strict post-start observation of a pinned host checkout")
     install.add_argument("--qualification-require-protected", action="store_true")
     install.add_argument("--qualification-require-ai", action="store_true")
@@ -612,19 +632,49 @@ def run_setup_command(command: str, args: argparse.Namespace, root: Path | None 
             return 1
         return _print_setup(result, as_json=bool(args.as_json))
     if command == "install":
-        receipt = install_application(
-            root,
-            install_python=not bool(args.skip_python),
-            start=bool(args.start),
+        parameters = dict(
+            install_python=not bool(args.skip_python), start=bool(args.start),
             qualification_source_head=getattr(args,"qualification_source_head",None),
             qualification_require_protected=bool(getattr(args,"qualification_require_protected",False)),
             qualification_require_ai=bool(getattr(args,"qualification_require_ai",False)),
-            full=bool(args.full),
-            production=bool(args.production),
-            hot=bool(args.hot),
-            rotate_secrets=bool(args.rotate_secrets),
-            admin_email=getattr(args, "admin_email", None),
-            admin_password_file=getattr(args, "admin_password_file", None),
+            full=bool(args.full), production=bool(args.production), hot=bool(args.hot),
+            rotate_secrets=bool(args.rotate_secrets), admin_email=getattr(args,"admin_email",None),
+            admin_password_file=getattr(args,"admin_password_file",None),
         )
-        return _print_install(receipt, as_json=bool(args.as_json))
+        directory=getattr(args,"session_dir",None)
+        session_id=getattr(args,"session_id",None)
+        source_head=getattr(args,"session_source_head",None)
+        resume=bool(getattr(args,"resume_session",False))
+        if directory is None:
+            if session_id is not None or source_head is not None or resume:
+                return _print_install(InstallReceipt(root,(InstallPhase("install-session",False,
+                    "session options require --session-dir"),)),as_json=bool(args.as_json))
+            return _print_install(install_application(root,**parameters),as_json=bool(args.as_json))
+        from skeleton.app.install_session import InstallSessionDenied, generated_session_id, open_session
+        if (source_head is None or (resume and session_id is None) or parameters["rotate_secrets"]
+                or parameters["admin_email"] is not None or parameters["admin_password_file"] is not None
+                or (parameters["qualification_source_head"] is not None and
+                    parameters["qualification_source_head"]!=source_head)):
+            return _print_install(InstallReceipt(root,(InstallPhase("install-session",False,
+                "session requires source SHA, explicit resume ID, stable credentials and matching qualification SHA"),)),
+                as_json=bool(args.as_json))
+        sid=session_id or generated_session_id()
+        options={key:parameters[key] for key in ("start","full","production","hot","install_python")}
+        options.update(bundled_runtime=False,require_strict=parameters["qualification_source_head"] is not None,
+                       require_protected=parameters["qualification_require_protected"],
+                       require_ai=parameters["qualification_require_ai"])
+        try:
+            with open_session(root,directory,sid,source_head,options,resume=resume) as session:
+                receipt=install_application(root,phase_observer=session,**parameters)
+                session.finish(receipt)
+                observation=session.report()
+        except InstallSessionDenied:
+            receipt=InstallReceipt(root,(InstallPhase("install-session",False,
+                "persistent install session blocked or uncertain; preserve state and inspect session"),))
+            observation={"session_id":sid,"outcome":"unqualified"}
+        if args.as_json:
+            print(json.dumps({**receipt.to_dict(),"install_session":observation},indent=2,sort_keys=True))
+            return 0 if receipt.ok else 1
+        print("Install session: "+sid)
+        return _print_install(receipt,as_json=False)
     raise ValueError(f"unsupported setup command: {command}")

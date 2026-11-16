@@ -122,6 +122,8 @@ jobs:
         run: python -m pytest -q --maxfail=1 skeleton/testing/test_chroma_recovery_stage.py
       - name: Qualify signed co-hosted native startup lifecycle
         run: python -m pytest -q --maxfail=1 skeleton/testing/test_protected_stack.py
+      - name: Qualify persistent installer intent and interrupted recovery custody
+        run: python -m pytest -q --maxfail=1 skeleton/testing/test_install_session.py
       - name: Verify construction and provider-owner contracts
         run: |
           python scripts/check_architecture_map.py

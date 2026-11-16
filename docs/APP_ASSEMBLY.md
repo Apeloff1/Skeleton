@@ -968,3 +968,34 @@ requires separate recovery; the tool intentionally refuses to ignore it.
 No replace, merge, live restore, graph integrity or full-profile acceptance
 is claimed. Use the isolated physical fixture for new-volume evidence and
 independently qualify a staged restore on the exact pinned Chroma image.
+
+
+### Persistent checkout installer recovery (POSIX)
+
+To retain each mutating phase across process interruption, create a private
+mode-0700 state directory outside the checkout and invoke the existing
+installer with --session-dir, --session-id and --session-source-head:
+
+    python scripts/install_app.py --production --start \
+      --session-dir /private/install-state --session-id first-install \
+      --session-source-head REVIEWED_SHA
+
+The same state directory excludes other cooperating installers of that
+checkout. Each setup, package, Compose and startup intent is fsynced before
+execution. Each outcome is appended with strict identity, sequence and
+hash-chain custody. Neither environment values, private fingerprints nor
+raw child errors are printed by the session observation.
+
+    python -m skeleton app inspect-install-session --session-dir /private/install-state \
+      --session-id first-install
+
+Resume an interrupted/blocked session only with the identical source SHA,
+options, state directory and ID plus --resume-session. The current private
+configuration must match the last recorded observation. Resume re-runs the
+normal idempotent installer, including validation, rather than trusting old
+passes or skipping uncertain stages. It never deletes images or volumes,
+reverts migrations or rotates secrets. If setup was interrupted after an
+unobserved .env change, preserve that file and independently reconcile before
+opening a new session. Explicit admin credentials and secret rotation are
+excluded from this recovery mode. Windows launcher behavior remains
+unchanged; this POSIX implementation is not a Windows ACL qualification.

@@ -31,7 +31,8 @@
     "scripts/qualify_chroma_persistence.py",
     "scripts/stage_chroma_recovery.py",
     "skeleton/app/protected_stack.py",
-    "scripts/start_protected_stack.py"
+    "scripts/start_protected_stack.py",
+    "skeleton/app/install_session.py"
   ],
   "services": [
     "mongo",
@@ -74,7 +75,8 @@
     "Strict checkout qualification binds multiple independent direct HTTP observations to the admitted host SHA and private environment identity; service observation never grants image, inference, restore, browser, device or release evidence.",
     "The pinned isolated Chroma physical fixture uses /data, verifies logical mutations through restart and container replacement, and preserves the legacy full-profile hold.",
     "Historical Chroma recovery stages only an independently signed selected backup lane into a new private directory and never modifies or merges the legacy stores.",
-    "The explicit protected co-hosted launcher independently verifies signed model and reviewer pins, shares actual backend canonical owners with the engine on one event loop, and drains the engine before closing the shared Mongo client."
+    "The explicit protected co-hosted launcher independently verifies signed model and reviewer pins, shares actual backend canonical owners with the engine on one event loop, and drains the engine before closing the shared Mongo client.",
+    "The optional persistent POSIX installer session records every mutation intent before dispatch, preserves uncertain attempts, and revalidates existing source and configuration before replay without destructive rollback."
   ],
   "diagnostic_report": {
     "schema_version": "skeleton.application.first_install_report.v1",

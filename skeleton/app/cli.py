@@ -69,6 +69,10 @@ def _parser() -> argparse.ArgumentParser:
                          help="require selected provider availability, not inference qualification")
     qualify.add_argument("--json", action="store_true", dest="as_json")
 
+    session = sub.add_parser("inspect-install-session", help="read redacted persistent install phase history")
+    session.add_argument("--session-dir", type=Path, required=True)
+    session.add_argument("--session-id", required=True)
+
     sub.add_parser("mongo-preflight", help="observe guarded Mongo prerequisites; never activate inference")
 
     plan = sub.add_parser("plan", help="show dependency-aware application startup order")
@@ -662,6 +666,15 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         )
     if command == "check":
         return _print_checks(bool(args.runtime), bool(args.as_json))
+    if command == "inspect-install-session":
+        from skeleton.app.install_session import InstallSessionDenied, inspect_session
+        try:
+            report=inspect_session(args.session_dir,args.session_id)
+        except InstallSessionDenied:
+            print("install session inspection unavailable")
+            return 1
+        print(json.dumps(report,indent=2,sort_keys=True))
+        return 0
     if command == "qualify-install":
         from skeleton.app.strict_install_qualification import QualificationDenied, qualify_live_install
         try:
