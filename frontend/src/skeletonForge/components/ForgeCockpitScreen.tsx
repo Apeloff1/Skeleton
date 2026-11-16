@@ -25,6 +25,46 @@ export interface ForgeCockpitScreenProps {
 export default function ForgeCockpitScreen({ initialTab = null, initialQuestionnaire = null, onOpenGalaxyStudio, onReturnToStudio }: ForgeCockpitScreenProps) {
   const [screen, dispatchScreen] = React.useReducer(cockpitScreenReducer, initialTab, initialScreenState);
   const [q, dispatchQ] = React.useReducer(questionnaireReducer, initialQuestionnaire ?? INITIAL_STATE);
+  const galRestoreActive = React.useRef(false);
+  const galRestoreMounted = React.useRef(false);
+  const galRestoreState = React.useRef(q);
+  galRestoreState.current = q;
+  const [galaxyRestoreBusy, setGalaxyRestoreBusy] = React.useState(false);
+  const [galaxyRestoreNotice, setGalaxyRestoreNotice] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    galRestoreMounted.current = true;
+    return () => { galRestoreMounted.current = false; };
+  }, []);
+  const restoreSavedGalaxy = React.useCallback(async () => {
+    if (galRestoreActive.current) return;
+    const epoch = getAuthEpoch();
+    const captured = galRestoreState.current;
+    const current = () => galRestoreMounted.current && getAuthEpoch() === epoch;
+    galRestoreActive.current = true;
+    setGalaxyRestoreBusy(true);
+    setGalaxyRestoreNotice(null);
+    try {
+      const { loadGalaxyProfile } = await import('../galaxyProfileCustody');
+      if (!current()) return;
+      const profile = await loadGalaxyProfile(epoch);
+      if (!current()) return;
+      if (galRestoreState.current !== captured) {
+        setGalaxyRestoreNotice('Forge changed during restore. Retry to explicitly import the saved design.');
+        return;
+      }
+      if (!profile) {
+        setGalaxyRestoreNotice('No valid saved Galaxy design for this local account.');
+        return;
+      }
+      dispatchQ({ type: 'importGalaxy', profile });
+      setGalaxyRestoreNotice('Saved full Galaxy design restored.');
+    } catch {
+      if (current()) setGalaxyRestoreNotice('Saved Galaxy design could not be restored. Retry.');
+    } finally {
+      galRestoreActive.current = false;
+      if (current()) setGalaxyRestoreBusy(false);
+    }
+  }, []);
   const catalog = useForgeCatalog();
   const compose = useLiveCompose(q.vision);
   const run = useForgeRun();
@@ -106,6 +146,9 @@ export default function ForgeCockpitScreen({ initialTab = null, initialQuestionn
         generations: catalog.generations,
         onForge: startRun,
         onOpenGalaxyStudio: onOpenGalaxyStudio ? () => onOpenGalaxyStudio(q) : undefined,
+        onRestoreGalaxyProfile: () => { void restoreSavedGalaxy(); },
+        galaxyRestoreBusy,
+        galaxyRestoreNotice,
         forging: run.phase === 'running',
         composeSummary: composeSummaryOf(compose.result),
         onViewPlan: hasPlan ? openPlan : undefined,
