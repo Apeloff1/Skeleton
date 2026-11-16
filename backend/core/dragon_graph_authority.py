@@ -216,7 +216,7 @@ def page(db,owner,terms,*,state,family,host,lower,cutoff,limit):
             sql="SELECT n.* FROM "+alias+".nodes n"
             values=[owner,state,lower];where=["n.owner=?","n.state=?","n.id>?"]
             if terms:
-                sql+=" JOIN "+alias+".graph_search f ON f.owner=n.owner AND f.id=n.id"
+                sql="SELECT n.* FROM "+alias+".graph_search f CROSS JOIN "+alias+".nodes n ON f.owner=n.owner AND f.id=n.id"
                 where.append("graph_search MATCH ?")
                 values.append('owner:"'+owner+'" AND '+' AND '.join('"'+term+'"' for term in terms))
             if family:where.append("n.family=?");values.append(family)
@@ -243,12 +243,19 @@ def _iter(db,sql,args=()):
 
 
 def _verify_graph(db):
+    from core.dragon_lead_graph import lead_id
+    from core.dragon_game_corpus import digest
     for index in range(LANES):
         alias=_alias(index)
         if db.execute("PRAGMA "+alias+".foreign_key_check").fetchone():raise GraphHeld("graph foreign key check failed")
         for table,field in (("nodes","id"),("edges","child")):
             for row in _iter(db,"SELECT owner,"+field+" FROM "+alias+"."+table):
                 if lane(row[1])!=index or not HEX.fullmatch(row[0]):raise GraphHeld("graph row outside partition")
+        for row in _iter(db,"SELECT id,url FROM "+alias+".nodes"):
+            if lead_id(row["url"])!=row["id"]:raise GraphHeld("canonical node ID witness differs")
+        for row in _iter(db,"SELECT id,parent,child,relation,subject,kind,title,witness,snapshot FROM "+alias+".edges"):
+            if digest([row[k] for k in ("parent","child","relation","subject","kind","title","witness","snapshot")])!=row["id"]:
+                raise GraphHeld("canonical edge ID witness differs")
         n=db.execute("SELECT COUNT(*) FROM "+alias+".nodes").fetchone()[0]
         ft=db.execute("SELECT COUNT(*) FROM "+alias+".graph_search").fetchone()[0]
         if n!=ft:raise GraphHeld("graph FTS row count differs")
@@ -312,6 +319,7 @@ def provision(root,paths,*,offline_acknowledged=False):
                     Path(str(p)+suffix).exists() or Path(str(p)+suffix).is_symlink() for suffix in ("-wal","-shm","-journal")):
                 raise GraphHeld("graph shard paths must be unused and canonical")
         db.execute("PRAGMA foreign_keys=ON")
+        db.execute("PRAGMA legacy_alter_table=OFF")
         if db.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()[0]!=0:
             raise GraphHeld("root WAL checkpoint busy")
         if db.execute("PRAGMA journal_mode=DELETE").fetchone()[0].lower()!="delete":
