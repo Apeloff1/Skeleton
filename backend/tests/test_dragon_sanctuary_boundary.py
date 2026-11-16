@@ -170,5 +170,64 @@ class AcquisitionHoldCatalogTests(unittest.IsolatedAsyncioTestCase):
         app.sessions.update_one.assert_not_awaited()
 
 
+
+class PublisherIntakeTests(unittest.IsolatedAsyncioTestCase):
+    def setup_intake(self):
+        app = object.__new__(DragonCrawlerApplication)
+        app.acquisition_hold_catalog = AsyncMock(return_value={
+            "capacity_reached": False, "excluded_sessions": 0, "holds": []})
+        app.create = AsyncMock(return_value={"session_id": "publisher"})
+        body = {"idempotency_key": "approved-intake", "endpoint": "https://example.com/dataset",
+                "method": "public_api", "consent": True, "rights_acknowledged": True,
+                "publisher_permission_acknowledged": True, "independent_resource_acknowledged": True}
+        return app, body
+
+    async def test_each_mode_queues_bounded_canonical_session(self):
+        for method in ("public_api", "publisher_feed", "open_dataset_manifest", "licensed_public_export"):
+            app, body = self.setup_intake()
+            body["method"] = method
+            result = await app.create_publisher_intake(SCOPE, body)
+            self.assertEqual(result["session_id"], "publisher")
+            scope, request = app.create.await_args.args
+            self.assertEqual(scope, SCOPE)
+            self.assertEqual(request["seeds"], [body["endpoint"]])
+            self.assertEqual(request["max_depth"], 0)
+            self.assertEqual(request["max_requests"], 8)
+            self.assertEqual(request["max_documents"], 1)
+            self.assertFalse(request["discover_sitemaps"])
+            self.assertEqual(request["publisher_intake"]["method"], method)
+
+    async def test_refuses_credentials_private_literal_and_missing_permissions(self):
+        for endpoint in ("http://example.com/data", "https://user:password@example.com/data",
+                         "https://127.0.0.1/data", "https://example.com/data?token=secret",
+                         "https://example.com/data#fragment"):
+            app, body = self.setup_intake()
+            body["endpoint"] = endpoint
+            with self.assertRaises(ValueError):
+                await app.create_publisher_intake(SCOPE, body)
+            app.create.assert_not_awaited()
+        for field in ("consent", "rights_acknowledged", "publisher_permission_acknowledged",
+                      "independent_resource_acknowledged"):
+            app, body = self.setup_intake()
+            body[field] = False
+            with self.assertRaises(CrawlerError):
+                await app.create_publisher_intake(SCOPE, body)
+            app.create.assert_not_awaited()
+
+    async def test_restriction_or_unqualified_audit_prevents_queue(self):
+        for report in (
+            {"capacity_reached": False, "excluded_sessions": 0,
+             "holds": [{"host": "example.com"}]},
+            {"capacity_reached": True, "excluded_sessions": 0, "holds": []},
+            {"capacity_reached": False, "excluded_sessions": 1, "holds": []},
+        ):
+            app, body = self.setup_intake()
+            app.acquisition_hold_catalog.return_value = report
+            with self.assertRaises(CrawlerError) as caught:
+                await app.create_publisher_intake(SCOPE, body)
+            self.assertEqual(caught.exception.code, "crawler_publisher_intake_held")
+            app.create.assert_not_awaited()
+
+
 if __name__ == "__main__":
     unittest.main()
