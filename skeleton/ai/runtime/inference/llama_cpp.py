@@ -1257,7 +1257,8 @@ class LlamaCppModel:
     def execution_profile_digest(self) -> str:
         """Bind decoding/resource policy without changing executable identity."""
         profile = {
-            "schema": "skeleton.llama-cpp.execution-profile.v1",
+            "schema": "skeleton.llama-cpp.execution-profile.v2",
+            "sampling_policy": "deployment-default-explicit-request-v1",
             "runtime": self.runtime_digest,
             "model": self.model_digest,
             "model_id": self._admitted_model_id,
@@ -1576,6 +1577,42 @@ class LlamaCppModel:
             return self._tool_response_schema(request)
         return self._normalized_structured_output_schema(request)
 
+    def _request_sampling(self, request: LocalInferenceRequest) -> tuple[float, tuple[str, ...]]:
+        """Honor explicit request profiles without overriding legacy defaults.
+
+        Untouched requests retain the deployment temperature and backend's
+        pinned argument defaults. Explicit sampling may not coexist with
+        an extra-argument sampler override whose precedence varies by build.
+        """
+        explicit = (request.temperature != 1.0 or request.top_k != 0
+                    or request.top_p != 1.0 or request.min_p != 0.0
+                    or request.repetition_penalty != 1.0)
+        if not explicit:
+            return float(self.config.temperature), ()
+        flags = {"--top-k", "--top-p", "--min-p", "--repeat-penalty",
+                 "--repeat-last-n", "--samplers", "--sampling-seq", "--sampler-seq",
+                 "--temp", "--temperature", "--typical", "--typical-p",
+                 "--mirostat", "--mirostat-lr", "--mirostat-ent",
+                 "--dynatemp-range", "--dynatemp-exp", "--presence-penalty",
+                 "--frequency-penalty", "--dry-multiplier", "--dry-base",
+                 "--dry-allowed-length", "--dry-penalty-last-n", "--xtc-probability",
+                 "--xtc-threshold", "--top-nsigma", "--adaptive-target", "--adaptive-decay"}
+        if any(arg.split("=", 1)[0] in flags for arg in self.config.extra_args):
+            raise LlamaCppRuntimeError("request sampling conflicts with pinned deployment sampler arguments")
+        # Native CLI accepts a finite signed-integer top-k. Actual model
+        # vocabulary semantics stay with the pinned GGUF tokenizer/runtime.
+        if request.top_k > 2_147_483_647:
+            raise LlamaCppRuntimeError("top_k exceeds native CLI integer bound")
+        temperature = request.temperature
+        if self.config.speculation_runtime_sha256 is not None and temperature != 0.0:
+            raise LlamaCppRuntimeError("initial native speculation requires greedy request sampling")
+        return temperature, (
+            "--top-k", str(request.top_k),
+            "--top-p", format(request.top_p, ".12g"),
+            "--min-p", format(request.min_p, ".12g"),
+            "--repeat-penalty", format(request.repetition_penalty, ".12g"),
+        )
+
     def _command(
         self,
         prompt_file: Path,
@@ -1583,6 +1620,7 @@ class LlamaCppModel:
         *,
         schema_file: Path | None = None,
     ) -> list[str]:
+        temperature, sampling_args = self._request_sampling(request)
         command = [
             self._runtime.path,
             "-m",
@@ -1594,9 +1632,10 @@ class LlamaCppModel:
             "--seed",
             str(request.seed % 0xFFFFFFFF),
             "--temp",
-            format(float(self.config.temperature), ".12g"),
+            format(temperature, ".12g"),
             "--no-display-prompt",
         ]
+        command.extend(sampling_args)
         command.extend(("-c", str(self._effective_context())))
         if self.config.threads is not None:
             command.extend(("-t", str(self.config.threads)))
