@@ -34,8 +34,11 @@ def _private_file(path: Path) -> None:
 
 
 @contextmanager
-def open_workspace(path: Path, *, create: bool, expedition: bool = False) -> Iterator[CampaignStore]:
+def open_workspace(path: Path, *, create: bool, expedition: bool = False,
+                   saga: bool = False) -> Iterator[CampaignStore]:
     """Trusted operator-specified local directory; no JSON-derived path or URI."""
+    if expedition and saga:
+        raise CampaignStoreError("workspace runtime selection is ambiguous")
     target = path.expanduser().absolute()
     parent = target.parent
     if parent.resolve(strict=True) != parent or not parent.is_dir():
@@ -69,7 +72,10 @@ def open_workspace(path: Path, *, create: bool, expedition: bool = False) -> Ite
     try:
         db.execute("PRAGMA synchronous = FULL")
         db.execute("PRAGMA trusted_schema = OFF")
-        if expedition:
+        if saga:
+            from skeleton.app.gameforge_saga_store import SagaStore
+            yield SagaStore(db, initialize=create)
+        elif expedition:
             from skeleton.app.gameforge_expedition_store import ExpeditionStore
             yield ExpeditionStore(db, initialize=create)
         else:
