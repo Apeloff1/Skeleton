@@ -989,7 +989,20 @@ class NativeLLMRuntime:
         self,
         requests: Sequence[BatchGenerationRequest],
         *, interrupt: Callable[[], None] | None = None,
+        reuse_shared_prefix: bool = False,
+        prefix_budget_bytes: int = 8 * 1024**2,
     ) -> tuple[BatchGenerationResult, ...]:
+        """Execute a bounded batch with optional same-owner CPU prefix reuse.
+
+        Explicit opt-in authorizes sharing prompt computation INSIDE this
+        batch only. The optimized path may reorder physical execution, but
+        results retain caller order. It never reuses generated continuation
+        tokens, crosses calls, or changes a sampling configuration.
+        """
+        if type(reuse_shared_prefix) is not bool:
+            raise RuntimeContractError("explicit shared prefix batch policy required")
+        if type(prefix_budget_bytes) is not int or not 1 <= prefix_budget_bytes <= 64 * 1024**2:
+            raise RuntimeContractError("invalid shared prefix batch budget")
         if not requests:
             return ()
         if len(requests) > self.limits.max_batch_size:
@@ -1014,6 +1027,13 @@ class NativeLLMRuntime:
         # Each admitted sequence is immutable and bound to the tokenizer
         # digest. Re-encoding a prompt here would create a second admission
         # boundary and allow a different token trajectory after preflight.
+        budget = min(prefix_budget_bytes, self.limits.max_kv_bytes // 4)
+        if (reuse_shared_prefix and budget > 0 and len(admitted) > 1
+                and type(self) is NativeLLMRuntime and self.device.actual == "cpu"
+                and not self.device.resident and self.model._accel is None
+                and not self.model.use_mod
+                and all(request.config.use_cache for request, _ in admitted)):
+            return self._generate_shared_prefix_batch(admitted, budget, interrupt)
         return tuple(
             BatchGenerationResult(
                 request.request_id,
@@ -1021,6 +1041,74 @@ class NativeLLMRuntime:
             )
             for request, sequence in admitted
         )
+
+    def _generate_shared_prefix_batch(self, admitted, budget, interrupt):
+        # Lexicographic order clusters exact token prefixes with one bank,
+        # not an unbounded Python trie or a full bank per leaf. Stable index
+        # ties preserve deterministic ordering for duplicate prompts.
+        order = sorted(range(len(admitted)), key=lambda i: (admitted[i][1].token_ids, i))
+        results = {}
+        cache = None
+        previous_prompt = ()
+        previous_binding = None
+        for i in order:
+            if interrupt is not None:
+                interrupt()
+            request, sequence = admitted[i]
+            ids = sequence.token_ids
+            binding = (self.model_digest, self.tokenizer.digest, self.architecture.digest,
+                       self.device.digest, self.device_policy, self.limits,
+                       self.model.steps, self.model.fitted, self.model.tied)
+            common = 0
+            if (cache is not None and binding == previous_binding
+                    and cache.owner is self.model
+                    and cache.revision == (self.model.steps, self.model.fitted,
+                                           self.model.tied, self.model.device, self.model.resident)
+                    and cache.next_position == len(cache.tokens)
+                    and tuple(cache.tokens) == previous_prompt[:len(cache.tokens)]):
+                for old, new in zip(cache.tokens, ids):
+                    if old != new:
+                        break
+                    common += 1
+                # A trimmed bank has no final logits. Leave one token to
+                # project in the canonical decoder, even for an exact match.
+                common = min(common, len(ids) - 1)
+            if common:
+                for bank in (cache.K, cache.V):
+                    for layer in bank:
+                        del layer[common:]
+                del cache.tokens[common:]
+                cache.next_position = common
+                cache.last_logits = None
+                cache.reserved_bytes = 0
+            else:
+                cache = KVCache(self.model.n_layers, self.limits.max_context)
+            with self.stream_sequence(sequence, request.config, interrupt=interrupt,
+                                      _private_cpu_cache=cache) as stream:
+                for _event in stream:
+                    pass
+            if stream.result is None:
+                raise RuntimeContractError("batch generation terminated without result")
+            results[i] = BatchGenerationResult(request.request_id, stream.result)
+            # Retain ONLY tokens belonging to this input. A sliding bank or
+            # changed device cannot contribute to subsequent prefill.
+            if (cache.next_position != len(cache.tokens) or len(cache.tokens) < len(ids)
+                    or tuple(cache.tokens[:len(ids)]) != ids
+                    or len(ids) + len(stream.result.generated_ids) > self.limits.max_context):
+                cache = None
+            else:
+                for bank in (cache.K, cache.V):
+                    for layer in bank:
+                        del layer[len(ids):]
+                del cache.tokens[len(ids):]
+                cache.next_position = len(ids)
+                cache.last_logits = None
+                cache.reserved_bytes = 0
+                if NativeConversationSession._retained_prefix_size(cache) > budget:
+                    cache = None
+            previous_prompt = ids
+            previous_binding = binding
+        return tuple(results[i] for i in range(len(admitted)))
 
     def replay(
         self,
