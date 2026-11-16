@@ -11,11 +11,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 import os
+import math
 from pathlib import Path
 from typing import Callable
 from uuid import uuid4
 
 from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
+from skeleton.ai.model_runtime.flgb_model_runtime import TokenSequence
+from skeleton.cortex.attn import cosine_lr, softmax
+from skeleton.cortex.transformer import KVCache
 
 from .flgb_training_runtime import (
     DatasetRevision, TrainingCheckpoint, TrainingManifest,
@@ -40,6 +44,8 @@ class ShadowNativeTrainingPolicy:
     maximum_steps: int = 8192
     lines_per_heartbeat: int = 16
     learning_rate_ppm: int = 20_000
+    teacher_retention_ppm: int = 0
+    teacher_min_target_probability_ppm: int = 100_000
 
     def __post_init__(self) -> None:
         values = (
@@ -48,6 +54,8 @@ class ShadowNativeTrainingPolicy:
             ("maximum_steps", self.maximum_steps, 1, 1_000_000),
             ("lines_per_heartbeat", self.lines_per_heartbeat, 1, 1024),
             ("learning_rate_ppm", self.learning_rate_ppm, 1, 100_000),
+            ("teacher_retention_ppm", self.teacher_retention_ppm, 0, 500_000),
+            ("teacher_min_target_probability_ppm", self.teacher_min_target_probability_ppm, 1, 1_000_000),
         )
         for name, value, minimum, maximum in values:
             if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
@@ -55,7 +63,7 @@ class ShadowNativeTrainingPolicy:
 
     @property
     def digest(self) -> str:
-        return digest_json({
+        payload = {
             "maximum_corpus_bytes": self.maximum_corpus_bytes,
             "maximum_lines": self.maximum_lines,
             "maximum_steps": self.maximum_steps,
@@ -63,7 +71,14 @@ class ShadowNativeTrainingPolicy:
             "learning_rate_ppm": self.learning_rate_ppm,
             "schedule": "cosine-batch",
             "engine": "skeleton.cortex.TinyTransformer",
-        })
+        }
+        if self.teacher_retention_ppm:
+            payload["teacher_retention"] = {
+                "algorithm": "unit-temperature-confidence-gated-soft-target-v1",
+                "weight_ppm": self.teacher_retention_ppm,
+                "minimum_target_probability_ppm": self.teacher_min_target_probability_ppm,
+            }
+        return digest_json(payload)
 
 
 class ShadowNativeTrainer:
@@ -154,6 +169,60 @@ class ShadowNativeTrainer:
             temporary.unlink(missing_ok=True)
         return target
 
+    def _fit_retention_batch(self, candidate: NativeLLMRuntime, batch: tuple[str, ...],
+                             session: ShadowLeaseSession) -> tuple[int, int]:
+        """Actual local confidence-gated champion rehearsal, no extra corpus.
+
+        Teacher gets the exact training prefix. Do not imitate teacher
+        distributions when their known target probability is too low.
+        Candidate and champion never share mutable parameter arrays.
+        """
+        teacher = self.champion
+        if (candidate.model is teacher.model
+                or candidate.tokenizer.digest != teacher.tokenizer.digest
+                or candidate.architecture.digest != teacher.architecture.digest
+                or candidate.limits.max_context != teacher.limits.max_context
+                or candidate.model._accel is not None or candidate.model.use_mod):
+            raise ShadowTrainingRejected("teacher-retention-tokenizer-or-graph-drift")
+        sequences=[]
+        for line in batch:
+            session.require_idle()
+            source = teacher.encode(line)
+            # The candidate's runtime identity describes the pre-SGD clone;
+            # tokenizer identity is unchanged, but do not pretend candidate
+            # weights are still the original admitted inference graph.
+            student_ids = tuple(candidate.model._ids(line))
+            if source.token_ids != student_ids:
+                raise ShadowTrainingRejected("teacher-retention-tokenization-drift")
+            sequences.append(source)
+        total = max(1, sum(max(0,len(seq.token_ids)-1) for seq in sequences))
+        steps = soft_steps = 0
+        for source in sequences:
+            cache = KVCache(teacher.model.n_layers, teacher.limits.max_context)
+            ids = source.token_ids
+            for i in range(1,len(ids)):
+                session.require_idle()
+                if steps and steps % 64 == 0:
+                    session.heartbeat()
+                window = ids[max(0,i-teacher.limits.max_context):i]
+                prefix = TokenSequence(teacher.tokenizer.digest, window,
+                                       digest_json([source.digest,i]))
+                result = teacher.infer_sequence(prefix, cache=cache, interrupt=session.require_idle)
+                probabilities = softmax(list(result.logits))
+                if any(not math.isfinite(p) for p in probabilities):
+                    raise ShadowTrainingRejected("teacher-retention-nonfinite-distribution")
+                eta = cosine_lr(steps,total,base=self.policy.learning_rate_ppm / 1_000_000)
+                if probabilities[ids[i]] * 1_000_000 >= self.policy.teacher_min_target_probability_ppm:
+                    candidate.model._sgd_soft_target(list(window),ids[i],result.logits,
+                            teacher_weight=self.policy.teacher_retention_ppm/1_000_000,lr=eta)
+                    soft_steps += 1
+                else:
+                    candidate.model._sgd(list(window),ids[i],eta)
+                steps += 1
+                session.require_idle()
+        candidate.model.fitted += len(batch)
+        return steps,soft_steps
+
     def __call__(self, session: ShadowLeaseSession) -> ShadowTrainingArtifacts:
         if not isinstance(session, ShadowLeaseSession):
             raise ShadowWeightError("training requires fenced shadow lease session")
@@ -162,6 +231,10 @@ class ShadowNativeTrainer:
         if self.champion.model_digest != item.base_model_digest:
             raise ShadowTrainingRejected("training-champion-drift")
         self.champion.assert_model_unchanged()
+        if self.policy.teacher_retention_ppm and (self.champion.device.actual != "cpu"
+                or self.champion.device.resident or self.champion.model._accel is not None
+                or self.champion.model.use_mod):
+            raise ShadowTrainingRejected("teacher-retention-requires-admitted-cpu-graph")
         if (
             any(source.contradiction or not source.allowed_for_training for source in item.sources)
         ):
@@ -211,14 +284,20 @@ class ShadowNativeTrainer:
             rng_digest=digest_json({"mode": "deterministic", "steps": 0}),
         )
         steps = 0
+        soft_steps = 0
         chunk_size = self.policy.lines_per_heartbeat
         for offset in range(0, len(corpus), chunk_size):
             session.heartbeat()
             batch = corpus[offset:offset + chunk_size]
-            steps += model.model.fit(
-                batch, lr=self.policy.learning_rate_ppm / 1_000_000,
-                schedule="cosine", interrupt=session.require_idle,
-            )
+            if self.policy.teacher_retention_ppm:
+                added, distilled = self._fit_retention_batch(model, batch, session)
+                steps += added
+                soft_steps += distilled
+            else:
+                steps += model.model.fit(
+                    batch, lr=self.policy.learning_rate_ppm / 1_000_000,
+                    schedule="cosine", interrupt=session.require_idle,
+                )
         session.require_idle()
         if steps != estimated_steps:
             raise ShadowWeightError("actual native SGD steps differ from admission budget")
@@ -244,6 +323,11 @@ class ShadowNativeTrainer:
             optimizer_digest=digest_json({
                 "optimizer": "sgd-no-momentum", "steps": steps,
                 "learning_rate_ppm": self.policy.learning_rate_ppm,
+                **({
+                    "teacher_model_digest": item.base_model_digest,
+                    "soft_target_steps": soft_steps,
+                    "teacher_retention_ppm": self.policy.teacher_retention_ppm,
+                } if self.policy.teacher_retention_ppm else {}),
             }),
             rng_digest=digest_json({
                 "mode": "deterministic-sgd", "batch_count":
