@@ -136,6 +136,9 @@ def make_pinned_native_guard_factory(
         if type(backend) is GgufTokenBridgeModel:
             backend.assert_identity()
             encode, decode = backend.encode_ids, backend.decode_ids
+            if (getattr(encode, "__func__", None) is not GgufTokenBridgeModel.encode_ids
+                    or getattr(decode, "__func__", None) is not GgufTokenBridgeModel.decode_ids):
+                raise ProviderPolicyError("exact GGUF tokenizer methods were replaced")
 
             def bridge_verify(active, encoder, decoder):
                 if active is not backend or encoder is not encode or decoder is not decode:

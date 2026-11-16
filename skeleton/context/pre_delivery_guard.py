@@ -643,6 +643,9 @@ class GuardedLocalInference:
         # worker slot. The engine's task-bound permit explicitly allows a
         # context-copied worker to prepare, but never to dispatch inference.
         prepare = getattr(self.engine, "prepare_input", None)
+        exact_tokens = getattr(self.engine.model, "requires_exact_guard_tokens", False) is True
+        if exact_tokens and not callable(prepare):
+            raise SealedContextBoundaryError("exact-token backend lacks guarded preparation")
         if callable(prepare):
             with verified_scope():
                 prepared = await self._bounded_native_call(
@@ -652,6 +655,13 @@ class GuardedLocalInference:
                     ),
                     remaining_timeout(self.native_timeout_seconds),
                 )
+            if exact_tokens:
+                # The physical vector must be exactly the independently reviewed
+                # one, not merely another sequence that decodes to the same text.
+                if (prepared is None or type(getattr(prepared, "token_sequence", None)) is not tuple
+                        or evidence.token_sequence_digest is None
+                        or _token_id_digest(prepared.token_sequence) != evidence.token_sequence_digest):
+                    raise SealedContextIntegrityError("prepared native IDs differ from reviewed token sequence")
             if prepared is not None:
                 engine_options["prepared_input"] = prepared
 

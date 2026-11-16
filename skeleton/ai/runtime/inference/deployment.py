@@ -280,7 +280,10 @@ class LocalModelDeployment:
             raise LocalModelDeploymentError(f"invalid GGUF model artifact: {exc}") from exc
         if runtime_kind == "llama.cpp-token-bridge-v1":
             from .gguf_token_bridge import _compatible
-            _compatible(validated)
+            try:
+                _compatible(validated)
+            except LlamaCppRuntimeError:
+                raise LocalModelDeploymentError("exact GGUF bridge profile invalid") from None
         deployment = cls(
             manifest_path=resolved_manifest,
             runtime_kind=runtime_kind,
@@ -389,16 +392,19 @@ class LocalModelDeployment:
             builder = build_llama_cpp_adapter
         else:
             raise LocalModelDeploymentError("unsupported activated runtime kind")
-        adapter = builder(
-            self.llama_cpp_config(rehash_artifacts_each_run=rehash_artifacts_each_run),
-            cache_size=cache_size,
-            default_seed=default_seed,
-            max_concurrency=max_concurrency,
-            max_queue_size=max_queue_size,
-            max_batch_size=max_batch_size,
-            require_guarded_inference=require_guarded_inference,
-            guarded_components=guarded_components,
-        )
+        try:
+            adapter = builder(
+                self.llama_cpp_config(rehash_artifacts_each_run=rehash_artifacts_each_run),
+                cache_size=cache_size,
+                default_seed=default_seed,
+                max_concurrency=max_concurrency,
+                max_queue_size=max_queue_size,
+                max_batch_size=max_batch_size,
+                require_guarded_inference=require_guarded_inference,
+                guarded_components=guarded_components,
+            )
+        except LlamaCppRuntimeError:
+            raise LocalModelDeploymentError("local GGUF deployment activation denied") from None
         model = adapter.engine.model
         if not isinstance(model, LlamaCppModel):
             raise LocalModelDeploymentError("deployment runtime identity is invalid")
@@ -454,6 +460,7 @@ def create_local_model_deployment(
         "raw",
         "llama-completion-chat",
         "qwen3-completion-chat",
+        "gguf-exact-token-bridge",
     }:
         raise LocalModelDeploymentError("unsupported local runtime profile")
     extra_args: tuple[str, ...] = ()
@@ -497,7 +504,8 @@ def create_local_model_deployment(
     )
     payload = {
         "schema_version": SCHEMA,
-        "runtime_kind": "llama.cpp-cli",
+        "runtime_kind": ("llama.cpp-token-bridge-v1"
+                         if runtime_profile == "gguf-exact-token-bridge" else "llama.cpp-cli"),
         "model_id": validated.model_id,
         "executable_path": str(executable),
         "executable_sha256": _sha256_file(executable),

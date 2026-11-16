@@ -136,6 +136,12 @@ class GgufTokenBridgeModel(LlamaCppModel):
         _compatible(profile)
         super().activate_prelaunch_resource_profile(profile)
 
+    def execution_snapshot(self):
+        result = super().execution_snapshot()
+        result.update(token_transport_kind=BRIDGE_RUNTIME_KIND,
+                      exact_token_admission=True, cpu_only=True)
+        return result
+
     def generation_limits(self):
         result = super().generation_limits()
         result.update(tokenizer=self.tokenizer_kind, tokenizer_max_chars=_MAX_TEXT,

@@ -136,7 +136,7 @@ def _parser() -> argparse.ArgumentParser:
     prepare.add_argument("--timeout", type=float, default=120.0)
     prepare.add_argument(
         "--runtime-profile",
-        choices=("raw", "llama-completion-chat", "qwen3-completion-chat"),
+        choices=("raw", "llama-completion-chat", "qwen3-completion-chat", "gguf-exact-token-bridge"),
         default="raw",
         help="operator-selected prompt/output protocol for the pinned local executable",
     )

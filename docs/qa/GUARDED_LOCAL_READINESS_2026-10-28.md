@@ -175,3 +175,27 @@ For an already running installation, run:
 Exit zero requires observed service/routes and selected AI availability;
 it is not evidence of generation, independent quality, or hardware success.
 Default doctor remains usable for diagnosing a shell whose AI is blocked.
+
+
+## Exact-token GGUF bridge (CPU source candidate)
+
+Build scripts/native/gguf_token_bridge against the reviewed llama.cpp
+b11429 commit d81235049384534c167caea52b85a694f6103d14.
+
+From trusted operator code or the CLI, prepare a NEW deployment manifest:
+
+    python -m skeleton app prepare-local-model --runtime-profile gguf-exact-token-bridge --executable /private/build/gguf-bridge/skeleton-gguf-token-bridge --model /private/model.gguf --output /private/exact-gguf.json --model-id jeeves --context-size 4096
+
+The factory supports explicit llama.cpp-token-bridge-v1 deployment kind only
+with protected components and independently reviewed model/runtime/tokenizer
+pins. This differs from the default provisioner's historical llama-cli
+manifest: it is CPU-only POSIX and raw greedy text. It does not advertise
+tool calls, chat templates, arbitrary sampling, GPU or Windows process
+custody. The helper retokenizes the actual prompt, compares the admitted
+IDs, and passes them directly to llama_decode; the host compares prepared
+IDs to the guard's independently reviewed token-sequence digest and
+verifies the consumed-ID receipt and output-token echo. Source and
+fixture tests do not constitute compiled native or physical-device proof.
+Do not change existing deployment hashes or guard configuration to enable
+this candidate. Repeated artifact hashing and vocab-only loads require
+measured performance qualification, not assumed throughput.

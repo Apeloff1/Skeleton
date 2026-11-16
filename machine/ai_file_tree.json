@@ -309,7 +309,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "04ed4b12b451d9b605a221f766d2ed87897d1d07",
+      "source_git_object_sha": "8f29f291fa097bd5c6a7ed769c8be3df719f89ab",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
