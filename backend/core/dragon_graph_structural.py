@@ -130,6 +130,36 @@ def _pending(db):
             or not isinstance(plan.get("lanes"),dict) or len(plan["lanes"])>a.LANES or not isinstance(plan.get("jobs"),list)
             or not 1<=len(plan["jobs"])<=MAX_JOBS):
         raise a.GraphHeld("structural journal shape differs")
+    large=plan["mode"] in ("snapshot","feed")
+    if len(raw.encode())>(MAX_IMPORT_PLAN_BYTES if large else MAX_PLAN_BYTES):
+        raise a.GraphHeld("structural journal mode byte bound")
+    records=0
+    for key,part in plan["lanes"].items():
+        if key not in {str(i) for i in range(a.LANES)} or not isinstance(part,dict) or set(part)!={"nodes","edges"}:
+            raise a.GraphHeld("structural lane shape differs")
+        for table,columns in (("nodes",a.NODE_COLUMNS),("edges",a.EDGE_COLUMNS)):
+            pairs=part[table]
+            if not isinstance(pairs,list):raise a.GraphHeld("structural row group differs")
+            records+=len(pairs)
+            for pair in pairs:
+                if not isinstance(pair,list) or len(pair)!=2 or not isinstance(pair[1],list) or len(pair[1])!=len(columns):
+                    raise a.GraphHeld("structural row shape differs")
+                if pair[0] is not None and (not isinstance(pair[0],list) or len(pair[0])!=len(columns) or pair[0][:2]!=pair[1][:2]):
+                    raise a.GraphHeld("structural before-state shape differs")
+                if any(not isinstance(v,str) or not a.HEX.fullmatch(v) for v in pair[1][:2]):
+                    raise a.GraphHeld("structural row identity differs")
+                if a.lane(pair[1][1] if table=="nodes" else pair[1][3])!=int(key):
+                    raise a.GraphHeld("structural row route differs")
+    if records>(MAX_IMPORT_RECORDS if large else MAX_RECORDS):raise a.GraphHeld("structural journal record bound")
+    grants=plan.get("grants",[])
+    if not isinstance(grants,list) or len(grants)>MAX_JOBS:
+        raise a.GraphHeld("structural grant count differs")
+    for grant in grants:
+        if (not isinstance(grant,dict) or set(grant)!={"owner","snapshot","sha256","expires_at"}
+                or any(not isinstance(grant[k],str) or not a.HEX.fullmatch(grant[k]) for k in ("owner","snapshot","sha256"))
+                or type(grant["expires_at"]) is not int):
+            raise a.GraphHeld("structural grant shape differs")
+    if large and not isinstance(plan.get("publication"),dict):raise a.GraphHeld("structural publication missing")
     return plan,row["sha256"]
 
 
