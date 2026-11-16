@@ -7,6 +7,46 @@ Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
     offline-runtime  Inspect pinned local weights and measured resource admission
     weight-store     Stage pinned weights and inspect cooperative disk/recovery custody
+    game-archive                  Rights-safe game hardware history
+    studio-dual-runtime           Original dual-runtime source pack
+    studio-dual-runtime-verify    Pinned original package verification
+    studio-game-model             Local game reviewer model operations
+    studio-game-workspace         Supervised original project workspace
+    studio-knowledge              Reviewed game knowledge library
+    studio-living-story           Original story blueprints
+    studio-npc-blueprint          Editable citizen blueprints
+    studio-export-batch           Pinned offline export batch verification
+    studio-export-delta           Independent pinned cohort comparison
+    studio-export-prepare         Prepare original export batches
+    studio-receipt-inspect        Inspect prior verified receipts
+    studio-original-game          Original-to-consumer studio run
+    studio-originality            Local originality evidence scanner
+    studio-playable               Compile and play an original game
+    studio-progressive-port       Design-only homebrew port preview
+    studio-quest-director         Original game scene director
+    studio-build-qualification    Explicit native build qualification
+    studio-campaign-assurance     Inspect studio production gates
+    studio-campaign               Resume native studio campaign
+    studio-dragon-lessons         Dragon corrective lessons
+    studio-execution-campaign     Explicit multi-console studio execution
+    studio-system-editor          Deterministic offline system editor
+    studio-tiled-map              Original playable Tiled map conversion
+    harbor-patrol                 Playable harbor patrol and export
+    harbor-salvage                Playable salvage and portable journal
+    harbor-salvage-map            Offline salvage scene renderer
+    harbor-salvage-choice         Replay-earned championship choices
+    harbor-salvage-season         Offline championship and CAS saves
+    harbor-salvage-story          Original salvage quest director
+    jeeves-adventure-game         Original adventure game construction
+    jeeves-full-game              Full original game creation
+    jeeves-game-building          Jeeves game building owner
+    game-learning                 Local game-policy learning
+    jeeves-studio-multifactor     Operator-admitted world optimization
+    jeeves-studio-policy          Local game-action policy training
+    jeeves-studio-rule-training   Candidate training over rule variants
+    jeeves-studio-shadow          Shadow original-game training audit
+    jeeves-console-capability     Local-model console capability
+    long-context                  Durable token spool and audited progress
     deploy      Validated self-host profiles, diagnostics, package/units and guarded boot
     ready       Organism readiness, optional --fix/--walk and bounded -n
     product     Live operator product and policy card
@@ -933,6 +973,126 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "offline-runtime":
         from skeleton.app.offline_runtime_cli import main as offline_runtime_main
         return offline_runtime_main(rest)
+    if cmd == "game-archive":
+        from skeleton.ai.game_builder.archive_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-dual-runtime":
+        from skeleton.ai.game_builder.dual_runtime_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-dual-runtime-verify":
+        from skeleton.ai.game_builder.dual_runtime_verify_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-game-model":
+        from skeleton.ai.game_builder.game_model_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-game-workspace":
+        from skeleton.ai.game_builder.game_workspace_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-knowledge":
+        from skeleton.ai.game_builder.knowledge_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-living-story":
+        from skeleton.ai.game_builder.living_story_blueprint_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-npc-blueprint":
+        from skeleton.ai.game_builder.npc_blueprint_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-export-batch":
+        from skeleton.ai.game_builder.offline_export_batch_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-export-delta":
+        from skeleton.ai.game_builder.offline_export_batch_delta_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-export-prepare":
+        from skeleton.ai.game_builder.offline_export_batch_prepare_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-receipt-inspect":
+        from skeleton.ai.game_builder.offline_receipt_inspect_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-original-game":
+        from skeleton.ai.game_builder.original_game_studio_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-originality":
+        from skeleton.ai.game_builder.plagiarism_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-playable":
+        from skeleton.ai.game_builder.playable_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-progressive-port":
+        from skeleton.ai.game_builder.progressive_port_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-quest-director":
+        from skeleton.ai.game_builder.quest_director_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-build-qualification":
+        from skeleton.ai.game_builder.studio_build_qualification_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-campaign-assurance":
+        from skeleton.ai.game_builder.studio_campaign_assurance_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-campaign":
+        from skeleton.ai.game_builder.studio_campaign_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-dragon-lessons":
+        from skeleton.ai.game_builder.studio_dragon_lessons_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-execution-campaign":
+        from skeleton.ai.game_builder.studio_execution_campaign_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-system-editor":
+        from skeleton.ai.game_builder.system_editor_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-tiled-map":
+        from skeleton.ai.game_builder.tiled_map_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "harbor-patrol":
+        from skeleton.game.gameplay.harbor_crafting_patrol_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "harbor-salvage":
+        from skeleton.game.gameplay.harbor_crafting_salvage_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "harbor-salvage-map":
+        from skeleton.game.gameplay.harbor_crafting_salvage_map_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "harbor-salvage-choice":
+        from skeleton.game.gameplay.harbor_crafting_salvage_season_choice_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "harbor-salvage-season":
+        from skeleton.game.gameplay.harbor_crafting_salvage_season_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "harbor-salvage-story":
+        from skeleton.game.gameplay.harbor_crafting_salvage_story_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-adventure-game":
+        from skeleton.jeeves.adventure_game_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-full-game":
+        from skeleton.jeeves.full_game_creation_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-game-building":
+        from skeleton.jeeves.game_building_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "game-learning":
+        from skeleton.jeeves.game_learning_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-studio-multifactor":
+        from skeleton.jeeves.game_studio_multifactor_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-studio-policy":
+        from skeleton.jeeves.game_studio_policy_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-studio-rule-training":
+        from skeleton.jeeves.game_studio_rule_training_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-studio-shadow":
+        from skeleton.jeeves.game_studio_shadow_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-console-capability":
+        from skeleton.jeeves.local_model_console_capability_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "long-context":
+        from skeleton.ai.model_runtime.long_context_cli import main as recovered_main
+        return recovered_main(rest)
     if cmd == "app":
         from skeleton.app.cli import run_app_cli
         return run_app_cli(rest)
