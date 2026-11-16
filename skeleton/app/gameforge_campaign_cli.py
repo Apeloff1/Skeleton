@@ -88,11 +88,12 @@ def main(
     commands = ("build", "verify", "play", "verify-play", "resume",
                 "create-slot", "append-slot", "read-slot", "history", "fork-slot",
                 "board", "assist", "verify-assist", "compare", "html", "turn",
-                "export-session", "import-session", "verify-board", "verify-compare")
+                "export-session", "import-session", "verify-board", "verify-compare", "snapshot-slot", "restore-slot")
     parser.add_argument("command", choices=commands)
     parser.add_argument("--database", type=Path)
     args = parser.parse_args(argv)
-    persistent = args.command in {"create-slot", "append-slot", "read-slot", "history", "fork-slot"}
+    persistent = args.command in {"create-slot", "append-slot", "read-slot", "history", "fork-slot",
+                                  "snapshot-slot", "restore-slot"}
     if persistent != (args.database is not None):
         parser.error("database required only for persistent slot commands")
     incoming = stdin if stdin is not None else sys.stdin.buffer
@@ -163,9 +164,11 @@ def main(
                 optional.add("revision")
             if args.command == "fork-slot":
                 required.update({"parent_revision", "expected_digest", "child_slot"})
+            if args.command == "restore-slot":
+                required.add("archive")
             data = _object(value, required, optional)
             assert args.database is not None
-            with open_workspace(args.database, create=args.command == "create-slot") as store:
+            with open_workspace(args.database, create=args.command in {"create-slot", "restore-slot"}) as store:
                 if args.command == "create-slot":
                     result = store.create(data["slot"], data["request"], data["operation"])
                 elif args.command == "append-slot":
@@ -176,6 +179,10 @@ def main(
                 elif args.command == "fork-slot":
                     result = store.fork(data["slot"], data["request"], data["parent_revision"],
                                         data["expected_digest"], data["child_slot"])
+                elif args.command == "snapshot-slot":
+                    result = store.snapshot(data["slot"], data["request"])
+                elif args.command == "restore-slot":
+                    result = store.restore(data["slot"], data["request"], data["archive"])
                 else:
                     result = store.history(data["slot"], data["request"])
         outgoing.write(_encode(result).decode("ascii") + "\n")
