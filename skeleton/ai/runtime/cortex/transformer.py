@@ -16,7 +16,7 @@ from skeleton.cortex.attn import (
     add_outer,
     apply_rope,
     apply_rope_bwd,
-    cached_mha,
+    cached_mha_context,
     cosine_lr,
     gelu,
     gelu_bwd,
@@ -316,6 +316,7 @@ class TransformerBlock:
         Vs: List[List[float]],
         n_heads: int,
         pos: int,
+        *, interrupt: Callable[[], None] | None = None,
     ) -> List[float]:
         """One-token decode step, storing keys already rotated at their position."""
         y, _, _ = self._norm(x, self.ln1_g, self.ln1_b)
@@ -329,7 +330,7 @@ class TransformerBlock:
         Ks.append(apply_rope(k, pos))
         Vs.append(v)
         q_rope = apply_rope(q, pos)
-        c, _ = cached_mha(q_rope, Ks, Vs, n_heads)
+        c = cached_mha_context(q_rope, Ks, Vs, n_heads, interrupt=interrupt)
         attn = matvec(self.Wo, c)
         u = add(x, attn)
         if self.d_ff:
@@ -728,7 +729,11 @@ class TinyTransformer:
             for li, layer in enumerate(self.layers):
                 if interrupt is not None:
                     interrupt()
-                x = layer.step(x, cache.K[li], cache.V[li], self.n_heads, t)
+                if interrupt is None:
+                    x = layer.step(x, cache.K[li], cache.V[li], self.n_heads, t)
+                else:
+                    x = layer.step(x, cache.K[li], cache.V[li], self.n_heads, t,
+                                   interrupt=interrupt)
         except BaseException:
             # A layer can fail after earlier layers appended a token. Such
             # a partial cache must never be offered to a subsequent decode.
