@@ -411,3 +411,53 @@ def test_queue_reinspection_requires_no_live_or_pending_requests(tmp_path, monke
         assert queue.revalidate_source()["source_status"] == "reinspected"
     finally:
         queue.close()
+
+
+def test_stalled_executor_releases_resident_slot_and_allows_next_request(tmp_path, monkeypatch):
+    queue, executor = make_queue(tmp_path, monkeypatch, max_active=1,
+                                  max_stalled_slices=2)
+    original = executor.run_slice
+
+    def execute(**kwargs):
+        if kwargs["request_id"] == "stalled":
+            return Progress("stalled", kwargs["phase"], 0)
+        return original(**kwargs)
+
+    executor.run_slice = execute
+    try:
+        queue.submit(BatchRequest("stalled", 2, 2, priority=10), timeout_ms=10000)
+        queue.submit(BatchRequest("waiting", 1, 1), timeout_ms=10000)
+        queue.tick()
+        queue.tick()
+        assert queue.status()["requests"][0]["stalled_slices"] == 1
+        result = queue.tick()
+        assert result["retired"] == [{"request_id": "stalled", "terminal": "stalled"}]
+        assert executor.releases == ["stalled"]
+        assert queue.status()["capacity"]["kv_used_bytes"] == 0
+        for _ in range(4):
+            queue.tick()
+            if not queue.status()["requests"]:
+                break
+        assert executor.calls == [("waiting", "prefill", 1), ("waiting", "decode", 1)]
+        assert executor.releases == ["stalled", "waiting"]
+        assert not queue.status()["poisoned"]
+    finally:
+        queue.close()
+
+
+def test_execution_deadline_intersects_source_age_and_grant(tmp_path, monkeypatch):
+    store, key, model_identity = stage(tmp_path)
+    clock = [1_000_000_000]
+    monkeypatch.setattr("skeleton.app.offline_runtime_session.time.monotonic_ns", lambda: clock[0])
+    session = OfflineRuntimeSession(
+        store, plan_digest=key, model_identity_digest=model_identity, policy=POLICY,
+        maximum_source_age_ns=100,
+    )
+    owner = session.claim_consumer()
+    try:
+        assert session.execution_deadline(clock[0] + 500, consumer=owner) == clock[0] + 100
+        assert session.execution_deadline(clock[0] + 50, consumer=owner) == clock[0] + 50
+        with pytest.raises(RuntimePreflightError, match="owner mismatch"):
+            session.execution_deadline(clock[0] + 500, consumer=object())
+    finally:
+        session.close()
