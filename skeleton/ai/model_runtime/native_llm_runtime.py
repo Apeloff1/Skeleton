@@ -690,6 +690,8 @@ class NativeLLMRuntime:
         the decoder still verifies compatibility and exact admitted tokens.
         """
         cfg = config or GenerationConfig(max_new_tokens=min(32, self.limits.max_new_tokens))
+        if _private_cpu_cache is None:
+            return GenerationStream(self._stream_sequence_impl(sequence, cfg, interrupt=interrupt))
         return GenerationStream(self._stream_sequence_impl(sequence, cfg, interrupt=interrupt,
                                _private_cpu_cache=_private_cpu_cache))
 
