@@ -189,6 +189,10 @@ class OfflineHTTPApplication:
             )
             from skeleton.app.jeeves_memory_vectors import MemoryVectorIndex
             self.memory_vectors = MemoryVectorIndex(self.approved_memory)
+            from skeleton.app.jeeves_turn_feedback import TurnFeedback
+            self.turn_feedback = TurnFeedback(
+                self._store, self.model_digest, self.tokenizer_digest,
+            )
             self.reference_reads = LocalReferenceRead(self.knowledge)
             self.reference_writes = LocalReferenceWrite(self.knowledge)
             self.reference_jobs = LocalReferenceJob(self.knowledge)
@@ -661,6 +665,13 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(405, "unsupported local API method")
         if body is None:
             body = {}
+        if path == "/v1/feedback/summary" and method == "POST":
+            from skeleton.app.jeeves_approved_memory import MemoryRejected
+            _fields(body, {"limit"}, set())
+            try:
+                return 200, self.turn_feedback.recent_summary(**body)
+            except MemoryRejected:
+                raise OfflineHTTPError(400, "invalid feedback summary request") from None
         if path.startswith("/v1/memory-vector/") and method == "POST":
             from skeleton.app.jeeves_approved_memory import MemoryConflict, MemoryRejected
             try:
@@ -1121,6 +1132,27 @@ class OfflineHTTPApplication:
                 }
             except CognitionRejected:
                 raise OfflineHTTPError(400, "invalid bounded cognition preview") from None
+        if tail in {"feedback-inspect","feedback-save","feedback-delete","feedback-followup"} and method == "POST":
+            from skeleton.app.jeeves_approved_memory import MemoryConflict, MemoryRejected
+            try:
+                if tail == "feedback-inspect":
+                    _fields(body, {"pin"}, {"pin"})
+                    return 200, self.turn_feedback.inspect(sid, **body)
+                if tail == "feedback-save":
+                    fields = {"pin","rating","flags","note","expected_feedback_sha256","approved"}
+                    _fields(body, fields, fields)
+                    return 200, self.turn_feedback.save(sid, **body)
+                if tail == "feedback-delete":
+                    fields = {"pin","expected_feedback_sha256","approved"}
+                    _fields(body, fields, fields)
+                    return 200, self.turn_feedback.delete(sid, **body)
+                fields = {"pin","mode","flags","note"}
+                _fields(body, fields, fields)
+                return 200, self.turn_feedback.prepare_followup(sid, **body)
+            except MemoryConflict:
+                raise OfflineHTTPError(409, "reviewed answer or feedback changed; refresh") from None
+            except MemoryRejected:
+                raise OfflineHTTPError(400, "invalid bounded feedback operation") from None
         if tail == "adaptive-context" and method == "POST":
             from skeleton.app.jeeves_approved_memory import MemoryConflict, MemoryRejected
             from skeleton.app.jeeves_adaptive_context import ContextPolicy, plan_context
