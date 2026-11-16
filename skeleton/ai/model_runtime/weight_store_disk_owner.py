@@ -309,14 +309,9 @@ class WeightStoreDiskOwner:
             # Pre-admit the complete distinct new-object and manifest byte
             # demand while no participating writer can enter. stage_plan
             # independently checks source/manifest identities.
-            if not isinstance(plan, WeightLoadPlan) or not isinstance(identity, ModelIdentity):
-                raise WeightShardStoreError("canonical model plan required")
-            manifest = canonical_bytes({
-                "schema_version": 1, "model_identity_digest": identity.identity_digest,
-                "weights_digest": identity.weights_digest, "plan_digest": plan.digest,
-                "expected_total_bytes": plan.expected_total_bytes,
-                "shards": [asdict(shard) for shard in plan.shards],
-            })
+            manifest = self._store.prepare_stage_manifest(identity, plan, source_paths)
+            # Freeze the trusted source path map before intent publication.
+            source_paths = dict(source_paths)
             absent = {}
             for shard in plan.shards:
                 target = self._store._object_path(shard.digest)
