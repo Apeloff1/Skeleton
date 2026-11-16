@@ -152,7 +152,7 @@ class OfflineHTTPApplication:
     """One locally selected model identity, one SQLite authority, bounded work."""
 
     def __init__(self, backend: LocalDesktopModel, database: str | Path,
-                 *, token: str) -> None:
+                 *, token: str, semantic_ranker=None) -> None:
         if not isinstance(token, str) or len(token) < 32:
             raise OfflineHTTPError(400, "a strong authorization token is required")
         # The generic offline desktop still supports native model fixtures.
@@ -181,7 +181,7 @@ class OfflineHTTPApplication:
                 self.database.with_name(self.database.name + ".longform.sqlite3")
             )
             self.knowledge = OfflineKnowledgeLibrary(
-                self._store, self.model_digest, self.tokenizer_digest
+                self._store, self.model_digest, self.tokenizer_digest, semantic_ranker=semantic_ranker
             )
             self.reference_reads = LocalReferenceRead(self.knowledge)
             self.reference_writes = LocalReferenceWrite(self.knowledge)
@@ -1549,7 +1549,11 @@ def main(argv: list[str] | None = None) -> int:
                         help="localhost TCP port, default: OS-assigned ephemeral port")
     parser.add_argument("--open-browser", action="store_true",
                         help="open the local workspace after binding; token remains in its private file")
+    parser.add_argument("--semantic-config",type=Path,help="explicit pinned local learned encoder config")
+    parser.add_argument("--semantic-config-sha256")
     args = parser.parse_args(argv)
+    if bool(args.semantic_config)!=bool(args.semantic_config_sha256):
+        parser.error("semantic configuration and exact file digest must be supplied together")
     app = None
     token_created = False
     token_identity: tuple[int, int, int, int] | None = None
@@ -1560,7 +1564,11 @@ def main(argv: list[str] | None = None) -> int:
                    else load_gguf_deployment(args.gguf_deployment))
         db = args.database or private_desktop_database(backend.model_digest)
         token = secrets.token_urlsafe(48)
-        app = OfflineHTTPApplication(backend, db, token=token)
+        ranker=None
+        if args.semantic_config is not None:
+            from skeleton.retrieval.semantic_config import load_semantic_ranker
+            ranker=load_semantic_ranker(args.semantic_config,args.semantic_config_sha256)
+        app = OfflineHTTPApplication(backend, db, token=token,semantic_ranker=ranker)
         # Bind before creating private credentials: a conflicting port must
         # not leave behind an unused secret file on the user's disk.
         with LocalOnlyHTTPServer(app, port=args.port) as server:

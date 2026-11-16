@@ -161,7 +161,7 @@ class OfflineKnowledgeLibrary:
     """Model-scoped documents stored in the existing local SQLite DB."""
 
     def __init__(self, store: OfflineChatStore, model_digest: str,
-                 tokenizer_digest: str) -> None:
+                 tokenizer_digest: str, *, semantic_ranker=None) -> None:
         if not isinstance(store, OfflineChatStore):
             raise RuntimeContractError("a canonical local SQLite store is required")
         self.store = store
@@ -171,6 +171,17 @@ class OfflineKnowledgeLibrary:
         self._storage_path = database[2] if database and database[2] else "."
         self.model_digest = _identity(model_digest, "model digest")
         self.tokenizer_digest = _identity(tokenizer_digest, "tokenizer digest")
+        self._semantic_ranker=semantic_ranker
+        self._semantic_cache=None
+        if semantic_ranker is not None:
+            from skeleton.retrieval.semantic_long_context import ContextualRanker
+            from skeleton.retrieval.semantic_vector_cache import DerivedVectorCache
+            if not isinstance(semantic_ranker,ContextualRanker):
+                raise RuntimeContractError("operator-owned semantic ranker required")
+            scope=sha256(("offline-knowledge-v1:"+self.model_digest+":"+self.tokenizer_digest).encode()).hexdigest()
+            self._semantic_cache=DerivedVectorCache(store._db,store._lock,scope,
+                dimension=semantic_ranker.encoder.policy.dimension,segments=semantic_ranker.policy.segments,
+                max_bytes=semantic_ranker.policy.max_vector_bytes)
         with store._lock:
             store._db.execute("""CREATE TABLE IF NOT EXISTS offline_documents (
                 document_id TEXT PRIMARY KEY,
@@ -359,6 +370,9 @@ class OfflineKnowledgeLibrary:
             )
             if deleted.rowcount != 1:
                 raise RuntimeContractError("unknown local reference document")
+            if self.store._db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='offline_semantic_vectors'").fetchone():
+                scope=sha256(("offline-knowledge-v1:"+self.model_digest+":"+self.tokenizer_digest).encode()).hexdigest()
+                self.store._db.execute("DELETE FROM offline_semantic_vectors WHERE scope=?",(scope,))
 
     def get_document(self, document_id: str) -> dict[str, Any]:
         """Return the exact verified source for inspection or private export."""
@@ -387,7 +401,7 @@ class OfflineKnowledgeLibrary:
         from .offline_grounding import normalized_document_scope
         selected = normalized_document_scope(document_ids)
         terms = _terms(query)
-        if not terms and selected is None:
+        if not terms and selected is None and self._semantic_ranker is None:
             return []
         documents, records = self._verified_snapshot()
         if selected is not None:
@@ -396,6 +410,9 @@ class OfflineKnowledgeLibrary:
                 raise RuntimeContractError("selected local grounding source is unavailable")
             selected_set = set(selected)
             records = [row for row in records if row[0] in selected_set]
+            documents = [row for row in documents if row[0] in selected_set]
+        if self._semantic_ranker is not None:
+            return self._semantic_search(query,documents,records,limit=limit,selected=selected)
         if not terms:
             return []
         corpus: list[tuple[tuple[Any, ...], set[str], dict[str, int]]] = []
@@ -429,6 +446,34 @@ class OfflineKnowledgeLibrary:
             ))
         scored.sort(key=lambda hit: (-hit.score, hit.document_id, hit.chunk_index))
         return [hit.to_dict() for hit in scored[:limit]]
+
+    def _semantic_search(self,query,documents,records,*,limit,selected):
+        from collections import defaultdict
+        from skeleton.retrieval.semantic_long_context import document_spans
+        policy=self._semantic_ranker.policy
+        if len(records)>policy.max_spans or sum(len(row[3]) for row in documents)>policy.max_source_chars:
+            raise RuntimeContractError("semantic source selection exceeds configured local budget")
+        by_source=defaultdict(list)
+        for row in records:
+            by_source[row[0]].append((row[3],row[4],row[5],row[6]))
+        spans=[]
+        titles={doc[0]:doc[1] for doc in documents}
+        with self.store._lock:
+            try:
+                for source_id,title,pin,body,_ in documents:
+                    spans.extend(document_spans(source_id,pin,body,by_source[source_id],policy))
+                ranked,proof=self._semantic_ranker.search(query,spans,limit=limit,cache=self._semantic_cache)
+                observed,_=self._verified_snapshot()
+                if selected is not None:
+                    observed=[row for row in observed if row[0] in set(selected)]
+                if [(x[0],x[1],x[2],x[4]) for x in observed]!=[(x[0],x[1],x[2],x[4]) for x in documents]:
+                    if self._semantic_cache is not None:
+                        self._semantic_cache.invalidate()
+                    raise RuntimeContractError("semantic source authority changed during retrieval")
+            except (ValueError,MemoryError,OSError) as exc:
+                raise RuntimeContractError("bounded learned semantic retrieval failed") from exc
+        return [LocalKnowledgeHit(row.source_id,titles[row.source_id],row.revision,row.ordinal,
+                                 row.start,row.end,row.text,score).to_dict() for row,score in ranked]
 
 
 __all__ = [
