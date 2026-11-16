@@ -294,7 +294,7 @@ def tournament(value, execute):
 
     execute(group, role, first_rank, stage) must return a strict numeric
     local rank. No generated URLs, prose, or tokens enter dispatch. A 48-way
-    packet uses at most eight two-role matches with at most eight candidates
+    packet uses at most nine two-role matches with at most eight candidates
     each. Failure of any match aborts the entire advisory computation.
     """
     ids=validate_packet(value)
