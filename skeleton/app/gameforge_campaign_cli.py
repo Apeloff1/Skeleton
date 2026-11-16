@@ -15,7 +15,10 @@ from skeleton.app.gameforge_campaign import (
 )
 from skeleton.app.gameforge_campaign_store import CampaignStore, CampaignStoreError
 from skeleton.app.gameforge_campaign_assist import plan_completion, verify_assistance
-from skeleton.app.gameforge_campaign_board import board, compare_branches, render_html
+from skeleton.app.gameforge_campaign_board import (
+    board, choose_board_action, compare_branches, export_checkpoint, import_checkpoint,
+    render_html, verify_board, verify_comparison,
+)
 from skeleton.app.original_quest_cli import _encode, _object, _require, read_document
 from skeleton.gameforge.errors import GameForgeError
 
@@ -80,7 +83,8 @@ def main(
     parser = argparse.ArgumentParser(description="Source-bound GameForge narrative campaign and revision journal")
     commands = ("build", "verify", "play", "verify-play", "resume",
                 "create-slot", "append-slot", "read-slot", "history", "fork-slot",
-                "board", "assist", "verify-assist", "compare", "html")
+                "board", "assist", "verify-assist", "compare", "html", "turn",
+                "export-session", "import-session", "verify-board", "verify-compare")
     parser.add_argument("command", choices=commands)
     parser.add_argument("--database", type=Path)
     args = parser.parse_args(argv)
@@ -122,6 +126,24 @@ def main(
                 _require(verify_assistance(data["request"], data["receipt"], data["assistance"]),
                          "assistance does not replay")
                 result = {"verified": True, "native_qualified": False, "release_qualified": False}
+        elif args.command == "turn":
+            data = _object(value, {"request", "receipt", "board_digest", "index"})
+            result = choose_board_action(data["request"], data["receipt"], data["board_digest"], data["index"])
+        elif args.command == "export-session":
+            data = _object(value, {"request", "receipt"})
+            result = export_checkpoint(data["request"], data["receipt"])
+        elif args.command == "import-session":
+            data = _object(value, {"request", "handoff"})
+            result = import_checkpoint(data["request"], data["handoff"])
+        elif args.command == "verify-board":
+            data = _object(value, {"request", "receipt", "board"})
+            _require(verify_board(data["request"], data["receipt"], data["board"]), "board replay mismatch")
+            result = {"verified": True, "native_qualified": False, "release_qualified": False}
+        elif args.command == "verify-compare":
+            data = _object(value, {"request", "left", "right", "comparison"})
+            _require(verify_comparison(data["request"], data["left"], data["right"], data["comparison"]),
+                     "comparison replay mismatch")
+            result = {"verified": True, "native_qualified": False, "release_qualified": False}
         elif args.command == "compare":
             data = _object(value, {"request", "left", "right"}, {"max_expansions"})
             result = compare_branches(data["request"], data["left"], data["right"],
