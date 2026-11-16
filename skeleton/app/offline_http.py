@@ -189,6 +189,8 @@ class OfflineHTTPApplication:
             )
             from skeleton.app.jeeves_memory_vectors import MemoryVectorIndex
             self.memory_vectors = MemoryVectorIndex(self.approved_memory)
+            from skeleton.app.jeeves_transformer_memory import TransformerMemoryIndex
+            self.transformer_memory = TransformerMemoryIndex(self.approved_memory)
             from skeleton.app.jeeves_turn_feedback import TurnFeedback
             self.turn_feedback = TurnFeedback(
                 self._store, self.model_digest, self.tokenizer_digest,
@@ -257,6 +259,7 @@ class OfflineHTTPApplication:
                 worker.join()
         if self.longform is not None:
             self.longform.close()
+        self.transformer_memory.close()
         self._store.close()
 
     def _request_cancel(self, turn: _LocalTurn) -> None:
@@ -703,6 +706,29 @@ class OfflineHTTPApplication:
                 return 200, self.turn_feedback.recent_summary(**body)
             except MemoryRejected:
                 raise OfflineHTTPError(400, "invalid feedback summary request") from None
+        if path.startswith("/v1/memory-transformer/") and method == "POST":
+            from skeleton.app.jeeves_approved_memory import MemoryConflict,MemoryRejected
+            try:
+                # Model installation/removal and file paths remain CLI-only.
+                if path=="/v1/memory-transformer/status":
+                    _fields(body,set(),set())
+                    return 200,self.transformer_memory.status()
+                if path=="/v1/memory-transformer/search":
+                    _fields(body,{"query","limit","kinds"},{"query"})
+                    return 200,self.transformer_memory.search(**body)
+                if path=="/v1/memory-transformer/refresh":
+                    _fields(body,{"expected_encoder","cursor","limit","approved"},
+                            {"expected_encoder","approved"})
+                    # Avoid contending for CPU/memory during a local chat pass.
+                    with self._turn_lock:
+                        if self._active_session is not None or self._closing:
+                            raise OfflineHTTPError(409,"local generation active; refresh index while idle")
+                    return 200,self.transformer_memory.refresh(**body)
+                raise OfflineHTTPError(404,"unknown local transformer memory operation")
+            except MemoryConflict:
+                raise OfflineHTTPError(409,"transformer encoder or approved memory changed") from None
+            except MemoryRejected:
+                raise OfflineHTTPError(422,"local transformer memory unavailable or invalid") from None
         if path.startswith("/v1/memory-vector/") and method == "POST":
             from skeleton.app.jeeves_approved_memory import MemoryConflict, MemoryRejected
             try:
