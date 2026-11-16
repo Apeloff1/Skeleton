@@ -3345,6 +3345,8 @@ async def lifespan(app: FastAPI):
             f"inflight={_runtime_lifecycle.inflight_work})"
         )
 
+    from core.canonical_writer_startup import drain_protected_stack_before_database_close
+    await drain_protected_stack_before_database_close(app)
     try:
         client.close()
     except Exception as exc:

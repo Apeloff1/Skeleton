@@ -32,7 +32,7 @@ def _collections(conversation, memory):
             "idempotency": memory.idempotency}
 
 
-def configure_cutover(app, approval, *, local_checkpoint=None):
+def configure_cutover(app, approval, *, local_checkpoint=None, after_binding=None, before_database_close=None):
     if type(approval) is not VerifiedWriterCutover:
         raise WriterCutoverDenied("explicit signed canonical cutover required")
     approval.verify()
@@ -40,6 +40,11 @@ def configure_cutover(app, approval, *, local_checkpoint=None):
             or getattr(app.state, "_trusted_writer_cutover", None) is not None
             or getattr(app.state, "_writer_cutover_installed", False)):
         raise WriterCutoverDenied("canonical cutover startup already configured")
+    if (after_binding is None) != (before_database_close is None) or (
+            after_binding is not None and (not callable(after_binding) or not callable(before_database_close))):
+        raise WriterCutoverDenied("protected stack lifecycle hooks must be paired")
+    app.state._writer_cutover_after_binding = after_binding
+    app.state._writer_cutover_before_database_close = before_database_close
     app.state._writer_cutover_requested = True
     app.state._trusted_writer_cutover = approval
     app.state._trusted_writer_checkpoint = local_checkpoint
@@ -112,9 +117,20 @@ async def install_before_lifespan(app):
             "external_writer_coverage_verified": False,
             "guarded_local_ai_ready": False,
         }
+        after_binding = getattr(app.state,"_writer_cutover_after_binding",None)
+        if after_binding is not None:
+            evidence = await after_binding(app.state._writer_cutover_runtime)
+            if (type(evidence) is not dict or evidence.get("shared_canonical_owners_observed") is not True
+                    or evidence.get("scoped_reviewer_challenge_observed") is not True
+                    or evidence.get("guarded_registry_available_observed") is not True
+                    or evidence.get("inference_qualified") is not False):
+                raise WriterCutoverDenied("protected co-hosted engine not qualified")
+            app.state.protected_stack_observation = evidence
     except WriterCutoverDenied:
+        app.state._writer_cutover_quarantined = True
         raise
     except Exception:
+        app.state._writer_cutover_quarantined = True
         raise WriterCutoverDenied("protected backend writer startup denied") from None
 
 
@@ -200,3 +216,12 @@ async def drain_protected_writer_readiness(app):
     if task is not None and not task.done():
         task.cancel()
         await asyncio.gather(task,return_exceptions=True)
+
+
+async def drain_protected_stack_before_database_close(app):
+    """The engine may use the exact same backend Mongo client until drained."""
+    hook=getattr(app.state,"_writer_cutover_before_database_close",None)
+    if hook is not None:
+        if getattr(app.state,"_writer_cutover_installed",False) is not True:
+            raise WriterCutoverDenied("protected stack shutdown custody unavailable")
+        await hook()

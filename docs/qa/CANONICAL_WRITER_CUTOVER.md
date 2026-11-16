@@ -186,3 +186,45 @@ health callers coalesce onto one check; cancelling a caller does not cancel
 the authority observation. Shutdown drains that task before Mongo closes.
 This does not attest inference or external writer coverage. The three
 duplicated mandatory route probes have been consolidated to one.
+
+
+### Explicit co-hosted protected engine and backend
+
+scripts/start_protected_stack.py is the operator-only single-host launcher.
+It consumes the same signed writer cutover and persistent local witness plus
+a separately signed ProtectedStackLaunchPlan bound to the writer-plan digest.
+It pins the exact source, both loopback ports, policy, memory namespace,
+all local model/runtime/tokenizer digests, selected active model, independent
+reviewer identity/signing key, CA and client certificate digest, and a
+reviewer challenge scope with an already provisioned stable actor epoch.
+The launch authority cannot be the reviewer key. It does not provision an
+actor or generate an approval.
+
+Configure existing AI_PROVIDER=local, exactly one local model source,
+SKELETON_INTERNAL_URL=http://127.0.0.1:ENGINE_PORT and the existing engine
+service credential before launch. No fallback model provider is allowed.
+Do not run the ordinary Compose backend or engine concurrently.
+
+    PYTHONPATH=.:backend python scripts/start_protected_stack.py \
+      --source-head REVIEWED_SHA --plan /private/writer.json \
+      --signature /private/writer.sig --authority AUTHORITY --deployment DEPLOYMENT \
+      --operator-public-key-hex PUBLIC_KEY --launch-plan /private/launch.json \
+      --launch-signature /private/launch.sig --state-dir /private/writer-custody \
+      --reviewer-ca /private/ca.pem --reviewer-client-cert /private/client.pem \
+      --reviewer-client-key /private/client.key
+
+The real backend writer binding runs first. Its trusted startup callback
+starts the real engine on the same event loop with exactly those owner
+objects. The engine verifies a scoped independent reviewer challenge against
+the signed pins and its actual registry must expose only the pinned guarded
+local models before backend startup continues. Each ASGI application keeps
+its own loopback listener and lifecycle. During orderly shutdown backend
+HTTP/background work drains, then engine finalization completes before shared
+Mongo closes. The process never retires the database latch automatically.
+A failed or uncertain launch requires offline reconciliation.
+
+This is a source implementation for an explicit deployment topology, not
+a substitute for real Mongo, signed reviewer, actual loaded model, process
+lifecycle, browser, Windows/WSL2, Docker or device qualification. In particular
+it does not automatically make the default Compose install guarded or
+establish semantic review quality or a successful inference.
