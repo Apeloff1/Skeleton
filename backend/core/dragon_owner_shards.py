@@ -252,6 +252,47 @@ def next_path(base,plane,job):
     return _target(base,plane,layout,lane)
 
 
+def next_paths(base,plane,job,*,count=2):
+    """Reserve a bounded set of distinct owner roots with one durable cursor.
+
+    Missing children are reported individually, not silently replaced by the
+    root. Cursor advancement commits before any child validation.
+    """
+    _plane(plane)
+    if type(count) is not int or not 1<=count<=LANES:raise ValueError("maintenance lane count")
+    if not isinstance(job,str) or not re.fullmatch(r"[a-z_]{1,64}",job):raise ValueError("job identity")
+    base,_=_private(base)
+    with _open(base) as db:
+        _migration_guard(db,plane)
+        layout=_layout(db,plane)
+        if layout is None:
+            if _required(plane) or _table(db,"dragon_shard_identity"):raise ShardHeld("missing root topology")
+            return ((0,base),),()
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            row=db.execute("SELECT lane FROM dragon_shard_cursor WHERE plane=? AND job=?",(plane,job)).fetchone()
+            start=row["lane"] if row else 0
+            if type(start) is not int or not 0<=start<LANES:raise ShardHeld("maintenance cursor invalid")
+            lanes=tuple((start+i)%LANES for i in range(count))
+            db.execute("""INSERT INTO dragon_shard_cursor VALUES(?,?,?)
+                ON CONFLICT(plane,job) DO UPDATE SET lane=excluded.lane""",(plane,job,(start+count)%LANES))
+            db.execute("COMMIT")
+        except BaseException:
+            if db.in_transaction:db.execute("ROLLBACK")
+            raise
+    ready=[];held=[];identities=set()
+    for lane in lanes:
+        try:
+            path=_target(base,plane,layout,lane)
+            identity=_private(path)[1]
+            if identity in identities:raise ShardHeld("maintenance roots alias")
+            identities.add(identity)
+            ready.append((lane,path))
+        except (ShardHeld,OSError,sqlite3.Error):
+            held.append(lane)
+    return tuple(ready),tuple(held)
+
+
 def main():
     import argparse
     parser=argparse.ArgumentParser(description=__doc__)

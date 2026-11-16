@@ -454,6 +454,9 @@ class LeadGraph:
         sha256=_id(sha256);previous_chain=_id(previous_chain)
         if not isinstance(raw,bytes) or not 1<=len(raw)<=MAX_PAGE_BYTES or hashlib.sha256(raw).hexdigest()!=sha256:
             raise ValueError("lead page digest")
+        from core.dragon_graph_structural import configured,append as parallel_append
+        if configured(self.path):
+            return parallel_append(self.path,scope,sid,ordinal=ordinal,raw=raw,sha256=sha256,previous_chain=previous_chain)
         _quota_disk(self.path);now=int(time.time())
         with self._db() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -582,10 +585,15 @@ class LeadGraph:
         return {"target_id":identifier,"lead_id":lead,"revision":revision,"enabled":enabled,
                 "expires_at":now+grant_seconds if enabled else 0,"network_authorized":False,"source_verified":False}
 
-    def feed_page(self,scope,*,url,raw,adapter,options,subscription_id):
+    def feed_page(self,scope,*,url,raw,adapter,options,subscription_id,batch_id=None):
         """Mirror already-approved feed proposals into graph, no extra fetch."""
         from core.dragon_release_discovery import parse_manifest,parse_steam_catalogue,parse_release_feed
         owner=owner_key(scope);now=int(time.time());_id(subscription_id)
+        from core.dragon_graph_structural import configured,feed as parallel_feed
+        if configured(self.path):
+            if batch_id is None:raise CatalogueHeld("parallel feed requires durable release batch witness")
+            return parallel_feed(self.path,scope,url=url,raw=raw,adapter=adapter,options=options,
+                                 subscription_id=subscription_id,batch_id=batch_id)
         try:
             with self._db() as db:
                 row=db.execute("SELECT enabled FROM lead_owner WHERE owner=?",(owner,)).fetchone()
@@ -728,7 +736,8 @@ class LeadGraph:
         now=int(time.time());_quota_disk(self.path)
         from core.dragon_graph_structural import configured,pulse
         parallel=configured(self.path)
-        independent=pulse(self.path,"expansion") if parallel else {"processed":0,"held":0}
+        if parallel:return pulse(self.path,"expansion")
+        independent={"processed":0,"held":0}
         with self._db() as db:
             db.execute("BEGIN IMMEDIATE")
             try:

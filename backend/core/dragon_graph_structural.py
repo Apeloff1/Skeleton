@@ -29,6 +29,8 @@ MAX_JOBS=32
 MAX_BOOTSTRAP_ROWS=128
 MAX_RECORDS=512
 MAX_PLAN_BYTES=4*1024**2
+MAX_IMPORT_RECORDS=8192
+MAX_IMPORT_PLAN_BYTES=32*1024**2
 WORKERS=4
 ROOT="""CREATE TABLE dragon_graph_structural(
  singleton INTEGER PRIMARY KEY CHECK(singleton=1),version INTEGER NOT NULL,epoch TEXT NOT NULL,
@@ -39,6 +41,10 @@ RECEIPT="""CREATE TABLE structural_receipt(
  singleton INTEGER PRIMARY KEY CHECK(singleton=1),sequence INTEGER NOT NULL,
  plan_sha TEXT NOT NULL,lane_sha TEXT NOT NULL
 )"""
+FEED_RECEIPTS="""CREATE TABLE IF NOT EXISTS dragon_parallel_feed_receipts(
+ owner TEXT NOT NULL,batch TEXT NOT NULL,request_sha TEXT NOT NULL,proposals INTEGER NOT NULL,
+ PRIMARY KEY(owner,batch),FOREIGN KEY(owner,batch) REFERENCES release_imports(owner,id)
+) WITHOUT ROWID"""
 PROTECTED=("lead_owner","lead_node_directory","lead_lane_counts","lead_dataset_candidates",
            "lead_dynamic_targets","lead_expand_jobs","lead_review_events")
 
@@ -117,13 +123,43 @@ def _pending(db):
     row=db.execute("SELECT sequence,state,plan,sha256 FROM main.dragon_graph_structural WHERE singleton=1").fetchone()
     if row["state"]=="idle":return None
     raw=row["plan"]
-    if not isinstance(raw,str) or not 1<=len(raw.encode())<=MAX_PLAN_BYTES or hashlib.sha256(raw.encode()).hexdigest()!=row["sha256"]:
+    if not isinstance(raw,str) or not 1<=len(raw.encode())<=MAX_IMPORT_PLAN_BYTES or hashlib.sha256(raw.encode()).hexdigest()!=row["sha256"]:
         raise a.GraphHeld("structural journal witness differs")
     plan=json.loads(raw)
-    if (not isinstance(plan,dict) or plan.get("sequence")!=row["sequence"] or plan.get("mode") not in {"catalogue","expansion","bootstrap"}
+    if (not isinstance(plan,dict) or plan.get("sequence")!=row["sequence"] or plan.get("mode") not in {"catalogue","expansion","bootstrap","snapshot","feed"}
             or not isinstance(plan.get("lanes"),dict) or len(plan["lanes"])>a.LANES or not isinstance(plan.get("jobs"),list)
             or not 1<=len(plan["jobs"])<=MAX_JOBS):
         raise a.GraphHeld("structural journal shape differs")
+    large=plan["mode"] in ("snapshot","feed")
+    if len(raw.encode())>(MAX_IMPORT_PLAN_BYTES if large else MAX_PLAN_BYTES):
+        raise a.GraphHeld("structural journal mode byte bound")
+    records=0
+    for key,part in plan["lanes"].items():
+        if key not in {str(i) for i in range(a.LANES)} or not isinstance(part,dict) or set(part)!={"nodes","edges"}:
+            raise a.GraphHeld("structural lane shape differs")
+        for table,columns in (("nodes",a.NODE_COLUMNS),("edges",a.EDGE_COLUMNS)):
+            pairs=part[table]
+            if not isinstance(pairs,list):raise a.GraphHeld("structural row group differs")
+            records+=len(pairs)
+            for pair in pairs:
+                if not isinstance(pair,list) or len(pair)!=2 or not isinstance(pair[1],list) or len(pair[1])!=len(columns):
+                    raise a.GraphHeld("structural row shape differs")
+                if pair[0] is not None and (not isinstance(pair[0],list) or len(pair[0])!=len(columns) or pair[0][:2]!=pair[1][:2]):
+                    raise a.GraphHeld("structural before-state shape differs")
+                if any(not isinstance(v,str) or not a.HEX.fullmatch(v) for v in pair[1][:2]):
+                    raise a.GraphHeld("structural row identity differs")
+                if a.lane(pair[1][1] if table=="nodes" else pair[1][3])!=int(key):
+                    raise a.GraphHeld("structural row route differs")
+    if records>(MAX_IMPORT_RECORDS if large else MAX_RECORDS):raise a.GraphHeld("structural journal record bound")
+    grants=plan.get("grants",[])
+    if not isinstance(grants,list) or len(grants)>MAX_JOBS:
+        raise a.GraphHeld("structural grant count differs")
+    for grant in grants:
+        if (not isinstance(grant,dict) or set(grant)!={"owner","snapshot","sha256","expires_at"}
+                or any(not isinstance(grant[k],str) or not a.HEX.fullmatch(grant[k]) for k in ("owner","snapshot","sha256"))
+                or type(grant["expires_at"]) is not int):
+            raise a.GraphHeld("structural grant shape differs")
+    if large and not isinstance(plan.get("publication"),dict):raise a.GraphHeld("structural publication missing")
     return plan,row["sha256"]
 
 
@@ -137,12 +173,12 @@ def _record(db,state,owner,identifier,table,columns,index):
     return state[k]
 
 
-def _reserve_row(db,work,owner,row,parent,relation,witness,now):
+def _reserve_row(db,work,owner,row,parent,relation,witness,now,snapshot=None):
     from core.dragon_lead_graph import (lead_id,digest,SOURCE_CLASSES,ZERO,DATASET_KINDS,
         _lane_counts,MAX_NODES,MAX_EDGES,NODES_PER_LANE,EDGES_PER_LANE)
     url,title,kind,subject=row
     identifier=lead_id(url);index=a.lane(identifier)
-    if parent!=ZERO and not db.execute("SELECT 1 FROM main.lead_node_directory WHERE owner=? AND id=?",(owner,parent)).fetchone():
+    if parent!=ZERO and (owner,parent) not in work["nodes"] and not db.execute("SELECT 1 FROM main.lead_node_directory WHERE owner=? AND id=?",(owner,parent)).fetchone():
         raise ValueError("parent missing")
     caps=db.execute("SELECT nodes,edges,enabled FROM main.lead_owner WHERE owner=?",(owner,)).fetchone()
     if not caps or not caps["enabled"]:raise CatalogueHeld("owner disabled")
@@ -155,9 +191,9 @@ def _reserve_row(db,work,owner,row,parent,relation,witness,now):
         node[1]=[owner,identifier,url,urlsplit(url).hostname,title,kind,SOURCE_CLASSES[kind].family,now,now,now,0,"candidate"]
         total[0]+=1;local[0]+=1
     elif node[1][2]!=url:raise CatalogueHeld("node identity conflict")
-    eid=digest([parent,identifier,relation,subject,kind,title,witness,None])
+    eid=digest([parent,identifier,relation,subject,kind,title,witness,snapshot])
     edge=_record(db,work["edges"],owner,eid,"edges",a.EDGE_COLUMNS,index)
-    expected=[owner,eid,parent,identifier,relation,subject,kind,title,witness,None]
+    expected=[owner,eid,parent,identifier,relation,subject,kind,title,witness,snapshot]
     if edge[1] is None:
         if caps["edges"]+total[1]>=MAX_EDGES or counts["edges"]+local[1]>=EDGES_PER_LANE:raise CatalogueHeld("edge quota")
         edge[1]=expected+[now,now]
@@ -167,6 +203,167 @@ def _reserve_row(db,work,owner,row,parent,relation,witness,now):
     node[1][8]=max(node[1][8],now)
     if kind in DATASET_KINDS:work["candidates"].add((owner,identifier))
     return identifier
+
+
+def _work():
+    return {"nodes":{},"edges":{},"owner_deltas":{},"deltas":{},"candidates":set(),"expansions":[]}
+
+
+def _publish(db,seq,mode,now,planned,work,*,bootstrap=None,publication=None,grants=None,large=False):
+    if len(work["nodes"])+len(work["edges"])>(MAX_IMPORT_RECORDS if large else MAX_RECORDS):
+        raise CatalogueHeld("structural record bound")
+    lanes={}
+    for kind in ("nodes","edges"):
+        for pair in work[kind].values():
+            index=a.lane(pair[1][1] if kind=="nodes" else pair[1][3])
+            lanes.setdefault(str(index),{"nodes":[],"edges":[]})[kind].append(pair)
+    plan={"sequence":seq,"mode":mode,"now":now,"jobs":planned,"lanes":lanes,"bootstrap":bootstrap,
+          "publication":publication,"grants":grants or [],
+          "deltas":[[owner,index,*delta] for (owner,index),delta in sorted(work["deltas"].items())],
+          "candidates":[list(x) for x in sorted(work["candidates"])],"expansions":work["expansions"]}
+    raw=_serialize(plan);witness=hashlib.sha256(raw.encode()).hexdigest()
+    if len(raw.encode())>(MAX_IMPORT_PLAN_BYTES if large else MAX_PLAN_BYTES):
+        raise a.GraphHeld("structural plan byte bound")
+    db.execute("UPDATE main.dragon_graph_structural SET sequence=?,state='pending',plan=?,sha256=? WHERE singleton=1",
+               (seq,raw,witness))
+    return plan,witness
+
+
+def _grant(db,owner,sid,now,*,append=False):
+    row=db.execute("SELECT * FROM main.lead_snapshots WHERE owner=? AND id=?",(owner,sid)).fetchone()
+    if row is None:raise LookupError("lead snapshot missing")
+    if row["state"] not in (("open",) if append else ("open","sealed")) or row["expires_at"]<=now:
+        raise CatalogueHeld("lead snapshot grant expired or revoked")
+    return dict(row)
+
+
+def _grant_witness(row):
+    return {"owner":row["owner"],"snapshot":row["id"],"sha256":_sha(row),"expires_at":row["expires_at"]}
+
+
+def _live_grants(db,plan):
+    now=int(time.time())
+    for grant in plan.get("grants",[]):
+        row=db.execute("SELECT * FROM main.lead_snapshots WHERE owner=? AND id=?",(grant["owner"],grant["snapshot"])).fetchone()
+        if row is None or row["state"]=="revoked" or row["expires_at"]<=now or _sha(dict(row))!=grant["sha256"]:
+            return False
+    return True
+
+
+def _owner_enabled(db,owner):
+    row=db.execute("SELECT enabled FROM main.lead_owner WHERE owner=?",(owner,)).fetchone()
+    return bool(row and row[0])
+
+
+def _request_pending(db,mode,request_sha):
+    pending=_pending(db)
+    if pending and (pending[0]["mode"]!=mode or (pending[0].get("publication") or {}).get("request_sha")!=request_sha):
+        raise CatalogueHeld("another structural reservation requires recovery")
+    return pending
+
+
+def reserve_snapshot(root,scope,sid,*,ordinal,raw,sha256,previous_chain):
+    from core.dragon_lead_graph import (_id,_int,MAX_SNAPSHOT_ROWS,MAX_PAGE_BYTES,parse_page,project,digest,_quota_disk)
+    owner=owner_key(scope);sid=_id(sid);ordinal=_int(ordinal,0,MAX_SNAPSHOT_ROWS)
+    sha256=_id(sha256);previous_chain=_id(previous_chain)
+    if not isinstance(raw,bytes) or not 1<=len(raw)<=MAX_PAGE_BYTES or hashlib.sha256(raw).hexdigest()!=sha256:
+        raise ValueError("lead page digest")
+    root=Path(root);_quota_disk(root)
+    request_sha=_sha([owner,sid,ordinal,sha256,previous_chain])
+    with a._probe_connection(root) as db:
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            pending=_request_pending(db,"snapshot",request_sha)
+            if pending:
+                db.execute("COMMIT");return pending,None
+            now=int(time.time())
+            if not _owner_enabled(db,owner):raise CatalogueHeld("lead expansion disabled")
+            snap=_grant(db,owner,sid,now)
+            prior=db.execute("SELECT * FROM lead_snapshot_pages WHERE owner=? AND snapshot=? AND ordinal=?",(owner,sid,ordinal)).fetchone()
+            if prior:
+                if prior["digest"]!=sha256 or prior["chain"]!=digest([previous_chain,ordinal,sha256,prior["row_count"]]):
+                    raise CatalogueHeld("lead snapshot replay differs")
+                db.execute("COMMIT")
+                return None,{"ordinal":ordinal,"rows":prior["row_count"],"chain":prior["chain"],"replayed":True,"network_authorized":False}
+            if snap["state"]!="open" or snap["next_page"]!=ordinal or snap["chain"]!=previous_chain:
+                raise CatalogueHeld("lead snapshot ordering")
+            bundle_witness=None
+            if snap["projection"]=="steam_seed":
+                from core.dragon_bundled_steam_leads import normalized_page,summary
+                expected,bundle_witness=normalized_page(ordinal)
+                if snap["source_sha"]!=summary()["bundle_revision"] or expected!=raw:
+                    raise CatalogueHeld("bundled dataset page differs from pinned source")
+            items=parse_page(raw,snap["projection"])
+            if snap["rows"]+len(items)>snap["expected_rows"]:raise CatalogueHeld("lead snapshot row budget")
+            chain=digest([previous_chain,ordinal,sha256,len(items)])
+            work=_work()
+            for ix,item in enumerate(items):
+                witness=digest([sid,ordinal,sha256,bundle_witness,ix,item])
+                for row in project(item,snap["projection"]):
+                    child=_reserve_row(db,work,owner,row,snap["root"],"dataset_projection",witness,now,sid)
+                    if snap["projection"]=="steam_seed":
+                        job=digest(["bundle-steam-app",child,item["appid"],sid])
+                        work["expansions"].append([owner,job,child,item["appid"],item["title"],witness,"queued",now,sid])
+            publication={"owner":owner,"snapshot":sid,"ordinal":ordinal,"digest":sha256,"chain":chain,
+                         "previous_chain":previous_chain,"rows":len(items),"request_sha":request_sha}
+            seq=db.execute("SELECT sequence FROM main.dragon_graph_structural WHERE singleton=1").fetchone()[0]+1
+            planned=[{"owner":owner,"id":sid,"witness":_sha(snap),"state":"done"}]
+            result=_publish(db,seq,"snapshot",now,planned,work,publication=publication,grants=[_grant_witness(snap)],large=True)
+            db.execute("COMMIT");return result,None
+        except BaseException:
+            if db.in_transaction:db.execute("ROLLBACK")
+            raise
+
+
+def reserve_feed(root,scope,*,url,raw,adapter,options,subscription_id,batch_id):
+    from core.dragon_lead_graph import (_id,_schema_row,digest,APPID,ZERO,_quota_disk)
+    from core.dragon_release_discovery import parse_manifest,parse_steam_catalogue,parse_release_feed
+    owner=owner_key(scope);subscription_id=_id(subscription_id);batch_id=_id(batch_id)
+    if not isinstance(options,dict) or set(options)-{"provider","external_id","title"}:
+        raise ValueError("feed options")
+    if adapter=="manifest" and not options:proposals=parse_manifest(raw)
+    elif adapter=="steam" and not options:proposals=parse_steam_catalogue(raw)
+    elif adapter=="rss_atom":proposals=parse_release_feed(raw,**options)
+    else:raise ValueError("lead feed adapter")
+    fingerprint=hashlib.sha256(raw).hexdigest()
+    input_digest=digest([adapter,fingerprint,options.get("provider"),options.get("external_id"),options.get("title")])
+    request_sha=_sha([owner,subscription_id,batch_id,url,input_digest])
+    root=Path(root);_quota_disk(root)
+    with a._probe_connection(root) as db:
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            pending=_request_pending(db,"feed",request_sha)
+            if pending:
+                db.execute("COMMIT");return pending,None
+            if not _owner_enabled(db,owner):
+                db.execute("COMMIT");return None,{"enabled":False}
+            source=db.execute("SELECT * FROM release_imports WHERE owner=? AND id=?",(owner,batch_id)).fetchone()
+            if source is None or source["input_digest"]!=input_digest or source["total"]!=len({p.event_key for p in proposals}):
+                raise CatalogueHeld("feed release batch witness differs")
+            db.execute(FEED_RECEIPTS)
+            prior=db.execute("SELECT request_sha,proposals FROM dragon_parallel_feed_receipts WHERE owner=? AND batch=?",(owner,batch_id)).fetchone()
+            if prior:
+                if prior["request_sha"]!=request_sha or prior["proposals"]!=len(proposals):raise CatalogueHeld("feed replay differs")
+                db.execute("COMMIT")
+                return None,{"enabled":True,"proposals":len(proposals),"replayed":True,"network_authorized":False}
+            now=int(time.time());work=_work()
+            parent=_reserve_row(db,work,owner,_schema_row(url,"Authorized feed metadata","release_feed","subscription:"+subscription_id),
+                                ZERO,"dataset_target",digest([subscription_id,url]),now)
+            for item in proposals:
+                witness=digest([subscription_id,fingerprint,item.event_key])
+                child=_reserve_row(db,work,owner,_schema_row(item.source,item.title,item.kind,(item.namespace+":"+item.external_id)[:256]),
+                                   parent,"feed_discovery",witness,now)
+                if adapter=="steam" and item.namespace=="steam" and APPID.fullmatch(item.external_id):
+                    job=digest(["steam-app",child,item.external_id,item.title])
+                    work["expansions"].append([owner,job,child,item.external_id,item.title,witness,"queued",now,None])
+            publication={"owner":owner,"batch":batch_id,"proposals":len(proposals),"request_sha":request_sha}
+            seq=db.execute("SELECT sequence FROM main.dragon_graph_structural WHERE singleton=1").fetchone()[0]+1
+            planned=[{"owner":owner,"id":batch_id,"witness":_sha(dict(source)),"state":"done"}]
+            result=_publish(db,seq,"feed",now,planned,work,publication=publication,large=True)
+            db.execute("COMMIT");return result,None
+        except BaseException:
+            if db.in_transaction:db.execute("ROLLBACK")
+            raise
 
 
 def reserve(root,mode):
@@ -179,6 +376,7 @@ def reserve(root,mode):
         try:
             previous=_pending(db)
             if previous:
+                if previous[0]["mode"]!=mode:raise CatalogueHeld("different structural operation pending; recover first")
                 db.execute("COMMIT");return previous
             seq=db.execute("SELECT sequence FROM main.dragon_graph_structural WHERE singleton=1").fetchone()[0]+1
             now=int(time.time())
@@ -197,11 +395,13 @@ def reserve(root,mode):
                   JOIN lead_owner o ON o.owner=q.owner
                   WHERE q.state='queued' AND j.state='done' AND o.enabled=1 ORDER BY q.created_at,q.owner,q.id LIMIT ?""",(MAX_JOBS,)).fetchall()
             else:
-                # Grant-bearing jobs stay in the original atomic snapshot path.
                 jobs=db.execute("""SELECT j.* FROM lead_expand_jobs j JOIN lead_owner o ON o.owner=j.owner
-                  WHERE j.state='queued' AND j.snapshot IS NULL AND o.enabled=1
-                  ORDER BY j.created_at,j.owner,j.id LIMIT 16""").fetchall()
-            work={"nodes":{},"edges":{},"owner_deltas":{},"deltas":{},"candidates":set(),"expansions":[]}
+                  WHERE j.state='queued' AND o.enabled=1 AND (j.snapshot IS NULL OR EXISTS(
+                      SELECT 1 FROM lead_snapshots s WHERE s.owner=j.owner AND s.id=j.snapshot
+                      AND s.state IN ('open','sealed') AND s.expires_at>?))
+                  ORDER BY j.created_at,j.owner,j.id LIMIT 16""",(now,)).fetchall()
+            work=_work()
+            grants={}
             planned=[]
             if mode=="bootstrap":
                 owner=record["owner"]
@@ -230,31 +430,27 @@ def reserve(root,mode):
                             trial["expansions"].append([owner,job_id,child,item["external_id"],title,witness,"queued",now,None])
                     else:
                         if not APPID.fullmatch(job["appid"]):raise ValueError("appid")
+                        snap=None
+                        if job["snapshot"] is not None:
+                            snap=_grant(db,owner,job["snapshot"],now)
+                            if snap["root"]!=job["parent"] and not db.execute(
+                                "SELECT 1 FROM lead_edges WHERE owner=? AND child=? AND snapshot=? LIMIT 1",
+                                (owner,job["parent"],job["snapshot"])).fetchone():
+                                raise CatalogueHeld("expansion snapshot parent differs")
                         for row in project({"appid":job["appid"],"title":job["title"]},"steam"):
-                            _reserve_row(db,trial,owner,row,job["parent"],"feed_discovery",job["witness"],now)
+                            _reserve_row(db,trial,owner,row,job["parent"],"dataset_projection" if snap else "feed_discovery",job["witness"],now,job["snapshot"])
                     if len(trial["nodes"])+len(trial["edges"])>MAX_RECORDS:
                         if planned:break
                         raise CatalogueHeld("job exceeds structural batch bound")
                     work=trial;state="done"
+                    if mode=="expansion" and snap:grants[(owner,snap["id"])]=_grant_witness(snap)
                 except (ValueError,KeyError,TypeError,CatalogueHeld):
                     state="held"
                 planned.append({"owner":owner,"id":job["id"],"witness":_sha(job),"state":state})
             if not planned:
                 db.execute("COMMIT");return None
-            lanes={}
-            for kind in ("nodes","edges"):
-                for pair in work[kind].values():
-                    index=a.lane(pair[1][1] if kind=="nodes" else pair[1][3])
-                    lanes.setdefault(str(index),{"nodes":[],"edges":[]})[kind].append(pair)
-            plan={"sequence":seq,"mode":mode,"now":now,"jobs":planned,"lanes":lanes,"bootstrap":bootstrap,
-                  "deltas":[[owner,index,*delta] for (owner,index),delta in sorted(work["deltas"].items())],
-                  "candidates":[list(x) for x in sorted(work["candidates"])],"expansions":work["expansions"]}
-            raw=_serialize(plan);witness=hashlib.sha256(raw.encode()).hexdigest()
-            if len(raw.encode())>MAX_PLAN_BYTES:raise a.GraphHeld("structural plan byte bound")
-            db.execute("UPDATE main.dragon_graph_structural SET sequence=?,state='pending',plan=?,sha256=? WHERE singleton=1",
-                       (seq,raw,witness))
-            db.execute("COMMIT")
-            return plan,witness
+            result=_publish(db,seq,mode,now,planned,work,bootstrap=bootstrap,grants=list(grants.values()))
+            db.execute("COMMIT");return result
         except BaseException:
             if db.in_transaction:db.execute("ROLLBACK")
             raise
@@ -292,7 +488,7 @@ def _write_lane(root,layout,index):
     path,identity=_private(Path(layout["paths"][index]))
     root_identity=_private(root)[1]
     if identity==root_identity:raise a.GraphHeld("lane aliases root")
-    if shutil.disk_usage(path.parent).free<512*1024**2+4*MAX_PLAN_BYTES:
+    if shutil.disk_usage(path.parent).free<512*1024**2+4*MAX_IMPORT_PLAN_BYTES:
         raise a.GraphHeld("structural lane disk reserve")
     with _open(path) as db:
         if db.execute("PRAGMA journal_mode").fetchone()[0].lower()!="delete":raise a.GraphHeld("structural lane journal differs")
@@ -321,6 +517,9 @@ def apply_lane(root,sequence,plan_sha,index):
             if policy.execute("PRAGMA journal_mode").fetchone()[0].lower()!="delete":
                 raise a.GraphHeld("structural policy journal differs")
             plan=item[0];part=plan["lanes"].get(str(index))
+            if not _live_grants(policy,plan):
+                policy.execute("COMMIT")
+                return {"lane":index,"skipped":True,"reason":"grant_changed"}
             if part is None:raise a.GraphHeld("unreserved lane")
             layout=a._layout(policy,root)
             witness=_sha(part)
@@ -344,15 +543,52 @@ def apply_lane(root,sequence,plan_sha,index):
 
 
 def _job_row(db,mode,owner,identifier):
-    if mode=="bootstrap":
+    if mode=="snapshot":
+        row=db.execute("SELECT * FROM main.lead_snapshots WHERE owner=? AND id=?",(owner,identifier)).fetchone()
+    elif mode=="feed":
+        row=db.execute("SELECT * FROM main.release_imports WHERE owner=? AND id=?",(owner,identifier)).fetchone()
+    elif mode=="bootstrap":
         row=db.execute("SELECT * FROM main.lead_owner WHERE owner=?",(owner,)).fetchone()
     elif mode=="catalogue":
         row=db.execute("""SELECT j.owner,j.id,j.payload,j.batch,o.scope_json FROM lead_release_outbox q
            JOIN release_jobs j ON j.owner=q.owner AND j.id=q.id JOIN lead_owner o ON o.owner=q.owner
            WHERE q.owner=? AND q.id=? AND q.state='queued' AND j.state='done'""",(owner,identifier)).fetchone()
     else:
-        row=db.execute("SELECT * FROM lead_expand_jobs WHERE owner=? AND id=? AND state='queued' AND snapshot IS NULL",(owner,identifier)).fetchone()
+        row=db.execute("SELECT * FROM lead_expand_jobs WHERE owner=? AND id=? AND state='queued'",(owner,identifier)).fetchone()
     return dict(row) if row else None
+
+
+def _rollback_grant(db,plan,witness):
+    """Exact compensation in one attached rollback-journal transaction.
+
+    No committed root directory/counter/page changes exist yet. Restore only
+    rows created/changed by this reservation; never erase historical evidence.
+    """
+    sequence=plan["sequence"]
+    for index,part in plan["lanes"].items():
+        alias=a._alias(int(index));prefix=alias+"."
+        receipt=db.execute("SELECT sequence,plan_sha,lane_sha FROM "+prefix+"structural_receipt WHERE singleton=1").fetchone()
+        if receipt and receipt[0]>=sequence:
+            if tuple(receipt)!=(sequence,witness,_sha(part)):raise a.GraphHeld("grant rollback receipt differs")
+            _verify_rows(db,part,prefix)
+            for kind,columns in (("edges",a.EDGE_COLUMNS),("nodes",a.NODE_COLUMNS)):
+                for before,after in reversed(part[kind]):
+                    if before is None:
+                        if kind=="nodes":
+                            db.execute("DELETE FROM "+prefix+"graph_search WHERE owner=? AND id=?",after[:2])
+                        if db.execute("DELETE FROM "+prefix+kind+" WHERE owner=? AND id=?",after[:2]).rowcount!=1:
+                            raise a.GraphHeld("grant rollback created row missing")
+                    else:
+                        if db.execute("UPDATE "+prefix+kind+" SET "+",".join(k+"=?" for k in columns[2:])+" WHERE owner=? AND id=?",
+                                      [*before[2:],*before[:2]]).rowcount!=1:
+                            raise a.GraphHeld("grant rollback prior row missing")
+            db.execute("DELETE FROM "+prefix+"structural_receipt WHERE singleton=1")
+        for kind,columns in (("nodes",a.NODE_COLUMNS),("edges",a.EDGE_COLUMNS)):
+            for before,after in part[kind]:
+                row=db.execute("SELECT "+",".join(columns)+" FROM "+prefix+kind+" WHERE owner=? AND id=?",after[:2]).fetchone()
+                if (list(row) if row else None)!=before:raise a.GraphHeld("grant rollback pre-state differs")
+    db.execute("UPDATE main.dragon_graph_structural SET state='idle',plan='',sha256='' WHERE singleton=1")
+    a._fence(db)
 
 
 def settle(root,sequence,plan_sha):
@@ -367,6 +603,10 @@ def settle(root,sequence,plan_sha):
                 db.execute("COMMIT");return {"processed":0,"held":0,"replayed":True,"network_executed":False}
             plan,witness=pending
             if (plan["sequence"],witness)!=(sequence,plan_sha):raise a.GraphHeld("settlement reservation differs")
+            if not _live_grants(db,plan):
+                _rollback_grant(db,plan,witness)
+                db.execute("COMMIT")
+                return {"processed":0,"held":len(plan["jobs"]),"aborted":True,"reason":"snapshot_grant_changed","network_executed":False}
             for index,part in plan["lanes"].items():
                 alias=a._alias(int(index))
                 receipt=db.execute("SELECT sequence,plan_sha,lane_sha FROM "+alias+".structural_receipt WHERE singleton=1").fetchone()
@@ -393,7 +633,19 @@ def settle(root,sequence,plan_sha):
                            (owner,identifier,plan["now"],plan["now"]))
             for expansion in plan["expansions"]:
                 db.execute("INSERT OR IGNORE INTO lead_expand_jobs VALUES(?,?,?,?,?,?,?,?,?)",expansion)
-            if plan["mode"]=="bootstrap":
+            if plan["mode"]=="snapshot":
+                page=plan["publication"]
+                db.execute("INSERT INTO lead_snapshot_pages VALUES(?,?,?,?,?,?)",
+                           (page["owner"],page["snapshot"],page["ordinal"],page["digest"],page["rows"],page["chain"]))
+                if db.execute("""UPDATE lead_snapshots SET rows=rows+?,next_page=next_page+1,chain=?
+                      WHERE owner=? AND id=? AND state='open' AND next_page=? AND chain=? AND expires_at>?""",
+                    (page["rows"],page["chain"],page["owner"],page["snapshot"],page["ordinal"],page["previous_chain"],int(time.time()))).rowcount!=1:
+                    raise a.GraphHeld("snapshot publication grant differs")
+            elif plan["mode"]=="feed":
+                page=plan["publication"]
+                db.execute("INSERT INTO dragon_parallel_feed_receipts VALUES(?,?,?,?)",
+                           (page["owner"],page["batch"],page["request_sha"],page["proposals"]))
+            elif plan["mode"]=="bootstrap":
                 cursor=plan["bootstrap"]
                 if db.execute("""UPDATE lead_owner SET bootstrap_revision=?,bootstrap_cursor=?,bootstrapped=?,due=?
                     WHERE owner=?""",(cursor["revision"],cursor["cursor"],int(cursor["complete"]),plan["now"]+1,cursor["owner"])).rowcount!=1:
@@ -403,6 +655,8 @@ def settle(root,sequence,plan_sha):
                 for job in plan["jobs"]:
                     if db.execute("UPDATE "+table+" SET state=? WHERE owner=? AND id=? AND state='queued'",
                                   (job["state"],job["owner"],job["id"])).rowcount!=1:raise a.GraphHeld("job settlement differs")
+            if plan["mode"]=="expansion" and not _live_grants(db,plan):
+                raise a.GraphHeld("snapshot grant expired during expansion settlement")
             a._fence(db)
             db.execute("COMMIT")
         except BaseException:
@@ -411,6 +665,10 @@ def settle(root,sequence,plan_sha):
     bootstrap=plan["bootstrap"]
     return {"processed":bootstrap["processed"] if bootstrap else sum(j["state"]=="done" for j in plan["jobs"]),
             **({"bootstrap_complete":bootstrap["complete"]} if bootstrap else {}),
+            **({"ordinal":plan["publication"]["ordinal"],"rows":plan["publication"]["rows"],
+                "chain":plan["publication"]["chain"],"replayed":False,"network_authorized":False} if plan["mode"]=="snapshot" else {}),
+            **({"enabled":True,"proposals":plan["publication"]["proposals"],
+                "replayed":False,"network_authorized":False} if plan["mode"]=="feed" else {}),
             "held":sum(j["state"]=="held" for j in plan["jobs"]),"mode":plan["mode"],
             "sequence":sequence,"physical_lanes":len(plan["lanes"]),"network_executed":False}
 
@@ -418,6 +676,11 @@ def settle(root,sequence,plan_sha):
 def _run(root,item):
     if item is None:return {"processed":0,"held":0,"network_executed":False}
     plan,witness=item;seq=plan["sequence"]
+    with _open(Path(root)) as db:
+        db.execute("BEGIN")
+        live=_live_grants(db,plan)
+        db.execute("COMMIT")
+    if not live:return settle(root,seq,witness)
     with ThreadPoolExecutor(max_workers=WORKERS,thread_name_prefix="dragon-structural") as pool:
         receipts=list(pool.map(lambda key:apply_lane(root,seq,witness,int(key)),plan["lanes"]))
     result=settle(root,seq,witness)
@@ -446,3 +709,34 @@ def status(root):
         row=db.execute("SELECT sequence,state,sha256 FROM main.dragon_graph_structural WHERE singleton=1").fetchone()
         return {"configured":True,"sequence":row[0],"state":row[1],"plan_sha":row[2],
                 "physical_writers":a.LANES,"network_authorized":False}
+
+
+def append(root,scope,sid,**kwargs):
+    try:
+        item,receipt=reserve_snapshot(root,scope,sid,**kwargs)
+        if receipt is not None:return receipt
+        result=_run(root,item)
+        if result.get("aborted"):raise CatalogueHeld("snapshot grant changed before publication")
+        if result.get("replayed"):
+            # Another worker may have settled the same page after this call
+            # reserved it. Read the canonical page receipt, not a guessed result.
+            _,receipt=reserve_snapshot(root,scope,sid,**kwargs)
+            if receipt is None:raise CatalogueHeld("snapshot settlement replay unavailable")
+            return receipt
+        return result
+    except (a.GraphHeld,ShardHeld,sqlite3.Error,OSError) as exc:
+        raise CatalogueHeld("snapshot structural admission held") from exc
+
+
+def feed(root,scope,**kwargs):
+    try:
+        item,receipt=reserve_feed(root,scope,**kwargs)
+        if receipt is not None:return receipt
+        result=_run(root,item)
+        if result.get("replayed"):
+            _,receipt=reserve_feed(root,scope,**kwargs)
+            if receipt is None:raise CatalogueHeld("feed settlement replay unavailable")
+            return receipt
+        return result
+    except (a.GraphHeld,ShardHeld,sqlite3.Error,OSError) as exc:
+        raise CatalogueHeld("feed structural admission held") from exc
