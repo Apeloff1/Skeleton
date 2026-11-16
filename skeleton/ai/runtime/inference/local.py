@@ -1617,12 +1617,19 @@ def _sample_darwin_resources() -> ServingResources:
         library.mach_port_deallocate(task, host)
 
 
-def sample_serving_resources() -> ServingResources:
-    """Sample fresh native counters; preserve unavailable restriction signals."""
+def sample_serving_resources(*, fresh: bool = False) -> ServingResources:
+    """Sample native counters; bypass the shared short cache at launch fences.
+
+    Ordinary serving maintenance retains its collection cache. A trusted
+    pre-spawn owner may request a new collection without changing admission
+    thresholds, pressure state or the process's identity.
+    """
+    if type(fresh) is not bool:
+        raise ValueError("fresh resource collection flag must be boolean")
     global _RESOURCE_COLLECTION
     with _RESOURCE_COLLECTION_LOCK:
         now = time.monotonic()
-        if _RESOURCE_COLLECTION is not None and now - _RESOURCE_COLLECTION[0] < 0.2:
+        if not fresh and _RESOURCE_COLLECTION is not None and now - _RESOURCE_COLLECTION[0] < 0.2:
             return _RESOURCE_COLLECTION[1]
         try:
             if os.name == "nt":
