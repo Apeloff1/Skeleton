@@ -185,6 +185,10 @@ def migrate(base,plane,scope,destination,*,offline_acknowledged=False):
         layout=_layout(src,plane)
         if layout is None:raise ShardHeld("provision topology first")
         target=_target(base,plane,layout,destination)
+        if plane=="corpus":
+            with _open(target) as probe:
+                if _table(probe,"dragon_graph_authority"):
+                    raise ShardHeld("canonical graph destination requires coherent multi-file migration")
         src.execute(JOURNAL)
         _initialize(src,plane)
         prior=src.execute("SELECT * FROM dragon_owner_migrations WHERE plane=? AND owner=?",(plane,owner)).fetchone()

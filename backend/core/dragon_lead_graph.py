@@ -151,9 +151,10 @@ def _lane_counts(db,owner,lane):
     # Lazy indexed migration of existing owner rows; one lane at a time.
     # Runs inside the caller's transaction; previous binaries must be stopped.
     low,high=lane_bounds(lane)
-    nodes=db.execute("SELECT COUNT(*) FROM lead_nodes WHERE owner=? AND id>=? AND id<?",
+    node_table,edge_table,_=authority.tables(db,low.ljust(64,"0"))
+    nodes=db.execute("SELECT COUNT(*) FROM "+node_table+" WHERE owner=? AND id>=? AND id<?",
         (owner,low,high)).fetchone()[0]
-    edges=db.execute("SELECT COUNT(*) FROM lead_edges WHERE owner=? AND child>=? AND child<?",
+    edges=db.execute("SELECT COUNT(*) FROM "+edge_table+" WHERE owner=? AND child>=? AND child<?",
         (owner,low,high)).fetchone()[0]
     db.execute("INSERT INTO lead_lane_counts VALUES(?,?,?,?)",(owner,lane,nodes,edges))
     return {"nodes":nodes,"edges":edges}
