@@ -368,3 +368,35 @@ def test_server_registry_factory_preserves_canonical_governed_route(authored, mo
     assert registry.active.require_guarded_inference
     assert registry.measured_local_status()["checks"] == 0
     asyncio.run(registry.active.close())
+
+
+def test_guarded_deployment_binds_shared_native_slot(authored, monkeypatch, tmp_path):
+    import os
+    from skeleton.app.offline_native_process_lease import NativeCpuLeaseOwner, NativeLeaseError
+
+    if os.name != "posix":
+        pytest.skip("POSIX native lease required")
+    local_environment(authored, monkeypatch)
+    install_probes(monkeypatch)
+    directory = tmp_path / "native-slot"
+    directory.mkdir(mode=0o700)
+    spec = replace(authored.spec, lease_directory=directory.resolve())
+    registry = ProviderRegistry.from_env(guarded_components=protected_components(),
+                                         measured_local_deployment=spec)
+    backend = registry.active.engine.model
+    assert registry.measured_local_status()["shared_native_lease"]["acquired"] == 0
+    # Exercise the actual activated launch-owner callback without generating
+    # text or invoking the framing-only fixture as a native model.
+    lease = backend._resource_lease_factory()
+    try:
+        assert len(lease.child_pass_fds()) == 1
+        observed = registry.measured_local_status()
+        assert observed["checks"] == 1
+        assert observed["shared_native_lease"]["owned_parent_references"] == 1
+        other = NativeCpuLeaseOwner(directory.resolve(), lambda: None)
+        with pytest.raises(NativeLeaseError, match="already held"):
+            other.acquire()
+    finally:
+        lease()
+        asyncio.run(registry.active.close())
+    assert registry.measured_local_status()["shared_native_lease"]["owned_parent_references"] == 0
