@@ -2992,6 +2992,12 @@ async def crawler_companion_sanctuary(scope: dict = Depends(_crawler_scope)) -> 
     return await _crawler_result(crawler_application.companion_sanctuary(scope))
 
 
+@router.get("/crawler/acquisition-holds")
+async def crawler_acquisition_holds(scope: dict = Depends(_crawler_scope)) -> dict:
+    """Read-only owner-scoped restriction audit; not a dispatch authorization."""
+    return await _crawler_result(crawler_application.acquisition_hold_catalog(scope))
+
+
 @router.get("/crawler/sessions")
 async def crawler_sessions(
     cursor: str | None = Query(default=None, min_length=1, max_length=128),
