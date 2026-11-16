@@ -569,3 +569,73 @@ def test_signed_predecessor_and_signer_continuity_against_restored_snapshots():
         assert next_active["generation"]==3
         assert coll.row["predecessor_latch_sha256"]==retired["latch_sha256"]
     asyncio.run(run())
+
+
+def test_local_highwater_witness_denies_genesis_after_successful_reservation(tmp_path):
+    from scripts.start_protected_backend import _reserve_cutover
+    directory=_private_dir(tmp_path)
+    first=signed()
+    with _reserve_cutover(first,directory) as witness:
+        evidence=witness.record({"generation":1,"latch_sha256":"1"*64})
+        assert evidence["generation"]==1
+        with pytest.raises(WriterCutoverDenied):
+            witness.record({"generation":1,"latch_sha256":"1"*64})
+    with pytest.raises(WriterCutoverDenied):
+        with _reserve_cutover(signed(backup_sha256="2"*64),directory):
+            pytest.fail("genesis reused after recorded shared reservation")
+    with _reserve_cutover(signed(predecessor_generation=2,predecessor_latch_sha256="3"*64),directory) as next_witness:
+        assert next_witness.record({"generation":3,"latch_sha256":"4"*64})["generation"]==3
+    files=sorted(directory.glob("witness-*.json"))
+    assert len(files)==2
+    assert json.loads(files[1].read_bytes())["previous_local_sha256"]==evidence["witness_sha256"]
+    with pytest.raises(WriterCutoverDenied):
+        with _reserve_cutover(signed(predecessor_generation=2,predecessor_latch_sha256="5"*64),directory):
+            pytest.fail("older predecessor admitted")
+
+
+@pytest.mark.parametrize("fault",["truncate","missing_ancestor","symlink","changed_key","wrong_generation"])
+def test_local_highwater_corruption_and_signer_change_fail_closed(tmp_path,fault):
+    from scripts.start_protected_backend import _reserve_cutover
+    directory=_private_dir(tmp_path)
+    with _reserve_cutover(signed(),directory) as witness:
+        witness.record({"generation":1,"latch_sha256":"1"*64})
+    with _reserve_cutover(signed(predecessor_generation=2,predecessor_latch_sha256="3"*64),directory) as witness:
+        witness.record({"generation":3,"latch_sha256":"4"*64})
+    files=sorted(directory.glob("witness-*.json"))
+    signer=None
+    if fault=="truncate":
+        files[1].write_bytes(b"{")
+    elif fault=="missing_ancestor":
+        files[0].unlink()
+    elif fault=="symlink":
+        files[0].unlink()
+        files[0].symlink_to(files[1])
+    elif fault=="changed_key":
+        signer=Ed25519PrivateKey.generate()
+    else:
+        files[0].rename(files[0].with_name(files[0].name.replace("0000000000000000001","0000000000000000005")))
+    with pytest.raises(WriterCutoverDenied):
+        with _reserve_cutover(signed(signer=signer,predecessor_generation=4,predecessor_latch_sha256="6"*64),directory):
+            pytest.fail("invalid local witness history admitted")
+
+
+def test_local_witness_rejects_mismatched_generation_and_post_context_use(tmp_path):
+    from scripts.start_protected_backend import _reserve_cutover
+    directory=_private_dir(tmp_path)
+    with _reserve_cutover(signed(),directory) as witness:
+        with pytest.raises(WriterCutoverDenied):
+            witness.record({"generation":3,"latch_sha256":"1"*64})
+        assert not list(directory.glob("witness-*.json"))
+    with pytest.raises(WriterCutoverDenied):
+        witness.record({"generation":1,"latch_sha256":"1"*64})
+
+
+def test_local_witness_detects_same_process_history_change_before_commit(tmp_path):
+    from scripts.start_protected_backend import _reserve_cutover
+    directory=_private_dir(tmp_path)
+    with _reserve_cutover(signed(),directory) as witness:
+        witness.record({"generation":1,"latch_sha256":"1"*64})
+    with _reserve_cutover(signed(predecessor_generation=2,predecessor_latch_sha256="2"*64),directory) as witness:
+        next(directory.glob("witness-*.json")).unlink()
+        with pytest.raises(WriterCutoverDenied):
+            witness.record({"generation":3,"latch_sha256":"3"*64})

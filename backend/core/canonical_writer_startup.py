@@ -29,7 +29,7 @@ def _collections(conversation, memory):
             "idempotency": memory.idempotency}
 
 
-def configure_cutover(app, approval):
+def configure_cutover(app, approval, *, local_checkpoint=None):
     if type(approval) is not VerifiedWriterCutover:
         raise WriterCutoverDenied("explicit signed canonical cutover required")
     approval.verify()
@@ -37,6 +37,7 @@ def configure_cutover(app, approval):
             or getattr(app.state, "_writer_cutover_installed", False)):
         raise WriterCutoverDenied("canonical cutover startup already configured")
     app.state._trusted_writer_cutover = approval
+    app.state._trusted_writer_checkpoint = local_checkpoint
 
 
 async def install_before_lifespan(app):
@@ -66,7 +67,17 @@ async def install_before_lifespan(app):
         )
         # Reserve shared startup custody only after the first read-only
         # signed inventory passes. Re-scan under that non-expiring reservation.
+        checkpoint = getattr(app.state,"_trusted_writer_checkpoint",None)
+        if not callable(checkpoint):
+            raise WriterCutoverDenied("trusted persistent deployment witness required")
         reservation = await reserve_writer_deployment(approval, epoch=epoch)
+        local_evidence = checkpoint(reservation)
+        if (type(local_evidence) is not dict or set(local_evidence) != {"generation","witness_sha256"}
+                or local_evidence["generation"] != reservation["generation"]
+                or type(local_evidence["witness_sha256"]) is not str
+                or len(local_evidence["witness_sha256"]) != 64
+                or any(c not in "0123456789abcdef" for c in local_evidence["witness_sha256"])):
+            raise WriterCutoverDenied("persistent deployment witness unavailable")
         confirmed = await qualify_writer_cutover(
             approval, epoch=epoch, collections=_collections(conversation, memory),
             repository_namespace=memory.repository_namespace,
@@ -88,6 +99,7 @@ async def install_before_lifespan(app):
             "local_collection_counts": dict(inventory.collection_counts),
             "known_local_writer_binding_installed": True,
             "shared_startup_reservation": reservation,
+            "local_deployment_witness": local_evidence,
             "known_writer_reservation_revalidation_installed": True,
             "distributed_writer_fencing_verified": False,
             "external_writer_coverage_verified": False,

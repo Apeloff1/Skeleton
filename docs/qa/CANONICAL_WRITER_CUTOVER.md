@@ -156,3 +156,21 @@ reset. Record every successful retirement receipt independently before issuing
 another activation. This is detection relative to an independently retained
 checkpoint, not physical anti-rollback if the independent evidence and
 database are restored together or the signer deliberately approves genesis.
+
+
+The launcher maintains an append-only local witness chain in its existing
+protected state directory. Every successful shared reservation must be
+published with exclusive creation and fsync before writer binding. Each
+record binds the actual active generation, latch digest, exact source,
+authority key and signed predecessor, plus the previous local record digest.
+A host which observed an active generation rejects a new genesis approval
+or any predecessor at or below that generation, even before contacting Mongo.
+Missing intermediate records, malformed records, key substitution and
+untrusted descriptor identities fail closed. The ledger accepts skipped
+generations only because other hosts may have made independently approved
+transitions. It does not recover missing documents, trim history, authorize
+startup independently, or detect deletion of all/suffix records without an
+external checkpoint. Keep the custody directory independently backed up and
+retain signed receipts outside both restore domains. Bounded to 4,096 witness
+records per deployment and 65,536 directory entries; larger histories require
+a separately reviewed archival/checkpoint protocol.
