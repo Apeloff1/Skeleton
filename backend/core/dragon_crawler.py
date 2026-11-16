@@ -2513,7 +2513,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
 
         at = _now()
         _, run_type = _core()
-        query = {**scope, "status": {"$nin": ["deleted", "cancelled"]},
+        query = {**scope, "status": {"$ne": "deleted"},
                  "consent_expires_at": {"$gt": at}}
 
         if peer_hosts is not None:
@@ -2552,7 +2552,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                         or binding["request_digest"] != row["request_digest"]
                         or _digest(_plain(row["request"])) != row["request_digest"]
                         or abs(database_expiry - expiry) > .0011
-                        or min(expiry, database_expiry) <= at.timestamp() or row["status"] in {"deleted", "cancelled"}):
+                        or min(expiry, database_expiry) <= at.timestamp() or row["status"] == "deleted"):
                     raise ValueError("acquisition hold authority mismatch")
                 readiness = acquisition_readiness(
                     measurements=snapshot["acquisition_measurements"],
