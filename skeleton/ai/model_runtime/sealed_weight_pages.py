@@ -10,12 +10,13 @@ from hashlib import sha256
 import mmap
 import os
 import sys
-from typing import Iterator
+from typing import Callable, Iterator
 
 from .flgb_model_runtime import ModelIdentity
 from .weight_shard_store import WeightShardStore, WeightShardStoreError
 
 _CHUNK = 1024 * 1024
+_PROGRESS_QUANTUM = 64 * _CHUNK
 
 
 class SealedWeightPagesError(WeightShardStoreError):
@@ -57,6 +58,7 @@ def open_sealed_weight_pages(
     *,
     model_identity: ModelIdentity,
     max_bytes: int,
+    progress_check: Callable[[int, int], None] | None = None,
 ) -> Iterator[tuple[mmap.mmap, ...]]:
     """Copy verified shard bytes into F_SEAL_WRITE memfds, then map read-only.
 
@@ -74,13 +76,20 @@ def open_sealed_weight_pages(
         raise SealedWeightPagesError("model identity differs from committed weight plan")
     if plan.expected_total_bytes > max_bytes:
         raise SealedWeightPagesError("shared-page request exceeds explicit memory budget")
+    if progress_check is not None and not callable(progress_check):
+        raise SealedWeightPagesError("invalid sealed copy progress callback")
     fcntl, flags, seals = _require_sealing()
     fds: list[int] = []
     pages: list[mmap.mmap] = []
+    copied = 0
+    last_check = -_PROGRESS_QUANTUM
     try:
         with store.open_verified(plan_digest, model_identity=model_identity) as streams:
             if len(streams) != len(plan.shards):
                 raise SealedWeightPagesError("weight shard count mismatch")
+            if progress_check is not None:
+                progress_check(0, plan.expected_total_bytes)
+                last_check = 0
             for shard, stream in zip(plan.shards, streams):
                 fd = os.memfd_create("skeleton-local-weights", flags=flags)
                 fds.append(fd)
@@ -93,8 +102,12 @@ def open_sealed_weight_pages(
                     total += len(block)
                     if total > shard.bytes:
                         raise SealedWeightPagesError("weight source exceeded committed shard size")
+                    if progress_check is not None and copied + len(block) - last_check > _PROGRESS_QUANTUM:
+                        progress_check(copied, plan.expected_total_bytes)
+                        last_check = copied
                     digest.update(block)
                     _write_all(fd, block)
+                    copied += len(block)
                 if total != shard.bytes or digest.hexdigest() != shard.digest:
                     raise SealedWeightPagesError("weight bytes changed after verification")
                 if os.fstat(fd).st_size != shard.bytes:
@@ -104,14 +117,30 @@ def open_sealed_weight_pages(
                 if observed & seals != seals:
                     raise SealedWeightPagesError("kernel did not apply immutable page seals")
                 pages.append(mmap.mmap(fd, shard.bytes, access=mmap.ACCESS_READ))
+        if copied != plan.expected_total_bytes:
+            raise SealedWeightPagesError("sealed copy total differs from plan")
+        if progress_check is not None:
+            progress_check(copied, plan.expected_total_bytes)
         yield tuple(pages)
     except OSError as exc:
         raise SealedWeightPagesError("OS-backed sealed memory unavailable") from exc
     finally:
+        # A consumer may incorrectly retain an exported memoryview. That
+        # mapping cannot be forcibly closed, but every other mapping and
+        # original descriptor must still be cleaned up.
+        failures = []
         for page in reversed(pages):
-            page.close()
+            try:
+                page.close()
+            except (BufferError, OSError, ValueError) as exc:
+                failures.append(exc)
         for fd in reversed(fds):
-            os.close(fd)
+            try:
+                os.close(fd)
+            except OSError as exc:
+                failures.append(exc)
+        if failures:
+            raise SealedWeightPagesError("sealed page cleanup remains incomplete") from failures[0]
 
 
 __all__ = ["SealedWeightPagesError", "open_sealed_weight_pages"]
