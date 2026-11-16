@@ -2373,6 +2373,7 @@ class LocalInferenceEngine:
             for name in (
                 "active_processes", "draining_processes", "spawning_processes", "processes_started",
                 "processes_exited", "termination_requests", "trained_context_tokens",
+                "unconfirmed_cleanup",
             ):
                 value = backend.get(name)
                 if value is None or (type(value) is int and 0 <= value < 2**63):
@@ -2465,6 +2466,16 @@ class LocalInferenceEngine:
                 await asyncio.sleep(0.01)
             except asyncio.CancelledError:
                 cancelled = True
+        # A coroutine/worker exit is not necessarily a reaped OS child.
+        # The canonical launcher retains failed cleanup separately from the
+        # engine's logical tickets. Retry its nonblocking, confirmed-dead
+        # cleanup before reporting successful physical drain to the coordinator.
+        recover = getattr(self.model, "reap_unconfirmed_cleanup", None)
+        if callable(recover):
+            result = recover()
+            if (not isinstance(result, Mapping) or type(result.get("remaining")) is not int
+                    or result["remaining"] != 0):
+                raise RuntimeError("local native process cleanup remains unconfirmed")
         if cancelled:
             raise asyncio.CancelledError
 
