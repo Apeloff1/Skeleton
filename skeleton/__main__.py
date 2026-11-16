@@ -7,6 +7,19 @@ Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
     offline-runtime  Inspect pinned local weights and measured resource admission
     weight-store     Stage pinned weights and inspect cooperative disk/recovery custody
+    jeeves-desktop-campaign-delivery   Explicit campaign source delivery
+    jeeves-desktop-capsule-transport   Approved capsule export and import
+    jeeves-desktop-capsule-verify      Cold verification of private capsule
+    jeeves-desktop-native-campaign     Native GGUF and SQLite campaign
+    jeeves-desktop-native-capsule      Source-bound cold native capsule
+    jeeves-desktop-native-code         Source-bound native code generation
+    jeeves-desktop-native-proposal     Private reviewed source proposal
+    jeeves-desktop-source-delivery     Cold-verified source delivery
+    jeeves-desktop-work                Private local source review
+    local-deployment-qualification     Operator-only GGUF qualification
+    local-model-install                Verified offline model installation
+    local-production-request           Durable verified local request
+    orphan-cli-audit                   Read-only bounded source entry-point gap audit
     jeeves-native-chat               Explicit local GGUF chat
     jeeves-native-acceptance         Native first turn and cold-reopen witness
     jeeves-native-batch              Native deterministic batch and replay
@@ -1220,6 +1233,45 @@ def main(argv: Optional[List[str]] = None) -> int:
         return recovered_main(rest)
     if cmd == "local-grounded-turn":
         from skeleton.ai.runtime.operational_ai.offline_cognition.grounded_cli import run as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-desktop-campaign-delivery":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_campaign_delivery_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-desktop-capsule-transport":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_capsule_transport_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-desktop-capsule-verify":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_capsule_verifier_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-desktop-native-campaign":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_campaign_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-desktop-native-capsule":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_capsule_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-desktop-native-code":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_code_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-desktop-native-proposal":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_proposal_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-desktop-source-delivery":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_source_delivery_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-desktop-work":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_work_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-deployment-qualification":
+        from skeleton.ai.runtime.operational_ai.deployment.qualification.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-model-install":
+        from skeleton.ai.runtime.operational_ai.deployment.install.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-production-request":
+        from skeleton.ai.runtime.operational_ai.deployment.production.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "orphan-cli-audit":
+        from skeleton.app.orphan_cli_audit import main as recovered_main
         return recovered_main(rest)
     if cmd == "app":
         from skeleton.app.cli import run_app_cli

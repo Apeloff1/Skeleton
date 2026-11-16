@@ -62,6 +62,19 @@ jeeves-production-training = ["torch>=2.5,<3"]
 hosted-inference = ["openai>=2.54.0,<3", "httpx>=0.28.1,<1"]
 
 [project.scripts]
+skeleton-jeeves-desktop-campaign-delivery = "skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_campaign_delivery_cli:main"
+skeleton-jeeves-desktop-capsule-transport = "skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_capsule_transport_cli:main"
+skeleton-jeeves-desktop-capsule-verify = "skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_capsule_verifier_cli:main"
+skeleton-jeeves-desktop-native-campaign = "skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_campaign_cli:main"
+skeleton-jeeves-desktop-native-capsule = "skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_capsule_cli:main"
+skeleton-jeeves-desktop-native-code = "skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_code_cli:main"
+skeleton-jeeves-desktop-native-proposal = "skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_proposal_cli:main"
+skeleton-jeeves-desktop-source-delivery = "skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_source_delivery_cli:main"
+skeleton-jeeves-desktop-work = "skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_work_cli:main"
+skeleton-local-deployment-qualification = "skeleton.ai.runtime.operational_ai.deployment.qualification.cli:main"
+skeleton-local-model-install = "skeleton.ai.runtime.operational_ai.deployment.install.cli:main"
+skeleton-local-production-request = "skeleton.ai.runtime.operational_ai.deployment.production.cli:main"
+skeleton-orphan-cli-audit = "skeleton.app.orphan_cli_audit:main"
 skeleton-jeeves-native-chat = "skeleton.jeeves.agent.native_cli:main"
 skeleton-jeeves-native-acceptance = "skeleton.jeeves.agent.native_acceptance_cli:main"
 skeleton-jeeves-native-batch = "skeleton.jeeves.agent.native_batch_cli:main"

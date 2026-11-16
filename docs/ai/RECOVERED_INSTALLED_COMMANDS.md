@@ -132,3 +132,48 @@ Run the new source suite `skeleton/testing/test_recovered_runtime_commands.py`
 alongside the wave 28 suite and per-owner exact-head gates, then qualify
 from an independently installed wheel. No CI, model or device success is
 claimed by registration.
+
+
+## Wave 30 — desktop custody and repeatable orphan discovery
+
+Pinned predecessor `ff74fcfa06d97608b3384add5e44b0d9dcb85ac3`. These existing headless owners retain their
+stdin contracts and explicit approval flags. Capsule verification and source
+delivery remain distinct from generation, and installing a pinned local
+model remains separate from any actual native inference request.
+
+| Root command | Installed command | Owner |
+| --- | --- | --- |
+| `jeeves-desktop-campaign-delivery` | `skeleton-jeeves-desktop-campaign-delivery` | `skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_campaign_delivery_cli:main` |
+| `jeeves-desktop-capsule-transport` | `skeleton-jeeves-desktop-capsule-transport` | `skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_capsule_transport_cli:main` |
+| `jeeves-desktop-capsule-verify` | `skeleton-jeeves-desktop-capsule-verify` | `skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_capsule_verifier_cli:main` |
+| `jeeves-desktop-native-campaign` | `skeleton-jeeves-desktop-native-campaign` | `skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_campaign_cli:main` |
+| `jeeves-desktop-native-capsule` | `skeleton-jeeves-desktop-native-capsule` | `skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_capsule_cli:main` |
+| `jeeves-desktop-native-code` | `skeleton-jeeves-desktop-native-code` | `skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_code_cli:main` |
+| `jeeves-desktop-native-proposal` | `skeleton-jeeves-desktop-native-proposal` | `skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_proposal_cli:main` |
+| `jeeves-desktop-source-delivery` | `skeleton-jeeves-desktop-source-delivery` | `skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_source_delivery_cli:main` |
+| `jeeves-desktop-work` | `skeleton-jeeves-desktop-work` | `skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_work_cli:main` |
+| `local-deployment-qualification` | `skeleton-local-deployment-qualification` | `skeleton.ai.runtime.operational_ai.deployment.qualification.cli:main` |
+| `local-model-install` | `skeleton-local-model-install` | `skeleton.ai.runtime.operational_ai.deployment.install.cli:main` |
+| `local-production-request` | `skeleton-local-production-request` | `skeleton.ai.runtime.operational_ai.deployment.production.cli:main` |
+| `orphan-cli-audit` | `skeleton-orphan-cli-audit` | `skeleton.app.orphan_cli_audit:main` |
+
+The new read-only audit can enumerate source-only CLI candidates across
+the checked-out package without importing any inspected modules:
+
+```sh
+python -m skeleton orphan-cli-audit --root . --candidates-only
+```
+
+The audit uses bounded entry, candidate and byte ceilings, content hashes,
+syntax inspection and comparisons of both console metadata formats and
+absolute imports in the root entrypoint. A source reference is not proof
+of dispatch reachability, and a candidate is not proof that the feature
+has no other consumer. Mirrored compatibility trees may produce separate
+candidates. Do not bulk-activate candidates without source ownership review.
+Only trusted local checkouts are supported; descriptor checks do not
+provide hostile parent-directory isolation or an atomic snapshot. Incomplete
+inventories return 3, malformed input 2. No source is written or imported.
+
+Test source: `skeleton/testing/test_recovered_desktop_commands.py`.
+Independent test and install execution remain required. No merge,
+release, device or native qualification is claimed.
