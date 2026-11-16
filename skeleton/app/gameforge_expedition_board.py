@@ -10,6 +10,7 @@ from skeleton.app.gameforge_expedition import (
 )
 from skeleton.app.original_quest_cli import _encode, _integer, _require
 from skeleton.game.gameplay import harbor_crafting as harbor
+from skeleton.game.gameplay.harbor_crafting_missions import mission_report, verify_mission_report
 from skeleton.gameforge.errors import GameForgeError
 
 BOARD_SCHEMA = "skeleton.gameforge.expedition.board.v1"
@@ -51,6 +52,8 @@ def expedition_board(source: Any, checkpoint: Any) -> dict:
                       "merchant_stock": current["npc_stock"], "coins": current["coins"],
                       "delivered": current["delivered"], "ending": current["ending"],
                       "reputation": current["reputation"]})
+        if "missions" in summary:
+            local[-1]["missions"] = summary["missions"]
     # Do not accidentally expose a base-campaign resolve action without its
     # stronger episode gate. Only the combined runtime owns legal actions.
     base.pop("board_digest")
@@ -97,6 +100,12 @@ def episode_evidence(source: Any, checkpoint: Any, objective: str) -> dict:
             "checkpoint_digest": checkpoint["session_digest"], "objective": objective,
             "required_ending": ep["ending"], "gate_satisfied": summary["gate_satisfied"],
             "bundle": bundle, "native_qualified": False, "release_qualified": False}
+    if "mission_board" in ep:
+        report = mission_report(bundle, ep["mission_board"])
+        verify_mission_report(report)
+        _require(report["report_digest"] == summary["missions"]["report_digest"],
+                 "mission evidence differs from integrated replay")
+        body["mission_report"] = report
     receipt = {**body, "evidence_digest": digest(body)}
     _encode({"request": source, "receipt": checkpoint, "evidence": receipt})
     return receipt
