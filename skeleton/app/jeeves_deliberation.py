@@ -219,5 +219,7 @@ async def deliberate(backend, question, *, history, instructions, revision,
             "contract_passed": any(row["verification"]["passed"] for row in candidates),
             "contract_scope_only": True, "candidate_text_reinjected": False,
         }
+    from skeleton.app.jeeves_candidate_challenge import examine
+    report["candidate_challenge"] = examine(candidates)
     report["report_sha256"] = _hash(_stable(report))
     return report
