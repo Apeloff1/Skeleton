@@ -220,6 +220,46 @@ def _inspect_bound_source(store: WeightShardStore, plan_digest: str, model_ident
                        scrub_campaign_digest)
 
 
+def revalidate_source_metadata(root: Path, source: ModelSource, policy: RuntimePolicy) -> dict:
+    """Rebind a selected managed source without claiming fresh model hashing.
+
+    Runtime grants and native launch checks call this boundary after source
+    inspection. It refuses unresolved managed transactions, changed policy
+    or selected manifest, and stale independently required full-store scrub
+    evidence. Legacy stores remain on the explicit source inspection model.
+    This check does not retain a lease for subsequent physical execution.
+    """
+    require(isinstance(source, ModelSource) and isinstance(policy, RuntimePolicy),
+            "validated source and runtime policy required")
+    store = WeightShardStore(root, maximum_bytes=policy.maximum_source_bytes, read_only=True)
+    with managed_weight_read(store) as owner:
+        observed_policy = owner._policy_sha256 if owner is not None else None
+        require(observed_policy == source.managed_policy_sha256,
+                "managed source policy changed; reopen explicitly inspected source")
+        observed_scrub = None
+        if owner is not None:
+            require(source.manifest_sha256 is not None and source.manifest_bytes is not None,
+                    "managed source lacks exact manifest evidence")
+            plan, pin, size = store.manifest_evidence(source.plan_digest, maximum=source.manifest_bytes)
+            require(plan.digest == source.plan_digest and plan.model_identity_digest == source.model_identity_digest
+                    and pin == source.manifest_sha256 and size == source.manifest_bytes,
+                    "managed source manifest changed; reopen explicitly inspected source")
+        if policy.required_scrub_digest is not None:
+            require(owner is not None and source.scrub_campaign_digest == policy.required_scrub_digest,
+                    "required scrub campaign differs from inspected source")
+            evidence = require_completed_weight_scrub(owner, campaign_digest=policy.required_scrub_digest)
+            observed_scrub = evidence["digest"]
+            require(observed_scrub == source.scrub_observation_digest,
+                    "managed source scrub observation changed")
+        body = {"schema": "skeleton.offline.source-metadata-fence.v1",
+                "source_digest": digest(source.snapshot()), "managed_policy_sha256": observed_policy,
+                "scrub_observation_digest": observed_scrub,
+                "scope": "managed_manifest_metadata" if owner is not None else "legacy_layout_only",
+                "current_weight_bytes_rehashed": False, "execution_lease_retained": False,
+                "native_qualified": False}
+        return {**body, "digest": digest(body)}
+
+
 @dataclass(frozen=True, slots=True)
 class HardwareSample:
     cpu: CpuTopology
