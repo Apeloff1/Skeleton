@@ -1208,7 +1208,10 @@ class CrawlRun:
         )
         if interstitial is not None:
             horizon = state["binding"]["consent"]["expires_at"]
-            for held_host in {host, p.hostname}:
+            chain = robots["redirects"] if needs_robots else item["redirects"]
+            held_hosts = {host, p.hostname, urlsplit(item["original_url"]).hostname}
+            held_hosts.update(urlsplit(previous).hostname for previous in chain)
+            for held_host in held_hosts.intersection(self.request.allowed_hosts):
                 state["host_ready"][held_host] = max(
                     state["host_ready"].get(held_host, 0), horizon,
                 )
