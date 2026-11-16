@@ -13,6 +13,8 @@ from dataclasses import asdict, dataclass, field, replace
 from enum import Enum
 from heapq import heappop, heappush
 from itertools import count
+import math
+from uuid import uuid4
 from time import monotonic
 from typing import Callable, Deque, Iterable, Iterator, Mapping
 
@@ -46,6 +48,9 @@ class SwarmTask:
     leased_to: str | None = None
     lease_deadline: float | None = None
     last_error: str | None = None
+    dependencies: tuple[str, ...] = ()
+    lease_token: str | None = None
+    effect_uncertain: bool = False
 
 
 @dataclass(slots=True)
@@ -93,14 +98,19 @@ class SwarmRuntime:
         max_tasks: int = 100_000,
         default_lease_seconds: float = 30.0,
         clock: Callable[[], float] = monotonic,
+        fenced: bool = False,
     ) -> None:
-        if max_tasks < 1:
+        if type(fenced) is not bool:
+            raise ValueError("fenced must be boolean")
+        if type(max_tasks) is not int or max_tasks < 1:
             raise ValueError("max_tasks must be positive")
-        if default_lease_seconds <= 0:
+        if not math.isfinite(default_lease_seconds) or default_lease_seconds <= 0:
             raise ValueError("default_lease_seconds must be positive")
         self.max_tasks = max_tasks
         self.default_lease_seconds = default_lease_seconds
         self._clock = clock
+        self.fenced = fenced
+        self._queued_generation: dict[str, int] = {}
         self._sequence = count()
         self._queue: list[tuple[int, int, str]] = []
         self._tasks: dict[str, SwarmTask] = {}
@@ -140,6 +150,9 @@ class SwarmRuntime:
         return worker
 
     def unregister_worker(self, worker_id: str, *, requeue: bool = True) -> int:
+        worker = self._workers.get(worker_id)
+        if self.fenced and worker is not None and worker.active:
+            raise LeaseError("active or uncertain work must be reconciled before worker removal")
         worker = self._workers.pop(worker_id, None)
         if worker is None:
             return 0
@@ -149,8 +162,9 @@ class SwarmRuntime:
             if task is None or task.state is not TaskState.LEASED:
                 continue
             released += 1
-            self._transition(task, TaskState.QUEUED if requeue else TaskState.DEAD)
-            if requeue:
+            retry = requeue and task.attempts < task.max_attempts
+            self._transition(task, TaskState.QUEUED if retry else TaskState.DEAD)
+            if retry:
                 self._requeue(task_id)
         self._event("worker.unregistered", worker_id)
         return released
@@ -162,15 +176,88 @@ class SwarmRuntime:
             raise AdmissionError("task id must not be empty")
         if task.id in self._tasks:
             raise AdmissionError(f"duplicate task id: {task.id}")
-        if task.max_attempts < 1:
-            raise AdmissionError("max_attempts must be positive")
-        admitted = replace(task, state=TaskState.QUEUED, attempts=0, leased_to=None, lease_deadline=None, last_error=None)
+        if type(task.max_attempts) is not int or not 1 <= task.max_attempts <= 1000:
+            raise AdmissionError("max_attempts must be an integer in [1, 1000]")
+        if type(task.dependencies) is not tuple or len(task.dependencies) > 256 or any(
+            type(dep) is not str or not dep or dep not in self._tasks for dep in task.dependencies
+        ) or len(set(task.dependencies)) != len(task.dependencies):
+            raise AdmissionError("dependencies require distinct previously submitted tasks")
+        admitted = replace(task, state=TaskState.QUEUED, attempts=0, leased_to=None,
+                           lease_deadline=None, last_error=None, lease_token=None, effect_uncertain=False)
         self._tasks[admitted.id] = admitted
         self._state_counts[TaskState.QUEUED] += 1
         self._submitted += 1
         self._requeue(admitted.id)
         self._event("task.submitted", admitted.id)
         return admitted
+
+    def submit_graph(self, tasks: tuple[SwarmTask, ...]) -> tuple[SwarmTask, ...]:
+        """Topologically admit a bounded graph into this existing queue.
+
+        All inputs are validated before publication; existing dependencies may
+        be referenced, but cycles and unknown parents are rejected. No task
+        payload grants worker or tool authority. This runtime is single-owner
+        and synchronous, so commit does not race another runtime operation.
+        """
+        from graphlib import TopologicalSorter, CycleError
+
+        if type(tasks) is not tuple or not 1 <= len(tasks) <= 4096:
+            raise AdmissionError("invalid graph size")
+        if len(tasks) + len(self._tasks) > self.max_tasks:
+            raise AdmissionError("runtime task capacity exhausted")
+        by_id: dict[str, SwarmTask] = {}
+        for task in tasks:
+            if not isinstance(task, SwarmTask) or type(task.id) is not str or not task.id.strip():
+                raise AdmissionError("invalid graph node")
+            if task.id in by_id or task.id in self._tasks:
+                raise AdmissionError("duplicate graph node")
+            if type(task.max_attempts) is not int or not 1 <= task.max_attempts <= 1000:
+                raise AdmissionError("invalid attempt budget")
+            if type(task.dependencies) is not tuple or len(task.dependencies) > 256 or any(
+                type(dep) is not str or not dep for dep in task.dependencies
+            ) or len(set(task.dependencies)) != len(task.dependencies):
+                raise AdmissionError("invalid graph predecessors")
+            if type(task.priority) is not int or not 0 <= task.priority <= 1000:
+                raise AdmissionError("invalid graph priority")
+            by_id[task.id] = task
+        if sum(len(t.dependencies) for t in tasks) > 65_536:
+            raise AdmissionError("graph edge limit exceeded")
+        for task in tasks:
+            if any(dep not in by_id and dep not in self._tasks for dep in task.dependencies):
+                raise AdmissionError("unresolved graph dependency")
+        sorter = TopologicalSorter({
+            task.id: tuple(sorted(dep for dep in task.dependencies if dep in by_id))
+            for task in sorted(tasks, key=lambda t: t.id)
+        })
+        try:
+            order = tuple(sorter.static_order())
+        except CycleError as exc:
+            raise AdmissionError("graph contains a cycle") from exc
+        return tuple(self.submit(by_id[task_id]) for task_id in order)
+
+    def blocked_dependencies(self, task_id: str) -> tuple[str, ...]:
+        """Inspect blockers without mutating or executing unrelated work."""
+        task = self._tasks.get(task_id)
+        if task is None:
+            raise AdmissionError("unknown task")
+        return tuple(dep for dep in task.dependencies
+                     if self._tasks[dep].state is not TaskState.SUCCEEDED)
+
+    def cancel_failed_dependents(self, *, limit: int = 4096) -> tuple[str, ...]:
+        """Explicitly propagate terminal dependency failures; uncertain effects hold."""
+        if type(limit) is not int or not 1 <= limit <= 4096:
+            raise AdmissionError("invalid dependency propagation limit")
+        cancelled: list[str] = []
+        for task in tuple(self._tasks.values()):
+            if len(cancelled) == limit:
+                break
+            if task.state is not TaskState.QUEUED:
+                continue
+            if any(self._tasks[dep].state in {TaskState.DEAD, TaskState.CANCELLED}
+                   for dep in task.dependencies):
+                self.cancel(task.id, reason="terminal dependency failed")
+                cancelled.append(task.id)
+        return tuple(cancelled)
 
     def lease(self, worker_id: str, *, limit: int | None = None) -> list[SwarmTask]:
         worker = self._workers.get(worker_id)
@@ -184,11 +271,15 @@ class SwarmRuntime:
         deferred: list[tuple[int, int, str]] = []
         while self._queue and len(leased) < budget:
             item = heappop(self._queue)
-            _, _, task_id = item
+            _, generation, task_id = item
             task = self._tasks.get(task_id)
-            if task is None or task.state is not TaskState.QUEUED:
+            if task is None or task.state is not TaskState.QUEUED or self._queued_generation.get(task_id) != generation:
                 continue
-            if not task.required_capabilities.issubset(worker.capabilities):
+            if task.attempts >= task.max_attempts:
+                self._queued_generation.pop(task_id, None)
+                self._transition(task, TaskState.DEAD)
+                continue
+            if self.blocked_dependencies(task_id) or not task.required_capabilities.issubset(worker.capabilities):
                 deferred.append(item)
                 continue
             updated = replace(
@@ -197,7 +288,10 @@ class SwarmRuntime:
                 attempts=task.attempts + 1,
                 leased_to=worker_id,
                 lease_deadline=self._clock() + self.default_lease_seconds,
+                lease_token=uuid4().hex if self.fenced else None,
+                effect_uncertain=False,
             )
+            self._queued_generation.pop(task_id, None)
             self._replace(task, updated)
             worker.active.add(task_id)
             worker.accepted += 1
@@ -207,10 +301,11 @@ class SwarmRuntime:
             heappush(self._queue, item)
         return leased
 
-    def renew(self, worker_id: str, task_id: str, *, seconds: float | None = None) -> SwarmTask:
-        task, worker = self._owned_lease(worker_id, task_id)
+    def renew(self, worker_id: str, task_id: str, *, seconds: float | None = None,
+              lease_token: str | None = None) -> SwarmTask:
+        task, worker = self._owned_lease(worker_id, task_id, lease_token=lease_token)
         duration = self.default_lease_seconds if seconds is None else seconds
-        if duration <= 0:
+        if not math.isfinite(duration) or duration <= 0:
             raise LeaseError("lease renewal duration must be positive")
         updated = replace(task, lease_deadline=self._clock() + duration)
         self._replace(task, updated)
@@ -220,9 +315,10 @@ class SwarmRuntime:
         self._event("task.lease_renewed", task_id)
         return updated
 
-    def succeed(self, worker_id: str, task_id: str) -> SwarmTask:
-        task, worker = self._owned_lease(worker_id, task_id)
-        updated = replace(task, state=TaskState.SUCCEEDED, leased_to=None, lease_deadline=None)
+    def succeed(self, worker_id: str, task_id: str, *, lease_token: str | None = None) -> SwarmTask:
+        task, worker = self._owned_lease(worker_id, task_id, lease_token=lease_token)
+        updated = replace(task, state=TaskState.SUCCEEDED, leased_to=None, lease_deadline=None,
+                          lease_token=None, effect_uncertain=False)
         self._replace(task, updated)
         worker.active.discard(task_id)
         worker.completed += 1
@@ -230,15 +326,22 @@ class SwarmRuntime:
         self._event("task.succeeded", task_id)
         return updated
 
-    def fail(self, worker_id: str, task_id: str, error: str) -> SwarmTask:
-        task, worker = self._owned_lease(worker_id, task_id)
+    def fail(self, worker_id: str, task_id: str, error: str, *,
+             lease_token: str | None = None, confirmed_no_effect: bool = False) -> SwarmTask:
+        task, worker = self._owned_lease(worker_id, task_id, lease_token=lease_token)
+        if type(confirmed_no_effect) is not bool:
+            raise LeaseError("invalid no-effect evidence declaration")
+        if self.fenced and not confirmed_no_effect:
+            return self._hold_uncertain(task, reason="worker outcome requires reconciliation")
         retry = task.attempts < task.max_attempts
         updated = replace(
             task,
             state=TaskState.QUEUED if retry else TaskState.DEAD,
             leased_to=None,
             lease_deadline=None,
-            last_error=error[:2_000],
+            last_error=("confirmed-no-effect" if self.fenced else error[:2_000]),
+            lease_token=None,
+            effect_uncertain=False,
         )
         self._replace(task, updated)
         worker.active.discard(task_id)
@@ -252,12 +355,61 @@ class SwarmRuntime:
             self._event("task.dead", task_id)
         return updated
 
+    def _hold_uncertain(self, task: SwarmTask, *, reason: str) -> SwarmTask:
+        # Retain the old worker's capacity and exact attempt token. Expiration
+        # alone is not evidence that a physical worker stopped or had no effect.
+        updated = replace(task, state=TaskState.FAILED, last_error=reason, effect_uncertain=True)
+        self._replace(task, updated)
+        self._event("task.effect_uncertain", task.id)
+        return updated
+
+    def reconcile_uncertain(self, task_id: str, *, lease_token: str,
+                            outcome: str, evidence_sha256: str) -> SwarmTask:
+        """Trusted owner only: acknowledge an independently verified stopped effect.
+
+        Evidence verification occurs at the existing owner boundary, not by
+        accepting untrusted model/worker statements. The digest is an audit
+        binding, not a signature or proof by itself.
+        """
+        if not self.fenced or type(evidence_sha256) is not str or len(evidence_sha256) != 64 or any(
+            char not in "0123456789abcdef" for char in evidence_sha256
+        ):
+            raise LeaseError("independently verified reconciliation evidence required")
+        task = self._tasks.get(task_id)
+        if task is None or not task.effect_uncertain or task.state is not TaskState.FAILED:
+            raise LeaseError("task does not have an uncertain attempt")
+        if not lease_token or task.lease_token != lease_token:
+            raise LeaseError("uncertain attempt token mismatch")
+        if outcome not in {"committed", "stopped-no-effect", "stopped-terminal"}:
+            raise LeaseError("unsupported reconciliation outcome")
+        worker = self._workers.get(task.leased_to or "")
+        if worker is None or task.id not in worker.active:
+            raise LeaseError("uncertain worker custody missing")
+        retry = outcome == "stopped-no-effect" and task.attempts < task.max_attempts
+        state = TaskState.SUCCEEDED if outcome == "committed" else (TaskState.QUEUED if retry else TaskState.DEAD)
+        updated = replace(task, state=state, leased_to=None, lease_token=None, lease_deadline=None,
+                          effect_uncertain=False, last_error=None if state is TaskState.SUCCEEDED
+                          else "reconciled:" + evidence_sha256)
+        self._replace(task, updated)
+        worker.active.discard(task_id)
+        if state is TaskState.SUCCEEDED:
+            worker.completed += 1
+        else:
+            worker.failed += 1
+        if retry:
+            self._retries += 1
+            self._requeue(task_id)
+        self._event("task.reconciled." + outcome, task_id)
+        return updated
+
     def cancel(self, task_id: str, *, reason: str = "cancelled") -> SwarmTask:
         task = self._tasks.get(task_id)
         if task is None:
             raise AdmissionError(f"unknown task: {task_id}")
         if task.state in {TaskState.SUCCEEDED, TaskState.CANCELLED}:
             return task
+        if self.fenced and (task.state is TaskState.LEASED or task.effect_uncertain):
+            raise LeaseError("stop and reconcile active or uncertain work before cancellation")
         if task.state is TaskState.LEASED and task.leased_to:
             worker = self._workers.get(task.leased_to)
             if worker is not None:
@@ -271,6 +423,8 @@ class SwarmRuntime:
         task = self._tasks.get(task_id)
         if task is None:
             raise AdmissionError(f"unknown task: {task_id}")
+        if task.effect_uncertain:
+            raise LeaseError("uncertain work requires reconciliation")
         if task.state not in {TaskState.DEAD, TaskState.CANCELLED, TaskState.FAILED}:
             raise AdmissionError(f"task is not recoverable: {task_id}")
         updated = replace(
@@ -291,6 +445,10 @@ class SwarmRuntime:
         now = self._clock()
         expired = [task for task in self._tasks.values() if task.state is TaskState.LEASED and task.lease_deadline is not None and task.lease_deadline <= now]
         for task in expired:
+            if self.fenced:
+                self._hold_uncertain(task, reason="expired attempt requires reconciliation")
+                self._expired_leases += 1
+                continue
             worker = self._workers.get(task.leased_to or "")
             if worker is not None:
                 worker.active.discard(task.id)
@@ -360,8 +518,9 @@ class SwarmRuntime:
 
     def export_state(self) -> dict[str, object]:
         return {
-            "version": 1,
-            "config": {"max_tasks": self.max_tasks, "default_lease_seconds": self.default_lease_seconds},
+            "version": 2 if self.fenced else 1,
+            "config": {"max_tasks": self.max_tasks, "default_lease_seconds": self.default_lease_seconds,
+                       "fenced": self.fenced},
             "tasks": [self._task_record(task) for task in self._tasks.values()],
             "workers": [self._worker_record(worker) for worker in self._workers.values()],
             "counters": {
@@ -385,13 +544,17 @@ class SwarmRuntime:
         config = state.get("config", {})
         if not isinstance(config, Mapping):
             raise ValueError("invalid runtime state config")
+        fenced = config.get("fenced", False)
+        if type(fenced) is not bool or state.get("version", 1) not in (1, 2) or (state.get("version", 1) == 2) != fenced:
+            raise ValueError("unsupported runtime checkpoint")
         runtime = cls(
+            fenced=fenced,
             max_tasks=int(config.get("max_tasks", 100_000)),
             default_lease_seconds=float(config.get("default_lease_seconds", 30.0)),
             clock=clock,
         )
         tasks = state.get("tasks", [])
-        if not isinstance(tasks, list):
+        if not isinstance(tasks, list) or len(tasks) > runtime.max_tasks:
             raise ValueError("invalid runtime task state")
         for raw in tasks:
             if not isinstance(raw, Mapping):
@@ -407,8 +570,20 @@ class SwarmRuntime:
                 leased_to=raw.get("leased_to") if raw.get("leased_to") is None else str(raw.get("leased_to")),
                 lease_deadline=None if raw.get("lease_deadline") is None else float(raw.get("lease_deadline")),
                 last_error=raw.get("last_error") if raw.get("last_error") is None else str(raw.get("last_error")),
+                dependencies=tuple(raw.get("dependencies", ())),
+                lease_token=raw.get("lease_token"),
+                effect_uncertain=raw.get("effect_uncertain", False),
             )
-            if task.state is TaskState.LEASED and requeue_leased:
+            if task.id in runtime._tasks or type(task.effect_uncertain) is not bool:
+                raise ValueError("invalid or duplicate checkpoint task")
+            if fenced and (task.state is TaskState.LEASED or task.effect_uncertain):
+                if not task.leased_to or type(task.lease_token) is not str or len(task.lease_token) != 32 or any(
+                    char not in "0123456789abcdef" for char in task.lease_token
+                ):
+                    raise ValueError("missing fenced checkpoint custody")
+                task = replace(task, state=TaskState.FAILED, effect_uncertain=True,
+                               last_error="restored attempt requires reconciliation")
+            elif task.state is TaskState.LEASED and requeue_leased:
                 task = replace(task, state=TaskState.QUEUED, leased_to=None, lease_deadline=None, last_error="restored lease requeued")
             runtime._tasks[task.id] = task
             runtime._state_counts[task.state] += 1
@@ -423,7 +598,7 @@ class SwarmRuntime:
                     id=str(raw["id"]),
                     capabilities=frozenset(raw.get("capabilities", ())),
                     capacity=int(raw.get("capacity", 1)),
-                    active=set() if requeue_leased else set(raw.get("active", ())),
+                    active=set() if requeue_leased or fenced else set(raw.get("active", ())),
                     accepted=int(raw.get("accepted", 0)),
                     completed=int(raw.get("completed", 0)),
                     failed=int(raw.get("failed", 0)),
@@ -431,7 +606,25 @@ class SwarmRuntime:
                     heartbeats=int(raw.get("heartbeats", 0)),
                     last_seen=float(raw.get("last_seen", clock())),
                 )
+                if worker.id in runtime._workers:
+                    raise ValueError("duplicate checkpoint worker")
                 runtime._workers[worker.id] = worker
+        from graphlib import TopologicalSorter, CycleError
+        all_tasks = runtime._tasks
+        for task in all_tasks.values():
+            if len(task.dependencies) > 256 or len(set(task.dependencies)) != len(task.dependencies) or any(
+                dep not in all_tasks for dep in task.dependencies
+            ):
+                raise ValueError("invalid restored dependencies")
+            if fenced and task.effect_uncertain:
+                worker = runtime._workers.get(task.leased_to or "")
+                if worker is None or worker.available < 1:
+                    raise ValueError("invalid restored uncertain worker capacity")
+                worker.active.add(task.id)
+        try:
+            tuple(TopologicalSorter({t.id: t.dependencies for t in all_tasks.values()}).static_order())
+        except CycleError as exc:
+            raise ValueError("restored dependency cycle") from exc
         counters = state.get("counters", {})
         if isinstance(counters, Mapping):
             runtime._submitted = int(counters.get("submitted", len(runtime._tasks)))
@@ -461,7 +654,8 @@ class SwarmRuntime:
             revived=self._revived,
         )
 
-    def _owned_lease(self, worker_id: str, task_id: str) -> tuple[SwarmTask, WorkerState]:
+    def _owned_lease(self, worker_id: str, task_id: str, *,
+                     lease_token: str | None = None) -> tuple[SwarmTask, WorkerState]:
         worker = self._workers.get(worker_id)
         if worker is None:
             raise LeaseError(f"unknown worker: {worker_id}")
@@ -470,11 +664,26 @@ class SwarmRuntime:
             raise LeaseError(f"task is not leased: {task_id}")
         if task.leased_to != worker_id:
             raise LeaseError(f"task {task_id} is leased to {task.leased_to}")
+        if self.fenced:
+            if not lease_token or task.lease_token != lease_token:
+                raise LeaseError("attempt token mismatch")
+            if task.lease_deadline is None or self._clock() >= task.lease_deadline:
+                raise LeaseError("attempt expired")
         return task, worker
 
     def _requeue(self, task_id: str) -> None:
         task = self._tasks[task_id]
-        heappush(self._queue, (task.priority, next(self._sequence), task_id))
+        generation = next(self._sequence)
+        self._queued_generation[task_id] = generation
+        heappush(self._queue, (task.priority, generation, task_id))
+        # Stale entries can accumulate through cancellation/revival. Compact
+        # amortized rather than turn a bounded task population into an unbounded heap.
+        if len(self._queue) > max(1024, len(self._queued_generation) * 3):
+            from heapq import heapify
+            self._queue[:] = [item for item in self._queue
+                              if self._queued_generation.get(item[2]) == item[1]
+                              and self._tasks[item[2]].state is TaskState.QUEUED]
+            heapify(self._queue)
 
     def _transition(self, task: SwarmTask, state: TaskState) -> SwarmTask:
         updated = replace(task, state=state, leased_to=None, lease_deadline=None)
@@ -486,6 +695,8 @@ class SwarmRuntime:
 
     def _replace(self, old: SwarmTask, new: SwarmTask) -> None:
         if old.state is not new.state:
+            if old.state is TaskState.QUEUED:
+                self._queued_generation.pop(old.id, None)
             self._state_counts[old.state] -= 1
             self._state_counts[new.state] += 1
         self._tasks[new.id] = new

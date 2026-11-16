@@ -153,6 +153,27 @@ or cross-process group persistence is asserted. Local group receipt capacity is
 bounded, and exhaustion fails closed; durable versioned receipt migration and
 retention policy remain future work.
 
+## Wave 4: existing swarm execution custody and DAG admission
+
+The canonical automation-agent SwarmRuntime now supports validated graph submission,
+dependency barriers, explicit terminal dependency propagation, heap-generation
+deduplication and bounded compaction. An opt-in fenced mode assigns random attempt
+tokens, requires exact live tokens for worker mutations, and retains worker capacity
+on expiry or ambiguous failure until trusted reconciliation. Restored fenced
+checkpoints hold rather than replay uncertain effects, because a monotonic clock
+from another process does not establish physical worker death. Token comparison
+and digest binding are not a transport authentication protocol or an independent
+proof of result; trusted host-side verification is required before reconciliation.
+Legacy callers retain their default non-fenced mode. No external execution
+authority or new scheduler is introduced.
+
+Research: https://distributed.dask.org/en/stable/scheduling-state.html
+and https://distributed.dask.org/en/stable/work-stealing.html (dependency and
+transactional transfer boundaries); https://kubernetes.io/docs/concepts/scheduling-eviction/scheduling-framework/
+(reserve and permit separation). New partial targets: 46, 47, 50, 53, 54, 58,
+59; no event-sourced durable swarm store is claimed, so these remain partial
+or open until the exact target-specific evidence exists.
+
 ## Qualification and rollback
 
 Run the focused test file, existing shared pressure tests, and every AGENTS.md

@@ -272,3 +272,101 @@ def test_resource_group_contending_threads_cannot_overbook():
         grants = list(pool.map(reserve, range(2)))
     assert sum(g is not None for g in grants) == 1
     assert owner.usage("ai").cpu_millis == 80
+
+def test_fenced_swarm_stale_attempt_and_unknown_effect():
+    from skeleton.automation.agents.swarm_runtime import SwarmRuntime, SwarmTask, TaskState, LeaseError
+
+    tick = [1.0]
+    runtime = SwarmRuntime(fenced=True, clock=lambda: tick[0], default_lease_seconds=2)
+    runtime.register_worker("w", capacity=1)
+    runtime.submit(SwarmTask("task", {}))
+    first = runtime.lease("w")[0]
+    assert first.lease_token
+    with pytest.raises(LeaseError):
+        runtime.succeed("w", "task")
+    tick[0] = 3
+    with pytest.raises(LeaseError):
+        runtime.succeed("w", "task", lease_token=first.lease_token)
+    assert runtime.reap_expired() == 1
+    assert runtime.task("task").effect_uncertain
+    assert runtime.worker("w").available == 0
+    assert not runtime.lease("w")
+    with pytest.raises(LeaseError):
+        runtime.revive("task")
+    with pytest.raises(LeaseError):
+        runtime.unregister_worker("w")
+    with pytest.raises(LeaseError):
+        runtime.reconcile_uncertain("task", lease_token="wrong", outcome="stopped-no-effect", evidence_sha256="a"*64)
+    runtime.reconcile_uncertain("task", lease_token=first.lease_token,
+                                outcome="stopped-no-effect", evidence_sha256="a"*64)
+    second = runtime.lease("w")[0]
+    assert second.lease_token != first.lease_token
+    with pytest.raises(LeaseError):
+        runtime.succeed("w", "task", lease_token=first.lease_token)
+    assert runtime.succeed("w", "task", lease_token=second.lease_token).state is TaskState.SUCCEEDED
+
+
+def test_fenced_swarm_checkpoint_preserves_uncertainty():
+    from skeleton.automation.agents.swarm_runtime import SwarmRuntime, SwarmTask, TaskState, LeaseError
+
+    runtime = SwarmRuntime(fenced=True, clock=lambda: 10)
+    runtime.register_worker("w")
+    runtime.submit(SwarmTask("a", {}))
+    leased = runtime.lease("w")[0]
+    restored = SwarmRuntime.from_state(runtime.export_state(), clock=lambda: 1)
+    assert restored.task("a").state is TaskState.FAILED
+    assert restored.task("a").effect_uncertain and restored.worker("w").available == 0
+    with pytest.raises(LeaseError):
+        restored.cancel("a")
+    restored.reconcile_uncertain("a", lease_token=leased.lease_token,
+                                 outcome="committed", evidence_sha256="c"*64)
+    assert restored.task("a").state is TaskState.SUCCEEDED
+    assert restored.worker("w").available == 1
+
+
+def test_swarm_graph_dependency_barrier_and_cycle():
+    from skeleton.automation.agents.swarm_runtime import SwarmRuntime, SwarmTask, AdmissionError
+
+    runtime = SwarmRuntime()
+    runtime.register_worker("w", capacity=3)
+    with pytest.raises(AdmissionError):
+        runtime.submit_graph((SwarmTask("a", {}, dependencies=("b",)),
+                              SwarmTask("b", {}, dependencies=("a",))))
+    assert not runtime.tasks()
+    runtime.submit_graph((SwarmTask("b", {}, priority=0, dependencies=("a",)),
+                          SwarmTask("a", {}, priority=100)))
+    assert runtime.blocked_dependencies("b") == ("a",)
+    assert [t.id for t in runtime.lease("w")] == ["a"]
+    runtime.succeed("w", "a")
+    assert [t.id for t in runtime.lease("w")] == ["b"]
+
+
+def test_swarm_terminal_dependency_propagation_and_stale_heap():
+    from skeleton.automation.agents.swarm_runtime import SwarmRuntime, SwarmTask, TaskState
+
+    runtime = SwarmRuntime()
+    runtime.register_worker("w")
+    runtime.submit_graph((SwarmTask("parent", {}, max_attempts=1),
+                          SwarmTask("child", {}, dependencies=("parent",))))
+    runtime.lease("w")
+    runtime.fail("w", "parent", "fail")
+    assert runtime.cancel_failed_dependents() == ("child",)
+    assert runtime.task("child").state is TaskState.CANCELLED
+    runtime.submit(SwarmTask("requeued", {}))
+    for _ in range(1100):
+        runtime.cancel("requeued")
+        runtime.revive("requeued")
+    assert len(runtime._queue) <= 1024
+    assert [t.id for t in runtime.lease("w")] == ["requeued"]
+
+
+def test_fenced_swarm_worker_failure_without_no_effect_confirmation_holds():
+    from skeleton.automation.agents.swarm_runtime import SwarmRuntime, SwarmTask
+
+    runtime = SwarmRuntime(fenced=True)
+    runtime.register_worker("w")
+    runtime.submit(SwarmTask("a", {}))
+    lease = runtime.lease("w")[0]
+    held = runtime.fail("w", "a", "opaque external failure", lease_token=lease.lease_token)
+    assert held.effect_uncertain and runtime.worker("w").available == 0
+    assert "opaque external failure" not in (held.last_error or "")
