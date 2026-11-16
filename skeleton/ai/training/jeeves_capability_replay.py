@@ -96,14 +96,27 @@ def schedule_capability_replay(
         if partner is None:
             raise CapabilityReplayError("each capability domain needs two distinct examples")
         take(partner)
-    # Novel specialty/lens coverage before further oversampling weak spots.
-    for row in hard:
-        if len(chosen) >= max(6, capacity * 3 // 4):
+    # Cover novel specialty/lens combinations fairly across domains before
+    # more hardness replay. Raw losses across unrelated domains need not
+    # share a meaningful scale; rank within a domain and balance counts.
+    def specialty(row):
+        return row["domain"], row["specialty"], row["lens"]
+
+    covered = {specialty(row) for row in chosen}
+    coverage_counts = Counter(row["domain"] for row in chosen)
+    while len(chosen) < max(6, capacity * 3 // 4):
+        novel = {}
+        for row in hard:
+            domain = row["domain"]
+            if row["digest"] not in chosen_hashes and specialty(row) not in covered:
+                novel.setdefault(domain, row)
+        if not novel:
             break
-        if not any(x["domain"] == row["domain"] and
-                   x["specialty"] == row["specialty"] and
-                   x["lens"] == row["lens"] for x in chosen):
-            take(row)
+        domain = min(novel, key=lambda value: (coverage_counts[value], value))
+        row = novel[domain]
+        take(row)
+        covered.add(specialty(row))
+        coverage_counts[domain] += 1
     # Spend remaining slots on hard examples using domain-relative hardness.
     # Loss distributions can differ across domains; comparing raw losses
     # alone can starve skills whose examples are naturally more predictable.
