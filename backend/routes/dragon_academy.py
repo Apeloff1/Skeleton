@@ -3192,11 +3192,12 @@ async def crawler_navigation_shortlist(
     query: str = Query(min_length=1,max_length=512),
     host: str | None = Query(default=None,max_length=253),
     limit: int = Query(default=48,ge=1,le=48),
+    due_only: bool = Query(default=False),
     scope: dict = Depends(_crawler_scope),
 ) -> dict:
     from core.dragon_navigation_federation import application_call
     return await _crawler_result(application_call(crawler_application,scope,"shortlist",
-        query=query,host=host,limit=limit))
+        query=query,host=host,limit=limit,due_only=due_only))
 
 
 @router.get("/crawler/navigation/federation/portfolio")
@@ -3221,6 +3222,19 @@ async def crawler_navigation_topology(
     from core.dragon_navigation_federation import application_call
     return await _crawler_result(application_call(crawler_application,scope,"topology",
         target=target,direction=direction,after=after,limit=limit))
+
+
+@router.get("/crawler/navigation/federation/targets/{target}/trail")
+async def crawler_navigation_trail(
+    target: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+    query: str = Query(min_length=1,max_length=512),
+    depth: int = Query(default=3,ge=1,le=6),
+    beam: int = Query(default=24,ge=1,le=48),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"trail",
+        root=target,query=query,depth=depth,beam=beam))
 
 
 @router.post("/crawler/navigation/federation/targets/{target}/review")
