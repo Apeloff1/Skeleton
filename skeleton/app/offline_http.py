@@ -536,10 +536,10 @@ class OfflineHTTPApplication:
     def _deliberation_review(self, sid: str, body: dict[str, Any]) -> dict[str, Any]:
         from skeleton.app.jeeves_deliberation import deliberate, MAX_CANDIDATE_TOKENS
         _fields(body, {"message", "expected_revision", "approved", "max_output_tokens",
-                       "require_full_history", "grounded", "document_ids"},
+                       "require_full_history", "grounded", "document_ids", "adaptive"},
                 {"message", "expected_revision", "approved"})
         if body["approved"] is not True:
-            raise OfflineHTTPError(403, "two local inference calls require explicit approval")
+            raise OfflineHTTPError(403, "bounded local inference review requires explicit approval")
         message, revision = body["message"], body["expected_revision"]
         strict, grounded = body.get("require_full_history", True), body.get("grounded", False)
         budget = _budget(body, min(self.default_output_tokens, MAX_CANDIDATE_TOKENS))
@@ -548,6 +548,13 @@ class OfflineHTTPApplication:
                 or type(strict) is not bool or type(grounded) is not bool
                 or budget > MAX_CANDIDATE_TOKENS):
             raise OfflineHTTPError(400, "invalid bounded deliberation policy")
+        adaptive = None
+        if "adaptive" in body:
+            from skeleton.app.jeeves_constraints import normalize_policy
+            try:
+                adaptive = normalize_policy(body["adaptive"], budget)
+            except (ValueError, TypeError, OverflowError):
+                raise OfflineHTTPError(400, "invalid bounded adaptive reasoning policy") from None
         scope = _document_scope(body, grounded)
         with self._turn_lock:
             if self._closing or self._active_session is not None:
@@ -599,6 +606,7 @@ class OfflineHTTPApplication:
                             revision=revision, model_digest=self.model_digest,
                             tokenizer_digest=self.tokenizer_digest, output_tokens=budget,
                             require_full_history=strict, evidence=manifest, recheck=recheck,
+                            adaptive=adaptive,
                         ))
                     except (LlamaCppRuntimeError, NativeRuntimeBackendError, TimeoutError, OSError):
                         self._inference_circuit.record_failure()
