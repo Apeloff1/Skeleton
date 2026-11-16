@@ -38,7 +38,10 @@ def fixture():
 
 
 def application(row, *, fence=True):
+    # The unit fixture deliberately models a legacy, non-cutover owner.
     app = object.__new__(DragonCrawlerApplication)
+    app._cutover_requested = False
+    app._cutover_active = False
     app.sessions = Mock()
     cursor = app.sessions.find.return_value
     cursor.sort.return_value = cursor

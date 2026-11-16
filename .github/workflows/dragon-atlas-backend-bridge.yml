@@ -7,6 +7,7 @@ on:
     branches:
       - feat/dragon-deployment-custody-qualification-20261116
       - feat/dragon-ecosystem-storage-custody-20261116
+      - feat/dragon-mongo-offline-relocation-20261116
 
 permissions:
   contents: read
@@ -127,3 +128,13 @@ jobs:
           set -euo pipefail
           python -m py_compile backend/core/dragon_ecosystem_custody.py
           python -m unittest discover -s backend/tests -p 'test_dragon_ecosystem_custody.py' -v
+
+      - name: Dragon Mongo relocation boundary qualification
+        timeout-minutes: 5
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python -m py_compile backend/core/dragon_mongo_relocation.py backend/core/dragon_mongo_cutover.py backend/core/dragon_crawler.py backend/server.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_mongo_relocation.py' -v

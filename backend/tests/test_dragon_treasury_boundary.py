@@ -15,6 +15,9 @@ from test_dragon_sanctuary_boundary import fixture, SCOPE
 class TreasuryPassageTests(unittest.IsolatedAsyncioTestCase):
     def app(self,row,*,stable=True):
         app=object.__new__(DragonCrawlerApplication)
+        # This isolated fixture deliberately represents the original local authority.
+        app._cutover_requested=False
+        app._cutover_active=False
         app._owned=AsyncMock(return_value=row)
         app.sessions=Mock()
         app.sessions.find_one=AsyncMock(return_value={"_id":row["_id"]} if stable else None)
@@ -139,6 +142,9 @@ class TreasuryIntegrationTests(unittest.IsolatedAsyncioTestCase):
     async def test_replaced_watch_claim_cannot_authorize_old_physical_worker(self):
         row,now=fixture()
         app=object.__new__(DragonCrawlerApplication)
+        # This isolated fixture deliberately represents the original local authority.
+        app._cutover_requested=False
+        app._cutover_active=False
         app.sessions=Mock()
         child={**row,"treasury_watch_parent":{"parent_id":"parent"},"worker_watch_claim":"old-claim"}
         app.sessions.find_one=AsyncMock(return_value=child)
@@ -164,6 +170,9 @@ class TreasuryIntegrationTests(unittest.IsolatedAsyncioTestCase):
         watch=claim_watch(watch,now=now.timestamp(),token="live")
         row["treasury_watch"]=watch
         app=object.__new__(DragonCrawlerApplication)
+        # This isolated fixture deliberately represents the original local authority.
+        app._cutover_requested=False
+        app._cutover_active=False
         app.sessions=Mock()
         app.sessions.find_one=AsyncMock(return_value=row)
         app._grant_principal=AsyncMock()
@@ -180,6 +189,9 @@ class TreasuryIntegrationTests(unittest.IsolatedAsyncioTestCase):
 
     def maintenance_app(self,row,*,modified=1,admission_error=None):
         app=object.__new__(DragonCrawlerApplication)
+        # This isolated fixture deliberately represents the original local authority.
+        app._cutover_requested=False
+        app._cutover_active=False
         app.ensure_indexes=AsyncMock()
         app.sessions=Mock()
         cursor=app.sessions.find.return_value
@@ -309,6 +321,9 @@ class TreasuryIntegrationTests(unittest.IsolatedAsyncioTestCase):
         row,captured=fixture()
         now=captured+timedelta(days=2)
         app=object.__new__(DragonCrawlerApplication)
+        # This isolated fixture deliberately represents the original local authority.
+        app._cutover_requested=False
+        app._cutover_active=False
         app.ensure_indexes=AsyncMock()
         app.sessions=Mock()
         cursor=app.sessions.find.return_value
@@ -343,8 +358,35 @@ class RecoveryLaneTests(unittest.IsolatedAsyncioTestCase):
         app.build_deep_indexes=AsyncMock(return_value={"indexed":1})
         app.purge_expired_deep_indexes=AsyncMock(return_value={"purged":1})
         app.recover_deep_erasure=AsyncMock(return_value={"cleaned":1})
-        with patch("core.dragon_crawler.crawler_application",app):
+        # Keep all independently registered maintenance lanes observable without
+        # starting background storage, network or model work in this unit test.
+        maintenance = {
+            "build_deep_dense_indexes": "deep_archive_dense",
+            "build_full_vector_batch": "deep_archive_full_vectors",
+            "build_current_vector_batch": "current_full_vectors",
+            "purge_current_vector_batches": "current_vector_purge",
+            "purge_stale_full_vector_batches": "deep_archive_full_vector_purge",
+            "cleanup_bulk_copies": "hoarder_copy_cleanup",
+            "recover_bulk_copies": "hoarder_copy_recovery",
+            "reconcile_cold_primaries": "hoarder_cold_primary",
+        }
+        for method in maintenance:
+            setattr(app, method, AsyncMock(return_value={"fixture_completed":True}))
+        from contextlib import ExitStack
+        pulses = ("pulse_release_imports", "pulse_world_discovery", "pulse_media_archive",
+                  "pulse_game_datasets", "pulse_lead_graph")
+        with ExitStack() as stack:
+            stack.enter_context(patch("core.dragon_crawler.crawler_application",app))
+            for method in pulses:
+                stack.enter_context(patch("core.dragon_corpus_runtime."+method,
+                                          new_callable=AsyncMock, return_value={"fixture_completed":True}))
+            stack.enter_context(patch("core.dragon_game_routing.backfill_routes",
+                                      new_callable=AsyncMock, return_value={"fixture_completed":True}))
             result=await recover_crawler_runs()
+        for method, lane in maintenance.items():
+            getattr(app, method).assert_awaited_once()
+            self.assertEqual(result[lane],{"fixture_completed":True})
+        self.assertEqual(result["lead_graph"],{"fixture_completed":True})
         self.assertTrue(result["treasury_watches"]["failed"])
         self.assertEqual(result["treasury_expired_segments"],{"purged":1})
         self.assertEqual(result["treasury_segment_repair"],{"repaired":1})
