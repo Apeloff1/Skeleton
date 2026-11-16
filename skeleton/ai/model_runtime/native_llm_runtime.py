@@ -108,6 +108,14 @@ class _FusedLogitsRequest:
     window: tuple[int, ...]
 
 
+@dataclass(frozen=True)
+class _PagedLogitsReply:
+    values: Sequence[float]
+    tokens: int
+    bytes: int
+    resets: int
+
+
 class GenerationStream:
     """Streaming iterator whose terminal GenerationResult is retained."""
 
@@ -678,11 +686,13 @@ class NativeLLMRuntime:
         self,
         prompt_sequence: TokenSequence,
         config: GenerationConfig,
-        *, interrupt: Callable[[], None] | None = None, fused: bool = False,
-    ) -> Generator[RuntimeEvent | _FusedLogitsRequest, Sequence[float] | None, GenerationResult]:
+        *, interrupt: Callable[[], None] | None = None, fused: bool = False, paged: bool = False,
+    ) -> Generator[RuntimeEvent | _FusedLogitsRequest, Sequence[float] | _PagedLogitsReply | None, GenerationResult]:
         if interrupt is not None:
             interrupt()
-        if fused and config.use_cache:
+        if paged and not (fused and config.use_cache):
+            raise RuntimeContractError("paged generation requires cached fused requests")
+        if fused and config.use_cache and not paged:
             raise RuntimeContractError("fused stateless batch requires explicit use_cache=False")
         self._admit_sequence(prompt_sequence, config)
         admitted_binding = (
@@ -742,8 +752,15 @@ class NativeLLMRuntime:
             window = output[-self.limits.max_context :]
             if fused:
                 raw_logits = yield _FusedLogitsRequest(tuple(window or [self.model.unk]))
-                if raw_logits is None:
-                    raise RuntimeContractError("fused decode lacks logits")
+                if isinstance(raw_logits, _PagedLogitsReply) and paged and cache is not None:
+                    cache.tokens = list(window or [self.model.unk])
+                    if len(cache.tokens) != raw_logits.tokens:
+                        raise RuntimeContractError("paged occupancy mismatch")
+                    cache.reserved_bytes = raw_logits.bytes
+                    cache.reset_count = raw_logits.resets
+                    raw_logits = raw_logits.values
+                elif raw_logits is None or paged:
+                    raise RuntimeContractError("fused decode lacks admitted logits")
             elif interrupt is None:
                 raw_logits = self.model._logits_window(window, cache)
             else:
@@ -1069,7 +1086,7 @@ class NativeLLMRuntime:
     def generate_fused_batch(
         self, requests: Sequence[BatchGenerationRequest], *,
         max_workspace_bytes: int, max_active_slots: int = 8,
-        require_gpu: bool = True,
+        require_gpu: bool = True, paged_kv_bytes: int | None = None,
         on_event: Callable[[str, RuntimeEvent], None] | None = None,
         interrupt: Callable[[], None] | None = None,
     ) -> tuple[BatchGenerationResult, ...]:
@@ -1092,16 +1109,27 @@ class NativeLLMRuntime:
         if on_event is not None and not callable(on_event):
             raise RuntimeContractError("fused observer must be callable")
         admitted = self._admit_batch(requests, interrupt=interrupt)
-        if any(request.config.use_cache for request, _ in admitted):
-            raise RuntimeContractError("fused batch requires explicit cache-free requests")
+        paged = paged_kv_bytes is not None
+        if any(request.config.use_cache != paged for request, _ in admitted):
+            raise RuntimeContractError("fused batch cache mode must match explicit paged policy")
+        if paged and (type(paged_kv_bytes) is not int or not 1 <= paged_kv_bytes <= 1024**4):
+            raise RuntimeContractError("invalid paged KV budget")
         completed = {}
         # Hold the canonical accelerator lock across the full campaign,
         # including checkpoint and token sampling, so training cannot rebind.
         with accel._inference_lock(interrupt):
             for offset in range(0, len(admitted), max_active_slots):
                 group = admitted[offset:offset + max_active_slots]
+                session = None
+                if paged:
+                    from .paged_attention import PagedBatchSession
+                    session = PagedBatchSession(accel, slots=len(group), context=self.limits.max_context,
+                        max_kv_bytes=paged_kv_bytes, require_gpu=require_gpu)
+                    if session.pages_per_slot*session.page_bytes > self.limits.max_kv_bytes:
+                        session.close()
+                        raise RuntimeContractError("paged per-stream allocation exceeds runtime KV ceiling")
                 generators = {
-                    j: self._stream_sequence_impl(seq, req.config, interrupt=interrupt, fused=True)
+                    j: self._stream_sequence_impl(seq, req.config, interrupt=interrupt, fused=True, paged=paged)
                     for j, (req, seq) in enumerate(group)
                 }
                 pending = {}
@@ -1117,6 +1145,8 @@ class NativeLLMRuntime:
                                 raise RuntimeContractError("fused stream missing terminal result")
                             completed[offset+j] = BatchGenerationResult(group[j][0].request_id, terminal.value)
                             del generators[j]
+                            if session is not None:
+                                session.release(j)
                             return
                         values = None
                         if isinstance(event, _FusedLogitsRequest):
@@ -1128,6 +1158,12 @@ class NativeLLMRuntime:
                     for j in tuple(generators):
                         advance(j)
                     while pending:
+                        if session is not None:
+                            indices = list(pending)
+                            windows = [pending.pop(j) for j in indices]
+                            for j, row in zip(indices, session.logits(indices, windows, interrupt=interrupt)):
+                                advance(j, _PagedLogitsReply(*row))
+                            continue
                         by_length = {}
                         for j, window in pending.items():
                             by_length.setdefault(len(window), []).append(j)
@@ -1144,6 +1180,8 @@ class NativeLLMRuntime:
                 finally:
                     for stream in generators.values():
                         stream.close()
+                    if session is not None:
+                        session.close()
         return tuple(completed[j] for j in range(len(admitted)))
 
     def replay(
