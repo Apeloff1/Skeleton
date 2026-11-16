@@ -1200,9 +1200,10 @@ def test_grounded_quote_review_requires_scope_and_distinct_sources_before_genera
             app.dispatch("POST", route + "/deliberation-review", body)
         assert error.value.status == 400
         first = app.knowledge.add_text("One source", "Nebula recovery uses the violet module.")
-        with pytest.raises(OfflineAIError):
+        with pytest.raises(OfflineHTTPError) as error:
             app.dispatch("POST", route + "/deliberation-review",
                          body | {"grounded": True, "document_ids": [first["document_id"]]})
+        assert error.value.status == 422
         assert app._active_session is None
         assert app.dispatch("GET", route)[1]["revision"] == 0
     finally:
