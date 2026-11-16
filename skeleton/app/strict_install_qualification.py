@@ -34,6 +34,10 @@ _HEX = re.compile(r"[a-f0-9]{64}\Z", re.ASCII)
 _MAX_PACKET = 512 * 1024
 _MAX_RECEIPT = 32 * 1024
 _MAX_PASSES = 4
+_MAX_INDEX_BYTES = 64 * 1024 * 1024
+_MAX_SOURCE_PATH_BYTES = 32768
+_WORKER_SOURCE_PATHS = ("skeleton/app", "skeleton/__init__.py", "skeleton.py",
+                        "sitecustomize.py", "usercustomize.py")
 _PROVIDERS = frozenset(("local", "openai"))
 _LANES = ("frontend_setup", "frontend_product", "backend_bootstrap", "backend_health",
           "engine_health", "aggregate_ready", "aggregate_status", "critical_routes",
@@ -425,24 +429,80 @@ def _bounded_worker(root, args, timeout):
         return _failed_worker("worker_unavailable")
 
 
+def _git_observation(root, env, args, *, limit, timeout=30):
+    # Use disk-backed output rather than accumulating arbitrary path names in
+    # process memory. Reports never expose path names or Git diagnostic text.
+    command = ["git", "-C", str(root), "-c", "core.fsmonitor=false",
+               "-c", "core.untrackedCache=false", "-c", "core.ignoreStat=false", *args]
+    with tempfile.TemporaryFile() as output:
+        result = subprocess.run(command, env=env, stdin=subprocess.DEVNULL, stdout=output,
+                                stderr=subprocess.DEVNULL, check=False, timeout=timeout)
+        _require(type(result.returncode) is int and result.returncode == 0)
+        output.seek(0)
+        raw = output.read(limit + 1)
+        _require(len(raw) <= limit)
+        return raw
+
+
+def _index_records(raw):
+    if not raw:
+        return ()
+    _require(raw.endswith(b"\0"))
+    rows = raw[:-1].split(b"\0")
+    _require(all(0 < len(row) <= _MAX_SOURCE_PATH_BYTES for row in rows))
+    return rows
+
+
+def _deny_shadow_paths(root, env):
+    # Include ignored executable/importable files: a .gitignore rule must
+    # not make an unreviewed module visible to the isolated Python worker.
+    for flags in (["--others", "--exclude-standard"],
+                  ["--others", "--ignored", "--exclude-standard"]):
+        raw = _git_observation(root, env, ["ls-files", "-z", *flags, "--",
+                                               *_WORKER_SOURCE_PATHS],
+                               limit=_MAX_INDEX_BYTES)
+        for row in _index_records(raw):
+            path = row.lower()
+            is_executable = path.endswith((b".py", b".pyw", b".pyd", b".so", b".dll",
+                                          b".pth", b".zip", b".egg"))
+            # Bytecode-only modules can be imported directly when placed
+            # beside a package; ordinary __pycache__ entries are not such
+            # paths. This is not a comprehensive interpreter provenance check.
+            direct_bytecode = path.endswith(b".pyc") and b"/__pycache__/" not in path
+            _require(not (is_executable or direct_bytecode))
+
+
 def assert_source_head(root, expected):
-    """Pin the inspected host checkout, not the identity of running images."""
+    """Pin an observed host checkout, never the identity of running images."""
     _require(type(expected) is str and _SHA.fullmatch(expected) is not None)
     env = {key: os.environ[key] for key in ("PATH","SYSTEMROOT","WINDIR","TEMP","TMP")
            if key in os.environ}
     env.update(GIT_OPTIONAL_LOCKS="0", GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull)
     try:
-        with tempfile.TemporaryFile() as output:
-            result = subprocess.run(["git","-C",str(root),"rev-parse","HEAD"], env=env,
-                stdout=output, stderr=subprocess.DEVNULL, check=False, timeout=10)
-            output.seek(0)
-            _require(result.returncode == 0 and output.read(128).strip() == expected.encode("ascii"))
-        for flags in (["diff","--quiet","--no-ext-diff","HEAD","--"],
-                      ["diff","--cached","--quiet","--no-ext-diff","HEAD","--"]):
-            result = subprocess.run(["git","-C",str(root),*flags], env=env,
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False, timeout=30)
-            _require(result.returncode == 0)
-    except (OSError, subprocess.SubprocessError):
+        root = Path(root).resolve(strict=True)
+        top = _git_observation(root, env, ["rev-parse", "--show-toplevel"],
+                               limit=_MAX_SOURCE_PATH_BYTES, timeout=10)
+        _require(bool(top) and top.endswith(b"\n"))
+        _require(Path(os.fsdecode(top.rstrip(b"\r\n"))).resolve(strict=True) == root)
+        head = _git_observation(root, env, ["rev-parse", "--verify", "HEAD^{commit}"],
+                                limit=128, timeout=10)
+        _require(head == expected.encode("ascii") + b"\n"
+                 or head == expected.encode("ascii") + b"\r\n")
+        # A sparse/skip-worktree or assume-unchanged entry can suppress
+        # ordinary diff evidence. Deny the entire masked checkout rather
+        # than silently granting a full-source observation.
+        records = _index_records(_git_observation(
+            root, env, ["ls-files", "-v", "-z", "--cached"], limit=_MAX_INDEX_BYTES))
+        _require(bool(records) and all(row.startswith(b"H ") for row in records))
+        for flags in (["diff","--quiet","--no-ext-diff","--ignore-submodules=none","HEAD","--"],
+                      ["diff","--cached","--quiet","--no-ext-diff","--ignore-submodules=none","HEAD","--"]):
+            _git_observation(root, env, flags, limit=0)
+        _deny_shadow_paths(root, env)
+        # A change to HEAD during a long index scan invalidates the observation.
+        again = _git_observation(root, env, ["rev-parse", "--verify", "HEAD^{commit}"],
+                                 limit=128, timeout=10)
+        _require(again == head)
+    except (OSError, ValueError, UnicodeError, subprocess.SubprocessError):
         raise QualificationDenied("host source identity could not be observed") from None
 
 

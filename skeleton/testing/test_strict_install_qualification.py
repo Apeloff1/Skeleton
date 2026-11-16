@@ -297,3 +297,68 @@ def test_strict_probe_rejects_noncanonical_path_before_transport(monkeypatch,pat
 def test_html_prefix_cannot_qualify_setup_document(body):
     with serve({"/setup":body}) as (base,_):
         assert q._get(base,"/setup",timeout=1,html=True)[0]!="observed"
+
+
+
+@pytest.fixture
+def pinned_checkout(tmp_path):
+    import shutil
+    import subprocess
+    git = shutil.which("git")
+    if git is None:
+        pytest.skip("git is not installed")
+    root = tmp_path / "checkout"
+    root.mkdir()
+
+    def run(*args):
+        return subprocess.run([git,"-C",str(root),*args], check=True,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout
+
+    run("init")
+    run("config","user.name","Install Fixture")
+    run("config","user.email","fixture@example.invalid")
+    (root/"skeleton"/"app").mkdir(parents=True)
+    (root/"skeleton"/"__init__.py").write_text("# fixture\n")
+    (root/"skeleton"/"app"/"owner.py").write_text("VERSION=1\n")
+    (root/".gitignore").write_text(".env\n__pycache__/\nshadow.py\n")
+    run("add",".")
+    run("commit","-m","source fixture")
+    return root,run,run("rev-parse","HEAD").decode().strip()
+
+
+def test_strict_source_pin_accepts_clean_checkout_and_ignored_private_runtime(pinned_checkout):
+    root,run,head=pinned_checkout
+    (root/".env").write_text("PRIVATE=fixture")
+    cache=root/"skeleton"/"app"/"__pycache__"
+    cache.mkdir()
+    (cache/"owner.cpython-311.pyc").write_bytes(b"cache fixture")
+    q.assert_source_head(root,head)
+
+
+@pytest.mark.parametrize("flag",["--assume-unchanged","--skip-worktree"])
+def test_strict_source_pin_rejects_hidden_index_entries(pinned_checkout,flag):
+    root,run,head=pinned_checkout
+    run("update-index",flag,"skeleton/app/owner.py")
+    (root/"skeleton"/"app"/"owner.py").write_text("VERSION=2\n")
+    with pytest.raises(q.QualificationDenied):
+        q.assert_source_head(root,head)
+
+
+@pytest.mark.parametrize("name",["shadow.py","extra.py","extra.pyc","extra.pyd","extra.so","extra.pth"])
+def test_strict_source_pin_rejects_unreviewed_worker_import_inputs(pinned_checkout,name):
+    root,run,head=pinned_checkout
+    (root/"skeleton"/"app"/name).write_bytes(b"fixture")
+    with pytest.raises(q.QualificationDenied):
+        q.assert_source_head(root,head)
+
+
+def test_strict_source_pin_rejects_ancestor_checkout_discovery(pinned_checkout):
+    root,run,head=pinned_checkout
+    with pytest.raises(q.QualificationDenied):
+        q.assert_source_head(root/"skeleton",head)
+
+
+@pytest.mark.parametrize("raw",[b"H tracked",b"H path\0\0",b"H "+b"x"*32769+b"\0"])
+def test_index_observation_rejects_incomplete_or_overlong_records(raw):
+    with pytest.raises(q.QualificationDenied):
+        q._index_records(raw)
