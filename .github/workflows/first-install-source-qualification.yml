@@ -67,6 +67,42 @@ jobs:
             skeleton/testing/test_app_offline_install_reconciliation.py \
             skeleton/testing/test_first_install_required_routes.py \
             skeleton/testing/test_windows_installer.py
+      - name: Verify guarded local activation and Mongo authority without live writes
+        run: |
+          python -m pytest -q --maxfail=1 -p pytest_asyncio.plugin \
+            skeleton/testing/test_compose_activation_role_custody.py \
+            skeleton/testing/test_compose_authentication_boundary_regression.py \
+            skeleton/testing/test_compose_explicit_null_role_boundary.py \
+            skeleton/testing/test_compose_final_observation_custody.py \
+            skeleton/testing/test_compose_guarded_activation.py \
+            skeleton/testing/test_compose_guarded_preflight.py \
+            skeleton/testing/test_compose_guarded_service.py \
+            skeleton/testing/test_compose_hello_message_boundary.py \
+            skeleton/testing/test_compose_load_balanced_authority.py \
+            skeleton/testing/test_compose_missing_role_inventory.py \
+            skeleton/testing/test_compose_mongo_first_run_status.py \
+            skeleton/testing/test_compose_mongo_topology_custody.py \
+            skeleton/testing/test_compose_null_primary_role_boundary.py \
+            skeleton/testing/test_compose_null_proxy_authority.py \
+            skeleton/testing/test_compose_null_topology_authority.py \
+            skeleton/testing/test_compose_primary_membership_regression.py \
+            skeleton/testing/test_compose_primary_topology_scalar_boundaries.py \
+            skeleton/testing/test_compose_revocation_window_regression.py \
+            skeleton/testing/test_compose_router_ghost_topology_fencing.py \
+            skeleton/testing/test_compose_terminal_authority_failures.py \
+            skeleton/testing/test_compose_terminal_topology.py \
+            skeleton/testing/test_mongo_epoch_document_shape.py \
+            skeleton/testing/test_mongo_epoch_exact_scalar_boundaries.py \
+            skeleton/testing/test_mongo_epoch_instance_writer_fence.py \
+            skeleton/testing/test_mongo_epoch_int64_boundaries.py \
+            skeleton/testing/test_mongo_epoch_lower_level_scope.py \
+            skeleton/testing/test_mongo_epoch_migration_guard.py \
+            skeleton/testing/test_mongo_epoch_operation_deadlines.py \
+            skeleton/testing/test_mongo_epoch_revocation.py \
+            skeleton/testing/test_mongo_epoch_writer_result_scope.py \
+            skeleton/testing/test_mongo_source_epoch.py \
+            skeleton/testing/test_reviewer_custody.py \
+            skeleton/testing/test_signed_reviewer_client.py
       - name: Verify construction and provider-owner contracts
         run: |
           python scripts/check_architecture_map.py
