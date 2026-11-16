@@ -41,7 +41,7 @@ def _portfolio_request(args, parser):
         max_per_host=args.max_per_host, indexed=args.indexed)
 
 
-def main():
+def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Import, inspect and seed sequential Dragon almanacs")
     parser.add_argument("command", choices=("bootstrap", "status", "experiment", "delivery-status", "delivery-search", "delivery-brief", "mission-scout", "mission-index", "mission-audit", "mission-health", "mission-portfolio", "campaign-record", "campaign-inspect", "campaign-refresh", "import-supplements", "discovery-verify", "discovery-census", "platform-matrix", "discovery-identity-audit", "stage-preview", "stage-materialize", "import-reconciled", "discovery-topics", "discovery-sources", "discovery-receipts"))
     parser.add_argument("--database", required=True)
@@ -80,7 +80,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=600)
     parser.add_argument("--query", help="Reviewed mechanic or design research question")
     parser.add_argument("--design", type=Path, help="Strict native game design JSON")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if not args.trusted_local_operator:
         parser.error("local authenticated operator acknowledgement required")
     if args.command in {"stage-preview", "stage-materialize"}:
@@ -267,6 +267,8 @@ def main():
                       "worker": worker.status(args.owner, authorized=True)}
         print(canonical_json(result))
 
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

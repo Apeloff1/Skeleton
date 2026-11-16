@@ -7,6 +7,18 @@ Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
     offline-runtime  Inspect pinned local weights and measured resource admission
     weight-store     Stage pinned weights and inspect cooperative disk/recovery custody
+    dragon-almanac                   Owner-scoped almanac projection
+    dragon-technical-sources         Reviewed technical research leads
+    original-native-evolution        Original cross-era source evolution
+    original-native-game             Explicit original native game source
+    original-native-portfolio        Original game source across native engines
+    studio-competitive-review        Explicit complete strategy review
+    studio-battle-review             Explicit three-packet local review
+    studio-competitive-watch         Local governed title watch
+    studio-rival-review              Evidence-bound rival review
+    cross-era-game-project           Legal-first cross-era project authoring
+    local-trust-gates                Explicit local trust contract operations
+    local-source-assurance           Run six canonical AI source assurance suites
     fixed-input-replay               Run deterministic semantic input and collision replay
     recovered-save-qualify           Qualify SQLite project version and replay custody
     synthesized-quest                Execute location-gated synthesized quest campaigns
@@ -1352,6 +1364,42 @@ def main(argv: Optional[List[str]] = None) -> int:
         return recovered_main(rest)
     if cmd == "recovered-save-qualify":
         from skeleton.app.recovered_save_qualification import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "dragon-almanac":
+        from skeleton.ai.game_builder.dragon_almanac_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "dragon-technical-sources":
+        from skeleton.ai.game_builder.dragon_technical_source_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-native-evolution":
+        from skeleton.ai.game_builder.native_evolution_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-native-game":
+        from skeleton.ai.game_builder.native_game_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-native-portfolio":
+        from skeleton.ai.game_builder.native_portfolio_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-competitive-review":
+        from skeleton.ai.game_builder.competitive_27page_review_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-battle-review":
+        from skeleton.ai.game_builder.competitive_battle_review_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-competitive-watch":
+        from skeleton.ai.game_builder.competitive_watch_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-rival-review":
+        from skeleton.ai.game_builder.rival_watch_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "cross-era-game-project":
+        from skeleton.ai.runtime.game_project_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-trust-gates":
+        from skeleton.ai.runtime.operational_ai.trust_gates.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-source-assurance":
+        from skeleton.app.local_source_assurance import main as recovered_main
         return recovered_main(rest)
     if cmd == "app":
         from skeleton.app.cli import run_app_cli

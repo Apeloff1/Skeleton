@@ -19,7 +19,7 @@ from .dragon_article_hatchling import DragonArticleHatchling
 from .reviewed_knowledge import ReviewedKnowledgeStore
 
 
-def main():
+def main(argv=None) -> int:
     parser=argparse.ArgumentParser(description="Policy-stage technical source metadata")
     parser.add_argument("command",choices=("census","import","plan","history",
                                                   "capture-history","capture-review",
@@ -43,7 +43,7 @@ def main():
     parser.add_argument("--max-per-host",type=int,default=2)
     parser.add_argument("--direct-only",action="store_true")
     parser.add_argument("--include-captured-text",action="store_true")
-    args=parser.parse_args()
+    args=parser.parse_args(argv)
     if not args.trusted_local_operator:
         parser.error("local operator trust required; no HTTP browsing endpoint")
     with ReviewedKnowledgeStore(args.database) as store:
@@ -178,6 +178,8 @@ def main():
                         ))
         print(canonical_json(report))
 
+    return 0
 
-if __name__=="__main__":
-    main()
+
+if __name__ == "__main__":
+    raise SystemExit(main())

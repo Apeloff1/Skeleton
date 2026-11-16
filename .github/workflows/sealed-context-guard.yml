@@ -70,6 +70,13 @@ on:
       - 'skeleton/app/orphan_source_graph*.py'
       - 'skeleton/app/orphan_graph_ownership.py'
       - 'skeleton/app/recovered_evidence.py'
+      - 'skeleton/app/local_source_assurance.py'
+      - 'skeleton/testing/test_recovered_assurance_routes.py'
+      - 'skeleton/ai/game_builder/dragon_almanac_cli.py'
+      - 'skeleton/ai/game_builder/dragon_technical_source_cli.py'
+      - 'skeleton/ai/game_builder/native_evolution_cli.py'
+      - 'skeleton/ai/game_builder/native_game_cli.py'
+      - 'skeleton/ai/game_builder/native_portfolio_cli.py'
       - 'skeleton/game/simulation/fixed_input_replay.py'
       - 'skeleton/app/fixed_input_replay_cli.py'
       - 'skeleton/app/recovered_save_qualification.py'
@@ -228,6 +235,11 @@ jobs:
         env:
           PYTHONPATH: '.:backend'
         run: python -m pytest -q skeleton/testing/test_recovered_fixed_input.py tests/test_game_fixed_clock_v6.py tests/test_game_input_collision.py tests/game_builder/test_project_bundle_save.py tests/game_builder/test_project_bundle_history.py
+
+      - name: Recovered AI source assurance and operator routes
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_assurance_routes.py
 
       - name: Consumer share and Chroma custody regressions
         env:
