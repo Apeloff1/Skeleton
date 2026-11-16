@@ -130,8 +130,8 @@ class WeightStoreDiskOwner:
         with os.scandir(self._store.objects) as listing:
             for bucket in listing:
                 count()
-                info = bucket.stat(follow_symlinks=False)
-                if not _BUCKET.fullmatch(bucket.name) or not _directory(info):
+                bucket_info = bucket.stat(follow_symlinks=False)
+                if not _BUCKET.fullmatch(bucket.name) or not _directory(bucket_info):
                     raise WeightShardStoreError("unexpected object bucket; recovery review required")
                 buckets += 1
                 with os.scandir(bucket.path) as children:
@@ -143,7 +143,7 @@ class WeightStoreDiskOwner:
                             raise WeightShardStoreError("unexpected weight object; recovery review required")
                         objects += 1
                         object_bytes += info.st_size
-                if _inode(os.stat(bucket.path, follow_symlinks=False)) != _inode(bucket.stat(follow_symlinks=False)):
+                if _inode(os.stat(bucket.path, follow_symlinks=False)) != _inode(bucket_info):
                     raise WeightShardStoreError("weight bucket changed during disk inventory")
         with os.scandir(self._store.manifests) as listing:
             for item in listing:
