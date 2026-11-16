@@ -220,12 +220,22 @@ HTML = r"""<!doctype html>
         <label for="grounded"><input id="grounded" type="checkbox"> Include local evidence</label>
         <label for="context-preserve"><input id="context-preserve" type="checkbox" checked> Require entire conversation context</label>
         <label for="budget">Output tokens <input id="budget" type="number" min="1" max="8192" value="32"></label>
-      </div></details>
+      </div>
+      <div class="inline">
+        <label for="adaptive-mode">Adaptive review <select id="adaptive-mode"><option value="off">Off — compare two candidates</option><option value="review">Budgeted reasoning</option><option value="arithmetic">Exact arithmetic</option><option value="table">Table artifact</option><option value="checklist">Checklist artifact</option><option value="series">Numeric series artifact</option></select></label>
+        <label for="adaptive-attempts">Maximum attempts <input id="adaptive-attempts" type="number" min="1" max="4" value="4"></label>
+        <label for="adaptive-total">Total reserved tokens <input id="adaptive-total" type="number" min="1" max="512" value="128"></label>
+        <label for="adaptive-language">Response language <select id="adaptive-language"><option value="auto">Automatic</option><option value="en">English</option><option value="nb">Norwegian Bokmål</option><option value="nn">Norwegian Nynorsk</option><option value="de">German</option><option value="fr">French</option><option value="es">Spanish</option><option value="it">Italian</option><option value="pt">Portuguese</option><option value="pl">Polish</option><option value="ja">Japanese</option><option value="ko">Korean</option><option value="zh">Chinese</option><option value="ar">Arabic</option><option value="hi">Hindi</option></select></label>
+      </div>
+      <label for="adaptive-expression">Explicit arithmetic expression (only used in arithmetic mode)</label>
+      <input id="adaptive-expression" type="text" maxlength="256" placeholder="(17 + 5) * 3 / 2">
+      <p class="minor">Only explicit arithmetic equality or artifact schema is checked independently. Artifact values, language quality and factual claims are not verified.</p>
+      </details>
       <div class="composer-submit">
         <span class="hint keyboard-hint">Ctrl / ⌘ + Enter to send</span>
         <button id="context-preview" class="small" disabled>Preview context</button>
         <button id="cognitive-preview" class="small" disabled>Review reasoning plan</button>
-        <button id="deliberation-review" class="small" disabled>Generate two review candidates (no save)</button>
+        <button id="deliberation-review" class="small" disabled>Run reasoning review (no save)</button>
         <button id="research-review" class="small" disabled>Research local references (multi-hop)</button>
         <button id="send" class="primary">Generate locally ↗</button>
         <button id="retry-turn" class="secondary" hidden>Retry original turn</button>
@@ -250,8 +260,9 @@ HTML = r"""<!doctype html>
     </details>
     <details id="deliberation-panel" class="grounding-preview" hidden>
       <summary>Local reasoning candidates — not independently verified</summary>
-      <p class="hint">Two actual local generations. Not saved to history. Review alternatives before writing your next message.</p>
+      <p class="hint">Bounded actual local generations. Not saved to history. Independent checks apply only to the explicit contract.</p>
       <pre id="deliberation-result" aria-live="polite"></pre>
+      <div id="adaptive-artifacts" aria-live="polite"></div>
     </details>
     <details id="context-grounding-preview" class="grounding-preview" hidden>
       <summary>Local grounding passages selected by preview — untrusted text</summary>
@@ -1343,6 +1354,52 @@ JAVASCRIPT = r"""'use strict';
     get('research-panel').hidden = false; get('research-panel').open = true;
     status(cards.length ? 'Local research completed. Review exact source passages.' : 'No local reference evidence found.');
   }));
+  function renderReviewArtifact(data, kind) {
+    if (!data || data.kind !== kind || typeof data.title !== 'string' || data.title.length > 120)
+      throw new Error('Invalid artifact.');
+    const root = document.createElement('div');
+    const heading = document.createElement('h3');
+    heading.textContent = data.title + ' — unverified values';
+    root.append(heading);
+    const cell = (tag, value) => {
+      if (typeof value !== 'string' || value.length > 300) throw new Error('Invalid artifact cell.');
+      const el = document.createElement(tag); el.textContent = value; return el;
+    };
+    if (kind === 'table') {
+      if (!Array.isArray(data.columns) || !data.columns.length || data.columns.length > 8 ||
+          !Array.isArray(data.rows) || !data.rows.length || data.rows.length > 32)
+        throw new Error('Invalid table dimensions.');
+      const table = document.createElement('table'), head = document.createElement('tr');
+      for (const label of data.columns) head.append(cell('th', label));
+      table.append(head);
+      for (const row of data.rows) {
+        if (!Array.isArray(row) || row.length !== data.columns.length) throw new Error('Invalid row.');
+        const tr = document.createElement('tr');
+        for (const value of row) tr.append(cell('td', value));
+        table.append(tr);
+      }
+      root.append(table);
+    } else if (kind === 'checklist') {
+      if (!Array.isArray(data.items) || !data.items.length || data.items.length > 32)
+        throw new Error('Invalid checklist.');
+      for (const value of data.items) {
+        const label = cell('label', value), box = document.createElement('input');
+        box.type = 'checkbox'; label.prepend(box); root.append(label, document.createElement('div'));
+      }
+    } else if (kind === 'series') {
+      if (typeof data.unit !== 'string' || data.unit.length > 24 || !Array.isArray(data.points) ||
+          !data.points.length || data.points.length > 48) throw new Error('Invalid series.');
+      const table = document.createElement('table');
+      for (const point of data.points) {
+        if (!point || typeof point.value !== 'number' || !Number.isFinite(point.value) ||
+            Math.abs(point.value) > 1e12) throw new Error('Invalid series value.');
+        const tr = document.createElement('tr'); tr.append(cell('th', point.label),
+          cell('td', String(point.value) + ' ' + data.unit)); table.append(tr);
+      }
+      root.append(table);
+    } else throw new Error('Unknown artifact type.');
+    return root;
+  }
   get('deliberation-review').addEventListener('click', () => run(async () => {
     const message = get('prompt').value.trim();
     const tokens = Number(get('budget').value);
@@ -1351,38 +1408,67 @@ JAVASCRIPT = r"""'use strict';
     const scope = selectedGroundingScope(grounded);
     const scopeVersion = state.knowledgeScopeVersion;
     const session = state.session, revision = state.revision, epoch = state.epoch;
+    const mode = get('adaptive-mode').value;
+    const adaptive = mode === 'off' ? null : {
+      max_attempts: Number(get('adaptive-attempts').value),
+      maximum_reserved_tokens: Number(get('adaptive-total').value),
+      language: get('adaptive-language').value,
+      contract: mode === 'review' ? {kind: 'review'} : mode === 'arithmetic' ?
+        {kind: 'arithmetic', expression: get('adaptive-expression').value.trim()} :
+        {kind: 'artifact', artifact_kind: mode}
+    };
+    const policyMatches = () => mode === get('adaptive-mode').value && (!adaptive ||
+      (adaptive.max_attempts === Number(get('adaptive-attempts').value) &&
+       adaptive.maximum_reserved_tokens === Number(get('adaptive-total').value) &&
+       adaptive.language === get('adaptive-language').value &&
+       (mode !== 'arithmetic' || adaptive.contract.expression === get('adaptive-expression').value.trim())));
     if (!session || !message || new TextEncoder().encode(message).length > 1024 ||
         !Number.isSafeInteger(tokens) || tokens < 1 || tokens > 128)
       throw new Error('Enter a question of at most 1024 bytes and a per-candidate budget of 1–128.');
     clearGroundingPreview();
-    status('Running two local review candidates. No transcript will be committed.');
+    get('adaptive-artifacts').replaceChildren();
+    status(adaptive ? 'Running budgeted local reasoning. No transcript will be committed.' : 'Running two local review candidates. No transcript will be committed.');
     const report = await api('POST', '/v1/sessions/' + session + '/deliberation-review', {
       message, expected_revision: revision, approved: true, max_output_tokens: tokens,
-      grounded, require_full_history: strict, ...(scope.length ? {document_ids: scope} : {})
+      grounded, require_full_history: strict, ...(scope.length ? {document_ids: scope} : {}),
+      ...(adaptive ? {adaptive} : {})
     });
     const sha = /^[0-9a-f]{64}$/;
-    if (report.schema !== 'skeleton.jeeves.deliberation-review.v1' ||
+    if (report.schema !== (adaptive ? 'skeleton.jeeves.adaptive-review.v1' : 'skeleton.jeeves.deliberation-review.v1') ||
         report.model_digest !== state.health?.model_digest ||
         report.tokenizer_digest !== state.health?.tokenizer_digest ||
         report.session_revision !== revision || report.question_sha256 !== await exactLocalSha256(message) ||
         report.generation_performed !== true || report.transcript_committed !== false ||
         report.tool_execution_authorized !== false || report.memory_saved !== false ||
         report.comparison?.answer_selected !== false || report.comparison?.semantic_truth_verified !== false ||
-        report.reserved_total_output_tokens !== 2 * tokens ||
-        !Array.isArray(report.candidates) || report.candidates.length !== 2 ||
+        !Array.isArray(report.candidates) || report.candidates.length < 1 ||
+        report.reserved_total_output_tokens !== report.candidates.length * tokens ||
+        (!adaptive && report.candidates.length !== 2) ||
+        (adaptive && (report.candidates.length > adaptive.max_attempts ||
+          report.reserved_total_output_tokens > adaptive.maximum_reserved_tokens ||
+          report.adaptive?.attempts !== report.candidates.length ||
+          report.adaptive?.contract_scope_only !== true ||
+          report.adaptive?.candidate_text_reinjected !== false)) ||
         !sha.test(report.report_sha256))
       throw new Error('Invalid local deliberation report.');
     const lines = [];
     let produced = 0;
     for (const [index, candidate] of report.candidates.entries()) {
-      if (candidate.strategy !== ['direct', 'counterpoint'][index] ||
+      if (candidate.strategy !== ['direct', 'counterpoint', 'decompose', 'recompute'][index] ||
           typeof candidate.text !== 'string' || !candidate.text.trim() ||
           candidate.text.length > 16384 ||
           !Number.isSafeInteger(candidate.output_tokens) || candidate.output_tokens < 0 || candidate.output_tokens > tokens ||
           !sha.test(candidate.execution_receipt_digest) ||
           candidate.output_sha256 !== await exactLocalSha256(candidate.text))
         throw new Error('Local candidate integrity check failed.');
+      if (adaptive && (candidate.verification?.output_sha256 !== candidate.output_sha256 ||
+          candidate.verification?.kind !== adaptive.contract.kind ||
+          typeof candidate.verification?.passed !== 'boolean' ||
+          candidate.verification?.semantic_truth_verified !== false ||
+          !sha.test(candidate.verification?.verifier_sha256 || '')))
+        throw new Error('Invalid scoped verifier evidence.');
       produced += candidate.output_tokens;
+      if (adaptive) lines.push('CONTRACT: ' + candidate.verification.code);
       lines.push(candidate.strategy.toUpperCase() + ' — ' + candidate.output_tokens + ' tokens',
         candidate.text, 'Execution receipt: ' + candidate.execution_receipt_digest, '');
     }
@@ -1390,13 +1476,21 @@ JAVASCRIPT = r"""'use strict';
         epoch !== state.epoch || !state.connected || state.session !== session ||
         state.revision !== revision || get('prompt').value.trim() !== message ||
         get('grounded').checked !== grounded || get('context-preserve').checked !== strict ||
-        Number(get('budget').value) !== tokens || scopeVersion !== state.knowledgeScopeVersion)
+        Number(get('budget').value) !== tokens || scopeVersion !== state.knowledgeScopeVersion || !policyMatches())
       throw new Error('Deliberation result no longer matches the current request.');
+    if (adaptive) {
+      lines.unshift('Stopped: ' + report.adaptive.stop_reason + ' | ' +
+        report.reserved_total_output_tokens + '/' + adaptive.maximum_reserved_tokens + ' reserved tokens');
+      for (const candidate of report.candidates) {
+        if (candidate.verification.passed && candidate.verification.kind === 'artifact')
+          get('adaptive-artifacts').append(renderReviewArtifact(candidate.verification.artifact, mode));
+      }
+    }
     lines.push('No answer automatically selected. Same model, different review strategies.');
     get('deliberation-result').textContent = lines.join('\n');
     get('deliberation-panel').hidden = false;
     get('deliberation-panel').open = true;
-    status('Review both local candidates. Conversation history is unchanged.');
+    status('Review the local candidates. Conversation history is unchanged.');
   }));
   get('cognitive-preview').addEventListener('click', () => run(async () => {
     const message = get('prompt').value.trim();
