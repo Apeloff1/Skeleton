@@ -19,6 +19,7 @@ def main(argv=None):
     p.add_argument("--spill-root", type=Path)
     p.add_argument("--slot-spill-bytes", type=int, default=0)
     p.add_argument("--spill-roundtrip", action="store_true")
+    p.add_argument("--prefix-affinity", action="store_true")
     p.add_argument("--slots", type=int, default=2)
     p.add_argument("--context-per-slot", type=int, required=True)
     p.add_argument("--gpu-layers", type=int, required=True)
@@ -56,6 +57,8 @@ def main(argv=None):
         prompts.append(raw.decode("utf-8"))
     if a.spill_roundtrip and not a.slot_spill_bytes:
         p.error("spill roundtrip requires explicit private spill configuration")
+    if a.prefix_affinity and (not a.slot_spill_bytes or not a.spill_root or a.repeats < 2):
+        p.error("prefix affinity requires private spill mode and at least two repeats")
     try:
         tuning = NativeResidentTuning(
             prefill_threads=a.prefill_threads, numa=a.numa, load_mode=a.load_mode,
@@ -65,7 +68,8 @@ def main(argv=None):
             ngram_draft=a.ngram_draft, extra_workspace_bytes=a.extra_workspace_bytes)
         policy = ResidentBatchPolicy(a.slots, a.context_per_slot, a.gpu_layers,
                                     a.max_memory_bytes, flash_attention=a.flash_attention,
-                                    slot_spill_bytes=a.slot_spill_bytes, tuning=tuning)
+                                    slot_spill_bytes=a.slot_spill_bytes, tuning=tuning,
+                                    prefix_affinity=a.prefix_affinity)
     except (ValueError, TypeError) as exc:
         p.error(str(exc))
     with ResidentGGUFBatch(model, a.server, a.server_sha256, policy,
@@ -73,7 +77,7 @@ def main(argv=None):
                            spill_root=a.spill_root) as session:
         for iteration in range(a.repeats):
             print(json.dumps(session.generate(prompts, max_new_tokens=a.max_new_tokens,
-                reuse_cache=a.spill_roundtrip and iteration > 0), allow_nan=False))
+                reuse_cache=(a.spill_roundtrip or a.prefix_affinity) and iteration > 0), allow_nan=False))
             if a.spill_roundtrip:
                 print(json.dumps(session.spill_slot(0), allow_nan=False))
                 print(json.dumps(session.restore_slot(0), allow_nan=False))
