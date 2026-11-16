@@ -197,6 +197,8 @@ class OfflineHTTPApplication:
             self.reference_jobs = LocalReferenceJob(self.knowledge)
             from skeleton.app.jeeves_review_campaign import ReviewCampaignStore
             self.review_campaigns = ReviewCampaignStore(self._store, self.model_digest, self.tokenizer_digest, knowledge=self.knowledge)
+            from skeleton.app.jeeves_reviewed_feedback import ReviewedFeedbackStore
+            self.reviewed_feedback = ReviewedFeedbackStore(self._store, self.model_digest, self.tokenizer_digest)
         except BaseException:
             if self.longform is not None:
                 self.longform.close()
@@ -1305,6 +1307,38 @@ class OfflineHTTPApplication:
         if tail in {"campaign-create", "campaign-inspect", "campaign-advance",
                     "campaign-abandon", "campaign-delete"} and method == "POST":
             return self._review_campaign(sid, tail, body)
+        if tail in {"feedback-save", "feedback-list", "feedback-delete", "feedback-export"} and method == "POST":
+            from skeleton.app.jeeves_reviewed_feedback import FeedbackConflict, FeedbackRejected
+            from skeleton.app.jeeves_reviewed_feedback import _digest as feedback_digest
+            allowed = {
+                "feedback-save": {"feedback_id", "expected_revision", "turn_index",
+                                  "prompt_sha256", "answer_sha256", "preference",
+                                  "correction", "training_allowed", "rights_evidence_sha256", "approved"},
+                "feedback-list": set(),
+                "feedback-delete": {"feedback_id", "expected_sha256", "approved"},
+                "feedback-export": {"expected_revision", "training_ids", "heldout_ids", "dataset_id", "approved"},
+            }[tail]
+            required = allowed - ({"correction", "training_allowed", "rights_evidence_sha256"}
+                                  if tail == "feedback-save" else set())
+            _fields(body, allowed, required)
+            if tail != "feedback-list" and body["approved"] is not True:
+                raise OfflineHTTPError(403, "reviewed feedback requires explicit approval")
+            try:
+                if tail == "feedback-list":
+                    result = self.reviewed_feedback.list(sid)
+                    return 200, {**result,"examples":[row | {"feedback_sha256":feedback_digest(row)}
+                                                     for row in result["examples"]]}
+                params = {key:value for key,value in body.items() if key != "approved"}
+                if tail == "feedback-save":
+                    row,created = self.reviewed_feedback.save(sid, **params)
+                    return (201 if created else 200), row | {"feedback_sha256":feedback_digest(row)}
+                if tail == "feedback-delete":
+                    return 200,self.reviewed_feedback.delete(sid, params["feedback_id"], params["expected_sha256"])
+                return 200,self.reviewed_feedback.export(sid, **params)
+            except FeedbackConflict as exc:
+                raise OfflineHTTPError(409, str(exc)) from None
+            except (FeedbackRejected, UnicodeError) as exc:
+                raise OfflineHTTPError(400, "reviewed feedback request rejected") from None
         if tail in {"memory-preview", "memory-save"} and method == "POST":
             from skeleton.app.jeeves_reviewed_memory import (
                 MemoryConflict, MemoryRejected, prepare_memory, save_memory,
