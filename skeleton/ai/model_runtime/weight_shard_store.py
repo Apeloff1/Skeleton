@@ -270,6 +270,41 @@ class WeightShardStore:
             tmp.unlink(missing_ok=True)
         return target
 
+    def prepare_stage_manifest(self, identity: ModelIdentity, plan: WeightLoadPlan,
+                               source_paths: Mapping[int, str | Path]) -> bytes:
+        """Pure shared staging contract, used before durable writer admission."""
+        if not isinstance(identity, ModelIdentity) or not isinstance(plan, WeightLoadPlan):
+            raise WeightShardStoreError("model identity and weight load plan required")
+        if plan.model_identity_digest != identity.identity_digest:
+            raise WeightShardStoreError("model identity differs from weight load plan")
+        if plan.expected_total_bytes > self.maximum_bytes:
+            raise WeightShardStoreError("weight plan exceeds storage budget")
+        if (not isinstance(source_paths, Mapping)
+                or any(type(index) is not int for index in source_paths)
+                or set(source_paths) != {shard.index for shard in plan.shards}):
+            raise WeightShardStoreError("source index set does not match shard manifest")
+        # Validate digest-size agreement before creating a durable intent.
+        distinct = {}
+        for shard in plan.shards:
+            prior = distinct.setdefault(shard.digest, shard.bytes)
+            if prior != shard.bytes:
+                raise WeightShardStoreError("same weight digest has conflicting byte declarations")
+        for path in source_paths.values():
+            if not isinstance(path, (str, Path)) or "\x00" in str(path):
+                raise WeightShardStoreError("invalid local staging source path")
+        manifest = {
+            "schema_version": 1,
+            "model_identity_digest": identity.identity_digest,
+            "weights_digest": identity.weights_digest,
+            "plan_digest": plan.digest,
+            "expected_total_bytes": plan.expected_total_bytes,
+            "shards": [asdict(shard) for shard in plan.shards],
+        }
+        encoded = canonical_bytes(manifest)
+        if not 1 <= len(encoded) <= _MAX_MANIFEST_BYTES:
+            raise WeightShardStoreError("weight manifest exceeds byte bounds")
+        return encoded
+
     def stage_plan(
         self,
         identity: ModelIdentity,
@@ -295,31 +330,11 @@ class WeightShardStore:
                    self.root / ".weight-stage-intent.json")
         if any(marker.exists() or marker.is_symlink() for marker in markers) and _write_checkpoint is None:
             raise WeightShardStoreError("managed weight store requires cooperative disk owner")
-        if not isinstance(identity, ModelIdentity) or not isinstance(plan, WeightLoadPlan):
-            raise WeightShardStoreError("model identity and weight load plan required")
-        if plan.model_identity_digest != identity.identity_digest:
-            raise WeightShardStoreError("model identity differs from weight load plan")
-        if plan.expected_total_bytes > self.maximum_bytes:
-            raise WeightShardStoreError("weight plan exceeds storage budget")
-        if (not isinstance(source_paths, Mapping)
-                or any(type(index) is not int for index in source_paths)
-                or set(source_paths) != {shard.index for shard in plan.shards}):
-            raise WeightShardStoreError("source index set does not match shard manifest")
+        encoded = self.prepare_stage_manifest(identity, plan, source_paths)
         if maximum_new_bytes is not None and (
             type(maximum_new_bytes) is not int or not 0 <= maximum_new_bytes <= self.maximum_bytes
         ):
             raise WeightShardStoreError("invalid new weight byte ceiling")
-        manifest = {
-            "schema_version": 1,
-            "model_identity_digest": identity.identity_digest,
-            "weights_digest": identity.weights_digest,
-            "plan_digest": plan.digest,
-            "expected_total_bytes": plan.expected_total_bytes,
-            "shards": [asdict(shard) for shard in plan.shards],
-        }
-        encoded = canonical_bytes(manifest)
-        if not 1 <= len(encoded) <= _MAX_MANIFEST_BYTES:
-            raise WeightShardStoreError("weight manifest exceeds byte bounds")
         target_manifest = self._manifest_path(plan.digest)
         if target_manifest.exists() or target_manifest.is_symlink():
             if _read_manifest(target_manifest) != encoded:
