@@ -608,13 +608,16 @@ def plan_consumer_llama_cpp(
     if isinstance(model_bytes, bool) or not isinstance(model_bytes, int) or model_bytes <= 0:
         raise ValueError("model_bytes must be positive")
     reserved = max(budget.reserve_bytes, budget.ram_bytes // 5)
-    fixed = reserved + budget.runtime_scratch_bytes + model_bytes
+    # A tuning budget may tighten, but never erase a larger existing reservation.
+    scratch = max(config.runtime_scratch_bytes, budget.runtime_scratch_bytes)
+    kv_per_token = max(config.kv_bytes_per_token or 0, budget.kv_bytes_per_token)
+    fixed = reserved + scratch + model_bytes
     available_for_kv = budget.ram_bytes - fixed
-    minimum_kv = budget.kv_bytes_per_token * 128
+    minimum_kv = kv_per_token * 128
     if available_for_kv < minimum_kv:
         raise LlamaCppRuntimeError("GGUF weights, KV cache and runtime headroom exceed consumer RAM budget")
     requested = config.context_size or budget.target_context_tokens
-    possible = min(requested, available_for_kv // budget.kv_bytes_per_token)
+    possible = min(requested, budget.target_context_tokens, available_for_kv // kv_per_token)
     context = (possible // 128) * 128
     if context < 128:
         raise LlamaCppRuntimeError("consumer RAM budget cannot support minimum context")
@@ -624,10 +627,10 @@ def plan_consumer_llama_cpp(
     batch = min(config.batch_size or budget.prefill_batch_tokens, budget.prefill_batch_tokens, context)
     chosen = replace(
         config, context_size=context, threads=threads, batch_size=batch,
-        runtime_scratch_bytes=budget.runtime_scratch_bytes,
-        kv_bytes_per_token=budget.kv_bytes_per_token,
+        runtime_scratch_bytes=scratch,
+        kv_bytes_per_token=kv_per_token,
     )
-    kv_total = context * budget.kv_bytes_per_token
+    kv_total = context * kv_per_token
     return ConsumerLlamaPlan(
         configuration=chosen,
         model_bytes=model_bytes,
