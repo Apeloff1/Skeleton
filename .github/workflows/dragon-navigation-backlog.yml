@@ -1,0 +1,45 @@
+name: Dragon checkpointed navigation qualification
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/dragon-jeeves-discourse-link-backlog-20261117
+  pull_request:
+    paths:
+      - 'skeleton/ai/webcrawler/**'
+      - 'backend/core/dragon_crawler.py'
+      - 'backend/routes/dragon_academy.py'
+      - 'frontend/src/product/crawlerClient.ts'
+      - 'tests/test_ai_webcrawler_navigation_backlog.py'
+      - '.github/workflows/dragon-navigation-backlog.yml'
+permissions:
+  contents: read
+concurrency:
+  group: dragon-navigation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  navigation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11.16"
+      - name: Compile modified runtime and application adapter
+        run: |
+          python -m py_compile skeleton/ai/webcrawler/navigation_backlog.py skeleton/ai/webcrawler/frontier_scheduler.py skeleton/ai/webcrawler/operations.py backend/core/dragon_crawler.py backend/routes/dragon_academy.py tests/test_ai_webcrawler_navigation_backlog.py
+      - name: Checkpoint, discourse, and policy fixture regressions
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_navigation_backlog.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_host_backpressure.py' -v
