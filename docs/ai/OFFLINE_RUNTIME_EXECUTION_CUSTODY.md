@@ -391,8 +391,10 @@ owner = WeightStoreDiskOwner(store, DiskAdmissionPolicy(
 ```
 
 This is opt-in cooperating-writer admission, not a hard physical disk
-quota or filesystem isolation. Direct legacy staging bypasses the
-shared lock; all participating processes must use the owner. The private
+quota or filesystem isolation. Before provisioning, legacy staging remains supported. Once a managed
+slot or control marker exists, the ordinary staging API requires the
+cooperating owner's trusted write checkpoint. All participating processes
+must use that owner. The private
 root, policy and lock inode must remain stable under trusted operator
 custody. File lengths do not include filesystem allocation rounding,
 metadata, snapshots or unrelated processes' writes. A disk failure or
@@ -408,3 +410,108 @@ lock replacement and stale existence observations. They are selected by
 the existing sealed-context workflow. Native Windows locking, platform
 qualification, crash injection on real storage and final-head CI remain
 outstanding.
+
+
+## Installed managed staging and interrupted-write recovery
+
+The cooperative owner now persists its canonical admission policy plus
+the root and lock inode identities under the shared writer slot. Reopening
+requires exactly the same policy and identities; no policy migration,
+lock recreation after provisioning, or directory relocation is automatic.
+Use a new independently provisioned store for a changed policy until
+an explicit migration procedure is qualified.
+
+The existing canonical staging API checks for managed control markers
+and refuses ordinary direct staging after provisioning. This is a
+trusted-code API boundary, not a sandbox against arbitrary code in the
+process or unrelated filesystem writers. Root control records are bounded
+separately from the logical weight/object/manifest accounting.
+
+Before staging mutates weight bytes, the owner validates the declaration
+and publishes a durable exact intent identifying the model, plan,
+complete manifest, persisted policy, baseline and admitted new-byte
+demand. Successful staging reconciles the final inventory, verifies
+the committed manifest and publishes a bounded durable outcome before
+removing that specific intent. The latest outcome records the prior
+outcome digest; it is not a complete history archive or an externally
+authenticated journal. An error after intent creation or interrupted
+control publication blocks further managed staging. Unreferenced valid
+CAS objects are preserved rather than automatically rolled back.
+
+### Operator commands
+
+The installed console command is `skeleton-weight-store`; the equivalent
+module route is `python -m skeleton weight-store`. Supply the same
+persisted disk policy options for all commands. All store and input
+source paths must be absolute local paths. Staging reads one bounded JSON
+request from stdin:
+
+```json
+{
+  "schema": "skeleton.weight-stage-request.v1",
+  "identity": {
+    "model_id": "operator-model",
+    "revision": "r1",
+    "architecture": "operator-architecture",
+    "config_digest": "<sha256>",
+    "tokenizer_digest": "<sha256>",
+    "weights_digest": "<sha256>"
+  },
+  "shards": [
+    {"index": 0, "digest": "<sha256>", "bytes": 1234, "source": "local"}
+  ],
+  "expected_total_bytes": 1234,
+  "source_paths": ["/private/source/model.gguf"]
+}
+```
+
+Replace all example placeholders and lengths with independently verified
+actual values. The raw JSON request SHA-256, canonical model identity
+digest and canonical plan digest are three required independent pins.
+The explicit logical plan ceiling is separate from deduplicated
+cooperative store accounting. The request does not download, discover,
+activate or execute a model.
+
+```sh
+skeleton-weight-store stage --store /private/service/weights \
+  --maximum-store-bytes 274877906944 --minimum-free-bytes 8589934592 \
+  --request-sha256 "$REQUEST_SHA" --model-identity-sha256 "$MODEL_SHA" \
+  --plan-sha256 "$PLAN_SHA" < request.json
+skeleton-weight-store inspect --store /private/service/weights \
+  --maximum-store-bytes 274877906944 --minimum-free-bytes 8589934592
+skeleton-weight-store recovery-review --store /private/service/weights \
+  --maximum-store-bytes 274877906944 --minimum-free-bytes 8589934592 \
+  --require-clean
+```
+
+Review uses the existing writer slot and noncreating read-only opening.
+It classifies interrupted linked/unpublished temporary files, missing
+or length-inconsistent referenced objects, invalid manifests, unexpected
+layout and potential unreferenced objects. Bounded deterministic metadata
+and complete manifest identity digests bind the review, including
+observations excluded by the detail limit. This is not object content
+verification, an atomic filesystem snapshot or authorization to delete
+anything. Incomplete reference scans never classify orphan candidates.
+
+After reviewing the exact receipt, an operator may explicitly acknowledge
+an interrupted intent using `acknowledge-recovery`, supplying
+`--intent-sha256`, `--review-sha256` and
+`--maximum-verified-weight-bytes` along with the same store and persisted
+policy options. This command reruns the exact review under the shared
+slot, independently verifies the entire committed manifest/object
+inventory within explicit bounds, checks any committed target against
+the interrupted manifest pin, and durably records the disposition before
+clearing the exact intent. It preserves every weight and manifest.
+Unexpected temporary files, inconsistent layouts, corrupt or missing
+references and review drift remain hard holds requiring operator repair.
+Unreferenced retained objects still count against the store cap.
+Control-file damage may require independent recovery before the tool
+can open the managed slot.
+
+Exit 0 means an operation completed; exit 2 means it was rejected;
+exit 3 means a completed `recovery-review --require-clean` found
+anomalies. CLI diagnostics intentionally exclude raw source paths.
+All newly authored regression sources are selected by the existing
+sealed-context gate. Physical disk exhaustion, real power-loss
+injection, filesystem semantics across platforms, exact-head CI and
+native Windows locking remain separate qualification requirements.
