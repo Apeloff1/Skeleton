@@ -80,19 +80,26 @@ def _bounded(value: Any) -> None:
     """Bound directly supplied Python values as well as parsed JSON."""
     stack = [(value, 0)]
     count = 0
+    characters = 0
     while stack:
         item, depth = stack.pop()
         count += 1
         _require(count <= MAX_NODES and depth <= MAX_DEPTH, "JSON structure too large")
         if type(item) is dict:
-            _require(len(item) <= 10_000, "object too large")
+            _require(len(item) <= 10_000 and count + len(stack) + len(item) <= MAX_NODES,
+                     "object or pending node budget exceeded")
             for key, child in item.items():
                 _text(key, 512)
+                characters += len(key)
+                _require(characters <= MAX_BYTES, "character budget exceeded")
                 stack.append((child, depth + 1))
         elif type(item) is list:
-            _require(len(item) <= 10_000, "array too large")
+            _require(len(item) <= 10_000 and count + len(stack) + len(item) <= MAX_NODES,
+                     "array or pending node budget exceeded")
             stack.extend((child, depth + 1) for child in item)
         elif type(item) is str:
+            characters += len(item)
+            _require(characters <= MAX_BYTES, "character budget exceeded")
             _require(len(item) <= 16_384 and not any(0xD800 <= ord(c) <= 0xDFFF for c in item),
                      "invalid JSON string")
         elif type(item) is int:
