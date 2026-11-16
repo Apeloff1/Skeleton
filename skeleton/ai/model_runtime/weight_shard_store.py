@@ -61,7 +61,8 @@ def _bounded_regular_reader(path: Path, maximum: int) -> Iterator[BinaryIO]:
         raise WeightShardStoreError("invalid weight read ceiling")
     try:
         named = path.lstat()
-        if not stat.S_ISREG(named.st_mode) or not 0 <= named.st_size <= maximum:
+        if (not stat.S_ISREG(named.st_mode) or not 0 <= named.st_size <= maximum
+                or getattr(named, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)):
             raise WeightShardStoreError("weight source violates regular-file or byte bounds")
         flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
         flags |= getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0)
@@ -156,6 +157,19 @@ class WeightShardStore:
         if bucket.exists() or bucket.is_symlink():
             _directory_identity(bucket)
         return bucket / digest
+
+    @contextmanager
+    def _object_reader(self, shard: WeightShard) -> Iterator[BinaryIO]:
+        path = self._object_path(shard.digest)
+        bucket = _directory_identity(path.parent)
+        with _bounded_regular_reader(path, shard.bytes) as stream:
+            self.assert_layout()
+            if _directory_identity(path.parent) != bucket:
+                raise WeightShardStoreError("weight object bucket identity changed")
+            yield stream
+        self.assert_layout()
+        if _directory_identity(path.parent) != bucket:
+            raise WeightShardStoreError("weight object bucket identity changed")
 
     def _manifest_path(self, digest: str) -> Path:
         require_digest(digest, "weight_manifest_digest")
@@ -325,7 +339,8 @@ class WeightShardStore:
         for shard in plan.shards:
             path = self._object_path(shard.digest)
             try:
-                digest, count = _hash_file(path, maximum=shard.bytes)
+                with self._object_reader(shard) as stream:
+                    digest, count = _hash_stream(stream, maximum=shard.bytes)
             except OSError as exc:
                 raise WeightShardStoreError("referenced weight object is unavailable") from exc
             if digest != shard.digest or count != shard.bytes:
@@ -368,7 +383,7 @@ class WeightShardStore:
             streams: list[BinaryIO] = []
             for shard in plan.shards:
                 stream = stack.enter_context(
-                    _bounded_regular_reader(self._object_path(shard.digest), shard.bytes)
+                    self._object_reader(shard)
                 )
                 observed, size = _hash_stream(stream, maximum=shard.bytes)
                 if observed != shard.digest or size != shard.bytes:
