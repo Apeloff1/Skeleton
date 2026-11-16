@@ -261,3 +261,24 @@ def test_tuning_config_hash_and_duplicate_rejection(tmp_path):
         else:
             with pytest.raises(ValueError):
                 read_candidates(path,pin)
+
+
+def test_prefix_affinity_matches_reordered_prompts_and_is_session_private():
+    from skeleton.ai.runtime.inference.resident_gguf_batch import (
+        _prefix_fingerprints, _match_prefix_slots,
+    )
+    key = b"a" * 32
+    first = _prefix_fingerprints([1] * 64 + [3], key)
+    second = _prefix_fingerprints([2] * 96, key)
+    partial = _prefix_fingerprints([1] * 31, key)
+    assert partial == ()
+    assert first != _prefix_fingerprints([1] * 64, b"b" * 32)
+    assert _match_prefix_slots([second, first], {0: first, 1: second}, (0, 1)) == ((1, 96), (0, 64))
+    assert _match_prefix_slots([second, first], {0: first, 1: second}, (0, 2)) == ((2, 0), (0, 64))
+    assert _match_prefix_slots([first, first], {0: first}, (0, 1)) == ((0, 64), (1, 0))
+    with pytest.raises(ValueError):
+        _match_prefix_slots([first, second], {0: first}, (0,))
+    with pytest.raises(ValueError):
+        ResidentBatchPolicy(2, 128, 1, 1024**3, prefix_affinity=True)
+    assert ResidentBatchPolicy(2, 128, 1, 1024**3, slot_spill_bytes=1024,
+                               prefix_affinity=True).prefix_affinity
