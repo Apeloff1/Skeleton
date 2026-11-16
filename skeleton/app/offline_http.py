@@ -189,6 +189,8 @@ class OfflineHTTPApplication:
             self.reference_reads = LocalReferenceRead(self.knowledge)
             self.reference_writes = LocalReferenceWrite(self.knowledge)
             self.reference_jobs = LocalReferenceJob(self.knowledge)
+            from skeleton.app.jeeves_review_campaign import ReviewCampaignStore
+            self.review_campaigns = ReviewCampaignStore(self._store, self.model_digest, self.tokenizer_digest)
         except BaseException:
             if self.longform is not None:
                 self.longform.close()
@@ -532,6 +534,62 @@ class OfflineHTTPApplication:
             rows,_proof=self.knowledge.search_multihop(text,document_ids=document_ids,limit=3)
             return rows
         return self.knowledge.search(text,limit=2,document_ids=document_ids,evidence_excerpt=True)
+
+    def _review_campaign(self, sid: str, action: str, body: dict[str, Any]):
+        from skeleton.app.jeeves_review_campaign import CampaignRejected, CampaignConflict
+        keys = {
+            "campaign-create": {"campaign_id", "expected_session_revision", "steps",
+                                "maximum_reserved_tokens", "approved"},
+            "campaign-inspect": {"campaign_id"},
+            "campaign-advance": {"campaign_id", "step_id", "operation_id",
+                                 "expected_revision", "approved"},
+            "campaign-abandon": {"campaign_id", "step_id", "operation_id",
+                                 "expected_revision", "approved"},
+            "campaign-delete": {"campaign_id", "expected_revision", "approved"},
+        }[action]
+        _fields(body, keys, keys)
+        if action != "campaign-inspect" and body["approved"] is not True:
+            raise OfflineHTTPError(403, "durable review campaign mutation requires explicit approval")
+        cid = body["campaign_id"]
+        campaigns = self.review_campaigns
+        try:
+            if action == "campaign-create":
+                view, created = campaigns.create(
+                    sid, cid, body["expected_session_revision"], body["steps"],
+                    body["maximum_reserved_tokens"],
+                )
+                return (201 if created else 200), view
+            if action == "campaign-inspect":
+                return 200, campaigns.inspect(sid, cid)
+            if action == "campaign-delete":
+                return 200, campaigns.delete(sid, cid, body["expected_revision"])
+            node, op = body["step_id"], body["operation_id"]
+            if action == "campaign-abandon":
+                return 200, campaigns.abandon(sid, cid, node, op, body["expected_revision"])
+            view, spec = campaigns.claim(sid, cid, node, op, body["expected_revision"])
+            if spec is None:
+                return 200, view
+            try:
+                report = self._deliberation_review(sid, {
+                    "message": spec["message"],
+                    "expected_revision": view["session_revision"], "approved": True,
+                    "max_output_tokens": spec["max_output_tokens"],
+                    "require_full_history": True, "grounded": False,
+                    "adaptive": spec["adaptive"],
+                })
+                return 200, campaigns.settle(sid, cid, node, op, report)
+            except BaseException:
+                # Preserve uncertain execution and the full reservation.
+                # A withdrawn/deleted claim cannot resurrect a stale result.
+                try:
+                    campaigns.settle(sid, cid, node, op)
+                except (CampaignRejected, RuntimeContractError, OSError):
+                    pass
+                raise
+        except CampaignConflict as exc:
+            raise OfflineHTTPError(409, str(exc)) from None
+        except CampaignRejected as exc:
+            raise OfflineHTTPError(400, str(exc)) from None
 
     def _deliberation_review(self, sid: str, body: dict[str, Any]) -> dict[str, Any]:
         from skeleton.app.jeeves_deliberation import deliberate, MAX_CANDIDATE_TOKENS
@@ -1171,6 +1229,9 @@ class OfflineHTTPApplication:
             )
         if tail == "deliberation-review" and method == "POST":
             return 200, self._deliberation_review(sid, body)
+        if tail in {"campaign-create", "campaign-inspect", "campaign-advance",
+                    "campaign-abandon", "campaign-delete"} and method == "POST":
+            return self._review_campaign(sid, tail, body)
         if tail in {"memory-preview", "memory-save"} and method == "POST":
             from skeleton.app.jeeves_reviewed_memory import (
                 MemoryConflict, MemoryRejected, prepare_memory, save_memory,
