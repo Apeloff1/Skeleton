@@ -144,3 +144,142 @@ def test_missing_transport_url_method_fails_closed(monkeypatch):
     assert not result.ok
     assert result.status is None
     assert result.detail == "health transport returned invalid response metadata"
+
+
+
+@pytest.mark.parametrize("suffix", ["?token=private", "?", "#", "?x=1#",
+                                    "/" + "x" * 4096])
+def test_health_rejects_unreviewed_suffix_without_echoing_it(monkeypatch, suffix):
+    def forbidden(*args, **kwargs):
+        pytest.fail("unreviewed URL dispatched IO")
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", forbidden)
+    result = probe_http("engine", "http://127.0.0.1:8010/health" + suffix)
+    assert not result.ok and result.url == ""
+
+
+@pytest.mark.parametrize("origin", [
+    "http://localhost:8080?", "http://localhost:8080#",
+    "http://localhost:8080?token=private", "http://local%68ost:8080",
+    "http://localhost:8080\\", "http://localhost:8080/" + "x" * 4096,
+])
+def test_setup_rejects_ambiguous_origin_before_io(monkeypatch, origin):
+    from types import SimpleNamespace
+    from skeleton.app.health import probe_local_setup
+    def forbidden(*args, **kwargs):
+        pytest.fail("invalid setup origin dispatched IO")
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", forbidden)
+    service = SimpleNamespace(name="frontend", public_url=origin, health_path="/setup")
+    assert probe_local_setup(service).url == ""
+
+
+_SETUP_URL = "http://127.0.0.1:8080/setup"
+
+
+def _setup_response(status, final_url, content_types, sample):
+    from email.message import Message
+
+    class Response:
+        def __enter__(self):
+            return self
+        def __exit__(self, *_args):
+            return False
+        def geturl(self):
+            return final_url
+        def read(self, size):
+            assert size == 512
+            return sample
+
+    response = Response()
+    if status != "missing":
+        response.status = status
+    response.headers = Message()
+    for value in content_types:
+        response.headers["Content-Type"] = value
+    return response
+
+
+@pytest.mark.parametrize("status", ["missing", None, True, "200", 0, 600, 302, 503])
+def test_setup_requires_observed_success_status(monkeypatch, status):
+    from types import SimpleNamespace
+    from skeleton.app.health import probe_local_setup
+    response = _setup_response(status, _SETUP_URL, ["text/html"], b"<!doctype html>")
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", lambda *_a, **_k: response)
+    service = SimpleNamespace(name="frontend", public_url=_SETUP_URL[:-6], health_path="/setup")
+    result = probe_local_setup(service)
+    assert not result.ok
+
+
+@pytest.mark.parametrize("url", [None, 123, "", "http://elsewhere.invalid/setup",
+                                 "http://127.0.0.1:8080/login"])
+def test_setup_requires_exact_observed_url_before_body(monkeypatch, url):
+    from types import SimpleNamespace
+    from skeleton.app.health import probe_local_setup
+    response = _setup_response(200, url, ["text/html"], b"<!doctype html>")
+    def forbidden(_size):
+        pytest.fail("unadmitted response body was read")
+    response.read = forbidden
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", lambda *_a, **_k: response)
+    service = SimpleNamespace(name="frontend", public_url=_SETUP_URL[:-6], health_path="/setup")
+    assert not probe_local_setup(service).ok
+
+
+@pytest.mark.parametrize("headers,sample,expected", [
+    (["text/html"], b"<!doctype html><html>", True),
+    (["text/html; charset=utf-8"], b" \n<!DOCTYPE HTML>", True),
+    ([], b"<!doctype html>", False),
+    (["text/html", "application/json"], b"<!doctype html>", False),
+    (["text/html", "text/html"], b"<!doctype html>", False),
+    (["application/json"], b"<!doctype html>", False),
+    (["text/html"], b"<!doctype html-not-a-document>", False),
+    (["text/html"], b"<!doctype html", False),
+    (["text/html"], "<!doctype html>", False),
+    (["text/html"], b"<!doctype html>" + b"x" * 512, False),
+])
+def test_setup_requires_unambiguous_bounded_html(monkeypatch, headers, sample, expected):
+    from types import SimpleNamespace
+    from skeleton.app.health import probe_local_setup
+    response = _setup_response(200, _SETUP_URL, headers, sample)
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", lambda *_a, **_k: response)
+    service = SimpleNamespace(name="frontend", public_url=_SETUP_URL[:-6], health_path="/setup")
+    assert probe_local_setup(service).ok is expected
+
+
+def test_generic_liveness_does_not_wait_for_response_body(monkeypatch):
+    response = _setup_response(200, _SETUP_URL, ["text/html"], b"")
+    def forbidden(_size):
+        pytest.fail("liveness unexpectedly waited for response body")
+    response.read = forbidden
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", lambda *_a, **_k: response)
+    assert probe_http("frontend", _SETUP_URL).ok
+
+
+@pytest.mark.parametrize("code", [None, True, "302", 0, 600, 302, 503])
+def test_http_error_response_is_closed_and_status_is_not_coerced(monkeypatch, code):
+    from urllib.error import HTTPError
+    class Error(HTTPError):
+        closed_by_probe = False
+        def close(self):
+            self.closed_by_probe = True
+    error = Error(_SETUP_URL, code, "private-message", {}, None)
+    def fail(*_a, **_k):
+        raise error
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", fail)
+    result = probe_http("frontend", _SETUP_URL)
+    assert not result.ok and error.closed_by_probe
+    assert result.status == (code if type(code) is int and 100 <= code <= 599 else None)
+    assert "private-message" not in repr(result.to_dict())
+
+
+def test_setup_protocol_failure_is_redacted(monkeypatch):
+    from http.client import IncompleteRead
+    from types import SimpleNamespace
+    from skeleton.app.health import probe_local_setup
+    response = _setup_response(200, _SETUP_URL, ["text/html"], b"")
+    def broken(_size):
+        raise IncompleteRead(b"private-response-content", 100)
+    response.read = broken
+    monkeypatch.setattr("skeleton.app.health._open_direct_health", lambda *_a, **_k: response)
+    service = SimpleNamespace(name="frontend", public_url=_SETUP_URL[:-6], health_path="/setup")
+    result = probe_local_setup(service)
+    assert not result.ok
+    assert "private-response-content" not in repr(result.to_dict())

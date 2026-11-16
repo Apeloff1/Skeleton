@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Mapping
 import math
+import re
 import time
+from http.client import HTTPException
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
@@ -45,6 +47,31 @@ def _open_direct_health(request: Request, *, timeout: float):
     return build_opener(ProxyHandler({}), RejectRedirect()).open(request, timeout=timeout)
 
 
+def _response_metadata(response) -> tuple[int, str] | None:
+    """Never coerce or default an unobserved transport status or URL."""
+    status = getattr(response, "status", None)
+    geturl = getattr(response, "geturl", None)
+    if type(status) is not int or not 100 <= status <= 599 or not callable(geturl):
+        return None
+    effective = geturl()
+    if not isinstance(effective, str) or not effective:
+        return None
+    return status, effective
+
+
+def _http_error_status(error: HTTPError) -> int | None:
+    # HTTPError is also a file-like response. Close it even when malformed;
+    # repeated cold-start retries must not accumulate open error responses.
+    try:
+        status = error.code
+        return status if type(status) is int and 100 <= status <= 599 else None
+    finally:
+        try:
+            error.close()
+        except (OSError, HTTPException, ValueError):
+            pass
+
+
 def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
     """Probe one health endpoint with no proxy or redirect side effects."""
 
@@ -53,7 +80,9 @@ def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
     try:
         # Reject non-string and whitespace/control characters before urllib parsing.
         # urllib strips some control bytes, which can change the actual target.
-        if not isinstance(url, str) or not url or any(ord(ch) <= 32 or ord(ch) == 127 for ch in url):
+        if (not isinstance(url, str) or not url or len(url) > 4096
+                or any(ord(ch) <= 32 or ord(ch) == 127 for ch in url)
+                or "?" in url or "#" in url):
             raise ValueError("invalid health target characters")
         target = urlsplit(url)
         valid = (
@@ -80,26 +109,15 @@ def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
         with _open_direct_health(request, timeout=timeout) as response:
             # A missing or malformed transport status is never an implicit 200.
             # The final URL must be supplied by the transport, not assumed.
-            raw_status = getattr(response, "status", None)
-            geturl = getattr(response, "geturl", None)
-            if (
-                isinstance(raw_status, bool)
-                or not isinstance(raw_status, int)
-                or not 100 <= raw_status <= 599
-                or not callable(geturl)
-            ):
+            metadata = _response_metadata(response)
+            if metadata is None:
                 return ProbeResult(
                     service=name, url=url, ok=False, status=None,
                     detail="health transport returned invalid response metadata",
                 )
-            status = raw_status
-            effective_url = geturl()
-            if not isinstance(effective_url, str):
-                return ProbeResult(
-                    service=name, url=url, ok=False, status=None,
-                    detail="health transport returned invalid response metadata",
-                )
-            response.read(256)
+            status, effective_url = metadata
+            # Liveness is a status-only contract. Do not read a potentially
+            # slow or unbounded body; strict product readiness is separate.
         ok = 200 <= status < 300 and effective_url == url
         detail = (
             "healthy"
@@ -118,15 +136,16 @@ def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
             detail=detail,
         )
     except HTTPError as exc:
-        code = int(exc.code)
+        code = _http_error_status(exc)
         return ProbeResult(
             service=name,
             url=url,
             ok=False,
             status=code,
-            detail="health endpoint redirected" if 300 <= code < 400 else f"HTTP error {code}",
+            detail=("health transport returned invalid response metadata" if code is None
+                    else "health endpoint redirected" if 300 <= code < 400 else f"HTTP error {code}"),
         )
-    except (URLError, TimeoutError, OSError) as exc:
+    except (URLError, TimeoutError, OSError, HTTPException, ValueError, UnicodeError) as exc:
         return ProbeResult(
             service=name,
             url=url,
@@ -146,8 +165,6 @@ def probe_local_setup(service: ServiceSpec, *, timeout: float = 2.0) -> ProbeRes
     a local 302 must never cause a second request to an attacker-controlled
     URL. Only a direct 2xx response from the declared local origin counts.
     """
-    from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
-
     if (
         isinstance(timeout, bool)
         or not isinstance(timeout, (int, float))
@@ -163,7 +180,9 @@ def probe_local_setup(service: ServiceSpec, *, timeout: float = 2.0) -> ProbeRes
         if (
             not isinstance(service.public_url, str)
             or not service.public_url
+            or len(service.public_url) > 4096
             or any(ord(ch) <= 32 or ord(ch) == 127 for ch in service.public_url)
+            or any(ch in service.public_url for ch in ("?", "#", "%", chr(92)))
         ):
             raise ValueError("invalid setup origin")
         parts = urlsplit(service.public_url)
@@ -187,24 +206,37 @@ def probe_local_setup(service: ServiceSpec, *, timeout: float = 2.0) -> ProbeRes
         )
     url = service.public_url.rstrip("/") + "/setup"
 
-    class RejectRedirect(HTTPRedirectHandler):
-        def redirect_request(self, request, fp, code, msg, headers, newurl):
-            return None
-
-    opener = build_opener(ProxyHandler({}), RejectRedirect())
     request = Request(url, headers={"User-Agent": "skeleton-setup-probe/1"})
     try:
-        with opener.open(request, timeout=timeout) as response:
-            status = int(getattr(response, "status", 200))
-            effective = response.geturl()
-            content_type = response.headers.get_content_type().lower()
+        with _open_direct_health(request, timeout=timeout) as response:
+            metadata = _response_metadata(response)
+            if metadata is None:
+                return ProbeResult(service.name, url, False, None,
+                                   "setup transport returned invalid response metadata")
+            status, effective = metadata
+            if not 200 <= status < 300 or effective != url:
+                return ProbeResult(service.name, url, False, status,
+                                   "setup endpoint did not answer directly")
+            headers = getattr(response, "headers", None)
+            content_types = getattr(headers, "get_all", None)
+            get_content_type = getattr(headers, "get_content_type", None)
+            if not callable(content_types) or not callable(get_content_type):
+                return ProbeResult(service.name, url, False, status,
+                                   "setup transport returned invalid content metadata")
+            values = content_types("Content-Type")
+            if (not isinstance(values, list) or len(values) != 1
+                    or not isinstance(values[0], str)
+                    or get_content_type() != "text/html"):
+                return ProbeResult(service.name, url, False, status,
+                                   "setup endpoint did not answer directly")
             sample = response.read(512)
         # A local port can be occupied by a different process that returns
         # HTTP 200. Only an HTML document may admit the setup browser, never
         # a JSON health response or empty generic success payload.
         html_document = (
-            content_type == "text/html"
-            and sample.lstrip().lower().startswith(b"<!doctype html")
+            isinstance(sample, bytes)
+            and len(sample) <= 512
+            and re.match(rb"\s*<!doctype\s+html\s*>", sample, re.IGNORECASE) is not None
         )
         ok = 200 <= status < 300 and effective == url and html_document
         return ProbeResult(
@@ -212,12 +244,13 @@ def probe_local_setup(service: ServiceSpec, *, timeout: float = 2.0) -> ProbeRes
             detail="healthy" if ok else "setup endpoint did not answer directly",
         )
     except HTTPError as exc:
-        status = int(exc.code)
+        status = _http_error_status(exc)
         return ProbeResult(
             service=service.name, url=url, ok=False, status=status,
-            detail="health endpoint redirected" if 300 <= status < 400 else f"HTTP error {status}",
+            detail=("setup transport returned invalid response metadata" if status is None
+                    else "health endpoint redirected" if 300 <= status < 400 else f"HTTP error {status}"),
         )
-    except (URLError, TimeoutError, OSError) as exc:
+    except (URLError, TimeoutError, OSError, HTTPException, ValueError, UnicodeError) as exc:
         return ProbeResult(
             service=service.name, url=url, ok=False, status=None,
             detail=f"{type(exc).__name__}: setup endpoint unreachable",
