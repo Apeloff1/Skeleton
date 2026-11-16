@@ -96,7 +96,7 @@ def _parse(meta: dict, body: bytes) -> tuple[str, dict | None]:
             if doc is None:
                 return "empty", None
             return "ok", {"title": doc.title, "text": doc.text,
-                          "links": list(doc.links[:128]),
+                          "links": list(doc.links[:256]),
                           "truncated": doc.provenance.get("parser_text_truncated") is True,
                           "structural_projection": doc.provenance.get("structural_projection")}
         if mode in {"sitemap", "discovery"}:
