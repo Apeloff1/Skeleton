@@ -489,3 +489,42 @@ def test_canonical_packing_retains_per_device_reserve_and_shard_boundaries():
         plan_device_placement(shards, devices, reserve_bytes_per_device=GIB)
     with pytest.raises(ModelRuntimeError, match="invalid preferred device kind"):
         plan_device_placement(shards, devices, preferred_kind="invalid")
+
+
+def test_gpu_pressure_uses_selected_device_maximum_not_aggregate():
+    from skeleton.ai.model_runtime.nvml_memory_probe import GpuMemoryObservation
+    gpu = NativeGpuMemoryReceipt("simulated_nvml", "measured", (
+        DeviceDescriptor("a", "cuda", 3 * GIB),
+        DeviceDescriptor("b", "cuda", 9 * GIB),
+    ), 20 * GIB, 12 * GIB, (
+        GpuMemoryObservation("a", 10 * GIB, 3 * GIB, 7 * GIB),
+        GpuMemoryObservation("b", 10 * GIB, 9 * GIB, GIB),
+    ))
+    reading = sample(gpu=gpu)
+    result = plan_preflight(source((6 * GIB, 2 * GIB)), reading,
+                            replace(POLICY, backend="cuda"), now_ns=reading.finished_ns)
+    assert result["gpu_pressure_basis"] == "selected_device_maximum"
+    assert result["pressure_fraction"] == pytest.approx(0.9)
+    assert {row["device_id"] for row in result["gpu_pressure"]} == {"a", "b"}
+
+
+def test_unallocated_saturated_gpu_does_not_throttle_selected_device():
+    from skeleton.ai.model_runtime.nvml_memory_probe import GpuMemoryObservation
+    gpu = NativeGpuMemoryReceipt("simulated_nvml", "measured",
+        (DeviceDescriptor("b", "cuda", 9 * GIB),), 20 * GIB, 9 * GIB, (
+        GpuMemoryObservation("a", 10 * GIB, 0, 10 * GIB),
+        GpuMemoryObservation("b", 10 * GIB, 9 * GIB, GIB),
+    ))
+    reading = sample(gpu=gpu)
+    result = plan_preflight(source((2 * GIB,)), reading,
+                            replace(POLICY, backend="cuda"), now_ns=reading.finished_ns)
+    assert result["pressure_fraction"] == pytest.approx(0.3)
+    assert len(result["gpu_pressure"]) == 1
+
+
+def test_live_gpu_requires_per_device_evidence():
+    reading = sample(gpu=measured_gpu(source_name="linux_nvml"), origin="local_probe")
+    result = plan_preflight(source(), reading, replace(POLICY, backend="cuda"),
+                            now_ns=reading.finished_ns)
+    assert "gpu_pressure_unavailable" in result["blockers"]
+    assert not result["worker_ceiling"]
