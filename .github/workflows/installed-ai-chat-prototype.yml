@@ -42,6 +42,13 @@ on:
       - "skeleton/ai/runtime/retrieval/learned_embeddings.py"
       - "skeleton/ai/runtime/retrieval/semantic_*.py"
       - "scripts/benchmark_semantic_context.py"
+      - "scripts/build_semantic_ann.py"
+      - "scripts/provision_semantic_models.py"
+      - "scripts/qualify_pretrained_semantic.py"
+      - "tests/test_disk_semantic_ann.py"
+      - "tests/test_semantic_ann_integration.py"
+      - "tests/test_semantic_provisioning.py"
+      - "tests/fixtures/semantic_public_diagnostic.json"
       - "tests/test_paged_prefill_prefix_reuse.py"
       - "pyproject.toml"
       - "tests/test_learned_context_encoder.py"
@@ -292,7 +299,52 @@ jobs:
           tests/test_semantic_evidence_excerpt.py
           tests/test_local_pair_reranker.py
           tests/test_semantic_context_evaluation.py
+          tests/test_disk_semantic_ann.py
+          tests/test_semantic_ann_integration.py
+          tests/test_semantic_provisioning.py
       - name: Verify canonical retrieval mirror
         run: python scripts/check_ai_file_tree.py
       - name: Clarify evidence
         run: echo "Real CPU graph execution with synthetic fixture weights only; no trained external embedding quality, native GPU performance, installed rollout or benchmark superiority is attested."
+
+  competitive-pretrained-semantic-cpu:
+    name: Exact-head actual public pretrained BGE CPU inference and disk ANN diagnostic
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: "."
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify source identity
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11.16"
+      - name: Install explicit CPU inference dependencies
+        run: python -m pip install --disable-pip-version-check --no-input -e ".[local-semantic]"
+      - name: Acquire only fixed public model bytes and execute native CPU admission
+        run: |
+          root="$(mktemp -d)"
+          printf '%s\n' "$root" > "$RUNNER_TEMP/semantic-qualification-root"
+          python -m scripts.provision_semantic_models --destination "$root/package" --encoder bge-small-f32 --acquire-reviewed-public-models
+      - name: Measure real learned retrieval and local disk shard evidence
+        run: |
+          root="$(cat "$RUNNER_TEMP/semantic-qualification-root")"
+          python -m scripts.qualify_pretrained_semantic --package "$root/package" --output "$RUNNER_TEMP/semantic-diagnostic/report.json"
+      - name: Retain measurements only, not model weights
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: semantic-pretrained-diagnostic-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/semantic-diagnostic/
+          if-no-files-found: warn
+          retention-days: 7
