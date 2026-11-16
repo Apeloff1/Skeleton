@@ -233,7 +233,7 @@ def _pulse_lane(src,owner,epoch,lane):
 def pulse(graph):
     """Advance one enrolled owner/lane per maintenance invocation."""
     target=_root()
-    from core.dragon_projection_relocation import advance
+    from core.dragon_projection_relocation import advance,permit
     from core.dragon_graph_deployment import DeploymentHeld
     try:rotation=advance(graph,"nodes",target)
     except DeploymentHeld as exc:raise IndexHeld("projection relocation held") from exc
@@ -242,6 +242,8 @@ def pulse(graph):
     with graph._db() as db:
         db.execute("BEGIN IMMEDIATE")
         try:
+            try:permit(db,"nodes",target)
+            except DeploymentHeld as exc:raise IndexHeld("projection relocation held") from exc
             item=db.execute("SELECT * FROM lead_index_enrollment WHERE due<=? ORDER BY due,owner LIMIT 1",(now,)).fetchone()
             if item is None:
                 db.execute("COMMIT");return {"processed":0,"configured":True}
@@ -254,6 +256,8 @@ def pulse(graph):
             raise
         db.execute("BEGIN")
         try:
+            try:permit(db,"nodes",target)
+            except DeploymentHeld as exc:raise IndexHeld("projection relocation held") from exc
             result=_pulse_lane(db,owner,epoch,lane)
             db.execute("COMMIT")
         except BaseException:

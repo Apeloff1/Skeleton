@@ -191,7 +191,7 @@ def _step(source,owner,epoch,lane):
 
 def pulse(graph):
     target=_root()
-    from core.dragon_projection_relocation import advance
+    from core.dragon_projection_relocation import advance,permit
     from core.dragon_graph_deployment import DeploymentHeld
     try:rotation=advance(graph,"edges",target)
     except DeploymentHeld as exc:raise EdgeHeld("projection relocation held") from exc
@@ -200,6 +200,8 @@ def pulse(graph):
     with graph._db() as db:
         db.execute("BEGIN IMMEDIATE")
         try:
+            try:permit(db,"edges",target)
+            except DeploymentHeld as exc:raise EdgeHeld("projection relocation held") from exc
             job=db.execute("SELECT * FROM lead_edge_enrollment WHERE due<=? ORDER BY due,owner LIMIT 1",(now,)).fetchone()
             if job is None:
                 db.execute("COMMIT");return {"processed":0}
@@ -212,6 +214,8 @@ def pulse(graph):
             raise
         db.execute("BEGIN")
         try:
+            try:permit(db,"edges",target)
+            except DeploymentHeld as exc:raise EdgeHeld("projection relocation held") from exc
             result=_step(db,owner,epoch,lane)
             db.execute("COMMIT")
         except BaseException:

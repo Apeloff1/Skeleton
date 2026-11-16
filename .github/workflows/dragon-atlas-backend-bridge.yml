@@ -8,6 +8,10 @@ on:
       - feat/dragon-deployment-custody-qualification-20261116
       - feat/dragon-ecosystem-storage-custody-20261116
       - feat/dragon-mongo-offline-relocation-20261116
+      - feat/dragon-derived-index-rebuild-custody-20261116
+  pull_request:
+    branches:
+      - feat/dragon-mongo-offline-relocation-20261116
 
 permissions:
   contents: read
@@ -138,3 +142,14 @@ jobs:
           set -euo pipefail
           python -m py_compile backend/core/dragon_mongo_relocation.py backend/core/dragon_mongo_cutover.py backend/core/dragon_crawler.py backend/server.py
           python -m unittest discover -s backend/tests -p 'test_dragon_mongo_relocation.py' -v
+
+      - name: Derived index relocation and vector lineage qualification
+        timeout-minutes: 8
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python -m py_compile backend/core/dragon_projection_relocation.py backend/core/dragon_posting_lineage.py backend/core/dragon_current_vectors.py backend/core/dragon_exhaustive_vectors.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_projection_relocation.py' -v
+          python -m unittest discover -s backend/tests -p 'test_dragon_posting_lineage.py' -v

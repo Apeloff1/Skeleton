@@ -1,0 +1,14 @@
+# Dragon derived index relocation and retrieval continuity
+
+A dedicated Mongo cutover now routes both current and historical exhaustive vector-posting collections to the selected Dragon database, never CORE_DB. User/account authority remains there. These postings are regenerable, not authoritative: the activated target creates or reopens its two derived collections only after relocation receipt validation. Each storage epoch binds the verified migration receipt, collection kind and actual collection UUID. During a bounded semantic worker claim, an old/missing epoch invalidates the previous coverage cursor and starts the existing source/consent/encoder pipeline from zero. Identical epoch retries resume the cursor; retrieval requires epoch plus existing generation, coverage, version, source policy and expiry checks. Legacy mode retains its original format. Re-created collection identities are detected on restart; do not drop live derived collections while workers run. Rebuild requires a configured local encoder and eligibility; expired/revoked records are not reauthorized. Old posting collections stay untouched.
+
+## Physical SQLite projections
+
+Stop old processes; create new empty private destination directories. For each configured noncanonical corpus root, run from backend:
+
+- python -m core.dragon_projection_relocation begin --corpus ROOT --kind nodes --target NEW_INDEX_ROOT --offline-writers-stopped
+- python -m core.dragon_projection_relocation begin --corpus ROOT --kind edges --target NEW_EDGE_ROOT --offline-writers-stopped
+
+Set SKL_DRAGON_LEAD_INDEX_ROOT and SKL_DRAGON_LEAD_EDGE_ROOT to the new roots before restart. Stage all corpus roots before workers populate shared destination directories. The persistent source marker rejects the former root or replaced destination inode. The normal maintenance pulses rotate at most 32 existing owner epochs per transaction and then resume ordinary ten-lane scan/delta catch-up. The same operation can be resumed by the advance command; status distinguishes rotation from rebuilding, not full coverage. Canonical search and traversal remain available when the projection is held. Never erase historical cache directories automatically. Canonical physically partitioned graphs do not require these derived node/edge projections.
+
+Run python -m core.dragon_projection_relocation audit --corpus ROOT --kind nodes --scope-json PRIVATE_SCOPE_JSON (and edges) after catch-up. Audits stream exact per-lane canonical/projected row digests, source stamps, SQLite integrity and FTS rowid/field witnesses; a missing or incomplete lane holds. This is operator-only full owner work, not a latency guarantee or independent authorization. Old index files are not part of the local backup; rebuild from preserved canonical stores rather than trusting an old projection. No production rebuild, encoder coverage, full hardware scale, or CI pass is claimed by source delivery.

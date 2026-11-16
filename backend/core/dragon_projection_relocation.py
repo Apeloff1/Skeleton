@@ -193,7 +193,8 @@ def audit(graph,kind,scope):
                             expected=_hash_rows(part.execute("SELECT owner,id,title,url,kind,family FROM nodes ORDER BY id"))
                             fts=_hash_rows(part.execute("SELECT owner,id,title,url,kind,family FROM search ORDER BY id"))
                             if expected!=fts or part.execute("""SELECT 1 FROM nodes n LEFT JOIN search f ON f.rowid=n.fts_row
-                                  WHERE f.rowid IS NULL OR f.owner<>n.owner OR f.id<>n.id LIMIT 1""").fetchone():
+                                  WHERE f.rowid IS NULL OR f.owner IS NOT n.owner OR f.id IS NOT n.id OR f.title IS NOT n.title
+                                  OR f.url IS NOT n.url OR f.kind IS NOT n.kind OR f.family IS NOT n.family LIMIT 1""").fetchone():
                                 raise DeploymentHeld("projection FTS witness differs")
                         part.execute("COMMIT")
                     except BaseException:
