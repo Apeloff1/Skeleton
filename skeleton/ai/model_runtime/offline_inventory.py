@@ -14,6 +14,7 @@ import re
 import stat
 from typing import Sequence
 
+from .flgb_model_runtime import MAX_WEIGHT_SHARDS
 from .weight_shard_store import WeightShardStore, WeightShardStoreError, _InventoryVerificationBatch
 
 _MANIFEST = re.compile(r"[0-9a-f]{64}\.json\Z")
@@ -40,7 +41,7 @@ class VerifiedOfflineWeightPlan:
         for digest in (self.plan_digest, self.model_identity_digest):
             if not re.fullmatch(r"[0-9a-f]{64}", digest):
                 raise OfflineInventoryError("invalid weight inventory digest")
-        if type(self.shard_count) is not int or not 1 <= self.shard_count <= 4096:
+        if type(self.shard_count) is not int or not 1 <= self.shard_count <= MAX_WEIGHT_SHARDS:
             raise OfflineInventoryError("invalid verified shard count")
         if type(self.weight_bytes) is not int or not 1 <= self.weight_bytes < 1 << 63:
             raise OfflineInventoryError("invalid verified weight size")
