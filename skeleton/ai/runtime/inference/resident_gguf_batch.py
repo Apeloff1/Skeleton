@@ -278,6 +278,8 @@ class ResidentGGUFBatch:
                     raise TimeoutError("resident response deadline")
                 # HTTPResponse can detach the connection socket on close; the
                 # original socket timeout still provides a bounded read.
+                if response.isclosed():
+                    break
                 if peer is not None:
                     peer.settimeout(remaining)
                 chunk = response.read1(min(65536, _MAX_REPLY_BYTES + 1 - len(raw)))
@@ -286,6 +288,8 @@ class ResidentGGUFBatch:
                 raw.extend(chunk)
                 if len(raw) > _MAX_REPLY_BYTES:
                     raise LlamaCppRuntimeError("native response exceeded byte ceiling")
+            if response.length not in (None, 0):
+                raise LlamaCppRuntimeError("native response body ended before declared length")
             value = json.loads(raw, object_pairs_hook=_strict_object, parse_constant=_bad_constant)
             if time.monotonic() >= min(deadline, self._deadline):
                 raise TimeoutError("resident response deadline")
