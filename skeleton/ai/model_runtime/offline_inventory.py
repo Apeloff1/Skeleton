@@ -129,7 +129,10 @@ def inventory_offline_weights(
             ))
         # Retain only fixed-size declarations, not every shard manifest.
         for row in declared:
-            paths = store.verified_paths(row.plan_digest)
+            if row.manifest_bytes is None or row.manifest_sha256 is None:
+                raise OfflineInventoryError("missing admitted manifest identity")
+            paths = store.verified_paths(row.plan_digest, expected_manifest_sha256=row.manifest_sha256,
+                                         maximum_manifest_bytes=row.manifest_bytes)
             plan, manifest_sha, manifest_size = store.manifest_evidence(
                 row.plan_digest, maximum=row.manifest_bytes
             )
@@ -153,6 +156,8 @@ def inventory_offline_weights(
         # Recheck exact bytes, including weight-identity fields, at the end.
         # This final pass is bounded by the same admitted metadata total.
         for row in declared:
+            if row.manifest_bytes is None:
+                raise OfflineInventoryError("missing admitted manifest byte ceiling")
             _, manifest_sha, manifest_size = store.manifest_evidence(
                 row.plan_digest, maximum=row.manifest_bytes
             )
