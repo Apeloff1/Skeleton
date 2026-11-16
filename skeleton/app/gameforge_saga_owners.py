@@ -11,6 +11,7 @@ from typing import Any
 
 from skeleton.app.gameforge_campaign import detached, digest
 from skeleton.app import gameforge_saga_league as league
+from skeleton.app import gameforge_saga_rounds as rounds
 from skeleton.app.original_quest_cli import _encode, _object, _require, _text
 from skeleton.game.gameplay import harbor_crafting as harbor
 from skeleton.game.gameplay import harbor_crafting_convoy as convoy
@@ -18,7 +19,7 @@ from skeleton.game.gameplay import harbor_crafting_convoy_contracts as contracts
 from skeleton.game.gameplay import harbor_crafting_expedition as exploration
 from skeleton.game.gameplay.harbor_crafting_expedition_ui import render_map
 
-KINDS = frozenset({"survey_expedition", "convoy_contract", "convoy_league"})
+KINDS = frozenset({"survey_expedition", "convoy_contract", "convoy_league"}) | rounds.KINDS
 MAX_TURNS = 256
 MAX_CANDIDATES = 128
 
@@ -42,6 +43,8 @@ def admit_episode(raw: Any) -> dict:
                  "dialogue": package["dialogue_board"], "required_ending": rules["required_ending"]}
     elif kind == "convoy_league":
         rules = league.validate_rules(world, rules)
+    elif kind in rounds.KINDS:
+        rules = rounds.validate_rules(kind, world, rules)
     else:
         rules = _object(rules, {"convoy", "contracts", "choice"})
         _require(rules["choice"] in ("relief", "salvage"), "unsupported contract choice")
@@ -63,6 +66,8 @@ def admit_episode(raw: Any) -> dict:
 def action_limit(episode: dict) -> int:
     if episode["kind"] == "convoy_league":
         return episode["rules"]["league"]["max_total_ticks"]
+    if episode["kind"] in rounds.KINDS:
+        return rounds.action_limit(episode["kind"], episode["source"], episode["rules"])
     return episode["source"]["max_ticks"]
 
 
@@ -85,6 +90,8 @@ def replay_episode(episode: dict, actions: Any) -> dict:
         return result
     if episode["kind"] == "convoy_league":
         return league.replay(world, rules, actions)
+    if episode["kind"] in rounds.KINDS:
+        return rounds.replay(episode["kind"], world, rules, actions)
     raise ValueError("unknown local saga owner")
 
 
@@ -105,6 +112,8 @@ def summarize(episode: dict, report: dict) -> dict:
                 "grid": render_map(report).splitlines()}
     if episode["kind"] == "convoy_league":
         return {**common, **league.summarize(episode["source"], episode["rules"], report)}
+    if episode["kind"] in rounds.KINDS:
+        return {**common, **rounds.summarize(episode["kind"], episode["source"], episode["rules"], report)}
     status = contracts.convoy_contract_status(report)
     local = report["convoy"]
     tactical = convoy.convoy_status(local)
@@ -130,6 +139,8 @@ def raw_candidates(episode: dict, report: dict, summary: dict) -> list[dict]:
     world = episode["source"]
     if episode["kind"] == "convoy_league":
         return league.candidates(world, episode["rules"], report, summary)
+    if episode["kind"] in rounds.KINDS:
+        return rounds.candidates(world, summary)
     candidates = [{"op": "move", "direction": direction} for direction in sorted(harbor.DIRECTIONS)]
     candidates += [{"op": "wait"}, {"op": "gather"}, {"op": "deliver"}]
     candidates += [{"op": "craft", "recipe": row["id"]} for row in world["recipes"]]
@@ -149,6 +160,8 @@ def raw_candidates(episode: dict, report: dict, summary: dict) -> list[dict]:
 def report_actions(episode: dict, report: dict) -> list:
     if episode["kind"] == "convoy_league":
         return league.flatten_sessions(episode["rules"]["league"], report["save"]["sessions"])
+    if episode["kind"] in rounds.KINDS:
+        return rounds.flatten(episode["kind"], episode["rules"], report)
     return report["input_actions"] if episode["kind"] == "survey_expedition" else report["convoy"]["actions"]
 
 
