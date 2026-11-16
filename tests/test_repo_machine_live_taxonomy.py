@@ -176,3 +176,10 @@ def test_game_provider_environment_remains_explicitly_source_retained() -> None:
     assert "game-environment" in retained[0]["owner"]
     assert "outside credential-provider AI tree" in retained[0]["reason"]
     assert all(record.get("source") != source for record in manifest["mappings"])
+
+def test_local_admission_ledger_has_explicit_security_ownership() -> None:
+    config = load_machine_config(ROOT)
+    placement = placement_for_path(config, "skeleton/admission/lease.py")
+    assert (placement.zone, placement.owner, placement.lifecycle) == (
+        "local-admission", "security-plane", "canonical"
+    )
