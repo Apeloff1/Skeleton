@@ -13,6 +13,7 @@ unless playable_content was explicitly requested.
 from __future__ import annotations
 
 import hashlib
+import re
 from typing import Any, Mapping
 
 from skeleton.forge.archetype_content import content_archetypes
@@ -99,6 +100,49 @@ def _script(archetype: str) -> str:
     )
 
 
+def _project_binding(project: str, scene: str, *, portal: bool) -> bool:
+    """Recognize only unambiguous active settings in their owning sections.
+
+    Godot accepts whitespace around assignment and duplicate overrides.
+    Literal substring counts alone admit a commented or misplaced assignment
+    and do not detect a second spelling with whitespace around '='.
+    """
+    if type(project) is not str or len(project) > 262144:
+        return False
+    section = ""
+    seen_sections: set[str] = set()
+    admitted: dict[str, tuple[str, str]] = {}
+    governed = {"run/main_scene", "InputBind", "PlayablePortal"}
+    for raw in project.splitlines():
+        line = raw.strip()
+        if not line or line.startswith((";", "#")):
+            continue
+        if line.startswith("["):
+            match = re.fullmatch(r"\[([A-Za-z0-9_/-]+)\]", line)
+            if match is None:
+                return False
+            section = match.group(1)
+            if section in seen_sections:
+                return False
+            seen_sections.add(section)
+            continue
+        if "=" not in line:
+            continue
+        key, value = (part.strip() for part in line.split("=", 1))
+        if key not in governed:
+            continue
+        if key in admitted:
+            return False
+        admitted[key] = (section, value)
+    expected = {
+        "run/main_scene": ("application", f'"{scene}"'),
+        "InputBind": ("autoload", '"*res://scripts/autoloads/input_bind.gd"'),
+    }
+    if portal:
+        expected["PlayablePortal"] = ("autoload", '"*res://scripts/autoloads/playable_portal.gd"')
+    return admitted == expected
+
+
 def attach_playable_portal(
     files: Mapping[str, str], archetype: str, *, start_in_prototype: bool = False,
 ) -> tuple[dict[str, str], dict[str, Any]]:
@@ -112,8 +156,9 @@ def attach_playable_portal(
     project = files.get("project.godot")
     if (
         type(project) is not str
+        or not _project_binding(project, WORLD_SCENE, portal=False)
         or project.count(INPUT_ENTRY) != 1
-        or f'run/main_scene="{WORLD_SCENE}"' not in project
+        or project.count(f'run/main_scene="{WORLD_SCENE}"') != 1
         or "PlayablePortal=" in project
         or any(path.casefold() == SCRIPT_PATH.casefold() for path in files if type(path) is str)
         or scene not in files
@@ -128,6 +173,8 @@ def attach_playable_portal(
         if settings.count(original) != 1:
             raise PlayablePortalError("ambiguous Godot startup scene")
         settings = settings.replace(original, f'run/main_scene="res://{scene}"', 1)
+    if not _project_binding(settings, f"res://{scene}" if start_in_prototype else WORLD_SCENE, portal=True):
+        raise PlayablePortalError("playable portal binding is ambiguous")
     out["project.godot"] = settings
     out[SCRIPT_PATH] = script
     return out, {
@@ -154,11 +201,10 @@ def verify_playable_portal(
         return (
             type(start_in_prototype) is bool and
             type(project) is str
+            and _project_binding(project, expected_scene, portal=True)
             and project.count(INPUT_ENTRY) == 1
             and project.count(AUTOLOAD_ENTRY) == 1
-            and project.count("PlayablePortal=") == 1
             and project.count(f'run/main_scene="{expected_scene}"') == 1
-            and project.count("run/main_scene=") == 1
             and scene in files
             and "scripts/autoloads/input_bind.gd" in files
             and "scenes/levels/run_level.tscn" in files

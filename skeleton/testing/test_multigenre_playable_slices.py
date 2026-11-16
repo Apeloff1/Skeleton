@@ -649,3 +649,23 @@ def test_bidirectional_startup_receipt_refuses_unreviewed_source_and_legacy_clai
             forged["source_files"], sort_keys=True, separators=(",", ":"),
         ).encode("utf-8")).hexdigest()
         assert not verify_playable_source(altered, forged)
+
+
+@pytest.mark.parametrize("mutation", [
+    lambda p: p.replace("[application]", '[application]\nrun/main_scene = "res://foreign.tscn"'),
+    lambda p: p.replace("[autoload]", '[autoload]\nPlayablePortal = "*res://foreign.gd"'),
+    lambda p: p.replace("[autoload]", "[foreign]"),
+    lambda p: p + "\n[application]\nconfig/name=\"Other\"\n",
+    lambda p: p.replace('run/main_scene="', ';run/main_scene="', 1),
+])
+def test_portal_rejects_shadowed_and_misplaced_project_settings(mutation):
+    from skeleton.forge.playable_portal import attach_playable_portal, verify_playable_portal
+    from skeleton.forge.playable_provenance import build_playable_source_receipt
+    base = attach_archetype_content(godot_files(), "puzzle")
+    files, _ = attach_playable_portal(base, "puzzle")
+    assert verify_playable_portal(files, "puzzle")
+    changed = dict(files)
+    changed["project.godot"] = mutation(files["project.godot"])
+    assert not verify_playable_portal(changed, "puzzle")
+    with pytest.raises(ValueError):
+        build_playable_source_receipt(changed, "puzzle")
