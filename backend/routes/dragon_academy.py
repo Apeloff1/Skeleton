@@ -3102,6 +3102,20 @@ async def crawler_automation(
 
 
 
+@router.get("/crawler/sessions/{session_id}/navigation")
+async def crawler_navigation_inventory(
+    session_id: str = URLPath(min_length=1, max_length=128),
+    snapshot_digest: str | None = Query(default=None, pattern="^[a-f0-9]{64}$"),
+    after: int = Query(default=0, ge=0, le=1000000000),
+    limit: int = Query(default=32, ge=1, le=32),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    return await _crawler_result(
+        crawler_application.navigation_inventory(scope, session_id,
+            snapshot_digest=snapshot_digest, after=after, limit=limit)
+    )
+
+
 @router.get("/crawler/sessions/{session_id}/research/inspection")
 async def crawler_research_inspection(
     session_id: str = URLPath(min_length=1, max_length=128),
