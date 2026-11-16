@@ -303,3 +303,160 @@ def test_head_rollback_and_nonobject_receipt_are_detected(tmp_path):
         db.commit()
         with pytest.raises(CampaignStoreError):
             store.read("slot", source)
+
+
+def test_completion_search_replays_actual_partial_dialogue_and_is_nonmutating():
+    from skeleton.app.gameforge_campaign_assist import plan_completion, verify_assistance
+    source = spec()
+    witness = build_campaign(source)["witness"]
+    checkpoint = play_campaign(source, witness[:1])
+    frozen = deepcopy(checkpoint)
+    plan = plan_completion(source, checkpoint)
+    assert plan["status"] == "completion_witness"
+    assert plan["next_action"] == witness[1]
+    assert plan["expanded"] <= plan["search_budget"]
+    assert verify_assistance(source, checkpoint, plan)
+    finished = append_actions(source, checkpoint, plan["additional"])
+    assert finished["state"]["status"] == "completed"
+    assert finished["session_digest"] == plan["completion_digest"]
+    assert checkpoint == frozen
+    assert plan_completion(source, finished)["status"] == "already_completed"
+
+
+def test_decline_is_proven_dialogue_blocker_not_fabricated_success():
+    from skeleton.app.gameforge_campaign_assist import plan_completion
+    source = spec()
+    declined = play_campaign(source, [{"type": "dialogue", "npc": "keeper", "choice": "depart"}])
+    result = plan_completion(source, declined)
+    assert result["status"] == "dialogue_unreachable"
+    assert result["blocker"]["npc"] == "keeper"
+    assert result["blocker"]["required_grants"] == ["restore-western-lens"]
+    assert result["additional"] == [] and result["completion_digest"] is None
+    assert declined["state"]["status"] == "in_progress"
+
+
+def test_bounded_search_does_not_assert_impossibility_on_exhaustion():
+    from skeleton.app.gameforge_campaign_assist import plan_completion
+    source = spec()
+    start = play_campaign(source, [])
+    result = plan_completion(source, start, max_expansions=1)
+    assert result["status"] == "budget_exhausted"
+    assert result["expanded"] <= 1 and result["additional"] == []
+    assert plan_completion(source, start)["status"] == "completion_witness"
+    with pytest.raises(ValueError):
+        plan_completion(source, start, max_expansions=True)
+
+
+def test_assistance_forgery_and_altered_source_are_rejected():
+    from skeleton.app.gameforge_campaign_assist import plan_completion, verify_assistance
+    source = spec()
+    start = play_campaign(source, [])
+    result = plan_completion(source, start)
+    tampered = deepcopy(result)
+    tampered["additional"] = []
+    rehash(tampered, "assistance_digest")
+    assert not verify_assistance(source, start, tampered)
+    forged = deepcopy(start)
+    forged["state"]["dialogues"]["keeper"]["state"]["quests"] = ["restore-western-lens"]
+    rehash(forged, "session_digest")
+    with pytest.raises(ValueError):
+        plan_completion(source, forged)
+
+
+def test_branch_comparison_reports_real_grants_rewards_and_reputation():
+    from skeleton.app.gameforge_campaign_board import compare_branches, verify_comparison
+    source = spec()
+    design = build_campaign(source)
+    left = play_campaign(source, [{"type": "dialogue", "npc": "keeper", "choice": "depart"}])
+    right = play_campaign(source, design["witness"])
+    comparison = compare_branches(source, left, right)
+    assert comparison["common_prefix"] == 0
+    assert comparison["left_first_divergence"]["choice"] == "depart"
+    assert comparison["right_first_divergence"]["choice"] == "listen"
+    assert comparison["dialogue_outcomes"]["keeper"]["reputation_delta"] == 9
+    assert comparison["left_completion"]["status"] == "dialogue_unreachable"
+    assert comparison["right_completion"]["status"] == "already_completed"
+    assert comparison["reward_delta_right_minus_left"]["gold"] == sum(
+        row["amount"] for row in right["state"]["earned_rewards"])
+    assert comparison["objective_changes"]["s0"]["right"] == "completed"
+    assert verify_comparison(source, left, right, comparison)
+    forged = deepcopy(comparison)
+    forged["reward_delta_right_minus_left"]["gold"] = 999
+    rehash(forged, "comparison_digest")
+    assert not verify_comparison(source, left, right, forged)
+
+
+def test_board_only_exposes_replayed_legal_actions_and_escapes_authored_html():
+    from skeleton.app.gameforge_campaign_board import board, render_html, verify_board
+    source = spec()
+    source["dialogues"][0]["source"]["nodes"][0]["text"] = '<img src=x onerror="alert(1)">'
+    initial = play_campaign(source, [])
+    result = board(source, initial)
+    assert result["legal_actions"] == initial["state"]["legal_actions"]
+    assert result["earned_totals"] == {}
+    assert result["nearby_npcs"][0]["text"].startswith("<img")
+    assert verify_board(source, initial, result)
+    assert all(not row.get("dialogue_gate", {}).get("satisfied") for row in result["objectives"])
+    html = render_html(source, initial)
+    assert "&lt;img" in html and "<img" not in html
+    assert "Content-Security-Policy" in html and "<script" not in html
+    assert initial["session_digest"] in html
+    assert render_html(source, initial) == html
+
+
+def test_historical_fork_copies_prefix_and_branches_without_losing_original(tmp_path):
+    from skeleton.app.gameforge_campaign_assist import plan_completion
+    source = spec()
+    witness = build_campaign(source)["witness"]
+    with sqlite3.connect(tmp_path / "timeline.sqlite") as db:
+        store = CampaignStore(db)
+        zero = store.create("original", source, "genesis")
+        first = store.append("original", source, 0, "listen", witness[:1])
+        ending = store.append("original", source, 1, "decline", [
+            {"type": "dialogue", "npc": "keeper", "choice": "decline"}])
+        child = store.fork("original", source, 1, first["receipt"]["session_digest"], "alternate")
+        assert child["child"]["receipt"] == first["receipt"]
+        assert child["child"]["revision"] == 1
+        assert store.read("alternate", source, 0)["receipt"] == zero["receipt"]
+        plan = plan_completion(source, child["child"]["receipt"])
+        won = store.append("alternate", source, 1, "win", plan["additional"])
+        assert won["receipt"]["state"]["status"] == "completed"
+        assert store.read("original", source) == ending
+        assert len(store.history("alternate", source)["revisions"]) == 3
+        assert plan_completion(source, ending["receipt"])["status"] == "dialogue_unreachable"
+        with pytest.raises(CampaignStoreError):
+            store.fork("original", source, 1, first["receipt"]["session_digest"], "alternate")
+
+
+def test_fork_wrong_digest_or_capacity_rolls_back_entire_child(tmp_path, monkeypatch):
+    import skeleton.app.gameforge_campaign_store as implementation
+    source = spec()
+    with sqlite3.connect(tmp_path / "timeline.sqlite") as db:
+        store = CampaignStore(db)
+        zero = store.create("original", source, "genesis")
+        with pytest.raises(RevisionConflict):
+            store.fork("original", source, 0, "0"*64, "wrong")
+        monkeypatch.setattr(implementation, "MAX_TOTAL_BYTES", 1)
+        with pytest.raises(CampaignStoreError, match="storage ceiling"):
+            store.fork("original", source, 0, zero["receipt"]["session_digest"], "full")
+        assert db.execute("SELECT slot FROM gf_campaign_slots_v1").fetchall() == [("original",)]
+        assert store.read("original", source) == zero
+
+
+def test_helpers_via_canonical_cli_and_historical_fork(tmp_path):
+    source = spec()
+    start = play_campaign(source, [])
+    bundle = {"request": source, "receipt": start}
+    code, plan, _ = invoke("assist", bundle)
+    assert code == 0 and plan["status"] == "completion_witness"
+    assert invoke("verify-assist", {**bundle, "assistance": plan})[0] == 0
+    assert invoke("board", bundle)[1]["checkpoint_digest"] == start["session_digest"]
+    assert invoke("compare", {"request": source, "left": start, "right": start})[1]["common_prefix"] == 0
+    out, err = io.StringIO(), io.StringIO()
+    assert main(["html"], stdin=io.BytesIO(encoded(bundle)), stdout=out, stderr=err) == 0
+    assert out.getvalue().startswith("<!doctype html>")
+    path = tmp_path / "campaign.sqlite"
+    assert invoke("create-slot", {"request": source, "slot": "a", "operation": "genesis"}, path)[0] == 0
+    code, forked, _ = invoke("fork-slot", {"request": source, "slot": "a",
+        "parent_revision": 0, "expected_digest": start["session_digest"], "child_slot": "b"}, path)
+    assert code == 0 and forked["child"]["receipt"] == start
