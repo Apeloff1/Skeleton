@@ -713,17 +713,23 @@ class OfflineHTTPApplication:
                 if path=="/v1/memory-transformer/status":
                     _fields(body,set(),set())
                     return 200,self.transformer_memory.status()
-                if path=="/v1/memory-transformer/search":
-                    _fields(body,{"query","limit","kinds"},{"query"})
-                    return 200,self.transformer_memory.search(**body)
-                if path=="/v1/memory-transformer/refresh":
-                    _fields(body,{"expected_encoder","cursor","limit","approved"},
-                            {"expected_encoder","approved"})
-                    # Avoid contending for CPU/memory during a local chat pass.
-                    with self._turn_lock:
-                        if self._active_session is not None or self._closing:
-                            raise OfflineHTTPError(409,"local generation active; refresh index while idle")
-                    return 200,self.transformer_memory.refresh(**body)
+                if path in {"/v1/memory-transformer/search","/v1/memory-transformer/refresh"}:
+                    search=path.endswith("/search")
+                    if search:
+                        _fields(body,{"query","limit","kinds"},{"query"})
+                    else:
+                        _fields(body,{"expected_encoder","cursor","limit","approved"},
+                                {"expected_encoder","approved"})
+                    # Use the same process/cross-process admission boundary as
+                    # language inference; checking idle alone races a new turn.
+                    with self._lock:
+                        with self._turn_lock:
+                            if self._active_session is not None or self._closing:
+                                raise OfflineHTTPError(409,"local generation active; use semantic recall while idle")
+                        with self._inference_lease.hold():
+                            result=(self.transformer_memory.search(**body) if search
+                                    else self.transformer_memory.refresh(**body))
+                    return 200,result
                 raise OfflineHTTPError(404,"unknown local transformer memory operation")
             except MemoryConflict:
                 raise OfflineHTTPError(409,"transformer encoder or approved memory changed") from None
