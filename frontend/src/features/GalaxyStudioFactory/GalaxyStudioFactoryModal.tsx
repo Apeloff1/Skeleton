@@ -1346,7 +1346,7 @@ export default function GalaxyStudioFactoryModal
   }, [buildId, addLog, safeFetch, startPolling]);
 
   // ═══ BUILD — creates server build, then starts client clock with REAL id ═══
-  const makeGalaxyBuildPayload = (selectedGenre: NonNullable<typeof selectedGenre>) => ({
+  const makeGalaxyBuildPayload = (selectedGenre: Genre) => ({
       title: title.trim(), genre: selectedGenre.id, subgenre: selectedSubgenre || undefined,
       // ═══ Multi-genre fusion — send lists alongside primary for backward compat ═══
       genres: multiGenreMode && extraGenreIds.length > 0
