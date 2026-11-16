@@ -5,6 +5,7 @@ from typing import Any
 
 from skeleton.app.gameforge_campaign import detached, digest
 from skeleton.app import gameforge_saga_league as league
+from skeleton.app import gameforge_saga_rounds as rounds
 from skeleton.app.gameforge_saga import MAX_EPISODES, REQUEST_SCHEMA, build_saga, play_saga
 from skeleton.app.original_quest_cli import _encode, _object, _require, _text
 from skeleton.game.gameplay import harbor_crafting as harbor
@@ -67,6 +68,18 @@ def author_saga(source: Any) -> dict:
                 witness, proof = league.solve_witness(world, rules)
                 receipt = {"owner": "harbor_crafting_convoy_league_solver",
                            "solver_digest": proof["plan_digest"], "witness_origin": "canonical_solver"}
+        elif kind in rounds.KINDS:
+            rules = rounds.validate_rules(kind, world, item["rules"])
+            _require("package" not in item, "unsupported round package input")
+            if "witness" in item:
+                witness = item["witness"]
+                receipt = {"owner": kind, "witness_origin": "authored"}
+            elif kind == "delivery_chain":
+                witness, custody_digests = rounds.solve_delivery(world, rules)
+                receipt = {"owner": "harbor_crafting_contract_solver",
+                           "solver_digests": custody_digests, "witness_origin": "canonical_solver"}
+            else:
+                raise ValueError("timed season requires an explicit authored witness")
         else:
             raise ValueError("unknown saga author owner")
         episodes.append({"objective": objective, "kind": kind, "source": world,
