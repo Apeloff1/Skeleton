@@ -24,6 +24,10 @@ from .weight_store_disk_owner import DiskAdmissionPolicy, WeightStoreDiskOwner
 from .weight_store_recovery import (
     RecoveryReviewPolicy, acknowledge_weight_store_recovery, review_weight_store,
 )
+from .weight_store_scrub import (
+    ScrubPolicy, advance_weight_scrub, require_completed_weight_scrub,
+    start_weight_scrub, weight_scrub_status,
+)
 
 _MAX_REQUEST_BYTES = 16 * 1024**2
 _MAX_OUTPUT_BYTES = 8 * 1024**2
@@ -103,7 +107,8 @@ def read_stage_request(stream: BinaryIO, *, request_sha256: str,
 def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
          stdout: TextIO | None = None, stderr: TextIO | None = None) -> int:
     parser = argparse.ArgumentParser(description="Cooperating offline weight store administration")
-    parser.add_argument("command", choices=("stage", "inspect", "recovery-review", "acknowledge-recovery"))
+    parser.add_argument("command", choices=("stage", "inspect", "recovery-review", "acknowledge-recovery",
+                                            "scrub-start", "scrub-step", "scrub-status", "scrub-check"))
     parser.add_argument("--store", type=Path, required=True)
     parser.add_argument("--maximum-store-bytes", type=int, required=True)
     parser.add_argument("--maximum-plan-bytes", type=int, default=MAX_WEIGHT_BYTES)
@@ -119,6 +124,11 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
     parser.add_argument("--intent-sha256")
     parser.add_argument("--review-sha256")
     parser.add_argument("--maximum-verified-weight-bytes", type=int)
+    parser.add_argument("--scrub-campaign-sha256")
+    parser.add_argument("--scrub-prior-sha256")
+    parser.add_argument("--scrub-total-bytes", type=int, default=MAX_WEIGHT_BYTES)
+    parser.add_argument("--scrub-tranche-bytes", type=int, default=4 * 1024**3)
+    parser.add_argument("--scrub-tranche-objects", type=int, default=64)
     parser.add_argument("--require-clean", action="store_true",
                         help="Exit 3 for a completed review containing anomalies")
     args = parser.parse_args(argv)
@@ -135,6 +145,12 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
         recovery_pins = (args.intent_sha256, args.review_sha256, args.maximum_verified_weight_bytes)
         if args.command != "acknowledge-recovery" and any(value is not None for value in recovery_pins):
             raise WeightShardStoreError("recovery pins require acknowledge-recovery")
+        if args.scrub_prior_sha256 is not None and args.command != "scrub-start":
+            raise WeightShardStoreError("prior scrub pin requires scrub-start")
+        if args.scrub_campaign_sha256 is not None and args.command not in ("scrub-step", "scrub-check"):
+            raise WeightShardStoreError("active scrub pin requires scrub-step or scrub-check")
+        if args.command in ("scrub-step", "scrub-check") and args.scrub_campaign_sha256 is None:
+            raise WeightShardStoreError("exact scrub campaign SHA required")
         if args.command == "stage":
             if not all(value is not None for value in pins) or args.require_clean:
                 raise WeightShardStoreError("stage requires three independent pins")
@@ -163,11 +179,29 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
             acknowledge = args.command == "acknowledge-recovery"
             if acknowledge and not all(value is not None for value in recovery_pins):
                 raise WeightShardStoreError("acknowledge-recovery requires explicit evidence pins and verification ceiling")
+            writable = acknowledge or args.command in ("scrub-start", "scrub-step")
             store = WeightShardStore(args.store, maximum_bytes=args.maximum_plan_bytes,
-                                     read_only=not acknowledge, create=False)
+                                     read_only=not writable, create=False)
             owner = WeightStoreDiskOwner(store, policy, initialize=False)
             if args.command == "inspect":
                 result = owner.inspect()
+            elif args.command == "scrub-start":
+                result = start_weight_scrub(owner, ScrubPolicy(
+                    maximum_entries=args.review_entries,
+                    maximum_manifest_bytes=args.review_metadata_bytes,
+                    maximum_references=args.review_references,
+                    maximum_total_bytes=args.scrub_total_bytes,
+                ), prior_campaign_digest=args.scrub_prior_sha256)
+            elif args.command == "scrub-step":
+                result = advance_weight_scrub(
+                    owner, campaign_digest=args.scrub_campaign_sha256,
+                    maximum_objects=args.scrub_tranche_objects,
+                    maximum_bytes=args.scrub_tranche_bytes,
+                )
+            elif args.command == "scrub-status":
+                result = weight_scrub_status(owner)
+            elif args.command == "scrub-check":
+                result = require_completed_weight_scrub(owner, campaign_digest=args.scrub_campaign_sha256)
             else:
                 review_policy = RecoveryReviewPolicy(
                     maximum_entries=args.review_entries,
@@ -186,6 +220,8 @@ def main(argv: Sequence[str] | None = None, *, stdin: BinaryIO | None = None,
         if len(encoded) > _MAX_OUTPUT_BYTES:
             raise WeightShardStoreError("administrative receipt exceeds byte bounds")
         output.write(encoded.decode("utf-8") + "\n")
+        if args.command == "scrub-step" and result.get("status") in ("blocked", "larger_tranche_required"):
+            return 3
         return 3 if args.require_clean and result.get("status") != "no_anomalies_observed" else 0
     except (ValueError, TypeError, KeyError, RecursionError, OverflowError, OSError) as exc:
         # Raw exception text can contain operator filesystem paths.
