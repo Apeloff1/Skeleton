@@ -225,6 +225,7 @@ HTML = r"""<!doctype html>
         <span class="hint keyboard-hint">Ctrl / ⌘ + Enter to send</span>
         <button id="context-preview" class="small" disabled>Preview context</button>
         <button id="cognitive-preview" class="small" disabled>Review reasoning plan</button>
+        <button id="deliberation-review" class="small" disabled>Generate two review candidates (no save)</button>
         <button id="send" class="primary">Generate locally ↗</button>
         <button id="retry-turn" class="secondary" hidden>Retry original turn</button>
       </div>
@@ -234,6 +235,17 @@ HTML = r"""<!doctype html>
       <summary>Reasoning plan and prior user messages — review only</summary>
       <p class="hint">Local heuristic planning, exact historical excerpts and lexical source coverage. Nothing is sent, saved, learned, or automatically injected.</p>
       <pre id="cognitive-result" aria-live="polite"></pre>
+      <label for="memory-kind">Memory classification (not verified truth)</label>
+      <select id="memory-kind"><option value="episode">Episode</option><option value="preference">Preference</option><option value="procedure">Procedure</option><option value="project-fact">Project fact</option></select>
+      <div id="memory-choices"></div>
+      <pre id="memory-review" aria-live="polite"></pre>
+      <button id="memory-save" type="button" class="small" disabled>Approve and save this independent memory copy</button>
+      <p class="hint">Deleting the original chat will not delete a saved memory. Remove the copy in the reference library. Saved memories are never automatically applied.</p>
+    </details>
+    <details id="deliberation-panel" class="grounding-preview" hidden>
+      <summary>Local reasoning candidates — not independently verified</summary>
+      <p class="hint">Two actual local generations. Not saved to history. Review alternatives before writing your next message.</p>
+      <pre id="deliberation-result" aria-live="polite"></pre>
     </details>
     <details id="context-grounding-preview" class="grounding-preview" hidden>
       <summary>Local grounding passages selected by preview — untrusted text</summary>
@@ -491,6 +503,10 @@ JAVASCRIPT = r"""'use strict';
     if (scopeBlocked) get('send').disabled = true;
     get('context-preview').disabled = locked || working || !state.session || scopeBlocked;
     get('cognitive-preview').disabled = get('context-preview').disabled;
+    get('deliberation-review').disabled = get('context-preview').disabled || foreignLease || state.health?.ready !== true;
+    get('memory-kind').disabled = locked || working;
+    get('memory-save').disabled = locked || working || !reviewedMemory;
+    get('memory-choices').querySelectorAll('button').forEach(node => {node.disabled = locked || working;});
     get('knowledge-scope-reset').disabled = locked || working;
     document.querySelectorAll('.knowledge-scope-picker').forEach(node => {
       node.disabled = locked || working;
@@ -627,7 +643,7 @@ JAVASCRIPT = r"""'use strict';
     // Long file ingestion may stream for hours. Abort only on an explicit
     // workspace lock; the durable import ID allows post-disconnect recovery.
     const timer = path === '/v1/resources/longform/ingest' ? null :
-      setTimeout(cancel, 15000);
+      setTimeout(cancel, path.endsWith('/deliberation-review') ? 60000 : 15000);
     let response;
     try {
       response = await fetch(path, {
@@ -1010,7 +1026,18 @@ JAVASCRIPT = r"""'use strict';
       if (epoch === state.epoch) updateControls();
     }
   }
+  let reviewedMemory = null;
+  function clearMemoryReview() {
+    reviewedMemory = null;
+    get('memory-review').textContent = '';
+    get('memory-save').disabled = true;
+  }
   function clearGroundingPreview() {
+    clearMemoryReview();
+    get('memory-choices').replaceChildren();
+    get('deliberation-panel').hidden = true;
+    get('deliberation-panel').open = false;
+    get('deliberation-result').textContent = '';
     get('cognitive-panel').hidden = true;
     get('cognitive-panel').open = false;
     get('cognitive-result').textContent = '';
@@ -1185,11 +1212,121 @@ JAVASCRIPT = r"""'use strict';
           scopeVersion !== state.knowledgeScopeVersion)
         throw new Error('The reasoning plan is stale. Request a new review.');
       get('cognitive-result').textContent = lines.join('\n');
+      const choices = get('memory-choices');
+      for (const row of plan.memory.matches) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'small';
+        button.textContent = 'Review memory from message ' + (row.message_index + 1);
+        button.addEventListener('click', () => run(async () => {
+          clearMemoryReview();
+          if (epoch !== state.epoch || state.session !== payload.session_id || state.revision !== revision)
+            throw new Error('The source conversation changed.');
+          const original = state.messages[row.message_index];
+          if (!original || original.role !== 'user' ||
+              typeof original.content !== 'string' ||
+              await exactLocalSha256(original.content) !== row.source_sha256 ||
+              Array.from(original.content).slice(row.start, row.end).join('') !== row.text)
+            throw new Error('The historical source does not match the displayed excerpt.');
+          const selection = {expected_revision: revision, message_index: row.message_index,
+            message_sha256: row.source_sha256, start: row.start, end: row.end,
+            kind: get('memory-kind').value};
+          const draft = await api('POST', '/v1/sessions/' + payload.session_id + '/memory-preview', {selection});
+          if (epoch !== state.epoch || state.session !== payload.session_id || state.revision !== revision ||
+              selection.kind !== get('memory-kind').value || draft.saved !== false ||
+              draft.schema !== 'skeleton.jeeves.reviewed-memory.v1' ||
+              draft.source?.message_sha256 !== row.source_sha256 || draft.excerpt !== row.text ||
+              draft.independent_copy !== true || draft.source_deletion_cascades !== false ||
+              draft.auto_applied !== false || !sha.test(draft.approval_sha256) ||
+              typeof draft.document_text !== 'string' || draft.document_text.length > 4096 ||
+              await exactLocalSha256(draft.document_text) !== draft.document_sha256)
+            throw new Error('The proposed memory copy could not be verified.');
+          if (epoch !== state.epoch || state.session !== payload.session_id || state.revision !== revision)
+            throw new Error('The source conversation changed.');
+          reviewedMemory = {epoch, session: payload.session_id, revision,
+            selection, approval: draft.approval_sha256, digest: draft.document_sha256};
+          get('memory-review').textContent = draft.document_text;
+          status('Review the exact independent memory copy, then approve saving if desired.');
+        }));
+        choices.append(button);
+      }
       get('cognitive-panel').hidden = false;
       get('cognitive-panel').open = true;
     }
     return payload;
   }
+  get('memory-kind').addEventListener('change', clearMemoryReview);
+  get('memory-save').addEventListener('click', () => run(async () => {
+    const review = reviewedMemory;
+    if (!review || review.epoch !== state.epoch || review.session !== state.session ||
+        review.revision !== state.revision) throw new Error('Review the current memory first.');
+    const result = await api('POST', '/v1/sessions/' + review.session + '/memory-save', {
+      selection: review.selection, approval_sha256: review.approval, approved: true
+    });
+    if (review.epoch !== state.epoch || state.session !== review.session ||
+        result.schema !== 'skeleton.jeeves.reviewed-memory.v1' || result.saved !== true ||
+        result.document_sha256 !== review.digest || result.approval_sha256 !== review.approval ||
+        result.independent_copy !== true || result.auto_applied !== false)
+      throw new Error('Memory publication could not be confirmed. Check the reference library.');
+    clearMemoryReview();
+    await loadDocuments();
+    status('Approved memory saved to the reference library. It is not automatically applied.');
+  }));
+  get('deliberation-review').addEventListener('click', () => run(async () => {
+    const message = get('prompt').value.trim();
+    const tokens = Number(get('budget').value);
+    const grounded = get('grounded').checked;
+    const strict = get('context-preserve').checked;
+    const scope = selectedGroundingScope(grounded);
+    const scopeVersion = state.knowledgeScopeVersion;
+    const session = state.session, revision = state.revision, epoch = state.epoch;
+    if (!session || !message || new TextEncoder().encode(message).length > 1024 ||
+        !Number.isSafeInteger(tokens) || tokens < 1 || tokens > 128)
+      throw new Error('Enter a question of at most 1024 bytes and a per-candidate budget of 1–128.');
+    clearGroundingPreview();
+    status('Running two local review candidates. No transcript will be committed.');
+    const report = await api('POST', '/v1/sessions/' + session + '/deliberation-review', {
+      message, expected_revision: revision, approved: true, max_output_tokens: tokens,
+      grounded, require_full_history: strict, ...(scope.length ? {document_ids: scope} : {})
+    });
+    const sha = /^[0-9a-f]{64}$/;
+    if (report.schema !== 'skeleton.jeeves.deliberation-review.v1' ||
+        report.model_digest !== state.health?.model_digest ||
+        report.tokenizer_digest !== state.health?.tokenizer_digest ||
+        report.session_revision !== revision || report.question_sha256 !== await exactLocalSha256(message) ||
+        report.generation_performed !== true || report.transcript_committed !== false ||
+        report.tool_execution_authorized !== false || report.memory_saved !== false ||
+        report.comparison?.answer_selected !== false || report.comparison?.semantic_truth_verified !== false ||
+        report.reserved_total_output_tokens !== 2 * tokens ||
+        !Array.isArray(report.candidates) || report.candidates.length !== 2 ||
+        !sha.test(report.report_sha256))
+      throw new Error('Invalid local deliberation report.');
+    const lines = [];
+    let produced = 0;
+    for (const [index, candidate] of report.candidates.entries()) {
+      if (candidate.strategy !== ['direct', 'counterpoint'][index] ||
+          typeof candidate.text !== 'string' || !candidate.text.trim() ||
+          candidate.text.length > 16384 ||
+          !Number.isSafeInteger(candidate.output_tokens) || candidate.output_tokens < 0 || candidate.output_tokens > tokens ||
+          !sha.test(candidate.execution_receipt_digest) ||
+          candidate.output_sha256 !== await exactLocalSha256(candidate.text))
+        throw new Error('Local candidate integrity check failed.');
+      produced += candidate.output_tokens;
+      lines.push(candidate.strategy.toUpperCase() + ' — ' + candidate.output_tokens + ' tokens',
+        candidate.text, 'Execution receipt: ' + candidate.execution_receipt_digest, '');
+    }
+    if (report.actual_total_output_tokens !== produced ||
+        epoch !== state.epoch || !state.connected || state.session !== session ||
+        state.revision !== revision || get('prompt').value.trim() !== message ||
+        get('grounded').checked !== grounded || get('context-preserve').checked !== strict ||
+        Number(get('budget').value) !== tokens || scopeVersion !== state.knowledgeScopeVersion)
+      throw new Error('Deliberation result no longer matches the current request.');
+    lines.push('No answer automatically selected. Same model, different review strategies.');
+    get('deliberation-result').textContent = lines.join('\n');
+    get('deliberation-panel').hidden = false;
+    get('deliberation-panel').open = true;
+    status('Review both local candidates. Conversation history is unchanged.');
+  }));
   get('cognitive-preview').addEventListener('click', () => run(async () => {
     const message = get('prompt').value.trim();
     const budget = Number(get('budget').value);
