@@ -44,6 +44,11 @@ class OfflineRuntimeSession:
             hysteresis or HysteresisPolicy(max_sample_age_ns=policy.sample_age_ns)))
         self._verified_ns = time.monotonic_ns()
 
+    @property
+    def policy(self) -> RuntimePolicy:
+        """Immutable operator policy used by the local admission controller."""
+        return self._policy
+
     def _open(self) -> None:
         require(not self._closed, "offline runtime session is closed")
 
