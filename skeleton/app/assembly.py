@@ -325,6 +325,61 @@ def _dotenv_value(raw: str) -> str:
 
 
 _MAX_DOTENV_BYTES = 256 * 1024
+_ENV_KEY = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z", re.ASCII)
+
+
+def _parse_dotenv_content(content: str) -> dict[str, str]:
+    """Parse the maintained single-line runtime assignment format.
+
+    Keep last-assignment semantics for legacy duplicate repair, but reject
+    syntax that the installer cannot review or preserve consistently.
+    Errors identify a category, never an operator's private line or value.
+    """
+    if type(content) is not str or len(content.encode("utf-8")) > _MAX_DOTENV_BYTES:
+        raise ValueError("runtime .env exceeds the 256 KiB input limit")
+    if any((ord(ch) < 32 and ch not in "\r\n\t") or ord(ch) == 127
+           or ch in "\u0085\u2028\u2029" for ch in content):
+        raise ValueError("runtime .env contains unsupported control or line separators")
+    values: dict[str, str] = {}
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            raise ValueError("runtime .env requires reviewed single-line assignments")
+        key, raw_value = line.split("=", 1)
+        key = key.strip()
+        if _ENV_KEY.fullmatch(key) is None:
+            raise ValueError("runtime .env contains an unsupported assignment key")
+        value = raw_value.strip()
+        if value.startswith(("'", '"')):
+            # Accept literal quoted values only when the quote actually
+            # closes on this line. Legacy quote syntax stays supported by
+            # the value decoder; multiline statements are not inferred.
+            quote = value[0]
+            escaped = False
+            closing = None
+            for index, char in enumerate(value[1:], 1):
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == quote:
+                    closing = index
+                    break
+            if closing is None:
+                raise ValueError("runtime .env contains an unterminated quoted assignment")
+            tail = value[closing + 1:]
+            if tail and not (tail[0].isspace() and tail.strip().startswith("#")):
+                raise ValueError("runtime .env contains an unsupported quoted assignment suffix")
+            value = value[:closing + 1]
+        values[key] = _dotenv_value(value)
+    return values
+
+
+def _dotenv_stamp(info: os.stat_result) -> tuple[int, ...]:
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid,
+            info.st_nlink, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
 
 
 def _read_dotenv(path: Path) -> dict[str, str]:
@@ -352,18 +407,20 @@ def _read_dotenv(path: Path) -> dict[str, str]:
             if (
                 not stat.S_ISREG(opened.st_mode)
                 or not stat.S_ISREG(named.st_mode)
-                or (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino)
+                or _dotenv_stamp(opened) != _dotenv_stamp(named)
                 or (os.name != "nt" and opened.st_nlink != 1)
             ):
                 raise ValueError("runtime .env must be a stable unlinked regular file")
             if opened.st_size > _MAX_DOTENV_BYTES:
                 raise ValueError("runtime .env exceeds the 256 KiB input limit")
             raw = stream.read(_MAX_DOTENV_BYTES + 1)
+            final = os.fstat(stream.fileno())
             current = os.lstat(path)
             if (
-                not stat.S_ISREG(current.st_mode)
-                or (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino)
+                len(raw) != opened.st_size
                 or len(raw) > _MAX_DOTENV_BYTES
+                or _dotenv_stamp(opened) != _dotenv_stamp(final)
+                or _dotenv_stamp(final) != _dotenv_stamp(current)
             ):
                 raise ValueError("runtime .env changed or exceeded the read limit")
     except OSError:
@@ -373,16 +430,7 @@ def _read_dotenv(path: Path) -> dict[str, str]:
     except UnicodeDecodeError:
         raise ValueError("runtime .env must contain UTF-8 text") from None
 
-    values: dict[str, str] = {}
-    for raw_line in content.splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        if key:
-            values[key] = _dotenv_value(value)
-    return values
+    return _parse_dotenv_content(content)
 
 
 def _runtime_env(root: Path, environ: Mapping[str, str] | None) -> dict[str, str]:

@@ -735,3 +735,31 @@ def test_private_runtime_read_preserves_inode_and_repairs_mode(tmp_path):
     after = source.stat()
     assert before.st_ino == after.st_ino
     assert after.st_mode & 0o777 == 0o600
+
+
+
+def test_setup_does_not_publish_generated_configuration_over_read_limit(tmp_path, monkeypatch):
+    from skeleton.app import setup_runtime
+    destination = tmp_path / ".env"
+    # Valid input within the bound; adding the missing runtime secrets would
+    # exceed it. Setup must preserve the source and avoid model provisioning.
+    text = "# " + "x" * (256 * 1024 - 4) + "\n"
+    destination.write_text(text, encoding="utf-8")
+    def forbidden(*args, **kwargs):
+        pytest.fail("invalid configuration must not prepare the model directory")
+    monkeypatch.setattr(setup_runtime, "_prepare_model_directory", forbidden)
+    with pytest.raises(ValueError, match="256 KiB"):
+        setup_runtime.ensure_runtime_environment(tmp_path)
+    assert destination.read_text(encoding="utf-8") == text
+
+
+@pytest.mark.parametrize("text", ["VALUE=one\x00two\n", 'VALUE="unfinished\n',
+                                  "COMMENT=" + "x" * (256 * 1024)])
+def test_atomic_write_refuses_unreadable_runtime_before_staging(tmp_path, text):
+    from skeleton.app import setup_runtime
+    destination = tmp_path / ".env"
+    destination.write_text("VALUE=original\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="runtime .env"):
+        setup_runtime._atomic_write(destination, text)
+    assert destination.read_text(encoding="utf-8") == "VALUE=original\n"
+    assert list(tmp_path.iterdir()) == [destination]

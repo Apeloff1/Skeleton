@@ -1261,3 +1261,75 @@ def test_chroma_published_host_port_cannot_overlap_existing_service(
         runtime_manifest(root=tmp_path, environ={})
     with pytest.raises(ValueError, match="CHROMA_PORT"):
         public_service_urls(tmp_path, environ={})
+
+
+
+@pytest.mark.parametrize("payload", [
+    "JWT_SECRET=fixture\x00value\n",
+    "JWT_SECRET=fixture\x7fvalue\n",
+    "JWT_SECRET=one\u2028OTHER=two\n",
+    "JWT_SECRET=one\u0085OTHER=two\n",
+    "export JWT_SECRET=fixture\n",
+    "INVALID-KEY=fixture\n",
+    "JWT_SECRET\n",
+    "JWT_SECRET: fixture\n",
+    'JWT_SECRET="unterminated\n',
+    "JWT_SECRET='unterminated\n",
+    'JWT_SECRET="value" trailing\n',
+])
+def test_runtime_and_setup_refuse_unreviewed_env_syntax_without_echo(tmp_path, payload):
+    from skeleton.app.assembly import _read_dotenv
+    from skeleton.app.setup_runtime import _parse_env
+    source = tmp_path / ".env"
+    source.write_text(payload, encoding="utf-8")
+    for operation in (lambda: _read_dotenv(source), lambda: _parse_env(payload)):
+        with pytest.raises(ValueError, match="runtime .env") as error:
+            operation()
+        assert "fixture" not in str(error.value)
+    assert source.read_text(encoding="utf-8") == payload
+
+
+def test_runtime_and_setup_share_legacy_duplicates_and_quoted_comment_semantics(tmp_path):
+    from skeleton.app.assembly import _read_dotenv
+    from skeleton.app.setup_runtime import _parse_env
+    text = (
+        "# legacy duplicates retain last assignment\n"
+        "VALUE=first\n"
+        'VALUE="second # literal" # external comment\n'
+        "PORT=8080 # comment\n"
+        "EMPTY=\n"
+        "SINGLE='literal # value' # comment\n"
+    )
+    source = tmp_path / ".env"
+    source.write_text(text, encoding="utf-8")
+    expected = {"VALUE": "second # literal", "PORT": "8080",
+                "EMPTY": "", "SINGLE": "literal # value"}
+    assert _parse_env(text) == _read_dotenv(source) == expected
+
+
+def test_readonly_dotenv_rejects_same_inode_mutation(tmp_path, monkeypatch):
+    import os
+    from skeleton.app.assembly import _read_dotenv
+    source = tmp_path / ".env"
+    source.write_text("VALUE=first\n")
+    actual_fdopen = os.fdopen
+
+    class Reader:
+        def __init__(self, fd, mode):
+            self.handle = actual_fdopen(fd, mode)
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            self.handle.close()
+        def fileno(self):
+            return self.handle.fileno()
+        def read(self, size):
+            content = self.handle.read(size)
+            source.write_text("VALUE=other\n")
+            info = source.stat()
+            os.utime(source, ns=(info.st_atime_ns, info.st_mtime_ns + 2_000_000_000))
+            return content
+
+    monkeypatch.setattr(os, "fdopen", Reader)
+    with pytest.raises(ValueError, match="changed"):
+        _read_dotenv(source)
