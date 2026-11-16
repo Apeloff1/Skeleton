@@ -174,7 +174,9 @@ class OfflineRequestQueue:
 
     def tick(self) -> dict:
         """Execute only a fresh, consumed cooperative grant, with bounded progress."""
-        require(self._iteration_lock.acquire(blocking=False), "another iteration is in progress")
+        with self._lock:
+            self._open()
+            require(self._iteration_lock.acquire(blocking=False), "another iteration is in progress")
         try:
             return self._tick()
         except BaseException:
@@ -185,10 +187,32 @@ class OfflineRequestQueue:
                 self._session.close()
             raise
         finally:
-            self._iteration_lock.release()
+            # Coordinate completion with close(): under the state lock, the
+            # closing thread either observes this final cleanup or owns the
+            # now-idle iteration lock itself. No unowned shutdown interval.
+            with self._lock:
+                try:
+                    if self._closed and not self._poisoned:
+                        self._sweep(time.monotonic_ns())
+                except BaseException:
+                    self._poisoned = True
+                    raise
+                finally:
+                    self._iteration_lock.release()
 
     def _tick(self) -> dict:
         with self._lock:
+            # close() may have won the interval after tick acquired custody.
+            # No further observation or admission should occur in that case.
+            if self._closed:
+                body = {"schema": SCHEMA, "sequence": self._sequence,
+                        "admission_digest": None, "scheduler_digest": self._scheduler.snapshot()["digest"],
+                        "progress": [], "retired": self._sweep(time.monotonic_ns()),
+                        "capacity": self._scheduler.capacity(), "status": "closed",
+                        "kv_accounting": "logical_reservation_only",
+                        "executor": "trusted_cooperative_owner",
+                        "native_qualified": False, "release_qualified": False}
+                return {**body, "progress_digest": digest(body)}
             self._open()
             retired = self._sweep(time.monotonic_ns())
             decision = self._scheduler.admit()
@@ -254,6 +278,8 @@ class OfflineRequestQueue:
         with self._lock:
             return {"closed": self._closed, "poisoned": self._poisoned,
                     "sequence": self._sequence, "capacity": self._scheduler.capacity(),
+                    "iteration_in_progress": self._iteration_lock.locked(),
+                    "drain_complete": self._closed and not self._requests and not self._iteration_lock.locked(),
                     "requests": [{"request_id": key, "prompt_left": row.prompt_left,
                                   "decode_left": row.decode_left, "cancelled": row.cancel.is_set()}
                                  for key, row in sorted(self._requests.items())],
@@ -264,20 +290,18 @@ class OfflineRequestQueue:
             self._closed = True
             for row in self._requests.values():
                 row.cancel.set()
-        # Do not block indefinitely on an uncooperative native executor.
-        if not self._iteration_lock.acquire(blocking=False):
-            self._session.close()
-            return
-        try:
-            with self._lock:
-                # After a poisoned executor, only an explicit successful
-                # release can retire its suspect logical reservation.
+            # If a tick holds the lock, let that owner finish draining.
+            # A stuck executor retains its reservations and cancellation fence.
+            owns_cleanup = self._iteration_lock.acquire(blocking=False)
+            if not owns_cleanup:
+                self._session.close()
+                return
+            try:
                 for key in tuple(self._requests):
                     self._retire(key, completed=False)
-        except BaseException:
-            with self._lock:
+            except BaseException:
                 self._poisoned = True
-            raise
-        finally:
-            self._session.close()
-            self._iteration_lock.release()
+                raise
+            finally:
+                self._session.close()
+                self._iteration_lock.release()
