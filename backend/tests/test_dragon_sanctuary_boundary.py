@@ -288,5 +288,71 @@ class PeerAcquisitionGateTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(query["_id"], {"$ne": "current"})
 
 
+class PublisherIntentCustodyTests(unittest.IsolatedAsyncioTestCase):
+    async def witnessed_row(self):
+        from core.dragon_crawler import (
+            _digest, _operation, _publisher_creation_body,
+        )
+        from skeleton.ai.webcrawler.operations import CrawlRequest
+
+        fixture = PublisherIntakeTests()
+        app, body = fixture.setup_intake()
+        await app.create_publisher_intake(SCOPE, body)
+        request_body = app.create.await_args.args[1]
+        normalized = _publisher_creation_body(request_body, _operation(body["idempotency_key"]))
+        digest = _digest(normalized)
+        identifier = "publisher-session"
+        row = {
+            "_id": identifier, **SCOPE, "creation_digest": digest,
+            "request": CrawlRequest(
+                seed_urls=tuple(normalized["seeds"]),
+                allowed_hosts=("example.com",), max_depth=0, max_requests=8,
+                max_documents=1, max_response_bytes=524288,
+                max_total_bytes=2 * 1024 * 1024).as_dict(),
+            "consent": {"consent_id": _digest([SCOPE, identifier, digest])},
+            "publisher_creation": {"schema": "skeleton.dragon.publisher-intent.v1",
+                                   "body": normalized, "digest": digest},
+        }
+        return row
+
+    async def test_receipt_is_bound_and_does_not_disclose_operation_key(self):
+        from core.dragon_crawler import _publisher_intent_projection
+        row = await self.witnessed_row()
+        result = _publisher_intent_projection(SCOPE, row)
+        self.assertTrue(result["operator_acknowledged"])
+        self.assertFalse(result["publisher_verified"])
+        self.assertFalse(result["license_verified"])
+        self.assertNotIn("approved-intake", str(row["publisher_creation"]))
+        self.assertNotIn("idempotency_key", result)
+        self.assertNotIn("seeds", result)
+
+    async def test_tampered_intent_scope_consent_or_budget_is_rejected(self):
+        from copy import deepcopy
+        from core.dragon_crawler import _publisher_intent_projection
+        row = await self.witnessed_row()
+        for path, value in (
+            (("publisher_creation", "digest"), "0"*64),
+            (("publisher_creation", "body", "max_requests"), 128),
+            (("request", "max_depth"), 1),
+            (("consent", "consent_id"), "0"*64),
+        ):
+            broken = deepcopy(row)
+            target = broken
+            for part in path[:-1]:
+                target = target[part]
+            target[path[-1]] = value
+            with self.assertRaises(CrawlerError) as caught:
+                _publisher_intent_projection(SCOPE, broken)
+            self.assertEqual(caught.exception.code, "crawler_publisher_intent_invalid")
+        with self.assertRaises(CrawlerError):
+            _publisher_intent_projection({**SCOPE, "owner_id": "other"}, row)
+
+    async def test_legacy_session_is_not_qualified_as_publisher_intent(self):
+        from core.dragon_crawler import _publisher_intent_projection
+        row = await self.witnessed_row()
+        del row["publisher_creation"]
+        self.assertIsNone(_publisher_intent_projection(SCOPE, row))
+
+
 if __name__ == "__main__":
     unittest.main()
