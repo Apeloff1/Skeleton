@@ -1184,3 +1184,14 @@ backend directory read-only and retains a separate writable /app/data
 volume. A previously running hot-reload backend can be replaced with a
 production container while retaining the named data volume. This storage
 exception does not attest the identity of code in an existing bind mount.
+
+
+The same launch observation also checks all resolved host port mappings
+against the selected local installation and mode. Post-start observations
+compare each running service's actual TCP bindings and image ID to the
+resolved service image reference and observed local image tag. Public or
+unexpected port bindings and mismatched image tags deny readiness. A
+per-campaign keyed fingerprint covers the entire resolved Compose model,
+including build arguments and environment, without publishing secret-bearing
+config or fingerprint data. This does not establish registry trust, build
+provenance, image source parity, immutable volume identity or device readiness.

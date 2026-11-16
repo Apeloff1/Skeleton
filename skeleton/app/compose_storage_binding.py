@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import hmac
+import secrets
 import json
 import re
 import subprocess
@@ -16,6 +18,7 @@ import tempfile
 from pathlib import Path
 from collections.abc import Mapping
 
+from skeleton.app.compose_runtime_identity import RuntimeIdentityDenied
 from skeleton.app.storage_custody import (
     CONTAINER_ROLES, VOLUME_ROLES, StorageCustodyDenied, _names,
 )
@@ -44,12 +47,16 @@ class _BindingIdentity:
     daemon_digest: str
     model_digest: str
     volume_digests: tuple[tuple[str, str], ...]
+    # A random per-campaign HMAC key avoids exposing an offline secret
+    # guessing oracle even if an in-memory identity is accidentally logged.
+    model_key: bytes
 # Emit only the relevant labels and mount metadata. Never inspect Config.Env.
 _CONTAINER_TEMPLATE = (
     '{"project":{{json (index .Config.Labels "com.docker.compose.project")}},'
     '"service":{{json (index .Config.Labels "com.docker.compose.service")}},'
     '"id":{{json .Id}},"running":{{json .State.Running}},'
-    '"mounts":{{json .Mounts}}}'
+    '"image_id":{{json .Image}},"image_ref":{{json .Config.Image}},'
+    '"ports":{{json .NetworkSettings.Ports}},"mounts":{{json .Mounts}}}'
 )
 _VOLUME_TEMPLATE = (
     '{"project":{{json (index .Labels "com.docker.compose.project")}},'
@@ -76,6 +83,8 @@ class BindingReport:
             "existing_volumes":self.existing_volumes,
             "database_authenticated":False,"backup_verified":False,
             "storage_modified":False,
+            "runtime_image_provenance_verified":False,
+            "source_to_image_verified":False,
         }
 
 
@@ -292,8 +301,27 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
 
         daemon_digest = daemon()
         hot = "docker-compose.hot.yml" in render
-        project, resolved = _resolved_model(inspect(render,_MAX_CONFIG),root=root,hot=hot)
-        model_digest = _digest((project,resolved))
+        from skeleton.app.assembly import _runtime_env
+        from skeleton.app.compose_runtime_identity import (
+            RuntimeIdentityDenied, model_identity, actual_identity, verify_image,
+        )
+        config = inspect(render,_MAX_CONFIG)
+        project, resolved = _resolved_model(config,root=root,hot=hot)
+        values = _runtime_env(root,copied)
+        expected_runtime = model_identity(config,values=values,hot=hot)
+        key = (previous.identity.model_key if require_started and previous is not None
+               and previous.identity is not None else secrets.token_bytes(32))
+
+        def model_mac(value):
+            raw = json.dumps(value,sort_keys=True,separators=(",",":"),
+                             ensure_ascii=True,allow_nan=False).encode("ascii")
+            return hmac.new(key,raw,hashlib.sha256).hexdigest()
+
+        # Bind the entire resolved model across observations, including
+        # build args, environment, security, networks and dependency policy.
+        # Neither the raw model nor its keyed fingerprint is published.
+        model_digest = model_mac(config)
+        del config,values
         if require_started:
             _require(previous is not None and previous.admitted is True
                      and previous.identity is not None, "prior_binding_unverified")
@@ -305,6 +333,16 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
         all_volumes, all_containers = names(volume_args), names(container_args)
         volume_digests = {}
         container_digests = {}
+        runtime_digests = {}
+
+        def observe_runtime(role,payload):
+            expected = expected_runtime[role]
+            image_id,ports = actual_identity(payload,expected)
+            tagged = inspect(["docker","image","inspect","--format",'{"id":{{json .Id}}}',
+                              expected.image],_MAX_INSPECT)
+            verify_image(tagged,image_id)
+            return _digest((image_id,ports))
+
         if require_started:
             _require(all("tutolage-"+role in all_containers for role in _ACTIVE_ROLES)
                      and all(resolved[role] in all_volumes
@@ -330,6 +368,8 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
                                    _CONTAINER_TEMPLATE,name],_MAX_INSPECT)
                 container_digests[role] = _container_binding(payload,project,role,resolved,
                     require_running=require_started and role in _ACTIVE_ROLES)
+                if require_started and role in _ACTIVE_ROLES:
+                    runtime_digests[role] = observe_runtime(role,payload)
                 existing_containers += 1
         if require_started:
             for role, digest in previous.identity.volume_digests:
@@ -343,15 +383,21 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
             _require(_container_binding(payload,project,role,resolved,
                 require_running=require_started and role in _ACTIVE_ROLES) == digest,
                 "container_binding_changed")
+            if role in runtime_digests:
+                _require(observe_runtime(role,payload)==runtime_digests[role],
+                         "running_image_or_ingress_changed")
         _require(names(volume_args) == all_volumes and names(container_args) == all_containers,
                  "docker_storage_inventory_changed")
-        _require(_resolved_model(inspect(render,_MAX_CONFIG),root=root,hot=hot) == (project,resolved),
+        reloaded = inspect(render,_MAX_CONFIG)
+        _require(_resolved_model(reloaded,root=root,hot=hot) == (project,resolved)
+                 and hmac.compare_digest(model_mac(reloaded),model_digest),
                  "compose_storage_model_changed")
+        del reloaded
         fence()
         _require(daemon() == daemon_digest, "docker_daemon_changed")
-        identity = _BindingIdentity(daemon_digest,model_digest,tuple(sorted(volume_digests.items())))
+        identity = _BindingIdentity(daemon_digest,model_digest,tuple(sorted(volume_digests.items())),key)
         return BindingReport(True,True,"binding_observed",existing_containers,existing_volumes,identity)
-    except BindingDenied as exc:
+    except (BindingDenied, RuntimeIdentityDenied) as exc:
         # All BindingDenied codes are fixed internal identifiers.
         return BindingReport(False,False,str(exc))
     except (StorageCustodyDenied,OSError,ValueError,TypeError,KeyError,IndexError,

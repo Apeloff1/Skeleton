@@ -156,6 +156,7 @@
     "skeleton/app/runtime_mutation.py",
     "skeleton/app/storage_custody.py",
     "skeleton/app/compose_storage_binding.py",
+    "skeleton/app/compose_runtime_identity.py",
     "skeleton/app/install_probe_worker.py",
     "skeleton/api/server.py",
     "frontend/app/product.tsx",
