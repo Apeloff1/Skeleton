@@ -221,7 +221,8 @@ class TransformerBlock:
         keys: List[List[float]] = []
         values: List[List[float]] = []
         if last_only:
-            for pos, row in enumerate(X[:-1]):
+            for pos in range(len(X) - 1):
+                row = X[pos]
                 if interrupt is not None:
                     interrupt()
                 normalized, _, _ = self._norm(row, self.ln1_g, self.ln1_b)
@@ -792,6 +793,10 @@ class TinyTransformer:
         else:
             H, _ = self._forward(ids, retain_cache=False, interrupt=interrupt)
         y = H[-1] if H else zeros(self.dim)
+        return self._project_logits(y, interrupt)
+
+    def _project_logits(self, y: Sequence[float],
+                        interrupt: Callable[[], None] | None = None) -> List[float]:
         if interrupt is not None and type(self) is TinyTransformer and "_unembed" not in self.__dict__:
             W = self.E if self.tied else self.Wout
             return add(_poll_matvec(W, list(y), interrupt), self.bout)
@@ -823,7 +828,7 @@ class TinyTransformer:
         cache.next_position += 1
         if project:
             try:
-                logits = self._unembed(x)
+                logits = self._project_logits(x, interrupt)
             except BaseException:
                 cache.reset()
                 raise
