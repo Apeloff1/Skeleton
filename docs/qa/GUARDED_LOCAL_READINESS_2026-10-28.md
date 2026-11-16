@@ -105,3 +105,31 @@ A staged result is never treated as an already committed result. If admission
 completion fails after a terminal result commits, current maintenance scans
 nonterminal executions and does not independently retry completion; a durable
 completion outbox or equivalent reconciliation remains required.
+
+
+## Candidate guarded Mongo observation (2026-11-16)
+
+For an already running, operator-provisioned replica set and an explicitly chosen
+existing shared epoch database, each deployed service can perform a read-only
+observation using its own existing credentials. Keep the backend's application
+database and the engine's memory database separate; this command does not rename,
+move, copy, initialize or modify either. It does not establish writer fencing.
+
+Supply a private UTF-8 JSON file outside the repository containing exactly
+"tenant_id", "actor_id", and "context_id" string fields (at most 4096 bytes).
+Use the same intended actor scope and existing epoch database in each command.
+For example, from the repository root on a configured Docker host:
+
+    docker compose exec -T backend python -m skeleton.app.compose_guarded_preflight --source backend --shared-epoch-database canonical_witness --scope-stdin --summary < /private/actor-scope.json
+    docker compose exec -T skeleton python -m skeleton.app.compose_guarded_preflight --source engine --shared-epoch-database canonical_witness --scope-stdin --summary < /private/actor-scope.json
+
+Replace the illustrative witness database name and file path with the actual
+operator-provisioned ones. The app CLI also exposes the same command as
+"python -m skeleton app mongo-preflight". There is no credential in argv, no
+automatic provisioning, and no raw Mongo response or actor identity in output.
+An independently observed single-source stable epoch is not evidence that the
+two services share the same physical cluster, writer authority or policy. Both
+commands deliberately return 2 even when an observation is complete; they are
+not an activation or service-readiness check. Existing database backup,
+authenticated replica configuration, quiescent migration, independent reviewer,
+pinned policy and exact active model/tokenizer custody remain mandatory.

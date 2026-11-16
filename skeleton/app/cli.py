@@ -59,6 +59,8 @@ def _parser() -> argparse.ArgumentParser:
         help="private existing bearer-token file for authenticated --studio --live server readiness",
     )
 
+    sub.add_parser("mongo-preflight", help="observe guarded Mongo prerequisites; never activate inference")
+
     plan = sub.add_parser("plan", help="show dependency-aware application startup order")
     plan.add_argument("--full", action="store_true", help="include optional full-profile services")
     plan.add_argument("--json", action="store_true", dest="as_json")
@@ -424,6 +426,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     """Run the application assembly CLI and return a process-style exit code."""
 
     arguments = list(argv or ())
+    if arguments and arguments[0] == "mongo-preflight":
+        from skeleton.app.compose_guarded_preflight import main as mongo_preflight_main
+        return mongo_preflight_main(arguments[1:])
     # The original-game authoring CLI owns its own strict argument validation,
     # source-bound replay and exclusive save-custody rules. Do not duplicate
     # those operations in the assembly shell's argument parser.

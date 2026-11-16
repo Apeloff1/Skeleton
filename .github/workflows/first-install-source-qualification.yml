@@ -67,6 +67,26 @@ jobs:
             skeleton/testing/test_app_offline_install_reconciliation.py \
             skeleton/testing/test_first_install_required_routes.py \
             skeleton/testing/test_windows_installer.py
+      - name: Qualify guarded Mongo observation and deployed-source scope custody
+        run: |
+          python -m pytest -q --maxfail=1 \
+            skeleton/testing/test_compose_authentication_boundary_regression.py \
+            skeleton/testing/test_compose_explicit_null_role_boundary.py \
+            skeleton/testing/test_compose_final_observation_custody.py \
+            skeleton/testing/test_compose_guarded_preflight.py \
+            skeleton/testing/test_compose_hello_message_boundary.py \
+            skeleton/testing/test_compose_load_balanced_authority.py \
+            skeleton/testing/test_compose_mongo_first_run_status.py \
+            skeleton/testing/test_compose_mongo_topology_custody.py \
+            skeleton/testing/test_compose_null_primary_role_boundary.py \
+            skeleton/testing/test_compose_null_proxy_authority.py \
+            skeleton/testing/test_compose_null_topology_authority.py \
+            skeleton/testing/test_compose_primary_membership_regression.py \
+            skeleton/testing/test_compose_primary_topology_scalar_boundaries.py \
+            skeleton/testing/test_compose_router_ghost_topology_fencing.py \
+            skeleton/testing/test_compose_terminal_authority_failures.py \
+            skeleton/testing/test_compose_terminal_topology.py \
+            skeleton/testing/test_guarded_mongo_operator.py
       - name: Verify construction and provider-owner contracts
         run: |
           python scripts/check_architecture_map.py
