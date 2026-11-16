@@ -101,6 +101,7 @@ class RuntimeAdmission:
         self._hysteresis = EnergyHysteresis(hysteresis_policy)
         self._sequence = 0
         self._last_sample = None
+        self._last_origin = None
         self._pending = None
         self._lock = threading.RLock()
 
@@ -109,10 +110,15 @@ class RuntimeAdmission:
         with self._lock:
             # A new offer always invalidates the previous unconsumed proposal.
             self._pending = None
-            rows = _work_rows(work)
+            _work_rows(work)
             require(digest(self.source.snapshot()) == self._source_digest,
                     "selected source evidence changed")
             preflight = plan_preflight(self.source, sample, self.policy, now_ns=now_ns)
+            if self._last_origin is not None and self._last_origin != sample.origin:
+                # Simulated observations cannot prewarm the live admission gate.
+                self._hysteresis = EnergyHysteresis(self._hysteresis.policy)
+                self._last_sample = None
+            self._last_origin = sample.origin
             chronological = self._last_sample is None or sample.started_ns > self._last_sample
             if not chronological or preflight["blockers"]:
                 self._hysteresis = EnergyHysteresis(self._hysteresis.policy)
@@ -177,5 +183,6 @@ class RuntimeAdmission:
     def status(self) -> dict:
         with self._lock:
             return {"sequence": self._sequence, "source_digest": self._source_digest,
-                    "pending": self._pending is not None, "worker_ceiling": self._hysteresis.workers,
+                    "pending": self._pending is not None, "hysteresis_workers": self._hysteresis.workers,
+                    "sample_origin": self._last_origin,
                     "native_qualified": False, "release_qualified": False}
