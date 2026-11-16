@@ -991,6 +991,51 @@ class OfflineHTTPApplication:
                 raise OfflineHTTPError(409, str(exc)) from exc
             except (ReferenceReadRejected, ReferenceWriteRejected, LocalJobRejected) as exc:
                 raise OfflineHTTPError(400, str(exc)) from exc
+        if path == "/v1/knowledge/research-review" and method == "POST":
+            _fields(body, {"query", "document_ids", "approved"}, {"query", "approved"})
+            if body["approved"] is not True:
+                raise OfflineHTTPError(403, "multi-hop local research requires explicit approval")
+            query = body["query"]
+            if type(query) is not str or not query.strip() or len(query.encode("utf-8")) > 1024:
+                raise OfflineHTTPError(400, "invalid bounded local research query")
+            scope = _document_scope(body, True)
+            try:
+                from skeleton.retrieval.evidence_walk import EvidenceWalkPolicy
+                with self._lock:
+                    hits, proof = self.knowledge.search_multihop(
+                        query.strip(), document_ids=scope, limit=3,
+                        policy=EvidenceWalkPolicy(max_queries=6, max_hops=2,
+                                                  max_query_bytes=1024, timeout_seconds=10),
+                        allow_lexical=True,
+                    )
+                    from skeleton.app.offline_grounding import _citation
+                    sources = [_citation(hit) for hit in hits]
+                    selected = tuple(sorted({c["document_id"] for c in sources}))
+                    with self._store.read_snapshot():
+                        if selected:
+                            if scope is not None and not set(selected).issubset(scope):
+                                raise RuntimeContractError("research source escaped requested scope")
+                            docs, _ = self.knowledge._verified_snapshot(selected)
+                            indexed = {doc[0]: doc for doc in docs}
+                            for c in sources:
+                                doc = indexed[c["document_id"]]
+                                if doc[2] != c["document_sha256"] or doc[3][c["char_start"]:c["char_end"]] != c["passage"]:
+                                    raise RuntimeContractError("research source changed")
+                        elif scope is not None:
+                            self.knowledge._verified_snapshot(scope)
+                    return 200, {
+                        "schema": "skeleton.jeeves.local-research-review.v1",
+                        "question_sha256": sha256(query.strip().encode("utf-8")).hexdigest(),
+                        "document_scope": None if scope is None else list(scope),
+                        "ranking": "learned" if self.knowledge._semantic_ranker is not None else "lexical",
+                        "sources": sources, "trace": proof,
+                        "generation_performed": False, "network_called": False,
+                        "semantic_entailment_verified": False, "memory_saved": False,
+                    }
+            except TimeoutError:
+                raise OfflineHTTPError(408, "bounded local research deadline exceeded") from None
+            except RuntimeContractError:
+                raise OfflineHTTPError(422, "local research evidence unavailable") from None
         if path == "/v1/knowledge/search" and method == "POST":
             _fields(body, {"query", "limit", "document_ids"}, {"query"})
             query, limit = body["query"], body.get("limit", 6)
