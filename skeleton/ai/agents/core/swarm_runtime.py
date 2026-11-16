@@ -68,6 +68,7 @@ class WorkerState:
     last_seen: float = field(default_factory=monotonic)
     parent_id: str | None = None
     delegated_capacity: int = 0
+    registration_token: str = field(default_factory=lambda: uuid4().hex)
 
     @property
     def available(self) -> int:

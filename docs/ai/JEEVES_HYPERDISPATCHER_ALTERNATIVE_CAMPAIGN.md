@@ -36,17 +36,17 @@ Further research queue (not yet verified): Restate, Oban, pg-boss, Faktory, Asyn
 | A12 | Durable timers and waits | Restate / DBOS | Open |
 | A13 | Atomic outcome plus enqueue | River | Open |
 | A14 | Transactional unique job identity | River / Oban | Open |
-| A15 | Versioned activation identity | Orleans | Open |
-| A16 | Idle actor passivation | Pekko / Orleans | Open |
+| A15 | Versioned activation identity | Orleans | P |
+| A16 | Idle actor passivation | Pekko / Orleans | P |
 | A17 | Memory-sensitive passivation | Orleans | Open |
 | A18 | Communication affinity graph | Orleans | Open |
 | A19 | Bounded migration rounds | Orleans | Open |
 | A20 | Activation balance and anti-thrash | Orleans | Open |
-| A21 | Scale-to-zero safety | Knative | Open |
-| A22 | Cooldown and warm retention | KEDA / Knative | Open |
-| A23 | Stale scaler metric hold | KEDA | Open |
-| A24 | Service-rate-based scale demand | KEDA / Parsl | Open |
-| A25 | Uncertain execution capacity floor | Jeeves extension | Open |
+| A21 | Scale-to-zero safety | Knative | P |
+| A22 | Cooldown and warm retention | KEDA / Knative | P |
+| A23 | Stale scaler metric hold | KEDA | P |
+| A24 | Service-rate-based scale demand | KEDA / Parsl | P |
+| A25 | Uncertain execution capacity floor | Jeeves extension | P |
 | A26 | Hierarchical allocation subleases | Flux / Parsl | Open |
 | A27 | Nested allocation reclamation | Flux | Open |
 | A28 | Data-affinity task scheduling | TaskVine / StarPU | Open |
@@ -73,3 +73,16 @@ Policies are trusted host configuration, not information inferred from task
 payload. The current archive does not independently persist or hash policy
 configuration; the recovery host must supply matching policy. Shared service
 ceilings are explicit tenant groupings, not per-operation keys.
+
+## Wave A2: activation identities and elastic lifecycle
+
+The existing runtime assigns a fresh registration token per worker activation;
+restored activation identities rotate and cannot reuse old stop evidence.
+The existing autoscale policy accounts for uncertain slots and does not recommend
+removing occupied capacity. The new service-rate elastic recommendation reduces
+backlog using bounded changes, freshness checks, warm retention, cooldown and
+explicit scale-to-zero readiness. A root idle-retirement proposal excludes queued
+demand, held capacity, delegated descendants and protected identities. The existing
+worker registry removes an idle logical worker only after a trusted stop verifier
+and exact generation revalidation. No external process is stopped or started
+by these methods. Zero-ready is a trusted host assertion, not a live probe.

@@ -1235,3 +1235,50 @@ def test_alternative_shared_quota_serializes_competing_tenants():
         result=list(pool.map(reserve,range(64)))
     assert sum(result)==3
     assert ledger.shared_snapshot()["all"]["leased"]==3
+
+def test_alternative_scaler_holds_stale_and_warming_capacity():
+    from skeleton.automation.agents.swarm_autoscale import ElasticPolicy, ScaleTelemetry
+    policy=ElasticPolicy(zero_ready_verified=True,warm_retention_ms=100,down_cooldown_ms=50,maximum_step=2)
+    t=ScaleTelemetry(1,1000,0,0,0,10,0,2,0)
+    assert policy.recommend(t,now_ms=1000,generation=1).desired_slots==0
+    assert policy.recommend(t,now_ms=1000,generation=2).desired_slots==2
+    assert policy.recommend(t,now_ms=7000,generation=1).desired_slots==2
+    assert policy.recommend(replace(t,warming_slots=1),now_ms=1000,generation=1).desired_slots==3
+    assert policy.recommend(replace(t,last_demand_ms=950),now_ms=1000,generation=1).desired_slots==1
+    assert policy.recommend(replace(t,backlog=100),now_ms=1000,generation=1).desired_slots==4
+    assert policy.recommend(replace(t,occupied_slots=2),now_ms=1000,generation=1).desired_slots==2
+
+
+def test_alternative_idle_retirement_is_fenced_against_registration_reuse():
+    from skeleton.automation.agents.swarm_autoscale import propose_idle_retirements, retire_idle_verified
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    now=[1.0]
+    runtime=HardenedSwarmRuntime(fenced=True,clock=lambda:now[0])
+    runtime.register_worker("w",capacity=2)
+    now[0]=20.0
+    proposal=propose_idle_retirements(runtime,desired_slots=0,idle_seconds=5)[0]
+    kw=dict(verify_stop=lambda *args: True,stop_receipt_sha256="a"*64,desired_slots=0,idle_seconds=5)
+    runtime.unregister_worker("w")
+    now[0]=1.0
+    runtime.register_worker("w",capacity=2)
+    now[0]=20.0
+    assert not retire_idle_verified(runtime,proposal,**kw)
+    fresh=propose_idle_retirements(runtime,desired_slots=0,idle_seconds=5)[0]
+    assert retire_idle_verified(runtime,fresh,**kw)
+    assert not runtime.workers()
+
+
+def test_alternative_uncertain_capacity_cannot_be_scaled_away():
+    from skeleton.automation.agents.swarm_autoscale import AutoscalePolicy, propose_idle_retirements
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_runtime import SwarmTask
+    now=[1.0]
+    runtime=HardenedSwarmRuntime(fenced=True,clock=lambda:now[0])
+    runtime.register_worker("w",capacity=1)
+    runtime.submit(SwarmTask("a",{}))
+    attempt=runtime.lease("w")[0]
+    runtime.fail("w","a","uncertain",lease_token=attempt.lease_token)
+    now[0]=100.0
+    rec=AutoscalePolicy(min_slots=0,max_slots=5).recommend(runtime)
+    assert rec.current_slots==1 and rec.desired_slots==1
+    assert not propose_idle_retirements(runtime,desired_slots=0,idle_seconds=5)
