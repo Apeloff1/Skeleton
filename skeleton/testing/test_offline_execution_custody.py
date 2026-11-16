@@ -280,3 +280,84 @@ def test_sealed_runtime_rechecks_pressure_during_copy(tmp_path, monkeypatch):
                                 maximum_sealed_bytes=len(payload)):
             pytest.fail("pressure-denied sealed source published")
     assert len(checks) == 3
+
+
+def test_runtime_session_exclusive_consumer_revokes_existing_offer(tmp_path, monkeypatch):
+    from skeleton.testing.test_offline_runtime_admission import work
+    session, _, _ = session_fixture(tmp_path, monkeypatch)
+    session.offer(work())
+    pending = session.offer(work())["admission"]
+    assert pending["status"] == "candidate"
+    owner = session.claim_consumer()
+    assert session.status()["exclusive_consumer_bound"]
+    assert not session.status()["admission"]["pending"]
+    with pytest.raises(RuntimePreflightError, match="no pending"):
+        session.consume(pending, consumer=owner)
+    with pytest.raises(RuntimePreflightError, match="already has"):
+        session.claim_consumer()
+    with pytest.raises(RuntimePreflightError, match="owner mismatch"):
+        session.offer(work())
+    with pytest.raises(RuntimePreflightError, match="owner mismatch"):
+        session.revalidate_source(consumer=object())
+    session.offer(work(), consumer=owner)
+    next_grant = session.offer(work(), consumer=owner)["admission"]
+    assert next_grant["status"] == "candidate"
+    with pytest.raises(RuntimePreflightError, match="owner mismatch"):
+        session.consume(next_grant, consumer=object())
+    assert session.consume(next_grant, consumer=owner)
+    session.close()
+
+
+def test_queue_and_whole_request_cannot_share_one_session(tmp_path, monkeypatch):
+    from skeleton.ai.runtime.inference.local import LocalInferenceEngine, ReferenceNGramModel
+    from skeleton.app.offline_runtime_whole_request import MeasuredWholeRequestEngine
+    policy = QueuePolicy()
+    session, base, _ = session_fixture(tmp_path, monkeypatch, queue_policy=policy)
+    queue = OfflineRequestQueue(session, policy, Executor(), base_policy=base)
+    model = ReferenceNGramModel.train(["harbor lights harbor lights"])
+    engine = LocalInferenceEngine(model, cache_size=0, max_concurrency=1)
+    try:
+        with pytest.raises(RuntimePreflightError, match="already has"):
+            MeasuredWholeRequestEngine(session, engine, backend_digest=model.model_digest)
+        with pytest.raises(RuntimePreflightError, match="already has"):
+            OfflineRequestQueue(session, policy, Executor(), base_policy=base)
+    finally:
+        queue.close()
+        asyncio.run(engine.close())
+
+
+def test_whole_request_wait_timeout_does_not_consume_or_revoke_owner(tmp_path, monkeypatch):
+    from skeleton.ai.runtime.inference.local import LocalInferenceEngine, LocalInferenceRequest, ReferenceNGramModel
+    from skeleton.app.offline_runtime_whole_request import MeasuredWholeRequestEngine
+    async def run():
+        session, _, samples = session_fixture(tmp_path, monkeypatch)
+        model = ReferenceNGramModel.train(["hello harbor hello"])
+        engine = LocalInferenceEngine(model, cache_size=0, max_concurrency=1)
+        adapter = MeasuredWholeRequestEngine(session, engine, backend_digest=model.model_digest)
+        req = LocalInferenceRequest("hello", max_output_tokens=4, seed=1, tool_choice="none")
+        await adapter._lock.acquire()
+        try:
+            with pytest.raises(RuntimePreflightError, match="expired while waiting"):
+                await asyncio.wait_for(adapter.generate(req, max_input_tokens=16, timeout_ms=5), timeout=2)
+            assert adapter._lock.locked()
+            assert samples[0] == 0
+            assert not session.status()["closed"]
+        finally:
+            adapter._lock.release()
+            adapter.close()
+            await engine.close()
+    asyncio.run(run())
+
+
+def test_large_unicode_result_uses_compact_custody_digest():
+    from skeleton.ai.runtime.inference.local import LocalInferenceResult
+    from skeleton.app.offline_runtime_whole_request import MeasuredWholeRequestEngine
+    payload = "\U0001f30a" * 400_000
+    result = LocalInferenceResult(payload, "fixture", "a" * 64, 1, 1)
+    first = MeasuredWholeRequestEngine._finish({}, "completed", result)
+    changed = replace(result, text=payload + "x")
+    second = MeasuredWholeRequestEngine._finish({}, "completed", changed)
+    assert first.result is result and second.result is changed
+    assert first.receipt["output_digest"] != second.receipt["output_digest"]
+    assert len(first.receipt["receipt_digest"]) == 64
+    assert payload[:100] not in str(first.receipt)
