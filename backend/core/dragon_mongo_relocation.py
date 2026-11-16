@@ -211,7 +211,7 @@ def copy_pulse(source,target,*,batches=8,offline_acknowledged=False):
     _ack(offline_acknowledged)
     if type(batches) is not int or not 1<=batches<=64:raise ValueError("bounded batch count")
     state=_state(target);_binding(source,target,state);_verify_target_binding(target,state)
-    if state["phase"]=="verified":return {"phase":"verified","copied":0}
+    if state["phase"]=="verified":return {"phase":"verified","copied":0,"ready_for_verify":True}
     if state["phase"]!="copying":raise RelocationHeld("prepare destination first")
     control=_journal(target);copied=0;remaining=batches
     for name in COLLECTIONS:
