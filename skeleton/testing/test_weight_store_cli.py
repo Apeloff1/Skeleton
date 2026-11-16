@@ -110,3 +110,33 @@ def test_exact_recovery_acknowledgement_cli(tmp_path):
     assert code == 0 and result["outcome"] == "recovery_reconciled"
     code, result, _ = invoke(["stage", *common(tmp_path), *pins], raw)
     assert code == 0 and result["plan_digest"] == plan.digest
+
+
+def test_scrub_commands_require_exact_cursor_and_verify_completed_snapshot(tmp_path):
+    raw, pins, _, _, _ = authored(tmp_path)
+    code, _, _ = invoke(["stage", *common(tmp_path), *pins], raw)
+    assert code == 0
+    code, initial, _ = invoke(["scrub-status", *common(tmp_path)])
+    assert code == 0 and initial["status"] == "not_started"
+    code, started, _ = invoke(["scrub-start", *common(tmp_path)])
+    assert code == 0 and started["status"] == "active"
+    command = ["scrub-step", *common(tmp_path), "--scrub-campaign-sha256", started["digest"]]
+    code, _, _ = invoke(["scrub-step", *common(tmp_path)])
+    assert code == 2
+    code, larger, _ = invoke([*command, "--scrub-tranche-bytes", "1"])
+    assert code == 3 and larger["status"] == "larger_tranche_required"
+    code, completed, _ = invoke([*command, "--scrub-tranche-bytes", "4096"])
+    assert code == 0 and completed["status"] == "completed"
+    final = completed["campaign"]["digest"]
+    code, _, _ = invoke(command)
+    assert code == 2
+    code, observation, _ = invoke(["scrub-check", *common(tmp_path),
+                                   "--scrub-campaign-sha256", final])
+    assert code == 0 and observation["current_metadata_revalidated"]
+    assert not observation["current_bytes_revalidated"]
+    assert str(tmp_path) not in json.dumps(observation)
+    code, _, _ = invoke(["scrub-start", *common(tmp_path)])
+    assert code == 2
+    code, next_campaign, _ = invoke(["scrub-start", *common(tmp_path), "--scrub-prior-sha256", final])
+    assert code == 0 and next_campaign["prior_campaign_digest"] == final
+    assert next_campaign["verified_objects"] == 0
