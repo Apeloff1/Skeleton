@@ -108,7 +108,7 @@ class OperatorGuardPreflight(unittest.TestCase):
         self.assertTrue(_scope("å" * 256))
         self.assertFalse(_scope("å" * 257))
         self.assertFalse(_scope("x" * 513))
-        self.assertFalse(_scope("\\ud800"))
+        self.assertFalse(_scope(chr(0xD800)))
         self.assertFalse(_valid_principal_utf8(""))
         self.assertFalse(_valid_principal_utf8("å" * 129))
         self.assertTrue(_valid_principal_utf8("å" * 128))

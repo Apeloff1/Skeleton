@@ -30,7 +30,7 @@ def summarize_observation(observation: object) -> dict[str, object]:
         type(observation) is dict
         and len(observation) <= 32
         # Check exact key types before any dictionary lookup can invoke a
-        # colliding hostile key\'s __eq__ callback.
+        # colliding hostile key's __eq__ callback.
         and all(type(key) is str and len(key) <= 128 for key in observation)
         and type(observation.get("schema_version")) is str
         and observation["schema_version"] == SCHEMA
