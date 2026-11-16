@@ -19,6 +19,7 @@ from pathlib import Path
 from collections.abc import Mapping
 
 from skeleton.app.compose_runtime_identity import RuntimeIdentityDenied
+from skeleton.app.compose_wiring import WiringDenied, validate_wiring
 from skeleton.app.storage_custody import (
     CONTAINER_ROLES, VOLUME_ROLES, StorageCustodyDenied, _names,
 )
@@ -339,6 +340,7 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
         expected_runtime = model_identity(config,values=values,hot=hot)
         from skeleton.app.compose_security_contract import model_security, live_security, network_security
         isolation = model_security(config,root=root,hot=hot)
+        validate_wiring(config,root=root,values=values,hot=hot)
         if previous is not None:
             _require(type(previous) is BindingReport and previous.admitted is True
                      and previous.identity is not None, "prior_binding_unverified")
@@ -453,7 +455,7 @@ def observe_binding(root: Path, *, command, environ: Mapping[str,str], runner=su
         identity = _BindingIdentity(daemon_digest,model_digest,tuple(sorted(volume_digests.items())),
                                     key,tuple(sorted(runtime_digests.items())),live_network)
         return BindingReport(True,True,"binding_observed",existing_containers,existing_volumes,identity)
-    except (BindingDenied, RuntimeIdentityDenied) as exc:
+    except (BindingDenied, RuntimeIdentityDenied, WiringDenied) as exc:
         # All BindingDenied codes are fixed internal identifiers.
         return BindingReport(False,False,str(exc))
     except (StorageCustodyDenied,OSError,ValueError,TypeError,KeyError,IndexError,

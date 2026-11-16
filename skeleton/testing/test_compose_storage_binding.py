@@ -8,6 +8,7 @@ import pytest
 from skeleton.app import compose_storage_binding as binding
 from skeleton.app import compose_runtime_identity as runtime
 from skeleton.app import compose_security_contract as isolation
+from skeleton.testing.compose_wiring_fixtures import fixture_values, populate_wiring
 
 PROJECT="fixture"
 COMMAND=("docker","compose","-f","docker-compose.yml","--env-file",".env",
@@ -50,7 +51,7 @@ def fixture_runner(*, resolved=None, volumes=(), containers=(), container_overri
         calls.append(tuple(command))
         assert kw["stderr"]==kw["stdin"]==subprocess.DEVNULL
         assert kw["check"] is False
-        assert kw["env"]=={"DOCKER_CONTEXT":"fixture-context"}
+        assert kw["env"]==fixture_values()
         if fail_on and fail_on in command:
             return subprocess.CompletedProcess(command,1)
         if command[1]=="info":
@@ -58,10 +59,11 @@ def fixture_runner(*, resolved=None, volumes=(), containers=(), container_overri
         elif command[1]=="compose":
             assert tuple(command)==COMMAND[:6]+("config","--format","json")
             value=deepcopy(payload)
+            populate_wiring(value,kw["cwd"],fixture_values())
             if changed_model and sum(c[1]=="compose" for c in calls)>1:
                 value["name"]="changed"
             if model_env_drift and sum(c[1]=="compose" for c in calls)>1:
-                value["services"]["backend"]["environment"]={"PRIVATE_FIXTURE":"different"}
+                value["services"]["backend"]["environment"]["PRIVATE_FIXTURE"]="different"
             raw=json.dumps(value).encode()
         elif command[1:3]==["network","inspect"]:
             network={"id":"e"*64,"name":PROJECT+"_tutolage","project":PROJECT,
@@ -122,7 +124,7 @@ def fixture_runner(*, resolved=None, volumes=(), containers=(), container_overri
 
 
 def observe(root,runner,admit=None,**options):
-    return binding.observe_binding(root,command=COMMAND,environ={"DOCKER_CONTEXT":"fixture-context"},
+    return binding.observe_binding(root,command=COMMAND,environ=fixture_values(),
                                    runner=runner,admit=admit,**options)
 
 

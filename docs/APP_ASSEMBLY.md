@@ -1277,3 +1277,14 @@ model's positive observation. Actual VM host-source path identity is not
 attested, because Docker Desktop can translate those paths. Conflicting
 tmpfs safety flags, root user aliases and explicitly disabled default
 security profiles are denied.
+
+
+The semantic wiring gate now runs with the independent Compose isolation
+contract on local installer startup, CLI startup, isolated frontend
+recovery and real-Compose source CI. It validates exact resolved
+credential propagation, private proxy bypass, local-only inference
+identity, protected application authentication, browser build/runtime
+origins, durable state paths, dependency health gates and canonical
+build contexts before a mutation. Only fixed failure codes leave the
+observer. This does not inspect running process credentials or prove
+source-to-image provenance.
