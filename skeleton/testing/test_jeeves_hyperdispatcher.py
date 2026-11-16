@@ -715,3 +715,34 @@ def test_verified_tenant_replay_and_cross_tenant_dependencies():
     assert broker.submit_verified_queued("t", SwarmTask("b", {}, dependencies=("a",))).admitted
     with pytest.raises(AdmissionError):
         broker.submit_verified_queued("t", SwarmTask("c", {}))
+
+def test_cognitive_specialists_are_policy_and_evidence_bound():
+    from skeleton.intelligence.dispatch_cognitive import CognitiveDemand, SpecialistObservation, choose_specialists
+    d = CognitiveDemand("task", "t", "a"*64, "b"*64, "code", frozenset({"code"}),
+                        frozenset({"c"*64, "d"*64}), 10, 10, 2, 1, 900000, 100, 20)
+    a = SpecialistObservation("a", "t", "c"*64, "family-a", "node-a", "a"*64, "code",
+                               frozenset({"code"}), "e"*64, "b"*64, 1, 1, 20, 10, 5, 10000, 9, 10, True, True)
+    b = replace(a, worker_id="b", model_sha256="d"*64, family_id="family-b", failure_domain="node-b",
+                capabilities=frozenset({"code", "verify"}), source_sha256="f"*64)
+    plan = choose_specialists(d, [a, b], now_ms=2)
+    assert plan.disposition == "independent_review" and plan.workers == ("a", "b")
+    assert plan.reserved_tokens == 40 and plan.reserved_cost == 10
+    assert choose_specialists(d, [b, a], now_ms=2) == plan
+    for bad in (replace(b, tenant_id="wrong"), replace(b, family_id="family-a"),
+                replace(b, failure_domain="node-a"), replace(b, local=False),
+                replace(b, policy_sha256="0"*64), replace(b, observed_ms=3),
+                replace(b, cost_microunits=16), replace(b, verified_successes=0)):
+        assert choose_specialists(d, [a, bad], now_ms=2).disposition == "hold_review_unavailable"
+    one = choose_specialists(replace(d, uncertainty_ppm=0), [a], now_ms=2)
+    assert one.disposition == "single" and one.plan_sha256 != plan.plan_sha256
+
+
+def test_hypothesis_aggregation_requires_independent_evidence():
+    from skeleton.intelligence.dispatch_cognitive import HypothesisObservation, review_hypotheses
+    a = HypothesisObservation("a", "a"*64, "family-a", "node-a", "c"*64, "d"*64, "e"*64, "supports")
+    b = replace(a, hypothesis_id="b", model_sha256="b"*64, family_id="family-b",
+                failure_domain="node-b", evidence_sha256="f"*64)
+    assert review_hypotheses("c"*64, [a, b]).disposition == "candidate_for_external_verification"
+    assert review_hypotheses("c"*64, [a, replace(b, evidence_sha256=a.evidence_sha256)]).disposition == "hold_insufficient_independence"
+    assert review_hypotheses("c"*64, [a, replace(b, verdict="contradicts")]).disposition == "hold_conflict"
+    assert review_hypotheses("c"*64, [a, replace(b, result_sha256="0"*64)]).disposition == "hold_disagreement"

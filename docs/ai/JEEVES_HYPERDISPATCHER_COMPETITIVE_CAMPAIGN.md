@@ -58,16 +58,16 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 15 | Adaptive batching | P |
 | 16 | Semantic classification | Open |
 | 17 | Model-directed worker selection | Open |
-| 18 | Specialist discovery | Open |
-| 19 | Reasoning complexity estimation | Open |
-| 20 | Uncertainty routing | Open |
-| 21 | Multi-model delegation | Open |
-| 22 | Adversarial verification | Open |
+| 18 | Specialist discovery | P |
+| 19 | Reasoning complexity estimation | P |
+| 20 | Uncertainty routing | P |
+| 21 | Multi-model delegation | P |
+| 22 | Adversarial verification | P |
 | 23 | Recursive decomposition | Open |
-| 24 | Parallel hypotheses | Open |
-| 25 | Historical-success routing | Open |
+| 24 | Parallel hypotheses | P |
+| 25 | Historical-success routing | P |
 | 26 | Learned cost prediction | P |
-| 27 | Context affinity | Open |
+| 27 | Context affinity | P |
 | 28 | Mission replanning | Open |
 | 29 | Tool-chain optimization | Open |
 | 30 | Redundant reasoning elimination | Open |
@@ -285,3 +285,24 @@ Wrong-tenant requests and changed replay identity are rejected. The tenant
 checkpoint classifies uncertain tasks as active and rebuilds leased accounting;
 legacy HTTP/broker calls cannot silently enter verified mode. This is a tested
 candidate interface for a trusted host, not external transport activation.
+
+## Wave 10: cognitive specialist and independent review proposals
+
+A source-bound routing kernel filters explicitly approved models by tenant,
+policy, task class, required capability, freshness, complexity proxy,
+token/deadline/cost budget and independently supplied historical results.
+It favors exact context affinity after a conservative shrunk evidence score.
+High uncertainty requires a budgeted producer/reviewer pair with distinct
+model family and failure domain; insufficient evidence or resources hold.
+Consensus compares exact result digests and independent evidence identities;
+contradiction or insufficient independence blocks the proposal. Neither a
+self-reported confidence nor agreement constitutes independent truth.
+These are advisory interfaces for the canonical cognitive execution owner,
+not autonomous model selection, actual inference or publication authority.
+
+Research: Ray model multiplexing and request routing (model/replica identity),
+https://docs.ray.io/en/latest/serve/model-multiplexing.html and
+https://docs.ray.io/en/latest/serve/llm/architecture/routing-policies.html.
+Newly partial targets 18, 19, 20, 21, 22, 24, 25, 27. Task classification
+requires an actual classifier; model-directed selection requires integration.
+Prior wave 9 exact-head focused CI: 40 passed; 183-mapping validator passed.
