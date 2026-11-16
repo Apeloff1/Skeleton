@@ -678,6 +678,7 @@ def test_atomic_env_staging_is_inside_both_new_and_legacy_privacy_fences(tmp_pat
     from skeleton.app import setup_runtime
 
     destination = tmp_path / ".env"
+    destination.write_text("PRIVATE_VALUE=original\n", encoding="utf-8")
     original_replace = os.replace
     observed = []
 
@@ -771,3 +772,114 @@ def test_atomic_write_refuses_unreadable_runtime_before_staging(tmp_path, text):
         setup_runtime._atomic_write(destination, text)
     assert destination.read_text(encoding="utf-8") == "VALUE=original\n"
     assert list(tmp_path.iterdir()) == [destination]
+
+
+
+@pytest.mark.parametrize("mutation", ["replace", "inplace", "delete", "create"])
+def test_setup_never_overwrites_observed_concurrent_operator_edit(tmp_path, monkeypatch, mutation):
+    import os
+    from skeleton.app import setup_runtime as setup
+    destination = tmp_path / ".env"
+    original = "JWT_SECRET=initial-fixture\n"
+    changed = "JWT_SECRET=operator-owned-new-fixture\n"
+    if mutation != "create":
+        destination.write_text(original)
+    def concurrent_change(root, values):
+        if mutation == "replace":
+            replacement = tmp_path / "replacement"
+            replacement.write_text(changed)
+            os.replace(replacement, destination)
+        elif mutation == "delete":
+            destination.unlink()
+        else:
+            destination.write_text(changed)
+        return False
+    monkeypatch.setattr(setup, "_prepare_model_directory", concurrent_change)
+    with pytest.raises(ValueError, match="changed since admission"):
+        setup.ensure_runtime_environment(tmp_path)
+    if mutation == "delete":
+        assert not destination.exists()
+    else:
+        assert destination.read_text() == changed
+    assert not list(tmp_path.glob(".env.*.tmp"))
+
+
+def test_atomic_first_creation_does_not_replace_concurrent_file_at_publication(tmp_path, monkeypatch):
+    import os
+    from skeleton.app import setup_runtime as setup
+    destination = tmp_path / ".env"
+    if os.name == "nt":
+        original = os.rename
+        def competing(source, target):
+            destination.write_text("VALUE=operator\n")
+            return original(source, target)
+        monkeypatch.setattr(os, "rename", competing)
+    else:
+        original = os.link
+        def competing(source, target, **kwargs):
+            destination.write_text("VALUE=operator\n")
+            return original(source, target, **kwargs)
+        monkeypatch.setattr(os, "link", competing)
+    with pytest.raises(FileExistsError):
+        setup._atomic_write(destination, "VALUE=generated\n", expected_stamp=None)
+    assert destination.read_text() == "VALUE=operator\n"
+    assert not list(tmp_path.glob(".env.*.tmp"))
+
+
+def test_atomic_staging_revalidates_existing_destination_after_fsync(tmp_path, monkeypatch):
+    import os
+    from skeleton.app import setup_runtime as setup
+    destination = tmp_path / ".env"
+    destination.write_text("VALUE=original\n")
+    original = os.fsync
+    changed = False
+    def mutate(fd):
+        nonlocal changed
+        original(fd)
+        if not changed:
+            changed = True
+            destination.write_text("VALUE=operator\n")
+    monkeypatch.setattr(os, "fsync", mutate)
+    with pytest.raises(ValueError, match="changed since admission"):
+        setup._atomic_write(destination, "VALUE=generated\n")
+    assert destination.read_text() == "VALUE=operator\n"
+    assert not list(tmp_path.glob(".env.*.tmp"))
+
+
+def test_atomic_first_publication_leaves_single_private_inode(tmp_path):
+    import os
+    from skeleton.app import setup_runtime as setup
+    destination = tmp_path / ".env"
+    setup._atomic_write(destination, "VALUE=complete\n", expected_stamp=None)
+    assert destination.read_bytes() == b"VALUE=complete\n"
+    assert list(tmp_path.iterdir()) == [destination]
+    if os.name != "nt":
+        assert destination.stat().st_nlink == 1
+        assert destination.stat().st_mode & 0o777 == 0o600
+
+
+def test_admin_password_rejects_same_inode_mutation_during_read(tmp_path, monkeypatch):
+    import os
+    from skeleton.app import setup_runtime as setup
+    path = tmp_path / "password"
+    path.write_text("original-password-1234\n")
+    path.chmod(0o600)
+    original = os.fdopen
+    class Reader:
+        def __init__(self,fd,mode):
+            self.handle=original(fd,mode)
+        def __enter__(self):
+            return self
+        def __exit__(self,*args):
+            self.handle.close()
+        def fileno(self):
+            return self.handle.fileno()
+        def read(self,size):
+            old=self.handle.read(size)
+            path.write_text("modified-password-1234\n")
+            current=path.stat()
+            os.utime(path,ns=(current.st_atime_ns,current.st_mtime_ns+2_000_000_000))
+            return old
+    monkeypatch.setattr(os,"fdopen",Reader)
+    with pytest.raises(ValueError,match="identity changed"):
+        setup._operator_admin("owner@example.invalid",path)

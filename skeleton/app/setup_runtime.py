@@ -182,7 +182,10 @@ def _env_descriptor_stamp(info: os.stat_result) -> tuple[int, ...]:
             info.st_nlink, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
 
 
-def _read_existing_env(path: Path, *, label: str = "runtime .env", private: bool = False) -> tuple[str, bool]:
+def _read_existing_env(
+    path: Path, *, label: str = "runtime .env", private: bool = False,
+    observed_stamp: list[tuple[int, ...]] | None = None,
+) -> tuple[str, bool]:
     """Bound secret-bearing input before reading; never block on a FIFO.
 
     O_NONBLOCK is essential: opening a FIFO read-only normally hangs before
@@ -238,7 +241,10 @@ def _read_existing_env(path: Path, *, label: str = "runtime .env", private: bool
             raise ValueError(f"{label} identity changed during read")
     if len(raw) > _MAX_ENV_BYTES:
         raise ValueError("runtime .env exceeds the 256 KiB input limit")
-    return raw.decode("utf-8"), repaired_permissions
+    text = raw.decode("utf-8")
+    if observed_stamp is not None:
+        observed_stamp.append(_env_descriptor_stamp(final))
+    return text, repaired_permissions
 
 
 
@@ -287,43 +293,114 @@ def runtime_source_fingerprint(root: Path) -> str:
         raise ValueError("runtime configuration source cannot be safely admitted") from None
 
 
-def _atomic_write(path: Path, text: str) -> None:
-    # Defense in depth for direct callers: never stage oversized or malformed
-    # private runtime credentials even if filesystem writes would succeed.
+_UNSPECIFIED_STAMP = object()
+
+
+def _configuration_destination(path: Path) -> tuple[int, ...] | None:
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        return None
+    if (not stat.S_ISREG(info.st_mode)
+            or (os.name != "nt" and (info.st_nlink != 1 or info.st_uid != os.geteuid()))):
+        raise ValueError("runtime .env destination is not an operator-owned unaliased regular file")
+    return _env_descriptor_stamp(info)
+
+
+def _require_configuration_destination(path: Path, expected: tuple[int, ...] | None) -> None:
+    if _configuration_destination(path) != expected:
+        raise ValueError("runtime .env changed since admission; preserve the current file and retry setup")
+
+
+def _parent_identity(path: Path) -> tuple[int, int]:
+    info = path.lstat()
+    if not stat.S_ISDIR(info.st_mode):
+        raise ValueError("runtime .env parent must be a real directory")
+    return info.st_dev, info.st_ino
+
+
+def _atomic_write(path: Path, text: str, *, expected_stamp=_UNSPECIFIED_STAMP) -> None:
+    """Publish a bounded configuration against its admitted destination.
+
+    Initial creation is no-clobber. Replacement of an existing file remains
+    an atomic rename under the cooperating setup lock, with explicit checks
+    immediately before it. Portable rename is not a hostile-writer CAS:
+    the operator-owned directory and lock are part of this contract.
+    """
     _parse_dotenv_content(text)
     path.parent.mkdir(parents=True, exist_ok=True)
+    parent = _parent_identity(path.parent)
+    expected = (_configuration_destination(path) if expected_stamp is _UNSPECIFIED_STAMP
+                else expected_stamp)
+    _require_configuration_destination(path, expected)
     temporary: Path | None = None
+    temporary_identity: tuple[int, int] | None = None
+    directory = None
     try:
-        # Include temp-file creation, write, flush and fsync in the cleanup
-        # boundary. The previous implementation entered try only *after*
-        # successful fsync, leaving secret-bearing .env.*.tmp files behind
-        # when disks filled or storage synchronization failed.
+        if os.name != "nt":
+            directory = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+                                | getattr(os, "O_NOFOLLOW", 0))
+            info = os.fstat(directory)
+            if (info.st_dev, info.st_ino) != parent:
+                raise ValueError("runtime .env parent changed before publication")
         with NamedTemporaryFile(
-            "w",
-            encoding="utf-8",
-            dir=path.parent,
-            # The name .env already has a leading dot. The previous
-            # double-dot prefix was outside the historic Docker fence.
+            "w", encoding="utf-8", newline="\n", dir=path.parent,
             prefix=f"{path.name if path.name.startswith('.') else '.' + path.name}.",
-            suffix=".tmp",
-            delete=False,
+            suffix=".tmp", delete=False,
         ) as handle:
             temporary = Path(handle.name)
+            opened = os.fstat(handle.fileno())
+            temporary_identity = (opened.st_dev, opened.st_ino)
             handle.write(text)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary, path)
-        # NamedTemporaryFile is private from creation; never publish a
-        # permissive intermediate file, including on interrupted writes.
-        if os.name != "nt":
-            directory = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-            try:
-                os.fsync(directory)
-            finally:
-                os.close(directory)
+            final = os.fstat(handle.fileno())
+            stamp = _env_descriptor_stamp(final)
+        if (_parent_identity(path.parent) != parent
+                or _env_descriptor_stamp(temporary.lstat()) != stamp
+                or (final.st_dev, final.st_ino) != temporary_identity
+                or not stat.S_ISREG(final.st_mode)
+                or (os.name != "nt" and (final.st_nlink != 1
+                    or final.st_uid != os.geteuid() or stat.S_IMODE(final.st_mode) != 0o600))
+                or final.st_size != len(text.encode("utf-8"))):
+            raise ValueError("runtime .env staging identity changed before publication")
+        _require_configuration_destination(path, expected)
+        if expected is None:
+            # A concurrently created file must not be overwritten, even at
+            # the instant of publication. Windows rename is no-replace;
+            # POSIX hard-link publication supplies the equivalent property.
+            if os.name == "nt":
+                os.rename(temporary, path)
+            else:
+                os.link(temporary, path, follow_symlinks=False)
+                temporary.unlink()
+        else:
+            os.replace(temporary, path)
+        published = path.lstat()
+        if (_parent_identity(path.parent) != parent
+                or not stat.S_ISREG(published.st_mode)
+                or (published.st_dev, published.st_ino) != temporary_identity
+                or published.st_size != final.st_size
+                or published.st_mtime_ns != final.st_mtime_ns
+                or (os.name != "nt" and (published.st_nlink != 1
+                    or published.st_uid != os.geteuid() or stat.S_IMODE(published.st_mode) != 0o600))):
+            raise ValueError("runtime .env publication could not be verified; preserve the current file")
+        if directory is not None:
+            os.fsync(directory)
     finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
+        try:
+            if temporary is not None and temporary_identity is not None:
+                try:
+                    current = temporary.lstat()
+                except FileNotFoundError:
+                    pass
+                else:
+                    # Never remove a different file planted at the staging name.
+                    if (current.st_dev, current.st_ino) == temporary_identity:
+                        temporary.unlink()
+        finally:
+            if directory is not None:
+                os.close(directory)
 
 
 def _operator_admin_values(email: str, password: str) -> tuple[str, str]:
@@ -378,18 +455,20 @@ def _operator_admin(email: str | None, password_file: Path | None) -> tuple[str,
         if (
             not stat.S_ISREG(info.st_mode)
             or not stat.S_ISREG(named.st_mode)
-            or (info.st_dev, info.st_ino) != (named.st_dev, named.st_ino)
+            or _env_descriptor_stamp(info) != _env_descriptor_stamp(named)
             or info.st_size > 4096
             or (os.name != "nt" and info.st_nlink != 1)
         ):
             raise ValueError("admin password input must be a stable single-link regular file of at most 4096 bytes")
-        if os.name != "nt" and info.st_mode & 0o077:
+        if os.name != "nt" and (info.st_uid != os.geteuid() or info.st_mode & 0o077):
             raise ValueError("admin password file must be private; run chmod 600 on that file")
         raw = handle.read(4097)
         # A pathname replacement after admission must never authorize a
         # password from an orphaned descriptor as the current operator input.
         current = os.lstat(password_path)
-        if not stat.S_ISREG(current.st_mode) or (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino):
+        final = os.fstat(handle.fileno())
+        if (len(raw) != info.st_size or _env_descriptor_stamp(info) != _env_descriptor_stamp(final)
+                or _env_descriptor_stamp(final) != _env_descriptor_stamp(current)):
             raise ValueError("admin password input identity changed during read")
     if len(raw) > 4096:
         raise ValueError("admin password file exceeds 4096 bytes")
@@ -469,12 +548,23 @@ def _ensure_runtime_environment_locked(
     example_path = root / ".env.example"
     if env_path.is_symlink():
         raise ValueError("runtime .env must not be a symbolic link")
-    created = not env_path.exists()
+    initial_stamp = _configuration_destination(env_path)
+    created = initial_stamp is None
     warnings: list[str] = []
     repaired_permissions = False
+    admitted_stamp = None
 
-    if env_path.exists():
-        text, repaired_permissions = _read_existing_env(env_path, private=True)
+    if not created:
+        observed_stamp: list[tuple[int, ...]] = []
+        text, repaired_permissions = _read_existing_env(
+            env_path, private=True, observed_stamp=observed_stamp,
+        )
+        if len(observed_stamp) != 1:
+            raise ValueError("runtime .env read did not yield an admitted destination")
+        admitted_stamp = observed_stamp[0]
+        if (initial_stamp[:2] != admitted_stamp[:2]
+                or (not repaired_permissions and initial_stamp != admitted_stamp)):
+            raise ValueError("runtime .env changed before setup input admission")
         if repaired_permissions:
             warnings.append("existing runtime .env permissions tightened to owner-only")
     elif example_path.exists() or example_path.is_symlink():
@@ -656,12 +746,15 @@ def _ensure_runtime_environment_locked(
     if published != values:
         raise ValueError("generated runtime .env does not round-trip through the runtime parser")
 
+    _require_configuration_destination(env_path, admitted_stamp)
     if _prepare_model_directory(root, values):
         warnings.append("Local AI mount directory prepared; no model files acquired or provider activated")
 
     changed = created or bool(configured) or repaired_permissions
     if created or configured:
-        _atomic_write(env_path, text)
+        _atomic_write(env_path, text, expected_stamp=admitted_stamp)
+    else:
+        _require_configuration_destination(env_path, admitted_stamp)
 
     return SetupResult(
         env_path=env_path,
