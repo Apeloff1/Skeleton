@@ -35,6 +35,12 @@ from .structured_discovery import (
     extract_robots_sitemaps,
 )
 from .frontier_scheduler import choose_frontier
+from .navigation_backlog import (
+    new_backlog, observe, count as count_discovery, pending_rows,
+    retire as retire_discovery, validate as validate_backlog,
+    projection as backlog_projection, remember as remember_discourse,
+    deliberate as deliberate_navigation,
+)
 from .dragon_companion import build_companion, companion_style
 from .dragon_curriculum_trace import decision_receipt, validate_receipt, trace_summary
 from .adaptive_navigation import (
@@ -112,6 +118,7 @@ def implementation_digest():
                 "structured_discovery.py",
                 "document_formats.py",
                 "frontier_scheduler.py",
+                "navigation_backlog.py",
                 "adaptive_navigation.py",
                 "acquisition_feedback.py",
                 "information_portfolio.py",
@@ -366,6 +373,7 @@ class CrawlRun:
             "sequence": 0,
             "usage": {"requests": 0, "bytes": 0, "reserved_bytes": 0, "documents": 0, "failures": 0},
             "frontier": [],
+            "discovery_backlog": new_backlog(),
             "seen": [],
             "host_ready": {},
             "robots": {},
@@ -379,7 +387,7 @@ class CrawlRun:
         }
         run._configure(fetcher)
         for url in request.seed_urls:
-            run._enqueue(url, depth=0, parent_url=None)
+            run._enqueue(url, depth=0, parent_url=None, relation="seed")
         return run
 
     @staticmethod
@@ -431,6 +439,7 @@ class CrawlRun:
             "sequence",
             "usage",
             "frontier",
+            "discovery_backlog",
             "seen",
             "host_ready",
             "robots",
@@ -512,6 +521,11 @@ class CrawlRun:
                 raise CrawlOperationError("redirect chain bound exceeded")
             for url in item["redirects"]:
                 run._admit(url)
+        try:
+            validate_backlog(state["discovery_backlog"], admit=run._admit,
+                             max_depth=request.max_depth)
+        except (ValueError, TypeError, KeyError) as exc:
+            raise CrawlOperationError("navigation backlog custody invalid") from exc
         pending = state.get("pending_dispatch")
         if pending is not None:
             if not isinstance(pending, dict) or set(pending) != {
@@ -741,42 +755,87 @@ class CrawlRun:
             raise CrawlOperationError("URL is outside admitted source scope")
         return normalized
 
-    def _enqueue(self, url, *, depth, parent_url):
+    def _enqueue(self, url, *, depth, parent_url, relation="document_link", record=True):
+        state = self._state
+        ledger = state["discovery_backlog"]
         try:
             url = self._admit(canonicalize_url(url, base=parent_url))
         except (ValueError, UnicodeError):
+            if record:
+                count_discovery(ledger, "outside_policy")
             return False
-        state = self._state
-        if (
-            depth > self.request.max_depth
-            or len(state["frontier"]) >= MAX_FRONTIER
-            or url in state["seen"]
-            or any(row["url"] == url for row in state["frontier"])
-        ):
+        observed = (observe(ledger, url=url, parent=parent_url, depth=depth, kind=relation)
+                    if record else ledger["records"].get(url))
+        if depth > self.request.max_depth:
+            if record:
+                count_discovery(ledger, "depth_held")
             return False
+        if (url in state["seen"] or any(row["url"] == url or row["original_url"] == url
+                                        for row in state["frontier"])):
+            retire_discovery(ledger, url)
+            return False
+        # Check the current canonical trap circuit even for deferred candidates.
         try:
             circuit = evaluate_frontier_candidate(
-                url,seen=state["seen"],
+                url, seen=state["seen"],
                 frontier=[entry["url"] for entry in state["frontier"]],
             )
-        except (ValueError,UnicodeError):
+        except (ValueError, UnicodeError):
+            circuit = None
+        if circuit is None or not circuit.allowed:
+            if record:
+                count_discovery(ledger, "circuit_held")
+            retire_discovery(ledger, url)
             return False
-        if not circuit.allowed:
-            return False
-        if sum(len(_json(row)) for row in state["frontier"]) + 3 * len(url.encode()) + 512 > 262144:
-            return False
-        state["frontier"].append(
-            {
-                "url": url,
-                "original_url": url,
-                "depth": depth,
-                "parent_url": parent_url,
-                "attempts": 0,
-                "ready_at": 0,
-                "redirects": [],
-            }
-        )
+        if (len(state["frontier"]) >= MAX_FRONTIER
+                or sum(len(_json(row)) for row in state["frontier"])
+                   + 3 * len(url.encode()) + 512 > 262144):
+            if observed is not None:
+                observed["pending"] = True
+            return observed is not None
+        state["frontier"].append({
+            "url": url, "original_url": url, "depth": depth,
+            "parent_url": parent_url, "attempts": 0, "ready_at": 0,
+            "redirects": [],
+        })
+        retire_discovery(ledger, url, promoted=True)
         return True
+
+    def _replenish_frontier(self, now):
+        """Move metadata candidates into the sole active frontier, never dispatch.
+
+        Reserve bounded work per checkpoint. Revalidate the canonical trap
+        circuit at promotion; current robots and live authority remain the
+        responsibility of _step and the existing worker transport.
+        """
+        state = self._state
+        ledger = state["discovery_backlog"]
+        if len(state["frontier"]) >= MAX_FRONTIER:
+            return
+        rows = pending_rows(ledger)
+        if not rows:
+            return
+        if self.request.frontier_strategy.startswith("companion"):
+            profile = self._companion(now)
+            rows.sort(key=lambda row: (
+                state["host_ready"].get(urlsplit(row["url"]).hostname, 0) > now,
+                -deliberate_navigation(row, base=.5, profile=profile,
+                                       query=self.request.query).final_priority,
+                row["depth"], row["url"],
+            ))
+        # A single page may produce more links than a session can ever visit.
+        # Refill only a bounded page to keep checkpoint cost predictable.
+        for row in rows[:32]:
+            if len(state["frontier"]) >= MAX_FRONTIER:
+                break
+            self._enqueue(row["url"], depth=row["depth"], parent_url=row["parent_url"],
+                          record=False)
+
+    def _observe_document_links(self, links, header_links, *, depth, parent_url):
+        for link in dict.fromkeys(links):
+            self._enqueue(link, depth=depth, parent_url=parent_url, relation="document_link")
+        for link in dict.fromkeys(header_links):
+            self._enqueue(link, depth=depth, parent_url=parent_url, relation="http_link")
 
     def snapshot(self):
         value = copy.deepcopy(self._state)
@@ -800,6 +859,8 @@ class CrawlRun:
             "code_digest": state["binding"]["code_digest"],
             "usage": dict(state["usage"]),
             "frontier_count": len(state["frontier"]),
+            "navigation_backlog": backlog_projection(state["discovery_backlog"],
+                frontier=state["frontier"], seen=state["seen"], max_depth=self.request.max_depth),
             "next_ready_at": min(ready) if ready else None,
             "source_count": len(state["sources"]),
             "instruction_security": incident_summary(state["instruction_incidents"]),
@@ -1120,6 +1181,8 @@ class CrawlRun:
         if item is None:
             return None
         url = item["url"]
+        if _selection.discourse is not None:
+            remember_discourse(state["discovery_backlog"], _selection.discourse)
         p = urlsplit(url)
         origin = f"{p.scheme}://{p.netloc}"
         robots = state["robots"].get(origin)
@@ -1345,7 +1408,7 @@ class CrawlRun:
                 ):
                     # Explicit host-scope opt-in. Metadata roots do not
                     # bypass depth, robots or network byte reservations.
-                    self._enqueue(sitemap_url, depth=0, parent_url=None)
+                    self._enqueue(sitemap_url, depth=0, parent_url=None, relation="robots_sitemap")
             event = self._event("robots", now=now, url=fetch_url, reason=f"http_{response.status}")
             if response.status == 200 and ctype == "text/plain":
                 observation = inspect_robots_comments(response.body)
@@ -1496,12 +1559,17 @@ class CrawlRun:
             if structured_type:
                 self._finish_item(item)
                 admitted = 0
-                for discovered_url in dict.fromkeys((*(discovery.links if rights.follow else ()), *header_links)):
-                    if self._enqueue(
-                        discovered_url, depth=item["depth"] + 1,
-                        parent_url=url,
-                    ):
+                relation = discovery.kind if discovery.kind in {"sitemap_urlset", "sitemap_index"} else "structured"
+                for discovered_url in dict.fromkeys(discovery.links if rights.follow else ()):
+                    if self._enqueue(discovered_url, depth=item["depth"] + 1,
+                                     parent_url=url, relation=relation):
                         admitted += 1
+                for discovered_url in dict.fromkeys(header_links):
+                    if self._enqueue(discovered_url, depth=item["depth"] + 1,
+                                     parent_url=url, relation="http_link"):
+                        admitted += 1
+                if discovery.capped:
+                    count_discovery(state["discovery_backlog"], "parser_capped")
                 # Indexes and feeds are discovery inputs, not trusted captured
                 # documents. The request and response bytes have already been
                 # durably charged through the ordinary canonical transport.
@@ -1548,8 +1616,8 @@ class CrawlRun:
         self._finish_item(item)
         if not rights.retain:
             if rights.follow:
-                for link in dict.fromkeys((*doc.links, *header_links)):
-                    self._enqueue(link, depth=item["depth"] + 1, parent_url=url)
+                self._observe_document_links(doc.links, header_links,
+                    depth=item["depth"] + 1, parent_url=url)
             return self._event(
                 "source_rights_restricted", now=now, url=url,
                 reason="source_noindex_or_noarchive",
@@ -1557,8 +1625,8 @@ class CrawlRun:
         primary = next((source for source in state["sources"].values()
                         if source["content_hash"] == doc.content_hash), None)
         if primary is not None:
-            for link in dict.fromkeys((*(doc.links if rights.follow else ()), *header_links)):
-                self._enqueue(link, depth=item["depth"] + 1, parent_url=url)
+            self._observe_document_links(doc.links if rights.follow else (), header_links,
+                depth=item["depth"] + 1, parent_url=url)
             event = self._event("duplicate", now=now, url=url, reason=doc.content_hash)
             state["source_aliases"].append(make_alias(
                 source_id=primary["source_id"], canonical_url=doc.canonical_url,
@@ -1610,8 +1678,8 @@ class CrawlRun:
             "observation": observation,
         }
         state["usage"]["documents"] += 1
-        for link in dict.fromkeys((*(doc.links if rights.follow else ()), *header_links)):
-            self._enqueue(link, depth=item["depth"] + 1, parent_url=url)
+        self._observe_document_links(doc.links if rights.follow else (), header_links,
+            depth=item["depth"] + 1, parent_url=url)
         return self._event("captured", now=now, url=url, source_id=source_id)
 
     def run_slice(self, *, max_steps=4, max_seconds=40, authorize=None, cancelled=None, on_checkpoint=None):
@@ -1665,16 +1733,21 @@ class CrawlRun:
                         else "cumulative_budget"
                     )
                     event = self._event("stopped", now=time.time(), reason=self._state["stop_reason"])
-                elif not self._state["frontier"]:
+                elif not self._state["frontier"] and not pending_rows(self._state["discovery_backlog"]):
                     self._state["state"] = "completed"
                     self._state["stop_reason"] = "frontier_drained"
                     event = self._event("completed", now=time.time(), reason="frontier_drained")
                 else:
-                    event = self._step(time.time())
+                    self._replenish_frontier(time.time())
+                    if not self._state["frontier"]:
+                        # Persist the retirement of trap-rejected pending rows.
+                        event = self._event("deferred", now=time.time(), reason="backlog_revalidation")
+                    else:
+                        event = self._step(time.time())
                     if event is None:
                         self._state = before
                         break
-                    if not self._state["frontier"]:
+                    if not self._state["frontier"] and not pending_rows(self._state["discovery_backlog"]):
                         self._state["state"] = "completed"
                         self._state["stop_reason"] = "frontier_drained"
                 self._settle_feedback(event, pending=pending)
