@@ -679,3 +679,63 @@ def test_deliberation_refuses_source_loss_without_partial_report(tmp_path, monke
         assert app.dispatch("GET", prefix)[1]["revision"] == 0
     finally:
         app.close()
+
+
+def test_grounded_context_preview_accounts_for_exact_rendered_newlines():
+    session = OfflineAISession(native_model())
+    question, context = "hello", "offline world"
+    report = session.preview_context(question, 2, grounding_context=context)
+    request, retained = session._request(question + "\n\n" + context, 2)
+    expected = len(session.backend.runtime.tokenizer.encode_ids(request.rendered_input))
+    assert report["estimated_input_tokens"] == expected
+    assert report["retained_history_messages"] == len(retained)
+
+
+def test_local_research_review_runs_multi_hop_lexical_and_preserves_explicit_scope(tmp_path):
+    app = OfflineHTTPApplication(native_model(), tmp_path / "research-review.sqlite3",
+                                 token="t"*64)
+    try:
+        a = app.knowledge.add_text("Recovery module", "Nebula recovery uses XA-193.")
+        b = app.knowledge.add_text("Module detail", "XA-193 restores offline backup state.")
+        other = app.knowledge.add_text("Unselected source", "Nebula recovery unrelated secret.")
+        scope = sorted([a["document_id"], b["document_id"]])
+        endpoint = "/v1/knowledge/research-review"
+        body = {"query": "Nebula recovery", "document_ids": scope, "approved": True}
+        status, report = app.dispatch("POST", endpoint, body)
+        assert status == 200 and report["ranking"] == "lexical"
+        assert report["document_scope"] == scope
+        assert report["network_called"] is False and report["generation_performed"] is False
+        assert report["semantic_entailment_verified"] is False
+        assert len(report["trace"]["queries"]) <= 6
+        assert any(q["parent_citation"] for q in report["trace"]["queries"])
+        assert report["sources"]
+        assert other["document_id"] not in {s["document_id"] for s in report["sources"]}
+        for row in report["sources"]:
+            original = app.knowledge.get_document(row["document_id"])
+            assert original["text"][row["char_start"]:row["char_end"]] == row["passage"]
+            assert sha256(row["passage"].encode()).hexdigest() == row["passage_sha256"]
+        with pytest.raises(OfflineHTTPError) as exc:
+            app.dispatch("POST", endpoint, body | {"approved": False})
+        assert exc.value.status == 403
+        app.knowledge.delete(b["document_id"])
+        with pytest.raises(OfflineHTTPError) as exc:
+            app.dispatch("POST", endpoint, body)
+        assert exc.value.status == 422
+        # A withdrawn explicit scope must not broaden to the other document.
+        assert len(app.knowledge.list_documents()) == 2
+    finally:
+        app.close()
+
+
+def test_local_research_review_no_evidence_is_not_generation(tmp_path):
+    app = OfflineHTTPApplication(native_model(), tmp_path / "research-empty.sqlite3",
+                                 token="t"*64)
+    try:
+        code, report = app.dispatch("POST", "/v1/knowledge/research-review",
+                                   {"query": "nebula", "approved": True})
+        assert code == 200 and report["sources"] == []
+        assert report["trace"]["status"] == "no_evidence"
+        assert report["trace"]["semantic_entailment_verified"] is False
+        assert report["generation_performed"] is False
+    finally:
+        app.close()
