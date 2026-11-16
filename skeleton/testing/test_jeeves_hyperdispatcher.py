@@ -1425,3 +1425,62 @@ def test_alternative_root_preemption_drains_nested_allocations_leaf_first():
                                     verify_stop=lambda *args:True)
     owner.ack_preempted(root.grant_id)
     assert owner.admit_next().request_id=="new"
+
+def test_alternative_durable_unique_job_replays_same_resident():
+    from skeleton.automation.agents.swarm_durable import SwarmDurableBridge
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.automation.agents.swarm_runtime import SwarmTask
+    runtime,broker=_verified_dispatch_fixture()
+    manager=SwarmRecoveryManager(delta_archive=True)
+    bridge=SwarmDurableBridge(_DispatcherCheckpointFixture())
+    task=SwarmTask("unique",{"job":1})
+    assert bridge.submit_unique_verified("run","owner",manager,broker,"a",task)
+    assert bridge.submit_unique_verified("run","owner",manager,broker,"a",task)
+    restored=bridge.load("run").restore_runtime()
+    assert len([t for t in restored.tasks() if t.id=="unique"])==1
+    assert broker.ingress.quota.usage("a").queued==2
+
+
+def test_alternative_durable_outcome_and_followups_are_one_archive():
+    from skeleton.automation.agents.swarm_durable import SwarmDurableBridge, DurableSwarmError
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, TaskState
+    runtime,broker=_verified_dispatch_fixture()
+    broker.broker._verify_worker=lambda *args:True
+    attempt=broker.lease_verified("a","a")
+    broker.record_verified("a","w","a",lease_token=attempt.lease_token,
+                           outcome="uncertain",evidence_sha256="a"*64)
+    manager=SwarmRecoveryManager(delta_archive=True)
+    store=_DispatcherCheckpointFixture()
+    bridge=SwarmDurableBridge(store)
+    bridge.capture("run","owner",manager,runtime,tenant_broker=broker)
+    bridge.reconcile_and_enqueue_verified("run","owner",manager,broker,"a","a","w",
+        lease_token=attempt.lease_token,evidence_sha256="b"*64,
+        followups=(SwarmTask("next",{},dependencies=("a",)),))
+    restored=bridge.load("run").restore_runtime()
+    assert restored.task("a").state is TaskState.SUCCEEDED
+    assert restored.task("next").state is TaskState.QUEUED
+    assert not restored.blocked_dependencies("next")
+
+
+def test_alternative_failed_continuation_publication_retires_owner():
+    from skeleton.automation.agents.swarm_durable import SwarmDurableBridge, DurableSwarmError
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.automation.agents.swarm_runtime import SwarmTask
+    runtime,broker=_verified_dispatch_fixture()
+    broker.broker._verify_worker=lambda *args:True
+    attempt=broker.lease_verified("a","a")
+    broker.record_verified("a","w","a",lease_token=attempt.lease_token,
+                           outcome="uncertain",evidence_sha256="a"*64)
+    manager=SwarmRecoveryManager(delta_archive=True)
+    store=_DispatcherCheckpointFixture()
+    bridge=SwarmDurableBridge(store)
+    bridge.capture("run","owner",manager,runtime,tenant_broker=broker)
+    store.fail=True
+    with pytest.raises(DurableSwarmError):
+        bridge.reconcile_and_enqueue_verified("run","owner",manager,broker,"a","a","w",
+            lease_token=attempt.lease_token,evidence_sha256="b"*64,
+            followups=(SwarmTask("next",{},dependencies=("a",)),))
+    assert broker.is_retired()
+    recovered=bridge.load("run").restore_runtime()
+    assert recovered.task("a").effect_uncertain and recovered.task("next") is None

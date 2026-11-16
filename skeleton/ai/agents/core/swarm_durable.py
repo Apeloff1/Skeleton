@@ -176,6 +176,107 @@ class SwarmDurableBridge:
                 raise DurableSwarmError("verified dispatch stopped; reconcile durable custody") from exc
             return tenant, task, capture
 
+    def _capture_checked(self, run_id: str, worker_id: str, manager: SwarmRecoveryManager,
+                         broker: TenantSwarmBroker) -> DurableSwarmCapture:
+        capture = self.capture(run_id, worker_id, manager, broker.broker.runtime,
+                               tenant_broker=broker)
+        latest = self.store.resume_state(run_id).checkpoint
+        if (latest is None or latest.state_version != capture.checkpoint.state_version
+                or manager._json_bytes(latest.state) != manager._json_bytes(capture.checkpoint.state)
+                or manager._json_bytes(latest.state) != manager._json_bytes(manager.export_archive())):
+            raise DurableSwarmError("durable publication readback mismatch")
+        return capture
+
+    def submit_unique_verified(self, run_id: str, worker_id: str,
+                               manager: SwarmRecoveryManager, broker: TenantSwarmBroker,
+                               tenant: str, task: SwarmTask) -> DurableSwarmCapture | None:
+        """Persist an admitted unique job before returning acknowledgement.
+
+        The existing tenant task identity is the idempotency key. Replay may
+        checkpoint the same resident again, but cannot create a second job.
+        The host holds the exclusive run writer and must restore the latest
+        archive after any ambiguous acknowledgement. Direct bypass is outside
+        the verified owner contract.
+        """
+        runtime = broker.broker.runtime
+        with broker._lock, runtime._lock, manager._lock:
+            broker._assert_verified()
+            try:
+                result = broker.submit_verified_queued(tenant, task)
+                if not result.admitted:
+                    return None
+                return self._capture_checked(run_id, worker_id, manager, broker)
+            except Exception as exc:
+                # Even an exception on submission may have occurred after a
+                # mutation. Never continue dispatch from an ambiguous owner.
+                broker.retire()
+                raise DurableSwarmError("unique job publication stopped; restore durable custody") from exc
+
+    def reconcile_and_enqueue_verified(self, run_id: str, worker_id: str,
+                                       manager: SwarmRecoveryManager, broker: TenantSwarmBroker,
+                                       tenant: str, parent_id: str, parent_worker: str, *,
+                                       lease_token: str, evidence_sha256: str,
+                                       followups: tuple[SwarmTask, ...]) -> DurableSwarmCapture:
+        """Commit an uncertain parent's verified success and queued children together.
+
+        Child admission happens while the parent still holds its dependency
+        barrier. The existing checkpoint store publishes one complete archive
+        after reconciliation. If any mutation or write is ambiguous, retire
+        the generation without returning success; recovery uses the actual
+        durable archive, never the partially mutated in-memory generation.
+        This is atomic archive visibility, not a transaction with external
+        effects or an independent outbox service.
+        """
+        from hashlib import sha256
+        import json
+
+        if (type(followups) is not tuple or not 1 <= len(followups) <= 64
+                or any(not isinstance(t, SwarmTask) for t in followups)):
+            raise DurableSwarmError("invalid follow-up batch")
+        if len({t.id for t in followups}) != len(followups):
+            raise DurableSwarmError("duplicate follow-up identity")
+        manifest = []
+        for task in followups:
+            if (task.dependencies != (parent_id,) or task.id == parent_id
+                    or task.state is not TaskState.QUEUED or task.attempts or task.effect_uncertain
+                    or task.lease_token is not None or task.leased_to is not None
+                    or task.lease_deadline is not None or task.reconciliation_sha256 is not None):
+                raise DurableSwarmError("follow-up must be fresh and depend only on parent")
+            manifest.append([task.id, dict(task.payload), task.priority, task.max_attempts,
+                             sorted(task.required_capabilities), task.dependencies])
+        encoded = json.dumps([run_id, tenant, parent_id, manifest], sort_keys=True,
+                             separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode()
+        if len(encoded) > 1024 * 1024:
+            raise DurableSwarmError("follow-up manifest exceeds bound")
+        pin = sha256(encoded).hexdigest()
+        runtime = broker.broker.runtime
+        with broker._lock, broker.broker._completion_lock, runtime._lock, manager._lock:
+            broker._assert_verified()
+            parent = broker._verified_resident(tenant, parent_id)
+            if not parent.effect_uncertain or parent.leased_to != parent_worker or parent.lease_token != lease_token:
+                raise DurableSwarmError("parent uncertain attempt does not match")
+            # Trusted host must independently authorize the exact continuation
+            # manifest in addition to the parent's actual outcome evidence.
+            broker.broker._verified(parent_worker, parent_id, lease_token,
+                                    "enqueue:" + pin, evidence_sha256)
+            broker.broker._verified(parent_worker, parent_id, lease_token,
+                                    "reconcile:committed", evidence_sha256)
+            for task in followups:
+                if (broker.tenant_for(task.id) is not None or runtime.task(task.id) is not None):
+                    raise DurableSwarmError("follow-up identity already resident")
+            try:
+                for task in followups:
+                    decision = broker.submit_verified_queued(tenant, task)
+                    if not decision.admitted or decision.duplicate:
+                        raise DurableSwarmError("follow-up admission refused")
+                broker.reconcile_verified(tenant, parent_worker, parent_id,
+                                          lease_token=lease_token, outcome="committed",
+                                          evidence_sha256=evidence_sha256)
+                return self._capture_checked(run_id, worker_id, manager, broker)
+            except Exception as exc:
+                broker.retire()
+                raise DurableSwarmError("completion and enqueue stopped; restore durable custody") from exc
+
     def load(self, run_id: str) -> DurableSwarmRecovery | None:
         """Load and verify the latest durable swarm archive for an outer run."""
         resume = self.store.resume_state(run_id)

@@ -34,8 +34,8 @@ Further research queue (not yet verified): Restate, Oban, pg-boss, Faktory, Asyn
 | A10 | Non-discarding throttle | Inngest | P |
 | A11 | Event correlation wakeup | Restate / Inngest | P |
 | A12 | Durable timers and waits | Restate / DBOS | P |
-| A13 | Atomic outcome plus enqueue | River | Open |
-| A14 | Transactional unique job identity | River / Oban | Open |
+| A13 | Atomic outcome plus enqueue | River | P |
+| A14 | Transactional unique job identity | River / Oban | P |
 | A15 | Versioned activation identity | Orleans | P |
 | A16 | Idle actor passivation | Pekko / Orleans | P |
 | A17 | Memory-sensitive passivation | Orleans | Open |
@@ -127,3 +127,17 @@ The host must reserve only the undelegated remainder for direct work. No
 distributed persistence or physical stop protocol is implied.
 The wave-A4 exact-head test failure (dictionary mutated during affinity scan)
 is repaired by nonmutating lookup. Existing regression kept intact.
+
+## Wave A6: durable unique job admission and verified follow-up publication
+
+The existing SwarmDurableBridge can acknowledge a unique job only after
+checkpoint/readback, using the canonical tenant/task identity. It also
+publishes a reconciled uncertain parent and a bounded, exact-manifest
+authorized batch of dependent follow-up jobs in one recovery archive.
+Children are admitted while the parent dependency barrier still holds.
+Any ambiguous mutation or storage acknowledgment retires the in-memory
+broker generation; restore from the actual durable archive. The host must
+hold the existing exclusive run-writer lease and must not bypass the
+verified owner. No external side-effect transaction or automatic replay
+of a completed continuation is claimed. Uncertain write acknowledgment
+requires recovery and inspection, not blind repetition.
