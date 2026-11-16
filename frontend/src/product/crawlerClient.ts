@@ -237,6 +237,16 @@ export type CrawlSession = {
   publisher_intent?: { schema: 'skeleton.dragon.publisher-intent.v1'; method: PublisherIntakeMethod;
     intent_digest: string; operator_acknowledged: true; publisher_verified: false;
     license_verified: false; network_authority_expanded: false };
+  publisher_capture_review?: {
+    schema: 'skeleton.dragon.publisher-capture-review.v1';
+    state: 'consent_expired' | 'restriction_observed' | 'representation_review_required' |
+      'declared_type_match_only' | 'discovery_metadata_only' | 'no_reviewable_capture';
+    settled_requests: number; retained_captures: number; declared_type_matches: number;
+    other_declared_types: number; inferred_or_unknown_types: number;
+    discovery_observations: number; denial_statuses: number; rejected_observations: number;
+    protocol_verified: false; publisher_verified: false; license_verified: false;
+    source_use_authorized: false; network_executed: false;
+  };
   companion?: DragonCompanion;
   curriculum_trace?: DragonCurriculumTrace;
   archive_grant?: DragonArchiveGrant; treasury_watch?: DragonTreasuryWatch|null; watch_managed?: boolean;
@@ -428,6 +438,21 @@ function session(value: CrawlSession, expectedId?: string): CrawlSession {
       || value.limits.max_requests !== 8 || value.limits.max_documents !== 1
       || value.limits.max_depth !== 0 || value.limits.max_total_bytes !== 2097152)
       invalid('Invalid verified publisher intent projection.');
+  }
+  if (value.publisher_capture_review !== undefined) {
+    const r = value.publisher_capture_review;
+    if (!r || !value.publisher_intent || r.schema !== 'skeleton.dragon.publisher-capture-review.v1'
+      || !['consent_expired','restriction_observed','representation_review_required','declared_type_match_only',
+        'discovery_metadata_only','no_reviewable_capture'].includes(r.state)
+      || r.protocol_verified !== false || r.publisher_verified !== false || r.license_verified !== false
+      || r.source_use_authorized !== false || r.network_executed !== false
+      || !integer(r.settled_requests, value.counters.requests) || r.retained_captures !== value.source_count
+      || !integer(r.declared_type_matches, r.retained_captures)
+      || !integer(r.other_declared_types, r.retained_captures)
+      || !integer(r.inferred_or_unknown_types, r.retained_captures)
+      || r.declared_type_matches + r.other_declared_types + r.inferred_or_unknown_types !== r.retained_captures
+      || !integer(r.discovery_observations, r.settled_requests) || !integer(r.denial_statuses, r.settled_requests)
+      || !integer(r.rejected_observations, r.settled_requests)) invalid('Invalid publisher capture review projection.');
   }
   if (value.acquisition_readiness !== undefined) {
     const r = value.acquisition_readiness;
