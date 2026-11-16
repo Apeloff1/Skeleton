@@ -28,6 +28,34 @@ from core.dragon_game_corpus import clean,digest
 MAX_COLUMNS=256
 MAX_FIELD=4*1024*1024
 CHUNK=1024*1024
+FORMATS={
+    "steam-csv":"steam", "steam-parquet":"steam", "steam-json":"steam",
+    "modrinth-json":"modrinth", "wikidata-csv":"locator", "locator-csv":"locator",
+    "normalized-jsonl":None,
+}
+PROJECTIONS=frozenset({"steam","modrinth","locator"})
+
+def _validate_format(format,projection):
+    if (not isinstance(format,str) or format not in FORMATS
+            or not isinstance(projection,str) or projection not in PROJECTIONS
+            or FORMATS[format] is not None and FORMATS[format]!=projection):
+        raise ValueError("unsupported or mismatched dataset projection")
+
+def _unique_pairs(pairs):
+    result={}
+    for key,value in pairs:
+        if key in result:raise ValueError("duplicate JSON export field")
+        result[key]=value
+    return result
+
+def _reject_constant(value):
+    raise ValueError("nonfinite JSON export number")
+
+def _expected_hash(value):
+    if value is not None and (not isinstance(value,str)
+            or not re.fullmatch(r"[a-f0-9]{64}",value)):
+        raise ValueError("expected SHA-256 must be canonical lowercase hex")
+    return value
 
 def _source_hash(path,witness):
     h=hashlib.sha256()
@@ -91,7 +119,7 @@ def modrinth_json(raw):
     # allocation: callers with multiple pages use normalized JSONL.
     data=raw.read(16*1024*1024+1)
     if len(data)>16*1024*1024:raise ValueError("Modrinth search export cap")
-    doc=json.loads(data)
+    doc=json.loads(data,object_pairs_hook=_unique_pairs,parse_constant=_reject_constant)
     if not isinstance(doc,dict) or not isinstance(doc.get("hits"),list) or not 1<=len(doc["hits"])<=100:
         raise ValueError("Modrinth search page schema")
     for item in doc["hits"]:
@@ -147,6 +175,7 @@ def normalized_jsonl(raw,projection):
         yield parse_page(line,projection)[0]
 
 def pages(path,witness,format,projection):
+    _validate_format(format,projection)
     with source_stream(path,None,witness) as stream:
         if format=="steam-csv":rows=steam_csv(stream)
         elif format=="steam-parquet":rows=steam_parquet(stream)
@@ -160,28 +189,57 @@ def pages(path,witness,format,projection):
             if not selected:break
             raw=b"".join(json.dumps(r,sort_keys=True,ensure_ascii=False,separators=(",",":")).encode()+b"\n" for r in selected)
             if len(raw)>MAX_PAGE_BYTES:raise ValueError("normalized projection page cap")
+            # Validate the exact serialized page before any graph reservation.
+            # In particular, a valid provider row is not sufficient evidence
+            # that the selected normalized projection schema accepts it.
+            if len(parse_page(raw,projection))!=len(selected):
+                raise ValueError("normalized page row conservation")
             yield raw,len(selected)
 
-def qualify(path,format,projection):
+def qualify(path,format,projection,*,expected_sha=None):
+    _validate_format(format,projection)
+    expected_sha=_expected_hash(expected_sha)
     witness=fingerprint(path)
     raw_sha=_source_hash(path,witness)
+    if expected_sha is not None and raw_sha!=expected_sha:
+        raise ValueError("input dataset SHA-256 differs")
     count=0;chain=ZERO;n=0
     for ordinal,(raw,size) in enumerate(pages(path,witness,format,projection)):
         count+=size
         if count>MAX_SNAPSHOT_ROWS:raise ValueError("dataset row cap")
         chain=digest([chain,ordinal,hashlib.sha256(raw).hexdigest(),size]);n+=1
     if count==0:raise ValueError("empty dataset")
+    # A timestamp/inode witness alone is not a cryptographic byte witness.
+    # Re-read the raw export after projection, before opening any write grant.
+    if _source_hash(path,witness)!=raw_sha:
+        raise ValueError("dataset bytes changed during qualification")
     return witness,raw_sha,count,chain,n
 
+def inspect_export(path,format,projection,*,expected_sha=None):
+    """Read-only validation of a separately supplied local export.
+
+    No graph object, target lookup, remote access, license assertion, import,
+    or permanent source permission is created by this report.
+    """
+    _,raw_sha,count,chain,n=qualify(Path(path),format,projection,expected_sha=expected_sha)
+    return {"schema":"skeleton.dragon.offline-export-inspection.v1",
+            "format":format,"projection":projection,"input_sha256":raw_sha,
+            "expected_sha_matched":expected_sha is not None,
+            "rows":count,"page_chain":chain,"pages":n,
+            "network_executed":False,"graph_written":False,
+            "license_verified":False,"source_rights_verified":False}
+
 def ingest(graph,scope,*,path,format,projection,target,rights_reference,grant_seconds,expected_sha=None):
-    witness,raw_sha,count,final_chain,total_pages=qualify(path,format,projection)
-    if expected_sha is not None and raw_sha!=expected_sha:raise ValueError("input dataset SHA-256 differs")
+    witness,raw_sha,count,final_chain,total_pages=qualify(path,format,projection,expected_sha=expected_sha)
     begun=graph.begin(scope,target_id=target,projection=projection,source_sha=raw_sha,expected_rows=count,
                       rights_ref=rights_reference,grant_seconds=grant_seconds,acknowledged=True)
     sid=begun["snapshot_id"]
     if begun["state"]=="sealed":
-        if begun["chain"]!=final_chain:raise ValueError("sealed snapshot differs")
-        return {**begun,"already_sealed":True,"verified_pages":total_pages}
+        if begun["chain"]!=final_chain or begun["rows"]!=count:
+            raise ValueError("sealed snapshot differs")
+        if _source_hash(path,witness)!=raw_sha:
+            raise ValueError("input dataset changed before sealed replay")
+        return {**begun,"already_sealed":True,"verified_pages":total_pages,"input_sha256":raw_sha}
     chain=ZERO;seen=0
     for ordinal,(raw,size) in enumerate(pages(path,witness,format,projection)):
         h=hashlib.sha256(raw).hexdigest()
