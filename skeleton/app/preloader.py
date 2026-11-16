@@ -6,6 +6,7 @@ installer mutation occurs: can this checkout support the assembled app?
 
 from __future__ import annotations
 
+import math
 import platform
 import shutil
 import subprocess
@@ -67,11 +68,15 @@ def _command_check(
     runner: Runner,
     timeout: float = 5.0,
 ) -> PreloadCheck:
+    if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 0 < timeout <= 30:
+        raise ValueError("host command timeout must be finite and at most 30 seconds")
     try:
         completed = runner(
             list(command),
             check=False,
-            capture_output=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             text=True,
             timeout=timeout,
         )
@@ -114,6 +119,11 @@ def inspect_host(
 ) -> PreloadReport:
     """Return a deterministic, read-only host readiness report."""
 
+    if (type(min_free_bytes) is not int or type(recommended_free_bytes) is not int
+            or not 0 < min_free_bytes <= recommended_free_bytes <= 2**63 - 1):
+        raise ValueError("host disk thresholds must be positive ordered integer byte counts")
+    if type(require_python) is not bool or type(require_pip) is not bool:
+        raise ValueError("host prerequisite switches must be explicit booleans")
     root = (root or find_repo_root()).resolve()
     checks: list[PreloadCheck] = []
 
@@ -219,6 +229,9 @@ def inspect_host(
         disk_error = type(exc).__name__
     else:
         disk_error = ""
+        if type(free_bytes) is not int or not 0 <= free_bytes <= 2**63 - 1:
+            free_bytes = None
+            disk_error = "invalid capacity observation"
 
     disk_ready = free_bytes is not None and free_bytes >= min_free_bytes
     recommended_ready = free_bytes is not None and free_bytes >= recommended_free_bytes

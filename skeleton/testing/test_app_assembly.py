@@ -1501,3 +1501,67 @@ def test_cli_compose_pins_original_process_environment(tmp_path, monkeypatch):
     monkeypatch.setattr(cli.subprocess, "run", subprocess_run)
     assert cli._run_compose(("docker", "compose", "--env-file", ".env", "up"), tmp_path,
                             process_env=captured) == 0
+
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"min_free_bytes": 0}, {"min_free_bytes": True},
+    {"min_free_bytes": -1}, {"min_free_bytes": 12*1024**3+1},
+    {"recommended_free_bytes": 2**63}, {"recommended_free_bytes": float("nan")},
+    {"require_python": "yes"}, {"require_pip": 1},
+])
+def test_host_preloader_rejects_invalid_admission_inputs_before_inspection(monkeypatch, kwargs):
+    from skeleton.app import preloader
+    def forbidden(*a, **k):
+        pytest.fail("invalid host thresholds reached filesystem inspection")
+    monkeypatch.setattr(preloader, "find_repo_root", forbidden)
+    with pytest.raises(ValueError):
+        preloader.inspect_host(**kwargs)
+
+
+@pytest.mark.parametrize("timeout", [True, None, 0, -1, 31, float("inf"), float("nan")])
+def test_host_command_bounds_timeout_before_dispatch(timeout):
+    from skeleton.app.preloader import _command_check
+    def forbidden(*a, **k):
+        pytest.fail("invalid command timeout reached subprocess")
+    with pytest.raises(ValueError, match="timeout"):
+        _command_check(["docker"], code="host:docker", label="Docker",
+                       remediation="repair", runner=forbidden, timeout=timeout)
+
+
+def test_host_command_does_not_buffer_untrusted_diagnostics():
+    import subprocess
+    from skeleton.app.preloader import _command_check
+    def runner(args, **kw):
+        assert kw["stdin"] == kw["stdout"] == kw["stderr"] == subprocess.DEVNULL
+        assert "capture_output" not in kw
+        return subprocess.CompletedProcess(args, 0)
+    result = _command_check(["docker"], code="host:docker", label="Docker",
+                            remediation="repair", runner=runner)
+    assert result.ok
+
+
+@pytest.mark.parametrize("raw", ["1"*10000, "000001", "１２３", "65536", "+80", " 80"])
+def test_runtime_port_admission_rejects_unbounded_or_ambiguous_decimal(tmp_path, raw):
+    from skeleton.app.assembly import runtime_manifest
+    with pytest.raises(ValueError, match="FRONTEND_PORT must be an integer"):
+        runtime_manifest(root=tmp_path, environ={"FRONTEND_PORT": raw})
+
+
+@pytest.mark.parametrize("origin", [
+    "http://external.invalid:3000", "http://user:password@localhost:3000",
+    "http://localhost:3000/path", "http://localhost:3000?", "http://localhost:3000#",
+    "http://local%68ost:3000", "http://localhost", "http://localhost:0",
+])
+@pytest.mark.parametrize("override", [False, True])
+def test_runtime_manifest_does_not_adopt_untrusted_default_or_overridden_origin(tmp_path, origin, override):
+    from dataclasses import replace
+    from skeleton.app.assembly import runtime_manifest, load_manifest
+    manifest = load_manifest()
+    manifest = replace(manifest, services=tuple(
+        replace(item, public_url=origin) if item.name == "frontend" else item
+        for item in manifest.services
+    ))
+    with pytest.raises(ValueError, match="frontend"):
+        runtime_manifest(manifest, root=tmp_path,
+                         environ={"FRONTEND_PORT": "3300"} if override else {})

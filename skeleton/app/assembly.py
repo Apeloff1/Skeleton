@@ -457,14 +457,16 @@ def runtime_manifest(
         "MONGO_PORT": "27017",
         "CHROMA_PORT": "8000",
     }
+    ports = {}
     for key, fallback in port_keys.items():
         raw = values.get(key, "") or fallback
-        if not raw.isascii() or not raw.isdigit() or not 1 <= int(raw) <= 65535:
+        # Bound decimal text before int(): huge strings must not leak a
+        # conversion exception or consume an unbounded parsing budget.
+        if (not 1 <= len(raw) <= 5 or not raw.isascii()
+                or not raw.isdigit() or not 1 <= int(raw) <= 65535):
             raise ValueError(f"{key} must be an integer from 1 to 65535")
-    public_ports = [
-        int(values.get(key, "") or port_keys[key])
-        for key in ("FRONTEND_PORT", "BACKEND_PORT", "SKELETON_PORT", "MONGO_PORT", "CHROMA_PORT")
-    ]
+        ports[key] = int(raw)
+    public_ports = list(ports.values())
     if len(public_ports) != len(set(public_ports)):
         raise ValueError("FRONTEND_PORT, BACKEND_PORT, SKELETON_PORT, MONGO_PORT and CHROMA_PORT must differ")
     services = []
@@ -476,17 +478,24 @@ def runtime_manifest(
             "chroma": "CHROMA_PORT",
         }.get(service.name)
         raw = values.get(key, "") if key else ""
-        if raw and service.public_url:
-            if not raw.isascii() or not raw.isdigit() or not 1 <= int(raw) <= 65535:
-                raise ValueError(f"{key} must be an integer from 1 to 65535")
-            url = urlsplit(service.public_url)
-            if url.scheme not in {"http", "https"} or url.hostname not in {"localhost", "127.0.0.1", "::1"}:
-                raise ValueError(f"{service.name} has a non-local public URL; port override rejected")
+        if key and service.public_url:
+            origin = service.public_url
+            if (len(origin) > 4096 or any(ord(ch) <= 32 or ord(ch) == 127 for ch in origin)
+                    or any(ch in origin for ch in ("?", "#", "%", chr(92)))):
+                raise ValueError(f"{service.name} has an invalid local public URL")
+            url = urlsplit(origin)
+            if (url.scheme not in {"http", "https"} or url.hostname not in {"localhost", "127.0.0.1", "::1"}
+                    or url.username is not None or url.password is not None
+                    or url.path not in {"", "/"} or not url.port):
+                raise ValueError(f"{service.name} has a non-local or invalid public URL")
+            if not raw:
+                services.append(service)
+                continue
             host = url.hostname
             if ":" in host:
                 host = "[" + host + "]"
             service = replace(
-                service, public_url=urlunsplit((url.scheme, f"{host}:{int(raw)}", url.path, "", ""))
+                service, public_url=urlunsplit((url.scheme, f"{host}:{ports[key]}", url.path, "", ""))
             )
         services.append(service)
     return replace(manifest, services=tuple(services))
