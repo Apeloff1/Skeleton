@@ -29,6 +29,7 @@ class QueuePolicy:
     max_request_tokens: int = 16384
     kv_capacity_bytes: int = 256 * 1024**2
     kv_bytes_per_token: int = 4096
+    max_stalled_slices: int = 8
 
     def __post_init__(self) -> None:
         integer(self.max_requests, 1, 4096, "queue size")
@@ -36,6 +37,7 @@ class QueuePolicy:
         integer(self.max_request_tokens, 1, 65536, "request token bound")
         integer(self.kv_capacity_bytes, 1, 1 << 40, "KV capacity")
         integer(self.kv_bytes_per_token, 1, 1 << 30, "KV token estimate")
+        integer(self.max_stalled_slices, 1, 1024, "stalled slice limit")
 
 
 def reserve_cache(policy: RuntimePolicy, queue: QueuePolicy) -> RuntimePolicy:
@@ -75,6 +77,8 @@ class _Request:
     deadline_ns: int
     cancel: threading.Event
     age: int = 0
+    stalled_slices: int = 0
+    executor_released: bool = False
 
 
 class OfflineRequestQueue:
@@ -154,7 +158,10 @@ class OfflineRequestQueue:
     def _retire(self, request_id: str, *, completed: bool) -> None:
         """Release executor ownership before returning scheduler capacity."""
         if request_id in self._scheduler.active_ids:
-            self._executor.release(request_id)
+            row = self._requests[request_id]
+            if not row.executor_released:
+                self._executor.release(request_id)
+                row.executor_released = True
             if completed:
                 self._scheduler.complete(request_id, retain_kv=False)
             else:
@@ -234,6 +241,8 @@ class OfflineRequestQueue:
             grant = observation["admission"]
             slices = (self._session.consume(grant, consumer=self._consumer)
                       if grant["status"] == "candidate" else ())
+            grant_deadline = (self._session.execution_deadline(grant["expires_ns"], consumer=self._consumer)
+                              if slices else None)
             self._sequence += 1
         progressed = []
         for item in slices:
@@ -244,13 +253,13 @@ class OfflineRequestQueue:
                 now = time.monotonic_ns()
                 if self._closed or row.cancel.is_set() or now >= row.deadline_ns:
                     continue
-                if self._session.status()["closed"] or now >= grant["expires_ns"]:
+                if self._session.status()["closed"] or grant_deadline is None or now >= grant_deadline:
                     break
                 phase = "prefill" if row.prompt_left else "decode"
                 remaining = row.prompt_left if row.prompt_left else row.decode_left
                 require(item["phase"] == phase and 1 <= item["tokens"] <= remaining,
                         "grant exceeds request phase budget")
-                deadline = min(row.deadline_ns, grant["expires_ns"])
+                deadline = min(row.deadline_ns, grant_deadline)
             result = self._executor.run_slice(request_id=key, phase=phase,
                                               tokens=item["tokens"], deadline_ns=deadline,
                                               cancel=row.cancel)
@@ -272,9 +281,19 @@ class OfflineRequestQueue:
                     retired.append({"request_id": key, "terminal": reason})
                     continue
                 progressed.append(asdict(result))
+                if result.processed_tokens:
+                    row.stalled_slices = 0
+                elif not result.terminal:
+                    row.stalled_slices += 1
                 if result.terminal or (row.prompt_left == 0 and row.decode_left == 0):
                     self._retire(key, completed=True)
                     retired.append({"request_id": key, "terminal": "completed"})
+                elif row.stalled_slices >= self._policy.max_stalled_slices:
+                    # A nonproductive but cooperative backend must not hold
+                    # a resident slot indefinitely at the expense of queued work.
+                    row.cancel.set()
+                    self._retire(key, completed=False)
+                    retired.append({"request_id": key, "terminal": "stalled"})
         with self._lock:
             if self._session.status()["closed"]:
                 self._closed = True
@@ -298,7 +317,8 @@ class OfflineRequestQueue:
                     "iteration_in_progress": self._iteration_lock.locked(),
                     "drain_complete": self._closed and not self._requests and not self._iteration_lock.locked(),
                     "requests": [{"request_id": key, "prompt_left": row.prompt_left,
-                                  "decode_left": row.decode_left, "cancelled": row.cancel.is_set()}
+                                  "decode_left": row.decode_left, "cancelled": row.cancel.is_set(),
+                                  "stalled_slices": row.stalled_slices, "executor_released": row.executor_released}
                                  for key, row in sorted(self._requests.items())],
                     "native_qualified": False, "release_qualified": False}
 
