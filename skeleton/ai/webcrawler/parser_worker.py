@@ -91,7 +91,7 @@ def _parse(meta: dict, body: bytes) -> tuple[str, dict | None]:
             response = FetchResponse(meta["url"], meta["status"],
                                      {"content-type": meta["media"]}, body, meta["fetched_at"])
             doc = extract_document(response, meta["canonical_url"],
-                                   max_links=128, max_text_chars=meta["max_chars"],
+                                   max_links=256, max_text_chars=meta["max_chars"],
                                    link_base_url=meta["url"])
             if doc is None:
                 return "empty", None
@@ -112,10 +112,10 @@ def _parse(meta: dict, body: bytes) -> tuple[str, dict | None]:
                                  max_response_bytes=meta["max_bytes"])
             if mode == "sitemap":
                 item = parse_plaintext_sitemap(body, document_url=meta["url"],
-                                               policy=policy, max_links=128, max_entries=512)
+                                               policy=policy, max_links=256, max_entries=1024)
             else:
                 item = parse_structured_discovery(body, media_type=meta["media"],
-                    document_url=meta["url"], policy=policy, max_links=128, max_entries=512)
+                    document_url=meta["url"], policy=policy, max_links=256, max_entries=1024)
             return "ok", {"kind": item.kind, "links": list(item.links),
                           "examined": item.examined_entries, "discarded": item.discarded_entries,
                           "capped": item.capped}
