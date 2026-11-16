@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import http.client
 import math
+import re
 import socket
 import ssl
 import threading
@@ -129,6 +130,36 @@ class SocketBoundFetcher:
         return "configured_proxy_public_origin_guard" if self.proxy_url else "direct_dns_socket_pinned"
 
     def fetch_once(self, url, *, user_agent, max_bytes, extra_headers=None):
+        return self._fetch_once(url,user_agent=user_agent,max_bytes=max_bytes,extra_headers=extra_headers)
+
+    def fetch_publisher_api_once(self, provider, resource, *, token, user_agent, max_bytes):
+        """Explicit official read-only API, not an alternate crawler fetch path.
+
+        No redirect forwarding, arbitrary query, arbitrary endpoint or caller
+        authorization headers. The caller must establish source permission and
+        the canonical shared host lease before calling.
+        """
+        if (not isinstance(resource,str) or not re.fullmatch(
+                r"[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}",resource)
+                or any(x in {".",".."} for x in resource.split("/"))):
+            raise ValueError("invalid official API resource")
+        if not isinstance(token,str) or not re.fullmatch(r"[A-Za-z0-9_~.+/-]{16,512}={0,2}",token):
+            raise ValueError("invalid publisher credential")
+        profiles={
+            "github_releases":("api.github.com","/repos/"+resource+"/releases"),
+            "github_tags":("api.github.com","/repos/"+resource+"/tags"),
+            "huggingface_dataset":("huggingface.co","/api/datasets/"+resource),
+        }
+        if provider not in profiles:raise ValueError("unsupported publisher API")
+        host,path=profiles[provider]
+        url="https://"+host+path
+        api_headers={"Authorization":"Bearer "+token,"Accept":"application/json"}
+        if provider.startswith("github_"):
+            api_headers["X-GitHub-Api-Version"]="2022-11-28"
+        return self._fetch_once(url,user_agent=user_agent,max_bytes=max_bytes,
+                                 publisher_identity=(url,api_headers))
+
+    def _fetch_once(self, url, *, user_agent, max_bytes, extra_headers=None, publisher_identity=None):
         if type(max_bytes) is not int or not 0 <= max_bytes <= 4_000_000:
             raise ValueError("invalid response byte bound")
         if (
@@ -160,6 +191,12 @@ class SocketBoundFetcher:
             ):
                 raise ValueError("unsupported crawler request header")
             headers[key] = value
+        if publisher_identity is not None:
+            # Only the specialized fixed endpoint method supplies this tuple.
+            # Refuse any canonical URL change or downgrade before attaching a secret.
+            if target.url != publisher_identity[0] or parsed.scheme != "https":
+                raise ValueError("publisher API identity changed")
+            headers.update(publisher_identity[1])
         proxy_auth = {}
         if self.proxy_url:
             proxy = urlsplit(self.proxy_url if "://" in self.proxy_url else "http://" + self.proxy_url)
