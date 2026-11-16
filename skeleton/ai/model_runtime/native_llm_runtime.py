@@ -170,8 +170,11 @@ class NativeLLMRuntime:
             raise RuntimeContractError("runtime context exceeds model context")
         self.device_policy = device_policy or DevicePolicy()
 
-        self._model_snapshot, self._model_digest = capture_validated_model(model)
-        self._model_bytes = logical_bytes(self._model_snapshot)
+        # Admission captures a detached graph for validation once; retaining
+        # it alongside live weights would permanently duplicate every row.
+        snapshot, self._model_digest = capture_validated_model(model)
+        self._model_bytes = logical_bytes(snapshot)
+        del snapshot
         if self._model_bytes > self.limits.max_model_bytes:
             raise RuntimeContractError("model exceeds runtime memory budget")
 
@@ -398,7 +401,7 @@ class NativeLLMRuntime:
                 raise RuntimeContractError(
                     "accelerator rebind failed during model identity refresh"
                 ) from exc
-        self._model_snapshot = snapshot
+        # Never retain a detached graph after its identity was admitted.
         self._model_digest = digest
         self._model_bytes = size
         self.tokenizer = tokenizer
