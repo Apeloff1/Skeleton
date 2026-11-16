@@ -22,6 +22,7 @@ from .schema import ensure_schema
 from .spec import JobIdentity, JobSpec, WorkLimits, require_id
 from .result import JobResult
 from .transaction import TransactionGate
+from .event_projection import verify_projection
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,7 +132,8 @@ class JobStore:
             "SELECT event_json FROM ai_job_audit WHERE job_id=? AND kind='submitted' LIMIT 2",
             (spec.job_id,),
         ).fetchall()
-        if len(admission) != 1 or decode(admission[0][0]).get("spec_sha") != spec.digest:
+        body = decode(admission[0][0]) if len(admission) == 1 else None
+        if type(body) is not dict or body.get("spec_sha") != spec.digest:
             deny("job-admission-binding")
         return spec
 
@@ -148,7 +150,10 @@ class JobStore:
             parent = self._row(db, dependency_id)
             if parent is None:
                 deny("dependency-corrupt")
-            self._bound_spec(db, parent)
+            parent_spec = self._bound_spec(db, parent)
+            verify_projection(db, parent, parent_spec)
+            if parent[13] == "completed":
+                self._verified_result(db, parent, parent_spec)
             if parent[1:3] != row[1:3] or parent[9] > row[9]:
                 deny("dependency-authority-corrupt")
             parents.append(parent)
@@ -182,7 +187,8 @@ class JobStore:
                 if current[8]!=spec.digest:
                     deny("job-id-collision")
                 self._clock_fence(current, now_ms)
-                self._bound_spec(db, current)
+                current_spec = self._bound_spec(db, current)
+                verify_projection(db, current, current_spec)
                 return "replayed"
             duplicate=db.execute("""SELECT job_id,spec_sha FROM ai_durable_jobs
               WHERE tenant=? AND user_id=? AND session_id=? AND request_id=?""",
@@ -231,7 +237,8 @@ class JobStore:
             if row is None:
                 deny("job-unknown")
             self._assert_owner(row,owner)
-            self._bound_spec(db, row)
+            spec = self._bound_spec(db, row)
+            verify_projection(db, row, spec)
             return self._public(row)
 
     def load_spec(self,job_id:str,owner:JobIdentity)->JobSpec:
@@ -243,7 +250,9 @@ class JobStore:
             if row is None:
                 deny("job-unknown")
             self._assert_owner(row,owner)
-            return self._bound_spec(db, row)
+            spec = self._bound_spec(db, row)
+            verify_projection(db, row, spec)
+            return spec
 
     def dependency_snapshot(self, job_id: str, owner: JobIdentity) -> tuple[dict, list[dict]]:
         """One SQLite snapshot for the child and immutable admitted parent inventory."""
@@ -254,6 +263,7 @@ class JobStore:
             if row is None:
                 deny("job-unknown")
             self._assert_owner(row, owner)
+            verify_projection(db, row, self._bound_spec(db, row))
             parents = self._dependency_rows(db, row)
             return self._public(row), [self._public(parent) for parent in parents]
 
@@ -311,6 +321,7 @@ class JobStore:
             job_id=candidate[0]
             row=self._row(db,job_id)
             spec=self._bound_spec(db,row)
+            verify_projection(db, row, spec)
             if any(parent[13] != "completed" for parent in self._dependency_rows(db,row)):
                 deny("dependency-not-completed")
             self._clock_fence(row,now_ms)
@@ -328,7 +339,8 @@ class JobStore:
               (token_sha,worker_id,until,now_ms,job_id))
             db.execute("UPDATE ai_job_state SET rr_tenant=? WHERE singleton=1",(tenant,))
             append_event(db,job_id,"claimed",{"worker":worker_id,"at":now_ms,
-                          "attempt":row[14]+1,"lease_expires_ms":until})
+                          "attempt":row[14]+1,"lease_expires_ms":until,
+                          "lease_token_sha":token_sha})
             return ClaimedJob(job_id,spec.request_id,spec.owner,spec.question,
                               worker_id,token,until,row[14]+1)
 
@@ -341,6 +353,9 @@ class JobStore:
         self._assert_owner(row,claim.owner)
         self._clock_fence(row, now_ms)
         spec = self._bound_spec(db, row)
+        projected = verify_projection(db, row, spec)
+        if projected.token_sha is None:
+            deny("claim-audit-unbound")
         if (spec.request_id != claim.request_id or spec.question != claim.question):
             deny("claim-spec-binding")
         if row[16]!=claim.worker_id or row[14]!=claim.attempt:
@@ -434,7 +449,7 @@ class JobStore:
             if row is None:
                 deny("job-unknown")
             self._assert_owner(row,owner)
-            self._bound_spec(db,row)
+            verify_projection(db,row,self._bound_spec(db,row))
             self._clock_fence(row,now_ms)
             state=row[13]
             if state in ("cancelled","cancel_requested"):
@@ -472,7 +487,7 @@ class JobStore:
               ORDER BY job_id LIMIT ?""",(now_ms,now_ms,now_ms,limit)).fetchall()
             for job_id, in candidates:
                 row=self._row(db,job_id)
-                self._bound_spec(db,row)
+                verify_projection(db,row,self._bound_spec(db,row))
                 self._clock_fence(row,now_ms)
                 self._dependency_rows(db,row)
                 if row[13]=="pending" and row[10]<=now_ms:
@@ -508,6 +523,7 @@ class JobStore:
             if not callable(proof_verifier):
                 deny("recovery-verifier-required")
             original=self._bound_spec(db,row)
+            verify_projection(db,row,original)
             if proof_verifier(original,no_effect_proof_sha256) is not True:
                 deny("recovery-proof-unverified")
             if row[14]>=20 or now_ms>=row[10]:
@@ -546,7 +562,8 @@ class JobStore:
             "SELECT event_json FROM ai_job_audit WHERE job_id=? AND kind='completed' LIMIT 2",
             (spec.job_id,),
         ).fetchall()
-        if len(terminal)!=1 or decode(terminal[0][0]).get("result_sha")!=result.digest:
+        body = decode(terminal[0][0]) if len(terminal) == 1 else None
+        if type(body) is not dict or body.get("result_sha") != result.digest:
             deny("result-audit-binding")
         return result
 
@@ -558,7 +575,10 @@ class JobStore:
             if row is None:
                 deny("job-unknown")
             self._assert_owner(row,owner)
-            return self._verified_result(db,row,self._bound_spec(db,row))
+            spec = self._bound_spec(db,row)
+            result = self._verified_result(db,row,spec)
+            verify_projection(db,row,spec)
+            return result
 
     def audit(self,job_id:str,owner:JobIdentity)->list[dict]:
         require_id(job_id,"job")

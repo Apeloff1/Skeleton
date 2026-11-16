@@ -75,7 +75,7 @@ def test_replay_requires_original_request_prompt_worker_attempt_and_audit():
         )
         with pytest.raises(JobDenied, match="result-audit-binding"):
             store.receipt(spec.job_id, OWNER)
-        with pytest.raises(JobDenied, match="result-audit-binding"):
+        with pytest.raises(JobDenied, match="job-audit-state-binding"):
             store.finish(claim, altered, now_ms=1002)
 
 
