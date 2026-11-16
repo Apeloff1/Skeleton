@@ -166,4 +166,3 @@ jobs:
           test ! -s "$work/stdout"
           sha256sum "$bridge"
           echo "Compile and malformed-input evidence only; no model inference or device acceptance."
-
