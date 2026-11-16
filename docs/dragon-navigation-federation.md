@@ -37,7 +37,7 @@ deployment limits and reserves apply. No automatic retention is enabled.
 GET `/api/dragon-academy/crawler/sessions/{id}/navigation/packet` while its
 manual companion frontier has a ready candidate and no pending dispatch.
 The packet contains bounded objective/path terms and opaque candidate IDs,
-not source body text, URL queries or credentials. It is valid for five
+not source body text, URL queries or credentials. It is valid for fifteen
 minutes, for the same checkpoint, and only for one target selection.
 
 Send the JSON packet response to the authenticated running local-only Jeeves
@@ -56,7 +56,10 @@ authorize any dispatch. Rebuild the packet if rejected. The existing local
 inference store retains the two role conversations and execution receipts;
 the operator may delete these using ordinary local conversation controls.
 
-The same primary local model executes two separate role contexts. Dragon
+The same primary local model executes two separate role contexts per match.
+The 48-candidate stratified tournament uses up to nine two-role matches (18
+actual inference calls), groups of at most eight candidates, and a final
+rank. A missing or invalid local response aborts the entire advisory result. Dragon
 critiques the first Jeeves ranking. This is genuine two-call orchestration
 when executed, not two separately trained models or a new model checkpoint.
 Rank influence is bounded and remains inactive during recovery/conservation.
@@ -67,7 +70,7 @@ local SQLite store. Deterministic browsing still works without this step.
 ## Qualification
 
 The exact-head workflow runs canonical navigation and host-backpressure tests,
-and physical SQLite fixture writes/read-back across 40 sessions (5120 matches).
+and physical SQLite fixture writes/read-back across 160 sessions (20480 matches).
 For a larger controlled scratch run, set
 `SKL_DRAGON_NAV_QUALIFICATION_BATCHES` between 40 and 4096 and run
 `PYTHONPATH=.:backend:tests python -m unittest discover -s backend/tests -p test_dragon_navigation_federation.py -v`.
@@ -76,3 +79,44 @@ It does not qualify the end user's device, distributed storage, production
 failure recovery, real internet acquisition or two independently trained models.
 Existing code-bound snapshots need separately authorized upgrade/migration;
 do not rewrite their integrity receipts to force admission.
+
+
+## Wide graph and adaptive browsing
+
+The checkpoint inventory holds up to 4096 records subject to its 1 MiB
+conservative byte envelope; incremental accounting is independently
+recomputed on restore. Supported document paths now request up to 1024
+links and structured parsers examine up to 4096 entries. Protocol-specific
+limits, snapshot limits, active frontier capacity and response-byte limits
+remain separate; this is not exhaustive extraction.
+
+New owner-scoped endpoints under `/api/dragon-academy/crawler/navigation/federation`:
+
+- POST `/batch`: specify 1–16 exact session/checkpoint pairs, independent
+  retention duration and rights acknowledgment. Each grant is transactional
+  and replay-safe; a batch may have mixed held/published outcomes.
+- GET `/shortlist?query=...`: indexed exact lexical, concept and trigram
+  candidate lanes; optional host and due-only filter. Up to 48 proposals.
+- GET `/portfolio?query=...`: advisory Jeeves objective score and Dragon
+  novelty, host-diversity, lineage and historical-outcome score with marginal
+  redundancy suppression. Up to 24 proposals.
+- GET `/targets/{sha256}/topology`: active grant-scoped parent or child edges.
+- GET `/targets/{sha256}/trail?query=...`: cycle-safe directed browsing trail,
+  up to six hops and 48 proposals. An edge is an observed historical link,
+  not proof that the destination is safe, current, or still exists.
+- POST `/targets/{sha256}/review`: optimistic revision compare-and-set on
+  candidate/held/retired classification and next review time.
+- POST `/reindex`: explicitly rebuild old or missing semantic postings in
+  keyset batches. This cannot invent historical topology absent from older
+  retention grants.
+
+All routes preserve owner scope, no-network authority, separate retention
+rights and grant expiry. New publications atomically retain witnessed
+topology, metadata-only outcome classifications and versioned posting lanes.
+The existing exhaustive keyset FTS listing remains separate from the bounded
+approximate research portfolio. Index migration, incomplete lanes and
+incomplete topology are reported. No actual capture is automatically launched.
+
+The physical fixture qualification validates grant/nodes/edges/postings/
+outcome counts and SQLite integrity/readback; live native model tournament,
+user hardware, and production throughput require separate evidence.
