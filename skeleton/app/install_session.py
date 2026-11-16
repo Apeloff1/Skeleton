@@ -440,6 +440,7 @@ def open_session(root,directory,session_id,head,options,*,resume=False):
             and type(resume) is bool)
     directory=Path(directory)
     require(directory!=root and root not in directory.parents,"session state must be outside checkout")
+    require(os.name=="posix", "persistent installer sessions require POSIX custody")
     import fcntl
     lock=None
     session=None

@@ -444,9 +444,9 @@ def stage_recovery(backup,output,approval):
             for row in rows:
                 approval.verify()
                 _copy_file(base,plan.selected_lane,row,data)
-            require(_manifest_files(data)==rows,"private copy differs from signed inventory")
+            require(sorted(_manifest_files(data),key=lambda row:row["path"])==rows,"private copy differs from signed inventory")
             integrity=sqlite_integrity(data/_DB)
-            require(_manifest_files(data)==rows,"SQLite verification mutated staged bytes")
+            require(sorted(_manifest_files(data),key=lambda row:row["path"])==rows,"SQLite verification mutated staged bytes")
             final_raw,final_manifest=_backup_observation(backup,base)
             require(final_raw==raw and lane_inventory(final_manifest,plan.selected_lane)==rows,
                     "source backup changed while staging")

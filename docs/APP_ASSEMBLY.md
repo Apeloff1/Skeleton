@@ -999,3 +999,35 @@ unobserved .env change, preserve that file and independently reconcile before
 opening a new session. Explicit admin credentials and secret rotation are
 excluded from this recovery mode. Windows launcher behavior remains
 unchanged; this POSIX implementation is not a Windows ACL qualification.
+
+
+### New-install durable Chroma provisioning (operator-gated)
+
+After the exact-source disposable Chroma persistence job succeeds on the
+same image ID, independently review and pin its JSON receipt. The default
+stack must already have its canonical engine and local Compose network running.
+For genuinely new storage only, the separate provisioner creates the new
+named volume at /data and starts only its verified owned container:
+
+    python scripts/provision_fresh_chroma.py --source-head REVIEWED_SHA fresh \
+      --fixture /private/fixture.json --fixture-sha256 REVIEWED_FILE_SHA256 \
+      --port 8000 --journal /private/chroma/new-attempt.json
+
+The private journal is fsynced before creation. A distinct created receipt
+is committed before the first start. Existing legacy containers or volumes
+block the fresh path. Existing corrected deployments can be observed or
+started by exact created-receipt pin:
+
+    python scripts/provision_fresh_chroma.py --source-head REVIEWED_SHA inspect-existing \
+      --receipt /private/chroma/new-attempt.created.json --receipt-sha256 REVIEWED_FILE_SHA256
+    python scripts/provision_fresh_chroma.py --source-head REVIEWED_SHA start-existing \
+      --receipt /private/chroma/new-attempt.created.json --receipt-sha256 REVIEWED_FILE_SHA256
+
+The operator is responsible for independently authenticating the fixture
+and created receipts and selecting the appropriate local port. An uncertain
+attempt is never recreated automatically. Preserve all resources for review.
+The exact image, volume and container identities, bridge membership, loopback
+port and service alias are checked, but production application vector
+integration, legacy migration and release remain held. The old full-profile
+Compose definition remains unchanged and must not be used to recreate the
+corrected service. No production resources are touched by source qualification.
