@@ -33,6 +33,11 @@ def _priority(summary: dict, depth: int) -> tuple:
     if summary["kind"] == "convoy_league":
         return (not summary["gate_satisfied"], len(summary["remaining"]),
                 -summary["score"], -summary["rounds_played"], -summary["waypoint"], depth)
+    if summary["kind"] in {"timed_season", "delivery_chain"}:
+        progress = summary["course_progress"] or {}
+        return (not summary["gate_satisfied"], len(summary["remaining"]),
+                -summary["score"], -len(progress.get("visits", [])),
+                not summary["state"]["delivered"], depth)
     return (not summary["gate_satisfied"], len(summary["required_contracts_remaining"]),
             -summary["points"], -summary["bounty"], -summary["waypoint"], depth)
 
