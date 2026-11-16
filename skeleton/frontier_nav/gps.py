@@ -136,13 +136,24 @@ class FrameGPSHub:
         proofs: Iterable[FrameProof], updates: Iterable[NavUpdate]
     ) -> bool:
         prev = GENESIS
-        for proof, upd in zip(proofs, updates, strict=True):
-            if proof.prev_hash != prev or proof.frame != upd.frame:
-                return False
-            if (
-                _digest(upd.console, upd.era, upd.frame, prev, upd.fixes)
-                != proof.digest
-            ):
-                return False
-            prev = proof.digest
+        prior_frame = -1
+        lane = None
+        try:
+            for proof, upd in zip(proofs, updates, strict=True):
+                if not isinstance(proof, FrameProof) or not isinstance(upd, NavUpdate):
+                    return False
+                current = (upd.console, upd.era)
+                if lane is None:
+                    lane = current
+                if (current != lane or (proof.console, proof.era) != lane
+                        or type(upd.frame) is not int or upd.frame <= prior_frame
+                        or proof.prev_hash != prev or proof.frame != upd.frame
+                        or upd.proof_hash != proof.digest):
+                    return False
+                if _digest(upd.console, upd.era, upd.frame, prev, upd.fixes) != proof.digest:
+                    return False
+                prior_frame = upd.frame
+                prev = proof.digest
+        except (TypeError, ValueError, AttributeError, OverflowError):
+            return False
         return True

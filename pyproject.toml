@@ -62,6 +62,7 @@ jeeves-production-training = ["torch>=2.5,<3"]
 hosted-inference = ["openai>=2.54.0,<3", "httpx>=0.28.1,<1"]
 
 [project.scripts]
+skeleton-grounded-quest-qualify = "skeleton.app.grounded_quest_cli:main"
 skeleton-quest-trace-repair = "skeleton.app.quest_trace_repair_cli:main"
 skeleton-quest-playtest-analytics = "skeleton.app.quest_playtest_analytics_cli:main"
 skeleton-studio-frame-qualification = "skeleton.app.studio_frame_qualification_cli:main"

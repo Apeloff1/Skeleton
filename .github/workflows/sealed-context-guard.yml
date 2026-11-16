@@ -70,6 +70,11 @@ on:
       - 'skeleton/app/orphan_source_graph*.py'
       - 'skeleton/app/orphan_graph_ownership.py'
       - 'skeleton/app/recovered_evidence.py'
+      - 'skeleton/app/grounded_quest_cli.py'
+      - 'skeleton/ai/game_builder/grounded_quest_qualification.py'
+      - 'skeleton/frontier_nav/signed_navigation.py'
+      - 'skeleton/frontier_nav/gps.py'
+      - 'skeleton/testing/test_recovered_signed_navigation.py'
       - 'skeleton/app/quest_trace_repair_cli.py'
       - 'skeleton/ai/game_builder/quest_trace_*.py'
       - 'skeleton/testing/test_recovered_quest_trace_repair.py'
@@ -271,6 +276,11 @@ jobs:
         env:
           PYTHONPATH: '.:backend'
         run: python -m pytest -q skeleton/testing/test_recovered_quest_trace_repair.py skeleton/gameforge/batch_b039/test_self_repair.py skeleton/gameforge/batch_b039/test_route_adapter.py tests/test_gf_b038_provenance.py
+
+      - name: Recovered signed route and navigation replay qualification
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_signed_navigation.py tests/test_frontier_nav_gf_h.py
 
       - name: Consumer share and Chroma custody regressions
         env:
