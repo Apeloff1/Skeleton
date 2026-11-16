@@ -74,16 +74,16 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 31 | CPU/GPU balancing | P |
 | 32 | Unified memory | P |
 | 33 | NUMA placement | P |
-| 34 | GPU topology | Open |
+| 34 | GPU topology | P |
 | 35 | Thermal scheduling | P |
 | 36 | Energy scheduling | P |
 | 37 | Bandwidth optimization | P |
-| 38 | Model preloading | Open |
+| 38 | Model preloading | P |
 | 39 | KV affinity | P |
 | 40 | Prefill/decode separation | P |
 | 41 | Token-level admission | P |
-| 42 | Cross-device migration | Open |
-| 43 | Pressure relief | Open |
+| 42 | Cross-device migration | P |
+| 43 | Pressure relief | P |
 | 44 | Storage-aware dispatch | P |
 | 45 | Heterogeneous accelerators | P |
 | 46 | Event-sourced execution | Open |
@@ -97,7 +97,7 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 54 | Checkpoint recovery | P |
 | 55 | Poison quarantine | P |
 | 56 | Retry budgets | P |
-| 57 | Failure prediction | Open |
+| 57 | Failure prediction | P |
 | 58 | Split brain prevention | P |
 | 59 | Journal compaction | Open |
 | 60 | Version migration | P |
@@ -380,3 +380,21 @@ The draft-19 source job's nonexistent archive test selector is replaced
 with the existing invalid-custody parametrized cases and source-tamper
 nonpublication regression. The original deterministic inspection and
 preflight assertions remain.
+
+## Wave 15: topology, migration, predictive preloading and pressure relief
+
+Directed, generation-scoped link observations support bounded shortest
+serial transfer-time path selection. A migration proposal requires stopped
+execution, matching ABI, checkpoint and stop evidence, verified target
+identity, destination plus scratch reservation, and a positive deadline
+and service-time benefit. Source authority is retained until target copy
+verification/publication and explicit stop/release acknowledgment.
+Preload selection ranks authorized same-tenant, same-device forecasts
+by expected benefit per reserved byte and obeys separate I/O and memory
+budgets. Pressure forecasts use a conservative nonnegative trend,
+recent error rates and recovery hysteresis; predicted overload proposes
+throttling, speculative-work cancellation and owner-verified idle eviction.
+
+New partial targets: 34, 38, 42, 43, 57. No physical memory migration,
+GPU peer transfers, calibrated failure predictor or actual cache action
+is yet demonstrated by these proposal functions.

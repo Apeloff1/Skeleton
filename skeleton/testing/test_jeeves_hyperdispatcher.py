@@ -1006,3 +1006,50 @@ def test_tool_fusion_is_pure_linear_and_policy_bound():
     assert not propose_fusion([a,replace(b,effect="write")], **kw)
     assert not propose_fusion([a,replace(b,policy_sha256="0"*64)], **kw)
     assert not propose_fusion([a,b,replace(c,dependencies=("a",))], **kw)
+
+def test_topology_respects_direction_and_transfer_cost():
+    from skeleton.intelligence.dispatch_fabric import FabricLink, transfer_path
+    links = [FabricLink("a","b",1,2,1000,"peer",True),
+             FabricLink("b","c",1,2,1000,"peer",True),
+             FabricLink("a","c",1,1,100,"host",True)]
+    kw = dict(bytes_to_copy=1000,generation=1,allowed_transports=frozenset({"peer","host"}))
+    path = transfer_path("a","c",links,**kw)
+    assert path.endpoints == ("a","b","c") and path.conservative_us == 2_000_004
+    assert transfer_path("c","a",links,**kw) is None
+    with pytest.raises(DispatchPolicyError):
+        transfer_path("a","c",links,**(kw|{"generation":2}))
+
+
+def test_migration_requires_stop_abi_budget_and_dual_custody():
+    from skeleton.intelligence.dispatch_fabric import FabricLink, MigrationSnapshot, propose_migration
+    s = MigrationSnapshot("task","t","a","b",1,2,"a"*64,"b"*64,"b"*64,"c"*64,
+                          "d"*64,"e"*64,100,200,20,10000,100000,100,True,True)
+    link = FabricLink("a","b",1,5,1_000_000,"peer",True)
+    kw = dict(topology_generation=1,allowed_transports=frozenset({"peer"}))
+    p = propose_migration(s,[link],**kw)
+    assert p.target_reservation_bytes == 120
+    assert p.required_phases[-1] == "ack-source-release"
+    for bad in (replace(s,verified_stop=False),replace(s,target_receipt_verified=False),
+                replace(s,target_abi_sha256="0"*64),replace(s,target_free_bytes=119)):
+        assert propose_migration(bad,[link],**kw) is None
+
+
+def test_preload_forecasts_never_borrow_other_tenant_capacity():
+    from skeleton.intelligence.dispatch_fabric import PreloadDemand, plan_preloads
+    d = PreloadDemand("t","a"*64,"gpu",1,10,"b"*64,900000,5,100,25,60,True)
+    rows = [d,replace(d,model_sha256="c"*64,bytes_required=70),
+            replace(d,tenant_id="other"),replace(d,model_sha256="d"*64,authorized=False)]
+    result = plan_preloads(rows,tenant_id="t",device_id="gpu",generation=1,now_ms=11,
+                           spare_bytes=100,spare_io_ms=100)
+    assert result == (d,)
+
+
+def test_pressure_forecast_hysteresis_and_generation():
+    from skeleton.intelligence.dispatch_fabric import HealthSample, forecast_pressure
+    rows = [HealthSample(0,1,500000,0),HealthSample(10,1,600000,0),HealthSample(20,1,700000,0)]
+    assert forecast_pressure(rows,generation=1,horizon_ms=20).state == "throttle"
+    flat = [replace(row,pressure_ppm=700000) for row in rows]
+    assert forecast_pressure(flat,generation=1,horizon_ms=1,previously_throttled=True).state == "recovering"
+    assert forecast_pressure(flat,generation=1,horizon_ms=1).state == "normal"
+    with pytest.raises(DispatchPolicyError):
+        forecast_pressure(rows,generation=2,horizon_ms=1)
