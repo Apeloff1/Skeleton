@@ -44,6 +44,34 @@ def _directory_identity(path: Path) -> tuple[int, int]:
     return info.st_dev, info.st_ino
 
 
+def _sync_directory(path: Path, expected: tuple[int, int] | None = None) -> None:
+    """Synchronize a named real directory, fencing observed identity changes.
+
+    POSIX filesystem durability is conditional on the filesystem and device
+    honoring fsync. This does not establish physical power-loss qualification.
+    """
+    if os.name != "posix":
+        return
+    observed = _directory_identity(path)
+    if expected is not None and observed != expected:
+        raise WeightShardStoreError("weight directory changed before durability barrier")
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags |= getattr(os, "O_CLOEXEC", 0)
+    try:
+        fd = os.open(path, flags)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISDIR(info.st_mode) or (info.st_dev, info.st_ino) != observed:
+                raise WeightShardStoreError("weight directory descriptor identity mismatch")
+            os.fsync(fd)
+            if _directory_identity(path) != observed:
+                raise WeightShardStoreError("weight directory changed during durability barrier")
+        finally:
+            os.close(fd)
+    except OSError as exc:
+        raise WeightShardStoreError("weight directory durability barrier failed") from exc
+
+
 def _file_identity(info: os.stat_result) -> tuple[int, ...]:
     return (info.st_dev, info.st_ino, info.st_mode, info.st_size,
             info.st_mtime_ns, info.st_ctime_ns, info.st_nlink)
@@ -239,7 +267,7 @@ class WeightShardStore:
     def _write_once(path: Path, content: bytes, *, reserve_write: Callable[[int], None] | None = None) -> None:
         if not 1 <= len(content) <= _MAX_MANIFEST_BYTES:
             raise WeightShardStoreError("weight manifest exceeds byte bounds")
-        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        parent_identity = _directory_identity(path.parent)
         if path.is_symlink():
             raise WeightShardStoreError("content-addressed path must not be a symlink")
         if path.exists():
@@ -262,14 +290,13 @@ class WeightShardStore:
                 if _read_manifest(path) != content:
                     raise WeightShardStoreError("concurrent manifest content mismatch")
             else:
-                if os.name == "posix":
-                    directory_fd = os.open(path.parent, os.O_RDONLY)
-                    try:
-                        os.fsync(directory_fd)
-                    finally:
-                        os.close(directory_fd)
+                _sync_directory(path.parent, parent_identity)
         finally:
+            # Persist removal of the temporary name as well as publication
+            # of the final link. A retained hardlink must not be reported
+            # as clean merely because the final name was already synced.
             tmp.unlink(missing_ok=True)
+            _sync_directory(path.parent, parent_identity)
 
     def _ingest(self, shard: WeightShard, source: str | Path, *,
                 reserve_write: Callable[[int], None] | None = None) -> Path:
@@ -277,8 +304,15 @@ class WeightShardStore:
         if path.is_symlink() or not path.is_file():
             raise WeightShardStoreError("weight shard input must be a regular non-symlink file")
         target = self._object_path(shard.digest)
-        target.parent.mkdir(mode=0o700, exist_ok=True)
-        _directory_identity(target.parent)
+        try:
+            target.parent.mkdir(mode=0o700, exist_ok=False)
+        except FileExistsError:
+            pass
+        else:
+            # Persist the bucket entry in its parent before a manifest
+            # can reference newly linked data beneath the bucket.
+            _sync_directory(self.objects, self._layout[self.objects])
+        bucket_identity = _directory_identity(target.parent)
         self.assert_layout()
         if target.is_symlink():
             raise WeightShardStoreError("stored weight object must not be a symlink")
@@ -317,14 +351,10 @@ class WeightShardStore:
                 if observed != shard.digest or stored_size != shard.bytes:
                     raise WeightShardStoreError("concurrent weight object mismatch")
             else:
-                if os.name == "posix":
-                    directory_fd = os.open(target.parent, os.O_RDONLY)
-                    try:
-                        os.fsync(directory_fd)
-                    finally:
-                        os.close(directory_fd)
+                _sync_directory(target.parent, bucket_identity)
         finally:
             tmp.unlink(missing_ok=True)
+            _sync_directory(target.parent, bucket_identity)
         return target
 
     def prepare_stage_manifest(self, identity: ModelIdentity, plan: WeightLoadPlan,
@@ -486,30 +516,78 @@ class WeightShardStore:
 
     def verified_paths(self, plan_digest: str, *, expected_manifest_sha256: str | None = None,
                        maximum_manifest_bytes: int = _MAX_MANIFEST_BYTES,
-                       _batch: _InventoryVerificationBatch | None = None) -> tuple[Path, ...]:
+                       _batch: _InventoryVerificationBatch | None = None,
+                       _durable: bool = False) -> tuple[Path, ...]:
         """Return verified shard paths under an optionally exact manifest pin."""
         plan, manifest_sha, manifest_size = self.manifest_evidence(plan_digest, maximum=maximum_manifest_bytes)
         if expected_manifest_sha256 is not None:
             require_digest(expected_manifest_sha256, "expected_manifest_sha256")
             if manifest_sha != expected_manifest_sha256:
                 raise WeightShardStoreError("weight manifest identity changed")
+        if type(_durable) is not bool or (_durable and (_batch is not None or os.name != "posix")):
+            raise WeightShardStoreError("managed POSIX durability verification required")
+        if _durable and expected_manifest_sha256 is None:
+            raise WeightShardStoreError("durable verification requires exact manifest pin")
         if _batch is not None and (not isinstance(_batch, _InventoryVerificationBatch)
                                    or _batch._store is not self):
             raise WeightShardStoreError("inventory verification batch belongs to another store")
         paths = []
+        durable_objects: dict[str, tuple[tuple[int, ...], tuple[int, int]]] = {}
         for shard in plan.shards:
             if _batch is not None:
                 paths.append(_batch.verify(shard))
                 continue
             path = self._object_path(shard.digest)
             try:
+                if _durable:
+                    before = (_file_identity(path.lstat()), _directory_identity(path.parent))
+                    prior = durable_objects.get(shard.digest)
+                    if prior is not None:
+                        if prior != before or before[0][3] != shard.bytes:
+                            raise WeightShardStoreError("shared durable weight identity changed")
+                        paths.append(path)
+                        continue
                 with self._object_reader(shard) as stream:
                     digest, count = _hash_stream(stream, maximum=shard.bytes)
+                    if _durable and digest == shard.digest and count == shard.bytes:
+                        # Synchronize the exact descriptor whose bytes were
+                        # verified, including preexisting retained objects.
+                        os.fsync(stream.fileno())
+                if _durable:
+                    after = (_file_identity(path.lstat()), _directory_identity(path.parent))
+                    if before != after:
+                        raise WeightShardStoreError("durable weight identity changed during verification")
+                    durable_objects[shard.digest] = after
             except OSError as exc:
                 raise WeightShardStoreError("referenced weight object is unavailable") from exc
             if digest != shard.digest or count != shard.bytes:
                 raise WeightShardStoreError("stored weight object changed since admission")
             paths.append(path)
+        if _durable:
+            buckets = {}
+            for key, (file_identity, bucket_identity) in durable_objects.items():
+                path = self._object_path(key)
+                if _file_identity(path.lstat()) != file_identity:
+                    raise WeightShardStoreError("durable weight changed before publication")
+                previous = buckets.setdefault(path.parent, bucket_identity)
+                if previous != bucket_identity:
+                    raise WeightShardStoreError("durable weight bucket identity changed")
+            for bucket, bucket_identity in sorted(buckets.items()):
+                _sync_directory(bucket, bucket_identity)
+            _sync_directory(self.objects, self._layout[self.objects])
+            # Data and directory entries precede the manifest durability
+            # fence. Never publish the success journal before this succeeds.
+            with _bounded_regular_reader(self._manifest_path(plan_digest), manifest_size) as stream:
+                observed, size = _hash_stream(stream, maximum=manifest_size)
+                if observed != manifest_sha or size != manifest_size:
+                    raise WeightShardStoreError("durable manifest differs from exact pin")
+                os.fsync(stream.fileno())
+            _sync_directory(self.manifests, self._layout[self.manifests])
+            _sync_directory(self.root, self._layout[self.root])
+            for key, expected in durable_objects.items():
+                path = self._object_path(key)
+                if (_file_identity(path.lstat()), _directory_identity(path.parent)) != expected:
+                    raise WeightShardStoreError("durable weight changed at final publication fence")
         _, final_sha, final_size = self.manifest_evidence(plan_digest, maximum=manifest_size)
         if final_sha != manifest_sha or final_size != manifest_size:
             raise WeightShardStoreError("weight manifest changed during object verification")
