@@ -1,0 +1,131 @@
+"""Connect measured offline admission to the existing whole-request engine.
+
+This adapter is intentionally distinct from the incremental SliceExecutor.
+A backend that implements only LocalInferenceEngine.generate is not treated
+as a token-sliced decoder. A trusted host supplies the actual engine and
+independently pinned backend identity; no provider or backend is selected
+from an external request.
+"""
+from __future__ import annotations
+
+import asyncio
+from dataclasses import asdict, dataclass
+import time
+from typing import Any
+
+from skeleton.ai.runtime.inference.local import (
+    LocalInferenceEngine, LocalInferenceRequest, LocalInferenceResult,
+)
+from skeleton.ai.model_runtime.iteration_scheduler import InferencePhase, IterationWork
+from skeleton.app.offline_runtime_preflight import digest, identity, integer, require
+from skeleton.app.offline_runtime_session import OfflineRuntimeSession
+
+
+@dataclass(frozen=True, slots=True)
+class WholeRequestOutcome:
+    receipt: dict
+    result: LocalInferenceResult | None
+
+
+class MeasuredWholeRequestEngine:
+    """One local full-request execution at a time under an exact full grant.
+
+    The engine retains its original guarded-context and resource checks.
+    Its independent backend identity pin is not a claim that the backend
+    mapped the weight-store pages. That loader binding requires separate
+    native qualification. The caller retains ownership of the engine.
+    """
+
+    def __init__(self, session: OfflineRuntimeSession, engine: LocalInferenceEngine, *,
+                 backend_digest: str) -> None:
+        require(isinstance(session, OfflineRuntimeSession), "trusted runtime session required")
+        require(isinstance(engine, LocalInferenceEngine), "canonical local engine required")
+        self._backend_digest = identity(backend_digest, "backend digest")
+        require(engine.model.model_digest == self._backend_digest, "backend identity mismatch")
+        self._session = session
+        self._engine = engine
+        self._lock = asyncio.Lock()
+        self._closed = False
+        self._sequence = 0
+
+    async def generate(self, request: LocalInferenceRequest, *, max_input_tokens: int,
+                       timeout_ms: int) -> WholeRequestOutcome:
+        require(isinstance(request, LocalInferenceRequest), "canonical inference request required")
+        require(not request.tools and request.tool_choice in ("none", "auto"),
+                "whole-request adapter supports inference only, without tool authority")
+        input_ceiling = integer(max_input_tokens, 1, 65536, "input allowance")
+        timeout = integer(timeout_ms, 1, 86_400_000, "request timeout")
+        demand = input_ceiling + request.max_output_tokens
+        require(demand <= self._session.policy.maximum_tokens and
+                demand <= self._session.policy.prefill_quantum,
+                "whole request exceeds configured atomic token allowance")
+        async with self._lock:
+            require(not self._closed, "whole-request adapter is closed")
+            require(self._engine.model.model_digest == self._backend_digest, "backend identity changed")
+            self._sequence += 1
+            started = time.monotonic_ns()
+            operation = "whole-" + str(self._sequence)
+            # This prefill-shaped scheduler request is a conservative reservation
+            # of the complete input + output bound, not measured prefill work.
+            observation = self._session.offer((IterationWork(
+                operation, InferencePhase.PREFILL, demand),))
+            grant = observation["admission"]
+            receipt: dict[str, Any] = {
+                "schema": "skeleton.offline.whole-request.v1",
+                "operation": operation, "backend_digest": self._backend_digest,
+                "request_digest": request.digest, "admission_digest": grant["admission_digest"],
+                "source_digest": grant["source_digest"],
+                "token_reservation": demand, "input_ceiling": input_ceiling,
+                "output_ceiling": request.max_output_tokens,
+                "backend_weight_binding": "not_assessed",
+                "native_qualified": False, "release_qualified": False,
+            }
+            if grant["status"] != "candidate":
+                return self._finish(receipt, "deferred")
+            slices = self._session.consume(grant)
+            if slices != ({"request_id": operation, "phase": "prefill", "tokens": demand},):
+                return self._finish(receipt, "partial_grant_deferred")
+            deadline_ns = min(grant["expires_ns"], started + timeout * 1_000_000)
+            if time.monotonic_ns() >= deadline_ns:
+                return self._finish(receipt, "expired_before_dispatch")
+            try:
+                result = await self._engine.generate(
+                    request, deadline=deadline_ns / 1_000_000_000,
+                    resource_max_input_tokens=input_ceiling,
+                    resource_max_output_tokens=request.max_output_tokens,
+                )
+                require(isinstance(result, LocalInferenceResult) and
+                        result.model_digest == self._backend_digest and
+                        self._engine.model.model_digest == self._backend_digest,
+                        "backend execution identity mismatch")
+                require(result.input_tokens <= input_ceiling and
+                        result.output_tokens <= request.max_output_tokens,
+                        "backend exceeded reserved token limits")
+                require(not result.tool_calls, "unexpected tool output")
+            except BaseException:
+                self._closed = True
+                self._session.close()
+                raise
+            # Even a real result is not published if it exceeded the grant's
+            # lifetime, was cancelled, or failed the canonical completion reason.
+            if (self._closed or time.monotonic_ns() > deadline_ns or
+                    result.finish_reason not in ("completed", "length")):
+                return self._finish(receipt, "terminal_without_output")
+            receipt["usage"] = {"input_tokens": result.input_tokens,
+                                "output_tokens": result.output_tokens,
+                                "source": result.usage_source, "cached": result.cached}
+            receipt["engine_receipt_digest"] = result.execution_receipt_digest
+            return self._finish(receipt, "completed", result)
+
+    @staticmethod
+    def _finish(receipt: dict, status: str,
+                result: LocalInferenceResult | None = None) -> WholeRequestOutcome:
+        body = {**receipt, "status": status,
+                "output_digest": digest(asdict(result)) if result is not None else None}
+        return WholeRequestOutcome({**body, "receipt_digest": digest(body)}, result)
+
+    def close(self) -> None:
+        # A running engine operation still owns its original cancellation and
+        # cleanup lifecycle. This adapter will refuse to publish its result.
+        self._closed = True
+        self._session.close()
