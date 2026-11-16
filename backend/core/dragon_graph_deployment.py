@@ -121,6 +121,29 @@ def _copy(source,target):
     return witness
 
 
+def _publish_copy(source,target,witness):
+    """Stage a complete verified copy, then publish without an overwrite.
+
+    A deterministic matching stage survives an interruption before publication.
+    A crash between hard-link publication and unlinking the staging name
+    deliberately holds for manual custody inspection of the two links.
+    """
+    _unused(target)
+    stage=target.parent/("."+target.name+".dragon-restore-"+witness["sha256"][:24])
+    if stage.exists() or stage.is_symlink():
+        if _fingerprint(stage)!=witness:raise DeploymentHeld("partial staged restore differs")
+    elif _copy(source,stage)!=witness:
+        raise DeploymentHeld("restore staging witness differs")
+    # link fails atomically if another process has created the destination.
+    # This requires a local filesystem with hard-link support.
+    if _fingerprint(stage)!=witness:raise DeploymentHeld("restore staging changed")
+    os.link(stage,target,follow_symlinks=False)
+    _sync_dir(target.parent)
+    stage.unlink()
+    _sync_dir(target.parent)
+    if _fingerprint(target)!=witness:raise DeploymentHeld("published restore witness differs")
+
+
 def _capacity(requests):
     """Aggregate required bytes by filesystem, not by logical lane."""
     devices={}
@@ -282,8 +305,7 @@ def restore_new(destination,*,offline_acknowledged=False):
     for row in [*rows[1:],rows[0]]:
         p=Path(row["original"])
         if not p.exists():
-            if _copy(destination/row["name"],p)!={k:row[k] for k in ("bytes","sha256")}:
-                raise DeploymentHeld("restore copy witness differs")
+            _publish_copy(destination/row["name"],p,{k:row[k] for k in ("bytes","sha256")})
     if m["epoch"]:graph.qualify(root,full=True)
     return {**verified,"restored":True,"replayed":False,"root_published_last":True}
 
@@ -377,6 +399,7 @@ def benchmark(root,*,bytes_per_lane=16*BLOCK,acknowledged=False):
     with _open(root) as db:
         if not graph.active(db):raise DeploymentHeld("graph topology not provisioned")
         layout=graph._layout(db,root)
+    graph.qualify(root)
     paths=[_private(Path(p))[0] for p in layout["paths"]]
     space=_require_space([(p.parent,bytes_per_lane) for p in paths])
     import secrets
@@ -415,6 +438,30 @@ def benchmark(root,*,bytes_per_lane=16*BLOCK,acknowledged=False):
             "graph_transaction_throughput_verified":False,"power_loss_qualified":False}
 
 
+def transaction_probe(root,*,bytes_per_lane=64*1024,rounds=3,acknowledged=False):
+    """Measure real fenced graph canary transactions, not game ingestion TPS."""
+    if acknowledged is not True:raise DeploymentHeld("explicit graph device write acknowledgement required")
+    if type(rounds) is not int or not 1<=rounds<=16 or type(bytes_per_lane) is not int or not 4096<=bytes_per_lane<=16*BLOCK:
+        raise ValueError("transaction probe bounds")
+    graph.qualify(Path(root))
+    if graph.pending_probes(Path(root))["pending_probe_ids"]:
+        raise DeploymentHeld("recover pending device probes first")
+    results=[]
+    for i in range(rounds):
+        started=time.perf_counter()
+        receipt=graph.write_probe(Path(root),bytes_per_lane=bytes_per_lane,acknowledged=True)
+        elapsed=max(time.perf_counter()-started,1e-9)
+        if not receipt.get("readback_verified") or not receipt.get("cleanup_verified"):
+            raise DeploymentHeld("transaction probe receipt incomplete")
+        results.append({"round":i,"seconds":elapsed,"verified_bytes":receipt["verified_bytes"],"probe_id":receipt["probe_id"]})
+    if graph.pending_probes(Path(root))["pending_probe_ids"]:raise DeploymentHeld("graph probe cleanup incomplete")
+    elapsed=sum(r["seconds"] for r in results)
+    return {"rounds":results,"elapsed_seconds":elapsed,"verified_bytes":sum(r["verified_bytes"] for r in results),
+            "probe_cycles_per_second":rounds/elapsed,"graph_canary_cycles_verified":True,
+            "production_ingestion_throughput_verified":False,"maximum_capacity_verified":False,
+            "power_loss_qualified":False}
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__);sub=parser.add_subparsers(dest="command",required=True)
     for name in ("backup","prepare","apply","restore-new","drill"):
@@ -427,8 +474,13 @@ def main():
     v=sub.add_parser("verify-backup");v.add_argument("--backup",required=True)
     b=sub.add_parser("benchmark");b.add_argument("--root",required=True)
     b.add_argument("--bytes-per-lane",type=int,default=16*BLOCK);b.add_argument("--acknowledge-device-writes",action="store_true")
+    tx=sub.add_parser("transaction-probe");tx.add_argument("--root",required=True)
+    tx.add_argument("--bytes-per-lane",type=int,default=64*1024);tx.add_argument("--rounds",type=int,default=3)
+    tx.add_argument("--acknowledge-device-writes",action="store_true")
     args=parser.parse_args()
-    if args.command=="verify-backup":result=verify_backup(args.backup)
+    if args.command=="transaction-probe":
+        result=transaction_probe(args.root,bytes_per_lane=args.bytes_per_lane,rounds=args.rounds,acknowledged=args.acknowledge_device_writes)
+    elif args.command=="verify-backup":result=verify_backup(args.backup)
     elif args.command=="benchmark":result=benchmark(args.root,bytes_per_lane=args.bytes_per_lane,acknowledged=args.acknowledge_device_writes)
     else:
         ack=args.offline_writers_stopped
