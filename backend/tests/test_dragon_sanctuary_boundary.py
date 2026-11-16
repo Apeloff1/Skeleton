@@ -406,5 +406,60 @@ class PublisherCaptureReviewTests(unittest.TestCase):
         self.assertFalse(r["source_use_authorized"])
 
 
+class PublisherArchivePreflightTests(unittest.TestCase):
+    def fixture(self):
+        source = {"source_id": "a"*64, "title": "Dataset inventory",
+                  "text": "A catalog of astronomical observations and measurement dates.",
+                  "content_type": "application/json",
+                  "provenance": {"declared_content_type": "application/json",
+                    "mime_inferred": False, "source_status": "unreviewed_external_capture",
+                    "training_permission": False, "http_freshness": {
+                        "private": False, "no_store": False, "sensitive_vary": False}}}
+        return {"snapshot_digest": "b"*64, "state": "completed",
+                "binding": {"consent": {"expires_at": 200}},
+                "sources": {source["source_id"]: source}, "acquisition_measurements": []}
+
+    def project(self, snapshot, *, status="completed", witnessed=True, policies=None):
+        from core.dragon_crawler import _publisher_archive_preflight
+        return _publisher_archive_preflight({"method": "public_api"}, snapshot, policies or {},
+                                            status=status, now=300, witnessed=witnessed)
+
+    def test_retained_terminal_metadata_cannot_issue_archive_or_dataset_rights(self):
+        result = self.project(self.fixture())
+        self.assertEqual(result["state"], "explicit_archive_grant_required")
+        self.assertEqual(result["archive_policy_candidates"], 1)
+        for flag in ("archive_grant_issued", "raw_dataset_verified",
+                     "source_use_authorized", "network_executed"):
+            self.assertIs(result[flag], False)
+
+    def test_checkpoint_and_terminal_requirements_take_precedence(self):
+        self.assertEqual(self.project(self.fixture(), witnessed=False)["state"],
+                         "checkpoint_unwitnessed")
+        self.assertEqual(self.project(self.fixture(), status="interrupted")["state"],
+                         "terminal_capture_required")
+
+    def test_capture_expiry_does_not_hide_prior_restriction(self):
+        snapshot = self.fixture()
+        snapshot["acquisition_measurements"] = [{"kind": "rejected", "status": 403}]
+        self.assertEqual(self.project(snapshot)["state"], "restriction_review_required")
+
+    def test_wrong_representation_and_missing_capture_stay_held(self):
+        snapshot = self.fixture()
+        snapshot["sources"]["a"*64]["provenance"]["mime_inferred"] = True
+        self.assertEqual(self.project(snapshot)["state"], "representation_review_required")
+        snapshot["sources"] = {}
+        self.assertEqual(self.project(snapshot)["state"], "no_retained_capture")
+
+    def test_archive_predicate_excludes_private_no_store_or_withdrawn(self):
+        for field in ("private", "no_store", "sensitive_vary"):
+            snapshot = self.fixture()
+            snapshot["sources"]["a"*64]["provenance"]["http_freshness"][field] = True
+            result = self.project(snapshot)
+            self.assertEqual(result["state"], "archive_policy_held")
+            self.assertEqual(result["archive_policy_candidates"], 0)
+        result = self.project(self.fixture(), policies={"a"*64: {"version": 2, "enabled": False}})
+        self.assertEqual(result["state"], "archive_policy_held")
+
+
 if __name__ == "__main__":
     unittest.main()
