@@ -170,7 +170,8 @@ def _state(directory_fd: int, owner: WeightStoreDiskOwner) -> dict | None:
     expected = {"schema", "campaign_id", "policy_sha256", "scrub_policy", "catalog_digest",
                 "object_count", "total_bytes", "manifest_count", "reference_count",
                 "unreferenced_count", "verified_objects", "verified_bytes", "chain_digest",
-                "tranches", "status", "failure_digest", "prior_campaign_digest", "digest"}
+                "tranches", "status", "failure_digest", "failure_reason", "failure_object_digest",
+                "prior_campaign_digest", "digest"}
     if set(row) != expected or row["policy_sha256"] != owner._policy_sha256:
         raise WeightShardStoreError("scrub state fields or policy identity mismatch")
     campaign = row["campaign_id"]
@@ -178,7 +179,7 @@ def _state(directory_fd: int, owner: WeightStoreDiskOwner) -> dict | None:
         raise WeightShardStoreError("invalid scrub campaign identity")
     for field in ("catalog_digest", "chain_digest", "digest"):
         require_digest(row[field], field)
-    for field in ("failure_digest", "prior_campaign_digest"):
+    for field in ("failure_digest", "failure_object_digest", "prior_campaign_digest"):
         if row[field] is not None:
             require_digest(row[field], field)
     try:
@@ -193,6 +194,13 @@ def _state(directory_fd: int, owner: WeightStoreDiskOwner) -> dict | None:
             or row["unreferenced_count"] > row["object_count"]
             or row["status"] not in ("active", "completed", "blocked")
             or (row["status"] == "blocked") != (row["failure_digest"] is not None)
+            or (row["status"] == "blocked") != (row["failure_reason"] is not None)
+            or (row["failure_reason"] is not None and row["failure_reason"] not in (
+                "catalog_unavailable", "catalog_identity_changed", "cursor_prefix_inconsistent",
+                "object_identity_changed", "object_content_mismatch", "object_verification_failed",
+                "catalog_unavailable_after_verification", "catalog_changed_during_verification",
+            ))
+            or (row["status"] != "blocked" and row["failure_object_digest"] is not None)
             or (row["status"] == "completed" and (
                 row["verified_objects"] != row["object_count"] or row["verified_bytes"] != row["total_bytes"]))):
         raise WeightShardStoreError("inconsistent scrub progress")
@@ -238,7 +246,8 @@ def start_weight_scrub(owner: WeightStoreDiskOwner, policy: ScrubPolicy | None =
                   "verified_objects": 0, "verified_bytes": 0,
                   "chain_digest": _digest(["scrub-start", catalog.digest]),
                   "tranches": 0, "status": "active" if catalog.objects else "completed",
-                  "failure_digest": None, "prior_campaign_digest": prior_campaign_digest}
+                  "failure_digest": None, "failure_reason": None, "failure_object_digest": None,
+                  "prior_campaign_digest": prior_campaign_digest}
         owner._inspect_lock(directory_fd, fd)
         return _save(directory_fd, record, replace=prior is not None)
 
@@ -279,6 +288,8 @@ def advance_weight_scrub(owner: WeightStoreDiskOwner, *, campaign_digest: str,
         def blocked(reason: str, object_digest: str | None = None) -> dict:
             state["status"] = "blocked"
             state["failure_digest"] = _digest([reason, object_digest, state["digest"]])
+            state["failure_reason"] = reason
+            state["failure_object_digest"] = object_digest
             owner._inspect_lock(directory_fd, fd)
             saved = _save(directory_fd, state, replace=True)
             return {"status": "blocked", "reason": reason, "object_digest": object_digest,
@@ -337,3 +348,38 @@ def advance_weight_scrub(owner: WeightStoreDiskOwner, *, campaign_digest: str,
                 "verified_this_tranche": count, "bytes_this_tranche": consumed,
                 "scope": "cooperating_store_observed_bytes", "native_qualified": False,
                 "deletion_authorized": False}
+
+
+def require_completed_weight_scrub(owner: WeightStoreDiskOwner, *, campaign_digest: str) -> dict:
+    """Rebind an independently pinned completed campaign to current metadata.
+
+    This is not a new read of the historical campaign's object bytes. It
+    verifies current manifest and stat identity against the completed
+    campaign and rejects drift. Runtime source loading still independently
+    verifies its own weight content under managed source custody.
+    """
+    require_digest(campaign_digest, "required scrub campaign digest")
+    if not isinstance(owner, WeightStoreDiskOwner):
+        raise WeightShardStoreError("cooperating disk owner required")
+    with owner._owned(shared=True) as (directory_fd, fd):
+        _ready(owner, directory_fd)
+        state = _state(directory_fd, owner)
+        if state is None or state["digest"] != campaign_digest or state["status"] != "completed":
+            raise WeightShardStoreError("required completed scrub campaign unavailable")
+        catalog = _catalog(owner, ScrubPolicy(**state["scrub_policy"]))
+        if (catalog.digest != state["catalog_digest"]
+                or len(catalog.objects) != state["object_count"]
+                or catalog.total_bytes != state["total_bytes"]
+                or catalog.manifests != state["manifest_count"]
+                or catalog.references != state["reference_count"]
+                or catalog.unreferenced != state["unreferenced_count"]):
+            raise WeightShardStoreError("completed scrub metadata no longer matches store")
+        owner._inspect_lock(directory_fd, fd)
+        body = {"schema": "skeleton.weight-scrub-observation.v1",
+                "campaign_digest": campaign_digest, "catalog_digest": catalog.digest,
+                "chain_digest": state["chain_digest"], "objects": len(catalog.objects),
+                "object_bytes": catalog.total_bytes, "policy_sha256": owner._policy_sha256,
+                "prior_physical_verification": "completed_campaign",
+                "current_metadata_revalidated": True, "current_bytes_revalidated": False,
+                "native_qualified": False, "deletion_authorized": False}
+        return {**body, "digest": _digest(body)}
