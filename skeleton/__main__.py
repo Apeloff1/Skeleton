@@ -7,6 +7,7 @@ Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
     offline-runtime  Inspect pinned local weights and measured resource admission
     weight-store     Stage pinned weights and inspect cooperative disk/recovery custody
+    frontier-wing-replay          Coupled articulated membrane deformation and flap/glide replay
     frontier-environment-replay    Coupled CPU world physics and photometry replay
     emulator-lens-work-queue       Source-pinned Jeeves/Dragon/adversary review queue
     frontier-campaign-archive      Durable candidate campaign source replay and history
@@ -1448,6 +1449,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         return recovered_main(rest)
     if cmd == "frontier-environment-replay":
         from skeleton.app.frontier_environment_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "frontier-wing-replay":
+        from skeleton.app.frontier_wing_cli import main as recovered_main
         return recovered_main(rest)
     if cmd == "app":
         from skeleton.app.cli import run_app_cli

@@ -70,6 +70,8 @@ on:
       - 'skeleton/app/orphan_source_graph*.py'
       - 'skeleton/app/orphan_graph_ownership.py'
       - 'skeleton/app/recovered_evidence.py'
+      - 'skeleton/app/frontier_wing_*.py'
+      - 'skeleton/testing/test_recovered_frontier_wings.py'
       - 'skeleton/app/frontier_environment_*.py'
       - 'skeleton/testing/test_recovered_frontier_environment.py'
       - 'skeleton/app/emulator_lens_*.py'
@@ -312,6 +314,11 @@ jobs:
         env:
           PYTHONPATH: '.:backend'
         run: python -m pytest -q skeleton/testing/test_recovered_frontier_environment.py
+
+      - name: Recovered articulated wing and elastic skin replay
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_frontier_wings.py
 
       - name: Consumer share and Chroma custody regressions
         env:

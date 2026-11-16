@@ -122,6 +122,7 @@ def simulate_elastic_skin(
     impact_force_n: Vec3 = Vec3(0, 0, 0),
     pinned_vertices: tuple[int, ...] = (0,),
     state: ElasticSkinState | None = None,
+    anchor_positions: tuple[Vec3, ...] | None = None,
 ) -> ElasticSkinFrame:
     """Semi-implicit damped reference integration with coherent bone anchors.
 
@@ -137,7 +138,23 @@ def simulate_elastic_skin(
         raise ElasticSkinError("pinned vertex identifiers required")
     if any(type(k) is not int or not 0 <= k < len(mesh.vertices) for k in pinned_vertices):
         raise ElasticSkinError("pinned vertex index invalid")
-    anchors = pose_skinned_mesh(skeleton, mesh, clip, time_ms)
+    # Explicit anchors allow independently authored three-axis rig samplers
+    # to reuse this topology solver. Preserve the legacy pose path by default.
+    if anchor_positions is None:
+        anchors = pose_skinned_mesh(skeleton, mesh, clip, time_ms)
+    else:
+        if (type(anchor_positions) is not tuple or len(anchor_positions) != len(mesh.vertices)
+                or any(not isinstance(p,Vec3) for p in anchor_positions)):
+            raise ElasticSkinError("explicit anchor dimensions or types invalid")
+        if type(time_ms) is not int or time_ms < 0:
+            raise ElasticSkinError("invalid explicit anchor sample time")
+        if (len(clip.keyframes[0].poses)!=len(skeleton.bones)
+                or any(type(i) is not int or not 0<=i<len(skeleton.bones)
+                       for i in mesh.bone_influences)):
+            raise ElasticSkinError("explicit anchor mesh/rig mismatch")
+        anchors=anchor_positions
+    if any(anchors[i].z < wrapper.collision_ground_z_m for i in pinned_vertices):
+        raise ElasticSkinError("pinned anchor conflicts with collision floor")
     current = state or ElasticSkinState(anchors,tuple(Vec3(0,0,0) for _ in anchors))
     if len(current.positions) != len(anchors):
         raise ElasticSkinError("state mesh dimension mismatch")
@@ -221,6 +238,14 @@ def simulate_elastic_skin(
                     positions[b] = positions[b]-correction.scaled(.5)
             for i in pins:
                 positions[i] = anchors[i]
+            # Constraint projection can reintroduce a floor penetration.
+            # Reconcile it after each pass, rather than return invalid geometry.
+            for i,p in enumerate(positions):
+                if i not in pins and p.z < wrapper.collision_ground_z_m:
+                    positions[i]=Vec3(p.x,p.y,wrapper.collision_ground_z_m)
+                    v=velocities[i]
+                    velocities[i]=Vec3(v.x,v.y,max(0.,v.z))
+                    collisions+=1
     strain = 0.
     for (a,b),rest in zip(links,rest_lengths):
         if rest > 1e-9:
@@ -233,6 +258,9 @@ def simulate_elastic_skin(
         "collisions": collisions,
         "positions": [[p.x,p.y,p.z] for p in positions],
     }
+    if anchor_positions is not None:
+        receipt["explicit_anchor_positions"]=[[p.x,p.y,p.z] for p in anchors]
+        receipt["velocities"]=[[p.x,p.y,p.z] for p in velocities]
     digest=sha256(json.dumps(receipt,sort_keys=True,separators=(",",":")).encode()).hexdigest()
     return ElasticSkinFrame(
         tuple(positions),tuple(velocities),wet,temp,strain,
