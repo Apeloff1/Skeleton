@@ -435,9 +435,8 @@ def _run_compose(
     # that is now an orphan and may own the only copy of writable /data.
     env["COMPOSE_REMOVE_ORPHANS"] = "0"
     if "--env-file" in command:
-        env["COMPOSE_DISABLE_ENV_FILE"] = "0"
-        env["COMPOSE_PROFILES"] = ""
-        env.pop("COMPOSE_ENV_FILES", None)
+        from skeleton.app.runtime_operation import compose_operation_environment
+        env = compose_operation_environment(env)
     try:
         completed = subprocess.run(list(command), cwd=root, check=False, env=env)
     except (OSError, subprocess.SubprocessError) as exc:
@@ -1192,107 +1191,113 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         if not 1 <= args.verify_attempts <= 120 or not math.isfinite(args.verify_delay) or not 0 <= args.verify_delay <= 30:
             print("startup verification requires 1 to 120 attempts and delay from 0 to 30 seconds")
             return 2
-        from skeleton.app.setup_runtime import runtime_source_fingerprint
-
-        process_env = dict(os.environ)
+        from skeleton.app.runtime_operation import RuntimeOperationDenied, runtime_operation
         try:
-            admitted = runtime_source_fingerprint(root)
-        except (OSError, ValueError, UnicodeError):
-            print("application start aborted: private runtime configuration unavailable; run app setup first")
-            return 2
+            with runtime_operation(root, "start") as lease:
+                from skeleton.app.setup_runtime import runtime_source_fingerprint
 
-        def source_stable():
-            try:
-                return runtime_source_fingerprint(root) == admitted
-            except (OSError, ValueError, UnicodeError):
-                return False
+                process_env = dict(os.environ)
+                try:
+                    admitted = runtime_source_fingerprint(root)
+                except (OSError, ValueError, UnicodeError):
+                    print("application start aborted: private runtime configuration unavailable; run app setup first")
+                    return 2
 
-        def changed():
-            print("application start cannot be qualified: runtime configuration changed; preserve existing services and .env")
-            return 2
+                def source_stable():
+                    try:
+                        return lease.current() and runtime_source_fingerprint(root) == admitted
+                    except (OSError, ValueError, UnicodeError):
+                        return False
 
-        checks = preflight(root, runtime=True, manifest=manifest, environ=process_env)
-        if not checks_ok(checks):
-            for check in checks:
-                if not check.ok and check.required:
-                    print(f"[FAIL] {check.message}")
-            print("application start aborted: runtime preflight failed")
-            return 1
-        if not source_stable():
-            return changed()
-        from skeleton.app.preloader import inspect_host
+                def changed():
+                    print("application start cannot be qualified: runtime configuration changed; preserve existing services and .env")
+                    return 2
 
-        host = inspect_host(root, require_pip=False)
-        if not host.ready:
-            for check in host.checks:
-                if check.required and not check.ok:
-                    print(f"[FAIL] {check.detail}; {check.remediation}")
-            return 1
-        try:
-            manifest = runtime_manifest(manifest, root=root, environ=process_env)
-        except (OSError, ValueError, UnicodeError):
-            print("application start aborted: runtime configuration changed or is unsafe")
-            return 2
-        mode = "production" if bool(args.production) else "development"
-        try:
-            startup_command = compose_command(
-                "up",
-                manifest=manifest,
-                full=bool(args.full),
-                build=not bool(args.no_build),
-                hot=bool(args.hot),
-                install_env=True,
-            )
-        except ValueError as exc:
-            print(str(exc))
-            return 1
-        if not source_stable():
-            return changed()
-        exit_code = _run_compose(
-            startup_command,
-            root,
-            env_overrides=manifest.mode_env(mode),
-            process_env=process_env,
-        )
-        if not source_stable():
-            return changed()
-        if exit_code or bool(args.no_verify):
-            return exit_code
+                checks = preflight(root, runtime=True, manifest=manifest, environ=process_env)
+                if not checks_ok(checks):
+                    for check in checks:
+                        if not check.ok and check.required:
+                            print(f"[FAIL] {check.message}")
+                    print("application start aborted: runtime preflight failed")
+                    return 1
+                if not source_stable():
+                    return changed()
+                from skeleton.app.preloader import inspect_host
 
-        from skeleton.app.health import probes_ok, wait_for_application
+                host = inspect_host(root, require_pip=False)
+                if not host.ready:
+                    for check in host.checks:
+                        if check.required and not check.ok:
+                            print(f"[FAIL] {check.detail}; {check.remediation}")
+                    return 1
+                try:
+                    manifest = runtime_manifest(manifest, root=root, environ=process_env)
+                except (OSError, ValueError, UnicodeError):
+                    print("application start aborted: runtime configuration changed or is unsafe")
+                    return 2
+                mode = "production" if bool(args.production) else "development"
+                try:
+                    startup_command = compose_command(
+                        "up",
+                        manifest=manifest,
+                        full=bool(args.full),
+                        build=not bool(args.no_build),
+                        hot=bool(args.hot),
+                        install_env=True,
+                    )
+                except ValueError as exc:
+                    print(str(exc))
+                    return 1
+                if not source_stable():
+                    return changed()
+                exit_code = _run_compose(
+                    startup_command,
+                    root,
+                    env_overrides=manifest.mode_env(mode),
+                    process_env=process_env,
+                )
+                if not source_stable():
+                    return changed()
+                if exit_code or bool(args.no_verify):
+                    return exit_code
 
-        try:
-            results = wait_for_application(
-                manifest=manifest,
-                full=bool(args.full),
-                timeout=3.0,
-                attempts=int(args.verify_attempts),
-                delay=float(args.verify_delay),
-            )
-        except ValueError as exc:
-            print(f"invalid startup verification budget: {exc}")
-            return 2
+                from skeleton.app.health import probes_ok, wait_for_application
 
-        if not source_stable():
-            return changed()
-        for result in results:
-            status = result.status if result.status is not None else "-"
-            print(
-                f"[{'PASS' if result.ok else 'FAIL'}] "
-                f"{result.service:<10} status={status} {result.url} {result.detail}"
-            )
-        if probes_ok(results):
-            from skeleton.app.first_install import critical_backend_route_report
-            registry = critical_backend_route_report(manifest.service("backend").public_url, timeout=3.0)
-            if not source_stable():
-                return changed()
-            if registry["ready"] is not True:
-                print("application start: critical API routers missing or unverified; inspect app doctor --live")
+                try:
+                    results = wait_for_application(
+                        manifest=manifest,
+                        full=bool(args.full),
+                        timeout=3.0,
+                        attempts=int(args.verify_attempts),
+                        delay=float(args.verify_delay),
+                    )
+                except ValueError as exc:
+                    print(f"invalid startup verification budget: {exc}")
+                    return 2
+
+                if not source_stable():
+                    return changed()
+                for result in results:
+                    status = result.status if result.status is not None else "-"
+                    print(
+                        f"[{'PASS' if result.ok else 'FAIL'}] "
+                        f"{result.service:<10} status={status} {result.url} {result.detail}"
+                    )
+                if probes_ok(results):
+                    from skeleton.app.first_install import critical_backend_route_report
+                    registry = critical_backend_route_report(manifest.service("backend").public_url, timeout=3.0)
+                    if not source_stable():
+                        return changed()
+                    if registry["ready"] is not True:
+                        print("application start: critical API routers missing or unverified; inspect app doctor --live")
+                        return 1
+                    print("application services: ready; AI availability is reported separately by app doctor --live")
+                    return 0
+                print("application start: services launched but readiness verification failed")
                 return 1
-            print("application services: ready; AI availability is reported separately by app doctor --live")
-            return 0
-        print("application start: services launched but readiness verification failed")
-        return 1
+        except RuntimeOperationDenied:
+            print("application start blocked: another runtime operation is active or the lock is unsafe")
+            return 1
     if command == "smoke":
         from skeleton.app.health import probes_ok, wait_for_application
 
@@ -1350,7 +1355,18 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             print("application smoke: healthy" if ok else "application smoke: unhealthy")
         return 0 if ok else 1
     if command == "down":
-        return _run_compose(compose_command("down", manifest=manifest), root)
+        from skeleton.app.runtime_operation import RuntimeOperationDenied, runtime_operation
+        try:
+            with runtime_operation(root, "stop") as lease:
+                if not lease.current():
+                    return 1
+                result = _run_compose(
+                    compose_command("down", manifest=manifest, install_env=True), root,
+                )
+                return result if lease.current() else 1
+        except RuntimeOperationDenied:
+            print("application stop blocked: another runtime operation is active or the lock is unsafe")
+            return 1
     if command == "ps":
         return _run_compose(compose_command("ps", manifest=manifest), root)
     if command == "logs":

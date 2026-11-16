@@ -706,3 +706,39 @@ def test_recovery_declares_no_dependency_start_authority(tmp_path, monkeypatch):
     assert plans[-1][1]["frontend_recovery"] is True
     assert plans[-1][1]["manifest"].default_services == ("frontend",)
     assert not plans[1][1].get("frontend_recovery", False)
+
+
+
+def test_install_operation_contention_blocks_before_setup_or_compose(tmp_path,monkeypatch):
+    from skeleton.app.runtime_operation import runtime_operation
+    _prepare(monkeypatch,tmp_path)
+    def forbidden(*a,**k):
+        pytest.fail("competing installer reached a side effect")
+    monkeypatch.setattr(installer,"inspect_host",forbidden)
+    monkeypatch.setattr(installer,"ensure_runtime_environment",forbidden)
+    with runtime_operation(tmp_path,"stop"):
+        receipt=installer.install_application(tmp_path,start=True,install_python=False,runner=forbidden)
+    assert not receipt.ok
+    assert [p.name for p in receipt.phases]==["runtime-operation"]
+
+
+def test_install_revalidates_operation_custody_after_start_intent(tmp_path,monkeypatch):
+    from skeleton.app.runtime_operation import LOCK_NAME
+    _prepare(monkeypatch,tmp_path)
+    seen=[]
+    class Observer:
+        def begin_phase(self,name):
+            if name=="start":
+                path=tmp_path/LOCK_NAME
+                if os.name=="nt":
+                    # Windows may deny unlink of the active descriptor.
+                    pytest.skip("Windows does not admit replacing a held lock inode")
+                path.unlink()
+        def complete_phase(self,phase): pass
+    def runner(command,**kw):
+        seen.append(command[-1])
+        return _completed(command)
+    receipt=installer.install_application(tmp_path,start=True,install_python=False,
+                                          runner=runner,phase_observer=Observer())
+    assert seen==["config"]
+    assert not receipt.ok and receipt.phases[-1].name=="start"

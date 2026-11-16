@@ -757,3 +757,23 @@ def test_windowed_probe_acceptance_requires_public_mount_evidence(monkeypatch,tm
     monkeypatch.setattr("skeleton.app.first_install.critical_backend_route_report",registry)
     args=launcher.parser().parse_args(["--verify-install-probe","32123"])
     assert launcher._headless(args,tmp_path)==expected
+
+
+@pytest.mark.parametrize("status",[False,True,None,"0",-9,2**40])
+def test_windows_stop_never_claims_uncertain_completion(tmp_path,monkeypatch,status):
+    from skeleton.app import windows_launcher as launcher
+    monkeypatch.setattr(launcher,"_hidden_runner",
+                        lambda *a,**k: SimpleNamespace(returncode=status))
+    ok,detail=launcher.stop_runtime(tmp_path)
+    assert ok is False
+    assert "uncertain" in detail
+
+
+def test_windows_stop_serializes_against_installer(tmp_path,monkeypatch):
+    from skeleton.app import windows_launcher as launcher
+    from skeleton.app.runtime_operation import runtime_operation
+    monkeypatch.setattr(launcher,"_hidden_runner",
+                        lambda *a,**k: pytest.fail("contended stop reached Docker"))
+    with runtime_operation(tmp_path,"install"):
+        ok,detail=launcher.stop_runtime(tmp_path)
+    assert ok is False and "another installation operation" in detail

@@ -35,7 +35,7 @@ _PHASES=frozenset(("arguments","preload","setup-runtime","configuration-note","p
                    "runtime-source-epoch","runtime-preflight","runtime-manifest","compose-config",
                    "public-endpoints","start","setup-ui-recovery","setup-ui-availability",
                    "readiness","critical-api-routes","strict-live-qualification","chroma-persistence",
-                   "qualification-input","qualification-source","install-session"))
+                   "qualification-input","qualification-source","install-session","runtime-operation"))
 _INTENTS=frozenset(("setup-runtime","python-install","compose-config","start","setup-ui-recovery"))
 _STATES=frozenset(("OPEN","ATTEMPT_BEGIN","PHASE_INTENT","PHASE_RESULT","ATTEMPT_END"))
 _OUTCOMES=frozenset(("passed","blocked","interrupted"))
@@ -369,7 +369,7 @@ def _admit_result(state, name, ok, required):
     results = state.phase_results
     if not results and state.pending is None and not ok and required:
         if name in {"arguments", "qualification-input", "qualification-source",
-                    "chroma-persistence", "install-session"}:
+                    "chroma-persistence", "install-session", "runtime-operation"}:
             return True
     if name == "runtime-source-epoch":
         # An epoch failure may interrupt an in-flight recovery intent.

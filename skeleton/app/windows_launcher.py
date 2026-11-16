@@ -145,23 +145,31 @@ def start_runtime(
 
 def stop_runtime(root: Path | None = None) -> tuple[bool, str]:
     root = (root or installation_root()).resolve()
+    from skeleton.app.runtime_operation import (
+        RuntimeOperationDenied, compose_operation_environment, runtime_operation,
+    )
     try:
-        completed = _hidden_runner(
-            list(compose_command("down", manifest=load_manifest())),
-            cwd=root,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=90,
-            env={**os.environ, "COMPOSE_REMOVE_ORPHANS": "0"},
-        )
+        with runtime_operation(root, "stop") as lease:
+            if not lease.current():
+                return False, "Runtime operation custody changed; inspect existing services"
+            completed = _hidden_runner(
+                list(compose_command("down", manifest=load_manifest(), install_env=True)),
+                cwd=root, check=False, text=True, timeout=90,
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                env=compose_operation_environment(os.environ),
+            )
+            if not lease.current():
+                return False, "Runtime operation custody changed; inspect existing services"
+    except RuntimeOperationDenied:
+        return False, "Stop blocked: another installation operation is active or the lock is unsafe"
     except (OSError, subprocess.SubprocessError) as exc:
         return False, f"Unable to stop services: {type(exc).__name__}; check Docker Desktop"
-    if completed.returncode == 0:
+    status = getattr(completed, "returncode", None)
+    if type(status) is not int or not 0 <= status <= 255:
+        return False, "Stop completion uncertain; inspect existing services"
+    if status == 0:
         return True, "Skeleton services stopped."
-    # Docker may echo environment values in diagnostics. Do not surface
-    # unredacted child stderr/stdout in the installed GUI or CLI.
-    return False, f"Stop command failed with exit {completed.returncode}"
+    return False, f"Stop command failed with exit {status}"
 
 
 def runtime_status(root: Path | None = None) -> tuple[bool, str]:

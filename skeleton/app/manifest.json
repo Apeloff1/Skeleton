@@ -152,6 +152,8 @@
     "frontend/Dockerfile",
     "skeleton/__main__.py",
     "skeleton/app/plan.py",
+    "skeleton/app/runtime_operation.py",
+    "skeleton/app/install_probe_worker.py",
     "skeleton/api/server.py",
     "frontend/app/product.tsx",
     "frontend/src/utils/apiBase.ts",
