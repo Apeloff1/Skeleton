@@ -345,10 +345,14 @@ def _safe_error(exc: BaseException) -> str:
 
 
 class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,DragonExhaustiveVectorMixin,DragonCurrentVectorMixin,DragonDenseArchiveMixin,DragonDeepArchiveMixin,DragonVaultMixin):
-    def __init__(self, database=core_db):
+    def __init__(self, database=core_db, *, coordination_database=None):
         self.database = database
         self.sessions = database["dragon_crawler_sessions"]
         self.limits = database["dragon_crawler_commands"]
+        # Pin the coordination handle for this instance. Session and command
+        # storage may later move, but that must not mint a second stripe pool.
+        self._coordination_limits = (self.limits if coordination_database is None
+                                     else coordination_database["dragon_crawler_commands"])
         try:
             self.engine = EngineClient.from_env()
         except EngineClientError:
@@ -3367,6 +3371,29 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
             await self._drain(row)
         return await self.get(scope, identifier)
 
+    def _acquisition_store(self):
+        """The originally bound coordination authority, independent of storage routing.
+
+        Legacy hermetic objects constructed without __init__ have only the
+        explicitly supplied limits fixture. Production initialization always
+        pins a handle, and an unavailable pinned database must fail closed.
+        """
+        if "_coordination_limits" in self.__dict__:
+            return self._coordination_limits
+        return self.limits
+
+    async def _release_worker_credits(self, token: str) -> None:
+        mutation = {"$unset": {"worker_token": "", "active_session_id": "", "lease_until": ""}}
+        store = self._acquisition_store()
+        try:
+            if store is not self.limits:
+                await store.update_many(
+                    {"kind": ACQUISITION_STRIPE_KIND, "worker_token": token}, mutation)
+        finally:
+            # Each collection releases only the exact token. No fallback to a
+            # secondary stripe pool is permitted when the pinned store fails.
+            await self.limits.update_many({"worker_token": token}, mutation)
+
     async def _claim_acquisition_stripes(self, row: dict, token: str) -> None:
         """Reserve all admitted canonical origins before any runner can start.
 
@@ -3379,7 +3406,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
         slots = _acquisition_stripes(row["request"]["allowed_hosts"])
         for slot in slots:
             try:
-                await self.limits.update_one(
+                await self._acquisition_store().update_one(
                     {"_id": slot},
                     {"$setOnInsert": {"kind": ACQUISITION_STRIPE_KIND}},
                     upsert=True,
@@ -3387,7 +3414,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
             except DuplicateKeyError:
                 # Another instance initialized this fixed ID concurrently.
                 pass
-            existing = await self.limits.find_one(
+            existing = await self._acquisition_store().find_one(
                 {"_id": slot, "kind": ACQUISITION_STRIPE_KIND}, {"worker_token": 1})
             if existing is None:
                 raise CrawlerError("crawler_acquisition_coordination_unavailable",
@@ -3396,7 +3423,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
             if handle is not None and not handle[1].done():
                 raise CrawlerError("crawler_acquisition_capacity",
                                    "Shared acquisition capacity is occupied.", 429)
-            claimed = await self.limits.find_one_and_update(
+            claimed = await self._acquisition_store().find_one_and_update(
                 {"_id": slot, "kind": ACQUISITION_STRIPE_KIND,
                  "$or": [{"lease_until": {"$exists": False}},
                          {"$expr": {"$lte": ["$lease_until", "$NOW"]}}]},
@@ -3411,7 +3438,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
     async def _assert_acquisition_stripes(self, row: dict, token: str) -> None:
         """Check every stripe immediately before canonical transport authority."""
         slots = _acquisition_stripes(row["request"]["allowed_hosts"])
-        count = await self.limits.count_documents(
+        count = await self._acquisition_store().count_documents(
             {"_id": {"$in": list(slots)}, "kind": ACQUISITION_STRIPE_KIND,
              "worker_token": token,
              "$expr": {"$gt": ["$lease_until", {"$add": ["$NOW", 15000]}]}},
@@ -3610,10 +3637,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                 # Callers prove either dispatch was never attempted, or the
                 # rejected runner actually exited without entering the crawl.
                 # Other tokens' capacity is never released.
-                await self.limits.update_many(
-                    {"worker_token": token},
-                    {"$unset": {"worker_token": "", "active_session_id": "", "lease_until": ""}},
-                )
+                await self._release_worker_credits(token)
 
         finishing = asyncio.create_task(cleanup())
         while not finishing.done():
@@ -4223,10 +4247,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
         finally:
             if runner_exited.is_set() and worker.done():
                 self._workers.pop(token, None)
-                await self.limits.update_many(
-                    {"worker_token": token},
-                    {"$unset": {"worker_token": "", "active_session_id": "", "lease_until": ""}},
-                )
+                await self._release_worker_credits(token)
         if isinstance(failure, asyncio.CancelledError):
             raise failure
         current = await self.get(scope, identifier)
