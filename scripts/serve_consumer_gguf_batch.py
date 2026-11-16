@@ -15,7 +15,10 @@ def main(argv=None):
     p.add_argument("--server", type=Path, required=True)
     p.add_argument("--server-sha256", required=True)
     p.add_argument("--server-library", action="append", default=[], metavar="NAME=SHA256")
-    p.add_argument("--prompt", action="append", required=True)
+    p.add_argument("--prompt-file", type=Path, action="append", required=True)
+    p.add_argument("--spill-root", type=Path)
+    p.add_argument("--slot-spill-bytes", type=int, default=0)
+    p.add_argument("--spill-roundtrip", action="store_true")
     p.add_argument("--slots", type=int, default=2)
     p.add_argument("--context-per-slot", type=int, required=True)
     p.add_argument("--gpu-layers", type=int, required=True)
@@ -28,12 +31,31 @@ def main(argv=None):
     model = LlamaCppModel(deployment.llama_cpp_config(rehash_artifacts_each_run=True))
     if model.model_digest != deployment.execution_model_sha256:
         raise RuntimeError("manifest model identity changed")
+    if not 2 <= len(a.prompt_file) <= a.slots:
+        p.error("2..slots prompt files required")
+    prompts = []
+    for source in a.prompt_file:
+        if source.is_symlink() or not source.is_file():
+            p.error("regular local prompt files required")
+        with source.open("rb") as handle:
+            raw = handle.read(1024**2+1)
+        if not 1 <= len(raw) <= 1024**2:
+            p.error("prompt file outside bounds")
+        prompts.append(raw.decode("utf-8"))
+    if a.spill_roundtrip and not a.slot_spill_bytes:
+        p.error("spill roundtrip requires explicit private spill configuration")
     policy = ResidentBatchPolicy(a.slots, a.context_per_slot, a.gpu_layers,
-                                 a.max_memory_bytes, flash_attention=a.flash_attention)
+                                 a.max_memory_bytes, flash_attention=a.flash_attention,
+                                 slot_spill_bytes=a.slot_spill_bytes)
     with ResidentGGUFBatch(model, a.server, a.server_sha256, policy,
-                           runtime_libraries=tuple(tuple(item.split("=",1)) for item in a.server_library)) as session:
-        for _ in range(a.repeats):
-            print(json.dumps(session.generate(a.prompt, max_new_tokens=a.max_new_tokens), allow_nan=False))
+                           runtime_libraries=tuple(tuple(item.split("=",1)) for item in a.server_library),
+                           spill_root=a.spill_root) as session:
+        for iteration in range(a.repeats):
+            print(json.dumps(session.generate(prompts, max_new_tokens=a.max_new_tokens,
+                reuse_cache=a.spill_roundtrip and iteration > 0), allow_nan=False))
+            if a.spill_roundtrip:
+                print(json.dumps(session.spill_slot(0), allow_nan=False))
+                print(json.dumps(session.restore_slot(0), allow_nan=False))
     return 0
 
 

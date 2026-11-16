@@ -52,3 +52,24 @@ def test_private_connection_validates_pid_before_transmitting(tmp_path):
     finally:
         worker.join(timeout=2)
     assert seen == [b"", b"local-only"]
+
+def test_native_spill_transfer_encrypts_and_authenticates_actual_bytes(tmp_path):
+    from types import SimpleNamespace
+    import time
+    from cryptography.exceptions import InvalidTag
+    from skeleton.ai.runtime.inference.resident_gguf_batch import ResidentGGUFBatch
+    session = object.__new__(ResidentGGUFBatch)
+    session._model = SimpleNamespace(model_digest="a"*64)
+    session._deadline = time.monotonic()+30
+    raw = tmp_path/"raw"
+    data = b"native-private-cache"*100000
+    raw.write_bytes(data)
+    sealed = tmp_path/"sealed"
+    key = b"k"*32
+    session._spill_transfer(raw, sealed, key=key, slot=0, size=len(data), encrypt=True)
+    assert data[:128] not in sealed.read_bytes()
+    restored = tmp_path/"restored"
+    session._spill_transfer(sealed, restored, key=key, slot=0, size=len(data), encrypt=False)
+    assert restored.read_bytes() == data
+    with pytest.raises(InvalidTag):
+        session._spill_transfer(sealed, tmp_path/"wrong-slot", key=key, slot=1, size=len(data), encrypt=False)

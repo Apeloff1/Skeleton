@@ -17,6 +17,8 @@ import re
 import secrets
 import socket
 import struct
+import stat
+import sys
 import subprocess
 import tempfile
 import threading
@@ -82,6 +84,7 @@ class ResidentBatchPolicy:
     timeout_seconds: int = 120
     max_session_seconds: int = 3600
     max_batches: int = 128
+    slot_spill_bytes: int = 0
 
     def __post_init__(self):
         bounds = (
@@ -93,6 +96,8 @@ class ResidentBatchPolicy:
         )
         if any(type(v) is not int or not lo <= v <= hi for v, lo, hi in bounds):
             raise ValueError("resident batch policy outside bounds")
+        if type(self.slot_spill_bytes) is not int or not 0 <= self.slot_spill_bytes <= 64*1024**3:
+            raise ValueError("native slot spill ceiling outside bounds")
         if self.slots * self.context_per_slot > 1_048_576:
             raise ValueError("aggregate native context exceeds ceiling")
         if self.microbatch_tokens > self.batch_tokens or self.flash_attention not in {"auto", "on", "off"}:
@@ -103,7 +108,7 @@ class ResidentGGUFBatch:
     """One explicitly owned native process, multiple bounded local batch calls."""
 
     def __init__(self, model: LlamaCppModel, server: Path, server_sha256: str,
-                 policy: ResidentBatchPolicy, *, runtime_libraries=()):
+                 policy: ResidentBatchPolicy, *, runtime_libraries=(), spill_root: Path | None = None):
         if not isinstance(model, LlamaCppModel) or not isinstance(policy, ResidentBatchPolicy):
             raise TypeError("admitted native model and resident policy required")
         if os.name != "posix" or not hasattr(socket, "SO_PEERCRED"):
@@ -144,6 +149,14 @@ class ResidentGGUFBatch:
         self._deadline = 0.0
         self._batches = 0
         self._closed = False
+        self._watchdog = None
+        self._spill_root = spill_root
+        if bool(policy.slot_spill_bytes) != (spill_root is not None):
+            raise ValueError("native spill root and byte ceiling must be supplied together")
+        self._spill_temp = None
+        self._disk_temp = None
+        self._live_slots = set()
+        self._spilled = {}
 
     def _assert_source(self):
         self._model.assert_identity()
@@ -173,7 +186,9 @@ class ResidentGGUFBatch:
 
     def _call(self, endpoint, payload=None, *, deadline):
         if endpoint not in {"/health", "/tokenize", "/completion"}:
-            raise ValueError("unapproved native endpoint")
+            slot = re.fullmatch(r"/slots/([0-9]+)\\?action=(save|restore|erase)", endpoint)
+            if not self._spill_temp or not slot or not 0 <= int(slot.group(1)) < self._policy.slots:
+                raise ValueError("unapproved native endpoint")
         if self._proc is None or self._proc.poll() is not None or self._socket is None:
             raise LlamaCppRuntimeError("resident native child unavailable")
         remaining = min(deadline, self._deadline) - time.monotonic()
@@ -242,11 +257,25 @@ class ResidentGGUFBatch:
                 args += ["--no-kv-offload"]
             self._deadline = time.monotonic() + p.max_session_seconds
             try:
+                if p.slot_spill_bytes:
+                    self._prepare_spill()
+                    args[args.index("--no-slots")] = "--slots"
+                    args[args.index("--no-cache-prompt")] = "--cache-prompt"
+                    args += ["--slot-save-path", self._spill_temp.name + "/"]
+                    # Native save files are hard-limited before exec. The
+                    # wrapper is static and the child PID survives exec.
+                    args = [sys.executable, "-I", "-c",
+                            "import os,resource,sys;n=int(sys.argv[1]);resource.setrlimit(resource.RLIMIT_FSIZE,(n,n));os.execv(sys.argv[2],sys.argv[2:])",
+                            str(p.slot_spill_bytes), *args]
                 self._proc = subprocess.Popen(args, stdin=subprocess.DEVNULL,
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=root,
                     env={"PATH": "/usr/bin:/bin", "HOME": str(root), "TMPDIR": str(root),
                          "LANG": "C", "LC_ALL": "C"},
                     start_new_session=True, close_fds=True, pass_fds=gguf_child_pass_fds())
+                self._watchdog = threading.Timer(max(0, self._deadline-time.monotonic()),
+                                                  LlamaCppModel._terminate, args=(self._proc,))
+                self._watchdog.daemon = True
+                self._watchdog.start()
                 self._reader = threading.Thread(target=self._drain_logs, daemon=True)
                 self._reader.start()
                 startup_deadline = min(self._deadline, time.monotonic() + p.timeout_seconds)
@@ -283,7 +312,8 @@ class ResidentGGUFBatch:
             raise LlamaCppRuntimeError("native tokenizer response rejected")
         return tokens
 
-    def generate(self, prompts: Sequence[str], *, max_new_tokens: int, seed: int = 0):
+    def generate(self, prompts: Sequence[str], *, max_new_tokens: int, seed: int = 0,
+                 reuse_cache: bool = False):
         """Submit independent requests concurrently to the same native scheduler."""
         with self._lock:
             if not self._ready.is_set() or self._closed:
@@ -297,17 +327,24 @@ class ResidentGGUFBatch:
                 raise ValueError("invalid generation token limit")
             if type(seed) is not int or not 0 <= seed < 2**32-1:
                 raise ValueError("explicit deterministic uint32 seed required")
+            if type(reuse_cache) is not bool or (reuse_cache and not self._spill_temp):
+                raise ValueError("cache reuse requires explicit private slot spill mode")
+            if self._spill_temp and any(i in self._spilled for i in range(len(prompts))):
+                raise RuntimeError("restore or discard a spilled slot before reuse")
             self._assert_source()
             deadline = min(self._deadline, time.monotonic() + p.timeout_seconds)
             tokenized = [self._tokenize(prompt, deadline) for prompt in prompts]
             if any(len(tokens) + max_new_tokens > p.context_per_slot for tokens in tokenized):
                 raise ValueError("native tokenized prompt exceeds private slot context")
             barrier = threading.Barrier(len(prompts))
-            def one(tokens):
+            def one(index, tokens):
                 barrier.wait(timeout=max(0.01, deadline-time.monotonic()))
-                row = self._call("/completion", {"prompt": tokens, "n_predict": max_new_tokens,
+                payload = {"prompt": tokens, "n_predict": max_new_tokens,
                     "seed": seed, "temperature": 0.0, "stream": False,
-                    "cache_prompt": False, "return_tokens": True}, deadline=deadline)
+                    "cache_prompt": reuse_cache, "return_tokens": True}
+                if self._spill_temp:
+                    payload["id_slot"] = index
+                row = self._call("/completion", payload, deadline=deadline)
                 if not isinstance(row, dict) or row.get("truncated") is not False or row.get("stop_type") not in {"eos","limit","word"}:
                     raise LlamaCppRuntimeError("resident completion was incomplete or truncated")
                 output, ids = row.get("content"), row.get("tokens")
@@ -315,9 +352,9 @@ class ResidentGGUFBatch:
                     or len(ids) > max_new_tokens or any(type(t) is not int or not 0 <= t <= 2**31-1 for t in ids)):
                     raise LlamaCppRuntimeError("invalid native completion payload")
                 return {"text": output, "token_ids": ids, "stop_type": row["stop_type"],
-                        "input_tokens": len(tokens)}
+                        "input_tokens": len(tokens), "slot": index if self._spill_temp else None}
             executor = ThreadPoolExecutor(max_workers=len(prompts))
-            futures = [executor.submit(one, tokens) for tokens in tokenized]
+            futures = [executor.submit(one, index, tokens) for index, tokens in enumerate(tokenized)]
             try:
                 _, pending = wait(futures, timeout=max(0, deadline-time.monotonic()))
                 if pending:
@@ -325,6 +362,8 @@ class ResidentGGUFBatch:
                 rows = [future.result() for future in futures]
                 self._assert_source()
                 self._batches += 1
+                if self._spill_temp:
+                    self._live_slots.update(range(len(rows)))
                 return {"model_sha256": self._model.model_digest, "server_sha256": self._server.sha256,
                         "offloaded_layers_reported": list(self._offloaded), "slots": p.slots,
                         "logical_memory_estimate_bytes": self._estimate, "results": rows,
@@ -335,10 +374,166 @@ class ResidentGGUFBatch:
             finally:
                 executor.shutdown(wait=True, cancel_futures=True)
 
+    def _prepare_spill(self):
+        # Native serialization writes plaintext only into Linux tmpfs. That
+        # tmpfs may itself swap: operators requiring no plaintext swap must
+        # disable swap or use encrypted swap. Disk output is AES-GCM sealed.
+        from .gguf_bundle import _open_directory
+        mount = Path("/dev/shm")
+        entries = Path("/proc/self/mountinfo").read_text(encoding="utf-8").splitlines()
+        if not any(line.split(" - ", 1)[0].split()[4] == "/dev/shm"
+                   and line.split(" - ", 1)[1].split()[0] == "tmpfs"
+                   for line in entries if " - " in line):
+            raise OSError("verified /dev/shm tmpfs required for slot spill")
+        root = Path(os.path.abspath(os.fspath(self._spill_root)))
+        fd = _open_directory(root)
+        try:
+            info = os.fstat(fd)
+            if info.st_uid != os.geteuid() or info.st_mode & 0o077:
+                raise PermissionError("native spill root must be owner-private")
+        finally:
+            os.close(fd)
+        self._spill_temp = tempfile.TemporaryDirectory(prefix="skkv-", dir=mount)
+        self._disk_temp = tempfile.TemporaryDirectory(prefix=".skkv-", dir=root)
+
+    @staticmethod
+    def _private_file(path, *, writing=False):
+        flags = (os.O_WRONLY | os.O_CREAT | os.O_EXCL) if writing else (os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
+        fd = os.open(path, flags | os.O_NOFOLLOW, 0o600)
+        info = os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
+                or info.st_uid != os.geteuid() or (not writing and info.st_mode & 0o022)):
+            os.close(fd)
+            raise PermissionError("native spill file custody rejected")
+        return os.fdopen(fd, "wb" if writing else "rb")
+
+    def _spill_transfer(self, source, destination, *, key, slot, size, encrypt):
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        cipher = AESGCM(key)
+        chunk = 1024**2
+        with self._private_file(source) as reader, self._private_file(destination, writing=True) as writer:
+            before = os.fstat(reader.fileno())
+            expected = size if encrypt else size + 28 * ((size+chunk-1)//chunk)
+            if before.st_size != expected:
+                raise OSError("native spill length changed")
+            for offset in range(0, size, chunk):
+                if time.monotonic() >= self._deadline:
+                    raise TimeoutError("native slot transfer deadline")
+                count = min(chunk, size-offset)
+                aad = f"{self._model.model_digest}:{slot}:{offset}:{count}".encode("ascii")
+                raw = reader.read(count if encrypt else count+28)
+                if len(raw) != (count if encrypt else count+28):
+                    raise OSError("native spill transfer truncated")
+                if encrypt:
+                    nonce = secrets.token_bytes(12)
+                    writer.write(nonce + cipher.encrypt(nonce, raw, aad))
+                else:
+                    writer.write(cipher.decrypt(raw[:12], raw[12:], aad))
+            if reader.read(1):
+                raise OSError("native spill trailing bytes")
+            after = os.fstat(reader.fileno())
+            if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+                    after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+                raise OSError("native spill source changed during transfer")
+            writer.flush()
+            os.fsync(writer.fileno())
+
+    def spill_slot(self, slot: int):
+        """Serialize native GGUF KV, seal to disk, erase the resident slot.
+
+        Erase frees sequence capacity; llama.cpp can retain preallocated GPU
+        backing buffers. This does not promise a driver VRAM decrease.
+        """
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        with self._lock:
+            if not self._ready.is_set() or not self._spill_temp or type(slot) is not int or slot not in self._live_slots:
+                raise RuntimeError("completed private native slot required")
+            if slot in self._spilled:
+                raise RuntimeError("slot already spilled")
+            self._assert_source()
+            cap = self._policy.slot_spill_bytes
+            existing = sum(row["sealed_bytes"] for row in self._spilled.values())
+            if existing >= cap:
+                raise MemoryError("native encrypted spill budget exhausted")
+            root = Path(self._spill_temp.name)
+            available = os.statvfs(root)
+            if available.f_bavail * available.f_frsize < cap-existing:
+                raise MemoryError("insufficient tmpfs spill capacity")
+            name = secrets.token_hex(24) + ".bin"
+            plain, sealed = root/name, Path(self._disk_temp.name)/(name+".sealed")
+            deadline = min(self._deadline, time.monotonic()+self._policy.timeout_seconds)
+            try:
+                result = self._call(f"/slots/{slot}?action=save", {"filename": name}, deadline=deadline)
+                size, tokens = result.get("n_written"), result.get("n_saved")
+                if (result.get("id_slot") != slot or result.get("filename") != name
+                        or type(size) is not int or type(tokens) is not int
+                        or not 1 <= size <= cap or not 1 <= tokens <= self._policy.context_per_slot):
+                    raise LlamaCppRuntimeError("native slot save receipt rejected")
+                sealed_size = size + 28*((size+1024**2-1)//1024**2)
+                if existing+sealed_size > cap:
+                    raise MemoryError("native spill exceeds remaining encrypted budget")
+                key = AESGCM.generate_key(bit_length=256)
+                self._spill_transfer(plain, sealed, key=key, slot=slot, size=size, encrypt=True)
+                plain.unlink()
+                erased = self._call(f"/slots/{slot}?action=erase", {}, deadline=deadline)
+                if erased.get("id_slot") != slot or erased.get("n_erased") != tokens:
+                    raise LlamaCppRuntimeError("native slot erase not confirmed")
+                self._assert_source()
+                self._spilled[slot] = {"path": sealed, "key": key, "bytes": size,
+                                       "sealed_bytes": sealed_size, "tokens": tokens}
+                self._live_slots.remove(slot)
+                return {"slot": slot, "native_tokens_saved_and_erased": tokens,
+                        "encrypted_bytes": sealed_size, "physical_gpu_allocation_reclaimed": False}
+            except BaseException:
+                self.close()
+                raise
+            finally:
+                plain.unlink(missing_ok=True)
+
+    def restore_slot(self, slot: int):
+        """Restore a same-process, same-model encrypted native slot."""
+        with self._lock:
+            if not self._ready.is_set() or type(slot) is not int or slot not in self._spilled:
+                raise RuntimeError("unknown private native spill slot")
+            if slot in self._live_slots:
+                raise RuntimeError("cannot overwrite an active native slot")
+            row = self._spilled[slot]
+            self._assert_source()
+            name = secrets.token_hex(24)+".bin"
+            plain = Path(self._spill_temp.name)/name
+            deadline = min(self._deadline, time.monotonic()+self._policy.timeout_seconds)
+            try:
+                self._spill_transfer(row["path"], plain, key=row["key"], slot=slot,
+                                     size=row["bytes"], encrypt=False)
+                restored = self._call(f"/slots/{slot}?action=restore", {"filename": name}, deadline=deadline)
+                if (restored.get("id_slot") != slot or restored.get("filename") != name
+                        or restored.get("n_restored") != row["tokens"] or restored.get("n_read") != row["bytes"]):
+                    raise LlamaCppRuntimeError("native slot restore receipt rejected")
+                self._assert_source()
+                row["path"].unlink()
+                del self._spilled[slot]
+                self._live_slots.add(slot)
+                return {"slot": slot, "native_tokens_restored": row["tokens"],
+                        "native_bytes_read": row["bytes"]}
+            except BaseException:
+                self.close()
+                raise
+            finally:
+                plain.unlink(missing_ok=True)
+
+    def discard_slot_spill(self, slot: int):
+        with self._lock:
+            if type(slot) is not int or slot not in self._spilled:
+                raise RuntimeError("unknown native spill slot")
+            self._spilled[slot]["path"].unlink()
+            del self._spilled[slot]
+
     def close(self):
         with self._lock:
             self._closed = True
             self._ready.clear()
+            if self._watchdog is not None:
+                self._watchdog.cancel()
             if self._proc is not None:
                 LlamaCppModel._terminate(self._proc)
                 self._proc.wait()
@@ -346,6 +541,12 @@ class ResidentGGUFBatch:
                 self._reader.join(timeout=2)
             if self._temp is not None:
                 self._temp.cleanup()
+            if self._spill_temp is not None:
+                self._spill_temp.cleanup()
+            if self._disk_temp is not None:
+                self._disk_temp.cleanup()
+            self._spilled.clear()
+            self._live_slots.clear()
             self._logs.clear()
             self._key = None
 
