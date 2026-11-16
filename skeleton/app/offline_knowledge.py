@@ -46,6 +46,9 @@ MAX_SEARCH_TOKENS = 24
 MAX_QUERY_BYTES = 1_024
 _CHUNK_CHARS = 600
 _CHUNK_OVERLAP = 80
+# Bounded query-local scratch; not a persistent index or source authority.
+_SPARSE_MATCH_COUNT = 2048
+_SPARSE_MATCH_BYTES = 2 * 1024 * 1024
 _MAX_DOC_CHUNKS = None
 _TERMS = re.compile(r"[^\W_]{2,}", re.UNICODE)
 _STOP = frozenset({
@@ -510,9 +513,10 @@ class OfflineKnowledgeLibrary:
         """Exact two-pass search with bounded retained ranking state.
 
         Every source and indexed slice remains verified inside a single read
-        snapshot. Only one document and at most 48 scored passages are
-        retained in Python. No stale result cache or new index authority is
-        introduced. Work remains linear in total corpus size per pass.
+        snapshot. Sparse matching rows use bounded query-local scratch; dense
+        queries transparently replay the verified SQL snapshot. At most 48
+        scored results survive. No stale cross-transaction result cache or
+        authority is introduced. Integrity verification is still linear.
         """
         if (not isinstance(query, str) or not query.strip()
                 or len(query.encode("utf-8")) > MAX_QUERY_BYTES):
@@ -531,6 +535,9 @@ class OfflineKnowledgeLibrary:
         df = {term: 0 for term in terms}
         n = 0
         best: list[LocalKnowledgeHit] = []
+        sparse = []
+        sparse_bytes = 0
+        sparse_available = True
         query_lower = unicodedata.normalize("NFKC", query.strip()).casefold()
 
         def frequencies(row):
@@ -542,14 +549,32 @@ class OfflineKnowledgeLibrary:
             return text, freqs
 
         def count(row):
-            nonlocal n
+            nonlocal n, sparse_bytes, sparse_available
             n += 1
-            _, freqs = frequencies(row)
+            text, freqs = frequencies(row)
             for token in freqs:
                 df[token] += 1
+            if not freqs or not sparse_available:
+                return
+            # A sparse query can finish ranking immediately after the integrity
+            # pass. Store only matched rows and small term-count tuples. The
+            # estimate deliberately overcounts text as 4 bytes/codepoint plus
+            # container, metadata and dictionary entries. A dense query falls
+            # back to the original same-snapshot SQL replay with no loss.
+            cost = 512 + 4 * sum(len(x) for x in (row[0], row[1], row[2], row[6]))
+            cost += sum(128 + 4 * len(term) for term in freqs)
+            if len(sparse) >= _SPARSE_MATCH_COUNT or sparse_bytes + cost > _SPARSE_MATCH_BYTES:
+                sparse.clear()
+                sparse_available = False
+                sparse_bytes = 0
+            else:
+                sparse.append((row, freqs, query_lower in text))
+                sparse_bytes += cost
 
-        def score(row):
-            text, freqs = frequencies(row)
+        def score(row, freqs=None, phrase=None):
+            if freqs is None:
+                text, freqs = frequencies(row)
+                phrase = query_lower in text
             if not freqs:
                 return
             value = sum(
@@ -557,7 +582,7 @@ class OfflineKnowledgeLibrary:
                 * math.log1p((n + 1) / (df[token] + 0.5))
                 for token in sorted(freqs)
             )
-            if query_lower in text:
+            if phrase:
                 value += 2.0
             hit = LocalKnowledgeHit(
                 document_id=row[0], title=row[1], sha256=row[2],
@@ -571,7 +596,10 @@ class OfflineKnowledgeLibrary:
 
         with self._read_snapshot():
             self._verified_search_pass(selected, consume=count)
-            if terms and n:
+            if sparse_available:
+                for row, freqs, phrase in sparse:
+                    score(row, freqs, phrase)
+            elif terms and n:
                 # The first pass verified every relevant source and every
                 # indexed slice in this SAME SQLite snapshot. Re-read the
                 # joined rows without rehashing documents or regenerating
