@@ -261,6 +261,7 @@ def acknowledge_weight_store_recovery(owner: WeightStoreDiskOwner, *,
     acknowledged. The operator must resolve those separately and rerun review.
     """
     from .flgb_model_runtime import MAX_WEIGHT_BYTES, require_digest
+    from .weight_store_scrub import ScrubPolicy, _catalog, verify_unreferenced_catalog_objects
 
     require_digest(intent_digest, "recovery intent digest")
     require_digest(review_digest, "recovery review digest")
@@ -281,15 +282,36 @@ def acknowledge_weight_store_recovery(owner: WeightStoreDiskOwner, *,
         if (not review["manifest_reference_scan_complete"] or not review["layout_scan_complete"]
                 or set(review["counts"]) - {"unresolved_staging_intent", "unreferenced_object_candidate"}):
             raise WeightShardStoreError("unresolved filesystem anomalies require operator repair")
-        # Independently verify all committed objects, not only their lengths,
-        # under the same cooperative lock and explicitly bounded budgets.
+        # Admit the complete physical namespace before reading any weight
+        # bytes. Unreferenced objects may have survived interrupted staging;
+        # metadata review alone is insufficient to acknowledge their custody.
+        scrub_policy = ScrubPolicy(
+            maximum_entries=policy.maximum_entries,
+            maximum_manifest_bytes=policy.maximum_metadata_bytes,
+            maximum_references=policy.maximum_references,
+            maximum_total_bytes=maximum_verified_weight_bytes,
+        )
+        catalog = _catalog(owner, scrub_policy)
+        # Independently verify every committed reference, deduplicated by
+        # object within the canonical inventory, under the same writer slot.
         inventory = inventory_offline_weights(
             owner._store.root,
             max_entries=min(4096, policy.maximum_entries),
             max_weight_bytes=maximum_verified_weight_bytes,
             max_manifest_bytes=policy.maximum_metadata_bytes,
             max_shard_references=policy.maximum_references,
+            max_physical_weight_bytes=maximum_verified_weight_bytes,
         )
+        referenced_bytes = inventory["verified_physical_weight_bytes"]
+        if referenced_bytes > catalog.total_bytes:
+            raise WeightShardStoreError("referenced verification exceeds admitted physical catalog")
+        orphan = verify_unreferenced_catalog_objects(
+            owner, catalog, maximum_bytes=maximum_verified_weight_bytes - referenced_bytes,
+        )
+        if (referenced_bytes + orphan["verified_bytes"] != catalog.total_bytes
+                or inventory["distinct_weight_objects"] + orphan["verified_objects"] != len(catalog.objects)
+                or _catalog(owner, scrub_policy).digest != catalog.digest):
+            raise WeightShardStoreError("physical recovery catalog changed during verification")
         matches = [row for row in inventory["models"] if row["plan_digest"] == intent["plan_digest"]]
         if matches:
             if (len(matches) != 1 or matches[0]["manifest_sha256"] != intent["manifest_sha256"]
@@ -312,6 +334,10 @@ def acknowledge_weight_store_recovery(owner: WeightStoreDiskOwner, *,
             outcome="recovery_reconciled", evidence={
                 "review_digest": review_digest, "inventory_digest": inventory["digest"],
                 "disposition": disposition, "accounted_bytes": observed["accounted_bytes"],
+                "physical_catalog_digest": catalog.digest,
+                "verified_physical_objects": len(catalog.objects),
+                "verified_physical_bytes": catalog.total_bytes,
+                "unreferenced_verification_digest": orphan["digest"],
                 "unreferenced_candidates": review["unreferenced_candidates"],
                 "weight_mutation_performed": False, "deletion_authorized": False,
             },
