@@ -267,12 +267,15 @@ def inspect_export(path,format,projection,*,expected_sha=None):
             "license_verified":False,"source_rights_verified":False}
 
 def ingest(graph,scope,*,path,format,projection,target,rights_reference,grant_seconds,expected_sha=None,
-           expected_inspection=None):
+           expected_inspection=None,graph_factory=None):
+    if (graph is None)==(graph_factory is None):
+        raise ValueError("exactly one graph or graph factory required")
     expected_inspection=_expected_hash(expected_inspection)
     witness,raw_sha,count,final_chain,total_pages=qualify(path,format,projection,expected_sha=expected_sha)
     inspection=_inspection_identity(format,projection,raw_sha,count,final_chain,total_pages)
     if expected_inspection is not None and expected_inspection!=inspection:
         raise ValueError("offline inspection digest differs; graph untouched")
+    if graph is None:graph=graph_factory()
     begun=graph.begin(scope,target_id=target,projection=projection,source_sha=raw_sha,expected_rows=count,
                       rights_ref=rights_reference,grant_seconds=grant_seconds,acknowledged=True)
     sid=begun["snapshot_id"]
@@ -326,10 +329,11 @@ def main(argv=None):
         parser.error("import requires target, tenant, owner and rights reference")
     if not args.acknowledge_metadata_rights:parser.error("explicit metadata rights acknowledgement required")
     scope={"tenant_id":args.tenant,"owner_id":args.owner}
-    graph=LeadGraph(_path(scope=scope,create=os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1"))
+    def graph_factory():
+        return LeadGraph(_path(scope=scope,create=os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1"))
     # The graph must have been enabled by its owner/editor. No automatic
     # permission, source grant, or activation of live crawling.
-    receipt=ingest(graph,scope,path=path,format=args.format,
+    receipt=ingest(None,scope,path=path,format=args.format,graph_factory=graph_factory,
                    projection=args.projection,target=args.target,rights_reference=args.rights_reference,
                    grant_seconds=args.grant_seconds,expected_sha=args.expected_sha,
                    expected_inspection=args.expected_inspection)
