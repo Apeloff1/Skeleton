@@ -84,6 +84,89 @@ def _operation(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
 
+PUBLISHER_METHODS = frozenset({"public_api", "publisher_feed", "open_dataset_manifest",
+                               "licensed_public_export"})
+
+
+def _publisher_creation_body(body: dict, operation_hash: str) -> dict:
+    """Finite explicit acquisition intent; never store the raw operation key."""
+    marker = body.get("publisher_intake")
+    if (not isinstance(marker, dict) or set(marker) != {
+            "method", "independent_resource_acknowledged", "publisher_permission_acknowledged"}
+            or marker.get("method") not in PUBLISHER_METHODS
+            or marker.get("independent_resource_acknowledged") is not True
+            or marker.get("publisher_permission_acknowledged") is not True
+            or body.get("consent") is not True or body.get("rights_acknowledged") is not True
+            or not isinstance(operation_hash, str) or len(operation_hash) != 64
+            or any(ch not in "0123456789abcdef" for ch in operation_hash)):
+        raise ValueError("invalid publisher creation intent")
+    from urllib.parse import urlsplit
+    from skeleton.ai.webcrawler.core import canonicalize_url, destination_allowed
+
+    seeds = body.get("seeds")
+    if not isinstance(seeds, list) or len(seeds) != 1 or not isinstance(seeds[0], str):
+        raise ValueError("publisher intent requires exactly one seed")
+    endpoint = seeds[0]
+    if not 1 <= len(endpoint) <= 2048:
+        raise ValueError("invalid publisher endpoint")
+    parsed = urlsplit(endpoint)
+    if (parsed.scheme != "https" or not parsed.hostname or parsed.port is not None
+            or parsed.username is not None or parsed.password is not None
+            or parsed.query or parsed.fragment or not destination_allowed(parsed.hostname)
+            or canonicalize_url(endpoint) != endpoint):
+        raise ValueError("invalid publisher endpoint")
+    expected = {
+        "idempotency_key": operation_hash, "seeds": [endpoint], "topics": [],
+        "title": "Publisher intake: " + marker["method"],
+        "max_depth": 0, "max_requests": 8, "max_documents": 1,
+        "max_bytes": 2 * 1024 * 1024, "discover_sitemaps": False,
+        "frontier_strategy": "fifo", "consent": True, "rights_acknowledged": True,
+        "publisher_intake": dict(marker),
+    }
+    if _digest({**body, "idempotency_key": operation_hash}) != _digest(expected):
+        raise ValueError("publisher intent differs from finite acquisition contract")
+    return expected
+
+
+def _publisher_intent_projection(scope: dict, row: dict) -> dict | None:
+    """Check consent linkage and expose only witnessed intent metadata.
+
+    The record attests the operator's acknowledgement, not publisher identity,
+    protocol compliance, licensing or content suitability. Legacy sessions
+    without the marker remain ordinary capture sessions.
+    """
+    if "publisher_creation" not in row:
+        return None
+    try:
+        receipt = _plain(row["publisher_creation"])
+        if not isinstance(receipt, dict) or set(receipt) != {"schema", "body", "digest"}:
+            raise ValueError("publisher receipt fields")
+        if receipt["schema"] != "skeleton.dragon.publisher-intent.v1":
+            raise ValueError("publisher receipt schema")
+        body = receipt["body"]
+        normalized = _publisher_creation_body(body, body["idempotency_key"])
+        digest = _digest(normalized)
+        if (digest != receipt["digest"] or digest != row["creation_digest"]
+                or row["consent"]["consent_id"] != _digest([scope, row["_id"], digest])):
+            raise ValueError("publisher intent is not bound to current consent")
+        request = _plain(row["request"])
+        from urllib.parse import urlsplit
+        if (request["seed_urls"] != normalized["seeds"]
+                or request["allowed_hosts"] != [urlsplit(normalized["seeds"][0]).hostname]
+                or request["max_depth"] != 0 or request["max_requests"] != 8
+                or request["max_documents"] != 1 or request["max_total_bytes"] != 2 * 1024 * 1024
+                or request["discover_sitemaps"] is not False or request["frontier_strategy"] != "fifo"
+                or request.get("discover_mementos", False) is not False):
+            raise ValueError("publisher intent is not bound to finite request")
+        return {"schema": receipt["schema"], "method": normalized["publisher_intake"]["method"],
+                "intent_digest": digest, "operator_acknowledged": True,
+                "publisher_verified": False, "license_verified": False,
+                "network_authority_expanded": False}
+    except (CrawlerError, KeyError, TypeError, ValueError, RecursionError) as exc:
+        raise CrawlerError("crawler_publisher_intent_invalid",
+                           "Publisher acquisition intent could not be verified.", 503) from exc
+
+
 def authenticated_scope(user: dict | None) -> dict[str, str]:
     if not isinstance(user, dict) or user.get("disabled") or user.get("dev_mode"):
         raise CrawlerError("crawler_sign_in_required", "Sign in to use scoped crawler data.", 401)
@@ -398,6 +481,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             raise CrawlerError(
                 "crawler_integrity", "Crawler snapshot owner does not match its durable scope.", 503
             )
+        _publisher_intent_projection(scope, row)
         policies = self._source_policies(row)
         if set(policies) - set(snapshot["sources"]):
             raise CrawlerError("crawler_integrity", "Source-use policies refer to missing captures.", 503)
@@ -548,6 +632,10 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             counters=status.get("usage", {}),
             limits=row["request"],
         )
+        publisher = _publisher_intent_projection(
+            {"tenant_id": row.get("tenant_id"), "owner_id": row.get("owner_id")}, row)
+        if publisher is not None:
+            status["publisher_intent"] = publisher
         # The companion is historical operational metadata. Current source-use
         # policy separately governs whether its evidence references are shown.
         # A session-level pause/cancel/lease interruption takes precedence
@@ -2784,10 +2872,28 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                 raise CrawlerError("crawler_watch_binding","Watch child limits changed.",403)
         namespace="dragon-crawler:" if watch_binding is None else "dragon-crawler-watch:"+_digest(watch_binding)+":"
         identifier = str(uuid5(NAMESPACE_URL, namespace + _digest(scope) + ":" + op))
-        request_digest = _digest(body if watch_binding is None else {"body":body,"watch":watch_binding})
+        legacy_creation_digest = _digest(body if watch_binding is None else {"body":body,"watch":watch_binding})
+        publisher_creation = None
+        request_digest = legacy_creation_digest
+        if "publisher_intake" in body:
+            if watch_binding is not None:
+                raise ValueError("publisher intake cannot borrow watch authority")
+            normalized = _publisher_creation_body(body, op)
+            request_digest = _digest(normalized)
+            publisher_creation = {"schema": "skeleton.dragon.publisher-intent.v1",
+                                  "body": normalized, "digest": request_digest}
+
+        def matches_creation(existing):
+            return (existing is not None
+                    and existing.get("treasury_watch_parent") == watch_binding
+                    and (existing.get("creation_digest") == request_digest
+                         or publisher_creation is not None
+                         and "publisher_creation" not in existing
+                         and existing.get("creation_digest") == legacy_creation_digest))
+
         prior = await self.sessions.find_one({"_id": identifier, **scope})
         if prior:
-            if prior["creation_digest"] != request_digest or prior.get("treasury_watch_parent")!=watch_binding:
+            if not matches_creation(prior):
                 raise CrawlerError(
                     "crawler_idempotency_conflict", "This operation key already names a different crawl.", 409
                 )
@@ -2844,9 +2950,13 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         }
         if watch_binding is not None:
             row["treasury_watch_parent"]=watch_binding
+        if publisher_creation is not None:
+            row["publisher_creation"] = publisher_creation
+            _publisher_intent_projection(scope, row)
         row["storage_receipt"] = await self._admit(
             scope, identifier, {"request": row["request"], **checkpoint,
-                                **({"treasury_watch_parent":watch_binding} if watch_binding is not None else {})}
+                                **({"treasury_watch_parent":watch_binding} if watch_binding is not None else {}),
+                                **({"publisher_creation":publisher_creation} if publisher_creation is not None else {})}
         )
         if watch_binding is not None:
             await self._watch_authority(scope,watch_binding,margin=60)
@@ -2878,7 +2988,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                     await self.limits.update_one({"_id":quota_id,**scope},
                         {"$pull":{"session_ids":identifier,"vault_ids":identifier}})
                 raise CrawlerError("crawler_not_found","Crawler session not found.",404) from None
-            if prior is None or prior["creation_digest"] != request_digest or prior.get("treasury_watch_parent")!=watch_binding:
+            if not matches_creation(prior):
                 raise CrawlerError(
                     "crawler_idempotency_conflict", "Concurrent crawler creation conflicted.", 409
                 ) from None
