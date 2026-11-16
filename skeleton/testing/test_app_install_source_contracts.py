@@ -14,6 +14,7 @@ from skeleton.app.install_source_contracts import (
     _copy_sources,
     _source_path_error,
     build_source_errors,
+    nginx_ingress_errors,
 )
 
 
@@ -243,3 +244,85 @@ def test_status_cli_returns_redacted_error_for_invalid_config(monkeypatch, tmp_p
     assert report["ok"] is False
     assert report["code"] == "runtime_configuration_unavailable"
     assert "BBBB" not in repr(report)
+
+
+# The deployed frontend previously exited before healthz because seven exact
+# /setup blocks survived repeated source-preserving integration.
+_INGRESS = r'''
+server {
+    # location = /setup { ignored comment
+    location = /setup {
+        try_files /setup.html /setup/index.html =404;
+        add_header Cache-Control "no-store";
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        add_header Content-Security-Policy "frame-ancestors 'self'; base-uri 'self'; object-src 'none'" always;
+    }
+    location = /healthz { return 200 "ok\n"; }
+    location / { try_files $uri /index.html; }
+}
+'''
+
+
+def _production_fixture(root):
+    _fixture(root)
+    dockerfile = root / "frontend" / "Dockerfile"
+    dockerfile.write_text(dockerfile.read_text(encoding="utf-8")
+                          + "FROM nginx:1.31-alpine AS production\n"
+                          + "COPY nginx.conf /etc/nginx/conf.d/default.conf\n",
+                          encoding="utf-8")
+    (root / "frontend" / "nginx.conf").write_text(_INGRESS, encoding="utf-8")
+
+
+def test_production_ingress_accepts_reviewed_exact_setup_and_literal_health(tmp_path):
+    _production_fixture(tmp_path)
+    assert build_source_errors(tmp_path) == ()
+    assert nginx_ingress_errors(_INGRESS) == ()
+
+
+@pytest.mark.parametrize("duplicate", [
+    'location = /setup { return 200 "not setup"; }',
+    'location\n  =\n  "/setup"\n  { return 200 "not setup"; }',
+    'location = /healthz { return 200 "not healthy"; }',
+    'location ^~ / { return 200 "duplicate prefix"; }',
+])
+def test_production_ingress_rejects_duplicate_location_before_install(tmp_path, duplicate):
+    _production_fixture(tmp_path)
+    path = tmp_path / "frontend" / "nginx.conf"
+    path.write_text(_INGRESS.rsplit("}", 1)[0] + duplicate + "\n}", encoding="utf-8")
+    assert any("duplicate production ingress location" in issue
+               for issue in build_source_errors(tmp_path))
+
+
+@pytest.mark.parametrize("source,reason", [
+    (_INGRESS.replace("=404", "/index.html"), "exported route or return 404"),
+    (_INGRESS.replace("camera=()", "camera=(self)"), "privacy or cache policy drift"),
+    (_INGRESS.replace('add_header Cache-Control "no-store";', ""),
+     "privacy or cache policy drift"),
+    (_INGRESS.replace("location = /setup", "location /setup"), "missing exact setup"),
+    (_INGRESS.replace('return 200 "ok\\n";', 'return 200 "wrong";'), "literal liveness"),
+    (_INGRESS.replace("server {", "server {\ninclude alternate.conf;"), "unreviewed include"),
+    (_INGRESS.replace("location = /setup {", "location = /setup {\nif ($uri) { return 200; }"),
+     "nested block"),
+    (_INGRESS + "}", "malformed"),
+    (_INGRESS + "'unterminated", "malformed"),
+])
+def test_ingress_policy_refuses_unreviewed_mutations(source, reason):
+    assert any(reason in issue for issue in nginx_ingress_errors(source))
+
+
+def test_production_ingress_rejects_missing_config(tmp_path):
+    _production_fixture(tmp_path)
+    (tmp_path / "frontend" / "nginx.conf").unlink()
+    assert any("production ingress missing" in issue for issue in build_source_errors(tmp_path))
+
+
+def test_production_ingress_rejects_oversized_config(tmp_path):
+    _production_fixture(tmp_path)
+    (tmp_path / "frontend" / "nginx.conf").write_bytes(b"x" * (128 * 1024 + 1))
+    assert any("production ingress missing" in issue for issue in build_source_errors(tmp_path))
+
+
+def test_repository_ingress_preserves_one_exact_setup_location():
+    root = find_repo_root(Path(__file__))
+    source = (root / "frontend" / "nginx.conf").read_text(encoding="utf-8")
+    assert nginx_ingress_errors(source) == ()

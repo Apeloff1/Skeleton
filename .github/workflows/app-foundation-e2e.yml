@@ -130,6 +130,10 @@ jobs:
           BUILDKIT_PROGRESS: plain
         run: docker compose -f docker-compose.yml build frontend
 
+      - name: Validate real production Nginx configuration before startup
+        timeout-minutes: 2
+        run: docker compose -f docker-compose.yml run --rm --no-deps frontend nginx -t
+
       - name: Build engine and backend images
         timeout-minutes: 15
         env:
@@ -157,6 +161,9 @@ jobs:
           }
           wait_for "${SKELETON_E2E_BASE_URL}/api/health" backend
           wait_for "${SKELETON_E2E_WEB_URL}/healthz" frontend
+          # Exact /setup must exist separately from the fallback SPA document.
+          curl --fail --silent --show-error --max-time 10 "${SKELETON_E2E_WEB_URL}/setup" -o "$RUNNER_TEMP/setup-document.html"
+          test -s "$RUNNER_TEMP/setup-document.html"
           docker compose -f docker-compose.yml ps
 
       - name: Set up Node 24
