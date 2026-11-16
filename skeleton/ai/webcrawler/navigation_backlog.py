@@ -15,8 +15,9 @@ from urllib.parse import unquote, urlsplit
 
 from .dragon_companion import companion_priority
 
-MAX_RECORDS = 1024
-MAX_BYTES = 384 * 1024
+MAX_RECORDS = 4096
+MAX_BYTES = 1024 * 1024
+ENVELOPE_RESERVE = 32768
 KINDS = frozenset({"seed", "robots_sitemap", "sitemap_urlset", "sitemap_index",
                    "structured", "document_link", "http_link"})
 COUNTERS = ("observations", "outside_policy", "capacity_omissions", "circuit_held",
@@ -34,7 +35,13 @@ def _digest(value):
 
 
 def new_backlog():
-    return {"records": {}, "counts": dict.fromkeys(COUNTERS, 0), "last_discourse": None}
+    return {"records": {}, "record_bytes": 0, "counts": dict.fromkeys(COUNTERS, 0), "last_discourse": None}
+
+
+def _record_cost(identity, row):
+    # Charge the longest pending boolean representation, plus key and
+    # separators. Changes between active and pending cannot grow this bill.
+    return len(_encoded(identity)) + len(_encoded({**row, "pending": False})) + 2
 
 
 def count(ledger, name):
@@ -56,18 +63,26 @@ def observe(ledger, *, url, parent, depth, kind):
     identity = hashlib.sha256(url.encode("utf-8")).hexdigest()
     previous = records.get(identity)
     if previous is not None:
-        previous["observations"] = min(1_000_000_000, previous["observations"] + 1)
-        if depth < previous["depth"]:
-            previous["depth"] = depth
-            previous["parent_url"] = parent
-            previous["kind"] = kind
-        if kind not in previous["relations"]:
-            previous["relations"] = sorted(set(previous["relations"]) | {kind})
-        if parent is not None and parent not in previous["parents"] and len(previous["parents"]) < 4:
-            previous["parents"].append(parent)
-        if len(_encoded(ledger)) > MAX_BYTES - 8192:
-            previous["relations"] = [previous["kind"]]
-            previous["parents"] = [previous["parent_url"]] if previous["parent_url"] is not None else []
+        old_cost = _record_cost(identity, previous)
+        candidate = {**previous, "parents": list(previous["parents"]),
+                     "relations": list(previous["relations"])}
+        candidate["observations"] = min(1_000_000_000, previous["observations"] + 1)
+        if depth < candidate["depth"]:
+            candidate.update(depth=depth, parent_url=parent, kind=kind)
+        candidate["relations"] = sorted(set(candidate["relations"]) | {kind})
+        if parent is not None and parent not in candidate["parents"] and len(candidate["parents"]) < 4:
+            candidate["parents"].append(parent)
+        cost = _record_cost(identity,candidate)
+        if ledger["record_bytes"] - old_cost + cost > MAX_BYTES - ENVELOPE_RESERVE:
+            # Do not discard already retained provenance to fit a new edge.
+            candidate = {**previous, "observations": candidate["observations"]}
+            cost = _record_cost(identity,candidate)
+            if ledger["record_bytes"] - old_cost + cost > MAX_BYTES - ENVELOPE_RESERVE:
+                count(ledger,"capacity_omissions")
+                return previous
+            count(ledger,"capacity_omissions")
+        previous.update(candidate)
+        ledger["record_bytes"] += cost - old_cost
         return previous
     if len(records) >= MAX_RECORDS:
         count(ledger, "capacity_omissions")
@@ -75,12 +90,12 @@ def observe(ledger, *, url, parent, depth, kind):
     row = {"url": url, "ordinal": ledger["counts"]["observations"],
            "depth": depth, "parent_url": parent, "parents": [parent] if parent is not None else [],
            "kind": kind, "relations": [kind], "observations": 1, "pending": False}
-    records[identity] = row
-    # Reserve room for changing counts, provenance and the last decision.
-    if len(_encoded(ledger)) > MAX_BYTES - 32768:
-        del records[identity]
+    cost = _record_cost(identity,row)
+    if ledger["record_bytes"] + cost > MAX_BYTES - ENVELOPE_RESERVE:
         count(ledger, "capacity_omissions")
         return None
+    records[identity] = row
+    ledger["record_bytes"] += cost
     return row
 
 
@@ -165,12 +180,14 @@ def remember(ledger, discourse):
 
 
 def validate(ledger, *, admit, max_depth):
-    if not isinstance(ledger, dict) or set(ledger) != {"records", "counts", "last_discourse"}:
+    if not isinstance(ledger, dict) or set(ledger) != {"records", "record_bytes", "counts", "last_discourse"}:
         raise ValueError("navigation ledger schema")
     records, counters = ledger["records"], ledger["counts"]
     if (not isinstance(records, dict) or len(records) > MAX_RECORDS
             or not isinstance(counters, dict) or set(counters) != set(COUNTERS)
             or any(type(v) is not int or not 0 <= v <= 1_000_000_000 for v in counters.values())
+            or type(ledger["record_bytes"]) is not int
+            or not 0 <= ledger["record_bytes"] <= MAX_BYTES - ENVELOPE_RESERVE
             or len(_encoded(ledger)) > MAX_BYTES):
         raise ValueError("navigation ledger bounds")
     total = 0
@@ -201,6 +218,8 @@ def validate(ledger, *, admit, max_depth):
                 or (row["pending"] and row["depth"] > max_depth)):
             raise ValueError("navigation row values")
         total += row["observations"]
+    if ledger["record_bytes"] != sum(_record_cost(k,v) for k,v in records.items()):
+        raise ValueError("navigation record byte custody")
     if total > counters["observations"]:
         raise ValueError("navigation observation accounting")
     receipt = ledger["last_discourse"]
