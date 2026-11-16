@@ -76,3 +76,59 @@ checks metadata parity, static owner presence, exact argument/status
 forwarding, help visibility and real selected offline owner help.
 No execution receipts, native/device evidence, Windows/WSL2 execution,
 merge, release or qualification are asserted by the source change.
+
+
+## Wave 29 — native Jeeves, original worlds and local AI operations
+
+Pinned predecessor `8fdf2254038e9deb1c786cf3cbd3a0384e8b5a1c`. Registered the following existing owner
+functions in both installation metadata formats and the root module entry.
+None of these registrations supplies implicit approval, a tenant, a model,
+a credential, an expected digest or a physical-device witness.
+
+| Root command | Installed command | Owner |
+| --- | --- | --- |
+| `jeeves-native-chat` | `skeleton-jeeves-native-chat` | `skeleton.jeeves.agent.native_cli:main` |
+| `jeeves-native-acceptance` | `skeleton-jeeves-native-acceptance` | `skeleton.jeeves.agent.native_acceptance_cli:main` |
+| `jeeves-native-batch` | `skeleton-jeeves-native-batch` | `skeleton.jeeves.agent.native_batch_cli:main` |
+| `jeeves-native-durable-batch` | `skeleton-jeeves-native-durable-batch` | `skeleton.jeeves.agent.native_durable_batch_cli:run` |
+| `jeeves-native-eval` | `skeleton-jeeves-native-eval` | `skeleton.jeeves.agent.native_eval_cli:main` |
+| `jeeves-native-operator-session` | `skeleton-jeeves-native-operator-session` | `skeleton.jeeves.agent.native_operator_session_cli:main` |
+| `jeeves-native-session` | `skeleton-jeeves-native-session` | `skeleton.jeeves.agent.native_session_cli:main` |
+| `world-reviewed-delivery` | `skeleton-world-reviewed-delivery` | `skeleton.jeeves.worlds.world_delivery_cli:run` |
+| `world-reviewed-edit` | `skeleton-world-reviewed-edit` | `skeleton.jeeves.worlds.world_edit_cli:run` |
+| `world-reviewed-handoff` | `skeleton-world-reviewed-handoff` | `skeleton.jeeves.worlds.world_handoff_cli:run` |
+| `world-reviewed-session` | `skeleton-world-reviewed-session` | `skeleton.jeeves.worlds.world_session_cli:run` |
+| `original-foundation` | `skeleton-original-foundation` | `skeleton.game.generation.original_foundation_cli:main` |
+| `original-world-campaign` | `skeleton-original-world-campaign` | `skeleton.game.generation.original_world_campaign_cli:main` |
+| `original-world` | `skeleton-original-world` | `skeleton.game.generation.original_world_cli:main` |
+| `original-world-era` | `skeleton-original-world-era` | `skeleton.game.generation.original_world_era_cli:main` |
+| `original-world-frontier` | `skeleton-original-world-frontier` | `skeleton.game.generation.original_world_frontier_cli:main` |
+| `original-world-living` | `skeleton-original-world-living` | `skeleton.game.generation.original_world_living_10x_cli:main` |
+| `original-world-million` | `skeleton-original-world-million` | `skeleton.game.generation.original_world_million_cli:main` |
+| `original-world-play` | `skeleton-original-world-play` | `skeleton.game.generation.original_world_play_cli:main` |
+| `original-world-product` | `skeleton-original-world-product` | `skeleton.game.generation.original_world_product_cli:main` |
+| `original-world-tenfold` | `skeleton-original-world-tenfold` | `skeleton.game.generation.original_world_tenfold_cli:main` |
+| `local-knowledge-plane` | `skeleton-local-knowledge-plane` | `skeleton.ai.runtime.operational_ai.context.knowledge_plane.cli:main` |
+| `local-repository-index` | `skeleton-local-repository-index` | `skeleton.ai.runtime.operational_ai.context.knowledge_plane.repository.cli:main` |
+| `local-model-admission` | `skeleton-local-model-admission` | `skeleton.ai.runtime.operational_ai.model.admission.cli:main` |
+| `local-gguf-prepare` | `skeleton-local-gguf-prepare` | `skeleton.ai.runtime.operational_ai.model.gguf.prepare_cli:main` |
+| `local-gguf-probe` | `skeleton-local-gguf-probe` | `skeleton.ai.runtime.operational_ai.model.gguf.probe_cli:main` |
+| `local-gguf-endurance` | `skeleton-local-gguf-endurance` | `skeleton.ai.runtime.operational_ai.model.qualification.cli:main` |
+| `local-native-candidate` | `skeleton-local-native-candidate` | `skeleton.ai.runtime.operational_ai.native_candidate.cli:main` |
+| `local-native-genesis` | `skeleton-local-native-genesis` | `skeleton.ai.runtime.operational_ai.native_genesis.cli:main` |
+| `local-native-qualification` | `skeleton-local-native-qualification` | `skeleton.ai.runtime.operational_ai.native_qualification.cli:main` |
+| `local-native-supervised` | `skeleton-local-native-supervised` | `skeleton.ai.runtime.operational_ai.native_supervised.cli:main` |
+| `local-grounded-turn` | `skeleton-local-grounded-turn` | `skeleton.ai.runtime.operational_ai.offline_cognition.grounded_cli:run` |
+
+The new routes preserve distinct world preview, publication, handoff and
+session replay authorities. Native acceptance, evaluation, batch and
+session tools are deliberately separate; no smoke run is equivalent to
+native endurance, cold-restart or physical device qualification. Local
+knowledge and repository operations preserve the owners' explicit tenant
+and subject requirements. Original-world entries are source integration,
+not a measured claim about how many worlds were physically generated.
+
+Run the new source suite `skeleton/testing/test_recovered_runtime_commands.py`
+alongside the wave 28 suite and per-owner exact-head gates, then qualify
+from an independently installed wheel. No CI, model or device success is
+claimed by registration.

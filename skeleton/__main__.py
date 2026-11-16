@@ -7,6 +7,38 @@ Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
     offline-runtime  Inspect pinned local weights and measured resource admission
     weight-store     Stage pinned weights and inspect cooperative disk/recovery custody
+    jeeves-native-chat               Explicit local GGUF chat
+    jeeves-native-acceptance         Native first turn and cold-reopen witness
+    jeeves-native-batch              Native deterministic batch and replay
+    jeeves-native-durable-batch      Durable native batch operations
+    jeeves-native-eval               Local native evaluation
+    jeeves-native-operator-session   Durable native operator terminal
+    jeeves-native-session            Multi-turn native replay acceptance
+    world-reviewed-delivery          Reviewed world delivery
+    world-reviewed-edit              Source-leased world edit
+    world-reviewed-handoff           Source-bound playable handoff
+    world-reviewed-session           Approved world session replay
+    original-foundation              Playable causal world-law compositions
+    original-world-campaign          Original-world campaign pilot
+    original-world                   Offline world law exploration
+    original-world-era               Playable original era reference world
+    original-world-frontier          Offline sparse frontier game
+    original-world-living            Living-world browser and saves
+    original-world-million           Million-world reference game
+    original-world-play              Offline world and multiverse play
+    original-world-product           One-player original-world product
+    original-world-tenfold           World architecture browser
+    local-knowledge-plane            Explicit tenant-scoped local knowledge operations
+    local-repository-index           Exact-source repository provenance index
+    local-model-admission            Private capacity inspection and recovery
+    local-gguf-prepare               Operator-controlled source-bound sharding
+    local-gguf-probe                 Explicit real-model generation smoke
+    local-gguf-endurance             Explicit real-model endurance
+    local-native-candidate           Offline native candidate operation
+    local-native-genesis             Native genesis candidate operation
+    local-native-qualification       Explicit real-native qualification
+    local-native-supervised          Operator-owned offline supervised training
+    local-grounded-turn              Explicit source-signed real GGUF turn
     game-archive                  Rights-safe game hardware history
     studio-dual-runtime           Original dual-runtime source pack
     studio-dual-runtime-verify    Pinned original package verification
@@ -1092,6 +1124,102 @@ def main(argv: Optional[List[str]] = None) -> int:
         return recovered_main(rest)
     if cmd == "long-context":
         from skeleton.ai.model_runtime.long_context_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-native-chat":
+        from skeleton.jeeves.agent.native_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-native-acceptance":
+        from skeleton.jeeves.agent.native_acceptance_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-native-batch":
+        from skeleton.jeeves.agent.native_batch_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-native-durable-batch":
+        from skeleton.jeeves.agent.native_durable_batch_cli import run as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-native-eval":
+        from skeleton.jeeves.agent.native_eval_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-native-operator-session":
+        from skeleton.jeeves.agent.native_operator_session_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-native-session":
+        from skeleton.jeeves.agent.native_session_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "world-reviewed-delivery":
+        from skeleton.jeeves.worlds.world_delivery_cli import run as recovered_main
+        return recovered_main(rest)
+    if cmd == "world-reviewed-edit":
+        from skeleton.jeeves.worlds.world_edit_cli import run as recovered_main
+        return recovered_main(rest)
+    if cmd == "world-reviewed-handoff":
+        from skeleton.jeeves.worlds.world_handoff_cli import run as recovered_main
+        return recovered_main(rest)
+    if cmd == "world-reviewed-session":
+        from skeleton.jeeves.worlds.world_session_cli import run as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-foundation":
+        from skeleton.game.generation.original_foundation_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-world-campaign":
+        from skeleton.game.generation.original_world_campaign_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-world":
+        from skeleton.game.generation.original_world_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-world-era":
+        from skeleton.game.generation.original_world_era_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-world-frontier":
+        from skeleton.game.generation.original_world_frontier_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-world-living":
+        from skeleton.game.generation.original_world_living_10x_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-world-million":
+        from skeleton.game.generation.original_world_million_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-world-play":
+        from skeleton.game.generation.original_world_play_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-world-product":
+        from skeleton.game.generation.original_world_product_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-world-tenfold":
+        from skeleton.game.generation.original_world_tenfold_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-knowledge-plane":
+        from skeleton.ai.runtime.operational_ai.context.knowledge_plane.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-repository-index":
+        from skeleton.ai.runtime.operational_ai.context.knowledge_plane.repository.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-model-admission":
+        from skeleton.ai.runtime.operational_ai.model.admission.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-gguf-prepare":
+        from skeleton.ai.runtime.operational_ai.model.gguf.prepare_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-gguf-probe":
+        from skeleton.ai.runtime.operational_ai.model.gguf.probe_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-gguf-endurance":
+        from skeleton.ai.runtime.operational_ai.model.qualification.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-native-candidate":
+        from skeleton.ai.runtime.operational_ai.native_candidate.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-native-genesis":
+        from skeleton.ai.runtime.operational_ai.native_genesis.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-native-qualification":
+        from skeleton.ai.runtime.operational_ai.native_qualification.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-native-supervised":
+        from skeleton.ai.runtime.operational_ai.native_supervised.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-grounded-turn":
+        from skeleton.ai.runtime.operational_ai.offline_cognition.grounded_cli import run as recovered_main
         return recovered_main(rest)
     if cmd == "app":
         from skeleton.app.cli import run_app_cli
