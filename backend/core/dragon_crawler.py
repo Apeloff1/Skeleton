@@ -351,8 +351,21 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
         self.limits = database["dragon_crawler_commands"]
         # Pin the coordination handle for this instance. Session and command
         # storage may later move, but that must not mint a second stripe pool.
-        self._coordination_limits = (self.limits if coordination_database is None
-                                     else coordination_database["dragon_crawler_commands"])
+        shared_commands = (self.limits if coordination_database is None
+                           else coordination_database["dragon_crawler_commands"])
+        from motor.motor_asyncio import AsyncIOMotorCollection
+        from pymongo import ReadPreference
+        from pymongo.read_concern import ReadConcern
+        from pymongo.write_concern import WriteConcern
+        # Majority durable claims and primary reads are required for the
+        # real Motor store, even when the application uses weaker defaults.
+        self._coordination_limits = (
+            shared_commands.with_options(
+                read_preference=ReadPreference.PRIMARY,
+                read_concern=ReadConcern("majority"),
+                write_concern=WriteConcern(w="majority", j=True, wtimeout=10000),
+            ) if isinstance(shared_commands, AsyncIOMotorCollection) else shared_commands
+        )
         try:
             self.engine = EngineClient.from_env()
         except EngineClientError:
