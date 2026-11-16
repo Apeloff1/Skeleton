@@ -212,7 +212,8 @@ class WeightShardStore:
         finally:
             tmp.unlink(missing_ok=True)
 
-    def _ingest(self, shard: WeightShard, source: str | Path) -> Path:
+    def _ingest(self, shard: WeightShard, source: str | Path, *,
+                reserve_write: Callable[[int], None] | None = None) -> Path:
         path = Path(source)
         if path.is_symlink() or not path.is_file():
             raise WeightShardStoreError("weight shard input must be a regular non-symlink file")
@@ -228,6 +229,10 @@ class WeightShardStore:
                 raise WeightShardStoreError("existing weight object failed content identity")
             return target
 
+        # Charge the actual write path, not merely the earlier existence
+        # observation. A vanished object cannot bypass a zero-byte cap.
+        if reserve_write is not None:
+            reserve_write(shard.bytes)
         tmp = target.with_name("." + target.name + "." + uuid4().hex + ".tmp")
         try:
             digest = sha256()
@@ -270,6 +275,7 @@ class WeightShardStore:
         source_paths: Mapping[int, str | Path],
         *,
         maximum_new_bytes: int | None = None,
+        _write_checkpoint: Callable[[int], None] | None = None,
     ) -> str:
         """Materialize physical bytes, with optional per-operation new-byte cap.
 
@@ -327,9 +333,23 @@ class WeightShardStore:
                 new_bytes += shard.bytes
                 if maximum_new_bytes is not None and new_bytes > maximum_new_bytes:
                     raise WeightShardStoreError("new weight bytes exceed operation budget")
+        if _write_checkpoint is not None and not callable(_write_checkpoint):
+            raise WeightShardStoreError("invalid trusted write checkpoint")
+        charged = 0
+
+        def reserve_write(size: int) -> None:
+            nonlocal charged
+            charged += size
+            if maximum_new_bytes is not None and charged > maximum_new_bytes:
+                raise WeightShardStoreError("actual new weight writes exceed operation budget")
+            if _write_checkpoint is not None:
+                _write_checkpoint(size)
+
         for shard in plan.shards:
-            self._ingest(shard, source_paths[shard.index])
+            self._ingest(shard, source_paths[shard.index], reserve_write=reserve_write)
         self.assert_layout()
+        if _write_checkpoint is not None:
+            _write_checkpoint(len(encoded) if not target_manifest.exists() else 0)
         self._write_once(target_manifest, encoded)
         self.assert_layout()
         return plan.digest
