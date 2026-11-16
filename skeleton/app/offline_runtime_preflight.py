@@ -122,6 +122,7 @@ class ModelSource:
     manifest_bytes: int | None = None
     managed_policy_sha256: str | None = None
     scrub_observation_digest: str | None = None
+    scrub_campaign_digest: str | None = None
 
     def __post_init__(self) -> None:
         for key in ("plan_digest", "model_identity_digest", "inventory_digest"):
@@ -137,9 +138,12 @@ class ModelSource:
             integer(self.manifest_bytes, 1, 16 * MIB, "selected manifest bytes")
         if self.managed_policy_sha256 is not None:
             identity(self.managed_policy_sha256, "managed policy SHA")
+        require((self.scrub_observation_digest is None) == (self.scrub_campaign_digest is None),
+                "incomplete scrub evidence")
         if self.scrub_observation_digest is not None:
             require(self.managed_policy_sha256 is not None, "scrub evidence requires managed source")
             identity(self.scrub_observation_digest, "scrub observation digest")
+            identity(self.scrub_campaign_digest, "scrub campaign digest")
         require(type(self.headers) is tuple and len(self.headers) in (0, len(self.plan.shards)),
                 "incomplete GGUF framing set")
         for shard, header in zip(self.plan.shards, self.headers):
@@ -161,6 +165,7 @@ class ModelSource:
                 "manifest_sha256": self.manifest_sha256, "manifest_bytes": self.manifest_bytes,
                 "managed_policy_sha256": self.managed_policy_sha256,
                 "scrub_observation_digest": self.scrub_observation_digest,
+                "scrub_campaign_digest": self.scrub_campaign_digest,
                 "tensor_validation": "not_assessed", "activation": "not_performed"}
 
 
@@ -178,12 +183,14 @@ def inspect_source(root: Path, *, plan_digest: str, model_identity_digest: str,
             observed_scrub = require_completed_weight_scrub(owner, campaign_digest=policy.required_scrub_digest)
         return _inspect_bound_source(store, plan_digest, model_identity_digest, policy,
                                      owner._policy_sha256 if owner is not None else None,
-                                     observed_scrub["digest"] if observed_scrub is not None else None)
+                                     observed_scrub["digest"] if observed_scrub is not None else None,
+                                     policy.required_scrub_digest)
 
 
 def _inspect_bound_source(store: WeightShardStore, plan_digest: str, model_identity_digest: str,
                           policy: RuntimePolicy, managed_policy_sha256: str | None,
-                          scrub_observation_digest: str | None) -> ModelSource:
+                          scrub_observation_digest: str | None,
+                          scrub_campaign_digest: str | None) -> ModelSource:
     inventory = inventory_offline_weights(store.root, max_entries=policy.maximum_inventory_entries,
                                           max_weight_bytes=policy.maximum_source_bytes)
     matches = [row for row in inventory["models"] if row["plan_digest"] == plan_digest]
@@ -209,7 +216,8 @@ def _inspect_bound_source(store: WeightShardStore, plan_digest: str, model_ident
     require(final_sha == manifest_sha and final_size == manifest_bytes,
             "selected manifest identity changed during inspection")
     return ModelSource(plan_digest, model_identity_digest, inventory["digest"], plan, headers,
-                       manifest_sha, manifest_bytes, managed_policy_sha256, scrub_observation_digest)
+                       manifest_sha, manifest_bytes, managed_policy_sha256, scrub_observation_digest,
+                       scrub_campaign_digest)
 
 
 @dataclass(frozen=True, slots=True)
@@ -339,6 +347,9 @@ def plan_preflight(source: ModelSource, sample: HardwareSample, policy: RuntimeP
     fresh = 0 <= age <= policy.sample_age_ns and sample.finished_ns <= now_ns
     require(source.plan.expected_total_bytes <= policy.maximum_source_bytes, "source exceeds policy")
     require(not policy.verify_gguf_headers or bool(source.headers), "GGUF framing required")
+    require(policy.required_scrub_digest is None or (
+        source.scrub_campaign_digest == policy.required_scrub_digest and source.scrub_observation_digest is not None
+    ), "source lacks required scrub evidence")
     placements, devices, placement_status = _placement(source, sample, policy)
     host_weights = sum(row["bytes"] for row in placements if row["device_id"] == "host-cpu")
     # Host worker budget must not double-count memory assigned to CPU weights.
