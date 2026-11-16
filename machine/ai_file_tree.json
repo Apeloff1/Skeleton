@@ -342,7 +342,7 @@
       "source": "skeleton/retrieval",
       "destination": "skeleton/ai/runtime/retrieval",
       "kind": "tree",
-      "source_git_object_sha": "e5aeee4da75674d2d8cba930a4786e87b65175b4",
+      "source_git_object_sha": "83621e090e8105bb91006f2cf7c2ed6e48e523f9",
       "role": "retrieval and grounding",
       "work_package_refs": [
         "WP-W08",

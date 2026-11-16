@@ -637,6 +637,31 @@ class OfflineKnowledgeLibrary:
             except (ValueError,MemoryError,OSError) as exc:
                 raise RuntimeContractError("bounded disk semantic retrieval failed") from exc
 
+    def search_multihop(self,query,*,document_ids=None,limit=3,policy=None,interrupt=None):
+        from dataclasses import replace
+        from .offline_grounding import normalized_document_scope
+        from skeleton.retrieval.evidence_walk import walk,EvidenceWalkPolicy
+        selected=normalized_document_scope(document_ids)
+        if self._semantic_ranker is None:
+            raise RuntimeContractError("multi-hop requires explicitly configured learned retrieval")
+        if type(limit) is not int or not 1<=limit<=3:raise RuntimeContractError("invalid multi-hop result limit")
+        policy=replace(policy or EvidenceWalkPolicy(),max_evidence=limit)
+        ranker=self._semantic_ranker
+        with self.store._lock:
+            before=self.semantic_source_snapshot()
+            def retrieve(text,count):
+                return self.search(text,limit=count,document_ids=selected,evidence_excerpt=True)
+            try:
+                hits,proof=walk(query,retrieve,policy=policy,
+                    embed=lambda text:ranker.encoder.query(text).dense,
+                    dimension=ranker.encoder.policy.dimension,interrupt=interrupt)
+            except RuntimeContractError:raise
+            except (ValueError,MemoryError,OSError) as exc:
+                raise RuntimeContractError("bounded multi-hop retrieval failed") from exc
+            if self.semantic_source_snapshot()!=before:
+                raise RuntimeContractError("multi-hop source authority changed before delivery")
+            return hits,proof
+
 
 __all__ = [
     "OfflineKnowledgeLibrary", "LocalKnowledgeHit", "read_reference_file",
