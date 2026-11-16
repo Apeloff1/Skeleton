@@ -89,6 +89,8 @@ on:
       - "tests/test_jeeves_live_local_advanced.py"
       - "tests/test_jeeves_context_window.py"
       - "skeleton/app/jeeves_cognitive.py"
+      - "skeleton/app/jeeves_reviewed_memory.py"
+      - "skeleton/app/jeeves_deliberation.py"
       - "scripts/evaluate_jeeves_calibration.py"
       - "tests/test_jeeves_document_scope.py"
       - "skeleton/app/offline_knowledge.py"
