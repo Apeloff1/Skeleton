@@ -78,3 +78,66 @@ def test_invalid_memory_budgets_fail_closed(tmp_path: Path) -> None:
         with pytest.raises(SealedWeightPagesError):
             with open_sealed_weight_pages(store, digest, model_identity=identity, max_bytes=budget):
                 pytest.fail("invalid budget admitted")
+
+
+@linux_sealing
+def test_progress_checks_refuse_partial_copy_before_publication(tmp_path, monkeypatch):
+    from skeleton.ai.model_runtime import sealed_weight_pages as owner
+
+    monkeypatch.setattr(owner, "_PROGRESS_QUANTUM", 8)
+    monkeypatch.setattr(owner, "_CHUNK", 4)
+    store, identity, digest = _stage(tmp_path, (b"a" * 12, b"b" * 8))
+    checks = []
+    created = []
+    original = owner.os.memfd_create
+
+    def capture(*args, **kwargs):
+        fd = original(*args, **kwargs)
+        created.append(fd)
+        return fd
+
+    def check(copied, total):
+        checks.append((copied, total))
+        if copied:
+            raise RuntimeError("pressure became critical")
+
+    monkeypatch.setattr(owner.os, "memfd_create", capture)
+    with pytest.raises(RuntimeError, match="pressure"):
+        with store.open_sealed_pages(digest, model_identity=identity, max_bytes=32,
+                                     progress_check=check):
+            pytest.fail("incomplete copy published")
+    assert checks == [(0, 20), (8, 20)]
+    assert created
+    for fd in created:
+        with pytest.raises(OSError):
+            os.fstat(fd)
+
+
+@linux_sealing
+def test_progress_covers_all_shards_and_final_exact_bytes(tmp_path, monkeypatch):
+    from skeleton.ai.model_runtime import sealed_weight_pages as owner
+    monkeypatch.setattr(owner, "_PROGRESS_QUANTUM", 8)
+    monkeypatch.setattr(owner, "_CHUNK", 4)
+    store, identity, digest = _stage(tmp_path, (b"a" * 12, b"b" * 8))
+    checks = []
+    with store.open_sealed_pages(digest, model_identity=identity, max_bytes=32,
+                                 progress_check=lambda copied, total: checks.append((copied, total))) as pages:
+        assert tuple(bytes(page) for page in pages) == (b"a" * 12, b"b" * 8)
+        assert checks == [(0, 20), (8, 20), (16, 20), (20, 20)]
+
+
+@linux_sealing
+def test_outstanding_memoryview_does_not_skip_other_page_cleanup(tmp_path):
+    store, identity, digest = _stage(tmp_path, (b"first", b"second"))
+    view = None
+    try:
+        with pytest.raises(SealedWeightPagesError, match="cleanup remains incomplete"):
+            with store.open_sealed_pages(digest, model_identity=identity, max_bytes=32) as pages:
+                view = memoryview(pages[1])
+        assert pages[0].closed
+        assert not pages[1].closed
+        assert bytes(view) == b"second"
+    finally:
+        if view is not None:
+            view.release()
+            pages[1].close()
