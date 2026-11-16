@@ -101,6 +101,12 @@ jobs:
           node scripts/patch-node-modules.js
           node scripts/patch-node-modules.js
           node scripts/verify-no-release-npm-security.js
+      - name: Verify frozen RSA tarball against independently reviewed source
+        working-directory: frontend
+        run: node scripts/verify-node-forge-frozen-archive.cjs
+      - name: Qualify no-write install hook and reviewed RSA source
+        working-directory: frontend
+        run: node --test scripts/test-node-forge-rsa-custody.cjs scripts/test-node-forge-digest-info-patch.cjs
       - name: Run all named focused Galaxy and Jeeves frontend tests
         working-directory: frontend
         run: >-
