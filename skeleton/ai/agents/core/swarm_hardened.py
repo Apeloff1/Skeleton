@@ -115,6 +115,16 @@ class HardenedSwarmRuntime(SwarmRuntime):
                 capacity=capacity,
             )
 
+    def worker_lineage(self, worker_id: str) -> tuple[str, ...]:
+        with self._lock:
+            return super().worker_lineage(worker_id)
+
+    def register_virtual_worker(self, worker_id: str, parent_id: str, *,
+                                capabilities: Iterable[str], capacity: int = 1) -> WorkerState:
+        with self._lock:
+            return super().register_virtual_worker(worker_id, parent_id,
+                                                   capabilities=capabilities, capacity=capacity)
+
     def heartbeat(self, worker_id: str) -> WorkerState:
         with self._lock:
             return super().heartbeat(worker_id.strip())

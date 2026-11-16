@@ -1053,3 +1053,63 @@ def test_pressure_forecast_hysteresis_and_generation():
     assert forecast_pressure(flat,generation=1,horizon_ms=1).state == "normal"
     with pytest.raises(DispatchPolicyError):
         forecast_pressure(rows,generation=2,horizon_ms=1)
+
+def test_virtual_workers_partition_physical_slots_and_restore_lineage():
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, AdmissionError, LeaseError
+    from skeleton.automation.agents.swarm_exact_lease import lease_exact
+    from skeleton.automation.agents.swarm_invariants import audit
+    runtime = HardenedSwarmRuntime(fenced=True, clock=lambda: 10.0)
+    runtime.register_worker("root", capabilities={"code","verify"}, capacity=4)
+    runtime.register_virtual_worker("child","root",capabilities={"code"},capacity=3)
+    runtime.register_virtual_worker("leaf","child",capabilities={"code"},capacity=2)
+    assert runtime.snapshot().available_slots == 4
+    assert runtime.worker_lineage("leaf") == ("leaf","child","root")
+    with pytest.raises(AdmissionError):
+        runtime.register_virtual_worker("over","root",capabilities={"code"},capacity=2)
+    with pytest.raises(AdmissionError):
+        runtime.register_virtual_worker("wrong","child",capabilities={"verify"},capacity=1)
+    runtime.submit(SwarmTask("a", {}, required_capabilities=frozenset({"code"})))
+    lease = lease_exact(runtime,"leaf","a")
+    assert runtime.snapshot().available_slots == 3 and audit(runtime).ok
+    with pytest.raises(LeaseError):
+        runtime.unregister_worker("root")
+    restored = HardenedSwarmRuntime.from_state(runtime.export_state(),clock=lambda: 1.0)
+    assert restored.snapshot().available_slots == 3 and audit(restored).ok
+    assert restored.task("a").effect_uncertain
+    restored.reconcile_uncertain("a",lease_token=lease.lease_token,outcome="committed",evidence_sha256="a"*64)
+    restored.unregister_worker("leaf")
+    assert restored.worker("child").available == 3
+    restored.unregister_worker("child")
+    assert restored.worker("root").available == 4
+
+
+def test_virtual_worker_quarantine_inherits_parent_boundary():
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from skeleton.automation.agents.swarm_runtime import SwarmTask
+    from skeleton.automation.agents.swarm_supervisor import SwarmSupervisor
+    runtime = HardenedSwarmRuntime(fenced=True)
+    runtime.register_worker("root",capabilities={"code"},capacity=2)
+    runtime.register_virtual_worker("child","root",capabilities={"code"},capacity=2)
+    task=runtime.submit(SwarmTask("a",{},required_capabilities=frozenset({"code"})))
+    supervisor=SwarmSupervisor()
+    assert supervisor.dispatch(runtime,task).worker_id=="child"
+    supervisor.quarantine_worker("root",reason="host unhealthy")
+    assert not supervisor.dispatch(runtime,task).accepted
+
+
+def test_virtual_worker_restore_rejects_forged_capacity_and_cycles():
+    from skeleton.automation.agents.swarm_hardened import HardenedSwarmRuntime
+    from copy import deepcopy
+    runtime=HardenedSwarmRuntime(fenced=True)
+    runtime.register_worker("root",capabilities={"code"},capacity=2)
+    runtime.register_virtual_worker("child","root",capabilities={"code"},capacity=2)
+    state=runtime.export_state()
+    over=deepcopy(state)
+    next(w for w in over["workers"] if w["id"]=="child")["capacity"]=3
+    with pytest.raises(ValueError):
+        HardenedSwarmRuntime.from_state(over)
+    cycle=deepcopy(state)
+    next(w for w in cycle["workers"] if w["id"]=="root")["parent_id"]="child"
+    with pytest.raises(ValueError):
+        HardenedSwarmRuntime.from_state(cycle)

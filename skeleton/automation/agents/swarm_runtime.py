@@ -66,10 +66,12 @@ class WorkerState:
     renewals: int = 0
     heartbeats: int = 0
     last_seen: float = field(default_factory=monotonic)
+    parent_id: str | None = None
+    delegated_capacity: int = 0
 
     @property
     def available(self) -> int:
-        return max(0, self.capacity - len(self.active))
+        return max(0, self.capacity - self.delegated_capacity - len(self.active))
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,6 +142,50 @@ class SwarmRuntime:
         self._event("worker.registered", worker_id)
         return state
 
+    def worker_lineage(self, worker_id: str) -> tuple[str, ...]:
+        """Return worker-to-root identities, never a transport credential."""
+        result: list[str] = []
+        current: str | None = worker_id
+        while current is not None:
+            if current in result or len(result) >= 9:
+                raise LeaseError("invalid worker hierarchy")
+            worker = self._workers.get(current)
+            if worker is None:
+                raise LeaseError("missing worker hierarchy owner")
+            result.append(current)
+            current = worker.parent_id
+        return tuple(result)
+
+    def register_virtual_worker(self, worker_id: str, parent_id: str, *,
+                                capabilities: Iterable[str], capacity: int = 1) -> WorkerState:
+        """Partition real logical capacity; a virtual child creates no new slots.
+
+        Only the existing trusted owner may register workers. Child capability
+        declarations may narrow but never enlarge their parent's authority.
+        This is logical capacity partitioning, not physical worker discovery.
+        """
+        if not self.fenced:
+            raise AdmissionError("virtual workers require fenced execution mode")
+        if type(worker_id) is not str or not worker_id or worker_id != worker_id.strip():
+            raise AdmissionError("invalid virtual worker identity")
+        if type(parent_id) is not str or parent_id != parent_id.strip():
+            raise AdmissionError("invalid parent identity")
+        if worker_id in self._workers or type(capacity) is not int or capacity < 1:
+            raise AdmissionError("duplicate virtual worker or invalid capacity")
+        parent = self._workers.get(parent_id)
+        if parent is None or capacity > parent.available or len(self.worker_lineage(parent_id)) >= 9:
+            raise AdmissionError("parent capacity or depth exhausted")
+        if isinstance(capabilities, (str, bytes)):
+            raise AdmissionError("invalid child capability set")
+        declared = frozenset(capabilities)
+        if not declared <= parent.capabilities:
+            raise AdmissionError("child capability escalation")
+        # register_worker is the existing hardened max-worker admission point.
+        child = self.register_worker(worker_id, capabilities=declared, capacity=capacity)
+        child.parent_id = parent_id
+        parent.delegated_capacity += capacity
+        return child
+
     def heartbeat(self, worker_id: str) -> WorkerState:
         worker = self._workers.get(worker_id)
         if worker is None:
@@ -152,8 +198,15 @@ class SwarmRuntime:
 
     def unregister_worker(self, worker_id: str, *, requeue: bool = True) -> int:
         worker = self._workers.get(worker_id)
+        if worker is not None and worker.delegated_capacity:
+            raise LeaseError("remove virtual descendants before their parent")
         if self.fenced and worker is not None and worker.active:
             raise LeaseError("active or uncertain work must be reconciled before worker removal")
+        if worker is not None and worker.parent_id is not None:
+            parent = self._workers.get(worker.parent_id)
+            if parent is None or parent.delegated_capacity < worker.capacity:
+                raise LeaseError("invalid virtual capacity custody")
+            parent.delegated_capacity -= worker.capacity
         worker = self._workers.pop(worker_id, None)
         if worker is None:
             return 0
@@ -621,10 +674,27 @@ class SwarmRuntime:
                     renewals=int(raw.get("renewals", 0)),
                     heartbeats=int(raw.get("heartbeats", 0)),
                     last_seen=float(raw.get("last_seen", clock())),
+                    parent_id=raw.get("parent_id"),
+                    delegated_capacity=0,
                 )
                 if worker.id in runtime._workers:
                     raise ValueError("duplicate checkpoint worker")
                 runtime._workers[worker.id] = worker
+        for worker in runtime._workers.values():
+            if worker.parent_id is not None:
+                if not fenced or type(worker.parent_id) is not str:
+                    raise ValueError("virtual worker requires fenced custody")
+                parent = runtime._workers.get(worker.parent_id)
+                if parent is None or not worker.capabilities <= parent.capabilities:
+                    raise ValueError("invalid virtual worker parent or capability")
+                parent.delegated_capacity += worker.capacity
+                try:
+                    runtime.worker_lineage(worker.id)
+                except LeaseError as exc:
+                    raise ValueError("invalid worker hierarchy") from exc
+        for worker in runtime._workers.values():
+            if worker.capacity < 1 or worker.delegated_capacity + len(worker.active) > worker.capacity:
+                raise ValueError("virtual worker capacity exceeded")
         from graphlib import TopologicalSorter, CycleError
         all_tasks = runtime._tasks
         for task in all_tasks.values():
@@ -741,4 +811,5 @@ class SwarmRuntime:
             "renewals": worker.renewals,
             "heartbeats": worker.heartbeats,
             "last_seen": worker.last_seen,
+            "parent_id": worker.parent_id,
         }

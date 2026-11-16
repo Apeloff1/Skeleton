@@ -199,6 +199,32 @@ def validate_restore_state(state: Mapping[str, object]) -> dict[str, object]:
         clean_workers.append(record)
         active_by_worker[worker_id] = active
 
+    # Restore the delegation tree before validating slot occupancy. The
+    # serialized parent relation is authoritative; never trust a claimed
+    # delegated total or allow descendants to mint physical capacity.
+    worker_map = {row["id"]: row for row in clean_workers}
+    delegated = {key: 0 for key in worker_map}
+    for key, row in worker_map.items():
+        parent = row.get("parent_id")
+        if parent is None:
+            continue
+        if not fenced or type(parent) is not str or parent not in worker_map or parent == key:
+            raise ValueError("invalid restored virtual parent")
+        if not set(row["capabilities"]) <= set(worker_map[parent]["capabilities"]):
+            raise ValueError("restored virtual capability escalation")
+        delegated[parent] += row["capacity"]
+        seen = {key}
+        cursor = parent
+        while cursor is not None:
+            if cursor in seen or cursor not in worker_map or len(seen) >= 9:
+                raise ValueError("restored virtual worker cycle or depth")
+            seen.add(cursor)
+            cursor = worker_map[cursor].get("parent_id")
+    for key, row in worker_map.items():
+        if delegated[key] + len(active_by_worker[key]) > row["capacity"]:
+            raise ValueError("restored virtual delegation over capacity")
+        row.pop("delegated_capacity", None)
+
     missing_workers = sorted({owner for owner in leased.values() if owner not in worker_ids})
     if missing_workers:
         raise ValueError(f"leased task references missing worker: {missing_workers[0]}")

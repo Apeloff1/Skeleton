@@ -40,6 +40,7 @@ def lease_exact(runtime: SwarmRuntime, worker_id: str, task_id: str) -> SwarmTas
             raise LeaseError(f"unknown worker: {worker_id}")
         if worker.available <= 0:
             raise LeaseError(f"worker has no available capacity: {worker_id}")
+        runtime.worker_lineage(worker_id)
         task = runtime._tasks.get(task_id)
         if task is None or task.state is not TaskState.QUEUED:
             raise LeaseError(f"task is not queued: {task_id}")

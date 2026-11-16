@@ -54,8 +54,24 @@ def audit(runtime: SwarmRuntime) -> InvariantReport:
             if task.lease_deadline is not None:
                 errors.append(f"non-leased task has deadline:{task.id}")
 
+    delegated = {worker.id: 0 for worker in workers}
     for worker in workers:
-        if len(worker.active) > worker.capacity:
+        if worker.parent_id is not None:
+            parent = worker_map.get(worker.parent_id)
+            if parent is None or not runtime.fenced:
+                errors.append(f"invalid virtual parent:{worker.id}")
+            else:
+                delegated[parent.id] += worker.capacity
+                if not worker.capabilities <= parent.capabilities:
+                    errors.append(f"virtual capability escalation:{worker.id}")
+                try:
+                    runtime.worker_lineage(worker.id)
+                except Exception:
+                    errors.append(f"invalid virtual lineage:{worker.id}")
+    for worker in workers:
+        if worker.delegated_capacity != delegated[worker.id]:
+            errors.append(f"virtual capacity accounting mismatch:{worker.id}")
+        if len(worker.active) + delegated[worker.id] > worker.capacity:
             errors.append(f"worker over capacity:{worker.id}")
         for task_id in worker.active:
             task = task_map.get(task_id)

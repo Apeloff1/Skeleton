@@ -112,7 +112,7 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 69 | Semantic deduplication | P |
 | 70 | Cross-domain lending | P |
 | 71 | Scheduler portfolios | P |
-| 72 | Virtual workers | Open |
+| 72 | Virtual workers | P |
 
 ## Wave 2: advisory routing and counterfactual evaluation
 
@@ -398,3 +398,16 @@ throttling, speculative-work cancellation and owner-verified idle eviction.
 New partial targets: 34, 38, 42, 43, 57. No physical memory migration,
 GPU peer transfers, calibrated failure predictor or actual cache action
 is yet demonstrated by these proposal functions.
+
+## Wave 16: hierarchical virtual workers in the existing swarm owner
+
+Fenced runtimes may register nested virtual worker partitions to a bounded
+depth. Each child consumes its parent's declared free logical capacity,
+so root and descendants cannot multiply admitted slots. Child capabilities
+are a subset of the parent, active or unresolved children retain capacity,
+parent removal fails until descendants are removed, and the supervisor
+applies ancestor quarantine. The canonical checkpoint validator reconstructs
+delegated capacity from exact parent relations and rejects cycles and
+over-allocation. Legacy unfenced mode does not admit virtual workers.
+Partial target 72. Physical worker processes, 100k+ fleet qualification,
+and authenticated transport remain explicitly unqualified.
