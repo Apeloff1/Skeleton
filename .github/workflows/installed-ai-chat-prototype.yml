@@ -31,6 +31,8 @@ on:
       - "skeleton/ai/runtime/inference/deployment.py"
       - "skeleton/ai/model_runtime/native_llm_runtime.py"
       - "skeleton/ai/runtime/inference/gguf_bundle.py"
+      - "skeleton/ai/runtime/inference/resident_gguf_batch.py"
+      - "tests/test_resident_gguf_batch.py"
       - "skeleton/cortex/torch_lm.py"
       - "skeleton/ai/runtime/cortex/torch_lm.py"
       - "tests/test_torch_physical_kv_fused_batch.py"
@@ -139,6 +141,7 @@ jobs:
           skeleton/testing/test_local_model_deployment.py
           tests/flgb/test_flgb_02_native_runtime.py
           tests/test_torch_physical_kv_fused_batch.py
+          tests/test_resident_gguf_batch.py
       - name: Set up Node 24
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
