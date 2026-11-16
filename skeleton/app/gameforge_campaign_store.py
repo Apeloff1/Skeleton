@@ -16,7 +16,7 @@ from typing import Any, Iterator
 from skeleton.app.gameforge_campaign import (
     append_actions, digest, play_campaign, verify_session,
 )
-from skeleton.app.original_quest_cli import _encode, _integer, _require
+from skeleton.app.original_quest_cli import _encode, _integer
 
 MAX_SLOTS = 128
 MAX_REVISIONS = 256
@@ -47,15 +47,27 @@ def _check(condition: bool, message: str) -> None:
 class CampaignStore:
     """Single private SQLite workspace, with independent request on every call."""
 
+    _namespace = "campaign"
+    _play = staticmethod(play_campaign)
+    _verify = staticmethod(verify_session)
+    _append = staticmethod(append_actions)
+
+    def _execute(self, sql: str, params: tuple = ()) -> sqlite3.Cursor:
+        # Only the two compile-time namespaces are allowed. Neither SQL
+        # identifiers nor statements can be selected by JSON input.
+        _check(self._namespace in {"campaign", "expedition"}, "unknown journal namespace")
+        return self.db.execute(sql.replace("gf_campaign_", "gf_" + self._namespace + "_"), params)
+
     def __init__(self, db: sqlite3.Connection, *, initialize: bool = True) -> None:
         _check(isinstance(db, sqlite3.Connection), "SQLite connection required")
         self.db = db
+        _check(self._namespace in {"campaign", "expedition"}, "unknown journal namespace")
         _check(not db.in_transaction, "store requires its own transaction boundary")
         db.execute("PRAGMA foreign_keys = ON")
         _check(db.execute("PRAGMA foreign_keys").fetchone()[0] == 1, "foreign keys unavailable")
         if not initialize:
-            names = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type=\'table\' AND name IN (?,?)", ("gf_campaign_slots_v1", "gf_campaign_revisions_v1"))}
-            _check(names == {"gf_campaign_slots_v1", "gf_campaign_revisions_v1"}, "campaign journal schema missing")
+            names = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type=\'table\' AND name IN (?,?)", ("gf_" + self._namespace + "_slots_v1", "gf_" + self._namespace + "_revisions_v1"))}
+            _check(names == {"gf_" + self._namespace + "_slots_v1", "gf_" + self._namespace + "_revisions_v1"}, "campaign journal schema missing")
             return
         with self._transaction():
             db.execute("""
@@ -82,7 +94,7 @@ class CampaignStore:
     @contextmanager
     def _transaction(self, *, write: bool = True) -> Iterator[None]:
         _check(not self.db.in_transaction, "nested store transaction forbidden")
-        self.db.execute("BEGIN IMMEDIATE" if write else "BEGIN")
+        self._execute("BEGIN IMMEDIATE" if write else "BEGIN")
         try:
             yield
             self.db.commit()
@@ -91,19 +103,19 @@ class CampaignStore:
             raise
 
     def _slot(self, slot: str, source: Any) -> int:
-        row = self.db.execute(
+        row = self._execute(
             "SELECT source_digest, head FROM gf_campaign_slots_v1 WHERE slot=?", (slot,)
         ).fetchone()
         _check(row is not None and row[0] == digest(source), "missing slot or independent source mismatch")
         head = _integer(row[1], 0, MAX_REVISIONS - 1)
-        count, maximum = self.db.execute(
+        count, maximum = self._execute(
             "SELECT COUNT(*), MAX(revision) FROM gf_campaign_revisions_v1 WHERE slot=?", (slot,)
         ).fetchone()
         _check(count == head + 1 and maximum == head, "slot head and journal disagree")
         return head
 
     def _row(self, slot: str, revision: int) -> tuple:
-        row = self.db.execute("""
+        row = self._execute("""
             SELECT revision, operation, request_digest, previous_digest, receipt_digest,
                    CASE WHEN length(receipt) <= 2097152 THEN receipt ELSE NULL END
             FROM gf_campaign_revisions_v1 WHERE slot=? AND revision=?
@@ -123,7 +135,7 @@ class CampaignStore:
         except (UnicodeError, ValueError, RecursionError) as exc:
             raise CampaignStoreError("stored receipt cannot be decoded") from exc
         _check(type(receipt) is dict and _encode(receipt) == raw and receipt.get("session_digest") == receipt_hash
-               and verify_session(source, receipt), "stored checkpoint replay mismatch")
+               and self._verify(source, receipt), "stored checkpoint replay mismatch")
         _check((revision == 0 and previous is None and receipt["actions"] == [])
                or (revision > 0 and type(previous) is str and len(previous) == 64),
                "invalid checkpoint lineage shape")
@@ -153,11 +165,11 @@ class CampaignStore:
         return result
 
     def _capacity(self, slot: str, raw: bytes) -> None:
-        slot_bytes = self.db.execute(
+        slot_bytes = self._execute(
             "SELECT COALESCE(SUM(length(receipt)),0) FROM gf_campaign_revisions_v1 WHERE slot=?",
             (slot,)
         ).fetchone()[0]
-        total = self.db.execute(
+        total = self._execute(
             "SELECT COALESCE(SUM(length(receipt)),0) FROM gf_campaign_revisions_v1"
         ).fetchone()[0]
         _check(slot_bytes + len(raw) <= MAX_SLOT_BYTES and total + len(raw) <= MAX_TOTAL_BYTES,
@@ -167,14 +179,14 @@ class CampaignStore:
                 previous: str | None, receipt: dict) -> None:
         raw = _encode(receipt)
         self._capacity(slot, raw)
-        self.db.execute("""
+        self._execute("""
             INSERT INTO gf_campaign_revisions_v1
             (slot, revision, operation, request_digest, previous_digest, receipt_digest, receipt)
             VALUES (?,?,?,?,?,?,?)
         """, (slot, revision, operation, request_hash, previous, receipt["session_digest"], raw))
 
     def _retry(self, slot: str, operation: str, request_hash: str, source: Any, head: int) -> dict | None:
-        prior = self.db.execute("""
+        prior = self._execute("""
             SELECT revision, request_digest FROM gf_campaign_revisions_v1
             WHERE slot=? AND operation=?
         """, (slot, operation)).fetchone()
@@ -190,7 +202,7 @@ class CampaignStore:
         source_hash = digest(source)
         request_hash = digest({"kind": "create", "source_digest": source_hash})
         with self._transaction():
-            exists = self.db.execute(
+            exists = self._execute(
                 "SELECT 1 FROM gf_campaign_slots_v1 WHERE slot=?", (slot,)
             ).fetchone()
             if exists:
@@ -199,10 +211,10 @@ class CampaignStore:
                 if replay is not None:
                     return replay
                 raise RevisionConflict("slot already exists")
-            count = self.db.execute("SELECT COUNT(*) FROM gf_campaign_slots_v1").fetchone()[0]
+            count = self._execute("SELECT COUNT(*) FROM gf_campaign_slots_v1").fetchone()[0]
             _check(count < MAX_SLOTS, "slot ceiling exceeded")
-            receipt = play_campaign(source, [])
-            self.db.execute(
+            receipt = self._play(source, [])
+            self._execute(
                 "INSERT INTO gf_campaign_slots_v1(slot,source_digest,head) VALUES(?,?,0)",
                 (slot, source_hash)
             )
@@ -225,9 +237,9 @@ class CampaignStore:
                 raise RevisionConflict("expected revision is not current")
             _check(head + 1 < MAX_REVISIONS, "revision ceiling exceeded")
             prior = self._verified(slot, source, head)["receipt"]
-            receipt = append_actions(source, prior, additional)
+            receipt = self._append(source, prior, additional)
             self._insert(slot, head + 1, operation, request_hash, prior["session_digest"], receipt)
-            updated = self.db.execute(
+            updated = self._execute(
                 "UPDATE gf_campaign_slots_v1 SET head=? WHERE slot=? AND head=?",
                 (head + 1, slot, head)
             )
@@ -259,16 +271,16 @@ class CampaignStore:
         with self._transaction():
             head = self._slot(parent, source)
             chosen = _integer(parent_revision, 0, head)
-            _check(self.db.execute("SELECT 1 FROM gf_campaign_slots_v1 WHERE slot=?", (child,)).fetchone()
+            _check(self._execute("SELECT 1 FROM gf_campaign_slots_v1 WHERE slot=?", (child,)).fetchone()
                    is None, "fork destination already exists")
-            _check(self.db.execute("SELECT COUNT(*) FROM gf_campaign_slots_v1").fetchone()[0] < MAX_SLOTS,
+            _check(self._execute("SELECT COUNT(*) FROM gf_campaign_slots_v1").fetchone()[0] < MAX_SLOTS,
                    "slot ceiling exceeded")
             selected = self._verified(parent, source, chosen)
             if selected["receipt"]["session_digest"] != expected_digest:
                 raise RevisionConflict("parent checkpoint digest mismatch")
             total = 0
             # Copy only the verified prefix, never the old branch's future.
-            self.db.execute(
+            self._execute(
                 "INSERT INTO gf_campaign_slots_v1(slot,source_digest,head) VALUES(?,?,?)",
                 (child, source_hash, chosen)
             )
@@ -291,7 +303,7 @@ class CampaignStore:
         slot = _identity(slot)
         with self._transaction(write=False):
             head = self._slot(slot, source)
-            rows = self.db.execute("""
+            rows = self._execute("""
                 SELECT revision, operation, request_digest, previous_digest, receipt_digest,
                        CASE WHEN length(receipt) <= 2097152 THEN receipt ELSE NULL END
                 FROM gf_campaign_revisions_v1 WHERE slot=? ORDER BY revision
