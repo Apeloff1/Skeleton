@@ -971,6 +971,7 @@ class LlamaCppModel:
         self._resource_lease_bound = False
         self._last_kv_observation: dict[str, Any] | None = None
         self._kv_by_execution_receipt: dict[str, dict[str, Any]] = {}
+        self._execution_receipt_frames: dict[str, dict[str, Any]] = {}
         self._processes_exited = 0
         self._termination_requests = 0
         if not _stat_matches(self._model):
@@ -1060,6 +1061,20 @@ class LlamaCppModel:
         with self._process_lock:
             observation = self._kv_by_execution_receipt.get(receipt_digest)
             return None if observation is None else dict(observation)
+
+    def execution_receipt_frame(self, receipt_digest: str) -> dict[str, Any] | None:
+        """Return the exact native receipt's non-content hash inputs.
+
+        The caller must provide the original typed result to reconstruct the
+        complete execution-receipt hash. Retain no additional prompt, stdout,
+        stderr or generated text in this bounded index. This is runtime-local
+        provenance, not a signature or a guarantee of answer correctness.
+        """
+        if not isinstance(receipt_digest, str) or not _HEX64.fullmatch(receipt_digest):
+            raise LlamaCppRuntimeError("invalid native execution receipt identity")
+        with self._process_lock:
+            frame = self._execution_receipt_frames.get(receipt_digest)
+            return None if frame is None else json.loads(_stable_json(frame))
 
     def install_prelaunch_resource_guard(self, guard: Callable[[], None]) -> None:
         """Install one trusted resource-preflight callback before inference.
@@ -1984,6 +1999,16 @@ class LlamaCppModel:
             response_id = (
                 "local:llama:" + self.runtime_digest + ":" + self.model_digest + ":" + response_digest
             )
+            receipt_frame = {
+                "schema": "skeleton.llama-cpp.execution-receipt.v1",
+                "raw_stdout_digest": hashlib.sha256(stdout_bytes).hexdigest(),
+                "output_framing": self.config.output_framing,
+                "kv_cache_location_requested": self.config.kv_cache_location,
+                "native_kv_observation": kv_observation,
+                "request": request.digest,
+                "execution_profile": execution_profile,
+                "response_id": response_id,
+            }
             result = LocalInferenceResult(
                 text=text,
                 model_id=self.model_id,
@@ -1992,31 +2017,22 @@ class LlamaCppModel:
                 output_tokens=output_estimate,
                 finish_reason=finish_reason,
                 response_id=response_id,
-                execution_receipt_digest=_digest(
-                    {
-                        "schema": "skeleton.llama-cpp.execution-receipt.v1",
-                        "raw_stdout_digest": hashlib.sha256(stdout_bytes).hexdigest(),
-                        "output_framing": self.config.output_framing,
-                        "kv_cache_location_requested": self.config.kv_cache_location,
-                        "native_kv_observation": kv_observation,
-                        "request": request.digest,
-                        "execution_profile": execution_profile,
-                        "response_id": response_id,
-                        "text": text,
-                        "tool_calls": [
-                            {
-                                "call_id": call.call_id,
-                                "tool_id": call.tool_id,
-                                "arguments": dict(call.arguments),
-                            }
-                            for call in tool_calls
-                        ],
-                        "structured_output": structured,
-                        "finish_reason": finish_reason,
-                        "input_tokens_estimate": input_estimate,
-                        "output_tokens_estimate": output_estimate,
-                    }
-                ),
+                execution_receipt_digest=_digest({
+                    **receipt_frame,
+                    "text": text,
+                    "tool_calls": [
+                        {
+                            "call_id": call.call_id,
+                            "tool_id": call.tool_id,
+                            "arguments": dict(call.arguments),
+                        }
+                        for call in tool_calls
+                    ],
+                    "structured_output": structured,
+                    "finish_reason": finish_reason,
+                    "input_tokens_estimate": input_estimate,
+                    "output_tokens_estimate": output_estimate,
+                }),
                 usage_source="local_model_estimate",
                 tool_calls=tool_calls,
                 structured_output=structured,
@@ -2029,10 +2045,15 @@ class LlamaCppModel:
                 self._kv_by_execution_receipt[
                     result.execution_receipt_digest
                 ] = dict(kv_observation)
+                self._execution_receipt_frames[result.execution_receipt_digest] = json.loads(
+                    _stable_json(receipt_frame)
+                )
                 while len(self._kv_by_execution_receipt) > 64:
                     self._kv_by_execution_receipt.pop(
                         next(iter(self._kv_by_execution_receipt))
                     )
+                while len(self._execution_receipt_frames) > 64:
+                    self._execution_receipt_frames.pop(next(iter(self._execution_receipt_frames)))
             return result
 
 
