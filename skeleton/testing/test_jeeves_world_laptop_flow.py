@@ -422,24 +422,28 @@ def test_laptop_diagnostic_distinguishes_unavailable_custody_at_each_stage(
     """Read-only diagnostics never prescribe source repair for lease permissions."""
     flow, _, _, _ = ready(tmp_path)
     flow.create_session("lighthouse", "player")
-    original = LaptopFlow._lock
+    import errno
+    import os
+    original = os.open
     calls = 0
 
-    def intermittent_lease(fd, world_id):
+    def intermittent_lease(path, flags, *args, **kwargs):
         nonlocal calls
-        calls += 1
-        if calls == failure_stage:
-            raise CanonError("lease_unavailable")
-        return original(fd, world_id)
+        # SessionStore and LaptopFlow acquire the same world lease through
+        # independent methods. Inject at the real exclusive open boundary.
+        if path == "lighthouse.lock" and flags & os.O_EXCL:
+            calls += 1
+            if calls == failure_stage:
+                raise PermissionError(errno.EACCES, "lease unavailable")
+        return original(path, flags, *args, **kwargs)
 
-    monkeypatch.setattr(LaptopFlow, "_lock", staticmethod(intermittent_lease))
+    monkeypatch.setattr(os, "open", intermittent_lease)
     report = flow.diagnose("lighthouse", "player")
     assert report["next_action"] == (
         "inspect_custody_permissions_without_removing_foreign_locks")
-    assert any(
-        stage.get("error") == "lease_unavailable"
-        for stage in report["checks"].values()
-    )
+    expected_stage = ("source", "builder", "session", "acceptance")[failure_stage - 1]
+    assert calls == failure_stage
+    assert report["checks"][expected_stage] == {"ok": False, "error": "lease_unavailable"}
     assert not (tmp_path / "lighthouse.lock").exists()
 
 

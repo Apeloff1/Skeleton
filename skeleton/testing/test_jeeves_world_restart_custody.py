@@ -271,3 +271,34 @@ def test_session_lease_failure_does_not_delete_another_writers_lock(tmp_path, mo
     assert exc.value.code == "lease_unavailable"
     assert lock.read_bytes() == b"foreign-writer-lease"
     assert not (tmp_path / "lighthouse.blocked.session.json").exists()
+
+
+def test_canonical_world_publish_and_compile_permission_denials_preserve_foreign_lock(tmp_path, monkeypatch):
+    """The lowest-level authoring API shares the same typed custody boundary."""
+    import errno
+    import os
+    from skeleton.jeeves.worlds.world_canon import WorldStore, digest
+
+    _compiled(tmp_path)
+    store = WorldStore(tmp_path)
+    world = store.read("lighthouse")
+    lock = tmp_path / "lighthouse.lock"
+    lock.write_bytes(b"foreign-writer")
+    source = tmp_path / "lighthouse.json"
+    before = source.read_bytes()
+    original = os.open
+
+    def denied(path, flags, *args, **kwargs):
+        if path == "lighthouse.lock" and flags & os.O_EXCL:
+            raise PermissionError(errno.EACCES, "lease unavailable")
+        return original(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", denied)
+    for operation in (
+        lambda: store.publish(world, expected_digest=digest(world)),
+        lambda: store.compile("lighthouse", digest(world)),
+    ):
+        with pytest.raises(CanonError, match="lease_unavailable"):
+            operation()
+        assert lock.read_bytes() == b"foreign-writer"
+        assert source.read_bytes() == before

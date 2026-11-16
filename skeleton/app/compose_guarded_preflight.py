@@ -220,6 +220,7 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
         value = hello.get(field)
         if value is not None and (type(value) is not str or not value
                                   or len(value) > 512 or not value.isascii()
+                                  or "\\" in value or "/" in value
                                   or any(ord(ch) < 33 or ord(ch) > 126 for ch in value)):
             return None
         values.append(value)
@@ -244,7 +245,7 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
         trusted: list[str] = []
         for host in hosts:
             if (type(host) is not str or not 1 <= len(host) <= 512
-                    or not host.isascii()
+                    or not host.isascii() or "\\" in host or "/" in host
                     or any(ord(ch) < 33 or ord(ch) > 126 for ch in host)
                     or host in seen_hosts):
                 return None
@@ -279,7 +280,8 @@ def _trusted_topology(hello: object) -> tuple[object, ...] | None:
             election = election.binary
         elif type(election) is not str or not election or len(election) > 128:
             return None
-        elif not election.isascii() or any(ord(ch) < 33 or ord(ch) > 126 for ch in election):
+        elif (not election.isascii() or "\\" in election
+              or any(ord(ch) < 33 or ord(ch) > 126 for ch in election)):
             return None
     values.append(election)
     version = hello.get("setVersion")

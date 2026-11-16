@@ -50,8 +50,10 @@ class ComposeTopologyCustodyTests(unittest.TestCase):
         for field, value in (
             ("me", []), ("primary", {}), ("electionId", []),
             ("setVersion", True), ("setVersion", -1),
-            ("me", "bad\\naddress"), ("primary", "x" * 513),
-            ("electionId", "bad\\nvalue"),
+            ("me", "bad\naddress"), ("primary", "x" * 513),
+            ("me", "bad\\naddress"), ("primary", "host/path"),
+            ("hosts", ["bad\\host"]), ("hosts", ["bad\nhost"]),
+            ("electionId", "bad\nvalue"), ("electionId", "bad\\nvalue"),
         ):
             with self.subTest(field=field, value=repr(value)):
                 self.assertIsNone(_trusted_topology({

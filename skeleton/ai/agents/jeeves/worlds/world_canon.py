@@ -26,6 +26,9 @@ MAX_CHOICES = 512
 MAX_FLAGS = 64
 MAX_STATES = 2048
 ID_RE = re.compile(r"^[a-z][a-z0-9_-]{0,47}$")
+# Capture capability identities, not mutable fault-injection wrappers. Every
+# actual operation still uses the live os function and stays descriptor-relative.
+_DIR_FD_PRIMITIVES = (os.open, os.mkdir, os.stat, os.rename, os.unlink)
 
 
 class CanonError(ValueError):
@@ -419,9 +422,9 @@ class WorldStore:
     than quietly falling back to symlink-following path operations.
     """
     def __init__(self, root: str | os.PathLike[str]) -> None:
-        if (not all(hasattr(os, attr) for attr in ("O_NOFOLLOW", "O_DIRECTORY"))
-                or os.open not in os.supports_dir_fd
-                or os.mkdir not in os.supports_dir_fd):
+        if (os.name != "posix"
+                or not all(hasattr(os, attr) for attr in ("O_NOFOLLOW", "O_DIRECTORY", "O_NONBLOCK", "supports_dir_fd"))
+                or not all(fn in os.supports_dir_fd for fn in _DIR_FD_PRIMITIVES)):
             raise CanonError("platform_not_supported")
         self.root = Path(os.path.abspath(root))
         # Create the requested root one directory descriptor at a time.
@@ -547,6 +550,8 @@ class WorldStore:
                                   os.O_NOFOLLOW, 0o600, dir_fd=fd)
             except FileExistsError:
                 raise CanonError("lease_busy") from None
+            except OSError as exc:
+                raise CanonError("lease_unavailable") from exc
             try:
                 os.close(lock_fd)
                 try:
@@ -586,6 +591,8 @@ class WorldStore:
                                   os.O_NOFOLLOW, 0o600, dir_fd=fd)
             except FileExistsError:
                 raise CanonError("lease_busy") from None
+            except OSError as exc:
+                raise CanonError("lease_unavailable") from exc
             try:
                 os.close(lock_fd)
                 if digest(strict_json(self._read(fd, world_id + ".json"))) != expected_digest:
