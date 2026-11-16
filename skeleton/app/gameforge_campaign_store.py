@@ -70,14 +70,14 @@ class CampaignStore:
             _check(names == {"gf_" + self._namespace + "_slots_v1", "gf_" + self._namespace + "_revisions_v1"}, "campaign journal schema missing")
             return
         with self._transaction():
-            db.execute("""
+            self._execute("""
                 CREATE TABLE IF NOT EXISTS gf_campaign_slots_v1 (
                     slot TEXT PRIMARY KEY,
                     source_digest TEXT NOT NULL,
                     head INTEGER NOT NULL CHECK(head >= 0)
                 )
             """)
-            db.execute("""
+            self._execute("""
                 CREATE TABLE IF NOT EXISTS gf_campaign_revisions_v1 (
                     slot TEXT NOT NULL REFERENCES gf_campaign_slots_v1(slot),
                     revision INTEGER NOT NULL CHECK(revision >= 0),
