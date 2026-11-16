@@ -2651,6 +2651,17 @@ class CrawlerPublisherIntakeRequest(CrawlerRequest):
     independent_resource_acknowledged: bool = Field(strict=True)
 
 
+class CrawlerRegistryConnectorRequest(CrawlerRequest):
+    target: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{0,63}$")
+    registry_revision: str = Field(pattern=r"^[a-f0-9]{64}$")
+    plan_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    idempotency_key: str = Field(min_length=1,max_length=128)
+    consent: bool = Field(strict=True)
+    rights_acknowledged: bool = Field(strict=True)
+    publisher_permission_acknowledged: bool = Field(strict=True)
+    independent_resource_acknowledged: bool = Field(strict=True)
+
+
 class CrawlerWriteRequest(CrawlerRequest):
     idempotency_key: str = Field(min_length=1, max_length=128)
     expected_version: int = Field(ge=1, strict=True)
@@ -2999,6 +3010,30 @@ async def crawler_publisher_intake(
 ) -> dict:
     return {"ok": True, "session": await _crawler_result(
         crawler_application.create_publisher_intake(scope, body.model_dump()))}
+
+
+@router.get("/crawler/registry-connectors/{target_id}")
+async def crawler_registry_connector_plan(
+    target_id: str = URLPath(pattern=r"^[a-z0-9][a-z0-9-]{0,63}$"),
+    revision: str = Query(pattern=r"^[a-f0-9]{64}$"),
+    scope: dict = Depends(_crawler_write_scope),
+) -> dict:
+    from core.dragon_registry_connector import plan_connector
+    try:
+        return plan_connector(target_id,revision)
+    except (ValueError,LookupError):
+        raise HTTPException(status_code=409,detail={"code":"crawler_connector_held",
+            "message":"Select a current reviewed registry connector."}) from None
+
+
+@router.post("/crawler/registry-connectors")
+async def crawler_registry_connector_queue(
+    body: CrawlerRegistryConnectorRequest,
+    scope: dict = Depends(_crawler_write_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    from core.dragon_registry_connector import queue_connector
+    return await _crawler_result(queue_connector(crawler_application,scope,body.model_dump(),principal=user))
 
 
 @router.get("/crawler/sessions")
