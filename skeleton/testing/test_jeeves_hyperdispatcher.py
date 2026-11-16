@@ -2546,3 +2546,34 @@ def test_extended_compute_refuses_malformed_or_oversized_before_start(tmp_path):
         with pytest.raises(DurableSwarmError):
             transport(HostDispatchAttempt("run", "a", "job", "w", f"{i:032x}", raw))
     assert custody.usage()["attempts"] == 0
+
+
+def test_managed_cancellation_propagates_dependencies_and_preserves_other_tenant(tmp_path):
+    from skeleton.automation.agents.swarm_durable import SwarmDurableBridge, DurableSwarmError
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.automation.agents.swarm_runtime import SwarmTask, TaskState
+    from skeleton.testing.test_durable_run_store import make_store
+    runtime, broker = _verified_dispatch_fixture()
+    store = make_store(tmp_path)
+    store.create_run("cancel")
+    store.claim_run("cancel", "owner", lease_seconds=60)
+    bridge = SwarmDurableBridge(store)
+    manager = SwarmRecoveryManager(delta_archive=True)
+    bridge.submit_unique_verified("cancel", "owner", manager, broker, "a",
+                                  SwarmTask("parent", {}))
+    bridge.submit_unique_verified("cancel", "owner", manager, broker, "a",
+                                  SwarmTask("child", {}, dependencies=("parent",)))
+    bridge.submit_unique_verified("cancel", "owner", manager, broker, "a",
+                                  SwarmTask("grandchild", {}, dependencies=("child",)))
+    with pytest.raises(DurableSwarmError, match="ownership"):
+        bridge.cancel_queued_and_capture("cancel", "owner", manager, broker, "b", "parent")
+    bridge.cancel_queued_and_capture("cancel", "owner", manager, broker, "a", "parent")
+    bridge.cancel_queued_and_capture("cancel", "owner", manager, broker, "a", "parent")
+    assert bridge.propagate_terminal_dependencies("cancel", "owner", manager, broker) == (
+        "child", "grandchild")
+    assert broker.ingress.phase("a", "child") is None
+    assert broker.ingress.phase("a", "grandchild") is None
+    restored = bridge.load("cancel").restore_runtime()
+    for identity in ("parent", "child", "grandchild"):
+        assert restored.task(identity).state is TaskState.CANCELLED
+    assert restored.task("b").state is TaskState.QUEUED

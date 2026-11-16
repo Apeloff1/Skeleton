@@ -707,7 +707,7 @@
       "source": "skeleton/automation/agents",
       "destination": "skeleton/ai/agents/core",
       "kind": "tree",
-      "source_git_object_sha": "7eef3d9bc7e164dd2a60b83ac5bab047d99a9c74",
+      "source_git_object_sha": "ed3a2f7c4ec33a48be5f2986f758344d26c5db98",
       "role": "canonical agent/swarm execution runtime under automation ownership",
       "work_package_refs": [
         "WP-W00",
@@ -766,7 +766,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "a26568a3b9bd5f38af353ddff309ab2f669c90bc",
+      "source_git_object_sha": "6f41c421b4cd060fff03135350929816978875df",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -2352,7 +2352,7 @@
       "source": "skeleton/state",
       "destination": "skeleton/ai/runtime/state",
       "kind": "tree",
-      "source_git_object_sha": "50f2e5ab3ff89f3526a6730793ff78f5a94d7feb",
+      "source_git_object_sha": "19da73d20b48a2dffde1c5528389f32db9cd9d65",
       "role": "Durable run/checkpoint state is engine-owned state/recovery infrastructure and belongs beside canonical persistence.",
       "work_package_refs": [
         "WP-W03",

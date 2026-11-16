@@ -18,6 +18,9 @@ on:
       - 'skeleton/intelligence/shared_pressure.py'
       - 'skeleton/ai/runtime/intelligence/**'
       - 'skeleton/testing/test_jeeves_hyperdispatcher.py'
+      - 'skeleton/testing/test_durable_run_store.py'
+      - 'skeleton/state/run_store.py'
+      - 'skeleton/ai/runtime/state/run_store.py'
       - 'machine/ai_file_tree.json'
       - '.machine/repository.toml'
       - '.github/workflows/jeeves-hyperdispatcher-source.yml'
@@ -39,4 +42,5 @@ jobs:
           python-version: '3.11'
       - run: python -m pip install --disable-pip-version-check --no-input -e . "pytest>=8,<9" "pytest-asyncio>=1.4.0,<2" "PyJWT==2.15.1" "zstandard==0.25.0" "PyYAML>=6,<7" "numpy>=2,<3" "Pillow>=13.0.0,<14"
       - run: python -m pytest -q -rP --noconftest skeleton/testing/test_jeeves_hyperdispatcher.py
+      - run: python -m pytest -q -rP --noconftest skeleton/testing/test_durable_run_store.py
       - run: python scripts/check_ai_file_tree.py

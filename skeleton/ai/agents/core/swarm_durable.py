@@ -381,6 +381,54 @@ class SwarmDurableBridge:
 
 
 
+    def cancel_queued_and_capture(
+        self, run_id: str, owner_id: str, manager: SwarmRecoveryManager,
+        broker: TenantSwarmBroker, tenant: str, task_id: str,
+    ) -> DurableSwarmCapture:
+        """Cancel only never-active queued work and durably release its quota."""
+        tenant, task_id = broker._tenant(tenant), broker._task_id(task_id)
+        runtime = broker.broker.runtime
+        with broker._lock, runtime._lock, manager._lock:
+            broker._assert_verified()
+            if broker.tenant_for(task_id) != tenant:
+                raise DurableSwarmError("task ownership mismatch")
+            resident = runtime.task(task_id)
+            if resident is None:
+                raise DurableSwarmError("task missing")
+            if resident.state is TaskState.CANCELLED and not resident.effect_uncertain:
+                return self._capture_checked(run_id, owner_id, manager, broker)
+            if resident.state is not TaskState.QUEUED or resident.effect_uncertain:
+                raise DurableSwarmError("only queued stopped tasks can be cancelled")
+            try:
+                changed = runtime.cancel(task_id, reason="operator cancelled queued task")
+                broker._sync_verified_outcome(tenant, changed)
+                return self._capture_checked(run_id, owner_id, manager, broker)
+            except Exception as exc:
+                broker.retire()
+                raise DurableSwarmError("cancellation publication failed") from exc
+
+    def propagate_terminal_dependencies(
+        self, run_id: str, owner_id: str, manager: SwarmRecoveryManager,
+        broker: TenantSwarmBroker, *, limit: int = 256,
+    ) -> tuple[str, ...]:
+        """Cancel failed-dependency work through canonical quota and one archive."""
+        runtime = broker.broker.runtime
+        with broker._lock, runtime._lock, manager._lock:
+            broker._assert_verified()
+            try:
+                cancelled = runtime.cancel_failed_dependents(limit=limit)
+                for task_id in cancelled:
+                    tenant = broker.tenant_for(task_id)
+                    if tenant is None:
+                        raise DurableSwarmError("cancelled dependency lacks tenant custody")
+                    broker._sync_verified_outcome(tenant, runtime.task(task_id))
+                if cancelled:
+                    self._capture_checked(run_id, owner_id, manager, broker)
+                return cancelled
+            except Exception as exc:
+                broker.retire()
+                raise DurableSwarmError("dependency propagation publication failed") from exc
+
     def hold_transport_unknown(
         self, run_id: str, owner_id: str, manager: SwarmRecoveryManager,
         broker: TenantSwarmBroker, tenant: str, task_id: str, *,
@@ -446,6 +494,7 @@ class SwarmDurableBridge:
 # Host-owned wait protocol. Raw task payloads never supply signing keys or clock
 # authority. The reserved envelope is stored in the existing task checkpoint.
 _HOST_WAIT_FIELD = "_jeeves_host_wait_v1"
+_HOST_SCHEDULE_FIELD = "_jeeves_host_schedule_v1"
 _MAX_WAIT_MS = (1 << 53) - 1
 
 
@@ -942,6 +991,7 @@ class HostDispatchService:
             try:
                 payload = dict(task.payload)
                 payload.pop(_HOST_WAIT_FIELD, None)
+                payload.pop(_HOST_SCHEDULE_FIELD, None)
                 attempt = HostDispatchAttempt(
                     owner.run_id, tenant, task.id, task.leased_to, task.lease_token,
                     _wait_bytes(payload),
@@ -1762,6 +1812,7 @@ class LocalCommittedRecovery:
                 raise DurableSwarmError("not an exact uncertain attempt")
             payload = dict(task.payload)
             payload.pop(_HOST_WAIT_FIELD, None)
+            payload.pop(_HOST_SCHEDULE_FIELD, None)
             attempt = HostDispatchAttempt(
                 owner.run_id, tenant, task_id, task.leased_to,
                 task.lease_token, _wait_bytes(payload),
@@ -1943,6 +1994,52 @@ class ManagedHostDispatcher:
             result = recovery.reconcile(self.owner, tenant, task_id)
             self.renew()
             return result
+
+    def cancel_queued(self, tenant: str, task_id: str) -> DurableSwarmCapture:
+        with self._lock:
+            self.renew()
+            return self.owner.bridge.cancel_queued_and_capture(
+                self.owner.run_id, self.owner.owner_id, self.owner.manager,
+                self.owner.broker, tenant, task_id,
+            )
+
+    def propagate_dependencies(self, *, limit: int = 256) -> tuple[str, ...]:
+        with self._lock:
+            self.renew()
+            return self.owner.bridge.propagate_terminal_dependencies(
+                self.owner.run_id, self.owner.owner_id, self.owner.manager,
+                self.owner.broker, limit=limit,
+            )
+
+    def prune_outer_checkpoints(self, *, keep: int = 16) -> int:
+        with self._lock:
+            self.renew()
+            latest = self.store.resume_state(self.owner.run_id).checkpoint
+            if latest is None:
+                raise DurableSwarmError("managed dispatcher has no checkpoint")
+            try:
+                return self.store.prune_checkpoint_only_run(
+                    self.owner.run_id, self.owner.owner_id,
+                    expected_revision=self._revision, keep=keep,
+                    expected_latest_id=latest.checkpoint_id,
+                )
+            except Exception as exc:
+                self.stop()
+                raise DurableSwarmError("checkpoint history pruning lost custody") from exc
+
+    def close(self) -> None:
+        """Graceful stop; exact live owner CAS releases the writer lease."""
+        with self._lock:
+            if self._stopped:
+                return
+            self.renew()
+            try:
+                self.store.release_run_lease(
+                    self.owner.run_id, self.owner.owner_id,
+                    expected_revision=self._revision,
+                )
+            finally:
+                self.stop()
 
     def stop(self) -> None:
         with self._lock:

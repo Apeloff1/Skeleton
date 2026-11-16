@@ -364,3 +364,17 @@ graph size, weights, result capacity and allowed capabilities before the
 first physical attempt. Two regressions exercise the real child process
 for all added operations, ties, unreachable and cyclic graphs, malformed
 inputs and refusal before tombstone creation. No neural inference claim.
+
+## Wave A18: durable cancellation, dependency propagation and bounded outer history
+
+The canonical durable bridge can now cancel owned queued tasks, release quota
+and checkpoint/read back atomically at the owner boundary. Terminal parent
+failure propagation uses canonical runtime dependency logic, tenant accounting
+and one durable capture; uncertain attempts are never treated as terminal
+failures. The real SQLite run store adds a revision-bound lease relinquish
+operation and dedicated checkpoint-only retention that rejects workflow steps,
+stale writers and mismatched latest checkpoint identity. Retained revisions
+are never renumbered. Managed owners expose explicit graceful close, periodic
+outer retention and durable cancellation/dependency propagation. Source and
+mirror files retain parity. New tests cover cancellation and dependency
+propagation plus independent run-store retention and exact-owner takeover.

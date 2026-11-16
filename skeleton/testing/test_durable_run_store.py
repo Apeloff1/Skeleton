@@ -391,3 +391,40 @@ def test_invalid_lease_durations_fail_closed(tmp_path, lease):
 
     with pytest.raises(ValueError, match="lease_seconds"):
         store.claim_run("run-1", "worker-a", lease_seconds=lease)
+
+
+def test_checkpoint_only_pruning_keeps_exact_latest_and_live_writer(tmp_path):
+    from skeleton.state import StateConflict
+    store = make_store(tmp_path)
+    store.create_run("bounded")
+    run = store.claim_run("bounded", "owner", lease_seconds=60)
+    checkpoints = [store.checkpoint("bounded", {"index": index}, worker_id="owner")
+                   for index in range(8)]
+    with pytest.raises(StateConflict):
+        store.prune_checkpoint_only_run(
+            "bounded", "owner", expected_revision=run.revision, keep=3,
+            expected_latest_id=checkpoints[-2].checkpoint_id)
+    assert store.prune_checkpoint_only_run(
+        "bounded", "owner", expected_revision=run.revision, keep=3,
+        expected_latest_id=checkpoints[-1].checkpoint_id) == 5
+    with sqlite3.connect(store.path) as conn:
+        assert conn.execute("SELECT revision FROM checkpoints ORDER BY revision").fetchall() == [
+            (6,), (7,), (8,)]
+    assert store.resume_state("bounded").checkpoint.checkpoint_id == checkpoints[-1].checkpoint_id
+    next_checkpoint = store.checkpoint("bounded", {"index": 8}, worker_id="owner")
+    assert next_checkpoint.revision == 9
+
+
+def test_exact_owner_lease_release_allows_clean_takeover(tmp_path):
+    from skeleton.state import StateConflict
+    store = make_store(tmp_path)
+    store.create_run("release")
+    first = store.claim_run("release", "first", lease_seconds=60)
+    with pytest.raises(StateConflict):
+        store.release_run_lease("release", "first", expected_revision=first.revision - 1)
+    released = store.release_run_lease("release", "first", expected_revision=first.revision)
+    assert released.status is RunStatus.RUNNING and released.worker_id is None and released.lease_until is None
+    second = store.claim_run("release", "second", expected_revision=released.revision)
+    with pytest.raises(StateConflict):
+        store.release_run_lease("release", "first", expected_revision=second.revision)
+    assert store.get_run("release").worker_id == "second"
