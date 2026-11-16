@@ -1700,3 +1700,58 @@ def test_alternative_ambiguous_wake_retires_generation_without_durable_open():
     assert bridge.load("run").restore_runtime().dispatch_blocked("wait")
     with pytest.raises(AdmissionError):
         broker.lease_verified("a","wait")
+
+
+def test_alternative_policy_seal_is_stable_across_accounting_and_forks():
+    from skeleton.automation.agents.swarm_ingress import SwarmIngressGovernor, DispatchRatePolicy
+    from skeleton.automation.agents.swarm_quota import SharedQuota, Quota
+    governor=SwarmIngressGovernor(dispatch_rate=DispatchRatePolicy(2,3))
+    governor.configure_shared(SharedQuota("service",Quota(max_leased=2),frozenset({"a","b"})))
+    governor.configure_tenant("a",weight=2)
+    seal=governor.policy_sha256()
+    assert governor.admit("a","one",{}).accepted
+    assert governor.admit("b","two",{}).accepted
+    assert governor.policy_sha256()==seal
+    assert governor.fork_empty().policy_sha256()==seal
+    governor.configure_tenant("b",weight=3)
+    assert governor.policy_sha256()!=seal
+
+
+def test_alternative_restore_refuses_relaxed_quota_without_mutation():
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from skeleton.automation.agents.swarm_broker import SwarmBroker
+    from skeleton.automation.agents.swarm_tenant_broker import TenantSwarmBroker
+    from skeleton.automation.agents.swarm_ingress import SwarmIngressGovernor
+    from skeleton.automation.agents.swarm_quota import SharedQuota, Quota
+    runtime,broker=_verified_dispatch_fixture()
+    broker.ingress.configure_shared(SharedQuota("all",Quota(max_leased=1)))
+    manager=SwarmRecoveryManager(delta_archive=True)
+    manager.checkpoint(runtime,broker)
+    archive=manager.export_archive()
+    assert archive["tenant"][0]["policy_sha256"]==broker.ingress.policy_sha256()
+    loaded=SwarmRecoveryManager.from_archive(archive)
+    recovered=loaded.restore_latest()
+    relaxed=TenantSwarmBroker(SwarmBroker(recovered,verify_worker=lambda *args:True),
+                               SwarmIngressGovernor(),verified_mode=True)
+    with pytest.raises(ValueError,match="policy"):
+        loaded.restore_tenants(relaxed)
+    assert relaxed.status()["tracked_tasks"]==0
+    assert relaxed.status()["ingress"]["accounted_tasks"]==0
+    exact=TenantSwarmBroker(SwarmBroker(recovered,verify_worker=lambda *args:True),
+                             broker.ingress.fork_empty(),verified_mode=True)
+    loaded.restore_tenants(exact)
+    assert exact.status()["tracked_tasks"]==2
+    assert exact.ingress.policy_sha256()==broker.ingress.policy_sha256()
+
+
+def test_alternative_policy_seal_is_covered_by_tenant_checksum():
+    from skeleton.automation.agents.swarm_recovery import SwarmRecoveryManager
+    from copy import deepcopy
+    runtime,broker=_verified_dispatch_fixture()
+    manager=SwarmRecoveryManager()
+    manager.checkpoint(runtime,broker)
+    archive=deepcopy(manager.export_archive())
+    archive["tenant"][0]["policy_sha256"]="0"*64
+    archive["archive_checksum"]=manager._archive_checksum({k:v for k,v in archive.items() if k!="archive_checksum"})
+    with pytest.raises(ValueError,match="checksum"):
+        SwarmRecoveryManager.from_archive(archive)

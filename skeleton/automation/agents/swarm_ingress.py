@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
+from hashlib import sha256
 import json
 from threading import RLock
 from collections.abc import Callable
@@ -121,6 +122,34 @@ class SwarmIngressGovernor:
     def configure_shared(self, policy: SharedQuota) -> None:
         with self._lock:
             self.quota.configure_shared(policy)
+
+    def policy_sha256(self) -> str:
+        """Hash effective admission configuration, not live quota counters.
+
+        All fields are host-controlled. Default-valued weight/limit entries
+        are omitted so restored accounting cannot itself change the seal.
+        This binds policy, but does not confer authority or sign a snapshot.
+        """
+        with self._lock, self.quota._lock, self.fairness._lock, self.rate._lock:
+            default = self.quota.default
+            weight = self.fairness.default_weight
+            policy = {
+                "schema": "swarm-ingress-policy-v1",
+                "default_quota": asdict(default),
+                "tenant_limits": {key: asdict(value) for key, value in self.quota.configured_limits().items()
+                                  if value != default},
+                "shared": [{"name": p.name, "limit": asdict(p.limit),
+                            "members": None if p.members is None else sorted(p.members)}
+                           for p in self.quota.configured_shared()],
+                "default_weight": weight,
+                "weights": {key: value for key, value in self.fairness.configured_weights().items()
+                            if value != weight},
+                "ingress_rate": [float(self.rate.capacity), float(self.rate.refill_per_second)],
+                "dispatch_rate": None if self.dispatch_rate is None else
+                    [self.dispatch_rate.capacity, float(self.dispatch_rate.refill_per_second)],
+            }
+            return sha256(json.dumps(policy, sort_keys=True, separators=(",", ":"),
+                                     ensure_ascii=True, allow_nan=False).encode()).hexdigest()
 
     def fork_empty(self) -> "SwarmIngressGovernor":
         """Clone admission policy without carrying live rate, quota, or task accounting."""

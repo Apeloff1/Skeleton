@@ -182,6 +182,7 @@ class SwarmRecoveryManager:
                     "checksum": item.checksum,
                     "active": [list(pair) for pair in item.active],
                     "terminal": [list(pair) for pair in item.terminal],
+                    **({"policy_sha256": item.policy_sha256} if item.policy_sha256 is not None else {}),
                 }
                 for item in self.tenant_store.history()
             ]
@@ -267,13 +268,19 @@ class SwarmRecoveryManager:
 
         runtime_sequences = set(manager.store.sequences())
         for raw in tenant_raw:
-            record = cls._record(raw, "tenant checkpoint", _TENANT_RECORD_FIELDS)
+            fields = _TENANT_RECORD_FIELDS
+            if isinstance(raw, Mapping) and "policy_sha256" in raw:
+                if raw["policy_sha256"] is None:
+                    raise ValueError("null tenant policy seal")
+                fields = fields | {"policy_sha256"}
+            record = cls._record(raw, "tenant checkpoint", fields)
             checkpoint = TenantMetadataCheckpoint(
                 sequence=record.get("sequence"),
                 created_at=record.get("created_at"),
                 checksum=record.get("checksum"),
                 active=cls._pairs(record.get("active"), "active tenant"),
                 terminal=cls._pairs(record.get("terminal"), "terminal tenant"),
+                policy_sha256=record.get("policy_sha256"),
             )
             if checkpoint.sequence not in runtime_sequences:
                 raise ValueError(f"tenant checkpoint has no runtime checkpoint: {checkpoint.sequence}")

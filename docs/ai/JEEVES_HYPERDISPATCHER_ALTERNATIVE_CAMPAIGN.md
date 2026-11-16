@@ -193,3 +193,17 @@ transport is claimed. Regression fixtures cover both lease paths,
 tenant isolation, uncertain restart, real SQLite reopen, and failed wake.
 Prior wave A8 exact head passed 89 focused tests and 183 architecture
 mappings; that is not a substitute for A9 exact-head qualification.
+
+## Wave A10: durable ingress-policy identity
+
+New verified tenant checkpoints bind a canonical fingerprint of effective
+admission policy: default/tenant/shared quotas, member scope, fairness
+weights, ingress and dispatch rates. Accounting alone does not alter this
+identity. Legacy sidecars retain their original checksum and remain readable;
+new sealed checkpoints refuse a mismatched restore host. Restore also checks
+verified task ownership and same-tenant dependencies before republishing
+metadata. This is an integrity binding within the existing archive, not a
+signature, independent authorization, or a persistent rate-credit ledger.
+Live policy changes require the trusted owner and a new durable checkpoint.
+New regressions cover canonical ordering, accounting stability, rejection
+of relaxed quota on restore, and invalid sidecar integrity.
