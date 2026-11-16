@@ -128,6 +128,7 @@ def plan_from_args(args: argparse.Namespace) -> dict[str, object]:
         raise LlamaCppRuntimeError("refusing symlinked GGUF ancestry")
     before = _stat_snapshot(path)
     header = inspect_gguf(path)
+    _serving_metadata(path, header).require_single_file(header)
     model_size = before[2]
     geometry, model_context, geometry_source = _geometry(args, path, header)
     if type(args.context) is not int or not 128 <= args.context <= 1_048_576:
