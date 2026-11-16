@@ -1005,6 +1005,28 @@ export async function listCrawls(cursor?: string, signal?: AbortSignal): Promise
 export async function getCrawl(id: string, signal?: AbortSignal): Promise<CrawlSession> {
   const value = await read(api.get<{ session: CrawlSession }>(ROOT + '/sessions/' + identifier(id), options(signal)), getAuthToken(), 'The crawler session could not be refreshed.'); return session(value.session, id);
 }
+export const PUBLISHER_INTAKE_METHODS = ['public_api', 'publisher_feed', 'open_dataset_manifest', 'licensed_public_export'] as const;
+export type PublisherIntakeMethod = typeof PUBLISHER_INTAKE_METHODS[number];
+export type PublisherIntake = {
+  idempotency_key: string; endpoint: string; method: PublisherIntakeMethod;
+  consent: true; rights_acknowledged: true; publisher_permission_acknowledged: true;
+  independent_resource_acknowledged: true;
+};
+export async function createPublisherIntake(body: PublisherIntake, signal?: AbortSignal): Promise<CrawlSession> {
+  let endpoint: URL;
+  try { endpoint = new URL(body.endpoint); } catch {
+    throw new ChatClientError('Enter one complete publisher-approved HTTPS resource.', { kind: 'validation' });
+  }
+  if (!PUBLISHER_INTAKE_METHODS.includes(body.method) || endpoint.protocol !== 'https:'
+    || endpoint.username || endpoint.password || endpoint.search || endpoint.hash || endpoint.port
+    || body.endpoint.length > 2048 || endpoint.href !== body.endpoint
+    || body.consent !== true || body.rights_acknowledged !== true
+    || body.publisher_permission_acknowledged !== true || body.independent_resource_acknowledged !== true) {
+    throw new ChatClientError('Confirm separate access permission for a canonical public HTTPS resource without credentials or query parameters.', { kind: 'validation' });
+  }
+  const value = await read(api.post<{session: CrawlSession}>(ROOT + '/publisher-intake', body, options(signal)), getAuthToken(), 'Publisher intake was not confirmed. Retry the same request to check its outcome.');
+  return session(value.session);
+}
 export async function createCrawl(body: CrawlCreate, signal?: AbortSignal): Promise<CrawlSession> {
   if (body.frontier_strategy !== undefined && !['fifo', 'balanced', 'coverage', 'companion', 'companion_curiosity', 'companion_scholar', 'companion_guardian'].includes(body.frontier_strategy)) throw new ChatClientError('Choose a canonical bounded frontier scheduling strategy.', { kind: 'validation' });
   if (body.discover_sitemaps !== undefined && typeof body.discover_sitemaps !== 'boolean') throw new ChatClientError('Sitemap discovery must be explicitly enabled or disabled.', { kind: 'validation' });
