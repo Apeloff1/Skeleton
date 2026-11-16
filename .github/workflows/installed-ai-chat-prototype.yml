@@ -47,6 +47,10 @@ on:
       - "skeleton/ai/training/contamination_scan.py"
       - "skeleton/testing/test_jeeves_candidate_retention_learning.py"
       - "skeleton/testing/test_jeeves_runtime_efficiency_v.py"
+      - "skeleton/ai/training/native_adapter_learning.py"
+      - "skeleton/ai/training/native_precision_calibration.py"
+      - "skeleton/testing/test_jeeves_native_adapter_learning.py"
+      - "skeleton/testing/test_jeeves_native_precision_calibration.py"
       - "machine/ai_file_tree.json"
       - "skeleton/testing/test_jeeves_measured_tuning.py"
       - "skeleton/testing/test_jeeves_evidence_packing.py"
@@ -142,6 +146,8 @@ jobs:
           skeleton/testing/test_jeeves_replay_balance.py
           skeleton/testing/test_jeeves_candidate_retention_learning.py
           skeleton/testing/test_jeeves_runtime_efficiency_v.py
+          skeleton/testing/test_jeeves_native_adapter_learning.py
+          skeleton/testing/test_jeeves_native_precision_calibration.py
       - name: Verify Docker materialization source-boundary parsing
         run: python -m unittest discover -s tests -p 'test_docker_materialization_parser.py' -v
       - name: Compile first-install operator entrypoints
