@@ -14,7 +14,7 @@ import re
 import stat
 from typing import Sequence
 
-from .weight_shard_store import WeightShardStore, WeightShardStoreError
+from .weight_shard_store import WeightShardStore, WeightShardStoreError, _InventoryVerificationBatch
 
 _MANIFEST = re.compile(r"[0-9a-f]{64}\.json\Z")
 _MAX_ENTRIES = 4096
@@ -67,6 +67,7 @@ def inventory_offline_weights(
     root: str | Path, *, max_entries: int = _MAX_ENTRIES, max_weight_bytes: int = (1 << 63) - 1,
     max_manifest_bytes: int = _DEFAULT_MANIFEST_BUDGET,
     max_shard_references: int = _DEFAULT_SHARD_REFERENCES,
+    max_physical_weight_bytes: int | None = None,
 ) -> dict[str, object]:
     """Verify all manifests and referenced physical bytes with bounded enumeration.
 
@@ -81,6 +82,9 @@ def inventory_offline_weights(
         raise OfflineInventoryError("invalid aggregate manifest byte limit")
     if type(max_shard_references) is not int or not 1 <= max_shard_references <= 4_194_304:
         raise OfflineInventoryError("invalid aggregate shard reference limit")
+    physical_limit = max_weight_bytes if max_physical_weight_bytes is None else max_physical_weight_bytes
+    if type(physical_limit) is not int or not 1 <= physical_limit < 1 << 63:
+        raise OfflineInventoryError("invalid physical weight read ceiling")
     path = Path(root).absolute()
     _directory(path)
     _directory(path / "manifests")
@@ -106,7 +110,8 @@ def inventory_offline_weights(
     # Otherwise N individually valid plans can force N huge reads before
     # the original post-read aggregate check reports exhaustion.
     declared: list[VerifiedOfflineWeightPlan] = []
-    cumulative = metadata_bytes = shard_references = 0
+    cumulative = metadata_bytes = shard_references = physical_bytes = 0
+    distinct: dict[str, int] = {}
     try:
         for name in sorted(names):
             digest = name[:-5]
@@ -123,16 +128,28 @@ def inventory_offline_weights(
                 raise OfflineInventoryError("aggregate shard reference budget exhausted")
             if cumulative > max_weight_bytes:
                 raise OfflineInventoryError("aggregate offline weights exceed byte budget")
+            for shard in plan.shards:
+                previous = distinct.get(shard.digest)
+                if previous is not None:
+                    if previous != shard.bytes:
+                        raise OfflineInventoryError("shared inventory digest has conflicting size")
+                    continue
+                distinct[shard.digest] = shard.bytes
+                physical_bytes += shard.bytes
+                if physical_bytes > physical_limit:
+                    raise OfflineInventoryError("distinct physical weights exceed byte budget")
             declared.append(VerifiedOfflineWeightPlan(
                 digest, plan.model_identity_digest, len(plan.shards), plan.expected_total_bytes,
                 manifest_sha, manifest_size,
             ))
-        # Retain only fixed-size declarations, not every shard manifest.
+        # Each distinct digest is physically hashed once within this bounded
+        # observation; repeated references must retain the exact file identity.
+        batch = _InventoryVerificationBatch(store, distinct)
         for row in declared:
             if row.manifest_bytes is None or row.manifest_sha256 is None:
                 raise OfflineInventoryError("missing admitted manifest identity")
             paths = store.verified_paths(row.plan_digest, expected_manifest_sha256=row.manifest_sha256,
-                                         maximum_manifest_bytes=row.manifest_bytes)
+                                         maximum_manifest_bytes=row.manifest_bytes, _batch=batch)
             plan, manifest_sha, manifest_size = store.manifest_evidence(
                 row.plan_digest, maximum=row.manifest_bytes
             )
@@ -163,6 +180,9 @@ def inventory_offline_weights(
             )
             if manifest_sha != row.manifest_sha256 or manifest_size != row.manifest_bytes:
                 raise OfflineInventoryError("manifest identity changed during inventory")
+        physical = batch.finalize()
+        if physical["verified_object_bytes"] != physical_bytes:
+            raise OfflineInventoryError("physical inventory bytes differ from admission")
         store.assert_layout()
     except OfflineInventoryError:
         raise
@@ -176,6 +196,8 @@ def inventory_offline_weights(
         "total_weight_bytes": cumulative,
         "total_manifest_bytes": metadata_bytes,
         "total_shard_references": shard_references,
+        "distinct_weight_objects": physical["distinct_objects"],
+        "verified_physical_weight_bytes": physical["verified_object_bytes"],
         "device_qualification": "not_assessed",
         "model_activation": "not_performed",
     }
@@ -192,11 +214,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--max-weight-bytes", type=int, default=(1 << 63) - 1)
     parser.add_argument("--max-manifest-bytes", type=int, default=_DEFAULT_MANIFEST_BUDGET)
     parser.add_argument("--max-shard-references", type=int, default=_DEFAULT_SHARD_REFERENCES)
+    parser.add_argument("--max-physical-weight-bytes", type=int)
     args = parser.parse_args(argv)
     try:
         result = inventory_offline_weights(
             args.store, max_entries=args.max_entries, max_weight_bytes=args.max_weight_bytes,
             max_manifest_bytes=args.max_manifest_bytes, max_shard_references=args.max_shard_references,
+            max_physical_weight_bytes=args.max_physical_weight_bytes,
         )
     except OfflineInventoryError as exc:
         parser.exit(2, "offline inventory unavailable: " + str(exc) + "\n")
