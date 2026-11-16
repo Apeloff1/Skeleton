@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import tempfile
 from pathlib import Path, PurePosixPath
@@ -17,25 +18,51 @@ _INTERNAL = {"forge_manifest.json", "context_ledger.json", "context_tensor.json"
 _DEVICES = {"con", "nul", "aux", "prn"} | {f"com{i}" for i in range(1, 10)} | {f"lpt{i}" for i in range(1, 10)}
 
 
+_PORTABLE_SEGMENT = re.compile(r"[A-Za-z0-9_.-]{1,120}\Z", re.ASCII)
+_MAX_PORTABLE_PATH = 240
+
+
 def _validate(files: Mapping[str, str]) -> dict[str, str]:
+    """Admit one portable tree before any hash, archive, or disk publication.
+
+    Match the API/Expo portable source path semantics even for CLI-only
+    projection. Reject file/directory collisions and case aliases at *every*
+    path component, not merely the full file name.
+    """
     if not isinstance(files, Mapping):
         raise ValueError("Godot files must be a mapping")
     checked: dict[str, str] = {}
-    aliases: set[str] = set()
+    leaves: set[str] = set()
+    directories: dict[str, str] = {}
     for name, body in files.items():
-        if not isinstance(name, str) or not name or "\\" in name or any(ord(c) < 32 for c in name):
+        if type(name) is not str or not name or len(name) > _MAX_PORTABLE_PATH:
             raise ValueError("invalid generated source path")
         parts = name.split("/")
-        if (PurePosixPath(name).is_absolute() or ":" in name
-                or any(p in ("", ".", "..") or p.rstrip(" .") != p
-                       or p.split(".")[0].casefold() in _DEVICES for p in parts)):
+        if (PurePosixPath(name).is_absolute()
+                or any(not _PORTABLE_SEGMENT.fullmatch(part)
+                       or part.startswith(".") or part.endswith(".")
+                       or part.split(".")[0].casefold() in _DEVICES for part in parts)):
             raise ValueError(f"unsafe generated source path: {name!r}")
-        if name.casefold() in aliases or name.casefold() in _INTERNAL:
+        folded = name.casefold()
+        if folded in leaves or folded in directories or folded in _INTERNAL:
             raise ValueError(f"ambiguous or reserved generated path: {name!r}")
-        if not isinstance(body, str):
+        for depth in range(1, len(parts)):
+            prefix = "/".join(parts[:depth])
+            alias = prefix.casefold()
+            if (alias in leaves or alias in _INTERNAL
+                    or (alias in directories and directories[alias] != prefix)):
+                raise ValueError(f"ambiguous generated directory: {prefix!r}")
+            directories[alias] = prefix
+        if type(body) is not str:
             raise ValueError(f"source must be text: {name!r}")
+        # Validate Unicode in fixed chunks, avoiding a full extra encoded copy.
+        try:
+            for offset in range(0, len(body), 65536):
+                body[offset:offset + 65536].encode("utf-8", errors="strict")
+        except UnicodeError:
+            raise ValueError(f"invalid generated source encoding: {name!r}") from None
         checked[name] = body
-        aliases.add(name.casefold())
+        leaves.add(folded)
     if "project.godot" not in checked:
         raise ValueError("missing project.godot")
     return checked

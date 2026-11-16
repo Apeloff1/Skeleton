@@ -669,3 +669,36 @@ def test_portal_rejects_shadowed_and_misplaced_project_settings(mutation):
     assert not verify_playable_portal(changed, "puzzle")
     with pytest.raises(ValueError):
         build_playable_source_receipt(changed, "puzzle")
+
+
+@pytest.mark.parametrize("extra", [
+    {"data": "file", "data/rooms.json": "{}"},
+    {"data/rooms.json": "{}", "data": "file"},
+    {"Data/one.txt": "one", "data/two.txt": "two"},
+    {"scripts/.hidden.gd": "extends Node"},
+    {"scripts/NUL.gd": "extends Node"},
+    {"scripts/name?.gd": "extends Node"},
+    {"forge_manifest.json/extra.txt": "reserved"},
+    {"scripts/" + "a" * 121 + ".gd": "extends Node"},
+    {"scripts/broken.gd": "\ud800"},
+])
+def test_generated_source_rejects_nonportable_tree_before_projection(tmp_path, extra):
+    from skeleton.forge.projector import write_project
+    source = {"project.godot": "config_version=5\n", **extra}
+    destination = tmp_path / "never-created"
+    with pytest.raises(ValueError):
+        source_manifest(source)
+    with pytest.raises(ValueError):
+        write_project(destination, source)
+    assert not destination.exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_source_projection_preserves_valid_nested_unicode_payload(tmp_path):
+    from skeleton.forge.projector import write_project
+    source = {"project.godot": "config_version=5\n", "Data/room.txt": "雪🌊"}
+    target = tmp_path / "portable"
+    receipt = source_manifest(source)
+    projected = write_project(target, source)
+    assert projected["source_sha256"] == receipt["sha256"]
+    assert (target / "Data/room.txt").read_bytes() == source["Data/room.txt"].encode("utf-8")
