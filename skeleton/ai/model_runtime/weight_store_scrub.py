@@ -17,7 +17,9 @@ from typing import Any
 from uuid import uuid4
 
 from .flgb_model_runtime import MAX_WEIGHT_BYTES, WeightShard, canonical_bytes, require_digest
-from .weight_shard_store import WeightShardStoreError, _hash_stream
+from .weight_shard_store import (
+    WeightShardStoreError, _bounded_regular_reader, _directory_identity, _hash_stream, _sync_directory,
+)
 from .weight_store_disk_owner import WeightStoreDiskOwner
 from .weight_store_transaction import _publish, _read, read_intent
 
@@ -61,6 +63,7 @@ class _Catalog:
     references: int
     unreferenced: int
     unreferenced_keys: tuple[str, ...]
+    manifest_rows: tuple[tuple[str, str, int, tuple[int, ...]], ...]
 
 
 def _identity(info: os.stat_result) -> tuple[int, ...]:
@@ -162,7 +165,8 @@ def _catalog(owner: WeightStoreDiskOwner, policy: ScrubPolicy) -> _Catalog:
     store.assert_layout()
     unreferenced = tuple(sorted(objects.keys() - claims.keys()))
     return _Catalog(chain.hexdigest(), tuple(objects[key] for key in sorted(objects)),
-                    total, len(manifests), references, len(unreferenced), unreferenced)
+                    total, len(manifests), references, len(unreferenced), unreferenced,
+                    tuple((key, pin, size, identity) for key, (pin, size, identity) in sorted(manifests.items())))
 
 
 def _verify_catalog_object(owner: WeightStoreDiskOwner, row: _Object) -> None:
@@ -198,6 +202,59 @@ def verify_unreferenced_catalog_objects(owner: WeightStoreDiskOwner, catalog: _C
         chain = _digest([chain, row.digest, row.size])
     body = {"catalog_digest": catalog.digest, "verified_objects": len(objects),
             "verified_bytes": required, "chain_digest": chain, "deletion_authorized": False}
+    return {**body, "digest": _digest(body)}
+
+
+def sync_verified_recovery_catalog(owner: WeightStoreDiskOwner, catalog: _Catalog,
+                                   policy: ScrubPolicy) -> dict:
+    """Synchronize already independently verified bytes before intent clearance.
+
+    The caller must hold the same exclusive slot used for physical hashing
+    of the entire catalog. Descriptor metadata must match that admitted
+    catalog. This is not a new content hash or hardware power-loss proof.
+    """
+    if os.name != "posix" or not isinstance(catalog, _Catalog):
+        raise WeightShardStoreError("managed POSIX recovery durability required")
+    if _catalog(owner, policy).digest != catalog.digest:
+        raise WeightShardStoreError("recovery catalog changed before durability barrier")
+    store = owner._store
+    buckets = {}
+    for row in catalog.objects:
+        path = store._object_path(row.digest)
+        bucket = _directory_identity(path.parent)
+        if _identity(path.lstat()) != row.identity:
+            raise WeightShardStoreError("recovery object changed before durability barrier")
+        with store._object_reader(WeightShard(0, row.digest, row.size, "local")) as stream:
+            if _identity(os.fstat(stream.fileno())) != row.identity:
+                raise WeightShardStoreError("recovery object descriptor differs from catalog")
+            os.fsync(stream.fileno())
+        if _identity(path.lstat()) != row.identity or _directory_identity(path.parent) != bucket:
+            raise WeightShardStoreError("recovery object changed during durability barrier")
+        if buckets.setdefault(path.parent, bucket) != bucket:
+            raise WeightShardStoreError("recovery bucket identity changed")
+    for bucket, expected in sorted(buckets.items()):
+        _sync_directory(bucket, expected)
+    _sync_directory(store.objects, store._layout[store.objects])
+    for key, pin, size, identity in catalog.manifest_rows:
+        path = store._manifest_path(key)
+        with _bounded_regular_reader(path, size) as stream:
+            if _identity(os.fstat(stream.fileno())) != identity:
+                raise WeightShardStoreError("recovery manifest descriptor differs from catalog")
+            observed, count = _hash_stream(stream, maximum=size)
+            if observed != pin or count != size:
+                raise WeightShardStoreError("recovery manifest differs from admitted content")
+            os.fsync(stream.fileno())
+    _sync_directory(store.manifests, store._layout[store.manifests])
+    # Sync root after subordinate directory entries are durable, before the
+    # transaction owner publishes an outcome and removes its exact intent.
+    _sync_directory(store.root, store._layout[store.root])
+    if _catalog(owner, policy).digest != catalog.digest:
+        raise WeightShardStoreError("recovery catalog changed at durability fence")
+    body = {"schema": "skeleton.weight-recovery-durability.v1",
+            "catalog_digest": catalog.digest, "synced_objects": len(catalog.objects),
+            "synced_manifests": len(catalog.manifest_rows),
+            "synced_object_bytes": catalog.total_bytes,
+            "fsync_completed": True, "physical_power_loss_qualified": False}
     return {**body, "digest": _digest(body)}
 
 
