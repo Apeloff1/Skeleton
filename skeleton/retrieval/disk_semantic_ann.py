@@ -7,7 +7,8 @@ No network services, pickle, implicit source imports or model downloads.
 """
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+import multiprocessing
 from dataclasses import asdict,dataclass
 import hashlib
 import itertools
@@ -39,6 +40,7 @@ class DiskANNPolicy:
     max_index_bytes:int=64*1024**3
     max_anchor_terms:int=16
     query_timeout_seconds:int=30
+    worker_mode:str="thread"
 
     def __post_init__(self):
         for v,lo,hi in ((self.shards,1,64),(self.bands,2,16),(self.bits,4,20),
@@ -49,6 +51,8 @@ class DiskANNPolicy:
                         (self.query_timeout_seconds,1,300)):
             if type(v) is not int or not lo<=v<=hi:
                 raise ValueError("invalid local disk ANN policy")
+        if self.worker_mode not in {"thread","process"}:
+            raise ValueError("explicit local ANN executor mode required")
         if self.bands*self.probes*self.bucket_limit+self.max_anchor_terms*self.bucket_limit>262144 or self.shards*self.shard_candidate_limit>262144:
             raise ValueError("aggregate ANN candidate workspace outside bounds")
         if self.probes>self.bits+1 or self.shard_candidate_limit<self.bucket_limit:
@@ -354,7 +358,12 @@ class DiskANN:
         merged=[]
         count=0
         truncated=False
-        with ThreadPoolExecutor(max_workers=min(p.workers,p.shards)) as executor:
+        workers=min(p.workers,p.shards)
+        pool=(ProcessPoolExecutor(max_workers=workers,mp_context=multiprocessing.get_context("spawn"))
+              if p.worker_mode=="process" else ThreadPoolExecutor(max_workers=workers))
+        # The process executor serializes only trusted internally constructed
+        # value objects, never an imported pickle or external worker payload.
+        with pool as executor:
             futures=[executor.submit(self._search,entry,q,codes,anchors,deadline,allowed) for entry in self._files]
             for f in futures:
                 rows,cut,observed=f.result(timeout=max(0.001,deadline-time.monotonic()))
@@ -364,7 +373,7 @@ class DiskANN:
         ranked=sorted(merged,key=lambda x:(-x.anchor_matches,-x.cosine,x.span_sha256))[:limit]
         receipt={"schema":"skeleton.local.disk-ann-query.v1","manifest_sha256":self.manifest_sha256,
                  "space_sha256":self.space,"source_snapshot_sha256":self.snapshot,
-                 "shards_searched":len(self._files),"indexed_rows":self.rows,"candidate_pointers":count,
+                 "shards_searched":len(self._files),"worker_mode":p.worker_mode,"indexed_rows":self.rows,"candidate_pointers":count,
                  "bucket_or_shard_truncation":bool(truncated),"approximate":True,
                  "selected":[r.span_sha256 for r in ranked],"citation_authorized":False}
         receipt["receipt_sha256"]=_digest(receipt)

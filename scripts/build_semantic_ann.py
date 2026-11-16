@@ -19,13 +19,14 @@ def main(argv=None):
     p.add_argument("--generation",required=True)
     p.add_argument("--shards",type=int,default=8)
     p.add_argument("--workers",type=int,default=4)
+    p.add_argument("--worker-mode",choices=("thread","process"),default="thread")
     p.add_argument("--max-rows",type=int,default=10_000_000)
     p.add_argument("--max-index-bytes",type=int,required=True)
     a=p.parse_args(argv)
     if not a.database.is_file() or a.database.is_symlink():
         p.error("existing canonical private database required")
     ranker=load_semantic_ranker(a.config,a.config_sha256)
-    policy=DiskANNPolicy(shards=a.shards,workers=a.workers,max_rows=a.max_rows,max_index_bytes=a.max_index_bytes)
+    policy=DiskANNPolicy(shards=a.shards,workers=a.workers,worker_mode=a.worker_mode,max_rows=a.max_rows,max_index_bytes=a.max_index_bytes)
     with OfflineChatStore(a.database) as store:
         library=OfflineKnowledgeLibrary(store,a.model_digest,a.tokenizer_digest,semantic_ranker=ranker)
         receipt=library.build_semantic_ann(a.index_root,a.generation,policy)
