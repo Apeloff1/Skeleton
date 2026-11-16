@@ -8,6 +8,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
+from collections.abc import Mapping
+from html.parser import HTMLParser
+import unicodedata
 from urllib.parse import urlsplit
 
 MAX_EVENTS = 64
@@ -114,3 +117,99 @@ def adaptive_priority(base_score: float, health: OriginHealth, *, coverage_cost:
         raise ValueError("invalid adaptive health")
     value = 1 - health.quality if coverage_cost else health.quality
     return round(.80 * base_score + .20 * value, 8)
+
+# Access interstitials are not source evidence, even if served with HTTP 200.
+# This is deliberately a conservative denial classifier, not a solver.
+_MAX_INTERSTITIAL_PREFIX = 32768
+_INTERSTITIAL_TITLES = frozenset({
+    "access denied", "request blocked", "verify you are human",
+    "human verification required", "security verification required",
+    "authentication required", "sign in required", "captcha required",
+    "checking your browser before accessing", "permission denied",
+})
+
+
+class _InterstitialTitle(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.in_title = False
+        self.finished = False
+        self.invalid = False
+        self.parts = []
+        self.chars = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "body" and not self.in_title:
+            self.finished = True
+        if tag == "title" and not self.finished:
+            if self.in_title:
+                self.invalid = True
+            self.in_title = True
+
+    def handle_endtag(self, tag):
+        if tag == "title" and self.in_title:
+            self.in_title = False
+            self.finished = True
+
+    def handle_data(self, data):
+        if self.in_title and not self.finished:
+            self.chars += len(data)
+            if self.chars > 256:
+                self.invalid = True
+            else:
+                self.parts.append(data)
+
+    def matched(self):
+        if self.invalid or not self.finished or self.in_title:
+            return False
+        title = " ".join(unicodedata.normalize("NFKC", "".join(self.parts)).casefold().split())
+        return title.rstrip(".!…") in _INTERSTITIAL_TITLES
+
+
+def access_interstitial_reason(status: int, headers: Mapping[str, str], body: bytes) -> str | None:
+    """Return only fixed local reason codes; never retain challenge bytes.
+
+    The caller must charge the original transport before classification and
+    stop automatic requests to the host for the remainder of current consent.
+    Missing or ambiguous signals do not prove permission. No credentials,
+    challenge execution, extra network probes or request changes occur here.
+    """
+    if type(status) is not int or not 100 <= status <= 599:
+        raise ValueError("invalid HTTP status")
+    if not isinstance(headers, Mapping) or not isinstance(body, bytes):
+        raise ValueError("invalid access observation")
+    if status == 407:
+        return "proxy_authentication_required"
+    if status == 402:
+        return "payment_required"
+    if any(
+        isinstance(key, str) and key.casefold() == "cf-mitigated"
+        and isinstance(value, str) and value.strip().casefold() == "challenge"
+        for key, value in headers.items()
+    ):
+        return "explicit_access_challenge"
+    if 200 <= status < 400 and any(
+        isinstance(key, str) and key.casefold() == "www-authenticate"
+        and isinstance(value, str) and bool(value.strip())
+        for key, value in headers.items()
+    ):
+        return "authentication_interstitial"
+    if not 200 <= status < 300:
+        return None
+    prefix = body[:_MAX_INTERSTITIAL_PREFIX]
+    mime = next((value.split(";", 1)[0].strip().casefold()
+                 for key, value in headers.items()
+                 if isinstance(key, str) and key.casefold() == "content-type"
+                 and isinstance(value, str)), "")
+    sniff = prefix[:256].lstrip(b"\xef\xbb\xbf \t\r\n").lower()
+    if mime not in {"text/html", "application/xhtml+xml"} and not sniff.startswith(
+        (b"<!doctype html", b"<html", b"<head")
+    ):
+        return None
+    parser = _InterstitialTitle()
+    try:
+        parser.feed(prefix.decode("utf-8-sig", errors="replace"))
+        parser.close()
+    except (ValueError, AssertionError, UnicodeError):
+        return None
+    return "access_interstitial_title" if parser.matched() else None
