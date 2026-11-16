@@ -1,0 +1,34 @@
+name: Isolated Chroma persistence qualification
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'scripts/qualify_chroma_persistence.py'
+      - 'skeleton/testing/test_chroma_persistence_qualification.py'
+      - 'docker-compose.yml'
+      - '.github/workflows/isolated-chroma-persistence-qualification.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: isolated-chroma-persistence-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  durable_named_volume:
+    name: Exact-head isolated Chroma /data restart and recreate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Execute disposable pinned image and volume qualification
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: python scripts/qualify_chroma_persistence.py --source-head "$EXPECTED_HEAD" --isolated-ci-fixture

@@ -924,3 +924,17 @@ This is stronger than a socket health check but not signed image provenance,
 browser JavaScript execution, actual inference, storage restoration, Windows
 device acceptance or release qualification. The default setup UI recovery
 remains available and protected startup is not enabled by this command.
+
+### Isolated corrected Chroma persistence qualification
+
+The corrected physical layout is independently tested by
+scripts/qualify_chroma_persistence.py --source-head REVIEWED_SHA
+--isolated-ci-fixture. It uses the exact pinned image ID, a uniquely
+generated local named volume mounted at /data, loopback-only ports and
+synthetic vector records. It checks collection identity, full vector/document/
+metadata equality, nearest-neighbor results, same-container restart,
+durable update/delete, and a genuinely new container with the same volume.
+Resource deletion is restricted to separately verified fixture ownership.
+The legacy full profile remains blocked until independently reviewed
+backup selection, restoration, real application integration and device
+qualification succeed. This fixture never starts or modifies legacy Chroma.
