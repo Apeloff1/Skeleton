@@ -396,4 +396,3 @@ def test_unknown_sensor_large_quantum_cannot_authorize_native_cpu(monkeypatch, u
     with pytest.raises(NativePressureInterrupted, match="untrusted OS pressure provenance"):
         guard.start(P)()
     assert guard.status().stopped
-
