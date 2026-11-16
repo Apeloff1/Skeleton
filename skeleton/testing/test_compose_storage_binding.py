@@ -92,6 +92,10 @@ def fixture_runner(*, resolved=None, volumes=(), containers=(), container_overri
             value={"project":PROJECT,"service":role,"id":"a"*64,"running":container_running,
                    "mounts":[{"Type":"volume","Name":PROJECT+"_"+volume,"Destination":path,"RW":True}
                              for path,volume in binding._BINDINGS.get(role,{}).items()]}
+            for mount in payload["services"][role].get("volumes",[]):
+                if mount.get("type")=="bind":
+                    value["mounts"].append({"Type":"bind","Destination":mount["target"],
+                                            "RW":not mount.get("read_only",False)})
             _,published,target=runtime.HOST_DEFAULTS[role]
             value.update(image_id="sha256:"+"d"*64,
                          started_at="2026-01-01T12:00:00.000000000Z",restart_count=0,
@@ -545,3 +549,57 @@ def test_replaced_bridge_or_unhealthy_daemon_invalidates_http_continuity(tmp_pat
         assert final.code==code
     runner,_=fixture_runner(**options)
     assert observe(tmp_path,runner,previous=post,require_started=True,require_same_runtime=True).admitted
+
+
+
+@pytest.mark.parametrize("options",[
+    "rw,noexec,exec,nosuid,nodev,size=64m",
+    "rw,noexec,nosuid,nodev,suid,size=64m",
+    "rw,noexec,nosuid,nodev,rw,size=64m",
+    "rw,noexec,nosuid,nodev,size=64m,size=67108864",
+])
+def test_tmpfs_safety_flags_cannot_be_overridden_by_contradictory_options(options):
+    with pytest.raises(runtime.RuntimeIdentityDenied):
+        isolation._required_tmpfs(isolation._tmpfs_options(options))
+
+
+@pytest.mark.parametrize("user",["","root","root:app","0","000","000:1000"])
+def test_runtime_user_admission_denies_effective_root_spelling(user):
+    assert not isolation._nonroot(user)
+
+
+@pytest.mark.parametrize("user",["appuser","1000","1000:1000"])
+def test_runtime_user_preserves_canonical_nonroot_identity(user):
+    assert isolation._nonroot(user)
+
+
+@pytest.mark.parametrize("security_opt",[["seccomp=unconfined"],["apparmor:unconfined"],
+                                         ["label=disable"],["no-new-privileges:false"]])
+def test_container_cannot_disable_default_security_profile(tmp_path,security_opt):
+    config=model()
+    config["services"]["frontend"]["security_opt"]=security_opt
+    runner,_=fixture_runner(resolved=config)
+    assert not observe(tmp_path,runner).admitted
+
+
+@pytest.mark.parametrize("fault",["rw_model","missing_model","foreign_socket","extra_mount"])
+def test_live_bind_destinations_and_permissions_match_model(tmp_path,fault):
+    config=model()
+    expected=isolation.model_security(config,root=tmp_path,hot=False)
+    spec={"privileged":False,"pid_mode":"","ipc_mode":"private","uts_mode":"",
+          "cap_add":None,"devices":[],"device_requests":None,"device_cgroup_rules":None,
+          "network_mode":PROJECT+"_tutolage","networks":[PROJECT+"_tutolage"],
+          "read_only":True,"cap_drop":["ALL"],"security_opt":["no-new-privileges:true"],
+          "user":"appuser","tmpfs":{"/tmp":"rw,noexec,nosuid,nodev,size=64m"}}
+    mounts=[{"Type":"bind","Destination":"/app/local-ai","RW":False}]
+    assert isolation.live_security({"isolation":spec,"mounts":mounts},expected["skeleton"])
+    if fault=="rw_model":
+        mounts[0]["RW"]=True
+    elif fault=="missing_model":
+        mounts.clear()
+    elif fault=="foreign_socket":
+        mounts.append({"Type":"bind","Destination":"/var/run/docker.sock","RW":True})
+    else:
+        mounts.append({"Type":"bind","Destination":"/app/extra","RW":False})
+    with pytest.raises(runtime.RuntimeIdentityDenied,match="runtime_host_bind_not_reviewed"):
+        isolation.live_security({"isolation":spec,"mounts":mounts},expected["skeleton"])

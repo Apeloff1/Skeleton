@@ -1270,3 +1270,10 @@ bind mounts are rejected. The actual bridge ID is sampled through runtime
 qualification, and Docker health must be healthy for Mongo, backend and
 engine at the final HTTP continuity observation. These settings do not
 attest host security, kernel integrity, registry trust or database contents.
+
+Actual host-bind destinations and read/write permissions must also match
+the reviewed model; arbitrary or writable model mounts cannot inherit the
+model's positive observation. Actual VM host-source path identity is not
+attested, because Docker Desktop can translate those paths. Conflicting
+tmpfs safety flags, root user aliases and explicitly disabled default
+security profiles are denied.

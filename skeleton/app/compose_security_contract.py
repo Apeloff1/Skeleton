@@ -32,6 +32,24 @@ def _options(value):
     return set(value)
 
 
+def _nonroot(user):
+    if type(user) is not str or not 1 <= len(user) <= 128:
+        return False
+    name=user.split(":",1)[0]
+    if not name or name.lower()=="root":
+        return False
+    return not (name.isascii() and name.isdecimal() and not name.strip("0"))
+
+
+def _reject_unconfined(value):
+    if value is None:
+        return
+    options=_options(value)
+    _need(not any("unconfined" in opt.lower() or opt.lower() in
+                  ("label:disable","label=disable","no-new-privileges:false","no-new-privileges=false")
+                  for opt in options),"runtime_security_profile_disabled")
+
+
 def _private_namespaces(spec, *, live=False):
     if live:
         _need(spec.get("privileged") is False, "runtime_privileged_container")
@@ -39,6 +57,7 @@ def _private_namespaces(spec, *, live=False):
               and spec.get("ipc_mode") in ("","private","shareable",None)
               and spec.get("uts_mode") in ("",None),
               "runtime_shared_host_namespace")
+        _reject_unconfined(spec.get("security_opt"))
         for key in ("cap_add","devices","device_requests","device_cgroup_rules"):
             _need(_empty(spec.get(key)), "runtime_unreviewed_device_or_capability")
     else:
@@ -46,6 +65,7 @@ def _private_namespaces(spec, *, live=False):
         _need(spec.get("pid") in (None,"") and spec.get("ipc") in (None,"","private","shareable")
               and spec.get("uts") in (None,"") and spec.get("network_mode") in (None,""),
               "compose_shared_host_namespace")
+        _reject_unconfined(spec.get("security_opt"))
         for key in ("cap_add","devices","device_cgroup_rules","device_requests","gpus",
                     "volumes_from","external_links","links"):
             _need(_empty(spec.get(key)), "compose_unreviewed_device_or_capability")
@@ -56,6 +76,7 @@ class IsolationContract:
     network: str
     protected: bool
     tmpfs_required: bool
+    reviewed_binds: tuple[tuple[str,bool], ...]
 
 
 def _network_names(value):
@@ -68,7 +89,9 @@ def _network_names(value):
 
 def _tmpfs_options(value):
     if type(value) is str:
-        return set(value.split(","))
+        parts=value.split(",")
+        _need(len(parts)==len(set(parts)),"runtime_tmpfs_options_invalid")
+        return set(parts)
     raise RuntimeIdentityDenied("runtime_tmpfs_options_invalid")
 
 
@@ -80,6 +103,8 @@ def _required_tmpfs(options):
     sizes={v for v in options if v.startswith("size=")}
     _need(len(sizes)==1 and next(iter(sizes)).lower() in ("size=64m","size=67108864"),
           "runtime_tmpfs_capacity_mismatch")
+    _need(options.issubset({"rw","noexec","nosuid","nodev","mode=1777"}|sizes),
+          "runtime_tmpfs_option_not_reviewed")
 
 
 def model_security(config, *, root: Path, hot: bool):
@@ -107,8 +132,8 @@ def model_security(config, *, root: Path, hot: bool):
             _need(type(tmpfs) is list and len(tmpfs)==1 and type(tmpfs[0]) is str
                   and tmpfs[0].startswith("/tmp:"),"compose_tmpfs_missing")
             _required_tmpfs(_tmpfs_options(tmpfs[0].split(":",1)[1]))
-            _need(spec.get("user") not in ("root","0","0:0",0),
-                  "compose_root_user_override")
+            if spec.get("user") is not None:
+                _need(_nonroot(spec["user"]),"compose_root_user_override")
         # Bind-mounted host paths are admitted only at reviewed roles and
         # destinations; no Docker socket or arbitrary host path exposure.
         allowed={"skeleton": {"/app/local-ai": True}}
@@ -132,9 +157,11 @@ def model_security(config, *, root: Path, hot: bool):
                     path=Path(source).resolve()
                     _need(path!=Path(path.anchor) and path!=(root/".env").resolve(),
                           "compose_model_bind_path_invalid")
+                _need(target not in actual,"compose_duplicate_host_bind")
                 actual[target]=ro
         _need(actual==allowed.get(role,{}),"compose_reviewed_bind_missing")
-        contracts[role]=IsolationContract(expected,role in _PROTECTED,role in _PROTECTED)
+        contracts[role]=IsolationContract(expected,role in _PROTECTED,role in _PROTECTED,
+                                          tuple(sorted(actual.items())))
     return contracts
 
 
@@ -154,16 +181,31 @@ def live_security(payload, expected: IsolationContract, *, require_healthy=False
               and _options(spec.get("security_opt")).issubset(_NO_PRIVS),
               "runtime_required_isolation_missing")
         user=spec.get("user")
-        _need(type(user) is str and user and user.split(":",1)[0] not in ("root","0"),
-              "runtime_nonroot_user_unverified")
+        _need(_nonroot(user),"runtime_nonroot_user_unverified")
         tmpfs=spec.get("tmpfs")
         _need(type(tmpfs) is dict and set(tmpfs)=={"/tmp"},"runtime_tmpfs_missing")
         _required_tmpfs(_tmpfs_options(tmpfs["/tmp"]))
+    mounts=payload.get("mounts")
+    _need(type(mounts) is list and len(mounts)<=128,"runtime_bind_inventory_invalid")
+    binds={}
+    for mount in mounts:
+        _need(type(mount) is dict,"runtime_bind_inventory_invalid")
+        if mount.get("Type")=="bind":
+            target=mount.get("Destination")
+            rw=mount.get("RW")
+            _need(type(target) is str and target not in binds and type(rw) is bool,
+                  "runtime_bind_inventory_invalid")
+            binds[target]=not rw
+    _need(tuple(sorted(binds.items()))==expected.reviewed_binds,
+          "runtime_host_bind_not_reviewed")
+    # Docker Desktop may translate host paths into VM mount paths; only
+    # actual destinations and access mode are claimed here. The source
+    # path is checked in the resolved model, not proven in the live VM.
     # On initial post-start the health check may be starting. At the final
     # HTTP continuity gate, require Docker's independent health verdict.
     if require_healthy:
         _need(payload.get("health")=="healthy","runtime_daemon_health_unverified")
-    return (expected.network,expected.protected,expected.tmpfs_required)
+    return (expected.network,expected.protected,expected.tmpfs_required,expected.reviewed_binds)
 
 
 def network_security(payload, project, expected):
