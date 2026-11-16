@@ -13,6 +13,7 @@ from skeleton.app.gameforge_expedition_board import expedition_board
 from skeleton.app.gameforge_expedition_recovery import plan_expedition
 from skeleton.app.gameforge_saga import MAX_ACTIONS, _admit, resume_saga, verify_saga
 from skeleton.app.gameforge_saga_owners import replay_episode, summarize
+from skeleton.app.gameforge_saga_search import search, MAX_STATES, MAX_ATTEMPTS
 from skeleton.app.original_quest_cli import _encode, _integer, _require
 from skeleton.game.gameplay.harbor_crafting import HarborError
 from skeleton.gameforge.errors import GameForgeError
@@ -107,8 +108,11 @@ def _continuation(episode: dict, prior: list, summary: dict) -> tuple[str, list]
     return "no_verified_local_continuation", []
 
 
-def recover(source: Any, receipt: Any, *, dialogue_budget: int = 1024, local_budget: int = 1024) -> dict:
+def recover(source: Any, receipt: Any, *, dialogue_budget: int = 1024, local_budget: int = 1024,
+            advanced_states: int = 32, advanced_attempts: int = 128) -> dict:
     _require(verify_saga(source, receipt, session=True), "saga checkpoint does not replay")
+    advanced_states = _integer(advanced_states, 1, MAX_STATES)
+    advanced_attempts = _integer(advanced_attempts, 1, MAX_ATTEMPTS)
     _, _, _, episodes = _admit(source)
     state = receipt["state"]
     outer = plan_expedition(source["expedition"], state["base"],
@@ -132,7 +136,17 @@ def recover(source: Any, receipt: Any, *, dialogue_budget: int = 1024, local_bud
                                                 state["episodes"][oid])
                 details[oid] = {"strategy": policy, "actions": len(suffix),
                                 "report_digest": state["episodes"][oid]["report_digest"]}
-                if policy in {"terminal_without_gate", "no_verified_local_continuation"}:
+                if policy == "no_verified_local_continuation":
+                    found = search(episodes[oid], _events(receipt, oid),
+                                   max_states=advanced_states, max_attempts=advanced_attempts)
+                    details[oid]["search"] = found
+                    if found["status"] == "completion_witness":
+                        policy, suffix = "bounded_owner_search", found["additional"]
+                        details[oid].update(strategy=policy, actions=len(suffix))
+                    else:
+                        policy = "advanced_" + found["status"]
+                if policy not in {"already_earned", "verified_witness_suffix",
+                                  "verified_wait_splice", "bounded_owner_search"}:
                     status = policy
                     blocker = {"scope": "advanced_episode", "objective": oid, "reason": policy}
                     break
@@ -152,6 +166,7 @@ def recover(source: Any, receipt: Any, *, dialogue_budget: int = 1024, local_bud
     body = {"schema": PLAN_SCHEMA, "source_digest": digest(source),
             "checkpoint_digest": receipt["session_digest"], "status": status,
             "dialogue_budget": dialogue_budget, "local_budget": local_budget,
+            "advanced_states": advanced_states, "advanced_attempts": advanced_attempts,
             "advanced_strategies": details, "blocker": blocker,
             "additional": additional, "next_action": additional[0] if additional else None,
             "completion_digest": completion["session_digest"] if completion else None,
@@ -221,7 +236,8 @@ def verify_derived(source: Any, receipt: Any, submitted: Any, *, kind: str, othe
             expected = episode_evidence(source, receipt, submitted["objective"])
         elif kind == "recovery":
             expected = recover(source, receipt, dialogue_budget=submitted["dialogue_budget"],
-                               local_budget=submitted["local_budget"])
+                               local_budget=submitted["local_budget"], advanced_states=submitted["advanced_states"],
+                               advanced_attempts=submitted["advanced_attempts"])
         elif kind == "comparison":
             expected = compare(source, receipt, other)
         else:
