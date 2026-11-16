@@ -223,6 +223,28 @@ export type CrawlAcquisitionReadiness = {
   network_authority_expanded: false; reason_inferred: false;
   independent_intake_requires_new_authorization: true;
 };
+export type NavigationDiscourse = {
+  url: string; quest: string; objective_coverage: number; uncovered_terms: number;
+  evidence_novelty: number; jeeves_proposal: number; dragon_counterproposal: number;
+  disagreement: number; final_priority: number; authority: 'advisory_only'; digest: string;
+};
+export type NavigationBacklogSummary = {
+  unique_targets: number; pending: number; active: number; visited: number;
+  depth_held_targets: number; counts: Record<string, number>;
+  max_records: number; max_bytes: number; last_discourse: NavigationDiscourse | null;
+  inventory_complete: false; authority: 'advisory_only';
+};
+export type NavigationTarget = {
+  url: string; ordinal: number; depth: number; parent_url: string | null;
+  parents: string[]; kind: string; relations: string[]; observations: number;
+  pending: boolean; phase: 'visited' | 'active' | 'depth_held' | 'pending' | 'observed_only';
+  navigation_authorized: false;
+};
+export type NavigationInventory = {
+  ok: true; session_id: string; snapshot_digest: string; read_only: true;
+  targets: NavigationTarget[]; next_after: number | null; summary: NavigationBacklogSummary;
+  network_authorized: false;
+};
 export type CrawlSession = {
   session_id: string; title: string; status: 'queued' | 'ready' | 'running' | 'paused' | 'completed' | 'cancelled' | 'budget_exhausted' | 'failed' | 'interrupted';
   state?: string; version: number; created_at: string; updated_at: string; seeds: string[];
@@ -234,6 +256,7 @@ export type CrawlSession = {
   duplicate_evidence?: CrawlDuplicateEvidence; checkpoint_recovery?: CrawlCheckpointRecovery;
   acquisition_economics?: CrawlAcquisitionEconomics;
   acquisition_readiness?: CrawlAcquisitionReadiness;
+  navigation_backlog?: NavigationBacklogSummary;
   publisher_intent?: { schema: 'skeleton.dragon.publisher-intent.v1'; method: PublisherIntakeMethod;
     intent_digest: string; operator_acknowledged: true; publisher_verified: false;
     license_verified: false; network_authority_expanded: false };
@@ -427,6 +450,30 @@ function validCurriculumTrace(trace: DragonCurriculumTrace, value: CrawlSession)
   }
   return true;
 }
+const NAVIGATION_KINDS = new Set(['seed', 'robots_sitemap', 'sitemap_urlset', 'sitemap_index', 'structured', 'document_link', 'http_link']);
+function navigationUrl(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length > 4096) return false;
+  try { const parsed = new URL(value); return ['https:', 'http:'].includes(parsed.protocol)
+    && !parsed.username && !parsed.password && !parsed.hash; } catch { return false; }
+}
+function validNavigationSummary(row: NavigationBacklogSummary): boolean {
+  if (!row || row.authority !== 'advisory_only' || row.inventory_complete !== false
+    || row.max_records !== 1024 || row.max_bytes !== 384 * 1024
+    || !integer(row.unique_targets, 1024) || !integer(row.pending, row.unique_targets)
+    || !integer(row.active, 512) || !integer(row.visited, 1024)
+    || !integer(row.depth_held_targets, row.unique_targets) || !row.counts) return false;
+  for (const name of ['observations', 'outside_policy', 'capacity_omissions', 'circuit_held',
+    'depth_held', 'promoted', 'retired', 'parser_capped']) {
+    if (!integer(row.counts[name], 1000000000)) return false;
+  }
+  const d = row.last_discourse;
+  if (d === null) return true;
+  if (!d || d.authority !== 'advisory_only' || !navigationUrl(d.url) || !HASH.test(d.digest)
+    || !['rest', 'recover', 'conserve', 'explore', 'synthesize', 'diversify'].includes(d.quest)) return false;
+  return [d.objective_coverage, d.uncovered_terms, d.evidence_novelty, d.jeeves_proposal,
+    d.dragon_counterproposal, d.disagreement, d.final_priority].every(
+      x => typeof x === 'number' && Number.isFinite(x) && x >= 0 && x <= 1);
+}
 function session(value: CrawlSession, expectedId?: string): CrawlSession {
   if (!value || !ID.test(value.session_id) || expectedId && value.session_id !== expectedId || !STATUSES.has(value.status)
     || !integer(value.version) || value.version < 1 || typeof value.title !== 'string' || value.title.length > 160
@@ -436,6 +483,7 @@ function session(value: CrawlSession, expectedId?: string): CrawlSession {
     || !Array.isArray(value.queue) || value.queue.length > 32 || JSON.stringify(value).length > 512 * 1024) invalid('The crawler returned an invalid session projection.');
   for (const count of Object.values(value.counters)) if (!integer(count, 33554432)) invalid('The crawler counters are invalid.');
   for (const field of ['requests', 'bytes', 'documents', 'failures'] as const) if (!integer(value.counters[field], 33554432)) invalid('The crawler counters are incomplete.');
+  if (value.navigation_backlog !== undefined && !validNavigationSummary(value.navigation_backlog)) invalid('Invalid checkpointed navigation inventory.');
   if (value.instruction_security !== undefined && !validInstructionSecurity(value.instruction_security, value.counters.requests)) invalid('The crawler instruction incident custody is invalid.');
   if (value.adaptive_origin_health !== undefined && !validOriginHealth(value.adaptive_origin_health)) invalid('The crawler origin health projection is invalid.');
   if (value.publisher_intent !== undefined) {
@@ -1050,6 +1098,39 @@ export async function listCrawls(cursor?: string, signal?: AbortSignal): Promise
 }
 export async function getCrawl(id: string, signal?: AbortSignal): Promise<CrawlSession> {
   const value = await read(api.get<{ session: CrawlSession }>(ROOT + '/sessions/' + identifier(id), options(signal)), getAuthToken(), 'The crawler session could not be refreshed.'); return session(value.session, id);
+}
+export async function getNavigationInventory(id: string, cursor?: { snapshot_digest: string; after: number },
+  signal?: AbortSignal): Promise<NavigationInventory> {
+  if (cursor && (!HASH.test(cursor.snapshot_digest) || !integer(cursor.after, 1000000000)))
+    invalid('Invalid navigation checkpoint cursor.');
+  const url = ROOT + '/sessions/' + identifier(id) + '/navigation?limit=32'
+    + (cursor ? '&snapshot_digest=' + cursor.snapshot_digest + '&after=' + cursor.after : '');
+  const value = await read(api.get<NavigationInventory>(url, options(signal)), getAuthToken(),
+    'The navigation inventory could not be loaded.');
+  if (!value || value.ok !== true || value.session_id !== id || value.read_only !== true
+    || value.network_authorized !== false || !HASH.test(value.snapshot_digest)
+    || (cursor && value.snapshot_digest !== cursor.snapshot_digest)
+    || !validNavigationSummary(value.summary) || !Array.isArray(value.targets)
+    || value.targets.length > 32 || JSON.stringify(value).length > 512 * 1024)
+    invalid('The crawler navigation page is invalid.');
+  let ordinal = cursor?.after ?? 0;
+  for (const target of value.targets) {
+    if (!target || !navigationUrl(target.url) || !integer(target.ordinal, 1000000000)
+      || target.ordinal <= ordinal || !integer(target.depth, 4)
+      || (target.parent_url !== null && !navigationUrl(target.parent_url))
+      || !Array.isArray(target.parents) || target.parents.length > 4 || !target.parents.every(navigationUrl)
+      || !NAVIGATION_KINDS.has(target.kind) || !Array.isArray(target.relations)
+      || !target.relations.length || target.relations.length > NAVIGATION_KINDS.size
+      || !target.relations.every(kind => NAVIGATION_KINDS.has(kind))
+      || !target.relations.includes(target.kind) || !integer(target.observations, 1000000000)
+      || target.observations < 1 || typeof target.pending !== 'boolean'
+      || !['visited', 'active', 'depth_held', 'pending', 'observed_only'].includes(target.phase)
+      || target.navigation_authorized !== false) invalid('The crawler returned an invalid navigation target.');
+    ordinal = target.ordinal;
+  }
+  if (value.next_after !== null && (!value.targets.length || value.next_after !== ordinal))
+    invalid('The crawler returned an invalid navigation cursor.');
+  return value;
 }
 export const PUBLISHER_INTAKE_METHODS = ['public_api', 'publisher_feed', 'open_dataset_manifest', 'licensed_public_export'] as const;
 export type PublisherIntakeMethod = typeof PUBLISHER_INTAKE_METHODS[number];
