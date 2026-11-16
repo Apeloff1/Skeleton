@@ -77,17 +77,20 @@ test('all 8 native sidecar modes and full 14-matrix source survive Forge > Galax
     const first = H.handoffFromForge(source, 1700000000000);
     const outbound = H.handoffFromGalaxy({
       title: 'Future Harbor', vision: '', genreId: 'beat_em_up',
+      profile: source.galaxyProfile,
     }, first, 1700000000001);
     const restored = H.forgeStateFromHandoff(outbound, 1700000000002);
     const request = Q.buildRunRequest(restored);
     assert.equal(restored.playable.mode, id);
     assert.equal(restored.playable.launch, true);
-    assert.equal(restored.step, 'review');
+    // Explicit profile transfer revisits options before the final review.
+    assert.equal(restored.step, 'options');
     assert.deepEqual(restored.instruments, { tempo: 0.71, risk: 0.22 });
     assert.deepEqual(restored.beats, { pace: 'unhurried', space: 'dungeon' });
     assert.equal(request.playable_archetype, id);
     assert.equal(request.playtest, 'require');
     assert.equal(request.include_files, true);
+    assert.deepEqual(request.galaxy_profile, source.galaxyProfile);
     assert.equal(request.galaxy_profile.config.extra_params.authored_slider_1, 99);
     assert.equal(G.MATRIX_FIELDS.filter(k => request.galaxy_profile.config[k]).length, 14);
   }

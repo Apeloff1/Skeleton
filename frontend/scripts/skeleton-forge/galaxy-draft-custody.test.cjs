@@ -142,6 +142,6 @@ test('Galaxy studio button snapshots draft before invoking the separate Forge ha
   assert.match(modal, /testID="galaxy-save-draft"/);
   assert.match(modal, /testID="galaxy-draft-saved"/);
   assert.match(modal, /onSendToForge\(\{ title, vision: gameVision/);
-  assert.match(route, /recoverCreatorRoute\(loadGalaxyDraft, \(\) => consumeCreatorBridge\('galaxy'\), isCurrent\)/);
+  assert.match(route, /recoverCreatorRoute\(loadGalaxyDraft, \(\) => consumeCreatorBridge\('galaxy', authEpoch, isCurrent\), isCurrent\)/);
   assert.match(route, /initialGalaxyDraft=\{savedGalaxy\}/);
 });
