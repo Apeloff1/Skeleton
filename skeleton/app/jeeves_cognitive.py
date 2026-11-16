@@ -115,9 +115,37 @@ def clauses(question):
     return result
 
 
+# Explicit multilingual intent vocabulary, normalized before overlap.
+# These are bounded routing signals, not translation or language detection.
+_MULTILINGUAL_CUES = {
+    "code": "kode programmering feilretting implementer test kodefeil programmieren debuggen implementieren code programmer déboguer implementar programar depurar código corrigir 编程 代码 调试 实现 テスト コード 実装 개발 코드 구현 برمجة كود تنفيذ कोड प्रोग्रामिंग",
+    "research": "forskning undersøk sammenlign kilder bevis verifiser recherchieren vergleichen quellen belege vérifier recherche comparer sources investigar comparar fuentes pesquisa fontes 研究 比较 来源 验证 調査 比較 検証 연구 비교 검증 بحث مقارنة مصادر शोध तुलना",
+    "planning": "planlegg planlegging arkitektur avhengigheter planung entwerfen architektur planifier architecture dépendances planificar diseño arquitectura planejamento dependências 规划 设计 架构 依赖 計画 設計 計画立案 계획 설계 의존성 تخطيط تصميم خطة योजना डिजाइन",
+    "creative": "skriv fortelling skap figur geschichte schreiben erfinden écrire histoire personnage escribir historia personaje escrever história 创作 故事 角色 物語 執筆 캐릭터 창작 이야기 قصة كتابة إبداع कहानी लेखन",
+    "game": "spill oppdrag scene nivå spiel quest szene spielentwicklung jeu quête niveau juego misión nivel jogo missão 游戏 关卡 任务 ゲーム クエスト 게임 퀘스트 레벨 لعبة مهمة مستوى खेल स्तर",
+    "analysis": "analyser beregn forklar vurder analysieren berechnen erklären analyser calculer expliquer analizar calcular explicar analisar calcular 计算 分析 解释 分析する 計算 説明 분석 계산 설명 تحليل حساب شرح विश्लेषण गणना",
+    "memory": "husk fortsett tidligere forrige erinnerung erinnern vorher fortsetzen mémoire souvenir continuer recordar anterior continuar lembrar anterior 记忆 继续 之前 記憶 続ける 以前 기억 계속 이전 ذاكرة تذكر متابعة स्मृति याद",
+    "media": "bilde lyd video foto bild audio aufnahme image audio vidéo imagen sonido vídeo imagem áudio 图片 音频 视频 画像 音声 動画 이미지 오디오 영상 صورة صوت فيديو चित्र ऑडियो",
+}
+_SCRIPT_CUES = frozenset({"研究", "比较", "来源", "验证", "编程", "代码", "调试", "实现",
+                          "规划", "设计", "架构", "依赖", "创作", "故事", "角色",
+                          "游戏", "关卡", "任务", "计算", "分析", "解释", "记忆", "继续",
+                          "之前", "图片", "音频", "视频", "調査", "比較", "検証", "コード",
+                          "実装", "計画", "設計", "物語", "執筆", "ゲーム", "クエスト",
+                          "計算", "説明", "記憶", "続ける", "画像", "音声", "動画"})
+
+
 def _roles(question):
     words = set(_terms(question))
-    scores = [(name, len(words & cues)) for name, cues in _CUES.items()]
+    normalized = unicodedata.normalize("NFKC", question).casefold()
+    scores = []
+    for name, cues in _CUES.items():
+        localized = set(_MULTILINGUAL_CUES[name].split())
+        matches = words & (cues | localized)
+        # CJK writing need not delimit words with spaces. Substring cues are
+        # limited to an explicit language-script inventory, never Latin words.
+        matches |= {cue for cue in localized & _SCRIPT_CUES if cue in normalized}
+        scores.append((name, len(matches)))
     ranked = sorted((row for row in scores if row[1]), key=lambda row: (-row[1], row[0]))
     return [name for name, _ in ranked[:3]] or ["general"]
 
