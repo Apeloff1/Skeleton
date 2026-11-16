@@ -7,6 +7,7 @@ import json
 from typing import Any, Iterable, Iterator, Mapping, Sequence
 
 from skeleton.cortex.transformer import TinyTransformer, UNK
+from skeleton.cortex.bpe import BytePairEncoder
 
 from .flgb_model_runtime import (
     MAX_TOKENS,
@@ -215,7 +216,14 @@ class NativeTokenizer:
         # Compare actual BPE canonical bytes with their admitted identity,
         # including the None/no-BPE state. No copied snapshot or full
         # vocabulary serialization is required on this hot path.
-        if digest_json(self._raw_bpe_snapshot()) != self._bpe_digest:
+        bpe = getattr(self.model, "bpe", None)
+        if bpe is None and self._bpe_snapshot is None:
+            return
+        # The built-in BPE snapshot already uses canonical string keys.
+        # Custom snapshot providers retain the pre-existing JSON roundtrip
+        # so unusual keys/container encodings have identical semantics.
+        observed = self._raw_bpe_snapshot() if type(bpe) is BytePairEncoder else self._capture_bpe()
+        if digest_json(observed) != self._bpe_digest:
             raise TokenizerContractError("BPE/tokenizer state changed after admission")
 
     def encode_ids(self, text: str) -> tuple[int, ...]:
