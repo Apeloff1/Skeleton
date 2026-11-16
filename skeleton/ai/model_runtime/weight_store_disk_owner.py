@@ -10,6 +10,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from hashlib import sha256
+import json
 import os
 from pathlib import Path
 import re
@@ -19,7 +20,7 @@ from uuid import uuid4
 from typing import Iterator, Mapping
 
 from .flgb_model_runtime import MAX_WEIGHT_BYTES, ModelIdentity, WeightLoadPlan, canonical_bytes
-from .weight_shard_store import WeightShardStore, WeightShardStoreError
+from .weight_shard_store import WeightShardStore, WeightShardStoreError, _bounded_regular_reader
 from .weight_store_transaction import begin_intent, finish_intent, read_intent, read_last
 
 _HEX = re.compile(r"[0-9a-f]{64}\Z")
@@ -98,11 +99,47 @@ class WeightStoreDiskOwner:
             os.close(directory_fd)
         # Establish one persistent byte/entry/free-space policy under the
         # same shared slot. A later process cannot choose a larger cap.
-        with self._owned() as (directory_fd, fd):
+        with self._owned(shared=not initialize) as (directory_fd, fd):
             if initialize:
                 self._require_no_control_temps()
             self._bind_policy(directory_fd, initialize=initialize)
             self._inspect_lock(directory_fd, fd)
+
+    @classmethod
+    def open_existing(cls, store: WeightShardStore) -> "WeightStoreDiskOwner":
+        """Read the persisted policy, then independently rebind it to the slot.
+
+        Runtime readers do not supply or install a replacement disk policy.
+        The constructor repeats exact private-file and inode verification
+        under a shared lock before any source bytes are inspected.
+        """
+        if not isinstance(store, WeightShardStore):
+            raise WeightShardStoreError("canonical store required")
+        with _bounded_regular_reader(store.root / _POLICY, _POLICY_LIMIT) as stream:
+            raw = stream.read(_POLICY_LIMIT + 1)
+        try:
+            record = json.loads(raw)
+            if (type(record) is not dict or set(record) != {"schema", "root_inode", "lock_inode", "policy"}
+                    or record["schema"] != "skeleton.weight-disk-policy.v1"
+                    or canonical_bytes(record) != raw):
+                raise WeightShardStoreError("invalid persisted disk policy")
+            policy = DiskAdmissionPolicy(**record["policy"])
+        except (ValueError, TypeError, KeyError, RecursionError) as exc:
+            raise WeightShardStoreError("invalid persisted disk policy") from exc
+        return cls(store, policy, initialize=False)
+
+    @contextmanager
+    def read_guard(self) -> Iterator[dict]:
+        """Cooperating shared custody across a synchronous source inspection."""
+        with self._owned(shared=True) as (directory_fd, fd):
+            self._require_no_control_temps()
+            if read_intent(directory_fd, self._policy_sha256) is not None:
+                raise WeightShardStoreError("unresolved staging intent blocks source inspection")
+            yield {"policy_sha256": self._policy_sha256, "scope": "cooperating_shared_read"}
+            self._inspect_lock(directory_fd, fd)
+            self._require_no_control_temps()
+            if read_intent(directory_fd, self._policy_sha256) is not None:
+                raise WeightShardStoreError("staging intent appeared during source inspection")
 
     def _require_no_control_temps(self) -> None:
         # Bound the root control namespace scan separately from the accounted
@@ -199,18 +236,19 @@ class WeightStoreDiskOwner:
         return observed
 
     @contextmanager
-    def _owned(self) -> Iterator[tuple[int, int]]:
+    def _owned(self, *, shared: bool = False) -> Iterator[tuple[int, int]]:
         import fcntl
 
         directory_fd = os.open(self._store.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
         try:
-            fd = os.open(_LOCK, os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory_fd)
+            flags = (os.O_RDONLY if shared else os.O_RDWR) | os.O_NOFOLLOW | os.O_NONBLOCK
+            fd = os.open(_LOCK, flags, dir_fd=directory_fd)
             try:
                 self._inspect_lock(directory_fd, fd)
                 try:
-                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    fcntl.flock(fd, (fcntl.LOCK_SH if shared else fcntl.LOCK_EX) | fcntl.LOCK_NB)
                 except BlockingIOError as exc:
-                    raise WeightShardStoreError("cooperative disk writer already active") from exc
+                    raise WeightShardStoreError("cooperative disk writer already active or shared readers own the slot") from exc
                 self._inspect_lock(directory_fd, fd)
                 yield directory_fd, fd
             finally:
@@ -356,6 +394,10 @@ class WeightStoreDiskOwner:
             body["manifest_sha256"] = actual_manifest_sha
             body["intent_digest"] = intent["digest"]
             receipt = {**body, "digest": sha256(canonical_bytes(body)).hexdigest()}
+            # Final verification reads the committed shards under the exact
+            # acknowledged manifest pin. Size accounting alone cannot qualify
+            # the staged object bytes after the temporary publication boundary.
+            self._store.verified_paths(key, expected_manifest_sha256=actual_manifest_sha)
             self._inspect_lock(directory_fd, fd)
             outcome = finish_intent(
                 directory_fd, policy_sha256=self._policy_sha256,
