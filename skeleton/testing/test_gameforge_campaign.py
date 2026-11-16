@@ -460,3 +460,44 @@ def test_helpers_via_canonical_cli_and_historical_fork(tmp_path):
     code, forked, _ = invoke("fork-slot", {"request": source, "slot": "a",
         "parent_revision": 0, "expected_digest": start["session_digest"], "child_slot": "b"}, path)
     assert code == 0 and forked["child"]["receipt"] == start
+
+
+def test_exact_board_turn_refuses_stale_selection_and_never_autoplays():
+    from skeleton.app.gameforge_campaign_board import board, choose_board_action
+    source = spec()
+    initial = play_campaign(source, [])
+    current = board(source, initial)
+    event = {"type": "dialogue", "npc": "keeper", "choice": "listen"}
+    index = current["legal_actions"].index(event)
+    result = choose_board_action(source, initial, current["board_digest"], index)
+    assert result["receipt"]["actions"] == [event]
+    assert result["board"]["action_count"] == 1
+    assert result["receipt"]["state"]["status"] == "in_progress"
+    with pytest.raises(ValueError, match="board changed"):
+        choose_board_action(source, result["receipt"], current["board_digest"], index)
+    with pytest.raises(ValueError):
+        choose_board_action(source, initial, current["board_digest"], True)
+    assert invoke("turn", {"request": source, "receipt": initial,
+                           "board_digest": current["board_digest"], "index": index})[1] == result
+
+
+def test_portable_handoff_requires_independent_source_and_full_replay():
+    from skeleton.app.gameforge_campaign_board import export_checkpoint, import_checkpoint
+    source = spec()
+    witness = build_campaign(source)["witness"]
+    checkpoint = play_campaign(source, witness[:1])
+    handoff = export_checkpoint(source, checkpoint)
+    assert import_checkpoint(source, handoff) == checkpoint
+    changed = deepcopy(source)
+    changed["quest_request"]["quest"]["seed"] += 1
+    with pytest.raises(ValueError, match="source mismatch"):
+        import_checkpoint(changed, handoff)
+    forged = deepcopy(handoff)
+    forged["receipt"]["state"]["earned_rewards"] = [{"kind": "gold", "amount": 999}]
+    rehash(forged["receipt"], "session_digest")
+    rehash(forged, "handoff_digest")
+    with pytest.raises(ValueError):
+        import_checkpoint(source, forged)
+    assert invoke("export-session", {"request": source, "receipt": checkpoint})[1] == handoff
+    assert invoke("import-session", {"request": source, "handoff": handoff})[1] == checkpoint
+    assert invoke("import-session", {"request": source, "handoff": forged})[0] == 1
