@@ -52,7 +52,7 @@ def _write_all(fd: int, block: bytes) -> None:
 
 
 @contextmanager
-def open_sealed_weight_pages(
+def _open_sealed_weight_pages(
     store: WeightShardStore,
     plan_digest: str,
     *,
@@ -155,6 +155,24 @@ def open_sealed_weight_pages(
                 failures.append(exc)
         if failures:
             raise SealedWeightPagesError("sealed page cleanup remains incomplete") from failures[0]
+
+
+@contextmanager
+def open_sealed_weight_pages(
+    store: WeightShardStore, plan_digest: str, *, model_identity: ModelIdentity,
+    max_bytes: int, progress_check: Callable[[int, int], None] | None = None,
+    expected_manifest_sha256: str | None = None, max_mappings: int = 256,
+) -> Iterator[tuple[mmap.mmap, ...]]:
+    """Guard managed source bytes through the synchronous sealed consumer."""
+    from .managed_weight_read import managed_weight_read
+
+    with managed_weight_read(store):
+        with _open_sealed_weight_pages(
+            store, plan_digest, model_identity=model_identity, max_bytes=max_bytes,
+            progress_check=progress_check, expected_manifest_sha256=expected_manifest_sha256,
+            max_mappings=max_mappings,
+        ) as pages:
+            yield pages
 
 
 __all__ = ["SealedWeightPagesError", "open_sealed_weight_pages"]
