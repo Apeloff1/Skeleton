@@ -210,9 +210,9 @@ Retention cannot discard unknown effects or referenced dependencies. The existin
 broker deliberately denies fenced mode until authenticated completion and tenant
 quota reconciliation can safely represent uncertain physical effects.
 
-Campaign measurement: 26/72 adoption targets have partial source implementations
+Wave 6 historical measurement: 26/72 adoption targets had partial source implementations
 (IDs 01,02,03,04,06,08,09,11,14,26,39,41,47,49,50,51,54,55,56,58,60,61,62,66,68,71).
-None is claimed fully qualified. Event sourcing, distributed deadlock detection,
+At wave 6 none was claimed fully qualified. Event sourcing, distributed deadlock detection,
 and journal compaction are not achieved by receipts, DAG cycle checks or heap
 compaction; these remain open in the primary register.
 
@@ -266,3 +266,10 @@ https://kubernetes.io/docs/concepts/scheduling-eviction/scheduling-framework/
 New partial source targets: 15, 31, 32, 33, 35, 36, 37, 40, 44, 45, 63.
 Physical allocation, measured GPU batching, true shared memory custody, device
 migration, generation invalidation wiring and scale benchmarks remain open.
+
+Current campaign measurement: 37/72 partial source targets. The wave-7
+intermediate exact head passed all 33 focused tests and the 183-mapping
+architecture validator. The separate integration source-object audit identified
+inherited stale source pins; the four verified mismatches for Jeeves, Learning,
+School and Provenance are corrected against their actual Git trees. No historical
+audit record or validator has been changed. Final-head CI remains required.
