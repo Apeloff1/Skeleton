@@ -218,6 +218,8 @@ def test_installer_skip_python_runs_bounded_validation(tmp_path, monkeypatch):
     commands = []
 
     def runner(command, **kwargs):
+        if command[1] in {"volume", "ps"}:
+            return subprocess.CompletedProcess(command, 0)
         commands.append(tuple(command))
         return subprocess.CompletedProcess(command, 0, stdout="valid\n", stderr="")
 
@@ -883,3 +885,52 @@ def test_admin_password_rejects_same_inode_mutation_during_read(tmp_path, monkey
     monkeypatch.setattr(os,"fdopen",Reader)
     with pytest.raises(ValueError,match="identity changed"):
         setup._operator_admin("owner@example.invalid",path)
+
+
+
+@pytest.mark.parametrize("query",["replicaSet=rs0&authSource=admin","authSource=other","tls=true"])
+def test_setup_never_rewrites_explicit_local_mongo_topology(tmp_path,query):
+    uri=_test_mongo_uri("admin","fixture-old","mongo:27017","tutolage")+"?"+query
+    env=tmp_path/".env"
+    env.write_text("MONGO_INITDB_ROOT_PASSWORD=stable-root-fixture\nMONGO_URL="+uri+"\n")
+    ensure_runtime_environment(tmp_path)
+    assert _read_values(env)["MONGO_URL"]==uri
+
+
+def test_guard_refusal_preserves_original_persistent_configuration(tmp_path):
+    from skeleton.app.storage_custody import StorageCustodyDenied
+    env=tmp_path/".env"
+    original="MONGO_INITDB_ROOT_PASSWORD=stable-root-fixture\nGF_KEYHOLDER_SEED=\n"
+    env.write_text(original)
+    def deny():
+        raise StorageCustodyDenied("Existing application storage detected")
+    with pytest.raises(StorageCustodyDenied):
+        ensure_runtime_environment(tmp_path,storage_guard=deny)
+    assert env.read_text()==original
+    assert not (tmp_path/"data"/"local-ai").exists()
+
+
+def test_fresh_setup_guard_runs_before_private_publication(tmp_path):
+    calls=[]
+    def guard():
+        assert not (tmp_path/".env").exists()
+        assert not (tmp_path/"data"/"local-ai").exists()
+        calls.append("observed")
+    result=ensure_runtime_environment(tmp_path,storage_guard=guard)
+    assert result.created and calls==["observed"]
+    ensure_runtime_environment(tmp_path,storage_guard=lambda:pytest.fail("stable secrets regenerated"))
+
+
+def test_install_blocks_storage_conflict_before_compose_or_new_credentials(tmp_path,monkeypatch):
+    from skeleton.app.storage_custody import StorageCustodyDenied
+    report=PreloadReport(tmp_path,"test","3.11",(PreloadCheck("host:ready",True,"ready"),))
+    monkeypatch.setattr("skeleton.app.installer.inspect_host",lambda *a,**k:report)
+    def runner(command,**kwargs):
+        assert command[1] in {"volume","ps"}
+        if command[1]=="volume" and "--filter" not in command:
+            kwargs["stdout"].write(b"old_install_mongo_data\n")
+        return subprocess.CompletedProcess(command,0)
+    receipt=install_application(tmp_path,start=True,install_python=False,runner=runner)
+    assert not receipt.ok and receipt.phases[-1].name=="setup-runtime"
+    assert "Existing application storage" in receipt.phases[-1].detail
+    assert not (tmp_path/".env").exists()

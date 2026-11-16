@@ -65,7 +65,7 @@ def _is_placeholder(value: str) -> bool:
     ) or lowered in {"example", "example-value", "example-secret"}
 
 
-def _bundled_mongo_endpoint(value: str) -> bool:
+def _bundled_mongo_endpoint(value: str, database: str) -> bool:
     """Recognize only the bundled Mongo host, including legacy no-auth URIs.
 
     Remote database URLs must never be rewritten during setup. URL parsing
@@ -77,6 +77,9 @@ def _bundled_mongo_endpoint(value: str) -> bool:
             parsed.scheme == "mongodb"
             and parsed.hostname == "mongo"
             and parsed.port in {None, 27017}
+            and parsed.path in {"", "/", "/" + database}
+            and parsed.query in {"", "authSource=admin"}
+            and not parsed.fragment
         )
     except ValueError:
         return False
@@ -539,6 +542,7 @@ def _ensure_runtime_environment_locked(
     rotate_secrets: bool = False,
     admin_email: str | None = None,
     admin_password_file: Path | None = None,
+    storage_guard=None,
 ) -> SetupResult:
     """Create or repair .env without overwriting valid existing values."""
 
@@ -691,7 +695,8 @@ def _ensure_runtime_environment_locked(
     }
     for key, generated in generated_uris.items():
         current = values.get(key, "")
-        local_generated_uri = _bundled_mongo_endpoint(current)
+        database = "tutolage" if key == "MONGO_URL" else "skeleton"
+        local_generated_uri = _bundled_mongo_endpoint(current, database)
         # A remote URI may legitimately contain "change-me" in its hostname
         # or credential. Never redirect any operator-supplied remote Mongo
         # endpoint to the bundled database, even if a placeholder token
@@ -747,6 +752,13 @@ def _ensure_runtime_environment_locked(
         raise ValueError("generated runtime .env does not round-trip through the runtime parser")
 
     _require_configuration_destination(env_path, admitted_stamp)
+    # The shipping CLI/installer binds credential generation to a read-only
+    # observation of the selected Docker daemon. The low-level library also
+    # supports offline fixture generation when no guard is provided.
+    from skeleton.app.storage_custody import DURABLE_KEYS
+    if storage_guard is not None and DURABLE_KEYS.intersection(configured):
+        storage_guard()
+        _require_configuration_destination(env_path, admitted_stamp)
     if _prepare_model_directory(root, values):
         warnings.append("Local AI mount directory prepared; no model files acquired or provider activated")
 
@@ -772,6 +784,7 @@ def ensure_runtime_environment(
     rotate_secrets: bool = False,
     admin_email: str | None = None,
     admin_password_file: Path | None = None,
+    storage_guard=None,
 ) -> SetupResult:
     """Cross-process, fail-closed runtime bootstrap with stable secret custody."""
     root = (root or find_repo_root()).resolve()
@@ -781,4 +794,5 @@ def ensure_runtime_environment(
             rotate_secrets=rotate_secrets,
             admin_email=admin_email,
             admin_password_file=admin_password_file,
+            storage_guard=storage_guard,
         )

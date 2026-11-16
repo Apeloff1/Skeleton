@@ -1116,3 +1116,21 @@ Acknowledgment records an explicit operator decision; it does not verify
 daemon idleness, retry startup, delete application data or certify readiness.
 A malformed or mismatched intent is intentionally preserved for manual
 investigation. Do not delete the lock or pending record to bypass custody.
+
+
+
+### Persistent identity on reinstall
+
+The installer and source setup command require a read-only selected-daemon
+storage inventory before generating missing persistent database/signing/sealing
+credentials. A deleted .env does not imply an empty Docker installation.
+Canonical volume suffixes, Compose volume role labels and fixed application
+container names are checked, including stopped containers; inventory changes
+or unverified Docker output deny new identity. No volume is created, mounted,
+deleted, inspected for contents or authenticated by this check. Existing
+credentials are preserved; restore the original private configuration rather
+than generating keys for old data. Explicit custom Mongo database paths,
+replica-set and authentication options are not normalized into a standalone
+bundled URI. This conservative policy may block another canonical stack in
+the same Docker context; independent migration/backup qualification is still
+required. Low-level offline configuration generation is not storage-qualified.

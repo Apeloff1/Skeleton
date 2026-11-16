@@ -210,6 +210,9 @@ def install_application(
     )
 
     def run_pipeline(lease):
+        from skeleton.app.storage_custody import StorageCustodyDenied, require_new_storage_identity
+        # Match the selected Docker context for credential custody and launch.
+        admitted_process_env = dict(os.environ)
         preload = inspect_host(
             root,
             runner=runner,
@@ -233,7 +236,13 @@ def install_application(
                 rotate_secrets=rotate_secrets,
                 admin_email=admin_email,
                 admin_password_file=admin_password_file,
+                storage_guard=lambda: require_new_storage_identity(
+                    root, runner=runner, environ=admitted_process_env,
+                ),
             )
+        except StorageCustodyDenied as exc:
+            phases.append(InstallPhase("setup-runtime", False, str(exc)))
+            return InstallReceipt(root, tuple(phases))
         except (OSError, ValueError) as exc:
             phases.append(
                 InstallPhase(
@@ -254,8 +263,6 @@ def install_application(
         except (OSError, ValueError, UnicodeError):
             phases.append(_runtime_source_rejection())
             return InstallReceipt(root=root, phases=tuple(phases))
-        admitted_process_env = dict(os.environ)
-
         def source_stable():
             return lease.current() and _runtime_source_stable(root, admitted_digest)
 
@@ -703,6 +710,8 @@ def run_setup_command(command: str, args: argparse.Namespace, root: Path | None 
         return _print_preload(inspect_host(root), as_json=bool(args.as_json))
     if command == "setup":
         from skeleton.app.runtime_operation import RuntimeOperationDenied, runtime_operation
+        from skeleton.app.storage_custody import require_new_storage_identity
+        captured = dict(os.environ)
         try:
             with runtime_operation(root, "setup") as lease:
                 if not lease.current():
@@ -712,6 +721,7 @@ def run_setup_command(command: str, args: argparse.Namespace, root: Path | None 
                     rotate_secrets=bool(args.rotate_secrets),
                     admin_email=getattr(args, "admin_email", None),
                     admin_password_file=getattr(args, "admin_password_file", None),
+                    storage_guard=lambda: require_new_storage_identity(root, environ=captured),
                 )
                 if not lease.current():
                     raise RuntimeOperationDenied("runtime operation custody changed")
