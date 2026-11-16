@@ -123,7 +123,10 @@ class MeasuredWholeRequestEngine:
             slices = self._session.consume(grant, consumer=self._consumer)
             if slices != ({"request_id": operation, "phase": "prefill", "tokens": demand},):
                 return self._finish(receipt, "partial_grant_deferred")
-            deadline_ns = min(grant["expires_ns"], caller_deadline)
+            deadline_ns = min(
+                self._session.execution_deadline(grant["expires_ns"], consumer=self._consumer),
+                caller_deadline,
+            )
             if time.monotonic_ns() >= deadline_ns:
                 return self._finish(receipt, "expired_before_dispatch")
             try:
