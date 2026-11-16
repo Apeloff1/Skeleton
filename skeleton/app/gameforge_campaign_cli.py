@@ -64,7 +64,7 @@ def open_workspace(path: Path, *, create: bool) -> Iterator[CampaignStore]:
     try:
         db.execute("PRAGMA synchronous = FULL")
         db.execute("PRAGMA trusted_schema = OFF")
-        yield CampaignStore(db)
+        yield CampaignStore(db, initialize=create)
     finally:
         db.close()
 
