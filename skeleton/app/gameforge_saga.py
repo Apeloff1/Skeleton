@@ -13,7 +13,7 @@ from skeleton.app.gameforge_expedition import (
     _admit as admit_base, _replay as replay_base, build_expedition, play_expedition,
 )
 from skeleton.app.gameforge_saga_owners import (
-    admit_episode, candidate_actions, replay_episode, summarize,
+    action_limit, admit_episode, candidate_actions, replay_episode, summarize,
 )
 from skeleton.app.original_quest_cli import _encode, _object, _require, _text
 from skeleton.gameforge.errors import GameForgeError
@@ -79,7 +79,7 @@ def _replay(data: dict, prepared: tuple, episodes: dict, events: Any, *, offer_a
                 admitted.add(oid)
             _require(type(action["action"]) is dict, "local owner action must be an object")
             local[oid].append(action["action"])
-            _require(len(local[oid]) <= episodes[oid]["source"]["max_ticks"],
+            _require(len(local[oid]) <= action_limit(episodes[oid]),
                      "local owner tick ceiling exceeded")
             reports.pop(oid, None)
             summaries.pop(oid, None)
