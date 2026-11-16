@@ -131,14 +131,22 @@ def accept_scene(world: Any = None, *, session: Any = None,
             + (["victory_ending_not_proven"] if "won" not in proofs else [])
         ),
     }
-    try:
-        serialized = json.dumps(report, sort_keys=True, separators=(",", ":"))
-    except (TypeError, ValueError, RecursionError) as exc:
-        raise SceneTravelError("invalid acceptance report encoding") from exc
-    if len(serialized.encode("utf-8")) > MAX_REPORT_BYTES:
-        raise SceneTravelError("acceptance report exceeds 2 MiB budget")
+    _report_bytes(report)
     report["report_digest"] = dig(report)
+    _report_bytes(report)
     return report
+
+
+def _report_bytes(report: dict[str, Any]) -> bytes:
+    """Enforce type-sensitive JSON identity and the complete wire size."""
+    try:
+        encoded = json.dumps(report, sort_keys=True, separators=(",", ":"),
+                             allow_nan=False).encode("utf-8")
+    except (TypeError, ValueError, RecursionError, UnicodeError) as exc:
+        raise SceneTravelError("invalid acceptance report encoding") from exc
+    if len(encoded) > MAX_REPORT_BYTES:
+        raise SceneTravelError("acceptance report exceeds 2 MiB budget")
+    return encoded
 
 
 def verify_acceptance(payload: Any) -> dict[str, Any]:
@@ -152,12 +160,13 @@ def verify_acceptance(payload: Any) -> dict[str, Any]:
         raise SceneTravelError("invalid acceptance report fields")
     if payload["schema_version"] != SCHEMA:
         raise SceneTravelError("unsupported acceptance report schema")
+    supplied_bytes = _report_bytes(payload)
     expected = accept_scene(
         session=payload["start_session"],
         max_states=payload["state_budget"],
         max_depth=payload["depth_budget"],
     )
-    if expected != payload:
+    if _report_bytes(expected) != supplied_bytes or expected != payload:
         raise SceneTravelError("acceptance report or proof mismatch")
     return expected
 
