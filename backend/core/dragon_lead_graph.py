@@ -332,6 +332,8 @@ class LeadGraph:
         owner=owner_key(scope);revision,seed=bootstrap_inventory()
         with self._db() as db:
             partitioned=authority.active(db)
+            from core.dragon_graph_direct_writer import enabled
+            independent_reviews=enabled(db) if partitioned else False
             record=db.execute("""SELECT enabled,bootstrap_revision,bootstrap_cursor,bootstrapped,nodes,edges,snapshots,due
                 FROM lead_owner WHERE owner=?""",(owner,)).fetchone()
         result=dict(record) if record else {"enabled":0,"bootstrap_revision":None,"bootstrap_cursor":0,"bootstrapped":0,"nodes":0,"edges":0,"snapshots":0,"due":0}
@@ -340,6 +342,7 @@ class LeadGraph:
                 "architecture_node_cap":MAX_NODES,"architecture_evidence_cap":MAX_EDGES,
                 "logical_quota_lanes":LEAD_LANES,"physical_graph_sharding":partitioned,
                 "canonical_write_lanes":LEAD_LANES if partitioned else 1,"coordinated_writer":True,
+                "independent_review_writers":LEAD_LANES if independent_reviews else 0,
                 "network_authorized":False,"physical_capacity_verified":False}
 
     def bootstrap_pulse(self):
@@ -823,6 +826,17 @@ class LeadGraph:
         if decision not in {"candidate","held","retired"}:raise ValueError("lead disposition")
         interval_seconds=_int(interval_seconds,900,90*86400);now=int(time.time())
         identity=digest([lead,operation]);witness=digest([decision,reason,interval_seconds])
+        from core.dragon_graph_direct_writer import configured,review as direct_review
+        from core.dragon_owner_shards import ShardHeld
+        # Existing non-provisioned stores retain the original transaction path.
+        try:
+            result=None
+            if configured(self.path):
+                result=direct_review(self.path,owner,lead,identity=identity,witness=witness,decision=decision,now=now,due=now+interval_seconds)
+                if result is None:raise authority.GraphHeld("direct writer enrollment changed")
+        except (authority.GraphHeld,ShardHeld,sqlite3.Error,OSError) as exc:
+            raise CatalogueHeld("canonical review writer held") from exc
+        if result is not None:return result
         with self._db() as db:
             db.execute("BEGIN IMMEDIATE")
             try:
@@ -839,3 +853,41 @@ class LeadGraph:
                 if db.in_transaction:db.execute("ROLLBACK")
                 raise
         return {"lead_id":lead,"decision":decision,"verified":False,"network_authorized":False}
+
+
+    def review_batch(self,scope,*,items):
+        """Bounded, per-lane ordered batch with explicit partial outcomes.
+
+        No new authority is granted by batching. Each operation has its own
+        durable replay receipt; this is not an all-or-nothing batch.
+        """
+        from concurrent.futures import ThreadPoolExecutor
+        from core.dragon_graph_direct_writer import enabled
+        if not isinstance(items,list) or not 1<=len(items)<=32:raise ValueError("review batch bound")
+        normalized=[];seen=set()
+        for raw in items:
+            if not isinstance(raw,dict) or set(raw)!={"lead","decision","reason","operation","interval_seconds"}:
+                raise ValueError("review batch fields")
+            lead=_id(raw["lead"]);operation=clean(raw["operation"],128);reason=clean(raw["reason"],512)
+            interval=_int(raw["interval_seconds"],900,90*86400)
+            if raw["decision"] not in {"candidate","held","retired"} or (lead,operation) in seen:
+                raise ValueError("review batch operation")
+            seen.add((lead,operation))
+            normalized.append({"lead":lead,"operation":operation,"reason":reason,"decision":raw["decision"],"interval_seconds":interval})
+        with self._db() as db:
+            if not enabled(db):raise CatalogueHeld("independent review writers not configured")
+            self._enabled(db,owner_key(scope))
+        groups={}
+        for i,item in enumerate(normalized):groups.setdefault(authority.lane(item["lead"]),[]).append((i,item))
+        def run(group):
+            result=[]
+            for i,item in group:
+                try:receipt={"index":i,"state":"committed",**self.review(scope,**item)}
+                except LookupError:receipt={"index":i,"state":"missing"}
+                except (CatalogueHeld,sqlite3.Error,OSError):receipt={"index":i,"state":"held"}
+                result.append(receipt)
+            return result
+        with ThreadPoolExecutor(max_workers=min(4,len(groups)),thread_name_prefix="dragon-review") as workers:
+            receipts=[item for group in workers.map(run,groups.values()) for item in group]
+        return {"results":sorted(receipts,key=lambda x:x["index"]),"atomic_batch":False,
+                "lanes_requested":len(groups),"network_authorized":False}

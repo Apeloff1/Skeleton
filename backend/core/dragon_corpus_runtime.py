@@ -223,7 +223,7 @@ async def pulse_lead_graph():
 
 async def lead_graph_call(scope,operation,*args,**kwargs):
     from core.dragon_lead_graph import LeadGraph
-    if operation not in {"configure","status","page","edges","begin","snapshot","append","seal","revoke","review","dataset_candidates","register_target","bundle_status","enable_bundle"}:
+    if operation not in {"configure","status","page","edges","begin","snapshot","append","seal","revoke","review","review_batch","dataset_candidates","register_target","bundle_status","enable_bundle"}:
         raise ValueError("lead graph operation")
     def work():
         path=_path(scope=scope,create=operation=="configure" and os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1")

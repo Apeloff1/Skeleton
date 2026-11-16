@@ -74,7 +74,8 @@ def _alias(index):
 def active(db):
     row=db.execute("SELECT 1 FROM main.sqlite_master WHERE type='table' AND name='dragon_graph_authority'").fetchone()
     if row is None:
-        if os.getenv("SKL_DRAGON_CANONICAL_GRAPH_REQUIRED")=="1":raise GraphHeld("canonical graph topology missing")
+        if os.getenv("SKL_DRAGON_CANONICAL_GRAPH_REQUIRED")=="1" or any(_table(db,name) for name in ("lead_node_directory","dragon_graph_direct_writer")):
+            raise GraphHeld("canonical graph topology missing")
         return False
     if db.execute("SELECT 1 FROM main.dragon_graph_authority WHERE singleton=1").fetchone() is None:
         raise GraphHeld("canonical graph topology incomplete")
@@ -160,6 +161,11 @@ def read_fence(db):
     if not db.in_transaction:raise GraphHeld("canonical graph read requires transaction")
     if db.execute("SELECT commit_sequence FROM main.dragon_graph_authority WHERE singleton=1").fetchone() is None:
         raise GraphHeld("root read fence missing")
+    # Pin each rollback-journal read lock before reading graph rows. Independent
+    # local review writers cannot commit on an already-pinned lane.
+    for i in range(LANES):
+        if db.execute("SELECT 1 FROM "+_alias(i)+".graph_identity WHERE singleton=1").fetchone() is None:
+            raise GraphHeld("graph lane read fence missing")
 
 
 def insert_node(db,args):
@@ -332,7 +338,8 @@ def provision(root,paths,*,offline_acknowledged=False):
             with _open(p) as child:
                 child.execute("PRAGMA journal_mode=DELETE")
                 child.execute("PRAGMA synchronous=EXTRA")
-                child.executescript(SCHEMA)
+                from core.dragon_graph_direct_writer import SCHEMA as DIRECT_SCHEMA
+                child.executescript(SCHEMA+DIRECT_SCHEMA)
                 child.execute("INSERT INTO graph_identity VALUES(1,?,?)",(epoch,i))
         _attach_files(db,root,layout)
         db.execute("BEGIN IMMEDIATE")
@@ -366,6 +373,8 @@ def provision(root,paths,*,offline_acknowledged=False):
             db.execute(TOPOLOGY)
             db.execute("CREATE TABLE dragon_graph_probe(id TEXT PRIMARY KEY,witness TEXT NOT NULL) WITHOUT ROWID")
             db.execute("INSERT INTO main.dragon_graph_authority VALUES(1,?,0)",(json.dumps(layout,separators=(",",":")),))
+            from core.dragon_graph_direct_writer import publish_marker
+            publish_marker(db,epoch)
             db.execute("COMMIT")
         except BaseException:
             if db.in_transaction:db.execute("ROLLBACK")
@@ -396,6 +405,8 @@ def qualify(root,*,full=False):
             if full:
                 if db.execute("PRAGMA main.integrity_check").fetchone()[0]!="ok":raise GraphHeld("root integrity check failed")
                 _verify_graph(db);_verify_directory(db)
+                from core.dragon_graph_direct_writer import verify
+                verify(db)
             db.execute("COMMIT")
         except BaseException:
             if db.in_transaction:db.execute("ROLLBACK")
@@ -523,8 +534,13 @@ def main():
     write.add_argument("--bytes-per-lane",type=int,default=1024**2);write.add_argument("--acknowledge-device-writes",action="store_true")
     pending=sub.add_parser("pending-probes");pending.add_argument("--root",required=True)
     recovery=sub.add_parser("recover-probe");recovery.add_argument("--root",required=True);recovery.add_argument("--id",required=True)
+    upgrade=sub.add_parser("enable-direct-writers");upgrade.add_argument("--root",required=True)
+    upgrade.add_argument("--offline-writers-stopped",action="store_true")
     a=parser.parse_args()
-    if a.command=="provision":receipt=provision(a.root,a.paths,offline_acknowledged=a.offline_writers_stopped)
+    if a.command=="enable-direct-writers":
+        from core.dragon_graph_direct_writer import install
+        receipt=install(a.root,offline_acknowledged=a.offline_writers_stopped)
+    elif a.command=="provision":receipt=provision(a.root,a.paths,offline_acknowledged=a.offline_writers_stopped)
     elif a.command=="qualify":receipt=qualify(a.root,full=a.full)
     elif a.command=="probe":receipt=write_probe(a.root,bytes_per_lane=a.bytes_per_lane,acknowledged=a.acknowledge_device_writes)
     elif a.command=="pending-probes":receipt=pending_probes(a.root)
