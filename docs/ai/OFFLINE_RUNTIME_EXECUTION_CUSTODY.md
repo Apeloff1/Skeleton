@@ -102,3 +102,35 @@ Full-size model and KV allocation, actual kernel cancellation, native
 multidevice execution, loader-to-sealed-byte binding, guarded Jeeves
 wiring, process recovery and independent security/device/release evidence
 remain outstanding. No merge or release authorization.
+
+
+## Source-store and lifecycle corrections
+
+The canonical store now limits each manifest to 16 MiB and checks a
+regular-file descriptor's observed identity before and after reading.
+The inventory admits all declared plan sizes before opening any weight
+object, retains fixed-size declarations, and checks the final manifest
+name set. This bounds the object hashing work by the admitted declared
+aggregate (plus per-object boundary detection), not the number of
+discovered models multiplied by the entire store budget.
+
+Decoder streams are now the same descriptors hashed and rewound by the
+store. Plan and weight identity come from a single bounded manifest read.
+This removes the verify-path/close/reopen gap. It does not prevent an
+authorized writer from modifying an already opened ordinary file during
+use; the Linux sealed-page owner remains the immutable-copy authority.
+Parent-path and platform-specific security also require their separate
+qualification.
+
+The cooperative iteration controller now rejects nonadvancing offer
+clocks, noncanonical phase values and public policy/source replacement.
+Malformed consumption invalidates the outstanding grant. Queue shutdown
+reports whether an iteration still owns reservations. Closing while a
+slice is running signals cancellation; the iteration owner drains on
+return. An executor failure retains suspect reservations until explicit
+cleanup succeeds. Logical drain is not an OS-level process-death receipt.
+
+Focused regression sources cover aggregate rejection before reads,
+oversized sparse manifests, symlink rejection, inventory drift, descriptor
+replacement and concurrent queue closure. These cases have not yet been
+executed against the final branch head.
