@@ -326,14 +326,20 @@ HTML = r"""<!doctype html>
       <label for="competitive-draft">Compatible speculative draft ID</label><input id="competitive-draft" maxlength="32">
       <label for="competitive-block">Draft block tokens</label><input id="competitive-block" type="number" min="1" max="8" value="4">
       <button id="competitive-speculative" class="small" disabled>Run native greedy speculative review</button>
+      <label for="competitive-temperature">Stochastic temperature</label><input id="competitive-temperature" type="number" min="0" max="2" step="0.1" value="0.8">
+      <label><input id="competitive-gpu" type="checkbox"> Require CUDA fused SDPA (no CPU fallback)</label>
+      <button id="competitive-stochastic" class="small" disabled>Run stochastic speculative review</button>
       <label for="competitive-media-profile">Local media profile ID</label><input id="competitive-media-profile" maxlength="32">
       <label for="competitive-media-file">Transient PNG, JPEG, WebP or PCM16 WAV (4 MiB max)</label>
       <input id="competitive-media-file" type="file" accept=".png,.jpg,.jpeg,.webp,.wav">
       <button id="competitive-media" class="small" disabled>Approve native media classification</button>
+      <label for="competitive-generation-profile">Vision-language or speech generator profile ID</label><input id="competitive-generation-profile" maxlength="32">
+      <button id="competitive-media-generate" class="small" disabled>Generate vision answer or speech transcript from file</button>
       <label for="competitive-prefetch-queries">Approved possible next queries (one per line)</label><textarea id="competitive-prefetch-queries" rows="4" maxlength="12000"></textarea>
+      <label><input id="competitive-learned" type="checkbox" disabled> Use pinned learned next-query predictor</label>
       <button id="competitive-prefetch" class="small" disabled>Prewarm two highest-ranked queries in selected references</button>
       <label for="competitive-tool-id">Durable tool campaign ID</label><input id="competitive-tool-id" maxlength="64">
-      <label for="competitive-tool-plan">Closed read-only action graph (JSON)</label>
+      <label for="competitive-tool-plan">Closed read-only action graph (JSON; optional selector with goal, labels, stop_label and maximum_decisions)</label>
       <textarea id="competitive-tool-plan" rows="5" maxlength="24000" placeholder='{"actions":[{"id":"calculation","kind":"calculate","arguments":{"expression":"(3+7)/2"},"depends_on":[],"condition":{"kind":"always","action":null}}],"maximum_calls":1,"maximum_seconds":15}'></textarea>
       <button id="competitive-tool-run" class="small" disabled>Approve closed tool plan and execute</button>
       <button id="competitive-tool-inspect" class="small" disabled>Inspect durable tool campaign</button>
@@ -633,6 +639,12 @@ JAVASCRIPT = r"""'use strict';
     get('competitive-ensemble').disabled=competitiveUnavailable||!competitiveCapability?.specialists?.length;
     get('competitive-speculative').disabled=competitiveUnavailable||!competitiveCapability?.native_greedy_speculative_target||!competitiveCapability?.specialists?.some(x=>x.role==='draft');
     get('competitive-media').disabled=competitiveUnavailable||!competitiveCapability?.media_profiles?.length;
+    get('competitive-stochastic').disabled=competitiveUnavailable||!competitiveCapability?.stochastic_speculative_target||!competitiveCapability?.specialists?.some(x=>x.role==='draft');
+    get('competitive-temperature').disabled=get('competitive-stochastic').disabled;
+    get('competitive-gpu').disabled=get('competitive-stochastic').disabled||!competitiveCapability?.cuda_fused_speculative_target;
+    get('competitive-generation-profile').disabled=locked||working||!state.session;
+    get('competitive-media-generate').disabled=competitiveUnavailable||!competitiveCapability?.media_generation_profiles?.length;
+    get('competitive-learned').disabled=competitiveUnavailable||!competitiveCapability?.learned_forecast_identity;
     get('competitive-prefetch').disabled=locked||working||!state.session||!competitiveCapability?.predictive_prefetch_available||state.knowledgeScopeMode!=='selected'||scopeBlocked;
     get('competitive-tool-abandon').disabled=locked||working||!inspectedToolCampaign||inspectedToolCampaign.status!=='running';
     get('campaign-batch-abandon').disabled = locked || working || !inspectedBatch || inspectedBatch.status !== 'running';
@@ -747,6 +759,8 @@ JAVASCRIPT = r"""'use strict';
     ['competitive-profiles','competitive-draft','competitive-media-profile','competitive-media-file',
      'competitive-prefetch-queries','competitive-tool-id','competitive-tool-plan'].forEach(id=>{get(id).value='';});
     get('competitive-reserved').value='128';get('competitive-block').value='4';
+    get('competitive-temperature').value='0.8';get('competitive-gpu').checked=false;
+    get('competitive-learned').checked=false;get('competitive-generation-profile').value='';
     get('competitive-status').textContent='Not inspected.';
     get('competitive-result').textContent='';
     get('campaign-batch-panel').open = false;
@@ -812,7 +826,7 @@ JAVASCRIPT = r"""'use strict';
     // Long file ingestion may stream for hours. Abort only on an explicit
     // workspace lock; the durable import ID allows post-disconnect recovery.
     const timer = path === '/v1/resources/longform/ingest' ? null :
-      setTimeout(cancel, path.endsWith('/campaign-batch-run') ? 210000 : (/\/(?:deliberation-review|campaign-advance|ensemble-review|speculative-review|media-review|tool-campaign-run|predictive-prefetch)$/.test(path)) ? 85000 : 15000);
+      setTimeout(cancel, path.endsWith('/campaign-batch-run') ? 210000 : (/\/(?:deliberation-review|campaign-advance|ensemble-review|speculative-review|stochastic-review|media-review|media-generate|tool-campaign-run|predictive-prefetch)$/.test(path)) ? 85000 : 15000);
     let response;
     try {
       response = await fetch(path, {
@@ -1836,6 +1850,48 @@ JAVASCRIPT = r"""'use strict';
        !competitivePin.test(result.receipt_sha256))throw new Error('Invalid speculative receipt.');
     competitiveDisplay(result);
   }));
+  get('competitive-stochastic').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),question=get('prompt').value.trim();
+    const draft=get('competitive-draft').value.trim(),budget=Number(get('budget').value),block=Number(get('competitive-block').value);
+    const temperature=Number(get('competitive-temperature').value),gpu=get('competitive-gpu').checked;
+    const profile=competitiveCapability?.specialists?.find(x=>x.id===draft&&x.role==='draft');
+    if(!profile||!question||!Number.isSafeInteger(budget)||budget<1||budget>128||
+       !Number.isSafeInteger(block)||block<1||block>8||!Number.isFinite(temperature)||temperature<0||temperature>2||
+       (gpu&&!competitiveCapability?.cuda_fused_speculative_target))throw new Error('Select an admitted draft and sampling policy.');
+    const result=await competitiveCall(ctx,'stochastic-review',{expected_revision:ctx.rev,message:question,
+      draft_profile:draft,max_output_tokens:budget,block,temperature,require_gpu:gpu,approved:true});
+    if(result.schema!=='skeleton.jeeves.stochastic-speculative.v1'||result.target_model_digest!==state.health?.model_digest||
+       result.draft_model_digest!==profile.model_digest||result.target_authoritative!==true||
+       result.transcript_committed!==false||result.speedup_certified!==false||
+       !Array.isArray(result.generated_ids)||result.generated_ids.length>budget||
+       (gpu&&JSON.stringify(result.target_graph_modes)!=='["cuda_fused_sdpa_required"]')||
+       !competitivePin.test(result.receipt_sha256))throw new Error('Unbound stochastic execution result.');
+    competitiveDisplay(result);
+  }));
+  get('competitive-media-generate').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),file=get('competitive-media-file').files?.[0];
+    const profile=get('competitive-generation-profile').value.trim();
+    const admitted=competitiveCapability?.media_generation_profiles?.find(x=>x.id===profile);
+    if(!admitted||!file||file.size<1||file.size>4*1024*1024)throw new Error('Choose an admitted decoder and local media file.');
+    const mime=localMediaType(file);
+    if(!['image/png','image/jpeg','image/webp','audio/wav'].includes(mime)||!mime.startsWith(admitted.modality+'/'))
+      throw new Error('Media modality mismatch.');
+    const question=admitted.modality==='image'?get('prompt').value.trim():'';
+    const budget=Math.min(Number(get('budget').value),admitted.max_output);
+    if(!Number.isSafeInteger(budget)||budget<1)throw new Error('Invalid decoder output budget.');
+    const raw=await file.arrayBuffer(),pin=await localMediaSha256(raw);
+    if(!competitiveCurrent(ctx)||get('competitive-media-file').files?.[0]!==file)throw new Error('Media selection changed.');
+    const result=await competitiveCall(ctx,'media-generate',{expected_revision:ctx.rev,profile,question,
+      media_type:mime,source_sha256:pin,media_base64:localMediaBase64(new Uint8Array(raw)),max_output_tokens:budget,approved:true});
+    if(result.schema!=='skeleton.jeeves.conditional-media-generation.v1'||result.profile!==profile||
+       result.source_sha256!==pin||result.encoder_sha256!==admitted.encoder_sha256||
+       result.decoder_sha256!==admitted.decoder_sha256||result.tokenizer_sha256!==admitted.tokenizer_sha256||
+       result.question_sha256!==await exactLocalSha256(question)||result.native_generation_performed!==true||
+       result.transcript_committed!==false||result.media_bytes_persisted!==false||
+       !Array.isArray(result.generated_ids)||result.generated_ids.length>budget||typeof result.text!=='string'||
+       !competitivePin.test(result.receipt_sha256))throw new Error('Unbound conditional generation result.');
+    get('competitive-media-file').value='';competitiveDisplay(result);
+  }));
   get('competitive-media').addEventListener('click',()=>run(async()=>{
     const ctx=competitiveContext(),file=get('competitive-media-file').files?.[0];
     const profile=get('competitive-media-profile').value.trim();
@@ -1859,11 +1915,14 @@ JAVASCRIPT = r"""'use strict';
     const candidates=get('competitive-prefetch-queries').value.split('\n').map(s=>s.trim()).filter(Boolean);
     if(!scope.length||!candidates.length||candidates.length>12||new Set(candidates).size!==candidates.length)
       throw new Error('Select exact local references and up to twelve distinct approved queries.');
+    const learned=get('competitive-learned').checked;
     const result=await competitiveCall(ctx,'predictive-prefetch',{expected_revision:ctx.rev,
-      document_ids:scope,candidates,maximum_queries:2,approved:true});
+      document_ids:scope,candidates,maximum_queries:2,learned,approved:true});
     if(result.schema!=='skeleton.jeeves.predictive-prefetch.v1'||result.session_revision!==ctx.rev||
        result.generation_performed!==false||JSON.stringify(result.selected_document_ids)!==JSON.stringify(scope)||
-       !Array.isArray(result.warmed)||result.warmed.length>2||!competitivePin.test(result.receipt_sha256))
+       !Array.isArray(result.warmed)||result.warmed.length>2||
+       (learned&&result.learned_forecast?.predictor_identity!==competitiveCapability?.learned_forecast_identity)||
+       !competitivePin.test(result.receipt_sha256))
       throw new Error('Invalid predictive prefetch receipt.');
     competitiveDisplay(result);
   }));
