@@ -644,3 +644,97 @@ class OfflineDatasetHandoffTests(TestCase):
                            graph_factory=factory,rights_acknowledged=False)
         factory.assert_not_called()
 
+
+class SignedOfflineDatasetHandoffTests(TestCase):
+    def setUp(self):
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+        self.fixture = OfflineDatasetHandoffTests()
+        self.fixture.setUp()
+        self.addCleanup(self.fixture.doCleanups)
+        self.key = Ed25519PrivateKey.generate()
+        self.public_key = self.key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+        self.pin = hashlib.sha256(self.public_key).hexdigest()
+
+    def proof(self, raw):
+        from core.dragon_publisher_export_proof import PublisherExportProof
+        return PublisherExportProof(self.public_key.hex(), self.pin, self.key.sign(raw).hex())
+
+    def test_signed_manifest_preserves_explicit_rights_boundary(self):
+        from core.dragon_offline_dataset_handoff import inspect_manifest
+        digest = self.fixture.write(self.fixture.entry("export.csv", 10001))
+        path = self.fixture.manifest
+        proof = self.proof(path.read_bytes())
+        receipt = inspect_manifest(path, expected_manifest_sha=digest, publisher_proof=proof)
+        evidence = receipt["publisher_proof"]
+        self.assertTrue(evidence["signature_verified"])
+        self.assertEqual(evidence["manifest_sha256"], digest)
+        self.assertEqual(evidence["public_key_sha256"], self.pin)
+        self.assertFalse(evidence["source_rights_verified"])
+        self.assertFalse(evidence["publisher_identity_independently_verified"])
+        self.assertFalse(evidence["network_authorized"])
+        self.assertNotIn(proof.signature_hex, str(receipt))
+
+    def test_wrong_public_key_pin_and_noncanonical_fields_are_refused(self):
+        from core.dragon_publisher_export_proof import PublisherExportProof
+        signature = self.key.sign(b"fixture").hex()
+        for public, pin, sig in (
+            (self.public_key.hex(), "0"*64, signature),
+            (self.public_key.hex()[:-1], self.pin, signature),
+            (self.public_key.hex(), self.pin, signature[:-1]),
+            (self.public_key.hex(), self.pin, "z"*128),
+        ):
+            with self.assertRaises(ValueError):
+                PublisherExportProof(public, pin, sig)
+
+    def test_manifest_rehash_does_not_reauthorize_changed_signed_bytes(self):
+        from core.dragon_offline_dataset_handoff import apply_manifest
+        from unittest.mock import Mock
+        item = self.fixture.entry("export.csv", 10001)
+        self.fixture.write(item)
+        path = self.fixture.manifest
+        proof = self.proof(path.read_bytes())
+        changed = self.fixture.write({**item, "rights_reference": "different reference"})
+        factory = Mock()
+        with self.assertRaisesRegex(ValueError, "signature differs"):
+            apply_manifest(path, expected_manifest_sha=changed, scope=OWNER,
+                           graph_factory=factory, rights_acknowledged=True, publisher_proof=proof)
+        factory.assert_not_called()
+
+    def test_valid_manifest_signature_does_not_waive_export_hash(self):
+        from core.dragon_offline_dataset_handoff import apply_manifest
+        from unittest.mock import Mock
+        item = self.fixture.entry("export.csv", 10001)
+        digest = self.fixture.write(item)
+        path = self.fixture.manifest
+        proof = self.proof(path.read_bytes())
+        (self.fixture.root/"export.csv").write_bytes(b"AppID,Name\n10002,Changed\n")
+        factory = Mock()
+        with self.assertRaisesRegex(ValueError, "SHA-256 differs"):
+            apply_manifest(path, expected_manifest_sha=digest, scope=OWNER,
+                           graph_factory=factory, rights_acknowledged=True, publisher_proof=proof)
+        factory.assert_not_called()
+
+    def test_signed_import_still_requires_operator_acknowledgement(self):
+        from core.dragon_offline_dataset_handoff import apply_manifest
+        from unittest.mock import Mock
+        digest = self.fixture.write(self.fixture.entry("export.csv", 10001))
+        path = self.fixture.manifest
+        factory = Mock()
+        with self.assertRaisesRegex(ValueError, "metadata rights"):
+            apply_manifest(path, expected_manifest_sha=digest, scope=OWNER,
+                           graph_factory=factory, rights_acknowledged=False,
+                           publisher_proof=self.proof(path.read_bytes()))
+        factory.assert_not_called()
+
+    def test_cli_partial_signature_inputs_fail_closed(self):
+        from core.dragon_offline_dataset_handoff import main
+        from contextlib import redirect_stderr
+        from io import StringIO
+        digest = self.fixture.write(self.fixture.entry("export.csv", 10001))
+        with redirect_stderr(StringIO()):
+            with self.assertRaises(SystemExit) as caught:
+                main(["--manifest", str(self.fixture.manifest), "--manifest-sha256", digest,
+                      "--publisher-public-key", self.public_key.hex()])
+        self.assertEqual(caught.exception.code, 2)
+
