@@ -180,12 +180,14 @@ def first_install_report(
         epoch_admitted = False
 
     def epoch_stable():
+        nonlocal epoch_admitted
         if not epoch_admitted:
             return False
         try:
-            return _configuration_epoch(root) == initial_epoch
+            epoch_admitted = _configuration_epoch(root) == initial_epoch
         except (OSError, ValueError, UnicodeError):
-            return False
+            epoch_admitted = False
+        return epoch_admitted
 
     checks = preflight(root, runtime=True, environ=captured)
     try:
@@ -337,7 +339,7 @@ def first_install_report(
         next_steps.append(
             "Run python -m skeleton app setup, then python -m skeleton app check --runtime; preserve the private .env file."
         )
-    if not live:
+    if not live and source_ok:
         next_steps.append(
             "Start the existing services with python -m skeleton app up, then rerun app doctor --live."
         )
@@ -357,7 +359,7 @@ def first_install_report(
         next_steps.append(
             "The required local AI guard configuration is invalid. Review the engine configuration and docs/qa/GUARDED_LOCAL_READINESS_2026-10-28.md; do not disable the guard."
         )
-    if not configured or (ai["available"] is False and "readiness_code" not in ai):
+    if source_ok and (not configured or (ai["available"] is False and "readiness_code" not in ai)):
         next_steps.append(
             "Configure genuine trained local weights or the engine-owned hosted provider in .env; see docs/APP_ASSEMBLY.md. Restart the engine after changes."
         )
@@ -413,6 +415,7 @@ def first_install_report(
             # inspection; never pass an authenticated token to a downgraded
             # diagnostics call that cannot bind its target.
             auth_token_file=auth_token_file if studio_live else None,
+            admit_live=epoch_stable,
         )
         crawler = report["studio"]["server"]["crawler"]
         observed = crawler.get("report", {})
@@ -420,6 +423,14 @@ def first_install_report(
             crawler.get("observed") is True
             and type(observed.get("available")) is bool
             and type(observed.get("configured")) is bool
+            and type(observed.get("code")) is str
+            and observed["code"] in {
+                "ready", "crawler_storage_unavailable", "crawler_admission_unconfigured",
+                "crawler_admission_unreachable", "crawler_runtime_unavailable",
+                "crawler_indexes_unavailable",
+            }
+            and (not observed["available"] or observed["configured"])
+            and (observed["code"] == "ready") == observed["available"]
         ):
             report["crawler"].update(
                 available=observed["available"],
@@ -438,6 +449,9 @@ def first_install_report(
         clear_epoch_observations()
         report.update(configuration_ready=False, services_ready=None, ai_ready=False)
         report["checks"]["live"] = []
+        report["endpoints"] = {}
+        report["next_steps"] = [item for item in report["next_steps"]
+                                if "app up" not in item and "Configure genuine trained" not in item]
         report["crawler"].update(available=None, observed=False,
                                  scope="Runtime configuration changed; crawler not observed.")
         report["crawler"].pop("configured", None)

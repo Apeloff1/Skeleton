@@ -18,7 +18,7 @@ import subprocess
 import sys
 import tempfile
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
@@ -447,6 +447,7 @@ def studio_readiness_report(
     live: bool = False,
     timeout: float = 3.0,
     auth_token_file: Path | None = None,
+    admit_live: Callable[[], bool] | None = None,
 ) -> dict[str, object]:
     if type(live) is not bool:
         raise TypeError("live inspection must be an explicit boolean")
@@ -459,58 +460,61 @@ def studio_readiness_report(
         raise ValueError("studio probe timeout must be finite and at most 10 seconds")
     if auth_token_file is not None and not live:
         raise ValueError("--auth-token-file requires --live")
-    token = _private_token(auth_token_file) if auth_token_file is not None else None
-    server = (
-        _bounded_server(
-            root,
-            backend_url,
-            token,
-            timeout,
-            endpoint="/api/game-studio-health",
-            schema="skeleton.game.studio_readiness.v1",
-        )
-        if live and token
-        else {
-            "observed": False,
-            "code": "authenticated_server_probe_not_requested",
-            "readiness_path": "/api/game-studio-health",
-        }
+    token = None
+    stamp = None
+    admitted = True
+    if auth_token_file is not None:
+        if admit_live is not None and admit_live() is not True:
+            admitted = False
+        else:
+            stamp = _token_stamp(auth_token_file.lstat())
+            token = _private_token(auth_token_file)
+            admitted = _token_stamp(auth_token_file.lstat()) == stamp
+
+    def current():
+        nonlocal admitted
+        if not admitted:
+            return False
+        try:
+            if admit_live is not None and admit_live() is not True:
+                admitted = False
+            if token is not None:
+                admitted = (admitted and _token_stamp(auth_token_file.lstat()) == stamp
+                            and _private_token(auth_token_file) == token
+                            and _token_stamp(auth_token_file.lstat()) == stamp)
+        except (OSError, ValueError, UnicodeError):
+            admitted = False
+        return admitted
+
+    def denied(endpoint):
+        return {"observed": False, "code": "authenticated_readiness_epoch_changed",
+                "readiness_path": endpoint}
+
+    def probe(endpoint, schema):
+        if not live or auth_token_file is None:
+            return {"observed": False, "code": "authenticated_server_probe_not_requested",
+                    "readiness_path": endpoint}
+        if token is None or not current():
+            return denied(endpoint)
+        result = _bounded_server(root, backend_url, token, timeout,
+                                 endpoint=endpoint, schema=schema)
+        return result if current() else denied(endpoint)
+
+    lanes = (
+        ("/api/game-studio-health", "skeleton.game.studio_readiness.v1"),
+        ("/api/dragon-academy/runtime/readiness", "skeleton.dragon.runtime_readiness.v1"),
+        ("/api/dragon-academy/crawler/readiness", "skeleton.dragon.crawler_readiness.v1"),
     )
-    server["dragon_runtime"] = (
-        _bounded_server(
-            root,
-            backend_url,
-            token,
-            timeout,
-            endpoint="/api/dragon-academy/runtime/readiness",
-            schema="skeleton.dragon.runtime_readiness.v1",
-        )
-        if live and token
-        else {
-            "observed": False,
-            "code": "authenticated_server_probe_not_requested",
-            "readiness_path": "/api/dragon-academy/runtime/readiness",
-        }
-    )
-    server["crawler"] = (
-        _bounded_server(
-            root,
-            backend_url,
-            token,
-            timeout,
-            endpoint="/api/dragon-academy/crawler/readiness",
-            schema="skeleton.dragon.crawler_readiness.v1",
-        )
-        if live and token
-        else {
-            "observed": False,
-            "code": "authenticated_server_probe_not_requested",
-            "readiness_path": "/api/dragon-academy/crawler/readiness",
-        }
-    )
+    observations = [probe(endpoint, schema) for endpoint, schema in lanes]
+    local = _inspect_host(root, values)
+    if live and auth_token_file is not None and not current():
+        observations = [denied(endpoint) for endpoint, _ in lanes]
+    server, dragon, crawler = observations
+    server["dragon_runtime"] = dragon
+    server["crawler"] = crawler
     return {
         "schema_version": "skeleton.application.studio_installation_report.v1",
-        "local_host": _inspect_host(root, values),
+        "local_host": local,
         "server": server,
         "operator_commands": [
             "python scripts/install_game_desktop_toolchains.py --help",

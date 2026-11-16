@@ -453,3 +453,37 @@ def test_unavailable_registry_never_returns_positive_readiness():
     from skeleton.app.first_install import critical_route_evidence
     payload = _mounted_registry({"critical_routes":{"ok":True,"report_available":False,"missing":[]}})
     assert critical_route_evidence(payload) == (False, False, [])
+
+
+
+@pytest.mark.parametrize("code,available,configured",[
+    ("reflected-private-value",True,True),("ready",True,False),
+    ("ready",False,True),("crawler_indexes_unavailable",True,True),
+])
+def test_doctor_crawler_projection_rejects_contradictory_or_unreviewed_code(
+    monkeypatch,tmp_path,code,available,configured
+):
+    def studio(*args,**kwargs):
+        return {"server":{"crawler":{"observed":True,"report":{
+            "available":available,"configured":configured,"code":code,
+        }}}}
+    result=_doctor(monkeypatch,tmp_path,_READY_ROUTES,providers=_READY_AI,studio_hook=studio)
+    assert result["crawler"]["observed"] is False
+    assert "code" not in result["crawler"]
+
+
+def test_doctor_sticky_epoch_rejection_even_if_absent_source_returns(monkeypatch,tmp_path):
+    config=tmp_path/".env"
+    def health():
+        config.write_text("VALUE=transient\n")
+    def studio(*args,**kwargs):
+        # A callback after the rejected epoch must not re-open the live lane.
+        config.unlink()
+        assert kwargs["admit_live"]() is False
+        assert kwargs["live"] is False
+        return {"server":{"crawler":{"observed":False}}}
+    result=_doctor(monkeypatch,tmp_path,_READY_ROUTES,providers=_READY_AI,
+                   health_hook=health,studio_hook=studio)
+    assert result["configuration_ready"] is False
+    assert result["endpoints"]=={}
+    assert not any("app up" in step for step in result["next_steps"])

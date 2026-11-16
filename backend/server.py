@@ -2533,6 +2533,17 @@ async def lifespan(app: FastAPI):
             logger.warning("Dragon runtime storage unavailable; check configured persistent paths")
     _kick(0, "dragon-runtime-storage", _kick_dragon_runtime)
 
+    # Schema initialization belongs to backend startup/recovery, not an
+    # authenticated GET readiness request. Keep this independent of optional
+    # heavy seeding and the unrelated general Mongo index creation sequence.
+    async def _kick_crawler_indexes():
+        try:
+            from core.dragon_crawler import crawler_application
+            await asyncio.wait_for(crawler_application.ensure_indexes(), timeout=10)
+        except Exception as exc:
+            logger.warning("crawler index initialization deferred: %s", type(exc).__name__)
+    _kick(1, "dragon-crawler-indexes", _kick_crawler_indexes)
+
 
     # ── Jeeves self-training: prefill game-specific logic at launch ──────────
     async def _kick_jeeves_training():

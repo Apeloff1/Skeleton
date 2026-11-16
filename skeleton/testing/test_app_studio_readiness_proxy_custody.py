@@ -221,3 +221,49 @@ def test_invalid_bearer_is_rejected_before_transport(token):
         with pytest.raises(ValueError):
             _server_snapshot(_BASE, token, 0.2)
         factory.assert_not_called()
+
+
+
+@pytest.mark.parametrize("mutation", ["token_content","token_replacement","runtime_epoch"])
+def test_authenticated_studio_stops_after_first_invalidated_lane(tmp_path,monkeypatch,mutation):
+    from skeleton.app import studio_readiness as studio
+    path=tmp_path/"token"
+    path.write_text(_TOKEN,encoding="ascii")
+    path.chmod(0o600)
+    allowed=True
+    calls=[]
+    def bounded(*args,**kwargs):
+        nonlocal allowed
+        calls.append(kwargs["endpoint"])
+        if mutation=="token_content":
+            path.write_text("modified-token-0123456789",encoding="ascii")
+        elif mutation=="token_replacement":
+            other=tmp_path/"replacement"
+            other.write_text(_TOKEN,encoding="ascii")
+            other.chmod(0o600)
+            os.replace(other,path)
+        else:
+            allowed=False
+        return {"observed":True,"report":{"status":"ready"}}
+    monkeypatch.setattr(studio,"_bounded_server",bounded)
+    monkeypatch.setattr(studio,"_inspect_host",lambda *a,**k:{"observed":True})
+    result=studio.studio_readiness_report(tmp_path,values={},backend_url=_BASE,live=True,
+                                         auth_token_file=path,admit_live=lambda:allowed)
+    assert calls==["/api/game-studio-health"]
+    server=result["server"]
+    for row in (server,server["dragon_runtime"],server["crawler"]):
+        assert row["observed"] is False
+        assert row["code"]=="authenticated_readiness_epoch_changed"
+    assert _TOKEN not in repr(result)
+
+
+def test_authenticated_studio_rechecks_epoch_before_reading_token(tmp_path,monkeypatch):
+    from skeleton.app import studio_readiness as studio
+    def forbidden(*a,**k):
+        pytest.fail("invalidated epoch reached credential or network")
+    monkeypatch.setattr(studio,"_private_token",forbidden)
+    monkeypatch.setattr(studio,"_bounded_server",forbidden)
+    monkeypatch.setattr(studio,"_inspect_host",lambda *a,**k:{})
+    result=studio.studio_readiness_report(tmp_path,values={},backend_url=_BASE,live=True,
+                                         auth_token_file=tmp_path/"absent",admit_live=lambda:False)
+    assert result["server"]["observed"] is False
