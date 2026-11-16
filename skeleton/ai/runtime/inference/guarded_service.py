@@ -53,6 +53,7 @@ class CanonicalGuardedLocalService:
         self, guard: GuardedLocalInference, *, snapshots: TrustedSnapshotReader,
         source_timeout_seconds: float = 5.0,
         activation_gate: Any | None = None,
+        attest_source: Any | None = None,
     ) -> None:
         if not isinstance(guard, GuardedLocalInference) or not callable(
             getattr(snapshots, "resolve", None)
@@ -71,6 +72,9 @@ class CanonicalGuardedLocalService:
             if type(activation_gate) is not MongoGuardedActivation:
                 raise SealedContextBoundaryError("trusted Compose activation gate required")
         self.activation_gate = activation_gate
+        if attest_source is not None and not callable(attest_source):
+            raise SealedContextBoundaryError("scoped reviewer attestation must be callable")
+        self._attest_source = attest_source
 
     async def _read(
         self, *, tenant_scope_id: str, context_id: str, request_digest: str,
@@ -107,6 +111,22 @@ class CanonicalGuardedLocalService:
             raise SealedContextBoundaryError("snapshot reader returned unverified state")
         if snapshot.tenant_id != tenant_scope_id or snapshot.context_id != context_id:
             raise SealedContextBoundaryError("snapshot reader crossed authorized scope")
+        if self._attest_source is not None:
+            # This callback is installed by the trusted per-backend registry,
+            # never passed in engine_options. Bound network + source rereads
+            # by the request's remaining wall clock.
+            remaining = 15.0 if deadline is None else min(15.0, deadline - time.monotonic())
+            if remaining <= 0:
+                raise SealedContextBoundaryError("reviewer source attestation deadline elapsed")
+            try:
+                async with asyncio.timeout(remaining):
+                    outcome = await self._attest_source(snapshot=snapshot, request_digest=request_digest)
+                if outcome is not None:
+                    raise SealedContextBoundaryError("reviewer source attestation returned unexpected authority")
+            except Exception:
+                raise SealedContextBoundaryError("independent scoped reviewer attestation unavailable") from None
+            if deadline is not None and time.monotonic() >= deadline:
+                raise SealedContextBoundaryError("reviewer source attestation deadline elapsed")
         return snapshot
 
     async def generate(
@@ -121,6 +141,7 @@ class CanonicalGuardedLocalService:
             raise SealedContextBoundaryError("canonical guard scope or contract missing")
         if any(key in engine_options for key in (
             "snapshot", "tenant_scope_id", "contract", "prepared_input", "_before_dispatch",
+            "attest_source", "_attest_source",
         )):
             raise SealedContextBoundaryError("caller attempted to override guarded authority")
         digest = getattr(request, "digest", None)

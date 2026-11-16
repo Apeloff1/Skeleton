@@ -138,6 +138,7 @@ class TrustedNativeStartup:
             initial = await _observe_primary(self.epoch)
             components = make_pinned_native_guard_factory(
                 snapshots=_UnboundSnapshot(), reviewer=self.reviewer, pins=self.pins,
+                require_scoped_attestation=True,
             )
             final = await _observe_primary(self.epoch)
             if initial != final or getattr(self.reviewer, "_closed", True) is not False:

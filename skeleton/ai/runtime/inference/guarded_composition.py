@@ -33,8 +33,11 @@ class ProtectedLocalComponents:
     sampler_support: Callable[[Any, Any], bool]
     projection_attestor: Callable[[Any, str, str], bool]
     roundtrip: Callable[[str], tuple[Sequence[int], str]] | None = None
+    attest_source: Callable[..., Any] | None = None
 
     def __post_init__(self) -> None:
+        if self.attest_source is not None and not callable(self.attest_source):
+            raise ProviderPolicyError("protected local source attestation must be callable")
         if self.roundtrip is not None and not callable(self.roundtrip):
             raise ProviderPolicyError("protected local roundtrip must be callable")
         if not callable(getattr(self.snapshots, "resolve", None)):
@@ -129,6 +132,7 @@ def compose_protected_local_adapter(
     )
     service = CanonicalGuardedLocalService(
         guard, snapshots=components.snapshots, activation_gate=activation_gate,
+        attest_source=components.attest_source,
     )
     return LocalModelAdapter(
         engine, default_seed=default_seed, artifact_status=artifact_status,

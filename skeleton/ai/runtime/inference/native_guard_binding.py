@@ -103,6 +103,7 @@ class NativeGuardPins:
 def make_pinned_native_guard_factory(
     *, snapshots: TrustedSnapshotReader, reviewer: Any,
     pins: tuple[NativeGuardPins, ...],
+    require_scoped_attestation: bool = False,
 ) -> ProtectedLocalComponentFactory:
     """Bind each eligible native backend created by the actual provider registry.
 
@@ -113,7 +114,9 @@ def make_pinned_native_guard_factory(
     from .native_runtime import NativeRuntimeLocalModel
     from .gguf_token_bridge import GgufTokenBridgeModel
     from .signed_reviewer_client import SignedReviewerClient
-    from .reviewer_custody import ReviewerTrustAnchor
+    from .reviewer_custody import ReviewerTrustAnchor, ReviewerCustodyVerifier
+    if type(require_scoped_attestation) is not bool:
+        raise ProviderPolicyError("scoped reviewer policy invalid")
     if (type(reviewer) is not SignedReviewerClient
             or type(getattr(reviewer, "_anchor", None)) is not ReviewerTrustAnchor):
         raise ProviderPolicyError("pinned independent reviewer required")
@@ -182,7 +185,21 @@ def make_pinned_native_guard_factory(
             except Exception:
                 return False
 
-        return replace(components, verify_native_tokenizer=pinned_verifier)
+        attest = None
+        if require_scoped_attestation:
+            from .engine_submission_snapshot import ScopedEngineCompiledSnapshotReader
+            if type(reader) is not ScopedEngineCompiledSnapshotReader:
+                raise ProviderPolicyError("trusted scoped execution snapshot reader required")
+            verifier = ReviewerCustodyVerifier(reviewer=reviewer,
+                authority_id=anchor.authority_id, trust_anchor=anchor)
+
+            async def attest(*, snapshot, request_digest):
+                if reviewer._anchor != anchor or getattr(reviewer, "_closed", True) is not False:
+                    raise ProviderPolicyError("independent reviewer authority changed")
+                await reader.attest_reviewer(verifier=verifier, pin=pin, snapshot=snapshot,
+                                             request_digest=request_digest)
+
+        return replace(components, verify_native_tokenizer=pinned_verifier, attest_source=attest)
 
     return ProtectedLocalComponentFactory(snapshots=snapshots, build=build)
 
