@@ -78,13 +78,24 @@ def _raw_candidate(response,token):
             or access_interstitial_reason(response.status,response.headers,response.body) is not None):
         return False
     try:
+        if "public" not in {x.strip().lower() for x in response.headers.get("cache-control","").split(",")}:
+            return False
         receipt=observe_http_freshness(response.headers,observed_at=response.fetched_at)
         if receipt.private or receipt.no_store or receipt.sensitive_vary:return False
         if not source_capture_rights(response.headers,response.body,media_type="application/json",
                                      user_agent=USER_AGENT).retain:return False
         observation=inspect_response(response.url,"application/json",response.body)
         if observation is not None and observation.held:return False
-        value=json.loads(response.body)
+        def pairs(items):
+            out={}
+            for key,value in items:
+                if key in out or key.casefold() in {"password","access_token","refresh_token","authorization",
+                    "api_key","client_secret","private_key","session_cookie","email","token"}:
+                    raise ValueError("sensitive or ambiguous JSON field")
+                out[key]=value
+            return out
+        def nonfinite(_):raise ValueError("nonfinite JSON")
+        value=json.loads(response.body,object_pairs_hook=pairs,parse_constant=nonfinite)
         return isinstance(value,(dict,list))
     except (ValueError,TypeError,UnicodeError,RecursionError):
         return False
@@ -124,8 +135,8 @@ async def execute(app,grant_path,*,expected_grant_digest):
         pass
     row={"request":{"allowed_hosts":[host]}}
     from pymongo import ReturnDocument
-    await app._claim_acquisition_stripes(row,token)
     try:
+        await app._claim_acquisition_stripes(row,token)
         await check()
         await app._assert_acquisition_stripes(row,token)
         claimed=await store.find_one_and_update({"_id":rid,"kind":"dragon_official_api_v1",
@@ -160,9 +171,16 @@ async def execute(app,grant_path,*,expected_grant_digest):
             if grant["retain_seconds"] and _raw_candidate(response,secret):
                 # Retention checks predate this write and remain independent
                 # of the credential. The body is never returned to the API CLI.
-                retained=await asyncio.to_thread(RawExportCustody(Path(grant["raw_store"])).retain_response,
-                    scope,response.body,expected_sha=raw_sha,operation="api:"+expected_grant_digest,
-                    retention_seconds=grant["retain_seconds"],rights_acknowledged=True)
+                def retain():
+                    return RawExportCustody(Path(grant["raw_store"])).retain_response(
+                        scope,response.body,expected_sha=raw_sha,operation="api:"+expected_grant_digest,
+                        retention_seconds=grant["retain_seconds"],rights_acknowledged=True)
+                retention_task=asyncio.create_task(asyncio.to_thread(retain))
+                try:retained=await asyncio.shield(retention_task)
+                except asyncio.CancelledError:
+                    try:await asyncio.shield(retention_task)
+                    except Exception:pass
+                    raise
             result={"status":status,"raw_body_sha256":raw_sha,"body_bytes":len(response.body),
                     "retention":retained,"raw_bytes_retained":retained is not None,
                     "network_executed":True,"license_verified":False,"training_allowed":False}
