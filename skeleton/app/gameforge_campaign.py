@@ -13,7 +13,7 @@ from skeleton.app.gameforge_quest_bridge import (
     MAX_ACTIONS, _route, _session, _steps, build_design,
 )
 from skeleton.app.original_quest_cli import (
-    _encode, _object, _require, _strings, _text,
+    _encode, _object, _require, _text,
 )
 from skeleton.game.gameplay.dialogue_graph import (
     replay as dialogue_replay, validate_source as validate_dialogue,
@@ -154,7 +154,10 @@ def _replay(source: Any, base: dict, conversations: dict, gates: dict, actions: 
             for choice in node["choices"]:
                 if set(choice["requires"]) <= flags:
                     # The owner remains the final authority for every offered action.
-                    dialogue_replay(row["source"], [*saved["choices"], choice["id"]])
+                    try:
+                        dialogue_replay(row["source"], [*saved["choices"], choice["id"]])
+                    except ValueError:
+                        continue
                     legal.append({"type": "dialogue", "npc": npc, "choice": choice["id"]})
     return {"quest": quest, "dialogues": dialogue, "location": location,
             "status": state["status"], "earned_rewards": state["earned_rewards"],
