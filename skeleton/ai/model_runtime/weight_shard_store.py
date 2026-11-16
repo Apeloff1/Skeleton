@@ -13,6 +13,7 @@ from dataclasses import asdict
 from hashlib import sha256
 import json
 import os
+import stat
 from pathlib import Path
 from typing import BinaryIO, Iterator, Mapping
 from uuid import uuid4
@@ -23,20 +24,65 @@ from .flgb_model_runtime import (
 )
 
 _CHUNK_SIZE = 4 * 1024 * 1024
+_MAX_MANIFEST_BYTES = 16 * 1024 * 1024
 
 
 class WeightShardStoreError(ModelRuntimeError):
     """Failure to ingest or read verified native or shadow model bytes."""
 
 
+def _file_identity(info: os.stat_result) -> tuple[int, ...]:
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_size,
+            info.st_mtime_ns, info.st_ctime_ns, info.st_nlink)
+
+
+@contextmanager
+def _bounded_regular_reader(path: Path, maximum: int) -> Iterator[BinaryIO]:
+    """Bound file reads and reject observed name/descriptor identity changes.
+
+    This is portable source inspection, not an immutable descriptor held by
+    the eventual model loader. The stronger Linux GGUF and sealed-page owners
+    still enforce their own parent custody.
+    """
+    if type(maximum) is not int or maximum < 1:
+        raise WeightShardStoreError("invalid weight read ceiling")
+    try:
+        named = path.lstat()
+        if not stat.S_ISREG(named.st_mode) or not 0 <= named.st_size <= maximum:
+            raise WeightShardStoreError("weight source violates regular-file or byte bounds")
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+        flags |= getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0)
+        fd = os.open(path, flags)
+        try:
+            before = os.fstat(fd)
+            if not stat.S_ISREG(before.st_mode) or _file_identity(before) != _file_identity(named):
+                raise WeightShardStoreError("weight source changed during open")
+            with os.fdopen(fd, "rb", closefd=False) as stream:
+                yield stream
+                after = os.fstat(fd)
+                if (_file_identity(after) != _file_identity(before)
+                        or _file_identity(path.lstat()) != _file_identity(before)):
+                    raise WeightShardStoreError("weight source changed during inspection")
+        finally:
+            os.close(fd)
+    except OSError as exc:
+        raise WeightShardStoreError("weight source unavailable during inspection") from exc
+
+
+def _read_manifest(path: Path) -> bytes:
+    with _bounded_regular_reader(path, _MAX_MANIFEST_BYTES) as stream:
+        raw = stream.read(_MAX_MANIFEST_BYTES + 1)
+        if not raw or len(raw) > _MAX_MANIFEST_BYTES:
+            raise WeightShardStoreError("weight manifest exceeds byte bounds")
+        return raw
+
+
 def _hash_file(path: Path, *, maximum: int) -> tuple[str, int]:
-    if path.is_symlink() or not path.is_file():
-        raise WeightShardStoreError("stored weight object must be a regular file")
     digest = sha256()
     size = 0
-    with path.open("rb") as stream:
+    with _bounded_regular_reader(path, maximum) as stream:
         while True:
-            chunk = stream.read(_CHUNK_SIZE)
+            chunk = stream.read(min(_CHUNK_SIZE, maximum - size + 1))
             if not chunk:
                 break
             size += len(chunk)
@@ -69,11 +115,13 @@ class WeightShardStore:
 
     @staticmethod
     def _write_once(path: Path, content: bytes) -> None:
+        if not 1 <= len(content) <= _MAX_MANIFEST_BYTES:
+            raise WeightShardStoreError("weight manifest exceeds byte bounds")
         path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         if path.is_symlink():
             raise WeightShardStoreError("content-addressed path must not be a symlink")
         if path.exists():
-            if path.read_bytes() != content:
+            if _read_manifest(path) != content:
                 raise WeightShardStoreError("existing content-addressed manifest is inconsistent")
             return
         tmp = path.with_name("." + path.name + "." + uuid4().hex + ".tmp")
@@ -87,7 +135,7 @@ class WeightShardStore:
             try:
                 os.link(tmp, path)
             except FileExistsError:
-                if path.is_symlink() or path.read_bytes() != content:
+                if _read_manifest(path) != content:
                     raise WeightShardStoreError("concurrent manifest content mismatch")
             else:
                 if os.name == "posix":
@@ -117,9 +165,9 @@ class WeightShardStore:
         try:
             digest = sha256()
             size = 0
-            with path.open("rb") as reader, os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as writer:
+            with _bounded_regular_reader(path, shard.bytes) as reader, os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as writer:
                 while True:
-                    block = reader.read(_CHUNK_SIZE)
+                    block = reader.read(min(_CHUNK_SIZE, shard.bytes - size + 1))
                     if not block:
                         break
                     size += len(block)
@@ -180,9 +228,9 @@ class WeightShardStore:
         """Reconstruct a committed plan without trusting caller-supplied paths."""
         path = self._manifest_path(plan_digest)
         try:
-            raw = path.read_bytes()
+            raw = _read_manifest(path)
             manifest = json.loads(raw)
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, RecursionError) as exc:
             raise WeightShardStoreError("weight plan manifest unavailable") from exc
         if not isinstance(manifest, dict) or set(manifest) != {
             "schema_version", "model_identity_digest", "weights_digest",
