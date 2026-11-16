@@ -87,6 +87,8 @@ jobs:
             skeleton/testing/test_compose_terminal_authority_failures.py \
             skeleton/testing/test_compose_terminal_topology.py \
             skeleton/testing/test_guarded_mongo_operator.py
+      - name: Qualify canonical Mongo epoch CAS and failure custody
+        run: python -m pytest -q -p pytest_asyncio.plugin --maxfail=1 skeleton/testing/test_mongo_source_epoch.py
       - name: Verify construction and provider-owner contracts
         run: |
           python scripts/check_architecture_map.py

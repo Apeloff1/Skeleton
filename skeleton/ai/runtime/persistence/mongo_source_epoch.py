@@ -28,18 +28,55 @@ from typing import Any
 
 _EPOCH_READ_MAX_TIME_MS = 2000
 _EPOCH_READ_DEADLINE_SECONDS = 3.0
+_EPOCH_MUTATION_DEADLINE_SECONDS = 12.0
+_MAX_EPOCH = (1 << 63) - 1
 
 class MongoSourceEpochError(RuntimeError):
     """Canonical source epoch is unavailable or violates write fencing."""
 
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class _BoundWriter:
     tenant_id: str
     actor_id: str
     task: asyncio.Task[Any]
     token: str
+    poisoned: bool = False
+
+
+def _epoch_integer(value: object) -> int | None:
+    """Normalize exact BSON driver integers, rejecting bool and subclasses."""
+    if type(value) is int:
+        return value
+    try:
+        from bson.int64 import Int64
+    except ImportError:
+        return None
+    if type(value) is Int64:
+        return int(value)
+    return None
+
+
+def _verified_epoch_record(
+    doc: object, *, key: str, tenant_id: str, actor_id: str,
+    phase: str, writer_token: str | None,
+) -> int | None:
+    if (type(doc) is not dict or len(doc) > 32
+            or any(type(item) is not str or len(item) > 128 for item in doc)):
+        return None
+    for field, value in (
+        ("_id", key), ("tenant_id", tenant_id), ("actor_id", actor_id),
+        ("phase", phase), ("writer_token", writer_token),
+    ):
+        if field not in doc or type(doc[field]) is not type(value) or doc[field] != value:
+            return None
+    number = _epoch_integer(doc.get("epoch"))
+    if number is None or not 2 <= number <= _MAX_EPOCH:
+        return None
+    if number % 2 != (1 if phase == "writing" else 0):
+        return None
+    return number
 
 
 class MongoCanonicalSourceEpoch:
@@ -81,7 +118,8 @@ class MongoCanonicalSourceEpoch:
     @staticmethod
     def _key(tenant_id: str, actor_id: str) -> str:
         try:
-            invalid = any(not isinstance(v, str) or not v or v != v.strip() or "\0" in v
+            invalid = any(type(v) is not str or not v or len(v) > 512 or v != v.strip()
+                          or any(ord(ch) < 32 or ord(ch) == 127 for ch in v)
                           or len(v.encode("utf-8", "strict")) > 512 for v in (tenant_id, actor_id))
         except UnicodeError as exc:
             raise MongoSourceEpochError("canonical source writer identity invalid") from exc
@@ -96,24 +134,26 @@ class MongoCanonicalSourceEpoch:
         # Scope includes context for callers, but the epoch deliberately fences
         # ALL contexts for one actor: memory mutations affect every conversation.
         self._key(tenant_id, context_id)
+        key = self._key(tenant_id, actor_id)
         try:
             # Keep cancellation/task identity intact and bound both Mongo's
             # server-side operation and the caller's overall read window.
             async with asyncio.timeout(_EPOCH_READ_DEADLINE_SECONDS):
                 doc = await self._reader.find_one({
-                    "_id": self._key(tenant_id, actor_id),
+                    "_id": key,
                     "tenant_id": tenant_id, "actor_id": actor_id,
                 }, max_time_ms=_EPOCH_READ_MAX_TIME_MS)
         except MongoSourceEpochError:
             raise
         except Exception as exc:
             raise MongoSourceEpochError("linearizable source epoch read unavailable") from exc
-        if (not isinstance(doc, dict) or doc.get("phase") != "stable"
-                or doc.get("writer_token") is not None
-                or type(doc.get("epoch")) is not int or doc["epoch"] < 2
-                or doc["epoch"] % 2):
+        number = _verified_epoch_record(
+            doc, key=key, tenant_id=tenant_id, actor_id=actor_id,
+            phase="stable", writer_token=None,
+        )
+        if number is None:
             raise MongoSourceEpochError("canonical source epoch missing, writing or quarantined")
-        return doc["epoch"]
+        return number
 
     async def provision_migration_epoch(self, *, tenant_id: str, actor_id: str) -> None:
         """ONLY for an operator-controlled quiescent migration; never on reads."""
@@ -130,15 +170,17 @@ class MongoCanonicalSourceEpoch:
 
     def require_actor_writer(self, *, tenant_id: str, actor_id: str) -> None:
         """Guard lower-level mutation paths that cannot acquire own epoch."""
+        self._key(tenant_id, actor_id)
         active = self._active.get()
-        if (active is None or active.task is not asyncio.current_task()
+        if (active is None or active.poisoned or active.task is not asyncio.current_task()
                 or active.tenant_id != tenant_id or active.actor_id != actor_id):
             raise MongoSourceEpochError("canonical write requires owner-scoped epoch")
 
     def require_tenant_writer(self, *, tenant_id: str) -> None:
         """Deletion-only boundary; tenant sweeps cannot invent actor custody."""
+        self._key(tenant_id, tenant_id)
         active = self._active.get()
-        if (active is None or active.task is not asyncio.current_task()
+        if (active is None or active.poisoned or active.task is not asyncio.current_task()
                 or active.tenant_id != tenant_id):
             raise MongoSourceEpochError("tenant deletion requires canonical actor writer")
 
@@ -153,48 +195,76 @@ class MongoCanonicalSourceEpoch:
             if (active.task is not task or active.tenant_id != tenant_id
                     or active.actor_id != actor_id):
                 raise MongoSourceEpochError("canonical writer scope cannot be inherited")
-            yield
+            if active.poisoned:
+                raise MongoSourceEpochError("canonical writer scope is quarantined")
+            try:
+                yield
+            except BaseException:
+                # Even a caught nested failure may have partially mutated data.
+                active.poisoned = True
+                raise
             return
+
         token = str(uuid4())
         try:
             from pymongo import ReturnDocument
-            acquired = await self._collection.find_one_and_update(
-                {"_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
-                 "phase": "stable", "writer_token": None},
-                {"$inc": {"epoch": 1},
-                 "$set": {"phase": "writing", "writer_token": token}},
-                return_document=ReturnDocument.AFTER,
+
+            # A stable linearizable read followed by an exact epoch CAS is
+            # essential: a generic phase query could increment corrupted,
+            # overflowing or already replaced source state.
+            expected = await self.read_epoch(
+                tenant_id=tenant_id, actor_id=actor_id, context_id=actor_id,
             )
-        except Exception as exc:
-            raise MongoSourceEpochError("canonical writer admission unavailable") from exc
-        if (not isinstance(acquired, dict) or acquired.get("writer_token") != token
-                or acquired.get("phase") != "writing"
-                or type(acquired.get("epoch")) is not int
-                or acquired["epoch"] < 3 or acquired["epoch"] % 2 != 1):
-            raise MongoSourceEpochError("canonical writer epoch not owned")
-        scope = self._active.set(_BoundWriter(tenant_id, actor_id, task, token))
-        try:
-            yield
-            try:
-                closed = await self._collection.find_one_and_update(
+            if expected > _MAX_EPOCH - 2:
+                raise MongoSourceEpochError("canonical epoch generation exhausted")
+            async with asyncio.timeout(_EPOCH_MUTATION_DEADLINE_SECONDS):
+                acquired = await self._collection.find_one_and_update(
                     {"_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
-                     "phase": "writing", "writer_token": token,
-                     "epoch": acquired["epoch"]},
+                     "phase": "stable", "writer_token": None, "epoch": expected},
                     {"$inc": {"epoch": 1},
-                     "$set": {"phase": "stable", "writer_token": None}},
+                     "$set": {"phase": "writing", "writer_token": token}},
                     return_document=ReturnDocument.AFTER,
                 )
-            except Exception as exc:
+        except Exception:
+            # An ambiguous driver timeout does not imply that the write failed.
+            # Never roll back, retry, or disclose driver exception contents.
+            raise MongoSourceEpochError("canonical writer admission unavailable") from None
+        acquired_number = _verified_epoch_record(
+            acquired, key=key, tenant_id=tenant_id, actor_id=actor_id,
+            phase="writing", writer_token=token,
+        )
+        if acquired_number != expected + 1:
+            raise MongoSourceEpochError("canonical writer epoch not owned")
+
+        custody = _BoundWriter(tenant_id, actor_id, task, token)
+        scope = self._active.set(custody)
+        try:
+            yield
+            if custody.poisoned:
+                raise MongoSourceEpochError("canonical writer scope is quarantined")
+            try:
+                async with asyncio.timeout(_EPOCH_MUTATION_DEADLINE_SECONDS):
+                    closed = await self._collection.find_one_and_update(
+                        {"_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
+                         "phase": "writing", "writer_token": token,
+                         "epoch": acquired_number},
+                        {"$inc": {"epoch": 1},
+                         "$set": {"phase": "stable", "writer_token": None}},
+                        return_document=ReturnDocument.AFTER,
+                    )
+            except Exception:
                 raise MongoSourceEpochError(
-                    "canonical writer completion unavailable; epoch remains quarantined"
-                ) from exc
-            if (not isinstance(closed, dict) or closed.get("phase") != "stable"
-                    or closed.get("epoch") != acquired["epoch"] + 1):
-                raise MongoSourceEpochError("canonical writer CAS lost; epoch quarantined")
+                    "canonical writer completion unavailable; reconcile uncertain epoch"
+                ) from None
+            closed_number = _verified_epoch_record(
+                closed, key=key, tenant_id=tenant_id, actor_id=actor_id,
+                phase="stable", writer_token=None,
+            )
+            if closed_number != acquired_number + 1:
+                raise MongoSourceEpochError("canonical writer CAS lost; reconcile uncertain epoch")
         finally:
-            # An exception in the protected mutation intentionally leaves the
-            # epoch WRITING: data might be partially committed and cannot be
-            # released on the basis of an in-process exception handler.
+            # An exception in protected mutation leaves the epoch WRITING.
+            # A completion-ack failure is uncertain, not evidence of rollback.
             self._active.reset(scope)
 
 
