@@ -267,7 +267,7 @@ def _remaining(deadline):
 
 
 def _http(path,token,method,route,payload,deadline):
-    conn=_UnixHTTP(path,min(60,_remaining(deadline)))
+    conn=_UnixHTTP(path,_remaining(deadline) if method=="POST" else min(5,_remaining(deadline)))
     try:
         raw=None if payload is None else stable(payload).encode()
         if raw is not None and len(raw)>MAX_REQUEST:
@@ -284,7 +284,7 @@ def _http(path,token,method,route,payload,deadline):
         chunks=[];total=0
         while True:
             if conn.sock is not None:
-                conn.sock.settimeout(min(60,_remaining(deadline)))
+                conn.sock.settimeout(_remaining(deadline) if method=="POST" else min(5,_remaining(deadline)))
             block=response.read(min(65536,MAX_RESPONSE+1-total))
             if not block:
                 break
@@ -378,6 +378,20 @@ class NativePeer:
 
     def _generate(self,messages,budget,deadline):
         stamps=self.spec.verify_files(deadline)
+        from skeleton.app.offline_resources import probe_local_resources
+        try:
+            # Advisory conservative RAM floor; not an exact architecture/KV
+            # measurement or hard kernel memory cap. Fail closed if telemetry
+            # is unavailable. Avoid deliberately overcommitting native CPU RAM.
+            observed=probe_local_resources(self.spec.model.path)
+            weights=sum(stamp[2] for path,stamp,_ in stamps if path!=self.spec.binary.path)
+            floor=2*weights+2*1024**3+self.spec.context_tokens*65536
+            if (observed.available_ram_bytes<floor or observed.memory_pressure_ratio>=0.85):
+                raise PeerRejected("insufficient measured host headroom for auxiliary inference")
+        except PeerRejected:
+            raise
+        except Exception:
+            raise PeerRejected("native peer resource telemetry unavailable") from None
         started=time.monotonic()
         # The socket is in an owner-only temporary directory. No TCP bind,
         # public listener, inherited proxy/LLAMA_ARG options or cloud token.
@@ -414,9 +428,10 @@ class NativePeer:
                         os.killpg(process.pid,signal.SIGKILL)
                 except ProcessLookupError:
                     pass
-            watchdog=threading.Timer(_remaining(deadline),expire)
-            watchdog.daemon=True;watchdog.start()
+            watchdog=None
             try:
+                watchdog=threading.Timer(_remaining(deadline),expire)
+                watchdog.daemon=True;watchdog.start()
                 while True:
                     _remaining(deadline)
                     if process.poll() is not None:
@@ -469,5 +484,8 @@ class NativePeer:
             except (OSError,http.client.HTTPException,subprocess.SubprocessError):
                 raise PeerRejected("native peer execution unavailable") from None
             finally:
-                watchdog.cancel();watchdog.join()
+                if watchdog is not None:
+                    watchdog.cancel()
+                    if watchdog.ident is not None:
+                        watchdog.join()
                 _stop(process)
