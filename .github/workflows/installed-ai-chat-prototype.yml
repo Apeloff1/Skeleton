@@ -61,6 +61,8 @@ on:
       - "skeleton/ai/model_runtime/decode_acceleration.py"
       - "skeleton/testing/test_jeeves_competitive_compute_viii.py"
       - "skeleton/testing/test_jeeves_checkpoint_efficiency_ix.py"
+      - "skeleton/ai/model_runtime/tokenization.py"
+      - "skeleton/testing/test_jeeves_causal_efficiency_x.py"
       - "machine/ai_file_tree.json"
       - "skeleton/testing/test_jeeves_measured_tuning.py"
       - "skeleton/testing/test_jeeves_evidence_packing.py"
@@ -161,6 +163,7 @@ jobs:
           skeleton/testing/test_jeeves_local_advantage_vii.py
           skeleton/testing/test_jeeves_competitive_compute_viii.py
           skeleton/testing/test_jeeves_checkpoint_efficiency_ix.py
+          skeleton/testing/test_jeeves_causal_efficiency_x.py
       - name: Verify Docker materialization source-boundary parsing
         run: python -m unittest discover -s tests -p 'test_docker_materialization_parser.py' -v
       - name: Compile first-install operator entrypoints
