@@ -49,7 +49,7 @@ class PrefixLease:
 class PrivatePrefillPool:
     def __init__(self,runtime:NativeLLMRuntime,*,max_bytes:int=8*1024**2,
                  max_scopes:int=8,ttl_seconds:int=120):
-        if type(runtime) is not NativeLLMRuntime:
+        if not isinstance(runtime,NativeLLMRuntime):
             raise TypeError("canonical native runtime required")
         for value,lo,hi in ((max_bytes,0,64*1024**2),(max_scopes,1,32),(ttl_seconds,1,600)):
             if type(value) is not int or not lo<=value<=hi:
@@ -67,7 +67,7 @@ class PrivatePrefillPool:
 
     def _enabled(self):
         r=self.runtime
-        return (self.capacity>0 and r.device.actual=="cpu" and not r.device.resident
+        return (type(r) is NativeLLMRuntime and self.capacity>0 and r.device.actual=="cpu" and not r.device.resident
                 and r.model._accel is None and not r.model.use_mod)
 
     def _drop(self,key):
@@ -179,7 +179,7 @@ class PrivatePrefillPool:
         with self._lock:
             self._expire(time.monotonic())
             entry=self._entries.get(lease.key)
-            if (entry is None or entry.epoch is not lease.epoch or profile!=lease.profile
+            if (entry is None or entry.cache is not None or entry.epoch is not lease.epoch or profile!=lease.profile
                     or not self._compatible(cache,profile,entry)):
                 return False
             size=NativeConversationSession._retained_prefix_size(cache)
