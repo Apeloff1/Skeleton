@@ -2479,3 +2479,70 @@ def test_managed_dispatcher_requires_empty_new_fenced_runtime(tmp_path):
         ManagedHostDispatcher.start(store, "fresh", ingress=SwarmIngressGovernor(),
                                     authority=authority, transport=transport, initial_runtime=runtime)
     assert store.get_run("fresh").worker_id is None
+
+
+def test_local_subprocess_extended_compute_catalog_independent_algorithms(tmp_path):
+    import json
+    from skeleton.automation.agents.swarm_durable import (
+        SQLiteWorkerCustody, LocalSubprocessTransport, LocalWorkerEvidenceValidator,
+        HostDispatchAttempt, HostWorkerAuthority,
+    )
+    custody = SQLiteWorkerCustody(_private_worker_directory(tmp_path))
+    jobs = [
+        ("chunk_manifest", {"text": "x" * 80, "chunk_bytes": 64}, None),
+        ("token_histogram", "One one TWO _word", [["_word", 1], ["one", 2], ["two", 1]]),
+        ("sparse_dot", {"left": {"x": 4, "y": -2}, "right": {"x": 3, "z": 9}}, 12),
+        ("lexical_rank", {"query": "a a b", "documents": {"c": "a", "a": "a b", "b": "a a b"},
+                          "limit": 2}, [["b", 3], ["a", 2]]),
+        ("shortest_path", {"nodes": ["a", "b", "c", "d"],
+                           "edges": [["a", "c", 1], ["a", "b", 1], ["c", "d", 1], ["b", "d", 1]],
+                           "start": "a", "goal": "d"}, {"cost": 2, "path": ["a", "b", "d"]}),
+        ("shortest_path", {"nodes": ["a", "b"], "edges": [], "start": "a", "goal": "b"},
+         {"cost": None, "path": []}),
+        ("topological_order", {"nodes": ["c", "b", "a"], "edges": [["b", "c"]]},
+         {"order": ["a", "b", "c"], "acyclic": True}),
+        ("topological_order", {"nodes": ["a", "b", "c"], "edges": [["a", "b"], ["b", "a"]]},
+         {"order": ["c"], "acyclic": False}),
+    ]
+    transport = LocalSubprocessTransport(
+        custody, grants={("a", "w"): frozenset(row[0] for row in jobs)},
+        worker_signers={"w": ("worker", b"w" * 32)},
+    )
+    authority = HostWorkerAuthority("run", grants={
+        ("worker", "w"): (b"w" * 32, frozenset({"success"})),
+    }, resolve=custody.resolve, validate_evidence=LocalWorkerEvidenceValidator(custody))
+    for i, (operation, value, expected) in enumerate(jobs):
+        payload = json.dumps({"operation": operation, "input": value},
+                             sort_keys=True, separators=(",", ":")).encode()
+        attempt = HostDispatchAttempt("run", "a", f"job-{i}", "w", f"{i:032x}", payload)
+        reply = transport(attempt)
+        receipt, artifact = custody.resolve(reply.evidence_sha256)
+        result = json.loads(artifact)["result"]
+        if operation == "chunk_manifest":
+            assert [row["bytes"] for row in result] == [64, 16]
+            assert [row["offset"] for row in result] == [0, 64]
+        else:
+            assert result == expected
+        assert authority("w", attempt.task_id, attempt.lease_token, "success", receipt.digest)
+
+
+def test_extended_compute_refuses_malformed_or_oversized_before_start(tmp_path):
+    import json
+    from skeleton.automation.agents.swarm_durable import (
+        SQLiteWorkerCustody, LocalSubprocessTransport, HostDispatchAttempt, DurableSwarmError,
+    )
+    custody = SQLiteWorkerCustody(_private_worker_directory(tmp_path), max_artifact_bytes=128)
+    transport = LocalSubprocessTransport(
+        custody, grants={("a", "w"): frozenset({"shortest_path", "sparse_dot", "chunk_manifest"})},
+        worker_signers={"w": ("worker", b"w" * 32)},
+    )
+    for i, payload in enumerate([
+        {"operation": "shortest_path", "input": {"nodes": ["a", "b"], "edges": [["a", "b", -1]],
+                                                "start": "a", "goal": "b"}},
+        {"operation": "sparse_dot", "input": {"left": {"a": True}, "right": {"a": 1}}},
+        {"operation": "chunk_manifest", "input": {"text": "x" * 1024, "chunk_bytes": 64}},
+    ]):
+        raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        with pytest.raises(DurableSwarmError):
+            transport(HostDispatchAttempt("run", "a", "job", "w", f"{i:032x}", raw))
+    assert custody.usage()["attempts"] == 0

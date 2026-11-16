@@ -1327,7 +1327,139 @@ class SQLiteWorkerCustody:
                 "reconciliations": reconciled}
 
 
-_LOCAL_OPERATIONS = frozenset({"sha256_text", "integer_sum", "json_sha256"})
+_LOCAL_OPERATIONS = frozenset({
+    "sha256_text", "integer_sum", "json_sha256", "chunk_manifest", "token_histogram",
+    "sparse_dot", "lexical_rank", "shortest_path", "topological_order",
+})
+
+
+def _local_tokens(text: str) -> list[str]:
+    import re
+    if type(text) is not str or len(text) > 32768:
+        raise DurableSwarmError("invalid bounded text input")
+    return re.findall(r"[a-z0-9_]+", text.lower(), flags=re.ASCII)
+
+
+def _local_graph(value: object, *, weighted: bool):
+    if type(value) is not dict or set(value) != (
+            {"nodes", "edges", "start", "goal"} if weighted else {"nodes", "edges"}):
+        raise DurableSwarmError("invalid local graph shape")
+    nodes, edges = value["nodes"], value["edges"]
+    if (type(nodes) is not list or not 1 <= len(nodes) <= 128
+            or type(edges) is not list or len(edges) > 1024):
+        raise DurableSwarmError("local graph exceeds bound")
+    for node in nodes:
+        _wait_identifier(node)
+        if len(node) > 64:
+            raise DurableSwarmError("graph identity too long")
+    index = set(nodes)
+    if len(index) != len(nodes):
+        raise DurableSwarmError("duplicate graph node")
+    adjacency = {node: [] for node in nodes}
+    seen = set()
+    for edge in edges:
+        if (type(edge) is not list or len(edge) != (3 if weighted else 2)
+                or type(edge[0]) is not str or type(edge[1]) is not str
+                or edge[0] not in index or edge[1] not in index
+                or edge[0] == edge[1] or (edge[0], edge[1]) in seen):
+            raise DurableSwarmError("invalid graph edge")
+        weight = edge[2] if weighted else 1
+        if type(weight) is not int or not 1 <= weight <= 1_000_000:
+            raise DurableSwarmError("invalid positive graph weight")
+        seen.add((edge[0], edge[1]))
+        adjacency[edge[0]].append((edge[1], weight))
+    if weighted and (type(value["start"]) is not str or type(value["goal"]) is not str
+                     or value["start"] not in index or value["goal"] not in index):
+        raise DurableSwarmError("invalid graph endpoints")
+    return adjacency
+
+
+def _local_vector(value: object) -> dict[str, int]:
+    if type(value) is not dict or len(value) > 2048:
+        raise DurableSwarmError("invalid sparse integer vector")
+    for key, item in value.items():
+        _wait_identifier(key)
+        if len(key) > 64 or type(item) is not int or abs(item) > 1_000_000:
+            raise DurableSwarmError("invalid sparse vector coordinate")
+    return value
+
+
+def _local_extended_reference(operation: str, value: object) -> object:
+    from collections import Counter
+    from hashlib import sha256
+    from heapq import heappop, heappush, heapify
+    if operation == "chunk_manifest":
+        if (type(value) is not dict or set(value) != {"text", "chunk_bytes"}
+                or type(value["text"]) is not str
+                or type(value["chunk_bytes"]) is not int
+                or not 64 <= value["chunk_bytes"] <= 16384):
+            raise DurableSwarmError("invalid chunk manifest request")
+        raw = value["text"].encode("utf-8")
+        width = value["chunk_bytes"]
+        if len(raw) > 32768 or (len(raw) + width - 1) // width > 256:
+            raise DurableSwarmError("chunk manifest exceeds bound")
+        return [{"offset": offset, "bytes": len(raw[offset:offset+width]),
+                 "sha256": sha256(raw[offset:offset+width]).hexdigest()}
+                for offset in range(0, len(raw), width)]
+    if operation == "token_histogram":
+        counts = Counter(_local_tokens(value))
+        if len(counts) > 2048:
+            raise DurableSwarmError("token histogram exceeds bound")
+        return [[token, counts[token]] for token in sorted(counts)]
+    if operation == "sparse_dot":
+        if type(value) is not dict or set(value) != {"left", "right"}:
+            raise DurableSwarmError("invalid sparse dot request")
+        left, right = _local_vector(value["left"]), _local_vector(value["right"])
+        return sum(left[key] * right[key] for key in left.keys() & right.keys())
+    if operation == "lexical_rank":
+        if (type(value) is not dict or set(value) != {"query", "documents", "limit"}
+                or type(value["documents"]) is not dict or len(value["documents"]) > 128
+                or type(value["limit"]) is not int or not 1 <= value["limit"] <= 128):
+            raise DurableSwarmError("invalid lexical ranking request")
+        query = Counter(_local_tokens(value["query"]))
+        rows = []
+        for identity, content in value["documents"].items():
+            _wait_identifier(identity)
+            terms = Counter(_local_tokens(content))
+            score = sum(min(count, terms[token]) for token, count in query.items())
+            if score:
+                rows.append([identity, score])
+        return sorted(rows, key=lambda row: (-row[1], row[0]))[:value["limit"]]
+    if operation == "shortest_path":
+        adjacency = _local_graph(value, weighted=True)
+        start, goal = value["start"], value["goal"]
+        queue = [(0, (start,))]
+        best = {}
+        while queue:
+            cost, path = heappop(queue)
+            node = path[-1]
+            if node in best:
+                continue
+            best[node] = cost
+            if node == goal:
+                return {"cost": cost, "path": list(path)}
+            for other, weight in adjacency[node]:
+                if other not in best:
+                    heappush(queue, (cost + weight, path + (other,)))
+        return {"cost": None, "path": []}
+    if operation == "topological_order":
+        adjacency = _local_graph(value, weighted=False)
+        degree = {node: 0 for node in adjacency}
+        for edges in adjacency.values():
+            for other, _ in edges:
+                degree[other] += 1
+        ready = [node for node, count in degree.items() if not count]
+        heapify(ready)
+        order = []
+        while ready:
+            node = heappop(ready)
+            order.append(node)
+            for other, _ in adjacency[node]:
+                degree[other] -= 1
+                if degree[other] == 0:
+                    heappush(ready, other)
+        return {"order": order, "acyclic": len(order) == len(adjacency)}
+    raise DurableSwarmError("unsupported local operation")
 
 
 def _local_reference(payload: dict[str, object]) -> object:
@@ -1350,15 +1482,18 @@ def _local_reference(payload: dict[str, object]) -> object:
         for item in value:
             result += item
         return result
-    if type(value) not in (dict, list):
-        raise DurableSwarmError("JSON digest requires object or array")
-    return sha256(_wait_bytes(value)).hexdigest()
+    if operation == "json_sha256":
+        if type(value) not in (dict, list):
+            raise DurableSwarmError("JSON digest requires object or array")
+        return sha256(_wait_bytes(value)).hexdigest()
+    return _local_extended_reference(operation, value)
 
 
 # The interpreter program is constant, never constructed from a task. There
 # is no shell, arbitrary command, dynamic import or untrusted executable.
 _LOCAL_WORKER_PROGRAM = """
-import hashlib, json, sys
+import hashlib, json, sys, re
+from collections import Counter
 request = json.loads(sys.stdin.buffer.read(65537))
 operation, value = request["operation"], request["input"]
 if operation == "sha256_text":
@@ -1368,9 +1503,60 @@ elif operation == "integer_sum":
 elif operation == "json_sha256":
     raw = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
     result = hashlib.sha256(raw.encode("ascii")).hexdigest()
+elif operation == "chunk_manifest":
+    raw = value["text"].encode("utf-8")
+    result = []
+    for offset in range(0, len(raw), value["chunk_bytes"]):
+        chunk = raw[offset:offset+value["chunk_bytes"]]
+        result.append({"offset": offset, "bytes": len(chunk), "sha256": hashlib.sha256(chunk).hexdigest()})
+elif operation == "token_histogram":
+    counts = {}
+    for word in re.findall(r"[a-z0-9_]+", value.lower(), flags=re.ASCII):
+        counts[word] = counts.get(word, 0) + 1
+    result = sorted([key, count] for key, count in counts.items())
+elif operation == "sparse_dot":
+    result = sum(number * value["right"].get(key, 0) for key, number in value["left"].items())
+elif operation == "lexical_rank":
+    query = Counter(re.findall(r"[a-z0-9_]+", value["query"].lower(), flags=re.ASCII))
+    scores = []
+    for key, text in value["documents"].items():
+        terms = Counter(re.findall(r"[a-z0-9_]+", text.lower(), flags=re.ASCII))
+        score = sum((query & terms).values())
+        if score:
+            scores.append([key, score])
+    result = sorted(scores, key=lambda row: (-row[1], row[0]))[:value["limit"]]
+elif operation == "shortest_path":
+    start, goal = value["start"], value["goal"]
+    # Bellman-Ford with lexicographically ordered shortest witnesses, rather
+    # than the owner's heap-based Dijkstra. Positive weights bound paths.
+    best = {start: (0, (start,))}
+    for _ in range(len(value["nodes"])-1):
+        after = dict(best)
+        for left, right, cost in value["edges"]:
+            if left in best:
+                previous_cost, path = best[left]
+                candidate = (previous_cost+cost, path+(right,))
+                if right not in after or candidate < after[right]:
+                    after[right] = candidate
+        if after == best:
+            break
+        best = after
+    result = {"cost": best[goal][0], "path": list(best[goal][1])} if goal in best else {"cost": None, "path": []}
+elif operation == "topological_order":
+    remaining = set(value["nodes"])
+    order = []
+    while remaining:
+        blocked = {right for left, right in value["edges"] if left in remaining and right in remaining}
+        available = remaining - blocked
+        if not available:
+            break
+        chosen = min(available)
+        remaining.remove(chosen)
+        order.append(chosen)
+    result = {"order": order, "acyclic": not remaining}
 else:
     raise ValueError("operation unavailable")
-sys.stdout.write(json.dumps(result, ensure_ascii=True, allow_nan=False))
+sys.stdout.write(json.dumps(result, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False))
 """
 
 
@@ -1443,6 +1629,11 @@ class LocalSubprocessTransport:
         _check_local_attempt(attempt)
         payload = attempt.payload()
         expected = _local_reference(payload)
+        expected_artifact = _wait_bytes({"version": 1,
+                                         "payload_sha256": sha256(attempt.payload_json).hexdigest(),
+                                         "result": expected})
+        if len(expected_artifact) > self.custody.max_artifact_bytes:
+            raise DurableSwarmError("local operation exceeds receipt capacity")
         if payload["operation"] not in self._grants.get((attempt.tenant, attempt.worker_id), ()):
             raise DurableSwarmError("local operation not granted for tenant and worker")
         if not self.custody.begin(attempt):
@@ -1461,12 +1652,13 @@ class LocalSubprocessTransport:
             input=attempt.payload_json, capture_output=True, timeout=self.timeout_seconds,
             cwd=self.custody.directory, env=env, shell=False, close_fds=True, check=False,
         )
-        # The fixed worker program produces only a bounded scalar. A modified
+        # The fixed worker program produces only bounded data. A modified
         # interpreter is outside the trusted host boundary.
-        if result.returncode != 0 or len(result.stdout) > 256 or result.stderr:
+        if (result.returncode != 0 or len(result.stdout) > self.custody.max_artifact_bytes
+                or result.stderr):
             raise DurableSwarmError("local worker process failed")
         value = json.loads(result.stdout)
-        if type(value) is not type(expected) or value != expected:
+        if _wait_bytes(value) != _wait_bytes(expected):
             raise DurableSwarmError("local worker result failed independent verification")
         artifact = _wait_bytes({"version": 1,
                                 "payload_sha256": sha256(attempt.payload_json).hexdigest(),

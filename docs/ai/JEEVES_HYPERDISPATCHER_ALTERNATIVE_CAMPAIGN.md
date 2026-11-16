@@ -349,3 +349,18 @@ This is an opt-in host lifecycle API, not yet wired into the app's global
 startup or daemon. Automatic candidate authorization, heterogeneous
 resource adapters, independent device qualification and external worker
 transport remain open.
+
+## Wave A17: bounded domain compute catalog
+
+The fixed physical transport now supports nine explicit operations including
+chunked content manifests, token histograms, sparse integer dot products,
+exact lexical retrieval ranking, shortest-path witnesses and dependency
+topological order. These are useful archive, retrieval, game-routing and
+workflow building blocks. The owner uses separately expressed algorithms
+(Dijkstra versus Bellman-Ford, heap indegrees versus repeated frontier
+selection, independent token counts) and exact canonical bytes, not
+approximate scores or worker assertions. Admission bounds input structure,
+graph size, weights, result capacity and allowed capabilities before the
+first physical attempt. Two regressions exercise the real child process
+for all added operations, ties, unreachable and cyclic graphs, malformed
+inputs and refusal before tombstone creation. No neural inference claim.
