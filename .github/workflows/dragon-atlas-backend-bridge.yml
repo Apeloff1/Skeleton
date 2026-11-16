@@ -117,6 +117,16 @@ jobs:
           python -m py_compile backend/core/dragon_capture_export_witness.py
           python -m unittest discover -s backend/tests -p 'test_dragon_capture_export_witness.py' -v
 
+      - name: Authorized delivery, local import orchestration and physical scratch fixtures
+        timeout-minutes: 5
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python -m py_compile backend/core/dragon_registry_connector.py backend/core/dragon_export_jobs.py backend/core/dragon_raw_export_custody.py backend/core/dragon_application_backup.py backend/core/dragon_capacity_qualification.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_delivery_orchestration.py' -v
+
       - name: Canonical physical graph and independent writer qualification
         timeout-minutes: 8
         env:
