@@ -365,3 +365,55 @@ def test_runtime_policy_and_source_bindings_cannot_be_reassigned():
     reading = sample()
     with pytest.raises(RuntimePreflightError, match="typed iteration work and phase"):
         owner.offer(reading, malformed, now_ns=reading.finished_ns)
+
+
+def test_scoped_headroom_intersects_host_and_windows_commit_without_false_credit():
+    from skeleton.ai.runtime.inference.adaptive_serving import ServingResources
+    from skeleton.app.offline_runtime_preflight import intersect_scoped_headroom
+    memory = MemoryTopology(16 * GIB, 12 * GIB, "host-fixture")
+    narrow = ServingResources(available_memory_bytes=3 * GIB, commit_available_bytes=2 * GIB)
+    assert intersect_scoped_headroom(memory, narrow).available_bytes == 2 * GIB
+    unknown = ServingResources(commit_available_bytes=10 * GIB)
+    assert intersect_scoped_headroom(memory, unknown).available_bytes is None
+    wide = ServingResources(available_memory_bytes=30 * GIB)
+    assert intersect_scoped_headroom(memory, wide).available_bytes == 12 * GIB
+
+
+def test_all_live_probes_use_scoped_evidence_and_reject_critical_pressure(monkeypatch):
+    from skeleton.ai.runtime.inference.adaptive_serving import ServingResources
+    from skeleton.app import offline_runtime_preflight as owner
+
+    fixture = sample()
+    monkeypatch.setattr(owner, "probe_cpu_topology", lambda: fixture.cpu)
+    monkeypatch.setattr(owner, "probe_memory_topology", lambda: fixture.memory)
+    monkeypatch.setattr(owner, "probe_power", lambda: fixture.power)
+    monkeypatch.setattr(owner, "probe_linux_nvidia_memory", lambda: fixture.gpu)
+    seen = []
+    measured = ServingResources(available_memory_bytes=4 * GIB,
+                                memory_used_fraction=0.25,
+                                memory_full_stall_fraction=0.2,
+                                source="scoped-fixture")
+
+    def collect(*, fresh=False):
+        seen.append(fresh)
+        return measured
+
+    monkeypatch.setattr("skeleton.ai.runtime.inference.local.sample_serving_resources", collect)
+    observation = owner.sample_hardware()
+    assert seen == [True]
+    assert observation.memory.available_bytes == 4 * GIB
+    assert observation.scoped_pressure == "critical"
+    assert observation.scoped_observation_digest == digest(measured.as_dict())
+    result = plan_preflight(source(), observation, POLICY, now_ns=observation.finished_ns)
+    assert result["status"] == "blocked"
+    assert "canonical_scoped_serving_pressure_critical" in result["blockers"]
+    assert result["worker_ceiling"] == 0
+
+
+def test_scoped_pressure_provenance_pair_is_validated():
+    with pytest.raises(RuntimePreflightError, match="incomplete scoped"):
+        replace(sample(), scoped_pressure="normal")
+    with pytest.raises(RuntimePreflightError, match="invalid scoped"):
+        replace(sample(), scoped_pressure="invented", scoped_observation_digest="a" * 64)
+    recorded = replace(sample(), scoped_pressure="recovering", scoped_observation_digest="a" * 64)
+    assert recorded.snapshot()["scoped_pressure"] == "recovering"
