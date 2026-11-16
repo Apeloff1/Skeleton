@@ -682,10 +682,16 @@ class NativeLLMRuntime:
         sequence: TokenSequence,
         config: GenerationConfig | None = None,
         *, interrupt: Callable[[], None] | None = None,
+        _private_cpu_cache: KVCache | None = None,
     ) -> GenerationStream:
-        """Stream pre-tokenized inference through the canonical decoder."""
+        """Stream pre-tokenized inference through the canonical decoder.
+
+        The private cache argument is for the trusted local prefill owner;
+        the decoder still verifies compatibility and exact admitted tokens.
+        """
         cfg = config or GenerationConfig(max_new_tokens=min(32, self.limits.max_new_tokens))
-        return GenerationStream(self._stream_sequence_impl(sequence, cfg, interrupt=interrupt))
+        return GenerationStream(self._stream_sequence_impl(sequence, cfg, interrupt=interrupt,
+                               _private_cpu_cache=_private_cpu_cache))
 
     def _stream_sequence_impl(
         self,
