@@ -76,3 +76,38 @@ def test_reject_untrusted_bundle(pair, fault):
         budget = first.stat().st_size
     with pytest.raises((ValueError, OSError, LlamaCppRuntimeError)):
         audit_bundle(first, pins, max_bytes=budget)
+
+@pytest.mark.skipif(os.name != "posix", reason="native split custody POSIX only")
+def test_native_split_dispatch_uses_first_path_and_full_identity(pair, tmp_path):
+    import sys
+    import threading
+    from skeleton.ai.runtime.inference.llama_cpp import LlamaCppConfig, LlamaCppModel
+    from skeleton.ai.runtime.inference.gguf_bundle import split_identity
+    from skeleton.ai.runtime.inference.local import LocalInferenceRequest
+    first, second, pins = pair
+    first.parent.chmod(0o700)
+    executable = tmp_path / "fixture-cli"
+    # Child verifies companion visibility. Synthetic fixture, not llama.cpp.
+    executable.write_text(f"#!{sys.executable}\nimport pathlib,sys\np=pathlib.Path(sys.argv[sys.argv.index('-m')+1])\nassert p.with_name(p.name.replace('00001-of','00002-of')).is_file()\nprint('OK',end='')\n")
+    executable.chmod(0o700)
+    model = LlamaCppModel(LlamaCppConfig(executable=str(executable), model_path=str(first),
+        context_size=128, rehash_artifacts_each_run=True, model_shard_sha256=tuple(pins)))
+    assert model.model_digest == split_identity(pins)
+    assert model.total_model_bytes == first.stat().st_size + second.stat().st_size
+    assert model.infer(LocalInferenceRequest(prompt="test", max_output_tokens=8),
+                       threading.Event()).text == "OK"
+    second.write_bytes(second.read_bytes() + b"tamper")
+    with pytest.raises((ValueError, OSError, LlamaCppRuntimeError)):
+        model.assert_identity()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="native split custody POSIX only")
+def test_native_split_requires_private_directory(pair):
+    from skeleton.ai.runtime.inference.gguf_bundle import admit_native_bundle
+    first, _, pins = pair
+    first.parent.chmod(0o755)
+    try:
+        with pytest.raises(PermissionError, match="owner-private"):
+            admit_native_bundle(first, pins)
+    finally:
+        first.parent.chmod(0o700)

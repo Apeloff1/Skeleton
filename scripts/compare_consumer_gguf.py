@@ -101,7 +101,7 @@ class Profile:
         if deployment.timeout_seconds > 300:
             raise ValueError("diagnostic profile timeout must be at most 300 seconds")
         return cls(label, deployment.manifest_path, deployment.manifest_digest,
-                   deployment.model_sha256, deployment.executable_sha256, deployment.model_id, file_digest)
+                   deployment.execution_model_sha256, deployment.executable_sha256, deployment.model_id, file_digest)
 
     def public(self) -> dict:
         return dict(label=self.label, manifest_sha256=self.manifest_sha256,

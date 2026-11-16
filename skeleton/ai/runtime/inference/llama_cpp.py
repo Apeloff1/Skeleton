@@ -301,6 +301,7 @@ class LlamaCppConfig:
     # Optional integrity inventory for files adjacent to the executable. This
     # does not attest system libraries or the dynamic loader's complete closure.
     runtime_libraries: tuple[tuple[str, str], ...] = ()
+    model_shard_sha256: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.executable, str) or not self.executable.strip():
@@ -387,6 +388,14 @@ class LlamaCppConfig:
                 )
             normalized_args.append(item)
         object.__setattr__(self, "extra_args", tuple(normalized_args))
+        if not isinstance(self.model_shard_sha256, (tuple, list)):
+            raise ValueError("model shard pins must be a sequence")
+        if self.model_shard_sha256:
+            from .gguf_bundle import split_identity
+            split_identity(self.model_shard_sha256)
+            if normalized_args or not self.reject_model_symlink or not self.rehash_artifacts_each_run:
+                raise ValueError("split GGUF requires strict rehash, no symlinks and no extra flags")
+        object.__setattr__(self, "model_shard_sha256", tuple(self.model_shard_sha256))
 
         if not isinstance(self.runtime_libraries, (tuple, list)) or len(self.runtime_libraries) > _MAX_RUNTIME_LIBRARIES:
             raise ValueError("runtime library inventory exceeds its bound")
@@ -989,7 +998,14 @@ class LlamaCppModel:
         )
         self._gguf_header = inspect_gguf(Path(self._model.path))
         self._serving_metadata = _serving_metadata(Path(self._model.path), self._gguf_header)
-        self._serving_metadata.require_single_file(self._gguf_header)
+        self._bundle_receipt = None
+        if config.model_shard_sha256:
+            from .gguf_bundle import admit_native_bundle
+            if self._model.sha256 != config.model_shard_sha256[0]:
+                raise LlamaCppRuntimeError("first shard digest differs from admission pin")
+            self._bundle_receipt = admit_native_bundle(Path(self._model.path), config.model_shard_sha256)
+        else:
+            self._serving_metadata.require_single_file(self._gguf_header)
         self._process_lock = threading.Lock()
         self._active_processes: set[int] = set()
         self._draining_processes: set[int] = set()
@@ -1038,7 +1054,7 @@ class LlamaCppModel:
             "reject_model_symlink", "rehash_artifacts_each_run",
             "output_framing", "runtime_scratch_bytes",
             "kv_bytes_per_token", "kv_cache_type_k", "kv_cache_type_v",
-            "runtime_libraries",
+            "runtime_libraries", "model_shard_sha256",
         )
         if any(getattr(profile, field) != getattr(self.config, field)
                for field in immutable_fields):
@@ -1134,7 +1150,14 @@ class LlamaCppModel:
 
     @property
     def model_digest(self) -> str:
+        if self.config.model_shard_sha256:
+            from .gguf_bundle import split_identity
+            return split_identity(self.config.model_shard_sha256)
         return self._model.sha256
+
+    @property
+    def total_model_bytes(self) -> int:
+        return self._bundle_receipt["total_bytes"] if self._bundle_receipt else self._model.size_bytes
 
     @property
     def runtime_digest(self) -> str:
@@ -1205,6 +1228,8 @@ class LlamaCppModel:
         with self._process_lock:
             return {
                 "kind": "llama_cpp_cli",
+                "model_shards": len(self.config.model_shard_sha256) or 1,
+                "total_model_bytes": self.total_model_bytes,
                 "active_processes": len(self._active_processes),
                 "draining_processes": len(self._draining_processes),
                 "spawning_processes": self._spawning_processes,
@@ -1236,7 +1261,7 @@ class LlamaCppModel:
         # models; this is host admission, not measured VRAM or shared-page use.
         context = self._effective_context()
         kv = self.config.kv_bytes_per_token or self._serving_metadata.kv_bytes_per_token_upper_bound or 0
-        return self._model.size_bytes + self.config.runtime_scratch_bytes + context * kv
+        return self.total_model_bytes + self.config.runtime_scratch_bytes + context * kv
 
     @property
     def model_artifact(self) -> ArtifactIdentity:
@@ -1274,6 +1299,12 @@ class LlamaCppModel:
             )
             if observed != self._runtime_libraries:
                 raise LlamaCppRuntimeError("runtime library file identity changed")
+        if self.config.model_shard_sha256:
+            from .gguf_bundle import admit_native_bundle
+            observed_bundle = admit_native_bundle(Path(self._model.path), self.config.model_shard_sha256,
+                                                  interrupt=interrupt)
+            if observed_bundle != self._bundle_receipt:
+                raise LlamaCppRuntimeError("split GGUF bundle identity changed")
         observed_header = inspect_gguf(Path(self._model.path))
         if observed_header != self._gguf_header:
             raise LlamaCppRuntimeError("GGUF fixed header changed")
@@ -1786,6 +1817,8 @@ class LlamaCppModel:
                             raise LlamaCppRuntimeError(
                                 "Metal lease did not provide release callback"
                             )
+                    if self.config.model_shard_sha256:
+                        self._assert_artifacts_stable(interrupt=interrupt)
                     process = subprocess.Popen(
                         command,
                         stdin=subprocess.DEVNULL,
