@@ -19,7 +19,7 @@ from uuid import uuid4
 
 from core.dragon_hoarder_bulk import BulkArchive,Volume,StorageHeld,GIB,MAX_VOLUMES
 from core.dragon_storage_topology import topology_config
-from core.dragon_hoarder_manifests import ManifestArchive
+from core.dragon_manifest_shards import ShardedManifestArchive
 
 MIN_PROBE=16*1024**2
 MAX_PROBE=GIB
@@ -53,7 +53,7 @@ def open_backup():
             raise StorageHeld("backup volume uninitialized")
         volumes.append(vol)
     if not bootstrap and not path.is_file():raise StorageHeld("backup manifest uninitialized")
-    return ManifestArchive(path,BulkArchive(tuple(volumes)))
+    return ShardedManifestArchive(path,BulkArchive(tuple(volumes)))
 
 
 def independent(primary,backup):
@@ -62,8 +62,18 @@ def independent(primary,backup):
         raise StorageHeld("primary and backup payload devices must differ")
     if primary.path.resolve()==backup.path.resolve() or primary.path.stat().st_dev==backup.path.stat().st_dev:
         raise StorageHeld("primary and backup ledger devices must differ")
-    return {"primary":a,"backup":b,"primary_ledger_device":primary.path.stat().st_dev,
+    result={"primary":a,"backup":b,"primary_ledger_device":primary.path.stat().st_dev,
             "backup_ledger_device":backup.path.stat().st_dev}
+    def ledgers(archive):
+        paths=archive.ledger_paths() if hasattr(archive,"ledger_paths") else (archive.path,)
+        return [{"path":str(p),"dev":p.stat().st_dev,"inode":p.stat().st_ino} for p in paths]
+    aa,bb=ledgers(primary),ledgers(backup)
+    if {x["dev"] for x in aa}&{x["dev"] for x in bb}:
+        raise StorageHeld("primary and backup shard ledger devices must differ")
+    # Keep the old unsharded receipt representation byte compatible.
+    if len(aa)>1 or len(bb)>1:
+        result.update(primary_ledger_shards=aa,backup_ledger_shards=bb)
+    return result
 
 
 def _receipt_path():

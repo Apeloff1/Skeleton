@@ -210,7 +210,7 @@ def main(argv=None):
     expected={"steam-csv":"steam","steam-parquet":"steam","steam-json":"steam","modrinth-json":"modrinth","wikidata-csv":"locator","locator-csv":"locator"}
     if args.format in expected and args.projection!=expected[args.format]:parser.error("input format and projection differ")
     scope={"tenant_id":args.tenant,"owner_id":args.owner}
-    graph=LeadGraph(_path(create=os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1"))
+    graph=LeadGraph(_path(scope=scope,create=os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1"))
     # The graph must have been enabled by its owner/editor. No automatic
     # permission, source grant, or activation of live crawling.
     receipt=ingest(graph,scope,path=args.input.expanduser().absolute(),format=args.format,
