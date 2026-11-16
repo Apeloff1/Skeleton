@@ -50,7 +50,7 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 07 | Deadline preemption | Open |
 | 08 | Atomic gang scheduling | P |
 | 09 | Work stealing | P |
-| 10 | Speculative execution | Open |
+| 10 | Speculative execution | P |
 | 11 | Capability matchmaking | P |
 | 12 | Task fusion | Open |
 | 13 | Dynamic decomposition | Open |
@@ -68,9 +68,9 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 25 | Historical-success routing | P |
 | 26 | Learned cost prediction | P |
 | 27 | Context affinity | P |
-| 28 | Mission replanning | Open |
+| 28 | Mission replanning | P |
 | 29 | Tool-chain optimization | Open |
-| 30 | Redundant reasoning elimination | Open |
+| 30 | Redundant reasoning elimination | P |
 | 31 | CPU/GPU balancing | P |
 | 32 | Unified memory | P |
 | 33 | NUMA placement | P |
@@ -92,8 +92,8 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 49 | Distributed lease fencing | P |
 | 50 | Idempotent side effects | P |
 | 51 | Transactional publication | P |
-| 52 | Compensation | Open |
-| 53 | Deadlock detection | Open |
+| 52 | Compensation | P |
+| 53 | Deadlock detection | P |
 | 54 | Checkpoint recovery | P |
 | 55 | Poison quarantine | P |
 | 56 | Retry budgets | P |
@@ -104,12 +104,12 @@ where applicable, exact-head checks, and matched performance evidence where clai
 | 61 | Shadow scheduling | P |
 | 62 | Counterfactual scheduling | P |
 | 63 | Negative capability cache | P |
-| 64 | Speculative reservations | Open |
-| 65 | Dependency collapse | Open |
+| 64 | Speculative reservations | P |
+| 65 | Dependency collapse | P |
 | 66 | Execution locality | P |
-| 67 | Failure-domain isolation | Open |
+| 67 | Failure-domain isolation | P |
 | 68 | Uncertainty-sensitive scheduling | P |
-| 69 | Semantic deduplication | Open |
+| 69 | Semantic deduplication | P |
 | 70 | Cross-domain lending | Open |
 | 71 | Scheduler portfolios | P |
 | 72 | Virtual workers | Open |
@@ -306,3 +306,21 @@ https://docs.ray.io/en/latest/serve/llm/architecture/routing-policies.html.
 Newly partial targets 18, 19, 20, 21, 22, 24, 25, 27. Task classification
 requires an actual classifier; model-directed selection requires integration.
 Prior wave 9 exact-head focused CI: 40 passed; 183-mapping validator passed.
+
+## Wave 11: deterministic graph optimization and recovery proposals
+
+Pure source/context/policy/input-bound computations can be proposed for
+common-subexpression elimination, retaining predecessor order and tenant
+boundaries. Rewritten dependency references are explicit, not implicitly
+published. Semantic label resemblance is a bounded, scoped review hint
+only. Compensations run in reverse topological proposal order with an
+explicit owner-approved inverse and committed receipt; unknown outcomes
+block the whole recovery proposal. Strongly connected wait-for components
+identify potential deadlocks in one generation; no worker is killed.
+Read-only is not synonymous with pure: speculative hedges are restricted
+to pure tasks and distinct failure domains with full duplicate reservation
+and deadline capacity, never writes or unknown-effect tasks.
+
+New partial targets: 10, 28, 30, 52, 53, 64, 65, 67, 69.
+No live graph rewrite, speculative execution, compensation execution or
+distributed deadlock resolution is enabled by these proposal functions.

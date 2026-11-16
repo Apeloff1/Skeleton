@@ -746,3 +746,64 @@ def test_hypothesis_aggregation_requires_independent_evidence():
     assert review_hypotheses("c"*64, [a, replace(b, evidence_sha256=a.evidence_sha256)]).disposition == "hold_insufficient_independence"
     assert review_hypotheses("c"*64, [a, replace(b, verdict="contradicts")]).disposition == "hold_conflict"
     assert review_hypotheses("c"*64, [a, replace(b, result_sha256="0"*64)]).disposition == "hold_disagreement"
+
+def test_workflow_graph_reduction_never_merges_effectful_or_cross_context_work():
+    from skeleton.intelligence.dispatch_workflow import WorkflowNode, reduce_pure_graph
+    a = WorkflowNode("a", "tenant", "compile", "a"*64, "b"*64, "c"*64, "d"*64, (), 10, 1, "pure")
+    b = replace(a, task_id="b")
+    c = replace(a, task_id="c", dependencies=("a",))
+    d = replace(c, task_id="d", dependencies=("b",))
+    e = replace(a, task_id="e", effect="write")
+    f = replace(a, task_id="f", context_sha256="e"*64)
+    rows = [a, b, c, d, e, f]
+    result = reduce_pure_graph(rows)
+    assert result.aliases == (("b", "a"), ("d", "c"))
+    assert result.estimated_saved_ms == 20 and set(result.order) == {"a", "c", "e", "f"}
+    assert reduce_pure_graph(list(reversed(rows))) == result
+    with pytest.raises(DispatchPolicyError):
+        reduce_pure_graph([a, replace(c, tenant_id="other")])
+
+
+def test_semantic_similarity_is_review_only_and_bounded():
+    from skeleton.intelligence.dispatch_workflow import WorkflowNode, semantic_review_pairs, reduce_pure_graph
+    a = WorkflowNode("a", "tenant", "compile", "a"*64, "b"*64, "c"*64, "d"*64, (), 10, 1,
+                     "pure", frozenset({"code", "compile"}))
+    b = replace(a, task_id="b", input_sha256="e"*64)
+    c = replace(a, task_id="c", tenant_id="other")
+    assert [(p.left, p.right) for p in semantic_review_pairs([a, b, c])] == [("a", "b")]
+    assert not reduce_pure_graph([a, b, c]).aliases
+    with pytest.raises(DispatchPolicyError):
+        semantic_review_pairs([a, b, c], pair_budget=1)
+
+
+def test_compensation_order_and_unknown_barrier():
+    from skeleton.intelligence.dispatch_workflow import WorkflowNode, EffectObservation, plan_recovery
+    a = WorkflowNode("a", "t", "mutate", "a"*64, "b"*64, "c"*64, "d"*64, (), 10, 1,
+                     "write", compensation_id="undo-a")
+    b = replace(a, task_id="b", dependencies=("a",), compensation_id="undo-b")
+    receipts = [EffectObservation("a", "committed", "e"*64), EffectObservation("b", "committed", "f"*64)]
+    allowed = frozenset({"undo-a", "undo-b"})
+    assert plan_recovery([a, b], receipts, approved_compensations=allowed).compensation_order == (
+        ("b", "undo-b", "f"*64), ("a", "undo-a", "e"*64))
+    p = plan_recovery([a, b], receipts[:1], approved_compensations=allowed)
+    assert p.hold_tasks == ("b",) and not p.compensation_order
+    assert not plan_recovery([a,b], receipts, approved_compensations=frozenset()).compensation_order
+
+
+def test_wait_graph_detects_components_and_rejects_stale_snapshots():
+    from skeleton.intelligence.dispatch_workflow import WaitEdge, wait_cycles
+    rows = [WaitEdge("a", "b", "gpu", 1), WaitEdge("b", "a", "ram", 1),
+            WaitEdge("c", "a", "disk", 1), WaitEdge("d", "d", "lock", 1)]
+    assert wait_cycles(rows, generation=1) == (("a", "b"), ("d",))
+    with pytest.raises(DispatchPolicyError):
+        wait_cycles(rows, generation=2)
+
+
+def test_speculative_hedge_rejects_effectful_and_unbudgeted_work():
+    from skeleton.intelligence.dispatch_workflow import HedgeObservation, propose_hedge
+    o = HedgeObservation("t", "pure", 100, 500, 50, 10, 100, 2, 3, "a", "b")
+    assert propose_hedge(o)
+    assert not propose_hedge(replace(o, effect="write"))
+    assert not propose_hedge(replace(o, spare_units=1))
+    assert not propose_hedge(replace(o, alternative_domain="a"))
+    assert not propose_hedge(replace(o, deadline_remaining_ms=59))
