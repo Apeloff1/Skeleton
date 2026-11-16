@@ -237,7 +237,7 @@ class OfflineKnowledgeLibrary:
             start = max(start + 1, end - _CHUNK_OVERLAP)
         return rows
 
-    def add_text(self, title: str, content: str) -> dict[str, Any]:
+    def add_text(self, title: str, content: str, *, _source_recheck=None) -> dict[str, Any]:
         import secrets
         import time
 
@@ -255,6 +255,10 @@ class OfflineKnowledgeLibrary:
         if not any(_terms(piece[2]) for piece in pieces):
             raise RuntimeContractError("reference document has no searchable terms")
         with self.store._transaction():
+            # Internal source-bound callers must check the originating row
+            # under the same write lock, including duplicate admissions.
+            if _source_recheck is not None:
+                _source_recheck()
             # Duplicate admissions must not launder a corrupted stored source
             # into an apparently verified result. Validate all existing
             # source/offset/hash records before changing or reusing the index.
