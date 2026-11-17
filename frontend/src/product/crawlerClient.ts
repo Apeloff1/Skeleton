@@ -1140,6 +1140,76 @@ export async function searchNavigationFederation(query:string,cursor?:string,sig
     ||v.next_cursor!==null&&!/^[a-f0-9]{64}:[a-f0-9]{64}$/.test(v.next_cursor)) invalid('Invalid federation page.');
   return v;
 }
+export type ResearchNavigationPlan = {
+  schema:'skeleton.dragon.navigation-plan.v1'; mode:'balanced'|'coverage'|'exploration'|'conservation';
+  epoch:number; facets:{id:string;terms:string[];concepts:number[];estimated_coverage:number}[];
+  targets:{target_id:string;url:string;host:string;jeeves:number;dragon:number;joint:number;estimated_work_units:number;
+    coverage_gain:number;redundancy_penalty:number;historical_yield_prior:number;historical_uncertainty:number;
+    supporting_lineage:number;facet_scores:{id:string;score:number}[];network_authorized:false;reviewed:false}[];
+  budget:number;remaining:number;distinct_hosts:number;excluded_prior_targets:number;pool_truncated:boolean;
+  index_backfill_pending:boolean;objective_coverage_is_estimated:true;cost_is_advisory:true;
+  network_authorized:false;training_permission:false;receipt:string;
+};
+function navigationUnit(x:unknown):x is number {return typeof x==='number'&&Number.isFinite(x)&&x>=0&&x<=1;}
+export async function getResearchNavigationPlan(query:string,mode:ResearchNavigationPlan['mode']='balanced',
+    budget=16,previous:string[]=[],signal?:AbortSignal):Promise<ResearchNavigationPlan>{
+  if(!query.trim()||query.length>512||!['balanced','coverage','exploration','conservation'].includes(mode)
+      ||!integer(budget,48)||budget<1||previous.length>128||new Set(previous).size!==previous.length
+      ||previous.some(id=>!HASH.test(id))) invalid('Invalid bounded research plan.');
+  const v=await read(api.post<ResearchNavigationPlan>(ROOT+'/navigation/federation/research-plan',
+    {query,budget,mode,previous},options(signal)),getAuthToken(),'Research plan unavailable.');
+  if(!v||v.schema!=='skeleton.dragon.navigation-plan.v1'||v.mode!==mode||v.budget!==budget
+    ||!integer(v.remaining,budget)||!integer(v.epoch)||!integer(v.distinct_hosts,24)
+    ||v.excluded_prior_targets!==previous.length||v.network_authorized!==false||v.training_permission!==false
+    ||v.objective_coverage_is_estimated!==true||v.cost_is_advisory!==true||!HASH.test(v.receipt)
+    ||typeof v.pool_truncated!=='boolean'||typeof v.index_backfill_pending!=='boolean'
+    ||!Array.isArray(v.facets)||v.facets.length<1||v.facets.length>8
+    ||v.facets.some(f=>!f||!/^([a-f0-9]{16})$/.test(f.id)||!Array.isArray(f.terms)||f.terms.length>48
+      ||!Array.isArray(f.concepts)||f.concepts.length>128||!navigationUnit(f.estimated_coverage))
+    ||!Array.isArray(v.targets)||v.targets.length>24
+    ||v.targets.some(t=>!t||!HASH.test(t.target_id)||previous.includes(t.target_id)||!navigationUrl(t.url)
+       ||t.network_authorized!==false||t.reviewed!==false||!integer(t.estimated_work_units,3)||t.estimated_work_units<1
+       ||![t.jeeves,t.dragon,t.coverage_gain,t.redundancy_penalty,t.historical_yield_prior,t.historical_uncertainty,t.supporting_lineage].every(navigationUnit)
+       ||!Number.isFinite(t.joint)||t.joint<-.2||t.joint>1||!Array.isArray(t.facet_scores)||t.facet_scores.length!==v.facets.length
+       ||t.facet_scores.some((x,i)=>x.id!==v.facets[i].id||!navigationUnit(x.score)))
+    ||new Set(v.targets.map(t=>t.target_id)).size!==v.targets.length
+    ||v.targets.reduce((total,t)=>total+t.estimated_work_units,0)+v.remaining!==budget)
+    invalid('Invalid research plan receipt.');
+  return v;
+}
+export type ArchiveIntelligenceReport={
+  snapshot_digest:string;grant_digest:string;qualified_sources:number;unique_texts:number;
+  logical_utf8_bytes:number;unique_text_utf8_bytes:number;exact_duplicate_bytes_estimate:number;
+  unique_chunk_bytes_estimate:number;shared_chunk_count:number;chunk_window_truncated:boolean;
+  groups:{text_digest:string;source_ids:string[];text_bytes:number;copies:number;valid_until:number}[];
+  similarity_pairs:{left:string;right:string;similarity:number;classification:'near_duplicate'|'related'}[];
+  pair_window_truncated:boolean;history_only:true;network_authorized:false;training_permission:false;
+  physical_storage_modified:false;receipt:string;
+};
+export async function getArchiveIntelligence(sessionId:string,compareSession?:string,signal?:AbortSignal){
+  if(!ID.test(sessionId)||compareSession!==undefined&&(!ID.test(compareSession)||compareSession===sessionId))
+    invalid('Invalid archive analysis session.');
+  const v=await read(api.get<{schema:'skeleton.dragon.archive-intelligence.v1';sessions:string[];reports:ArchiveIntelligenceReport[];
+      revision_comparison:null|{matched_locator_families:number;left_only:number;right_only:number;comparisons:unknown[]};
+      history_only:true;source_text_returned:false;physical_storage_modified:false;network_authorized:false;
+      training_permission:false;receipt:string}>(ROOT+'/companion/archive-intelligence?session_id='+encodeURIComponent(sessionId)
+      +(compareSession?'&compare_session='+encodeURIComponent(compareSession):''),options(signal)),getAuthToken(),'Archive intelligence unavailable.');
+  if(!v||v.schema!=='skeleton.dragon.archive-intelligence.v1'||v.history_only!==true||v.source_text_returned!==false
+    ||v.physical_storage_modified!==false||v.network_authorized!==false||v.training_permission!==false||!HASH.test(v.receipt)
+    ||!Array.isArray(v.sessions)||v.sessions.join(',')!==[sessionId,...(compareSession?[compareSession]:[])].join(',')
+    ||!Array.isArray(v.reports)||v.reports.length!==v.sessions.length
+    ||v.reports.some(p=>!p||!HASH.test(p.snapshot_digest)||!HASH.test(p.grant_digest)||!HASH.test(p.receipt)
+       ||p.history_only!==true||p.network_authorized!==false||p.training_permission!==false||p.physical_storage_modified!==false
+       ||!integer(p.qualified_sources,64)||!integer(p.unique_texts,p.qualified_sources)||!integer(p.logical_utf8_bytes,64*96000)
+       ||!integer(p.unique_text_utf8_bytes,p.logical_utf8_bytes)||p.exact_duplicate_bytes_estimate!==p.logical_utf8_bytes-p.unique_text_utf8_bytes
+       ||!Array.isArray(p.groups)||p.groups.length!==p.unique_texts
+       ||p.groups.some(g=>!g||!HASH.test(g.text_digest)||!Array.isArray(g.source_ids)||g.source_ids.some(id=>!HASH.test(id))
+          ||g.copies!==g.source_ids.length||!integer(g.text_bytes,96000)||!Number.isFinite(g.valid_until))
+       ||!Array.isArray(p.similarity_pairs)||p.similarity_pairs.length>32
+       ||p.similarity_pairs.some(x=>!x||!HASH.test(x.left)||!HASH.test(x.right)||!navigationUnit(x.similarity))))
+    invalid('Archive analysis witness invalid.');
+  return v;
+}
 export type NavigationPortfolioTarget = {id:string;url:string;host:string;score:number;votes:number;
   features:{exact:number;concept:number;trigram:number;lineage:number;score:number};
   jeeves:number;dragon:number;joint:number;lineage_support:number;reviewed:false;network_authorized:false};
