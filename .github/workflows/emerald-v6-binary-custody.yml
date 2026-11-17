@@ -1,0 +1,64 @@
+name: Emerald V6 exact original tail model custody
+on:
+  push:
+    branches:
+      - 'feat/emerald-v6-exact-binary-*'
+      - 'assets/emerald-v6-*'
+    paths:
+      - 'assets/emerald/evolution-v6/**'
+      - 'scripts/publish_emerald_v6_tail.py'
+      - 'scripts/test_emerald_v6_publication.py'
+      - '.github/workflows/emerald-v6-binary-custody.yml'
+  pull_request:
+    paths:
+      - 'assets/emerald/evolution-v6/**'
+      - 'scripts/publish_emerald_v6_tail.py'
+      - 'scripts/test_emerald_v6_publication.py'
+      - '.github/workflows/emerald-v6-binary-custody.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  transport-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Require exact source checkout
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - name: Install only pinned scientific ABI
+        run: python -m pip install --only-binary=:all: numpy==2.3.5
+      - name: Compile source, exporter and data-custody tests
+        run: python -m py_compile scripts/publish_emerald_v6_tail.py scripts/emerald_v6_tail_clearance.py scripts/verify_emerald_v6_tail.py scripts/test_emerald_v6_publication.py
+      - name: Reject malicious archives and forged pin scenarios
+        run: python scripts/test_emerald_v6_publication.py
+      - name: Qualification boundary
+        run: echo 'Manifest and synthetic custody only. Giant original binary chunks are qualified separately; no model auto-adoption, RTX or release.'
+  actual-original-binary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: startsWith(github.head_ref, 'assets/emerald-v6-') || startsWith(github.ref_name, 'assets/emerald-v6-')
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Reject absent actual original Git blob bytes
+        shell: bash
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          case "$BRANCH" in
+            assets/emerald-v6-pathfinder-tail-clearance-20261117) stage=pathfinder ;;
+            assets/emerald-v6-archivist-tail-clearance-20261117) stage=archivist ;;
+            *) echo 'Unsupported original-model publication branch'; exit 1 ;;
+          esac
+          python3 scripts/publish_emerald_v6_tail.py verify-tree --stage "$stage"
