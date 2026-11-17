@@ -115,6 +115,34 @@ def classify(weights: np.ndarray, joints: np.ndarray,
     return majority, counts
 
 
+
+def blended_seam_census(weights: np.ndarray, joints: np.ndarray,
+                        faces: np.ndarray, threshold: float = .20) -> dict[str, int]:
+    """Count secondary *skin influence*, not just majority-cohort disagreement.
+
+    Triangles may have a clear majority and still have cross-rig weighting at
+    their vertices. Counts are risk indicators, never collision clearance.
+    """
+    require(.05 <= threshold <= .4 and math.isfinite(threshold),
+            "unsupported skin seam threshold")
+    cohort = cohort_table()[joints]
+    supported = np.stack([
+        np.sum(np.where(cohort == i, weights, 0.), axis=1) >= threshold
+        for i in range(len(COHORTS))
+    ], axis=1)
+    vertices_in_multiple = np.count_nonzero(supported, axis=1) >= 2
+    tri_in_multiple = np.any(vertices_in_multiple[faces], axis=1)
+    union = np.logical_or.reduce(supported[faces], axis=1)
+    distinct = np.count_nonzero(union, axis=1)
+    return {
+        "threshold_fraction": threshold,
+        "multi_cohort_vertices": int(np.count_nonzero(vertices_in_multiple)),
+        "triangles_touching_multi_influence_vertices": int(np.count_nonzero(tri_in_multiple)),
+        "triangles_with_three_or_more_supported_cohorts": int(np.count_nonzero(distinct >= 3)),
+        "unresolved_blended_contact_triangles": int(np.count_nonzero(tri_in_multiple)),
+    }
+
+
 def prior_coverage(weights: np.ndarray, joints: np.ndarray,
                    faces: np.ndarray) -> dict[str, Any]:
     """Reconcile the earlier strict high-risk region selection independently."""
@@ -245,6 +273,7 @@ def classify_model(path: Path, stage: str, version: str) -> dict:
     faces_all = np.concatenate(faces, axis=0)
     cohort_index, counts = classify(weights_all, joints_all, faces_all)
     old = prior_coverage(weights_all, joints_all, faces_all)
+    seams = blended_seam_census(weights_all, joints_all, faces_all)
     total = len(faces_all)
     safe_majority = total-counts["three_way_mixed"]
     return {
@@ -259,10 +288,12 @@ def classify_model(path: Path, stage: str, version: str) -> dict:
         "three_way_mixed_triangles": counts["three_way_mixed"],
         "triangle_classification_counts": counts,
         "prior_strict_coverage": old,
+        "blended_rig_seam_risk": seams,
         "full_mesh_classified_or_explicitly_mixed": True,
         "pose_contact_tests_run": 0,
         "continuous_intervals_qualified": 0,
         "worklist": worklist(counts),
+        "blended_seam_contact_qualified": False,
         "all_anatomical_contacts_qualified": False,
         "all_equipment_contacts_qualified": False,
         "continuous_collision_qualified": False,
