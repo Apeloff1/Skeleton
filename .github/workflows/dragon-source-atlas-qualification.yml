@@ -7,7 +7,9 @@ on:
     paths:
       - 'skeleton/ai/webcrawler/source_navigation.py'
       - 'skeleton/ai/webcrawler/source_catalogue_bulk.py'
+      - 'skeleton/ai/webcrawler/source_catalogue_index.py'
       - 'skeleton/ai/webcrawler/catalogues/*.json'
+      - 'machine/ai_dragon_crawler_operations.json'
       - 'skeleton/ai/webcrawler/navigation_semantics.py'
       - 'skeleton/ai/webcrawler/frontier_scheduler.py'
       - 'skeleton/ai/webcrawler/operations.py'
@@ -15,6 +17,7 @@ on:
       - 'backend/core/dragon_navigation_federation.py'
       - 'backend/tests/test_dragon_source_atlas.py'
       - 'backend/tests/test_dragon_source_catalogue_bulk.py'
+      - 'backend/tests/test_dragon_source_catalogue_index.py'
       - 'backend/tests/test_dragon_archive_matrix.py'
       - 'backend/routes/dragon_academy.py'
       - 'frontend/src/product/crawlerClient.ts'
@@ -42,7 +45,7 @@ jobs:
         with:
           python-version: "3.11.16"
       - name: Compile source registry, atlas and canonical integration
-        run: python -m py_compile skeleton/ai/webcrawler/source_catalogue_bulk.py skeleton/ai/webcrawler/source_navigation.py skeleton/ai/webcrawler/frontier_scheduler.py skeleton/ai/webcrawler/navigation_semantics.py skeleton/ai/webcrawler/operations.py backend/core/dragon_source_atlas.py backend/core/dragon_navigation_federation.py backend/routes/dragon_academy.py
+        run: python -m py_compile skeleton/ai/webcrawler/source_catalogue_index.py skeleton/ai/webcrawler/source_catalogue_bulk.py skeleton/ai/webcrawler/source_navigation.py skeleton/ai/webcrawler/frontier_scheduler.py skeleton/ai/webcrawler/navigation_semantics.py skeleton/ai/webcrawler/operations.py backend/core/dragon_source_atlas.py backend/core/dragon_navigation_federation.py backend/routes/dragon_academy.py
       - name: Catalogue scope, current graph, navigation and matrix regressions
         env:
           PYTHONPATH: ".:backend:tests:backend/tests"
@@ -50,9 +53,32 @@ jobs:
         run: |
           python -m unittest discover -s backend/tests -p 'test_dragon_source_atlas.py' -v
           python -m unittest discover -s backend/tests -p 'test_dragon_source_catalogue_bulk.py' -v
+          python -m unittest discover -s backend/tests -p 'test_dragon_source_catalogue_index.py' -v
           python -m unittest discover -s backend/tests -p 'test_dragon_navigation_federation.py' -v
           python -m unittest discover -s backend/tests -p 'test_dragon_archive_matrix.py' -v
       - name: Record packaged registry identity (not source access evidence)
         env:
           PYTHONPATH: ".:backend"
         run: python -c 'import json; from skeleton.ai.webcrawler.source_navigation import catalogue; print("DRAGON_SOURCE_ATLAS_RECEIPT",json.dumps(catalogue().summary(),sort_keys=True))'
+
+  hundredfold-index:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11.16"
+      - name: Real disk index build, reopen and bounded retrieval at 389400 synthetic sources
+        env:
+          PYTHONPATH: ".:backend:tests:backend/tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+          SKL_DRAGON_SOURCE_INDEX_SCALE: "389400"
+        run: python -m unittest discover -s backend/tests -p 'test_dragon_source_catalogue_index.py' -v
