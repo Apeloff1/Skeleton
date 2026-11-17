@@ -3,6 +3,9 @@
 # docker compose -f docker-compose.yml -f docker-compose.local-ai.yml config
 services:
   skeleton:
+    build:
+      args:
+        SKL_LOCAL_ONLY_IMAGE: "1"
     image: ${SKL_LOCAL_AI_IMAGE:-skeleton-local-ai:dev}
     init: true
     stop_grace_period: 120s

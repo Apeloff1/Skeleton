@@ -100,6 +100,10 @@ def _mount_from_compose(data: Mapping[str, object]) -> tuple[Path, str]:
         raise LocalDockerError("engine capabilities were not dropped")
     if "no-new-privileges:true" not in skeleton.get("security_opt", []):
         raise LocalDockerError("engine privilege fence is missing")
+    build = skeleton.get("build")
+    args = build.get("args") if isinstance(build, dict) else None
+    if not isinstance(args, dict) or str(args.get("SKL_LOCAL_ONLY_IMAGE")) != "1":
+        raise LocalDockerError("local Jeeves image must exclude hosted inference extras")
     mounts = [
         volume for volume in skeleton.get("volumes", [])
         if isinstance(volume, dict) and volume.get("target") == "/app/local-ai"

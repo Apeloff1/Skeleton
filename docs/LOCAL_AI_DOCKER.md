@@ -397,3 +397,14 @@ fail closed. The original node-forge pin and release-time hostile RSA signature
 probe are retained. The explicit `test:node-forge-custody` command executes
 exact installed-byte verification and immutable-postinstall denial tests; this
 is source/integrity evidence only, not full frontend export or release approval.
+
+### Image dependency profile separation
+
+The canonical Dockerfile retains its existing default dependency graph for
+ordinary application installation. When launched through the local-AI overlay,
+`SKL_LOCAL_ONLY_IMAGE=1` excludes the optional `hosted-inference` extra from
+the image dependency install plan while retaining baseline application and
+`local-inference` packages. The host doctor rejects a rendered Compose image
+where this build argument is absent or disabled. This reduces optional hosted
+SDK attack surface; it does **not** assert that transitive dependencies can
+never contain HTTP clients, nor that the application network is air-gapped.

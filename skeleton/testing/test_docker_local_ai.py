@@ -31,6 +31,7 @@ def _fake_config(root: Path) -> dict[str, object]:
                     "target": "/app/local-ai", "read_only": True,
                 }],
                 "image": "skeleton-local-ai:dev",
+                "build": {"args": {"SKL_LOCAL_ONLY_IMAGE": "1"}},
                 "mem_limit": 8589934592,
                 "cpus": 4,
                 "pids_limit": 512,
@@ -505,3 +506,23 @@ def test_backend_provider_contract_is_structured_not_a_flat_id_list() -> None:
     assert '"ownership": "engine-process"' in source
     assert '"availability_observed": True' in source
     assert '"model": raw.get("model")' in source
+
+
+def test_local_ai_docker_image_omits_optional_hosted_sdk_extra() -> None:
+    root = Path(__file__).resolve().parents[2]
+    dockerfile = (root / "Dockerfile").read_text(encoding="utf-8")
+    overlay = (root / "docker-compose.local-ai.yml").read_text(encoding="utf-8")
+    assert "ARG SKL_LOCAL_ONLY_IMAGE=0" in dockerfile
+    assert "local_only=os.environ.get('SKL_LOCAL_ONLY_IMAGE','0')" in dockerfile
+    assert "([] if local_only=='1' else p['optional-dependencies']['hosted-inference'])" in dockerfile
+    assert 'SKL_LOCAL_ONLY_IMAGE: "1"' in overlay
+
+
+def test_local_image_rejects_hosted_dependency_profile_drift(tmp_path: Path) -> None:
+    config = _fake_config(tmp_path)
+    config["services"]["skeleton"]["build"]["args"]["SKL_LOCAL_ONLY_IMAGE"] = "0"
+    with pytest.raises(host.LocalDockerError, match="exclude hosted"):
+        host._mount_from_compose(config)
+    config["services"]["skeleton"]["build"]["args"].pop("SKL_LOCAL_ONLY_IMAGE")
+    with pytest.raises(host.LocalDockerError, match="exclude hosted"):
+        host._mount_from_compose(config)
