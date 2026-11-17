@@ -73,14 +73,14 @@ export const PLAYABLE_SLICES = [
 ] as const;
 
 export const PLAYABLE_TUNING_EFFECTS: Record<string, readonly string[]> = {
-  extraction: ['Tempo: movement', 'Risk: heat', 'Scarcity: heat budget', 'Agency: pickup range'],
-  combat_loop: ['Tempo: movement', 'Lethality: contact damage', 'Agency: attack range', 'Progression depth: waves'],
-  pipeline: ['Tempo: movement', 'Risk: frame budget', 'Agency: interaction range', 'Progression depth: deliveries'],
-  puzzle: ['Tempo: movement', 'Mystery: switch hints'],
-  racing: ['Tempo: movement', 'Risk: time limit', 'Progression depth: laps'],
-  survival: ['Tempo: movement', 'Scarcity: hydration'],
-  stealth: ['Tempo: movement', 'Risk: guard radius', 'Mystery: guard visibility'],
-  crafting: ['Tempo: movement'],
+  extraction: ['Tempo → movement speed', 'Risk → heat pressure', 'Scarcity → heat budget', 'Agency → cache pickup range'],
+  combat_loop: ['Tempo → movement speed', 'Lethality → starting health', 'Progression depth → combat waves'],
+  pipeline: ['Tempo → movement speed', 'Progression depth → shipment quota'],
+  puzzle: ['Tempo → movement speed', 'Mystery → switch hints'],
+  racing: ['Tempo → movement speed', 'Risk → checkpoint time limit', 'Progression depth → race laps'],
+  survival: ['Tempo → movement speed', 'Scarcity → hydration drain'],
+  stealth: ['Tempo → movement speed', 'Risk → guard detection radius', 'Mystery → guard-zone visibility'],
+  crafting: ['Tempo → movement speed'],
 };
 
 export const VISION_MAX = 4000;
@@ -329,10 +329,11 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   // JSON blueprint export cannot embed it.
   if (state.playable?.enabled && request.target === 'godot') {
     request.playable_content = true;
-    if (state.playable.mode && PLAYABLE_SLICES.some((item) => item.id === state.playable!.mode)) {
-      request.playable_archetype = state.playable.mode;
-    }
-    if (request.playable_archetype || state.playable.launch) request.playable_main_scene = state.playable.launch === true && !state.quest?.enabled;
+    request.playable_archetype = (
+      state.playable.mode && PLAYABLE_SLICES.some((item) => item.id === state.playable!.mode)
+        ? state.playable.mode : 'extraction'
+    );
+    request.playable_main_scene = state.playable.launch === true && !state.quest?.enabled;
   }
   if (state.playtest && state.playtest !== 'off' && request.target === 'godot') {
     request.playtest = state.playtest;
