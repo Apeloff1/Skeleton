@@ -22,6 +22,7 @@ import stat
 import sys
 import threading
 import time
+import math
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -169,6 +170,7 @@ class OfflineHTTPApplication:
         self.tokenizer_digest = _model_tokenizer_digest(backend)
         self._lock = threading.RLock()
         self._turn_lock = threading.RLock()
+        self._navigation_discourse_lock = threading.Lock()
         self._inference_circuit = LocalInferenceCircuit()
         self._inference_lease = LocalInferenceLease(self.database)
         self._turns: dict[tuple[str, str], _LocalTurn] = {}
@@ -660,16 +662,19 @@ class OfflineHTTPApplication:
                 validate_packet, role_prompt, parse_rank, tournament, ADVICE_LIFETIME,
             )
             from skeleton.ai.jeeves_local_policy import primary_model_id
-            _fields(body, {"packet", "approved"}, {"packet", "approved"})
+            _fields(body, {"packet", "approved", "deadline"}, {"packet", "approved"})
             if body["approved"] is not True or getattr(self.backend, "model_id", None) != primary_model_id():
                 raise OfflineHTTPError(403, "explicit local Jeeves discourse approval required")
             packet = body["packet"]
             ids = validate_packet(packet)
-            if not 0 <= time.time() - packet["as_of"] <= ADVICE_LIFETIME:
+            deadline=body.get("deadline",packet["as_of"]+ADVICE_LIFETIME)
+            if (type(deadline) not in (int,float) or not math.isfinite(deadline)
+                    or not time.time()<deadline<=packet["as_of"]+ADVICE_LIFETIME
+                    or not 0 <= time.time() - packet["as_of"] <= ADVICE_LIFETIME):
                 raise OfflineHTTPError(409, "navigation packet expired")
             receipts = []
             def execute(group, role, first, stage):
-                if not 0 <= time.time() - packet["as_of"] <= ADVICE_LIFETIME:
+                if time.time()>=deadline or not 0 <= time.time() - packet["as_of"] <= ADVICE_LIFETIME:
                     raise OfflineHTTPError(409, "navigation tournament expired")
                 prompt = role_prompt(group, role, first)
                 _, session = self.dispatch("POST", "/v1/sessions",
@@ -691,8 +696,13 @@ class OfflineHTTPApplication:
                     "execution_receipt_digest": execution["execution_receipt_digest"],
                     "output_digest": result["output_digest"]})
                 return rank
-            advice = tournament(packet, execute)
-            if not 0 <= time.time() - packet["as_of"] <= ADVICE_LIFETIME:
+            if not self._navigation_discourse_lock.acquire(blocking=False):
+                raise OfflineHTTPError(429,"Another local navigation tournament is active.")
+            try:
+                advice = tournament(packet, execute)
+            finally:
+                self._navigation_discourse_lock.release()
+            if time.time()>=deadline or not 0 <= time.time() - packet["as_of"] <= ADVICE_LIFETIME:
                 raise OfflineHTTPError(409, "navigation tournament expired")
             return 200, {"advice": advice, "candidate_count":len(ids),
                          "model_digest": self.model_digest, "role_receipts": receipts,
