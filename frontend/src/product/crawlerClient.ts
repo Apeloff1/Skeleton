@@ -1244,6 +1244,128 @@ export async function closeResearchCampaign(id:string,expectedRevision:number,si
   if(v.state!=='closed'||typeof v.replayed!=='boolean')invalid('Campaign close not confirmed.');
   return v;
 }
+export type ResearchFleet={
+  fleet_id:string;revision:number;created_at:number;expires_at:number;budget:number;remaining:number;
+  state:'active'|'closed'|'exhausted'|'expired';members:{campaign_id:string;weight:number;rounds:number;
+  spent:number;campaign_revision:number|null;campaign_remaining:number|null;eligible:boolean}[];
+  network_authorized:false;training_permission:false
+};
+export type FleetPulse={fleet:ResearchFleet;operation:string;campaign_id:string;state:'complete'|'held';
+  allocated:number;spent:number;round:number|null;plan_digest:string|null;code:string|null;
+  targets:CampaignRound['targets'];replayed:boolean;network_authorized:false;receipt:string};
+const FLEETS=ROOT+'/navigation/fleets';
+function fleetValid(v:ResearchFleet,id?:string){
+  if(!v||!HASH.test(v.fleet_id)||id!==undefined&&v.fleet_id!==id||!integer(v.revision,1282)||v.revision<1
+    ||!integer(v.created_at)||!integer(v.expires_at)||v.expires_at<=v.created_at||v.expires_at-v.created_at>2592000
+    ||!integer(v.budget,40960)||v.budget<1||!integer(v.remaining,v.budget)
+    ||!['active','closed','exhausted','expired'].includes(v.state)||v.network_authorized!==false||v.training_permission!==false
+    ||!Array.isArray(v.members)||v.members.length>10||new Set(v.members.map(m=>m.campaign_id)).size!==v.members.length
+    ||v.members.some(m=>!m||!HASH.test(m.campaign_id)||!integer(m.weight,16)||m.weight<1
+      ||!integer(m.rounds,1280)||!integer(m.spent,4096)||typeof m.eligible!=='boolean'
+      ||m.campaign_revision!==null&&(!integer(m.campaign_revision,130)||m.campaign_revision<1)
+      ||m.campaign_remaining!==null&&!integer(m.campaign_remaining,4096))
+    ||v.members.reduce((s,m)=>s+m.spent,0)>v.budget-v.remaining)invalid('Invalid research fleet custody.');
+  return v;
+}
+export async function createResearchFleet(body:{operation:string;members:{campaign_id:string;weight:number}[];
+  budget:number;retention_seconds:number;acknowledged:true},signal?:AbortSignal){
+  if(!campaignOperation(body.operation)||!Array.isArray(body.members)||body.members.length<1||body.members.length>10
+    ||new Set(body.members.map(m=>m.campaign_id)).size!==body.members.length||body.members.some(m=>!HASH.test(m.campaign_id)
+      ||!integer(m.weight,16)||m.weight<1)||!integer(body.budget,40960)||body.budget<1
+    ||!integer(body.retention_seconds,2592000)||body.retention_seconds<900||body.acknowledged!==true)
+    invalid('Explicit finite research fleet required.');
+  const v=await read(api.post<ResearchFleet&{replayed:boolean}>(FLEETS,body,options(signal)),getAuthToken(),'Research fleet creation held.');
+  fleetValid(v);
+  if(v.budget!==body.budget||typeof v.replayed!=='boolean')invalid('Fleet identity differs.');
+  return v;
+}
+export async function pulseResearchFleet(id:string,body:{operation:string;objectives:{campaign_id:string;query:string}[];
+  expected_revision:number;budget:number},signal?:AbortSignal){
+  if(!HASH.test(id)||!campaignOperation(body.operation)||!integer(body.expected_revision,1282)||body.expected_revision<1
+    ||!integer(body.budget,48)||body.budget<1||!Array.isArray(body.objectives)||body.objectives.length<1||body.objectives.length>10
+    ||new Set(body.objectives.map(m=>m.campaign_id)).size!==body.objectives.length||body.objectives.some(m=>!HASH.test(m.campaign_id)
+      ||typeof m.query!=='string'||!m.query.trim()||m.query.length>512))invalid('Invalid fleet pulse.');
+  const v=await read(api.post<FleetPulse>(FLEETS+'/'+id+'/pulse',body,options(signal)),getAuthToken(),'Fleet pulse held; inspect or reconcile.');
+  if(!v||!HASH.test(v.operation)||!HASH.test(v.campaign_id)||!HASH.test(v.receipt)||!['complete','held'].includes(v.state)
+    ||!integer(v.allocated,body.budget)||v.allocated<1||!integer(v.spent,v.allocated)||typeof v.replayed!=='boolean'
+    ||v.network_authorized!==false||!Array.isArray(v.targets)||v.targets.length>24
+    ||v.targets.some(x=>!x||!HASH.test(x.target_id)||!navigationUrl(x.url)||!integer(x.position,23)||!integer(x.cost,3)||x.cost<1
+      ||x.network_authorized!==false)||new Set(v.targets.map(x=>x.target_id)).size!==v.targets.length
+    ||v.targets.reduce((s,x)=>s+x.cost,0)>v.spent
+    ||v.state==='complete'&&(!HASH.test(v.plan_digest??'')||!integer(v.round??0,128)||v.round===0)
+    ||v.state==='held'&&(v.spent!==0||v.targets.length!==0||v.plan_digest!==null||v.round!==null||!v.code))
+    invalid('Invalid fleet pulse receipt.');
+  fleetValid(v.fleet,id);return v;
+}
+export async function inspectResearchFleet(id:string,after?:string,limit=16,signal?:AbortSignal){
+  if(!HASH.test(id)||after!==undefined&&!HASH.test(after)||!integer(limit,64)||limit<1)invalid('Invalid fleet inspection cursor.');
+  const v=await read(api.get<{fleet:ResearchFleet;jobs:{operation:string;campaign:string;state:'leased'|'complete'|'held';
+    spent:number;round:number|null;plan_digest:string|null;code:string|null;created:number;updated:number}[];
+    next_cursor:string|null;network_authorized:false}>(FLEETS+'/'+id+'?limit='+limit+(after?'&after='+after:''),options(signal)),
+    getAuthToken(),'Research fleet unavailable.');
+  if(!v||v.network_authorized!==false||!Array.isArray(v.jobs)||v.jobs.length>limit
+    ||v.next_cursor!==null&&!HASH.test(v.next_cursor)||v.jobs.some(j=>!j||!HASH.test(j.operation)||!HASH.test(j.campaign)
+      ||!['leased','complete','held'].includes(j.state)||!integer(j.spent,48)||!integer(j.created)||!integer(j.updated)))
+    invalid('Invalid fleet history.');
+  fleetValid(v.fleet,id);return v;
+}
+export async function reconcileResearchFleet(id:string,signal?:AbortSignal){
+  if(!HASH.test(id))invalid('Invalid fleet identity.');
+  const v=await read(api.post<{fleet:ResearchFleet;reconciled:boolean;operation?:string;state?:'complete'|'held';spent?:number;
+    network_authorized:false}>(FLEETS+'/'+id+'/reconcile',{},options(signal)),getAuthToken(),'Fleet recovery held.');
+  if(!v||typeof v.reconciled!=='boolean'||v.network_authorized!==false
+    ||v.reconciled&&(!HASH.test(v.operation??'')||!['complete','held'].includes(v.state??'')||!integer(v.spent??-1,48)))
+    invalid('Invalid fleet recovery receipt.');
+  fleetValid(v.fleet,id);return v;
+}
+export async function closeResearchFleet(id:string,revision:number,signal?:AbortSignal){
+  if(!HASH.test(id)||!integer(revision,1282)||revision<1)invalid('Invalid fleet close.');
+  const v=await read(api.post<ResearchFleet&{replayed:boolean}>(FLEETS+'/'+id+'/close',{expected_revision:revision},options(signal)),
+    getAuthToken(),'Fleet closure held.');
+  fleetValid(v,id);
+  if(v.state!=='closed'||typeof v.replayed!=='boolean')invalid('Fleet closure not confirmed.');
+  return v;
+}
+export type MatrixWitness={session_id:string;source_id:string;version:number;snapshot_digest:string;
+  valid_until:number;captured_at:number;policy_version:number};
+export type ArchiveMatrix={schema:'skeleton.dragon.archive-matrix.v1';objective_count:number;scanned_sessions:number;
+  held_sessions:number;verified_source_checks:number;matching_payloads:number;result_truncated:boolean;
+  objectives:{objective_id:string;estimated_coverage:number}[];
+  payloads:{payload:string;score:number;witness_count:number;witnesses:MatrixWitness[];
+    objectives:{objective_id:string;matched_terms:number;term_frequency:number;coverage:number;score:number;best_witness:MatrixWitness}[];
+    independent_corroboration_verified:false}[];
+  feature_work:{requests:number;hits:number;misses:number;evictions:number;resident_entries:number;estimated_feature_bytes:number;persistent:false};
+  next_cursor:string|null;as_of_unix:number;approximate_routing:true;page_local_ranking:true;history_only:true;
+  network_authorized:false;source_text_returned:false;model_context_permission:false;training_permission:false;
+  coverage_is_estimated:true;receipt:string};
+function matrixWitness(v:MatrixWitness){return !!v&&ID.test(v.session_id)&&HASH.test(v.source_id)&&HASH.test(v.snapshot_digest)
+  &&integer(v.version)&&v.version>0&&Number.isFinite(v.valid_until)&&Number.isFinite(v.captured_at)&&integer(v.policy_version);}
+export async function getArchiveMatrix(queries:string[],limit=32,cursor?:string,sessionIds?:string[],signal?:AbortSignal){
+  if(!Array.isArray(queries)||queries.length<1||queries.length>10||new Set(queries).size!==queries.length
+     ||queries.some(q=>typeof q!=='string'||!q.trim()||q.length>512)||!integer(limit,128)||limit<1
+     ||cursor!==undefined&&cursor.length>193||sessionIds!==undefined&&(!Array.isArray(sessionIds)||sessionIds.length<1
+       ||sessionIds.length>100||new Set(sessionIds).size!==sessionIds.length||sessionIds.some(s=>!ID.test(s))))
+    invalid('Invalid historical objective matrix.');
+  const v=await read(api.post<ArchiveMatrix>(ROOT+'/companion/archive-matrix',{queries,limit,cursor:cursor??null,session_ids:sessionIds??null},options(signal)),
+    getAuthToken(),'Historical archive matrix unavailable.');
+  if(!v||v.schema!=='skeleton.dragon.archive-matrix.v1'||v.objective_count!==queries.length||!integer(v.scanned_sessions,32)
+    ||!integer(v.held_sessions,v.scanned_sessions)||!integer(v.verified_source_checks,32*64)||!integer(v.matching_payloads,32*64)
+    ||!HASH.test(v.receipt)||v.history_only!==true||v.network_authorized!==false||v.source_text_returned!==false
+    ||v.model_context_permission!==false||v.training_permission!==false||v.coverage_is_estimated!==true||v.approximate_routing!==true
+    ||v.page_local_ranking!==true||typeof v.result_truncated!=='boolean'||!Number.isFinite(v.as_of_unix)
+    ||!v.feature_work||v.feature_work.persistent!==false||!integer(v.feature_work.requests,v.verified_source_checks)
+    ||v.feature_work.hits+v.feature_work.misses!==v.feature_work.requests
+    ||!Array.isArray(v.objectives)||v.objectives.length!==queries.length||v.objectives.some(q=>!q||!HASH.test(q.objective_id)||!navigationUnit(q.estimated_coverage))
+    ||new Set(v.objectives.map(q=>q.objective_id)).size!==queries.length||!Array.isArray(v.payloads)||v.payloads.length>limit
+    ||new Set(v.payloads.map(p=>p.payload)).size!==v.payloads.length||v.payloads.some(p=>!p||!HASH.test(p.payload)||!navigationUnit(p.score)
+      ||!integer(p.witness_count,32*64)||p.witness_count<1||p.independent_corroboration_verified!==false
+      ||!Array.isArray(p.witnesses)||!p.witnesses.length||p.witnesses.length>4||!p.witnesses.every(matrixWitness)
+      ||!Array.isArray(p.objectives)||p.objectives.length>queries.length||p.objectives.some(q=>!q
+        ||!v.objectives.some(o=>o.objective_id===q.objective_id)||!integer(q.matched_terms,32)||q.matched_terms<1
+        ||!integer(q.term_frequency,256)||!navigationUnit(q.coverage)||!navigationUnit(q.score)||!matrixWitness(q.best_witness))))
+    invalid('Invalid historical archive matrix receipt.');
+  return v;
+}
 export type BulkMigrationCandidate={session_id:string;version:number;manifest:string;expected_bytes:number;expires_at:number;physical_layout_verified:false};
 export type BulkMigrationReceipt={manifest:string;sha256:string;bytes:number;chunks:number;
   layout:'content_defined_v1';switched:boolean;replayed:boolean;readback_verified:true;garbage_remaining:number;
