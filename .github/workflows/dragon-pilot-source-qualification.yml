@@ -19,6 +19,13 @@ on:
       - "frontend/src/features/Jeeves/dragonResearchDecisionEngine.ts"
       - "frontend/src/features/Jeeves/DragonResearchDecisionCockpit.tsx"
       - "frontend/scripts/test-dragon-advanced-decision.mjs"
+      - "scripts/emerald_v7_*.py"
+      - "scripts/prepare_emerald_v7_*.py"
+      - "scripts/publish_emerald_v7_*.py"
+      - "scripts/test_emerald_v7_*.py"
+      - "scripts/test_prepare_emerald_v7_*.py"
+      - "scripts/check_emerald_v7_*.py"
+      - "assets/emerald/evolution-v7/**"
   workflow_dispatch:
 
 permissions:
@@ -74,3 +81,69 @@ jobs:
         run: |
           node --experimental-strip-types --test frontend/scripts/test-crawler-pilot-journey.mjs
           node --experimental-strip-types --test frontend/scripts/test-dragon-advanced-decision.mjs
+
+
+  v7_source:
+    name: V7 exact-head original-model source and adverse custody tests
+    if: startsWith(github.head_ref, 'feat/emerald-v7-') || startsWith(github.head_ref, 'fix/emerald-v7-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Checkout exact V7 PR SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Match exact head before any acceptance check
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - name: Supported isolated Python interpreter
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.13"
+      - name: Pinned scientific ABI used by the reviewed contact source
+        run: python -m pip install --disable-pip-version-check --only-binary=:all: numpy==2.3.5 scipy==1.16.3 numba==0.62.1
+      - name: Compile original-model qualification source
+        run: |
+          python -m py_compile scripts/emerald_v7_orbit02.py scripts/verify_emerald_v7_orbit02.py
+          python -m py_compile scripts/emerald_v7_crossfade_screen.py scripts/check_emerald_v7_evidence.py
+          python -m py_compile scripts/check_emerald_v7_nine_phase.py scripts/prepare_emerald_v7_reviewed_tools.py
+          python -m py_compile scripts/publish_emerald_v7_orbit02.py
+      - name: Test real-format crossfade evidence and unsafe-source rejection
+        run: |
+          python scripts/test_emerald_v7_orbit02.py
+          python scripts/test_emerald_v7_evidence.py
+          python scripts/test_emerald_v7_publication.py
+          python scripts/test_emerald_v7_nine_phase.py
+          python scripts/test_emerald_v7_nine_phase_contract.py
+          python scripts/test_prepare_emerald_v7_reviewed_tools.py
+          python scripts/check_emerald_v7_nine_phase.py
+      - name: Bound claims
+        run: echo 'Only source, synthetic and recorded report consistency. No original 229 MB GLB reexecution, full CCD, browser/device, artist, RTX, release or merge evidence.'
+  v7_original_binary:
+    name: V7 actual raw original Git bytes (fail closed)
+    if: startsWith(github.head_ref, 'assets/emerald-v7-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact payload PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Match payload source
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - name: Verify all actual SHA-256-pinned GLB chunks
+        env:
+          BRANCH: ${{ github.head_ref }}
+        shell: bash
+        run: |
+          case "$BRANCH" in
+            assets/emerald-v7-pathfinder-orbit02-20261117) stage=pathfinder ;;
+            assets/emerald-v7-archivist-orbit02-20261117) stage=archivist ;;
+            *) echo 'Unreviewed original payload branch'; exit 1 ;;
+          esac
+          python3 scripts/publish_emerald_v7_orbit02.py verify-tree --stage "$stage"
