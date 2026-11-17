@@ -2966,6 +2966,14 @@ async def crawler_deep_search(query:str=Query(min_length=1,max_length=512),
     return await _crawler_result(crawler_application.deep_archive_search(scope,query=query,cursor=cursor))
 
 
+@router.post("/crawler/sessions/{session_id}/migrate-bulk-copy")
+async def crawler_migrate_bulk_copy(body:CrawlerVaultRetireRequest,
+    session_id:str=URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope:dict=Depends(_crawler_write_scope),user:dict=Depends(get_current_user))->dict:
+    return await _crawler_result(crawler_application.migrate_bulk_copy(
+        scope,session_id,body.model_dump(),principal=user))
+
+
 @router.post("/crawler/sessions/{session_id}/deep-archive")
 async def crawler_archive_to_deep(body:CrawlerVaultRetireRequest,
     session_id:str=URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
