@@ -98,17 +98,10 @@ def _compact_both(scope,mark,raw):
     evidence=require_probe(primary,backup)
     if evidence["receipt_sha256"]!=mark["qualification_digest"]:
         raise StorageHeld("independent qualification witness changed")
-    if any(_read_one(store,scope,mark)!=raw for store in (primary,backup)):
-        raise StorageHeld("dual-custody payload differs")
-    secondary=backup.migrate_content_defined(scope,mark["manifest"],raw)
-    if _read_one(backup,scope,mark)!=raw:
-        raise StorageHeld("backup migration readback failed")
-    first=primary.migrate_content_defined(scope,mark["manifest"],raw)
-    if any(_read_one(store,scope,mark)!=raw for store in (primary,backup)):
-        raise StorageHeld("dual-custody final readback differs")
-    return {"primary":first,"backup":secondary,"independent_readback_verified":True,
-            "qualification_digest":evidence["receipt_sha256"],"cross_store_atomic":False,
-            "canonical_primary_replaced":False,"source_authorized":False}
+    from core.dragon_archive_migration import compact_pair
+    result=compact_pair(primary,backup,scope,mark,raw)
+    return {**result,"independent_readback_verified":True,
+            "qualification_digest":evidence["receipt_sha256"]}
 
 
 def custody_snapshot(row):
@@ -255,8 +248,11 @@ class DragonColdPrimaryMixin:
             raw=await _io(material)
             if not await self.sessions.find_one(fence,{"_id":1},max_time_ms=2000):
                 raise StorageHeld("cold migration authority changed")
-            result=await _io(lambda:_compact_both(scope,mark,raw) if _now().timestamp()<mark["expires_at"]
-                else (_ for _ in ()).throw(StorageHeld("cold migration grant expired")))
+            def compact():
+                if _now().timestamp()>=mark["expires_at"]:
+                    raise StorageHeld("cold migration grant expired")
+                return _compact_both(scope,mark,raw)
+            result=await _io(compact)
             if _now().timestamp()>=mark["expires_at"] or not await self.sessions.find_one(fence,{"_id":1},max_time_ms=2000):
                 raise StorageHeld("cold migration authority changed during conversion")
         except (CrawlerError,StorageHeld,CheckpointReplicaError,ValueError,KeyError,TypeError,sqlite3.Error,OSError,TimeoutError) as exc:
