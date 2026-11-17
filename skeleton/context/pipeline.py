@@ -607,6 +607,17 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         from skeleton.ai.game_builder.godot_quest_bridge import verify_native_quest
         if not verify_native_quest(files):
             raise RuntimeError("final native room quest verification failed")
+    # Reconstruct native authored source after all independent writers finish.
+    # A matching digest alone is insufficient: every GDScript and the portal
+    # must still equal the source regenerated from the admitted mode and axes.
+    if ctx.get("playable_content"):
+        from skeleton.forge.playable_provenance import build_playable_receipt
+        ctx["playable_receipt"] = build_playable_receipt(
+            files, active, operator_axes=ctx.get("operator_axes"),
+            start_in_prototype=ctx.get("playable_main_scene") is True,
+        )
+        if ctx.get("playable_tuning_receipt") is not None:
+            ctx["playable_tuning"] = ctx["playable_tuning_receipt"]
     # Validate names in both API/in-memory and disk build modes, before any
     # expensive engine checks or project publication.
     source_manifest(files)
