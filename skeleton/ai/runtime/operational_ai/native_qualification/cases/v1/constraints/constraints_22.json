@@ -6,11 +6,11 @@
   "objective": "Measure model instruction and classification robustness, domain constraints task 22",
   "steps": [
     {
-      "prompt": "Reverse all letters of \"spruce\", without changing case. Reply with only the reversed word.",
+      "prompt": "Reverse all letters of \"redwood\", without changing case. Reply with only the reversed word.",
       "checks": [
         {
           "kind": "exact",
-          "expected": "ecurps"
+          "expected": "doowder"
         }
       ],
       "intermediate": false
