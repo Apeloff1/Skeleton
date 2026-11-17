@@ -17,7 +17,7 @@ from scripts import local_ai_docker as host
 
 
 def _fake_config(root: Path) -> dict[str, object]:
-    return {
+    config = {
         "services": {
             "mongo": {}, "backend": {}, "frontend": {}, "chroma": {},
             "skeleton": {
@@ -39,6 +39,64 @@ def _fake_config(root: Path) -> dict[str, object]:
             },
         },
     }
+
+
+    services = config["services"]
+    user = "fixture_reader"
+    password = "synthetic_custody_value"
+    uri = f"mongodb://{user}:{password}@mongo:27017/skeleton?authSource=admin"
+    services["skeleton"]["environment"].update({
+        "SKL_MONGO_URI": uri, "SKL_ENGINE_SERVICE_TOKEN": "fixture-local-engine-token",
+    })
+    services["skeleton"]["volumes"].append({
+        "type": "volume", "source": "docker_skeleton_data", "target": "/app/data",
+        "read_only": False,
+    })
+    services["backend"] = {
+        "environment": {
+            "MONGO_URL": uri,
+            "SKELETON_INTERNAL_URL": "http://skeleton:8001",
+            "JEEVES_LOCAL_ONLY": "1",
+            "JEEVES_PRIMARY_MODEL_ID": "jeeves",
+            "SKL_ENGINE_SERVICE_TOKEN": "fixture-local-engine-token",
+        },
+        "ports": [{"host_ip": "127.0.0.1", "published": "8001", "target": 8001}],
+        "volumes": [{"type": "volume", "source": "docker_backend_data",
+                     "target": "/app/data", "read_only": False}],
+    }
+    services["frontend"] = {
+        "ports": [{"host_ip": "127.0.0.1", "published": "3000", "target": 3000}],
+        "environment": {
+            "EXPO_PUBLIC_BACKEND_URL": "http://localhost:8001",
+            "EXPO_PUBLIC_SKELETON_URL": "http://localhost:8010",
+        },
+        "build": {"args": {
+            "EXPO_PUBLIC_BACKEND_URL": "http://localhost:8001",
+            "EXPO_PUBLIC_SKELETON_URL": "http://localhost:8010",
+        }},
+    }
+    services["mongo"] = {
+        "image": "mongo:fixture@sha256:" + "a" * 64,
+        "ports": [{"host_ip": "127.0.0.1", "published": "27017", "target": 27017}],
+        "environment": {
+            "MONGO_INITDB_ROOT_USERNAME": "admin",
+            "MONGO_INITDB_ROOT_PASSWORD": password,
+        },
+        "volumes": [
+            {"type": "volume", "source": "docker_mongo_data",
+             "target": "/data/db", "read_only": False},
+            {"type": "volume", "source": "docker_mongo_config",
+             "target": "/data/configdb", "read_only": False},
+        ],
+    }
+    services["chroma"] = {
+        "image": "chroma:fixture@sha256:" + "b" * 64,
+        "ports": [{"host_ip": "127.0.0.1", "published": "8000", "target": 8000}],
+        "profiles": ["full"],
+        "volumes": [{"type": "volume", "source": "docker_chroma_data",
+                     "target": "/chroma/chroma", "read_only": False}],
+    }
+    return config
 
 
 def test_hermetic_mount_rejects_escape_and_symlinks(tmp_path: Path) -> None:
