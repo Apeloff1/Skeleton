@@ -43,8 +43,6 @@ def _fake_config(root: Path) -> dict[str, object]:
 
     config["networks"] = {"tutolage": {"name": "docker_tutolage", "driver": "bridge"}}
     services = config["services"]
-    for service in services.values():
-        service["networks"] = {"tutolage": None}
     user = "fixture_reader"
     password = "synthetic_custody_value"
     uri = f"mongodb://{user}:{password}@mongo:27017/skeleton?authSource=admin"
@@ -99,6 +97,8 @@ def _fake_config(root: Path) -> dict[str, object]:
         "volumes": [{"type": "volume", "source": "docker_chroma_data",
                      "target": "/chroma/chroma", "read_only": False}],
     }
+    for service in services.values():
+        service["networks"] = {"tutolage": None}
     return config
 
 
