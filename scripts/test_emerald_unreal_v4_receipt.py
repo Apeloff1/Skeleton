@@ -12,7 +12,7 @@ class NativeEvidenceTests(unittest.TestCase):
    "engine_compiled":False,"physical_rtx_verified":False,"artist_approved":False,
    "release_qualified":False,"engine_version":"5.5.0-test-placeholder",
    "models":[{"stage":x["stage"],"source_sha256":x["sha256"],"source_bytes":x["bytes"],
-    "animation_count":381,"skeletal_mesh":"/Game/EmeraldV4/Qualification/"+x["stage"]+"_receipt",
+    "animation_count":381,"source_animation_names_exact":True,"skeletal_mesh":"/Game/EmeraldV4/Qualification/"+x["stage"]+"_receipt",
     "skeleton":"/Game/EmeraldV4/Skeleton","imported_paths":["/Game/EmeraldV4/"+str(i) for i in range(382)],
     "artist_approved":False} for x in self.manifest["forms"]]}
  def verify(self):return proof.verify(self.receipt,self.manifest,self.run)
@@ -33,6 +33,9 @@ class NativeEvidenceTests(unittest.TestCase):
   with self.assertRaisesRegex(ValueError,"five separate"):self.verify()
  def test_wrong_digest_denied(self):
   self.receipt["models"][2]["source_sha256"]="0"*64
+  with self.assertRaisesRegex(ValueError,"incomplete"):self.verify()
+ def test_missing_source_binding_denied(self):
+  self.receipt["models"][0]["source_animation_names_exact"]=False
   with self.assertRaisesRegex(ValueError,"incomplete"):self.verify()
  def test_partial_clip_denied(self):
   self.receipt["models"][0]["animation_count"]=380
