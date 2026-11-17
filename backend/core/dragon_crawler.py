@@ -3307,6 +3307,9 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
             raise CrawlerError("crawler_grant_denied", "Current editor authority is required.", 403)
         if type(body.get("enabled")) is not bool:
             raise CrawlerError("crawler_grant_invalid", "Choose an explicit finite execution intent.")
+        discourse=body.get("navigation_discourse",False)
+        if type(discourse) is not bool or (discourse and not body["enabled"]):
+            raise CrawlerError("crawler_grant_invalid","Explicit autonomous discourse enablement requires an enabled grant.")
         slices, seconds = body.get("max_slices", 16), body.get("max_seconds", 900)
         if (
             type(slices) is not int
@@ -3339,6 +3342,13 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
             raise CrawlerError(
                 "crawler_consent_expired", "The original capture consent is too close to expiry.", 403
             )
+        if discourse:
+            from core.dragon_autonomous_discourse import config,DiscourseHeld
+            if not row["request"]["frontier_strategy"].startswith("companion") or seconds<60:
+                raise CrawlerError("crawler_discourse_bounds","Autonomous discourse requires a companion strategy and at least 60 seconds.")
+            try:config(scope)
+            except DiscourseHeld as exc:
+                raise CrawlerError("crawler_discourse_held","Configure the owner-pinned local inference service.",503) from exc
         epoch = int(row.get("automation", {}).get("epoch", 0)) + 1
         grant = {
             "schema_version": "skeleton.dragon.crawler_execution_grant.v1",
@@ -3355,6 +3365,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
             "slices_started": 0,
             "next_run_at": now,
             "stop_reason": None if body["enabled"] else "operator_disabled",
+            **({"navigation_discourse":True} if discourse else {}),
         }
         if body["enabled"]:
             await self._grant_principal(scope, grant)
@@ -3758,7 +3769,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
 
     async def run(
         self, scope: dict[str, str], identifier: str, body: dict, *, automation_epoch: int | None = None,
-        watch_claim: str | None = None
+        watch_claim: str | None = None, autonomous_discourse: dict | None = None
     ) -> dict:
         row = await self._reconcile(scope, await self._owned(scope, identifier))
         if row.get("cold_primary"):
@@ -3773,7 +3784,8 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
             }
         if row["version"] != body["expected_version"]:
             raise CrawlerError("crawler_conflict", "Reload the current crawler revision before running.", 409)
-        if body.get("navigation_advice") is not None:
+        navigation_advice=body.get("navigation_advice")
+        if navigation_advice is not None:
             from skeleton.ai.webcrawler.navigation_semantics import advice_weights
             snapshot = _plain(self._custody_snapshot(row))
             if (automation_epoch is not None or watch_claim is not None
@@ -3817,6 +3829,21 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
             ):
                 raise CrawlerError("crawler_grant_expired", "The finite autonomous grant has stopped.", 403)
             await self._grant_principal(scope, grant)
+        if autonomous_discourse is not None:
+            from core.dragon_autonomous_discourse import config,DiscourseHeld
+            from skeleton.ai.webcrawler.navigation_semantics import advice_weights,digest as navigation_digest
+            if (automation_epoch is None or watch_claim is not None or navigation_advice is not None
+                    or grant.get("navigation_discourse") is not True or body.get("max_steps")!=1):
+                raise CrawlerError("crawler_discourse_held","Autonomous advice lacks the current execution grant.",403)
+            try:
+                if (autonomous_discourse["model_digest"]!=config(scope)["model_digest"]
+                        or autonomous_discourse["network_authorized"] is not False
+                        or navigation_digest({k:v for k,v in autonomous_discourse.items() if k!="receipt"})!=autonomous_discourse["receipt"]):
+                    raise ValueError("discourse receipt")
+                navigation_advice=autonomous_discourse["advice"]
+                advice_weights(navigation_advice,_plain(self._custody_snapshot(row)),now=_now().timestamp())
+            except (DiscourseHeld,ValueError,TypeError,KeyError) as exc:
+                raise CrawlerError("crawler_discourse_stale","Local advice is no longer valid.",409) from exc
         quota_id, token = _digest(scope), str(uuid4())
         local_credit = await self.limits.find_one({"_id": quota_id, **scope}, {"worker_token": 1})
         local_handle = self._workers.get((local_credit or {}).get("worker_token"))
@@ -4027,7 +4054,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                 authorize=lambda: bridge(self._live(scope, identifier, token, epoch, network_margin=True)),
                 cancelled=cancelled.is_set,
                 on_checkpoint=lambda snapshot, event: bridge(commit(snapshot, event)),
-                **({"navigation_advice": body["navigation_advice"]} if body.get("navigation_advice") is not None else {}),
+                **({"navigation_advice": navigation_advice} if navigation_advice is not None else {}),
             )
             return runtime.snapshot(), _plain(summary)
 
@@ -4227,6 +4254,9 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                 },
                 "result_digest": _digest(summary),
                 "event_digests": [event["event_digest"] for event in summary.get("slice_events", [])],
+                **({"navigation_discourse":{"receipt":autonomous_discourse["receipt"],
+                    "model_digest":autonomous_discourse["model_digest"],"role_calls":autonomous_discourse["role_calls"],
+                    "role_receipts_digest":autonomous_discourse["role_receipts_digest"]}} if autonomous_discourse else {}),
             }
             automation_update = {}
             if automation_epoch is not None:
@@ -5312,7 +5342,35 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                     "idempotency_key": f"autonomous:{epoch}:{grant['slices_started'] + 1}",
                     "max_steps": 4,
                 }
-                result = await self.run(scope, identifier, body, automation_epoch=epoch)
+                advice=None
+                if grant.get("navigation_discourse") is True:
+                    from core.dragon_autonomous_discourse import advise,DiscourseHeld
+                    from skeleton.ai.webcrawler.navigation_semantics import packet
+                    snapshot=_plain(self._custody_snapshot(row))
+                    candidate_packet=packet(snapshot,now=_now().timestamp())
+                    if snapshot["pending_dispatch"] is None and candidate_packet["candidates"]:
+                        # Reserve the model-advice window before starting local
+                        # inference; the normal worker claim remains separate.
+                        claimed=await self.sessions.update_one({**scope,"_id":identifier,
+                            "version":row["version"],"automation.epoch":epoch,"automation.enabled":True,
+                            "automation.next_run_at":{"$lte":_now()}},
+                            {"$set":{"automation.next_run_at":min(_now()+timedelta(seconds=200),_utc(grant["expires_at"]))},
+                             "$inc":{"version":1}})
+                        if not claimed.modified_count:return "superseded"
+                        row={**row,"version":row["version"]+1}
+                        body["expected_version"]=row["version"]
+                        body["max_steps"]=1
+                        try:
+                            advice=await asyncio.to_thread(advise,scope,candidate_packet,
+                                grant_deadline=_utc(grant["expires_at"]).timestamp())
+                        except DiscourseHeld as exc:
+                            raise CrawlerError("crawler_discourse_held","Local model advice did not qualify.",503) from exc
+                    else:
+                        # The existing interrupted dispatch or no-ready-target
+                        # transition must be resolved by the canonical runner.
+                        body["max_steps"]=1
+                result = await self.run(scope, identifier, body, automation_epoch=epoch,
+                                        **({"autonomous_discourse":advice} if advice is not None else {}))
                 return "executed" if result.get("ok") else "interrupted"
             except CrawlerError as exc:
                 retry = exc.status in {409, 429, 503} and exc.code not in {
