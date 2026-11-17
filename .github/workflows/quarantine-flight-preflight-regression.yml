@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: quarantine-flight-preflight-${{ github.event.pull_request.number || github.sha }}
+  group: quarantine-flight-preflight-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

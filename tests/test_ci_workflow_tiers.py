@@ -46,7 +46,7 @@ class WorkflowTierTests(unittest.TestCase):
         runner = (ROOT / "scripts/run_domain_suite_shard.py").read_text(encoding="utf-8")
         self.assertIn('options.get("testpaths") != ["skeleton/testing"]', runner)
         self.assertIn('"--tb=short"', runner)
-        self.assertIn('"--maxfail=1"', runner)
+        self.assertIn('"--maxfail=20"', runner)
         self.assertNotIn("--ignore=skeleton/testing/test_local_ai_boilerplate.py", readiness)
 
     def test_backlog_housekeeping_is_manual_without_weakening_recovery(self):
@@ -255,20 +255,46 @@ class WorkflowTierTests(unittest.TestCase):
             ))
             strict.write_text(strict_original)
 
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
+            # Removing a real source dependency must fail closed.
+            source_need = "      - source_01\n"
+            self.assertIn(source_need, readiness_original)
+            readiness.write_text(readiness_original.replace(source_need, "", 1))
+            self.assertTrue(any(
+                "consolidated source missing from fail-closed gate needs" in issue
+                for issue in audit(root)
+            ))
             readiness.write_text(readiness_original)
 
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
+            # A failed source gate must never be accepted as incomplete/green.
+            success_guard = "needs.source_qualification_gate.result == 'success'"
+            self.assertIn(success_guard, readiness_original)
+            readiness.write_text(readiness_original.replace(
+                success_guard, "needs.source_qualification_gate.result != 'failure'", 1,
+            ))
+            self.assertTrue(any(
+                "required CI/CD lane lost fail-closed consolidated source qualification" in issue
+                for issue in audit(root)
+            ))
             readiness.write_text(readiness_original)
 
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
+            # Source results must remain explicitly bound to the mandatory gate.
+            binding = "SOURCE_RESULTS: ${{ toJSON(needs) }}"
+            self.assertIn(binding, readiness_original)
+            readiness.write_text(readiness_original.replace(binding, "SOURCE_RESULTS: {}", 1))
+            self.assertTrue(any(
+                "required CI/CD lane lost fail-closed consolidated source qualification" in issue
+                for issue in audit(root)
+            ))
             readiness.write_text(readiness_original)
 
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
+            # CI must depend on the real source aggregate.
+            dependency = "needs: source_qualification_gate"
+            self.assertIn(dependency, readiness_original)
+            readiness.write_text(readiness_original.replace(dependency, "needs: source_01", 1))
+            self.assertTrue(any(
+                "required CI/CD lane lost fail-closed consolidated source qualification" in issue
+                for issue in audit(root)
+            ))
             readiness.write_text(readiness_original)
 
             # The required Merge Readiness lane must retain the same exact
