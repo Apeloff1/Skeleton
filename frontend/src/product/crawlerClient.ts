@@ -1213,6 +1213,24 @@ export async function migrateBulkArchive(id:string,body:CrawlCommand&{retention_
     invalid('Archive migration identity differs.');
   validateBulkMigrationReceipt(v.migration);return v;
 }
+export async function compactColdPrimary(id:string,body:CrawlCommand&{acknowledged:true},signal?:AbortSignal){
+  if(!ID.test(id)||body.acknowledged!==true||!integer(body.expected_version)||body.expected_version<1)
+    invalid('Explicit dual-plane archive compaction required.');
+  const v=await read(api.post<{session_id:string;version:number;network_executed:false;source_authorized:false;
+    migration:{primary:BulkMigrationReceipt;backup:BulkMigrationReceipt;both_payloads_readback_verified:true;
+       independent_readback_verified:true;qualification_digest:string;cross_store_atomic:false;
+       canonical_primary_replaced:false;source_authorized:false}}>(ROOT+'/sessions/'+encodeURIComponent(id)+'/compact-cold-primary',
+    body,options(signal)),getAuthToken(),'Dual-plane archive compaction held; reload current custody.');
+  if(!v||v.session_id!==id||v.version!==body.expected_version||v.network_executed!==false||v.source_authorized!==false
+    ||!v.migration||v.migration.both_payloads_readback_verified!==true||v.migration.independent_readback_verified!==true
+    ||!HASH.test(v.migration.qualification_digest)||v.migration.cross_store_atomic!==false
+    ||v.migration.canonical_primary_replaced!==false||v.migration.source_authorized!==false)
+    invalid('Invalid independent archive compaction receipt.');
+  const first=validateBulkMigrationReceipt(v.migration.primary),second=validateBulkMigrationReceipt(v.migration.backup);
+  if(first.manifest!==second.manifest||first.sha256!==second.sha256||first.bytes!==second.bytes)
+    invalid('Archive replica witnesses differ.');
+  return v;
+}
 export async function migrateBulkArchiveBatch(sessions:(CrawlCommand&{session_id:string})[],retentionAcknowledged:true,signal?:AbortSignal){
   if(retentionAcknowledged!==true||!Array.isArray(sessions)||sessions.length<1||sessions.length>8
     ||new Set(sessions.map(x=>x.session_id)).size!==sessions.length||sessions.some(x=>!ID.test(x.session_id)
