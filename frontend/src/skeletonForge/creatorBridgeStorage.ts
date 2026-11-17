@@ -106,7 +106,7 @@ export async function consumeCreatorBridge(target: CreatorBridgeTarget): Promise
     if (!scope.stillCurrent()) throw new Error('Account changed before reading creator handoff');
     const raw = await AsyncStorage.getItem(scope.key);
     if (!scope.stillCurrent()) throw new Error('Account changed while reading the creator handoff');
-    if (!raw || raw.length > 16_384) {
+    if (!raw || raw.length > CREATOR_BRIDGE_MAX_CHARS) {
       if (raw) await AsyncStorage.removeItem(scope.key);
       return null;
     }
