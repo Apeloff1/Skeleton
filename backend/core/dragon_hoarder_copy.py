@@ -285,6 +285,53 @@ class DragonHoarderCopyMixin:
         return {"ok":True,"session_id":identifier,"version":row["version"],"migration":result,
                 "source_authorized":False,"network_executed":False}
 
+    async def bulk_migration_candidates(self,scope,*,after=None,limit=32):
+        """Keyset page of existing copies; never infer their physical layout."""
+        from core.dragon_crawler import _now
+        if type(limit) is not int or not 1<=limit<=64 or after is not None and not identity(after):
+            raise ValueError("migration catalogue bounds")
+        await self.ensure_indexes()
+        q={**scope,"status":{"$in":sorted(TERMINAL)},"deep_archive.released":True,
+            "bulk_copy.state":"sealed","bulk_copy_invalidated":False,
+            "bulk_copy.expires_at":{"$gt":_now().timestamp()}}
+        if after is not None:q["_id"]={"$gt":after}
+        rows=await self.sessions.find(q,{"_id":1,"version":1,"bulk_copy":1}).sort(
+            "_id",ASCENDING).limit(limit+1).max_time_ms(2000).to_list(limit+1)
+        items=[]
+        for row in rows[:limit]:
+            try:mark=validate_marker(scope,row["_id"],row["bulk_copy"])
+            except (ValueError,TypeError,KeyError):continue
+            items.append({"session_id":row["_id"],"version":row["version"],"manifest":mark["manifest"],
+                "expected_bytes":mark["expected_bytes"],"expires_at":mark["expires_at"],
+                "physical_layout_verified":False})
+        return {"candidates":items,"next_cursor":rows[limit-1]["_id"] if len(rows)>limit else None,
+                "source_authorized":False,"network_executed":False}
+
+    async def migrate_bulk_batch(self,scope,body,*,principal):
+        """Finite owner batch; partial results and exact replay are explicit."""
+        from core.dragon_crawler import CrawlerError,authenticated_scope
+        if authenticated_scope(principal)!=scope or principal.get("role") not in {"editor","admin"}:
+            raise CrawlerError("crawler_bulk_denied","Current editor authority required.",403)
+        entries=body.get("sessions")
+        if (body.get("retention_acknowledged") is not True or not isinstance(entries,list)
+                or not 1<=len(entries)<=8 or any(not isinstance(x,dict) or
+                set(x)!={"session_id","expected_version","idempotency_key"} or not identity(x["session_id"])
+                or type(x["expected_version"]) is not int or x["expected_version"]<1 for x in entries)
+                or len({x["session_id"] for x in entries})!=len(entries)):
+            raise CrawlerError("crawler_bulk_invalid","Explicit unique bounded archive migration batch required.",422)
+        outcomes=[]
+        for item in entries:
+            try:
+                result=await self.migrate_bulk_copy(scope,item["session_id"],{
+                    "expected_version":item["expected_version"],"idempotency_key":item["idempotency_key"],
+                    "retention_acknowledged":True},principal=principal)
+                outcomes.append({"session_id":item["session_id"],"state":"verified","result":result["migration"]})
+            except CrawlerError as exc:
+                outcomes.append({"session_id":item["session_id"],"state":"held","code":exc.code})
+        return {"outcomes":outcomes,"verified":sum(x["state"]=="verified" for x in outcomes),
+                "held":sum(x["state"]=="held" for x in outcomes),"atomic_batch":False,
+                "source_authorized":False,"network_executed":False}
+
     async def recover_bulk_copies(self,*,limit=2):
         from core.dragon_crawler import _now,CrawlerError
         from pymongo.errors import PyMongoError
