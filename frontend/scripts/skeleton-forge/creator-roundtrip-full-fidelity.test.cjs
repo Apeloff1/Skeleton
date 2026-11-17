@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const Module = require('node:module');
+const path = require('node:path');
 const { load } = require('./harness.cjs');
 
 const kv = new Map();
@@ -23,11 +24,14 @@ Module._load = function(request, parent, isMain) {
       digestStringAsync: async (_, value) => crypto.createHash('sha256').update(value).digest('hex'),
     };
   }
-  if (request === '../auth/gameforgeAuth') return {
+  if (['../auth/gameforgeAuth', '../../auth/gameforgeAuth'].includes(request)) {
+    assert.equal(Module._resolveFilename(request, parent, isMain), path.resolve(__dirname, '../../src/auth/gameforgeAuth.ts'));
+    return {
     getAuthEpoch: () => auth.epoch,
     getAuthToken: () => auth.token,
     initializeStoredToken: async () => {},
-  };
+    };
+  }
   return original.call(this, request, parent, isMain);
 };
 let bridgeStorage, galaxyStorage, Draft;
