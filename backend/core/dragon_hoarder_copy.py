@@ -129,8 +129,11 @@ def _write(scope,identifier,mark,raw):
     if begun["state"]=="building":
         layout=begun.get("chunk_lengths")
         parts=split(raw,layout) if layout is not None else (raw[start:start+BLOCK] for start in range(0,len(raw),BLOCK))
-        for ordinal,part in enumerate(parts):
-            store.append(scope,mark["manifest"],ordinal,part)
+        parts=list(parts)
+        if hasattr(store,"append_many"):
+            for offset in range(0,len(parts),128):store.append_many(scope,mark["manifest"],offset,parts[offset:offset+128])
+        else:
+            for ordinal,part in enumerate(parts):store.append(scope,mark["manifest"],ordinal,part)
     sealed=store.seal(scope,mark["manifest"])
     if sealed["sha256"]!=mark["expected_hash"] or sealed["bytes"]!=mark["expected_bytes"]:
         raise StorageHeld("sealed copy witness differs")
