@@ -74,7 +74,7 @@ def _relative(path: str) -> Path:
         raise ModelBackupError("invalid pinned model path")
     p = PurePosixPath(path)
     if (not p.is_absolute() or p == ROOT or not p.is_relative_to(ROOT)
-            or any(part in ("", ".", "..") for part in path.split("/"))
+            or any(part in ("", ".", "..") for part in path[1:].split("/"))
             or len(p.parts) > 18):
         raise ModelBackupError("pinned model path escapes local model root")
     return Path(*p.relative_to(ROOT).parts)
