@@ -2960,6 +2960,18 @@ async def crawler_archive_intelligence(
         session_id=session_id,compare_session=compare_session))
 
 
+class CrawlerArchiveMatrix(CrawlerRequest):
+    queries:list[str]=Field(min_length=1,max_length=10)
+    cursor:str|None=Field(default=None,max_length=193)
+    limit:int=Field(default=32,ge=1,le=128,strict=True)
+    session_ids:list[str]|None=Field(default=None,min_length=1,max_length=100)
+
+
+@router.post("/crawler/companion/archive-matrix")
+async def crawler_archive_matrix(body:CrawlerArchiveMatrix,scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.deep_archive_matrix_search(scope,**body.model_dump()))
+
+
 @router.get("/crawler/companion/deep-search")
 async def crawler_deep_search(query:str=Query(min_length=1,max_length=512),
     cursor:str|None=Query(default=None,max_length=193),scope:dict=Depends(_crawler_scope))->dict:
