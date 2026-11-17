@@ -1712,6 +1712,10 @@ export default function GalaxyStudioFactoryModal
   };
 
   const sendToGameForge = async () => {
+    // This callback belongs to the currently mounted Forge transfer route.
+    // Never create a public handoff when the receiving route is absent.
+    const transfer = onSendToForge;
+    if (!transfer) throw new Error('GameForge transfer route is unavailable');
     assertEditorOwner();
     await persistGalaxyDraft();
     assertEditorOwner();
@@ -1719,7 +1723,7 @@ export default function GalaxyStudioFactoryModal
     // owner-epoch-bound JS memory until the next Forge screen consumes it.
     const galaxyHandoffId = prepareGalaxyHandoff(makeGalaxyBuildPayload(selectedGenre), Date.now(), editorEpoch.current);
     assertEditorOwner();
-    await onSendToForge({ title, vision: gameVision, genreId: selectedGenre?.id ?? null, galaxyHandoffId });
+    await transfer({ title, vision: gameVision, genreId: selectedGenre?.id ?? null, galaxyHandoffId });
     assertEditorOwner();
   };
 
