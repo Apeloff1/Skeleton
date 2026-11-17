@@ -7,6 +7,8 @@ on:
       - 'scripts/verify_emerald_v5_publication.py'
       - 'scripts/test_emerald_v5_scholar.py'
       - 'scripts/test_emerald_v5_publication.py'
+      - 'scripts/check_emerald_v5_contact_evidence.py'
+      - 'scripts/test_emerald_v5_contact_evidence.py'
       - 'assets/emerald/evolution-v5/**'
       - '.github/workflows/emerald-v5-scholar-wingfold.yml'
   workflow_dispatch:
@@ -32,11 +34,13 @@ jobs:
       - name: Install pinned numeric library
         run: python -m pip install --only-binary=:all: numpy==2.3.5
       - name: Compile all new source and synthetic tests
-        run: python -m py_compile scripts/emerald_v5_scholar_wingfold.py scripts/verify_emerald_v5_scholar.py scripts/verify_emerald_v5_publication.py scripts/test_emerald_v5_scholar.py scripts/test_emerald_v5_publication.py
+        run: python -m py_compile scripts/emerald_v5_scholar_wingfold.py scripts/verify_emerald_v5_scholar.py scripts/verify_emerald_v5_publication.py scripts/test_emerald_v5_scholar.py scripts/test_emerald_v5_publication.py scripts/check_emerald_v5_contact_evidence.py scripts/test_emerald_v5_contact_evidence.py
       - name: Run negative custody and correction math tests
         run: |
           python scripts/test_emerald_v5_scholar.py
           python scripts/test_emerald_v5_publication.py
+          python scripts/test_emerald_v5_contact_evidence.py
+          python scripts/check_emerald_v5_contact_evidence.py
       - name: No automatic physical or artistic approval
         run: echo 'Source and synthetic tests only. Missing original GLB, full continuous CCD, GPU, artist and Unreal acceptance remain held.'
   payload:
