@@ -27,7 +27,7 @@ jobs:
       - name: Assert exact head SHA
         env:
           EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: test "$(git rev-parse ${{ github.event.pull_request.head.sha || github.sha }})" = "$EXPECTED"
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
       - name: Install reviewed numerical wheel
         run: python3 -m pip install --only-binary=:all: numpy==2.3.5
       - name: Compile source
@@ -43,9 +43,9 @@ jobs:
           python3 scripts/test_emerald_scholar_publication.py
       - name: Require real SHA-bound binary bytes on dedicated payload draft
         env:
-          ${{ github.head_ref || github.ref_name }}: ${{ github.head_ref || github.ref_name }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
-          if [ "$${{ github.head_ref || github.ref_name }}" = "assets/emerald-scholar-wingfold-r1-20261117" ]; then
+          if [ "$BRANCH" = "assets/emerald-scholar-wingfold-r1-20261117" ]; then
             python3 scripts/publish_emerald_scholar_wingfold.py verify-tree
           else
             echo "Source-only candidate: actual Git binary bytes NOT qualified"
