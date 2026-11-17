@@ -47,8 +47,8 @@ def build(stage,source,destination):
  require(stage in SOURCES,'invalid stage')
  source=Path(source);destination=Path(destination)
  size,source_sha,next_stage=SOURCES[stage]
- require(source.is_file() and not source.is_symlink() and source.stat().st_size==size and sha(source)==source_sha,'untrusted original source')
  require(destination.parent.is_dir() and not destination.parent.is_symlink() and not os.path.lexists(destination),'trusted empty output required')
+ require(source.is_file() and not source.is_symlink() and source.stat().st_size==size and sha(source)==source_sha,'untrusted original source')
  f=source.open('rb');raw=mmap.mmap(f.fileno(),0,access=mmap.ACCESS_READ)
  try:
   magic,ver,total,jsonlen,tag=struct.unpack_from('<4sIIII',raw)
