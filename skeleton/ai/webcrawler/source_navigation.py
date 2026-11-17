@@ -52,7 +52,7 @@ ECOSYSTEMS={
  "grand-theft-auto":("grand theft auto","gta","rockstar","fivem","cfx","openiv"),
  "elder-scrolls":("elder scrolls","uesp","bethesda","skse","xedit","loot","wabbajack","mod organizer"),
  "fallout":("fallout","bethesda","f4se","xedit","loot","mod organizer"),
- "nintendo":("nintendo","mario","zelda","pokemon","bulbapedia","serebii","smash","nesdev","snes","n64brew"),
+ "nintendo":("nintendo","mario","mariowiki","zelda","zeldawiki","pokemon","bulbapedia","serebii","smash","nesdev","snes","n64brew"),
  "guild-wars":("guild wars","gw2"),
  "runescape":("runescape","osrs","runelite"),
  "path-of-exile":("path of exile","poe"),
@@ -86,9 +86,38 @@ def _contains(haystack,needle):
     return bool(needle) and (" "+needle+" ") in (" "+haystack+" ")
 
 
+@lru_cache(maxsize=1)
+def _normalized_ecosystems():
+    return {key:tuple(_norm(alias) for alias in aliases) for key,aliases in ECOSYSTEMS.items()}
+
+
 def ecosystem_tags(value):
     normalized=_norm(value)
-    return frozenset(key for key,aliases in ECOSYSTEMS.items() if any(_contains(normalized,_norm(alias)) for alias in aliases))
+    haystack=" "+normalized+" "
+    return frozenset(key for key,aliases in _normalized_ecosystems().items()
+                     if any(" "+alias+" " in haystack for alias in aliases))
+
+
+# Explicit lexical aliases for compound publisher brands. A literal
+# "mariowiki" token formerly disappeared from "Super Mario Nintendo"
+# searches at tenfold density. Do not split or guess unrelated brands.
+COMPOUND_NAMES={
+    "mariowiki":("super","mario","wiki","nintendo"),
+    "zeldawiki":("zelda","wiki","nintendo"),
+    "warcraftlogs":("warcraft","logs","world"),
+    "wowhead":("warcraft","wow"),
+    "eveonline":("eve","online"),
+    "steamdb":("steam","database"),
+    "pcgamingwiki":("pc","gaming","wiki"),
+    "n64brew":("nintendo","n64","development"),
+}
+
+
+def source_identity_terms(record,host,path):
+    identity=set(words(record["name"]+" "+host+" "+path))
+    for term in tuple(identity):
+        identity.update(COMPOUND_NAMES.get(term,()))
+    return frozenset(identity)
 
 
 def _root(url):
@@ -138,7 +167,7 @@ def source_record(record):
             or not isinstance(record["tags"],str) or not 1<=len(record["tags"])<=256):
         raise ValueError("source registry row")
     host,path=_root(record["url"])
-    identity=frozenset(words(record["name"]+" "+host+" "+path))
+    identity=source_identity_terms(record,host,path)
     tags=frozenset(words(record["tags"]))|identity
     ecosystems=ecosystem_tags(record["name"]+" "+host+" "+path)
     return Source(digest(["dragon-source-root",host,path]),record["name"],record["url"],host,path,
