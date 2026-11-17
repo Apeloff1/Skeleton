@@ -52,6 +52,17 @@ def contextual_features(base,pool):
             percentile(0),percentile(9),len(pool)/8,abs(base[0]-base[7]))
 
 
+def interaction_features(context):
+    """Exact v4 feature transform shared with the original training pipeline."""
+    if len(context)!=18 or any(type(x) not in (float,int) or not math.isfinite(x) or not 0<=x<=1 for x in context):
+        raise ValueError("interaction feature bound")
+    s,e,c,f,n,d,t,j,v,g,rs,re,rg,rt,sp,gp,remain,dis=context
+    return (*context,1-dis,c*g,e*g,s*g,c*n,s*n,v*g,1-t,1-d,j*(1-dis),
+        e*(1-c),c*(1-e),e*(1-c),s*j,g*j,c*(1-t),s*(1-t),n*(1-t),
+        g*(1-t),(1-d)*(1-t),e*c,s*c,s*v,c*v,min(e,c,g),g*remain,
+        s*remain,dis*(1-sp),j*g,j*c,c*(1-sp),.5*(d+t))
+
+
 def beam_rank(model,group,first):
     ids=validate_packet(group)
     if len(ids)>ROLE_GROUP:raise ValueError("specialist beam candidate bound")
@@ -67,7 +78,9 @@ def beam_rank(model,group,first):
             row["semantic"]/1000,len(terms-anchor)/max(1,len(terms)),
             row["depth"]/3,row["attempts"]/3,rank.get(i,0)))
     memo={};contexts={};evaluations=0
-    contextual=getattr(model,"feature_count",10)==18
+    feature_count=getattr(model,"feature_count",10)
+    contextual=feature_count in (18,50)
+    interaction=feature_count==50
     def base_features(state,c):
         return (c.semantic,c.exact,c.related,c.fuzzy,c.novelty,c.depth,c.retry,c.first_rank,
                 len(c.terms-state.terms)/max(1,len(c.terms)),
@@ -86,6 +99,7 @@ def beam_rank(model,group,first):
                 if mask not in contexts:
                     contexts[mask]=tuple(base_features(state,other) for other in candidates if other.index not in state.order)
                 features=contextual_features(features,contexts[mask])
+                if interaction:features=interaction_features(features)
             score,spread=model.score_detail(features)
             if not math.isfinite(score) or not math.isfinite(spread) or not 0<=score<=1 or spread<0:
                 raise ValueError("specialist numeric output")
@@ -131,7 +145,7 @@ def beam_rank(model,group,first):
     return list(best.order),list(best.decisions),{
         "planner":"bounded_marginal_beam_v1","beam_width":BEAM_WIDTH,"lookahead":horizon,
         "numeric_evaluations":evaluations,"evaluation_limit":MAX_EVALUATIONS,
-        "contextual_features":contextual,"distinct_contexts":len(contexts),
+        "contextual_features":contextual,"interaction_features":interaction,"distinct_contexts":len(contexts),
         "estimated_objective_coverage":round(len(q&best.terms)/max(1,len(q)),8),
         "estimated_concept_coverage":round(len(qc&best.tags)/max(1,len(qc)),8),
         "utility_estimate":round(best.utility,8),
