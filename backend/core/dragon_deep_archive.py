@@ -358,7 +358,7 @@ class DragonDeepArchiveMixin:
         return totals
 
     async def deep_archive_matrix_search(self,scope,*,queries,cursor=None,limit=32,session_ids=None):
-        """Route ten objectives together and rank exact authorized payloads."""
+        """Route up to one hundred objectives and stream exact authorized evidence."""
         from core.dragon_crawler import CrawlerError,_now
         from core import dragon_archive_matrix as matrix
         from core.dragon_archive_intelligence import ArchiveWork
@@ -387,7 +387,7 @@ class DragonDeepArchiveMixin:
                 "deep_hybrid_route.digest":1,"deep_passage_route.digest":1}).sort("_id",ASCENDING
                 ).limit(matrix.MAX_PAGE+1).max_time_ms(3000).to_list(matrix.MAX_PAGE+1)
         rows=await page()
-        work=ArchiveWork();hits=[];fences=[];held=0;checks=0
+        work=ArchiveWork();accumulator=matrix.MatrixAccumulator(prepared);fences=[];held=0;checks=0
         for item in rows[:matrix.MAX_PAGE]:
             row=await self.sessions.find_one({**scope,"_id":item["_id"],"version":item["version"],
                 "deep_index.digest":item["deep_index"]["digest"],"deep_archive.released":True,
@@ -415,15 +415,16 @@ class DragonDeepArchiveMixin:
             if found:
                 fences.append({"_id":row["_id"],"version":row["version"],"deep_archive":row["deep_archive"],
                     "archive_grant":row["archive_grant"],"source_use_policies":row.get("source_use_policies",{"$exists":False})})
-            hits.extend({**x,"session_id":row["_id"],"version":row["version"],
-                         "snapshot_digest":row["deep_archive"]["snapshot_digest"]} for x in found)
-        fused=await _bounded_discovery_cpu(lambda:matrix.fuse(prepared,hits,limit=limit))
+            qualified=[{**x,"session_id":row["_id"],"version":row["version"],
+                        "snapshot_digest":row["deep_archive"]["snapshot_digest"]} for x in found]
+            await _bounded_discovery_cpu(accumulator.add,qualified)
+        fused=await _bounded_discovery_cpu(lambda:accumulator.result(limit=limit))
         if fences:
             current=await self.sessions.find({**scope,"$or":fences},{"_id":1}).limit(len(fences)
                 ).max_time_ms(3000).to_list(len(fences))
             if {x["_id"] for x in current}!={x["_id"] for x in fences}:
                 raise CrawlerError("crawler_archive_matrix_changed","Historical authority changed.",409)
-        if rows!=await page() or hits and min(x["valid_until"] for x in hits)<=_now().timestamp():
+        if rows!=await page() or accumulator.earliest_expiry is not None and accumulator.earliest_expiry<=_now().timestamp():
             raise CrawlerError("crawler_archive_matrix_changed","Historical route or expiry changed.",409)
         result={"schema":"skeleton.dragon.archive-matrix.v1","objective_count":len(prepared),
             "scanned_sessions":min(len(rows),matrix.MAX_PAGE),"held_sessions":held,"verified_source_checks":checks,
