@@ -29,6 +29,7 @@
     "test:playable-preview": "node --test scripts/test-playable-preview.cjs scripts/test-playable-preview-browser.cjs scripts/test-successor-preview-isolation.cjs",
     "test:private-media": "node --test scripts/test-private-image.cjs scripts/test-private-image-browser.cjs scripts/test-private-atlas-export.cjs",
     "test:creator-identity": "node --test scripts/test-creator-account-identity.cjs scripts/test-creator-dashboard-identity.cjs",
+    "test:dragon-pilot": "node --experimental-strip-types --test scripts/test-crawler-pilot-journey.mjs scripts/test-dragon-advanced-decision.mjs scripts/test-dragon-atlas-contract.cjs",
     "test:dragon-companion": "node scripts/test-dragon-companion.cjs && node scripts/test-dragon-living-motion.cjs && node scripts/test-dragon-progression.cjs && node scripts/test-dragon-journal-chain.cjs",
     "test:skeleton-forge": "node --test scripts/skeleton-forge/*.test.cjs",
     "test:forge-operator": "node --test scripts/forge-operator/*.test.cjs",
