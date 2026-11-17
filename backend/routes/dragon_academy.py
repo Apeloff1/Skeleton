@@ -3286,21 +3286,21 @@ class CrawlerFleetObjective(CrawlerRequest):
 
 class CrawlerFleetCreate(CrawlerRequest):
     operation:str=Field(min_length=16,max_length=128)
-    members:list[CrawlerFleetMember]=Field(min_length=1,max_length=10)
-    budget:int=Field(ge=1,le=40960,strict=True)
+    members:list[CrawlerFleetMember]=Field(min_length=1,max_length=100)
+    budget:int=Field(ge=1,le=409600,strict=True)
     retention_seconds:int=Field(ge=900,le=2592000,strict=True)
     acknowledged:bool=Field(strict=True)
 
 
 class CrawlerFleetPulse(CrawlerRequest):
     operation:str=Field(min_length=16,max_length=128)
-    objectives:list[CrawlerFleetObjective]=Field(min_length=1,max_length=10)
-    expected_revision:int=Field(ge=1,le=1282,strict=True)
+    objectives:list[CrawlerFleetObjective]=Field(min_length=1,max_length=100)
+    expected_revision:int=Field(ge=1,le=12802,strict=True)
     budget:int=Field(default=16,ge=1,le=48,strict=True)
 
 
 class CrawlerFleetClose(CrawlerRequest):
-    expected_revision:int=Field(ge=1,le=1282,strict=True)
+    expected_revision:int=Field(ge=1,le=12802,strict=True)
 
 
 @router.post("/crawler/navigation/fleets")
