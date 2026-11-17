@@ -3274,6 +3274,35 @@ async def crawler_navigation_shortlist(
         query=query,host=host,limit=limit,due_only=due_only))
 
 
+class CrawlerSourceNavigation(CrawlerRequest):
+    query:str=Field(min_length=1,max_length=512)
+    limit:int=Field(default=32,ge=1,le=48,strict=True)
+    families:list[str]|None=Field(default=None,max_length=10)
+    previous:list[str]|None=Field(default=None,max_length=512)
+    mode:str=Field(default="balanced",pattern=r"^(balanced|coverage|exploration|conservation)$")
+
+
+@router.get("/crawler/navigation/source-atlas")
+async def crawler_source_atlas(after:str|None=Query(default=None,max_length=253),
+    limit:int=Query(default=32,ge=1,le=64),scope:dict=Depends(_crawler_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"source_atlas",action="inventory",after=after,limit=limit))
+
+
+@router.post("/crawler/navigation/source-plan")
+async def crawler_source_plan(body:CrawlerSourceNavigation,scope:dict=Depends(_crawler_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"source_atlas",action="plan",**body.model_dump()))
+
+
+@router.get("/crawler/navigation/source-trace")
+async def crawler_source_trace(host:str=Query(min_length=1,max_length=253),
+    after:str|None=Query(default=None,pattern=r"^[a-f0-9]{64}$"),
+    limit:int=Query(default=24,ge=1,le=48),scope:dict=Depends(_crawler_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"source_atlas",action="trace",host=host,after=after,limit=limit))
+
+
 class CrawlerFleetMember(CrawlerRequest):
     campaign_id:str=Field(pattern=r"^[a-f0-9]{64}$")
     weight:int=Field(ge=1,le=16,strict=True)
