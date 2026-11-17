@@ -5,6 +5,10 @@ on:
       - 'feat/emerald-v5-contact-coverage-*'
     paths:
       - 'scripts/emerald_v5_anatomical_census.py'
+      - 'scripts/emerald_v5_expanded_broadphase.py'
+      - 'scripts/check_emerald_v5_expanded_bounds.py'
+      - 'scripts/test_emerald_v5_expanded_broadphase.py'
+      - 'assets/emerald/evolution-v5/expanded-sampled-bounds.json'
       - 'scripts/test_emerald_v5_anatomical_census.py'
       - 'scripts/check_emerald_v5_anatomical_evidence.py'
       - 'scripts/test_emerald_v5_anatomical_evidence.py'
@@ -13,6 +17,10 @@ on:
   pull_request:
     paths:
       - 'scripts/emerald_v5_anatomical_census.py'
+      - 'scripts/emerald_v5_expanded_broadphase.py'
+      - 'scripts/check_emerald_v5_expanded_bounds.py'
+      - 'scripts/test_emerald_v5_expanded_broadphase.py'
+      - 'assets/emerald/evolution-v5/expanded-sampled-bounds.json'
       - 'scripts/test_emerald_v5_anatomical_census.py'
       - 'scripts/check_emerald_v5_anatomical_evidence.py'
       - 'scripts/test_emerald_v5_anatomical_evidence.py'
@@ -40,11 +48,13 @@ jobs:
       - name: Install bounded numerical dependency
         run: python -m pip install --only-binary=:all: numpy==2.3.5
       - name: Compile classifier and evidence contracts
-        run: python -m py_compile scripts/emerald_v5_anatomical_census.py scripts/test_emerald_v5_anatomical_census.py scripts/check_emerald_v5_anatomical_evidence.py scripts/test_emerald_v5_anatomical_evidence.py
+        run: python -m py_compile scripts/emerald_v5_anatomical_census.py scripts/test_emerald_v5_anatomical_census.py scripts/check_emerald_v5_anatomical_evidence.py scripts/test_emerald_v5_anatomical_evidence.py scripts/emerald_v5_expanded_broadphase.py scripts/check_emerald_v5_expanded_bounds.py scripts/test_emerald_v5_expanded_broadphase.py
       - name: Execute all anatomical negative-path regressions
         run: |
           python scripts/test_emerald_v5_anatomical_census.py
           python scripts/test_emerald_v5_anatomical_evidence.py
           python scripts/check_emerald_v5_anatomical_evidence.py
+          python scripts/test_emerald_v5_expanded_broadphase.py
+          python scripts/check_emerald_v5_expanded_bounds.py
       - name: No collision or release acceptance
         run: echo 'Only source and recorded census consistency checked. External exact GLBs, actual skinned-mesh collisions, all intervals, Unreal, RTX, artistic approval and release remain held.'
