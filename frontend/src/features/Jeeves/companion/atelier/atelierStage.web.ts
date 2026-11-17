@@ -1,11 +1,17 @@
-import type { AtelierReceipt } from './atelierAsset';
-import { completeStep, setIntent, startDirector, type Director } from './atelierDirector';
+import type { AtelierReceipt, Family } from './atelierAsset';
+import { completeStep, inspectClip, resetLive, setIntent, startDirector, type Director } from './atelierDirector';
 
 type ThreeModule = typeof import('three');
 type Loader = typeof import('three/addons/loaders/GLTFLoader.js');
 type Gltf = Parameters<Parameters<InstanceType<Loader['GLTFLoader']>['parse']>[2]>[0];
+export type AtelierCamera='perspective'|'side'|'overhead'|'front';
+export type AtelierQuality='detail'|'balanced'|'economy';
 export interface AtelierStage {
   setIntent: (airborne:boolean,reduced:boolean) => void;
+  inspect:(family:Family,clip:string)=>void;
+  followEvents:()=>void;
+  setCamera:(camera:AtelierCamera)=>void;
+  setQuality:(quality:AtelierQuality)=>void;
   dispose: () => void;
 }
 function disposeModel(gltf:Gltf) {
@@ -82,13 +88,16 @@ export async function createAtelierStage(canvas:HTMLCanvasElement,bytes:ArrayBuf
     graphics.shadowMap.type=Three.PCFSoftShadowMap;
     const mixer=new Three.AnimationMixer(gltf.scene);
     let director:Director=startDirector(receipt.families);
+    let manual=false;
+    let desired={airborne:false,reduced:false};
+    let quality:AtelierQuality='balanced';
     let action:any=null;
     let retired:{action:any;deadline:number}[]=[];
     let disposed=false,failed=false,frame=0,last=0,elapsed=0;
     const resize=()=>{
       if(disposed||failed)return;
       const width=Math.max(1,Math.min(1200,canvas.clientWidth||640)),height=Math.max(1,Math.min(720,canvas.clientHeight||360));
-      graphics.setPixelRatio(Math.min(2,window.devicePixelRatio||1));
+      graphics.setPixelRatio(Math.min(quality==='detail'?2:quality==='balanced'?1.5:1,window.devicePixelRatio||1));
       graphics.setSize(width,height,false);camera.aspect=width/height;camera.updateProjectionMatrix();
     };
     const draw=()=>{if(!disposed&&!failed)graphics.render(scene,camera);};
@@ -111,11 +120,11 @@ export async function createAtelierStage(canvas:HTMLCanvasElement,bytes:ArrayBuf
       }
       if(next.reduced){for(const entry of retired)entry.action.stop();retired=[];action.paused=true;mixer.update(0);}
       else action.paused=false;
-      status('Local 3D prototype · '+next.step.family+' · '+next.step.clip);
+      status((manual?'Manual clip inspection (not crawl telemetry)':'Recorded-event 3D presentation')+' · '+next.step.family+' · '+next.step.clip);
       draw();
     };
     const onFinished=(event:{action:unknown})=>{
-      if(!disposed&&!failed&&event.action===action)apply(completeStep(director,receipt.families,director.step.serial));
+      if(!disposed&&!failed&&!manual&&event.action===action)apply(completeStep(director,receipt.families,director.step.serial));
     };
     mixer.addEventListener('finished',onFinished);
     const tick=(now:number)=>{
@@ -148,7 +157,43 @@ export async function createAtelierStage(canvas:HTMLCanvasElement,bytes:ArrayBuf
     apply(director);
     // The caller applies reduced-motion and actual event intent before starting the clock.
     return {
-      setIntent:(airborne,reduced)=>{if(disposed||failed)return;apply(setIntent(director,receipt.families,airborne,reduced));if(reduced)stop();else resume();},
+      setIntent:(airborne,reduced)=>{
+        if(disposed||failed)return;
+        desired={airborne,reduced};
+        if(manual)apply({...director,reduced});
+        else apply(setIntent(director,receipt.families,airborne,reduced));
+        if(reduced)stop();else resume();
+      },
+      inspect:(family,clip)=>{
+        if(disposed||failed)return;
+        const next=inspectClip(director,receipt.families,family,clip,desired.reduced);
+        manual=true;apply(next);resume();
+      },
+      followEvents:()=>{
+        if(disposed||failed||!manual)return;
+        manual=false;apply(resetLive(director,receipt.families,desired.airborne,desired.reduced));resume();
+      },
+      setCamera:(preset)=>{
+        if(disposed||failed)return;
+        const viewpoints:Record<AtelierCamera,readonly [number,number,number]>={perspective:[3.9,2.55,4.4],side:[6,1.15,0],overhead:[0,6.6,.02],front:[0,1.4,6]};
+        const coordinates=viewpoints[preset];if(!coordinates)return;
+        camera.position.set(...coordinates);camera.lookAt(0,0,0);draw();
+      },
+      setQuality:(preset)=>{
+        if(disposed||failed||!['detail','balanced','economy'].includes(preset)||preset===quality)return;
+        quality=preset;graphics.shadowMap.enabled=quality!=='economy';
+        key.castShadow=quality!=='economy';
+        const size=quality==='detail'?2048:1024;
+        if(key.shadow.mapSize.x!==size){
+          key.shadow.map?.dispose();key.shadow.map=null;key.shadow.mapSize.set(size,size);
+        }
+        // Shadow layout and sampling changed, so rebuild material programs.
+        scene.traverse((object:Record<string,any>)=>{
+          const materials=Array.isArray(object.material)?object.material:[object.material];
+          for(const material of materials)if(material)material.needsUpdate=true;
+        });
+        resize();draw();
+      },
       dispose:teardown,
     };
   } catch(error) {
