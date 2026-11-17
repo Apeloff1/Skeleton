@@ -48,7 +48,8 @@
     "skeleton/ai/webcrawler/source_navigation.py",
     "skeleton/ai/webcrawler/source_catalogue_bulk.py",
     "skeleton/ai/webcrawler/source_catalogue_index.py",
-    "skeleton/ai/webcrawler/source_catalogue_normalize.py"
+    "skeleton/ai/webcrawler/source_catalogue_normalize.py",
+    "skeleton/ai/webcrawler/source_catalogue_campaign.py"
   ],
   "state_authority": "Existing CORE_DB Mongo application custody; pure snapshots have no independent storage authority",
   "public_api": {
@@ -163,7 +164,7 @@
     "treasury_vault_care_history": "Same-row finite version-bound hash-linked grant/withdrawal/automatic repair receipts; unknown legacy prefix and held malformed history; no source access or independent audit authority.",
     "deep_archive": "Witnessed partition reserve/publish/release; grant-bound indexed routing and exact historical reparse. Physical capacity unverified.",
     "treasury_archive_routing": "Owner-scoped multikey inverted candidate index automatically built from qualified archive posting segments, rechecked original bytes and per-source grants; pointers only, bounded partial candidate ranking.",
-    "source_catalogue": "Candidate metadata only; the optional operator-reviewed local immutable SQLite generation is tied to packaged catalogue and checkpoint identity. Export provenance and distinct URLs are not verified source access, publisher authority, crawl consent or acquired content. Bounded origin-diverse candidate lanes; no global recall guarantee. Existing dispatch, robots and authorization boundaries unchanged."
+    "source_catalogue": "Candidate metadata only; the optional operator-reviewed local immutable SQLite generation is tied to packaged catalogue and checkpoint identity. Export provenance and distinct URLs are not verified source access, publisher authority, crawl consent or acquired content. Reviewed local multi-export campaign plans pin input bytes and publisher references; normalized outputs are replayed only with matching receipts and an independently verified immutable index. Bounded origin-diverse candidate lanes; no global recall guarantee. Existing dispatch, robots and authorization boundaries unchanged."
   },
   "network": {
     "direct": "Validated public DNS addresses pinned to socket with original TLS SNI/hostname verification",
