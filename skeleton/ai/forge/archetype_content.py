@@ -152,7 +152,7 @@ func _finish(ok: bool, reason: String) -> void:
 \telse:
 \t\tprint("{failed} ", ARCHETYPE, " ", reason)
 \t\tloop_failed.emit(ARCHETYPE, reason)
-\tif player.autopilot:
+\tif bool(player.get("autopilot")):
 \t\tget_tree().quit(0 if ok else 1)
 
 
@@ -186,12 +186,12 @@ func _tick(delta: float) -> void:
 \t\t_finish(false, "heat critical")
 \t\treturn
 \tif loot.size() > 0:
-\t\tplayer.autopilot_target = loot[0]
+\t\tplayer.set("autopilot_target", loot[0])
 \t\tif player.global_position.distance_to(loot[0]) <= PICKUP_RADIUS:
 \t\t\tloot.remove_at(0)
 \t\t\tcarried += 1
 \telse:
-\t\tplayer.autopilot_target = extract_point
+\t\tplayer.set("autopilot_target", extract_point)
 \t\tif player.global_position.distance_to(extract_point) <= PICKUP_RADIUS:
 \t\t\t_finish(true, "extracted loot=%d heat=%d" % [carried, int(heat)])
 
@@ -234,7 +234,7 @@ func _tick(_delta: float) -> void:
 \t\t\treturn
 \t\t_spawn_wave()
 \tvar target: Dictionary = enemies[0]
-\tplayer.autopilot_target = target["pos"]
+\tplayer.set("autopilot_target", target["pos"])
 \tfor enemy in enemies:
 \t\tenemy["pos"] = enemy["pos"].move_toward(player.global_position, 0.5)
 \t\tif enemy["pos"].distance_to(player.global_position) < 8.0 and frames % 30 == 0:
@@ -275,11 +275,11 @@ var refine_timer: float = 0.0
 func _tick(delta: float) -> void:
 \tmatch stage:
 \t\t"to_source":
-\t\t\tplayer.autopilot_target = source
+\t\t\tplayer.set("autopilot_target", source)
 \t\t\tif player.global_position.distance_to(source) <= RADIUS:
 \t\t\t\tstage = "to_refinery"
 \t\t"to_refinery":
-\t\t\tplayer.autopilot_target = refinery
+\t\t\tplayer.set("autopilot_target", refinery)
 \t\t\tif player.global_position.distance_to(refinery) <= RADIUS:
 \t\t\t\tstage = "refining"
 \t\t\t\trefine_timer = 0.25
@@ -288,7 +288,7 @@ func _tick(delta: float) -> void:
 \t\t\tif refine_timer <= 0.0:
 \t\t\t\tstage = "to_depot"
 \t\t"to_depot":
-\t\t\tplayer.autopilot_target = depot
+\t\t\tplayer.set("autopilot_target", depot)
 \t\t\tif player.global_position.distance_to(depot) <= RADIUS:
 \t\t\t\tshipped += 1
 \t\t\t\tstage = "to_source"
