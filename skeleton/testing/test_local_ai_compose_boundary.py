@@ -71,11 +71,21 @@ def test_service_privilege_expansion_is_denied(
 @pytest.mark.parametrize("url", [
     "https://example.invalid/api", "http://10.1.2.3:8001",
     "http://localhost:8002", "http://localhost:8001/?private=1",
-    "http://alice:token@localhost:8001", "http://localhost:8001/path",
+    "http://localhost:8001/path",
     "file:///etc/passwd", "http://[::]:8001",
 ])
 def test_frontend_remote_or_mutated_backend_urls_are_denied(tmp_path: Path, url: str) -> None:
     config = _valid(tmp_path)
+    config["services"]["frontend"]["environment"]["EXPO_PUBLIC_BACKEND_URL"] = url
+    config["services"]["frontend"]["build"]["args"]["EXPO_PUBLIC_BACKEND_URL"] = url
+    with pytest.raises(ComposeBoundaryError, match="frontend"):
+        validate_compose_boundary(config)
+
+
+def test_frontend_credentials_in_url_are_denied(tmp_path: Path) -> None:
+    config = _valid(tmp_path)
+    username, password = "fixture_user", "synthetic_only"
+    url = f"http://{username}:{password}@localhost:8001"
     config["services"]["frontend"]["environment"]["EXPO_PUBLIC_BACKEND_URL"] = url
     config["services"]["frontend"]["build"]["args"]["EXPO_PUBLIC_BACKEND_URL"] = url
     with pytest.raises(ComposeBoundaryError, match="frontend"):
