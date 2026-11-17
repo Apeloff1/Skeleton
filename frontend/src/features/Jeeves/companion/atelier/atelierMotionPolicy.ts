@@ -17,10 +17,11 @@ export function enforceDragonClearanceHold(
   intent:MotionIntent,
 ):MotionPolicy {
   const original=variant==='hoarder';
+  const mode:MotionPolicy['mode']=original?'original-event-driven':'manual-pose-only';
   return Object.freeze({
     airborne:original && intent.airborne,
     reduced:!original || intent.reduced,
-    mode:original?'original-event-driven':'manual-pose-only',
+    mode,
     isClearanceHold:!original,
   });
 }
