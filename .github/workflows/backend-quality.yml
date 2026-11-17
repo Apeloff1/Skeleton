@@ -664,6 +664,11 @@ jobs:
           python -m pytest -q --maxfail=6 --noconftest \
             tests/test_backend_source_convergence_ci.py \
             tests/test_repo_machine_live_taxonomy.py
+      - name: Validate opt-in local AI Docker source and denial tests
+        run: |
+          set -euo pipefail
+          python -m compileall -q skeleton/app/docker_local_ai.py scripts/local_ai_docker.py skeleton/testing/test_docker_local_ai.py
+          python -m pytest -q --noconftest --maxfail=8 skeleton/testing/test_docker_local_ai.py
       - name: Exercise true backend source, replay and security regressions
         run: |
           set -euo pipefail
