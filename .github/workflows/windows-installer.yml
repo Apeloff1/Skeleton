@@ -35,6 +35,7 @@ jobs:
             /.dockerignore
             /.env.example
             /Dockerfile
+            /Dockerfile.dockerignore
             /README.md
             /docker-compose.yml
             /docker-compose.hot.yml
@@ -62,6 +63,11 @@ jobs:
           $observed = (git rev-parse HEAD).Trim()
           if ($observed -ne $env:EXPECTED_HEAD) {
             throw "installer checkout provenance mismatch: observed $observed, expected $env:EXPECTED_HEAD"
+          }
+          # A sparse checkout must not silently omit the root engine Docker
+          # context policy consumed by the archived installer payload.
+          if (-not (Test-Path -LiteralPath "Dockerfile.dockerignore" -PathType Leaf)) {
+            throw "Exact-head root engine Dockerfile.dockerignore missing from Windows installer source"
           }
           Write-Host "Exact-head installer source confirmed: $observed"
 
