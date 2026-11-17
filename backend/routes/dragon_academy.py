@@ -3262,6 +3262,79 @@ async def crawler_navigation_shortlist(
         query=query,host=host,limit=limit,due_only=due_only))
 
 
+class CrawlerFleetMember(CrawlerRequest):
+    campaign_id:str=Field(pattern=r"^[a-f0-9]{64}$")
+    weight:int=Field(ge=1,le=16,strict=True)
+
+
+class CrawlerFleetObjective(CrawlerRequest):
+    campaign_id:str=Field(pattern=r"^[a-f0-9]{64}$")
+    query:str=Field(min_length=1,max_length=512)
+
+
+class CrawlerFleetCreate(CrawlerRequest):
+    operation:str=Field(min_length=16,max_length=128)
+    members:list[CrawlerFleetMember]=Field(min_length=1,max_length=10)
+    budget:int=Field(ge=1,le=40960,strict=True)
+    retention_seconds:int=Field(ge=900,le=2592000,strict=True)
+    acknowledged:bool=Field(strict=True)
+
+
+class CrawlerFleetPulse(CrawlerRequest):
+    operation:str=Field(min_length=16,max_length=128)
+    objectives:list[CrawlerFleetObjective]=Field(min_length=1,max_length=10)
+    expected_revision:int=Field(ge=1,le=1282,strict=True)
+    budget:int=Field(default=16,ge=1,le=48,strict=True)
+
+
+class CrawlerFleetClose(CrawlerRequest):
+    expected_revision:int=Field(ge=1,le=1282,strict=True)
+
+
+@router.post("/crawler/navigation/fleets")
+async def crawler_fleet_create(body:CrawlerFleetCreate,scope:dict=Depends(_crawler_write_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"fleet",action="create",**body.model_dump()))
+
+
+@router.get("/crawler/navigation/fleets/{fleet_id}")
+async def crawler_fleet_inspect(fleet_id:str=URLPath(pattern=r"^[a-f0-9]{64}$"),
+    after:str|None=Query(default=None,pattern=r"^[a-f0-9]{64}$"),
+    limit:int=Query(default=16,ge=1,le=64),scope:dict=Depends(_crawler_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"fleet",action="inspect",
+        fleet_id=fleet_id,after=after,limit=limit))
+
+
+@router.post("/crawler/navigation/fleets/{fleet_id}/pulse")
+async def crawler_fleet_pulse(body:CrawlerFleetPulse,
+    fleet_id:str=URLPath(pattern=r"^[a-f0-9]{64}$"),scope:dict=Depends(_crawler_write_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"fleet",action="pulse",
+        fleet_id=fleet_id,**body.model_dump()))
+
+
+@router.post("/crawler/navigation/fleets/{fleet_id}/reconcile")
+async def crawler_fleet_reconcile(fleet_id:str=URLPath(pattern=r"^[a-f0-9]{64}$"),
+    scope:dict=Depends(_crawler_write_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"fleet",action="reconcile",fleet_id=fleet_id))
+
+
+@router.post("/crawler/navigation/fleets/{fleet_id}/close")
+async def crawler_fleet_close(body:CrawlerFleetClose,fleet_id:str=URLPath(pattern=r"^[a-f0-9]{64}$"),
+    scope:dict=Depends(_crawler_write_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"fleet",action="close",
+        fleet_id=fleet_id,**body.model_dump()))
+
+
+@router.post("/crawler/navigation/fleets/purge")
+async def crawler_fleet_purge(limit:int=Query(default=16,ge=1,le=32),scope:dict=Depends(_crawler_write_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"fleet",action="purge",limit=limit))
+
+
 class CrawlerCampaignCreate(CrawlerRequest):
     query:str=Field(min_length=1,max_length=512)
     operation:str=Field(min_length=16,max_length=128)
