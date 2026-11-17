@@ -22,6 +22,14 @@ on:
       - "scripts/emerald_v7_*.py"
       - "scripts/prepare_emerald_v7_*.py"
       - "scripts/qualify_emerald_v7_offline_stack.py"
+      - "scripts/audit_emerald_v7_original_zip_pair.py"
+      - "scripts/test_audit_emerald_v7_original_zip_pair.py"
+      - "scripts/check_emerald_v7_independent_original_receipt.py"
+      - "scripts/test_emerald_v7_independent_original_receipt.py"
+      - "scripts/audit_emerald_v7_original_zip_pair.py"
+      - "scripts/test_audit_emerald_v7_original_zip_pair.py"
+      - "scripts/check_emerald_v7_independent_original_receipt.py"
+      - "scripts/test_emerald_v7_independent_original_receipt.py"
       - "scripts/test_qualify_emerald_v7_offline_stack.py"
       - "scripts/publish_emerald_v7_*.py"
       - "scripts/test_emerald_v7_*.py"
@@ -121,6 +129,12 @@ jobs:
           python scripts/test_emerald_v7_nine_phase_contract.py
           python scripts/test_prepare_emerald_v7_reviewed_tools.py
           python scripts/test_qualify_emerald_v7_offline_stack.py
+          python scripts/test_audit_emerald_v7_original_zip_pair.py
+          python scripts/test_emerald_v7_independent_original_receipt.py
+          python scripts/check_emerald_v7_independent_original_receipt.py
+          python scripts/test_audit_emerald_v7_original_zip_pair.py
+          python scripts/test_emerald_v7_independent_original_receipt.py
+          python scripts/check_emerald_v7_independent_original_receipt.py
           python scripts/check_emerald_v7_nine_phase.py
       - name: Bound claims
         run: echo 'Only source, synthetic and recorded report consistency. No original 229 MB GLB reexecution, full CCD, browser/device, artist, RTX, release or merge evidence.'
