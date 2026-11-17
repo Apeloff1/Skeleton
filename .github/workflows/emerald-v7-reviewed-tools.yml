@@ -3,10 +3,16 @@ on:
   push:
     branches:
       - 'feat/emerald-v7-reviewed-contact-toolchain-*'
+      - 'test/emerald-v7-independent-binary-*'
     paths:
       - 'scripts/prepare_emerald_v7_reviewed_tools.py'
       - 'scripts/test_prepare_emerald_v7_reviewed_tools.py'
       - 'scripts/qualify_emerald_v7_offline_stack.py'
+      - 'scripts/audit_emerald_v7_original_zip_pair.py'
+      - 'scripts/test_audit_emerald_v7_original_zip_pair.py'
+      - 'scripts/check_emerald_v7_independent_original_receipt.py'
+      - 'scripts/test_emerald_v7_independent_original_receipt.py'
+      - 'assets/emerald/evolution-v7/independent-original-zip-custody-20261117.json'
       - 'scripts/test_qualify_emerald_v7_offline_stack.py'
       - '.github/workflows/emerald-v7-reviewed-tools.yml'
   pull_request:
@@ -14,6 +20,11 @@ on:
       - 'scripts/prepare_emerald_v7_reviewed_tools.py'
       - 'scripts/test_prepare_emerald_v7_reviewed_tools.py'
       - 'scripts/qualify_emerald_v7_offline_stack.py'
+      - 'scripts/audit_emerald_v7_original_zip_pair.py'
+      - 'scripts/test_audit_emerald_v7_original_zip_pair.py'
+      - 'scripts/check_emerald_v7_independent_original_receipt.py'
+      - 'scripts/test_emerald_v7_independent_original_receipt.py'
+      - 'assets/emerald/evolution-v7/independent-original-zip-custody-20261117.json'
       - 'scripts/test_qualify_emerald_v7_offline_stack.py'
       - '.github/workflows/emerald-v7-reviewed-tools.yml'
   workflow_dispatch:
@@ -45,5 +56,10 @@ jobs:
         run: python scripts/test_prepare_emerald_v7_reviewed_tools.py
       - name: Check original V7 end-to-end conductor fixtures and full-review holds
         run: python scripts/test_qualify_emerald_v7_offline_stack.py
+      - name: Independently verify source-only GLB/ZIP custody negatives
+        run: |
+          python scripts/test_audit_emerald_v7_original_zip_pair.py
+          python scripts/test_emerald_v7_independent_original_receipt.py
+          python scripts/check_emerald_v7_independent_original_receipt.py
       - name: External original archive evidence boundary
         run: echo 'Source tests do not have original ZIPs, native GLBs, browser mixer, continuous CCD, artist, physical RTX or release acceptance.'
