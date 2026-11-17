@@ -15,9 +15,14 @@ import subprocess
 import sys
 import tempfile
 
-from scripts.local_ai_docker import GPU_OVERLAYS, BASE, LOCAL, LocalDockerError, _validate_config
-
+# Direct invocation with 'python scripts/qualify_local_ai_compose.py' sets
+# sys.path[0] to scripts/, not necessarily the repository root. This is a
+# source-only operator command: bind the absolute repository root explicitly.
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.local_ai_docker import GPU_OVERLAYS, BASE, LOCAL, LocalDockerError, _validate_config
 
 
 def qualify(root: Path = ROOT) -> dict[str, object]:

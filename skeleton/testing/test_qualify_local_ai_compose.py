@@ -50,3 +50,21 @@ def test_profile_cli_source_never_builds_or_activates_models() -> None:
     assert 'docker", "compose"' in source
     assert '"up", "-d"' not in source
     assert '"build", "skeleton"' not in source
+
+
+def test_compose_source_cli_imports_under_isolated_python(tmp_path: Path) -> None:
+    import subprocess
+    import sys
+
+    module_path = Path(qual.__file__).resolve()
+    # Do not run the Docker qualification here: importing a standalone
+    # operator script must work without PYTHONPATH or a daemon.
+    command = [
+        sys.executable, "-I", "-c",
+        "import runpy; runpy.run_path(" + repr(str(module_path)) + ", run_name='source_only')",
+    ]
+    completed = subprocess.run(
+        command, cwd=tmp_path, capture_output=True, text=True, timeout=15,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr[:500]
