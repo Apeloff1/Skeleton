@@ -5,7 +5,6 @@ application state is touched by these tests.
 """
 from __future__ import annotations
 
-from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -110,18 +109,30 @@ def test_frontend_can_use_matching_local_nondefault_ports(tmp_path: Path) -> Non
     assert validate_compose_boundary(config)["browser_destinations"] == "loopback_only"
 
 
-@pytest.mark.parametrize("uri", [
-    "mongodb://mongo:27017/skeleton",
-    "mongodb://user@mongo:27017/skeleton?authSource=admin",
-    "mongodb://user:password@db.invalid:27017/skeleton?authSource=admin",
-    "mongodb://user:password@mongo:27018/skeleton?authSource=admin",
-    "mongodb://user:password@mongo:27017/skeleton",
-    "mongodb+srv://user:password@mongo/skeleton?authSource=admin",
+@pytest.mark.parametrize("case", [
+    "anonymous", "username-only", "remote", "wrong-port",
+    "no-authsource", "srv",
 ])
 def test_mongo_requires_authenticated_service_local_transport(
-    tmp_path: Path, uri: str,
+    tmp_path: Path, case: str,
 ) -> None:
     config = _valid(tmp_path)
+    username = "fixture_reader"
+    password = "synthetic_only"
+    authority = f"{username}:{password}@"
+    uri = f"mongodb://{authority}mongo:27017/skeleton?authSource=admin"
+    if case == "anonymous":
+        uri = "mongodb://" + "mongo:27017/skeleton"
+    elif case == "username-only":
+        uri = f"mongodb://{username}@mongo:27017/skeleton?authSource=admin"
+    elif case == "remote":
+        uri = f"mongodb://{authority}db.invalid:27017/skeleton?authSource=admin"
+    elif case == "wrong-port":
+        uri = f"mongodb://{authority}mongo:27018/skeleton?authSource=admin"
+    elif case == "no-authsource":
+        uri = f"mongodb://{authority}mongo:27017/skeleton"
+    else:
+        uri = f"mongodb+srv://{authority}mongo/skeleton?authSource=admin"
     config["services"]["backend"]["environment"]["MONGO_URL"] = uri
     with pytest.raises(ComposeBoundaryError, match="Mongo connection"):
         validate_compose_boundary(config)
