@@ -3342,11 +3342,14 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
             raise CrawlerError(
                 "crawler_consent_expired", "The original capture consent is too close to expiry.", 403
             )
+        discourse_models={}
         if discourse:
             from core.dragon_autonomous_discourse import config,DiscourseHeld
             if not row["request"]["frontier_strategy"].startswith("companion") or seconds<60:
                 raise CrawlerError("crawler_discourse_bounds","Autonomous discourse requires a companion strategy and at least 60 seconds.")
-            try:config(scope)
+            try:
+                configured=config(scope)
+                discourse_models={k:configured[k] for k in ("model_digest","dragon_model_digest") if k in configured}
             except DiscourseHeld as exc:
                 raise CrawlerError("crawler_discourse_held","Configure the owner-pinned local inference service.",503) from exc
         epoch = int(row.get("automation", {}).get("epoch", 0)) + 1
@@ -3365,7 +3368,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
             "slices_started": 0,
             "next_run_at": now,
             "stop_reason": None if body["enabled"] else "operator_disabled",
-            **({"navigation_discourse":True} if discourse else {}),
+            **({"navigation_discourse":True,"navigation_discourse_models":discourse_models} if discourse else {}),
         }
         if body["enabled"]:
             await self._grant_principal(scope, grant)
@@ -3836,7 +3839,10 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                     or grant.get("navigation_discourse") is not True or body.get("max_steps")!=1):
                 raise CrawlerError("crawler_discourse_held","Autonomous advice lacks the current execution grant.",403)
             try:
-                if (autonomous_discourse["model_digest"]!=config(scope)["model_digest"]
+                configured=config(scope)
+                models={k:configured[k] for k in ("model_digest","dragon_model_digest") if k in configured}
+                if (grant.get("navigation_discourse_models")!=models
+                        or any(autonomous_discourse.get(k)!=models.get(k) for k in ("model_digest","dragon_model_digest"))
                         or autonomous_discourse["network_authorized"] is not False
                         or navigation_digest({k:v for k,v in autonomous_discourse.items() if k!="receipt"})!=autonomous_discourse["receipt"]):
                     raise ValueError("discourse receipt")
@@ -4256,7 +4262,8 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                 "event_digests": [event["event_digest"] for event in summary.get("slice_events", [])],
                 **({"navigation_discourse":{"receipt":autonomous_discourse["receipt"],
                     "model_digest":autonomous_discourse["model_digest"],"role_calls":autonomous_discourse["role_calls"],
-                    "role_receipts_digest":autonomous_discourse["role_receipts_digest"]}} if autonomous_discourse else {}),
+                    "role_receipts_digest":autonomous_discourse["role_receipts_digest"],
+                    **({"dragon_model_digest":autonomous_discourse["dragon_model_digest"]} if "dragon_model_digest" in autonomous_discourse else {})}} if autonomous_discourse else {}),
             }
             automation_update = {}
             if automation_epoch is not None:
@@ -5344,8 +5351,15 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                 }
                 advice=None
                 if grant.get("navigation_discourse") is True:
-                    from core.dragon_autonomous_discourse import advise,DiscourseHeld
+                    from core.dragon_autonomous_discourse import advise,DiscourseHeld,config
                     from skeleton.ai.webcrawler.navigation_semantics import packet
+                    try:
+                        configured=config(scope)
+                        models={k:configured[k] for k in ("model_digest","dragon_model_digest") if k in configured}
+                        if grant.get("navigation_discourse_models")!=models:
+                            raise DiscourseHeld("grant model identities changed")
+                    except DiscourseHeld as exc:
+                        raise CrawlerError("crawler_discourse_held","Renew the finite model-pinned grant.",409) from exc
                     snapshot=_plain(self._custody_snapshot(row))
                     candidate_packet=packet(snapshot,now=_now().timestamp())
                     if snapshot["pending_dispatch"] is None and candidate_packet["candidates"]:
