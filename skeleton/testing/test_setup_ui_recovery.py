@@ -57,7 +57,7 @@ def _run_install(tmp_path: Path, monkeypatch, *, independent: bool, recovery_ok:
         # so the test can exercise Compose failures and setup-only recovery,
         # without disabling the production epoch fence.
         source = tmp_path / ".env"
-        source.write_text("TEST_RUNTIME_SOURCE=synthetic-fixture\\n", encoding="utf-8")
+        source.write_text("TEST_RUNTIME_SOURCE=synthetic-fixture\n", encoding="utf-8")
         source.chmod(0o600)
         monkeypatch.setattr(
             installer, "ensure_runtime_environment",
