@@ -1152,12 +1152,12 @@ export type ResearchNavigationPlan = {
 };
 function navigationUnit(x:unknown):x is number {return typeof x==='number'&&Number.isFinite(x)&&x>=0&&x<=1;}
 export async function getResearchNavigationPlan(query:string,mode:ResearchNavigationPlan['mode']='balanced',
-    budget=16,previous:string[]=[],signal?:AbortSignal):Promise<ResearchNavigationPlan>{
+    budget=16,previous:string[]=[],signal?:AbortSignal,learned=false):Promise<ResearchNavigationPlan>{
   if(!query.trim()||query.length>512||!['balanced','coverage','exploration','conservation'].includes(mode)
       ||!integer(budget,48)||budget<1||previous.length>128||new Set(previous).size!==previous.length
       ||previous.some(id=>!HASH.test(id))) invalid('Invalid bounded research plan.');
   const v=await read(api.post<ResearchNavigationPlan>(ROOT+'/navigation/federation/research-plan',
-    {query,budget,mode,previous},options(signal)),getAuthToken(),'Research plan unavailable.');
+    {query,budget,mode,previous,learned},options(signal)),getAuthToken(),'Research plan unavailable.');
   if(!v||v.schema!=='skeleton.dragon.navigation-plan.v1'||v.mode!==mode||v.budget!==budget
     ||!integer(v.remaining,budget)||!integer(v.epoch)||!integer(v.distinct_hosts,24)
     ||v.excluded_prior_targets!==previous.length||v.network_authorized!==false||v.training_permission!==false
@@ -1381,7 +1381,7 @@ export type CrawlSearchHit = {
   review_state: string; authority: string; instruction_risks: { risk: string; start: number; end: number; detail: string }[];
 };
 export type CrawlSearchPage = { schema_version: string; run_id: string; session_id: string; version: number; query: string; hits: CrawlSearchHit[]; evidence_digest: string };
-export async function authorizeCrawlAutomation(id: string, body: CrawlCommand & { enabled: boolean; max_slices: number; max_seconds: number }, signal?: AbortSignal): Promise<CrawlSession> {
+export async function authorizeCrawlAutomation(id: string, body: CrawlCommand & { enabled: boolean; max_slices: number; max_seconds: number; navigation_discourse?: boolean }, signal?: AbortSignal): Promise<CrawlSession> {
   if (typeof body.enabled !== 'boolean' || !integer(body.max_slices, 64) || body.max_slices < 1 || !integer(body.max_seconds, 3600) || body.max_seconds < 15) throw new ChatClientError('Choose 1–64 bounded slices and 15–3,600 seconds.', { kind: 'validation' });
   const value = await read(api.post<{ session: CrawlSession }>(ROOT + '/sessions/' + identifier(id) + '/automation', body, options(signal)), getAuthToken(), 'Automatic capture was not confirmed. Retry the same saved request or refresh its state.');
   return session(value.session, id);
