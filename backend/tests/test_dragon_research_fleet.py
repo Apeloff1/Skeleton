@@ -45,16 +45,22 @@ class FleetTests(unittest.TestCase):
         self.assertEqual(self.record["remaining"],40960)
         self.assertEqual(len(self.record["members"]),10)
         self.assertTrue(self.repo.fleet(SCOPE,action="create",**self.args)["replayed"])
-        total=0;chosen=set();revision=1
+        total=0;chosen=set();targets=set();revision=1
         for i in range(10):
             receipt=self.pulse(revision,f"fleet-pulse-{i:08d}")
             self.assertEqual(receipt["state"],"complete")
             self.assertTrue(receipt["targets"])
             chosen.add(receipt["campaign_id"])
+            current={x["target_id"] for x in receipt["targets"]}
+            self.assertFalse(targets & current);targets.update(current)
             total+=receipt["spent"]
             revision=receipt["fleet"]["revision"]
             self.assertFalse(receipt["network_authorized"])
         self.assertEqual(len(chosen),10)
+        self.assertGreaterEqual(len(targets),10)
+        with self.assertRaises(ValueError):
+            self.repo.campaign(SCOPE,action="advance",campaign_id=self.members[0],query=self.query,
+                operation="direct-bypass-attempt",expected_revision=2,budget=4,now=NOW)
         self.assertEqual(self.current()["remaining"],40960-total)
         self.assertEqual(sum(m["spent"] for m in self.current()["members"]),total)
         replay=self.pulse(1,"fleet-pulse-00000000")
