@@ -1,0 +1,95 @@
+{
+  "schema": "skeleton.emerald.proximal-wingfold-publication.v1",
+  "donor_sha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+  "stage_order": [
+    "pathfinder",
+    "archivist"
+  ],
+  "max_chunk_bytes": 33554432,
+  "forms": [
+    {
+      "stage": "pathfinder",
+      "model": "pathfinder.glb",
+      "bytes": 114687832,
+      "sha256": "80a98c198f5d8a6e101b571a9def6869904df4dfb0e5d90cba33f8890de9112f",
+      "source_sha256": "e51e44a3277da1123df017d23f41aee43e373ea1c9e126f30dafd9a24c213092",
+      "bundle": "pathfinder-wingfold-v5.zip",
+      "bundle_sha256": "1b5d793f183dfd70b6739bc023f0f428f2cdc591f81229a234146d50729d2ba0",
+      "parts": [
+        {
+          "path": "assets/emerald/evolution-v5/pathfinder/pathfinder.glb.part001",
+          "offset": 0,
+          "bytes": 33554432,
+          "sha256": "a4307493567485448cac9717a259aeea77ed8ba0ed7e332171a5c3cf473621fc"
+        },
+        {
+          "path": "assets/emerald/evolution-v5/pathfinder/pathfinder.glb.part002",
+          "offset": 33554432,
+          "bytes": 33554432,
+          "sha256": "236b549e4c78b1c5a9162fdebf11db544bbcc5220e4628021fc36a31355e9ac7"
+        },
+        {
+          "path": "assets/emerald/evolution-v5/pathfinder/pathfinder.glb.part003",
+          "offset": 67108864,
+          "bytes": 33554432,
+          "sha256": "6afb0f20c517bc80623afc47fcea92afc847fd273cefb641b277fe055e02feb6"
+        },
+        {
+          "path": "assets/emerald/evolution-v5/pathfinder/pathfinder.glb.part004",
+          "offset": 100663296,
+          "bytes": 14024536,
+          "sha256": "e4c8ce4915789862f572ed541dc25765785e90655c5f5581cba8139b3269f52e"
+        }
+      ],
+      "automatic_adoption": false,
+      "full_continuous_collision_qualified": false,
+      "artist_approved": false,
+      "physical_rtx_verified": false,
+      "release_qualified": false
+    },
+    {
+      "stage": "archivist",
+      "model": "archivist.glb",
+      "bytes": 114810480,
+      "sha256": "569fdf85be64705b857a43e2491b62ae6970fe90739c1050ffb49494da642b27",
+      "source_sha256": "0b7804643c65a5eb06f5baac2008d88b101b363613d2244016b3a33470c18d8f",
+      "bundle": "archivist-wingfold-v5.zip",
+      "bundle_sha256": "b2eb71ab5222d20f95851fdb214de5406f30b875dbfb6fb6eda9352a290605d1",
+      "parts": [
+        {
+          "path": "assets/emerald/evolution-v5/archivist/archivist.glb.part001",
+          "offset": 0,
+          "bytes": 33554432,
+          "sha256": "fb5efbdd6d1e80ba358ca28c87dfa43ebaa1774882ff96210caed8fd4ae9bab6"
+        },
+        {
+          "path": "assets/emerald/evolution-v5/archivist/archivist.glb.part002",
+          "offset": 33554432,
+          "bytes": 33554432,
+          "sha256": "c136880e5c230062cfe8813c353ddabd19b9c852b7513a907db55e68002f66c1"
+        },
+        {
+          "path": "assets/emerald/evolution-v5/archivist/archivist.glb.part003",
+          "offset": 67108864,
+          "bytes": 33554432,
+          "sha256": "b4a958b0e7b6c4925ce12eab23e84bc83cd62ed90d5158bee662a00e7b1651b4"
+        },
+        {
+          "path": "assets/emerald/evolution-v5/archivist/archivist.glb.part004",
+          "offset": 100663296,
+          "bytes": 14147184,
+          "sha256": "c7d36968c496319b57712ddb0da2d832b28e040353f8e5f3e69b839cf93679b6"
+        }
+      ],
+      "automatic_adoption": false,
+      "full_continuous_collision_qualified": false,
+      "artist_approved": false,
+      "physical_rtx_verified": false,
+      "release_qualified": false
+    }
+  ],
+  "remote_binary_published": false,
+  "source_art_unmodified": true,
+  "equipment_enabled": false,
+  "release_qualified": false
+}
