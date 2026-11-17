@@ -213,14 +213,15 @@ def _live_env(name: str, service: Mapping[str, Any], doc: Mapping[str, Any]) -> 
         if key in observed:
             raise host.LocalDockerError("Docker service duplicates environment keys")
         observed[key] = value
+    # Dedicated fail-closed errors take precedence over generic drift.
+    if name == "skeleton":
+        if any(str(observed.get(key, "")).strip() for key in host.EMPTY_FENCE):
+            raise host.LocalDockerError("live engine exposes a hosted inference fallback")
+        if any(observed.get(key) != value for key, value in host.ENV_FENCE.items()):
+            raise host.LocalDockerError("live engine local-only fence differs")
     for key, value in env.items():
         if not isinstance(key, str) or not isinstance(value, str) or observed.get(key) != value:
             raise host.LocalDockerError("runtime environment differs from rendered Compose")
-    if name == "skeleton":
-        if any(observed.get(key) != value for key, value in host.ENV_FENCE.items()):
-            raise host.LocalDockerError("live engine local-only fence differs")
-        if any(str(observed.get(key, "")).strip() for key in host.EMPTY_FENCE):
-            raise host.LocalDockerError("live engine exposes a hosted inference fallback")
 
 
 def _compare_network(doc: Mapping[str, Any], topology: Mapping[str, Any]) -> None:
