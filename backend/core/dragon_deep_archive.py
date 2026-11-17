@@ -336,11 +336,8 @@ class DragonDeepArchiveMixin:
             try:
                 def build():
                     snap,grant,policies,allowed=self._deep_material(scope,row,now)
-                    from core.dragon_hybrid_rank import build_route
-                    from core.dragon_passage_index import build_passage_route
-                    return (a.build_index(scope,snap,grant,policies,now,allowed),
-                            build_route(scope,snap,grant,policies,now,allowed),
-                            build_passage_route(scope,snap,grant,policies,now,allowed))
+                    from core.dragon_archive_intelligence import build_index_bundle
+                    return build_index_bundle(scope,snap,grant,policies,now,allowed)
                 index,hybrid,passages=await _bounded_discovery_cpu(build)
                 await self._admit(scope,row["_id"],{"deep_index":index,"deep_hybrid_route":hybrid,
                     "deep_passage_route":passages})
