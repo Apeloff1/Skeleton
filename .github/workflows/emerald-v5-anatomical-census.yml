@@ -1,5 +1,15 @@
 name: Emerald V5 anatomical coverage custody
 on:
+  push:
+    branches:
+      - 'feat/emerald-v5-contact-coverage-*'
+    paths:
+      - 'scripts/emerald_v5_anatomical_census.py'
+      - 'scripts/test_emerald_v5_anatomical_census.py'
+      - 'scripts/check_emerald_v5_anatomical_evidence.py'
+      - 'scripts/test_emerald_v5_anatomical_evidence.py'
+      - 'assets/emerald/evolution-v5/anatomical-census-measured.json'
+      - '.github/workflows/emerald-v5-anatomical-census.yml'
   pull_request:
     paths:
       - 'scripts/emerald_v5_anatomical_census.py'
