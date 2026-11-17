@@ -37,19 +37,26 @@ def _stage_id(owner,original):
         separators=(",",":")).encode())
 
 
-def _read_locked(archive,db,scope,row):
+def _read_locked(archive,db,scope,row,*,maximum_bytes=MAX_BYTES):
     # Read all placements under the same ledger fence; individual chunk reads
     # across a concurrent layout switch are not a coherent snapshot.
     layout=archive._layout(db,row)
     chunks=archive._placements(db,row["owner"],row["id"])
     count=len(layout) if layout is not None else (row["expected_bytes"]+BLOCK-1)//BLOCK
-    if len(chunks)!=count or row["expected_bytes"]>MAX_BYTES:
+    if len(chunks)!=count or row["expected_bytes"]>maximum_bytes:
         raise StorageHeld("migration source layout unavailable")
     raw=bytearray()
+    receipts=[]
     for i,chunk in enumerate(chunks):
         if chunk["ordinal"]!=i or chunk["raw_bytes"]!=archive._bound(row,i,layout):
             raise StorageHeld("migration placement differs")
-        raw.extend(archive.bulk.read(scope,archive._receipt(row["owner"],chunk)))
+        receipts.append(archive._receipt(row["owner"],chunk))
+    for offset in range(0,len(receipts),128):
+        group=receipts[offset:offset+128]
+        if hasattr(archive.bulk,"read_many"):
+            for part in archive.bulk.read_many(scope,group):raw.extend(part)
+        else:
+            for receipt in group:raw.extend(archive.bulk.read(scope,receipt))
     if len(raw)!=row["expected_bytes"] or _sha(raw)!=row["expected_hash"]:
         raise StorageHeld("migration source checksum differs")
     return bytes(raw)
@@ -145,8 +152,9 @@ def migrate(archive,scope,identifier,raw,*,collect_limit=128):
     switched=False
     if phase!="already":
         if phase=="building":
-            for i,part in enumerate(split(raw,layout)):
-                archive.append(scope,stage,i,part)
+            parts=list(split(raw,layout))
+            for offset in range(0,len(parts),128):
+                archive.append_many(scope,stage,offset,parts[offset:offset+128])
             archive.seal(scope,stage)
         switched=_switch(archive,scope,identifier,stage,raw,layout)
     # Reopen a new transaction after the commit and verify original identity.
