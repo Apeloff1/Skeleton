@@ -99,7 +99,7 @@ def fuse(prepared,matches,*,limit):
             if key not in qids:raise ValueError("unbound matrix objective")
             old=payload["objectives"].get(key)
             if old is None or (match["score"],match["matched_terms"])>(old["score"],old["matched_terms"]):
-                payload["objectives"][key]=match
+                payload["objectives"][key]={**match,"best_witness":witness}
     candidates=[]
     for p in payloads.values():
         p["witnesses"].sort(key=lambda w:(-w["captured_at"],w["session_id"],w["source_id"]))
