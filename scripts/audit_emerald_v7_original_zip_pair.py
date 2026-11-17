@@ -155,6 +155,16 @@ def compare_old_new(old_raw,new_raw,stage):
              "real_mixer_qualified","crossfade_transition_qualified",
              "artist_approved","physical_rtx_verified","release_qualified")),
          "wrong V7 tail correction or false GPU/art/release claim")
+ # Compare hash of actual complete source embedded BIN, not a sampled prefix.
+ a=memoryview(old_raw)[obase:obase+obin]
+ b=memoryview(new_raw)[nbase:nbase+obin]
+ try:
+  ha=hashlib.sha256(a).hexdigest()
+  hb=hashlib.sha256(b).hexdigest()
+  require(ha==hb,"original full embedded BIN bytes changed")
+ finally:
+  a.release();b.release()
+
  changed=0
  for a,b in zip(old["animations"],new["animations"]):
   require(a["name"]==b["name"] and a["channels"]==b["channels"]
@@ -176,15 +186,6 @@ def compare_old_new(old_raw,new_raw,stage):
     changed+=1
    else:require(before==after,"untargeted original sampler changed")
  require(changed==1,"wrong corrected stream count")
- # Compare hash of actual complete source embedded BIN, not a sampled prefix.
- a=memoryview(old_raw)[obase:obase+obin]
- b=memoryview(new_raw)[nbase:nbase+obin]
- try:
-  ha=hashlib.sha256(a).hexdigest()
-  hb=hashlib.sha256(b).hexdigest()
-  require(ha==hb,"original full embedded BIN bytes changed")
- finally:
-  a.release();b.release()
  return {"original_binary_prefix_sha256":ha,
          "original_binary_prefix_identical":True,
          "source_mesh_skin_material_nodes_exact":True,
