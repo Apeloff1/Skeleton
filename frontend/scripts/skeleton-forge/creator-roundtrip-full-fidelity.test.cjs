@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const Module = require('node:module');
+const path = require('node:path');
 const { load } = require('./harness.cjs');
 
 const kv = new Map();
@@ -23,11 +24,14 @@ Module._load = function(request, parent, isMain) {
       digestStringAsync: async (_, value) => crypto.createHash('sha256').update(value).digest('hex'),
     };
   }
-  if (request === '../auth/gameforgeAuth') return {
+  if (['../auth/gameforgeAuth', '../../auth/gameforgeAuth'].includes(request)) {
+    assert.equal(Module._resolveFilename(request, parent, isMain), path.resolve(__dirname, '../../src/auth/gameforgeAuth.ts'));
+    return {
     getAuthEpoch: () => auth.epoch,
     getAuthToken: () => auth.token,
     initializeStoredToken: async () => {},
-  };
+    };
+  }
   return original.call(this, request, parent, isMain);
 };
 let bridgeStorage, galaxyStorage, Draft;
@@ -88,6 +92,19 @@ test('all 8 native sidecar modes and full 14-matrix source survive Forge > Galax
     assert.equal(request.galaxy_profile.config.extra_params.authored_slider_1, 99);
     assert.equal(G.MATRIX_FIELDS.filter(k => request.galaxy_profile.config[k]).length, 14);
   }
+});
+
+test('Galaxy selection preserves matrices only for the same genre without a replacement profile', () => {
+  const first = H.handoffFromForge(setup(), 1700000000000);
+  const same = H.handoffFromGalaxy({
+    title: 'Future Harbor', vision: '', genreId: 'beat_em_up',
+  }, first, 1700000000001);
+  assert.equal(same.galaxyProfile.config.extra_params.authored_slider_1, 99);
+  assert.equal(G.MATRIX_FIELDS.filter(k => same.galaxyProfile.config[k]).length, 14);
+  const changed = H.handoffFromGalaxy({
+    title: 'Different Genre', vision: '', genreId: 'puzzle',
+  }, first, 1700000000001);
+  assert.equal(changed.galaxyProfile, null, 'a new genre must not inherit incompatible matrices');
 });
 
 test('bridge rejects forged full Galaxy source rather than silently degrading content', () => {

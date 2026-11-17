@@ -92,8 +92,11 @@ jobs:
       - name: Compile full frontend TypeScript
         working-directory: frontend
         run: yarn typecheck
-      - name: Export existing web application
+      - name: Verify guarded Expo exporter and adversarial lifecycle regressions
         working-directory: frontend
-        run: yarn export:web
+        run: node --test scripts/test-guarded-expo-export.cjs
+      - name: Export existing web application with bounded process custody
+        working-directory: frontend
+        run: node scripts/guarded-expo-export.cjs
       - name: Qualification boundary
         run: echo 'Source and synthetic fixtures only. Original GLB, artistic quality, Unreal, physical RTX, and device acceptance are not qualified by this job.'

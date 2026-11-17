@@ -19,8 +19,8 @@ test('all offline questionnaire panels render without importing the Expo API run
   }));
   assert.match(chosenGenreHtml, /q-genre-control-preview/);
   assert.match(html, /q-jeeves-quality-panel/);
-  assert.match(html, /q-native-playtest-mode/);
-  const expoPrefix = path.join(ROOT, 'node_modules', 'expo-modules-core', 'src');
-  assert.ok(!Object.keys(require.cache).some(file => file.startsWith(expoPrefix)),
+  assert.match(html, /data-testid="q-playtest-controls"/);
+  const forbidden = ['expo-modules-core', 'expo-secure-store'].map(name => path.join(ROOT, 'node_modules', name) + path.sep);
+  assert.ok(!Object.keys(require.cache).some(file => forbidden.some(prefix => file.startsWith(prefix))),
     'a pure editor SSR test must not load a native Expo module');
 });
