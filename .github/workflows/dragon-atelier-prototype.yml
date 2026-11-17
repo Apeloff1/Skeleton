@@ -15,6 +15,8 @@ on:
       - 'scripts/test_emerald_retained_archives.py'
       - 'scripts/rebuild_emerald_exact_binary.py'
       - 'scripts/test_emerald_exact_binary.py'
+      - 'scripts/prepare_emerald_delivery.py'
+      - 'scripts/test_emerald_delivery.py'
       - 'scripts/audit_emerald_animation.py'
       - 'scripts/audit_emerald_skin.py'
       - 'scripts/audit_emerald_materials.py'
@@ -73,6 +75,7 @@ jobs:
           python3 scripts/test_emerald_recovery.py
           python3 scripts/test_emerald_retained_archives.py
           python3 scripts/test_emerald_exact_binary.py
+          python3 scripts/test_emerald_delivery.py
           python3 scripts/test_emerald_animation_audit.py
           python3 scripts/test_emerald_skin_audit.py
           python3 scripts/test_emerald_material_audit.py
