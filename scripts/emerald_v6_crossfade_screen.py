@@ -295,17 +295,30 @@ def run(stage,model_path,tool_dir,steps=5,limit_seconds=600,journal=None,resume=
  require(source.is_file() and not source.is_symlink() and
          source.stat().st_size==required_bytes and
          sha(source)==required_sha,"V6 source pin mismatch")
+ if journal is None:
+  require(not resume,"resume requires a journal")
+  saved=[]
+ else:
+  journal=Path(journal)
+  require(journal.parent.is_dir() and not journal.parent.is_symlink()
+          and journal.exists()==resume and not journal.is_symlink(),
+          "trusted unused journal required, or exact existing journal for resume")
+  saved=verify_journal(json.loads(journal.read_bytes()),stage,required_sha,steps) if resume else []
  start=time.monotonic();deadline=start+limit_seconds
  model=auditor.GLB(source,required_bytes,required_sha,stage)
  try:
   g=model.geometry();groups=anatomy(g)
   results=[]
-  for preceding,following in TRANSITIONS:
+  for transition_index,(preceding,following) in enumerate(TRANSITIONS):
    dur_old,_,_=local_pose(model,g,preceding,0.)
    dur_new,_,_=local_pose(model,g,following,0.)
    require(dur_old>=CROSSFADE_SECONDS and dur_new>=CROSSFADE_SECONDS,
            "actual clip shorter than original .22s crossfade")
    for index in range(steps):
+    sample_index=transition_index*steps+index
+    if sample_index<len(saved):
+     results.append(saved[sample_index])
+     continue
     require(time.monotonic()<deadline,"incomplete transition time budget")
     alpha=index/(steps-1)
     # Source-compatible fade: hold outgoing clip at its final .22s
@@ -324,6 +337,8 @@ def run(stage,model_path,tool_dir,steps=5,limit_seconds=600,journal=None,resume=
         "source_new_time_s":new_time,
         **detail,
     })
+    if journal is not None:
+     store_journal(journal,stage,required_sha,steps,results)
   unresolved=sum(row["new_independent_contact_pairs"]>0 for row in results)
   return {
    "schema":"skeleton.emerald.v6.crossfade-mesh-screen.v1",
@@ -360,10 +375,13 @@ def main():
  p.add_argument("--output",required=True,type=Path)
  p.add_argument("--steps",type=int,default=5)
  p.add_argument("--time-budget-seconds",type=float,default=600)
+ p.add_argument("--checkpoint",type=Path)
+ p.add_argument("--resume",action="store_true")
  a=p.parse_args()
  require(a.output.parent.is_dir() and not a.output.parent.is_symlink()
          and not os.path.lexists(a.output),"trusted new report path required")
- report=run(a.stage,a.model,a.source_tools,a.steps,a.time_budget_seconds)
+ report=run(a.stage,a.model,a.source_tools,a.steps,a.time_budget_seconds,
+            journal=a.checkpoint,resume=a.resume)
  with a.output.open("x",encoding="utf-8") as target:
   json.dump(report,target,indent=2,allow_nan=False)
   target.write("\n")
