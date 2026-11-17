@@ -70,7 +70,7 @@ def reject_external(value: Any) -> None:
 def inspect_glb(path: Path, expected: str) -> dict:
     require(re.fullmatch(r"[0-9a-f]{64}", expected) is not None, "trusted lowercase SHA-256 required")
     require(path.name == "emerald_continuum.glb", "original model filename required")
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0) | getattr(os, "O_NONBLOCK", 0)
     require(not path.is_symlink(), "symlink asset denied")
     fd = os.open(path, flags)
     with os.fdopen(fd, "rb") as source:

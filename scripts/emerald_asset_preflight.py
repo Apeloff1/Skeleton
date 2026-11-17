@@ -23,7 +23,7 @@ def witness(path: Path, expected_size: int, expected_sha: str) -> dict:
     if path.is_symlink():
         return {**result, "state": "unsafe"}
     try:
-        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0))
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0) | getattr(os, "O_NONBLOCK", 0))
     except FileNotFoundError:
         return result
     except OSError:
