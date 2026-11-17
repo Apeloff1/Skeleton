@@ -15,13 +15,13 @@ from core import dragon_research_campaign as campaign
 from core import dragon_navigation_graph as graph
 from skeleton.ai.webcrawler.navigation_semantics import digest
 
-MAX_MEMBERS=10
+MAX_MEMBERS=100
 MAX_FLEETS=32
 MAX_LEASE=180
-MAX_JOBS=1280
+MAX_JOBS=12800
 MAX_LIFETIME=30*86400
 MAX_PAGE=64
-MAX_BUDGET=40960
+MAX_BUDGET=409600
 
 SCHEMA="""
 CREATE TABLE IF NOT EXISTS navigation_fleets(
@@ -199,8 +199,10 @@ def _claim(db,owner,fleet,operation,command,objectives,budget,expected_revision,
     if db.execute("SELECT 1 FROM navigation_fleet_jobs WHERE owner=? AND fleet=? AND state='leased'",
                   (owner,fleet)).fetchone():
         raise ValueError("recover the outstanding fleet operation first")
-    if db.execute("SELECT COUNT(*) FROM (SELECT 1 FROM navigation_fleet_jobs WHERE owner=? AND fleet=? LIMIT ?)",
-                  (owner,fleet,MAX_JOBS)).fetchone()[0]>=MAX_JOBS:
+    # A settled operation increments revision exactly once. With no active
+    # lease and an active fleet, revision-1 is the committed job count.
+    # Avoid rescanning up to 12,800 historical job rows on every pulse.
+    if row["revision"]-1>=MAX_JOBS:
         raise ValueError("fleet round cap")
     members=_members(db,owner,fleet)
     if set(objectives)!={m["campaign"] for m in members}:
