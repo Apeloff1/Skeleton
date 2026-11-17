@@ -23,7 +23,7 @@ def fixture():
                for n in range(379)]
  clips.append({"name":"growth-pathfinder-to-archivist",
                "samplers":[],"channels":[]})
- old={"asset":{"version":"2.0"},
+ old={"asset":{"version":"2.0","generator":"Emerald original-donor pathfinder V6 tail-root flight clearance candidate"},
       "extras":{"stage":stage,"donorSha256":audit.DONOR},
       "skins":[{"joints":list(range(108))}],
       "nodes":[],"meshes":[],"materials":[],
@@ -32,6 +32,7 @@ def fixture():
       "bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":len(q)}],
       "accessors":[{"bufferView":0,"type":"VEC4","componentType":5126,"count":160}]}
  new=copy.deepcopy(old)
+ new["asset"]["generator"]="Emerald original-donor pathfinder V7 orbit-02 tail clearance candidate"
  new["animations"][0]["samplers"][0]["output"]=1
  new["bufferViews"].append({"buffer":0,"byteOffset":2560,"byteLength":2560})
  new["accessors"].append({"bufferView":1,"type":"VEC4",
@@ -45,7 +46,7 @@ def fixture():
    "modified_keyframes":160,"equipment_enabled":False,
    "continuous_collision_qualified":False,
    "real_mixer_qualified":False,"crossfade_transition_qualified":False,
-   "artist_approved":False,"physical_rtx_verified":False,
+   "artist_approved":False,"unreal_compiled":False,"physical_rtx_verified":False,
    "release_qualified":False}
  s=math.sin(.09);c=math.cos(.09)
  added=struct.pack("<4f",0,s,0,c)*160
@@ -73,6 +74,34 @@ class ExactV7ZipAuditTests(unittest.TestCase):
   altered=bytearray(q);altered[0]=1
   with self.assertRaisesRegex(ValueError,"BIN bytes changed"):
    audit.compare_old_new(make_glb(old,bytes(altered)),b,"pathfinder")
+
+ def test_extra_glb_extension_is_refused(self):
+  a,_,old,new,q,extra=fixture()
+  new["extensionsUsed"]=["KHR_external_resource"]
+  with self.assertRaisesRegex(ValueError,"top-level sections"):
+   audit.compare_old_new(a,make_glb(new,q+extra),"pathfinder")
+
+ def test_fake_provenance_or_extra_release_flag_refused(self):
+  a,_,old,new,q,extra=fixture()
+  changed=copy.deepcopy(new)
+  changed["asset"]["generator"]="unreviewed binary generator"
+  with self.assertRaisesRegex(ValueError,"asset provenance"):
+   audit.compare_old_new(a,make_glb(changed,q+extra),"pathfinder")
+  changed=copy.deepcopy(new)
+  changed["extras"]["releaseComplete"]=True
+  with self.assertRaisesRegex(ValueError,"metadata"):
+   audit.compare_old_new(a,make_glb(changed,q+extra),"pathfinder")
+
+ def test_binary_append_must_be_in_one_canonical_accessor(self):
+  a,_,old,new,q,extra=fixture()
+  changed=copy.deepcopy(new)
+  changed["bufferViews"][-1]["byteOffset"]=512
+  with self.assertRaisesRegex(ValueError,"binary data extent"):
+   audit.compare_old_new(a,make_glb(changed,q+extra),"pathfinder")
+  changed=copy.deepcopy(new)
+  changed["buffers"][0]["byteLength"]+=16
+  with self.assertRaisesRegex(ValueError,"binary data extent"):
+   audit.compare_old_new(a,make_glb(changed,q+extra+b"\\0"*16),"pathfinder")
 
  def test_nonauthorized_new_animation_is_denied(self):
   a,_,old,new,q,extra=fixture()
