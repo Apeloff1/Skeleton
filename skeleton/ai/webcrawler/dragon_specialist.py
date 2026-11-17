@@ -150,6 +150,18 @@ class DragonSpecialist:
         ids=validate_packet(group)
         if len(ids)>ROLE_GROUP:raise ValueError("dragon specialist group bound")
         first=parse_rank(json.dumps(first),len(ids))
+        if self.ensemble:
+            from .dragon_specialist_search import beam_rank
+            order,values,planner=beam_rank(self,group,first)
+            receipt={"schema":"skeleton.dragon.specialist-execution.v1","model_digest":self.model_digest,
+                "packet_digest":group["packet_digest"],"first_rank_digest":digest(first),
+                "feature_digest":digest(values),"output_digest":digest(order),
+                "candidate_count":len(ids),"inference_engine":"dragon_neural_ranker",
+                "architecture":ENSEMBLE_SCHEMA,"member_count":len(self.ensemble),
+                "mean_logit_spread":round(sum(x["ensemble_logit_spread"] for x in values)/len(values),10),
+                "confidence_is_calibrated_probability":False,"planner":planner,
+                "network_authorized":False,"production_quality_verified":False}
+            return order,{**receipt,"execution_receipt_digest":digest(receipt)}
         q=set(group["objective"]);qc=concepts(q);qg=grams(q)
         selected=set();covered=set();values=[]
         ranks={n:1/(1+i) for i,n in enumerate(first)}
