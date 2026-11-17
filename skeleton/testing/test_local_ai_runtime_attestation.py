@@ -89,7 +89,8 @@ def _setup(root: Path, mode: str = "cpu") -> tuple[dict, dict[str, dict]]:
             },
             "HostConfig": hostconfig,
             "Mounts": mounts,
-            "NetworkSettings": {"Ports": deepcopy(port_map)},
+            "NetworkSettings": {"Ports": deepcopy(port_map),
+                                "Networks": {"docker_tutolage": {}}},
         }
     return config, docs
 
@@ -130,7 +131,8 @@ def test_actual_container_attestation_accepts_canonical_synthetic_runtime(
     result = _attest(tmp_path, config, docs, mode=mode)
     assert result["mode"] == mode
     assert result["services_verified"] == list(runtime._REQUIRED)
-    assert result["container_images_compared"] is True
+    assert result["container_image_ids_compared"]["skeleton"] == IMAGE_ID
+    assert result["container_image_ids_compared"]["mongo"] == IMAGE_ID
     assert result["database_epoch_qualified"] is False
     assert result["guarded_chat_qualified"] is False
     assert result["gpu_offload_qualified"] is False
@@ -341,3 +343,23 @@ def test_read_only_attestation_has_no_container_mutation_commands(tmp_path: Path
                and "run" not in command and "build" not in command
                and "rm" not in command and "prune" not in command
                for command in observed)
+
+
+@pytest.mark.parametrize("name", runtime._REQUIRED)
+def test_live_container_cannot_join_unexpected_network(
+    tmp_path: Path, name: str,
+) -> None:
+    config, docs = _setup(tmp_path)
+    docs[name]["NetworkSettings"]["Networks"]["untrusted_bridge"] = {}
+    with pytest.raises(host.LocalDockerError, match="network membership"):
+        _attest(tmp_path, config, docs)
+
+
+@pytest.mark.parametrize("name", runtime._REQUIRED)
+def test_live_container_cannot_switch_network_mode(
+    tmp_path: Path, name: str,
+) -> None:
+    config, docs = _setup(tmp_path)
+    docs[name]["HostConfig"]["NetworkMode"] = "other_project_bridge"
+    with pytest.raises(host.LocalDockerError, match="network mode"):
+        _attest(tmp_path, config, docs)
