@@ -338,7 +338,8 @@ test('auth change mid-return cannot reissue the prior account draft to a new acc
   bearer = 'alice-offline-bearer'; epoch++;
   const restored = await bridgeStorage.withCreatorBridge('studio', async (draft) => draft);
   assert.equal(restored.studioProjectId, 'alice-private-return');
-  assert.equal(kv.size, 1);
+  assert.equal(kv.size, 0, 'successful original-owner return acknowledges the one-time handoff');
+  assert.equal(await bridgeStorage.consumeCreatorBridge('studio'), null, 'acknowledged return cannot replay');
 });
 
 test('first-install return no longer consumes a draft before saving it', () => {
