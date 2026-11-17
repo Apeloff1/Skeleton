@@ -1245,7 +1245,7 @@ export async function closeResearchCampaign(id:string,expectedRevision:number,si
   return v;
 }
 export type SourceCatalogueSummary={schema:'skeleton.dragon.source-catalogue.v1';revision:string;catalogue_digest:string;
-  sources:number;hosts:number;families:Record<string,number>;candidate_only:true;network_authorized:false};
+  sources:number;hosts:number;families:Record<string,number>;candidate_only:true;network_authorized:false;indexed_generation?:true};
 export type SourceNavigationCandidate={candidate_id:string;source_id:string|null;target_id:string|null;name:string;
   url:string;host:string;family:string;kind:string;ecosystems:string[];relevance:number;priority:number;
   historical_quality:number;restriction_rate:number;witness_count:number;lineage_support:number;observed:boolean;
@@ -1254,14 +1254,14 @@ export type SourceNavigationCandidate={candidate_id:string;source_id:string|null
 export type SourceNavigationPlan={schema:'skeleton.dragon.source-navigation-plan.v1';catalogue:SourceCatalogueSummary;
   sources:SourceNavigationCandidate[];ecosystems:string[];goals:string[];distinct_hosts:number;
   mode:'balanced'|'coverage'|'exploration'|'conservation';retained_graph_candidates:number;
-  index_backfill_pending:boolean;lane_truncated:boolean;selection_is_advisory:true;model_inference_executed:false;
+  index_backfill_pending:boolean;lane_truncated:boolean;rank_search_is_bounded?:boolean;selection_is_advisory:true;model_inference_executed:false;
   network_authorized:false;source_rights_granted:false;receipt:string};
 const SOURCE_FAMILIES=new Set(['game-discovery','mods','mmo','game-worlds','engine-tools','open-assets','datasets','apis','history-media','global']);
 const SOURCE_KINDS=new Set(['directory','community','reference','documentation','asset_catalogue','dataset','connector_docs','observed_locator']);
 const SOURCE_HOST=/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/;
 function sourceCatalogueValid(v:SourceCatalogueSummary){
   return !!v&&v.schema==='skeleton.dragon.source-catalogue.v1'&&/^\d{4}-\d{2}-\d{2}$/.test(v.revision)
-    &&HASH.test(v.catalogue_digest)&&integer(v.sources,4096)&&v.sources>0&&integer(v.hosts,v.sources)&&v.hosts>0
+    &&HASH.test(v.catalogue_digest)&&integer(v.sources,1048576)&&v.sources>0&&(v.indexed_generation===undefined||v.indexed_generation===true)&&integer(v.hosts,v.sources)&&v.hosts>0
     &&!!v.families&&Object.entries(v.families).every(([k,n])=>SOURCE_FAMILIES.has(k)&&integer(n,v.sources))
     &&Object.values(v.families).reduce((s,n)=>s+n,0)===v.sources&&v.candidate_only===true&&v.network_authorized===false;
 }
@@ -1280,7 +1280,7 @@ export async function getSourceNavigationPlan(body:{query:string;limit?:number;f
   const v=await read(api.post<SourceNavigationPlan>(ROOT+'/navigation/source-plan',{...body,limit,mode},options(signal)),
     getAuthToken(),'Source exploration unavailable.');
   if(!v||v.schema!=='skeleton.dragon.source-navigation-plan.v1'||!sourceCatalogueValid(v.catalogue)||!HASH.test(v.receipt)
-    ||v.mode!==mode||v.selection_is_advisory!==true||v.model_inference_executed!==false||v.network_authorized!==false
+    ||v.mode!==mode||v.rank_search_is_bounded!==undefined&&typeof v.rank_search_is_bounded!=='boolean'||v.selection_is_advisory!==true||v.model_inference_executed!==false||v.network_authorized!==false
     ||v.source_rights_granted!==false||!Array.isArray(v.sources)||v.sources.length>limit
     ||!integer(v.retained_graph_candidates,48)||!integer(v.distinct_hosts,v.sources.length)
     ||typeof v.index_backfill_pending!=='boolean'||typeof v.lane_truncated!=='boolean'
