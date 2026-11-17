@@ -357,6 +357,82 @@ class DragonDeepArchiveMixin:
             totals["indexed" if changed.modified_count else "superseded"]+=1
         return totals
 
+    async def deep_archive_matrix_search(self,scope,*,queries,cursor=None,limit=32,session_ids=None):
+        """Route ten objectives together and rank exact authorized payloads."""
+        from core.dragon_crawler import CrawlerError,_now
+        from core import dragon_archive_matrix as matrix
+        from core.dragon_archive_intelligence import ArchiveWork
+        try:
+            prepared=matrix.prepare(scope,queries)
+            if type(limit) is not int or not 1<=limit<=matrix.MAX_PAYLOADS:
+                raise ValueError("archive matrix result bound")
+            if session_ids is not None and (not isinstance(session_ids,list) or not 1<=len(session_ids)<=100
+                    or len(set(session_ids))!=len(session_ids) or not all(identity(x) for x in session_ids)):
+                raise ValueError("archive matrix session bound")
+            query_key=a.digest(["archive-matrix-v1",queries,sorted(session_ids or [])])
+            after=a.decode_cursor(scope,query_key,cursor)
+            lanes=matrix.routes(prepared)
+        except (ValueError,TypeError) as exc:
+            raise CrawlerError("crawler_archive_matrix_bounds","Invalid objective matrix or cursor.",422) from exc
+        await self.ensure_indexes()
+        now=_now().timestamp()
+        predicate={**scope,"status":{"$in":sorted(TERMINAL)},"deep_archive.released":True,
+            "deep_index.expires_at":{"$gt":now},"$or":[{"deep_index.tokens":{"$in":lanes["exact"]}},
+            {"deep_hybrid_route.tokens":{"$in":lanes["rare"]},"deep_hybrid_route.expires_at":{"$gt":now}},
+            {"deep_passage_route.tokens":{"$in":lanes["passage"]},"deep_passage_route.expires_at":{"$gt":now}}]}
+        if session_ids is not None:predicate["_id"]={"$in":session_ids}
+        if after:predicate.setdefault("_id",{})["$gt"]=after
+        async def page():
+            return await self.sessions.find(predicate,{"_id":1,"version":1,"deep_index.digest":1,
+                "deep_hybrid_route.digest":1,"deep_passage_route.digest":1}).sort("_id",ASCENDING
+                ).limit(matrix.MAX_PAGE+1).max_time_ms(3000).to_list(matrix.MAX_PAGE+1)
+        rows=await page()
+        work=ArchiveWork();hits=[];fences=[];held=0;checks=0
+        for item in rows[:matrix.MAX_PAGE]:
+            row=await self.sessions.find_one({**scope,"_id":item["_id"],"version":item["version"],
+                "deep_index.digest":item["deep_index"]["digest"],"deep_archive.released":True,
+                "status":{"$in":sorted(TERMINAL)}},max_time_ms=2000)
+            if row is None:
+                raise CrawlerError("crawler_archive_matrix_changed","Historical candidate changed.",409)
+            try:
+                def evaluate():
+                    snap,grant,policies,allowed=self._deep_material(scope,row,now)
+                    a.validate_index(row["deep_index"],snap,grant,policies,now)
+                    if row.get("deep_hybrid_route") is not None:
+                        from core.dragon_hybrid_rank import validate_route
+                        validate_route(row["deep_hybrid_route"],snap,grant,policies,now)
+                    if row.get("deep_passage_route") is not None:
+                        from core.dragon_passage_index import validate_passage_route
+                        validate_passage_route(row["deep_passage_route"],snap,grant,policies,now)
+                    return matrix.evaluate(snap,grant,policies,allowed,now,prepared,work)
+                found,checked=await _bounded_discovery_cpu(evaluate)
+            except CrawlerError as exc:
+                if exc.code=="crawler_vault_busy":raise
+                held+=1;continue
+            except (ValueError,TypeError,KeyError,CheckpointReplicaError):
+                held+=1;continue
+            checks+=checked
+            if found:
+                fences.append({"_id":row["_id"],"version":row["version"],"deep_archive":row["deep_archive"],
+                    "archive_grant":row["archive_grant"],"source_use_policies":row.get("source_use_policies",{"$exists":False})})
+            hits.extend({**x,"session_id":row["_id"],"version":row["version"],
+                         "snapshot_digest":row["deep_archive"]["snapshot_digest"]} for x in found)
+        fused=await _bounded_discovery_cpu(lambda:matrix.fuse(prepared,hits,limit=limit))
+        if fences:
+            current=await self.sessions.find({**scope,"$or":fences},{"_id":1}).limit(len(fences)
+                ).max_time_ms(3000).to_list(len(fences))
+            if {x["_id"] for x in current}!={x["_id"] for x in fences}:
+                raise CrawlerError("crawler_archive_matrix_changed","Historical authority changed.",409)
+        if rows!=await page() or hits and min(x["valid_until"] for x in hits)<=_now().timestamp():
+            raise CrawlerError("crawler_archive_matrix_changed","Historical route or expiry changed.",409)
+        result={"schema":"skeleton.dragon.archive-matrix.v1","objective_count":len(prepared),
+            "scanned_sessions":min(len(rows),matrix.MAX_PAGE),"held_sessions":held,"verified_source_checks":checks,
+            **fused,"feature_work":work.receipt(),"next_cursor":a.cursor(scope,query_key,rows[matrix.MAX_PAGE-1]["_id"])
+                if len(rows)>matrix.MAX_PAGE else None,"as_of_unix":now,"approximate_routing":True,
+            "page_local_ranking":True,"history_only":True,"network_authorized":False,
+            "source_text_returned":False,"model_context_permission":False,"training_permission":False}
+        return {**result,"receipt":a.digest(result)}
+
     async def deep_archive_search(self,scope,*,query,cursor=None,session_ids=None,game_id=None,_work=None):
         """Indexed candidate pages, exact reparse of each admitted row."""
         from core.dragon_crawler import CrawlerError,_now
