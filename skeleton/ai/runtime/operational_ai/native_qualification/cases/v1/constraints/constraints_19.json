@@ -6,11 +6,11 @@
   "objective": "Measure model instruction and classification robustness, domain constraints task 19",
   "steps": [
     {
-      "prompt": "Wrap the exact lowercase word \"ash\" in square brackets. Reply only with the bracketed word.",
+      "prompt": "Wrap the exact lowercase word \"hemlock\" in square brackets. Reply only with the bracketed word.",
       "checks": [
         {
           "kind": "exact",
-          "expected": "[ash]"
+          "expected": "[hemlock]"
         }
       ],
       "intermediate": false
