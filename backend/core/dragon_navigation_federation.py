@@ -141,6 +141,10 @@ class NavigationFederation:
                         raise ValueError("navigation retention grant no longer active")
                     db.execute("COMMIT")
                     return self._receipt(prior, replayed=True)
+                # A fresh owner or previously certified complete index can
+                # preserve its readiness without a catalogue-wide rescan.
+                complete_before=(not graph.index_incomplete(db,owner) or not db.execute(
+                    "SELECT 1 FROM navigation_nodes WHERE owner=? LIMIT 1",(owner,)).fetchone())
                 db.execute("INSERT INTO navigation_grants VALUES(?,?,?,?,?,?,'active',?,?)",
                            (owner,grant,session_id,checkpoint,rights,now+retention_seconds,len(rows),omitted))
                 for identifier,url,row in rows:
@@ -160,6 +164,9 @@ class NavigationFederation:
                                (owner,grant,identifier,row["ordinal"],row["observations"],row["kind"]))
                 for identifier,url,_ in rows:
                     graph.index_node(db,owner,identifier,url)
+                if complete_before:
+                    db.execute("INSERT INTO navigation_index_coverage VALUES(?,?,1) ON CONFLICT(owner) "
+                        "DO UPDATE SET revision=excluded.revision,complete=1",(owner,graph.INDEX_REVISION))
                 graph.publish_edges(db,owner,grant,rows)
                 graph.publish_outcomes(db,owner,grant,rows,snapshot)
                 stored = db.execute("SELECT * FROM navigation_grants WHERE owner=? AND grant_id=?",
