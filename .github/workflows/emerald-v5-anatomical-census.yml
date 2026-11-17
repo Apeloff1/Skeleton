@@ -1,0 +1,40 @@
+name: Emerald V5 anatomical coverage custody
+on:
+  pull_request:
+    paths:
+      - 'scripts/emerald_v5_anatomical_census.py'
+      - 'scripts/test_emerald_v5_anatomical_census.py'
+      - 'scripts/check_emerald_v5_anatomical_evidence.py'
+      - 'scripts/test_emerald_v5_anatomical_evidence.py'
+      - 'assets/emerald/evolution-v5/anatomical-census-measured.json'
+      - '.github/workflows/emerald-v5-anatomical-census.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  measured-census-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Require exact source SHA
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - name: Install bounded numerical dependency
+        run: python -m pip install --only-binary=:all: numpy==2.3.5
+      - name: Compile classifier and evidence contracts
+        run: python -m py_compile scripts/emerald_v5_anatomical_census.py scripts/test_emerald_v5_anatomical_census.py scripts/check_emerald_v5_anatomical_evidence.py scripts/test_emerald_v5_anatomical_evidence.py
+      - name: Execute all anatomical negative-path regressions
+        run: |
+          python scripts/test_emerald_v5_anatomical_census.py
+          python scripts/test_emerald_v5_anatomical_evidence.py
+          python scripts/check_emerald_v5_anatomical_evidence.py
+      - name: No collision or release acceptance
+        run: echo 'Only source and recorded census consistency checked. External exact GLBs, actual skinned-mesh collisions, all intervals, Unreal, RTX, artistic approval and release remain held.'
