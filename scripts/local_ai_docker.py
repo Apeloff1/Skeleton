@@ -342,6 +342,9 @@ def _decode_receipt(payload: str, phase: str) -> dict[str, object]:
         # well-formed but altered response must never authorize service boot.
         signed = dict(receipt)
         expected_digest = signed.pop("receipt_digest")
+        # The in-container CLI adds 'ok' around the canonical deployment
+        # receipt; it is NOT a member of the engine's signed payload.
+        signed.pop("ok", None)
         observed_digest = hashlib.sha256(json.dumps(
             signed, sort_keys=True, separators=(",", ":"),
             ensure_ascii=False, allow_nan=False,

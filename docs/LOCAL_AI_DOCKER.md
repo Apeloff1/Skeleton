@@ -374,3 +374,4 @@ binary supply, physical GPU qualification, an airgapped application network,
 complete offline installer packaging, tested backup restores, or model
 benchmark superiority. None of those gates should be marked green until
 independent exact-head receipts exist.
+\n### Source-custody lexer and receipt envelope repairs\n\nThe provider bootstrap Dockerfile source-custody parser now rejects unsupported,\nmultiple, partially matched or unterminated heredoc delimiters. A `FROM` or\n`COPY` embedded in such a script never certifies a new runtime layer or\npackaged source. This is tested against real backend Dockerfile stages and\nadversarial injected statements. The local-AI operator also checks the actual\ncanonical GGUF receipt SHA-256 over the engine payload **without** the external\nCLI `ok` envelope. This is essential: including `ok` in the digest would\nreject every genuine inference receipt even when real inference succeeded.\n

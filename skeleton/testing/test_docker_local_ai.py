@@ -339,8 +339,11 @@ def _model_receipt(phase: str) -> dict[str, object]:
             "runtime_kind": "llama.cpp-cli",
             "response_id": "qualified:" + _ZERO + ":" + _ONE,
         }
+        # The model engine seals its receipt before the container CLI adds
+        # the process-level ok wrapper.
+        canonical = {key: value for key, value in receipt.items() if key != "ok"}
         receipt["receipt_digest"] = hashlib.sha256(json.dumps(
-            receipt, sort_keys=True, separators=(",", ":"),
+            canonical, sort_keys=True, separators=(",", ":"),
             ensure_ascii=False, allow_nan=False,
         ).encode("utf-8")).hexdigest()
         return receipt
@@ -439,3 +442,19 @@ def test_unqualified_model_cannot_start_compose(tmp_path: Path) -> None:
     assert not any("up" in argv for argv in calls)
 
 
+
+
+def test_model_receipt_ok_wrapper_is_not_canonical_hash_input() -> None:
+    original = _model_receipt("qualify")
+    assert host._decode_receipt(json.dumps(original), "qualify") == original
+    copied = dict(original)
+    copied["ok"] = False
+    with pytest.raises(host.LocalDockerError):
+        host._decode_receipt(json.dumps(copied), "qualify")
+    copied = dict(original)
+    copied["receipt_digest"] = hashlib.sha256(json.dumps(
+        {k: v for k, v in original.items() if k != "receipt_digest"},
+        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    ).encode("utf-8")).hexdigest()
+    with pytest.raises(host.LocalDockerError, match="content changed"):
+        host._decode_receipt(json.dumps(copied), "qualify")

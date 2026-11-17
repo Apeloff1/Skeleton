@@ -71,6 +71,37 @@ FROM production AS development
                 _instructions, stages = check_provider_bootstrap._docker_materialization_stages(source)
                 self.assertEqual(stages, [])
 
+    def test_heredoc_malformed_delimiters_never_admit_later_copy(self):
+        for opener, closer in (
+            ("RUN <<123", "123"),
+            ("RUN <<FIRST <<SECOND", "SECOND"),
+            ("RUN <<END-DOC", "END-DOC"),
+            ("RUN <<'END'DOC", "ENDDOC"),
+            ("RUN cat <<EOF", " EOF"),
+            ("RUN <<-SCRIPT", " SCRIPT"),
+        ):
+            with self.subTest(opener=opener, closer=closer):
+                source = ("FROM python:3.14 AS production\\n" + opener +
+                          "\\nFROM attacker AS injected\\nCOPY . .\\n" + closer +
+                          "\\nCOPY . .\\n")
+                _, stages = check_provider_bootstrap._docker_materialization_stages(source)
+                self.assertEqual(stages, [])
+
+    def test_real_heredoc_requires_full_closer_before_copy(self):
+        source = ("FROM python:3.14 AS production\\nWORKDIR /app\\n"
+                  "RUN python - <<'PYTHON'\\n"
+                  "FROM attacker AS injected\\nCOPY . .\\n"
+                  "PYTHON\\nCOPY . .\\n")
+        instructions, stages = check_provider_bootstrap._docker_materialization_stages(source)
+        self.assertEqual([x["name"] for x in stages], ["production"])
+        self.assertEqual(stages[0]["copies"], [("COPY . .", "/app")])
+        self.assertNotIn("FROM attacker AS injected", instructions)
+
+    def test_unfinished_backslash_continuation_denies_materialization(self):
+        source = "FROM python:3.14 AS production\\nRUN echo pending \\\\"
+        _, stages = check_provider_bootstrap._docker_materialization_stages(source)
+        self.assertEqual(stages, [])
+
     def test_repository_backend_stages_survive_embedded_python(self):
         source = (Path(__file__).resolve().parents[1] / "backend/Dockerfile").read_text()
         _instructions, stages = check_provider_bootstrap._docker_materialization_stages(source)
