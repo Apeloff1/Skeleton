@@ -285,12 +285,13 @@ def store_journal(path, stage, model_sha, steps, rows):
             temp.unlink()
 
 
-def run(stage,model_path,tool_dir,steps=5,limit_seconds=600,journal=None,resume=False):
- require(stage in MODELS and 3<=steps<=17
+def run(stage,model_path,tool_dir,steps=5,limit_seconds=600,journal=None,resume=False,pins=None):
+ pins=MODELS if pins is None else pins
+ require(stage in pins and 3<=steps<=17
          and isinstance(steps,int) and 60<=limit_seconds<=3600,
          "unsupported model, time or sample quota")
  source=Path(model_path)
- required_bytes,required_sha=MODELS[stage]
+ required_bytes,required_sha=pins[stage]
  auditor,seam=vetted_tools(tool_dir)
  require(source.is_file() and not source.is_symlink() and
          source.stat().st_size==required_bytes and
