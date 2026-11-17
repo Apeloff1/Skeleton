@@ -15,7 +15,7 @@ from pathlib import Path
 import stat
 import sys
 
-from skeleton.ai.webcrawler.navigation_semantics import validate_packet
+from skeleton.ai.webcrawler.navigation_semantics import validate_packet,digest
 
 MAX_PACKET = 32768
 MAX_RESPONSE = 128 * 1024
@@ -41,13 +41,16 @@ def load_token(path):
     return token
 
 
-def request_discourse(port, token, packet):
+def request_discourse(port, token, packet, *, jeeves_digest=None, dragon_digest=None):
     ids = set(validate_packet(packet))
     if type(port) is not int or not 1 <= port <= 65535:
         raise ValueError("invalid loopback port")
+    if any(x is not None and not re.fullmatch(r"[a-f0-9]{64}",x) for x in (jeeves_digest,dragon_digest)) or dragon_digest is not None and (jeeves_digest is None or jeeves_digest==dragon_digest):
+        raise ValueError("independent role digests required")
     connection = http.client.HTTPConnection("127.0.0.1", port, timeout=920)
     try:
-        data = json.dumps({"packet":packet,"approved":True},ensure_ascii=True).encode()
+        data = json.dumps({"packet":packet,"approved":True,
+            **({"dragon_model_digest":dragon_digest} if dragon_digest else {})},ensure_ascii=True).encode()
         connection.request("POST","/v1/dragon/navigation-discourse",body=data,
                            headers={"Authorization":"Bearer "+token,"Content-Type":"application/json"})
         response=connection.getresponse()
@@ -56,7 +59,9 @@ def request_discourse(port, token, packet):
             raise RuntimeError("local model discourse did not return a bounded successful result")
         result=json.loads(body)
         advice=result["advice"]
-        if (result["network_authorized"] is not False or result["single_local_model_two_roles"] is not True
+        if (result["network_authorized"] is not False or result["single_local_model_two_roles"] is not (dragon_digest is None)
+                or jeeves_digest is not None and result.get("model_digest")!=jeeves_digest
+                or dragon_digest is not None and (result.get("dragon_model_digest")!=dragon_digest or result.get("distinct_role_weights") is not True)
                 or advice["snapshot_digest"]!=packet["snapshot_digest"]
                 or advice["packet_digest"]!=packet["packet_digest"] or advice["as_of"]!=packet["as_of"]):
             raise ValueError("local discourse result identity mismatch")
@@ -75,6 +80,15 @@ def request_discourse(port, token, packet):
             if (a.get("stage")!=b.get("stage") or a.get("group_digest")!=b.get("group_digest")
                     or a["session_id"]==b["session_id"]):
                 raise ValueError("local role match custody mismatch")
+            if dragon_digest is not None:
+                proof=b["specialist_receipt"]
+                if (a.get("engine")!="native_jeeves" or a.get("model_digest")!=jeeves_digest
+                        or b.get("engine")!="dragon_neural_ranker" or b.get("model_digest")!=dragon_digest
+                        or proof.get("model_digest")!=dragon_digest or proof.get("packet_digest")!=b["group_digest"]
+                        or proof.get("network_authorized") is not False or proof.get("output_digest")!=b["output_digest"]
+                        or proof.get("execution_receipt_digest")!=b["execution_receipt_digest"]
+                        or digest({k:v for k,v in proof.items() if k!="execution_receipt_digest"})!=b["execution_receipt_digest"]):
+                    raise ValueError("independent Dragon witness differs")
         for row in receipts:
             for key in ("group_digest","execution_receipt_digest","output_digest"):
                 if not re.fullmatch(r"[a-f0-9]{64}",row.get(key,"")):
@@ -89,6 +103,8 @@ def main(argv=None):
     parser.add_argument("--port",required=True,type=int)
     parser.add_argument("--token-file",required=True)
     parser.add_argument("--approve-local-inference",action="store_true")
+    parser.add_argument("--jeeves-model-sha256")
+    parser.add_argument("--dragon-model-sha256")
     args=parser.parse_args(argv)
     if not args.approve_local_inference:
         parser.error("explicit local inference approval required")
@@ -98,7 +114,8 @@ def main(argv=None):
     try:
         value=json.loads(raw)
         packet=value.get("packet",value)
-        receipt=request_discourse(args.port,load_token(args.token_file),packet)
+        receipt=request_discourse(args.port,load_token(args.token_file),packet,
+            jeeves_digest=args.jeeves_model_sha256,dragon_digest=args.dragon_model_sha256)
     except (ValueError,TypeError,KeyError,OSError,RuntimeError,http.client.HTTPException):
         print("Local navigation discourse not confirmed; refresh packet and model status.",file=sys.stderr)
         return 1
