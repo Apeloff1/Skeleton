@@ -228,7 +228,64 @@ def contact_check(positions,g,groups,auditor,seam,deadline):
          "within_8mm_not_contact":near,
          "pairs":breakdown}
 
-def run(stage,model_path,tool_dir,steps=5,limit_seconds=600):
+def verify_journal(snapshot, stage, model_sha, steps):
+    """Accept only an exact prefix of the known pose matrix; never certify it."""
+    require(snapshot.get("schema") == "skeleton.emerald.v6.crossfade-checkpoint.v1"
+            and snapshot.get("stage") == stage
+            and snapshot.get("model_sha256") == model_sha
+            and snapshot.get("steps_per_transition") == steps
+            and snapshot.get("crossfade_seconds") == CROSSFADE_SECONDS
+            and snapshot.get("margin_m") == MARGIN
+            and snapshot.get("reviewed_tool_digests") == TOOLS
+            and snapshot.get("completed") is False
+            and snapshot.get("continuous_collision_qualified") is False
+            and snapshot.get("release_qualified") is False,
+            "wrong source, policy or falsely qualified checkpoint")
+    rows = snapshot.get("samples")
+    require(isinstance(rows, list) and len(rows) < len(TRANSITIONS)*steps,
+            "corrupt or finished checkpoint")
+    for i, row in enumerate(rows):
+        outgoing, incoming = TRANSITIONS[i//steps]
+        require(row.get("from_clip") == outgoing and
+                row.get("to_clip") == incoming and
+                row.get("alpha") == (i % steps)/(steps-1) and
+                isinstance(row.get("pairs"), list) and
+                [p.get("pair") for p in row["pairs"]] ==
+                [a+"__"+b for a,b in PAIRS] and
+                type(row.get("new_independent_contact_pairs")) is int and
+                row["new_independent_contact_pairs"] >= 0,
+                "missing, duplicate or altered checkpoint sample")
+    return rows
+
+
+def store_journal(path, stage, model_sha, steps, rows):
+    """Atomic progress receipt; always incomplete, even on the final sample."""
+    path = Path(path)
+    temp = path.parent / ("." + path.name + ".partial")
+    require(not os.path.lexists(temp), "staging checkpoint already exists")
+    value = {
+        "schema": "skeleton.emerald.v6.crossfade-checkpoint.v1",
+        "stage": stage, "model_sha256": model_sha,
+        "steps_per_transition": steps,
+        "crossfade_seconds": CROSSFADE_SECONDS, "margin_m": MARGIN,
+        "reviewed_tool_digests": TOOLS, "completed": False,
+        "remaining_sample_count": len(TRANSITIONS)*steps-len(rows),
+        "continuous_collision_qualified": False,
+        "release_qualified": False, "samples": rows,
+    }
+    try:
+        with temp.open("x", encoding="utf-8") as stream:
+            json.dump(value, stream, indent=2, allow_nan=False)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp, path)
+    finally:
+        if temp.exists():
+            temp.unlink()
+
+
+def run(stage,model_path,tool_dir,steps=5,limit_seconds=600,journal=None,resume=False):
  require(stage in MODELS and 3<=steps<=17
          and isinstance(steps,int) and 60<=limit_seconds<=3600,
          "unsupported model, time or sample quota")
