@@ -83,8 +83,9 @@ def _run(args: Sequence[str], *, root: Path = ROOT, capture: bool = False) -> st
         # Docker diagnostics can contain interpolated credentials, proxy URLs
         # and private paths. Never return raw stdout/stderr in operator output.
         raise LocalDockerError("Docker command failed; inspect Docker locally")
-    if not capture and completed.stdout.strip():
-        print(completed.stdout.rstrip())
+    # Docker stdout may contain private env, transient proxy URLs or image
+    # build output from plugins. Return only explicitly requested private data
+    # to the internal validator; never echo untrusted daemon text by default.
     return completed.stdout if capture else ""
 
 
@@ -441,7 +442,7 @@ def up(mode: str, root: Path = ROOT) -> None:
     # Docker Compose -d alone returns before backend readiness; bound startup
     # health checks instead of declaring a false unavailable provider on race.
     _run([*compose_command(mode, root), "up", "-d", "--no-build",
-          "--wait", "--wait-timeout", "180",
+          "--pull", "never", "--wait", "--wait-timeout", "180",
           "mongo", "skeleton", "backend", "frontend"], root=root)
     # Independently verify the actual Docker container/image state after --wait;
     # source-valid Compose cannot certify stale or privileged live containers.
