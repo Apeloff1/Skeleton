@@ -4,6 +4,11 @@ on:
     paths:
       - 'scripts/dragon_atelier_admit.py'
       - 'scripts/emerald_asset_preflight.py'
+      - 'scripts/stage_emerald_native.py'
+      - 'scripts/test_emerald_native_gate.py'
+      - 'frontend/scripts/install_emerald_assets.py'
+      - 'frontend/scripts/test_emerald_assets.py'
+      - 'frontend/src/features/Jeeves/companion/emeraldAssetPin.json'
       - 'scripts/recover_emerald_assets.py'
       - 'scripts/test_emerald_recovery.py'
       - 'scripts/audit_emerald_animation.py'

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 spec = importlib.util.spec_from_file_location("install_emerald", Path(__file__).with_name("install_emerald_assets.py"))
@@ -50,6 +51,23 @@ class AssetTests(unittest.TestCase):
         pin = self.make(extra=("extra.js", b"x"))
         with self.assertRaises(ValueError):
             mod.install(self.archive, self.target, pin)
+
+    def test_extracts_only_private_verified_snapshot(self):
+        pin=self.make()
+        original=mod.exact_snapshot
+        def mutate_after_snapshot(archive,destination,expected):
+            original(archive,destination,expected)
+            archive.write_bytes(b"replacement")
+        with patch.object(mod,"exact_snapshot",mutate_after_snapshot):
+            mod.install(self.archive,self.target,pin)
+        self.assertEqual((self.target/"asset.png").read_bytes(),b"test")
+        self.assertFalse(any(p.name.startswith(".emerald-stage-") for p in self.root.iterdir()))
+
+    def test_reject_corrupt_initial_archive(self):
+        pin=self.make()
+        self.archive.write_bytes(b"x"*self.archive.stat().st_size)
+        with self.assertRaises(ValueError):mod.install(self.archive,self.target,pin)
+        self.assertFalse(self.target.exists())
 
     def test_installed_mutation(self):
         pin = self.make()
