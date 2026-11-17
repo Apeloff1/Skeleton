@@ -179,12 +179,14 @@ def _blocks(text):
     A rolling 32-bit gear-style boundary recovers after inserted text rather
     than moving every fixed-size block. No chunk bytes leave this function.
     """
+    from core.dragon_content_chunks import GEAR
     raw=text.encode("utf-8")
     state=0;start=0;parts=[]
     for i,byte in enumerate(raw):
-        state=((state<<1)+((byte+1)*0x9e3779b1)) & 0xffffffff
+        state=((state<<1)+GEAR[byte]) & 0xffffffff
         length=i+1-start
-        if length>=256 and ((state&0x1ff)==0 or length>=MAX_BLOCK_BYTES):
+        if length>=256 and ((state&0x1ff)==0 or length>=MAX_BLOCK_BYTES
+                or (length>=384 and byte in (10,46,63,33))):
             parts.append((hashlib.sha256(raw[start:i+1]).hexdigest(),length))
             start=i+1;state=0
             if len(parts)>=MAX_BLOCKS:
