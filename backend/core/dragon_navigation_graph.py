@@ -39,6 +39,21 @@ CREATE TABLE IF NOT EXISTS navigation_indexed(
  PRIMARY KEY(owner,target),
  FOREIGN KEY(owner,target) REFERENCES navigation_nodes(owner,id) ON DELETE CASCADE
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS navigation_index_coverage(
+ owner TEXT PRIMARY KEY,revision TEXT NOT NULL,complete INTEGER NOT NULL CHECK(complete IN (0,1))
+) WITHOUT ROWID;
+CREATE TRIGGER IF NOT EXISTS navigation_index_new_node AFTER INSERT ON navigation_nodes
+BEGIN
+ UPDATE navigation_index_coverage SET complete=0 WHERE owner=NEW.owner;
+END;
+CREATE TRIGGER IF NOT EXISTS navigation_index_changed AFTER UPDATE OF revision ON navigation_indexed
+BEGIN
+ UPDATE navigation_index_coverage SET complete=0 WHERE owner=NEW.owner;
+END;
+CREATE TRIGGER IF NOT EXISTS navigation_index_removed AFTER DELETE ON navigation_indexed
+BEGIN
+ UPDATE navigation_index_coverage SET complete=0 WHERE owner=OLD.owner;
+END;
 CREATE TABLE IF NOT EXISTS navigation_outcomes(
  owner TEXT NOT NULL, grant_id TEXT NOT NULL, target TEXT NOT NULL,
  phase TEXT NOT NULL CHECK(phase IN ('captured','duplicate','discovered','rejected','retry','error',
@@ -128,6 +143,23 @@ def publish_edges(db,owner,grant,rows):
     return count
 
 
+def index_incomplete(db,owner):
+    row=db.execute("SELECT revision,complete FROM navigation_index_coverage WHERE owner=?",(owner,)).fetchone()
+    return row is None or row["revision"]!=INDEX_REVISION or row["complete"]!=1
+
+
+def reconcile_index_coverage(db,owner):
+    # Explicit maintenance, not a full-owner scan on every search facet.
+    # The caller's write transaction fences concurrent insert/delete.
+    missing=db.execute("""SELECT 1 FROM navigation_nodes n WHERE n.owner=?
+        AND NOT EXISTS(SELECT 1 FROM navigation_indexed i WHERE i.owner=n.owner
+        AND i.target=n.id AND i.revision=?) LIMIT 1""",(owner,INDEX_REVISION)).fetchone()
+    complete=int(missing is None)
+    db.execute("INSERT INTO navigation_index_coverage VALUES(?,?,?) ON CONFLICT(owner) "
+        "DO UPDATE SET revision=excluded.revision,complete=excluded.complete",(owner,INDEX_REVISION,complete))
+    return bool(complete)
+
+
 def reindex(db,owner,*,after=None,limit=100):
     """Explicit lazy migration; never implies old topology can be recreated."""
     _integer(limit,1,MAX_PAGE)
@@ -138,6 +170,7 @@ def reindex(db,owner,*,after=None,limit=100):
         ORDER BY n.id LIMIT ?""",(owner,lower,INDEX_REVISION,limit+1)).fetchall()
     for row in rows[:limit]:
         index_node(db,owner,row["id"],row["url"])
+    if len(rows)<=limit:reconcile_index_coverage(db,owner)
     return {"indexed":min(len(rows),limit),"next_cursor":rows[limit-1]["id"]
         if len(rows)>limit else None,"network_authorized":False,
         "historical_edge_backfill_verified":False}
@@ -221,6 +254,7 @@ def retrieve(db,owner,*,query,now,host=None,limit=48,per_term=32,due_only=False,
             evidence[row["target"]]+=1
     # Bound the second stage before reading full target metadata.
     candidates=[]
+    maximum_vote=max(votes.values(),default=1)
     for identifier,vote in sorted(votes.items(),key=lambda p:(-p[1],p[0]))[:limit*2]:
         row=db.execute("SELECT id,url,host FROM navigation_nodes WHERE owner=? AND id=?",
                        (owner,identifier)).fetchone()
@@ -229,13 +263,11 @@ def retrieve(db,owner,*,query,now,host=None,limit=48,per_term=32,due_only=False,
         feature=semantic_features(query,row["url"])
         candidates.append({**dict(row),"features":feature,"votes":vote,
             "matching_lanes":evidence[identifier],
-            "score":round(.85*feature["score"]+.15*vote/max(1, max(votes.values())),8)})
+            "score":round(.85*feature["score"]+.15*vote/maximum_vote,8)})
     candidates.sort(key=lambda x:(-x["score"],x["id"]))
     # New and backfilled targets share the same index. This query uses
     # the owner/id row key and exits at the first missing index witness.
-    incomplete=db.execute("""SELECT 1 FROM navigation_nodes n WHERE n.owner=?
-        AND NOT EXISTS(SELECT 1 FROM navigation_indexed i
-        WHERE i.owner=n.owner AND i.target=n.id AND i.revision=?) LIMIT 1""",(owner,INDEX_REVISION)).fetchone() is not None
+    incomplete=index_incomplete(db,owner)
     return {"targets":candidates[:limit],"index_backfill_pending":incomplete,
         "lane_truncated":truncated or len(votes)>limit,"network_authorized":False,
         "exhaustive":False,"exploration_epoch":exploration_epoch}
@@ -376,9 +408,11 @@ def trail(db,owner,*,root,query,now,depth=3,beam=24):
                       +_active_sql("n"),(owner,root,now)).fetchone():
         raise LookupError("active root unavailable")
     visited={root};frontier=[(root,[root])];result=[];truncated=False
+    expanded=0
     for level in range(1,depth+1):
         candidates={}
         for parent,path in frontier:
+            expanded+=1
             page=neighbors(db,owner,parent,now=now,limit=min(beam,24))
             truncated|=page["next_cursor"] is not None
             for row in page["neighbors"]:
@@ -393,11 +427,15 @@ def trail(db,owner,*,root,query,now,depth=3,beam=24):
         slots=beam-len(result)
         ordered=sorted(candidates.values(),key=lambda x:(-x["score"],x["id"]))
         truncated|=len(ordered)>slots
-        chosen=ordered[:slots]
+        # Reserve output capacity for deeper levels instead of consuming
+        # the entire budget on a broad root. The final level gets the tail.
+        level_slots=slots if level==depth else max(1,slots//(depth-level+1))
+        truncated|=len(ordered)>level_slots
+        chosen=ordered[:level_slots]
         result.extend(chosen);visited.update(row["id"] for row in chosen)
         frontier=[(row["id"],row["path"]) for row in chosen]
         if not frontier or len(result)>=beam:
             break
     return {"root":root,"targets":result,"max_depth":depth,"beam":beam,
-        "truncated":truncated or len(result)>=beam,"network_authorized":False,
+        "truncated":truncated or len(result)>=beam,"expanded_parents":expanded,"network_authorized":False,
         "historical_topology_complete":False}
