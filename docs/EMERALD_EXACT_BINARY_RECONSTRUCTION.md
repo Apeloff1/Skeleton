@@ -12,6 +12,10 @@ On 2026-11-17, the missing original was reconstructed from the retained source l
 
 The actual GLB header, all 56,307 buffer-view ranges, 56,296 accessor count, 380 animations (320 ground, 20 orbit, 20 takeoff, 20 landing), 108 joints, 365,997 vertices, 719,312 triangles and four embedded image SHA-256 identities were independently inspected. The embedded maps match the original Fold archive's basecolor, normal, ORM and emission PNG bytes. This is source/model identity evidence, not a physical rendering qualification.
 
+## Independent animation preservation recheck
+
+The original `Tools/verify_export.py` was run against the reconstructed Artisan and Fold models and passed. All 380 clips were reopened. All 20 orbit clips retained exact definitions and pose arrays; 360 planned clips contain Fold retargeting. All body transforms outside the corrected wing/helper channels, original translations through joint 91, mesh, skin, image and material definitions, and the original binary prefix remained exact. Maximum normalized quaternion unit error was 2.220446049250313e-16; maximum wing correction 0.3616285406994455 radians. These are asset integrity and discrete source-motion checks, not collision, artistic or physical rendering acceptance.
+
 ## Reproduce or restore
 
 The source replay uses the six pinned ZIPs listed in the script, with their released NumPy arrays and maps. Python 3, NumPy, SciPy and Pillow and the native GL loader import dependencies are needed; no rendering or GPU work is requested by the exporters. Provide an existing trusted output parent directory with ample space (recommend at least 8 GiB scratch space). The observed reconstruction used Python 3.13, NumPy 2.3.5, SciPy 1.17.0 and Pillow 12.3.0. The historical choreography import is restored from the continuum source; the already-encoded normal map is reused rather than generating a different PNG bitstream.
