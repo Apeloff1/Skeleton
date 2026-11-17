@@ -1,0 +1,2681 @@
+{
+  "schema": "skeleton.dragon.source-catalogue.v1",
+  "revision": "2026-11-17",
+  "status": "candidate_registry_not_access_verified",
+  "sources": [
+    {
+      "name": "Steam",
+      "url": "https://store.steampowered.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "Steam Community",
+      "url": "https://steamcommunity.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "GOG",
+      "url": "https://www.gog.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "Epic Games Store",
+      "url": "https://store.epicgames.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "itch.io",
+      "url": "https://itch.io/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "Game Jolt",
+      "url": "https://gamejolt.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "Humble",
+      "url": "https://www.humblebundle.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "MobyGames",
+      "url": "https://www.mobygames.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "IGDB",
+      "url": "https://www.igdb.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "RAWG",
+      "url": "https://rawg.io/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "OpenCritic",
+      "url": "https://opencritic.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "Metacritic",
+      "url": "https://www.metacritic.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "SteamDB",
+      "url": "https://steamdb.info/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "Steam Charts",
+      "url": "https://steamcharts.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "PCGamingWiki",
+      "url": "https://www.pcgamingwiki.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "GameFAQs",
+      "url": "https://gamefaqs.gamespot.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "StrategyWiki",
+      "url": "https://strategywiki.org/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "The Cutting Room Floor",
+      "url": "https://tcrf.net/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "HowLongToBeat",
+      "url": "https://howlongtobeat.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "Speedrun",
+      "url": "https://www.speedrun.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "Indie DB",
+      "url": "https://www.indiedb.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "Game Developer",
+      "url": "https://www.gamedeveloper.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "Rock Paper Shotgun",
+      "url": "https://www.rockpapershotgun.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "Eurogamer",
+      "url": "https://www.eurogamer.net/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "Nintendo",
+      "url": "https://www.nintendo.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "PlayStation",
+      "url": "https://www.playstation.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "Xbox",
+      "url": "https://www.xbox.com/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "Apple Arcade",
+      "url": "https://www.apple.com/apple-arcade/",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "Google Play",
+      "url": "https://play.google.com/store/games",
+      "family": "game-discovery",
+      "kind": "directory",
+      "tags": "games catalog platforms releases discovery"
+    },
+    {
+      "name": "Nexus Mods",
+      "url": "https://www.nexusmods.com/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Mod DB",
+      "url": "https://www.moddb.com/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "GameBanana",
+      "url": "https://gamebanana.com/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Modrinth",
+      "url": "https://modrinth.com/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "CurseForge",
+      "url": "https://www.curseforge.com/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "mod.io",
+      "url": "https://mod.io/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Thunderstore",
+      "url": "https://thunderstore.io/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Steam Workshop",
+      "url": "https://steamcommunity.com/workshop/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Paradox Mods",
+      "url": "https://mods.paradoxplaza.com/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Bethesda Creations",
+      "url": "https://creations.bethesda.net/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Factorio Mod Portal",
+      "url": "https://mods.factorio.com/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Vintage Story Mods",
+      "url": "https://mods.vintagestory.at/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Sims Resource",
+      "url": "https://www.thesimsresource.com/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Mod The Sims",
+      "url": "https://modthesims.info/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "GTA5 Mods",
+      "url": "https://www.gta5-mods.com/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "GTA Forums",
+      "url": "https://gtaforums.com/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "OpenIV",
+      "url": "https://openiv.com/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "FiveM docs",
+      "url": "https://docs.fivem.net/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Cfx.re forum",
+      "url": "https://forum.cfx.re/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Script Merger",
+      "url": "https://www.nexusmods.com/witcher3/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "SKSE",
+      "url": "https://skse.silverlock.org/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "F4SE",
+      "url": "https://f4se.silverlock.org/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "xEdit",
+      "url": "https://tes5edit.github.io/docs/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "LOOT",
+      "url": "https://loot.github.io/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Wabbajack",
+      "url": "https://www.wabbajack.org/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Mod Organizer",
+      "url": "https://github.com/ModOrganizer2/modorganizer",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "BepInEx",
+      "url": "https://docs.bepinex.dev/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "MelonLoader",
+      "url": "https://melonwiki.xyz/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "SMAPI",
+      "url": "https://smapi.io/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Stardew Valley modding",
+      "url": "https://stardewvalleywiki.com/Modding:Index",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Fabric",
+      "url": "https://docs.fabricmc.net/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Forge",
+      "url": "https://docs.minecraftforge.net/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "NeoForge",
+      "url": "https://docs.neoforged.net/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Bukkit",
+      "url": "https://www.bukkit.org/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "SpigotMC",
+      "url": "https://www.spigotmc.org/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "PaperMC",
+      "url": "https://docs.papermc.io/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Minecraft Bedrock addons",
+      "url": "https://learn.microsoft.com/en-us/minecraft/creator/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Terraria tModLoader",
+      "url": "https://github.com/tModLoader/tModLoader",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "RimWorld modding",
+      "url": "https://rimworldwiki.com/wiki/Modding_Tutorials",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Unreal modding",
+      "url": "https://docs.unrealengine.com/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "uMod",
+      "url": "https://umod.org/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Overwolf developer docs",
+      "url": "https://dev.overwolf.com/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Guild Wars addons",
+      "url": "https://www.gw2ui.com/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "KSP mods",
+      "url": "https://spacedock.info/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "OpenTTD content",
+      "url": "https://bananas.openttd.org/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "Dwarf Fortress mods",
+      "url": "https://www.bay12forums.com/",
+      "family": "mods",
+      "kind": "community",
+      "tags": "modding mods plugins maps addons dependencies compatibility versions"
+    },
+    {
+      "name": "EVE developer",
+      "url": "https://developers.eveonline.com/docs/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "EVE SDE schema",
+      "url": "https://developers.eveonline.com/docs/community/eve-online-sde-documentation/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "EVE ESI",
+      "url": "https://developers.eveonline.com/docs/services/esi/overview/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "EVE University",
+      "url": "https://wiki.eveuniversity.org/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "EVE Ref",
+      "url": "https://everef.net/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "EVE Ref datasets",
+      "url": "https://docs.everef.net/datasets/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "DOTLAN",
+      "url": "https://evemaps.dotlan.net/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "EVE Workbench",
+      "url": "https://www.eveworkbench.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "zKillboard",
+      "url": "https://zkillboard.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "EVE Forums",
+      "url": "https://forums.eveonline.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "World of Warcraft",
+      "url": "https://worldofwarcraft.blizzard.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Battle.net Developer",
+      "url": "https://develop.battle.net/documentation",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Wowhead",
+      "url": "https://www.wowhead.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Warcraft Wiki",
+      "url": "https://warcraft.wiki.gg/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Warcraft Logs",
+      "url": "https://www.warcraftlogs.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Raider.IO",
+      "url": "https://raider.io/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Icy Veins",
+      "url": "https://www.icy-veins.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Method",
+      "url": "https://www.method.gg/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "FFXIV Lodestone",
+      "url": "https://na.finalfantasyxiv.com/lodestone/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "FFXIV Gamer Escape",
+      "url": "https://ffxiv.gamerescape.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "FF Logs",
+      "url": "https://www.fflogs.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "XIVAPI",
+      "url": "https://xivapi.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Universalis",
+      "url": "https://universalis.app/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Garland Tools",
+      "url": "https://www.garlandtools.org/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Guild Wars 2 wiki",
+      "url": "https://wiki.guildwars2.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Guild Wars 2 API wiki",
+      "url": "https://wiki.guildwars2.com/wiki/API:Main",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "GW2 Efficiency",
+      "url": "https://gw2efficiency.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "OSRS Wiki",
+      "url": "https://oldschool.runescape.wiki/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "RuneScape Wiki",
+      "url": "https://runescape.wiki/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "RuneLite",
+      "url": "https://runelite.net/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Albion Online",
+      "url": "https://albiononline.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Albion data",
+      "url": "https://www.albion-online-data.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Elder Scrolls Online",
+      "url": "https://www.elderscrollsonline.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "UESP",
+      "url": "https://en.uesp.net/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Destiny API",
+      "url": "https://bungie-net.github.io/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Light.gg",
+      "url": "https://www.light.gg/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Destiny Item Manager",
+      "url": "https://destinyitemmanager.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Warframe wiki",
+      "url": "https://wiki.warframe.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Warframe market",
+      "url": "https://warframe.market/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Path of Exile",
+      "url": "https://www.pathofexile.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "PoE Wiki",
+      "url": "https://www.poewiki.net/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "PoE Ninja",
+      "url": "https://poe.ninja/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Lost Ark",
+      "url": "https://www.playlostark.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Black Desert",
+      "url": "https://www.naeu.playblackdesert.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "MapleStory",
+      "url": "https://maplestory.nexon.net/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "New World",
+      "url": "https://www.newworld.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Star Citizen",
+      "url": "https://robertsspaceindustries.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Elite Dangerous",
+      "url": "https://www.elitedangerous.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "Inara",
+      "url": "https://inara.cz/elite/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "SWTOR",
+      "url": "https://www.swtor.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "LOTRO",
+      "url": "https://www.lotro.com/",
+      "family": "mmo",
+      "kind": "reference",
+      "tags": "mmo multiplayer raid combat economy market map guild crafting"
+    },
+    {
+      "name": "MarioWiki",
+      "url": "https://www.mariowiki.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Zelda Wiki",
+      "url": "https://zeldawiki.wiki/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Bulbapedia",
+      "url": "https://bulbapedia.bulbagarden.net/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Serebii",
+      "url": "https://www.serebii.net/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "SmashWiki",
+      "url": "https://www.ssbwiki.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Minecraft Wiki",
+      "url": "https://minecraft.wiki/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Terraria Wiki",
+      "url": "https://terraria.wiki.gg/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Stardew Valley Wiki",
+      "url": "https://stardewvalleywiki.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Factorio Wiki",
+      "url": "https://wiki.factorio.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Satisfactory Wiki",
+      "url": "https://satisfactory.wiki.gg/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "RimWorld Wiki",
+      "url": "https://rimworldwiki.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Dwarf Fortress Wiki",
+      "url": "https://dwarffortresswiki.org/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "No Man Sky Wiki",
+      "url": "https://nomanssky.fandom.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Fallout Wiki",
+      "url": "https://fallout.wiki/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Baldur's Gate 3 Wiki",
+      "url": "https://bg3.wiki/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Cyberpunk Wiki",
+      "url": "https://cyberpunk.fandom.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Witcher Wiki",
+      "url": "https://witcher.fandom.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "GTA Wiki",
+      "url": "https://gta.fandom.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Rockstar Games",
+      "url": "https://www.rockstargames.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Rockstar Newswire",
+      "url": "https://www.rockstargames.com/newswire",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Map Genie",
+      "url": "https://mapgenie.io/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Paradox Wikis",
+      "url": "https://wikis.paradoxplaza.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Civilization Wiki",
+      "url": "https://civilization.fandom.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Total War",
+      "url": "https://www.totalwar.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Age of Empires",
+      "url": "https://www.ageofempires.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Halo Waypoint",
+      "url": "https://www.halowaypoint.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Halopedia",
+      "url": "https://www.halopedia.org/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Doom Wiki",
+      "url": "https://doomwiki.org/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Quake Wiki",
+      "url": "https://quakewiki.org/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Team Fortress Wiki",
+      "url": "https://wiki.teamfortress.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Counter Strike",
+      "url": "https://www.counter-strike.net/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Dota 2",
+      "url": "https://www.dota2.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "League of Legends",
+      "url": "https://www.leagueoflegends.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "League Wiki",
+      "url": "https://wiki.leagueoflegends.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Valorant",
+      "url": "https://playvalorant.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Fortnite",
+      "url": "https://www.fortnite.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Fortnite Creative docs",
+      "url": "https://dev.epicgames.com/documentation/en-us/fortnite/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Roblox Creator",
+      "url": "https://create.roblox.com/docs",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Kerbal Space Program Wiki",
+      "url": "https://wiki.kerbalspaceprogram.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "OpenTTD Wiki",
+      "url": "https://wiki.openttd.org/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "BeamNG docs",
+      "url": "https://documentation.beamng.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Cities Skylines Wiki",
+      "url": "https://skylines.paradoxwikis.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "ARK Wiki",
+      "url": "https://ark.wiki.gg/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Rust Wiki",
+      "url": "https://wiki.facepunch.com/rust/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Garry's Mod Wiki",
+      "url": "https://wiki.facepunch.com/gmod/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Project Zomboid Wiki",
+      "url": "https://pzwiki.net/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Mount and Blade",
+      "url": "https://www.taleworlds.com/",
+      "family": "game-worlds",
+      "kind": "reference",
+      "tags": "game wiki walkthrough quests lore maps mechanics patches"
+    },
+    {
+      "name": "Godot Docs",
+      "url": "https://docs.godotengine.org/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Godot Asset Library",
+      "url": "https://godotengine.org/asset-library/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Unreal Engine docs",
+      "url": "https://dev.epicgames.com/documentation/en-us/unreal-engine/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Unity Manual",
+      "url": "https://docs.unity3d.com/Manual/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Unity Scripting",
+      "url": "https://docs.unity3d.com/ScriptReference/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "GameMaker Manual",
+      "url": "https://manual.gamemaker.io/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Construct manual",
+      "url": "https://www.construct.net/en/make-games/manuals/construct-3",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "GDevelop docs",
+      "url": "https://wiki.gdevelop.io/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Defold manuals",
+      "url": "https://defold.com/manuals/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Game Engine Architecture",
+      "url": "https://www.gameenginebook.com/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Bevy",
+      "url": "https://bevy.org/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Bevy docs",
+      "url": "https://docs.rs/bevy/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Fyrox",
+      "url": "https://fyrox.rs/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Stride",
+      "url": "https://www.stride3d.net/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "MonoGame",
+      "url": "https://docs.monogame.net/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "FNA",
+      "url": "https://fna-xna.github.io/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "LÖVE",
+      "url": "https://love2d.org/wiki/Main_Page",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Raylib",
+      "url": "https://www.raylib.com/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "SDL",
+      "url": "https://wiki.libsdl.org/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "SFML",
+      "url": "https://www.sfml-dev.org/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Pygame",
+      "url": "https://www.pygame.org/docs/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Panda3D",
+      "url": "https://docs.panda3d.org/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Cocos",
+      "url": "https://docs.cocos.com/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Phaser",
+      "url": "https://phaser.io/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "PixiJS",
+      "url": "https://pixijs.com/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Babylon.js",
+      "url": "https://doc.babylonjs.com/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Three.js",
+      "url": "https://threejs.org/docs/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "PlayCanvas",
+      "url": "https://developer.playcanvas.com/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "O3DE",
+      "url": "https://www.o3de.org/docs/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "CryEngine",
+      "url": "https://www.cryengine.com/docs/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Armory3D",
+      "url": "https://armory3d.org/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "RenPy",
+      "url": "https://www.renpy.org/doc/html/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Twine",
+      "url": "https://twinery.org/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Ink",
+      "url": "https://www.inklestudios.com/ink/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Yarn Spinner",
+      "url": "https://docs.yarnspinner.dev/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "RPG Maker",
+      "url": "https://www.rpgmakerweb.com/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Tiled",
+      "url": "https://doc.mapeditor.org/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "LDtk",
+      "url": "https://ldtk.io/docs/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Blender",
+      "url": "https://docs.blender.org/manual/en/latest/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Krita",
+      "url": "https://docs.krita.org/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Aseprite",
+      "url": "https://www.aseprite.org/docs/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Houdini",
+      "url": "https://www.sidefx.com/docs/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Substance",
+      "url": "https://helpx.adobe.com/substance-3d.html",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "OpenUSD",
+      "url": "https://openusd.org/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "glTF",
+      "url": "https://www.khronos.org/gltf/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Vulkan",
+      "url": "https://docs.vulkan.org/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "DirectX",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/directx",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "WebGPU",
+      "url": "https://www.w3.org/TR/webgpu/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "OpenGL",
+      "url": "https://www.khronos.org/opengl/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "PhysX",
+      "url": "https://nvidia-omniverse.github.io/PhysX/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Bullet",
+      "url": "https://pybullet.org/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Jolt Physics",
+      "url": "https://jrouwe.github.io/JoltPhysics/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Box2D",
+      "url": "https://box2d.org/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Recast Navigation",
+      "url": "https://recastnav.com/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "OpenAL",
+      "url": "https://www.openal.org/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "FMOD",
+      "url": "https://www.fmod.com/docs/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Wwise",
+      "url": "https://www.audiokinetic.com/en/library/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Valve Developer Community",
+      "url": "https://developer.valvesoftware.com/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Steamworks",
+      "url": "https://partner.steamgames.com/doc/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "GDC Vault",
+      "url": "https://www.gdcvault.com/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "GPUOpen",
+      "url": "https://gpuopen.com/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "NVIDIA Developer",
+      "url": "https://developer.nvidia.com/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Intel Graphics",
+      "url": "https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-research/overview.html",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Microsoft Game Dev",
+      "url": "https://learn.microsoft.com/en-us/gaming/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Xbox accessibility",
+      "url": "https://learn.microsoft.com/en-us/gaming/accessibility/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "Game Accessibility Guidelines",
+      "url": "https://gameaccessibilityguidelines.com/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "engine editor rendering physics animation scripting development sdk"
+    },
+    {
+      "name": "OpenGameArt",
+      "url": "https://opengameart.org/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Kenney",
+      "url": "https://kenney.nl/assets",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Poly Haven",
+      "url": "https://polyhaven.com/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "ambientCG",
+      "url": "https://ambientcg.com/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Quaternius",
+      "url": "https://quaternius.com/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Poly Pizza",
+      "url": "https://poly.pizza/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Game-icons",
+      "url": "https://game-icons.net/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Freesound",
+      "url": "https://freesound.org/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Openverse",
+      "url": "https://openverse.org/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Wikimedia Commons",
+      "url": "https://commons.wikimedia.org/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Sketchfab",
+      "url": "https://sketchfab.com/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Blend Swap",
+      "url": "https://www.blendswap.com/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Fab",
+      "url": "https://www.fab.com/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Unity Asset Store",
+      "url": "https://assetstore.unity.com/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Itch game assets",
+      "url": "https://itch.io/game-assets",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "CraftPix",
+      "url": "https://craftpix.net/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "GameDev Market",
+      "url": "https://www.gamedevmarket.net/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Synty",
+      "url": "https://syntystore.com/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Mixamo",
+      "url": "https://www.mixamo.com/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "OpenClipart",
+      "url": "https://openclipart.org/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Google Fonts",
+      "url": "https://fonts.google.com/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Open Font Library",
+      "url": "https://fontlibrary.org/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Free Music Archive",
+      "url": "https://freemusicarchive.org/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Internet Archive audio",
+      "url": "https://archive.org/details/audio",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Khronos sample assets",
+      "url": "https://github.com/KhronosGroup/glTF-Sample-Assets",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Blender Studio",
+      "url": "https://studio.blender.org/",
+      "family": "open-assets",
+      "kind": "asset_catalogue",
+      "tags": "asset textures materials audio models sprites rig animation license"
+    },
+    {
+      "name": "Wikidata",
+      "url": "https://www.wikidata.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Wikimedia dumps",
+      "url": "https://dumps.wikimedia.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Hugging Face Datasets",
+      "url": "https://huggingface.co/datasets",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Zenodo",
+      "url": "https://zenodo.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Figshare",
+      "url": "https://figshare.com/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Dataverse",
+      "url": "https://dataverse.harvard.edu/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Open Science Framework",
+      "url": "https://osf.io/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Kaggle datasets",
+      "url": "https://www.kaggle.com/datasets",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Google Dataset Search",
+      "url": "https://datasetsearch.research.google.com/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Data.gov",
+      "url": "https://data.gov/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "European Data Portal",
+      "url": "https://data.europa.eu/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "World Bank Open Data",
+      "url": "https://data.worldbank.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "OpenStreetMap",
+      "url": "https://www.openstreetmap.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Geofabrik",
+      "url": "https://download.geofabrik.de/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Natural Earth",
+      "url": "https://www.naturalearthdata.com/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "NASA Open Data",
+      "url": "https://data.nasa.gov/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "NOAA",
+      "url": "https://www.noaa.gov/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "USGS",
+      "url": "https://www.usgs.gov/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Open Alex",
+      "url": "https://openalex.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Crossref",
+      "url": "https://www.crossref.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "arXiv",
+      "url": "https://arxiv.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Semantic Scholar",
+      "url": "https://www.semanticscholar.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "OpenReview",
+      "url": "https://openreview.net/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Papers With Code",
+      "url": "https://paperswithcode.com/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Common Crawl",
+      "url": "https://commoncrawl.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Internet Archive",
+      "url": "https://archive.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Software Heritage",
+      "url": "https://www.softwareheritage.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "OpenML",
+      "url": "https://www.openml.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "UCI ML Repository",
+      "url": "https://archive.ics.uci.edu/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "OpenDota",
+      "url": "https://www.opendota.com/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "OpenDota Docs",
+      "url": "https://docs.opendota.com/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "OpenSpiel",
+      "url": "https://github.com/google-deepmind/open_spiel",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Gymnasium",
+      "url": "https://gymnasium.farama.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "PettingZoo",
+      "url": "https://pettingzoo.farama.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Procgen",
+      "url": "https://github.com/openai/procgen",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "NetHack Learning Environment",
+      "url": "https://github.com/facebookresearch/nle",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "MineRL",
+      "url": "https://minerl.readthedocs.io/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "MiniGrid",
+      "url": "https://minigrid.farama.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "OpenGameData",
+      "url": "https://opengamedata.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Open Data Commons",
+      "url": "https://opendatacommons.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Creative Commons",
+      "url": "https://creativecommons.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "SPDX",
+      "url": "https://spdx.org/",
+      "family": "datasets",
+      "kind": "dataset",
+      "tags": "dataset research data benchmark export archive corpus metadata"
+    },
+    {
+      "name": "Riot Developer",
+      "url": "https://developer.riotgames.com/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "Steam Web API",
+      "url": "https://developer.valvesoftware.com/wiki/Steam_Web_API",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "IGDB API",
+      "url": "https://api-docs.igdb.com/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "Modrinth API",
+      "url": "https://docs.modrinth.com/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "CurseForge API",
+      "url": "https://docs.curseforge.com/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "mod.io documentation",
+      "url": "https://docs.mod.io/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "Nexus API",
+      "url": "https://www.nexusmods.com/about/api",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "GitHub REST",
+      "url": "https://docs.github.com/en/rest",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "GitLab API",
+      "url": "https://docs.gitlab.com/api/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "Codeberg",
+      "url": "https://codeberg.org/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "OpenAPI",
+      "url": "https://spec.openapis.org/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "JSON Schema",
+      "url": "https://json-schema.org/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "Schema.org",
+      "url": "https://schema.org/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "Sitemaps protocol",
+      "url": "https://www.sitemaps.org/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "RSS advisory board",
+      "url": "https://www.rssboard.org/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "Atom standard",
+      "url": "https://www.rfc-editor.org/rfc/rfc4287",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "OAI PMH",
+      "url": "https://www.openarchives.org/pmh/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "DCAT",
+      "url": "https://www.w3.org/TR/vocab-dcat-3/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "DataCite",
+      "url": "https://datacite.org/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "PyPI",
+      "url": "https://pypi.org/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "npm",
+      "url": "https://www.npmjs.com/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "Crates.io",
+      "url": "https://crates.io/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "NuGet",
+      "url": "https://www.nuget.org/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "Maven Central",
+      "url": "https://central.sonatype.com/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "Open Source Initiative",
+      "url": "https://opensource.org/",
+      "family": "apis",
+      "kind": "connector_docs",
+      "tags": "api connector schema openapi pagination version credentials data export"
+    },
+    {
+      "name": "Video Game History Foundation",
+      "url": "https://gamehistory.org/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "The Strong Museum",
+      "url": "https://www.museumofplay.org/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "Museum of the Game",
+      "url": "https://www.arcade-museum.com/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "AtariAge",
+      "url": "https://atariage.com/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "Sega Retro",
+      "url": "https://segaretro.org/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "SNES Central",
+      "url": "https://snescentral.com/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "Game Boy documentation",
+      "url": "https://gbdev.io/pandocs/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "NESdev Wiki",
+      "url": "https://www.nesdev.org/wiki/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "PSX-SPX",
+      "url": "https://psx-spx.consoledev.net/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "N64brew",
+      "url": "https://n64brew.dev/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "Dolphin Wiki",
+      "url": "https://wiki.dolphin-emu.org/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "PCSX2 Wiki",
+      "url": "https://wiki.pcsx2.net/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "RPCS3 Wiki",
+      "url": "https://wiki.rpcs3.net/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "RetroArch docs",
+      "url": "https://docs.libretro.com/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "ScummVM Wiki",
+      "url": "https://wiki.scummvm.org/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "DOSBox Staging",
+      "url": "https://www.dosbox-staging.org/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "MAME docs",
+      "url": "https://docs.mamedev.org/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "Open Source Game Clones",
+      "url": "https://osgameclones.com/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "Game preservation",
+      "url": "https://www.gamingalexandria.com/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "Games Done Quick",
+      "url": "https://gamesdonequick.com/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "YouTube",
+      "url": "https://www.youtube.com/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "Twitch",
+      "url": "https://www.twitch.tv/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "PeerTube",
+      "url": "https://joinpeertube.org/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "Vimeo",
+      "url": "https://vimeo.com/",
+      "family": "history-media",
+      "kind": "reference",
+      "tags": "history preservation manuals hardware emulation video audio timeline"
+    },
+    {
+      "name": "Famitsu",
+      "url": "https://www.famitsu.com/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "4Gamer",
+      "url": "https://www.4gamer.net/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "Game Watch",
+      "url": "https://game.watch.impress.co.jp/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "Automaton",
+      "url": "https://automaton-media.com/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "Gamer.ne.jp",
+      "url": "https://www.gamer.ne.jp/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "Inven",
+      "url": "https://www.inven.co.kr/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "Ruliweb",
+      "url": "https://www.ruliweb.com/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "Gamer.com.tw",
+      "url": "https://www.gamer.com.tw/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "GNN",
+      "url": "https://gnn.gamer.com.tw/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "TapTap",
+      "url": "https://www.taptap.cn/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "Bilibili Games",
+      "url": "https://game.bilibili.com/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "GameStar",
+      "url": "https://www.gamestar.de/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "Jeuxvideo",
+      "url": "https://www.jeuxvideo.com/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "Gamekult",
+      "url": "https://www.gamekult.com/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "Meristation",
+      "url": "https://as.com/meristation/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "Vandal",
+      "url": "https://vandal.elespanol.com/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "3DJuegos",
+      "url": "https://www.3djuegos.com/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "Multiplayer.it",
+      "url": "https://multiplayer.it/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "Eurogamer Portugal",
+      "url": "https://www.eurogamer.pt/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "Gry Online",
+      "url": "https://www.gry-online.pl/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "Gamer.no",
+      "url": "https://www.gamer.no/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "Spillhistorie",
+      "url": "https://spillhistorie.no/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "LevelUp",
+      "url": "https://www.levelup.com/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "IGN Brasil",
+      "url": "https://br.ign.com/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "GamesIndustry",
+      "url": "https://www.gamesindustry.biz/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "PocketGamer",
+      "url": "https://www.pocketgamer.com/",
+      "family": "global",
+      "kind": "directory",
+      "tags": "regional international localized games communities language"
+    }
+  ]
+}
