@@ -23,6 +23,8 @@ on:
       - "scripts/prepare_emerald_v7_*.py"
       - "scripts/qualify_emerald_v7_offline_stack.py"
       - "scripts/audit_emerald_v7_original_zip_pair.py"
+      - "scripts/verify_emerald_v7_remote_original.py"
+      - "scripts/test_emerald_v7_remote_original.py"
       - "scripts/test_audit_emerald_v7_original_zip_pair.py"
       - "scripts/check_emerald_v7_independent_original_receipt.py"
       - "scripts/test_emerald_v7_independent_original_receipt.py"
@@ -132,6 +134,7 @@ jobs:
           python scripts/test_audit_emerald_v7_original_zip_pair.py
           python scripts/test_emerald_v7_independent_original_receipt.py
           python scripts/check_emerald_v7_independent_original_receipt.py
+          python scripts/test_emerald_v7_remote_original.py
           python scripts/test_audit_emerald_v7_original_zip_pair.py
           python scripts/test_emerald_v7_independent_original_receipt.py
           python scripts/check_emerald_v7_independent_original_receipt.py
