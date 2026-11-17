@@ -29,13 +29,16 @@ class V7QuarantineTests(unittest.TestCase):
             file.write_bytes(payload)
             sha=hashlib.sha256(payload).hexdigest()
             entries=[]
-            for j,chunk in enumerate((payload[:8],payload[8:])):
+            previous=0
+            chunks=(payload[:8],payload[8:16],payload[16:20],payload[20:])
+            for j,chunk in enumerate(chunks):
                 entries.append({
                     "path":f"assets/emerald/evolution-v7/{name}/{name}.glb.part{j+1:03}",
                     "bytes":len(chunk),
                     "sha256":hashlib.sha256(chunk).hexdigest(),
-                    "offset":0 if j==0 else 8,
+                    "offset":previous,
                 })
+                previous+=len(chunk)
             self.forms.append({"stage":name,"asset":name+".glb",
                                "bytes":len(payload),"sha256":sha,
                                "parts":entries})
