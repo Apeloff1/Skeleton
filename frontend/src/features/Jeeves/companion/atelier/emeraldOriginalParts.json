@@ -1,0 +1,15 @@
+{
+  "model_sha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+  "parts": [
+    {
+      "name": "emerald_continuum.glb.part01",
+      "size": 231574870,
+      "sha256": "db8a76f932dfc5db50f5097c1850d9e23a80d62810812962bd352d9b560329b0"
+    },
+    {
+      "name": "emerald_continuum.glb.part02",
+      "size": 231574870,
+      "sha256": "52594a7e9246d55dc610b262a2524b2e5a41709d1162dfdb359b40cea2415466"
+    }
+  ]
+}

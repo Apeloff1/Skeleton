@@ -3,6 +3,7 @@ import {useIsFocused} from '@react-navigation/native';
 import type {AtelierPrototypeProps} from './AtelierPrototype';
 import {parsePeakReceipt,verifyFile,MAX_MODEL_BYTES,PEAK_MODEL_BYTES,FAMILIES,type Catalogue,type Family} from './atelierAsset';
 import {flightIntent} from './atelierDirector';
+import originalAdmission from './emeraldOriginalAdmission.json';
 import {acquireAtelierLease,type AtelierLease} from './atelierLease';
 import type {AtelierStage,AtelierCamera,AtelierQuality} from './atelierStage.web';
 import type {PlaybackStats} from './atelierPlaybackMeter';
@@ -51,13 +52,13 @@ export default function AtelierPrototype({state,reducedMotion,onOpenChange}:Atel
     stop();setBusy(false);setStatus('Original model not loaded');setSelection(old=>({...old,...patch}));
   };
   const load=async()=>{
-    if(!canvas.current||!selection.model||!selection.receipt||control.current)return;
+    if(!canvas.current||!selection.model||control.current)return;
     const abort=new AbortController();control.current=abort;setBusy(true);setStatus('Verifying local model and clip catalogue…');
     let lease:AtelierLease|undefined;
     try{
       lease=acquireAtelierLease((navigator as Navigator & {deviceMemory?:number}).deviceMemory);
-      if(selection.receipt.size>256*1024||selection.model.size>MAX_MODEL_BYTES)throw new Error('Local asset exceeds prototype limits');
-      const receipt=parsePeakReceipt(JSON.parse(await selection.receipt.text()));
+      if((selection.receipt?.size??0)>256*1024||selection.model.size>MAX_MODEL_BYTES)throw new Error('Local asset exceeds prototype limits');
+      const receipt=parsePeakReceipt(selection.receipt?JSON.parse(await selection.receipt.text()):originalAdmission);
       if(abort.signal.aborted)return;
       const bytes=await verifyFile(selection.model,receipt,abort.signal);
       if(abort.signal.aborted||!canvas.current)return;
@@ -79,10 +80,10 @@ export default function AtelierPrototype({state,reducedMotion,onOpenChange}:Atel
   return <div style={{color:'#e2e8f0',marginTop:12,padding:10,border:'1px solid #334155',borderRadius:8}}>
     <button type="button" onClick={()=>open?close():setOpen(true)}>{open?'Close 3D prototype':'Open original 3D prototype (local files)'}</button>
     {open&&<div>
-      <p>Use only the original Atelier Fold GLB, admission receipt matching the existing repository pin (463,149,740 bytes). Files remain in this browser session; the ordinary companion remains available. This is not Unreal or physical RTX qualification.</p>
+      <p>Use only the original Atelier Fold GLB, admission receipt matching the existing repository pin (463,149,740 bytes). The exact original clip catalogue is now bundled; an alternate receipt is optional. Files remain in this browser session; the ordinary companion remains available. This is not Unreal or physical RTX qualification.</p>
       <label style={{display:'block'}}>Original model <input type="file" accept=".glb" onChange={e=>change({model:e.target.files?.[0]??null})}/></label>
-      <label style={{display:'block'}}>Admission receipt <input type="file" accept=".json,application/json" onChange={e=>change({receipt:e.target.files?.[0]??null})}/></label>
-      <button type="button" disabled={busy||!selection.model||!selection.receipt||selection.model.size!==PEAK_MODEL_BYTES} onClick={()=>{stop();void load();}}>Verify and render</button>
+      <label style={{display:'block'}}>Optional alternate admission receipt <input type="file" accept=".json,application/json" onChange={e=>change({receipt:e.target.files?.[0]??null})}/></label>
+      <button type="button" disabled={busy||!selection.model||selection.model.size!==PEAK_MODEL_BYTES} onClick={()=>{stop();void load();}}>Verify and render</button>
       {catalogue&&<fieldset style={{border:'1px solid #475569',padding:8,marginTop:8}}>
         <legend>Original 3D inspection laboratory</legend>
         <p>Manual clips are visual previews only and never assert crawler activity. Detail mode retains the full admitted mesh; economy changes raster cost, not the model.</p>

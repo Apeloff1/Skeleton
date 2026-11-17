@@ -10,6 +10,8 @@ on:
       - 'frontend/scripts/test_emerald_assets.py'
       - 'frontend/src/features/Jeeves/companion/emeraldAssetPin.json'
       - 'scripts/recover_emerald_assets.py'
+      - 'scripts/join_emerald_original.py'
+      - 'scripts/test_emerald_original_recovery.py'
       - 'scripts/test_emerald_recovery.py'
       - 'scripts/audit_emerald_animation.py'
       - 'scripts/audit_emerald_skin.py'
@@ -67,6 +69,7 @@ jobs:
           python3 scripts/test_emerald_native_gate.py
           python3 scripts/test_emerald_asset_preflight.py
           python3 scripts/test_emerald_recovery.py
+          python3 scripts/test_emerald_original_recovery.py
           python3 scripts/test_emerald_animation_audit.py
           python3 scripts/test_emerald_skin_audit.py
           python3 scripts/test_emerald_material_audit.py
