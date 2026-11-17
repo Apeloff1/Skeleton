@@ -1,0 +1,44 @@
+name: Emerald V4 real mesh contact source qualification
+on:
+  pull_request:
+    paths:
+      - 'scripts/emerald_v4_contact_geometry.py'
+      - 'scripts/emerald_v4_contact_scan.py'
+      - 'scripts/verify_emerald_v4_contact_receipt.py'
+      - 'scripts/test_emerald_v4_mesh_contact.py'
+      - 'frontend/src/features/Jeeves/companion/atelier/evolutionPin.json'
+      - '.github/workflows/emerald-v4-mesh-contact.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: emerald-v4-mesh-contact-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact checkout SHA
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - name: Compile full contact implementation
+        run: |
+          python3 -m py_compile \
+            scripts/emerald_v4_contact_geometry.py \
+            scripts/emerald_v4_contact_scan.py \
+            scripts/verify_emerald_v4_contact_receipt.py \
+            scripts/test_emerald_v4_mesh_contact.py
+      - name: Install fixed numerical analysis runtime
+        run: python3 -m pip install --only-binary=:all: numpy==2.3.5 scipy==1.17.0
+      - name: Prove hostile geometry and evidence rejection
+        run: python3 scripts/test_emerald_v4_mesh_contact.py
+      - name: Qualification boundary
+        run: |
+          echo "Math/contract tests only. Real original V4 binaries are not stored in this PR."
+          echo "No false claims: no actual mesh clearance, nonlinear CCD, equipment, Unreal, RTX, artist review or release."
