@@ -553,6 +553,10 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         ctx["file_count"] = len(files)
         ctx["playable_archetype"] = archetype_name
         ctx["playable_portal_receipt"] = portal_receipt
+        # Preserve the source-bound scene and startup contract for consumers.
+        # The returned scene is admitted by the verified portal, never a user path.
+        ctx["playable_scene"] = f"res://{portal_receipt['scene']}"
+        ctx["playable_launch_scene"] = portal_receipt.get("launch_scene")
         # New modes expose their actual sparse native effects; existing modes
         # retain the established source-verified mechanics receipt.
         from skeleton.forge.playable_tuning import SOURCE_PATH
