@@ -119,6 +119,8 @@ def implementation_digest():
                 "structured_discovery.py",
                 "document_formats.py",
                 "frontier_scheduler.py",
+                "source_navigation.py",
+                "catalogues/dragon_source_catalogue.v1.json",
                 "navigation_backlog.py",
                 "navigation_semantics.py",
                 "adaptive_navigation.py",
