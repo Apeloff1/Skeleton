@@ -83,6 +83,39 @@ class AnatomicalCensusTests(unittest.TestCase):
         self.assertTrue(all(x["status"].startswith("unqualified") for x in worklist))
         self.assertEqual(worklist[-1]["triangles_a"],2)
 
+    def test_blended_influences_not_hidden_by_majority_vote(self):
+        # A clear torso majority does not mean all its triangle vertices are
+        # torso-only. One vertex is 70% torso / 30% flight wing.
+        j=self.joints.copy()
+        w=self.weights.copy()
+        j[0,1]=68
+        w[0,0]=.70
+        w[0,1]=.30
+        _, majority=census.classify(w,j,self.faces)
+        self.assertEqual(majority["torso"],2)
+        seam=census.blended_seam_census(w,j,self.faces)
+        self.assertEqual(seam["multi_cohort_vertices"],1)
+        self.assertEqual(seam["triangles_touching_multi_influence_vertices"],2)
+        self.assertFalse(seam.get("continuous_collision_qualified",False))
+
+    def test_low_secondary_weights_do_not_cross_review_threshold(self):
+        j=self.joints.copy()
+        w=self.weights.copy()
+        j[0,1]=68
+        w[0,0]=.81
+        w[0,1]=.19
+        seam=census.blended_seam_census(w,j,self.faces)
+        self.assertEqual(seam["multi_cohort_vertices"],0)
+        w[0,0]=.80
+        w[0,1]=.20
+        seam=census.blended_seam_census(w,j,self.faces)
+        self.assertEqual(seam["multi_cohort_vertices"],1)
+
+    def test_seam_threshold_out_of_policy_denied(self):
+        for t in (-.1,0,.04,.41,float("nan")):
+            with self.assertRaisesRegex(ValueError,"threshold"):
+                census.blended_seam_census(self.weights,self.joints,self.faces,t)
+
     def test_unknown_stage_is_rejected_before_io(self):
         with tempfile.TemporaryDirectory() as root:
             with self.assertRaisesRegex(ValueError,"stage/version"):
