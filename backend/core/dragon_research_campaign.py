@@ -143,7 +143,7 @@ def _coverage(db,owner,identifier,facets,now):
     return values,len(rows)>128
 
 
-def advance(db,owner,*,campaign_id,query,operation,expected_revision,budget=16,now=None):
+def advance(db,owner,*,campaign_id,query,operation,expected_revision,budget=16,now=None,_fleet_claim=None):
     from core.dragon_navigation_intelligence import plan,objective_facets
     at=_now(now);objective=_objective(query);op=_operation(operation)
     graph._integer(expected_revision,1,MAX_ROUNDS+1);graph._integer(budget,1,48)
@@ -181,6 +181,14 @@ def advance(db,owner,*,campaign_id,query,operation,expected_revision,budget=16,n
         at2=_now(now)
         if db.execute("PRAGMA data_version").fetchone()[0]!=before or row["expires"]<=at2 or expiry is not None and expiry<=at2:
             raise ValueError("campaign catalogue changed during deliberation")
+        if _fleet_claim is not None:
+            fleet_id,operation_digest,token=_fleet_claim
+            witness=db.execute("""SELECT 1 FROM navigation_fleet_jobs j JOIN navigation_fleets f
+                ON f.owner=j.owner AND f.id=j.fleet WHERE j.owner=? AND j.fleet=? AND j.operation=?
+                AND j.token=? AND j.campaign=? AND j.state=\'leased\' AND j.lease_until>?
+                AND f.state=\'active\' AND f.expires>?""",
+                (owner,fleet_id,operation_digest,token,campaign_id,at2,at2)).fetchone()
+            if witness is None:raise ValueError("fleet lease changed before campaign publication")
         latest=_row(db,owner,campaign_id)
         if latest["revision"]!=expected_revision or latest["state"]!="active":
             raise ValueError("campaign revision changed")
