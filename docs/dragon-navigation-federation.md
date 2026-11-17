@@ -636,3 +636,60 @@ No actual deployed archive migration, certified production hardware
 capacity, independently trained generative Dragon LLM, or physical
 power-loss qualification is claimed. Preserve authorization and release
 holds.
+
+
+## Eleventh expansion — source catalogue and intelligent navigation
+
+The packaged source catalogue introduces 382 candidate entry points across
+357 distinct hostnames and ten families: game discovery, mods, MMO,
+game-world references, development tools, assets, datasets, API
+documentation, preservation/media and regional communities. These are
+candidate metadata, not claims of live availability or access rights.
+Some roots may redirect or need operator review. Public dataset and
+asset listing does not authorize copying, training, binary download or
+redistribution; review the individual publisher, dataset and item terms.
+Examples include official EVE ESI/SDE documentation, modding platforms,
+independent game wikis, official engine manuals and open-data portals.
+Reference examples inspected at authoring time:
+https://developers.eveonline.com/docs/services/esi/overview/,
+https://developers.eveonline.com/docs/community/eve-online-sde-documentation/,
+https://www.nexusmods.com/, https://strategywiki.org/wiki/Main_Page.
+No site-wide live accessibility sweep was performed.
+
+The source ranking plane uses ecosystem aliases, objective-specific
+identity/lexical/concept affinity, source-kind intent, cross-family
+bridges, diversity and prior candidate exclusion. Source roots are
+classified by exact HTTPS hostname and path segment boundaries. Source
+navigation plans combine these unobserved registry entries with current
+owner-witnessed graph targets, capture yield, negative restriction
+evidence, witnessed parent lineage and source diversity. Jeeves/Dragon
+scores here are deterministic advisory heuristics; they do not assert
+live generative evaluation. Path cues recognize observed index, schema,
+release, dependency and rights-related paths. Each source kind has a
+symbolic investigation sequence and suggested review cadence, not
+invented fetch URLs or automatic scheduled work.
+
+Three owner-scoped API routes use the existing navigation federation:
+GET /crawler/navigation/source-atlas (host-keyset inventory);
+POST /crawler/navigation/source-plan (ranked 1–48 source candidates);
+GET /crawler/navigation/source-trace (bounded witnessed cross-host
+bridges). The atlas grows with every separately authorized retained
+checkpoint, without copying a second URL database. It exposes only
+current grant witnesses; trace and ranking enforce review/expiry fences.
+A source plan is deliberately not a crawl request or new authorization.
+Unadmitted external URLs are not collected by this atlas.
+
+The canonical companion scheduler adds a small bounded source preference
+only for already admitted due frontier rows, never overriding robots,
+host pressure, transport admission or the rest/recovery/conservation
+quest policy. Tournament packets add at most three curated source-name
+tokens, still at most eight total candidate terms, and mix up to 15%
+source affinity into the candidate semantic score. This supports existing
+native Jeeves and independent Dragon inference without adding raw URLs,
+source text or query-string values to prompts. The packaged registry and
+source navigation code are included in exact checkpoint implementation
+identity: prior checkpoints with different code identities remain held
+until supported migration, not silently accepted. Source catalogue
+packaging, API, client validation and exact-head source qualification
+are included. No live external crawl, binary import, credentialed API
+execution, production migration or production-device attestation claimed.
