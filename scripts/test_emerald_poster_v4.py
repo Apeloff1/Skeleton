@@ -25,7 +25,8 @@ class V4CustodyTests(unittest.TestCase):
     def test_corrupt_manifest_fails(self):
         raw=json.loads(p.MANIFEST.read_bytes())
         raw["forms"][0]["sha256"]="0"*64
-        with patch.object(p.MANIFEST.__class__,"read_bytes",return_value=json.dumps(raw).encode()):
+        original=Path.read_bytes
+        with patch.object(Path,"read_bytes",autospec=True,side_effect=lambda self: json.dumps(raw).encode() if self==p.MANIFEST else original(self)):
             with self.assertRaisesRegex(ValueError,"model pin mismatch"):p.load()
 
     def test_truncated_stage_is_rejected(self):
