@@ -115,8 +115,15 @@ def test_session_forgery_and_source_revision_fail_closed():
     altered = copy.deepcopy(source)
     altered["scenes"][0]["narrative"] = "Revised original text"
     prove(altered)
-    with pytest.raises(CanonError, match="counterfactual_world_lease_mismatch"):
+    # The original session is also leased to the old world, so the earliest
+    # guard must refuse replay before inspecting the review's stale lease.
+    with pytest.raises(CanonError, match="session_world_lease_mismatch"):
         validate_review(data, altered, state)
+    # Once the player session is independently rebuilt on the revised source,
+    # the earlier review still cannot be reused as current world evidence.
+    revised_state = session(altered)
+    with pytest.raises(CanonError, match="counterfactual_world_lease_mismatch"):
+        validate_review(data, altered, revised_state)
 
 
 def test_budgets_do_not_silently_truncate():
