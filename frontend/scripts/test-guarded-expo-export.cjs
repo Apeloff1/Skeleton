@@ -208,3 +208,19 @@ test('clean EOF cannot join unfinished marker fragments across streams', async t
     /completion marker missing/,
   );
 });
+
+
+test('Atelier CI uses the guarded Expo exporter after running its lifecycle regressions', () => {
+  const workflow = fs.readFileSync(
+    path.resolve(__dirname, '..', '..', '.github', 'workflows', 'dragon-atelier-prototype.yml'),
+    'utf8',
+  );
+  assert.match(workflow, /run: node --test scripts\/test-guarded-expo-export\.cjs/);
+  assert.match(workflow, /run: node scripts\/guarded-expo-export\.cjs/);
+  assert.doesNotMatch(workflow, /run:\s*yarn export:web/);
+  assert.ok(
+    workflow.indexOf('run: node --test scripts/test-guarded-expo-export.cjs') <
+    workflow.indexOf('run: node scripts/guarded-expo-export.cjs'),
+    'supervisor regressions must execute before export',
+  );
+});
