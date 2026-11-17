@@ -135,3 +135,35 @@ test('each exact developmental receipt binds its own immutable bytes and growth 
     assert.throws(()=>a.parseVariantReceipt(row,'hoarder'),/Wrong asset/);
   }
 });
+
+
+test('developmental stages may only show explicit frozen poses while clearance is unverified',()=>{
+  const {enforceDragonClearanceHold}=load('atelierMotionPolicy');
+  for(const stage of ['hatchling','scout','scholar','pathfinder','archivist']){
+    for(const intent of [{airborne:true,reduced:false},{airborne:false,reduced:false},
+                         {airborne:true,reduced:true}]){
+      const result=enforceDragonClearanceHold(stage,intent);
+      assert.equal(result.airborne,false);
+      assert.equal(result.reduced,true);
+      assert.equal(result.mode,'manual-pose-only');
+      assert.equal(result.isClearanceHold,true);
+      assert.ok(Object.isFrozen(result));
+    }
+  }
+  const original=enforceDragonClearanceHold('hoarder',{airborne:true,reduced:false});
+  assert.equal(original.airborne,true);
+  assert.equal(original.reduced,false);
+  assert.equal(original.mode,'original-event-driven');
+  assert.equal(original.isClearanceHold,false);
+  assert.equal(enforceDragonClearanceHold('hoarder',{airborne:false,reduced:true}).reduced,true);
+});
+
+test('renderer independently enforces developmental hold even if UI omits it',()=>{
+  const stage=fs.readFileSync(path.join(root,'atelierStage.web.ts'),'utf8');
+  const ui=fs.readFileSync(path.join(root,'AtelierPrototype.web.tsx'),'utf8');
+  assert.match(stage,/desired=\{airborne:!receipt\.variant&&airborne,reduced:!!receipt\.variant\|\|reduced\}/);
+  assert.match(stage,/let desired=\{airborne:false,reduced:!!receipt\.variant\}/);
+  assert.match(ui,/enforceDragonClearanceHold\(variant,intent\.current\)/);
+  assert.match(ui,/disabled=\{reducedMotion\|\|variant!=='hoarder'\}/);
+  assert.match(ui,/Developmental animation clearance hold:/);
+});
