@@ -75,6 +75,13 @@ def vetted_tools(folder):
   require(contact.SHA_DONOR==DONOR and
           tuple(seam.PAIRS)==PAIRS and len(seam.REGIONS)==len(REGIONS),
           "wrong geometric review implementation")
+  # A sys.modules cache entry from another path must never defeat SHA custody.
+  for name in ("contact_audit","analyze_seams","fast_wing_witness",
+               "contact_geometry","contact_geometry_accel"):
+   module=sys.modules.get(name)
+   require(module is not None and
+           Path(module.__file__).resolve()==(folder/(name+".py")).resolve(),
+           "imported source escapes the verified contact-tool directory")
   return contact,seam
  finally:
   sys.path.pop(0)
