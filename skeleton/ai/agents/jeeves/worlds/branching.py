@@ -45,7 +45,10 @@ def propose_fork(world: Any, parent: Any, *, parent_slot: str,
         "parent_slot": parent_slot, "target_slot": target_slot,
         "parent_digest": digest(parent), "parent_choices": parent["choices"],
         "at_revision": at_revision, "choice_id": choice_id,
-        "prompt": prompt, "initial_session_digest": digest(descendant),
+        # Bind the reviewed preview text to the proposal bytes. This is
+        # source-integrity evidence, not a cryptographic operator signature.
+        "prompt": prompt, "prompt_digest": digest(prompt),
+        "initial_session_digest": digest(descendant),
         "preview": player_view(descendant, world),
     }
 
@@ -153,7 +156,7 @@ class ForkStore:
         obj = _keys(proposal, {
             "schema", "world_id", "world_digest", "parent_slot", "target_slot",
             "parent_digest", "parent_choices", "at_revision", "choice_id",
-            "prompt", "initial_session_digest", "preview",
+            "prompt", "prompt_digest", "initial_session_digest", "preview",
         })
         if obj["schema"] != PROPOSAL_SCHEMA or obj["world_id"] != world_id:
             raise CanonError("fork_proposal_schema_mismatch")
@@ -230,7 +233,14 @@ class ForkStore:
             target_slot=target_slot, prompt=receipt["prompt"],
             at_revision=revision, choice_id=receipt["choice_id"])
         if _receipt(expected_proposal) != receipt:
-            raise CanonError("fork_receipt_mismatch")
+            # Existing read-only v1 sidecars predate the new prompt witness.
+            # Their original proposal digest remains reproducible and is
+            # checked against the published immutable receipt; new publishes
+            # must use the complete proposal with prompt_digest.
+            legacy = dict(expected_proposal)
+            legacy.pop("prompt_digest")
+            if _receipt(legacy) != receipt:
+                raise CanonError("fork_receipt_mismatch")
         seed = _source_session(world, old_parent["choices"][:revision])
         genesis = apply_choice(seed, world, receipt["choice_id"])
         if (digest(genesis) != receipt["initial_session_digest"]
