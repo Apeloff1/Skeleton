@@ -284,7 +284,7 @@ def test_package_entry_point_dispatches_deploy(capsys) -> None:
 
 def test_package_help_lists_deploy(capsys) -> None:
     assert skeleton_main(["help"]) == 0
-    assert "deploy      Self-host deployment" in capsys.readouterr().out
+    assert "deploy      Validated self-host profiles" in capsys.readouterr().out
 
 
 def test_python_dash_m_subprocess_smoke(tmp_path) -> None:
