@@ -2990,6 +2990,18 @@ async def crawler_migrate_bulk_batch(body:CrawlerMigrationBatch,
     return await _crawler_result(crawler_application.migrate_bulk_batch(scope,body.model_dump(),principal=user))
 
 
+class CrawlerColdCompaction(CrawlerWriteRequest):
+    acknowledged:bool=Field(strict=True)
+
+
+@router.post("/crawler/sessions/{session_id}/compact-cold-primary")
+async def crawler_compact_cold_primary(body:CrawlerColdCompaction,
+    session_id:str=URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope:dict=Depends(_crawler_write_scope),user:dict=Depends(get_current_user))->dict:
+    return await _crawler_result(crawler_application.compact_cold_primary(
+        scope,session_id,body.model_dump(),principal=user))
+
+
 @router.post("/crawler/sessions/{session_id}/migrate-bulk-copy")
 async def crawler_migrate_bulk_copy(body:CrawlerVaultRetireRequest,
     session_id:str=URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
