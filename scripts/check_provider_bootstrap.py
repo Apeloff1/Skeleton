@@ -499,7 +499,7 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
             continue
         # Only a single, completely supported heredoc opener may establish
         # subsequent Docker source custody. Ambiguous shell syntax fails closed.
-        markers = list(re.finditer(r"<<(-?)([^\\s]+)", instruction))
+        markers = list(re.finditer(r"<<(-?)([^\s]+)", instruction))
         if len(markers) != 1:
             return instructions, []
         token = markers[0].group(2)
