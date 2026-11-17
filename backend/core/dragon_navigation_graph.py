@@ -203,7 +203,7 @@ def neighbors(db,owner,target,*,direction="children",after=None,limit=32,now):
             "network_authorized":False,"historical_topology_complete":False}
 
 
-def retrieve(db,owner,*,query,now,host=None,limit=48,per_term=32,due_only=False,exploration_epoch=None):
+def retrieve(db,owner,*,query,now,host=None,limit=48,per_term=32,due_only=False,exploration_epoch=None,campaign_id=None):
     """Multi-lane indexed candidate pool; bounded, not exhaustive search.
 
     This performs at most MAX_TERMS indexed seeks, each returning a
@@ -219,6 +219,7 @@ def retrieve(db,owner,*,query,now,host=None,limit=48,per_term=32,due_only=False,
         raise ValueError("navigation graph query")
     if exploration_epoch is not None:
         _integer(exploration_epoch,0,10**12)
+    if campaign_id is not None:_id(campaign_id)
     keys=term_keys(query)
     votes=Counter();truncated=False
     # Stable owner/query/epoch-specific anchor. Exact retrieval keeps its
@@ -234,6 +235,9 @@ def retrieve(db,owner,*,query,now,host=None,limit=48,per_term=32,due_only=False,
             sql+=" AND n.host=?";args.append(host)
         if due_only:
             sql+=" AND (r.next_review IS NULL OR r.next_review<=?)";args.append(now)
+        if campaign_id is not None:
+            sql+=" AND NOT EXISTS(SELECT 1 FROM navigation_campaign_targets t WHERE t.owner=p.owner AND t.campaign=? AND t.target=p.target)"
+            args.append(campaign_id)
         if exploration_epoch is None:
             rows=db.execute(sql+" ORDER BY p.target LIMIT ?",[*args,per_term+1]).fetchall()
         else:
