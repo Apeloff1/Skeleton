@@ -83,6 +83,8 @@ def trace(db,owner,*,host,now,limit=24,after=None):
         for row in page["neighbors"]:
             child=row["id"]
             if row["host"]==host or after is not None and child<=after:continue
+            review=db.execute("SELECT state,next_review FROM navigation_reviews WHERE owner=? AND target=?",(owner,child)).fetchone()
+            if review and (review["state"]!="candidate" or review["next_review"]>now):continue
             previous=neighbours.get(child)
             if previous is None:
                 neighbours[child]={"target_id":child,"url":row["url"],"host":row["host"],
@@ -111,7 +113,7 @@ def plan(db,owner,*,query,now,limit=32,families=None,previous=None,mode="balance
     if mode not in {"balanced","coverage","exploration","conservation"}:
         raise ValueError("source navigation mode")
     previous=[] if previous is None else previous
-    if not isinstance(previous,list) or len(previous)>512 or len(set(previous))!=len(previous):
+    if not isinstance(previous,list) or len(previous)>512 or any(not isinstance(x,str) for x in previous) or len(set(previous))!=len(previous):
         raise ValueError("source prior selection bounds")
     old={graph._id(x) for x in previous}
     task=objective(query);registry=catalogue()
