@@ -110,7 +110,7 @@ test('edited source preserves historical receipt only as outdated, not current q
   assert.equal(result.status, 'applied');
   assert.equal(result.projects[0].lastRunOutdated, true);
   assert.equal(M.openTarget(result.projects[0], null, 'idle'), 'brief');
-  assert.match(M.projectStatus(result.projects[0], null, 'idle'), /build again/);
+  assert.match(M.projectStatus(result.projects[0], null, 'idle'), /Needs rebuild/);
   assert.equal(M.nextStudioRevision(AT, AT), '2026-11-13T12:00:00.001Z');
 });
 
@@ -131,10 +131,12 @@ test('actual source wiring consumes one-time return and reopens the matching act
   const live = file('src/skeletonForge/components/foundation/FoundationScreen.tsx');
   const shell = file('src/skeletonForge/components/foundation/FoundationShell.tsx');
   const scope = file('src/skeletonForge/creatorStorageScope.ts');
-  assert.match(live, /consumeCreatorBridge\('studio'\)/);
+  assert.match(live, /withCreatorBridge\('studio', async \(returned\) =>/);
   assert.match(live, /reconcileStudioReturn\(/);
   assert.match(live, /recoverStudioReturnAsCopy\(/);
-  assert.match(live, /storeCreatorBridge\(returned\)/);
+  assert.match(live, /updateFoundation\(store, current =>/);
+  assert.match(live, /storeCreatorBridge\(envelope, epoch\)/);
+  assert.match(live, /sourceRevision, restored, at, receipt/);
   assert.match(live, /handoffFromStudio\(project\.questionnaire, project\.id, project\.updatedAt\)/);
   assert.match(live, /key=\{authEpoch\}/);
   assert.match(shell, /ports\.onOpenCockpit\(active \?\? undefined\)/);
