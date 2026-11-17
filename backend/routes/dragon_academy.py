@@ -2682,6 +2682,7 @@ class CrawlerNavigationRetention(CrawlerRequest):
 
 class CrawlerResearchPlan(CrawlerRequest):
     query: str = Field(min_length=1,max_length=512)
+    learned: bool = Field(default=False,strict=True)
     budget: int = Field(default=16,ge=1,le=48,strict=True)
     mode: str = Field(default="balanced",pattern=r"^(balanced|coverage|exploration|conservation)$")
     previous: list[str] = Field(default_factory=list,max_length=128)
