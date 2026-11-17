@@ -129,6 +129,12 @@ def test_persist_compile_verify_player_and_replay(tmp_path):
         root / "reef.integrated.manifest.json").read_text()
     sessions = SessionStore(root)
     sessions.create("reef", "one")
+    # The integrated player reuses the same pinned descriptor, but MUST
+    # still deny a different writer's live lease, not read without custody.
+    (root / "reef.lock").write_text("other-writer", encoding="utf-8")
+    with pytest.raises(CanonError, match="lease_busy"):
+        store.player("reef", "one")
+    (root / "reef.lock").unlink()
     assert store.player("reef", "one")["promises"]["open_required"] == []
     sessions.choose("reef", "one", "take_oath",
                     digest(sessions.read("reef", "one")))
