@@ -152,7 +152,7 @@ def inventory(source: Path) -> list[dict[str, Any]]:
     if observed != set(libraries):
         raise ModelBackupError("runtime adjacent library inventory is not fully pinned")
     for name, digest in libraries.items():
-        if not isinstance(name, str) or not _LIB.fullmatch(name):
+        if not isinstance(name, str) or not _LIBRARY.fullmatch(name):
             raise ModelBackupError("unsafe runtime library name")
         relative = executable.parent / name
         if relative in entries or not isinstance(digest, str) or not _HEX.fullmatch(digest):
