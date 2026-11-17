@@ -338,3 +338,22 @@ def test_archive_dotdot_alias_into_original_source_is_rejected(
         )
     assert not (root / "untrusted.zip").exists()
     assert not list(root.glob("*.zip"))
+
+
+def test_studio_archive_rejects_missing_or_forged_custody_source(tmp_path, capsys):
+    """The Draft19 custody gate must reject absent and independently forged source pins."""
+    root, manifest = _build(tmp_path, capsys)
+    archive = tmp_path / "custody.zip"
+    assert run_app_cli(_package(root, manifest, archive)) == 0
+    receipt = json.loads(capsys.readouterr().out)
+    archive_pin = receipt["independent_archive_sha256"]
+
+    # A missing archive is never reconstructed or silently accepted.
+    missing = tmp_path / "missing.zip"
+    assert run_app_cli(_inspect(missing, archive_pin, manifest)) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert not missing.exists()
+
+    # The archive's genuine bytes cannot establish custody under a forged source pin.
+    assert run_app_cli(_inspect(archive, archive_pin, "0" * 64)) == 2
+    assert json.loads(capsys.readouterr().err)["status"] == "blocked"
