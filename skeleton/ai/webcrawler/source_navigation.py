@@ -14,6 +14,7 @@ from pathlib import Path
 import json
 import ipaddress
 import math
+import os
 import re
 from urllib.parse import urlsplit,unquote
 
@@ -128,6 +129,23 @@ class Source:
                 "access_verified":False,"rights_verified":False,"network_authorized":False}
 
 
+def source_record(record):
+    """Construct canonical source identity without loading a full registry."""
+    if (not isinstance(record,dict) or set(record)!={"name","url","family","kind","tags"}
+            or not isinstance(record["family"],str) or record["family"] not in FAMILIES
+            or not isinstance(record["kind"],str) or record["kind"] not in KINDS
+            or not isinstance(record["name"],str) or not 1<=len(record["name"])<=100
+            or not isinstance(record["tags"],str) or not 1<=len(record["tags"])<=256):
+        raise ValueError("source registry row")
+    host,path=_root(record["url"])
+    identity=frozenset(words(record["name"]+" "+host+" "+path))
+    tags=frozenset(words(record["tags"]))|identity
+    ecosystems=ecosystem_tags(record["name"]+" "+host+" "+path)
+    return Source(digest(["dragon-source-root",host,path]),record["name"],record["url"],host,path,
+                  record["family"],record["kind"],tags,identity,ecosystems,
+                  frozenset(concepts(tags)),frozenset(grams(identity)))
+
+
 class Catalogue:
     def __init__(self,raw):
         if not isinstance(raw,bytes) or not 1<=len(raw)<=MAX_BYTES:raise ValueError("source registry bytes")
@@ -139,19 +157,9 @@ class Catalogue:
             raise ValueError("source registry schema")
         roots={};by_host={};rows=[]
         for record in data["sources"]:
-            if (not isinstance(record,dict) or set(record)!={"name","url","family","kind","tags"}
-                    or record["family"] not in FAMILIES or record["kind"] not in KINDS
-                    or not isinstance(record["name"],str) or not 1<=len(record["name"])<=100
-                    or not isinstance(record["tags"],str) or not 1<=len(record["tags"])<=256):
-                raise ValueError("source registry row")
-            host,path=_root(record["url"]);key=(host,path)
+            row=source_record(record)
+            host,path=row.host,row.path;key=(host,path)
             if key in roots:raise ValueError("duplicate source root")
-            identity=frozenset(words(record["name"]+" "+host+" "+path))
-            tags=frozenset(words(record["tags"]))|identity
-            ecosystems=ecosystem_tags(record["name"]+" "+host+" "+path)
-            row=Source(digest(["dragon-source-root",host,path]),record["name"],record["url"],host,path,
-                       record["family"],record["kind"],tags,identity,ecosystems,
-                       frozenset(concepts(tags)),frozenset(grams(identity)))
             roots[key]=row;by_host.setdefault(host,[]).append(row);rows.append(row)
         self.rows=tuple(sorted(rows,key=lambda x:x.id));self.revision=data["revision"]
         self.digest=digest(data);self._hosts={key:tuple(sorted(value,key=lambda x:-len(x.path))) for key,value in by_host.items()}
@@ -184,9 +192,35 @@ class Catalogue:
                 "candidate_only":True,"network_authorized":False}
 
 
+INDEX_ENV="SKL_DRAGON_SOURCE_INDEX_MANIFEST"
+
+
+def catalogue_binding():
+    """Read the operator-selected generation pin, not a new source grant."""
+    configured=os.environ.get(INDEX_ENV)
+    if configured is None:
+        return None
+    if not configured.strip():
+        raise ValueError("empty source index manifest path")
+    from .source_catalogue_index import manifest_bytes
+    path=Path(configured).resolve(strict=True)
+    raw=manifest_bytes(path)
+    return str(path),raw
+
+
 @lru_cache(maxsize=1)
+def _catalogue_generation(binding):
+    if binding is None:
+        return Catalogue(REGISTRY_PATH.read_bytes())
+    from .source_catalogue_index import IndexedCatalogue
+    return IndexedCatalogue(Path(binding[0]),binding[1],base_path=REGISTRY_PATH)
+
+
 def catalogue():
-    return Catalogue(REGISTRY_PATH.read_bytes())
+    result=_catalogue_generation(catalogue_binding())
+    if hasattr(result,"assert_unchanged"):
+        result.assert_unchanged()
+    return result
 
 
 @dataclass(frozen=True)
@@ -232,10 +266,12 @@ def rank_sources(query,*,limit=24,families=None,previous=(),registry=None):
     # representative per origin. Thousands of repository paths on one host
     # must not evict all independent publishers before diversity selection.
     host_best={}
+    indexed=hasattr(registry,"candidate_rows")
+    shortlist=registry.candidate_rows(task,families,prior) if indexed else registry.rows
     def order(row):
         return (-row[1],row[0].id)
     def candidates():
-        for s in registry.rows:
+        for s in shortlist:
             if s.id in prior or families is not None and s.family not in families:
                 continue
             score,features=score_source(s,task)
@@ -264,7 +300,7 @@ def rank_sources(query,*,limit=24,families=None,previous=(),registry=None):
         hosts[s.host]+=1;kinds[s.kind]+=1;groups[s.family]+=1;covered.update(task.terms&s.tags)
     return {"catalogue":registry.summary(),"sources":selected,"goals":list(task.goals),
             "ecosystems":sorted(task.ecosystems),"distinct_hosts":len(hosts),
-            "coverage_is_estimated":True,"network_authorized":False,
+            "coverage_is_estimated":True,"rank_search_is_bounded":indexed,"network_authorized":False,
             "source_rights_granted":False}
 
 
