@@ -2961,7 +2961,7 @@ async def crawler_archive_intelligence(
 
 
 class CrawlerArchiveMatrix(CrawlerRequest):
-    queries:list[str]=Field(min_length=1,max_length=10)
+    queries:list[str]=Field(min_length=1,max_length=100)
     cursor:str|None=Field(default=None,max_length=193)
     limit:int=Field(default=32,ge=1,le=128,strict=True)
     session_ids:list[str]|None=Field(default=None,min_length=1,max_length=100)
