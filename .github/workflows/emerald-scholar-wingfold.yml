@@ -1,0 +1,56 @@
+name: Emerald experimental Scholar wingfold custody
+on:
+  pull_request:
+    paths:
+      - 'frontend/src/features/Jeeves/companion/atelier/**'
+      - 'assets/emerald/evolution-v5/scholar-wingfold-r1/**'
+      - 'scripts/patch_emerald_scholar_wingfold.py'
+      - 'scripts/test_emerald_scholar_wingfold.py'
+      - 'scripts/publish_emerald_scholar_wingfold.py'
+      - 'scripts/test_emerald_scholar_publication.py'
+      - '.github/workflows/emerald-scholar-wingfold.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: emerald-scholar-candidate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  source-and-custody:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert exact head SHA
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse ${{ github.event.pull_request.head.sha || github.sha }})" = "$EXPECTED"
+      - name: Install reviewed numerical wheel
+        run: python3 -m pip install --only-binary=:all: numpy==2.3.5
+      - name: Compile source
+        run: |
+          python3 -m py_compile \
+            scripts/patch_emerald_scholar_wingfold.py \
+            scripts/test_emerald_scholar_wingfold.py \
+            scripts/publish_emerald_scholar_wingfold.py \
+            scripts/test_emerald_scholar_publication.py
+      - name: Verify source quaternion and hostile binary custody tests
+        run: |
+          python3 scripts/test_emerald_scholar_wingfold.py
+          python3 scripts/test_emerald_scholar_publication.py
+      - name: Require real SHA-bound binary bytes on dedicated payload draft
+        env:
+          ${{ github.head_ref || github.ref_name }}: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if [ "$${{ github.head_ref || github.ref_name }}" = "assets/emerald-scholar-wingfold-r1-20261117" ]; then
+            python3 scripts/publish_emerald_scholar_wingfold.py verify-tree
+          else
+            echo "Source-only candidate: actual Git binary bytes NOT qualified"
+          fi
+      - name: Acceptance boundaries
+        run: |
+          echo "No physical RTX, real Unreal import, all-triangle CCD, human artwork or release evidence."
+          echo "Source-only receipt tests are not model rendering or full animation safety."
