@@ -19,7 +19,7 @@ test('prototype sources compile syntactically and both crawler surfaces mount th
 test('browser owns opt-in, context disposal and no crawler mutation',()=>{
   const ui=read('companion/atelier/AtelierPrototype.web.tsx');
   const stage=read('companion/atelier/atelierStage.web.ts');
-  assert.match(ui,/verifyFile\(selection.model,receipt\)/);
+  assert.match(ui,/verifyFile\(selection.model,receipt,abort.signal\)/);
   assert.match(ui,/if\(!focused\)/);
   assert.match(ui,/stage.current\?\.dispose\(\)/);
   assert.match(stage,/manager.setURLModifier/);
@@ -29,4 +29,13 @@ test('browser owns opt-in, context disposal and no crawler mutation',()=>{
   assert.match(stage,/graphics.dispose\(\)/);
   assert.match(stage,/director.reduced/);
   assert.doesNotMatch(ui+stage,/\b(?:fetch|XMLHttpRequest|sendBeacon|createCrawl|runCrawl|controlCrawl)\s*\(/);
+});
+
+test('large asset never abandons its realm lease before decode cleanup',()=>{
+  const ui=read('companion/atelier/AtelierPrototype.web.tsx');
+  const asset=read('companion/atelier/atelierAsset.ts');
+  assert.match(ui,/acquireAtelierLease/);
+  assert.match(ui,/resident.current=lease;lease=undefined/);
+  assert.match(ui,/lease\?\.release\(\)/);
+  assert.match(asset,/reader.abort\(\)/);
 });

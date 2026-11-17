@@ -101,6 +101,8 @@ export async function createAtelierStage(canvas:HTMLCanvasElement,bytes:ArrayBuf
       graphics.setSize(width,height,false);camera.aspect=width/height;camera.updateProjectionMatrix();
     };
     const draw=()=>{if(!disposed&&!failed)graphics.render(scene,camera);};
+    // A driver/render failure must stop the loop instead of silently dropping frames.
+    const halt=(reason:string)=>{if(disposed||failed)return;failed=true;if(frame)cancelAnimationFrame(frame);frame=0;last=0;status(reason);};
     const apply=(next:Director)=>{
       const changed=!action||director.step.serial!==next.step.serial;
       director=next;
@@ -131,6 +133,7 @@ export async function createAtelierStage(canvas:HTMLCanvasElement,bytes:ArrayBuf
       frame=0;
       if(disposed||failed||document.hidden||director.reduced)return;
       if(!last)last=now;
+      try{
       if(now-last>=16){
         const dt=Math.min(.05,(now-last)/1000);last=now;elapsed+=dt;
         mixer.update(dt);
@@ -138,12 +141,13 @@ export async function createAtelierStage(canvas:HTMLCanvasElement,bytes:ArrayBuf
         draw();
       }
       frame=requestAnimationFrame(tick);
+      }catch{halt('Full model playback failed. Close the inspector to release resources.');}
     };
     const stop=()=>{if(frame)cancelAnimationFrame(frame);frame=0;last=0;};
     const resume=()=>{if(!disposed&&!failed&&!document.hidden&&!director.reduced&&!frame)frame=requestAnimationFrame(tick);};
     const visibility=()=>{stop();if(!document.hidden){draw();resume();}};
-    const lost=(event:Event)=>{event.preventDefault();failed=true;stop();status('WebGL context lost. Close and reload the verified model.');};
-    const onResize=()=>{resize();draw();};
+    const lost=(event:Event)=>{event.preventDefault();halt('WebGL context lost. Close and reload the verified model.');};
+    const onResize=()=>{try{resize();draw();}catch{halt('Viewport resize failed. Close the inspector to release resources.');}};
     const observer=typeof ResizeObserver==='undefined'?null:new ResizeObserver(onResize);
     teardown=()=>{
       if(disposed)return;disposed=true;stop();observer?.disconnect();window.removeEventListener('resize',onResize);

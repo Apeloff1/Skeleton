@@ -77,3 +77,16 @@ test('manual exact clip inspection cannot claim a live event or manufacture a cl
   assert.notEqual(live.step.serial,manual.step.serial);
   assert.equal(d.resetLive(live,families,true,true).step.family,'ground');
 });
+
+test('single original-model lease is held through delayed cleanup and cannot release a replacement',()=>{
+  const {acquireAtelierLease}=load('atelierLease');
+  assert.throws(()=>acquireAtelierLease(2),/less than 4/);
+  const old=acquireAtelierLease(undefined);
+  assert.throws(()=>acquireAtelierLease(8),/still active/);
+  old.release();
+  const current=acquireAtelierLease(8);
+  old.release();
+  assert.throws(()=>acquireAtelierLease(8),/still active/);
+  current.release();
+  acquireAtelierLease(8).release();
+});
