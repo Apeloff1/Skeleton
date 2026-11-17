@@ -482,24 +482,38 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
     # In particular, Python 'from ... import ...' is not a new FROM stage.
     instructions = []
     heredoc_end = None
-    for line in docker.replace("\\\n", " ").splitlines():
-        stripped = line.strip()
+    strip_tabs = False
+    pending = ""
+    for line in docker.splitlines():
         if heredoc_end is not None:
-            if stripped == heredoc_end:
+            candidate = line.lstrip("\t") if strip_tabs else line
+            if candidate == heredoc_end:
                 heredoc_end = None
             continue
-        if not stripped or stripped.startswith("#"):
+        if not line.strip() or line.lstrip().startswith("#"):
             continue
-        instruction = " ".join(stripped.split())
+        if line.endswith("\\"):
+            pending += line[:-1] + " "
+            continue
+        raw = pending + line
+        pending = ""
+        instruction = " ".join(raw.split())
         instructions.append(instruction)
+        if "<<" not in raw:
+            continue
+        # Only one simple, fully delimited heredoc is supported. Reject
+        # ambiguous shell syntax rather than treating its body as Docker COPY.
+        if raw.count("<<") != 1:
+            return instructions, []
         marker = re.search(
-            r"<<-?(?:'([^']+)'|\"([^\"]+)\"|([A-Za-z_][A-Za-z_0-9]*))",
-            instruction,
+            r"""<<(-?)[ \t]*(?:'([A-Za-z_][A-Za-z_0-9]*)'|"([A-Za-z_][A-Za-z_0-9]*)"|([A-Za-z_][A-Za-z_0-9]*))(?=[ \t]*$)""",
+            raw,
         )
-        if marker:
-            heredoc_end = next(value for value in marker.groups() if value)
-    if heredoc_end is not None:
-        # An unterminated source stage cannot establish materialization.
+        if marker is None:
+            return instructions, []
+        strip_tabs = marker.group(1) == "-"
+        heredoc_end = next(value for value in marker.groups()[1:] if value)
+    if heredoc_end is not None or pending:
         return instructions, []
     stages, named = [], {}
     current = None
