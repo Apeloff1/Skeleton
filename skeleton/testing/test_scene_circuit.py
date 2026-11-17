@@ -63,7 +63,7 @@ def test_invalid_authored_circuit_fails_closed(mutate):
     lambda x: x["state"]["scene"]["state"].update(scene_id="sanctuary"),
     lambda x: x["journal"][0]["action"].update(switch_id="gate_pulse"),
     lambda x: x["journal"][0].update(receipt="0" * 64),
-    lambda x: x["save"].update(parent_save_digest=None),
+    lambda x: x["save"].update(parent_save_digest="0" * 64),
     lambda x: x.update(source_digest="0" * 64),
     lambda x: x.update(event_bus_digest="0" * 64),
 ])
