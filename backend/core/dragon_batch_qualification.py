@@ -24,7 +24,7 @@ MIB=1024*1024
 MAX_LOGICAL=2*GIB
 
 
-def _trial(root,*,families,revisions,size,batch):
+def _trial(root,*,families,revisions,size,batch,family_start=0):
     root.mkdir(mode=0o700)
     # One volume per physical filesystem is a production invariant. A CI
     # scratch folder cannot simulate independent devices with two directories.
@@ -35,7 +35,7 @@ def _trial(root,*,families,revisions,size,batch):
     ledger=root/"manifest.sqlite3"
     def open_store():return ManifestArchive(ledger,BulkArchive(specs))
     store=open_store();records=[];calls=0;logical=0;write=0.;seal=0.
-    for family in range(families):
+    for family in range(family_start,family_start+families):
         for revision in range(revisions):
             raw=fixture(family,revision,size)
             layout=lengths(raw);parts=list(split(raw,layout))
@@ -95,10 +95,11 @@ def _trial(root,*,families,revisions,size,batch):
         "reference_collection_verified":True,"integrity_check_verified":True}
 
 
-def qualify(folder,*,families=8,revisions=3,size=512*1024,approved=False):
+def qualify(folder,*,families=8,revisions=3,size=512*1024,family_start=0,approved=False):
     if approved is not True:raise ValueError("explicit scratch writes required")
     if (type(families) is not int or not 1<=families<=256 or type(revisions) is not int
             or not 2<=revisions<=16 or type(size) is not int or not 256*1024<=size<=3*MIB
+            or type(family_start) is not int or not 0<=family_start<=1000000-families
             or families*revisions*(size+1024)*2>MAX_LOGICAL):
         raise ValueError("qualification workload bound")
     folder=Path(folder).resolve(strict=True)
@@ -107,11 +108,11 @@ def qualify(folder,*,families=8,revisions=3,size=512*1024,approved=False):
         raise OSError("scratch reserve held")
     with tempfile.TemporaryDirectory(prefix="dragon-batch-",dir=folder) as temp:
         root=Path(temp)
-        serial=_trial(root/"serial",families=families,revisions=revisions,size=size,batch=False)
-        batched=_trial(root/"batched",families=families,revisions=revisions,size=size,batch=True)
+        serial=_trial(root/"serial",families=families,revisions=revisions,size=size,batch=False,family_start=family_start)
+        batched=_trial(root/"batched",families=families,revisions=revisions,size=size,batch=True,family_start=family_start)
     for key in ("logical_bytes","manifest_count","post_collection_unique_chunks","post_collection_compressed_bytes"):
         if serial[key]!=batched[key]:raise RuntimeError("archive equivalence differs")
-    result={"schema":"skeleton.dragon.batch-io-qualification.v1","families":families,"revisions":revisions,
+    result={"schema":"skeleton.dragon.batch-io-qualification.v1","families":families,"family_start":family_start,"revisions":revisions,
         "serial":serial,"batched":batched,"append_call_reduction":serial["append_api_calls"]-batched["append_api_calls"],
         "read_call_reduction":serial["read_api_calls"]-batched["read_api_calls"],
         "write_speed_ratio":round(batched["write_mib_s"]/max(serial["write_mib_s"],1e-9),6),
@@ -126,10 +127,11 @@ def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--scratch-directory",required=True);p.add_argument("--families",type=int,default=8)
     p.add_argument("--revisions",type=int,default=3);p.add_argument("--size",type=int,default=512*1024)
+    p.add_argument("--family-start",type=int,default=0)
     p.add_argument("--acknowledge-scratch-writes",action="store_true")
     a=p.parse_args(argv)
     result=qualify(a.scratch_directory,families=a.families,revisions=a.revisions,size=a.size,
-                   approved=a.acknowledge_scratch_writes)
+                   family_start=a.family_start,approved=a.acknowledge_scratch_writes)
     print("DRAGON_BATCH_COMPARATIVE_RECEIPT "+json.dumps(result,sort_keys=True))
     return 0
 
