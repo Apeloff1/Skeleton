@@ -13,7 +13,7 @@ import re
 from urllib.parse import urlsplit
 
 from core import dragon_navigation_graph as graph
-from skeleton.ai.webcrawler.source_navigation import catalogue,rank_sources,objective,score_source,BRIDGES
+from skeleton.ai.webcrawler.source_navigation import catalogue,rank_sources,objective,score_source,BRIDGES,discovery_profile
 from skeleton.ai.webcrawler.navigation_semantics import digest,words,concepts
 
 MAX_HOSTS=64
@@ -176,6 +176,7 @@ def plan(db,owner,*,query,now,limit=32,families=None,previous=None,mode="balance
             "connector_docs":"documented_endpoint_and_auth_review","observed_locator":"witnessed_hyperlinks"}[row["kind"]]
         chosen.append({**row,"priority":-neg,"jeeves":round(jeeves,8),"dragon":round(dragon,8),
             "navigation_strategy":strategy,"bridge_families":list(BRIDGES[root.family]) if root else [],
+            "navigation_profile":discovery_profile(row["url"],task,registry),
             "permission_required":True,"network_authorized":False})
     result={"schema":"skeleton.dragon.source-navigation-plan.v1","catalogue":registry.summary(),
         "sources":chosen,"ecosystems":root_plan["ecosystems"],"goals":root_plan["goals"],
