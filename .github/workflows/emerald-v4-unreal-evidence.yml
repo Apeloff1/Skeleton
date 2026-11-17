@@ -6,6 +6,10 @@ on:
       - 'scripts/qualify_emerald_unreal_v4.ps1'
       - 'scripts/verify_emerald_unreal_v4_receipt.py'
       - 'scripts/test_emerald_unreal_v4_receipt.py'
+      - 'scripts/emerald_v4_contact_geometry.py'
+      - 'scripts/emerald_v4_contact_scan.py'
+      - 'scripts/verify_emerald_v4_contact_receipt.py'
+      - 'scripts/test_emerald_v4_mesh_contact.py'
       - '.github/workflows/emerald-v4-unreal-evidence.yml'
   workflow_dispatch:
 permissions:
@@ -45,3 +49,25 @@ jobs:
           [System.Management.Automation.Language.Parser]::ParseFile($p,[ref]$tokens,[ref]$errors)|Out-Null
           if($errors.Count -gt 0){$errors|ForEach-Object { Write-Error $_.Message }; exit 1}
           Write-Output 'PowerShell parses. Installed engine and physical hardware are NOT qualified.'
+
+  mesh-contact-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact head
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - name: Compile exact mesh and hostile-test source
+        run: |
+          python3 -m py_compile scripts/emerald_v4_contact_geometry.py scripts/emerald_v4_contact_scan.py scripts/verify_emerald_v4_contact_receipt.py scripts/test_emerald_v4_mesh_contact.py
+      - name: Install fixed numerical scan dependencies
+        run: python3 -m pip install --only-binary=:all: numpy==2.3.5 scipy==1.17.0
+      - name: Run hostile geometry and receipt tests
+        run: python3 scripts/test_emerald_v4_mesh_contact.py
+      - name: Collision evidence is not qualified by this source test
+        run: echo 'No live GLB bytes in this job. No continuous CCD, source art, Unreal engine, device or RTX pass.'
