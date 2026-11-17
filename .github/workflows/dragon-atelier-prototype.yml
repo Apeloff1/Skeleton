@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'scripts/dragon_atelier_admit.py'
+      - 'scripts/emerald_asset_preflight.py'
+      - 'scripts/test_emerald_asset_preflight.py'
       - 'tests/test_dragon_atelier_admit.py'
       - 'frontend/src/features/Jeeves/companion/atelier/**'
       - 'frontend/src/features/Jeeves/CrawlerWorkspace.tsx'
@@ -50,6 +52,7 @@ jobs:
         run: |
           python3 frontend/scripts/test_emerald_assets.py
           python3 scripts/test_emerald_native_gate.py
+          python3 scripts/test_emerald_asset_preflight.py
           cd frontend && yarn test:emerald-integration
       - name: Verify recovered creator contracts
         working-directory: frontend

@@ -3,6 +3,7 @@ import {useIsFocused} from '@react-navigation/native';
 import type {AtelierPrototypeProps} from './AtelierPrototype';
 import {parsePeakReceipt,verifyFile,MAX_MODEL_BYTES,PEAK_MODEL_BYTES,FAMILIES,type Catalogue,type Family} from './atelierAsset';
 import {flightIntent} from './atelierDirector';
+import {acquireAtelierLease,type AtelierLease} from './atelierLease';
 import type {AtelierStage,AtelierCamera,AtelierQuality} from './atelierStage.web';
 type Selection={model:File|null;receipt:File|null};
 const initial:Selection={model:null,receipt:null};
@@ -21,14 +22,15 @@ export default function AtelierPrototype({state,reducedMotion}:AtelierPrototypeP
   const canvas=useRef<HTMLCanvasElement>(null);
   const stage=useRef<AtelierStage|null>(null);
   const control=useRef<AbortController|null>(null);
+  const resident=useRef<AtelierLease|null>(null);
   const intent=useRef({airborne:flightIntent(state),reduced:reducedMotion});
   intent.current={airborne:flightIntent(state),reduced:reducedMotion};
   const stop=()=>{
     control.current?.abort();control.current=null;
-    stage.current?.dispose();stage.current=null;
+    try{stage.current?.dispose();}finally{stage.current=null;resident.current?.release();resident.current=null;}
     setCatalogue(null);setManual(false);setFamily('ground');setClip('');setCamera('perspective');setQuality('balanced');
   };
-  useEffect(()=>()=>{control.current?.abort();stage.current?.dispose();},[]);
+  useEffect(()=>()=>{control.current?.abort();try{stage.current?.dispose();}finally{stage.current=null;resident.current?.release();resident.current=null;}},[]);
   useEffect(()=>{
     if(!focused){stop();setOpen(false);setSelection(initial);setBusy(false);setStatus('Original model not loaded');}
   },[focused]);
@@ -39,21 +41,25 @@ export default function AtelierPrototype({state,reducedMotion}:AtelierPrototypeP
   const load=async()=>{
     if(!canvas.current||!selection.model||!selection.receipt||control.current)return;
     const abort=new AbortController();control.current=abort;setBusy(true);setStatus('Verifying local model and clip catalogue…');
+    let lease:AtelierLease|undefined;
     try{
+      lease=acquireAtelierLease((navigator as Navigator & {deviceMemory?:number}).deviceMemory);
       if(selection.receipt.size>256*1024||selection.model.size>MAX_MODEL_BYTES)throw new Error('Local asset exceeds prototype limits');
       const receipt=parsePeakReceipt(JSON.parse(await selection.receipt.text()));
       if(abort.signal.aborted)return;
-      const bytes=await verifyFile(selection.model,receipt);
+      const bytes=await verifyFile(selection.model,receipt,abort.signal);
       if(abort.signal.aborted||!canvas.current)return;
       const {createAtelierStage}=await import('./atelierStage.web');
       if(abort.signal.aborted||!canvas.current)return;
       const mounted=await createAtelierStage(canvas.current,bytes,receipt,abort.signal,message=>{if(!abort.signal.aborted)setStatus(message);});
       if(abort.signal.aborted){mounted.dispose();return;}
-      stage.current=mounted;mounted.setIntent(intent.current.airborne,intent.current.reduced);
+      try{mounted.setIntent(intent.current.airborne,intent.current.reduced);}catch(error){mounted.dispose();throw error;}
+      stage.current=mounted;resident.current=lease;lease=undefined;
       setCatalogue(receipt.families);setClip(receipt.families.ground[0]);
     }catch(error){
       if(!abort.signal.aborted)setStatus(error instanceof Error?error.message:'Local 3D prototype unavailable');
     }finally{
+      lease?.release();
       if(control.current===abort){control.current=null;setBusy(false);}
     }
   };
