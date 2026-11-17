@@ -245,6 +245,46 @@ class DragonHoarderCopyMixin:
             "bulk_copy.state":"sealed","bulk_copy.expires_at":{"$gt":_now().timestamp()}},{"_id":1},max_time_ms=2000)
         return "sealed" if latest else "held"
 
+    async def migrate_bulk_copy(self,scope,identifier,body,*,principal):
+        """Convert a sealed copy without changing its canonical identity."""
+        from core.dragon_crawler import CrawlerError,authenticated_scope,_now
+        if authenticated_scope(principal)!=scope or principal.get("role") not in {"editor","admin"}:
+            raise CrawlerError("crawler_bulk_denied","Current editor authority required.",403)
+        if (not identity(identifier) or set(body)!={"expected_version","idempotency_key","retention_acknowledged"}
+                or type(body["expected_version"]) is not int or body["expected_version"]<1
+                or body["retention_acknowledged"] is not True):
+            raise CrawlerError("crawler_bulk_invalid","Explicit archive migration required.",422)
+        if not configured():
+            raise CrawlerError("crawler_bulk_unconfigured","Provision private Hoarder volumes first.",503)
+        await self.ensure_indexes()
+        q={**self._deep_query(scope,identifier),"deep_archive.released":True,
+            "bulk_copy_invalidated":False,"bulk_copy.state":"sealed","version":body["expected_version"]}
+        row=await self.sessions.find_one(q,max_time_ms=2000)
+        if row is None:
+            raise CrawlerError("crawler_bulk_conflict","Reload the exact sealed copy.",409)
+        try:
+            mark=validate_marker(scope,identifier,row["bulk_copy"])
+            raw,_,binding=await _bounded_discovery_cpu(self._copy_material,scope,row,_now().timestamp())
+            if any(mark[k]!=value for k,value in binding.items()):
+                raise ValueError("current archive witness changed")
+            fence={**q,"bulk_copy":mark,"archive_grant":row["archive_grant"],
+                   "source_use_policies":row.get("source_use_policies",{"$exists":False})}
+            if not await self.sessions.find_one(fence,{"_id":1},max_time_ms=2000):
+                raise ValueError("archive authority changed")
+            def migrate():
+                if _now().timestamp()>=mark["expires_at"]:
+                    raise StorageHeld("archive grant expired before migration")
+                return _archive().migrate_content_defined(scope,mark["manifest"],raw)
+            result=await _io(migrate)
+            if (result["sha256"]!=mark["expected_hash"] or result["bytes"]!=mark["expected_bytes"]
+                    or _now().timestamp()>=mark["expires_at"] or
+                    not await self.sessions.find_one(fence,{"_id":1},max_time_ms=2000)):
+                raise ValueError("archive authority changed during migration")
+        except (ValueError,TypeError,KeyError,CheckpointReplicaError,StorageHeld,sqlite3.Error,OSError,TimeoutError) as exc:
+            raise CrawlerError("crawler_bulk_migration_held","Exact migration held; replay the same current copy or reconcile cleanup.",409) from exc
+        return {"ok":True,"session_id":identifier,"version":row["version"],"migration":result,
+                "source_authorized":False,"network_executed":False}
+
     async def recover_bulk_copies(self,*,limit=2):
         from core.dragon_crawler import _now,CrawlerError
         from pymongo.errors import PyMongoError
