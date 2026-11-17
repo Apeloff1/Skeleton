@@ -94,6 +94,19 @@ test('all 8 native sidecar modes and full 14-matrix source survive Forge > Galax
   }
 });
 
+test('Galaxy selection preserves matrices only for the same genre without a replacement profile', () => {
+  const first = H.handoffFromForge(setup(), 1700000000000);
+  const same = H.handoffFromGalaxy({
+    title: 'Future Harbor', vision: '', genreId: 'beat_em_up',
+  }, first, 1700000000001);
+  assert.equal(same.galaxyProfile.config.extra_params.authored_slider_1, 99);
+  assert.equal(G.MATRIX_FIELDS.filter(k => same.galaxyProfile.config[k]).length, 14);
+  const changed = H.handoffFromGalaxy({
+    title: 'Different Genre', vision: '', genreId: 'puzzle',
+  }, first, 1700000000001);
+  assert.equal(changed.galaxyProfile, null, 'a new genre must not inherit incompatible matrices');
+});
+
 test('bridge rejects forged full Galaxy source rather than silently degrading content', () => {
   const x = H.handoffFromForge(setup(), 1700000000000);
   const forged = {
