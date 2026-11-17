@@ -630,97 +630,66 @@ def _number(value: float) -> str:
 
 def archetype_files(
     name: str, *, operator_axes: Optional[Mapping[str, float]] = None,
+    tuning: Optional[Mapping[str, float]] = None,
 ) -> Dict[str, str]:
-    """Deterministic Godot playable slice with optional *mechanical* knobs.
+    """Compile one of eight original gameplay loops and its sparse native edits.
 
-    Tempo controls movement in all three archetypes. Risk adjusts extraction
-    heat and the pipeline time budget; lethality changes combat contact damage;
-    scarcity changes extraction heat budget; agency changes interaction range;
-    grind controls combat wave count and pipeline delivery quota. Remaining
-    creative-only axes stay in the tensor/blueprint, never falsely advertised
-    as live native gameplay settings.
+    The historical tuning keyword is admitted solely as a compatibility alias.
+    Callers cannot combine it with the authoritative operator_axes input, and
+    no user-provided source, path, expression or arbitrary GDScript is executed.
+    Every nonempty tuning now emits one exact source-bound receipt.
     """
     if type(name) is not str or name not in content_archetypes():
         raise KeyError("unsupported original playable archetype")
-    axes = _admit_axes(operator_axes)
+    if operator_axes is not None and tuning is not None:
+        raise ValueError("conflicting playable tuning authorities")
+    axes = _admit_axes(tuning if tuning is not None else operator_axes)
     if name in _EXPANDED_SPECS:
         return _expanded_files(name, axes)
-    body, speed, max_frames = _SPECS[name]
-    if "tempo" in axes:
-        speed = round(speed * (0.75 + 0.5 * axes["tempo"]), 2)
-    if name == "extraction":
-        if "risk" in axes:
-            body = _swap_constant(
-                body, "const HEAT_PER_SECOND := 6.0",
-                "const HEAT_PER_SECOND := " + _number(3.0 + 7.0 * axes["risk"]),
-            )
-        if "scarcity" in axes:
-            body = _swap_constant(
-                body, "const HEAT_LIMIT := 100.0",
-                "const HEAT_LIMIT := " + _number(120.0 - 50.0 * axes["scarcity"]),
-            )
-        if "agency" in axes:
-            body = _swap_constant(
-                body, "const PICKUP_RADIUS := 12.0",
-                "const PICKUP_RADIUS := " + _number(8.0 + 12.0 * axes["agency"]),
-            )
-    elif name == "combat_loop":
-        if "lethality" in axes:
-            body = _swap_constant(
-                body, "const CONTACT_DAMAGE := 1",
-                "const CONTACT_DAMAGE := " + str(1 + int(4.0 * axes["lethality"] + 0.5)),
-            )
-        if "grind" in axes:
-            body = _swap_constant(
-                body, "const WAVES := 3",
-                "const WAVES := " + str(2 + int(3.0 * axes["grind"] + 0.5)),
-            )
-        if "agency" in axes:
-            body = _swap_constant(
-                body, "const ATTACK_RANGE := 24.0",
-                "const ATTACK_RANGE := " + _number(16.0 + 24.0 * axes["agency"]),
-            )
-    elif name == "pipeline":
-        if "grind" in axes:
-            body = _swap_constant(
-                body, "const QUOTA := 4",
-                "const QUOTA := " + str(2 + int(6.0 * axes["grind"] + 0.5)),
-            )
-        if "agency" in axes:
-            body = _swap_constant(
-                body, "const RADIUS := 12.0",
-                "const RADIUS := " + _number(8.0 + 12.0 * axes["agency"]),
-            )
-        if "risk" in axes:
-            # High risk shortens the completion window but never removes
-            # enough time for a low-end machine to finish the 4-load demo.
-            max_frames = round(max_frames * (1.5 - 0.5 * axes["risk"]))
 
+    from skeleton.forge.playable_tuning import (
+        SOURCE_PATH, compile_playable_tuning, tuning_source,
+    )
+    body, speed, max_frames = _SPECS[name]
     fmt = {"name": name, "version": ARCHETYPE_CONTENT_VERSION}
     title = "".join(part.capitalize() for part in name.split("_")) + "Main"
-    return {
-        f"scenes/archetypes/{name}/main.tscn": _SCENE.format(name=name, title=title),
-        f"scripts/archetypes/{name}/player_controller.gd": _CONTROLLER.format(speed=speed, **fmt),
-        f"scripts/archetypes/{name}/core_loop.gd": _LOOP_HEADER.format(
-            max_frames=max_frames, complete=COMPLETE_MARKER, failed=FAILED_MARKER,
-            instruction=_INSTRUCTIONS[name], **fmt
-        ) + body,
+    player = _CONTROLLER.format(speed=speed, **fmt)
+    loop = _LOOP_HEADER.format(
+        max_frames=max_frames, complete=COMPLETE_MARKER, failed=FAILED_MARKER,
+        instruction=_INSTRUCTIONS[name], **fmt,
+    ) + body
+    player, loop, receipt = compile_playable_tuning(
+        name, axes or None, speed=speed, player=player, loop=loop,
+    )
+    result = {
+        f"scenes/archetypes/{name}/main.tscn": _SCENE.format(
+            name=name, title=title,
+        ),
+        f"scripts/archetypes/{name}/player_controller.gd": player,
+        f"scripts/archetypes/{name}/core_loop.gd": loop,
     }
-
+    if receipt is not None:
+        result[SOURCE_PATH] = tuning_source(receipt)
+    return result
 
 def verify_archetype_content(
-    files: Mapping[str, str], name: str, *, operator_axes: Optional[Mapping[str, float]] = None,
+    files: Mapping[str, str], name: str, *,
+    operator_axes: Optional[Mapping[str, float]] = None,
+    tuning: Optional[Mapping[str, float]] = None,
 ) -> bool:
     """Source-verification after all independent Godot/quest file writers."""
     return isinstance(files, Mapping) and all(
         files.get(path) == body
-        for path, body in archetype_files(name, operator_axes=operator_axes).items()
+        for path, body in archetype_files(
+            name, operator_axes=operator_axes, tuning=tuning,
+        ).items()
     )
 
 
 def attach_archetype_content(
     files: Mapping[str, str], name: str, *,
     operator_axes: Optional[Mapping[str, float]] = None,
+    tuning: Optional[Mapping[str, float]] = None,
 ) -> Dict[str, str]:
     """Layer ``name``'s playable slice onto an emitted project (additive only).
 
@@ -736,7 +705,9 @@ def attach_archetype_content(
         raise ValueError("playable project file identity or source is invalid")
     key = name if name in content_archetypes() else "extraction"
     out = dict(files)
-    for path, body in archetype_files(key, operator_axes=operator_axes).items():
+    for path, body in archetype_files(
+        key, operator_axes=operator_axes, tuning=tuning,
+    ).items():
         if path in out and out[path] != body:
             raise ValueError("playable archetype output collides with existing source: " + path)
         out[path] = body
