@@ -6,11 +6,11 @@
   "objective": "Measure model instruction and classification robustness, domain constraints task 16",
   "steps": [
     {
-      "prompt": "Count the ASCII letters in \"pine\". Reply with the decimal integer only.",
+      "prompt": "Count the ASCII letters in \"alder\". Reply with the decimal integer only.",
       "checks": [
         {
           "kind": "exact",
-          "expected": "4"
+          "expected": "5"
         }
       ],
       "intermediate": false
