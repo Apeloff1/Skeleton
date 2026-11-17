@@ -30,7 +30,7 @@ test('native source checks and opt-in modes appear in options UI', () => {
     dispatch: () => {}, beats: Q.FALLBACK_BEATS, onForge: () => {},
   }));
   for (const id of ['off', 'auto', 'require']) {
-    assert.match(html, new RegExp('data-testid="q-native-playtest-' + id + '"'));
+    assert.match(html, new RegExp('data-testid="q-playtest-' + id + '"'));
   }
   assert.match(text(html), /independently of the main world/);
 });
@@ -48,7 +48,9 @@ test('scene proof needs exact completion status and admitted Godot provenance', 
     assert.equal(R.playableSceneView({ ...base, playable_scene_playtest: p }).tone, 'bad');
   }
   assert.equal(R.playableSceneView({ ...base, playable_scene_playtest: { status: 'passed', passed: true, verified: false } }).tone, 'warn');
-  assert.equal(R.playableSceneView({ ...base, playable_scene_playtest: { status: 'passed', passed: true, verified: true } }).tone, 'ok');
+  assert.equal(R.playableSceneView({ ...base, playable_scene_playtest: { status: 'passed', passed: true, verified: true } }).tone, 'warn');
+  assert.equal(R.playableSceneView({ ...base, playable_scene_playtest: { status: 'passed', passed: true, verified: true, scene: 'scenes/archetypes/puzzle/main.tscn' } }).tone, 'ok');
+  assert.equal(R.playableSceneView({ ...base, playable_scene_playtest: { status: 'passed', passed: true, verified: true, scene: 'scenes/archetypes/racing/main.tscn' } }).tone, 'bad');
 });
 test('run view warns when native gameplay succeeds on unknown engine binary', () => {
   const payload = {
@@ -58,12 +60,12 @@ test('run view warns when native gameplay succeeds on unknown engine binary', ()
     playtest: { status: 'passed', passed: true, verified: false },
     playable_scene_playtest: {
       status: 'passed', passed: true, verified: false,
-      scene: 'res://scenes/archetypes/puzzle/main.tscn',
+      scene: 'scenes/archetypes/puzzle/main.tscn',
     },
   };
-  const html = render(h(Panel, { phase: 'success', payload, startedAt: 1, finishedAt: 2001 }));
-  assert.match(html, /data-testid="run-native-playable-scene"/);
-  assert.match(html, /data-testid="run-native-binary-unverified"/);
+  const html = render(h(Panel, { phase: 'done', payload, startedAt: 1, finishedAt: 2001 }));
+  assert.match(html, /data-testid="run-playable-scene-qualification"/);
+  assert.match(html, /data-testid="run-playable-binary-unverified"/);
   assert.match(text(html), /puzzle/);
-  assert.match(text(html), /engine integrity unverified/);
+  assert.match(text(html), /release provenance is unverified/);
 });
