@@ -244,7 +244,9 @@ def implementation_digest():
                 "robot_scene_artifacts.py",
             )
         }
-    from .source_navigation import catalogue_binding, catalogue
+    from .source_navigation import catalogue_binding, catalogue, packaged_catalogue_parts
+    for part in packaged_catalogue_parts():
+        files['catalogues/'+part.name]=hashlib.sha256(part.read_bytes()).hexdigest()
     binding = catalogue_binding()
     if binding is not None:
         manifest_digest = hashlib.sha256(binding[1]).hexdigest()
