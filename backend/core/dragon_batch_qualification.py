@@ -26,7 +26,9 @@ MAX_LOGICAL=2*GIB
 
 def _trial(root,*,families,revisions,size,batch):
     root.mkdir(mode=0o700)
-    paths=[root/"volume-a",root/"volume-b"]
+    # One volume per physical filesystem is a production invariant. A CI
+    # scratch folder cannot simulate independent devices with two directories.
+    paths=[root/"volume-a"]
     for path in paths:path.mkdir(mode=0o700)
     specs=tuple(Volume("volume-"+str(i),path,GIB+families*revisions*(size+1024))
                 for i,path in enumerate(paths))
