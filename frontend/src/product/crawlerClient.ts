@@ -1180,6 +1180,54 @@ export async function getResearchNavigationPlan(query:string,mode:ResearchNaviga
     invalid('Invalid research plan receipt.');
   return v;
 }
+export type BulkMigrationCandidate={session_id:string;version:number;manifest:string;expected_bytes:number;expires_at:number;physical_layout_verified:false};
+export type BulkMigrationReceipt={manifest:string;sha256:string;bytes:number;chunks:number;
+  layout:'content_defined_v1';switched:boolean;replayed:boolean;readback_verified:true;garbage_remaining:number;
+  unreferenced_chunks_collected:number;canonical_primary_replaced:false;physical_secure_erasure:false};
+function validateBulkMigrationReceipt(v:BulkMigrationReceipt):BulkMigrationReceipt{
+  if(!v||!HASH.test(v.manifest)||!HASH.test(v.sha256)||!integer(v.bytes,4*1024*1024)||v.bytes<1
+    ||!integer(v.chunks,512)||v.chunks<1||v.layout!=='content_defined_v1'||v.readback_verified!==true
+    ||typeof v.switched!=='boolean'||typeof v.replayed!=='boolean'||v.switched===v.replayed
+    ||!integer(v.garbage_remaining)||!integer(v.unreferenced_chunks_collected,128)
+    ||v.canonical_primary_replaced!==false||v.physical_secure_erasure!==false) invalid('Invalid archive migration receipt.');
+  return v;
+}
+export async function listBulkMigrationCandidates(after?:string,limit=32,signal?:AbortSignal){
+  if(after!==undefined&&!ID.test(after)||!integer(limit,64)||limit<1)invalid('Invalid archive migration cursor.');
+  const v=await read(api.get<{candidates:BulkMigrationCandidate[];next_cursor:string|null;source_authorized:false;network_executed:false}>(
+      ROOT+'/companion/bulk-migration-candidates?limit='+limit+(after?'&after='+encodeURIComponent(after):''),options(signal)),
+    getAuthToken(),'Archive migration inventory unavailable.');
+  if(!v||v.source_authorized!==false||v.network_executed!==false||!Array.isArray(v.candidates)||v.candidates.length>limit
+    ||v.next_cursor!==null&&!ID.test(v.next_cursor)||v.candidates.some(x=>!x||!ID.test(x.session_id)||!HASH.test(x.manifest)
+       ||!integer(x.version)||x.version<1||!integer(x.expected_bytes,4*1024*1024)||x.expected_bytes<1
+       ||!Number.isFinite(x.expires_at)||x.physical_layout_verified!==false))invalid('Invalid archive migration inventory.');
+  return v;
+}
+export async function migrateBulkArchive(id:string,body:CrawlCommand&{retention_acknowledged:true},signal?:AbortSignal){
+  if(!ID.test(id)||body.retention_acknowledged!==true||!integer(body.expected_version)||body.expected_version<1)
+    invalid('Explicit archive migration required.');
+  const v=await read(api.post<{ok:true;session_id:string;version:number;migration:BulkMigrationReceipt;
+    source_authorized:false;network_executed:false}>(ROOT+'/sessions/'+encodeURIComponent(id)+'/migrate-bulk-copy',body,options(signal)),
+    getAuthToken(),'Archive migration held; replay the current exact copy.');
+  if(!v||v.ok!==true||v.session_id!==id||v.version!==body.expected_version||v.source_authorized!==false||v.network_executed!==false)
+    invalid('Archive migration identity differs.');
+  validateBulkMigrationReceipt(v.migration);return v;
+}
+export async function migrateBulkArchiveBatch(sessions:(CrawlCommand&{session_id:string})[],retentionAcknowledged:true,signal?:AbortSignal){
+  if(retentionAcknowledged!==true||!Array.isArray(sessions)||sessions.length<1||sessions.length>8
+    ||new Set(sessions.map(x=>x.session_id)).size!==sessions.length||sessions.some(x=>!ID.test(x.session_id)
+       ||!integer(x.expected_version)||x.expected_version<1||!x.idempotency_key))invalid('Explicit bounded archive migration batch required.');
+  const v=await read(api.post<{outcomes:{session_id:string;state:'verified'|'held';result?:BulkMigrationReceipt;code?:string}[];
+      verified:number;held:number;atomic_batch:false;source_authorized:false;network_executed:false}>(
+      ROOT+'/companion/migrate-bulk-batch',{sessions,retention_acknowledged:true},options(signal)),
+    getAuthToken(),'Batch migration not confirmed; replay the same current copies.');
+  if(!v||v.atomic_batch!==false||v.source_authorized!==false||v.network_executed!==false||!Array.isArray(v.outcomes)
+     ||v.outcomes.length!==sessions.length||!integer(v.verified,8)||!integer(v.held,8)||v.verified+v.held!==sessions.length
+     ||v.outcomes.some((x,i)=>!x||x.session_id!==sessions[i].session_id||!['verified','held'].includes(x.state)))
+    invalid('Invalid batch migration outcome.');
+  for(const x of v.outcomes){if(x.state==='verified'){if(!x.result)invalid('Migration receipt missing.');validateBulkMigrationReceipt(x.result);}else if(!x.code)invalid('Migration hold reason missing.');}
+  return v;
+}
 export type ArchiveIntelligenceReport={
   snapshot_digest:string;grant_digest:string;qualified_sources:number;unique_texts:number;
   logical_utf8_bytes:number;unique_text_utf8_bytes:number;exact_duplicate_bytes_estimate:number;
