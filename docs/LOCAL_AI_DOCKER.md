@@ -408,3 +408,17 @@ the image dependency install plan while retaining baseline application and
 where this build argument is absent or disabled. This reduces optional hosted
 SDK attack surface; it does **not** assert that transitive dependencies can
 never contain HTTP clients, nor that the application network is air-gapped.
+
+### Real Docker Compose parser validation in CI
+
+The source-only `scripts/qualify_local_ai_compose.py` invokes the actual
+`docker compose config --format json` parser for CPU, NVIDIA and ROCm
+with ephemeral generated synthetic credentials and a temporary model-mount
+path. It never prints the sensitive Compose JSON, contacts a Docker daemon,
+pulls an image, downloads weights, or claims physical accelerator execution.
+It rejects provider-fence drift, missing mandatory services, unexpected new
+services, unsafe mounts, missing local-only image build args, resource limits
+and missing GPU profile requests. Chroma may be absent when its optional
+Compose profile is inactive. The launch path uses bounded Compose `--wait`
+health admission before the existing backend provider readiness check; it
+still does not authorize real chat without the trusted model guard.

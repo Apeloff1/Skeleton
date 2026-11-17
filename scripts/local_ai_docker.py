@@ -82,9 +82,9 @@ def _run(args: Sequence[str], *, root: Path = ROOT, capture: bool = False) -> st
 
 def _mount_from_compose(data: Mapping[str, object]) -> tuple[Path, str]:
     services = data.get("services")
-    if not isinstance(services, dict) or set(services) != {
-        "mongo", "skeleton", "backend", "frontend", "chroma",
-    }:
+    required_services = {"mongo", "skeleton", "backend", "frontend"}
+    actual_services = set(services) if isinstance(services, dict) else set()
+    if actual_services not in (required_services, required_services | {"chroma"}):
         raise LocalDockerError("compose runtime service topology differs from canonical assembly")
     skeleton = services.get("skeleton")
     if not isinstance(skeleton, dict):
@@ -146,15 +146,10 @@ def _bounded_limit(value: object, *, name: str) -> str:
     return text
 
 
-def inspect_config(mode: str, root: Path = ROOT) -> dict[str, object]:
-    command = compose_command(mode, root)
-    raw = _run([*command, "config", "--format", "json"], root=root, capture=True)
-    try:
-        topology = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise LocalDockerError("Docker Compose returned invalid topology JSON") from exc
-    if not isinstance(topology, dict):
-        raise LocalDockerError("Docker Compose returned invalid topology")
+def _validate_config(mode: str, topology: dict[str, object]) -> dict[str, object]:
+    """Check normalized Compose output, including optional Chroma profile."""
+    if mode not in GPU_OVERLAYS or not isinstance(topology, dict):
+        raise LocalDockerError("invalid Docker local-AI profile or topology")
     mount, image = _mount_from_compose(topology)
     skeleton = topology["services"]["skeleton"]
     limits = {
@@ -199,12 +194,23 @@ def inspect_config(mode: str, root: Path = ROOT) -> dict[str, object]:
         "image": image,
         "runtime_service": "skeleton",
         "provider": "local",
-        "services": 5,
+        "services": len(topology["services"]),
+        "optional_chroma_present": "chroma" in topology["services"],
         "limits": limits,
         "render_gid": render_gid,
         "downloaded_models": False,
         "inference_executed": False,
     }
+
+
+def inspect_config(mode: str, root: Path = ROOT) -> dict[str, object]:
+    command = compose_command(mode, root)
+    raw = _run([*command, "config", "--format", "json"], root=root, capture=True)
+    try:
+        topology = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise LocalDockerError("Docker Compose returned invalid topology JSON") from exc
+    return _validate_config(mode, topology)
 
 
 def _isolated_container(
@@ -400,7 +406,10 @@ def up(mode: str, root: Path = ROOT) -> None:
     first = _run_model_step(mode, "preflight", root=root)
     qualified = _run_model_step(mode, "qualify", root=root)
     _require_same_model(first, qualified)
+    # Docker Compose -d alone returns before backend readiness; bound startup
+    # health checks instead of declaring a false unavailable provider on race.
     _run([*compose_command(mode, root), "up", "-d", "--no-build",
+          "--wait", "--wait-timeout", "180",
           "mongo", "skeleton", "backend", "frontend"], root=root)
     live = live_ai_status(mode, root)
     print(json.dumps(live, sort_keys=True))

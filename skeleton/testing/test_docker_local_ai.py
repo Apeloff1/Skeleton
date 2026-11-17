@@ -430,6 +430,7 @@ def test_model_receipts_must_qualify_before_compose_up(tmp_path: Path) -> None:
     assert calls[0] == ["docker", "preflight"]
     assert calls[1] == ["docker", "qualify"]
     assert ["docker", "compose", "up", "-d", "--no-build",
+            "--wait", "--wait-timeout", "180",
             "mongo", "skeleton", "backend", "frontend"] in calls
 
 
@@ -526,3 +527,28 @@ def test_local_image_rejects_hosted_dependency_profile_drift(tmp_path: Path) -> 
     config["services"]["skeleton"]["build"]["args"].pop("SKL_LOCAL_ONLY_IMAGE")
     with pytest.raises(host.LocalDockerError, match="exclude hosted"):
         host._mount_from_compose(config)
+
+
+def test_optional_chroma_profile_absent_is_valid_canonical_assembly(tmp_path: Path) -> None:
+    cfg = _fake_config(tmp_path)
+    cfg["services"].pop("chroma")
+    effective = host._validate_config("cpu", cfg)
+    assert effective["services"] == 4
+    assert effective["optional_chroma_present"] is False
+
+
+def test_running_engine_waits_for_bounded_compose_health() -> None:
+    source = (Path(__file__).resolve().parents[2] / "scripts/local_ai_docker.py").read_text()
+    assert '"--wait", "--wait-timeout", "180"' in source
+    assert '"--no-build"' in source
+
+
+def test_extra_service_and_missing_mandatory_service_both_fail(tmp_path: Path) -> None:
+    for modified in (
+        lambda config: config["services"].update({"remote-inference": {}}),
+        lambda config: config["services"].pop("mongo"),
+    ):
+        config = _fake_config(tmp_path)
+        modified(config)
+        with pytest.raises(host.LocalDockerError, match="topology"):
+            host._validate_config("cpu", config)
