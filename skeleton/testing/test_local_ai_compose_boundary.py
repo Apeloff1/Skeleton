@@ -203,3 +203,33 @@ def test_full_boundary_is_enforced_by_operator_without_leaking_credentials(
         host._validate_config("cpu", config)
     assert "synthetic_custody_value" not in str(err.value)
     assert "mongodb:" not in str(err.value)
+
+
+@pytest.mark.parametrize("name", ["mongo", "backend", "frontend", "skeleton", "chroma"])
+def test_canonical_service_cannot_join_other_compose_network(
+    tmp_path: Path, name: str,
+) -> None:
+    config = _valid(tmp_path)
+    config["services"][name]["networks"]["other_bridge"] = None
+    with pytest.raises(ComposeBoundaryError, match="network membership"):
+        validate_compose_boundary(config)
+
+
+@pytest.mark.parametrize("change", [
+    {"driver": "overlay"},
+    {"name": "unexpected name"},
+])
+def test_compose_network_contract_requires_one_private_bridge(
+    tmp_path: Path, change: dict,
+) -> None:
+    config = _valid(tmp_path)
+    config["networks"]["tutolage"].update(change)
+    with pytest.raises(ComposeBoundaryError, match="network"):
+        validate_compose_boundary(config)
+
+
+def test_compose_network_cannot_add_external_attachment(tmp_path: Path) -> None:
+    config = _valid(tmp_path)
+    config["networks"]["other"] = {"name": "public-network", "external": True}
+    with pytest.raises(ComposeBoundaryError, match="bridge network"):
+        validate_compose_boundary(config)
