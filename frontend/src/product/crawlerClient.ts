@@ -1244,6 +1244,89 @@ export async function closeResearchCampaign(id:string,expectedRevision:number,si
   if(v.state!=='closed'||typeof v.replayed!=='boolean')invalid('Campaign close not confirmed.');
   return v;
 }
+export type SourceCatalogueSummary={schema:'skeleton.dragon.source-catalogue.v1';revision:string;catalogue_digest:string;
+  sources:number;hosts:number;families:Record<string,number>;candidate_only:true;network_authorized:false};
+export type SourceNavigationCandidate={candidate_id:string;source_id:string|null;target_id:string|null;name:string;
+  url:string;host:string;family:string;kind:string;ecosystems:string[];relevance:number;priority:number;
+  historical_quality:number;restriction_rate:number;witness_count:number;lineage_support:number;observed:boolean;
+  origin:'registry'|'retained_graph';jeeves:number;dragon:number;navigation_strategy:string;bridge_families:string[];
+  permission_required:true;network_authorized:false;access_verified:false;rights_verified:false};
+export type SourceNavigationPlan={schema:'skeleton.dragon.source-navigation-plan.v1';catalogue:SourceCatalogueSummary;
+  sources:SourceNavigationCandidate[];ecosystems:string[];goals:string[];distinct_hosts:number;
+  mode:'balanced'|'coverage'|'exploration'|'conservation';retained_graph_candidates:number;
+  index_backfill_pending:boolean;lane_truncated:boolean;selection_is_advisory:true;model_inference_executed:false;
+  network_authorized:false;source_rights_granted:false;receipt:string};
+const SOURCE_FAMILIES=new Set(['game-discovery','mods','mmo','game-worlds','engine-tools','open-assets','datasets','apis','history-media','global']);
+const SOURCE_KINDS=new Set(['directory','community','reference','documentation','asset_catalogue','dataset','connector_docs','observed_locator']);
+const SOURCE_HOST=/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/;
+function sourceCatalogueValid(v:SourceCatalogueSummary){
+  return !!v&&v.schema==='skeleton.dragon.source-catalogue.v1'&&/^\d{4}-\d{2}-\d{2}$/.test(v.revision)
+    &&HASH.test(v.catalogue_digest)&&integer(v.sources,4096)&&v.sources>0&&integer(v.hosts,v.sources)&&v.hosts>0
+    &&!!v.families&&Object.entries(v.families).every(([k,n])=>SOURCE_FAMILIES.has(k)&&integer(n,v.sources))
+    &&Object.values(v.families).reduce((s,n)=>s+n,0)===v.sources&&v.candidate_only===true&&v.network_authorized===false;
+}
+function sourceLeadUrl(url:string,host:string){
+  if(!navigationUrl(url)||!SOURCE_HOST.test(host))return false;
+  const p=new URL(url);return p.protocol==='https:'&&p.hostname===host&&!p.search&&(!p.port||p.port==='443');
+}
+export async function getSourceNavigationPlan(body:{query:string;limit?:number;families?:string[];
+  previous?:string[];mode?:SourceNavigationPlan['mode']},signal?:AbortSignal){
+  const limit=body.limit??32,mode=body.mode??'balanced';
+  if(typeof body.query!=='string'||!body.query.trim()||body.query.length>512||!integer(limit,48)||limit<1
+    ||!['balanced','coverage','exploration','conservation'].includes(mode)||body.families!==undefined
+      &&(body.families.length>10||body.families.some(x=>!SOURCE_FAMILIES.has(x)))
+    ||body.previous!==undefined&&(body.previous.length>512||new Set(body.previous).size!==body.previous.length
+      ||body.previous.some(x=>!HASH.test(x))))invalid('Invalid source exploration plan.');
+  const v=await read(api.post<SourceNavigationPlan>(ROOT+'/navigation/source-plan',{...body,limit,mode},options(signal)),
+    getAuthToken(),'Source exploration unavailable.');
+  if(!v||v.schema!=='skeleton.dragon.source-navigation-plan.v1'||!sourceCatalogueValid(v.catalogue)||!HASH.test(v.receipt)
+    ||v.mode!==mode||v.selection_is_advisory!==true||v.model_inference_executed!==false||v.network_authorized!==false
+    ||v.source_rights_granted!==false||!Array.isArray(v.sources)||v.sources.length>limit
+    ||!integer(v.retained_graph_candidates,48)||!integer(v.distinct_hosts,v.sources.length)
+    ||typeof v.index_backfill_pending!=='boolean'||typeof v.lane_truncated!=='boolean'
+    ||!Array.isArray(v.goals)||!Array.isArray(v.ecosystems)
+    ||new Set(v.sources.map(x=>x.candidate_id)).size!==v.sources.length||new Set(v.sources.map(x=>x.url)).size!==v.sources.length
+    ||new Set(v.sources.map(x=>x.host)).size!==v.distinct_hosts||v.sources.some(x=>!x||!HASH.test(x.candidate_id)
+      ||body.previous?.includes(x.candidate_id)||x.source_id!==null&&!HASH.test(x.source_id)
+      ||x.target_id!==null&&!HASH.test(x.target_id)||!sourceLeadUrl(x.url,x.host)
+      ||typeof x.name!=='string'||!['registry','retained_graph'].includes(x.origin)
+      ||x.observed!==(x.origin==='retained_graph')||x.origin==='registry'&&(x.target_id!==null||x.candidate_id!==x.source_id)
+      ||x.origin==='retained_graph'&&x.candidate_id!==x.target_id
+      ||!(SOURCE_FAMILIES.has(x.family)||x.family==='discovered')||!SOURCE_KINDS.has(x.kind)
+      ||![x.relevance,x.priority,x.historical_quality,x.restriction_rate,x.lineage_support,x.jeeves,x.dragon].every(navigationUnit)
+      ||!integer(x.witness_count,256)||x.permission_required!==true||x.network_authorized!==false
+      ||x.access_verified!==false||x.rights_verified!==false||!Array.isArray(x.bridge_families)
+      ||x.bridge_families.some(k=>!SOURCE_FAMILIES.has(k))))invalid('Invalid source navigation receipt.');
+  return v;
+}
+export async function getSourceAtlas(after?:string,limit=32,signal?:AbortSignal){
+  if(after!==undefined&&!SOURCE_HOST.test(after)||!integer(limit,64)||limit<1)invalid('Invalid source atlas cursor.');
+  const v=await read(api.get<{hosts:{host:string;known_source_ids:string[];sample_targets:number;sample_truncated:boolean;
+    observed_phases:Record<string,number>;captured_witnesses:number;metadata_only:true;network_authorized:false}[];
+    next_cursor:string|null;catalogue:SourceCatalogueSummary;sample_is_bounded:true;global_completeness_claimed:false;
+    network_authorized:false;receipt:string}>(ROOT+'/navigation/source-atlas?limit='+limit+(after?'&after='+encodeURIComponent(after):''),options(signal)),
+    getAuthToken(),'Retained source atlas unavailable.');
+  if(!v||!sourceCatalogueValid(v.catalogue)||!HASH.test(v.receipt)||v.sample_is_bounded!==true||v.global_completeness_claimed!==false
+    ||v.network_authorized!==false||!Array.isArray(v.hosts)||v.hosts.length>limit
+    ||v.next_cursor!==null&&!SOURCE_HOST.test(v.next_cursor)||v.hosts.some(x=>!SOURCE_HOST.test(x.host)
+      ||!integer(x.sample_targets,12)||!integer(x.captured_witnesses,3072)||typeof x.sample_truncated!=='boolean'
+      ||!Array.isArray(x.known_source_ids)||x.known_source_ids.some(k=>!HASH.test(k))
+      ||x.metadata_only!==true||x.network_authorized!==false))invalid('Invalid retained source atlas.');
+  return v;
+}
+export async function traceSourceBridges(host:string,after?:string,limit=24,signal?:AbortSignal){
+  if(!SOURCE_HOST.test(host)||after!==undefined&&!HASH.test(after)||!integer(limit,48)||limit<1)invalid('Invalid source bridge query.');
+  const v=await read(api.get<{host:string;targets:{target_id:string;url:string;host:string;parent_ids:string[];network_authorized:false}[];
+    parent_sample_count:number;next_cursor:string|null;sample_truncated:boolean;graph_complete:false;network_authorized:false;receipt:string}>(
+      ROOT+'/navigation/source-trace?host='+encodeURIComponent(host)+'&limit='+limit+(after?'&after='+after:''),options(signal)),
+    getAuthToken(),'Source bridge evidence unavailable.');
+  if(!v||v.host!==host||!HASH.test(v.receipt)||v.graph_complete!==false||v.network_authorized!==false
+    ||!integer(v.parent_sample_count,12)||typeof v.sample_truncated!=='boolean'||!Array.isArray(v.targets)||v.targets.length>limit
+    ||v.next_cursor!==null&&!HASH.test(v.next_cursor)||v.targets.some(x=>!HASH.test(x.target_id)||!sourceLeadUrl(x.url,x.host)
+      ||x.host===host||!Array.isArray(x.parent_ids)||x.parent_ids.length<1||x.parent_ids.length>4
+      ||x.parent_ids.some(k=>!HASH.test(k))||x.network_authorized!==false))invalid('Invalid source bridge evidence.');
+  return v;
+}
 export type ResearchFleet={
   fleet_id:string;revision:number;created_at:number;expires_at:number;budget:number;remaining:number;
   state:'active'|'closed'|'exhausted'|'expired';members:{campaign_id:string;weight:number;rounds:number;
