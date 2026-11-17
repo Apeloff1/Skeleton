@@ -102,8 +102,7 @@ def _digest(value):
 
 def implementation_digest():
     root = Path(__file__).parent
-    return _digest(
-        {
+    files = {
             name: hashlib.sha256((root / name).read_bytes()).hexdigest()
             for name in (
                 "operations.py",
@@ -120,6 +119,8 @@ def implementation_digest():
                 "document_formats.py",
                 "frontier_scheduler.py",
                 "source_navigation.py",
+                "source_catalogue_index.py",
+                "source_catalogue_bulk.py",
                 "catalogues/dragon_source_catalogue.v1.json",
                 "navigation_backlog.py",
                 "navigation_semantics.py",
@@ -243,7 +244,14 @@ def implementation_digest():
                 "robot_scene_artifacts.py",
             )
         }
-    )
+    from .source_navigation import catalogue_binding, catalogue
+    binding = catalogue_binding()
+    if binding is not None:
+        manifest_digest = hashlib.sha256(binding[1]).hexdigest()
+        if catalogue().digest != manifest_digest:
+            raise CrawlOperationError("source catalogue generation changed during binding")
+        files["reviewed_source_index_manifest"] = manifest_digest
+    return _digest(files)
 
 
 def _integer(value, low, high, name):
