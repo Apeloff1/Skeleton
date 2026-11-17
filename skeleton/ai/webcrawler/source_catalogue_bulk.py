@@ -17,6 +17,7 @@ import tempfile
 
 from .source_navigation import (
     Catalogue, REGISTRY_PATH, MAX_BYTES, MAX_REGISTRY, FAMILIES, KINDS, _root,
+    packaged_catalogue_bytes,
 )
 
 BASELINE = 382
@@ -90,7 +91,7 @@ def expand(base_path, export_path, *, expected_base_sha256,
             or len(rights_reference) > 512
             or any(ord(c) < 32 or ord(c) == 127 for c in rights_reference)):
         raise ValueError("explicit metadata rights reference required")
-    raw = _bytes(base_path, MAX_BYTES)
+    raw = packaged_catalogue_bytes(base_path)
     if _hash(raw) != expected_base_sha256:
         raise ValueError("base catalogue digest mismatch")
     base = Catalogue(raw)
