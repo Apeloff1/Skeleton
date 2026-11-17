@@ -497,7 +497,7 @@ def test_model_receipts_must_qualify_before_compose_up(tmp_path: Path) -> None:
     assert calls[0] == ["docker", "preflight"]
     assert calls[1] == ["docker", "qualify"]
     assert ["docker", "compose", "up", "-d", "--no-build",
-            "--wait", "--wait-timeout", "180",
+            "--pull", "never", "--wait", "--wait-timeout", "180",
             "mongo", "skeleton", "backend", "frontend"] in calls
 
 
