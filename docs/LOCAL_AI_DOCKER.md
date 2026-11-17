@@ -56,6 +56,47 @@ authority. Model weights and executable libraries are **operator-owned** and
 never copied into the engine image. Their bind mount is read-only in normal
 service operation.
 
+
+## Full-stack Compose admission (new source hardening)
+
+The host doctor, build, pin, preflight, qualify, up and status commands now
+enforce a second independent boundary on the **rendered effective** Compose
+document before starting a container or running the model. This covers the
+canonical browser/backend/engine/Mongo/optional-Chroma stack, rather than
+checking only the engine. The validator lives in
+`scripts/local_ai_compose_boundary.py`.
+
+- **Ingress:** each canonical service must publish exactly one TCP port on
+  `127.0.0.1` or `::1`. Wildcard, LAN, additional, privileged or host-network
+  mappings are rejected. Internal target ports for the APIs/Mongo/Chroma remain
+  fixed; the published frontend container target may be configured.
+- **Browser:** runtime `EXPO_PUBLIC_BACKEND_URL` and
+  `EXPO_PUBLIC_SKELETON_URL` must match the *actual rendered published*
+  backend/engine ports, resolve only to local loopback, and equal the values
+  baked into the frontend image build. This rejects a remotely redirected UI
+  while the model is supposedly local.
+- **Backend/database:** backend must talk only to the canonical engine service,
+  retain the Jeeves local-only owner and service token, and use an authenticated
+  internal Mongo URI. The engine Mongo URI is independently checked. Mongo's
+  root-user setup must not be blank.
+- **State and custody:** engine, backend, Mongo data/config and optional Chroma
+  must preserve their canonical writable **named** volume targets. The reviewed
+  Mongo/Chroma images must retain digest pinning; Chroma remains behind its
+  `full` profile so the existing physical recovery hold cannot be bypassed by
+  silently enabling it.
+- **Adversarial checks:** dedicated source tests reject non-loopback publishing
+  on *every* service, remote UI origins, mismatched frontend build origins,
+  uncredentialed/remote Mongo, unexpected sidecars, privilege expansion,
+  unpinned DB images and replaced authority volumes. These tests are included
+  in existing Backend Quality and first-install qualification lanes.
+
+A passing result reports `compose_boundary` with
+`actual_network_qualified=false` and
+`application_recovery_qualified=false`. Compose parsing cannot prove actual
+host firewall containment, database consistency, epoch fencing, backups, GPU
+offload, GGUF inference or guarded Jeeves chat. Those gates remain independent.
+No state is modified by admission.
+
 ## Supported deployment classes
 
 | Class | Container requirements | Model/runtime artifact | Qualification status |
