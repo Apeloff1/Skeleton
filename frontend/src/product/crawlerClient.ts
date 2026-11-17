@@ -1180,6 +1180,70 @@ export async function getResearchNavigationPlan(query:string,mode:ResearchNaviga
     invalid('Invalid research plan receipt.');
   return v;
 }
+export type ResearchCampaign={
+  campaign_id:string;objective_digest:string;mode:ResearchNavigationPlan['mode'];learned:boolean;
+  created_at:number;expires_at:number;budget:number;remaining:number;revision:number;rounds:number;
+  state:'active'|'exhausted'|'closed'|'expired';network_authorized:false;training_permission:false
+};
+export type CampaignRound={campaign:ResearchCampaign;round:number;plan_digest:string;spent:number;created_at:number;
+  pool_truncated:boolean;targets:{target_id:string;position:number;cost:number;url:string;host:string;network_authorized:false}[];
+  replayed:boolean;network_authorized:false;training_permission:false;receipt:string};
+const CAMPAIGNS=ROOT+'/navigation/campaigns';
+function campaignValid(v:ResearchCampaign,id?:string){
+  if(!v||!HASH.test(v.campaign_id)||id!==undefined&&v.campaign_id!==id||!HASH.test(v.objective_digest)
+      ||!['balanced','coverage','exploration','conservation'].includes(v.mode)||typeof v.learned!=='boolean'
+      ||!integer(v.created_at)||!integer(v.expires_at)||v.expires_at<=v.created_at||v.expires_at-v.created_at>2592000
+      ||!integer(v.budget,4096)||v.budget<1||!integer(v.remaining,v.budget)||!integer(v.revision,130)||v.revision<1
+      ||!integer(v.rounds,128)||!['active','exhausted','closed','expired'].includes(v.state)
+      ||v.network_authorized!==false||v.training_permission!==false) invalid('Invalid research campaign custody.');
+  return v;
+}
+function campaignOperation(operation:string){return typeof operation==='string'&&/^[!-~]{16,128}$/.test(operation);}
+export async function createResearchCampaign(body:{query:string;operation:string;budget:number;retention_seconds:number;
+  mode:ResearchCampaign['mode'];learned:boolean;acknowledged:true},signal?:AbortSignal){
+  if(!body.query.trim()||body.query.length>512||!campaignOperation(body.operation)||!integer(body.budget,4096)||body.budget<1
+    ||!integer(body.retention_seconds,2592000)||body.retention_seconds<900||body.acknowledged!==true)
+    invalid('Explicit finite campaign required.');
+  const v=await read(api.post<ResearchCampaign&{replayed:boolean}>(CAMPAIGNS,body,options(signal)),getAuthToken(),'Campaign creation held.');
+  campaignValid(v);
+  if(typeof v.replayed!=='boolean'||v.budget!==body.budget||v.mode!==body.mode||v.learned!==body.learned)
+    invalid('Campaign creation identity differs.');
+  return v;
+}
+export async function advanceResearchCampaign(id:string,body:{query:string;operation:string;expected_revision:number;budget:number},signal?:AbortSignal){
+  if(!HASH.test(id)||!body.query.trim()||body.query.length>512||!campaignOperation(body.operation)
+    ||!integer(body.expected_revision,129)||body.expected_revision<1||!integer(body.budget,48)||body.budget<1)
+    invalid('Invalid campaign advance.');
+  const v=await read(api.post<CampaignRound>(CAMPAIGNS+'/'+id+'/advance',body,options(signal)),getAuthToken(),'Campaign advance held; reload custody.');
+  if(!v||!HASH.test(v.plan_digest)||!HASH.test(v.receipt)||!integer(v.round,128)||v.round<1||!integer(v.spent,body.budget)
+    ||!integer(v.created_at)||typeof v.pool_truncated!=='boolean'||typeof v.replayed!=='boolean'
+    ||v.network_authorized!==false||v.training_permission!==false||!Array.isArray(v.targets)||v.targets.length>24
+    ||v.targets.some(x=>!x||!HASH.test(x.target_id)||!navigationUrl(x.url)||!integer(x.position,23)
+       ||!integer(x.cost,3)||x.cost<1||x.network_authorized!==false)
+    ||new Set(v.targets.map(x=>x.target_id)).size!==v.targets.length
+    ||new Set(v.targets.map(x=>x.position)).size!==v.targets.length
+    ||v.targets.reduce((s,x)=>s+x.cost,0)>v.spent)invalid('Invalid campaign round custody.');
+  campaignValid(v.campaign,id);return v;
+}
+export async function inspectResearchCampaign(id:string,after=0,limit=16,signal?:AbortSignal){
+  if(!HASH.test(id)||!integer(after,128)||!integer(limit,64)||limit<1)invalid('Invalid campaign history cursor.');
+  const v=await read(api.get<{campaign:ResearchCampaign;rounds:{ordinal:number;spent:number;plan_digest:string;
+      created_at:number;pool_truncated:boolean}[];next_cursor:number|null;network_authorized:false;training_permission:false}>(
+      CAMPAIGNS+'/'+id+'?after='+after+'&limit='+limit,options(signal)),getAuthToken(),'Campaign history unavailable.');
+  if(!v||v.network_authorized!==false||v.training_permission!==false||!Array.isArray(v.rounds)||v.rounds.length>limit
+    ||v.rounds.some((x,i)=>!x||!integer(x.ordinal,128)||x.ordinal<=(i?v.rounds[i-1].ordinal:after)
+      ||!integer(x.spent,48)||!HASH.test(x.plan_digest)||!integer(x.created_at)||typeof x.pool_truncated!=='boolean')
+    ||v.next_cursor!==null&&(!integer(v.next_cursor,128)||v.next_cursor<=after))invalid('Invalid campaign history.');
+  campaignValid(v.campaign,id);return v;
+}
+export async function closeResearchCampaign(id:string,expectedRevision:number,signal?:AbortSignal){
+  if(!HASH.test(id)||!integer(expectedRevision,130)||expectedRevision<1)invalid('Invalid campaign close.');
+  const v=await read(api.post<ResearchCampaign&{replayed:boolean}>(CAMPAIGNS+'/'+id+'/close',
+    {expected_revision:expectedRevision},options(signal)),getAuthToken(),'Campaign close held.');
+  campaignValid(v,id);
+  if(v.state!=='closed'||typeof v.replayed!=='boolean')invalid('Campaign close not confirmed.');
+  return v;
+}
 export type BulkMigrationCandidate={session_id:string;version:number;manifest:string;expected_bytes:number;expires_at:number;physical_layout_verified:false};
 export type BulkMigrationReceipt={manifest:string;sha256:string;bytes:number;chunks:number;
   layout:'content_defined_v1';switched:boolean;replayed:boolean;readback_verified:true;garbage_remaining:number;
