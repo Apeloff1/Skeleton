@@ -21,27 +21,42 @@ function synthetic(){
     accessors.push({bufferView:view,componentType:5126,count,type:kind});
     return accessor;
   };
-  const nodes=Array.from({length:108},(_,i)=>({
-    name:i===0?'Emerald continuous reconstructed character':'joint_'+i,translation:[0.001*i,0,0],rotation:[0,0,0,1],
-    ...(i<107?{children:[i+1]}:{}),
+  const palette=Array.from({length:108},(_,i)=>i<92?i:i+1);
+  const nodes=Array.from({length:109},(_,i)=>({
+    name:i===0?'Emerald continuous reconstructed character':'node_'+i,
+    translation:[0.001*i,0,0],rotation:[0,0,0,1],
   }));
+  nodes[92]={name:'Emerald continuous reconstructed character mesh',mesh:0};
+  for(let i=0;i<107;i++)nodes[palette[i]].children=[palette[i+1]];
+  const census={
+    'ground-idle-1':{rotation:97,translation:17},
+    'takeoff-1':{rotation:106,translation:18},
+    'orbit-01':{rotation:71,translation:17},
+    'orbit-02':{rotation:71,translation:17},
+    'landing-1':{rotation:105,translation:18},
+  };
   const animations=names.map((name,i)=>{
     const samplers=[],channels=[];
-    for(let j=0;j<88;j++){
-      const kind=j<71?'rotation':'translation';
-      const t=put([0,1],'SCALAR');
-      const yaw=.06*(i+1)*(j===34?1:.1);
-      const r=(kind==='rotation'
-        ?[0,0,0,1,0,Math.sin(yaw/2),0,Math.cos(yaw/2)]
-        :[0,0,0,.01*(i+1),0,0]);
-      const o=put(r,kind==='rotation'?'VEC4':'VEC3');
-      const sampler=samplers.length;
-      samplers.push({input:t,output:o,interpolation:'LINEAR'});
-      channels.push({sampler,target:{node:j,path:kind}});
+    const count=census[name];
+    for(const kind of ['rotation','translation']){
+      for(let k=0;k<count[kind];k++){
+        // Use a non-contiguous original glTF node as the final bone target.
+        const paletteIndex=k===count[kind]-1?107:k;
+        const gltfNode=palette[paletteIndex];
+        const t=put([0,1],'SCALAR');
+        const yaw=.06*(i+1)*(paletteIndex===34?1:.1);
+        const values=(kind==='rotation'
+          ?[0,0,0,1,0,Math.sin(yaw/2),0,Math.cos(yaw/2)]
+          :[0,0,0,.01*(i+1),0,0]);
+        const o=put(values,kind==='rotation'?'VEC4':'VEC3');
+        const sampler=samplers.length;
+        samplers.push({input:t,output:o,interpolation:'LINEAR'});
+        channels.push({sampler,target:{node:gltfNode,path:kind}});
+      }
     }
     return {name,channels,samplers};
   });
-  const doc={asset:{version:'2.0'},nodes,skins:[{joints:nodes.map((_,i)=>i)}],
+  const doc={asset:{version:'2.0'},nodes,skins:[{joints:palette}],
     animations,buffers:[{byteLength:bytes}],bufferViews:views,accessors,
     extras:{stage:'pathfinder',donorSha256:DONOR,
       orbit02ClearanceCorrection:{schema:'skeleton.emerald.orbit02-tail-clearance.v1',
@@ -84,6 +99,8 @@ test('real Three creates 108 original named bones with exact parent hierarchy',(
   assert.equal(bones[34].name,'emerald_joint_34');
   assert.equal(bones[0].userData.originalDonorName,'Emerald continuous reconstructed character');
   assert.equal(bones[34].parent,bones[33]);
+  assert.equal(bones[107].userData.originalGLTFNodeIndex,108);
+  assert.equal(bones.some(x=>x.userData.originalGLTFNodeIndex===92),false);
 });
 
 test('all six original motion clips become genuine Three tracks without texture rendering',()=>{
@@ -92,7 +109,8 @@ test('all six original motion clips become genuine Three tracks without texture 
   for(const name of names){
     const clip=clipFromDocument(THREE,original,bones,name);
     assert.equal(clip.name,name);
-    assert.equal(clip.tracks.length,88);
+    const counts={'ground-idle-1':114,'takeoff-1':124,'orbit-01':88,'orbit-02':88,'landing-1':123};
+    assert.equal(clip.tracks.length,counts[name]);
     assert.equal(clip.duration,1);
     const track=clip.tracks.find(x=>x.name==='emerald_joint_34.quaternion');
     assert.ok(track instanceof THREE.QuaternionKeyframeTrack);
