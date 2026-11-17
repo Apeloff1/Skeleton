@@ -239,7 +239,8 @@ def test_actual_image_id_cannot_be_stale(tmp_path: Path) -> None:
 
 def test_runtime_cannot_restore_hosted_credential(tmp_path: Path) -> None:
     config, docs = _setup(tmp_path)
-    docs["skeleton"]["Config"]["Env"].append("OPENAI_API_KEY=synthetic-untrusted-value")
+    key, value = "OPENAI_API_KEY", "synthetic-untrusted-value"
+    docs["skeleton"]["Config"]["Env"].append(f"{key}={value}")
     with pytest.raises(host.LocalDockerError, match="live engine exposes"):
         _attest(tmp_path, config, docs)
 
