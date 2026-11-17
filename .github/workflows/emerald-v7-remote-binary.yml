@@ -1,0 +1,44 @@
+name: Emerald V7 remote original Git reassembly source
+on:
+  push:
+    branches:
+      - 'feat/emerald-v7-remote-binary-*'
+    paths:
+      - 'scripts/verify_emerald_v7_remote_original.py'
+      - 'scripts/test_emerald_v7_remote_original.py'
+      - '.github/workflows/emerald-v7-remote-binary.yml'
+  pull_request:
+    paths:
+      - 'scripts/verify_emerald_v7_remote_original.py'
+      - 'scripts/test_emerald_v7_remote_original.py'
+      - '.github/workflows/emerald-v7-remote-binary.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  remote-source-contract:
+    name: Exact-head remote raw blob rejection fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact review commit without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify actual checked-out source SHA
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - name: Supported isolated standard-library Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+      - name: Compile remote publication verification pipeline
+        run: |
+          python -m py_compile scripts/verify_emerald_v7_remote_original.py
+          python -m py_compile scripts/test_emerald_v7_remote_original.py
+      - name: Reject forged original Git tree entries and incomplete publication
+        run: python scripts/test_emerald_v7_remote_original.py
+      - name: Strict original model publication boundary
+        run: echo 'Synthetic remote-Git tests only. Actual eight remote raw Git blobs are absent from the source-only runner; complete remote publication, continuous CCD, real Three, Unreal/RTX, artist and release remain unqualified.'
