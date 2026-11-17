@@ -129,8 +129,9 @@ def validate_compose_boundary(topology: Mapping[str, Any]) -> dict[str, object]:
     }
     # Frontend's container port can be configured independently.
     _port(nodes["frontend"], None) if "frontend" in nodes else None
-    for name, service in nodes.items():
-        _state_volume(service, name)
+    for name in _STATE_MOUNTS:
+        if name in nodes:
+            _state_volume(nodes[name], name)
     for name in ("mongo", "chroma"):
         if name in nodes and not _SHA_IMAGE.fullmatch(str(nodes[name].get("image", ""))):
             raise ComposeBoundaryError("database image must be SHA-256 digest-pinned")
