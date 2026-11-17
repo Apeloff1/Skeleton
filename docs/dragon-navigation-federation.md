@@ -157,3 +157,90 @@ and verify planner budget/exclusion and owner boundaries. Real-device
 throughput, production archive scale, actual physical chunk compaction,
 autonomous model discourse and separately trained role models remain
 independent qualification or implementation work.
+
+
+## Autonomous Jeeves–Dragon discourse
+
+The finite crawler execution grant accepts optional
+`navigation_discourse: true` with an explicit enabled companion session.
+This is not a new acquisition grant. The existing owner/editor role,
+consent, automation epoch, slice quota, origin stripes and live transport
+checks still govern each dispatch. An opted-in grant uses one canonical
+slice step per pulse. Before a new model-ranked selection it reserves a
+bounded advisor window with the existing row/version compare-and-set.
+
+Configure `SKL_DRAGON_AUTONOMOUS_DISCOURSE_JSON` on the backend with exactly
+`owner_digest` (navigation_semantics.digest of the tenant_id/owner_id scope
+object), `port` (the running local-only Jeeves HTTP port), `token_file`
+(an absolute owner-private token file), and `model_digest` (the exact
+configured local model digest). The connection is always 127.0.0.1;
+the user cannot supply a destination, credential or arbitrary inference
+parameters. A 180-second advisor deadline is further narrowed by the
+original grant. The local HTTP service serializes tournaments and
+checks the supplied deadline before every role. Invalid or unavailable
+advice holds an opted-in new selection instead of silently falling back.
+An already reserved interrupted dispatch or an empty candidate packet is
+handled by the canonical runner without a new model selection.
+The completed run receipt records model identity, actual role count and
+the exact returned receipt digests. This binds the trusted local service
+response; it is not remote hardware attestation. Roles still use one
+primary model, not independently trained weight sets.
+
+## Physical compressed chunk compaction
+
+New explicitly authorized Hoarder bulk copies now use bounded content-
+defined byte chunking (32 KiB minimum, approximately 64 KiB target,
+256 KiB maximum), compressed physical chunk storage, exact SHA-256 keyed
+reuse and independently witnessed manifest placement. The layout itself
+has a digest and is written transactionally with the manifest. The
+existing append/seal/abort/collect protocol is unchanged in authority:
+a complete reconstruction must match the original byte count and hash.
+An existing fixed-layout manifest replays in its original format.
+No old copy is destructively migrated; cold-primary manifests still use
+their existing fixed-format reader. Offline copied-ecosystem audits
+recognize both layout types and verify the entire reconstructed payload.
+
+Deduplication shares storage only within the same existing owner and
+physical manifest-write namespace. Logical compressed storage savings do
+not necessarily imply immediate file shrinkage or secure erasure of
+SQLite pages, WAL or backups.
+
+## Learned semantic optimization
+
+The research-plan request accepts optional `learned: true`.
+A configured pinned local ONNX encoder reranks a bounded pool using
+objective and public locator path terms only, with exact batch dimensions
+and finite normalized vectors. An unavailable encoder is reported as
+held rather than claimed as measured inference. A transient regularized
+logistic fit uses active-grant operational outcome counts (not source
+bodies); immutable target hashes split training from holdout. It influences
+ranking only when held-out log loss improves on the empirical prior.
+The learned state is not persisted or shared across owners, and the
+source's no-training flag is unchanged. Concurrent catalogue changes or
+expiry hold the result. This is operational calibration, not a benchmark
+of general factual or semantic quality.
+
+## Measured storage qualification
+
+The exact-head workflow runs the focused archive/crawler suites and
+physical fixed-vs-content-defined fixture qualification on the CI device.
+For a larger real scratch workload under a dedicated writable directory:
+
+```sh
+PYTHONPATH=.:backend python -m core.dragon_chunk_qualification \
+  --scratch-directory /absolute/private/scratch \
+  --families 128 --revisions 4 --size 1048576 \
+  --acknowledge-scratch-writes
+```
+
+The command compares real compressed payload and database bytes, writes
+and reconstructs all fixture revisions after reopening the manifests,
+runs SQLite integrity and WAL checkpoint checks, and verifies
+reference-aware cleanup. Its bounded aggregate cap is 4 GiB of logical
+fixture input across both layouts; sufficient disk reserve is required.
+For actual configured storage devices, use the existing separately
+authorized `core.dragon_capacity_qualification` scratch probe and the
+existing copied-ecosystem sealed-payload audit. These are intentionally
+not production-load, physical maximum capacity, power-loss or launch
+qualification. No user-device, live native tournament or real encoder
+model performance is asserted by fixture tests.
