@@ -22,7 +22,7 @@ import sys
 import time
 
 from scripts.dragon_local_navigation_discourse import load_token,request_discourse
-from skeleton.ai.webcrawler.navigation_semantics import digest
+from skeleton.ai.webcrawler.navigation_semantics import digest,semantic_features
 from core.dragon_capacity_qualification import plan as capacity_plan,qualify as capacity_qualify,_devices
 from core.dragon_chunk_qualification import qualify as chunk_qualify
 
@@ -38,6 +38,22 @@ TASKS=(
         ("persistence","checkpoint"),("combat","sword"),("music","song"),("recovery","diagnostic")),(3,3,2,0,0,1)),
     (("inventory","crafting"),(("inventory","crafting","manual"),("crafting","inventory","recipes"),
         ("loot","equipment"),("physics","gravity"),("transport","rail"),("inventory","storage")),(3,3,2,0,0,1)),
+    (("memory","offload"),(("vram","paging","cache"),("memory","swap","offload"),
+        ("memory","poetry"),("gpu","allocation"),("memory","offload","advertisement"),("disk","storage")),(3,3,0,2,0,1)),
+    (("navigation","pathfinding"),(("astar","navmesh","routing"),("pathfinding","navigation","tutorial"),
+        ("navigation","astronomy"),("navmesh","pathfinding","algorithm"),("website","navigation"),("route","map")),(3,3,0,3,0,1)),
+    (("license","modding"),(("copyright","license","mods"),("game","mod","licensing"),
+        ("driver","license","test"),("modpack","forge"),("license","license","advertisement"),("community","forum")),(3,3,0,2,0,1)),
+    (("networking","replication"),(("netcode","replication","server"),("networking","replication","guide"),
+        ("replication","biology"),("multiplayer","client","synchronization"),("networking","career"),("http","protocol")),(3,3,0,2,0,1)),
+    (("animation","skinning"),(("rigging","skinning","mesh"),("animation","retargeting","rig"),
+        ("skin","medicine"),("skeleton","animation","weights"),("animation","movie","reviews"),("geometry","vertex")),(3,3,0,3,0,1)),
+    (("archive","deduplication"),(("chunk","compression","deduplication"),("archive","content","hash"),
+        ("archive","film","reviews"),("archive","storage","deduplication"),("duplicate","photos","ad"),("database","sqlite")),(3,3,0,3,0,1)),
+    (("game","localization"),(("game","translation","i18n"),("localization","subtitles","language"),
+        ("localization","gps","position"),("game","localization","strings"),("game","news"),("font","unicode")),(3,3,0,3,0,1)),
+    (("inference","quantization"),(("gguf","quantization","llama"),("inference","quantization","memory"),
+        ("quantization","music","beats"),("transformer","lowbit","inference"),("inference","statistics","exam"),("gpu","hardware")),(3,3,0,3,0,1)),
 )
 
 
@@ -63,8 +79,10 @@ def fixture_packet(index,nonce):
     rows=[];relevance={}
     for i in order:
         identifier=hashlib.sha256(f"device-fixture:{index}:{nonce}:{i}".encode()).hexdigest()
-        rows.append({"id":identifier,"terms":list(targets[i]),"depth":i%3,
-                     "attempts":int(i==5),"semantic":(labels[i]*300)})
+        # Independent label map is never used to build model features.
+        score=semantic_features(" ".join(objective),"https://fixture.example/"+"/".join(targets[i]))["score"]
+        rows.append({"id":identifier,"terms":list(targets[i]),"depth":(i+shift)%3,
+                     "attempts":(i+shift)%2,"semantic":round(score*1000)})
         relevance[identifier]=labels[i]
     body={"snapshot_digest":digest(["device-fixture",index,nonce]),"as_of":int(time.time()),
           "objective":list(objective),"candidates":rows}
@@ -84,7 +102,7 @@ def quantile(values,q):
 
 def qualify_live(*,port,token_file,jeeves_digest,dragon_digest,rounds,min_ndcg,max_p95_seconds,approved):
     if approved is not True:raise ValueError("explicit local model qualification permission")
-    if (type(rounds) is not int or not 4<=rounds<=32 or not 0<min_ndcg<=1
+    if (type(rounds) is not int or not len(TASKS)<=rounds<=32 or not 0<min_ndcg<=1
             or not 1<=max_p95_seconds<=900 or not HEX.fullmatch(jeeves_digest)
             or not HEX.fullmatch(dragon_digest) or jeeves_digest==dragon_digest):
         raise ValueError("live qualification bounds")
@@ -107,10 +125,12 @@ def qualify_live(*,port,token_file,jeeves_digest,dragon_digest,rounds,min_ndcg,m
             "dragon_ndcg":round(ndcg(reply["advice"]["dragon_rank"],labels),8),
             "seconds":round(elapsed,6)})
     scores={role:sum(row[role+"_ndcg"] for row in runs)/rounds for role in ("jeeves","dragon")}
+    worst={role:min(row[role+"_ndcg"] for row in runs) for role in ("jeeves","dragon")}
     p95=quantile([row["seconds"] for row in runs],.95)
     return {"actual_loopback_service_exercised":True,"native_jeeves_receipts":rounds,
             "specialist_inference_receipts":rounds,"jeeves_model_digest":jeeves_digest,
-            "dragon_model_digest":dragon_digest,"synthetic_task_ndcg":scores,"p95_seconds":p95,
+            "dragon_model_digest":dragon_digest,"synthetic_task_ndcg":scores,"worst_task_ndcg":worst,
+            "feature_labels_separated":True,"distinct_task_families":len(TASKS),"p95_seconds":p95,
             "operator_thresholds_met":min(scores.values())>=min_ndcg and p95<=max_p95_seconds,
             "runs":runs,"real_web_quality_verified":False,"independent_hardware_attestation":False}
 
@@ -152,7 +172,7 @@ def main(argv=None):
     p.add_argument("--expected-head",required=True)
     p.add_argument("--port",type=int,required=True);p.add_argument("--token-file",required=True)
     p.add_argument("--jeeves-model-sha256",required=True);p.add_argument("--dragon-model-sha256",required=True)
-    p.add_argument("--rounds",type=int,default=4);p.add_argument("--min-ndcg",type=float,required=True)
+    p.add_argument("--rounds",type=int,default=len(TASKS));p.add_argument("--min-ndcg",type=float,required=True)
     p.add_argument("--max-p95-seconds",type=float,required=True)
     p.add_argument("--families",type=int,default=16);p.add_argument("--revisions",type=int,default=4)
     p.add_argument("--size",type=int,default=MIB)
