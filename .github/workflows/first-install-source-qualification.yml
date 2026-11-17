@@ -48,11 +48,13 @@ jobs:
           python -m compileall -q skeleton/app
           python -m compileall -q skeleton/testing/test_app_install_source_contracts.py skeleton/testing/test_app_assembly.py skeleton/testing/test_app_installer.py skeleton/testing/test_app_installer_epoch.py
           python -m compileall -q scripts/check_app_assembly.py scripts/check_app_compose_parity.py
+          python -m compileall -q scripts/local_ai_docker.py skeleton/app/docker_local_ai.py skeleton/testing/test_docker_local_ai.py
       - name: Qualify actual first-install assembly and required source inputs
         run: python scripts/check_app_assembly.py
       - name: Run focused host-portable first-install regressions
         run: |
           python -m pytest -q --maxfail=1 \
+            skeleton/testing/test_docker_local_ai.py \
             skeleton/testing/test_app_install_source_contracts.py \
             skeleton/testing/test_app_assembly.py \
             skeleton/testing/test_app_installer.py \
