@@ -1,0 +1,109 @@
+{
+  "schema": "skeleton.emerald.measured-anatomical-census.v1",
+  "date": "2026-11-17",
+  "method": "Independent offline exact-SHA full GLB reads; four-influence JOINTS_0 / WEIGHTS_0; highest-weight joint per vertex, majority of three vertices per triangle; no contact test for newly assigned cohorts",
+  "donor_sha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+  "previous_strict_anatomy_count": 269919,
+  "majority_assigned_count": 719228,
+  "ambiguous_three_way_count": 84,
+  "cohort_counts": {
+    "torso": 224140,
+    "head": 44618,
+    "forelegs": 20728,
+    "hindlegs": 17918,
+    "tail": 43160,
+    "wing_primary_near": 0,
+    "wing_primary_far": 260,
+    "wing_mounted_detail": 78,
+    "wing_flight_near": 144912,
+    "wing_flight_far": 143876,
+    "rig_correctives": 79538,
+    "three_way_mixed": 84
+  },
+  "verified_exact_local_model_runs": [
+    {
+      "stage": "hatchling",
+      "version": "v4",
+      "bytes": 111849460,
+      "sha256": "452371639f28e5ade305b3ba1aa506804d9749197936339817bed027f320d38f",
+      "triangle_count": 719312,
+      "majority_assigned": 719228,
+      "three_way_mixed": 84,
+      "prior_classified": 269919,
+      "prior_unclassified": 449393
+    },
+    {
+      "stage": "scout",
+      "version": "v4",
+      "bytes": 112199628,
+      "sha256": "0ca21a7e3889d0bac5df48292fd711a7325b0373add2a84710540d3814d96d2b",
+      "triangle_count": 719312,
+      "majority_assigned": 719228,
+      "three_way_mixed": 84,
+      "prior_classified": 269919,
+      "prior_unclassified": 449393
+    },
+    {
+      "stage": "scholar",
+      "version": "v4",
+      "bytes": 112509064,
+      "sha256": "db15c598fe3c6ef71384ca5f834c7eb2271014819ff0603207d454a87c03fdb9",
+      "triangle_count": 719312,
+      "majority_assigned": 719228,
+      "three_way_mixed": 84,
+      "prior_classified": 269919,
+      "prior_unclassified": 449393
+    },
+    {
+      "stage": "pathfinder",
+      "version": "v4",
+      "bytes": 112706532,
+      "sha256": "e51e44a3277da1123df017d23f41aee43e373ea1c9e126f30dafd9a24c213092",
+      "triangle_count": 719312,
+      "majority_assigned": 719228,
+      "three_way_mixed": 84,
+      "prior_classified": 269919,
+      "prior_unclassified": 449393
+    },
+    {
+      "stage": "archivist",
+      "version": "v4",
+      "bytes": 112829184,
+      "sha256": "0b7804643c65a5eb06f5baac2008d88b101b363613d2244016b3a33470c18d8f",
+      "triangle_count": 719312,
+      "majority_assigned": 719228,
+      "three_way_mixed": 84,
+      "prior_classified": 269919,
+      "prior_unclassified": 449393
+    },
+    {
+      "stage": "pathfinder",
+      "version": "v5",
+      "bytes": 114687832,
+      "sha256": "80a98c198f5d8a6e101b571a9def6869904df4dfb0e5d90cba33f8890de9112f",
+      "triangle_count": 719312,
+      "majority_assigned": 719228,
+      "three_way_mixed": 84,
+      "prior_classified": 269919,
+      "prior_unclassified": 449393
+    },
+    {
+      "stage": "archivist",
+      "version": "v5",
+      "bytes": 114810480,
+      "sha256": "569fdf85be64705b857a43e2491b62ae6970fe90739c1050ffb49494da642b27",
+      "triangle_count": 719312,
+      "majority_assigned": 719228,
+      "three_way_mixed": 84,
+      "prior_classified": 269919,
+      "prior_unclassified": 449393
+    }
+  ],
+  "unqualified_contact_triangles": 719312,
+  "completed_full_contact_pairings": 0,
+  "continuous_collision_qualified": false,
+  "optional_equipment_enabled": false,
+  "physical_rtx_verified": false,
+  "artist_approved": false,
+  "release_qualified": false
+}
