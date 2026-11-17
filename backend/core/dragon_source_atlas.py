@@ -182,6 +182,7 @@ def plan(db,owner,*,query,now,limit=32,families=None,previous=None,mode="balance
         "sources":chosen,"ecosystems":root_plan["ecosystems"],"goals":root_plan["goals"],
         "distinct_hosts":len(hosts),"mode":mode,"retained_graph_candidates":len(page["targets"]),
         "index_backfill_pending":page["index_backfill_pending"],"lane_truncated":page["lane_truncated"],
+        "rank_search_is_bounded":root_plan["rank_search_is_bounded"],
         "selection_is_advisory":True,"model_inference_executed":False,"network_authorized":False,
         "source_rights_granted":False}
     return {**result,"receipt":digest(result)}
