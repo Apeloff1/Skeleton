@@ -300,6 +300,7 @@ def attest_runtime(mode: str, root: Path = host.ROOT) -> dict[str, object]:
     if not isinstance(topology.get("name"), str) or not topology["name"]:
         raise host.LocalDockerError("Compose project identity is unavailable")
     verified: list[str] = []
+    inspected_ids: set[str] = set()
     image_ids: dict[str, str] = {}
     for name in _REQUIRED:
         cid = host._run([*command, "ps", "-q", name], root=root, capture=True).strip()
@@ -312,13 +313,22 @@ def attest_runtime(mode: str, root: Path = host.ROOT) -> dict[str, object]:
         _image_matches(name, topology["services"][name], doc, root)
         if isinstance(topology["services"][name].get("image"), str):
             image_ids[name] = doc["Image"]
+        inspected_ids.add(cid)
         verified.append(name)
-    if "chroma" in topology["services"]:
-        # The optional database's legacy data recovery is not qualified.
-        # A separate explicit migration approval must precede live use.
-        cid = host._run([*command, "ps", "-q", "chroma"], root=root, capture=True).strip()
-        if cid:
-            raise host.LocalDockerError("optional Chroma is running without recovery qualification")
+    # Check *all* running project members, not only the four services queried.
+    # This also sees profile-disabled Chroma and stale/orphan sidecars without
+    # relying on 'compose ps' accepting a disabled-profile service name.
+    active_raw = host._run([
+        "docker", "ps", "--no-trunc",
+        "--filter", "label=com.docker.compose.project=" + topology["name"],
+        "--format", "{{.ID}}",
+    ], root=root, capture=True)
+    active = [line.strip() for line in active_raw.splitlines() if line.strip()]
+    if (len(active) != len(verified) or any(not _CONTAINER_ID.fullmatch(value) for value in active)
+            or set(active) != inspected_ids):
+        raise host.LocalDockerError(
+            "Docker project has a stale, extra or optional unqualified running container"
+        )
     return {
         "schema": "skeleton.local-ai.docker.runtime-attestation.v1",
         "status": "running_boundary_verified_not_guarded_chat_qualified",
