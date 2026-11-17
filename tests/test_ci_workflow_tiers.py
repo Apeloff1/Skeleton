@@ -97,6 +97,18 @@ class WorkflowTierTests(unittest.TestCase):
                 self.assertIn(f"uses: ./.github/workflows/{name}", readiness)
                 self.assertIn(f"      - extension_{i:02d}\n", readiness)
 
+    def test_extension_caller_parser_retains_nested_permissions_and_rejects_missing_permissions(self):
+        from scripts.check_ci_workflow_tiers import EXTRA_SOURCE_WORKFLOWS
+        readiness = (ROOT / ".github/workflows/merge-readiness.yml").read_text()
+        for index, name in enumerate(EXTRA_SOURCE_WORKFLOWS, 1):
+            job = f"extension_{index:02d}"
+            section = readiness.split(f"  {job}:\\n", 1)[1]
+            section = re.split(r"(?m)^  [A-Za-z_][A-Za-z0-9_-]*:\\s*$", section, maxsplit=1)[0]
+            self.assertIn(f"uses: ./.github/workflows/{name}", section)
+            self.assertIn("    permissions:\\n      contents: read", section)
+            self.assertIn("if: ${{ github.event_name == 'pull_request'", section)
+            self.assertNotIn("continue-on-error: true", section)
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})

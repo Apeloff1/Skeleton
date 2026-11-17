@@ -257,7 +257,9 @@ def audit(root: Path = ROOT) -> list[str]:
         if len(blocks) != 2:
             failures.append(f"{name}: missing mandatory source extension caller")
             continue
-        call = blocks[1].split("\n  ", 1)[0]
+        # Split only at the next top-level job key, not at indented
+        # comments/fields inside the current reusable-workflow caller.
+        call = re.split(r"(?m)^  [A-Za-z_][A-Za-z0-9_-]*:\\s*$", blocks[1], maxsplit=1)[0]
         if (f"uses: ./.github/workflows/{name}" not in call
                 or "if: ${{ github.event_name == 'pull_request'" not in call
                 or "    permissions:\n      contents: read" not in call):
