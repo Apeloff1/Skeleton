@@ -5,7 +5,7 @@ export type EmeraldCue = Readonly<{ sequence: number; phase: EmeraldPhase; targe
 export type EmeraldTarget = Readonly<{ url: string | null; sourceId: string | null; captured: boolean }>;
 export type EmeraldProjection = Readonly<{
   sessionId: string; watermark: number; initialized: boolean; cue: EmeraldCue | null;
-  target: EmeraldTarget | null; pending: CrawlEvent | null; acknowledged: readonly string[];
+  target: EmeraldTarget | null; resourceKey: string; pending: CrawlEvent | null; acknowledged: readonly string[];
   availability: 'waiting' | 'live' | 'stale' | 'inactive'; revision: number;
 }>;
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -20,7 +20,7 @@ const PHASES: Readonly<Record<string, EmeraldPhase>> = {
 };
 export function initialEmerald(sessionId: string): EmeraldProjection {
   return {sessionId, watermark: 0, initialized: false, cue: null, target: null,
-    pending: null, acknowledged: [], availability: 'waiting', revision: 0};
+    resourceKey: '', pending: null, acknowledged: [], availability: 'waiting', revision: 0};
 }
 function safeUrl(value: unknown): string | null {
   if (typeof value !== 'string' || value.length > 4096) return null;
@@ -57,7 +57,7 @@ export function projectEmerald(
   const fresh = observed && !stale;
   const active = session.consent_current && ACTIVE.has(session.status);
   const availability = !fresh ? observed ? 'stale' : 'waiting' : active ? 'live' : 'inactive';
-  if (!fresh) return {...state, availability, cue:null, target:null, pending:null};
+  if (!fresh) return {...state, availability, cue:null, target:null, resourceKey:'', pending:null};
   const valid = events.slice(-64).filter(e => Number.isSafeInteger(e.sequence) && e.sequence > 0);
   const last = valid[valid.length - 1];
   // The first observed history is a baseline, not new work. Reloads never replay smoke.
@@ -65,21 +65,23 @@ export function projectEmerald(
     return {...state, initialized:true, watermark:last?.sequence ?? 0, availability,
       target:active && last ? targetFor(last) : null};
   }
-  if (last && last.sequence < state.watermark) return {...state, availability:'stale', cue:null, target:null, pending:null};
+  if (last && last.sequence < state.watermark) return {...state, availability:'stale', cue:null, target:null, resourceKey:'', pending:null};
   let pending = state.pending;
   let newest = state.watermark;
   let target = state.target;
   let phase: EmeraldPhase | null = null;
   let captured = false;
   let ack = state.acknowledged;
-  let resourceKey = state.cue?.target ?? '';
+  let resourceKey = state.resourceKey;
   for (const event of valid) {
     if (event.sequence <= newest) continue;
     newest = event.sequence;
     if (!Object.prototype.hasOwnProperty.call(PHASES,event.kind)) continue;
-    target = targetFor(event);
+    const nextTarget = targetFor(event);
+    const sameResource = !!resourceKey && !!target && ((!!nextTarget.url && nextTarget.url === target.url) || (!!nextTarget.sourceId && nextTarget.sourceId === target.sourceId));
+    if (!sameResource) resourceKey = localTarget(nextTarget,event.sequence);
+    target = nextTarget;
     phase = PHASES[event.kind];
-    resourceKey = localTarget(target, event.sequence);
     if (event.kind === 'captured') pending = event;
     else if (event.kind !== 'duplicate' && event.kind !== 'completed') pending = null;
   }
@@ -92,17 +94,17 @@ export function projectEmerald(
       if (!ack.includes(key)) {
         ack = [...ack.slice(-63),key];
         target = targetFor(pending,true);
-        phase = 'index'; captured = true; resourceKey = 'source:' + row.source_id;
+        phase = 'index'; captured = true; resourceKey ||= localTarget(target,pending.sequence);
       }
       pending = null;
     }
   }
-  if (!active && !(captured && session.status === 'completed')) {
+  if (!active && !(captured && session.status === 'completed') && !(state.cue?.captured && session.status === 'completed' && session.consent_current && newest===state.watermark)) {
     pending = null; target = null;
     if (state.availability === 'live' || phase !== null || TERMINAL.has(session.status) && state.availability !== 'inactive') phase = 'land';
     else phase = null;
   }
   const revision = phase ? state.revision + 1 : state.revision;
-  return {...state, availability, watermark:newest, target, pending, acknowledged:ack, revision,
+  return {...state, availability, watermark:newest, target, resourceKey, pending, acknowledged:ack, revision,
     cue:phase ? {sequence:revision,phase,target:resourceKey || 'rest',captured} : state.cue};
 }

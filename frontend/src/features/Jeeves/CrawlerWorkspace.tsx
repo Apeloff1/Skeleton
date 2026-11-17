@@ -101,7 +101,7 @@ function CrawlerContent() {
   useEffect(() => {
     if (!active) return;
     const current = new AbortController(); const id = active.session_id;
-    void getCrawlEvents(id, current.signal).then(page => { if (!current.signal.aborted && activeRef.current?.session_id === id) { setEvents(page.events); setEventsObserved(true); setEventsError(''); setTruncatedEvents(page.history_truncated); } }).catch(error => { if (!current.signal.aborted && activeRef.current?.session_id === id) setEventsError(error instanceof Error ? error.message : 'Recorded events could not be refreshed.'); });
+    void getCrawlEvents(id, current.signal).then(async page => { if (!current.signal.aborted && activeRef.current?.session_id === id) { setEvents(page.events); setEventsObserved(true); setEventsError(''); setTruncatedEvents(page.history_truncated); if (page.events.some(event => event.kind === 'captured' && event.source_id)) { const inventory = await listCrawlSources(id, undefined, current.signal); if (!current.signal.aborted && activeRef.current?.session_id === id) { setSources(rows => [...inventory.sources, ...rows.filter(row => !inventory.sources.some(item => item.source_id === row.source_id))].slice(0,64)); setSourceCursor(inventory.next_cursor); } } } }).catch(error => { if (!current.signal.aborted && activeRef.current?.session_id === id) setEventsError(error instanceof Error ? error.message : 'Recorded events could not be refreshed.'); });
     return () => current.abort();
   }, [active?.session_id, active?.version]);
   const open = useCallback((row: CrawlSession, preservePane = false) => {
