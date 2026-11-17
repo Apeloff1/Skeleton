@@ -75,7 +75,7 @@ def advise(scope,packet,*,grant_deadline):
     try:
         token=_token(conf["token_file"])
         connection=http.client.HTTPConnection("127.0.0.1",conf["port"],timeout=max(1,deadline-time.time()))
-        body=json.dumps({"packet":packet,"approved":True},ensure_ascii=True).encode()
+        body=json.dumps({"packet":packet,"approved":True,"deadline":deadline},ensure_ascii=True).encode()
         connection.request("POST","/v1/dragon/navigation-discourse",body=body,
             headers={"Content-Type":"application/json","Authorization":"Bearer "+token})
         response=connection.getresponse()
