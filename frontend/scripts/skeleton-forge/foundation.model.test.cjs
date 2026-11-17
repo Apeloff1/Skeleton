@@ -549,7 +549,7 @@ test('saved build receipt becomes outdated only after material game design chang
   });
   assert.equal(state.projects[0].lastRunOutdated, true);
   assert.equal(state.projects[0].lastRun.payload.run.run_id, 'build1');
-  assert.equal(m.projectStatus(state.projects[0], null, 'idle'), 'Needs rebuild');
+  assert.equal(m.projectStatus(state.projects[0], null, 'idle'), 'Needs rebuild — build again to qualify updated source');
   assert.equal(m.openTarget(state.projects[0], null, 'idle'), 'brief');
   const stored = m.sanitizeProjects(m.persistSnapshot(state).projects);
   assert.equal(stored.corrupt, false);

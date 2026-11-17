@@ -38,7 +38,12 @@ test('Galaxy handoff exactly inventories every historical matrix', () => {
   }
   assert.match(source, /makeGalaxyBuildPayload\(selectedGenre\)/);
   assert.match(source, /prepareGalaxyHandoff\(makeGalaxyBuildPayload\(selectedGenre\), Date\.now\(\), editorEpoch\.current\)/);
-  assert.match(source, /galaxy-send-full-design-to-gameforge/);
+  // Both local save and explicit handoff controls are visible; the actual
+  // one-time transfer carries an epoch-bound opaque hint, not a public payload.
+  assert.match(source, /galaxy-save-full-design/);
+  assert.match(source, /galaxy-continue-in-gameforge/);
+  assert.match(source, /galaxyHandoffId/);
+  assert.match(source, /assertEditorOwner\(\)/);
 });
 
 test('single-use per-app navigation preserves exact complete authoring snapshot', () => {

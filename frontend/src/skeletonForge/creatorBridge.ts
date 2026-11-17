@@ -7,9 +7,12 @@ import { STEPS, reachable, type QuestionnaireState } from './questionnaire';
 import { DESIGN_AXES } from './instruments';
 import { GALAXY_CHOICES, mappedBriefGenre } from './galaxyGenres';
 import { GENRE_CHOICES } from './genreCatalog';
+import { normaliseGalaxyProfile, type GalaxyProfile } from './galaxyHandoff';
 
 export const CREATOR_BRIDGE_SCHEMA = 'skeleton.creator.handoff.v1' as const;
 export const CREATOR_BRIDGE_TTL_MS = 20 * 60 * 1000;
+/** A fully authored Galaxy profile may itself reach 450K characters. */
+export const CREATOR_BRIDGE_MAX_CHARS = 512_000;
 
 export type CreatorBridgeTarget = 'galaxy' | 'forge' | 'studio';
 export interface CreatorBridgeDraft {
@@ -31,6 +34,8 @@ export interface CreatorBridgeDraft {
   playable: { enabled: boolean; mode?: string; launch?: boolean };
   playtest: 'off' | 'auto' | 'require';
   sourceExport: { enabled: boolean };
+  /** Account-scoped, validated full 14-matrix authoring snapshot, not axes. */
+  galaxyProfile?: GalaxyProfile | null;
 }
 export interface GalaxyBridgeSelection {
   title: string;
@@ -115,6 +120,18 @@ export function parseCreatorBridge(
   const playtest = input.playtest === 'auto' || input.playtest === 'require'
     ? input.playtest : 'off';
   const rawExport = record(input.sourceExport);
+  // A present but unrecognized full profile is a forged/invalid handoff, not
+  // optional metadata that may safely be discarded. Every matrix is checked.
+  let galaxyProfile: GalaxyProfile | null = null;
+  if (input.galaxyProfile !== undefined && input.galaxyProfile !== null) {
+    const candidate = record(input.galaxyProfile);
+    if (!candidate || candidate.schema !== 'skeleton.gameforge.galaxy_profile.v1') return null;
+    try {
+      galaxyProfile = normaliseGalaxyProfile(candidate.config);
+    } catch {
+      return null;
+    }
+  }
   const rawPlayable = record(input.playable);
   const rawQuest = record(input.quest);
   // Do not silently convert an unsupported native scene into a different
@@ -142,6 +159,7 @@ export function parseCreatorBridge(
     playable,
     playtest,
     sourceExport: { enabled: rawExport?.enabled === true },
+    ...(galaxyProfile ? { galaxyProfile } : {}),
   };
 }
 
@@ -161,6 +179,7 @@ export function handoffFromForge(
     options: state.options, quest: state.quest,
     playable: state.playable, playtest: state.playtest,
     sourceExport: state.sourceExport,
+    galaxyProfile: state.galaxyProfile ?? null,
   };
   const valid = parseCreatorBridge(raw, 'galaxy', now);
   if (!valid) throw new Error('Cannot prepare bounded creator handoff');
@@ -211,6 +230,7 @@ export function handoffFromGalaxy(
     playable: previous?.playable ?? { enabled: false },
     playtest: previous?.playtest ?? 'off',
     sourceExport: previous?.sourceExport ?? { enabled: false },
+    galaxyProfile: previous?.galaxyProfile ?? null,
   };
   const valid = parseCreatorBridge(raw, 'forge', now);
   if (!valid) throw new Error('Cannot prepare bounded Galaxy handoff');
@@ -227,6 +247,7 @@ export function forgeStateFromHandoff(raw: CreatorBridgeDraft, now: number = Dat
     playable: draft.playable,
     playtest: draft.playtest,
     sourceExport: draft.sourceExport,
+    galaxyProfile: draft.galaxyProfile ?? null,
   };
   // A valid handoff must not become a way to jump past a blocked vision
   // step. Preserve completed progress; reset only an unreachable step.
