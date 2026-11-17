@@ -39,3 +39,13 @@ test('large asset never abandons its realm lease before decode cleanup',()=>{
   assert.match(ui,/lease\?\.release\(\)/);
   assert.match(asset,/reader.abort\(\)/);
 });
+
+test('prepared renderer releases its residency when the full inspector is selected or focus changes',()=>{
+  const workspace=read('CrawlerWorkspace.tsx');const web=read('companion/EmeraldCrawlerStage.web.tsx');const renderer=read('companion/emeraldWebRenderer.ts');
+  assert.match(workspace,/suspended=\{inspectorKey!==null&&inspectorScope===inspectorKey\}/);
+  assert.match(web,/suspended\|\|!focused/);
+  assert.match(web,/\[projection.sessionId,suspended,focused\]/);
+  assert.match(renderer,/if\(!reduced\)request\(\)/);
+  assert.match(renderer,/signal.removeEventListener\('abort',abort\)/);
+  assert.match(renderer,/ground\?\.dispose\?\.\(\)/);
+});
