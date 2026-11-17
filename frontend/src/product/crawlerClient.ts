@@ -9,7 +9,7 @@ export type CrawlerReadiness = { available: boolean; configured: boolean; code: 
 export type CrawlUsage = { requests: number; bytes: number; documents: number; failures: number; reserved_bytes?: number };
 export type CrawlAutomation = {
   enabled: boolean; state: 'authorized' | 'running' | 'waiting' | 'stopped' | 'disabled' | 'blocked' | 'not_authorized';
-  epoch: number; slices_started: number; max_slices: number;
+  epoch: number; slices_started: number; max_slices: number; navigation_discourse?: boolean;
   expires_at: string | null; next_run_at: string | null; stop_reason: string | null;
 };
 export type CrawlWorker = { active: boolean; quiescent: boolean; local: boolean; lease_until: string | null; confirmation?: string; recovery_eligible?: boolean };
@@ -1145,10 +1145,12 @@ export type ResearchNavigationPlan = {
   epoch:number; facets:{id:string;terms:string[];concepts:number[];estimated_coverage:number}[];
   targets:{target_id:string;url:string;host:string;jeeves:number;dragon:number;joint:number;estimated_work_units:number;
     coverage_gain:number;redundancy_penalty:number;historical_yield_prior:number;historical_uncertainty:number;
-    supporting_lineage:number;facet_scores:{id:string;score:number}[];network_authorized:false;reviewed:false}[];
+    supporting_lineage:number;facet_scores:{id:string;score:number}[];dense_similarity?:number;calibrated_yield?:number;network_authorized:false;reviewed:false}[];
   budget:number;remaining:number;distinct_hosts:number;excluded_prior_targets:number;pool_truncated:boolean;
   index_backfill_pending:boolean;objective_coverage_is_estimated:true;cost_is_advisory:true;
   network_authorized:false;training_permission:false;receipt:string;
+  learning?:{dense:{status:'encoded'|'empty_pool'|'local_encoder_held';model_digest?:string;dimensions?:number;batches?:number};
+    calibration:{status:'insufficient_outcomes'|'baseline_retained'|'heldout_improvement';training_targets:number;holdout_targets:number;holdout_log_loss:number|null;baseline_log_loss:number|null;telemetry_only:true;persisted:false;production_quality_verified:false}};
 };
 function navigationUnit(x:unknown):x is number {return typeof x==='number'&&Number.isFinite(x)&&x>=0&&x<=1;}
 export async function getResearchNavigationPlan(query:string,mode:ResearchNavigationPlan['mode']='balanced',
@@ -1170,6 +1172,7 @@ export async function getResearchNavigationPlan(query:string,mode:ResearchNaviga
     ||v.targets.some(t=>!t||!HASH.test(t.target_id)||previous.includes(t.target_id)||!navigationUrl(t.url)
        ||t.network_authorized!==false||t.reviewed!==false||!integer(t.estimated_work_units,3)||t.estimated_work_units<1
        ||![t.jeeves,t.dragon,t.coverage_gain,t.redundancy_penalty,t.historical_yield_prior,t.historical_uncertainty,t.supporting_lineage].every(navigationUnit)
+       ||t.dense_similarity!==undefined&&!navigationUnit(t.dense_similarity)||t.calibrated_yield!==undefined&&!navigationUnit(t.calibrated_yield)
        ||!Number.isFinite(t.joint)||t.joint<-.2||t.joint>1||!Array.isArray(t.facet_scores)||t.facet_scores.length!==v.facets.length
        ||t.facet_scores.some((x,i)=>x.id!==v.facets[i].id||!navigationUnit(x.score)))
     ||new Set(v.targets.map(t=>t.target_id)).size!==v.targets.length
