@@ -247,6 +247,24 @@ jobs:
           python -m unittest discover -s tests -p test_environment_replay_admission_bounds.py -v
       - name: Install frontend dependencies
         run: yarn --cwd frontend install --ignore-scripts --non-interactive
+      # An independent npm tarball check is mandatory: an installed package
+      # checksum alone cannot prove the reviewed upstream bytes. Do not
+      # modify package digests, lockfiles or RSA source to make this green.
+      - name: Verify exact-head frozen node-forge npm archive
+        shell: bash
+        env:
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid custody head SHA" >&2; exit 2; }
+          ORIGINAL_SHA="$(git rev-parse HEAD)"
+          git cat-file -e "$CANDIDATE_SHA^{commit}"
+          git -c advice.detachedHead=false checkout -q -f "$CANDIDATE_SHA"
+          trap 'git checkout -q -f "$ORIGINAL_SHA"' EXIT
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          yarn --cwd frontend install --frozen-lockfile --ignore-scripts --non-interactive
+          node --test frontend/scripts/test-node-forge-rsa-custody.cjs frontend/scripts/test-node-forge-digest-info-patch.cjs
+          node frontend/scripts/verify-node-forge-frozen-archive.cjs
       # Existing protected Lint Type Security check admits the restored
       # creator; no extra automatic workflow is registered.
       - name: Exact-head historical GameForge frontend and native acceptance
