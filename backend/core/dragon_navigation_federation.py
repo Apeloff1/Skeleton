@@ -250,10 +250,27 @@ class NavigationFederation:
 
     def research_plan(self,scope,*,query,budget=16,mode="balanced",previous=None,learned=False,now=None):
         from core.dragon_navigation_intelligence import plan
+        owner=owner_key(scope)
+        observed=int(time.time()) if now is None else now
         with self._db() as db:
+            before=db.execute("PRAGMA data_version").fetchone()[0]
             db.execute("BEGIN")
-            return plan(db,owner_key(scope),query=query,budget=budget,mode=mode,previous=previous,learned=learned,
-                        now=int(time.time()) if now is None else now)
+            try:
+                # Earliest eligible grant expiry is a conservative fence for
+                # all path/feedback witnesses consulted by the planner. A
+                # long model run cannot return expired metadata.
+                next_expiry=db.execute("SELECT MIN(expires) FROM navigation_grants "
+                    "WHERE owner=? AND state='active' AND expires>?",(owner,observed)).fetchone()[0]
+                result=plan(db,owner,query=query,budget=budget,mode=mode,previous=previous,
+                            learned=learned,now=observed)
+                db.execute("COMMIT")
+            except BaseException:
+                if db.in_transaction:db.execute("ROLLBACK")
+                raise
+            if (db.execute("PRAGMA data_version").fetchone()[0]!=before
+                    or now is None and next_expiry is not None and next_expiry<=time.time()):
+                raise ValueError("navigation grant or catalogue changed during planning")
+            return result
 
     def trail(self,scope,*,root,query,depth=3,beam=24,now=None):
         with self._db() as db:
