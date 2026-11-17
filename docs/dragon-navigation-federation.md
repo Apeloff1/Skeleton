@@ -386,3 +386,70 @@ aggregate NDCG and latency. Separate CI runs the trained specialist,
 real batch fixture recovery, two-store mixed-layout recovery and
 reproducible retraining, without pretending to operate your native
 Jeeves model or production hardware.
+
+
+## Eighth expansion: contextual intelligence, persistent campaigns, batch sealing
+
+Dragon v3 is an actual three-member 18-input/48-hidden-unit pairwise
+ensemble with 2,880 independently learned parameters. Reproducible original
+hard-negative curriculum: 4,096 training groups (24,578 candidate
+examples), 768 development groups, and 1,536 shifted holdout groups
+(9,218 examples). All comparisons below use the same v3 shifted holdout:
+
+| Model | NDCG@3 | Pair accuracy | Top-choice regret |
+| --- | ---: | ---: | ---: |
+| v2 | 0.99279446 | 0.96939754 | 0.02114564 |
+| v3 | 0.99535659 | 0.97848655 | 0.01561307 |
+| lexical | 0.95116993 | 0.89597665 | 0.17855697 |
+
+The new artifact is explicitly selected and pinned through the existing
+Dragon specialist configuration; old v1/v2 pins remain compatible.
+Context-relative semantic/exact/gap/retry features, percentile features,
+remaining fraction and Jeeves disagreement are recomputed at each beam
+state. Equivalent membership states share contextual calculations.
+Neither these synthetic scoring metrics nor the native arithmetic tests
+certify real-world browsing or a second generative model. Production
+Jeeves/Dragon execution requires the actual configured local service.
+
+Persistent advisory research campaigns are available through
+`POST /crawler/navigation/campaigns`, `GET /crawler/navigation/campaigns/{id}`,
+`POST /crawler/navigation/campaigns/{id}/advance`, and the corresponding
+close and purge endpoints. Creation requires an explicit acknowledgment,
+stable operation key, objective, mode, finite 1–4,096 unit budget and
+900-second to 30-day lifetime. Each advance requires the exact original
+objective, a new operation key, expected revision and up to 48 units.
+Campaigns have at most 128 rounds; each round proposes at most 24 targets.
+All work units and coverage are advisory estimates. The database stores
+only an objective digest, plan receipt digests, owner-scoped target
+references and budget state; raw objectives and model prompts are not
+persisted by the campaign layer. Selection history is excluded during
+indexed candidate retrieval rather than relying on a client-side list.
+Coverage carries forward only from a bounded window of currently
+grant-witnessed captures. Concurrent catalogue mutation, expiry or
+revision races hold publication; no debit is made on an invalid plan.
+Replay retains the original round commitment but reveals only currently
+eligible targets. Closing removes target references, expiry purge removes
+round history and leaves an opaque retired operation identity. Campaigns
+never authorize or perform network requests; the existing crawl mandate
+and execution grants retain sole dispatch authority.
+
+The federation maintains an explicit versioned conservative index
+readiness certificate. It is invalidated by node/index mutation, restored
+by explicit reconciliation or known-complete incremental publication.
+Search no longer rescans the entire owner catalogue per research facet.
+Graph trail output now reserves slots for deeper levels instead of
+spending its entire budget on the root's widest neighbors.
+
+Manifest sealing uses bounded shared read windows (128 chunks and 16 MiB
+maximum per batch), with exact per-chunk and whole-document witnesses.
+The new `core.dragon_batch_qualification` command compares identical
+serial and batched CDC workloads on real temporary SQLite volumes,
+checks restart readback, physical integrity, reference-safe deletion,
+equal deduplicated compressed bytes and reports actual measured write/read
+rates and API-call counts. Invoke with explicit private scratch permission.
+Its same-device fixture is not independent-volume attestation; timing
+ratios are measurements rather than acceptance thresholds. The new
+parallel exact-head workflow reproduces v3 training, exercises campaign
+recovery and runs this physical benchmark. No deployed archive, user
+hardware, production traffic, release or live generative inference is
+claimed.
