@@ -14,7 +14,7 @@ import StudioLoginGate, { useStudioAuth } from '../../auth/StudioLoginGate';
 import { getAuthToken } from '../../auth/gameforgeAuth';
 import {
   createCrawl, crawlRequestKey, controlCrawl, exportCrawlSource,
-  getCrawl, getCrawlSource, getCrawlerReadiness, listCrawls, listCrawlSources,
+  getCrawl, getCrawlEvents, getCrawlSource, getCrawlerReadiness, listCrawls, listCrawlSources,
   runCrawl, type CapturedSource, type CrawlAtlasReport, type CrawlCommand,
   type CrawlCreate, type CrawlerReadiness, type CrawlSession,
 } from '../../product/crawlerClient';
@@ -31,6 +31,10 @@ import {
 import CrawlerResearchAtlasPanel from './CrawlerResearchAtlasPanel';
 import CrawlerSourceLibrary, { type CrawlPassageSelection } from './CrawlerSourceLibrary';
 import DragonKnowledgePanel from './DragonKnowledgePanel';
+import AtelierPrototype from './companion/atelier/AtelierPrototype';
+import { companionFromCapture, INITIAL_DRAGON_STATE } from './companion/dragonCompanionState';
+import { useReducedMotion } from './companion/useDragonMotion';
+import { usePowerAwareness } from '../../hooks/usePowerAwareness';
 import {
   derivePilotGates, EMPTY_PILOT_FORM, PILOT_STAGES, preparePilotCreate,
   previewPilotScope, type PilotForm, type PilotStage,
@@ -91,6 +95,9 @@ function PilotContent() {
   const [sessions, setSessions] = useState<CrawlSession[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [session, setSession] = useState<CrawlSession | null>(null);
+  const [atelierEvent, setAtelierEvent] = useState<{id:string;version:number;kind:string}|null>(null);
+  const atelierReduceMotion=useReducedMotion();
+  const atelierPower=usePowerAwareness();
   const [sources, setSources] = useState<CapturedSource[]>([]);
   const [bundleSelected, setBundleSelected] = useState<string[]>([]);
   // Re-key the source-library component on every authority refresh. It owns
@@ -125,6 +132,21 @@ function PilotContent() {
   const shareLock = useRef(false);
   const shareAbort = useRef<AbortController | null>(null);
   const epoch = useRef(0);
+  const atelierSessionId=session?.session_id;
+  const atelierVersion=session?.version;
+  useEffect(()=>{
+    setAtelierEvent(null);
+    if(stage!=='capture'||!atelierSessionId||atelierVersion===undefined)return;
+    const abort=new AbortController();
+    const owner=account.current;
+    const revision=atelierVersion;
+    void getCrawlEvents(atelierSessionId,abort.signal).then(page=>{
+      if(abort.signal.aborted||!alive.current||owner!==getAuthToken()||sessionRef.current?.session_id!==atelierSessionId||sessionRef.current.version!==revision)return;
+      const last=page.events.reduce<{sequence:number;kind:string}|null>((best,event)=>!best||event.sequence>best.sequence?event:best,null);
+      if(last)setAtelierEvent({id:atelierSessionId,version:revision,kind:last.kind});
+    }).catch(()=>{if(!abort.signal.aborted)setAtelierEvent(null);});
+    return()=>abort.abort();
+  },[stage,atelierSessionId,atelierVersion]);
 
   const fresh = (signal?: AbortSignal, original = account.current) =>
     alive.current && !signal?.aborted && getAuthToken() === original;
@@ -659,6 +681,7 @@ function PilotContent() {
           ? <Text style={s.error}>No owned session selected. Start with Scope & consent.</Text>
           : <>
             <Text style={s.heading}>{session.title} · {label(session.status)}</Text>
+            <AtelierPrototype key={'atelier-pilot:'+session.session_id+':'+account.current} state={atelierEvent?.id===session.session_id&&atelierEvent.version===session.version?companionFromCapture(atelierEvent.kind):INITIAL_DRAGON_STATE} reducedMotion={atelierReduceMotion||atelierPower.shouldReduceAnimations} />
             <Text style={s.small}>Revision {session.version} · last updated {new Date(session.updated_at).toLocaleString()} · consent {session.consent_current ? 'current' : 'expired'}</Text>
             <View style={s.row}>
               <Metric name="Committed requests" value={String(session.counters.requests)}
