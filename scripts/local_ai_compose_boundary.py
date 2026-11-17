@@ -114,6 +114,23 @@ def _browser_url(value: object, port: int) -> None:
         raise ComposeBoundaryError("frontend may reference only the published local API")
 
 
+def _network_contract(topology: Mapping[str, Any], nodes: Mapping[str, Any]) -> str:
+    networks = topology.get("networks")
+    if not isinstance(networks, dict) or set(networks) != {"tutolage"}:
+        raise ComposeBoundaryError("canonical Compose bridge network differs")
+    bridge = networks["tutolage"]
+    if not isinstance(bridge, dict) or bridge.get("driver", "bridge") != "bridge":
+        raise ComposeBoundaryError("canonical Compose network driver differs")
+    name = bridge.get("name")
+    if not isinstance(name, str) or not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}", name):
+        raise ComposeBoundaryError("canonical Compose bridge name is invalid")
+    for service in nodes.values():
+        assigned = service.get("networks")
+        if not isinstance(assigned, dict) or set(assigned) != {"tutolage"}:
+            raise ComposeBoundaryError("service network membership differs")
+    return name
+
+
 def validate_compose_boundary(topology: Mapping[str, Any]) -> dict[str, object]:
     """Verify local browser/engine ingress and durable authority; no side effects."""
     if not isinstance(topology, dict) or not isinstance(topology.get("services"), dict):
@@ -123,6 +140,7 @@ def validate_compose_boundary(topology: Mapping[str, Any]) -> dict[str, object]:
     if set(services) != expected:
         raise ComposeBoundaryError("Compose service topology is not canonical")
     nodes = {name: _service(services, name) for name in expected}
+    bridge = _network_contract(topology, nodes)
     published = {
         name: _port(service, _PORTS.get(name))
         for name, service in nodes.items()
@@ -162,6 +180,8 @@ def validate_compose_boundary(topology: Mapping[str, Any]) -> dict[str, object]:
             raise ComposeBoundaryError("frontend build and runtime API origins differ")
     return {
         "browser_destinations": "loopback_only",
+        "network_membership": "single_canonical_bridge",
+        "network_name": bridge,
         "database_transport": "authenticated_internal",
         "state_mounts": "canonical_named_volumes",
         "chroma_profile": "optional" if "chroma" in nodes else "absent",
