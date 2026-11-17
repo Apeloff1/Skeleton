@@ -12,7 +12,7 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 _LOOPBACK = frozenset(("127.0.0.1", "::1"))
-_PORTS = {"skeleton": 8001, "backend": 8001, "mongo": 27017, "chroma": 8000}
+_PORTS = {"skeleton": 8001, "backend": 8001, "frontend": None, "mongo": 27017, "chroma": 8000}
 _SHA_IMAGE = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
 _STATE_MOUNTS = {
     "skeleton": {"/app/data": "skeleton_data"},
