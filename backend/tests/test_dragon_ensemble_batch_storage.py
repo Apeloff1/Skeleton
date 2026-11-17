@@ -12,7 +12,7 @@ from unittest.mock import patch
 from core.dragon_hoarder_bulk import BulkArchive,Volume,StorageHeld,GIB
 from core.dragon_hoarder_manifests import ManifestArchive,BLOCK
 from core.dragon_content_chunks import lengths,split
-from core import dragon_cold_primary as cold
+from core.dragon_archive_migration import compact_pair
 from core.dragon_chunk_qualification import fixture
 from skeleton.ai.webcrawler.dragon_specialist import DragonSpecialist
 from skeleton.ai.webcrawler.navigation_semantics import digest,tournament,semantic_features
@@ -92,15 +92,14 @@ class StorageTests(unittest.TestCase):
         mark={"manifest":mid,"bytes":len(raw),"sha256":hashlib.sha256(raw).hexdigest(),"qualification_digest":"a"*64}
         # Physical fixture stores are distinct files but not independently
         # qualified devices. Only the source topology gate is stubbed.
-        with patch.object(cold,"_stores",return_value=(self.primary,self.backup)),patch.object(cold,"require_probe",return_value={"receipt_sha256":"a"*64}):
-            with patch.object(self.primary,"migrate_content_defined",side_effect=StorageHeld("interrupted after backup")):
-                with self.assertRaises(StorageHeld):cold._compact_both(SCOPE,mark,raw)
-            self.assertEqual(cold._read_one(self.primary,SCOPE,mark),raw)
-            self.assertEqual(cold._read_one(self.backup,SCOPE,mark),raw)
-            result=cold._compact_both(SCOPE,mark,raw)
+        with patch.object(self.primary,"migrate_content_defined",side_effect=StorageHeld("interrupted after backup")):
+            with self.assertRaises(StorageHeld):compact_pair(self.primary,self.backup,SCOPE,mark,raw)
+        self.assertEqual(self.primary.read_document(SCOPE,mid),raw)
+        self.assertEqual(self.backup.read_document(SCOPE,mid),raw)
+        result=compact_pair(self.primary,self.backup,SCOPE,mark,raw)
         self.assertTrue(result["backup"]["replayed"])
         self.assertTrue(result["primary"]["switched"])
-        self.assertTrue(result["independent_readback_verified"])
+        self.assertTrue(result["both_payloads_readback_verified"])
 
     def test_batch_workload_observed_rates(self):
         raw=fixture(25,0,2*1024*1024)
