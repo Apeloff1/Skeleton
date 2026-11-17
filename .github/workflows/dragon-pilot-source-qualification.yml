@@ -26,6 +26,8 @@ on:
       - "scripts/emerald_v7_model_pins.py"
       - "scripts/test_emerald_v7_model_pins.py"
       - "scripts/verify_emerald_v7_remote_original.py"
+      - "scripts/stage_emerald_v7_quarantine.py"
+      - "scripts/test_stage_emerald_v7_quarantine.py"
       - "scripts/test_emerald_v7_remote_original.py"
       - "scripts/test_audit_emerald_v7_original_zip_pair.py"
       - "scripts/check_emerald_v7_independent_original_receipt.py"
@@ -138,6 +140,7 @@ jobs:
           python scripts/check_emerald_v7_independent_original_receipt.py
           python scripts/test_emerald_v7_model_pins.py
           python scripts/test_emerald_v7_remote_original.py
+          python scripts/test_stage_emerald_v7_quarantine.py
           python scripts/test_audit_emerald_v7_original_zip_pair.py
           python scripts/test_emerald_v7_independent_original_receipt.py
           python scripts/check_emerald_v7_independent_original_receipt.py
