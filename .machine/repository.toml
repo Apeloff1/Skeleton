@@ -726,6 +726,15 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "guarded-admission"
+prefixes = ["skeleton/admission/"]
+owner = "security-plane"
+criticality = "high"
+purpose = "Local guarded admission and policy enforcement primitives."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "supply-chain-extensions"
 prefixes = ["skeleton/supply_chain/"]
 owner = "security-plane"
