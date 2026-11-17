@@ -9,6 +9,7 @@ on:
       - 'skeleton/ai/webcrawler/source_catalogue_bulk.py'
       - 'skeleton/ai/webcrawler/source_catalogue_index.py'
       - 'skeleton/ai/webcrawler/source_catalogue_normalize.py'
+      - 'skeleton/ai/webcrawler/source_catalogue_campaign.py'
       - 'skeleton/ai/webcrawler/catalogues/*.json'
       - 'machine/ai_dragon_crawler_operations.json'
       - 'skeleton/ai/webcrawler/navigation_semantics.py'
@@ -20,6 +21,7 @@ on:
       - 'backend/tests/test_dragon_source_catalogue_bulk.py'
       - 'backend/tests/test_dragon_source_catalogue_index.py'
       - 'backend/tests/test_dragon_source_catalogue_normalize.py'
+      - 'backend/tests/test_dragon_source_catalogue_campaign.py'
       - 'backend/tests/test_dragon_archive_matrix.py'
       - 'backend/routes/dragon_academy.py'
       - 'frontend/src/product/crawlerClient.ts'
@@ -47,7 +49,7 @@ jobs:
         with:
           python-version: "3.11.16"
       - name: Compile source registry, atlas and canonical integration
-        run: python -m py_compile skeleton/ai/webcrawler/source_catalogue_normalize.py skeleton/ai/webcrawler/source_catalogue_index.py skeleton/ai/webcrawler/source_catalogue_bulk.py skeleton/ai/webcrawler/source_navigation.py skeleton/ai/webcrawler/frontier_scheduler.py skeleton/ai/webcrawler/navigation_semantics.py skeleton/ai/webcrawler/operations.py backend/core/dragon_source_atlas.py backend/core/dragon_navigation_federation.py backend/routes/dragon_academy.py
+        run: python -m py_compile skeleton/ai/webcrawler/source_catalogue_campaign.py skeleton/ai/webcrawler/source_catalogue_normalize.py skeleton/ai/webcrawler/source_catalogue_index.py skeleton/ai/webcrawler/source_catalogue_bulk.py skeleton/ai/webcrawler/source_navigation.py skeleton/ai/webcrawler/frontier_scheduler.py skeleton/ai/webcrawler/navigation_semantics.py skeleton/ai/webcrawler/operations.py backend/core/dragon_source_atlas.py backend/core/dragon_navigation_federation.py backend/routes/dragon_academy.py
       - name: Catalogue scope, current graph, navigation and matrix regressions
         env:
           PYTHONPATH: ".:backend:tests:backend/tests"
@@ -57,6 +59,7 @@ jobs:
           python -m unittest discover -s backend/tests -p 'test_dragon_source_catalogue_bulk.py' -v
           python -m unittest discover -s backend/tests -p 'test_dragon_source_catalogue_index.py' -v
           python -m unittest discover -s backend/tests -p 'test_dragon_source_catalogue_normalize.py' -v
+          python -m unittest discover -s backend/tests -p 'test_dragon_source_catalogue_campaign.py' -v
           python -m unittest discover -s backend/tests -p 'test_dragon_navigation_federation.py' -v
           python -m unittest discover -s backend/tests -p 'test_dragon_archive_matrix.py' -v
       - name: Record packaged registry identity (not source access evidence)
