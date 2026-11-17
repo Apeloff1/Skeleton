@@ -1,0 +1,39 @@
+name: Emerald V7 original contact toolchain custody
+on:
+  push:
+    branches:
+      - 'feat/emerald-v7-reviewed-contact-toolchain-*'
+    paths:
+      - 'scripts/prepare_emerald_v7_reviewed_tools.py'
+      - 'scripts/test_prepare_emerald_v7_reviewed_tools.py'
+      - '.github/workflows/emerald-v7-reviewed-tools.yml'
+  pull_request:
+    paths:
+      - 'scripts/prepare_emerald_v7_reviewed_tools.py'
+      - 'scripts/test_prepare_emerald_v7_reviewed_tools.py'
+      - '.github/workflows/emerald-v7-reviewed-tools.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-head-original-tool-custody:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Exact source identity
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - name: Compile exact source-tool stager
+        run: python -m py_compile scripts/prepare_emerald_v7_reviewed_tools.py scripts/test_prepare_emerald_v7_reviewed_tools.py
+      - name: Reject hostile archives, symlinks, mutations and false acceptance
+        run: python scripts/test_prepare_emerald_v7_reviewed_tools.py
+      - name: External original archive evidence boundary
+        run: echo 'Source tests do not have original ZIPs, native GLBs, browser mixer, continuous CCD, artist, physical RTX or release acceptance.'
