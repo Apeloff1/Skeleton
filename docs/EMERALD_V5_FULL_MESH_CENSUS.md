@@ -37,3 +37,34 @@ The resulting worklist explicitly leaves wing-to-torso, head, limbs, tail, corre
 ## Acceptance holds
 
 Full bounded broad/narrow-phase contacts must be run across new cohorts; 171,165 blended-risk triangles need independent seam analysis, and *continuous* animation intervals need defensible deformation bounds rather than sampled timestamps. Optional equipment remains disabled. The original poster's visual fidelity, human-authored paint, removal of inherited adult detail, actual Unreal compilation, Windows/GPU physical RTX, final-head CI and release provenance are all unqualified. Neither this source branch nor its worklist authorizes adoption, merge or release.
+
+
+## Actual V5 posed broad-phase expansion
+
+The archived reviewed `Tools/contact_audit.py` (exact SHA-256 `0333ec4e01f701554e6f62b443fc5b2283bb68e8a62aaf324760068cc7107d4f`, 23,471 bytes) was used on the independently SHA-verified Pathfinder and Archivist V5 GLBs. The new operator implementation requires **that exact tool source** instead of importing an unreviewed file. The model, tool and working head have separate custody.
+
+At 7 sampled poses per stage and 19 anatomical pair types per pose, the conservative AABB lower-bound screen measured:
+
+| Source-bound pair status | Instances |
+| --- | ---: |
+| Posed boxes separated by more than 8 mm | **76** |
+| Overlapping posed boxes, exact triangle test required | **176** |
+| Empty majority cohort, evidence missing | **14** |
+| **Total** | **266** |
+
+The 76 separations are valid only at the **specific sampled instants**. All 176 overlapping boxes remain unqualified; an overlap is **not** itself a triangle intersection. The 14 empty-group cases are unqualified rather than silently passed. The complete source-bound status matrix is in `assets/emerald/evolution-v5/expanded-sampled-bounds.json`; detailed per-pair AABB lower bounds can be regenerated using the exact operator source and models.
+
+```sh
+python scripts/emerald_v5_expanded_broadphase.py \
+  --stage pathfinder \
+  --model /verified/pathfinder.glb \
+  --contact-tool /retained/source-and-contact-evidence/Tools/contact_audit.py \
+  --out /new-evidence/pathfinder-aabb.json
+python scripts/emerald_v5_expanded_broadphase.py \
+  --stage archivist \
+  --model /verified/archivist.glb \
+  --contact-tool /retained/source-and-contact-evidence/Tools/contact_audit.py \
+  --out /new-evidence/archivist-aabb.json
+```
+
+This broad-phase tool checks source pin, model topology and numerical limits, then writes a bounded sampled-pose report. Its success **does not assert** full-mesh triangle narrow-phase, arbitrary temporal intervals, stitched/weighted skin seam clearance, optional equipment, artist approval, Unreal compilation, physical RTX or launch readiness. Source-only CI checks synthetic geometry, evidence consistency and hostile input rejection; actual GLB execution remains external.
