@@ -403,6 +403,24 @@ def _run_model_step(
     return _decode_receipt(_run(argv, root=root, capture=True), action)
 
 
+def _validate_model_mode(mode: str, receipt: Mapping[str, object]) -> None:
+    """A device choice must match the immutable GGUF pin BEFORE generation.
+
+    This is configuration admission, not a proof of actual GPU offload. GPU
+    physical qualification is an independent device evidence gate.
+    """
+    if mode not in GPU_OVERLAYS:
+        raise LocalDockerError("unsupported local AI accelerator mode")
+    layers = receipt.get("gpu_layers_requested")
+    if type(layers) is not int or not 0 <= layers <= 1024:
+        raise LocalDockerError("pinned GGUF GPU layer declaration is unavailable")
+    if (mode == "cpu" and layers != 0) or (mode != "cpu" and layers == 0):
+        raise LocalDockerError("pinned GGUF GPU layers do not match selected Docker mode")
+    context = receipt.get("context_size")
+    if type(context) is not int or not 256 <= context <= 131072:
+        raise LocalDockerError("pinned GGUF context is outside qualified operator range")
+
+
 def _require_same_model(
     preflight: Mapping[str, object], qualification: Mapping[str, object],
 ) -> None:
@@ -417,6 +435,7 @@ def up(mode: str, root: Path = ROOT) -> None:
     # Both exact-byte admission and REAL one-shot inference must succeed
     # BEFORE service startup. This does NOT qualify the canonical chat guard.
     first = _run_model_step(mode, "preflight", root=root)
+    _validate_model_mode(mode, first)
     qualified = _run_model_step(mode, "qualify", root=root)
     _require_same_model(first, qualified)
     # Docker Compose -d alone returns before backend readiness; bound startup
@@ -484,6 +503,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.action in {"pin", "preflight", "qualify"}:
             extra: list[str] = []
             if args.action == "pin":
+                _validate_model_mode(args.mode, {
+                    "gpu_layers_requested": args.gpu_layers, "context_size": args.context,
+                })
                 extra = [
                     "--model", args.model, "--executable", args.executable,
                     "--profile", args.profile, "--context", str(args.context),
@@ -493,9 +515,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                     extra += ["--threads", str(args.threads)]
             if args.action == "qualify":
                 extra = ["--max-output-tokens", str(args.max_output_tokens)]
-            print(json.dumps(
-                _run_model_step(args.mode, args.action, extra=extra), sort_keys=True,
-            ))
+            if args.action == "qualify":
+                initial = _run_model_step(args.mode, "preflight")
+                _validate_model_mode(args.mode, initial)
+                completed = _run_model_step(args.mode, "qualify", extra=extra)
+                _require_same_model(initial, completed)
+            else:
+                completed = _run_model_step(args.mode, args.action, extra=extra)
+                if args.action == "preflight":
+                    _validate_model_mode(args.mode, completed)
+            print(json.dumps(completed, sort_keys=True))
         elif args.action == "up":
             up(args.mode)
         elif args.action == "stop":
