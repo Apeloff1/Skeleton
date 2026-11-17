@@ -1,9 +1,11 @@
 import React,{useEffect,useRef,useState} from 'react';
+import {useIsFocused} from '@react-navigation/native';
 import {View,Text,StyleSheet} from 'react-native';
 import type { EmeraldStageProps } from './emeraldStageTypes';
 import { mountEmerald, type MountedEmerald } from './emeraldWebRenderer';
 
-export default function EmeraldCrawlerStage({projection,reducedMotion,fallback}:EmeraldStageProps){
+export default function EmeraldCrawlerStage({projection,reducedMotion,suspended=false,fallback}:EmeraldStageProps){
+  const focused=useIsFocused();
   const canvas=useRef<HTMLCanvasElement|null>(null);
   const handle=useRef<MountedEmerald|null>(null);
   const latest=useRef({projection,reducedMotion});
@@ -11,24 +13,24 @@ export default function EmeraldCrawlerStage({projection,reducedMotion,fallback}:
   const [unavailable,setUnavailable]=useState(false);
   useEffect(()=>{latest.current={projection,reducedMotion};handle.current?.setProjection(projection);handle.current?.setReduced(reducedMotion);},[projection,reducedMotion]);
   useEffect(()=>{
-    const element=canvas.current;if(!element)return;
+    const element=canvas.current;if(!element||suspended||!focused){setReady(false);setUnavailable(false);return;}
     const controller=new AbortController();let mounted=true;
     setReady(false);setUnavailable(false);
-    const fail=()=>{if(mounted){setUnavailable(true);setReady(false);}};
+    const fail=()=>{if(mounted){handle.current?.dispose();handle.current=null;setUnavailable(true);setReady(false);}};
     void mountEmerald(element,controller.signal,fail).then(runtime=>{
       if(!mounted){runtime.dispose();return;}
       handle.current=runtime;runtime.setProjection(latest.current.projection);runtime.setReduced(latest.current.reducedMotion);setReady(true);
     }).catch(fail);
     return ()=>{mounted=false;controller.abort();handle.current?.dispose();handle.current=null;};
-  },[projection.sessionId]);
+  },[projection.sessionId,suspended,focused]);
   const target=projection.target;
   return <View>
-    <View style={[styles.surface,!ready&&styles.hidden]}>
+    <View style={[styles.surface,(!ready||suspended||!focused)&&styles.hidden]}>
       {React.createElement('canvas',{ref:canvas,'aria-hidden':true,style:{width:'100%',height:'100%',display:'block',pointerEvents:'none'}})}
     </View>
-    {!ready&&fallback}
+    {(!ready||suspended||!focused)&&fallback}
     {unavailable&&<Text style={styles.note}>Emerald art pack unavailable or unverified. Using the existing companion.</Text>}
-    {ready&&<View accessibilityLiveRegion="polite" style={styles.status}>
+    {ready&&!suspended&&focused&&<View accessibilityLiveRegion="polite" style={styles.status}>
       <Text style={styles.title}>Emerald · {projection.availability==='live'?'recorded crawler activity':projection.availability==='stale'?'connection unavailable':'resting'}</Text>
       {target&&projection.availability!=='stale'&&<Text selectable style={styles.note}>{target.captured?'Capture recorded (not reviewed or learned): ':'Observed target: '}{target.url??'source'}</Text>}
       <Text style={styles.note}>Decorative motion only. No new network requests, review or XP authority.</Text>

@@ -4,6 +4,7 @@ import type { DragonCompanionState } from '../dragonCompanionState';
 export interface AtelierPrototypeProps {
   state: DragonCompanionState;
   reducedMotion: boolean;
+  onOpenChange?: (open:boolean)=>void;
 }
 /** Platform fallback; no claim that the native Unreal runtime is integrated. */
 export default function AtelierPrototype(_props: AtelierPrototypeProps) {

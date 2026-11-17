@@ -41,8 +41,8 @@ function disposeModel(gltf:Gltf) {
       }
     });
   }
-  for(const resource of resources) resource.dispose();
-  for(const source of sources) source.close();
+  for(const resource of resources){try{resource.dispose();}catch{}}
+  for(const source of sources){try{source.close();}catch{}}
 }
 async function loadEmbedded(Three:ThreeModule,loader:Loader,bytes:ArrayBuffer):Promise<Gltf> {
   const manager=new Three.LoadingManager();
@@ -152,7 +152,7 @@ export async function createAtelierStage(canvas:HTMLCanvasElement,bytes:ArrayBuf
     };
     const stop=()=>{if(frame)cancelAnimationFrame(frame);frame=0;last=0;meter.reset();};
     const resume=()=>{if(!disposed&&!failed&&!document.hidden&&!director.reduced&&!manualPaused&&!frame)frame=requestAnimationFrame(tick);};
-    const visibility=()=>{stop();if(!document.hidden){draw();resume();}};
+    const visibility=()=>{stop();if(!document.hidden){try{draw();resume();}catch{halt('Viewport resume failed. Close the inspector to release resources.');}}};
     const lost=(event:Event)=>{event.preventDefault();halt('WebGL context lost. Close and reload the verified model.');};
     const onResize=()=>{try{resize();draw();}catch{halt('Viewport resize failed. Close the inspector to release resources.');}};
     const observer=typeof ResizeObserver==='undefined'?null:new ResizeObserver(onResize);
@@ -160,7 +160,8 @@ export async function createAtelierStage(canvas:HTMLCanvasElement,bytes:ArrayBuf
       if(disposed)return;disposed=true;stop();observer?.disconnect();window.removeEventListener('resize',onResize);
       document.removeEventListener('visibilitychange',visibility);canvas.removeEventListener('webglcontextlost',lost);
       mixer.removeEventListener('finished',onFinished);mixer.stopAllAction();mixer.uncacheRoot(gltf.scene);
-      floor.geometry.dispose();floor.material.dispose();key.shadow.dispose?.();disposeModel(gltf);graphics.dispose();
+      // Preserve cleanup through failures in individual Three resources.
+      for(const release of [()=>floor.geometry.dispose(),()=>floor.material.dispose(),()=>key.shadow.dispose?.(),()=>disposeModel(gltf),()=>graphics.dispose()]){try{release();}catch{}}
     };
     observer?.observe(canvas);window.addEventListener('resize',onResize);document.addEventListener('visibilitychange',visibility);
     canvas.addEventListener('webglcontextlost',lost);
@@ -232,7 +233,7 @@ export async function createAtelierStage(canvas:HTMLCanvasElement,bytes:ArrayBuf
       dispose:teardown,
     };
   } catch(error) {
-    if(teardown)teardown();else {renderer?.dispose();disposeModel(gltf);}
+    if(teardown)teardown();else {try{renderer?.dispose();}finally{disposeModel(gltf);}}
     throw error;
   }
 }

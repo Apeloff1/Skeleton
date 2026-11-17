@@ -8,9 +8,11 @@ import type {AtelierStage,AtelierCamera,AtelierQuality} from './atelierStage.web
 import type {PlaybackStats} from './atelierPlaybackMeter';
 type Selection={model:File|null;receipt:File|null};
 const initial:Selection={model:null,receipt:null};
-export default function AtelierPrototype({state,reducedMotion}:AtelierPrototypeProps) {
+export default function AtelierPrototype({state,reducedMotion,onOpenChange}:AtelierPrototypeProps) {
   const focused=useIsFocused();
   const [open,setOpen]=useState(false);
+  const notifyOpen=useRef(onOpenChange);notifyOpen.current=onOpenChange;
+  useEffect(()=>{notifyOpen.current?.(open);return()=>notifyOpen.current?.(false);},[open]);
   const [selection,setSelection]=useState<Selection>(initial);
   const [status,setStatus]=useState('Original model not loaded');
   const [busy,setBusy]=useState(false);
