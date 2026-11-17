@@ -1,0 +1,73 @@
+{
+  "schema": "skeleton.emerald.exact-recovery.v1",
+  "asset_set": "emerald-20261117-r1",
+  "assets": {
+    "model": {
+      "name": "emerald_continuum.glb",
+      "bytes": 463149740,
+      "sha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+      "verified": true
+    },
+    "source": {
+      "name": "emerald-atelier-fold-source.zip",
+      "bytes": 194733639,
+      "sha256": "093feccb25846b39eefe94a4385873e25df125371544545042c3d34b3fe879f5",
+      "verified": true
+    },
+    "web": {
+      "name": "emerald-skeleton-web-assets.zip",
+      "bytes": 48249605,
+      "sha256": "354b7d1dadc02f7919aa6b9b802f949894d2cb6ea0e0e493db9ba9d819d22851",
+      "verified": true
+    }
+  },
+  "reconstructed_byte_identically": true,
+  "verified_web_manifest_entries": 19,
+  "source_zip_crc_verified": true,
+  "web_zip_crc_verified": true,
+  "clip_families": {
+    "ground": 320,
+    "takeoff": 20,
+    "flight": 20,
+    "landing": 20
+  },
+  "joints": 108,
+  "vertices_reported_by_original_manifest": 365997,
+  "triangles_reported_by_original_manifest": 719312,
+  "embedded_textures_matching_original_source": [
+    {
+      "name": "basecolor.png",
+      "bytes": 22761361,
+      "sha256": "44c4a024848c410e5db5e0553d5e2c7cd22469f2eb1626a23b41600c380b3ccb"
+    },
+    {
+      "name": "normal.png",
+      "bytes": 46855712,
+      "sha256": "2af5a65872e9b7bd4c573c65cfbf28754ae0271bdd770552a872eaec242b552a"
+    },
+    {
+      "name": "orm.png",
+      "bytes": 26998502,
+      "sha256": "da77fc4ea5d0e6425a2d5e3e60b40a360c9456667cb9c14e8133e420b2b7d627"
+    },
+    {
+      "name": "emission.png",
+      "bytes": 414035,
+      "sha256": "7e69a751615cf0279c1e0cbf04297d7adbd2f5ffea0fcdb0b795c91ba4e29469"
+    }
+  ],
+  "rerun_original_export_checks": {
+    "verified_all_clips": 380,
+    "rebaked": 360,
+    "exact_orbit_clips": 20,
+    "body_motion_exact": true,
+    "mesh_skin_and_materials_exact": true,
+    "source_binary_prefix_sha256_exact": true,
+    "max_wing_correction_radians": 0.3616285406994455,
+    "max_quaternion_unit_error": 2.220446049250313e-16
+  },
+  "unreal_compiled": false,
+  "physical_rtx_verified": false,
+  "artist_approved": false,
+  "repository_binary_uploaded": false
+}
