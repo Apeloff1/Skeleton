@@ -424,6 +424,10 @@ def up(mode: str, root: Path = ROOT) -> None:
     _run([*compose_command(mode, root), "up", "-d", "--no-build",
           "--wait", "--wait-timeout", "180",
           "mongo", "skeleton", "backend", "frontend"], root=root)
+    # Independently verify the actual Docker container/image state after --wait;
+    # source-valid Compose cannot certify stale or privileged live containers.
+    from scripts.local_ai_runtime_attestation import attest_runtime
+    print(json.dumps(attest_runtime(mode, root), sort_keys=True))
     live = live_ai_status(mode, root)
     print(json.dumps(live, sort_keys=True))
     if not live["ready"]:
@@ -457,7 +461,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     q = sub.add_parser("qualify", help="Offline REAL GGUF generation, with receipt")
     q.add_argument("--max-output-tokens", type=int, default=32)
     sub.add_parser("up", help="Qualify first, then start the app with local AI")
-    sub.add_parser("status", help="Inspect engine and service status; no model activation")
+    sub.add_parser("status", help="Inspect actual running service security and readiness")
+    sub.add_parser("attest-runtime", help="Read-only attestation of running containers and image IDs")
     sub.add_parser("stop", help="Stop services without deleting containers or volumes")
     backup = sub.add_parser("backup-model", help="Copy all exact-pinned Jeeves model bytes offline")
     backup.add_argument("--source", type=Path, required=True, help="existing host local AI mount")
@@ -496,12 +501,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.action == "stop":
             stop(args.mode)
         else:
-            inspect_config(args.mode)
-            _run([*compose_command(args.mode), "ps"], root=ROOT)
-            _run([*compose_command(args.mode), "exec", "-T", "skeleton",
-                  "python", "-m", "skeleton.app.docker_local_ai",
-                  "preflight", "--require-env"], root=ROOT)
-            print(json.dumps(live_ai_status(args.mode), sort_keys=True))
+            from scripts.local_ai_runtime_attestation import attest_runtime
+            print(json.dumps(attest_runtime(args.mode), sort_keys=True))
+            if args.action == "status":
+                _run([*compose_command(args.mode), "exec", "-T", "skeleton",
+                      "python", "-m", "skeleton.app.docker_local_ai",
+                      "preflight", "--require-env"], root=ROOT)
+                print(json.dumps(live_ai_status(args.mode), sort_keys=True))
     except (LocalDockerError, ValueError, TypeError, OSError, RuntimeError) as exc:
         # Model custody errors can contain host paths: redact all inner details.
         print(json.dumps({"ok": False, "error": "local AI operation rejected"}), file=sys.stderr)
