@@ -1,0 +1,59 @@
+name: Dragon Atelier prototype source qualification
+on:
+  pull_request:
+    paths:
+      - 'scripts/dragon_atelier_admit.py'
+      - 'tests/test_dragon_atelier_admit.py'
+      - 'frontend/src/features/Jeeves/companion/atelier/**'
+      - 'frontend/src/features/Jeeves/CrawlerWorkspace.tsx'
+      - 'frontend/src/features/Jeeves/CrawlerReleasePrototype.tsx'
+      - 'frontend/src/types/three-atelier.d.ts'
+      - 'frontend/scripts/test-dragon-atelier*.cjs'
+      - '.github/workflows/dragon-atelier-prototype.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: dragon-atelier-source-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  source:
+    name: Exact-head Atelier source and synthetic structural qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify checkout identity
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Offline GLB structure and rejection fixtures
+        run: python3 -m unittest discover -s tests -p test_dragon_atelier_admit.py -v
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: "24.20.0"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+      - name: Install reviewed lockfile without lifecycle scripts
+        working-directory: frontend
+        run: yarn install --ignore-scripts --frozen-lockfile --non-interactive
+      - name: Apply approved local dependency patches
+        working-directory: frontend
+        run: node ./scripts/patch-node-modules.js
+      - name: Test source and state transition contracts
+        working-directory: frontend
+        run: node --test scripts/test-dragon-atelier-runtime.cjs scripts/test-dragon-atelier-integration.cjs
+      - name: Preserve existing companion behavior
+        working-directory: frontend
+        run: yarn test:dragon-companion
+      - name: Compile full frontend TypeScript
+        working-directory: frontend
+        run: yarn typecheck
+      - name: Export existing web application
+        working-directory: frontend
+        run: yarn export:web
+      - name: Qualification boundary
+        run: echo 'Source and synthetic fixtures only. Original GLB, artistic quality, Unreal, physical RTX, and device acceptance are not qualified by this job.'
