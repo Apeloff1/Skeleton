@@ -107,9 +107,13 @@ jobs:
         if: ${{ !cancelled() && steps.checkout_identity.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.patches.outcome == 'success' }}
         working-directory: frontend
         run: yarn typecheck
-      - name: Export existing web application
+      - name: Verify guarded Expo exporter and adversarial lifecycle regressions
         if: ${{ !cancelled() && steps.checkout_identity.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.patches.outcome == 'success' }}
         working-directory: frontend
-        run: yarn export:web
+        run: node --test scripts/test-guarded-expo-export.cjs
+      - name: Export existing web application with bounded process custody
+        if: ${{ !cancelled() && steps.checkout_identity.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.patches.outcome == 'success' }}
+        working-directory: frontend
+        run: node scripts/guarded-expo-export.cjs
       - name: Qualification boundary
         run: echo 'Source and synthetic fixtures only. Original GLB, artistic quality, Unreal, physical RTX, and device acceptance are not qualified by this job.'
