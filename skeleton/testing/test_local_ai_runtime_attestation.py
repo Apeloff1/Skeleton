@@ -100,6 +100,11 @@ def _run_simulator(config: dict, docs: dict[str, dict], *, chroma_running: bool 
         assert kwargs.get("capture") is True
         if "config" in argv:
             return json.dumps(config)
+        if argv[:2] == ["docker", "ps"] and "--no-trunc" in argv:
+            active = list(runtime._REQUIRED)
+            if chroma_running:
+                active.append("chroma")
+            return "\\n".join(IDS[name] for name in active)
         if "ps" in argv and "-q" in argv:
             name = argv[-1]
             return IDS[name] if name in runtime._REQUIRED or chroma_running else ""
@@ -315,7 +320,7 @@ def test_rocm_profile_requires_applied_render_group(tmp_path: Path) -> None:
 
 def test_unqualified_chroma_container_cannot_silently_start(tmp_path: Path) -> None:
     config, docs = _setup(tmp_path)
-    with pytest.raises(host.LocalDockerError, match="Chroma"):
+    with pytest.raises(host.LocalDockerError, match="optional unqualified"):
         _attest(tmp_path, config, docs, chroma_running=True)
 
 
