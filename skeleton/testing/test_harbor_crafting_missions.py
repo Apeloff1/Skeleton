@@ -65,7 +65,7 @@ def test_solver_produces_real_victory_with_all_missions_or_fails_closed():
     report = solve_missions(source(), board())
     assert report["bundle"]["state"]["ending"] == "beacon"
     assert verify_mission_report(report, require_all=True)["points"] == 60
-    with pytest.raises(HarborError, match="not fully earned"):
+    with pytest.raises(HarborError, match="mission choice conflicts with requested ending"):
         solve_missions(source(), board(), choice="shelter")
 
 
