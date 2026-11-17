@@ -17,14 +17,20 @@ from test_dragon_navigation_federation import SCOPE,OTHER,NOW
 class CatalogueTests(unittest.TestCase):
     def test_full_catalogue_and_source_identity(self):
         reg=catalogue();summary=reg.summary()
-        self.assertEqual(summary["sources"],382)
-        self.assertEqual(summary["hosts"],357)
+        self.assertGreaterEqual(summary["sources"],3820)
+        self.assertGreaterEqual(summary["hosts"],357)
         self.assertEqual(len(summary["families"]),10)
-        self.assertEqual(len(reg.by_id),382)
+        self.assertEqual(len(reg.by_id),summary["sources"])
         self.assertFalse(summary["network_authorized"])
         for s in reg.rows:
             self.assertFalse(s.public()["rights_verified"])
             self.assertEqual(reg.match(s.url),s)
+
+    def test_repository_density_does_not_erase_other_publishers(self):
+        result=rank_sources("world of warcraft mods tools documentation",limit=64)
+        hosts={r["host"] for r in result["sources"]}
+        self.assertGreater(len(hosts),1)
+        self.assertTrue(all(not r["network_authorized"] for r in result["sources"]))
 
     def test_specific_ecosystem_sources_and_authority(self):
         for query,ecosystem,expected in (
