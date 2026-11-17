@@ -1,0 +1,3 @@
+# Original Emerald deposit — no LFS
+
+Dedicated custody branch only; never merge it into main or release the application. The manifest pins 32 exact compressed shards and the unchanged original three asset SHA-256 values. At creation, only manifest and custody instructions are present, not the payload. Upload the `.bin` files (all 32; each under 25 decimal MB) into this directory through the signed-in GitHub upload page. Do not upload the outer delivery ZIPs. Once the upload commit exists, independent reassembly and hash readback is required; the manifest is not remote byte custody. No physical RTX, Unreal or art qualification.
