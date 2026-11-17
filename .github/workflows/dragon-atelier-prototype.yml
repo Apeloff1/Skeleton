@@ -46,6 +46,14 @@ jobs:
       - name: Test source and state transition contracts
         working-directory: frontend
         run: node --test scripts/test-dragon-atelier-runtime.cjs scripts/test-dragon-atelier-integration.cjs
+      - name: Verify Emerald event projection and installer/native synthetic tests
+        run: |
+          python3 frontend/scripts/test_emerald_assets.py
+          python3 scripts/test_emerald_native_gate.py
+          cd frontend && yarn test:emerald-integration
+      - name: Verify recovered creator contracts
+        working-directory: frontend
+        run: yarn test:skeleton-forge
       - name: Preserve existing companion behavior
         working-directory: frontend
         run: yarn test:dragon-companion

@@ -53,7 +53,7 @@ export function parseReceipt(value: unknown, trustedDigest: string): AtelierRece
   check(Object.keys(families).length === 4, 'Four explicit families required');
   const copy = {} as Record<Family, readonly string[]>;
   for (const family of FAMILIES) {
-    const values = names(families[family], family === 'ground' ? 300 : 20);
+    const values = names(families[family], 1);
     for (const name of values) {
       check(available.has(name) && !seen.has(name), 'Unknown or overlapping family clip');
       seen.add(name);
