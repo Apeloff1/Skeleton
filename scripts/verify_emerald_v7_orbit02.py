@@ -81,9 +81,9 @@ def verify(stage,source,candidate):
     for channel in old_clip['channels']:
      old_s=old_clip['samplers'][channel['sampler']]
      new_s=new_clip['samplers'][channel['sampler']]
-     if old_clip['name']==TARGET_CLIP and
-        channel['target']['node']==target_node and
-        channel['target']['path']=='rotation':
+     if (old_clip['name']==TARGET_CLIP and
+         channel['target']['node']==target_node and
+         channel['target']['path']=='rotation'):
       original=read_quats(a,before,ba,old_s['output'])
       corrected=read_quats(b,after,bb,new_s['output'])
       require(old_s['input']==new_s['input']
