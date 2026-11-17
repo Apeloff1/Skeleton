@@ -72,7 +72,8 @@ def _bounded_feedback(feedback):
     return mean,sigma,cost,settled
 
 
-def plan(db,owner,*,query,now,budget=16,mode="balanced",previous=None):
+def plan(db,owner,*,query,now,budget=16,mode="balanced",previous=None,learned=False):
+    if type(learned) is not bool:raise ValueError("learned semantics flag")
     if type(budget) is not int or not 1<=budget<=MAX_BUDGET:
         raise ValueError("research advisory budget")
     if mode not in {"balanced","coverage","exploration","conservation"}:
@@ -105,6 +106,19 @@ def plan(db,owner,*,query,now,budget=16,mode="balanced",previous=None):
                    feedback=feedback,mean=mean,sigma=sigma,cost=cost,
                    settled=settled,lineage=min(1,len(parent["neighbors"])/4),
                    terms=set(words(unquote(urlsplit(row["url"]).path,errors="replace"))))
+    learning=None;dense={};calibrated={}
+    if learned:
+        from core.dragon_navigation_learning import dense_scores,calibrate
+        from core.dragon_local_embeddings import EmbeddingHeld
+        dense_receipt={"status":"empty_pool"}
+        if candidates:
+            try:dense,dense_receipt=dense_scores(query,candidates)
+            except (EmbeddingHeld,ValueError,RuntimeError,OSError):
+                dense_receipt={"status":"local_encoder_held","source_bodies_encoded":False}
+        for row in candidates:
+            if row["id"] in dense:row["dense_similarity"]=dense[row["id"]]
+        calibrated,fit_receipt=calibrate(candidates,query)
+        learning={"dense":dense_receipt,"calibration":fit_receipt}
     weights={"balanced":(.62,.38),"coverage":(.82,.18),
              "exploration":(.42,.58),"conservation":(.78,.22)}[mode]
     selected=[];host_counts=Counter();coverage=[0.]*len(facets);remaining=budget
@@ -117,6 +131,8 @@ def plan(db,owner,*,query,now,budget=16,mode="balanced",previous=None):
             redundancy=max((len(row["terms"] & chosen["terms"])/max(1,len(row["terms"] | chosen["terms"]))
                             for chosen in selected),default=0.)
             expected=.48*novelty+.22*relevance+.20*row["mean"]+.10*row["lineage"]
+            if row["id"] in dense:expected=.85*expected+.15*dense[row["id"]]
+            if row["id"] in calibrated:expected=.90*expected+.10*calibrated[row["id"]]
             exploration=.35*min(1.,row["sigma"]*3)+.30/(1+host_counts[row["host"]])+                         .20*row["feedback"]["exploration_prior"]+.15/(1+row["settled"])
             joint=(weights[0]*expected+weights[1]*exploration-.20*redundancy)/row["cost"]
             if mode=="conservation":joint*=row["mean"]
@@ -132,6 +148,8 @@ def plan(db,owner,*,query,now,budget=16,mode="balanced",previous=None):
             "redundancy_penalty":round(redundancy,8),"historical_yield_prior":round(row["mean"],8),
             "historical_uncertainty":round(row["sigma"],8),"supporting_lineage":row["lineage"],
             "facet_scores":[{"id":f["id"],"score":round(v,8)} for f,v in zip(facets,row["coverage"])],
+            **({"dense_similarity":round(dense[row["id"]],8)} if row["id"] in dense else {}),
+            **({"calibrated_yield":round(calibrated[row["id"]],8)} if row["id"] in calibrated else {}),
             "network_authorized":False,"reviewed":False}
     body={"schema":"skeleton.dragon.navigation-plan.v1","mode":mode,"epoch":epoch,
         "facets":[{"id":f["id"],"terms":f["terms"],"concepts":f["concepts"],
@@ -140,5 +158,6 @@ def plan(db,owner,*,query,now,budget=16,mode="balanced",previous=None):
         "distinct_hosts":len(host_counts),"excluded_prior_targets":len(old),
         "pool_truncated":truncated,"index_backfill_pending":incomplete,
         "objective_coverage_is_estimated":True,"cost_is_advisory":True,
-        "network_authorized":False,"training_permission":False}
+        "network_authorized":False,"training_permission":False,
+        **({"learning":learning} if learning is not None else {})}
     return {**body,"receipt":digest(body)}
