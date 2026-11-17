@@ -453,3 +453,108 @@ parallel exact-head workflow reproduces v3 training, exercises campaign
 recovery and runs this physical benchmark. No deployed archive, user
 hardware, production traffic, release or live generative inference is
 claimed.
+
+
+## Ninth expansion: tenfold model, campaign and archive evaluation scale
+
+The independently trained Dragon v4 artifact has five disjoint-fold
+members with 50 features, 112 hidden units per member and 29,120 learned
+parameters (10.11x the v3 model's 2,880 parameters). Its original synthetic
+interaction curriculum has 40,960 training groups and 245,760 training
+candidate examples, 1,024 development groups, and 2,048 shifted holdout
+groups with 12,285 candidate examples. Each member trains on a distinct
+8,192-group fold for four epochs. No external capture bodies were used.
+The authoring-time training result on the same v4 shifted holdout is:
+
+| Model | NDCG@3 | Pair accuracy | Top-choice regret |
+| --- | ---: | ---: | ---: |
+| v3 | 0.97232563 | 0.91450092 | 0.07426666 |
+| v4 | 0.99829437 | 0.98695882 | 0.00449746 |
+| lexical | 0.88815129 | 0.83139843 | 0.41068195 |
+
+The new curriculum is intentionally different from previous versions;
+compare v3 and v4 within this table, not across earlier holdout datasets.
+Interaction features derive from actual candidate/context inputs, including
+concept/gap, cost/retry safety, agreement, relative rarity and lexical
+hard-negative indicators. Some features are correlated or redundant;
+50 features does not mean 50 independent empirical predictors.
+The same bounded beam runtime now supports v1, v2, v3 and v4 via explicit
+operator-pinned artifact identity. Weight schema, exact byte digest, tensor
+shape, distinct member identities and synthetic promotion metrics are
+verified before inference. The actual v4 scoring weights are supplied;
+these are specialist ranking weights, not a second generative LLM.
+CI retrains the five folds and verifies the artifacts and comparisons,
+and separately measures nine-match numeric inference.
+
+### Research fleet lifecycle
+
+A fleet coordinates up to ten existing explicitly acknowledged campaigns
+at once, admitting an aggregate budget of at most 40,960 advisory units
+and at most 1,280 leased round operations. This is an aggregate capacity,
+not one unbounded session or ten concurrently running network crawls.
+Each pulse is serialized for one fleet, selecting the eligible member with
+the lowest weighted accrued work/round deficit. Selected member budgets
+and aggregate fleet debit are both limited, and direct advancement of a
+fleet member is held until its membership is released. Fleet-wide target
+exclusion and currently grant-witnessed capture coverage share indexed
+history rather than re-proposing the same retained candidate in each
+campaign. Historic identities remain subject to graph retention and purge.
+
+Endpoints:
+- POST /crawler/navigation/fleets — create from existing campaign IDs and
+  integer weights 1–16 with finite budget, retention and acknowledgment.
+- GET /crawler/navigation/fleets/{id} — paged digest receipt/job history.
+- POST /crawler/navigation/fleets/{id}/pulse — exact objectives for all
+  members, operation key, expected revision and bounded round budget.
+- POST /crawler/navigation/fleets/{id}/reconcile — settle an expired
+  operation lease without resupplying or storing raw objectives.
+- POST /crawler/navigation/fleets/{id}/close — close at the current revision
+  and release membership.
+- POST /crawler/navigation/fleets/purge — bounded expired fleet cleanup.
+
+No raw objective is stored by the fleet or campaign layer. The objective
+commitment is replay-checked and a deterministic internal operation ID
+binds each fleet pulse to a canonical campaign round. A crash after
+round commit but before aggregate debit is recovered exactly once;
+a lease superseded or expired before publication cannot commit a new
+round. Current grant review and expiry fences apply when projecting
+targets from any replay. A fleet is not a live dispatch authority,
+worker process, scheduler daemon or automatically enabled acquisition
+grant. Its current operation must be explicitly pulsed by an authenticated
+operator/client. Existing campaign grants are not extended.
+
+### Multi-objective archive matrix
+
+POST /crawler/companion/archive-matrix accepts 1–10 distinct query strings,
+optional admitted session IDs, an objective-bound cursor and up to 128
+payload results. Scope-bound exact, hybrid and passage route token unions
+select one 32-session candidate page. Each session's immutable checkpoint,
+grant and routes are validated once; a request-local inverted objective
+term map evaluates all ten objectives against each eligible source in one
+feature pass. Source hashing, policy and expiry checks remain exact.
+Revalidate all matching source-session authority fences and the candidate
+page before returning. The response includes per-objective matched terms,
+coverage and exact best-witness identity, even when that witness lies
+outside the four representative witnesses for a duplicated payload.
+Duplicate payloads never count as independent corroboration. Derived
+metadata is history-only; no raw body, model-context permission, training
+permission or live acquisition authority is returned. Routing and
+page-local selection are approximate, and omission is explicit.
+
+The new qualification suite compares all ten objective matches and term
+frequencies with the canonical separate exact-ranking operations, including
+cache work counts and revoked/expired/tampered source cases. The optimized
+matrix deliberately uses exact lexical coverage scores, not the same
+hybrid ranking formula as single-objective historical context.
+
+The earlier physical comparator was held by the one-volume-per-filesystem
+policy because two scratch directories were mistakenly configured as two
+devices. It now uses one actual filesystem per trial without weakening
+the separate-device policy. A new exact-head workload compares serial
+and batched writes/reads over 80 families x 3 one-MiB revisions in each
+layout (approximately 480 MiB of aggregate logical input, tenfold the
+earlier 24-revision-per-layout fixture). Physical timing, dedup equality,
+integrity, restart readback and reference cleanup remain measured results,
+not assumed speedups or production qualification. No deployed storage
+was migrated, and physical production capacity, live native Jeeves and
+independent generative Dragon LLM execution remain separate gates.
