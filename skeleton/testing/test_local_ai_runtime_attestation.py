@@ -30,7 +30,7 @@ def _setup(root: Path, mode: str = "cpu") -> tuple[dict, dict[str, dict]]:
         config["services"]["skeleton"]["deploy"] = {
             "resources": {"reservations": {"devices": [
                 {"driver": "nvidia", "count": 1, "capabilities": ["gpu"]}
-            ]}}
+            ]}}}
     if mode == "rocm":
         config["services"]["skeleton"]["group_add"] = ["109"]
         config["services"]["skeleton"]["devices"] = [
