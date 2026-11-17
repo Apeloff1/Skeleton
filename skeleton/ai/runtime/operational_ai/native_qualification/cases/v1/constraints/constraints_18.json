@@ -6,11 +6,11 @@
   "objective": "Measure model instruction and classification robustness, domain constraints task 18",
   "steps": [
     {
-      "prompt": "Reverse all letters of \"elm\", without changing case. Reply with only the reversed word.",
+      "prompt": "Reverse all letters of \"cypress\", without changing case. Reply with only the reversed word.",
       "checks": [
         {
           "kind": "exact",
-          "expected": "mle"
+          "expected": "sserpyc"
         }
       ],
       "intermediate": false
