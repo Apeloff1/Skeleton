@@ -208,7 +208,7 @@ test('all keys in one project snapshot use one immutable account identity', asyn
   bearer = 'alice-offline-bearer'; epoch++;
   const aliceAgain = studioStorage.asyncStorageKv();
   assert.equal(await aliceAgain.getItem('skeleton.studio.onboarded.v1'), '1');
-  assert.match(await aliceAgain.getItem('skeleton.studio.prefs.v1'), /large/);
+  assert.equal(await aliceAgain.getItem('skeleton.studio.prefs.v1'), null, 'stale partial publication must be rolled back');
 });
 
 test('legacy unscoped projects are only read by an explicit migration adapter', async () => {
@@ -235,7 +235,7 @@ test('account rotation while writing Studio projects rejects publication to the 
   bearer = 'alice-offline-bearer';
   epoch++;
   await assert.rejects(store.getItem('skeleton.studio.projects.v1'), /Account changed/);
-  assert.match(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), /Alice only/);
+  assert.equal(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), null, 'rotated write must not persist even under its original owner');
 });
 
 test('first-install Studio unmounts old local projects when the signed-in account changes', () => {
@@ -334,7 +334,7 @@ test('auth change mid-return cannot reissue the prior account draft to a new acc
   assert.equal(bearer, 'bob-offline-bearer');
   assert.equal(await bridgeStorage.consumeCreatorBridge('studio'), null);
   assert.equal(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), null);
-  assert.equal(kv.size, 2, 'Alice handoff and partial Alice project are under Alice keys only');
+  assert.equal(kv.size, 1, 'Alice handoff survives, but incomplete project publication is rolled back');
   bearer = 'alice-offline-bearer'; epoch++;
   const restored = await bridgeStorage.withCreatorBridge('studio', async (draft) => draft);
   assert.equal(restored.studioProjectId, 'alice-private-return');
