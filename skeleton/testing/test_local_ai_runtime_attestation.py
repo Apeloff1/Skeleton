@@ -240,7 +240,13 @@ def test_actual_image_id_cannot_be_stale(tmp_path: Path) -> None:
 def test_runtime_cannot_restore_hosted_credential(tmp_path: Path) -> None:
     config, docs = _setup(tmp_path)
     key, value = "OPENAI_API_KEY", "synthetic-untrusted-value"
-    docs["skeleton"]["Config"]["Env"].append(f"{key}={value}")
+    # Replace the Compose-owned empty key so this exercises hosted fallback;
+    # adding a duplicate would legitimately fail the earlier duplicate-key gate.
+    fields = docs["skeleton"]["Config"]["Env"]
+    docs["skeleton"]["Config"]["Env"] = [
+        f"{key}={value}" if field.startswith(key + "=") else field
+        for field in fields
+    ]
     with pytest.raises(host.LocalDockerError, match="live engine exposes"):
         _attest(tmp_path, config, docs)
 
