@@ -1,0 +1,45 @@
+name: Emerald five evolution forms
+on:
+  pull_request:
+    paths:
+      - 'assets/emerald/evolution-v1/**'
+      - 'scripts/emerald-evolution/**'
+      - 'frontend/src/features/Jeeves/companion/emeraldAssetPin.json'
+      - '.github/workflows/emerald-five-evolutions.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  geometry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact checkout
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - name: Inspect all five actual GLBs against immutable pins
+        run: node scripts/emerald-evolution/verify.cjs
+      - name: Verify regenerated geometry without overstating renderer acceptance
+        run: |
+          node - <<'NODE'
+          const assert = require('node:assert/strict');
+          const {buildForm} = require('./scripts/emerald-evolution/build.cjs');
+          const {inspectForm} = require('./scripts/emerald-evolution/verify.cjs');
+          const manifest = require('./assets/emerald/evolution-v1/manifest.json');
+          for (const row of manifest.forms) {
+            const result = buildForm(row.stage, row.detail);
+            const inspected = inspectForm(result.bytes, {...row, bytes: result.bytes.length});
+            assert.equal(inspected.clips, row.animations.length);
+            const second = buildForm(row.stage, row.detail);
+            assert.deepEqual(Buffer.from(second.bytes), Buffer.from(result.bytes));
+          }
+          assert.throws(() => buildForm('hoarder', 2));
+          assert.throws(() => buildForm('scout', 99));
+          NODE
+      - name: Qualification boundary
+        run: echo 'Exact model identity and sampled structural checks only. No visual, artistic, skeletal skin, physics, Unreal, GPU or release approval.'
