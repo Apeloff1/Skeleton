@@ -80,7 +80,9 @@ test('all 8 native sidecar modes and full 14-matrix source survive Forge > Galax
     const request = Q.buildRunRequest(restored);
     assert.equal(restored.playable.mode, id);
     assert.equal(restored.playable.launch, true);
-    assert.equal(restored.step, 'review');
+    // A transferred full Galaxy profile is a newly selected design: require
+    // explicit Forge option review before presenting the final build request.
+    assert.equal(restored.step, 'options');
     assert.deepEqual(restored.instruments, { tempo: 0.71, risk: 0.22 });
     assert.deepEqual(restored.beats, { pace: 'unhurried', space: 'dungeon' });
     assert.equal(request.playable_archetype, id);
