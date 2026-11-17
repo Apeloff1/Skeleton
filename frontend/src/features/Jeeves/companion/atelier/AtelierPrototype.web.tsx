@@ -3,6 +3,7 @@ import {useIsFocused} from '@react-navigation/native';
 import type {AtelierPrototypeProps} from './AtelierPrototype';
 import {parseVariantReceipt,verifyFile,MAX_MODEL_BYTES,expectedVariantBytes,EVOLUTION_STAGES,FAMILIES,type Catalogue,type Family,type AtelierVariant} from './atelierAsset';
 import {flightIntent} from './atelierDirector';
+import {enforceDragonClearanceHold} from './atelierMotionPolicy';
 import {acquireAtelierLease,type AtelierLease} from './atelierLease';
 import type {AtelierStage,AtelierCamera,AtelierQuality} from './atelierStage.web';
 import type {PlaybackStats} from './atelierPlaybackMeter';
@@ -46,7 +47,7 @@ export default function AtelierPrototype({state,reducedMotion,onOpenChange}:Atel
   useEffect(()=>{
     if(!focused){stop();setOpen(false);setSelection(initial);setBusy(false);setStatus('Original model not loaded');}
   },[focused]);
-  useEffect(()=>{stage.current?.setIntent(intent.current.airborne,intent.current.reduced);},[state.phase,state.wings,reducedMotion]);
+  useEffect(()=>{const safe=enforceDragonClearanceHold(variant,intent.current);stage.current?.setIntent(safe.airborne,safe.reduced);},[state.phase,state.wings,reducedMotion,variant]);
   useEffect(()=>{if(!catalogue||!focused||!open)return;const timer=setInterval(()=>{if(!document.hidden&&stage.current)setStats(stage.current.diagnostics());},1000);return()=>clearInterval(timer);},[catalogue,focused,open]);
   const capture=async()=>{const mounted=stage.current;if(!mounted)return;revokeCapture();setSnapshot(null);const epoch=captureEpoch.current;try{const blob=await mounted.snapshot();if(captureEpoch.current!==epoch||stage.current!==mounted)return;const url=URL.createObjectURL(blob);captureUrl.current=url;setSnapshot(url);}catch(error){if(captureEpoch.current===epoch)setStatus(error instanceof Error?error.message:'Capture unavailable');}};
   const change=(patch:Partial<Selection>)=>{
@@ -67,7 +68,7 @@ export default function AtelierPrototype({state,reducedMotion,onOpenChange}:Atel
       if(abort.signal.aborted||!canvas.current)return;
       const mounted=await createAtelierStage(canvas.current,bytes,receipt,abort.signal,message=>{if(!abort.signal.aborted)setStatus(message);});
       if(abort.signal.aborted){mounted.dispose();return;}
-      try{mounted.setIntent(intent.current.airborne,intent.current.reduced);}catch(error){mounted.dispose();throw error;}
+      try{const safe=enforceDragonClearanceHold(variant,intent.current);mounted.setIntent(safe.airborne,safe.reduced);}catch(error){mounted.dispose();throw error;}
       stage.current=mounted;resident.current=lease;lease=undefined;
       setCatalogue(receipt.families);setGrowth(receipt.growthClip??null);setClip(receipt.families.ground[0]);
     }catch(error){
@@ -89,6 +90,7 @@ export default function AtelierPrototype({state,reducedMotion,onOpenChange}:Atel
       {catalogue&&<fieldset style={{border:'1px solid #475569',padding:8,marginTop:8}}>
         <legend>Local 3D inspection laboratory</legend>
         <p>Manual clips are visual previews only and never assert crawler activity. Detail mode retains the full admitted mesh; economy changes raster cost, not the model.</p>
+        {variant!=='hoarder'&&<p role="note">Developmental animation clearance hold: source-authenticated model is restricted to manual pose and growth inspection. Continuous playback and crawler-event motion remain disabled until independent membrane and limb clearance, artist acceptance and device evidence are available.</p>}
         <label style={{display:'block'}}>Camera <select value={camera} onChange={e=>{const value=e.target.value as AtelierCamera;setCamera(value);stage.current?.setCamera(value);}}>
           <option value="perspective">Three-quarter</option><option value="side">Side / takeoff</option><option value="overhead">Overhead wingspan</option><option value="front">Front anatomy</option>
         </select></label>
@@ -104,7 +106,7 @@ export default function AtelierPrototype({state,reducedMotion,onOpenChange}:Atel
         <button type="button" disabled={!catalogue[family].includes(clip)} onClick={()=>{if(stage.current){stage.current.inspect(family,clip);setManual(true);setPose(0);revokeCapture();setSnapshot(null);}}}>Inspect selected clip</button>
         {growth&&<button type="button" onClick={()=>{stage.current?.inspectGrowth();setManual(true);setPose(0);revokeCapture();setSnapshot(null);}}>Inspect next-form growth morph (open bind pose)</button>}
         <button type="button" disabled={!manual} onClick={()=>{stage.current?.followEvents();setManual(false);revokeCapture();setSnapshot(null);}}>Return to recorded crawler events</button>
-        {manual&&<div><label style={{display:'block'}}>Inspect exact clip position ({Math.round(pose*100)}%) <input aria-label="Inspect clip position" type="range" min={0} max={1} step={0.001} value={pose} onChange={e=>{const value=Number(e.target.value);setPose(value);stage.current?.seek(value);}}/></label><button type="button" disabled={reducedMotion} onClick={()=>stage.current?.playManual()}>Resume clip playback</button><button type="button" onClick={()=>void capture()}>Capture current pose PNG</button>{snapshot&&<a href={snapshot} download="emerald-original-pose.png">Save captured viewport PNG</a>}</div>}
+        {manual&&<div><label style={{display:'block'}}>Inspect exact clip position ({Math.round(pose*100)}%) <input aria-label="Inspect clip position" type="range" min={0} max={1} step={0.001} value={pose} onChange={e=>{const value=Number(e.target.value);setPose(value);stage.current?.seek(value);}}/></label><button type="button" disabled={reducedMotion||variant!=='hoarder'} onClick={()=>stage.current?.playManual()}>Resume clip playback</button><button type="button" onClick={()=>void capture()}>Capture current pose PNG</button>{snapshot&&<a href={snapshot} download="emerald-original-pose.png">Save captured viewport PNG</a>}</div>}
         {stats&&<p>Measured browser render intervals: {stats.samples} samples; mean {stats.meanIntervalMs?.toFixed(2)??'—'} ms; p95 {stats.p95IntervalMs?.toFixed(2)??'—'} ms; render submission {stats.meanRenderSubmissionMs?.toFixed(2)??'—'} ms. Not measured GPU present time or RTX evidence.</p>}
         {reducedMotion&&<p>Reduced motion is active: automatic playback is frozen; explicit pose inspection remains available.</p>}
       </fieldset>}

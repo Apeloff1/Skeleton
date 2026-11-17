@@ -93,11 +93,13 @@ export async function createAtelierStage(canvas:HTMLCanvasElement,bytes:ArrayBuf
     graphics.shadowMap.enabled=true;
     graphics.shadowMap.type=Three.PCFSoftShadowMap;
     const mixer=new Three.AnimationMixer(gltf.scene);
-    let director:Director=startDirector(receipt.families);
+    let director:Director=receipt.variant
+      ? setIntent(startDirector(receipt.families),receipt.families,false,true)
+      : startDirector(receipt.families);
     let manual=false;
     let manualPaused=false;
     const meter=new PlaybackMeter();
-    let desired={airborne:false,reduced:false};
+    let desired={airborne:false,reduced:!!receipt.variant};
     let quality:AtelierQuality='balanced';
     let action:any=null;
     let retired:{action:any;deadline:number}[]=[];
@@ -172,10 +174,11 @@ export async function createAtelierStage(canvas:HTMLCanvasElement,bytes:ArrayBuf
     return {
       setIntent:(airborne,reduced)=>{
         if(disposed||failed)return;
-        desired={airborne,reduced};
-        if(manual)apply({...director,reduced});
-        else apply(setIntent(director,receipt.families,airborne,reduced));
-        if(reduced||manualPaused)stop();else resume();
+        // Recheck at the rendering boundary, even if a caller forgets the UI hold.
+        desired={airborne:!receipt.variant&&airborne,reduced:!!receipt.variant||reduced};
+        if(manual)apply({...director,reduced:desired.reduced});
+        else apply(setIntent(director,receipt.families,desired.airborne,desired.reduced));
+        if(desired.reduced||manualPaused)stop();else resume();
       },
       inspect:(family,clip)=>{
         if(disposed||failed)return;
