@@ -267,6 +267,67 @@ class ManifestArchive:
                        (receipt.compressed_bytes,owner,digest))
         return {"manifest":identifier,"ordinal":ordinal,"digest":digest,"stored":True}
 
+    def append_many(self,scope,identifier,start,parts):
+        """Bounded journal batch; one ledger intent and one publication fence.
+
+        The exact same bytes can be replayed after any subset of volume
+        transactions committed. Never replace an existing ordinal or move
+        an existing digest to a different physical storage namespace.
+        """
+        if (type(start) is not int or start<0 or not isinstance(parts,(tuple,list))
+                or not 1<=len(parts)<=128 or any(not isinstance(p,bytes) or not 1<=len(p)<=BLOCK for p in parts)
+                or sum(map(len,parts))>16*1024**2):
+            raise ValueError("manifest batch bound")
+        owner=owner_key(scope)
+        intents=[(start+i,_hash(data),data) for i,data in enumerate(parts)]
+        with self._write() as db:
+            row=self._manifest(db,owner,identifier,{"building"})
+            layout=self._layout(db,row)
+            for ordinal,d,raw in intents:
+                if self._bound(row,ordinal,layout)!=len(raw):
+                    raise ValueError("chunk length differs from manifest")
+                prior=db.execute("SELECT digest FROM placements WHERE owner=? AND manifest=? AND ordinal=?",
+                                 (owner,identifier,ordinal)).fetchone()
+                if prior is not None and prior["digest"]!=d:
+                    raise StorageHeld("chunk ordinal already binds different bytes")
+                db.execute("INSERT OR IGNORE INTO chunks(owner,digest,volume,raw_bytes) VALUES(?,?,?,?)",
+                           (owner,d,self._volume(owner,d),len(raw)))
+                db.execute("INSERT OR IGNORE INTO placements VALUES(?,?,?,?)",(owner,identifier,ordinal,d))
+            db.execute("UPDATE manifests SET updated_at=? WHERE owner=? AND id=?",(int(time.time()),owner,identifier))
+        with self._write() as db:
+            self._manifest(db,owner,identifier,{"building"})
+            groups={}
+            for ordinal,d,data in intents:
+                chunk=db.execute("""SELECT c.* FROM chunks c JOIN placements p
+                    ON c.owner=p.owner AND c.digest=p.digest
+                    WHERE p.owner=? AND p.manifest=? AND p.ordinal=?""",(owner,identifier,ordinal)).fetchone()
+                if not chunk or chunk["digest"]!=d or chunk["raw_bytes"]!=len(data):
+                    raise StorageHeld("batch intent changed")
+                groups.setdefault(chunk["volume"],[]).append((chunk,data))
+            for volume,items in sorted(groups.items()):
+                if hasattr(self.bulk,"put_many"):
+                    receipts=self.bulk.put_many(volume,scope,[data for _,data in items])
+                else:
+                    receipts=[self.bulk.put(volume,scope,data) for _,data in items]
+                if len(receipts)!=len(items):raise StorageHeld("bulk batch count differs")
+                for (chunk,data),receipt in zip(items,receipts):
+                    if (receipt.digest,receipt.raw_bytes)!=(chunk["digest"],len(data)) or (
+                            chunk["compressed_bytes"] is not None and chunk["compressed_bytes"]!=receipt.compressed_bytes):
+                        raise StorageHeld("bulk batch receipt differs")
+                    db.execute("UPDATE chunks SET compressed_bytes=? WHERE owner=? AND digest=?",
+                               (receipt.compressed_bytes,owner,chunk["digest"]))
+        return {"manifest":identifier,"first_ordinal":start,"stored":len(parts)}
+
+    def read_document(self,scope,identifier,*,maximum_bytes=4*1024**2):
+        """Whole-manifest exact read within a single layout/GC fence."""
+        if type(maximum_bytes) is not int or not 1<=maximum_bytes<=16*1024**2:
+            raise ValueError("document read bound")
+        from core.dragon_archive_migration import _read_locked
+        with self._write() as db:
+            row=self._manifest(db,owner_key(scope),identifier,{"sealed"})
+            if row["expected_bytes"]>maximum_bytes:raise StorageHeld("document read exceeds accepted bound")
+            return _read_locked(self,db,scope,row,maximum_bytes=maximum_bytes)
+
     def _placements(self,db,owner,identifier):
         return db.execute("""SELECT p.ordinal,c.digest,c.volume,c.raw_bytes,c.compressed_bytes
                     FROM placements p JOIN chunks c ON c.owner=p.owner AND c.digest=p.digest
