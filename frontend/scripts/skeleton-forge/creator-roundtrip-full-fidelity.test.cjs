@@ -74,6 +74,7 @@ test('all 8 native sidecar modes and full 14-matrix source survive Forge > Galax
     const first = H.handoffFromForge(source, 1700000000000);
     const outbound = H.handoffFromGalaxy({
       title: 'Future Harbor', vision: '', genreId: 'beat_em_up',
+      profile: source.galaxyProfile,
     }, first, 1700000000001);
     const restored = H.forgeStateFromHandoff(outbound, 1700000000002);
     const request = Q.buildRunRequest(restored);

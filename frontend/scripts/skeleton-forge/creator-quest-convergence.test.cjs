@@ -73,7 +73,7 @@ test('native scene opt-in explains rendered goals and touch controls, without ov
   assert.match(ui, /draw visible objectives, live progress indicators/);
   assert.match(ui, /touch\/keyboard directional controller/);
   assert.match(ui, /Eight source-backed modes have distinct win\/lose loops/);
-  assert.match(ui, /not a claim of 158 gameplay engines/);
+  assert.match(ui, /This does not mean all 69 catalog genres have complete gameplay/);
 });
 
 test('native playable sidecar and room quest compose in the same Godot source request', () => {

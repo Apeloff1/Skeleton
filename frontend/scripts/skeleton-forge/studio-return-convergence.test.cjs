@@ -139,7 +139,7 @@ test('actual source wiring consumes one-time return and reopens the matching act
   assert.match(route, /storeCreatorBridge\(handoffToStudio\(draft, incoming\), authEpoch\)/);
   assert.match(live, /handoffFromStudio\(project\.questionnaire, project\.id, project\.updatedAt\)/);
   assert.match(live, /key=\{authEpoch\}/);
-  assert.match(shell, /ports\.onOpenCockpit\(active \?\? undefined\)/);
+  assert.match(shell, /ports\.onOpenCockpit\(active \?\? undefined, persistSnapshot\(state\)\)/);
   for (const key of ['onboarded', 'projects', 'prefs']) {
     assert.ok(scope.includes("'skeleton.studio." + key + ".v1'"));
   }
