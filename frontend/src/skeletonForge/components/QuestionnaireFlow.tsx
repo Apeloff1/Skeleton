@@ -392,17 +392,23 @@ function OptionsStep({ state, dispatch, eras = [], generations = [],
         <Text style={st.q}>Godot headless playtest</Text>
         <Text style={st.help}>Optional runtime check: boot the generated main world in locally installed Godot; when a playable sidecar is selected, run its complete win/lose scene separately. Best effort reports unavailable engines; Require rejects the build if an engine is missing or either scene fails. No engine is downloaded or contacted remotely.</Text>
         <View style={st.chips}>
-          <Chip label="Off" selected={!state.playtest || state.playtest === 'off'}
-            onPress={() => dispatch({ type: 'setPlaytestMode', value: 'off' })}
-            testID="q-playtest-off" />
-          <Chip label="Best effort" selected={state.playtest === 'auto'}
-            disabled={state.options.target !== 'godot'} color={C.blue}
-            onPress={() => dispatch({ type: 'setPlaytestMode', value: 'auto' })}
-            testID="q-playtest-auto" />
-          <Chip label="Require both when present" selected={state.playtest === 'require'}
-            disabled={state.options.target !== 'godot'} color={C.green}
-            onPress={() => dispatch({ type: 'setPlaytestMode', value: 'require' })}
-            testID="q-playtest-require" />
+          <View testID="q-native-playtest-off">
+            <Chip label="Off" selected={!state.playtest || state.playtest === 'off'}
+              onPress={() => dispatch({ type: 'setPlaytestMode', value: 'off' })}
+              testID="q-playtest-off" />
+          </View>
+          <View testID="q-native-playtest-auto">
+            <Chip label="Best effort" selected={state.playtest === 'auto'}
+              disabled={state.options.target !== 'godot'} color={C.blue}
+              onPress={() => dispatch({ type: 'setPlaytestMode', value: 'auto' })}
+              testID="q-playtest-auto" />
+          </View>
+          <View testID="q-native-playtest-require">
+            <Chip label="Require both when present" selected={state.playtest === 'require'}
+              disabled={state.options.target !== 'godot'} color={C.green}
+              onPress={() => dispatch({ type: 'setPlaytestMode', value: 'require' })}
+              testID="q-playtest-require" />
+          </View>
         </View>
       </View>
       <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Era override">

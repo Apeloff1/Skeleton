@@ -207,9 +207,11 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
                 </View>
                 {payload.playable_scene_playtest?.scene ? <Text style={st.small}>Source scene: {payload.playable_scene_playtest.scene}</Text> : null}
                 {payload.playable_scene_playtest?.status === 'passed' && payload.playable_scene_playtest.passed === true && payload.playable_scene_playtest.verified !== true ? (
-                  <Banner tone="warn" testID="run-playable-binary-unverified">
-                    Playable scene completed, but the Godot binary&apos;s release provenance is unverified.
-                  </Banner>
+                  <View testID="run-native-binary-unverified">
+                    <Banner tone="warn" testID="run-playable-binary-unverified">
+                      Playable scene completed; engine integrity unverified. The Godot binary&apos;s release provenance is unverified.
+                    </Banner>
+                  </View>
                 ) : null}
                 {payload.playable_scene_playtest?.errors?.length ? (
                   <Text style={[st.small, { color: C.red }]} testID="run-playable-scene-errors">

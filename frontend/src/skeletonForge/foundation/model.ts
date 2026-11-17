@@ -590,6 +590,12 @@ function sanitizeProject(raw: unknown): StudioProject | null {
     !questionnaire.sourceExport || typeof questionnaire.sourceExport !== 'object'
     || typeof questionnaire.sourceExport.enabled !== 'boolean'
   )) return null;
+  if (questionnaire.quest !== undefined && (
+    !questionnaire.quest || typeof questionnaire.quest !== 'object'
+    || typeof questionnaire.quest.enabled !== 'boolean'
+    || !Number.isInteger(questionnaire.quest.length)
+    || questionnaire.quest.length < 1 || questionnaire.quest.length > 8
+  )) return null;
   const playable = questionnaire.playable;
   const modes = ['extraction', 'combat_loop', 'pipeline', 'puzzle',
     'racing', 'survival', 'stealth', 'crafting'];
